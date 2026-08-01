@@ -39,3 +39,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+# sqlite database (local, seeded via tsx prisma/seed.ts)
+*.db
+*.db-journal
+
+# AI-tooling artifacts (Freebuff/Claude/Windsurf local configs)
+.agents/
+.claude/
+.windsurf/
+.freebuff/
+.freebuff-preview.log
+skills-lock.json
+
+# temp working files
+/tmp_*.txt

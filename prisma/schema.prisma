@@ -1,0 +1,163 @@
+// TravelHub v1
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum ServiceType {
+  TOUR
+  HOTEL
+  SANATORIUM
+  FLIGHT
+  TRAIN
+  EXCURSION
+  GUIDE
+  TRANSFER
+  PHOTOGRAPHER
+}
+
+enum UserRole {
+  BUYER
+  PARTNER
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  PAID
+  REFUNDED
+  COMPLETED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  firstName    String
+  lastName     String?
+  role         UserRole  @default(BUYER)
+  companyName  String?
+  phone        String?
+  partnerType  String?
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  services     Service[]
+  reviews      Review[]
+  bookings     Booking[]
+  serviceViews ServiceView[]
+}
+
+model Service {
+  id           String      @id @default(cuid())
+  type         ServiceType
+  title        String
+  slug         String      @unique
+  description  String?
+  shortDesc    String?
+  price        Float
+  currency     String      @default("USD")
+  discountPrice Float?
+  city         String?
+  country      String?
+  countryCode  String?
+  latitude     Float?
+  longitude    Float?
+  rating       Float       @default(0)
+  reviewCount  Int         @default(0)
+  images       String      @default("[]")
+  duration     String?
+  maxGuests    Int?
+  languages    String?
+  isActive     Boolean     @default(true)
+  isFeatured   Boolean     @default(false)
+  isHot        Boolean     @default(false)
+  hotDiscount  Int?        @default(0)
+  providerId   String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  provider     User? @relation(fields: [providerId], references: [id])
+  reviews      Review[]
+  bookings     Booking[]
+  serviceViews ServiceView[]
+
+  @@index([type, isActive])
+  @@index([countryCode])
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  userId      String
+  serviceId   String
+  status      BookingStatus @default(PENDING)
+  amount      Float
+  serviceDate DateTime
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([serviceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ServiceView {
+  id        String   @id @default(cuid())
+  userId    String
+  serviceId String
+  viewedAt  DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([serviceId])
+  @@index([viewedAt])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  serviceId String
+  userId    String
+  rating    Int
+  text      String?
+  createdAt DateTime @default(now())
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([serviceId])
+}
+
+model Country {
+  code      String   @id
+  nameRu    String
+  nameEn    String
+  createdAt DateTime @default(now())
+
+  cities City[]
+}
+
+model City {
+  id          String   @id @default(cuid())
+  nameRu      String
+  nameEn      String
+  countryCode String
+  createdAt   DateTime @default(now())
+
+  country   Country @relation(fields: [countryCode], references: [code])
+
+  @@unique([countryCode, nameRu])
+  @@index([countryCode])
+}

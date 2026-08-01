@@ -3,24 +3,72 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --primary: #f97316;
+  --primary-dark: #ea580c;
+  --secondary: #0f172a;
+  --accent: #06b6d4;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --star: #facc15;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-star: var(--star);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --animate-fadeInUp: fadeInUp 0.6s ease-out both;
+  --animate-pulse-gentle: pulse-gentle 3s ease-in-out infinite;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-gentle {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+/* Административная панель: переменные светлой/тёмной темы */
+.admin-app {
+  --admin-bg: #f1f5f9;
+  --admin-card: #ffffff;
+  --admin-border: #e2e8f0;
+  --admin-text: #0f172a;
+  --admin-muted: #64748b;
+}
+.admin-app.dark {
+  --admin-bg: #0f172a;
+  --admin-card: #1e293b;
+  --admin-border: #334155;
+  --admin-text: #f1f5f9;
+  --admin-muted: #94a3b8;
+}
+/* Скрытие скроллбара для горизонтальных лент */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Карточка с hover-подъёмом */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.12);
 }
