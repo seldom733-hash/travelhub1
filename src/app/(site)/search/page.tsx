@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import ServiceCard, { ServiceCardData } from "@/components/ServiceCard";
 import { TYPE_META, TYPE_LIST } from "@/lib/service-utils";
@@ -83,9 +84,9 @@ export default async function SearchPage({ searchParams }: SearchParams) {
           <div className="text-4xl mb-3">🔍</div>
           <p className="text-sm font-medium text-gray-600">Ничего не найдено</p>
           <p className="text-xs text-gray-400 mt-1">Попробуйте изменить запрос или категорию</p>
-          <a href="/" className="inline-block mt-4 px-5 h-10 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors leading-10">
+          <Link href="/" className="inline-block mt-4 px-5 h-10 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors leading-10">
             На главную
-          </a>
+          </Link>
         </div>
       )}
     </main>

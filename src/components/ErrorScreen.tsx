@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import ErrorReportForm from "@/components/ErrorReportForm";
 
 interface ErrorScreenProps {
   error: Error & { digest?: string };
@@ -111,6 +112,8 @@ export default function ErrorScreen({
             Код ошибки: {error.digest}
           </p>
         )}
+
+        <ErrorReportForm digest={error.digest} dark={dark} />
       </div>
     </main>
   );

@@ -9,6 +9,7 @@ import {
   fmtMoney,
 } from "@/lib/admin-data";
 import { getCurrentUser } from "@/lib/auth";
+import { serverErrorResponse } from "@/lib/server-error";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,8 @@ export async function GET(request: Request) {
     });
     const statusCounts: Record<string, number> = {};
     for (const r of statusRows) statusCounts[r.status] = r._count;
+    // CONFIRMED — «подтверждено, ожидает оплаты»: учитываем вместе с PENDING в метрике ожидающих
+    const pendingCount = (statusCounts["PENDING"] ?? 0) + (statusCounts["CONFIRMED"] ?? 0);
 
     // ── KPI: конверсия (просмотры → брони → оплата) ──
     const viewServiceFilter = {
@@ -296,10 +299,10 @@ export async function GET(request: Request) {
         effect: `${fmtMoney(topCountry.revenue)} за период`,
       });
     }
-    if (statusCounts["PENDING"]) {
+    if (pendingCount) {
       aiRecommendations.push({
         level: "medium",
-        title: `${statusCounts["PENDING"]} броней ожидают оплаты`,
+        title: `${pendingCount} броней ожидают оплаты`,
         effect: "Напомнить клиентам",
       });
     }
@@ -330,8 +333,8 @@ export async function GET(request: Request) {
         },
         bookings: {
           created: bookingsAgg._count,
-          confirmed: statusCounts["PAID"] ?? 0,
-          pending: statusCounts["PENDING"] ?? 0,
+          confirmed: (statusCounts["CONFIRMED"] ?? 0) + (statusCounts["PAID"] ?? 0),
+          pending: pendingCount,
           cancelled: statusCounts["REFUNDED"] ?? 0,
           completed: statusCounts["COMPLETED"] ?? 0,
           change: changePct(bookingsAgg._count, prevBookingsAgg._count),
@@ -363,7 +366,6 @@ export async function GET(request: Request) {
       period: { start: range.start, end: range.end },
     });
   } catch (error) {
-    console.error("Admin analytics API error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return serverErrorResponse(error, "Admin analytics API error");
   }
 }

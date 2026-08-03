@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
@@ -112,7 +113,7 @@ export default async function ServiceDetailPage({ params }: Props) {
       {/* Хлебные крошки */}
       <div className="max-w-7xl mx-auto px-4 pt-6">
         <nav className="flex items-center gap-1.5 text-xs text-gray-400">
-          <a href="/" className="hover:text-primary transition-colors">Главная</a>
+          <Link href="/" className="hover:text-primary transition-colors">Главная</Link>
           <span>→</span>
           {catalog && (
             <>

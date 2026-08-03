@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import ServiceCard, { ServiceCardData } from "@/components/ServiceCard";
 import CatalogFilters from "@/components/CatalogFilters";
@@ -112,7 +113,7 @@ export default async function CatalogPage({ config, searchParams }: Props) {
       <section className={`bg-gradient-to-br ${config.gradient} text-white`}>
         <div className="max-w-7xl mx-auto px-4 py-14">
           <nav className="flex items-center gap-1.5 text-xs text-white/60 mb-4">
-            <a href="/" className="hover:text-white transition-colors">Главная</a>
+            <Link href="/" className="hover:text-white transition-colors">Главная</Link>
             <span>→</span>
             <span className="text-white/90">{config.title}</span>
           </nav>

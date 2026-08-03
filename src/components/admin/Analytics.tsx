@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { RevenueChart, DonutChart, CHART_COLORS } from "@/components/admin/charts";
 import { fmtMoney, fmtNumber, fmtDateTime } from "@/lib/admin-data";
+import ActiveFilterChips, { type ActiveFilterChip } from "@/components/admin/ActiveFilterChips";
+import { describeApiError } from "@/lib/api-error";
 
 interface AnalyticsData {
   kpi: {
@@ -64,6 +66,7 @@ const PERIODS = [
 
 const STATUS_LABELS: Record<string, string> = {
   PAID: "Оплачен",
+  CONFIRMED: "Подтверждён",
   COMPLETED: "Завершён",
   PENDING: "Ожидает",
   REFUNDED: "Возврат",
@@ -77,16 +80,26 @@ export default function Analytics() {
   const [type, setType] = useState("");
   const [chartMode, setChartMode] = useState<"line" | "bar" | "area">("line");
   const [data, setData] = useState<AnalyticsData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
+    setError(null);
     const params = new URLSearchParams({ period });
     if (country) params.set("country", country);
     if (city) params.set("city", city);
     if (type) params.set("type", type);
     fetch(`/api/admin/analytics?${params}`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error(await describeApiError(r, "Ошибка загрузки данных"));
+        return r.json();
+      })
       .then(setData)
-      .catch(console.error);
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Неизвестная ошибка"));
+  };
+
+  useEffect(() => {
+    void Promise.resolve().then(load);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, country, city, type]);
 
   const revSeries = useMemo(
@@ -105,6 +118,25 @@ export default function Analytics() {
     const entry = data.salesByCountry.find((c) => c.code === country);
     return entry ? entry.cities.map((c) => c.name) : [];
   }, [data, country]);
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-[var(--admin-card)] border border-red-200 rounded-2xl p-8 text-center max-w-md mx-auto">
+          <div className="text-4xl mb-3">⚠️</div>
+          <h2 className="text-lg font-bold text-[var(--admin-text)] mb-2">Ошибка загрузки</h2>
+          <p className="text-sm text-[var(--admin-muted)] mb-1">{error}</p>
+          <p className="text-[11px] text-[var(--admin-muted)]/70 mb-4">Подробности — в консоли браузера (F12)</p>
+          <button
+            onClick={load}
+            className="px-4 h-10 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors"
+          >
+            Повторить
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!data) {
     return (
@@ -127,6 +159,30 @@ export default function Analytics() {
     { label: "Бронирование", value: kpi.conversion.bookings },
     { label: "Оплата", value: kpi.conversion.paid },
   ];
+
+  // ── Чипы активных фильтров (общий компонент ActiveFilterChips) ──
+  // Показывают, какие фильтры/селекты применены; клик по ✕ сбрасывает фильтр.
+  const activeFilterChips: ActiveFilterChip[] = [
+    { key: "period", label: `Период: ${PERIODS.find((p) => p.key === period)?.label ?? period}` },
+  ];
+  if (country) {
+    activeFilterChips.push({
+      key: "country",
+      label: `Страна: ${countries.find((c) => c.code === country)?.name ?? country}`,
+      onClear: () => {
+        setCountry("");
+        setCity("");
+      },
+    });
+  }
+  if (city) activeFilterChips.push({ key: "city", label: `Город: ${city}`, onClear: () => setCity("") });
+  if (type) {
+    activeFilterChips.push({
+      key: "type",
+      label: `Услуга: ${data.salesByCategory.find((c) => c.type === type)?.label ?? type}`,
+      onClear: () => setType(""),
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -193,6 +249,13 @@ export default function Analytics() {
           <button className="px-3 h-9 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors ml-auto">
             Экспорт
           </button>
+        </div>
+
+        {/* Индикация активных фильтров — что сейчас применено (общий компонент
+            ActiveFilterChips). Чип периода отображается всегда; остальные — по мере
+            применения фильтров. */}
+        <div className="mt-3 pt-3 border-t border-[var(--admin-border)]">
+          <ActiveFilterChips chips={activeFilterChips} />
         </div>
       </div>
 

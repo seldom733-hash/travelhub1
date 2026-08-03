@@ -29,9 +29,33 @@ enum UserRole {
 
 enum BookingStatus {
   PENDING
+  CONFIRMED
   PAID
   REFUNDED
   COMPLETED
+}
+
+/// Жизненный цикл заказа (Гл. 6.10): Черновик → Создан → В обработке →
+/// Ожидает подтверждения → Подтверждён → Ожидает оплаты → Частично оплачен →
+/// Оплачен → Подготовка документов → Готов к поездке → Завершён.
+/// Дополнительные статусы: Изменён, Возвращён, Отменён, Просрочен, Архивирован.
+enum OrderStatus {
+  DRAFT
+  CREATED
+  PROCESSING
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  AWAITING_PAYMENT
+  PARTIALLY_PAID
+  PAID
+  DOCUMENT_PREP
+  READY
+  COMPLETED
+  CHANGED
+  REFUNDED
+  CANCELLED
+  OVERDUE
+  ARCHIVED
 }
 
 model User {
@@ -52,6 +76,7 @@ model User {
   services     Service[]
   reviews      Review[]
   bookings     Booking[]
+  orders       Order[]
   serviceViews ServiceView[]
 }
 
@@ -105,10 +130,122 @@ model Booking {
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  history BookingHistory[]
+  messages BookingMessage[]
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([serviceId])
   @@index([status])
+  @@index([createdAt])
+  @@index([orderId])
+}
+
+/// Заказ — центральная бизнес-сущность платформы (Гл. 6): объединяет клиента,
+/// одну или несколько услуг (через бронирования), платежи, документы, партнёров,
+/// менеджеров и историю взаимодействий.
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
+  userId      String
+  status      OrderStatus @default(CREATED)
+  currency    String      @default("USD")
+  amount      Float
+  paidAmount  Float       @default(0)
+  serviceDate DateTime?
+  source      String      @default("Сайт")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  history  OrderHistory[]
+  messages OrderMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([serviceDate])
+}
+
+/// Сообщение переписки менеджера и клиента по заказу (вкладка «Коммуникации», Гл. 6.9).
+/// senderRole: manager | client | system
+model OrderMessage {
+  id         String   @id @default(cuid())
+  orderId    String
+  senderId   String?
+  senderName String
+  senderRole String
+  text       String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([senderRole, isRead])
+  @@index([createdAt])
+}
+
+/// Журнал изменений заказа (вкладка «История изменений», Гл. 6.9).
+/// action: created | confirm | pay | complete | cancel | refund | archive | update
+model OrderHistory {
+  id        String   @id @default(cuid())
+  orderId   String
+  action    String
+  from      String? // предыдущий статус (для переходов)
+  to        String? // новый статус (для переходов)
+  fields    String? // JSON: изменённые поля (для action = update)
+  actorId   String?
+  actorName String
+  comment   String?
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+/// Сообщение переписки менеджера и клиента (вкладка «Переписка», Гл. 5.9).
+/// senderRole: manager | client | system
+/// isRead: прочитано ли сообщение (непрочитанные system/manager помечают переписку
+/// как требующую внимания — бейдж на вкладке и в таблице).
+model BookingMessage {
+  id         String   @id @default(cuid())
+  bookingId  String
+  senderId   String?
+  senderName String
+  senderRole String
+  text       String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([senderRole, isRead])
+  @@index([createdAt])
+}
+
+/// Журнал изменений бронирования (вкладка «История» в карточке, Гл. 5.9).
+/// action: created | confirm | pay | complete | cancel | update
+model BookingHistory {
+  id        String   @id @default(cuid())
+  bookingId String
+  action    String
+  from      String? // предыдущий статус (для переходов)
+  to        String? // новый статус (для переходов)
+  fields    String? // JSON: изменённые поля (для action = update)
+  actorId   String?
+  actorName String
+  comment   String?
+  createdAt DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
   @@index([createdAt])
 }
 

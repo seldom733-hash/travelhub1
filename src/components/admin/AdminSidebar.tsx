@@ -2,31 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-
-const MENU: { icon: string; label: string; href: string }[] = [
-  { icon: "🏠", label: "Центр управления", href: "/admin" },
-  { icon: "📈", label: "Аналитика", href: "/admin/analytics" },
-  { icon: "💰", label: "Продажи", href: "/admin/analytics" },
-  { icon: "📑", label: "Бронирования", href: "/admin/analytics" },
-  { icon: "📦", label: "Заказы", href: "/admin/analytics" },
-  { icon: "🧳", label: "Каталог услуг", href: "/admin/analytics" },
-  { icon: "📝", label: "Контент", href: "/admin/analytics" },
-  { icon: "🤝", label: "CRM", href: "/admin/analytics" },
-  { icon: "👥", label: "Пользователи", href: "/admin/analytics" },
-  { icon: "💳", label: "Финансы", href: "/admin/analytics" },
-  { icon: "📢", label: "Маркетинг", href: "/admin/analytics" },
-  { icon: "🎧", label: "Поддержка", href: "/admin/analytics" },
-  { icon: "📊", label: "Отчеты", href: "/admin/analytics" },
-  { icon: "📅", label: "Календарь", href: "/admin/analytics" },
-  { icon: "📁", label: "Документы", href: "/admin/analytics" },
-  { icon: "🔌", label: "Интеграции", href: "/admin/analytics" },
-  { icon: "🖥", label: "Система", href: "/admin/analytics" },
-  { icon: "🤖", label: "AI Center", href: "/admin/analytics" },
-  { icon: "⚙", label: "Настройки", href: "/admin/analytics" },
-];
+import { ADMIN_MENU, getAdminSection } from "@/lib/admin-menu";
 
 export default function AdminSidebar() {
   const pathname = usePathname();
+  const activeSection = getAdminSection(pathname);
 
   return (
     <aside className="w-16 lg:w-60 shrink-0 bg-secondary text-white flex flex-col sticky top-0 h-screen overflow-y-auto no-scrollbar">
@@ -41,12 +21,12 @@ export default function AdminSidebar() {
         </span>
       </div>
 
-      {/* Пункты меню */}
+      {/* Пункты меню (скрытые временно — не показываются) */}
       <nav className="flex-1 py-3">
-        {MENU.map((item) => {
+        {ADMIN_MENU.filter((item) => !item.hidden).map((item) => {
           const active =
-            (item.href === "/admin" && pathname === "/admin") ||
-            (item.href === "/admin/analytics" && pathname.startsWith("/admin/analytics"));
+            (item === ADMIN_MENU[0] && pathname === "/admin") ||
+            (item === activeSection && pathname !== "/admin");
           return (
             <Link
               key={item.label}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { filterConfigs, type ServiceCategory, type FilterDefinition } from "@/lib/filterConfig";
 import CountryFilter from "@/components/CountryFilter";
 import CityFilter from "@/components/CityFilter";
@@ -122,21 +122,22 @@ export default function FilterSidebar({
     [onSortChange]
   );
 
-  const prevFilterStateRef = useRef<string>(JSON.stringify(filterState));
-  useEffect(() => {
-    const serialized = JSON.stringify(filterState);
-    if (prevFilterStateRef.current !== serialized) {
-      prevFilterStateRef.current = serialized;
-      if (filterState && Object.keys(filterState).length === 0) {
-        setSelectedValues({});
-        setSelectedRating(0);
-        setSelectedCountries([]);
-        setSelectedCities([]);
-        const pf = allFilters.find((f) => f.type === "range");
-        setPriceRange([pf?.min || 0, pf?.max || 5000]);
-      }
+  // Синхронизация при сбросе фильтров родителем: канонический паттерн React
+  // «adjust state during render» — сравнение через state вместо ref, чтобы не
+  // нарушать правила react-hooks (запрещён доступ к ref.current в рендере).
+  const [prevFilterKey, setPrevFilterKey] = useState<string>(() => JSON.stringify(filterState));
+  const serializedFilter = JSON.stringify(filterState);
+  if (serializedFilter !== prevFilterKey) {
+    setPrevFilterKey(serializedFilter);
+    if (filterState && Object.keys(filterState).length === 0) {
+      setSelectedValues({});
+      setSelectedRating(0);
+      setSelectedCountries([]);
+      setSelectedCities([]);
+      const pf = allFilters.find((f) => f.type === "range");
+      setPriceRange([pf?.min || 0, pf?.max || 5000]);
     }
-  }, [filterState, allFilters]);
+  }
 
   const getComboboxLabel = (filter: FilterDefinition): string => {
     const selected = selectedValues[filter.id] || [];

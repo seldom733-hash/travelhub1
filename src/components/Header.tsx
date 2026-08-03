@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -19,12 +19,28 @@ const NAV = [
 
 export default function Header() {
   const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const { user, isLoading, logout } = useAuth();
   const router = useRouter();
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // Закрыть меню профиля при клике вне
+  useEffect(() => {
+    function handleClickOutside(e: PointerEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    if (profileOpen) {
+      document.addEventListener("pointerdown", handleClickOutside);
+      return () => document.removeEventListener("pointerdown", handleClickOutside);
+    }
+  }, [profileOpen]);
 
   const handleLogout = async () => {
     await logout();
     setOpen(false);
+    setProfileOpen(false);
     router.push("/");
   };
 
@@ -93,24 +109,65 @@ export default function Header() {
               </>
             )}
             {!isLoading && user && (
-              <div className="hidden sm:flex items-center gap-2">
-                <Link
-                  href={user.role === "BUYER" ? "/profile" : "/admin"}
-                  className="flex items-center gap-2 px-2.5 h-10 rounded-xl hover:bg-gray-100 transition-colors"
-                  title="Мой профиль"
-                >
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
-                    {user.firstName[0]}
-                  </div>
-                  <span className="text-sm font-medium text-gray-600 hidden lg:inline">{user.firstName}</span>
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="px-3 h-10 rounded-xl text-sm text-gray-400 hover:text-danger hover:bg-danger/5 transition-colors"
-                  title="Выйти"
-                >
-                  Выйти
-                </button>
+              <div className="hidden sm:flex items-center gap-2" ref={profileRef}>
+                {/* Профиль — выпадающее меню для всех ролей */}
+                <div className="relative">
+                  <button
+                    onClick={() => setProfileOpen(!profileOpen)}
+                    className="flex items-center gap-2 px-2.5 h-10 rounded-xl hover:bg-gray-100 transition-colors"
+                    title="Мой профиль"
+                    aria-expanded={profileOpen}
+                    aria-haspopup="menu"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
+                      {user.firstName[0]}
+                    </div>
+                    <span className="text-sm font-medium text-gray-600 hidden lg:inline">{user.firstName}</span>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Выпадающее меню */}
+                  {profileOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-150" role="menu">
+                      <div className="px-4 py-3 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900">{user.firstName} {user.lastName || ""}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{user.email}</p>
+                      </div>
+                      <Link
+                        href="/profile"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        role="menuitem"
+                      >
+                        <span>👤</span>
+                        <span>Мой профиль</span>
+                      </Link>
+                      {user.role === "ADMIN" && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                          role="menuitem"
+                        >
+                          <span>⚙️</span>
+                          <span>Центр Управления</span>
+                        </Link>
+                      )}
+                      <div className="border-t border-gray-100 mt-1 pt-1">
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-danger hover:bg-danger/5 transition-colors"
+                          role="menuitem"
+                        >
+                          <span>🚪</span>
+                          <span>Выход</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {/* Мобильное меню */}
@@ -153,12 +210,30 @@ export default function Header() {
                 </>
               )}
               {!isLoading && user && (
-                <button
-                  onClick={handleLogout}
-                  className="flex-1 text-center px-3 py-2.5 rounded-xl bg-danger/10 text-danger text-sm font-medium"
-                >
-                  Выйти ({user.firstName})
-                </button>
+                <>
+                  <Link
+                    href="/profile"
+                    onClick={() => setOpen(false)}
+                    className="flex-1 text-center px-3 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-medium"
+                  >
+                    👤 Профиль
+                  </Link>
+                  {user.role === "ADMIN" && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setOpen(false)}
+                      className="flex-1 text-center px-3 py-2.5 rounded-xl bg-primary/10 text-primary text-sm font-medium"
+                    >
+                      ⚙️ Управление
+                    </Link>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="flex-1 text-center px-3 py-2.5 rounded-xl bg-danger/10 text-danger text-sm font-medium"
+                  >
+                    🚪 Выход
+                  </button>
+                </>
               )}
             </div>
           </div>

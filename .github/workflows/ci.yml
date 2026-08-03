@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Typecheck · Lint · Build
+    runs-on: ubuntu-latest
+    env:
+      # SQLite локально в CI; prisma.config.ts и src/lib/prisma.ts читают эту переменную
+      DATABASE_URL: "file:./dev.db"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # src/generated/prisma не хранится в git — генерируем клиент
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      # Главная страница prerender'ится на этапе build и обращается к БД,
+      # поэтому перед сборкой применяем миграции
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
