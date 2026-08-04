@@ -10,23 +10,21 @@ import {
   actorDisplayName,
   orderSystemMessage,
   ORDER_STATUS_GROUPS,
+  MANAGERS,
+  pickManager,
 } from "@/lib/admin-data";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
+import { SALES_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
 type PeriodKey = "today" | "yesterday" | "week" | "month" | "quarter" | "year" | "custom";
 
-// Детерминированный список менеджеров (в схеме нет поля manager — ротация по id)
-const MANAGERS = ["Анна Смирнова", "Дмитрий Петров", "Ольга Козлова", "Игорь Волков", "Мария Соколова"];
+// Менеджеры и их назначение — общий справочник в admin-data.ts (pickManager),
+// используется и в Order Center, и на Dashboard (блок «Продажи»).
 
-export function pickManager(id: string): string {
-  let h = 0;
-  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return MANAGERS[h % MANAGERS.length];
-}
-
+// Детерминированный список источников заявки (в схеме нет поля source — ротация по id)
 export function pickSource(id: string): string {
   const sources = ["Сайт", "Мобильное приложение", "Партнёр", "Call-центр", "Telegram-бот", "WhatsApp"];
   let h = 0;
@@ -73,9 +71,11 @@ export function worstBookingStatus(statuses: string[]): string {
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, SALES_ROLES);
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
 
@@ -561,9 +561,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, SALES_ROLES);
+    if (denied) return denied;
 
     let body: Record<string, unknown>;
     try {

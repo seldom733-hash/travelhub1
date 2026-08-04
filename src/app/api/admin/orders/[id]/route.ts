@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
-import { SERVICE_TYPE_LABELS, actorDisplayName, orderSystemMessage } from "@/lib/admin-data";
-import { pickManager, pickSource, orderPaymentStatus, worstBookingStatus } from "@/app/api/admin/orders/route";
+import { SERVICE_TYPE_LABELS, actorDisplayName, orderSystemMessage, pickManager } from "@/lib/admin-data";
+import { pickSource, orderPaymentStatus, worstBookingStatus } from "@/app/api/admin/orders/route";
+import { SALES_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +43,11 @@ const TRANSITIONS: Record<string, { from: string[]; to: string }> = {
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, SALES_ROLES);
+    if (denied) return denied;
     const { id } = await params;
 
     const order = await prisma.order.findUnique({
@@ -157,9 +160,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, SALES_ROLES);
+    if (denied) return denied;
 
     const { id } = await params;
     let body: { action?: unknown; serviceDate?: unknown; amount?: unknown };

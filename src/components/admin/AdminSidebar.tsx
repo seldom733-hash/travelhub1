@@ -2,11 +2,12 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { ADMIN_MENU, getAdminSection } from "@/lib/admin-menu";
+import { menuForRole, getAdminSection } from "@/lib/admin-menu";
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ role = "ADMIN" }: { role?: string }) {
   const pathname = usePathname();
-  const activeSection = getAdminSection(pathname);
+  const activeSection = getAdminSection(pathname, role);
+  const items = menuForRole(role);
 
   return (
     <aside className="w-16 lg:w-60 shrink-0 bg-secondary text-white flex flex-col sticky top-0 h-screen overflow-y-auto no-scrollbar">
@@ -21,11 +22,11 @@ export default function AdminSidebar() {
         </span>
       </div>
 
-      {/* Пункты меню (скрытые временно — не показываются) */}
+      {/* Пункты меню (для ограниченных ролей — только их разделы) */}
       <nav className="flex-1 py-3">
-        {ADMIN_MENU.filter((item) => !item.hidden).map((item) => {
+        {items.map((item) => {
           const active =
-            (item === ADMIN_MENU[0] && pathname === "/admin") ||
+            (item.href === "/admin" && pathname === "/admin") ||
             (item === activeSection && pathname !== "/admin");
           return (
             <Link

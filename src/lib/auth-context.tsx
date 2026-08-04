@@ -9,6 +9,7 @@ export interface SessionUser {
   lastName: string | null;
   role: string;
   companyName: string | null;
+  defaultWorkspace?: string | null;
 }
 
 interface AuthContextType {

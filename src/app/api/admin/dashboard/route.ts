@@ -12,10 +12,12 @@ import {
   ruPlural,
   fmtMoney,
   ORDER_STATUS_GROUPS,
+  pickManager,
 } from "@/lib/admin-data";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { getDashboardMessages } from "@/lib/dashboard-messages";
+import { ALL_ADMIN_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -61,9 +63,11 @@ async function userSeries(range: { start: Date; end: Date }, role?: "ADMIN" | "B
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, ALL_ADMIN_ROLES);
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
     const period = (searchParams.get("period") || "month") as
@@ -737,6 +741,178 @@ export async function GET(request: Request) {
       },
     };
 
+    // ── Блок «Продажи» (Гл. 1.11): новые заявки, оплаченные заказы, ──
+    // средний чек, конверсия, лучшие менеджеры — всё из реальных заказов периода.
+    // Менеджеры назначаются детерминированно (pickManager), как в Order Center.
+    const salesRows = await prisma.order.findMany({
+      where: { createdAt: { gte: range.start, lte: range.end } },
+      select: { id: true, status: true, amount: true, paidAmount: true },
+    });
+    const salesPaidRows = salesRows.filter((o) =>
+      (PAID_STATUSES as readonly string[]).includes(o.status)
+    );
+    const paidAmountPeriod = salesPaidRows.reduce((a, o) => a + (o.paidAmount ?? 0), 0);
+    const salesAvgCheck = salesPaidRows.length ? Math.round(paidAmountPeriod / salesPaidRows.length) : 0;
+    const salesConversion = salesRows.length ? Math.round((salesPaidRows.length / salesRows.length) * 100) : 0;
+    const salesByManager = new Map<string, { orders: number; amount: number }>();
+    for (const o of salesPaidRows) {
+      const m = pickManager(o.id);
+      const cur = salesByManager.get(m) ?? { orders: 0, amount: 0 };
+      cur.orders += 1;
+      cur.amount += o.paidAmount ?? 0;
+      salesByManager.set(m, cur);
+    }
+    const topManagers = [...salesByManager.entries()]
+      .map(([name, v]) => ({ name, orders: v.orders, amount: Math.round(v.amount) }))
+      .sort((a, b) => b.orders - a.orders || b.amount - a.amount)
+      .slice(0, 3);
+    const sales = {
+      newRequests: salesRows.length,
+      paidOrders: salesPaidRows.length,
+      paidAmount: Math.round(paidAmountPeriod),
+      avgCheck: salesAvgCheck,
+      conversion: salesConversion,
+      topManagers,
+    };
+
+    // ── Блок «Исполнение» (Гл. 1.12): заказы в обработке, ожидают ответа ──
+    // поставщика, готовы к выдаче документов, просроченные, среднее время.
+    const [execProcessing, execDocsReady] = await Promise.all([
+      prisma.order.count({
+        where: { status: { in: ["PROCESSING", "CONFIRMED"] }, createdAt: { gte: range.start, lte: range.end } },
+      }),
+      prisma.order.count({
+        where: { status: { in: ["DOCUMENT_PREP", "READY"] }, createdAt: { gte: range.start, lte: range.end } },
+      }),
+    ]);
+    const execution = {
+      inProcessing: execProcessing,
+      awaitingSupplier: awaitingConf,
+      docsReady: execDocsReady,
+      overdue,
+      avgTime: departments.operations.avgTime,
+    };
+
+    // ── Блок «Финансы» (Гл. 1.13): доход, выплаты партнёрам, задолженности, ──
+    // возвраты и ожидаемые поступления — всё из реальных данных заказов.
+    const [refundsMonth, awaitingMoney, recentLogins, onlineUsers, inactiveUsers, managerActivity] =
+      await Promise.all([
+        // Возвраты за месяц: сумма заказов со статусом REFUNDED
+        prisma.order.aggregate({
+          where: { status: "REFUNDED", createdAt: { gte: monthStart } },
+          _sum: { amount: true },
+          _count: true,
+        }),
+        // Ожидаемые поступления: суммы заказов, ждущих оплаты (в т.ч. просроченных)
+        prisma.order.findMany({
+          where: { status: { in: [...AWAITING_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+          select: { amount: true, paidAmount: true, status: true },
+        }),
+        // Последние входы (Гл. 1.16) — для блока «Активность пользователей»
+        prisma.user.findMany({
+          where: { lastLoginAt: { not: null } },
+          orderBy: { lastLoginAt: "desc" },
+          take: 6,
+          select: { id: true, firstName: true, lastName: true, email: true, role: true, lastLoginAt: true },
+        }),
+        // Пользователи онлайн: входили за последние 15 минут
+        prisma.user.count({ where: { lastLoginAt: { gte: new Date(Date.now() - 15 * 60000) } } }),
+        // Пользователи с длительным отсутствием активности (30+ дней)
+        prisma.user.count({ where: { lastLoginAt: { lt: new Date(Date.now() - 30 * 86400000) } } }),
+        // Активность менеджеров: сообщения менеджера за месяц (по заказам)
+        prisma.orderMessage.count({ where: { senderRole: "manager", createdAt: { gte: monthStart } } }),
+      ]);
+    // Задолженности: суммы, которые клиенты уже должны доплатить (частично оплаченные)
+    const debtTotal = awaitingMoney
+      .filter((o) => o.paidAmount < o.amount)
+      .reduce((a, o) => a + (o.amount - o.paidAmount), 0);
+    const expectedInflow = awaitingMoney.reduce((a, o) => a + (o.amount - o.paidAmount), 0);
+    // Выплаты партнёрам: доля партнёров в доходе месяца (88% при комиссии 12%)
+    const partnerPayouts = Math.round(revenueMonth * 0.88);
+    const finance = {
+      revenueToday,
+      revenueMonth,
+      commission,
+      // Выплаты партнёрам за месяц (партнёрская доля дохода)
+      partnerPayouts,
+      // Задолженности клиентов перед платформой (остаток по частичным оплатам)
+      debtTotal: Math.round(debtTotal),
+      // Возвраты за месяц (сумма и число)
+      refunds: Math.round(refundsMonth._sum.amount ?? 0),
+      refundsCount: refundsMonth._count,
+      // Ожидаемые поступления (все заказы, ждущие оплаты)
+      expectedInflow: Math.round(expectedInflow),
+      awaitingCount: awaitingMoney.length,
+    };
+
+    // ── Активность пользователей (Гл. 1.16) ──
+    const userActivity = {
+      online: onlineUsers,
+      // Активность менеджеров: сообщения + обработанные заказы
+      managerActions: managerActivity,
+      managerLabel: `${managerActivity} ${ruPlural(managerActivity, "действие менеджера", "действия менеджеров", "действий менеджеров")}`,
+      lastLogins: recentLogins.map((u) => ({
+        id: u.id,
+        name: `${u.firstName} ${u.lastName ?? ""}`.trim(),
+        email: u.email,
+        role: u.role,
+        at: u.lastLoginAt,
+      })),
+      inactive: inactiveUsers,
+    };
+
+    // ── Decision Feed (Гл. 1.29): карточки «проблема → влияние → действие» ──
+    // Строим из реальных аномалий: просроченные, застрявшие подтверждения/оплаты,
+    // рост отмен. Каждая карточка имеет влияние и рекомендуемое действие.
+    const decisionFeed: { level: string; title: string; impact: string; action: string; href: string }[] = [];
+    if (overdue > 0) {
+      decisionFeed.push({
+        level: "high",
+        title: `${overdue} ${ruPlural(overdue, "заказ просрочен", "заказа просрочено", "заказов просрочено")}`,
+        impact: `Могут быть отменены или вызвать негатив клиентов`,
+        action: "Принять решение по просроченным заказам",
+        href: "/admin/orders?status=OVERDUE",
+      });
+    }
+    if (staleConfirmations > 0) {
+      decisionFeed.push({
+        level: "high",
+        title: `${staleConfirmations} ${ruPlural(staleConfirmations, "подтверждение ждёт", "подтверждения ждут", "подтверждений ждут")} более 48 ч`,
+        impact: `Клиенты могут не успеть к дате поездки`,
+        action: "Связаться с поставщиком и ускорить ответ",
+        href: "/admin/orders?status=AWAITING_CONFIRMATION",
+      });
+    }
+    if (stalePayments > 0) {
+      decisionFeed.push({
+        level: "medium",
+        title: `${stalePayments} ${ruPlural(stalePayments, "заказ ожидает", "заказа ожидают", "заказов ожидают")} оплату более 72 ч`,
+        impact: `Заблокировано ${fmtMoney(
+          awaitingMoney.filter((o) => o.paidAmount < o.amount).reduce((a, o) => a + (o.amount - o.paidAmount), 0)
+        )} ожидаемых поступлений`,
+        action: "Отправить клиентам напоминания об оплате",
+        href: "/admin/orders?status=AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE",
+      });
+    }
+    if (refundsMonth._count > 0) {
+      decisionFeed.push({
+        level: "info",
+        title: `${refundsMonth._count} ${ruPlural(refundsMonth._count, "возврат за", "возврата за", "возвратов за")} месяц`,
+        impact: `Сумма возвратов ${fmtMoney(refundsMonth._sum.amount ?? 0)}`,
+        action: "Проверить причины возвратов",
+        href: "/admin/orders?status=REFUNDED",
+      });
+    }
+    if (decisionFeed.length === 0) {
+      decisionFeed.push({
+        level: "ok",
+        title: "Всё в порядке",
+        impact: "Критических проблем не обнаружено",
+        action: "Продолжайте работу в обычном режиме",
+        href: "/admin/orders",
+      });
+    }
+
     // ── Последние события платформы (Гл. 1.27) ──
     const events = [
       ...recentOrders.map((o) => ({
@@ -832,6 +1008,42 @@ export async function GET(request: Request) {
     // Подпись периода для виджетов («Продажи по категориям», «Популярные направления»…)
     const periodLabel = range.start.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
 
+    // ── Нижняя панель Dashboard (Гл. 1.28) ──
+    // Версия платформы из package.json, дата последнего обновления, статусы
+    // интеграций (из панели здоровья), состояние очередей и ссылки на документацию.
+    let platformVersion = "v1.0.0";
+    try {
+      const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")) as { version?: string };
+      if (pkg.version) platformVersion = `v${pkg.version}`;
+    } catch {
+      /* версия по умолчанию */
+    }
+    const footer = {
+      version: platformVersion,
+      // Дата последнего обновления — самый свежий заказ/пользователь в БД
+      lastUpdate: new Date(
+        Math.max(
+          recentOrders[0]?.createdAt.getTime() ?? 0,
+          recentUsers[0]?.createdAt.getTime() ?? 0,
+          Date.now() - 86400000
+        )
+      ),
+      // Статус интеграций из панели здоровья (платёжные, email, SMS)
+      integrations: {
+        payments: health.payments,
+        email: health.email,
+        sms: health.sms,
+        gds: { status: "green", detail: "Доступно" },
+      },
+      queue: system.queue,
+      docs: [
+        { label: "Архитектура проекта", href: "/Архитектура%20проекта.docx" },
+        { label: "Глава 5. Booking Center", href: "/Глава%205.docx" },
+        { label: "Глава 6. Заказ", href: "/Глава%206.docx" },
+        { label: "Глава 7. Order Center", href: "/Глава%207.docx" },
+      ],
+    };
+
     return NextResponse.json({
       greeting: {
         name: user.firstName,
@@ -880,6 +1092,12 @@ export async function GET(request: Request) {
       popularDestinations,
       periodLabel,
       partnersAll,
+      finance,
+      userActivity,
+      decisionFeed,
+      footer,
+      sales,
+      execution,
     });
   } catch (error) {
     return serverErrorResponse(error, "Admin dashboard API error");

@@ -1,23 +1,88 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getAdminSection } from "@/lib/admin-menu";
+import { fmtMoney } from "@/lib/admin-data";
+
+/** Результаты глобального поиска (Гл. 1.5): сгруппированы по типу сущности. */
+interface SearchResults {
+  query: string;
+  orders: { id: string; label: string; detail: string; status: string; amount: number; href: string }[];
+  users: { id: string; label: string; detail: string; role: string; companyName: string | null; href: string }[];
+  services: { id: string; label: string; detail: string; price: number; currency: string; href: string }[];
+  bookings: { id: string; label: string; detail: string; status: string; amount: number; href: string }[];
+}
+
+const ROLE_ICONS: Record<string, string> = {
+  ADMIN: "🛡",
+  MODERATOR: "🛠",
+  BUYER: "👤",
+  PARTNER: "🤝",
+  SALES_MANAGER: "💼",
+  OPERATOR: "⚙️",
+};
 
 /**
  * Шапка админки (Гл. 2.3): логотип, хлебные крошки, глобальный поиск,
  * иконки уведомлений/сообщений/календаря/темы/AI.
  * Заголовок и крошки отображают название активного раздела из левого меню.
  */
-export default function AdminHeader() {
+export default function AdminHeader({ role = "ADMIN" }: { role?: string }) {
   const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResults | null>(null);
+  const [searching, setSearching] = useState(false);
   const [dark, setDark] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiQ, setAiQ] = useState("");
   const [aiAnswer, setAiAnswer] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
-  const section = getAdminSection(pathname);
+  const section = getAdminSection(pathname, role);
+
+  // Глобальный поиск (Гл. 1.5): запрос с задержкой (debounce 250 мс), результаты
+  // сгруппированы по типу сущности. Пустой/короткий запрос очищает список.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      // Сброс откладываем на микротаск — setState в теле эффекта напрямую
+      // вызывает предупреждение react-hooks/set-state-in-effect
+      const reset = setTimeout(() => {
+        setResults(null);
+        setSearching(false);
+      }, 0);
+      return () => clearTimeout(reset);
+    }
+    const searchingTimer = setTimeout(() => setSearching(true), 0);
+    const timer = setTimeout(() => {
+      fetch(`/api/admin/search?q=${encodeURIComponent(q)}`)
+        .then(async (r) => (r.ok ? (r.json() as Promise<SearchResults>) : Promise.reject(new Error("search failed"))))
+        .then((j) => setResults(j))
+        .catch(() => setResults({ query: q, orders: [], users: [], services: [], bookings: [] }))
+        .finally(() => setSearching(false));
+    }, 250);
+    return () => {
+      clearTimeout(searchingTimer);
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  // Закрытие выпадающего списка по клику вне поля поиска
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!searchBoxRef.current?.contains(e.target as Node)) setResults(null);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  // При смене раздела (переход по ссылке результата) закрываем список
+  useEffect(() => {
+    const reset = setTimeout(() => setResults(null), 0);
+    return () => clearTimeout(reset);
+  }, [pathname]);
 
   const askAi = async (text: string) => {
     setAiQ(text);
@@ -52,10 +117,10 @@ export default function AdminHeader() {
         <h1 className="text-base font-bold mt-0.5 truncate">{section.label}</h1>
       </div>
 
-      {/* Центр: глобальный поиск */}
-      <div className="flex-1 max-w-xl mx-auto relative">
+      {/* Центр: глобальный поиск (Гл. 1.5) */}
+      <div ref={searchBoxRef} className="flex-1 max-w-xl mx-auto relative">
         <div className="flex items-center gap-2 bg-[var(--admin-bg)] border border-[var(--admin-border)] rounded-xl px-3.5 h-10 focus-within:border-primary transition-colors">
-          <span className="text-[var(--admin-muted)]">🔍</span>
+          <span className={`${searching ? "animate-spin" : ""} text-[var(--admin-muted)]`}>🔍</span>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -68,16 +133,104 @@ export default function AdminHeader() {
             </button>
           )}
         </div>
-        {query.trim() && (
-          <div className="absolute top-12 left-0 right-0 bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-xl shadow-xl z-50 py-2 text-sm max-h-80 overflow-auto">
-            {["Бронирования", "Заказы", "Пользователи", "Партнёры", "Услуги"].map((g) => (
-              <div key={g} className="px-3 py-1 text-[11px] uppercase tracking-wide text-[var(--admin-muted)] font-semibold">
-                {g}
+        {results && (
+          <div className="absolute top-12 left-0 right-0 bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-xl shadow-xl z-50 py-2 text-sm max-h-96 overflow-auto">
+            {/* Заказы */}
+            {results.orders.length > 0 && (
+              <div className="mb-1">
+                <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-[var(--admin-muted)] font-semibold">
+                  📦 Заказы
+                </div>
+                {results.orders.map((o) => (
+                  <Link
+                    key={o.id}
+                    href={o.href}
+                    className="flex items-center justify-between gap-2 px-4 py-2 hover:bg-[var(--admin-bg)] transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-[var(--admin-text)]">{o.label}</div>
+                      <div className="text-[11px] text-[var(--admin-muted)] truncate">{o.detail}</div>
+                    </div>
+                    <span className="text-[11px] text-[var(--admin-muted)] shrink-0">{fmtMoney(o.amount)}</span>
+                  </Link>
+                ))}
               </div>
-            ))}
-            <button className="w-full text-left px-4 py-2 hover:bg-[var(--admin-bg)] transition-colors text-[var(--admin-muted)]">
-              Поиск «{query}» во всех разделах…
-            </button>
+            )}
+            {/* Пользователи и партнёры */}
+            {results.users.length > 0 && (
+              <div className="mb-1">
+                <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-[var(--admin-muted)] font-semibold">
+                  👥 Пользователи и партнёры
+                </div>
+                {results.users.map((u) => (
+                  <Link
+                    key={u.id}
+                    href={u.href}
+                    className="flex items-center justify-between gap-2 px-4 py-2 hover:bg-[var(--admin-bg)] transition-colors"
+                  >
+                    <div className="min-w-0 flex items-center gap-2">
+                      <span>{ROLE_ICONS[u.role] ?? "👤"}</span>
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-[var(--admin-text)]">{u.label}</div>
+                        <div className="text-[11px] text-[var(--admin-muted)] truncate">
+                          {u.companyName ?? u.detail}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-[var(--admin-muted)] shrink-0 capitalize">{u.role.toLowerCase()}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+            {/* Услуги */}
+            {results.services.length > 0 && (
+              <div className="mb-1">
+                <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-[var(--admin-muted)] font-semibold">
+                  🧳 Услуги
+                </div>
+                {results.services.map((s) => (
+                  <Link
+                    key={s.id}
+                    href={s.href}
+                    className="flex items-center justify-between gap-2 px-4 py-2 hover:bg-[var(--admin-bg)] transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-[var(--admin-text)]">{s.label}</div>
+                      <div className="text-[11px] text-[var(--admin-muted)] truncate">{s.detail}</div>
+                    </div>
+                    <span className="text-[11px] text-[var(--admin-muted)] shrink-0">{fmtMoney(s.price)}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+            {/* Бронирования */}
+            {results.bookings.length > 0 && (
+              <div className="mb-1">
+                <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-[var(--admin-muted)] font-semibold">
+                  📑 Бронирования
+                </div>
+                {results.bookings.map((b) => (
+                  <Link
+                    key={b.id}
+                    href={b.href}
+                    className="flex items-center justify-between gap-2 px-4 py-2 hover:bg-[var(--admin-bg)] transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-[var(--admin-text)]">{b.label}</div>
+                      <div className="text-[11px] text-[var(--admin-muted)] truncate">{b.detail}</div>
+                    </div>
+                    <span className="text-[11px] text-[var(--admin-muted)] shrink-0">{fmtMoney(b.amount)}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+            {/* Пусто */}
+            {!results.orders.length && !results.users.length && !results.services.length && !results.bookings.length && (
+              <div className="px-4 py-3 text-[var(--admin-muted)]">Ничего не найдено по запросу «{results.query}»</div>
+            )}
+            <div className="px-4 py-1.5 border-t border-[var(--admin-border)] text-[11px] text-[var(--admin-muted)]">
+              Найдено: {results.orders.length + results.users.length + results.services.length + results.bookings.length}
+            </div>
           </div>
         )}
       </div>

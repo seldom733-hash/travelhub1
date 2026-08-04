@@ -1,9 +1,9 @@
-import Analytics from "@/components/admin/Analytics";
+import BiCenter from "@/components/admin/BiCenter";
 
 export const metadata = {
-  title: "TravelHub — Аналитика",
+  title: "TravelHub — Центр бизнес-аналитики",
 };
 
 export default function AnalyticsPage() {
-  return <Analytics />;
+  return <BiCenter />;
 }

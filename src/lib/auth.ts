@@ -26,6 +26,7 @@ export async function getCurrentUser() {
       lastName: true,
       role: true,
       companyName: true,
+      defaultWorkspace: true,
     },
   });
 }

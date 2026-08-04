@@ -1,5 +1,6 @@
 import AdminSidebar from "@/components/admin/AdminSidebar";
 import AdminHeader from "@/components/admin/AdminHeader";
+import AdminRoleGuard from "@/components/admin/AdminRoleGuard";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -20,6 +21,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ]);
   return (
     <div className="admin-app min-h-screen flex flex-col bg-[var(--admin-bg)] text-[var(--admin-text)]">
+      {/* Ограничение разделов по роли (SALES_MANAGER / OPERATOR) */}
+      <AdminRoleGuard role={user.role} />
       {/* Верхняя тонкая панель: телефон, почта, локали (Гл. 1.3) */}
       <div className="h-9 bg-secondary text-white text-sm flex items-center justify-between px-4 lg:px-6 shrink-0">
         <div className="flex items-center gap-4">
@@ -41,12 +44,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       </div>
 
       <div className="flex flex-1 min-h-0">
-        {/* Левое меню — закреплено */}
-        <AdminSidebar />
+        {/* Левое меню — закреплено (для ограниченных ролей — только их разделы) */}
+        <AdminSidebar role={user.role} />
 
         {/* Рабочая область */}
         <div className="flex-1 min-w-0 flex flex-col">
-          <AdminHeader />
+          <AdminHeader role={user.role} />
           <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">{children}</main>
           {/* Footer админки */}
           <footer className="px-4 lg:px-6 py-4 text-xs text-[var(--admin-muted)] border-t border-[var(--admin-border)] flex items-center justify-between">

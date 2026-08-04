@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { SERVICE_TYPE_LABELS, actorDisplayName, bookingSystemMessage } from "@/lib/admin-data";
 import { pickManager, pickSource } from "@/app/api/admin/bookings/route";
+import { EXECUTION_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,11 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, EXECUTION_ROLES);
+    if (denied) return denied;
     const { id } = await params;
 
     const booking = await prisma.booking.findUnique({
@@ -97,9 +100,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, EXECUTION_ROLES);
+    if (denied) return denied;
 
     const { id } = await params;
     let body: { action?: unknown; serviceDate?: unknown; amount?: unknown };

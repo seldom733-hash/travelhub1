@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { actorDisplayName, orderSystemMessage } from "@/lib/admin-data";
+import { SALES_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -49,9 +50,11 @@ const TRANSITIONS: Record<Exclude<BulkAction, "assign_manager">, { from: OrderSt
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, SALES_ROLES);
+    if (denied) return denied;
 
     let body: { action?: unknown; ids?: unknown; value?: unknown };
     try {

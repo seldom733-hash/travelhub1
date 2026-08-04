@@ -12,6 +12,7 @@ import {
 } from "@/lib/admin-data";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
+import { EXECUTION_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +48,11 @@ export function pickSource(id: string): string {
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, EXECUTION_ROLES);
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
 
@@ -626,9 +629,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, EXECUTION_ROLES);
+    if (denied) return denied;
 
     let body: Record<string, unknown>;
     try {

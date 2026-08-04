@@ -10,6 +10,7 @@ import {
 } from "@/lib/admin-data";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
+import { FULL_ADMIN_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +24,12 @@ type PeriodKey = "today" | "yesterday" | "week" | "month" | "quarter" | "year" |
  */
 export async function GET(request: Request) {
   try {
-    // Только админ/партнёр: без сессии или покупатель → 401
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, FULL_ADMIN_ROLES);
+    if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
     const period = (searchParams.get("period") || "month") as PeriodKey;

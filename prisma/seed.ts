@@ -190,13 +190,43 @@ async function main() {
   // ── Админ ──
   await prisma.user.upsert({
     where: { email: "admin@travelhub.az" },
-    update: {},
+    update: { defaultWorkspace: "main" },
     create: {
       email: "admin@travelhub.az",
       passwordHash: hash("admin123"),
       firstName: "Надир",
       lastName: "Сулейманов",
       role: "ADMIN",
+      defaultWorkspace: "main",
+    },
+  });
+
+  // ── Менеджер по продажам и операционист (Гл. 1.2): стартовые пространства
+  // «Продажи» и «Исполнение» фиксируются в настройках пользователя.
+  await prisma.user.upsert({
+    where: { email: "sales@travelhub.az" },
+    update: { defaultWorkspace: "sales" },
+    create: {
+      email: "sales@travelhub.az",
+      passwordHash: hash("manager123"),
+      firstName: "Айхан",
+      lastName: "Рагимов",
+      role: "SALES_MANAGER",
+      defaultWorkspace: "sales",
+      createdAt: userCreatedAt(false),
+    },
+  });
+  await prisma.user.upsert({
+    where: { email: "operator@travelhub.az" },
+    update: { defaultWorkspace: "execution" },
+    create: {
+      email: "operator@travelhub.az",
+      passwordHash: hash("manager123"),
+      firstName: "Эльвин",
+      lastName: "Мамедов",
+      role: "OPERATOR",
+      defaultWorkspace: "execution",
+      createdAt: userCreatedAt(false),
     },
   });
 
@@ -1217,6 +1247,8 @@ async function main() {
     users: await prisma.user.count(),
     buyers: await prisma.user.count({ where: { role: "BUYER" } }),
     partners: await prisma.user.count({ where: { role: "PARTNER" } }),
+    salesManagers: await prisma.user.count({ where: { role: "SALES_MANAGER" } }),
+    operators: await prisma.user.count({ where: { role: "OPERATOR" } }),
     services: await prisma.service.count(),
     bookings: await prisma.booking.count(),
     serviceViews: await prisma.serviceView.count(),

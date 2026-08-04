@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
         lastName: user.lastName,
         role: user.role,
         companyName: user.companyName,
+        defaultWorkspace: user.defaultWorkspace,
       },
     });
   } catch (error) {

@@ -148,6 +148,41 @@ export const ORDER_STATUS_GROUPS = {
   terminal: ["COMPLETED", "REFUNDED", "CANCELLED", "ARCHIVED"],
 } as const;
 
+/**
+ * Детерминированный список менеджеров платформы. В схеме нет поля manager —
+ * менеджер назначается ротацией по id (pickManager). Единый источник для
+ * Order Center (фильтр «Менеджер») и Dashboard (блок «Продажи» — лучшие менеджеры).
+ */
+// ── Роли и рабочие пространства Dashboard (Гл. 1.2, 1.44) ──
+// Стартовое пространство зависит от роли; ключи должны совпадать с WORKSPACES
+// в dashboard-widgets.tsx (main, sales, execution, finance, marketing, ai).
+
+export const WORKSPACE_KEYS = ["main", "sales", "execution", "finance", "marketing", "ai"] as const;
+export type WorkspaceKey = (typeof WORKSPACE_KEYS)[number];
+
+/** Пространство Dashboard по умолчанию для роли (Гл. 1.2). */
+export const ROLE_DEFAULT_WORKSPACE: Record<string, WorkspaceKey> = {
+  ADMIN: "main",
+  SALES_MANAGER: "sales",
+  OPERATOR: "execution",
+  PARTNER: "main",
+  BUYER: "main",
+};
+
+/** Стартовое пространство роли (с фолбэком на «Главный»). */
+export function roleDefaultWorkspace(role: string): WorkspaceKey {
+  return ROLE_DEFAULT_WORKSPACE[role] ?? "main";
+}
+
+export const MANAGERS = ["Анна Смирнова", "Дмитрий Петров", "Ольга Козлова", "Игорь Волков", "Мария Соколова"];
+
+/** Детерминированное назначение менеджера по id заказа (хэш id). */
+export function pickManager(id: string): string {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return MANAGERS[h % MANAGERS.length];
+}
+
 export const PLATFORM_SERVICES = [
   { key: "api", label: "API" },
   { key: "db", label: "База данных" },

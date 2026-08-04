@@ -42,17 +42,61 @@ export const ADMIN_MENU: AdminMenuItem[] = [
   { icon: "📝", label: "Контент", href: "/admin/content", hidden: true },
 ];
 
+/**
+ * Доступ ролей к разделам админки (Гл. 1.2): менеджер по продажам — Dashboard
+ * и «Продажи» (заказы, продажи); операционист — Dashboard и «Исполнение»
+ * (бронирования). Роли без записи (ADMIN, MODERATOR, PARTNER и пр.) — полный доступ.
+ * Путь разрешён, если совпадает с префиксом раздела (сам раздел или его вкладка).
+ */
+export const ROLE_ALLOWED_PREFIXES: Record<string, string[]> = {
+  SALES_MANAGER: ["/admin", "/admin/orders", "/admin/sales"],
+  OPERATOR: ["/admin", "/admin/bookings"],
+};
+
+/** Может ли роль открыть указанный путь админки (сам путь или вкладка). */
+export function canAccessAdminPath(pathname: string, role: string): boolean {
+  const prefixes = ROLE_ALLOWED_PREFIXES[role];
+  if (!prefixes) return true;
+  return prefixes.some((p) => {
+    // Корневой Dashboard «/admin» — только сам корень (не все /admin/*).
+    if (p === "/admin") return pathname === "/admin";
+    return pathname === p || pathname.startsWith(p + "/");
+  });
+}
+
+/**
+ * Пункты меню для роли (сайдбар и шапка). Ограниченные роли видят только свои
+ * разделы: SALES_MANAGER — «Продажи», OPERATOR — «Исполнение» (бронирования).
+ */
+export function menuForRole(role: string): AdminMenuItem[] {
+  const full = ADMIN_MENU.filter((i) => !i.hidden);
+  if (role === "SALES_MANAGER") {
+    return full
+      .filter((i) => i.href === "/admin" || i.href === "/admin/orders")
+      .map((i) => (i.href === "/admin/orders" ? { ...i, label: "Продажи" } : i));
+  }
+  if (role === "OPERATOR") {
+    const dashboard = full.find((i) => i.href === "/admin")!;
+    const bookings = ADMIN_MENU.find((i) => i.href === "/admin/bookings")!;
+    return [dashboard, { ...bookings, label: "Исполнение", hidden: false }];
+  }
+  return full;
+}
+
 /** Возвращает пункт меню, соответствующий текущему пути (или дефолт). */
-export function getAdminSection(pathname: string): AdminMenuItem {
+export function getAdminSection(pathname: string, role?: string): AdminMenuItem {
+  // Меню, из которого ищем раздел: для ограниченных ролей — их собственное меню,
+  // чтобы хлебные крошки и заголовок показывали корректный раздел.
+  const source = role ? menuForRole(role) : ADMIN_MENU;
   // Точное совпадение для корня админки
   if (pathname === "/admin") {
-    return ADMIN_MENU[0];
+    return source[0];
   }
   // Префиксное совпадение + алиасы (вкладки раздела «Продажи и исполнение»)
-  const match = ADMIN_MENU.find((item) => {
+  const match = source.find((item) => {
     if (item.href === "/admin") return false;
     if (pathname === item.href || pathname.startsWith(item.href + "/")) return true;
     return !!item.aliases?.some((a) => pathname === a || pathname.startsWith(a + "/"));
   });
-  return match ?? ADMIN_MENU[0];
+  return match ?? source[0];
 }

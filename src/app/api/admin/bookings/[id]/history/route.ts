@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
+import { EXECUTION_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +14,11 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = requireRole(user, EXECUTION_ROLES);
+    if (denied) return denied;
     const { id } = await params;
 
     const booking = await prisma.booking.findUnique({ where: { id }, select: { id: true } });

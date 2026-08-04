@@ -25,6 +25,8 @@ enum UserRole {
   BUYER
   PARTNER
   ADMIN
+  SALES_MANAGER
+  OPERATOR
 }
 
 enum BookingStatus {
@@ -70,6 +72,9 @@ model User {
   partnerType  String?
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
+  // Стартовое рабочее пространство Dashboard (Гл. 1.2, 1.44): по умолчанию
+  // зависит от роли (см. roleDefaultWorkspace), пользователь может переопределить.
+  defaultWorkspace String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
