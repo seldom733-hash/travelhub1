@@ -17,7 +17,9 @@ export type AnalyticsSection =
   | "crm"
   | "partners"
   | "catalog"
-  | "marketing";
+  | "marketing"
+  | "departments"
+  | "ai";
 
 export interface AnalyticsFilters {
   period: PeriodKey;
@@ -37,7 +39,9 @@ export interface KpiCard {
   key: string;
   title: string;
   value: number;
-  /** Строка-подпись для денег/процентов (например, "$", "%"). */
+  /** Подпись для НЕденежных значений: "%" → 39.7%, "ч" → 24 ч, " шт" → 58 шт,
+   *  "/100" → 82/100. Без unit значение считается денежным и форматируется
+   *  с валютой отображения (валюта из Настроек аналитики). */
   unit?: string;
   change?: number;
   spark?: number[];
@@ -149,6 +153,15 @@ export interface PulseItem {
   type: "sales" | "alert" | "partner" | "system" | "support";
 }
 
+/** География продаж с детализацией до городов (2.9.10 «Страна → Регион → Курорт»). */
+export interface GeoRegion {
+  code: string;
+  name: string;
+  revenue: number;
+  count: number;
+  cities: { name: string; revenue: number; count: number }[];
+}
+
 /** Полный ответ одного модуля аналитики. */
 export interface AnalyticsSectionData {
   section: AnalyticsSection;
@@ -164,4 +177,6 @@ export interface AnalyticsSectionData {
   barLists: BarListBlock[];
   tables: TableBlock[];
   ai: AiInsight[];
+  /** География с цепочкой Страна → Город (для интерактивной карты 2.9.10). */
+  geo?: GeoRegion[];
 }

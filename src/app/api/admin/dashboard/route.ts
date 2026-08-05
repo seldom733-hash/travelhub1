@@ -22,7 +22,7 @@ import { ALL_ADMIN_ROLES, requireRole } from "@/lib/admin-access";
 export const dynamic = "force-dynamic";
 
 // Единый источник статусных групп — ORDER_STATUS_GROUPS из admin-data.ts
-// (используется и Order Center, чтобы карточки и таблицы не расходились).
+// (используется и в реестре заказов, чтобы карточки и таблицы не расходились).
 const PAID_STATUSES = [...ORDER_STATUS_GROUPS.paid] as const;
 const AWAITING_STATUSES = [...ORDER_STATUS_GROUPS.awaitingPayment] as const;
 const ACTIVE_STATUSES = [...ORDER_STATUS_GROUPS.active] as const;
@@ -80,14 +80,12 @@ export async function GET(request: Request) {
       | "custom";
 
     const range = periodRange(period);
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const yesterdayStart = new Date(todayStart.getTime() - 86400000);
-    const monthStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
-    const prevMonthStart = new Date(todayStart.getFullYear(), todayStart.getMonth() - 1, 1);
+    const monthStart = new Date();
+    monthStart.setHours(0, 0, 0, 0);
+    monthStart.setDate(1);
 
     // ── KPI: заказы в работе / подтверждение / оплата / выполнены ──
-    // Считаем за выбранный период (как Order Center), чтобы карточки сходились
+    // Считаем за выбранный период (как в реестре заказов), чтобы карточки сходились
     // с количеством записей в реестре заказов. Дельта — период vs предыдущий период.
     const [ordersInWork, ordersInWorkPrev, awaitingConf, awaitingConfPrev, awaitingPay, awaitingPayPrev, completed, completedPrev, overdue] =
       await Promise.all([
@@ -102,65 +100,46 @@ export async function GET(request: Request) {
         prisma.order.count({ where: { status: "OVERDUE", createdAt: { gte: range.start, lte: range.end } } }),
       ]);
 
-    // ── KPI: новые за сегодня — с начала суток (то же окно, что период «today» в реестре,
-    // чтобы при клике по карточке таблица показывала ровно столько же записей). ──
-    const [ordersToday, ordersPrevDay] = await Promise.all([
-      prisma.order.count({ where: { createdAt: { gte: todayStart } } }),
-      prisma.order.count({ where: { createdAt: { gte: yesterdayStart, lt: todayStart } } }),
+    // ── KPI: все карточки считаются за выбранный период (как в реестре заказов,
+    // Гл. 3 «Продажи и исполнение»), чтобы переключение периода на панели меняло
+    // цифры на карточках и совпадало с количеством записей в реестре. ──
+    const [ordersRange, ordersRangePrev] = await Promise.all([
+      prisma.order.count({ where: { createdAt: { gte: range.start, lte: range.end } } }),
+      prisma.order.count({ where: { createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
     ]);
 
-    // ── KPI: доход сегодня / месяц, комиссия ──
-    const [todayRev, yesterdayRev, monthRev, prevMonthRev] = await Promise.all([
+    // ── KPI: доход за период, комиссия ──
+    const [periodRev, prevPeriodRev] = await Promise.all([
       prisma.order.aggregate({
-        where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: todayStart } },
+        where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
         _sum: { paidAmount: true },
         _count: true,
       }),
       prisma.order.aggregate({
-        where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: yesterdayStart, lt: todayStart } },
-        _sum: { paidAmount: true },
-        _count: true,
-      }),
-      prisma.order.aggregate({
-        where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: monthStart } },
-        _sum: { paidAmount: true },
-        _count: true,
-      }),
-      prisma.order.aggregate({
-        where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: prevMonthStart, lt: monthStart } },
+        where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } },
         _sum: { paidAmount: true },
         _count: true,
       }),
     ]);
 
-    const revenueToday = todayRev._sum.paidAmount ?? 0;
-    const revenueMonth = monthRev._sum.paidAmount ?? 0;
-    const commission = Math.round(revenueMonth * 0.12); // 12% комиссия платформы
-    const commissionPrev = Math.round((prevMonthRev._sum.paidAmount ?? 0) * 0.12);
+    // «Доход за период» и «прогноз» — обе карточки строятся на доходе периода;
+    // revenueToday используется и блоком «Финансы» как доход за выбранный период.
+    const revenueToday = periodRev._sum.paidAmount ?? 0;
+    const revenueMonth = revenueToday;
+    const revenuePrev = prevPeriodRev._sum.paidAmount ?? 0;
+    const commission = Math.round(revenueToday * 0.12); // 12% комиссия платформы
+    const commissionPrev = Math.round(revenuePrev * 0.12);
 
-    // Среднемесячный доход за предыдущие месяцы — реальная база для % плана.
-    // Делим на число месяцев с фактическими продажами (а не всегда на 3),
-    // чтобы на молодой платформе базовый уровень не занижался пустыми месяцами.
-    const prev3MonthsStart = new Date(todayStart.getFullYear(), todayStart.getMonth() - 3, 1);
-    const prev3MonthsRows = await prisma.order.findMany({
-      where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: prev3MonthsStart, lt: monthStart } },
-      select: { createdAt: true, paidAmount: true },
-    });
-    const monthsWithRevenue = new Set(prev3MonthsRows.map((r) => `${r.createdAt.getFullYear()}-${r.createdAt.getMonth()}`)).size;
-    const avgMonthlyRevenue = monthsWithRevenue
-      ? prev3MonthsRows.reduce((a, r) => a + (r.paidAmount ?? 0), 0) / monthsWithRevenue
-      : 0;
-
-    // Дельта «сегодня vs вчера», но без пугающей «▼ 100%» при нулевой базе
+    // Дельта без пугающей «▼ 100%» при нулевой базе
     const safeChange = (cur: number, prev: number) => (cur === 0 && prev === 0 ? 0 : changePct(cur, prev));
 
-    // ── KPI: новые пользователи / партнёры ──
+    // ── KPI: новые пользователи / партнёры за период ──
     const [usersToday, usersYesterday, partnersToday, partnersYesterday, activeUsersCount, partnersAll] =
       await Promise.all([
-        prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
-        prisma.user.count({ where: { createdAt: { gte: yesterdayStart, lt: todayStart } } }),
-        prisma.user.count({ where: { role: "PARTNER", createdAt: { gte: todayStart } } }),
-        prisma.user.count({ where: { role: "PARTNER", createdAt: { gte: yesterdayStart, lt: todayStart } } }),
+        prisma.user.count({ where: { createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.user.count({ where: { createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
+        prisma.user.count({ where: { role: "PARTNER", createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.user.count({ where: { role: "PARTNER", createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
         prisma.user.count({ where: { isActive: true } }),
         prisma.user.count({ where: { role: "PARTNER" } }),
       ]);
@@ -454,7 +433,7 @@ export async function GET(request: Request) {
     // Все пункты строятся только из реальных данных БД; захардкожены лишь сами
     // формулировки правил. Прогноз — линейный тренд серий выбранного периода.
     const attentionCount = awaitingConf + awaitingPay;
-    const todayGrowth = changePct(revenueToday, yesterdayRev._sum.paidAmount ?? 0);
+    const todayGrowth = changePct(revenueToday, revenuePrev);
 
     // Предупреждения: реальные «застрявшие» заказы — просроченные, подтверждения
     // дольше 48 часов, оплаты дольше 72 часов.
@@ -541,20 +520,20 @@ export async function GET(request: Request) {
 
     // Сводка: факты периода; строка «всё в норме» — только если аномалий нет.
     const aiSummary: { text: string; href?: string }[] = [];
-    if (ordersToday > 0) {
+    if (ordersRange > 0) {
       aiSummary.push({
-        text: `Сегодня ${ordersToday} ${ruPlural(ordersToday, "новая заявка", "новые заявки", "новых заявок")}`,
-        href: "/admin/orders?period=today",
+        text: `За период ${ordersRange} ${ruPlural(ordersRange, "новая заявка", "новые заявки", "новых заявок")}`,
+        href: `/admin/sales-execution?period=${period}`,
       });
     }
     if (revenueToday > 0) {
-      aiSummary.push({ text: `Доход сегодня ${fmtMoney(revenueToday)}` });
+      aiSummary.push({ text: `Доход за период ${fmtMoney(revenueToday)}` });
     }
     // AWAITING_STATUSES уже включает OVERDUE, поэтому не прибавляем overdue повторно.
     if (attentionCount > 0) {
       aiSummary.push({
         text: `${attentionCount} ${ruPlural(attentionCount, "заказ требует", "заказа требуют", "заказов требуют")} внимания`,
-        href: "/admin/orders?status=AWAITING_CONFIRMATION,AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE",
+        href: "/admin/sales-execution?status=AWAITING_CONFIRMATION,AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE",
       });
     }
     const hasAnomaly = aiWarnings.length > 0 || aiRecommendations.some((r) => r.level === "high");
@@ -598,7 +577,7 @@ export async function GET(request: Request) {
           detail: `${fmtMoney(o.amount)}`,
           at: o.createdAt,
           // Глубокий переход: открывает карточку заказа в реестре (вкладка «Обзор»)
-          href: `/admin/orders?open=${o.id}&tab=overview`,
+          href: `/admin/sales-execution?open=${o.id}&tab=overview`,
         };
       }),
       ...recentUsers.map((u) => ({
@@ -645,7 +624,7 @@ export async function GET(request: Request) {
     const tomorrowKey = dayKey(new Date(now.getTime() + 86400000));
     // Каждый пункт календаря ведёт на карточку конкретного заказа в реестре
     const withOrderHref = (arr: typeof calendarOrders) =>
-      arr.map((o) => ({ ...o, href: `/admin/orders?open=${o.id}&tab=overview` }));
+      arr.map((o) => ({ ...o, href: `/admin/sales-execution?open=${o.id}&tab=overview` }));
     const calendar = {
       today: withOrderHref(calendarOrders.filter((o) => o.serviceDate && dayKey(o.serviceDate) === todayKey)),
       tomorrow: withOrderHref(calendarOrders.filter((o) => o.serviceDate && dayKey(o.serviceDate) === tomorrowKey)),
@@ -721,8 +700,8 @@ export async function GET(request: Request) {
     const departments = {
       sales: {
         received: ordersInPeriod,
-        transferred: monthRev._count,
-        conversion: ordersInPeriod ? Math.round((monthRev._count / ordersInPeriod) * 100) : 0,
+        transferred: periodRev._count,
+        conversion: ordersInPeriod ? Math.round((periodRev._count / ordersInPeriod) * 100) : 0,
       },
       operations: {
         received: ordersInPeriod,
@@ -743,7 +722,7 @@ export async function GET(request: Request) {
 
     // ── Блок «Продажи» (Гл. 1.11): новые заявки, оплаченные заказы, ──
     // средний чек, конверсия, лучшие менеджеры — всё из реальных заказов периода.
-    // Менеджеры назначаются детерминированно (pickManager), как в Order Center.
+    // Менеджеры назначаются детерминированно (pickManager), как в реестре заказов.
     const salesRows = await prisma.order.findMany({
       where: { createdAt: { gte: range.start, lte: range.end } },
       select: { id: true, status: true, amount: true, paidAmount: true },
@@ -797,9 +776,9 @@ export async function GET(request: Request) {
     // возвраты и ожидаемые поступления — всё из реальных данных заказов.
     const [refundsMonth, awaitingMoney, recentLogins, onlineUsers, inactiveUsers, managerActivity] =
       await Promise.all([
-        // Возвраты за месяц: сумма заказов со статусом REFUNDED
+        // Возвраты за период: сумма заказов со статусом REFUNDED
         prisma.order.aggregate({
-          where: { status: "REFUNDED", createdAt: { gte: monthStart } },
+          where: { status: "REFUNDED", createdAt: { gte: range.start, lte: range.end } },
           _sum: { amount: true },
           _count: true,
         }),
@@ -827,7 +806,7 @@ export async function GET(request: Request) {
       .filter((o) => o.paidAmount < o.amount)
       .reduce((a, o) => a + (o.amount - o.paidAmount), 0);
     const expectedInflow = awaitingMoney.reduce((a, o) => a + (o.amount - o.paidAmount), 0);
-    // Выплаты партнёрам: доля партнёров в доходе месяца (88% при комиссии 12%)
+    // Выплаты партнёрам: доля партнёров в доходе периода (88% при комиссии 12%)
     const partnerPayouts = Math.round(revenueMonth * 0.88);
     const finance = {
       revenueToday,
@@ -871,7 +850,7 @@ export async function GET(request: Request) {
         title: `${overdue} ${ruPlural(overdue, "заказ просрочен", "заказа просрочено", "заказов просрочено")}`,
         impact: `Могут быть отменены или вызвать негатив клиентов`,
         action: "Принять решение по просроченным заказам",
-        href: "/admin/orders?status=OVERDUE",
+        href: "/admin/sales-execution?status=OVERDUE",
       });
     }
     if (staleConfirmations > 0) {
@@ -880,7 +859,7 @@ export async function GET(request: Request) {
         title: `${staleConfirmations} ${ruPlural(staleConfirmations, "подтверждение ждёт", "подтверждения ждут", "подтверждений ждут")} более 48 ч`,
         impact: `Клиенты могут не успеть к дате поездки`,
         action: "Связаться с поставщиком и ускорить ответ",
-        href: "/admin/orders?status=AWAITING_CONFIRMATION",
+        href: "/admin/sales-execution?status=AWAITING_CONFIRMATION",
       });
     }
     if (stalePayments > 0) {
@@ -891,16 +870,16 @@ export async function GET(request: Request) {
           awaitingMoney.filter((o) => o.paidAmount < o.amount).reduce((a, o) => a + (o.amount - o.paidAmount), 0)
         )} ожидаемых поступлений`,
         action: "Отправить клиентам напоминания об оплате",
-        href: "/admin/orders?status=AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE",
+        href: "/admin/sales-execution?status=AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE",
       });
     }
     if (refundsMonth._count > 0) {
       decisionFeed.push({
         level: "info",
-        title: `${refundsMonth._count} ${ruPlural(refundsMonth._count, "возврат за", "возврата за", "возвратов за")} месяц`,
+        title: `${refundsMonth._count} ${ruPlural(refundsMonth._count, "возврат за", "возврата за", "возвратов за")} период`,
         impact: `Сумма возвратов ${fmtMoney(refundsMonth._sum.amount ?? 0)}`,
         action: "Проверить причины возвратов",
-        href: "/admin/orders?status=REFUNDED",
+        href: "/admin/sales-execution?status=REFUNDED",
       });
     }
     if (decisionFeed.length === 0) {
@@ -909,7 +888,7 @@ export async function GET(request: Request) {
         title: "Всё в порядке",
         impact: "Критических проблем не обнаружено",
         action: "Продолжайте работу в обычном режиме",
-        href: "/admin/orders",
+        href: "/admin/sales-execution",
       });
     }
 
@@ -921,7 +900,7 @@ export async function GET(request: Request) {
         title: `Заказ №${o.orderNumber}: ${ORDER_NOTIFY[o.status]?.title ?? o.status}`,
         detail: `${fmtMoney(o.amount)}`,
         at: o.createdAt,
-        href: `/admin/orders?open=${o.id}&tab=overview`,
+        href: `/admin/sales-execution?open=${o.id}&tab=overview`,
       })),
       ...recentUsers.map((u) => ({
         id: `ue-${u.id}`,
@@ -1038,9 +1017,7 @@ export async function GET(request: Request) {
       queue: system.queue,
       docs: [
         { label: "Архитектура проекта", href: "/Архитектура%20проекта.docx" },
-        { label: "Глава 5. Booking Center", href: "/Глава%205.docx" },
-        { label: "Глава 6. Заказ", href: "/Глава%206.docx" },
-        { label: "Глава 7. Order Center", href: "/Глава%207.docx" },
+        { label: "Заказ", href: "/Заказ.docx" },
       ],
     };
 
@@ -1054,22 +1031,18 @@ export async function GET(request: Request) {
         attentionTasks: attentionOrdersCount,
       },
       kpi: {
-        ordersToday: { value: ordersToday, change: safeChange(ordersToday, ordersPrevDay) },
+        ordersToday: { value: ordersRange, change: safeChange(ordersRange, ordersRangePrev) },
         ordersInWork: { value: ordersInWork, change: safeChange(ordersInWork, ordersInWorkPrev) },
         awaitingConfirmation: { value: awaitingConf, change: safeChange(awaitingConf, awaitingConfPrev) },
         awaitingPayment: { value: awaitingPay, change: safeChange(awaitingPay, awaitingPayPrev) },
         completed: { value: completed, change: safeChange(completed, completedPrev) },
-        revenueToday: { value: revenueToday, change: safeChange(revenueToday, yesterdayRev._sum.paidAmount ?? 0), spark: revenueSpark },
+        revenueToday: { value: revenueToday, change: safeChange(revenueToday, revenuePrev), spark: revenueSpark },
         revenueMonth: {
           value: revenueMonth,
-          change: safeChange(revenueMonth, prevMonthRev._sum.paidAmount ?? 0),
-          // % плана: отношение дохода месяца к среднемесячному доходу за прошлые 3 месяца
-          planPct: avgMonthlyRevenue
-            ? Math.min(100, Math.round((revenueMonth / avgMonthlyRevenue) * 100))
-            : revenueMonth
-              ? 100
-              : 0,
-          // Прогноз — экстраполяция линейного тренда серии месяца (вместо ×1.18)
+          change: safeChange(revenueMonth, revenuePrev),
+          // % плана: отношение дохода периода к доходу предыдущего периода
+          planPct: revenuePrev ? Math.min(100, Math.round((revenueMonth / revenuePrev) * 100)) : revenueMonth ? 100 : 0,
+          // Прогноз — экстраполяция линейного тренда серии периода
           forecast: Math.round(revenueMonth * (1 + seriesTrendPct(revenueSeries.values) / 100)),
         },
         commission: { value: commission, change: safeChange(commission, commissionPrev) },

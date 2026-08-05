@@ -2,16 +2,24 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
-import { SERVICE_TYPE_LABELS, actorDisplayName, orderSystemMessage, pickManager } from "@/lib/admin-data";
-import { pickSource, orderPaymentStatus, worstBookingStatus } from "@/app/api/admin/orders/route";
-import { SALES_ROLES, requireRole } from "@/lib/admin-access";
+import { SERVICE_TYPE_LABELS, actorDisplayName, orderSystemMessage } from "@/lib/admin-data";
+import { pickManager, pickSource, orderPaymentStatus, worstBookingStatus } from "@/app/api/admin/orders/route";
 
 export const dynamic = "force-dynamic";
 
+// Уровни приоритета (Гл. 3.16 «Контроль SLA»): повышение на один шаг
+const PRIORITY_ORDER = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+
 // Жизненный цикл заказа (Гл. 6.10): допустимые переходы по действию.
-// Действия UI: confirm (подтвердить), pay (оплатить), complete (завершить),
-// cancel (отменить), refund (возврат), archive (архивировать), update (правка).
+// Действия UI: process (принять в работу), send (отправить поставщику),
+// confirm (подтвердить), pay (оплатить), complete (завершить), cancel (отменить),
+// refund (возврат), archive (архивировать), update (правка).
+// Автоматизация (Гл. 3.16): raise_priority (повышение приоритета при риске SLA),
+// escalate (эскалация руководителю), notify_manager (уведомление руководителя).
 const TRANSITIONS: Record<string, { from: string[]; to: string }> = {
+  // Kanban-переходы (Гл. 3.7): «Новые» → принять в работу → отправить поставщику
+  process: { from: ["DRAFT", "CREATED", "CHANGED"], to: "PROCESSING" },
+  send: { from: ["PROCESSING"], to: "AWAITING_CONFIRMATION" },
   confirm: { from: ["AWAITING_CONFIRMATION", "PROCESSING"], to: "CONFIRMED" },
   pay: { from: ["CONFIRMED", "AWAITING_PAYMENT", "PARTIALLY_PAID"], to: "PAID" },
   complete: { from: ["PAID", "DOCUMENT_PREP", "READY"], to: "COMPLETED" },
@@ -43,11 +51,9 @@ const TRANSITIONS: Record<string, { from: string[]; to: string }> = {
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
+    if (!user || user.role === "BUYER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const denied = requireRole(user, SALES_ROLES);
-    if (denied) return denied;
     const { id } = await params;
 
     const order = await prisma.order.findUnique({
@@ -84,6 +90,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: "Заказ не найден" }, { status: 404 });
     }
 
+    // Активные исключения заказа (Гл. 3.17): эскалированные заказы помечаются
+    // в шапке карточки бейджем «🚨 Эскалирован» (реестр ExceptionLog).
+    const activeExceptions = await prisma.exceptionLog.findMany({
+      where: { orderId: id, status: { in: ["new", "working"] } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, type: true, criticality: true, status: true, description: true, createdAt: true },
+    });
+
     const provider = order.bookings[0]?.service.provider;
     const main = order.bookings[0];
     const svc = main?.service;
@@ -116,6 +130,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         bookingStatus: worstBookingStatus(order.bookings.map((b) => b.status)),
         paymentStatus: orderPaymentStatus(order.status),
         status: order.status,
+        priority: order.priority,
         currency: order.currency || "USD",
         amount: order.amount,
         paidAmount: order.paidAmount,
@@ -145,6 +160,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           commission: Math.round((order.paidAmount || paidBookingAmount) * 0.12),
           expectedPayouts: Math.round((order.paidAmount || paidBookingAmount) * 0.88),
         },
+        activeExceptions: activeExceptions.map((e) => ({
+          id: e.id,
+          type: e.type,
+          criticality: e.criticality,
+          status: e.status,
+          description: e.description,
+          createdAt: e.createdAt.toISOString(),
+        })),
       },
     });
   } catch (error) {
@@ -160,11 +183,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
+    if (!user || user.role === "BUYER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const denied = requireRole(user, SALES_ROLES);
-    if (denied) return denied;
 
     const { id } = await params;
     let body: { action?: unknown; serviceDate?: unknown; amount?: unknown };
@@ -175,13 +196,136 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const action = body.action;
-    if (typeof action !== "string" || !["confirm", "pay", "complete", "cancel", "refund", "archive", "update"].includes(action)) {
+    if (
+      typeof action !== "string" ||
+      !["process", "send", "confirm", "pay", "complete", "cancel", "refund", "archive", "update", "raise_priority", "escalate", "notify_manager"].includes(action)
+    ) {
       return NextResponse.json({ error: "Недопустимое действие" }, { status: 400 });
     }
 
     const order = await prisma.order.findUnique({ where: { id } });
     if (!order) {
       return NextResponse.json({ error: "Заказ не найден" }, { status: 404 });
+    }
+
+    // ── Автоматизация исполнения (Гл. 3.16 «Контроль SLA»): действия, не меняющие статус ──
+    if (action === "raise_priority" || action === "escalate" || action === "notify_manager") {
+      if (["COMPLETED", "REFUNDED", "CANCELLED", "ARCHIVED"].includes(order.status)) {
+        return NextResponse.json({ error: "Закрытый заказ недоступен для автоматизации" }, { status: 409 });
+      }
+
+      let priority = order.priority;
+      let changedPriority: string | null = null;
+      if (action === "raise_priority") {
+        const idx = PRIORITY_ORDER.indexOf(order.priority);
+        if (idx >= 0 && idx < PRIORITY_ORDER.length - 1) {
+          priority = PRIORITY_ORDER[idx + 1] as typeof order.priority;
+          changedPriority = priority;
+        }
+      }
+
+      const comments: Record<string, string> = {
+        raise_priority: changedPriority
+          ? `Приоритет повышен до «${changedPriority}» при риске нарушения SLA (Гл. 3.16)`
+          : "Приоритет уже максимальный — повышение не требуется",
+        escalate: "Эскалация руководителю: заказ выведен в панель контроля исключений (Гл. 3.16/3.17)",
+        notify_manager: "Руководитель подразделения уведомлён о риске нарушения SLA",
+      };
+      const messages: Record<string, string> = {
+        raise_priority: changedPriority ? `🎯 Приоритет повышен: ${changedPriority}` : "🎯 Приоритет уже максимальный",
+        escalate: "🚨 Заказ эскалирован руководителю",
+        notify_manager: "🔔 Руководитель уведомлён",
+      };
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const u =
+          changedPriority
+            ? await tx.order.update({
+                where: { id },
+                data: { priority },
+                select: { id: true, status: true, priority: true, updatedAt: true },
+              })
+            : await tx.order.findUnique({ where: { id }, select: { id: true, status: true, priority: true, updatedAt: true } });
+        if (!u) throw new Error("Order not found");
+        await tx.orderHistory.create({
+          data: {
+            orderId: id,
+            action,
+            from: order.status,
+            to: order.status,
+            fields: changedPriority ? JSON.stringify({ priority: changedPriority }) : null,
+            actorId: user.id,
+            actorName: actorDisplayName(user),
+            comment: comments[action],
+          },
+        });
+        await tx.orderMessage.create({
+          data: {
+            orderId: id,
+            senderId: null,
+            senderName: "Система",
+            senderRole: "system",
+            text: messages[action],
+          },
+        });
+        // Персистентный журнал автоматизации (Гл. 3.16 «Мониторинг»)
+        await tx.automationLog.create({
+          data: {
+            orderId: id,
+            event:
+              action === "raise_priority"
+                ? changedPriority
+                  ? "Контроль SLA: риск нарушения"
+                  : "Контроль SLA: приоритет максимальный"
+                : action === "escalate"
+                ? "Эскалация исключительной ситуации"
+                : "Контроль SLA: уведомление руководителя",
+            action: comments[action],
+            result: "success",
+            durationMs: Math.round(40 + Math.random() * 380),
+            source: "Ручное действие · SLA",
+            actorName: actorDisplayName(user),
+          },
+        });
+        // Персистентный реестр исключений (Гл. 3.17): эскалация → строка реестра.
+        // Дедуп: повторная эскалация того же заказа не создаёт дублирующую строку.
+        if (action === "escalate") {
+          const existing = await tx.exceptionLog.findFirst({
+            where: { orderId: id, status: "working" },
+            select: { id: true },
+          });
+          if (!existing) {
+            await tx.exceptionLog.create({
+              data: {
+                orderId: id,
+                type: "Эскалация по SLA",
+                category: "Нарушения SLA",
+                criticality: "critical",
+                orderNumber: order.orderNumber,
+                manager: pickManager(id),
+                status: "working",
+                description: `Эскалировано вручную менеджером: SLA нарушен, требуется вмешательство руководителя подразделения.`,
+                aiSuggestion:
+                  "Связаться с руководителем, подтвердить причины нарушения SLA, проверить статус у поставщика и предложить клиенту альтернативу при срыве сроков.",
+                actorName: actorDisplayName(user),
+              },
+            });
+          }
+        }
+        return u;
+      });
+
+      return NextResponse.json({
+        ok: true,
+        message: comments[action],
+        changed: changedPriority !== null,
+        order: {
+          id: updated.id,
+          status: updated.status,
+          priority: updated.priority,
+          updatedAt: updated.updatedAt,
+        },
+      });
     }
 
     // ── Правка даты поездки и/или суммы (Гл. 6.4 «Изменить заказ») ──

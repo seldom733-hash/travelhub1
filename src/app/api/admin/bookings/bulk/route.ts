@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { actorDisplayName, bookingSystemMessage } from "@/lib/admin-data";
-import { EXECUTION_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +27,9 @@ const TRANSITIONS: Record<BulkAction, { from: BookingStatusValue[]; to: BookingS
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
+    if (!user || user.role === "BUYER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const denied = requireRole(user, EXECUTION_ROLES);
-    if (denied) return denied;
 
     let body: { action?: unknown; ids?: unknown };
     try {

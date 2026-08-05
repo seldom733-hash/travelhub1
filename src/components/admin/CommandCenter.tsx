@@ -276,7 +276,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
     };
     const timer = setInterval(refresh, 60_000);
     // Плюс мгновенное обновление при возврате на вкладку/окно: если менеджер
-    // прочитал сообщения в Order Center и вернулся на дашборд раньше тика,
+    // прочитал сообщения в реестре заказов и вернулся на дашборд раньше тика,
     // счётчик не должен устаревать до конца минуты.
     const onVisible = () => {
       if (document.visibilityState === "visible") refresh();
@@ -464,13 +464,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
       case "kpi":
         exportCSV("dashboard-kpi.csv", [
           ["Показатель", "Значение", "Изменение"],
-          ["Заказы за сегодня", data.kpi.ordersToday.value, `${data.kpi.ordersToday.change}%`],
+          ["Заказы за период", data.kpi.ordersToday.value, `${data.kpi.ordersToday.change}%`],
           ["Заказы в работе", data.kpi.ordersInWork.value, `${data.kpi.ordersInWork.change}%`],
           ["Ожидают подтверждения", data.kpi.awaitingConfirmation.value, `${data.kpi.awaitingConfirmation.change}%`],
           ["Ожидают оплаты", data.kpi.awaitingPayment.value, `${data.kpi.awaitingPayment.change}%`],
           ["Выполненные", data.kpi.completed.value, `${data.kpi.completed.change}%`],
-          ["Доход за сегодня", fmtMoney(data.kpi.revenueToday.value), `${data.kpi.revenueToday.change}%`],
-          ["Доход за месяц", fmtMoney(data.kpi.revenueMonth.value), `${data.kpi.revenueMonth.change}%`],
+          ["Доход за период", fmtMoney(data.kpi.revenueToday.value), `${data.kpi.revenueToday.change}%`],
+          ["Доход за период (прогноз)", fmtMoney(data.kpi.revenueMonth.value), `${data.kpi.revenueMonth.change}%`],
           ["Комиссия платформы", fmtMoney(data.kpi.commission.value), `${data.kpi.commission.change}%`],
           ["Новые пользователи", data.kpi.newUsers.value, `${data.kpi.newUsers.change}%`],
           ["Новые партнёры", data.kpi.newPartners.value, `${data.kpi.newPartners.change}%`],
@@ -635,7 +635,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
                     {t.priority === "high" ? "Высокий" : "Средний"}
                   </span>
                   <span className="text-xs text-[var(--admin-muted)]">⏰ {fmtDateTime(t.deadline)}</span>
-                  <Link href={`/admin/orders?open=${t.id}&tab=${t.tab ?? "overview"}`} className="text-xs text-primary font-medium hover:underline">Открыть</Link>
+                  <Link href={`/admin/sales-execution?open=${t.id}&tab=overview`} className="text-xs text-primary font-medium hover:underline">Открыть</Link>
                 </div>
               </div>
             ))}
@@ -645,7 +645,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
         return (
           <div className="space-y-2">
             {data.queues.map((q) => (
-              <Link key={q.key} href={`/admin/orders?status=${q.statuses.join(",")}`} className="flex items-center justify-between p-3 rounded-xl bg-[var(--admin-bg)] hover:border-primary border border-transparent transition-colors">
+              <Link key={q.key} href={`/admin/sales-execution?status=${q.statuses.join(",")}`} className="flex items-center justify-between p-3 rounded-xl bg-[var(--admin-bg)] hover:border-primary border border-transparent transition-colors">
                 <span className="text-sm">{q.label}</span>
                 <span className="text-lg font-bold text-primary">{q.count}</span>
               </Link>
@@ -792,7 +792,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
           <p className="text-[11px] text-[var(--admin-muted)]/70 mb-4">Подробности — в консоли браузера (F12)</p>
           <button
             onClick={() => load()}
-            className="px-4 h-10 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors"
+            className="ac-btn ac-btn-primary"
           >
             Повторить
           </button>
@@ -817,10 +817,10 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
   const { kpi, greeting } = data;
 
   /* ── KPI-карточки (Гл. 1.7) ── */
-  const kpiCards = buildKpiCards(kpi);
+  const kpiCards = buildKpiCards(kpi, period);
 
   const quickActions = [
-    { icon: "➕", label: "Новый заказ", href: "/admin/orders" },
+    { icon: "➕", label: "Новый заказ", href: "/admin/sales-execution?open=new" },
     { icon: "➕", label: "Новый партнер", href: "/admin/crm" },
     { icon: "➕", label: "Новая услуга", href: "/admin/catalog" },
     { icon: "📄", label: "Создать счет", href: "/admin/finance" },
@@ -847,32 +847,26 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
           </p>
           <div className="flex gap-2 mt-4 flex-wrap">
             <Link
-              href="/admin/orders"
-              className="px-4 h-9 rounded-xl bg-white text-primary text-sm font-semibold flex items-center gap-2 hover:bg-white/90 transition-colors"
-            >
-              ➕ Создать заказ
-            </Link>
-            <Link
               href="/admin/catalog"
-              className="px-4 h-9 rounded-xl bg-white/15 text-white text-sm font-medium flex items-center gap-2 hover:bg-white/25 transition-colors"
+              className="ac-btn ac-btn-glass"
             >
               ➕ Добавить услугу
             </Link>
             <Link
               href="/admin/crm"
-              className="px-4 h-9 rounded-xl bg-white/15 text-white text-sm font-medium flex items-center gap-2 hover:bg-white/25 transition-colors"
+              className="ac-btn ac-btn-glass"
             >
               ➕ Добавить партнера
             </Link>
             <Link
               href="/admin/analytics"
-              className="px-4 h-9 rounded-xl bg-white/15 text-white text-sm font-medium flex items-center gap-2 hover:bg-white/25 transition-colors"
+              className="ac-btn ac-btn-glass"
             >
               📊 Открыть аналитику
             </Link>
             <Link
               href="/admin/reports"
-              className="px-4 h-9 rounded-xl bg-white/15 text-white text-sm font-medium flex items-center gap-2 hover:bg-white/25 transition-colors"
+              className="ac-btn ac-btn-glass"
             >
               📑 Создать отчет
             </Link>
@@ -882,6 +876,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
 
       {/* ── Рабочие пространства (Гл. 1.44): переключение одним кликом ── */}
       <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="ac-tabs flex-wrap">
         {WORKSPACES.map((ws) => {
           const active = activeWs === ws.key;
           return (
@@ -889,16 +884,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
               key={ws.key}
               onClick={() => setActiveWs(ws.key)}
               title={ws.description}
-              className={`px-3 h-8 rounded-xl text-xs font-medium transition-colors ${
-                active
-                  ? "bg-primary text-white shadow-sm"
-                  : "bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-muted)] hover:border-primary hover:text-[var(--admin-text)]"
-              }`}
+              className={`ac-tab ${active ? "ac-tab-active" : ""}`}
             >
               {ws.icon} {ws.label}
             </button>
           );
         })}
+        </div>
         {/* Меню настроек пространства: экспорт, импорт, обмен, сброс (Гл. 1.44) */}
         <div ref={wsMenuRef} className="relative">
           <button
@@ -907,11 +899,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
               if (!wsMenuOpen) setConfirmReset(false);
             }}
             title="Настройки пространства: экспорт, импорт, сброс"
-            className={`w-8 h-8 rounded-xl transition-colors ${
-              wsMenuOpen
-                ? "bg-primary text-white"
-                : "bg-[var(--admin-card)] border border-[var(--admin-border)] text-[var(--admin-muted)] hover:border-primary hover:text-[var(--admin-text)]"
-            }`}
+            className={`ac-btn ac-btn-sm ac-btn-icon ${wsMenuOpen ? "ac-btn-primary" : "ac-btn-secondary"}`}
           >
             ⚙️
           </button>
@@ -984,7 +972,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
 
       {/* ── Панель инструментов: период данных + библиотека виджетов (Гл. 1.17, 1.32, 1.33) ── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-1 bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-xl p-1">
+        <div className="ac-tabs">
           {PERIOD_OPTIONS.map((p) => (
             <button
               key={p.key}
@@ -993,9 +981,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
                 load(p.key);
               }}
               disabled={p.key === period}
-              className={`px-3 h-8 rounded-lg text-xs font-medium transition-colors disabled:opacity-90 ${
-                p.key === period ? "bg-secondary text-white" : "text-[var(--admin-muted)] hover:bg-[var(--admin-bg)] hover:text-[var(--admin-text)]"
-              }`}
+              className={`ac-tab ${p.key === period ? "ac-tab-active" : ""}`}
             >
               {p.label}
             </button>
@@ -1003,7 +989,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
         </div>
         <button
           onClick={() => setLibOpen(true)}
-          className="px-3 h-8 rounded-xl bg-[var(--admin-card)] border border-[var(--admin-border)] text-xs font-medium text-[var(--admin-muted)] hover:text-[var(--admin-text)] hover:border-primary transition-colors"
+          className="ac-btn ac-btn-secondary ac-btn-sm"
         >
           ➕ Добавить виджет
         </button>
@@ -1020,7 +1006,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
               <button
                 key={key}
                 onClick={() => setFullscreen(key)}
-                className="px-2.5 py-1.5 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] text-xs hover:border-primary/40 hover:text-primary transition-colors"
+                className="ac-btn ac-btn-secondary ac-btn-sm"
                 title="Открыть в полноэкранном режиме"
               >
                 {m.icon} {m.title}
@@ -1052,17 +1038,17 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
                   <Link
                     key={card.key}
                     href={card.href}
-                    className="bg-[var(--admin-bg)] border border-[var(--admin-border)] rounded-2xl p-4 hover:shadow-lg hover:border-primary/40 transition-all group"
+                    className="ac-card ac-card-hover p-3.5 group flex flex-col"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-[var(--admin-muted)] font-medium group-hover:text-primary transition-colors">
-                        {card.title}
-                      </span>
-                      <span className="w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: `${color}1a` }}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="ac-kpi-icon shrink-0" style={{ background: `${color}1a` }}>
                         <span style={{ color }}>{card.key.includes("revenue") || card.key === "commission" ? "💰" : "📊"}</span>
                       </span>
+                      <span className="text-[11px] font-medium text-[var(--admin-muted)] leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+                        {card.title}
+                      </span>
                     </div>
-                    {card.body}
+                    <div className="mt-2.5 flex-1">{card.body}</div>
                   </Link>
                 );
               })}
@@ -1109,9 +1095,9 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
                 return (
                   <Link
                     key={t.status}
-                    href={`/admin/orders?status=${t.status}`}
+                    href={`/admin/sales-execution?status=${t.status}`}
                     title={tip}
-                    className="px-2 py-1 rounded-lg bg-[var(--admin-bg)] text-xs text-[var(--admin-muted)] hover:text-[var(--admin-text)] hover:border-primary border border-transparent transition-colors"
+                    className="ac-chip"
                   >
                     {t.label} <b className="text-[var(--admin-text)]">{t.count}</b>
                     {t.reminded > 0 && (
@@ -1134,7 +1120,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
                       <div className="flex items-center justify-between mt-1.5">
                         <span className="text-[10px] text-[var(--admin-muted)]">⏰ {fmtDateTime(t.deadline)}</span>
                         <Link
-                          href={`/admin/orders?open=${t.id}&tab=${t.tab ?? "overview"}`}
+                          href={`/admin/sales-execution?open=${t.id}&tab=overview`}
                           className="text-[11px] text-primary font-medium hover:underline"
                         >
                           Открыть
@@ -1164,7 +1150,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
                 {data.queues.map((q) => (
                   <Link
                     key={q.key}
-                    href={`/admin/orders?status=${q.statuses.join(",")}`}
+                    href={`/admin/sales-execution?status=${q.statuses.join(",")}`}
                     title={QUEUE_HINTS[q.key]}
                     className="flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-[var(--admin-bg)] transition-colors group"
                   >
@@ -1184,7 +1170,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
                   <Link
                     key={a.label}
                     href={a.href}
-                    className="flex items-center gap-2 px-3 h-9 rounded-xl bg-[var(--admin-bg)] text-sm text-[var(--admin-muted)] hover:border-primary hover:text-primary border border-transparent transition-colors"
+                    className="ac-chip justify-start w-full"
                   >
                     <span>{a.icon}</span>
                     <span className="truncate">{a.label}</span>
@@ -1207,7 +1193,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
               onFullscreen={() => setFullscreen("ai")}
               onExport={() => exportWidget("ai")}
             >
-              <div className="flex items-center gap-1 flex-wrap mb-3">
+              <div className="ac-tabs flex-wrap mb-3">
                 {(
                   [
                     ["summary", "Сводка"],
@@ -1219,9 +1205,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
                   <button
                     key={key}
                     onClick={() => setAiTab(key)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                      aiTab === key ? "bg-secondary text-white" : "text-[var(--admin-muted)] hover:bg-[var(--admin-bg)]"
-                    }`}
+                    className={`ac-tab ${aiTab === key ? "ac-tab-active" : ""}`}
                   >
                     {label}
                   </button>
@@ -2036,61 +2020,64 @@ function DeptCard({ title, rows }: { title: string; rows: [string, string][] }) 
   );
 }
 
-/* ─── KPI-карточки (Гл. 1.7): общий билдер для страницы и полноэкранного вида ─── */
-function buildKpiCards(kpi: DashData["kpi"]): { key: string; title: string; href: string; body: React.ReactNode }[] {
+/* ─── KPI-карточки (Гл. 1.7): общий билдер для страницы и полноэкранного вида ───
+ * Все карточки считаются за выбранный период (Dashboard API), поэтому заголовки
+ * и переходы включают метку периода — цифры меняются вместе с переключателем. */
+function buildKpiCards(kpi: DashData["kpi"], period: PeriodKey): { key: string; title: string; href: string; body: React.ReactNode }[] {
+  const periodLabel = PERIOD_OPTIONS.find((p) => p.key === period)?.label ?? "период";
   return [
     {
       key: "ordersToday",
-      title: "Заказы за сегодня",
-      href: "/admin/orders?period=today",
+      title: `Заказы за ${periodLabel.toLowerCase()}`,
+      href: `/admin/sales-execution?period=${period}`,
       body: <KpiValue kpi={kpi.ordersToday} format={(v) => fmtNumber(v)} />,
     },
     {
       key: "ordersInWork",
       title: "Заказы в работе",
-      href: "/admin/orders?status=DRAFT,CREATED,PROCESSING,AWAITING_CONFIRMATION,CONFIRMED,AWAITING_PAYMENT,PARTIALLY_PAID,PAID,DOCUMENT_PREP,READY,CHANGED,OVERDUE",
+      href: `/admin/sales-execution?period=${period}&status=DRAFT,CREATED,PROCESSING,AWAITING_CONFIRMATION,CONFIRMED,AWAITING_PAYMENT,PARTIALLY_PAID,PAID,DOCUMENT_PREP,READY,CHANGED,OVERDUE`,
       body: <KpiValue kpi={kpi.ordersInWork} format={(v) => fmtNumber(v)} />,
     },
     {
       key: "awaitingConfirmation",
       title: "Ожидают подтверждения",
-      href: "/admin/orders?status=AWAITING_CONFIRMATION",
+      href: `/admin/sales-execution?period=${period}&status=AWAITING_CONFIRMATION`,
       body: <KpiValue kpi={kpi.awaitingConfirmation} format={(v) => fmtNumber(v)} />,
     },
     {
       key: "awaitingPayment",
       title: "Ожидают оплаты",
-      href: "/admin/orders?status=AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE",
+      href: `/admin/sales-execution?period=${period}&status=AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE`,
       body: <KpiValue kpi={kpi.awaitingPayment} format={(v) => fmtNumber(v)} />,
     },
     {
       key: "completed",
       title: "Выполненные",
-      href: "/admin/orders?status=COMPLETED",
+      href: `/admin/sales-execution?period=${period}&status=COMPLETED`,
       body: <KpiValue kpi={kpi.completed} format={(v) => fmtNumber(v)} />,
     },
     {
       key: "revenueToday",
-      title: "Доход за сегодня",
-      href: "/admin/sales",
+      title: `Доход за ${periodLabel.toLowerCase()}`,
+      href: `/admin/sales-execution?period=${period}`,
       body: <KpiValue kpi={kpi.revenueToday} format={(v) => fmtMoney(v)} spark />,
     },
     {
       key: "revenueMonth",
-      title: "Доход за месяц",
-      href: "/admin/sales",
+      title: `Доход за ${periodLabel.toLowerCase()} (прогноз)`,
+      href: `/admin/sales-execution?period=${period}`,
       body: (
         <div>
           <div className="text-2xl font-bold">{fmtMoney(kpi.revenueMonth.value)}</div>
           <div className="flex items-center gap-2 text-xs mt-1">
-            <ChangeBadge change={kpi.revenueMonth.change} suffix=" к прошлому месяцу" />
+            <ChangeBadge change={kpi.revenueMonth.change} suffix=" к прошлому периоду" />
           </div>
           <div className="mt-2">
             <div className="h-1.5 bg-[var(--admin-bg)] rounded-full overflow-hidden">
               <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, kpi.revenueMonth.planPct ?? 0)}%` }} />
             </div>
             <div className="text-[11px] text-[var(--admin-muted)] mt-1">
-              {kpi.revenueMonth.planPct}% плана · прогноз {fmtMoney(kpi.revenueMonth.forecast ?? 0)}
+              {kpi.revenueMonth.planPct}% к прошлому периоду · прогноз {fmtMoney(kpi.revenueMonth.forecast ?? 0)}
             </div>
           </div>
         </div>
@@ -2103,7 +2090,7 @@ function buildKpiCards(kpi: DashData["kpi"]): { key: string; title: string; href
       body: (
         <div>
           <div className="text-2xl font-bold">{fmtMoney(kpi.commission.value)}</div>
-          <div className="text-xs text-[var(--admin-muted)] mt-1">12% от дохода месяца</div>
+          <div className="text-xs text-[var(--admin-muted)] mt-1">12% от дохода за период</div>
         </div>
       ),
     },
@@ -2243,7 +2230,7 @@ function SalesWidget({ data }: { data: DashData }) {
           <div className="text-xs text-[var(--admin-muted)]">Нет оплаченных заказов за период</div>
         )}
         <div className="mt-2">
-          <Link href="/admin/orders" className="text-[11px] text-primary font-medium hover:underline">
+          <Link href="/admin/sales-execution" className="text-[11px] text-primary font-medium hover:underline">
             Открыть реестр заказов →
           </Link>
         </div>
@@ -2268,7 +2255,7 @@ function ExecutionWidget({ data }: { data: DashData }) {
           statuses ? (
             <Link
               key={label}
-              href={`/admin/orders?status=${statuses}`}
+              href={`/admin/sales-execution?status=${statuses}`}
               className="flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-[var(--admin-bg)] transition-colors group"
             >
               <span className="text-sm text-[var(--admin-muted)] group-hover:text-[var(--admin-text)]">{label}</span>
@@ -2285,7 +2272,7 @@ function ExecutionWidget({ data }: { data: DashData }) {
         )}
       </div>
       <div className="mt-3 pt-3 border-t border-[var(--admin-border)]">
-        <Link href="/admin/orders" className="text-[11px] text-primary font-medium hover:underline">
+        <Link href="/admin/sales-execution" className="text-[11px] text-primary font-medium hover:underline">
           Открыть реестр заказов →
         </Link>
       </div>

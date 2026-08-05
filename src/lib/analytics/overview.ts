@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import {
+  ORDER_STATUS_GROUPS,
   SERVICE_TYPE_LABELS,
   SERVICE_TYPE_ICONS,
   changePct,
@@ -13,49 +14,64 @@ import {
   analyticsRange,
 } from "@/lib/analytics";
 
-const PAID: ("PAID" | "COMPLETED")[] = ["PAID", "COMPLETED"];
+const PAID = [...ORDER_STATUS_GROUPS.paid] as const;
 
 /**
  * 2.9 Общая аналитика — главный аналитический экран платформы.
  * KPI платформы, Индекс здоровья бизнеса (2.9.7), динамика (2.9.8),
  * структура доходов (2.9.9), география (2.9.10), AI-инсайты и Пульс компании (2.9.11).
+ *
+ * Все денежные и количественные показатели строятся на заказах (Order) —
+ * том же источнике, что раздел «Продажи и исполнение» (Гл. 3), чтобы карточки
+ * Аналитики совпадали с реестром заказов.
  */
 export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSectionData> {
   const range = analyticsRange(f);
 
-  // Фильтры по услуге
+  // Фильтры по услуге (заказ связан с услугами через бронирования)
   const serviceFilter: Record<string, unknown> = {};
   if (f.country) serviceFilter.countryCode = f.country;
   if (f.city) serviceFilter.city = { contains: f.city };
   if (f.type) serviceFilter.type = f.type;
   if (f.partnerId) serviceFilter.providerId = f.partnerId;
+  if (f.currency) serviceFilter.currency = f.currency;
   const hasServiceFilter = Object.keys(serviceFilter).length > 0;
 
-  const bookingWhere: Record<string, unknown> = { createdAt: { gte: range.start, lte: range.end } };
-  const prevBookingWhere: Record<string, unknown> = { createdAt: { gte: range.prevStart, lte: range.prevEnd } };
+  const orderWhere: Record<string, unknown> = { createdAt: { gte: range.start, lte: range.end } };
+  const prevOrderWhere: Record<string, unknown> = { createdAt: { gte: range.prevStart, lte: range.prevEnd } };
+  if (f.status) {
+    orderWhere.status = f.status;
+    prevOrderWhere.status = f.status;
+  }
   if (hasServiceFilter) {
-    bookingWhere.service = serviceFilter;
-    prevBookingWhere.service = serviceFilter;
+    orderWhere.bookings = { some: { service: serviceFilter } };
+    prevOrderWhere.bookings = { some: { service: serviceFilter } };
   }
 
-  // ── KPI: выручка, продажи, средний чек, прибыль ──
-  const [paidAgg, prevPaidAgg, bookingsAgg, prevBookingsAgg] = await Promise.all([
-    prisma.booking.aggregate({ where: { ...bookingWhere, status: { in: PAID } }, _sum: { amount: true }, _count: true, _avg: { amount: true } }),
-    prisma.booking.aggregate({ where: { ...prevBookingWhere, status: { in: PAID } }, _sum: { amount: true }, _count: true, _avg: { amount: true } }),
-    prisma.booking.aggregate({ where: bookingWhere, _count: true }),
-    prisma.booking.aggregate({ where: prevBookingWhere, _count: true }),
-  ]);
-  const revenue = paidAgg._sum.amount ?? 0;
-  const revenuePrev = prevPaidAgg._sum.amount ?? 0;
-  const salesCount = paidAgg._count;
-  const avgCheck = paidAgg._avg.amount ?? 0;
+  // Платёжные агрегаты уважают фильтр статуса: при выбранном статусе вся страница
+  // показывает данные только по нему, иначе — только оплаченные (Гл. 2.7).
+  const paidStatus: { in: (typeof PAID)[number][] } | (typeof PAID)[number] = f.status
+    ? (f.status as (typeof PAID)[number])
+    : { in: [...PAID] };
 
-  // ── KPI: бронирования по статусам, отмены, возвраты ──
+  // ── KPI: выручка, продажи, заказы, средний чек, прибыль ──
+  const [paidAgg, prevPaidAgg, ordersAgg, prevOrdersAgg] = await Promise.all([
+    prisma.order.aggregate({ where: { ...orderWhere, status: paidStatus }, _sum: { paidAmount: true }, _count: true, _avg: { paidAmount: true } }),
+    prisma.order.aggregate({ where: { ...prevOrderWhere, status: paidStatus }, _sum: { paidAmount: true }, _count: true, _avg: { paidAmount: true } }),
+    prisma.order.aggregate({ where: orderWhere, _count: true }),
+    prisma.order.aggregate({ where: prevOrderWhere, _count: true }),
+  ]);
+  const revenue = paidAgg._sum.paidAmount ?? 0;
+  const revenuePrev = prevPaidAgg._sum.paidAmount ?? 0;
+  const salesCount = paidAgg._count;
+  const avgCheck = paidAgg._avg.paidAmount ?? 0;
+
+  // ── KPI: заказы по статусам, отмены, возвраты ──
   const [statusRows, prevStatusRows, refundAgg, prevRefundAgg] = await Promise.all([
-    prisma.booking.groupBy({ by: ["status"], where: bookingWhere, _count: true }),
-    prisma.booking.groupBy({ by: ["status"], where: prevBookingWhere, _count: true }),
-    prisma.booking.aggregate({ where: { ...bookingWhere, status: "REFUNDED" }, _sum: { amount: true }, _count: true }),
-    prisma.booking.aggregate({ where: { ...prevBookingWhere, status: "REFUNDED" }, _sum: { amount: true }, _count: true }),
+    prisma.order.groupBy({ by: ["status"], where: orderWhere, _count: true }),
+    prisma.order.groupBy({ by: ["status"], where: prevOrderWhere, _count: true }),
+    prisma.order.aggregate({ where: { ...orderWhere, status: "REFUNDED" }, _sum: { amount: true }, _count: true }),
+    prisma.order.aggregate({ where: { ...prevOrderWhere, status: "REFUNDED" }, _sum: { amount: true }, _count: true }),
   ]);
   const counts: Record<string, number> = {};
   for (const r of statusRows) counts[r.status] = r._count;
@@ -63,10 +79,10 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
   for (const r of prevStatusRows) prevCounts[r.status] = r._count;
   const refunds = refundAgg._count;
   const refundAmount = refundAgg._sum.amount ?? 0;
-  const refundPct = bookingsAgg._count ? (refunds / bookingsAgg._count) * 100 : 0;
-  const refundRate = refundAgg._count ? (refundAmount / (paidAgg._sum.amount ?? 1)) * 100 : 0;
+  const refundPct = ordersAgg._count ? (refunds / ordersAgg._count) * 100 : 0;
+  const refundRate = refundAgg._count ? (refundAmount / (paidAgg._sum.paidAmount ?? 1)) * 100 : 0;
 
-  // ── KPI: конверсия (просмотры → брони → оплата) ──
+  // ── KPI: конверсия (просмотры → заказы → оплата) ──
   const viewFilter: Record<string, unknown> = {};
   if (f.country) viewFilter.countryCode = f.country;
   if (f.type) viewFilter.type = f.type;
@@ -74,59 +90,62 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
   const viewWhere = { viewedAt: { gte: range.start, lte: range.end }, ...(hasViewFilter ? { service: viewFilter } : {}) };
   const [viewsInPeriod, paidInPeriod] = await Promise.all([
     prisma.serviceView.count({ where: viewWhere }),
-    prisma.booking.count({ where: { ...bookingWhere, status: { in: PAID } } }),
+    prisma.order.count({ where: { ...orderWhere, status: paidStatus } }),
   ]);
-  const conversion = bookingsAgg._count ? (paidInPeriod / bookingsAgg._count) * 100 : 0;
+  const conversion = ordersAgg._count ? (paidInPeriod / ordersAgg._count) * 100 : 0;
 
   // ── KPI: клиенты — новые, повторные, LTV ──
   const [newUsers, prevNewUsers, buyersWithOrders, totalRevenueAll] = await Promise.all([
     prisma.user.count({ where: { createdAt: { gte: range.start, lte: range.end } } }),
     prisma.user.count({ where: { createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
     prisma.user.count({ where: { role: "BUYER", orders: { some: {} } } }),
-    prisma.booking.aggregate({ where: { status: { in: PAID } }, _sum: { amount: true } }),
+    prisma.order.aggregate({ where: { status: { in: [...PAID] } }, _sum: { paidAmount: true } }),
   ]);
   // Повторные покупатели — клиенты с 2+ заказами
   const repeatBuyerIds = await prisma.order.groupBy({ by: ["userId"], _count: { _all: true } });
   const repeatBuyers = repeatBuyerIds.filter((r) => r._count._all >= 2).length;
   const repeatPct = buyersWithOrders ? (repeatBuyers / buyersWithOrders) * 100 : 0;
-  const ltv = buyersWithOrders ? (totalRevenueAll._sum?.amount ?? 0) / buyersWithOrders : 0;
+  const ltv = buyersWithOrders ? (totalRevenueAll._sum?.paidAmount ?? 0) / buyersWithOrders : 0;
 
   // ── KPI: партнёры онлайн ──
   const onlineCutoff = new Date(Date.now() - 15 * 60000);
   const partnersOnline = await prisma.user.count({ where: { role: "PARTNER", lastLoginAt: { gte: onlineCutoff } } });
 
   // ── Серии: выручка, заказы, новые клиенты ──
-  const revRows = await prisma.booking.findMany({
-    where: { ...bookingWhere, status: { in: PAID } },
-    select: { createdAt: true, amount: true },
+  const paidRows = await prisma.order.findMany({
+    where: { ...orderWhere, status: paidStatus },
+    select: {
+      createdAt: true,
+      paidAmount: true,
+      bookings: { select: { service: { select: { type: true, countryCode: true, country: true, city: true } } } },
+    },
   });
-  const revenueSeries = bucketize(revRows.map((r) => ({ at: r.createdAt, amount: r.amount })), f.period, range);
+  const revenueSeries = bucketize(paidRows.map((r) => ({ at: r.createdAt, amount: r.paidAmount ?? 0 })), f.period, range);
   const orderRows = await prisma.order.findMany({ where: { createdAt: { gte: range.start, lte: range.end } }, select: { createdAt: true } });
   const ordersSeries = bucketize(orderRows.map((r) => ({ at: r.createdAt, amount: 1 })), f.period, range);
   const userRows = await prisma.user.findMany({ where: { createdAt: { gte: range.start, lte: range.end } }, select: { createdAt: true } });
   const usersSeries = bucketize(userRows.map((r) => ({ at: r.createdAt, amount: 1 })), f.period, range);
 
-  // ── Структура доходов по категориям (2.9.9) ──
-  const typeRows = await prisma.booking.groupBy({
-    by: ["serviceId"],
-    where: { ...bookingWhere, status: { in: PAID } },
-    _sum: { amount: true },
-    _count: true,
-  });
-  const typeServiceIds = typeRows.map((r) => r.serviceId);
-  const typeServices = typeServiceIds.length
-    ? await prisma.service.findMany({ where: { id: { in: typeServiceIds } }, select: { id: true, type: true } })
-    : [];
-  const typeMap = new Map(typeServices.map((s) => [s.id, s.type]));
+  // ── Структура доходов по категориям (2.9.9): по услугам оплаченных заказов ──
   const typeAgg: Record<string, { count: number; revenue: number }> = {};
-  for (const r of typeRows) {
-    const t = typeMap.get(r.serviceId) ?? "OTHER";
-    typeAgg[t] ??= { count: 0, revenue: 0 };
-    typeAgg[t].count += r._count;
-    typeAgg[t].revenue += r._sum.amount ?? 0;
+  for (const o of paidRows) {
+    const services = o.bookings.map((b) => b.service);
+    if (!services.length) {
+      typeAgg["OTHER"] ??= { count: 0, revenue: 0 };
+      typeAgg["OTHER"].count += 1;
+      typeAgg["OTHER"].revenue += o.paidAmount ?? 0;
+      continue;
+    }
+    const perType = (o.paidAmount ?? 0) / services.length;
+    for (const s of services) {
+      const t = s.type ?? "OTHER";
+      typeAgg[t] ??= { count: 0, revenue: 0 };
+      typeAgg[t].count += 1;
+      typeAgg[t].revenue += perType;
+    }
   }
   const categoryRows = Object.entries(typeAgg)
-    .map(([type, v]) => ({ type, label: SERVICE_TYPE_LABELS[type] ?? "Прочие", icon: SERVICE_TYPE_ICONS[type] ?? "🧩", count: v.count, revenue: v.revenue }))
+    .map(([type, v]) => ({ type, label: SERVICE_TYPE_LABELS[type] ?? "Прочие", icon: SERVICE_TYPE_ICONS[type] ?? "🧩", count: v.count, revenue: Math.round(v.revenue) }))
     .sort((a, b) => b.revenue - a.revenue);
   const categoryDonut = {
     key: "structure",
@@ -141,33 +160,55 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
     rows: categoryRows.map((c) => ({ label: c.label, value: c.revenue, sub: `${c.count} продаж · ${SERVICE_TYPE_LABELS[c.type] ?? c.type}` })),
   };
 
-  // ── География продаж (2.9.10) ──
-  const geoRows = await prisma.booking.findMany({
-    where: { ...bookingWhere, status: { in: PAID } },
-    select: { amount: true, service: { select: { countryCode: true, country: true, city: true } } },
-  });
-  const countryAgg = new Map<string, { name: string; revenue: number; count: number }>();
-  for (const r of geoRows) {
-    const code = r.service.countryCode ?? "OTHER";
-    const entry = countryAgg.get(code) ?? { name: r.service.country ?? code, revenue: 0, count: 0 };
-    entry.revenue += r.amount;
-    entry.count += 1;
-    countryAgg.set(code, entry);
+  // ── География продаж (2.9.10): Страна → Город для интерактивной карты ──
+  const countryAgg = new Map<string, { name: string; revenue: number; count: number; cities: Map<string, { revenue: number; count: number }> }>();
+  for (const o of paidRows) {
+    const services = o.bookings.map((b) => b.service);
+    const perDest = services.length ? (o.paidAmount ?? 0) / services.length : (o.paidAmount ?? 0);
+    const dests = services.length ? services : [];
+    if (!dests.length) {
+      const code = "OTHER";
+      const entry = countryAgg.get(code) ?? { name: "Прочее", revenue: 0, count: 0, cities: new Map() };
+      entry.revenue += perDest;
+      entry.count += 1;
+      countryAgg.set(code, entry);
+      continue;
+    }
+    for (const s of dests) {
+      const code = s.countryCode ?? "OTHER";
+      const entry = countryAgg.get(code) ?? { name: s.country ?? code, revenue: 0, count: 0, cities: new Map() };
+      entry.revenue += perDest;
+      entry.count += 1;
+      const city = s.city ?? "—";
+      const cityEntry = entry.cities.get(city) ?? { revenue: 0, count: 0 };
+      cityEntry.revenue += perDest;
+      cityEntry.count += 1;
+      entry.cities.set(city, cityEntry);
+      countryAgg.set(code, entry);
+    }
   }
+  const geo: { code: string; name: string; revenue: number; count: number; cities: { name: string; revenue: number; count: number }[] }[] = [...countryAgg.entries()]
+    .map(([code, v]) => ({
+      code,
+      name: v.name,
+      revenue: Math.round(v.revenue),
+      count: v.count,
+      cities: [...v.cities.entries()]
+        .map(([name, c]) => ({ name, revenue: Math.round(c.revenue), count: c.count }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 6),
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
   const geoBar = {
     key: "geo",
     title: "Продажи по странам",
     icon: "🌍",
-    rows: [...countryAgg.entries()]
-      .map(([code, v]) => ({ label: `${code} · ${v.name}`, value: Math.round(v.revenue), sub: `${v.count} продаж` }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8),
+    rows: geo.slice(0, 8).map((g) => ({ label: `${g.code} · ${g.name}`, value: g.revenue, sub: `${g.count} продаж · ${g.cities.length} городов` })),
   };
 
   // ── Индекс здоровья бизнеса (2.9.7): композит 0–100 ──
-  // Факторы: выполнение плана (100% = доход периода к среднему 3 мес), конверсия,
-  // скорость обработки (из OrderHistory), доля успешных броней, прибыльность,
-  // возвраты (ниже — лучше), надёжность партнёров, доступность интеграций (симуляция).
+  // Факторы: выполнение плана (100% = доход периода к предыдущему), конверсия,
+  // возвраты (ниже — лучше), прибыльность (12% комиссия).
   const planFactor = Math.min(100, Math.round((revenue / Math.max(1, revenuePrev || revenue)) * 100));
   const convFactor = Math.min(100, Math.round(conversion));
   const refundFactor = Math.max(0, 100 - Math.round(refundPct * 12));
@@ -179,7 +220,7 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
     label: health >= 80 ? "Отличное состояние" : health >= 60 ? "Хорошее состояние" : health >= 40 ? "Удовлетворительное" : "Требуется внимание",
     factors: [
       { label: `Выполнение плана: ${planFactor}%`, effect: planFactor >= 70 ? "up" as const : "down" as const, weight: planFactor },
-      { label: `Конверсия бронь → оплата: ${conversion.toFixed(0)}%`, effect: conversion >= 40 ? "up" as const : "down" as const, weight: convFactor },
+      { label: `Конверсия заказ → оплата: ${conversion.toFixed(0)}%`, effect: conversion >= 40 ? "up" as const : "down" as const, weight: convFactor },
       { label: `Возвраты: ${refundRate.toFixed(1)}% от выручки`, effect: refundRate <= 3 ? "up" as const : "down" as const, weight: refundFactor },
       { label: `Маржа платформы: 12% комиссия`, effect: "up" as const, weight: profitFactor },
     ],
@@ -211,7 +252,7 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
     prisma.order.findMany({ where: { createdAt: { gte: dayAgo } }, orderBy: { createdAt: "desc" }, take: 3, select: { createdAt: true, orderNumber: true, amount: true } }),
     prisma.booking.findMany({ where: { createdAt: { gte: dayAgo } }, orderBy: { createdAt: "desc" }, take: 3, select: { createdAt: true, amount: true, status: true } }),
     prisma.user.findMany({ where: { createdAt: { gte: dayAgo } }, orderBy: { createdAt: "desc" }, take: 3, select: { createdAt: true, firstName: true, role: true } }),
-    prisma.booking.findMany({ where: { status: "REFUNDED", updatedAt: { gte: dayAgo } }, orderBy: { updatedAt: "desc" }, take: 2, select: { updatedAt: true, amount: true } }),
+    prisma.order.findMany({ where: { status: "REFUNDED", updatedAt: { gte: dayAgo } }, orderBy: { updatedAt: "desc" }, take: 2, select: { updatedAt: true, amount: true } }),
     prisma.orderMessage.count({ where: { createdAt: { gte: dayAgo } } }),
   ]);
   const pulse: PulseItem[] = [];
@@ -230,17 +271,17 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
     periodLabel: range.start.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }),
     kpis: [
       { key: "revenue", title: "Выручка", value: revenue, change: changePct(revenue, revenuePrev), forecast: Math.round(revenue * (1 + seriesTrendPct(revenueSeries.values) / 100)), spark: revenueSeries.values, tone: revenue >= revenuePrev ? "positive" : "negative" },
-      { key: "sales", title: "Продано услуг", value: salesCount, change: changePct(salesCount, prevPaidAgg._count), tone: "neutral" },
-      { key: "orders", title: "Бронирования", value: bookingsAgg._count, change: changePct(bookingsAgg._count, prevBookingsAgg._count), tone: "neutral" },
-      { key: "avgCheck", title: "Средний чек", value: avgCheck, change: changePct(avgCheck, prevPaidAgg._avg.amount ?? 0), tone: "neutral" },
-      { key: "conversion", title: "Конверсия", value: conversion, unit: "%", tone: conversion >= 40 ? "positive" : "negative", detail: `${paidInPeriod} оплат из ${bookingsAgg._count} броней` },
+      { key: "sales", title: "Продано услуг", value: salesCount, unit: " шт", change: changePct(salesCount, prevPaidAgg._count), tone: "neutral" },
+      { key: "orders", title: "Заказы", value: ordersAgg._count, unit: " шт", change: changePct(ordersAgg._count, prevOrdersAgg._count), tone: "neutral" },
+      { key: "avgCheck", title: "Средний чек", value: avgCheck, change: changePct(avgCheck, prevPaidAgg._avg.paidAmount ?? 0), tone: "neutral" },
+      { key: "conversion", title: "Конверсия", value: conversion, unit: "%", tone: conversion >= 40 ? "positive" : "negative", detail: `${paidInPeriod} оплат из ${ordersAgg._count} заказов` },
       { key: "profit", title: "Прибыль платформы", value: Math.round(revenue * 0.12), change: changePct(revenue * 0.12, revenuePrev * 0.12), tone: "positive", detail: "комиссия 12%" },
       { key: "refunds", title: "Возвраты", value: refunds, change: changePct(refunds, prevRefundAgg._count), tone: refunds > prevRefundAgg._count ? "negative" : "positive", detail: `${refundRate.toFixed(1)}% от выручки` },
-      { key: "newUsers", title: "Новые клиенты", value: newUsers, change: changePct(newUsers, prevNewUsers), spark: usersSeries.values, tone: "neutral" },
+      { key: "newUsers", title: "Новые клиенты", value: newUsers, unit: " чел.", change: changePct(newUsers, prevNewUsers), spark: usersSeries.values, tone: "neutral" },
       { key: "repeat", title: "Повторные покупки", value: repeatPct, unit: "%", tone: repeatPct >= 30 ? "positive" : "neutral", detail: `${repeatBuyers} клиентов с 2+ заказами` },
       { key: "ltv", title: "LTV клиента", value: Math.round(ltv) },
-      { key: "nps", title: "NPS (оценка)", value: 82, detail: "по отзывам и возвратам" },
-      { key: "partnersOnline", title: "Партнёров онлайн", value: partnersOnline },
+      { key: "nps", title: "NPS (оценка)", value: 82, unit: "/100", detail: "по отзывам и возвратам" },
+      { key: "partnersOnline", title: "Партнёров онлайн", value: partnersOnline, unit: " шт" },
     ],
     health: healthBlock,
     pulse,
@@ -250,19 +291,20 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
         title: "Воронка конверсии",
         steps: [
           { label: "Просмотры услуг", value: viewsInPeriod },
-          { label: "Бронирования", value: bookingsAgg._count, detail: `${viewsInPeriod ? Math.round((bookingsAgg._count / viewsInPeriod) * 100) : 0}% от просмотров` },
-          { label: "Оплачено", value: paidInPeriod, detail: `${conversion.toFixed(0)}% от броней` },
+          { label: "Заказы", value: ordersAgg._count, detail: `${viewsInPeriod ? Math.round((ordersAgg._count / viewsInPeriod) * 100) : 0}% от просмотров` },
+          { label: "Оплачено", value: paidInPeriod, detail: `${conversion.toFixed(0)}% от заказов` },
         ],
       },
     ],
     series: [
       { key: "revenue", title: "Выручка", icon: "📈", mode: "area", data: revenueSeries },
-      { key: "orders", title: "Бронирования", icon: "📑", mode: "bar", data: ordersSeries },
+      { key: "orders", title: "Заказы", icon: "📦", mode: "bar", data: ordersSeries },
       { key: "users", title: "Новые клиенты", icon: "👥", mode: "line", data: usersSeries },
     ],
     donuts: [categoryDonut],
     barLists: [categoryBar, geoBar],
     tables: [],
     ai,
+    geo,
   };
 }

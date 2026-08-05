@@ -18,6 +18,10 @@ interface SearchResults {
 const ROLE_ICONS: Record<string, string> = {
   ADMIN: "🛡",
   MODERATOR: "🛠",
+  DIRECTOR: "👔",
+  FINANCE: "💵",
+  MARKETER: "📣",
+  ANALYST: "📊",
   BUYER: "👤",
   PARTNER: "🤝",
   SALES_MANAGER: "💼",

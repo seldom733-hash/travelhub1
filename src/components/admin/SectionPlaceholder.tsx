@@ -49,13 +49,6 @@ export default function SectionPlaceholder({
           >
             ← В Центр управления
           </Link>
-          <Link
-            href="/admin/bookings"
-            className="px-5 h-10 rounded-xl inline-flex items-center text-sm font-medium transition-all hover:bg-black/5 active:scale-[0.98]"
-            style={{ border: "1px solid var(--admin-border)", color: "var(--admin-text)" }}
-          >
-            📑 Бронирования
-          </Link>
         </div>
       </div>
     </div>

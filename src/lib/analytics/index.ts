@@ -9,7 +9,9 @@ export { getFinanceData } from "./finance";
 export { getCrmData } from "./crm";
 export { getPartnersData } from "./partners";
 export { getCatalogData } from "./catalog";
+export { getAiData } from "./ai";
 export { getMarketingData } from "./marketing";
+export { getDepartmentsData } from "./departments";
 export * from "@/lib/analytics";
 
 import type { AnalyticsFilters, AnalyticsSection } from "@/lib/analytics";
@@ -23,6 +25,8 @@ import { getCrmData } from "./crm";
 import { getPartnersData } from "./partners";
 import { getCatalogData } from "./catalog";
 import { getMarketingData } from "./marketing";
+import { getDepartmentsData } from "./departments";
+import { getAiData } from "./ai";
 
 export const ANALYTICS_SECTIONS: { key: AnalyticsSection; title: string; icon: string }[] = [
   { key: "overview", title: "Общая аналитика", icon: "🏛️" },
@@ -34,6 +38,8 @@ export const ANALYTICS_SECTIONS: { key: AnalyticsSection; title: string; icon: s
   { key: "partners", title: "Партнёры", icon: "🤝" },
   { key: "catalog", title: "Каталог услуг", icon: "🗂️" },
   { key: "marketing", title: "Маркетинг", icon: "📣" },
+  { key: "departments", title: "Подразделения", icon: "🏢" },
+  { key: "ai", title: "AI Analytics", icon: "🤖" },
 ];
 
 const BUILDERS: Record<AnalyticsSection, (f: AnalyticsFilters) => Promise<AnalyticsSectionData>> = {
@@ -46,6 +52,8 @@ const BUILDERS: Record<AnalyticsSection, (f: AnalyticsFilters) => Promise<Analyt
   partners: getPartnersData,
   catalog: getCatalogData,
   marketing: getMarketingData,
+  departments: getDepartmentsData,
+  ai: getAiData,
 };
 
 export function isAnalyticsSection(value: string): value is AnalyticsSection {

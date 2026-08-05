@@ -206,9 +206,9 @@ export async function getPartnersData(f: AnalyticsFilters): Promise<AnalyticsSec
     subtitle: "Партнёрская сеть и поставщики (Гл. 2.15)",
     periodLabel: range.start.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }),
     kpis: [
-      { key: "total", title: "Всего партнёров", value: partners.length, tone: "neutral" },
-      { key: "active", title: "Активные за период", value: active, tone: "positive" },
-      { key: "new", title: "Новые партнёры", value: newPartners, change: changePct(newPartners, prevPartnerCount), tone: "neutral" },
+      { key: "total", title: "Всего партнёров", value: partners.length, unit: " шт", tone: "neutral" },
+      { key: "active", title: "Активные за период", value: active, unit: " шт", tone: "positive" },
+      { key: "new", title: "Новые партнёры", value: newPartners, unit: " шт", change: changePct(newPartners, prevPartnerCount), tone: "neutral" },
       { key: "score", title: "Средний рейтинг", value: avgScore, unit: "/100", tone: avgScore >= 70 ? "positive" : "negative" },
       { key: "confirm", title: "Подтверждение броней", value: avgConfirm, unit: "%", tone: avgConfirm >= 80 ? "positive" : "negative" },
       { key: "cancel", title: "Отмены", value: avgCancel, unit: "%", tone: avgCancel <= 10 ? "positive" : "negative" },

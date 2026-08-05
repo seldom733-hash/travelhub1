@@ -24,14 +24,13 @@ export async function getDashboardMessages() {
   ]);
   return {
     unread,
-    // Каждое сообщение ведёт на карточку заказа с открытой вкладкой «Коммуникации»
     items: recent.map((m) => ({
       id: m.id,
       senderName: m.senderName,
       text: m.text,
       createdAt: m.createdAt,
       order: { id: m.order.id, orderNumber: m.order.orderNumber },
-      href: `/admin/orders?open=${m.order.id}&tab=messages`,
+      href: `/admin/sales-execution?open=${m.order.id}&tab=overview`,
     })),
   };
 }

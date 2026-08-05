@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { actorDisplayName, orderSystemMessage } from "@/lib/admin-data";
-import { SALES_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
 const MAX_IDS = 100;
 
-type BulkAction = "confirm" | "pay" | "complete" | "cancel" | "archive" | "assign_manager";
+type BulkAction = "confirm" | "pay" | "complete" | "cancel" | "archive" | "assign_manager" | "set_priority";
+
+const PRIORITY_VALUES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 // Допустимые исходные статусы и целевой статус для каждого массового действия
 type OrderStatusValue =
@@ -17,7 +18,7 @@ type OrderStatusValue =
   | "AWAITING_PAYMENT" | "PARTIALLY_PAID" | "PAID" | "DOCUMENT_PREP" | "READY"
   | "COMPLETED" | "CHANGED" | "REFUNDED" | "CANCELLED" | "OVERDUE" | "ARCHIVED";
 
-const TRANSITIONS: Record<Exclude<BulkAction, "assign_manager">, { from: OrderStatusValue[]; to: OrderStatusValue }> = {
+const TRANSITIONS: Record<Exclude<BulkAction, "assign_manager" | "set_priority">, { from: OrderStatusValue[]; to: OrderStatusValue }> = {
   confirm: { from: ["AWAITING_CONFIRMATION", "PROCESSING"], to: "CONFIRMED" },
   pay: { from: ["CONFIRMED", "AWAITING_PAYMENT", "PARTIALLY_PAID"], to: "PAID" },
   complete: { from: ["PAID", "DOCUMENT_PREP", "READY"], to: "COMPLETED" },
@@ -50,11 +51,9 @@ const TRANSITIONS: Record<Exclude<BulkAction, "assign_manager">, { from: OrderSt
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
+    if (!user || user.role === "BUYER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const denied = requireRole(user, SALES_ROLES);
-    if (denied) return denied;
 
     let body: { action?: unknown; ids?: unknown; value?: unknown };
     try {
@@ -65,12 +64,17 @@ export async function POST(request: Request) {
 
     const action = body.action;
     const isAssignManager = action === "assign_manager";
-    if (typeof action !== "string" || !(isAssignManager || action in TRANSITIONS)) {
+    const isSetPriority = action === "set_priority";
+    if (typeof action !== "string" || !(isAssignManager || isSetPriority || action in TRANSITIONS)) {
       return NextResponse.json({ error: "Недопустимое действие" }, { status: 400 });
     }
     const managerValue = isAssignManager && typeof body.value === "string" && body.value ? body.value : "";
     if (isAssignManager && !managerValue) {
       return NextResponse.json({ error: "Укажите менеджера" }, { status: 400 });
+    }
+    const priorityValue = isSetPriority && typeof body.value === "string" && PRIORITY_VALUES.includes(body.value) ? body.value : "";
+    if (isSetPriority && !priorityValue) {
+      return NextResponse.json({ error: "Укажите приоритет" }, { status: 400 });
     }
     if (!Array.isArray(body.ids) || !body.ids.length) {
       return NextResponse.json({ error: "Не выбраны заказы" }, { status: 400 });
@@ -80,7 +84,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Не выбраны заказы" }, { status: 400 });
     }
 
-    const t = isAssignManager ? null : TRANSITIONS[action as Exclude<BulkAction, "assign_manager">];
+    const t = isAssignManager || isSetPriority ? null : TRANSITIONS[action as Exclude<BulkAction, "assign_manager" | "set_priority">];
 
     const processed = await prisma.$transaction(async (tx) => {
       const rows = await tx.order.findMany({
@@ -89,7 +93,35 @@ export async function POST(request: Request) {
       });
       let count = 0;
       for (const r of rows) {
-        if (!isAssignManager && !t!.from.includes(r.status as OrderStatusValue)) continue;
+        if (!isAssignManager && !isSetPriority && !t!.from.includes(r.status as OrderStatusValue)) continue;
+        if (isSetPriority) {
+          // Смена приоритета (Гл. 3.8 «Массовые операции»): обновляем поле priority,
+          // фиксируем в журнале и системном сообщении.
+          await tx.order.update({ where: { id: r.id }, data: { priority: priorityValue as OrderPriority } });
+          await tx.orderHistory.create({
+            data: {
+              orderId: r.id,
+              action: "set_priority",
+              from: r.status,
+              to: r.status,
+              fields: JSON.stringify({ priority: priorityValue }),
+              actorId: user.id,
+              actorName: actorDisplayName(user),
+              comment: `Приоритет заказа: ${priorityValue}`,
+            },
+          });
+          await tx.orderMessage.create({
+            data: {
+              orderId: r.id,
+              senderId: null,
+              senderName: "Система",
+              senderRole: "system",
+              text: `🎯 Приоритет заказа: ${priorityValue}`,
+            },
+          });
+          count++;
+          continue;
+        }
         if (isAssignManager) {
           // Назначение менеджера: менеджер не хранится в схеме (детерминированная
           // ротация по id), поэтому фиксируем назначение в журнале и системном сообщении.
@@ -166,6 +198,9 @@ function bulkMessage(action: string): string {
     cancel: "Массовая отмена заказов",
     archive: "Массовая архивация заказов",
     assign_manager: "Назначение менеджера",
+    set_priority: "Изменение приоритета заказов",
   };
-  return map[action] ?? `Массовое действие: ${action}`;
+  return    map[action] ?? `Массовое действие: ${action}`;
 }
+
+type OrderPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";

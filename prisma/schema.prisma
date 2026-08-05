@@ -27,6 +27,11 @@ enum UserRole {
   ADMIN
   SALES_MANAGER
   OPERATOR
+  DIRECTOR
+  FINANCE
+  MARKETER
+  ANALYST
+  MODERATOR
 }
 
 enum BookingStatus {
@@ -41,6 +46,14 @@ enum BookingStatus {
 /// Ожидает подтверждения → Подтверждён → Ожидает оплаты → Частично оплачен →
 /// Оплачен → Подготовка документов → Готов к поездке → Завершён.
 /// Дополнительные статусы: Изменён, Возвращён, Отменён, Просрочен, Архивирован.
+/// Приоритет заказа (Гл. 3.7, 3.8, 3.10): влияет на порядок в рабочих очередях.
+enum OrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
 enum OrderStatus {
   DRAFT
   CREATED
@@ -151,11 +164,12 @@ model Booking {
 /// одну или несколько услуг (через бронирования), платежи, документы, партнёров,
 /// менеджеров и историю взаимодействий.
 model Order {
-  id          String      @id @default(cuid())
-  orderNumber String      @unique
+  id          String        @id @default(cuid())
+  orderNumber String        @unique
   userId      String
-  status      OrderStatus @default(CREATED)
-  currency    String      @default("USD")
+  status      OrderStatus   @default(CREATED)
+  priority    OrderPriority @default(MEDIUM)
+  currency    String        @default("USD")
   amount      Float
   paidAmount  Float       @default(0)
   serviceDate DateTime?
@@ -167,6 +181,8 @@ model Order {
   bookings Booking[]
   history  OrderHistory[]
   messages OrderMessage[]
+  automationLogs AutomationLog[]
+  exceptionLogs  ExceptionLog[]
 
   @@index([userId])
   @@index([status])
@@ -280,6 +296,73 @@ model Review {
   user    User    @relation(fields: [userId], references: [id])
 
   @@index([serviceId])
+}
+
+/// Журнал автоматических операций (Гл. 3.16 «Мониторинг»): персистентные записи
+/// SLA-действий из карточки заказа (повышение приоритета, эскалация, уведомление
+/// руководителя). Дополняет детерминированные события Business Event Engine.
+/// result: success | error | skipped
+model AutomationLog {
+  id          String   @id @default(cuid())
+  orderId     String?
+  event       String
+  action      String
+  result      String   @default("success")
+  durationMs  Int      @default(0)
+  source      String   @default("Business Event Engine")
+  actorName   String?
+  createdAt   DateTime @default(now())
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+/// Реестр исключительных ситуаций (Гл. 3.17): персистентные записи эскалаций
+/// из карточки заказа. criticality: low | medium | high | critical,
+/// status: new | working | resolved | closed.
+model ExceptionLog {
+  id           String   @id @default(cuid())
+  orderId      String?
+  type         String
+  category     String
+  criticality  String   @default("critical")
+  orderNumber  String?
+  manager      String?
+  status       String   @default("working")
+  description  String
+  aiSuggestion String?
+  actorName    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  order   Order?               @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  history ExceptionLogHistory[]
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+/// Журнал обработки исключения (Гл. 3.17): каждая смена статуса записывает
+/// историю — кто, когда и какое действие выполнил (взял в работу, решил, закрыл).
+/// action: take | resolve | close | reopen
+model ExceptionLogHistory {
+  id        String   @id @default(cuid())
+  exceptionLogId String
+  action    String
+  from      String?
+  to        String?
+  comment   String?
+  actorId   String?
+  actorName String
+  createdAt DateTime @default(now())
+
+  exceptionLog ExceptionLog @relation(fields: [exceptionLogId], references: [id], onDelete: Cascade)
+
+  @@index([exceptionLogId])
+  @@index([createdAt])
 }
 
 model Country {

@@ -14,10 +14,15 @@ export async function getOrdersData(f: AnalyticsFilters): Promise<AnalyticsSecti
   if (f.city) serviceFilter.city = { contains: f.city };
   if (f.type) serviceFilter.type = f.type;
   if (f.partnerId) serviceFilter.providerId = f.partnerId;
+  if (f.currency) serviceFilter.currency = f.currency;
   const hasServiceFilter = Object.keys(serviceFilter).length > 0;
 
   const orderWhere: Record<string, unknown> = { createdAt: { gte: range.start, lte: range.end } };
   const prevOrderWhere: Record<string, unknown> = { createdAt: { gte: range.prevStart, lte: range.prevEnd } };
+  if (f.status) {
+    orderWhere.status = f.status;
+    prevOrderWhere.status = f.status;
+  }
   if (hasServiceFilter) {
     orderWhere.bookings = { some: { service: serviceFilter } };
     prevOrderWhere.bookings = { some: { service: serviceFilter } };
@@ -25,15 +30,24 @@ export async function getOrdersData(f: AnalyticsFilters): Promise<AnalyticsSecti
 
   const AWAITING = [...ORDER_STATUS_GROUPS.awaitingPayment] as const;
   const PAID = [...ORDER_STATUS_GROUPS.paid] as const;
+  // Срезовые агрегаты уважают фильтр статуса (Гл. 2.7): при выбранном статусе
+  // конверсия и передача Buyer считаются по отфильтрованному множеству.
+  const paidStatus: { in: ("PAID" | "DOCUMENT_PREP" | "READY" | "COMPLETED")[] } | (typeof PAID)[number] =
+    f.status ? (f.status as (typeof PAID)[number]) : { in: [...PAID] };
+  const inWorkStatus: { in: ("PROCESSING" | "AWAITING_CONFIRMATION" | "CONFIRMED")[] } | (typeof PAID)[number] =
+    f.status ? (f.status as (typeof PAID)[number]) : { in: ["PROCESSING", "AWAITING_CONFIRMATION", "CONFIRMED"] };
+  const awaitingStatus: { in: ("AWAITING_PAYMENT" | "PARTIALLY_PAID" | "OVERDUE")[] } | (typeof PAID)[number] =
+    f.status ? (f.status as (typeof PAID)[number]) : { in: [...AWAITING] };
+  const overdueStatus: (typeof PAID)[number] | "OVERDUE" = f.status ? (f.status as (typeof PAID)[number]) : "OVERDUE";
 
   const [allRows, prevCount, statusRows, inWorkRows, awaitingRows, paidRows, overdueRows] = await Promise.all([
     prisma.order.findMany({ where: orderWhere, select: { id: true, status: true, amount: true, paidAmount: true, createdAt: true, serviceDate: true } }),
     prisma.order.count({ where: prevOrderWhere }),
     prisma.order.groupBy({ by: ["status"], where: orderWhere, _count: true }),
-    prisma.order.count({ where: { ...orderWhere, status: { in: ["PROCESSING", "AWAITING_CONFIRMATION", "CONFIRMED"] } } }),
-    prisma.order.count({ where: { ...orderWhere, status: { in: [...AWAITING] } } }),
-    prisma.order.count({ where: { ...orderWhere, status: { in: [...PAID] } } }),
-    prisma.order.count({ where: { ...orderWhere, status: "OVERDUE" } }),
+    prisma.order.count({ where: { ...orderWhere, status: inWorkStatus } }),
+    prisma.order.count({ where: { ...orderWhere, status: awaitingStatus } }),
+    prisma.order.count({ where: { ...orderWhere, status: paidStatus } }),
+    prisma.order.count({ where: { ...orderWhere, status: overdueStatus } }),
   ]);
 
   const statusCounts: Record<string, number> = {};
@@ -166,14 +180,14 @@ export async function getOrdersData(f: AnalyticsFilters): Promise<AnalyticsSecti
     subtitle: "Жизненный цикл заказа и контроль SLA (Гл. 2.11)",
     periodLabel: range.start.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }),
     kpis: [
-      { key: "created", title: "Новые заказы", value: created, change: changePct(created, prevCount), spark: ordersSeries.values, tone: "neutral" },
-      { key: "inWork", title: "В работе", value: inWorkRows, tone: "neutral" },
-      { key: "awaiting", title: "Ожидают оплаты", value: awaitingRows, tone: awaitingRows > 0 ? "medium" as const : "neutral" },
-      { key: "transferred", title: "Передано в бронирование", value: transferred, tone: "positive" },
+      { key: "created", title: "Новые заказы", value: created, unit: " шт", change: changePct(created, prevCount), spark: ordersSeries.values, tone: "neutral" },
+      { key: "inWork", title: "В работе", value: inWorkRows, unit: " шт", tone: "neutral" },
+      { key: "awaiting", title: "Ожидают оплаты", value: awaitingRows, unit: " шт", tone: awaitingRows > 0 ? "medium" as const : "neutral" },
+      { key: "transferred", title: "Передано в бронирование", value: transferred, unit: " шт", tone: "positive" },
       { key: "avgTime", title: "Ср. время подтверждения", value: avgHours, unit: "ч", tone: avgHours > 0 && avgHours <= 48 ? "positive" : "negative" },
       { key: "sla", title: "Выполнение SLA", value: sla, unit: "%", tone: sla >= 80 ? "positive" : "negative" },
-      { key: "perManager", title: "Заказов на менеджера", value: Math.round(perManager), tone: "neutral" },
-      { key: "cancelled", title: "Отменено", value: cancelled, tone: cancelled > 0 ? "negative" : "positive", detail: `${Math.round((cancelled / Math.max(1, created)) * 100)}% от созданных` },
+      { key: "perManager", title: "Заказов на менеджера", value: Math.round(perManager), unit: " шт", tone: "neutral" },
+      { key: "cancelled", title: "Отменено", value: cancelled, unit: " шт", tone: cancelled > 0 ? "negative" : "positive", detail: `${Math.round((cancelled / Math.max(1, created)) * 100)}% от созданных` },
     ],
     funnels: [
       {

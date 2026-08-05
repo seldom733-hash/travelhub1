@@ -16,20 +16,29 @@ export async function getBookingsData(f: AnalyticsFilters): Promise<AnalyticsSec
   if (f.city) serviceFilter.city = { contains: f.city };
   if (f.type) serviceFilter.type = f.type;
   if (f.partnerId) serviceFilter.providerId = f.partnerId;
+  if (f.currency) serviceFilter.currency = f.currency;
   const hasServiceFilter = Object.keys(serviceFilter).length > 0;
 
   const bookingWhere: Record<string, unknown> = { createdAt: { gte: range.start, lte: range.end } };
   const prevBookingWhere: Record<string, unknown> = { createdAt: { gte: range.prevStart, lte: range.prevEnd } };
+  if (f.status) {
+    bookingWhere.status = f.status;
+    prevBookingWhere.status = f.status;
+  }
   if (hasServiceFilter) {
     bookingWhere.service = serviceFilter;
     prevBookingWhere.service = serviceFilter;
   }
 
+  // Платёжный агрегат уважает фильтр статуса (Гл. 2.7).
+  const paidStatus: { in: ("PAID" | "COMPLETED")[] } | "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED" =
+    f.status ? (f.status as "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED") : { in: PAID };
+
   const [statusRows, prevStatusRows, allRows, paidAgg] = await Promise.all([
     prisma.booking.groupBy({ by: ["status"], where: bookingWhere, _count: true }),
     prisma.booking.groupBy({ by: ["status"], where: prevBookingWhere, _count: true }),
     prisma.booking.findMany({ where: bookingWhere, select: { id: true, status: true, amount: true, createdAt: true, service: { select: { providerId: true, provider: { select: { companyName: true, firstName: true } }, type: true, country: true, city: true, title: true } } } }),
-    prisma.booking.aggregate({ where: { ...bookingWhere, status: { in: PAID } }, _sum: { amount: true }, _count: true }),
+    prisma.booking.aggregate({ where: { ...bookingWhere, status: paidStatus }, _sum: { amount: true }, _count: true }),
   ]);
 
   const counts: Record<string, number> = {};
@@ -149,16 +158,16 @@ export async function getBookingsData(f: AnalyticsFilters): Promise<AnalyticsSec
     subtitle: "Отдел бронирования (Buyer Department), Гл. 2.12",
     periodLabel: range.start.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }),
     kpis: [
-      { key: "received", title: "Получено заказов", value: received, change: changePct(received, Object.values(prevCounts).reduce((a, b) => a + b, 0)), tone: "neutral" },
-      { key: "confirmed", title: "Подтверждено", value: confirmed, change: changePct(confirmed, (prevCounts["CONFIRMED"] ?? 0) + (prevCounts["PAID"] ?? 0) + (prevCounts["COMPLETED"] ?? 0)), tone: "positive" },
-      { key: "awaiting", title: "Ожидают ответа", value: awaitingSupplier, tone: awaitingSupplier > 0 ? "medium" as const : "neutral" },
-      { key: "paid", title: "Получена оплата", value: paid, tone: "positive" },
-      { key: "completed", title: "Завершено оформление", value: completed, tone: "positive" },
+      { key: "received", title: "Получено заказов", value: received, unit: " шт", change: changePct(received, Object.values(prevCounts).reduce((a, b) => a + b, 0)), tone: "neutral" },
+      { key: "confirmed", title: "Подтверждено", value: confirmed, unit: " шт", change: changePct(confirmed, (prevCounts["CONFIRMED"] ?? 0) + (prevCounts["PAID"] ?? 0) + (prevCounts["COMPLETED"] ?? 0)), tone: "positive" },
+      { key: "awaiting", title: "Ожидают ответа", value: awaitingSupplier, unit: " шт", tone: awaitingSupplier > 0 ? "medium" as const : "neutral" },
+      { key: "paid", title: "Получена оплата", value: paid, unit: " шт", tone: "positive" },
+      { key: "completed", title: "Завершено оформление", value: completed, unit: " шт", tone: "positive" },
       { key: "revenue", title: "Выручка", value: revenue, tone: "positive", spark: series.values },
       { key: "avgTime", title: "Ср. время подтверждения", value: avgHours, unit: "ч", tone: avgHours > 0 && avgHours <= 48 ? "positive" : "negative" },
       { key: "sla", title: "Выполнение SLA", value: sla, unit: "%", tone: sla >= 80 ? "positive" : "negative" },
       { key: "success", title: "Успешные брони", value: successPct, unit: "%", tone: successPct >= 80 ? "positive" : "negative" },
-      { key: "cancelled", title: "Отмены", value: cancelled, tone: cancelled > 0 ? "negative" : "positive", detail: `${cancelPct.toFixed(0)}% от полученных` },
+      { key: "cancelled", title: "Отмены", value: cancelled, unit: " шт", tone: cancelled > 0 ? "negative" : "positive", detail: `${cancelPct.toFixed(0)}% от полученных` },
     ],
     funnels: [
       {

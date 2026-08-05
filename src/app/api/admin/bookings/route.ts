@@ -495,7 +495,7 @@ export async function GET(request: Request) {
       id: r.id,
       bookingNumber: `BK-${r.id.slice(-8).toUpperCase()}`,
       // Номер заказа берём из реальной связи booking.order (не генерируем из id брони),
-      // чтобы колонка «Заказ» совпадала с номером заказа в Order Center.
+      // чтобы колонка «Заказ» совпадала с номером заказа в реестре заказов.
       orderId: r.order?.orderNumber ?? "—",
       client: `${r.user.firstName} ${r.user.lastName ?? ""}`.trim(),
       partner: r.service.provider?.companyName || r.service.provider?.firstName || "—",
@@ -737,8 +737,8 @@ export async function POST(request: Request) {
       booking: {
         id: created.id,
         bookingNumber: `BK-${created.id.slice(-8).toUpperCase()}`,
-        // Бронь, созданная в Booking Center, не привязана к заказу — показываем «—»
-        // (заказ создаётся отдельно в Order Center, Гл. 5.8).
+        // Бронь, созданная без заказа, не привязана к заказу — показываем «—»
+        // (заказ создаётся отдельно в реестре заказов).
         orderId: "—",
         client: `${created.user.firstName} ${created.user.lastName ?? ""}`.trim(),
         partner: created.service.provider?.companyName || created.service.provider?.firstName || "—",

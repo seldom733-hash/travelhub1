@@ -30,12 +30,17 @@ export async function getMarketingData(f: AnalyticsFilters): Promise<AnalyticsSe
   if (f.city) serviceFilter.city = { contains: f.city };
   if (f.type) serviceFilter.type = f.type;
   if (f.partnerId) serviceFilter.providerId = f.partnerId;
+  if (f.currency) serviceFilter.currency = f.currency;
   const hasServiceFilter = Object.keys(serviceFilter).length > 0;
 
   const viewWhere: Record<string, unknown> = { viewedAt: { gte: range.start, lte: range.end } };
   const prevViewWhere: Record<string, unknown> = { viewedAt: { gte: range.prevStart, lte: range.prevEnd } };
   const bookingWhere: Record<string, unknown> = { createdAt: { gte: range.start, lte: range.end } };
   const prevBookingWhere: Record<string, unknown> = { createdAt: { gte: range.prevStart, lte: range.prevEnd } };
+  if (f.status) {
+    bookingWhere.status = f.status;
+    prevBookingWhere.status = f.status;
+  }
   if (hasServiceFilter) {
     viewWhere.service = serviceFilter;
     prevViewWhere.service = serviceFilter;
@@ -43,12 +48,16 @@ export async function getMarketingData(f: AnalyticsFilters): Promise<AnalyticsSe
     prevBookingWhere.service = serviceFilter;
   }
 
+  // Платёжный агрегат уважает фильтр статуса (Гл. 2.7).
+  const paidStatus: { in: ("PAID" | "COMPLETED")[] } | "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED" =
+    f.status ? (f.status as "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED") : { in: PAID };
+
   const [views, prevViews, bookings, prevBookings, paidAgg, newUsers, prevNewUsers] = await Promise.all([
     prisma.serviceView.count({ where: viewWhere }),
     prisma.serviceView.count({ where: prevViewWhere }),
     prisma.booking.count({ where: bookingWhere }),
     prisma.booking.count({ where: prevBookingWhere }),
-    prisma.booking.aggregate({ where: { ...bookingWhere, status: { in: PAID } }, _sum: { amount: true } }),
+    prisma.booking.aggregate({ where: { ...bookingWhere, status: paidStatus }, _sum: { amount: true } }),
     prisma.user.count({ where: { createdAt: { gte: range.start, lte: range.end } } }),
     prisma.user.count({ where: { createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
   ]);
@@ -229,9 +238,9 @@ export async function getMarketingData(f: AnalyticsFilters): Promise<AnalyticsSe
     subtitle: "Marketing Intelligence Center (Гл. 2.17)",
     periodLabel: range.start.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }),
     kpis: [
-      { key: "visitors", title: "Посетители", value: visitors, change: changePct(visitors, prevVisitors), spark: visitorsSeries.values, tone: "neutral" },
-      { key: "newUsers", title: "Новые пользователи", value: newUsers, change: changePct(newUsers, prevNewUsers), tone: "neutral" },
-      { key: "leads", title: "Лиды", value: leads, change: changePct(leads, prevBookings * 3), tone: "neutral" },
+      { key: "visitors", title: "Посетители", value: visitors, unit: " чел.", change: changePct(visitors, prevVisitors), spark: visitorsSeries.values, tone: "neutral" },
+      { key: "newUsers", title: "Новые пользователи", value: newUsers, unit: " чел.", change: changePct(newUsers, prevNewUsers), tone: "neutral" },
+      { key: "leads", title: "Лиды", value: leads, unit: " шт", change: changePct(leads, prevBookings * 3), tone: "neutral" },
       { key: "cpl", title: "CPL", value: cpl, unit: "$", tone: "neutral" },
       { key: "cac", title: "CAC", value: Math.round(cac), unit: "$", tone: cac > 0 && cac < 100 ? "positive" : "negative" },
       { key: "conversionSite", title: "Конверсия сайта", value: conversionSite, unit: "%", tone: conversionSite >= 5 ? "positive" : "negative", detail: "посетитель → заявка" },

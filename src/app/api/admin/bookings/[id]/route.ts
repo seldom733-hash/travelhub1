@@ -4,86 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { SERVICE_TYPE_LABELS, actorDisplayName, bookingSystemMessage } from "@/lib/admin-data";
 import { pickManager, pickSource } from "@/app/api/admin/bookings/route";
-import { EXECUTION_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
-
-/**
- * GET /api/admin/bookings/[id]
- * Полная бронь в формате карточки (BookingRow) — для глубокой ссылки
- * из виджета «Проблемные бронирования» (?open=<id>&tab=messages).
- */
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const denied = requireRole(user, EXECUTION_ROLES);
-    if (denied) return denied;
-    const { id } = await params;
-
-    const booking = await prisma.booking.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        amount: true,
-        status: true,
-        serviceDate: true,
-        createdAt: true,
-        updatedAt: true,
-        order: { select: { orderNumber: true } },
-        user: { select: { firstName: true, lastName: true, email: true } },
-        service: {
-          select: {
-            title: true,
-            type: true,
-            currency: true,
-            country: true,
-            city: true,
-            provider: { select: { companyName: true, firstName: true, lastName: true } },
-          },
-        },
-      },
-    });
-    if (!booking) {
-      return NextResponse.json({ error: "Бронирование не найдено" }, { status: 404 });
-    }
-    const provider = booking.service.provider;
-
-    return NextResponse.json({
-      booking: {
-        id: booking.id,
-        bookingNumber: `BK-${booking.id.slice(-8).toUpperCase()}`,
-        orderId: booking.order?.orderNumber ?? "—",
-        client: `${booking.user.firstName} ${booking.user.lastName ?? ""}`.trim(),
-        partner: provider?.companyName || provider?.firstName || "—",
-        provider: provider?.companyName || `${provider?.firstName ?? ""} ${provider?.lastName ?? ""}`.trim() || "—",
-        service: booking.service.title,
-        category: SERVICE_TYPE_LABELS[booking.service.type] || booking.service.type,
-        categoryType: booking.service.type,
-        direction: [booking.service.country, booking.service.city].filter(Boolean).join(" · ") || "—",
-        amount: booking.amount,
-        currency: booking.service.currency || "USD",
-        bookingStatus: booking.status,
-        paymentStatus:
-          booking.status === "PAID" || booking.status === "COMPLETED"
-            ? "paid"
-            : booking.status === "PENDING" || booking.status === "CONFIRMED"
-            ? "pending"
-            : "refunded",
-        manager: pickManager(booking.id),
-        source: pickSource(booking.id),
-        unreadCount: 0,
-        createdAt: booking.createdAt.toISOString(),
-        serviceDate: booking.serviceDate.toISOString(),
-        updatedAt: booking.updatedAt.toISOString(),
-      },
-    });
-  } catch (error) {
-    return serverErrorResponse(error, "Admin booking GET error");
-  }
-}
 
 /**
  * PATCH /api/admin/bookings/[id]
@@ -100,11 +22,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
+    if (!user || user.role === "BUYER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const denied = requireRole(user, EXECUTION_ROLES);
-    if (denied) return denied;
 
     const { id } = await params;
     let body: { action?: unknown; serviceDate?: unknown; amount?: unknown };

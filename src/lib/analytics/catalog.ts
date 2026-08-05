@@ -16,23 +16,32 @@ export async function getCatalogData(f: AnalyticsFilters): Promise<AnalyticsSect
   if (f.city) serviceFilter.city = { contains: f.city };
   if (f.type) serviceFilter.type = f.type;
   if (f.partnerId) serviceFilter.providerId = f.partnerId;
+  if (f.currency) serviceFilter.currency = f.currency;
   const hasServiceFilter = Object.keys(serviceFilter).length > 0;
 
   const bookingWhere: Record<string, unknown> = { createdAt: { gte: range.start, lte: range.end } };
   const prevBookingWhere: Record<string, unknown> = { createdAt: { gte: range.prevStart, lte: range.prevEnd } };
   const viewWhere: Record<string, unknown> = { viewedAt: { gte: range.start, lte: range.end } };
+  if (f.status) {
+    bookingWhere.status = f.status;
+    prevBookingWhere.status = f.status;
+  }
   if (hasServiceFilter) {
     bookingWhere.service = serviceFilter;
     prevBookingWhere.service = serviceFilter;
     viewWhere.service = serviceFilter;
   }
 
+  // Платёжные агрегаты уважают фильтр статуса (Гл. 2.7).
+  const paidStatus: { in: ("PAID" | "COMPLETED")[] } | "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED" =
+    f.status ? (f.status as "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED") : { in: PAID };
+
   // ── Каталог в целом ──
   const [totalServices, activeServices, paidRows, prevPaidRows, allBookingRows, viewsInPeriod] = await Promise.all([
     prisma.service.count(),
     prisma.service.count({ where: { isActive: true } }),
-    prisma.booking.findMany({ where: { ...bookingWhere, status: { in: PAID } }, select: { id: true, amount: true, serviceId: true, serviceDate: true, createdAt: true } }),
-    prisma.booking.findMany({ where: { ...prevBookingWhere, status: { in: PAID } }, select: { amount: true } }),
+    prisma.booking.findMany({ where: { ...bookingWhere, status: paidStatus }, select: { id: true, amount: true, serviceId: true, serviceDate: true, createdAt: true } }),
+    prisma.booking.findMany({ where: { ...prevBookingWhere, status: paidStatus }, select: { amount: true } }),
     prisma.booking.findMany({ where: bookingWhere, select: { status: true, serviceId: true, createdAt: true } }),
     prisma.serviceView.count({ where: viewWhere }),
   ]);
@@ -83,7 +92,7 @@ export async function getCatalogData(f: AnalyticsFilters): Promise<AnalyticsSect
 
   // ── Карточки категорий (2.16.3): рост относительно прошлого периода ──
   const prevCatRows = await prisma.booking.findMany({
-    where: { ...prevBookingWhere, status: { in: PAID } },
+    where: { ...prevBookingWhere, status: paidStatus },
     select: { serviceId: true, amount: true },
   });
   const prevCatMap = new Map<string, number>();
@@ -220,9 +229,9 @@ export async function getCatalogData(f: AnalyticsFilters): Promise<AnalyticsSect
     subtitle: "Категории, спрос и популярность услуг (Гл. 2.16)",
     periodLabel: range.start.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }),
     kpis: [
-      { key: "services", title: "Услуг в каталоге", value: totalServices, tone: "neutral" },
-      { key: "active", title: "Активные услуги", value: activeServices, tone: "positive" },
-      { key: "sold", title: "Проданные услуги", value: sold, change: changePct(sold, soldPrev), tone: "neutral" },
+      { key: "services", title: "Услуг в каталоге", value: totalServices, unit: " шт", tone: "neutral" },
+      { key: "active", title: "Активные услуги", value: activeServices, unit: " шт", tone: "positive" },
+      { key: "sold", title: "Проданные услуги", value: sold, unit: " шт", change: changePct(sold, soldPrev), tone: "neutral" },
       { key: "revenue", title: "Общая выручка", value: revenue, change: changePct(revenue, revenuePrev), spark: monthSeries.values, tone: revenue >= revenuePrev ? "positive" : "negative" },
       { key: "profit", title: "Прибыль каталога", value: Math.round(revenue * 0.12), tone: "positive" },
       { key: "avgCheck", title: "Средний чек", value: Math.round(avgCheck), tone: "neutral" },

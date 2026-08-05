@@ -14,22 +14,31 @@ export async function getSalesData(f: AnalyticsFilters): Promise<AnalyticsSectio
   if (f.city) serviceFilter.city = { contains: f.city };
   if (f.type) serviceFilter.type = f.type;
   if (f.partnerId) serviceFilter.providerId = f.partnerId;
+  if (f.currency) serviceFilter.currency = f.currency;
   const hasServiceFilter = Object.keys(serviceFilter).length > 0;
 
   const orderWhere: Record<string, unknown> = { createdAt: { gte: range.start, lte: range.end } };
   const prevOrderWhere: Record<string, unknown> = { createdAt: { gte: range.prevStart, lte: range.prevEnd } };
+  if (f.status) {
+    orderWhere.status = f.status;
+    prevOrderWhere.status = f.status;
+  }
   if (hasServiceFilter) {
     orderWhere.bookings = { some: { service: serviceFilter } };
     prevOrderWhere.bookings = { some: { service: serviceFilter } };
   }
 
   const PAID = [...ORDER_STATUS_GROUPS.paid] as const;
+  // Платёжные агрегаты уважают фильтр статуса (Гл. 2.7): при выбранном статусе
+  // конверсия и выручка считаются по отфильтрованному множеству.
+  const paidStatus: { in: ("PAID" | "DOCUMENT_PREP" | "READY" | "COMPLETED")[] } | (typeof PAID)[number] =
+    f.status ? (f.status as (typeof PAID)[number]) : { in: [...PAID] };
 
   const [ordersAll, prevOrdersAll, paidRows, paidAgg] = await Promise.all([
     prisma.order.findMany({ where: orderWhere, select: { id: true, status: true, amount: true, paidAmount: true, createdAt: true } }),
     prisma.order.count({ where: prevOrderWhere }),
-    prisma.order.findMany({ where: { ...orderWhere, status: { in: [...PAID] } }, select: { id: true, amount: true, paidAmount: true, status: true, createdAt: true } }),
-    prisma.order.aggregate({ where: { ...orderWhere, status: { in: [...PAID] } }, _sum: { paidAmount: true } }),
+    prisma.order.findMany({ where: { ...orderWhere, status: paidStatus }, select: { id: true, amount: true, paidAmount: true, status: true, createdAt: true } }),
+    prisma.order.aggregate({ where: { ...orderWhere, status: paidStatus }, _sum: { paidAmount: true } }),
   ]);
   const created = ordersAll.length;
   const paidCount = paidRows.length;
@@ -140,8 +149,8 @@ export async function getSalesData(f: AnalyticsFilters): Promise<AnalyticsSectio
     subtitle: "Эффективность коммерческого отдела (Гл. 2.10)",
     periodLabel: range.start.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }),
     kpis: [
-      { key: "new", title: "Новые обращения", value: created, change: changePct(created, prevOrdersAll), tone: "neutral" },
-      { key: "paid", title: "Оплаченные заказы", value: paidCount, change: changePct(paidCount, prevOrdersAll ? prevOrdersAll : 0), tone: "positive" },
+      { key: "new", title: "Новые обращения", value: created, unit: " шт", change: changePct(created, prevOrdersAll), tone: "neutral" },
+      { key: "paid", title: "Оплаченные заказы", value: paidCount, unit: " шт", change: changePct(paidCount, prevOrdersAll ? prevOrdersAll : 0), tone: "positive" },
       { key: "conversion", title: "Конверсия → оплата", value: conversion, unit: "%", tone: conversion >= 40 ? "positive" : "negative" },
       { key: "avgCheck", title: "Средний чек", value: Math.round(avgCheck), tone: "neutral" },
       { key: "revenue", title: "Выручка", value: Math.round(revenue), tone: "positive", spark: revenueSeries.values },

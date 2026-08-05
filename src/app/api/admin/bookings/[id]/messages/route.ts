@@ -3,20 +3,17 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { actorDisplayName } from "@/lib/admin-data";
-import { EXECUTION_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
 const MAX_TEXT = 2000;
 
-/** Проверка существования брони + авторизации. Возвращает 401/403/404 ответ или null. */
+/** Проверка существования брони + авторизации. Возвращает 401/404 ответ или null. */
 async function guard(request: Request, id: string): Promise<NextResponse | null> {
   const user = await getCurrentUser();
-  if (!user) {
+  if (!user || user.role === "BUYER") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const denied = requireRole(user, EXECUTION_ROLES);
-  if (denied) return denied;
   const booking = await prisma.booking.findUnique({ where: { id }, select: { id: true } });
   if (!booking) {
     return NextResponse.json({ error: "Бронирование не найдено" }, { status: 404 });
@@ -78,11 +75,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const { id } = await params;
     const user = await getCurrentUser();
-    if (!user) {
+    if (!user || user.role === "BUYER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const denied = requireRole(user, EXECUTION_ROLES);
-    if (denied) return denied;
     const booking = await prisma.booking.findUnique({ where: { id }, select: { id: true } });
     if (!booking) {
       return NextResponse.json({ error: "Бронирование не найдено" }, { status: 404 });

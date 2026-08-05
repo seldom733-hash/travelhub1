@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { OrderPriority } from "@/generated/prisma/enums";
 import {
   SERVICE_TYPE_LABELS,
   SERVICE_TYPE_ICONS,
@@ -16,15 +17,24 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { SALES_ROLES, requireRole } from "@/lib/admin-access";
+import {
+  AUTOMATION_SCENARIOS,
+  buildAutomationJournal,
+  automationStats,
+  buildExceptions,
+  exceptionStats,
+} from "@/lib/sales-automation";
 
 export const dynamic = "force-dynamic";
 
 type PeriodKey = "today" | "yesterday" | "week" | "month" | "quarter" | "year" | "custom";
 
 // Менеджеры и их назначение — общий справочник в admin-data.ts (pickManager),
-// используется и в Order Center, и на Dashboard (блок «Продажи»).
+// используется и в реестре заказов, и на Dashboard (блок «Продажи»).
 
 // Детерминированный список источников заявки (в схеме нет поля source — ротация по id)
+export { pickManager } from "@/lib/admin-data";
+
 export function pickSource(id: string): string {
   const sources = ["Сайт", "Мобильное приложение", "Партнёр", "Call-центр", "Telegram-бот", "WhatsApp"];
   let h = 0;
@@ -127,6 +137,7 @@ export async function GET(request: Request) {
     const partnerId = searchParams.get("partnerId") || undefined;
     const providerId = searchParams.get("providerId") || partnerId || undefined;
     const status = searchParams.get("status") || undefined;
+    const priority = searchParams.get("priority") || undefined;
     const bookingStatus = searchParams.get("bookingStatus") || undefined;
     const paymentStatus = searchParams.get("paymentStatus") || undefined;
     const manager = searchParams.get("manager") || undefined;
@@ -136,6 +147,8 @@ export async function GET(request: Request) {
     const maxPrice = parseFloat(searchParams.get("maxPrice") || "0") || 0;
     const search = searchParams.get("search") || undefined;
     const needsAttention = searchParams.get("needsAttention") === "1";
+    // Фильтр «Эскалированные» (Гл. 3.17): только заказы с активными исключениями
+    const escalated = searchParams.get("escalated") === "1";
     const sort = searchParams.get("sort") || undefined;
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "15");
@@ -152,6 +165,7 @@ export async function GET(request: Request) {
 
     // ── Фильтры по заказу ──
     const orderWhere: Record<string, unknown> = { createdAt: { gte: range.start, lte: range.end } };
+    if (priority) orderWhere.priority = priority; // фильтр приоритета (Гл. 3.9)
     if (hasServiceFilter) orderWhere.bookings = { some: { service: serviceFilter } };
     if (minPrice > 0) orderWhere.amount = { gte: minPrice };
     if (maxPrice > 0) orderWhere.amount = { ...(orderWhere.amount as object ?? {}), lte: maxPrice };
@@ -289,6 +303,27 @@ export async function GET(request: Request) {
     const unreadMap = new Map(unreadAgg.map((u) => [u.orderId, u._count]));
     const attentionCount = unreadMap.size;
 
+    // Эскалированные заказы (Гл. 3.17): реальные активные исключения (status
+    // new/working) в выбранном периоде — тот же фильтр, что у панели исключений,
+    // чтобы клик по индикатору всегда приводил к видимой строке реестра.
+    // (Бейдж в карточке заказа остаётся период-независимым — это сигнал
+    // «текущего состояния» заказа.) Счётчик за прошлый период — для KPI-карточки.
+    const [escalatedRows, prevEscalatedRows] = await Promise.all([
+      prisma.exceptionLog.findMany({
+        where: { status: { in: ["new", "working"] }, createdAt: { gte: range.start, lte: range.end } },
+        select: { orderId: true },
+        take: 500,
+      }),
+      prisma.exceptionLog.findMany({
+        where: { status: { in: ["new", "working"] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } },
+        select: { orderId: true },
+        take: 500,
+      }),
+    ]);
+    const escalatedOrderIds = new Set(escalatedRows.map((e) => e.orderId).filter(Boolean));
+    const escalatedCount = escalatedOrderIds.size;
+    const prevEscalatedCount = new Set(prevEscalatedRows.map((e) => e.orderId).filter(Boolean)).size;
+
     const orders = tableOrders.map((r) => {
       const main = r.bookings[0];
       const svc = main?.service;
@@ -316,11 +351,14 @@ export async function GET(request: Request) {
         commission: Math.round(r.paidAmount * 0.12),
         currency: r.currency || "USD",
         status: r.status,
+        priority: r.priority,
         bookingStatus: worstBookingStatus(r.bookings.map((b) => b.status)),
         paymentStatus: orderPaymentStatus(r.status),
         manager: pickManager(r.id),
         source: r.source || pickSource(r.id),
         unreadCount: unreadMap.get(r.id) ?? 0,
+        // Эскалация заказа (Гл. 3.17): колонка-индикатор «🚨» в реестре
+        escalated: escalatedOrderIds.has(r.id),
         createdAt: r.createdAt.toISOString(),
         serviceDate: serviceDate ? serviceDate.toISOString() : null,
         updatedAt: r.updatedAt.toISOString(),
@@ -339,6 +377,7 @@ export async function GET(request: Request) {
     }
     if (paymentStatus) filteredOrders = filteredOrders.filter((o) => o.paymentStatus === paymentStatus);
     if (needsAttention) filteredOrders = filteredOrders.filter((o) => o.unreadCount > 0);
+    if (escalated) filteredOrders = filteredOrders.filter((o) => o.escalated);
     if (manager) filteredOrders = filteredOrders.filter((o) => o.manager === manager);
     if (source) filteredOrders = filteredOrders.filter((o) => o.source === source);
     if (currency) filteredOrders = filteredOrders.filter((o) => o.currency === currency);
@@ -356,6 +395,46 @@ export async function GET(request: Request) {
     if (sort === "unread") {
       filteredOrders = [...filteredOrders].sort((a, b) => b.unreadCount - a.unreadCount);
     }
+
+    // ── Kanban (Гл. 3.7): все заказы периода без пагинации и без фильтра статуса
+    // (в Kanban-режиме колонки заменяют фильтр статуса). Остальные фильтры
+    // применяются, чтобы доска соответствовала реестру. До 150 карточек.
+    const kq = search?.toLowerCase();
+    const kanbanOrders = orders
+      .filter((o) => {
+        if (paymentStatus && o.paymentStatus !== paymentStatus) return false;
+        if (needsAttention && o.unreadCount === 0) return false;
+        if (escalated && !o.escalated) return false;
+        if (manager && o.manager !== manager) return false;
+        if (source && o.source !== source) return false;
+        if (currency && o.currency !== currency) return false;
+        if (kq) {
+          const hit =
+            o.orderNumber.toLowerCase().includes(kq) ||
+            o.client.toLowerCase().includes(kq) ||
+            o.service.toLowerCase().includes(kq) ||
+            o.provider.toLowerCase().includes(kq) ||
+            o.partner.toLowerCase().includes(kq);
+          if (!hit) return false;
+        }
+        return true;
+      })
+      .slice(0, 150)
+      .map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        client: o.client,
+        service: o.service,
+        categoryType: o.categoryType,
+        status: o.status,
+        priority: o.priority,
+        amount: o.amount,
+        currency: o.currency,
+        manager: o.manager,
+        serviceDate: o.serviceDate,
+        escalated: o.escalated,
+        unreadCount: o.unreadCount,
+      }));
 
     // ── Пагинация ──
     const totalCount = filteredOrders.length;
@@ -467,15 +546,18 @@ export async function GET(request: Request) {
       { id: "doc", type: "info", title: "Готовы документы по 2 заказам", detail: "Ваучеры доступны для отправки клиентам" },
     ];
 
-    const aiRecommendations = [
+    // AI-рекомендации (Гл. 3.4 «AI как помощник оператора»): где рекомендация
+    // относится к конкретному заказу — прикладываем orderId, чтобы клик по
+    // карточке рекомендации открывал AI-анализ этого заказа.
+    const aiRecommendations: { level: string; title: string; effect: string; orderId?: string }[] = [
       ...(overdueActions.length
-        ? [{ level: "high", title: `${overdueActions.length} заказов просрочены`, effect: "Ускорить обработку с поставщиками" }]
+        ? [{ level: "high", title: `${overdueActions.length} заказов просрочены`, effect: "Ускорить обработку с поставщиками", orderId: overdueActions[0].id }]
         : []),
       ...(pendingPayments.length
-        ? [{ level: "medium", title: `${pendingPayments.length} заказов ожидают оплаты`, effect: `${fmtMoney(financial.pendingAmount)} к получению` }]
+        ? [{ level: "medium", title: `${pendingPayments.length} заказов ожидают оплаты`, effect: `${fmtMoney(financial.pendingAmount)} к получению`, orderId: pendingPayments[0].id }]
         : []),
-      ...(cancelledCount > 0
-        ? [{ level: "medium", title: `${cancelledCount} отмен за период`, effect: "Проанализировать причины отказов" }]
+      ...(cancelledCount > 0 && refunds.length
+        ? [{ level: "medium", title: `${cancelledCount} отмен за период`, effect: "Проанализировать причины отказов", orderId: refunds[0].id }]
         : []),
       ...(bookingsByService[0]
         ? [{ level: "info", title: `Популярная категория: ${bookingsByService[0].label}`, effect: `${bookingsByService[0].count} позиций` }]
@@ -491,9 +573,142 @@ export async function GET(request: Request) {
     const slaTotal = activeCount;
     const slaCompliance = slaTotal ? Math.max(0, Math.round(((slaTotal - slaBreaches) / slaTotal) * 100)) : 100;
 
+    // ── SLA по рабочим очередям (Гл. 3.7): % соблюдения и среднее время обработки ──
+    // Считаем из уже загруженных tableOrders (без лишних запросов): просроченным
+    // считается заказ в активном статусе, чей возраст превышает SLA-цель (48 ч),
+    // а также любой заказ со статусом OVERDUE. Время обработки = updatedAt − createdAt.
+    const QUEUE_SLA_GROUPS: Record<string, string[]> = {
+      new: ["DRAFT", "CREATED"],
+      check: ["PROCESSING"],
+      provider: ["AWAITING_CONFIRMATION"],
+      payment: ["AWAITING_PAYMENT", "PARTIALLY_PAID", "OVERDUE"],
+      docs: ["DOCUMENT_PREP", "READY"],
+      refunds: ["REFUNDED", "CANCELLED"],
+      overdue: ["OVERDUE"],
+      all: Object.keys(counts),
+    };
+    const nowMs = Date.now();
+    const slaTargetMs = slaTargetHours * 3600000;
+    const queueSla: Record<string, { total: number; compliance: number; avgHours: number }> = {};
+    for (const [key, statuses] of Object.entries(QUEUE_SLA_GROUPS)) {
+      const rows = tableOrders.filter((r) => statuses.includes(r.status));
+      if (!rows.length) {
+        queueSla[key] = { total: 0, compliance: 100, avgHours: 0 };
+        continue;
+      }
+      const overdueCount = rows.filter((r) => {
+        if (r.status === "OVERDUE") return true;
+        if (["COMPLETED", "REFUNDED", "CANCELLED", "ARCHIVED"].includes(r.status)) return false;
+        return nowMs - r.createdAt.getTime() > slaTargetMs;
+      }).length;
+      const totalMs = rows.reduce((a, r) => a + (r.updatedAt.getTime() - r.createdAt.getTime()), 0);
+      queueSla[key] = {
+        total: rows.length,
+        compliance: Math.max(0, Math.round(((rows.length - overdueCount) / rows.length) * 100)),
+        avgHours: Math.round((totalMs / rows.length / 3600000) * 10) / 10,
+      };
+    }
+
     // ── Воронка жизненного цикла (создано → подтверждено → оплачено) ──
     const confirmedCount =
       (counts["CONFIRMED"] ?? 0) + (counts["AWAITING_PAYMENT"] ?? 0) + (counts["PARTIALLY_PAID"] ?? 0) + paidCount;
+
+    // ── Автоматизация (Гл. 3.16) и исключения (Гл. 3.17) ──
+    // Демо-журнал и реестр строятся из заказов периода (согласованы с KPI/реестром),
+    // а реальные записи (эскалации и SLA-действия из карточки) читаются из БД и
+    // показываются первыми — они переживают перезагрузку страницы.
+    const demoJournal = buildAutomationJournal(filteredOrders);
+    const demoExceptions = buildExceptions(filteredOrders);
+    const [realLogs, realExceptions] = await Promise.all([
+      // Реальные записи согласуются с периодом (как и демо-журнал): показываются
+      // только записи выбранного периода, чтобы панель «за период» была честной.
+      prisma.automationLog.findMany({
+        where: { createdAt: { gte: range.start, lte: range.end } },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: { order: { select: { orderNumber: true } } },
+      }),
+      prisma.exceptionLog.findMany({
+        where: { createdAt: { gte: range.start, lte: range.end } },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          history: { orderBy: { createdAt: "desc" }, take: 20 },
+        },
+      }),
+    ]);
+    const automationJournal: {
+      id: string;
+      at: string;
+      event: string;
+      action: string;
+      result: "success" | "error" | "skipped";
+      durationMs: number;
+      source: string;
+      orderNumber?: string;
+    }[] = [
+      ...realLogs.map((l) => ({
+        id: `log-${l.id}`,
+        at: l.createdAt.toISOString(),
+        event: l.event,
+        action: l.action,
+        result: (l.result === "error" || l.result === "skipped" ? l.result : "success") as "success" | "error" | "skipped",
+        durationMs: l.durationMs,
+        source: l.source,
+        orderNumber: l.order?.orderNumber ?? undefined,
+      })),
+      ...demoJournal,
+    ];
+    const exceptions: {
+      id: string;
+      type: string;
+      category: string;
+      criticality: "low" | "medium" | "high" | "critical";
+      orderNumber: string;
+      orderId: string;
+      manager: string;
+      createdAt: string;
+      updatedAt?: string;
+      status: "new" | "working" | "resolved" | "closed";
+      description: string;
+      aiSuggestion: string;
+      history?: {
+        id: string;
+        action: string;
+        from: string | null;
+        to: string | null;
+        comment: string | null;
+        actorName: string;
+        createdAt: string;
+      }[];
+    }[] = [
+      ...realExceptions.map((e) => ({
+        id: `exc-${e.id}`,
+        type: e.type,
+        category: e.category,
+        criticality: (e.criticality === "low" || e.criticality === "medium" || e.criticality === "high" || e.criticality === "critical"
+          ? e.criticality
+          : "critical") as "low" | "medium" | "high" | "critical",
+        orderNumber: e.orderNumber || "—",
+        orderId: e.orderId || "",
+        manager: e.manager || "—",
+        createdAt: e.createdAt.toISOString(),
+        updatedAt: e.updatedAt.toISOString(),
+        status: (e.status === "new" || e.status === "working" || e.status === "resolved" || e.status === "closed" ? e.status : "working") as "new" | "working" | "resolved" | "closed",
+        description: e.description,
+        aiSuggestion: e.aiSuggestion || "",
+        history: e.history.map((h) => ({
+          id: h.id,
+          action: h.action,
+          from: h.from,
+          to: h.to,
+          comment: h.comment,
+          actorName: h.actorName,
+          createdAt: h.createdAt.toISOString(),
+        })),
+      })),
+      ...demoExceptions,
+    ];
 
     return NextResponse.json({
       kpi: {
@@ -514,6 +729,8 @@ export async function GET(request: Request) {
         cancelledOrders: { value: cancelledCount, change: changePct(cancelledCount, prevCounts["CANCELLED"] ?? 0), detail: totalOrders ? `${Math.round((cancelledCount / totalOrders) * 100)}% от всех заказов` : "0%" },
         avgCycle: { value: avgCycleHours, change: 0, detail: `Цель SLA: ${slaTargetHours} ч · Соблюдение ${slaCompliance}%` },
         refunds: { value: refundedCount, change: changePct(refundedCount, prevCounts["REFUNDED"] ?? 0), detail: `${fmtMoney(financial.refundedAmount)} возвращено` },
+        // Эскалации (Гл. 3.17): заказы с активными исключениями за период
+        escalations: { value: escalatedCount, change: changePct(escalatedCount, prevEscalatedCount), detail: "Заказы с активными исключениями" },
         aiForecast: { value: forecastOrders, change: 0, detail: `Выручка ${fmtMoney(forecastRevenue)} · план ~${Math.round((monthAgg._count ? (forecastOrders / Math.max(1, monthAgg._count * 1.3)) * 100 : 0))}%` },
         needsAttention: { value: attentionCount, change: 0, detail: `${filteredOrders.reduce((a, o) => a + o.unreadCount, 0)} непрочитанных сообщений` },
       },
@@ -542,7 +759,18 @@ export async function GET(request: Request) {
       providerNotifications,
       aiRecommendations,
       sla: { targetHours: slaTargetHours, compliance: slaCompliance, breaches: slaBreaches, total: slaTotal },
+      queueSla,
+      automation: {
+        scenarios: AUTOMATION_SCENARIOS,
+        journal: automationJournal,
+        stats: automationStats(automationJournal),
+      },
+      exceptions: {
+        list: exceptions,
+        stats: exceptionStats(exceptions),
+      },
       managers: MANAGERS,
+      kanban: kanbanOrders,
       orders: pagedOrders,
       pagination: { page, limit, total: totalCount, totalPages: Math.max(1, Math.ceil(totalCount / limit)) },
       period: { start: range.start, end: range.end },
@@ -578,6 +806,8 @@ export async function POST(request: Request) {
     const serviceId = typeof body.serviceId === "string" ? body.serviceId : "";
     const serviceDate = typeof body.serviceDate === "string" ? new Date(body.serviceDate) : null;
     const amountRaw = typeof body.amount === "number" ? body.amount : null;
+    // Приоритет заказа (Гл. 3.10): валидируем против допустимых значений.
+    const priority = (typeof body.priority === "string" && ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(body.priority) ? body.priority : undefined) as OrderPriority | undefined;
 
     if (!userId || !serviceId) {
       return NextResponse.json({ error: "Укажите клиента и услугу" }, { status: 400 });
@@ -605,17 +835,20 @@ export async function POST(request: Request) {
     const amount = amountRaw && amountRaw > 0 ? Math.round(amountRaw * 100) / 100 : service.discountPrice ?? service.price;
 
     const created = await prisma.$transaction(async (tx) => {
-      const last = await tx.order.findFirst({ orderBy: { createdAt: "desc" }, select: { orderNumber: true } });
+      // Номер = максимальный существующий + 1 (не «последний по дате» — иначе
+      // при создании после заказов с более высокими номерами будет конфликт уникальности).
+      const rows = await tx.order.findMany({ select: { orderNumber: true } });
       let seq = 1000;
-      if (last?.orderNumber) {
-        const n = parseInt(last.orderNumber.replace("ORD-", ""), 10);
-        if (!isNaN(n)) seq = n + 1;
+      for (const r of rows) {
+        const n = parseInt(r.orderNumber.replace("ORD-", ""), 10);
+        if (!isNaN(n) && n >= seq) seq = n + 1;
       }
       const order = await tx.order.create({
         data: {
           orderNumber: `ORD-${seq}`,
           userId,
           status: "AWAITING_CONFIRMATION",
+          ...(priority ? { priority } : {}),
           currency: service.currency || "USD",
           amount,
           paidAmount: 0,

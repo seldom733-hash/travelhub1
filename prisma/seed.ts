@@ -230,6 +230,32 @@ async function main() {
     },
   });
 
+  // ── Роли из Гл. 2.2: Руководитель, Финансовый отдел, Маркетолог, Аналитик, Модератор ──
+  // Каждая роль получает рабочее пространство Dashboard по умолчанию и полный доступ
+  // к админке (см. FULL_ADMIN_ROLES в lib/admin-access.ts).
+  const roleUsers: { email: string; role: string; firstName: string; lastName: string; workspace: string }[] = [
+    { email: "director@travelhub.az", role: "DIRECTOR", firstName: "Лейла", lastName: "Алиева", workspace: "main" },
+    { email: "finance@travelhub.az", role: "FINANCE", firstName: "Кямал", lastName: "Гусейнов", workspace: "finance" },
+    { email: "marketer@travelhub.az", role: "MARKETER", firstName: "Нигяр", lastName: "Гаджиева", workspace: "marketing" },
+    { email: "analyst@travelhub.az", role: "ANALYST", firstName: "Рауф", lastName: "Бабаев", workspace: "main" },
+    { email: "moderator@travelhub.az", role: "MODERATOR", firstName: "Айсель", lastName: "Каримова", workspace: "main" },
+  ];
+  for (const u of roleUsers) {
+    await prisma.user.upsert({
+      where: { email: u.email },
+      update: { defaultWorkspace: u.workspace },
+      create: {
+        email: u.email,
+        passwordHash: hash("manager123"),
+        firstName: u.firstName,
+        lastName: u.lastName,
+        role: u.role as never,
+        defaultWorkspace: u.workspace,
+        createdAt: userCreatedAt(false),
+      },
+    });
+  }
+
   // ── Демо-покупатель ──
   const buyerRecords: { id: string; createdAt: Date }[] = [];
   const demoBuyer = await prisma.user.upsert({
@@ -624,8 +650,8 @@ async function main() {
     });
   }
 
-  // ── Booking Center: целевые сценарии для виджетов (Гл. 5) ──
-  // Бронирования с гарантированными окнами дат, чтобы панель Booking Center
+  // ── Бронирования: целевые сценарии для виджетов (Гл. 5) ──
+  // Бронирования с гарантированными окнами дат, чтобы панель бронирований
   // показывала: ближайшие поездки, просроченные подтверждения, проблемные брони,
   // ожидающие оплаты и свежие брони за сегодня/неделю.
   const bcTargets: Array<{
@@ -867,17 +893,25 @@ async function main() {
     await prisma.bookingMessage.createMany({ data: messageRows.slice(i, i + 1000) });
   }
 
-  // ── Заказы (Order Center, Гл. 6): группируем бронирования в заказы ──
+  // ── Заказы (Гл. 6): группируем бронирования в заказы ──
   // Заказ — центральная сущность платформы: объединяет 1–3 брони одного клиента.
   // Статус заказа выводится из статусов входящих броней; далее добавляем целевые
   // заказы с фиксированными статусами жизненного цикла (Гл. 6.10), чтобы виджеты
-  // Order Center были заполнены.
+  // реестр заказов был заполнен.
   await prisma.order.deleteMany({});
   type OrderStatusValue =
     | "DRAFT" | "CREATED" | "PROCESSING" | "AWAITING_CONFIRMATION" | "CONFIRMED"
     | "AWAITING_PAYMENT" | "PARTIALLY_PAID" | "PAID" | "DOCUMENT_PREP" | "READY"
     | "COMPLETED" | "CHANGED" | "REFUNDED" | "CANCELLED" | "OVERDUE" | "ARCHIVED";
   const orderSources = ["Сайт", "Мобильное приложение", "Партнёр", "Call-центр", "Telegram-бот", "WhatsApp"];
+  // Приоритет заказа по статусу (Гл. 3.7): просроченные — срочные, активные
+  // этапы — высокий, завершённые/отменённые — низкий.
+  const orderPriorityForStatus = (s: string): string => {
+    if (s === "OVERDUE") return "URGENT";
+    if (["AWAITING_CONFIRMATION", "PROCESSING", "AWAITING_PAYMENT", "PARTIALLY_PAID", "CONFIRMED", "CHANGED"].includes(s)) return "HIGH";
+    if (["COMPLETED", "REFUNDED", "CANCELLED", "ARCHIVED"].includes(s)) return "LOW";
+    return "MEDIUM";
+  };
   const orderStatusFromBookings = (items: { status: string }[]): OrderStatusValue => {
     const st = new Set(items.map((b) => b.status));
     const has = (s: string) => st.has(s);
@@ -929,6 +963,7 @@ async function main() {
         orderNumber: `ORD-${String(1000 + ordIdx)}`,
         userId: g.userId,
         status,
+        priority: orderPriorityForStatus(status) as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
         currency: "USD",
         amount,
         paidAmount,
@@ -945,7 +980,7 @@ async function main() {
     });
   }
 
-  // ── Целевые заказы по статусам жизненного цикла (для виджетов Order Center) ──
+  // ── Целевые заказы по статусам жизненного цикла (для реестра заказов) ──
   const bookingStatusFor = (s: OrderStatusValue): BookingStatusValue => {
     if (s === "COMPLETED" || s === "ARCHIVED") return "COMPLETED";
     if (s === "REFUNDED" || s === "CANCELLED") return "REFUNDED";
@@ -997,6 +1032,7 @@ async function main() {
           orderNumber: `ORD-${String(1000 + ordIdx)}`,
           userId: buyer.id,
           status: t.status,
+          priority: orderPriorityForStatus(t.status) as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
           currency: svc.currency || "USD",
           amount,
           paidAmount,

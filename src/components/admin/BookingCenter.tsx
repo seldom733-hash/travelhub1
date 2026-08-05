@@ -313,7 +313,6 @@ function BookingDetailSidebar({
   acting,
   historyVersion,
   onMessagesRead,
-  initialTab = "overview",
 }: {
   booking: BookingRow;
   onClose: () => void;
@@ -322,10 +321,8 @@ function BookingDetailSidebar({
   acting: string | null;
   historyVersion: number;
   onMessagesRead: () => void;
-  // Стартовая вкладка: «Переписка» (messages) при переходе из «Проблемных бронирований»
-  initialTab?: string;
 }) {
-  const [tab, setTab] = useState(initialTab);
+  const [tab, setTab] = useState("overview");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -477,7 +474,7 @@ function BookingDetailSidebar({
               </div>
               <p className="text-xs text-[var(--admin-muted)] mt-0.5">Заказ {booking.orderId} · {booking.client}</p>
             </div>
-            <button onClick={onClose} className="w-9 h-9 rounded-xl hover:bg-[var(--admin-bg)] flex items-center justify-center text-[var(--admin-muted)] transition-colors">
+            <button onClick={onClose} className="ac-btn ac-btn-ghost ac-btn-icon">
               ✕
             </button>
           </div>
@@ -576,14 +573,14 @@ function BookingDetailSidebar({
                 <button
                   onClick={() => onAction("complete")}
                   disabled={busy || booking.bookingStatus !== "PAID"}
-                  className="flex-1 h-10 rounded-xl border border-[var(--admin-border)] text-[var(--admin-muted)] text-sm font-medium hover:bg-[var(--admin-bg)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="ac-btn ac-btn-secondary flex-1"
                 >
                   Завершить поездку
                 </button>
                 <button
                   onClick={() => onAction("cancel")}
                   disabled={busy || !["PENDING", "CONFIRMED", "PAID"].includes(booking.bookingStatus)}
-                  className="flex-1 h-10 rounded-xl border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="ac-btn ac-btn-danger flex-1"
                 >
                   Отменить
                 </button>
@@ -591,7 +588,7 @@ function BookingDetailSidebar({
               <button
                 onClick={onEdit}
                 disabled={busy || booking.bookingStatus === "REFUNDED"}
-                className="w-full h-10 rounded-xl border border-violet-200 text-violet-600 text-sm font-medium hover:bg-violet-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="ac-btn w-full border-violet-200 text-violet-600 hover:bg-violet-50"
               >
                 ✏️ Изменить даты и сумму
               </button>
@@ -934,7 +931,7 @@ function CreateBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
             <h2 className="font-bold text-[var(--admin-text)]">➕ Создать бронирование</h2>
             <p className="text-xs text-[var(--admin-muted)] mt-0.5">Новая бронь создаётся со статусом «Ожидает подтверждения»</p>
           </div>
-          <button onClick={onClose} className="w-9 h-9 rounded-xl hover:bg-[var(--admin-bg)] flex items-center justify-center text-[var(--admin-muted)] transition-colors">
+          <button onClick={onClose} className="ac-btn ac-btn-ghost ac-btn-icon">
             ✕
           </button>
         </div>
@@ -1046,14 +1043,14 @@ function CreateBookingModal({ onClose, onCreated }: { onClose: () => void; onCre
         <div className="px-5 py-4 border-t border-[var(--admin-border)] flex items-center justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-4 h-10 rounded-xl border border-[var(--admin-border)] text-[var(--admin-muted)] text-sm font-medium hover:bg-[var(--admin-bg)] transition-colors"
+            className="ac-btn ac-btn-secondary"
           >
             Отмена
           </button>
           <button
             onClick={() => void handleSubmit()}
             disabled={submitting || loading || !clientId || !serviceId || !serviceDate}
-            className="px-5 h-10 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="ac-btn ac-btn-primary"
           >
             {submitting ? "Создаём…" : "Создать бронирование"}
           </button>
@@ -1128,7 +1125,7 @@ function EditBookingModal({ booking, onClose, onSaved }: { booking: BookingRow; 
             <h2 className="font-bold text-[var(--admin-text)]">✏️ Изменить бронирование</h2>
             <p className="text-xs text-[var(--admin-muted)] mt-0.5">{booking.bookingNumber} · {booking.client}</p>
           </div>
-          <button onClick={onClose} className="w-9 h-9 rounded-xl hover:bg-[var(--admin-bg)] flex items-center justify-center text-[var(--admin-muted)] transition-colors">
+          <button onClick={onClose} className="ac-btn ac-btn-ghost ac-btn-icon">
             ✕
           </button>
         </div>
@@ -1171,14 +1168,14 @@ function EditBookingModal({ booking, onClose, onSaved }: { booking: BookingRow; 
         <div className="px-5 py-4 border-t border-[var(--admin-border)] flex items-center justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-4 h-10 rounded-xl border border-[var(--admin-border)] text-[var(--admin-muted)] text-sm font-medium hover:bg-[var(--admin-bg)] transition-colors"
+            className="ac-btn ac-btn-secondary"
           >
             Отмена
           </button>
           <button
             onClick={() => void handleSave()}
             disabled={submitting}
-            className="px-5 h-10 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="ac-btn ac-btn-primary"
           >
             {submitting ? "Сохраняем…" : "Сохранить"}
           </button>
@@ -1200,12 +1197,6 @@ export default function BookingCenter() {
   // Сортировка таблицы по числу непрочитанных сообщений (убывание), Гл. 5.8
   const [sortUnread, setSortUnread] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingRow | null>(null);
-  // Стартовая вкладка карточки брони: «Переписка» (messages) при переходе
-  // из «Проблемных бронирований» — менеджер сразу пишет клиенту напоминание.
-  const [bookingSidebarInitialTab, setBookingSidebarInitialTab] = useState("overview");
-  // Глубокая ссылка из виджета: ?open=<id>&tab=<вкладка>
-  const [urlOpenBookingId, setUrlOpenBookingId] = useState<string | null>(null);
-  const [urlOpenBookingTab, setUrlOpenBookingTab] = useState("overview");
   const [chartMode, setChartMode] = useState<"line" | "bar" | "area">("line");
   const [aiOpen, setAiOpen] = useState(false);
   const [savedFilters, setSavedFilters] = useState<string[]>([]);
@@ -1363,23 +1354,6 @@ export default function BookingCenter() {
     [fetchData]
   );
 
-  // Открытие карточки брони с вкладкой «Переписка» из «Проблемных бронирований»:
-  // подтягиваем полную бронь по id (GET) — проблемная бронь может быть не на
-  // текущей странице таблицы.
-  const openProblemBooking = useCallback(async (id: string) => {
-    try {
-      const res = await fetch(`/api/admin/bookings/${id}`);
-      if (!res.ok) return;
-      const json = await res.json();
-      if (json?.booking) {
-        setSelectedBooking(json.booking as BookingRow);
-        setBookingSidebarInitialTab("messages");
-      }
-    } catch {
-      /* карточка не откроется, но страница реестра останется рабочей */
-    }
-  }, []);
-
   // Быстрое действие «Подтвердить/Отменить/Отправить на оплату» работает по выбранной строке
   const quickActionOnSelection = async (action: "confirm" | "cancel" | "pay") => {
     if (!selectedBooking) {
@@ -1402,42 +1376,6 @@ export default function BookingCenter() {
         if (seq === requestSeq.current && res) setData(res);
       });
   }, [fetchData]);
-
-  // Глубокая ссылка извне (?open=<id>&tab=<вкладка>): подтягиваем бронь по id
-  // и открываем карточку сразу с нужной вкладкой. Внутри страницы проблемные брони
-  // открываются через openProblemBooking (onClick), поэтому повторные клики работают.
-  useEffect(() => {
-    if (!urlOpenBookingId) return;
-    let cancelled = false;
-    void Promise.resolve().then(async () => {
-      try {
-        const res = await fetch(`/api/admin/bookings/${urlOpenBookingId}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        if (cancelled || !json?.booking) return;
-        setSelectedBooking(json.booking as BookingRow);
-        setBookingSidebarInitialTab(urlOpenBookingTab);
-      } catch {
-        /* карточка не откроется, но страница реестра останется рабочей */
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [urlOpenBookingId, urlOpenBookingTab]);
-
-  // Читаем ?open&tab из URL один раз при монтировании (паттерн adjust-state-during-render,
-  // как в Order Center: без эффекта, чтобы не было гонки с гидратацией).
-  const [urlBookingHandled, setUrlBookingHandled] = useState(false);
-  if (!urlBookingHandled && typeof window !== "undefined") {
-    const params = new URLSearchParams(window.location.search);
-    const open = params.get("open");
-    if (open) {
-      setUrlOpenBookingId(open);
-      setUrlOpenBookingTab(params.get("tab") ?? "overview");
-    }
-    setUrlBookingHandled(true);
-  }
 
   const resetFilters = () => {
     setFilters({ country: "", city: "", type: "", status: "", paymentStatus: "", manager: "", source: "", currency: "", minPrice: "", maxPrice: "", needsAttention: false });
@@ -1675,7 +1613,7 @@ export default function BookingCenter() {
     [data]
   );
 
-  // Клиентский поиск по таблице (как в SalesCenter)
+  // Клиентский поиск по таблице
   const visibleBookings = useMemo(() => {
     const rows = data?.bookings || [];
     if (!searchQuery.trim()) return rows;
@@ -1787,7 +1725,7 @@ export default function BookingCenter() {
               const fresh = await fetchData();
               if (fresh) setData(fresh);
             }}
-            className="px-4 h-10 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors"
+            className="ac-btn ac-btn-primary"
           >
             Повторить
           </button>
@@ -1828,7 +1766,7 @@ export default function BookingCenter() {
                 if (action.label === "Отправить на оплату") void quickActionOnSelection("pay");
                 if (action.label === "Отменить") void quickActionOnSelection("cancel");
               }}
-              className={`flex items-center gap-2 px-3 h-9 rounded-xl text-white text-xs font-medium ${action.color} hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all shrink-0`}
+              className={`ac-btn shrink-0 text-white ${action.color} hover:opacity-90`}
               title={action.label}
             >
               <span>{action.icon}</span>
@@ -1865,12 +1803,12 @@ export default function BookingCenter() {
                   }
                 }}
                 title={card.onClick ? `Показать фильтр: ${card.title}` : undefined}
-                className={`bg-[var(--admin-card)] border rounded-2xl p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all card-hover ${
+                className={`ac-card ac-card-hover p-3.5 ${
                   card.onClick ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/60" : ""
-                } ${card.active ? "border-primary ring-2 ring-primary/40 bg-primary/5" : "border-[var(--admin-border)]"}`}
+                } ${card.active ? "ac-card-active ring-2 ring-primary/40" : ""}`}
               >
                 <div className="flex items-center gap-2 mb-3">
-                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center text-white text-lg shadow-lg`}>{card.icon}</div>
+                  <div className={`ac-kpi-icon shrink-0 bg-gradient-to-br ${card.color} text-white shadow-lg`}>{card.icon}</div>
                   <span className="text-[11px] font-medium text-[var(--admin-muted)] leading-tight">{card.title}</span>
                   {card.onClick && (
                     <span
@@ -1882,7 +1820,7 @@ export default function BookingCenter() {
                     </span>
                   )}
                 </div>
-                <div className="text-xl font-extrabold text-[var(--admin-text)] mb-1">{card.value}</div>
+                <div className="text-2xl font-bold text-[var(--admin-text)] mb-1">{card.value}</div>
                 {card.change && (
                   <div className={`text-xs font-semibold ${card.changeType === "up" ? "text-emerald-600" : card.changeType === "down" ? "text-red-600" : "text-[var(--admin-muted)]"}`}>
                     {card.change}
@@ -1970,24 +1908,24 @@ export default function BookingCenter() {
             <h3 className="text-sm font-semibold text-[var(--admin-text)]">Фильтры</h3>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-[var(--admin-muted)]">Период:</span>
-              <div className="flex items-center gap-1">
+              <div className="ac-tabs">
                 {PERIODS.map((p) => (
                   <button
                     key={p.key}
                     onClick={() => { setPeriod(p.key); setPage(1); }}
-                    className={`px-2.5 h-7 rounded-lg text-[11px] font-medium transition-colors ${period === p.key ? "bg-primary text-white" : "text-[var(--admin-muted)] hover:bg-[var(--admin-bg)]"}`}
+                    className={`ac-tab ${period === p.key ? "ac-tab-active" : ""}`}
                   >
                     {p.label}
                   </button>
                 ))}
               </div>
-              <button onClick={() => { setPage(1); fetchData(); }} className="px-3 h-8 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary-dark transition-colors">
+              <button onClick={() => { setPage(1); fetchData(); }} className="ac-btn ac-btn-primary ac-btn-sm">
                 Применить
               </button>
-              <button onClick={resetFilters} className="px-3 h-8 rounded-lg border border-[var(--admin-border)] text-[var(--admin-muted)] text-xs font-medium hover:bg-[var(--admin-bg)] transition-colors">
+              <button onClick={resetFilters} className="ac-btn ac-btn-secondary ac-btn-sm">
                 Сбросить
               </button>
-              <button onClick={saveFilter} className="px-3 h-8 rounded-lg border border-[var(--admin-border)] text-[var(--admin-muted)] text-xs font-medium hover:bg-[var(--admin-bg)] transition-colors" title="Сохранить текущий фильтр">
+              <button onClick={saveFilter} className="ac-btn ac-btn-secondary ac-btn-sm" title="Сохранить текущий фильтр">
                 💾 Сохранить
               </button>
             </div>
@@ -2017,7 +1955,7 @@ export default function BookingCenter() {
                   });
                   setPage(1);
                 }}
-                className="px-2.5 h-7 rounded-lg bg-[var(--admin-bg)] border border-[var(--admin-border)] text-[11px] text-[var(--admin-muted)] hover:border-primary hover:text-primary transition-colors"
+                className="ac-chip"
               >
                 {qf.label}
               </button>
@@ -2026,7 +1964,7 @@ export default function BookingCenter() {
               <button
                 key={sf}
                 onClick={() => removeSavedFilter(sf)}
-                className="px-2.5 h-7 rounded-lg bg-primary/10 border border-primary/20 text-[11px] text-primary hover:bg-primary/20 transition-colors"
+                className="ac-chip ac-chip-active"
                 title="Удалить фильтр"
               >
                 {sf} ✕
@@ -2107,20 +2045,12 @@ export default function BookingCenter() {
               {loading ? <SkeletonBlock className="h-32 w-full" /> : (
                 <div className="space-y-2">
                   {(data?.problemBookings || []).map((p) => (
-                    // Клик открывает карточку брони сразу на вкладке «Переписка»,
-                    // чтобы отправить клиенту напоминание (Гл. 5.9). Открытие через
-                    // onClick + GET по id — без навигации, чтобы повторные клики
-                    // по разным броням работали (one-time URL-флаг сломал бы их).
-                    <button
-                      key={p.id}
-                      onClick={() => void openProblemBooking(p.id)}
-                      className={`block w-full text-left p-2.5 rounded-xl text-xs hover:opacity-90 hover:shadow-sm transition-all cursor-pointer ${p.urgency === "high" ? "bg-red-50 border border-red-100" : "bg-amber-50 border border-amber-100"}`}
-                    >
+                    <div key={p.id} className={`p-2.5 rounded-xl text-xs ${p.urgency === "high" ? "bg-red-50 border border-red-100" : "bg-amber-50 border border-amber-100"}`}>
                       <div className="font-medium text-[var(--admin-text)] truncate">{p.client} — {p.service}</div>
                       <div className="text-[10px] text-[var(--admin-muted)] mt-0.5">
                         {fmtMoney(p.amount)} · поездка {fmtDate(p.serviceDate)} {p.urgency === "high" ? "· 🔴 срочно" : "· 🟡 скоро"}
                       </div>
-                    </button>
+                    </div>
                   ))}
                   {!data?.problemBookings.length && <div className="text-xs text-[var(--admin-muted)]">Проблемных бронирований нет 🎉</div>}
                 </div>
@@ -2320,7 +2250,7 @@ export default function BookingCenter() {
           <div className="px-4 py-3 border-b border-[var(--admin-border)] flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-sm font-semibold text-[var(--admin-text)]">Таблица бронирований {data?.pagination.total ? `(${data.pagination.total})` : ""}</h3>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 bg-[var(--admin-bg)] rounded-lg px-3 h-8 w-56">
+              <div className="flex items-center gap-2 bg-[var(--admin-bg)] rounded-xl px-3 h-9 w-56">
                 <span className="text-[var(--admin-muted)]">🔍</span>
                 <input
                   value={searchQuery}
@@ -2329,7 +2259,7 @@ export default function BookingCenter() {
                   className="bg-transparent outline-none text-xs w-full"
                 />
               </div>
-              <button className="px-2.5 h-8 rounded-lg border border-[var(--admin-border)] text-[11px] text-[var(--admin-muted)] hover:bg-[var(--admin-bg)] transition-colors">📤 Экспорт</button>
+              <button className="ac-btn ac-btn-secondary ac-btn-sm">📤 Экспорт</button>
             </div>
           </div>
 
@@ -2354,35 +2284,35 @@ export default function BookingCenter() {
                     <button
                       onClick={() => void runBulkAction("confirm")}
                       disabled={bulkRunning !== null}
-                      className="px-3 h-8 rounded-lg bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 transition-colors disabled:opacity-40"
+                      className="ac-btn ac-btn-sm bg-emerald-500 text-white hover:bg-emerald-600"
                     >
                       {bulkRunning === "confirm" ? "Подтверждаем…" : `✅ Подтвердить (${selectedIds.length})`}
                     </button>
                     <button
                       onClick={() => void runBulkAction("pay")}
                       disabled={bulkRunning !== null}
-                      className="px-3 h-8 rounded-lg bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 transition-colors disabled:opacity-40"
+                      className="ac-btn ac-btn-sm bg-blue-500 text-white hover:bg-blue-600"
                     >
                       {bulkRunning === "pay" ? "Отправляем…" : `💳 На оплату (${selectedIds.length})`}
                     </button>
                     <button
                       onClick={() => void runBulkAction("cancel")}
                       disabled={bulkRunning !== null}
-                      className="px-3 h-8 rounded-lg bg-red-500 text-white text-xs font-medium hover:bg-red-600 transition-colors disabled:opacity-40"
+                      className="ac-btn ac-btn-sm bg-red-500 text-white hover:bg-red-600"
                     >
                       {bulkRunning === "cancel" ? "Отменяем…" : `❌ Отменить (${selectedIds.length})`}
                     </button>
                   </div>
-                  <button onClick={clearSelection} className="ml-auto px-2.5 h-8 rounded-lg border border-[var(--admin-border)] text-[11px] text-[var(--admin-muted)] hover:bg-[var(--admin-bg)] transition-colors">
+                  <button onClick={clearSelection} className="ac-btn ac-btn-secondary ac-btn-sm ml-auto">
                     ✕ Снять выбор
                   </button>
                 </div>
               )}
               <div className="overflow-x-auto">
-                <table className="w-full text-xs whitespace-nowrap">
+                <table className="ac-table whitespace-nowrap">
                   <thead>
-                    <tr className="border-b border-[var(--admin-border)] bg-[var(--admin-bg)]">
-                      <th className="px-3 py-2.5 pl-4 w-8">
+                    <tr>
+                      <th className="ac-th w-8 pl-4">
                         <input
                           type="checkbox"
                           checked={allVisibleSelected}
@@ -2395,7 +2325,7 @@ export default function BookingCenter() {
                         />
                       </th>
                       {["№ брони", "№ заказа", "Клиент", "Партнёр", "Поставщик", "Услуга", "Категория", "Направление", "Стоимость", "Валюта", "Статус брони", "Статус оплаты", "Переписка", "Менеджер", "Создано", "Дата поездки", "Изменено"].map((h) => (
-                        <th key={h} className="text-left px-3 py-2.5 font-semibold text-[var(--admin-muted)]">
+                        <th key={h} className="ac-th">
                           {h === "Переписка" ? (
                             /* Клик по заголовку «Переписка» сортирует по числу непрочитанных (убывание), Гл. 5.8 */
                             <button
@@ -2429,11 +2359,11 @@ export default function BookingCenter() {
                       <tr
                         key={b.id}
                         onClick={() => setSelectedBooking(b)}
-                        className={`border-b border-[var(--admin-border)] hover:bg-[var(--admin-bg)] cursor-pointer transition-colors ${
+                        className={`ac-tr cursor-pointer ${
                           isSelected ? "bg-primary/5" : hasUnread ? "bg-red-50/70" : ""
                         } ${hasUnread ? "font-semibold" : ""}`}
                       >
-                        <td className="px-3 py-3 pl-4 w-8" onClick={(e) => e.stopPropagation()}>
+                        <td className="ac-td w-8 pl-4" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -2441,19 +2371,19 @@ export default function BookingCenter() {
                             className="accent-[var(--primary)] w-4 h-4 cursor-pointer"
                           />
                         </td>
-                        <td className="px-3 py-3 font-semibold text-primary">{b.bookingNumber}</td>
-                        <td className="px-3 py-3 text-[var(--admin-muted)]">{b.orderId}</td>
-                        <td className="px-3 py-3 font-medium text-[var(--admin-text)]">{b.client}</td>
-                        <td className="px-3 py-3 text-[var(--admin-text)]">{b.partner}</td>
-                        <td className="px-3 py-3 text-[var(--admin-text)]">{b.provider}</td>
-                        <td className="px-3 py-3 text-[var(--admin-text)] max-w-[180px] truncate" title={b.service}>{b.service}</td>
-                        <td className="px-3 py-3 text-[var(--admin-muted)]">{b.category}</td>
-                        <td className="px-3 py-3 text-[var(--admin-muted)]">{b.direction}</td>
-                        <td className="px-3 py-3 text-right font-bold text-[var(--admin-text)]">{fmtMoney(b.amount)}</td>
-                        <td className="px-3 py-3 text-[var(--admin-muted)]">{b.currency}</td>
-                        <td className="px-3 py-3"><Badge label={STATUS_LABELS[b.bookingStatus] ?? b.bookingStatus} className={STATUS_STYLES[b.bookingStatus]} /></td>
-                        <td className="px-3 py-3"><Badge label={b.paymentStatus === "paid" ? "Оплачен" : b.paymentStatus === "pending" ? "Ожидает" : "Возврат"} className={PAY_STYLES[b.paymentStatus]} /></td>
-                        <td className="px-3 py-3">
+                        <td className="ac-td font-semibold text-primary">{b.bookingNumber}</td>
+                        <td className="ac-td text-[var(--admin-muted)]">{b.orderId}</td>
+                        <td className="ac-td font-medium">{b.client}</td>
+                        <td className="ac-td">{b.partner}</td>
+                        <td className="ac-td">{b.provider}</td>
+                        <td className="ac-td max-w-[180px] truncate" title={b.service}>{b.service}</td>
+                        <td className="ac-td text-[var(--admin-muted)]">{b.category}</td>
+                        <td className="ac-td text-[var(--admin-muted)]">{b.direction}</td>
+                        <td className="ac-td text-right font-bold">{fmtMoney(b.amount)}</td>
+                        <td className="ac-td text-[var(--admin-muted)]">{b.currency}</td>
+                        <td className="ac-td"><Badge label={STATUS_LABELS[b.bookingStatus] ?? b.bookingStatus} className={STATUS_STYLES[b.bookingStatus]} /></td>
+                        <td className="ac-td"><Badge label={b.paymentStatus === "paid" ? "Оплачен" : b.paymentStatus === "pending" ? "Ожидает" : "Возврат"} className={PAY_STYLES[b.paymentStatus]} /></td>
+                        <td className="ac-td">
                           {b.unreadCount > 0 ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 border border-red-200 text-red-600 text-[11px] font-semibold">
                               <span>💬</span>
@@ -2463,10 +2393,10 @@ export default function BookingCenter() {
                             <span className="text-[var(--admin-muted)]">—</span>
                           )}
                         </td>
-                        <td className="px-3 py-3 text-[var(--admin-text)]">{b.manager}</td>
-                        <td className="px-3 py-3 text-[var(--admin-muted)]">{fmtDate(b.createdAt)}</td>
-                        <td className="px-3 py-3 text-[var(--admin-text)]">{fmtDate(b.serviceDate)}</td>
-                        <td className="px-3 py-3 text-[var(--admin-muted)]">{fmtDate(b.updatedAt)}</td>
+                        <td className="ac-td">{b.manager}</td>
+                        <td className="ac-td text-[var(--admin-muted)]">{fmtDate(b.createdAt)}</td>
+                        <td className="ac-td">{fmtDate(b.serviceDate)}</td>
+                        <td className="ac-td text-[var(--admin-muted)]">{fmtDate(b.updatedAt)}</td>
                       </tr>
                       );
                     })}
@@ -2497,7 +2427,6 @@ export default function BookingCenter() {
       {/* ─── Карточка бронирования (боковая панель) ─── */}
       {selectedBooking && (
         <BookingDetailSidebar
-          key={`${selectedBooking.id}-${bookingSidebarInitialTab}`}
           booking={selectedBooking}
           onClose={() => setSelectedBooking(null)}
           onAction={(a) => void runBookingAction(selectedBooking.id, a)}
@@ -2510,8 +2439,6 @@ export default function BookingCenter() {
               if (fresh) setData(fresh);
             });
           }}
-          // Стартовая вкладка: «Переписка» при переходе из «Проблемных бронирований»
-          initialTab={bookingSidebarInitialTab}
         />
       )}
 
@@ -2570,7 +2497,7 @@ export default function BookingCenter() {
                 <h2 className="font-bold text-[var(--admin-text)] flex items-center gap-2">🤖 AI Assistant</h2>
                 <p className="text-xs text-[var(--admin-muted)] mt-0.5">Анализ и прогнозы по бронированиям</p>
               </div>
-              <button onClick={() => setAiOpen(false)} className="w-9 h-9 rounded-xl hover:bg-[var(--admin-bg)] flex items-center justify-center text-[var(--admin-muted)]">✕</button>
+              <button onClick={() => setAiOpen(false)} className="ac-btn ac-btn-ghost ac-btn-icon">✕</button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-2">
@@ -2585,7 +2512,7 @@ export default function BookingCenter() {
             <div className="p-4 border-t border-[var(--admin-border)]">
               <div className="flex items-center gap-2 bg-[var(--admin-bg)] rounded-xl px-3.5 h-11">
                 <input placeholder="Задайте вопрос о бронированиях…" className="flex-1 bg-transparent outline-none text-sm" />
-                <button className="w-9 h-9 rounded-lg bg-primary text-white flex items-center justify-center hover:bg-primary-dark transition-colors shrink-0">➤</button>
+                <button className="ac-btn ac-btn-primary ac-btn-icon shrink-0">➤</button>
               </div>
             </div>
           </div>
@@ -2613,7 +2540,7 @@ function FilterSelect({ label, value, onChange, options, disabled }: { label: st
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="w-full h-9 px-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-bg)] text-xs text-[var(--admin-text)] outline-none focus:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="ac-select w-full"
       >
         {options.map((o) => (
           <option key={o.key || o.label} value={o.key}>{o.label}</option>

@@ -62,7 +62,7 @@ export const BOOKING_STATUS_COLORS: Record<string, string> = {
   COMPLETED: "#06b6d4",
 };
 
-// ── Заказы (Order Center, Гл. 6) ──
+// ── Заказы (Гл. 6) ──
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {
   DRAFT: "Черновик",
@@ -151,7 +151,7 @@ export const ORDER_STATUS_GROUPS = {
 /**
  * Детерминированный список менеджеров платформы. В схеме нет поля manager —
  * менеджер назначается ротацией по id (pickManager). Единый источник для
- * Order Center (фильтр «Менеджер») и Dashboard (блок «Продажи» — лучшие менеджеры).
+ * реестр заказов (фильтр «Менеджер») и Dashboard (блок «Продажи» — лучшие менеджеры).
  */
 // ── Роли и рабочие пространства Dashboard (Гл. 1.2, 1.44) ──
 // Стартовое пространство зависит от роли; ключи должны совпадать с WORKSPACES
@@ -163,6 +163,11 @@ export type WorkspaceKey = (typeof WORKSPACE_KEYS)[number];
 /** Пространство Dashboard по умолчанию для роли (Гл. 1.2). */
 export const ROLE_DEFAULT_WORKSPACE: Record<string, WorkspaceKey> = {
   ADMIN: "main",
+  DIRECTOR: "main",
+  FINANCE: "finance",
+  MARKETER: "marketing",
+  ANALYST: "main",
+  MODERATOR: "main",
   SALES_MANAGER: "sales",
   OPERATOR: "execution",
   PARTNER: "main",

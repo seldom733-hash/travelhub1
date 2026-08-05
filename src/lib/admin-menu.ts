@@ -20,8 +20,8 @@ export const ADMIN_MENU: AdminMenuItem[] = [
   {
     icon: "🧳",
     label: "Продажи и исполнение",
-    href: "/admin/orders",
-    aliases: ["/admin/sales", "/admin/bookings"],
+    href: "/admin/sales-execution",
+    aliases: ["/admin/bookings"],
   },
   { icon: "📚", label: "Каталог услуг", href: "/admin/catalog" },
   { icon: "🤝", label: "CRM", href: "/admin/crm" },
@@ -44,12 +44,12 @@ export const ADMIN_MENU: AdminMenuItem[] = [
 
 /**
  * Доступ ролей к разделам админки (Гл. 1.2): менеджер по продажам — Dashboard
- * и «Продажи» (заказы, продажи); операционист — Dashboard и «Исполнение»
+ * и «Продажи» (Гл. 3, Sales Center); операционист — Dashboard и «Исполнение»
  * (бронирования). Роли без записи (ADMIN, MODERATOR, PARTNER и пр.) — полный доступ.
  * Путь разрешён, если совпадает с префиксом раздела (сам раздел или его вкладка).
  */
 export const ROLE_ALLOWED_PREFIXES: Record<string, string[]> = {
-  SALES_MANAGER: ["/admin", "/admin/orders", "/admin/sales"],
+  SALES_MANAGER: ["/admin", "/admin/sales-execution"],
   OPERATOR: ["/admin", "/admin/bookings"],
 };
 
@@ -71,9 +71,7 @@ export function canAccessAdminPath(pathname: string, role: string): boolean {
 export function menuForRole(role: string): AdminMenuItem[] {
   const full = ADMIN_MENU.filter((i) => !i.hidden);
   if (role === "SALES_MANAGER") {
-    return full
-      .filter((i) => i.href === "/admin" || i.href === "/admin/orders")
-      .map((i) => (i.href === "/admin/orders" ? { ...i, label: "Продажи" } : i));
+    return full.filter((i) => i.href === "/admin" || i.href === "/admin/sales-execution");
   }
   if (role === "OPERATOR") {
     const dashboard = full.find((i) => i.href === "/admin")!;
@@ -92,7 +90,7 @@ export function getAdminSection(pathname: string, role?: string): AdminMenuItem 
   if (pathname === "/admin") {
     return source[0];
   }
-  // Префиксное совпадение + алиасы (вкладки раздела «Продажи и исполнение»)
+  // Префиксное совпадение + алиасы (вкладки раздела)
   const match = source.find((item) => {
     if (item.href === "/admin") return false;
     if (pathname === item.href || pathname.startsWith(item.href + "/")) return true;

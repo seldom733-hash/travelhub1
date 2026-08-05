@@ -64,6 +64,241 @@ body {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ─────────────────────────────────────────────────────────────
+   Единый дизайн-кит административной панели (все вкладки):
+   карточки, кнопки, табы, чипы, поля, таблицы, бейджи.
+   Единые радиусы (16px карточки / 12px элементы), высоты
+   (36px элементы, 32px табы), размеры шрифтов.
+   ───────────────────────────────────────────────────────────── */
+.admin-app .ac-card {
+  background: var(--admin-card);
+  border: 1px solid var(--admin-border);
+  border-radius: 1rem; /* rounded-2xl */
+}
+
+/* Заголовок секции внутри карточки: единый размер и вес шрифта */
+.admin-app .ac-card-title {
+  font-size: 0.9375rem; /* text-[15px] */
+  font-weight: 700;
+  color: var(--admin-text);
+  line-height: 1.25;
+}
+.admin-app .ac-card-sub {
+  font-size: 0.75rem; /* text-xs */
+  color: var(--admin-muted);
+  margin-top: 0.125rem;
+}
+
+/* Кнопки: единая высота 36px, радиус 12px, размер шрифта 12px */
+.admin-app .ac-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2.25rem;
+  padding: 0 0.875rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
+  cursor: pointer;
+}
+.admin-app .ac-btn:active:not(:disabled) { transform: scale(0.98); }
+.admin-app .ac-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.admin-app .ac-btn-primary { background: var(--primary); color: #fff; }
+.admin-app .ac-btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+.admin-app .ac-btn-secondary {
+  background: var(--admin-card);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text);
+}
+.admin-app .ac-btn-secondary:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.admin-app .ac-btn-ghost { color: var(--admin-muted); }
+.admin-app .ac-btn-ghost:hover:not(:disabled) { background: var(--admin-bg); color: var(--admin-text); }
+.admin-app .ac-btn-danger {
+  color: #e11d48;
+  border: 1px solid #fecdd3;
+  background: var(--admin-card);
+}
+.admin-app .ac-btn-danger:hover:not(:disabled) { background: #fff1f2; border-color: #fda4af; }
+.admin-app .ac-btn-success {
+  color: #059669;
+  border: 1px solid #a7f3d0;
+  background: var(--admin-card);
+}
+.admin-app .ac-btn-success:hover:not(:disabled) { background: #ecfdf5; border-color: #6ee7b7; }
+.admin-app .ac-btn-sm { height: 2rem; padding: 0 0.625rem; border-radius: 0.5rem; }
+.admin-app .ac-btn-lg { height: 2.5rem; padding: 0 1.125rem; font-size: 0.8125rem; }
+/* «Стеклянная» кнопка для цветных шапок (приветствие ЦУ, карточки-баннеры) */
+.admin-app .ac-btn-glass {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(4px);
+}
+.admin-app .ac-btn-glass:hover:not(:disabled) { background: rgba(255, 255, 255, 0.28); }
+/* Инверсная тёмная кнопка (PDF/печать и т.п.) */
+.admin-app .ac-btn-inverse { background: var(--secondary); color: #fff; }
+.admin-app .ac-btn-inverse:hover:not(:disabled) { opacity: 0.9; }
+/* Квадратная иконка-кнопка (32×32): ширина/паддинги перекрывают базовые, т.к. утилиты
+   Tailwind лежат в @layer и проигрывают не-слоёным правилам кита. */
+.admin-app .ac-btn.ac-btn-icon { width: 2rem; padding: 0; }
+
+/* Карточка с единым hover (тень + рамка акцента). Применять вместе с .ac-card.
+   Нужен отдельный класс, а не hover-утилиты: border у .ac-card вне @layer
+   перебивает layered hover:border-*. */
+.admin-app .ac-card-hover { transition: box-shadow 0.2s ease, border-color 0.2s ease; }
+.admin-app .ac-card-hover:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--admin-border));
+  box-shadow: 0 12px 24px -8px rgba(15, 23, 42, 0.14);
+}
+/* Активная карточка (фильтр по клику): подсветка фона и рамка. Отдельный класс,
+   т.к. layered bg-primary/5 проигрывает не-слоёному фону .ac-card. */
+.admin-app .ac-card-active {
+  background: color-mix(in srgb, var(--primary) 6%, var(--admin-card));
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--admin-border));
+}
+
+/* Поля ввода и селекты: единая высота 36px, радиус 12px, шрифт 12px */
+.admin-app .ac-input,
+.admin-app .ac-select {
+  height: 2.25rem;
+  border-radius: 0.75rem;
+  background: var(--admin-bg);
+  border: 1px solid var(--admin-border);
+  font-size: 0.75rem;
+  color: var(--admin-text);
+  padding: 0 0.75rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.admin-app .ac-input::placeholder { color: var(--admin-muted); }
+.admin-app .ac-input:focus,
+.admin-app .ac-select:focus { border-color: var(--primary); }
+.admin-app .ac-input:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent); }
+.admin-app .ac-select { cursor: pointer; }
+
+/* Табы и период-табы: единый контейнер и активное состояние */
+.admin-app .ac-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--admin-card);
+  border: 1px solid var(--admin-border);
+  border-radius: 0.75rem;
+  padding: 0.25rem;
+}
+.admin-app .ac-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--admin-muted);
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.admin-app .ac-tab:hover { background: var(--admin-bg); color: var(--admin-text); }
+.admin-app .ac-tab-active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+.admin-app .ac-tab-active:hover { background: var(--primary); color: #fff; }
+
+/* Чипы быстрых фильтров */
+.admin-app .ac-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.25rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--admin-bg);
+  border: 1px solid var(--admin-border);
+  color: var(--admin-muted);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  /* min-height вместо height: чипы с подписью на второй строке («из них напомнено N»)
+     растут, а не обрезаются. */
+}
+.admin-app .ac-chip:hover { border-color: var(--primary); color: var(--primary); }
+.admin-app .ac-chip-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.admin-app .ac-chip-active:hover { background: var(--primary); color: #fff; }
+
+/* Таблицы: единые шапка, строки, ячейки */
+.admin-app .ac-table { width: 100%; border-collapse: collapse; }
+.admin-app .ac-th {
+  text-align: left;
+  font-size: 0.6875rem; /* text-[11px] */
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: var(--admin-muted);
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-bg);
+  white-space: nowrap;
+}
+.admin-app .ac-td {
+  padding: 0.75rem;
+  font-size: 0.75rem; /* text-xs */
+  border-bottom: 1px solid color-mix(in srgb, var(--admin-border) 60%, transparent);
+  vertical-align: middle;
+  /* Без color: наследуется, чтобы цветовые утилиты ячеек (text-primary, muted)
+     работали поверх кита — утилиты Tailwind лежат в @layer и проигрывают
+     не-слоёным правилам. */
+}
+.admin-app .ac-tr { transition: background 0.15s ease; }
+.admin-app .ac-tr:hover { background: var(--admin-bg); }
+
+/* Бейджи статусов */
+.admin-app .ac-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+/* Изменение ▲/▼ для KPI */
+.admin-app .ac-change { font-size: 0.6875rem; font-weight: 600; }
+.admin-app .ac-change-up { color: #16a34a; }
+.admin-app .ac-change-down { color: #dc2626; }
+
+/* Скелетоны загрузки — единый стиль */
+.admin-app .ac-skeleton {
+  background: color-mix(in srgb, var(--admin-border) 50%, transparent);
+  border-radius: 0.75rem;
+  animation: pulse-gentle 1.6s ease-in-out infinite;
+}
+
+/* Заголовок карточки KPI-панели: иконка в цветном квадрате */
+.admin-app .ac-kpi-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.admin-app .ac-kpi-value { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+
 /* Карточка с hover-подъёмом */
 .card-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -71,4 +306,76 @@ body {
 .card-hover:hover {
   transform: translateY(-4px);
   box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.12);
+}
+
+/* ── Печатная версия отчётов (Гл. 2.6): PDF/печать через window.print ── */
+/* Блок, видимый только при печати (заголовок отчёта) */
+.print-only {
+  display: none;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+  /* Цвета графиков и диаграмм печатаются: без «печатать фоновые изображения»
+     браузер не выводит заливки SVG, градиенты и цветные полосы. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* Скрываем служебные элементы админки: сайдбар, шапку, верхнюю панель, футер */
+  .admin-app aside,
+  .admin-app header,
+  .admin-app footer,
+  .admin-app > div.h-9,
+  /* Вспомогательные элементы интерфейса (кнопки, фильтры, вкладки) */
+  .no-print {
+    display: none !important;
+  }
+  /* Печать всегда в светлой теме */
+  .admin-app {
+    --admin-bg: #f8fafc !important;
+    --admin-card: #ffffff !important;
+    --admin-border: #e2e8f0 !important;
+    --admin-text: #0f172a !important;
+    --admin-muted: #64748b !important;
+    background: #ffffff !important;
+  }
+  .admin-app main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  /* Прокручиваемые блоки («Пульс», таблицы) не обрезаются на бумаге */
+  .admin-app main .overflow-x-auto,
+  .admin-app main .overflow-y-auto {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  /* Ячейки таблиц переносятся по словам, чтобы столбцы не обрезались */
+  .admin-app main th,
+  .admin-app main td {
+    white-space: normal !important;
+    word-break: break-word;
+  }
+  /* Карточки и графики не разрываются между страницами */
+  .admin-app main .rounded-2xl,
+  .admin-app main .rounded-xl {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* Таблицы не разрываются внутри строк */
+  .admin-app main tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* Ширина A4 меньше экрана: lg/xl-брейкпоинты не срабатывают, поэтому сетки
+     ложатся в 2 колонки вместо одной — отчёт компактнее. */
+  .admin-app main .grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  /* Печатный заголовок отчёта */
+  .print-only {
+    display: block !important;
+  }
 }

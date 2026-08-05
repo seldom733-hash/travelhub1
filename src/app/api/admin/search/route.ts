@@ -141,7 +141,7 @@ export async function GET(request: Request) {
         detail: `${o.user.firstName} ${o.user.lastName ?? ""}`.trim() || "—",
         status: o.status,
         amount: o.amount,
-        href: `/admin/orders?open=${o.id}&tab=overview`,
+        href: `/admin/sales-execution?open=${o.id}&tab=overview`,
       })) : [],
       users: canUsersServices ? users.map((u) => ({
         id: u.id,
@@ -165,7 +165,7 @@ export async function GET(request: Request) {
         detail: `${b.user.firstName} ${b.user.lastName ?? ""}`.trim() || "—",
         status: b.status,
         amount: b.amount,
-        href: b.orderId ? `/admin/orders?open=${b.orderId}&tab=overview` : "/admin/bookings",
+        href: b.orderId ? `/admin/sales-execution?open=${b.orderId}&tab=overview` : "/admin/bookings",
       })) : [],
     });
   } catch (error) {

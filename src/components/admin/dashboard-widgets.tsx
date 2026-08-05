@@ -555,7 +555,7 @@ export function ActivityMap({ destinations, periodLabel }: { destinations: MapDe
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {selected.code && (
-              <Link href={`/admin/orders?country=${selected.code}`} className="text-[11px] text-primary font-medium hover:underline">
+              <Link href={`/admin/sales-execution?country=${selected.code}`} className="text-[11px] text-primary font-medium hover:underline">
                 Открыть заказы →
               </Link>
             )}
