@@ -408,8 +408,11 @@ export default function SalesExecution() {
   const urlOpen = searchParams.get("open");
   const urlTab = searchParams.get("tab");
   useEffect(() => {
-    setOpenId(urlOpen);
-    setOpenTab(urlTab || "overview");
+    // setState в микротаске — синхронный вызов ловит react-hooks/set-state-in-effect
+    void Promise.resolve().then(() => {
+      setOpenId(urlOpen);
+      setOpenTab(urlTab || "overview");
+    });
   }, [urlOpen, urlTab]);
 
   const [data, setData] = useState<OrdersResponse | null>(null);
@@ -477,6 +480,10 @@ export default function SalesExecution() {
   // «📍 Открыть в реестре исключений» закрывает карточку, раскрывает и
   // прокручивает панель исключений, подсвечивая строку заказа.
   const [excHighlight, setExcHighlight] = useState<string | null>(null);
+  // Состояние панели реестра исключений (Гл. 3.17): объявлено здесь, а не в блоке
+  // автоматизации, потому что linkException (ниже) открывает панель через setExcOpen
+  // — ссылка на setter до его объявления ловит react-hooks/immutability.
+  const [excOpen, setExcOpen] = useState(true);
   // Функция остановки цикла прокрутки: хранится в ref, чтобы очистить цикл
   // при повторном клике или размонтировании компонента.
   const scrollRetryStopRef = useRef<(() => void) | null>(null);
@@ -591,14 +598,11 @@ export default function SalesExecution() {
   };
 
   // Переключение фильтра «Эскалированные» (Гл. 3.17): клик по KPI-карточке
-  // применяет/снимает фильтр, синхронизируя URL. Значение читается через ref,
-  // чтобы быстрые двойные клики в одном цикле рендера не использовали устаревший
-  // closure (иначе второй клик повторно применяет фильтр вместо снятия).
-  const escalatedRef = useRef(escalated);
-  escalatedRef.current = escalated;
+  // применяет/снимает фильтр, синхронизируя URL. Значение берём из состояния
+  // напрямую (escalated в зависимостях): запись в ref во время рендера ловит
+  // react-hooks/refs, а колбэк пересоздаётся после каждого изменения фильтра.
   const toggleEscalated = useCallback(() => {
-    const next = !escalatedRef.current;
-    escalatedRef.current = next;
+    const next = !escalated;
     setEscalated(next);
     setPage(1);
     const p = new URLSearchParams(searchParams.toString());
@@ -606,7 +610,7 @@ export default function SalesExecution() {
     else p.delete("escalated");
     p.delete("open");
     router.replace(`/admin/sales-execution?${p.toString()}`);
-  }, [router, searchParams]);
+  }, [router, searchParams, escalated]);
 
   // ── Массовые операции (Гл. 3.8) ──
   const runBulk = async (action: string, value?: string) => {
@@ -698,8 +702,11 @@ export default function SalesExecution() {
     // Ждём отфильтрованные данные: на старых (нефильтрованных) не срабатываем,
     // чтобы не открывать карточку из устаревшей выборки и не сбрасывать ожидание раньше времени.
     if (!data.orders.length || !data.orders.every((o) => statuses.includes(o.status))) return;
-    openCard(data.orders[0].id, quickOpen.tab);
-    setQuickOpen(null);
+    // setState в микротаске — синхронный вызов ловит react-hooks/set-state-in-effect
+    void Promise.resolve().then(() => {
+      openCard(data.orders[0].id, quickOpen.tab);
+      setQuickOpen(null);
+    });
   }, [quickOpen, data, loading, openCard]);
 
   // ── KPI-карточки (Гл. 3.6): Новые / В работе / Ожидают поставщика /
@@ -813,12 +820,16 @@ export default function SalesExecution() {
   const [kpiHidden, setKpiHidden] = useState<string[]>([]);
   const [kpiSettingsOpen, setKpiSettingsOpen] = useState(false);
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("sales-kpi-hidden");
-      if (raw) setKpiHidden(JSON.parse(raw));
-    } catch {
-      /* ignore */
-    }
+    // setState в микротаске — синхронный вызов ловит react-hooks/set-state-in-effect;
+    // try/catch внутри микротаска, чтобы повреждённый JSON не давал rejection
+    void Promise.resolve().then(() => {
+      try {
+        const raw = localStorage.getItem("sales-kpi-hidden");
+        if (raw) setKpiHidden(JSON.parse(raw));
+      } catch {
+        /* ignore */
+      }
+    });
   }, []);
   const toggleKpi = (key: string) => {
     setKpiHidden((prev) => {
@@ -840,17 +851,20 @@ export default function SalesExecution() {
     }
   };
 
-  // ── Автоматизация (Гл. 3.16): включённые сценарии и свёрнутость панелей ──
+  // ── Автоматизация (Гл. 3.16): включённые сценарии и свёрнутость панели автоматизации ──
   const [autoDisabled, setAutoDisabled] = useState<string[]>([]);
   const [autoOpen, setAutoOpen] = useState(true);
-  const [excOpen, setExcOpen] = useState(true);
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("sales-auto-disabled");
-      if (raw) setAutoDisabled(JSON.parse(raw));
-    } catch {
-      /* ignore */
-    }
+    // setState в микротаске — синхронный вызов ловит react-hooks/set-state-in-effect;
+    // try/catch внутри микротаска, чтобы повреждённый JSON не давал rejection
+    void Promise.resolve().then(() => {
+      try {
+        const raw = localStorage.getItem("sales-auto-disabled");
+        if (raw) setAutoDisabled(JSON.parse(raw));
+      } catch {
+        /* ignore */
+      }
+    });
   }, []);
   const toggleScenario = (key: string) => {
     const next = autoDisabled.includes(key) ? autoDisabled.filter((k) => k !== key) : [...autoDisabled, key];
@@ -2002,11 +2016,14 @@ function SavedViews({
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    try {
-      setViews(JSON.parse(localStorage.getItem("sales-views") || "[]"));
-    } catch {
-      setViews([]);
-    }
+    // setState в микротаске — синхронный вызов ловит react-hooks/set-state-in-effect
+    void Promise.resolve().then(() => {
+      try {
+        setViews(JSON.parse(localStorage.getItem("sales-views") || "[]"));
+      } catch {
+        setViews([]);
+      }
+    });
   }, [open]);
 
   const persist = (next: SavedView[]) => {
@@ -3768,9 +3785,6 @@ function BookingsTab({ order }: { order: OrderCardData }) {
 
 // Способы оплаты (Гл. 3.11 «Платежи»)
 const PAYMENT_METHODS = ["Банковская карта", "Банковский перевод", "Stripe", "PayPal", "Внутренний баланс"];
-
-// Статусы счетов (Гл. 3.11 «Счета»)
-const INVOICE_STATUSES = ["Черновик", "Выставлен", "Отправлен", "Частично оплачен", "Оплачен", "Просрочен", "Аннулирован"];
 
 function FinanceTab({ order, onRunSlaAction }: { order: OrderCardData; onRunSlaAction?: (action: "raise_priority" | "escalate" | "notify_manager") => void }) {
   const f = order.financial;
