@@ -135,7 +135,6 @@ export default async function CatalogPage({ config, searchParams }: Props) {
       {/* Содержимое: фильтры + сетка */}
       <div className="max-w-7xl mx-auto px-4 py-8 grid lg:grid-cols-[300px_1fr] gap-8 items-start">
         <CatalogFilters
-          type={config.type}
           filterCategory={config.filterCategory}
           path={config.path}
           sort={sort}

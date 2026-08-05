@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { parseImages, formatPrice } from "@/lib/service-utils";
 
 interface PhotoData {
@@ -41,10 +42,10 @@ export default function PhotographersSection({ photographers }: { photographers:
                 className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-pink-300 hover:shadow-lg transition-all"
               >
                 <div className="relative h-48 overflow-hidden">
-                  <img src={imgs[0] || "/placeholder.svg"} alt={p.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  <Image src={imgs[0] || "/placeholder.svg"} alt={p.title} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="object-cover group-hover:scale-110 transition-transform duration-500" />
                   {imgs[1] && (
                     <div className="absolute top-3 right-3">
-                      <img src={imgs[1]} alt={p.title} className="w-12 h-12 rounded-full border-2 border-white object-cover shadow-lg" />
+                      <Image src={imgs[1]} alt={p.title} width={48} height={48} className="rounded-full border-2 border-white object-cover shadow-lg" />
                     </div>
                   )}
                 </div>

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { parseImages, formatPrice } from "@/lib/service-utils";
 
 const FLAGS: Record<string, string> = {
@@ -48,7 +49,7 @@ export default function TransfersSection({ transfers }: { transfers: TransferDat
                 className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-primary/30 hover:shadow-lg transition-all"
               >
                 <div className="relative h-48 overflow-hidden">
-                  <img src={img} alt={tr.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  <Image src={img} alt={tr.title} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="object-cover group-hover:scale-110 transition-transform duration-500" />
                   {tr.duration && (
                     <div className="absolute top-3 left-3">
                       <span className="bg-white/90 backdrop-blur-sm text-secondary text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">

@@ -5,14 +5,12 @@ import FilterSidebar, { type FilterState } from "@/components/FilterSidebar";
 import type { ServiceCategory } from "@/lib/filterConfig";
 
 interface Props {
-  type: string;
   filterCategory: ServiceCategory;
   path: string;
   sort: string | undefined;
 }
 
 export default function CatalogFilters({
-  type,
   filterCategory,
   path,
   sort,

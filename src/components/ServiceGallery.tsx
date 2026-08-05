@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { parseImages } from "@/lib/service-utils";
 
@@ -9,16 +10,16 @@ export default function ServiceGallery({ images, title }: { images: string; titl
 
   if (!imgs.length) {
     return (
-      <div className="rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
-        <img src="/placeholder.svg" alt={title} className="w-full h-80 md:h-[420px] object-cover" />
+      <div className="relative rounded-3xl overflow-hidden border border-gray-100 shadow-sm h-80 md:h-[420px]">
+        <Image src="/placeholder.svg" alt={title} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
       </div>
     );
   }
 
   return (
     <div>
-      <div className="rounded-3xl overflow-hidden border border-gray-100 shadow-sm bg-gray-50">
-        <img src={imgs[active]} alt={title} className="w-full h-80 md:h-[420px] object-cover" />
+      <div className="relative rounded-3xl overflow-hidden border border-gray-100 shadow-sm bg-gray-50 h-80 md:h-[420px]">
+        <Image src={imgs[active]} alt={title} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
       </div>
       {imgs.length > 1 && (
         <div className="flex gap-3 mt-3 overflow-x-auto no-scrollbar">
@@ -27,11 +28,11 @@ export default function ServiceGallery({ images, title }: { images: string; titl
               key={i}
               type="button"
               onClick={() => setActive(i)}
-              className={`w-24 h-20 rounded-xl overflow-hidden border-2 shrink-0 transition-all ${
+              className={`relative w-24 h-20 rounded-xl overflow-hidden border-2 shrink-0 transition-all ${
                 i === active ? "border-primary shadow-md" : "border-gray-100 opacity-70 hover:opacity-100"
               }`}
             >
-              <img src={img} alt={`${title} ${i + 1}`} className="w-full h-full object-cover" />
+              <Image src={img} alt={`${title} ${i + 1}`} fill sizes="96px" className="object-cover" />
             </button>
           ))}
         </div>

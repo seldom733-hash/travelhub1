@@ -197,7 +197,6 @@ export function buildAutomationJournal(orders: OrderLike[]): AutomationEvent[] {
   };
 
   for (const o of orders.slice(0, 60)) {
-    const createdAt = new Date(o.createdAt).getTime();
     const updatedAt = new Date(o.updatedAt).getTime();
     const paid = PAID_STATUSES.includes(o.status as (typeof PAID_STATUSES)[number]);
     const active = [...ORDER_STATUS_GROUPS.active].includes(o.status as (typeof ORDER_STATUS_GROUPS.active)[number]);

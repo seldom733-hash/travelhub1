@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const DESTINATIONS = [
   { name: "Турция", icon: "🇹🇷", count: "3 240 туров", img: "https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?w=600&q=80" },
   { name: "Грузия", icon: "🇬🇪", count: "1 870 туров", img: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&q=80" },
@@ -28,7 +30,7 @@ export default function PopularDestinations() {
             href={`/search?country=${encodeURIComponent(d.name)}`}
             className="group relative rounded-3xl overflow-hidden h-44 shadow-sm hover:shadow-xl transition-all duration-300"
           >
-            <img src={d.img} alt={d.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            <Image src={d.img} alt={d.name} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
               <div className="text-lg font-bold">{d.icon} {d.name}</div>

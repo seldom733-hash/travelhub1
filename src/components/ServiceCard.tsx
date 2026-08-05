@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { parseImages, formatPrice, TYPE_META } from "@/lib/service-utils";
 
 export interface ServiceCardData {
@@ -29,11 +30,12 @@ export default function ServiceCard({ s }: { s: ServiceCardData }) {
       className="group bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col"
     >
       <div className="relative h-44 overflow-hidden">
-        <img
+        <Image
           src={img}
           alt={s.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          loading="lazy"
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+          className="object-cover group-hover:scale-105 transition-transform duration-500"
         />
         <div className="absolute top-3 left-3 flex items-center gap-1.5">
           <span className="bg-white/95 backdrop-blur rounded-lg px-2 py-1 text-[11px] font-semibold text-gray-700 shadow-sm">

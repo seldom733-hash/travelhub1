@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { parseImages, formatPrice } from "@/lib/service-utils";
 
 interface GuideData {
@@ -43,7 +44,7 @@ export default function GuidesSection({ guides }: { guides: GuideData[] }) {
                 className="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-primary/30 hover:shadow-lg transition-all"
               >
                 <div className="relative h-48 overflow-hidden">
-                  <img src={img} alt={guide.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  <Image src={img} alt={guide.title} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="object-cover group-hover:scale-110 transition-transform duration-500" />
                   <div className="absolute top-3 right-3 bg-emerald-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg">✓ Лицензия</div>
                 </div>
                 <div className="p-4">
