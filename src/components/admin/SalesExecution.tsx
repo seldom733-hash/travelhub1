@@ -112,7 +112,11 @@ interface OrdersResponse {
     expectedPayouts: number;
   };
   sla: { targetHours: number; compliance: number; breaches: number; total: number };
-  ordersSeries: { labels: string[]; values: number[] };
+  ordersSeries: { labels: string[]; values: number[]; starts: string[] };
+  // Серии KPI-карточек (Гл. 3.6): у каждой карточки свой мини-график — динамика
+  // её набора статусов, а не общая динамика заказов. starts — ISO-границы
+  // бакетов (для drill-down по точке графика).
+  kpiSeries: Record<string, { labels: string[]; values: number[]; starts: string[] }>;
   aiRecommendations: { level: string; title: string; effect: string; orderId?: string }[];
   providerNotifications: { id: string; type: string; title: string; detail: string }[];
   automation: {
@@ -424,6 +428,15 @@ export default function SalesExecution() {
   // «Создать счёт» и «Отправить документы» применяют фильтр по статусам и,
   // когда данные загрузятся, открывают первый подходящий заказ на нужной вкладке.
   const [quickOpen, setQuickOpen] = useState<{ statuses: string; tab: string } | null>(null);
+  // Drill-down по бакету спарклайна KPI-карточки (Гл. 3.6): клик по точке графика
+  // сужает реестр заказов до временного бакета (createdAt в границах бакета),
+  // KPI и графики остаются по периоду. Инициализируется из URL
+  // (bucketFrom/bucketTo), чтобы фильтр переживал перезагрузку и deep-ссылки.
+  const [bucketFilter, setBucketFilter] = useState<{ from: string; to: string; label: string } | null>(() => {
+    const f = searchParams.get("bucketFrom");
+    const t = searchParams.get("bucketTo");
+    return f && t ? { from: f, to: t, label: searchParams.get("bucketLabel") || "выбранный бакет" } : null;
+  });
 
   // Построение параметров запроса реестра
   const buildParams = useCallback(
@@ -442,9 +455,14 @@ export default function SalesExecution() {
       if (category) params.set("type", category);
       if (escalated) params.set("escalated", "1");
       if (search) params.set("search", search);
+      // Бакет спарклайна (Гл. 3.6): фильтр реестра по границам точки графика
+      if (bucketFilter) {
+        params.set("bucketFrom", bucketFilter.from);
+        params.set("bucketTo", bucketFilter.to);
+      }
       return params;
     },
-    [period, status, priority, manager, source, paymentStatus, category, escalated, search, limit, viewMode]
+    [period, status, priority, manager, source, paymentStatus, category, escalated, search, limit, viewMode, bucketFilter]
   );
 
   // Единый загрузчик списка заказов (используется эффектом и refreshData)
@@ -562,10 +580,15 @@ export default function SalesExecution() {
       // Выбор очереди открывает отфильтрованный табличный реестр (Гл. 3.7)
       setViewMode("table");
       setPage(1);
+      // Бакет спарклайна привязан к точке графика — очередь сбрасывает его
+      setBucketFilter(null);
       const p = new URLSearchParams(searchParams.toString());
       if (statuses) p.set("status", statuses);
       else p.delete("status");
       p.delete("open");
+      p.delete("bucketFrom");
+      p.delete("bucketTo");
+      p.delete("bucketLabel");
       router.replace(`/admin/sales-execution?${p.toString()}`);
     },
     [router, searchParams]
@@ -576,13 +599,94 @@ export default function SalesExecution() {
     (key: string) => {
       setPeriod(key);
       setPage(1);
+      // Бакет спарклайна привязан к старому периоду — сбрасываем при смене периода
+      setBucketFilter(null);
       const p = new URLSearchParams(searchParams.toString());
       p.set("period", key);
       p.delete("open");
+      p.delete("bucketFrom");
+      p.delete("bucketTo");
+      p.delete("bucketLabel");
       router.replace(`/admin/sales-execution?${p.toString()}`);
     },
     [router, searchParams]
   );
+
+  // Надёжная прокрутка к реестру после клика по точке спарклайна: перезагрузка
+  // данных (скелетон) сдвигает layout, поэтому плавный скролл повторяется, пока
+  // секция реестра не окажется в зоне видимости. Цикл останавливается, если
+  // секция видна, исчерпан лимит попыток, пользователь начал прокручивать
+  // вручную или компонент размонтирован (очистка в эффекте ниже).
+  const scrollToRegistry = useCallback(() => {
+    const target = document.querySelector("#registry-section");
+    if (!target) return;
+    scrollRetryStopRef.current?.();
+    let attempts = 0;
+    const stop = () => {
+      window.clearInterval(iv);
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchstart", stop);
+      if (scrollRetryStopRef.current === stop) scrollRetryStopRef.current = null;
+    };
+    const iv = window.setInterval(() => {
+      attempts++;
+      if (!target.isConnected) {
+        stop();
+        return;
+      }
+      const rect = target.getBoundingClientRect();
+      if (rect.top >= -80 && rect.top < window.innerHeight * 0.4) {
+        stop();
+        return;
+      }
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (attempts >= 12) stop();
+    }, 250);
+    window.addEventListener("wheel", stop, { passive: true });
+    window.addEventListener("touchstart", stop, { passive: true });
+    scrollRetryStopRef.current = stop;
+  }, []);
+
+  // Применение drill-down по бакету спарклайна (Гл. 3.6): реестр заказов
+  // сужается до временного бакета точки (from/to — ISO-границы бакета).
+  // Период и KPI-карточки не меняются. Прокрутку к реестру выполняет сам
+  // обработчик клика (scrollToRegistry вызывается отдельно, чтобы не тянуть
+  // доступ к ref в колбэк — react-hooks/refs).
+  const applyBucketFilter = useCallback(
+    (from: string, to: string, label: string) => {
+      setBucketFilter({ from, to, label });
+      setPage(1);
+      const p = new URLSearchParams(searchParams.toString());
+      p.set("bucketFrom", from);
+      p.set("bucketTo", to);
+      p.set("bucketLabel", label);
+      p.delete("open");
+      p.delete("tab");
+      router.replace(`/admin/sales-execution?${p.toString()}`);
+    },
+    [router, searchParams]
+  );
+
+  // Снятие фильтра по бакету: чип над реестром или повторный клик по активной точке
+  const clearBucketFilter = useCallback(() => {
+    setBucketFilter(null);
+    setPage(1);
+    const p = new URLSearchParams(searchParams.toString());
+    p.delete("bucketFrom");
+    p.delete("bucketTo");
+    p.delete("bucketLabel");
+    router.replace(`/admin/sales-execution?${p.toString()}`);
+  }, [router, searchParams]);
+
+  // Прокрутка к реестру после drill-down (Гл. 3.6): клик по точке ставит флаг
+  // в обработчике события, а эффект ниже скроллит после перезагрузки данных
+  // (доступ к ref — только в эффекте, react-hooks/refs).
+  const scrollToRegistryAfterBucketRef = useRef(false);
+  useEffect(() => {
+    if (!scrollToRegistryAfterBucketRef.current) return;
+    scrollToRegistryAfterBucketRef.current = false;
+    scrollToRegistry();
+  }, [bucketFilter, scrollToRegistry]);
 
   const resetFilters = () => {
     setStatus("");
@@ -594,6 +698,7 @@ export default function SalesExecution() {
     setEscalated(false);
     setSearch("");
     setPage(1);
+    setBucketFilter(null);
     router.replace("/admin/sales-execution");
   };
 
@@ -605,10 +710,15 @@ export default function SalesExecution() {
     const next = !escalated;
     setEscalated(next);
     setPage(1);
+    // Бакет спарклайна не сочетается с фильтром эскалаций — сбрасываем
+    setBucketFilter(null);
     const p = new URLSearchParams(searchParams.toString());
     if (next) p.set("escalated", "1");
     else p.delete("escalated");
     p.delete("open");
+    p.delete("bucketFrom");
+    p.delete("bucketTo");
+    p.delete("bucketLabel");
     router.replace(`/admin/sales-execution?${p.toString()}`);
   }, [router, searchParams, escalated]);
 
@@ -813,6 +923,29 @@ export default function SalesExecution() {
   }, [kpi, data]);
 
   const seriesValues = data?.ordersSeries?.values ?? [];
+  // Мини-график KPI-карточки (Гл. 3.6): своя серия на карточку из kpiSeries;
+  // если ключа нет (старые данные) — fallback на общую динамику заказов.
+  // Нулевая (плоская) серия карточки — например «Просрочено» без заказов —
+  // не рисуется, чтобы не показывать пустой график.
+  const kpiSeriesValues = (key: string): number[] | null => {
+    const own = data?.kpiSeries?.[key]?.values;
+    if (own) return own.some((v) => v > 0) ? own : null;
+    return seriesValues.length > 1 ? seriesValues : null;
+  };
+  // Тренд KPI-карточки (Гл. 3.6): изменение последнего бакета серии относительно
+  // предыдущего. Положительное — ▲ (рост), отрицательное — ▼ (снижение),
+  // нулевое — • (без изменений). Для SLA тренд «вверх» = улучшение (больше %).
+  const kpiTrend = (key: string): { dir: "up" | "down" | "flat"; delta: number } | null => {
+    const own = data?.kpiSeries?.[key]?.values;
+    // Нулевая серия (например «Просрочено» без заказов) — тренда нет, как и графика.
+    if (!own || own.length < 2 || !own.some((v) => v > 0)) return null;
+    const prev = own[own.length - 2];
+    const last = own[own.length - 1];
+    const delta = last - prev;
+    if (delta > 0) return { dir: "up", delta };
+    if (delta < 0) return { dir: "down", delta };
+    return { dir: "flat", delta: 0 };
+  };
   const activeFiltersCount =
     [status, priority, manager, source, paymentStatus, category, escalated ? "1" : ""].filter(Boolean).length;
 
@@ -1005,37 +1138,94 @@ export default function SalesExecution() {
               ))
             : kpiCards
                 .filter((c) => !kpiHidden.includes(c.key))
-                .map((c) => (
-                  <button
-                    key={c.key}
-                    onClick={() => {
-                      if (c.key === "escalations") {
-                        toggleEscalated();
-                        return;
-                      }
-                      if (c.statuses) applyQueue(c.statuses);
-                      else setShowFilters(true);
-                    }}
-                    className={`ac-card ac-card-hover p-3.5 group text-left w-full ${
-                      c.key === "escalations" && escalated ? "ring-2 ring-red-500/60 shadow-lg" : ""
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="ac-kpi-icon shrink-0" style={{ background: `${c.color}1a`, color: c.color }}>{c.icon}</span>
-                      <span className="text-[11px] font-medium text-[var(--admin-muted)] leading-tight line-clamp-2 flex-1">{c.title}</span>
-                      <span className="text-[10px] text-[var(--admin-muted)] shrink-0">↗</span>
-                    </div>
-                    <div className="mt-2.5 text-2xl font-bold leading-none" style={{ color: c.color }}>
-                      {c.isPct ? `${c.value}%` : fmtNumber(c.value)}
-                    </div>
-                    <div className="text-[10px] text-[var(--admin-muted)] mt-1 line-clamp-2">{c.detail}</div>
-                    {seriesValues.length > 1 && (
-                      <div className="mt-2 h-6">
-                        <Sparkline data={seriesValues.slice(-10)} color={c.color} height={24} />
+                .map((c) => {
+                  const spark = kpiSeriesValues(c.key);
+                  // Тренд-метка (Гл. 3.6): ▲/▼/• по последнему бакету серии относительно
+                  // предыдущего. Цвет — контекстный: рост зелёный, спад красный.
+                  const trend = kpiTrend(c.key);
+                  // Спарклайн карточки: последние 10 бакетов серии.
+                  const sparkSlice = spark && spark.length > 1 ? spark.slice(-10) : null;
+                  const seriesMeta = data?.kpiSeries?.[c.key];
+                  // Активный бакет (drill-down, Гл. 3.6): подсветка выбранной точки
+                  // на карточке, если фильтр реестра задан именно с этой карточки.
+                  const activeFullIdx =
+                    bucketFilter && seriesMeta?.starts ? seriesMeta.starts.indexOf(bucketFilter.from) : -1;
+                  const activeIdx =
+                    activeFullIdx >= 0 && spark && sparkSlice ? activeFullIdx - (spark.length - sparkSlice.length) : -1;
+                  return (
+                    <button
+                      key={c.key}
+                      onClick={() => {
+                        if (c.key === "escalations") {
+                          toggleEscalated();
+                          return;
+                        }
+                        if (c.statuses) applyQueue(c.statuses);
+                        else setShowFilters(true);
+                      }}
+                      className={`ac-card ac-card-hover p-3.5 group text-left w-full ${
+                        c.key === "escalations" && escalated ? "ring-2 ring-red-500/60 shadow-lg" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="ac-kpi-icon shrink-0" style={{ background: `${c.color}1a`, color: c.color }}>{c.icon}</span>
+                        <span className="text-[11px] font-medium text-[var(--admin-muted)] leading-tight line-clamp-2 flex-1">{c.title}</span>
+                        {trend && (
+                          <span
+                            title={`Последний период: ${trend.dir === "up" ? "рост" : trend.dir === "down" ? "снижение" : "без изменений"} ${Math.abs(trend.delta)}`}
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
+                              trend.dir === "up"
+                                ? "bg-emerald-500/10 text-emerald-600"
+                                : trend.dir === "down"
+                                ? "bg-red-500/10 text-red-500"
+                                : "bg-[var(--admin-bg)] text-[var(--admin-muted)]"
+                            }`}
+                          >
+                            {trend.dir === "up" ? "▲" : trend.dir === "down" ? "▼" : "•"}
+                            {trend.delta > 0 ? `+${trend.delta}` : trend.delta}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </button>
-                ))}
+                      <div className="mt-2.5 text-2xl font-bold leading-none" style={{ color: c.color }}>
+                        {c.isPct ? `${c.value}%` : fmtNumber(c.value)}
+                      </div>
+                      <div className="text-[10px] text-[var(--admin-muted)] mt-1 line-clamp-2">{c.detail}</div>
+                      {sparkSlice && (
+                        <div className="mt-2 h-6">
+                          <Sparkline
+                            data={sparkSlice}
+                            color={c.color}
+                            height={24}
+                            pointLabels={seriesMeta?.labels?.slice(-sparkSlice.length)}
+                            activeIndex={activeIdx}
+                            // Клик по точке (Гл. 3.6): drill-down — реестр заказов
+                            // сужается до бакета точки (временной фильтр createdAt),
+                            // период и графики не меняются. Повторный клик по активной
+                            // точке снимает фильтр.
+                            onPointClick={(idx) => {
+                              const meta = data?.kpiSeries?.[c.key];
+                              if (!meta?.starts || !spark || spark.length < 2) return;
+                              // idx — позиция в sparkSlice (последние 10 бакетов);
+                              // пересчитываем индекс в полной серии
+                              const i = spark.length - sparkSlice.length + idx;
+                              const from = meta.starts[i];
+                              if (!from) return;
+                              if (bucketFilter && bucketFilter.from === from) {
+                                clearBucketFilter();
+                                return;
+                              }
+                              const to = i + 1 < meta.starts.length ? meta.starts[i + 1] : data?.period?.end ?? from;
+                              applyBucketFilter(from, to, meta.labels[i] ?? "");
+                              // Прокрутка к реестру после перезагрузки данных
+                              // (перезагрузка сдвигает layout — см. scrollToRegistry)
+                              scrollToRegistryAfterBucketRef.current = true;
+                            }}
+                          />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
         </div>
       </div>
 
@@ -1475,7 +1665,7 @@ export default function SalesExecution() {
       </div>
 
       {/* ── Реестр заказов (Гл. 3.8) ── */}
-      <div className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl overflow-hidden">
+      <div id="registry-section" className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--admin-border)] flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold">Реестр заказов</h2>
@@ -1488,6 +1678,17 @@ export default function SalesExecution() {
                 ? `Найдено: ${pagination.total} ${ruPlural(pagination.total, "заказ", "заказа", "заказов")}`
                 : "…"}
             </span>
+            {/* Drill-down по бакету спарклайна (Гл. 3.6): активный фильтр точки */}
+            {bucketFilter && (
+              <button
+                onClick={clearBucketFilter}
+                title={`Снять фильтр по бакету «${bucketFilter.label}»`}
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/10 text-primary text-[11px] font-semibold hover:bg-primary/20 transition-colors"
+              >
+                🎯 {bucketFilter.label}
+                <span className="text-primary/60">✕</span>
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {/* Режим отображения реестра (Гл. 3.7): таблица / Kanban-доска */}

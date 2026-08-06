@@ -1,28 +1,89 @@
 "use client";
 
+import type { MouseEvent } from "react";
+
 /**
  * Лёгкие SVG-графики без внешних зависимостей.
  */
 
-export function Sparkline({ data, color = "#22c55e", height = 36 }: { data: number[]; color?: string; height?: number }) {
+export function Sparkline({
+  data,
+  color = "#22c55e",
+  height = 36,
+  onPointClick,
+  pointLabels,
+  activeIndex,
+}: {
+  data: number[];
+  color?: string;
+  height?: number;
+  // Drill-down (Гл. 3.6): клик по спарклайну (у ненулевой точки) → фильтр
+  // реестра по бакету (день/час). Индекс — позиция в переданном массиве data.
+  onPointClick?: (index: number) => void;
+  // Подписи точек для тултипов (должны соответствовать data по индексу).
+  pointLabels?: string[];
+  // Активный бакет (drill-down, Гл. 3.6): кольцо-подсветка выбранной точки.
+  activeIndex?: number;
+}) {
   const w = 120;
   const max = Math.max(...data, 1);
   const min = Math.min(...data, 0);
   const range = max - min || 1;
-  const pts = data
-    .map((v, i) => {
-      const x = data.length > 1 ? (i / (data.length - 1)) * w : w / 2;
-      const y = height - 3 - ((v - min) / range) * (height - 6);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+  const xAt = (i: number) => (data.length > 1 ? (i / (data.length - 1)) * w : w / 2);
+  const yAt = (v: number) => height - 3 - ((v - min) / range) * (height - 6);
+  const pts = data.map((v, i) => `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`).join(" ");
   const last = data[data.length - 1] ?? 0;
-  const lastY = height - 3 - ((last - min) / range) * (height - 6);
+  const lastY = yAt(last);
+
+  // Клик по всему SVG: ищем ближайшую НЕНУЛЕВУЮ точку (клик по нулевому бакету
+  // не открывает пустой список). Обработчик на SVG (а не на отдельных rect)
+  // делает область клика шире и надёжнее; stopPropagation не даёт клику по
+  // графику сработать как клик по KPI-карточке.
+  const handleClick = (e: MouseEvent<SVGSVGElement>) => {
+    if (!onPointClick) return;
+    const svg = e.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const x = ((e.clientX - rect.left) / rect.width) * w;
+    let best = -1;
+    let bestDist = Infinity;
+    data.forEach((v, i) => {
+      if (v <= 0) return;
+      const d = Math.abs(xAt(i) - x);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    // Клик вне «полосы» точек (ближе к нулевым участкам) игнорируем
+    if (best >= 0 && bestDist <= (w / data.length) * 0.7) onPointClick(best);
+    e.stopPropagation();
+  };
 
   return (
-    <svg viewBox={`0 0 ${w} ${height}`} className="w-full h-full" preserveAspectRatio="none">
+    <svg
+      viewBox={`0 0 ${w} ${height}`}
+      className={`w-full h-full ${onPointClick ? "cursor-pointer" : ""}`}
+      preserveAspectRatio="none"
+      onClick={handleClick}
+    >
       <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={w} cy={lastY} r="2.5" fill={color} />
+      {/* Маркеры ненулевых точек — видимые зоны клика (drill-down, Гл. 3.6) */}
+      {onPointClick &&
+        data.map((v, i) =>
+          v > 0 ? (
+            <circle key={i} cx={xAt(i)} cy={yAt(v)} r={i === data.length - 1 ? 3 : 2.2} fill={color}>
+              {pointLabels?.[i] && <title>{`${pointLabels[i]} · ${v}`}</title>}
+            </circle>
+          ) : null
+        )}
+      {/* Кольцо активного бакета (drill-down, Гл. 3.6) — поверх маркера точки */}
+      {activeIndex != null && activeIndex >= 0 && activeIndex < data.length && data[activeIndex] > 0 && (
+        <circle cx={xAt(activeIndex)} cy={yAt(data[activeIndex])} r="5" fill="none" stroke={color} strokeWidth="1.6" opacity="0.85" />
+      )}
+      {/* Фиксированный маркер последней точки — только если её нет среди
+          интерактивных маркеров (нулевое значение или неинтерактивный график) */}
+      {(!onPointClick || last <= 0) && <circle cx={w} cy={lastY} r="2.5" fill={color} />}
     </svg>
   );
 }

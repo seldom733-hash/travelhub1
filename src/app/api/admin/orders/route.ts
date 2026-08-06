@@ -24,6 +24,7 @@ import {
   buildExceptions,
   exceptionStats,
 } from "@/lib/sales-automation";
+import { recordAudit, requestContext } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,8 @@ export function worstBookingStatus(statuses: string[]): string {
  * Параметры: period, from, to, country, city, type, partnerId, providerId,
  *            status (один или список через запятую; применяется только к таблице),
  *            bookingStatus, paymentStatus, manager, source, currency,
- *            minPrice, maxPrice, search, page, limit, sort=unread, needsAttention
+ *            minPrice, maxPrice, search, page, limit, sort=unread, needsAttention,
+ *            bucketFrom/bucketTo (drill-down по точке спарклайна, Гл. 3.6)
  */
 export async function GET(request: Request) {
   try {
@@ -149,6 +151,11 @@ export async function GET(request: Request) {
     const needsAttention = searchParams.get("needsAttention") === "1";
     // Фильтр «Эскалированные» (Гл. 3.17): только заказы с активными исключениями
     const escalated = searchParams.get("escalated") === "1";
+    // Drill-down по бакету спарклайна (Гл. 3.6): клик по точке графика сужает
+    // ТОЛЬКО реестр заказов (и Kanban) до временного бакета; KPI-карточки и
+    // графики остаются по периоду. from/to — ISO-строки границ бакета.
+    const bucketFrom = searchParams.get("bucketFrom") || undefined;
+    const bucketTo = searchParams.get("bucketTo") || undefined;
     const sort = searchParams.get("sort") || undefined;
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "15");
@@ -241,12 +248,73 @@ export async function GET(request: Request) {
     const forecastOrders = Math.round(monthAgg._count * 1.18);
 
     // ── Серия заказов ──
-    const seriesRows = await prisma.order.findMany({ where: orderWhere, select: { createdAt: true } });
+    const seriesRows = await prisma.order.findMany({ where: orderWhere, select: { createdAt: true, status: true } });
     const ordersSeries = bucketize(
       seriesRows.map((r) => ({ at: r.createdAt, amount: 1 })),
       period,
       range
     );
+
+    // ── Серии KPI-карточек (Гл. 3.6) ──
+    // Каждая карточка показывает динамику СВОЕГО набора статусов (не общую серию
+    // заказов): Новые / В работе / Ожидают поставщика / Ожидают оплаты / Документы /
+    // Просрочено / Возвраты. SLA — процент соблюдения по бакетам, эскалации —
+    // количество исключений по бакетам. Так мини-графики карточек различаются.
+    const seriesFor = (statuses: string[]) =>
+      bucketize(
+        seriesRows.filter((r) => statuses.includes(r.status)).map((r) => ({ at: r.createdAt, amount: 1 })),
+        period,
+        range
+      );
+    const kpiSeries: Record<string, { labels: string[]; values: number[]; starts: string[] }> = {
+      new: seriesFor(["DRAFT", "CREATED"]),
+      active: seriesFor([...ACTIVE_STATUSES]),
+      provider: seriesFor(["AWAITING_CONFIRMATION"]),
+      payment: seriesFor(["AWAITING_PAYMENT", "PARTIALLY_PAID", "OVERDUE"]),
+      docs: seriesFor(["DOCUMENT_PREP", "READY"]),
+      overdue: seriesFor(["OVERDUE"]),
+      refunds: seriesFor(["REFUNDED", "CANCELLED"]),
+    };
+    // SLA по бакетам: доля АКТИВНЫХ заказов без превышения норматива (OVERDUE —
+    // нарушение), как и KPI-карточка «Соблюдение SLA» (считается по активным).
+    {
+      const active = seriesFor([...ACTIVE_STATUSES]).values;
+      const breaches = seriesFor(["OVERDUE"]).values;
+      kpiSeries.sla = {
+        labels: ordersSeries.labels,
+        values: active.map((a, i) => (a > 0 ? Math.round(((a - breaches[i]) / a) * 100) : 100)),
+        starts: ordersSeries.starts,
+      };
+    }
+    // Эскалации по бакетам: активные исключения (new/working) из БД. Считаем
+    // УНИКАЛЬНЫЕ заказы в каждом бакете (системные исключения без orderId — как
+    // отдельные единицы), чтобы сумма бакетов сходилась с KPI-карточкой
+    // «Эскалации», которая считает заказы, а не записи исключений.
+    const escalationSeriesRows = await prisma.exceptionLog.findMany({
+      where: { status: { in: ["new", "working"] }, createdAt: { gte: range.start, lte: range.end } },
+      select: { createdAt: true, orderId: true },
+    });
+    const escBuckets = bucketize(
+      escalationSeriesRows.map((r) => ({ at: r.createdAt, amount: 1 })),
+      period,
+      range
+    );
+    const escStarts = escBuckets.starts.map((s) => new Date(s).getTime());
+    const escValues = escBuckets.values.map(() => 0);
+    const escSeen = new Set<string>();
+    for (const r of escalationSeriesRows) {
+      // Индекс бакета: последний start, не превышающий createdAt записи
+      let idx = 0;
+      for (let i = 0; i < escStarts.length; i++) {
+        if (escStarts[i] <= r.createdAt.getTime()) idx = i;
+        else break;
+      }
+      const key = `${idx}:${r.orderId ?? "sys"}`;
+      if (escSeen.has(key)) continue;
+      escSeen.add(key);
+      escValues[idx] += 1;
+    }
+    kpiSeries.escalations = { labels: escBuckets.labels, values: escValues, starts: escBuckets.starts };
 
     // ── Тепловая карта активности ──
     const heatmap: { day: string; hour: number; value: number }[] = [];
@@ -392,6 +460,10 @@ export async function GET(request: Request) {
           o.partner.toLowerCase().includes(q)
       );
     }
+    // Бакет спарклайна (Гл. 3.6): createdAt в границах выбранной точки графика.
+    // Сравнение по ISO-строкам — обе стороны формируются toISOString().
+    if (bucketFrom) filteredOrders = filteredOrders.filter((o) => o.createdAt >= bucketFrom);
+    if (bucketTo) filteredOrders = filteredOrders.filter((o) => o.createdAt <= bucketTo);
     if (sort === "unread") {
       filteredOrders = [...filteredOrders].sort((a, b) => b.unreadCount - a.unreadCount);
     }
@@ -405,6 +477,9 @@ export async function GET(request: Request) {
         if (paymentStatus && o.paymentStatus !== paymentStatus) return false;
         if (needsAttention && o.unreadCount === 0) return false;
         if (escalated && !o.escalated) return false;
+        // Бакет спарклайна (Гл. 3.6): доска повторяет фильтр реестра
+        if (bucketFrom && o.createdAt < bucketFrom) return false;
+        if (bucketTo && o.createdAt > bucketTo) return false;
         if (manager && o.manager !== manager) return false;
         if (source && o.source !== source) return false;
         if (currency && o.currency !== currency) return false;
@@ -637,6 +712,16 @@ export async function GET(request: Request) {
         },
       }),
     ]);
+    // Дедупликация (Гл. 3.16/3.17): сид теперь пишет персистентные записи для тех же
+    // заказов, что и демо-журнал. Демо остаётся запасным вариантом для пустой БД,
+    // но при наличии реальной записи по тому же ключу (заказ + событие/тип) —
+    // дубликат из демо отбрасывается, чтобы журнал и реестр не показывали дважды
+    // одну и ту же операцию.
+    const realLogKeys = new Set(realLogs.map((l) => `${l.order?.orderNumber ?? ""}|${l.event}`));
+    const realExceptionKeys = new Set(realExceptions.map((e) => `${e.orderId ?? ""}|${e.type}`));
+    const demoJournalFiltered = demoJournal.filter((d) => !realLogKeys.has(`${d.orderNumber ?? ""}|${d.event}`));
+    const demoExceptionsFiltered = demoExceptions.filter((d) => !realExceptionKeys.has(`${d.orderId}|${d.type}`));
+
     const automationJournal: {
       id: string;
       at: string;
@@ -657,7 +742,7 @@ export async function GET(request: Request) {
         source: l.source,
         orderNumber: l.order?.orderNumber ?? undefined,
       })),
-      ...demoJournal,
+      ...demoJournalFiltered,
     ];
     const exceptions: {
       id: string;
@@ -707,7 +792,7 @@ export async function GET(request: Request) {
           createdAt: h.createdAt.toISOString(),
         })),
       })),
-      ...demoExceptions,
+      ...demoExceptionsFiltered,
     ];
 
     return NextResponse.json({
@@ -740,6 +825,7 @@ export async function GET(request: Request) {
         paid: paidCount,
       },
       ordersSeries,
+      kpiSeries,
       confirmSeries: bucketize(
         cycleRows.map((r) => ({ at: r.updatedAt, amount: 1 })),
         period,
@@ -900,6 +986,22 @@ export async function POST(request: Request) {
         },
       });
       return { order, bookingId: booking.id };
+    });
+
+    // Гл. 3.18: создание заказа фиксируется в журнале аудита.
+    const ctx = requestContext(request);
+    await recordAudit({
+      user,
+      category: "Пользовательские действия",
+      action: "create",
+      objectType: "Заказ",
+      objectId: created.order.id,
+      objectNumber: created.order.orderNumber,
+      toData: { amount, serviceDate: serviceDate.toISOString(), priority: priority ?? "MEDIUM" },
+      comment: `Заказ создан: ${service.title} для ${client.firstName} ${client.lastName ?? ""}`.trim(),
+      source: "Web",
+      ip: ctx.ip,
+      userAgent: ctx.userAgent,
     });
 
     return NextResponse.json(

@@ -28,35 +28,31 @@ export async function getOrdersData(f: AnalyticsFilters): Promise<AnalyticsSecti
     prevOrderWhere.bookings = { some: { service: serviceFilter } };
   }
 
-  const AWAITING = [...ORDER_STATUS_GROUPS.awaitingPayment] as const;
   const PAID = [...ORDER_STATUS_GROUPS.paid] as const;
-  // Срезовые агрегаты уважают фильтр статуса (Гл. 2.7): при выбранном статусе
-  // конверсия и передача Buyer считаются по отфильтрованному множеству.
-  const paidStatus: { in: ("PAID" | "DOCUMENT_PREP" | "READY" | "COMPLETED")[] } | (typeof PAID)[number] =
-    f.status ? (f.status as (typeof PAID)[number]) : { in: [...PAID] };
-  const inWorkStatus: { in: ("PROCESSING" | "AWAITING_CONFIRMATION" | "CONFIRMED")[] } | (typeof PAID)[number] =
-    f.status ? (f.status as (typeof PAID)[number]) : { in: ["PROCESSING", "AWAITING_CONFIRMATION", "CONFIRMED"] };
-  const awaitingStatus: { in: ("AWAITING_PAYMENT" | "PARTIALLY_PAID" | "OVERDUE")[] } | (typeof PAID)[number] =
-    f.status ? (f.status as (typeof PAID)[number]) : { in: [...AWAITING] };
-  const overdueStatus: (typeof PAID)[number] | "OVERDUE" = f.status ? (f.status as (typeof PAID)[number]) : "OVERDUE";
-
-  const [allRows, prevCount, statusRows, inWorkRows, awaitingRows, paidRows, overdueRows] = await Promise.all([
+  const [allRowsRaw, prevCount, statusRows] = await Promise.all([
     prisma.order.findMany({ where: orderWhere, select: { id: true, status: true, amount: true, paidAmount: true, createdAt: true, serviceDate: true } }),
     prisma.order.count({ where: prevOrderWhere }),
     prisma.order.groupBy({ by: ["status"], where: orderWhere, _count: true }),
-    prisma.order.count({ where: { ...orderWhere, status: inWorkStatus } }),
-    prisma.order.count({ where: { ...orderWhere, status: awaitingStatus } }),
-    prisma.order.count({ where: { ...orderWhere, status: paidStatus } }),
-    prisma.order.count({ where: { ...orderWhere, status: overdueStatus } }),
   ]);
+  // Фильтр по ответственному менеджеру (Гл. 2.7)
+  const allRows = f.manager ? allRowsRaw.filter((o) => pickManager(o.id) === f.manager) : allRowsRaw;
 
   const statusCounts: Record<string, number> = {};
   for (const r of statusRows) statusCounts[r.status] = r._count;
   const created = allRows.length;
+  // При активном фильтре менеджера срезы статусов считаем из отфильтрованных
+  // строк, иначе агрегаты по всему периоду разошлись бы с «Новые заказы» (Гл. 2.7).
+  if (f.manager) {
+    for (const o of allRows) statusCounts[o.status] = (statusCounts[o.status] ?? 0) + 1;
+  }
   const cancelled = (statusCounts["CANCELLED"] ?? 0) + (statusCounts["REFUNDED"] ?? 0);
-  const transferred = paidRows;
-  const conversion = created ? (paidRows / created) * 100 : 0;
-  const sla = created ? Math.max(0, Math.round(((created - overdueRows) / created) * 100)) : 100;
+  const inWorkCount = (statusCounts["PROCESSING"] ?? 0) + (statusCounts["AWAITING_CONFIRMATION"] ?? 0) + (statusCounts["CONFIRMED"] ?? 0);
+  const awaitingCount = (statusCounts["AWAITING_PAYMENT"] ?? 0) + (statusCounts["PARTIALLY_PAID"] ?? 0) + (statusCounts["OVERDUE"] ?? 0);
+  const paidCount = (statusCounts["PAID"] ?? 0) + (statusCounts["DOCUMENT_PREP"] ?? 0) + (statusCounts["READY"] ?? 0) + (statusCounts["COMPLETED"] ?? 0);
+  const overdueCount = statusCounts["OVERDUE"] ?? 0;
+  const transferred = paidCount;
+  const conversion = created ? (paidCount / created) * 100 : 0;
+  const sla = created ? Math.max(0, Math.round(((created - overdueCount) / created) * 100)) : 100;
   const perManager = created ? created / MANAGERS.length : 0;
 
   // ── Среднее время обработки (2.11.4) из журнала OrderHistory ──
@@ -169,7 +165,7 @@ export async function getOrdersData(f: AnalyticsFilters): Promise<AnalyticsSecti
   });
 
   const ai: { level: "positive" | "medium" | "high" | "info"; title: string; detail: string }[] = [];
-  if (overdueRows > 0) ai.push({ level: "high", title: `${overdueRows} заказов просрочено`, detail: "Требуется решение менеджера" });
+  if (overdueCount > 0) ai.push({ level: "high", title: `${overdueCount} заказов просрочено`, detail: "Требуется решение менеджера" });
   if (avgHours > 0) ai.push({ level: "info", title: `Среднее время подтверждения: ${avgHours} ч`, detail: sla >= 80 ? "SLA соблюдается" : "SLA нарушается" });
   if (cancelled > 0) ai.push({ level: "medium", title: `${cancelled} отмен за период`, detail: `${Math.round((cancelled / Math.max(1, created)) * 100)}% от созданных` });
   ai.push({ level: "info", title: `Передано в бронирование: ${transferred}`, detail: `конверсия ${conversion.toFixed(0)}%` });
@@ -181,8 +177,8 @@ export async function getOrdersData(f: AnalyticsFilters): Promise<AnalyticsSecti
     periodLabel: range.start.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }),
     kpis: [
       { key: "created", title: "Новые заказы", value: created, unit: " шт", change: changePct(created, prevCount), spark: ordersSeries.values, tone: "neutral" },
-      { key: "inWork", title: "В работе", value: inWorkRows, unit: " шт", tone: "neutral" },
-      { key: "awaiting", title: "Ожидают оплаты", value: awaitingRows, unit: " шт", tone: awaitingRows > 0 ? "medium" as const : "neutral" },
+      { key: "inWork", title: "В работе", value: inWorkCount, unit: " шт", tone: "neutral" },
+      { key: "awaiting", title: "Ожидают оплаты", value: awaitingCount, unit: " шт", tone: awaitingCount > 0 ? "medium" as const : "neutral" },
       { key: "transferred", title: "Передано в бронирование", value: transferred, unit: " шт", tone: "positive" },
       { key: "avgTime", title: "Ср. время подтверждения", value: avgHours, unit: "ч", tone: avgHours > 0 && avgHours <= 48 ? "positive" : "negative" },
       { key: "sla", title: "Выполнение SLA", value: sla, unit: "%", tone: sla >= 80 ? "positive" : "negative" },

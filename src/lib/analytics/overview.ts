@@ -206,23 +206,47 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
     rows: geo.slice(0, 8).map((g) => ({ label: `${g.code} · ${g.name}`, value: g.revenue, sub: `${g.count} продаж · ${g.cities.length} городов` })),
   };
 
-  // ── Индекс здоровья бизнеса (2.9.7): композит 0–100 ──
-  // Факторы: выполнение плана (100% = доход периода к предыдущему), конверсия,
-  // возвраты (ниже — лучше), прибыльность (12% комиссия).
+  // ── Индекс здоровья бизнеса (2.9.7): композит 0–100 из 9 факторов ──
+  // 1. Выполнение плана (доход периода к предыдущему), 2. Конверсия,
+  // 3. Скорость обработки заказов (доля не просроченных), 4. Успешные бронирования,
+  // 5. Прибыльность (12% комиссия), 6. Возвраты (ниже — лучше),
+  // 7. Удовлетворённость клиентов (NPS из отзывов), 8. Надёжность партнёров,
+  // 9. Доступность интеграций (оценка из журнала автоматизации).
   const planFactor = Math.min(100, Math.round((revenue / Math.max(1, revenuePrev || revenue)) * 100));
   const convFactor = Math.min(100, Math.round(conversion));
-  const refundFactor = Math.max(0, 100 - Math.round(refundPct * 12));
-  // Прибыльность: 12% комиссия при выручке выше среднего — выше оценка
+  const [overdueCount, orderCountForSla, confirmedBookings, allBookingsForSla, reviewStats, automationErrors] = await Promise.all([
+    prisma.order.count({ where: { ...orderWhere, status: "OVERDUE" } }),
+    prisma.order.count({ where: orderWhere }),
+    prisma.booking.count({ where: { createdAt: { gte: range.start, lte: range.end }, status: { in: ["CONFIRMED", "PAID", "COMPLETED"] } } }),
+    prisma.booking.count({ where: { createdAt: { gte: range.start, lte: range.end } } }),
+    prisma.review.aggregate({ where: { createdAt: { gte: range.start, lte: range.end } }, _avg: { rating: true }, _count: true }),
+    prisma.automationLog.count({ where: { createdAt: { gte: range.start, lte: range.end }, result: "error" } }),
+  ]);
+  const slaFactor = orderCountForSla ? Math.max(0, 100 - Math.round((overdueCount / orderCountForSla) * 100)) : 100;
+  const bookingFactor = allBookingsForSla ? Math.round((confirmedBookings / allBookingsForSla) * 100) : 100;
   const profitFactor = Math.min(100, Math.round(72 + Math.max(0, Math.min(28, seriesTrendPct(revenueSeries.values)) * 0.5)));
-  const health = Math.round((planFactor + convFactor + refundFactor + profitFactor) / 4);
+  const refundFactor = Math.max(0, 100 - Math.round(refundPct * 12));
+  // NPS из реальных отзывов: промоутеры (5) − критики (1–2)
+  const reviewAvg = reviewStats._avg?.rating ?? 0;
+  const reviewCount = reviewStats._count ?? 0;
+  const npsValue = reviewCount ? Math.round(((reviewAvg - 3) / 2) * 100) : 50;
+  const npsFactor = Math.max(0, Math.min(100, 50 + npsValue / 2));
+  const partnerFactor = Math.min(100, Math.round(70 + Math.min(30, partnersOnline * 4)));
+  const integrationFactor = Math.max(0, 100 - Math.min(100, automationErrors * 8));
+  const health = Math.round((planFactor + convFactor + slaFactor + bookingFactor + profitFactor + refundFactor + npsFactor + partnerFactor + integrationFactor) / 9);
   const healthBlock = {
     value: Math.max(0, Math.min(100, health)),
     label: health >= 80 ? "Отличное состояние" : health >= 60 ? "Хорошее состояние" : health >= 40 ? "Удовлетворительное" : "Требуется внимание",
     factors: [
-      { label: `Выполнение плана: ${planFactor}%`, effect: planFactor >= 70 ? "up" as const : "down" as const, weight: planFactor },
+      { label: `Выполнение плана продаж: ${planFactor}%`, effect: planFactor >= 70 ? "up" as const : "down" as const, weight: planFactor },
       { label: `Конверсия заказ → оплата: ${conversion.toFixed(0)}%`, effect: conversion >= 40 ? "up" as const : "down" as const, weight: convFactor },
+      { label: `Скорость обработки (без просрочек): ${slaFactor}%`, effect: slaFactor >= 80 ? "up" as const : "down" as const, weight: slaFactor },
+      { label: `Успешные бронирования: ${bookingFactor}%`, effect: bookingFactor >= 70 ? "up" as const : "down" as const, weight: bookingFactor },
+      { label: `Прибыльность: комиссия 12%`, effect: "up" as const, weight: profitFactor },
       { label: `Возвраты: ${refundRate.toFixed(1)}% от выручки`, effect: refundRate <= 3 ? "up" as const : "down" as const, weight: refundFactor },
-      { label: `Маржа платформы: 12% комиссия`, effect: "up" as const, weight: profitFactor },
+      { label: `Удовлетворённость клиентов (NPS ${npsValue}): ${reviewCount} отзывов`, effect: npsValue >= 30 ? "up" as const : "down" as const, weight: npsFactor },
+      { label: `Надёжность партнёров: ${partnersOnline} онлайн`, effect: partnersOnline > 0 ? "up" as const : "down" as const, weight: partnerFactor },
+      { label: `Доступность интеграций: ${automationErrors} сбоев`, effect: automationErrors === 0 ? "up" as const : "down" as const, weight: integrationFactor },
     ],
   };
 
@@ -280,7 +304,7 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
       { key: "newUsers", title: "Новые клиенты", value: newUsers, unit: " чел.", change: changePct(newUsers, prevNewUsers), spark: usersSeries.values, tone: "neutral" },
       { key: "repeat", title: "Повторные покупки", value: repeatPct, unit: "%", tone: repeatPct >= 30 ? "positive" : "neutral", detail: `${repeatBuyers} клиентов с 2+ заказами` },
       { key: "ltv", title: "LTV клиента", value: Math.round(ltv) },
-      { key: "nps", title: "NPS (оценка)", value: 82, unit: "/100", detail: "по отзывам и возвратам" },
+      { key: "nps", title: "NPS", value: Math.max(-100, Math.min(100, npsValue)), unit: "/100", tone: npsValue >= 30 ? "positive" : "negative", detail: `${reviewCount} отзывов за период, средняя оценка ${reviewAvg ? reviewAvg.toFixed(1) : "—"}` },
       { key: "partnersOnline", title: "Партнёров онлайн", value: partnersOnline, unit: " шт" },
     ],
     health: healthBlock,

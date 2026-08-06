@@ -42,6 +42,18 @@ enum BookingStatus {
   COMPLETED
 }
 
+/// Жизненный цикл услуги (Гл. 4.12): Черновик → Заполнение → Проверка →
+/// Согласование → Публикация → Активная продажа → Обновление → Приостановка →
+/// Архив. READY = «готова к публикации», REVIEW = «на согласовании».
+enum ServiceStatus {
+  DRAFT
+  REVIEW
+  READY
+  PUBLISHED
+  SUSPENDED
+  ARCHIVED
+}
+
 /// Жизненный цикл заказа (Гл. 6.10): Черновик → Создан → В обработке →
 /// Ожидает подтверждения → Подтверждён → Ожидает оплаты → Частично оплачен →
 /// Оплачен → Подготовка документов → Готов к поездке → Завершён.
@@ -91,7 +103,8 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  services     Service[]
+  services     Service[] @relation("ServiceProvider")
+  managedServices Service[] @relation("ServiceManager")
   reviews      Review[]
   bookings     Booking[]
   orders       Order[]
@@ -100,6 +113,8 @@ model User {
 
 model Service {
   id           String      @id @default(cuid())
+  /// Код услуги (Гл. 4.3, 4.5): формируется системой автоматически, напр. SVC-0001
+  code         String      @unique
   type         ServiceType
   title        String
   slug         String      @unique
@@ -127,13 +142,75 @@ model Service {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  provider     User? @relation(fields: [providerId], references: [id])
+  // ── Жизненный цикл услуги (Гл. 4.12) ──
+  /// Текущий статус жизненного цикла (Черновик…Архив)
+  status       ServiceStatus @default(DRAFT)
+  /// Номер текущей редакции карточки (Гл. 4.12 «Текущая версия»)
+  version      Int          @default(1)
+  /// Ответственный сотрудник (менеджер каталога, Гл. 4.3/4.5)
+  managerId    String?
+  /// Дата публикации (Гл. 4.10)
+  publishedAt  DateTime?
+  /// Классификация: подкатегория, напр. «Пляжный», «Семейный» (Гл. 4.5)
+  category     String?
+  /// Теги: JSON-массив строк (Гл. 4.8)
+  tags         String?
+
+  // ── Доступность и квоты (Гл. 4.7) ──
+  /// Период продажи
+  salesStart   DateTime?
+  salesEnd     DateTime?
+  /// Период оказания услуги
+  serviceStart DateTime?
+  serviceEnd   DateTime?
+  /// Общая квота, забронировано, в резерве (доступно = общая − забронировано − резерв)
+  quotaTotal   Int?         @default(0)
+  quotaBooked  Int?         @default(0)
+  quotaReserved Int?        @default(0)
+
+  // ── SEO и публикация (Гл. 4.8/4.10) ──
+  seoTitle       String?
+  seoDescription String?
+  seoKeywords    String?
+  /// Каналы распространения: JSON-массив, напр. ["Сайт","Мобильное приложение"] (Гл. 4.10)
+  channels       String?
+  /// Связанные услуги: JSON-массив id (Гл. 4.9)
+  relatedIds     String?
+
+  provider     User? @relation("ServiceProvider", fields: [providerId], references: [id])
+  manager      User? @relation("ServiceManager", fields: [managerId], references: [id])
   reviews      Review[]
   bookings     Booking[]
   serviceViews ServiceView[]
+  history      ServiceHistory[]
 
   @@index([type, isActive])
   @@index([countryCode])
+  @@index([status])
+  @@index([managerId])
+}
+
+/// Журнал изменений и версий карточки услуги (Гл. 4.12): каждая сохранённая
+/// редакция фиксируется с номером версии, автором и перечнем изменённых разделов.
+/// Используется для «Истории изменений», «Сравнения версий» и «Восстановления».
+/// action: created | update | publish | unpublish | suspend | archive | restore | price
+model ServiceHistory {
+  id        String   @id @default(cuid())
+  serviceId String
+  version   Int
+  action    String
+  from      String?  // предыдущий статус (для переходов)
+  to        String?  // новый статус
+  fields    String?  // JSON: изменённые поля (для action = update)
+  actorId   String?
+  actorName String
+  comment   String?
+  createdAt DateTime @default(now())
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId])
+  @@index([createdAt])
 }
 
 model Booking {
@@ -363,6 +440,73 @@ model ExceptionLogHistory {
 
   @@index([exceptionLogId])
   @@index([createdAt])
+}
+
+/// Журнал аудита (Гл. 3.18): централизованная регистрация всех значимых действий
+/// пользователей, автоматических процессов и внешних интеграций. Неизменяемый
+/// журнал — записи не редактируются и не удаляются обычными пользователями.
+/// Категории: Пользовательские действия | Финансовые операции | Документооборот |
+/// Безопасность | Интеграции | AI-события. action: login | logout | create |
+/// update | status | payment | refund | document | bulk | api | ai | security.
+model AuditLog {
+  id           String   @id @default(cuid())
+  /// Уникальный номер события (например AUD-000001)
+  eventId      String   @unique
+  /// Исполнитель (пользователь, система, интеграция, AI)
+  userId       String?
+  actorName    String
+  actorRole    String?
+  department   String?
+  /// Категория события (см. комментарий модели)
+  category     String
+  /// Тип действия
+  action       String
+  /// Объект: Заказ, Документ, Платёж, Пользователь, Услуга, Бронирование, Исключение
+  objectType   String?
+  objectId     String?
+  /// Номер объекта: ORD-1001, SVC-0001, INV-0001…
+  objectNumber String?
+  /// JSON: предыдущие значения изменённых полей
+  fromData     String?
+  /// JSON: новые значения изменённых полей
+  toData       String?
+  /// Комментарий / причина изменения
+  comment      String?
+  /// Источник: Web, API, Mobile, AI, Integration, System
+  source       String   @default("Web")
+  /// IP-адрес источника (для пользовательских действий)
+  ip           String?
+  /// User Agent клиентского приложения
+  userAgent    String?
+  /// Критичность: info | warning | error | critical
+  criticality  String   @default("info")
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([category])
+  @@index([action])
+  @@index([userId])
+  @@index([objectType, objectId])
+}
+
+/// Шаблон Dashboard (Гл. 1.36): администратор создаёт макет для роли,
+/// каждый новый сотрудник этой роли получает его автоматически как стартовый.
+/// layout — JSON LayoutState (hidden/order/stars/sizes) из dashboard-widgets.ts.
+model DashboardTemplate {
+  id        String   @id @default(cuid())
+  /// Роль, для которой предназначен шаблон (ADMIN, SALES_MANAGER, OPERATOR…)
+  role      String
+  /// Название шаблона, например «Dashboard менеджера»
+  name      String
+  /// JSON-макет (LayoutState) либо 'workspace:<key>' для шаблона пространства
+  layout    String
+  /// Кто создал шаблон
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([role, name])
+  @@index([role])
 }
 
 model Country {

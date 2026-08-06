@@ -4,10 +4,18 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { menuForRole, getAdminSection } from "@/lib/admin-menu";
 
-export default function AdminSidebar({ role = "ADMIN" }: { role?: string }) {
+export default function AdminSidebar({
+  role = "ADMIN",
+  user = null,
+}: {
+  role?: string;
+  user?: { firstName: string | null; lastName: string | null; email: string; role: string | null; companyName?: string | null } | null;
+}) {
   const pathname = usePathname();
   const activeSection = getAdminSection(pathname, role);
   const items = menuForRole(role);
+  const displayName = user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email : "Администратор";
+  const initials = user ? ((user.firstName?.[0] ?? "") + (user.lastName?.[0] ?? "")).toUpperCase() || "А" : "А";
 
   return (
     <aside className="w-16 lg:w-60 shrink-0 bg-secondary text-white flex flex-col sticky top-0 h-screen overflow-y-auto no-scrollbar">
@@ -49,11 +57,11 @@ export default function AdminSidebar({ role = "ADMIN" }: { role?: string }) {
       <div className="p-3 lg:p-4 border-t border-white/10 shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
-            А
+            {initials}
           </div>
           <div className="hidden lg:block">
-            <div className="text-sm font-medium">Администратор</div>
-            <div className="text-xs text-gray-400">admin@travelhub.az</div>
+            <div className="text-sm font-medium truncate">{displayName}</div>
+            <div className="text-xs text-gray-400 truncate">{user?.email ?? "admin@travelhub.az"}</div>
           </div>
         </div>
       </div>

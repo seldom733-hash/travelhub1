@@ -84,39 +84,64 @@ export async function GET(request: Request) {
     monthStart.setHours(0, 0, 0, 0);
     monthStart.setDate(1);
 
+    // ── Фильтры виджетов (Гл. 1.33): страна и тип услуги ──
+    // Применяются ко всем агрегатам по заказам: вычисляем один раз список id
+    // заказов, чьи бронирования относятся к выбранной стране/типу услуги.
+    // SERVICE_TYPE_LABELS уже импортирован выше — используем как whitelist.
+    const countryFilter = (searchParams.get("country") || "").trim();
+    // Тип услуги валидируем по известным значениям — мусор с клиента не
+    // должен попадать в запрос (Гл. 1.33)
+    const typeRaw = (searchParams.get("type") || "").trim();
+    const typeFilter = Object.keys(SERVICE_TYPE_LABELS).includes(typeRaw) ? typeRaw : "";
+    let orderFilter: Record<string, unknown> = {};
+    if (countryFilter || typeFilter) {
+      const scopedBookings = await prisma.booking.findMany({
+        where: {
+          service: {
+            ...(countryFilter ? { countryCode: countryFilter } : {}),
+            ...(typeFilter ? { type: typeFilter as never } : {}),
+          },
+        },
+        select: { orderId: true },
+      });
+      const ids = Array.from(new Set(scopedBookings.map((b) => b.orderId).filter(Boolean)));
+      if (ids.length) orderFilter = { id: { in: ids } };
+      else orderFilter = { id: { in: ["__none__"] } };
+    }
+
     // ── KPI: заказы в работе / подтверждение / оплата / выполнены ──
     // Считаем за выбранный период (как в реестре заказов), чтобы карточки сходились
     // с количеством записей в реестре заказов. Дельта — период vs предыдущий период.
     const [ordersInWork, ordersInWorkPrev, awaitingConf, awaitingConfPrev, awaitingPay, awaitingPayPrev, completed, completedPrev, overdue] =
       await Promise.all([
-        prisma.order.count({ where: { status: { in: [...ACTIVE_STATUSES] }, createdAt: { gte: range.start, lte: range.end } } }),
-        prisma.order.count({ where: { status: { in: [...ACTIVE_STATUSES] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
-        prisma.order.count({ where: { status: "AWAITING_CONFIRMATION", createdAt: { gte: range.start, lte: range.end } } }),
-        prisma.order.count({ where: { status: "AWAITING_CONFIRMATION", createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
-        prisma.order.count({ where: { status: { in: [...AWAITING_STATUSES] }, createdAt: { gte: range.start, lte: range.end } } }),
-        prisma.order.count({ where: { status: { in: [...AWAITING_STATUSES] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
-        prisma.order.count({ where: { status: "COMPLETED", createdAt: { gte: range.start, lte: range.end } } }),
-        prisma.order.count({ where: { status: "COMPLETED", createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
-        prisma.order.count({ where: { status: "OVERDUE", createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.order.count({ where: { ...orderFilter, status: { in: [...ACTIVE_STATUSES] }, createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.order.count({ where: { ...orderFilter, status: { in: [...ACTIVE_STATUSES] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
+        prisma.order.count({ where: { ...orderFilter, status: "AWAITING_CONFIRMATION", createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.order.count({ where: { ...orderFilter, status: "AWAITING_CONFIRMATION", createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
+        prisma.order.count({ where: { ...orderFilter, status: { in: [...AWAITING_STATUSES] }, createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.order.count({ where: { ...orderFilter, status: { in: [...AWAITING_STATUSES] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
+        prisma.order.count({ where: { ...orderFilter, status: "COMPLETED", createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.order.count({ where: { ...orderFilter, status: "COMPLETED", createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
+        prisma.order.count({ where: { ...orderFilter, status: "OVERDUE", createdAt: { gte: range.start, lte: range.end } } }),
       ]);
 
     // ── KPI: все карточки считаются за выбранный период (как в реестре заказов,
     // Гл. 3 «Продажи и исполнение»), чтобы переключение периода на панели меняло
     // цифры на карточках и совпадало с количеством записей в реестре. ──
     const [ordersRange, ordersRangePrev] = await Promise.all([
-      prisma.order.count({ where: { createdAt: { gte: range.start, lte: range.end } } }),
-      prisma.order.count({ where: { createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
+      prisma.order.count({ where: { ...orderFilter, createdAt: { gte: range.start, lte: range.end } } }),
+      prisma.order.count({ where: { ...orderFilter, createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
     ]);
 
     // ── KPI: доход за период, комиссия ──
     const [periodRev, prevPeriodRev] = await Promise.all([
       prisma.order.aggregate({
-        where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+        where: { ...orderFilter, status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
         _sum: { paidAmount: true },
         _count: true,
       }),
       prisma.order.aggregate({
-        where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } },
+        where: { ...orderFilter, status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } },
         _sum: { paidAmount: true },
         _count: true,
       }),
@@ -149,7 +174,7 @@ export async function GET(request: Request) {
       userSeries(range),
       userSeries(range, "PARTNER"),
       prisma.order.findMany({
-        where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+        where: { ...orderFilter, status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
         select: { createdAt: true, paidAmount: true },
       }),
     ]);
@@ -175,7 +200,7 @@ export async function GET(request: Request) {
     );
     const [orderRows, userRowsRange] = await Promise.all([
       prisma.order.findMany({
-        where: { createdAt: { gte: range.start, lte: range.end } },
+        where: { ...orderFilter, createdAt: { gte: range.start, lte: range.end } },
         select: { createdAt: true },
       }),
       prisma.user.findMany({
@@ -192,12 +217,14 @@ export async function GET(request: Request) {
     const [staleConfirmations, stalePayments] = await Promise.all([
       prisma.order.count({
         where: {
+          ...orderFilter,
           status: "AWAITING_CONFIRMATION",
           createdAt: { gte: range.start, lte: new Date(Date.now() - 48 * 3600000) },
         },
       }),
       prisma.order.count({
         where: {
+          ...orderFilter,
           status: { in: ["AWAITING_PAYMENT", "PARTIALLY_PAID"] },
           createdAt: { gte: range.start, lte: new Date(Date.now() - 72 * 3600000) },
         },
@@ -207,7 +234,7 @@ export async function GET(request: Request) {
     // ── Продажи по типам услуг и направлениям (кольцевая диаграмма + AI-рекомендации) ──
     const salesByTypeRows = await prisma.order.groupBy({
       by: ["id"],
-      where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+      where: { ...orderFilter, status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
       _sum: { paidAmount: true },
     });
     const orderIds = salesByTypeRows.map((r) => r.id);
@@ -276,7 +303,7 @@ export async function GET(request: Request) {
     const queueCounts = await Promise.all(
       queueGroups.map((g) =>
         prisma.order.count({
-          where: { status: { in: g.statuses }, createdAt: { gte: range.start, lte: range.end } },
+          where: { ...orderFilter, status: { in: g.statuses }, createdAt: { gte: range.start, lte: range.end } },
         })
       )
     );
@@ -312,7 +339,7 @@ export async function GET(request: Request) {
     const [taskTypeCounts, taskReminded, taskNotReminded, taskPool] = await Promise.all([
       prisma.order.groupBy({
         by: ["status"],
-        where: { status: { in: [...TASK_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+        where: { ...orderFilter, status: { in: [...TASK_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
         _count: { _all: true },
       }),
       // Сколько из них уже «напомнили»: по оплатным заказам периода есть хотя бы одно
@@ -320,6 +347,7 @@ export async function GET(request: Request) {
       prisma.order.groupBy({
         by: ["status"],
         where: {
+          ...orderFilter,
           status: { in: [...ESCALATION_STATUSES] },
           createdAt: { gte: range.start, lte: range.end },
           messages: { some: { senderRole: "manager" } },
@@ -330,6 +358,7 @@ export async function GET(request: Request) {
       // Их номера показываются в тултипе чипа «по каким заказам напоминание не отправлено».
       prisma.order.findMany({
         where: {
+          ...orderFilter,
           status: { in: [...ESCALATION_STATUSES] },
           createdAt: { gte: range.start, lte: range.end },
           messages: { none: { senderRole: "manager" } },
@@ -343,7 +372,7 @@ export async function GET(request: Request) {
         },
       }),
       prisma.order.findMany({
-        where: { status: { in: [...TASK_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+        where: { ...orderFilter, status: { in: [...TASK_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
         orderBy: { serviceDate: "asc" },
         take: 40,
         select: {
@@ -608,7 +637,7 @@ export async function GET(request: Request) {
     const tomorrow = new Date(now.getTime() + 86400000);
     tomorrow.setHours(23, 59, 59, 999);
     const calendarOrders = await prisma.order.findMany({
-      where: { serviceDate: { not: null }, status: { in: [...ACTIVE_STATUSES] } },
+      where: { ...orderFilter, serviceDate: { not: null }, status: { in: [...ACTIVE_STATUSES] } },
       orderBy: { serviceDate: "asc" },
       take: 40,
       select: {
@@ -688,11 +717,11 @@ export async function GET(request: Request) {
     // ── Производительность подразделений (Гл. 1.26) ──
     const [ordersInPeriod, confirmedInPeriod, changedInPeriod, servicesNew, servicesInactive, clientMsgs] =
       await Promise.all([
-        prisma.order.count({ where: { createdAt: { gte: monthStart } } }),
+        prisma.order.count({ where: { ...orderFilter, createdAt: { gte: monthStart } } }),
         prisma.order.count({
-          where: { status: { in: ["CONFIRMED", ...PAID_STATUSES] }, createdAt: { gte: monthStart } },
+          where: { ...orderFilter, status: { in: ["CONFIRMED", ...PAID_STATUSES] }, createdAt: { gte: monthStart } },
         }),
-        prisma.order.count({ where: { status: "CHANGED", createdAt: { gte: monthStart } } }),
+        prisma.order.count({ where: { ...orderFilter, status: "CHANGED", createdAt: { gte: monthStart } } }),
         prisma.service.count({ where: { createdAt: { gte: monthStart } } }),
         prisma.service.count({ where: { isActive: false } }),
         prisma.orderMessage.count({ where: { senderRole: "client" } }),

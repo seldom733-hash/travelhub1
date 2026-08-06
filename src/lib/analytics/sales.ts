@@ -34,15 +34,20 @@ export async function getSalesData(f: AnalyticsFilters): Promise<AnalyticsSectio
   const paidStatus: { in: ("PAID" | "DOCUMENT_PREP" | "READY" | "COMPLETED")[] } | (typeof PAID)[number] =
     f.status ? (f.status as (typeof PAID)[number]) : { in: [...PAID] };
 
-  const [ordersAll, prevOrdersAll, paidRows, paidAgg] = await Promise.all([
+  const [ordersAllRaw, prevOrdersAll, paidRowsRaw] = await Promise.all([
     prisma.order.findMany({ where: orderWhere, select: { id: true, status: true, amount: true, paidAmount: true, createdAt: true } }),
     prisma.order.count({ where: prevOrderWhere }),
     prisma.order.findMany({ where: { ...orderWhere, status: paidStatus }, select: { id: true, amount: true, paidAmount: true, status: true, createdAt: true } }),
-    prisma.order.aggregate({ where: { ...orderWhere, status: paidStatus }, _sum: { paidAmount: true } }),
   ]);
+  // Фильтр по ответственному менеджеру (Гл. 2.7): ротация pickManager по id заказа
+  const managerFiltered = <T extends { id: string }>(rows: T[]): T[] => (f.manager ? rows.filter((o) => pickManager(o.id) === f.manager) : rows);
+  const ordersAll = managerFiltered(ordersAllRaw);
+  const paidRows = managerFiltered(paidRowsRaw);
   const created = ordersAll.length;
   const paidCount = paidRows.length;
-  const revenue = paidAgg._sum.paidAmount ?? 0;
+  // Выручка считается из отфильтрованных строк (не из агрегата), чтобы при
+  // активном фильтре менеджера KPI совпадал с графиком и таблицей (Гл. 2.7).
+  const revenue = paidRows.reduce((a, o) => a + (o.paidAmount ?? 0), 0);
   const avgCheck = paidCount ? revenue / paidCount : 0;
   const conversion = created ? (paidCount / created) * 100 : 0;
   const cancelled = ordersAll.filter((o) => o.status === "CANCELLED").length;

@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
-import { SERVICE_TYPE_LABELS, actorDisplayName, orderSystemMessage } from "@/lib/admin-data";
+import { SERVICE_TYPE_LABELS, actorDisplayName, orderSystemMessage, ORDER_STATUS_LABELS } from "@/lib/admin-data";
 import { pickManager, pickSource, orderPaymentStatus, worstBookingStatus } from "@/app/api/admin/orders/route";
+import { recordAudit, requestContext } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -237,6 +238,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         notify_manager: "🔔 Руководитель уведомлён",
       };
 
+      const ctx = requestContext(request);
       const updated = await prisma.$transaction(async (tx) => {
         const u =
           changedPriority
@@ -314,6 +316,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         }
         return u;
       });
+      // Гл. 3.18: автоматизация исполнения фиксируется в журнале аудита.
+      // Действия инициируются менеджером (ручное решение), поэтому категория —
+      // «Пользовательские действия»; AI-события остаются за AI Center.
+      await recordAudit({
+        user,
+        category: "Пользовательские действия",
+        action: "status",
+        objectType: "Заказ",
+        objectId: id,
+        objectNumber: order.orderNumber,
+        toData: changedPriority ? { priority: changedPriority } : null,
+        comment: comments[action],
+        source: "Web",
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+        criticality: action === "escalate" ? "warning" : "info",
+      });
 
       return NextResponse.json({
         ok: true,
@@ -358,6 +377,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return NextResponse.json({ error: "Укажите новую дату или сумму" }, { status: 400 });
       }
 
+      const ctx = requestContext(request);
       const updated = await prisma.$transaction(async (tx) => {
         const u = await tx.order.update({
           where: { id },
@@ -391,6 +411,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return u;
       });
 
+      // Гл. 3.18: изменение заказа фиксируется в журнале аудита.
+      await recordAudit({
+        user,
+        category: "Пользовательские действия",
+        action: "update",
+        objectType: "Заказ",
+        objectId: id,
+        objectNumber: order.orderNumber,
+        toData: data,
+        comment: "Изменены дата поездки и/или сумма",
+        source: "Web",
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+      });
+
       return NextResponse.json({
         ok: true,
         message: "Заказ изменён",
@@ -413,6 +448,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       );
     }
 
+    const ctx = requestContext(request);
     const updated = await prisma.$transaction(async (tx) => {
       // Оплата/возврат: синхронизируем paidAmount в том же обновлении, чтобы
       // ответ содержал актуальное значение (Гл. 6.5 «Оплаченные заказы»)
@@ -446,6 +482,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         },
       });
       return u;
+    });
+
+    // Гл. 3.18: переход статуса фиксируется в журнале аудита.
+    const financialActions = new Set(["pay", "refund"]);
+    await recordAudit({
+      user,
+      category: financialActions.has(action) ? "Финансовые операции" : "Пользовательские действия",
+      action: financialActions.has(action) ? (action === "refund" ? "refund" : "payment") : "status",
+      objectType: "Заказ",
+      objectId: id,
+      objectNumber: order.orderNumber,
+      fromData: { status: order.status },
+      toData: { status: t.to },
+      comment: `${ORDER_STATUS_LABELS[order.status] ?? order.status} → ${ORDER_STATUS_LABELS[t.to] ?? t.to}`,
+      source: "Web",
+      ip: ctx.ip,
+      userAgent: ctx.userAgent,
+      criticality: action === "cancel" || action === "refund" ? "warning" : "info",
     });
 
     return NextResponse.json({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { fmtMoney, ruPlural } from "@/lib/admin-data";
 
@@ -17,11 +17,129 @@ export function flagEmoji(code: string | null): string {
     : "📍";
 }
 
-/* ─── Экспорт виджета (Гл. 1.39): CSV из любых строк ─── */
+/* ─── Экспорт виджета (Гл. 1.39) ─── */
+
+/** CSV из любых строк. */
 export function exportCSV(filename: string, rows: (string | number)[][]) {
   const esc = (v: string | number) => `"${String(v).replace(/"/g, '"')}"`;
   const csv = rows.map((r) => r.map(esc).join(";")).join("\r\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  downloadBlob(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }), filename);
+}
+
+/** Excel (.xls) — HTML-таблица с объявлением mime Excel. */
+export function exportExcel(filename: string, title: string, rows: (string | number)[][]) {
+  const esc = (v: string | number) =>
+    String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+    <head><meta charset="utf-8"><title>${esc(title)}</title></head>
+    <body>
+      <h2>${esc(title)}</h2>
+      <table border="1">
+        ${rows
+          .map(
+            (r) =>
+              "<tr>" + r.map((c) => `<td>${esc(c)}</td>`).join("") + "</tr>"
+          )
+          .join("\n")}
+      </table>
+    </body>
+    </html>`;
+  downloadBlob(new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8" }), filename);
+}
+
+/** PDF — HTML с CSS для печати, открывается в диалоге печати (сохранить как PDF). */
+export function exportPDF(filename: string, title: string, rows: (string | number)[][]) {
+  const esc = (v: string | number) =>
+    String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const html = `
+    <!doctype html>
+    <html><head><meta charset="utf-8"><title>${esc(title)}</title>
+    <style>
+      @page { size: A4 landscape; margin: 12mm; }
+      body { font-family: 'Segoe UI', Arial, sans-serif; color: #111; }
+      h2 { margin: 0 0 8px; font-size: 18px; }
+      .sub { color: #666; font-size: 11px; margin-bottom: 12px; }
+      table { border-collapse: collapse; width: 100%; font-size: 11px; }
+      th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; }
+      th { background: #f1f5f9; font-weight: 600; }
+      tr:nth-child(even) td { background: #fafafa; }
+    </style></head>
+    <body>
+      <h2>${esc(title)}</h2>
+      <div class="sub">TravelHub Admin · экспортировано ${new Date().toLocaleString("ru-RU")}</div>
+      <table>
+        <thead><tr>${rows[0]?.map((c) => `<th>${esc(c)}</th>`).join("") ?? ""}</tr></thead>
+        <tbody>
+          ${rows
+            .slice(1)
+            .map((r) => "<tr>" + r.map((c) => `<td>${esc(c)}</td>`).join("") + "</tr>")
+            .join("\n")}
+        </tbody>
+      </table>
+      <script>window.onload = () => setTimeout(() => window.print(), 250);</script>
+    </body></html>`;
+  const win = window.open("", "_blank", "width=900,height=650");
+  if (!win) {
+    // Блокировка всплывающих окон: скачиваем HTML-версию как fallback
+    downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), filename.replace(/\.pdf$/i, ".html"));
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+}
+
+/** PNG — рисует простую таблицу на canvas и сохраняет изображение. */
+export function exportPNG(filename: string, title: string, rows: (string | number)[][]) {
+  const pad = 24;
+  const colW = 220;
+  const rowH = 26;
+  const headerH = 64;
+  const h = Math.max(4, rows.length) * rowH + headerH + pad * 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = 4 * colW + pad * 2;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  // Фон
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Заголовок
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 16px Segoe UI, Arial";
+  ctx.fillText(title, pad, pad + 16);
+  ctx.fillStyle = "#64748b";
+  ctx.font = "11px Segoe UI, Arial";
+  ctx.fillText(new Date().toLocaleString("ru-RU"), pad, pad + 34);
+  // Шапка таблицы
+  ctx.fillStyle = "#f1f5f9";
+  ctx.fillRect(pad, headerH, colW * 4, rowH);
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 12px Segoe UI, Arial";
+  rows[0]?.forEach((c, i) => ctx.fillText(String(c).slice(0, 28), pad + 8 + i * colW, headerH + 17));
+  // Строки
+  ctx.font = "12px Segoe UI, Arial";
+  rows.slice(1, 25).forEach((r, ri) => {
+    const y = headerH + rowH + ri * rowH;
+    if (ri % 2 === 1) {
+      ctx.fillStyle = "#fafafa";
+      ctx.fillRect(pad, y, colW * 4, rowH);
+    }
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(pad + colW * 4, y);
+    ctx.stroke();
+    ctx.fillStyle = "#1e293b";
+    r.slice(0, 4).forEach((c, ci) => ctx.fillText(String(c).slice(0, 28), pad + 8 + ci * colW, y + 17));
+  });
+  canvas.toBlob((blob) => {
+    if (blob) downloadBlob(blob, filename);
+  }, "image/png");
+}
+
+/** Скачивание Blob-файла (общий хелпер экспорта). */
+export function downloadBlob(blob: Blob, filename: string) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
@@ -238,6 +356,162 @@ export function saveWorkspacesState(active: string, layouts: Record<string, Layo
   }
 }
 
+/* ─── История изменений Dashboard (Гл. 1.41) ───
+   Все изменения макета записываются в журнал (localStorage): кто, когда и что
+   изменил (скрыл виджет, переставил секцию, применил AI-макет и т.д.). */
+
+export interface DashboardHistoryEntry {
+  at: string;
+  action: string;
+  label: string;
+}
+
+const HISTORY_KEY = "travelhub:dashboard:history:v1";
+const HISTORY_LIMIT = 60;
+
+export function loadDashboardHistory(): DashboardHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw) {
+      const p = JSON.parse(raw) as unknown;
+      if (Array.isArray(p)) {
+        return p.filter(
+          (x): x is DashboardHistoryEntry =>
+            Boolean(x) && typeof (x as DashboardHistoryEntry).at === "string" && typeof (x as DashboardHistoryEntry).label === "string"
+        );
+      }
+    }
+  } catch {
+    /* повреждённый журнал — начинаем заново */
+  }
+  return [];
+}
+
+/** Добавляет запись в журнал изменений Dashboard (свежие сверху). */
+export function logDashboardAction(action: string, label: string) {
+  try {
+    const prev = loadDashboardHistory();
+    const next = [{ at: new Date().toISOString(), action, label }, ...prev].slice(0, HISTORY_LIMIT);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  } catch {
+    /* localStorage недоступен — историю не ведём */
+  }
+}
+
+export function clearDashboardHistory() {
+  try {
+    localStorage.removeItem(HISTORY_KEY);
+  } catch {
+    /* localStorage недоступен */
+  }
+}
+
+/* ─── AI-конструктор Dashboard (Гл. 1.42) ───
+   Пользователь описывает, что хочет видеть, — по ключевым словам система
+   собирает макет: нужные виджеты, период и рабочее пространство. */
+
+/** Результат сборки дашборда по текстовому запросу. */
+export interface AiComposeResult {
+  widgets: string[];
+  period?: PeriodKey;
+  workspace?: string;
+  country?: { name: string; code: string };
+  summary: string;
+}
+
+/** Ключевые слова → виджеты (Гл. 1.32 «Библиотека виджетов»). */
+const AI_WIDGET_KEYWORDS: { widget: string; keywords: string[] }[] = [
+  { widget: "sales", keywords: ["продаж", "заявк", "конверси", "менеджер", "воронк", "чек", "лучшие"] },
+  { widget: "finance", keywords: ["финанс", "доход", "выручк", "комисси", "выплат", "задолжен", "возврат", "деньг", "платеж", "прибыл"] },
+  { widget: "execution", keywords: ["исполнен", "документ", "поставщик", "подтвержден", "обработк", "срок"] },
+  { widget: "tasks", keywords: ["задач", "просрочен", "дедлайн", "внимани", "напоминани"] },
+  { widget: "queues", keywords: ["очеред", "queue"] },
+  { widget: "kpi", keywords: ["kpi", "показател", "метрик", "сводк"] },
+  { widget: "ai", keywords: ["прогноз", "риск", "рекомендац", "аномали", "ии", "ai", "инсайт", "тренд"] },
+  { widget: "map", keywords: ["карт", "направлен", "стран", "географ", "локац"] },
+  { widget: "notifications", keywords: ["уведомлен", "событи", "лент", "новост"] },
+  { widget: "messages", keywords: ["сообщени", "чат", "переписк"] },
+  { widget: "calendar", keywords: ["календар", "расписан", "встреч"] },
+  { widget: "departments", keywords: ["подразделен", "отдел", "эффективност", "производител"] },
+  { widget: "activity", keywords: ["активност", "пользовател", "онлайн", "вход"] },
+  { widget: "decision", keywords: ["решен", "проблем", "влияние", "feed"] },
+  { widget: "health", keywords: ["здоров", "статус сервис", "техническ", "интеграц"] },
+];
+
+/** Ключевые слова → период (Гл. 1.33). */
+const AI_PERIOD_KEYWORDS: { period: PeriodKey; keywords: string[] }[] = [
+  { period: "today", keywords: ["сегодня", "за день", "за сутки"] },
+  { period: "week", keywords: ["недел", "7 дней", "за 7"] },
+  { period: "quarter", keywords: ["квартал", "3 месяц"] },
+  { period: "year", keywords: ["год", "годовой"] },
+  { period: "month", keywords: ["месяц", "за 30", "текущ"] },
+];
+
+/** Ключевые слова → направление (страна) для подсказки-фильтра. */
+const AI_COUNTRY_KEYWORDS: { name: string; code: string; keywords: string[] }[] = [
+  { name: "Турция", code: "TR", keywords: ["турци", "антали", "стамбул"] },
+  { name: "Египет", code: "EG", keywords: ["египет", "шарм", "хургад"] },
+  { name: "Грузия", code: "GE", keywords: ["грузи", "тбилиси", "батум"] },
+  { name: "Азербайджан", code: "AZ", keywords: ["азербайджан", "баку"] },
+  { name: "Таиланд", code: "TH", keywords: ["таиланд", "паттай", "пхукет", "бангкок"] },
+  { name: "ОАЭ", code: "AE", keywords: ["оаэ", "эмират", "дуба"] },
+  { name: "Россия", code: "RU", keywords: ["росси", "сочи", "москв", "крым"] },
+  { name: "Италия", code: "IT", keywords: ["итали", "рим", "милан"] },
+  { name: "Испания", code: "ES", keywords: ["испани", "барселон", "мадрид"] },
+  { name: "Греция", code: "GR", keywords: ["греци", "крит", "родос"] },
+];
+
+/**
+ * Собирает макет Dashboard по текстовому запросу (Гл. 1.42).
+ * Чистая функция без состояния — легко тестировать и переиспользовать.
+ */
+export function aiComposeDashboard(query: string): AiComposeResult {
+  const q = query.toLowerCase();
+  const widgets = new Set<string>();
+
+  for (const { widget, keywords } of AI_WIDGET_KEYWORDS) {
+    if (keywords.some((k) => q.includes(k))) widgets.add(widget);
+  }
+
+  let period: PeriodKey | undefined;
+  for (const { period: p, keywords } of AI_PERIOD_KEYWORDS) {
+    if (keywords.some((k) => q.includes(k))) {
+      period = p;
+      break;
+    }
+  }
+
+  let country: { name: string; code: string } | undefined;
+  for (const c of AI_COUNTRY_KEYWORDS) {
+    if (c.keywords.some((k) => q.includes(k))) {
+      country = c;
+      break;
+    }
+  }
+
+  // Рабочее пространство — по доминирующей теме запроса
+  let workspace = "main";
+  if (["finance", "sales", "execution", "ai", "marketing"].some((w) => widgets.has(w))) {
+    if (widgets.has("finance") && !widgets.has("sales")) workspace = "finance";
+    else if (widgets.has("execution") && !widgets.has("finance") && !widgets.has("sales")) workspace = "execution";
+    else if (widgets.has("ai") && !widgets.has("sales") && !widgets.has("finance") && !widgets.has("execution")) workspace = "ai";
+    else if (widgets.has("marketing") && !widgets.has("sales") && !widgets.has("finance")) workspace = "marketing";
+    else if (widgets.has("sales") && !widgets.has("finance") && !widgets.has("execution")) workspace = "sales";
+  }
+
+  // Если ничего не распознано — главное пространство целиком
+  const all = WIDGET_META.map((w) => w.key);
+  const selected = widgets.size ? all.filter((k) => widgets.has(k)) : all;
+
+  const parts: string[] = [];
+  parts.push(`Показано ${selected.length} ${ruPlural(selected.length, "виджет", "виджета", "виджетов")}`);
+  if (period) parts.push(`период «${PERIOD_OPTIONS.find((p) => p.key === period)?.label.toLowerCase()}»`);
+  if (country) parts.push(`направление ${country.name}`);
+  if (workspace !== "main") parts.push(`пространство «${WORKSPACES.find((w) => w.key === workspace)?.label}»`);
+
+  return { widgets: selected, period, workspace, country, summary: parts.join(" · ") };
+}
+
 /* ─── Экспорт/импорт макета пространства (Гл. 1.44): обмен настройками ─── */
 const WS_EXPORT_VERSION = 1;
 
@@ -335,18 +609,36 @@ export function parseWorkspaceJSON(raw: string): { layout: LayoutState; workspac
   return { layout: { hidden, order, stars, sizes }, workspace };
 }
 
+/* ─── Контекст меню виджета (Гл. 1.34): ───
+   Провайдер в CommandCenter даёт каждому WidgetFrame обработчики
+   «Настроить» и «Дублировать» — без пробрасывания пропсов в 37 мест. */
+
+export interface WidgetActions {
+  onConfigure?: (key: string) => void;
+  onDuplicate?: (key: string) => void;
+}
+
+export const WidgetActionsContext = createContext<WidgetActions>({});
+
+/** Хук: действия виджета (настройка / дублирование), если провайдер задан. */
+export function useWidgetActions(): WidgetActions {
+  return useContext(WidgetActionsContext);
+}
+
 /* ─── Каркас виджета с контекстным меню (Гл. 1.34): ───
-   Обновить · Развернуть · Экспорт CSV · Избранное · Скрыть */
+   Обновить · Настроить · Развернуть · Дублировать · Экспорт · Избранное · Скрыть */
 export function WidgetFrame({
   title,
   icon,
   subtitle,
   menu = true,
   starred = false,
+  widgetKey,
   onStar,
   onHide,
   onFullscreen,
   onExport,
+  onExportMore,
   onRefresh,
   children,
 }: {
@@ -355,15 +647,24 @@ export function WidgetFrame({
   subtitle?: string;
   menu?: boolean;
   starred?: boolean;
+  /** Ключ виджета для «Настроить»/«Дублировать» (Гл. 1.34); без него
+      определяется по title из WIDGET_META. */
+  widgetKey?: string;
   onStar?: () => void;
   onHide?: () => void;
   onFullscreen?: () => void;
   onExport?: () => void;
+  /** Дополнительные форматы экспорта (Гл. 1.39): xls | pdf | png */
+  onExportMore?: (format: "xls" | "pdf" | "png") => void;
   onRefresh?: () => void;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // Действия из контекста (Гл. 1.34): «Настроить» и «Дублировать» доступны
+  // каждому виджету, если CommandCenter предоставил обработчики.
+  const actions = useWidgetActions();
+  const resolvedKey = widgetKey ?? WIDGET_META.find((w) => w.title === title)?.key ?? title;
 
   useEffect(() => {
     if (!open) return;
@@ -425,8 +726,14 @@ export function WidgetFrame({
               {open && (
                 <div className="absolute right-0 top-8 w-52 bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-xl shadow-xl z-40 py-1.5">
                   {onRefresh && menuItem("Обновить", "🔄", onRefresh)}
+                  {actions.onConfigure && menuItem("Настроить", "⚙️", () => actions.onConfigure!(resolvedKey))}
                   {onFullscreen && menuItem("Развернуть на весь экран", "⛶", onFullscreen)}
-                  {onExport && menuItem("Экспорт CSV", "⬇️", onExport)}
+                  {actions.onDuplicate && menuItem("Дублировать", "📑", () => actions.onDuplicate!(resolvedKey))}
+                  <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-[var(--admin-muted)] font-semibold">Экспорт (Гл. 1.39)</div>
+                  {onExport && menuItem("CSV", "⬇️", onExport)}
+                  {onExportMore && menuItem("Excel", "📊", () => onExportMore("xls"))}
+                  {onExportMore && menuItem("PDF", "📄", () => onExportMore("pdf"))}
+                  {onExportMore && menuItem("PNG", "🖼", () => onExportMore("png"))}
                   {onStar && menuItem(starred ? "Снять из избранного" : "В избранное", "⭐", onStar)}
                   {onHide && menuItem("Скрыть виджет", "🚫", onHide, true)}
                 </div>

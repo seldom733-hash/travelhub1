@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { actorDisplayName, orderSystemMessage } from "@/lib/admin-data";
+import { recordAudit, requestContext } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -176,6 +177,24 @@ export async function POST(request: Request) {
     });
 
     const skipped = ids.length - processed;
+
+    // Гл. 3.18: массовая операция фиксируется в журнале аудита.
+    if (processed > 0) {
+      const ctx = requestContext(request);
+      await recordAudit({
+        user,
+        category: "Пользовательские действия",
+        action: "bulk",
+        objectType: "Заказ",
+        toData: { action, count: processed },
+        comment: `${bulkMessage(action)} — обработано ${processed} заказов${skipped ? `, пропущено ${skipped}` : ""}`,
+        source: "Web",
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+        criticality: action === "cancel" || action === "archive" ? "warning" : "info",
+      });
+    }
+
     return NextResponse.json({
       ok: true,
       message:

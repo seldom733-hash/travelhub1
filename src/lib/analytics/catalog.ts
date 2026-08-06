@@ -58,8 +58,16 @@ export async function getCatalogData(f: AnalyticsFilters): Promise<AnalyticsSect
   // ── По категориям: продажи, выручка, прибыль, отмены ──
   const serviceIds = [...new Set([...paidRows.map((r) => r.serviceId), ...allBookingRows.map((r) => r.serviceId)])];
   const serviceTypes = serviceIds.length
-    ? await prisma.service.findMany({ where: { id: { in: serviceIds } }, select: { id: true, type: true, title: true, price: true, rating: true, reviewCount: true, country: true, city: true } })
+    ? await prisma.service.findMany({ where: { id: { in: serviceIds } }, select: { id: true, type: true, title: true, price: true, rating: true, reviewCount: true, country: true, city: true, provider: { select: { companyName: true, firstName: true, lastName: true } } } })
     : [];
+  // Имя поставщика для анализа партнёров внутри категории (2.16.8)
+  const providerNameById = new Map<string, string>();
+  for (const s of serviceTypes) {
+    providerNameById.set(
+      s.id,
+      s.provider ? s.provider.companyName || `${s.provider.firstName} ${s.provider.lastName ?? ""}`.trim() : "Без поставщика"
+    );
+  }
   const typeMap = new Map(serviceTypes.map((s) => [s.id, s.type]));
   const catMap = new Map<string, { count: number; revenue: number; cancelled: number }>();
   for (const r of allBookingRows) {
@@ -202,6 +210,51 @@ export async function getCatalogData(f: AnalyticsFilters): Promise<AnalyticsSect
     .filter((c) => c.revenue > 0)
     .sort((a, b) => b.trend - a.trend);
 
+  // ── Матрица жизненного цикла услуги (2.16.11): Запуск → Рост → Зрелость → Спад ──
+  // Стадия определяется по темпу роста выручки и текущему объёму продаж.
+  const lifecycleRows = categories.map((c) => {
+    const trend = changePct(c.revenue, prevCatMap.get(c.type) ?? 0);
+    const stage =
+      c.count <= 1 && c.revenue > 0
+        ? { key: "launch", label: "Запуск", icon: "🚀", advice: "оценить первые продажи и реакцию клиентов" }
+        : trend > 15
+          ? { key: "growth", label: "Рост", icon: "📈", advice: "усилить продвижение и расширить ассортимент" }
+          : trend >= -10 && trend <= 15
+            ? { key: "maturity", label: "Зрелость", icon: "⚖️", advice: "удержание качества и оптимизация маржи" }
+            : { key: "decline", label: "Спад", icon: "📉", advice: "обновить предложение, изменить цену или вывести из каталога" };
+    return { ...c, trend, stage };
+  });
+  const lifecycleBar = {
+    key: "lifecycle",
+    title: "Матрица жизненного цикла услуг",
+    icon: "🔄",
+    rows: lifecycleRows.map((c) => ({
+      label: `${c.icon} ${c.label} — ${c.stage.icon} ${c.stage.label}`,
+      value: Math.round(Math.max(5, Math.abs(c.trend)) * 10),
+      sub: `${c.revenue} $ · тренд ${c.trend >= 0 ? "+" : ""}${c.trend.toFixed(0)}% · ${c.stage.advice}`,
+    })),
+  };
+
+  // ── Партнёры внутри категории (2.16.8): поставщики услуг оплаченных броней ──
+  const providerMap = new Map<string, { revenue: number; count: number }>();
+  for (const r of paidRows) {
+    const pname = providerNameById.get(r.serviceId);
+    if (!pname) continue;
+    const cur = providerMap.get(pname) ?? { revenue: 0, count: 0 };
+    cur.revenue += r.amount;
+    cur.count += 1;
+    providerMap.set(pname, cur);
+  }
+  const partnersInCatBar = {
+    key: "partnersInCategory",
+    title: "Лучшие партнёры каталога",
+    icon: "🤝",
+    rows: [...providerMap.entries()]
+      .map(([name, v]) => ({ label: name, value: Math.round(v.revenue), sub: `${v.count} продаж` }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8),
+  };
+
   const ai: { level: "positive" | "medium" | "high" | "info"; title: string; detail: string }[] = [];
   if (categories[0]) {
     const sharePct = revenue ? Math.round((categories[0].revenue / revenue) * 100) : 0;
@@ -260,7 +313,7 @@ export async function getCatalogData(f: AnalyticsFilters): Promise<AnalyticsSect
         data: categories.slice(0, 8).map((c) => ({ label: c.label, value: c.revenue })),
       },
     ],
-    barLists: [topSoldBar, topViewedBar, topRatedBar, geoBar],
+    barLists: [topSoldBar, topViewedBar, topRatedBar, geoBar, lifecycleBar, partnersInCatBar],
     tables: [catTable],
     ai,
   };

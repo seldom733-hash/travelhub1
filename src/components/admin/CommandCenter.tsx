@@ -3,12 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Sparkline, DonutChart, CHART_COLORS } from "@/components/admin/charts";
-import { fmtMoney, fmtDateTime, fmtNumber, ruPlural } from "@/lib/admin-data";
+import { fmtMoney, fmtDateTime, fmtNumber, ruPlural, MANAGERS } from "@/lib/admin-data";
 import { describeApiError } from "@/lib/api-error";
 import {
   WidgetFrame,
+  WidgetActionsContext,
   ActivityMap,
   exportCSV,
+  exportExcel,
+  exportPDF,
+  exportPNG,
   WIDGET_META,
   WIDGET_GROUP_LABELS,
   PERIOD_OPTIONS,
@@ -19,9 +23,14 @@ import {
   exportWorkspaceJSON,
   copyWorkspaceJSON,
   parseWorkspaceJSON,
+  aiComposeDashboard,
+  logDashboardAction,
+  clearDashboardHistory,
+  loadDashboardHistory,
   flagEmoji,
   type PeriodKey,
   type LayoutState,
+  type AiComposeResult,
 } from "@/components/admin/dashboard-widgets";
 
 /* ─── Типы данных API (Гл. 1: Центр управления) ─── */
@@ -182,7 +191,7 @@ const QUEUE_HINTS: Record<string, string> = {
   refund: "Оформление возвратов",
 };
 
-export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWorkspace?: string }) {
+export default function CommandCenter({ defaultWorkspace = "main", role = "ADMIN", userName = "" }: { defaultWorkspace?: string; role?: string; userName?: string }) {
   const [data, setData] = useState<DashData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aiTab, setAiTab] = useState<"summary" | "recs" | "warnings" | "forecast">("summary");
@@ -190,17 +199,68 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
   // у каждого пространства свой макет (скрытые виджеты, порядок, размеры, избранное).
   // Стартовое пространство берётся из настроек пользователя/роли (Гл. 1.2).
   const [period, setPeriod] = useState<PeriodKey>("month");
+  // Настройка виджета (Гл. 1.33): страна и тип услуги фильтруют данные дашборда
+  const [widgetCountry, setWidgetCountry] = useState("");
+  const [widgetType, setWidgetType] = useState("");
   const [wsState] = useState(() => loadWorkspacesState(defaultWorkspace));
   const [activeWs, setActiveWs] = useState<string>(wsState.active);
   const [userDefaultWs, setUserDefaultWs] = useState<string>(defaultWorkspace);
   const [layouts, setLayouts] = useState<Record<string, LayoutState>>(wsState.layouts);
   const [libOpen, setLibOpen] = useState(false);
+  const [aiBuilderOpen, setAiBuilderOpen] = useState(false);
+  const [aiBuilderQuery, setAiBuilderQuery] = useState("");
+  const [aiCompose, setAiCompose] = useState<AiComposeResult | null>(null);
+  const [aiApplyMsg, setAiApplyMsg] = useState<"ok" | null>(null);
+  const aiApplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [fullscreen, setFullscreen] = useState<string | null>(null);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   // Меню настроек пространства (Гл. 1.44): экспорт / импорт / обмен / сброс
   const [wsMenuOpen, setWsMenuOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  // История изменений Dashboard (Гл. 1.41) и шаблоны (Гл. 1.36)
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyItems, setHistoryItems] = useState<ReturnType<typeof loadDashboardHistory>>([]);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; role: string; name: string; layout: string; createdAt: string }[]>([]);
+  const [templatesMsg, setTemplatesMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const templatesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Быстрые действия с задачами (Гл. 1.8): назначение менеджера и отложенные
+  const [taskAssignments, setTaskAssignments] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("travelhub:tasks:assignments:v1") ?? "{}") as Record<string, string>;
+    } catch {
+      return {};
+    }
+  });
+  const [snoozedTasks, setSnoozedTasks] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("travelhub:tasks:snoozed:v1") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
+  const [assignOpenFor, setAssignOpenFor] = useState<string | null>(null);
+  const assignRefs = useRef(new Map<string, HTMLDivElement>());
+  // Контекстное меню виджета (Гл. 1.34): настройка и дубликаты
+  const [duplicates, setDuplicates] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("travelhub:dashboard:duplicates:v1") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
+  const [configureFor, setConfigureFor] = useState<string | null>(null);
+  const [configurePeriod, setConfigurePeriod] = useState<PeriodKey>("month");
+  const [configureCountry, setConfigureCountry] = useState("");
+  const [configureType, setConfigureType] = useState("");
+  // Совместный доступ (Гл. 1.40): выбор получателей + ссылка-макет
+  const [shareOpen, setShareOpen] = useState(false);
+  const [staff, setStaff] = useState<{ id: string; name: string; email: string; role: string }[]>([]);
+  const [shareSelected, setShareSelected] = useState<string[]>([]);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [incomingShare, setIncomingShare] = useState<{ layout: LayoutState; workspace?: string; from: string } | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
@@ -211,9 +271,12 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const defaultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = (p: PeriodKey = period) => {
+  const load = (p: PeriodKey = period, country = widgetCountry, type = widgetType) => {
     setError(null);
-    fetch(`/api/admin/dashboard?period=${p}`)
+    const params = new URLSearchParams({ period: p });
+    if (country) params.set("country", country);
+    if (type) params.set("type", type);
+    fetch(`/api/admin/dashboard?${params.toString()}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(await describeApiError(r, "Ошибка загрузки данных"));
         return r.json();
@@ -226,6 +289,38 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
     void Promise.resolve().then(() => load());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Авто-применение шаблона роли при первом заходе (Гл. 1.36): если для роли
+  // есть сохранённый шаблон, а у пользователя ещё нет собственного макета,
+  // применяем шаблон. Повторно не применяем — только при первом заходе.
+  useEffect(() => {
+    try {
+      const appliedKey = `travelhub:dashboard:template-applied:${role}`;
+      if (localStorage.getItem(appliedKey)) return;
+      fetch(`/api/admin/dashboard-templates?role=${encodeURIComponent(role)}`)
+        .then(async (r) => (r.ok ? (r.json() as Promise<{ items: { id: string; role: string; name: string; layout: string }[] }>) : Promise.reject(new Error("templates failed"))))
+        .then((j) => {
+          const t = j.items[0];
+          if (!t) return;
+          const parsed = parseWorkspaceJSON(t.layout);
+          logDashboardAction("template", `Авто-применён шаблон «${t.name}» для роли ${role}`);
+          setLayouts((prev) => ({ ...prev, [parsed.workspace ?? "main"]: parsed.layout }));
+          if (parsed.workspace) setActiveWs(parsed.workspace);
+          // Флаг ставим только после успешного применения — при сбое сети
+          // шаблон применится при следующем заходе
+          try {
+            localStorage.setItem(appliedKey, "1");
+          } catch {
+            /* localStorage недоступен */
+          }
+        })
+        .catch(() => {
+          /* тихо: шаблон недоступен — оставляем макет по умолчанию */
+        });
+    } catch {
+      /* localStorage недоступен */
+    }
+  }, [role]);
 
   // Текущий макет активного пространства (или макет по умолчанию)
   const layout = layouts[activeWs] ?? defaultLayoutFor(activeWs);
@@ -253,8 +348,109 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
     return () => {
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       if (defaultTimerRef.current) clearTimeout(defaultTimerRef.current);
+      if (aiApplyTimerRef.current) clearTimeout(aiApplyTimerRef.current);
+      if (templatesTimerRef.current) clearTimeout(templatesTimerRef.current);
     };
   }, []);
+
+  // Совместный доступ (Гл. 1.40): при открытии модалки загружаем сотрудников
+  const openShare = () => {
+    setShareOpen(true);
+    setShareLink(null);
+    setShareCopied(false);
+    fetch("/api/admin/dashboard-share")
+      .then(async (r) => (r.ok ? (r.json() as Promise<{ items: { id: string; name: string; email: string; role: string }[] }>) : Promise.reject(new Error("staff failed"))))
+      .then((j) => setStaff(j.items))
+      .catch(() => {
+        /* тихо: список недоступен */
+      });
+  };
+  // Генерация ссылки с закодированным макетом текущего пространства
+  const buildShareLink = () => {
+    const payload = {
+      app: "travelhub-admin",
+      version: 1,
+      workspace: activeWs,
+      layout: layouts[activeWs] ?? defaultLayoutFor(activeWs),
+      from: userName,
+    };
+    // base64url — безопасно для URL
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const url = `${window.location.origin}/admin?share=${b64}`;
+    setShareLink(url);
+    return url;
+  };
+  // Обработка входящей ссылки ?share=…: предлагаем применить чужой макет
+  useEffect(() => {
+    try {
+      const raw = new URLSearchParams(window.location.search).get("share");
+      if (!raw) return;
+      const json = decodeURIComponent(escape(atob(raw.replace(/-/g, "+").replace(/_/g, "/"))));
+      const data = JSON.parse(json) as { app?: string; workspace?: string; layout?: LayoutState; from?: string };
+      if (data.app !== "travelhub-admin" || !data.layout) return;
+      const shared = data.layout as LayoutState;
+      // setState откладываем на микротаск — вызов в теле эффекта напрямую
+      // вызывает предупреждение react-hooks/set-state-in-effect
+      setTimeout(() => {
+        setIncomingShare({
+          layout: {
+            hidden: shared.hidden ?? [],
+            order: shared.order ?? [],
+            stars: shared.stars ?? [],
+            sizes: shared.sizes ?? {},
+          },
+          workspace: data.workspace,
+          from: data.from ?? "",
+        });
+      }, 0);
+    } catch {
+      /* повреждённая ссылка — игнорируем */
+    }
+  }, []);
+  // Применение полученного макета
+  const applyIncomingShare = () => {
+    if (!incomingShare) return;
+    const target = incomingShare.workspace ?? activeWs;
+    logDashboardAction("share", `Применён макет, полученный по ссылке${incomingShare.from ? ` от ${incomingShare.from}` : ""}`);
+    setLayouts((prev) => ({ ...prev, [target]: incomingShare.layout }));
+    if (incomingShare.workspace) setActiveWs(incomingShare.workspace);
+    setIncomingShare(null);
+    // Убираем share из URL, чтобы не применять повторно
+    window.history.replaceState({}, "", window.location.pathname);
+  };
+  // Персист дубликатов виджетов (Гл. 1.34)
+  useEffect(() => {
+    try {
+      localStorage.setItem("travelhub:dashboard:duplicates:v1", JSON.stringify(duplicates));
+    } catch {
+      /* localStorage недоступен */
+    }
+  }, [duplicates]);
+  // Персист назначений и отложенных задач (Гл. 1.8)
+  useEffect(() => {
+    try {
+      localStorage.setItem("travelhub:tasks:assignments:v1", JSON.stringify(taskAssignments));
+    } catch {
+      /* localStorage недоступен */
+    }
+  }, [taskAssignments]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("travelhub:tasks:snoozed:v1", JSON.stringify(snoozedTasks));
+    } catch {
+      /* localStorage недоступен */
+    }
+  }, [snoozedTasks]);
+  // Закрытие выпадающего списка назначения по клику вне (Гл. 1.8)
+  useEffect(() => {
+    if (!assignOpenFor) return;
+    const onClick = (e: MouseEvent) => {
+      const el = assignRefs.current.get(assignOpenFor);
+      if (el && !el.contains(e.target as Node)) setAssignOpenFor(null);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [assignOpenFor]);
 
   // Фоновое обновление счётчика «N новых» в виджете «Сообщения» (Гл. 1.24):
   // раз в минуту опрашиваем лёгкий эндпоинт и тихо подменяем только блок
@@ -293,18 +489,29 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
   /* ─── Виджет-система (Гл. 1.17, 1.30–1.37): видимость, избранное, порядок ─── */
   const isVisible = (key: string) => !layout.hidden.includes(key);
   const isStar = (key: string) => layout.stars.includes(key);
-  const toggleStar = (key: string) =>
+  const toggleStar = (key: string) => {
+    const w = WIDGET_META.find((x) => x.key === key);
+    const adding = !layout.stars.includes(key);
+    logDashboardAction("star", `${adding ? "Закреплён в избранном" : "Снят из избранного"} виджет «${w?.title ?? key}»`);
     updateLayout((l) => ({
       ...l,
       stars: l.stars.includes(key) ? l.stars.filter((k) => k !== key) : [...l.stars, key],
     }));
-  const hideWidget = (key: string) =>
+  };
+  const hideWidget = (key: string) => {
+    const w = WIDGET_META.find((x) => x.key === key);
+    logDashboardAction("hide", `Скрыт виджет «${w?.title ?? key}»`);
     updateLayout((l) => (l.hidden.includes(key) ? l : { ...l, hidden: [...l.hidden, key] }));
-  const showWidget = (key: string) =>
+  };
+  const showWidget = (key: string) => {
+    const w = WIDGET_META.find((x) => x.key === key);
+    logDashboardAction("show", `Возвращён виджет «${w?.title ?? key}»`);
     updateLayout((l) => ({ ...l, hidden: l.hidden.filter((k) => k !== key) }));
+  };
 
   /* ── Рабочие пространства: экспорт / импорт / сброс (Гл. 1.44) ── */
   const resetWorkspace = () => {
+    logDashboardAction("reset", `Пространство «${WORKSPACES.find((w) => w.key === activeWs)?.label}» сброшено к настройкам по умолчанию`);
     setLayouts((prev) => ({ ...prev, [activeWs]: defaultLayoutFor(activeWs) }));
     setWsMenuOpen(false);
     setConfirmReset(false);
@@ -325,6 +532,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
       const { layout, workspace } = parseWorkspaceJSON(text);
       // Если в JSON указано пространство — применяем к нему, иначе к активному
       const target = workspace ?? activeWs;
+      logDashboardAction("import", `Импортирован макет в пространство «${WORKSPACES.find((w) => w.key === target)?.label ?? target}»`);
       setLayouts((prev) => ({ ...prev, [target]: layout }));
       setActiveWs(target);
       setImportOpen(false);
@@ -333,6 +541,60 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Ошибка импорта");
     }
+  };
+
+  /* ── Шаблоны Dashboard (Гл. 1.36) ── */
+  const loadTemplates = () => {
+    fetch("/api/admin/dashboard-templates")
+      .then(async (r) => (r.ok ? (r.json() as Promise<{ items: typeof templates }>) : Promise.reject(new Error("templates failed"))))
+      .then((j) => setTemplates(j.items))
+      .catch(() => {
+        /* тихо */
+      });
+  };
+  // Сохранить текущий макет активного пространства как шаблон для роли
+  const saveTemplate = async (name: string, role: string) => {
+    try {
+      const r = await fetch("/api/admin/dashboard-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role, name, layout: JSON.stringify(layouts[activeWs] ?? defaultLayoutFor(activeWs)) }),
+      });
+      if (!r.ok) throw new Error("save failed");
+      setTemplatesMsg({ ok: true, text: `Шаблон «${name}» сохранён для роли ${role}` });
+      logDashboardAction("template", `Создан шаблон «${name}» для роли ${role}`);
+      loadTemplates();
+    } catch {
+      setTemplatesMsg({ ok: false, text: "Не удалось сохранить шаблон" });
+    }
+    if (templatesTimerRef.current) clearTimeout(templatesTimerRef.current);
+    templatesTimerRef.current = setTimeout(() => setTemplatesMsg(null), 3000);
+  };
+  // Применить шаблон к текущему пространству (layout хранит LayoutState)
+  const applyTemplate = (t: { id: string; role: string; name: string; layout: string }) => {
+    try {
+      const parsed = parseWorkspaceJSON(t.layout);
+      logDashboardAction("template", `Применён шаблон «${t.name}» (роль ${t.role})`);
+      setLayouts((prev) => ({ ...prev, [activeWs]: parsed.layout }));
+      if (parsed.workspace) setActiveWs(parsed.workspace);
+      setTemplatesMsg({ ok: true, text: `Шаблон «${t.name}» применён` });
+    } catch {
+      setTemplatesMsg({ ok: false, text: "Не удалось применить шаблон: повреждённый макет" });
+    }
+    if (templatesTimerRef.current) clearTimeout(templatesTimerRef.current);
+    templatesTimerRef.current = setTimeout(() => setTemplatesMsg(null), 3000);
+  };
+  const deleteTemplate = async (id: string, name: string) => {
+    try {
+      await fetch(`/api/admin/dashboard-templates?id=${id}`, { method: "DELETE" });
+      logDashboardAction("template", `Удалён шаблон «${name}»`);
+      setTemplates((prev) => prev.filter((t) => t.id !== id));
+      setTemplatesMsg({ ok: true, text: `Шаблон «${name}» удалён` });
+    } catch {
+      setTemplatesMsg({ ok: false, text: "Не удалось удалить шаблон" });
+    }
+    if (templatesTimerRef.current) clearTimeout(templatesTimerRef.current);
+    templatesTimerRef.current = setTimeout(() => setTemplatesMsg(null), 3000);
   };
   const onImportFile = (file: File) => {
     const reader = new FileReader();
@@ -370,6 +632,8 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
   })();
   const moveSection = (from: string, to: string) => {
     if (from === to) return;
+    const labelOf = (k: string) => WIDGET_META.find((w) => w.key === k)?.title ?? k;
+    logDashboardAction("move", `Секция «${labelOf(from)}» перемещена после «${labelOf(to)}»`);
     updateLayout((l) => {
       const order = sectionOrder.slice();
       const i = order.indexOf(from);
@@ -443,7 +707,10 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
           ).map(([s, label]) => (
             <button
               key={s}
-              onClick={() => updateLayout((l) => ({ ...l, sizes: { ...l.sizes, [key]: s } }))}
+              onClick={() => {
+                logDashboardAction("size", `Размер секции «${WIDGET_META.find((w) => w.key === key)?.title ?? key}» → ${label}`);
+                updateLayout((l) => ({ ...l, sizes: { ...l.sizes, [key]: s } }));
+              }}
               className={`px-2 h-6 rounded-lg text-[10px] font-medium transition-colors ${
                 size === s ? "bg-secondary text-white" : "text-[var(--admin-muted)] hover:bg-[var(--admin-bg)] hover:text-[var(--admin-text)]"
               }`}
@@ -594,6 +861,95 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
         ]);
         break;
     }
+  };
+
+  /* ── Экспорт виджета в других форматах (Гл. 1.39): Excel/PDF/PNG ── */
+  const exportWidgetMore = (key: string, format: "xls" | "pdf" | "png") => {
+    if (!data) return;
+    const title = WIDGET_META.find((w) => w.key === key)?.title ?? key;
+    const rowsFor = (): (string | number)[][] => {
+      switch (key) {
+        case "kpi":
+          return [
+            ["Показатель", "Значение", "Изменение"],
+            ["Заказы за период", data.kpi.ordersToday.value, `${data.kpi.ordersToday.change}%`],
+            ["Заказы в работе", data.kpi.ordersInWork.value, `${data.kpi.ordersInWork.change}%`],
+            ["Ожидают подтверждения", data.kpi.awaitingConfirmation.value, `${data.kpi.awaitingConfirmation.change}%`],
+            ["Ожидают оплаты", data.kpi.awaitingPayment.value, `${data.kpi.awaitingPayment.change}%`],
+            ["Выполненные", data.kpi.completed.value, `${data.kpi.completed.change}%`],
+            ["Доход за период", fmtMoney(data.kpi.revenueToday.value), `${data.kpi.revenueToday.change}%`],
+            ["Комиссия платформы", fmtMoney(data.kpi.commission.value), `${data.kpi.commission.change}%`],
+            ["Новые пользователи", data.kpi.newUsers.value, `${data.kpi.newUsers.change}%`],
+            ["Новые партнёры", data.kpi.newPartners.value, `${data.kpi.newPartners.change}%`],
+          ];
+        case "tasks":
+          return [
+            ["Заказ", "Задача", "Клиент", "Приоритет"],
+            ...data.tasks.map((t) => [t.orderNumber, t.title, t.client, t.priority]),
+          ];
+        case "queues":
+          return [["Очередь", "Количество"], ...data.queues.map((q) => [q.label, q.count])];
+        case "sales":
+          return [
+            ["Метрика", "Значение"],
+            ["Новые заявки", data.sales.newRequests],
+            ["Оплаченные заказы", data.sales.paidOrders],
+            ["Выручка", fmtMoney(data.sales.paidAmount)],
+            ["Средний чек", fmtMoney(data.sales.avgCheck)],
+            ["Конверсия", `${data.sales.conversion}%`],
+            ...data.sales.topManagers.map((m) => ["Менеджер: " + m.name, `${m.orders} заказов, ${fmtMoney(m.amount)}`]),
+          ];
+        case "execution":
+          return [
+            ["Метрика", "Значение"],
+            ["В обработке", data.execution.inProcessing],
+            ["Ждут ответа поставщика", data.execution.awaitingSupplier],
+            ["Готовы документы", data.execution.docsReady],
+            ["Просроченные", data.execution.overdue],
+            ["Среднее время обработки", data.execution.avgTime],
+          ];
+        case "finance":
+          return [
+            ["Метрика", "Значение"],
+            ["Доход месяца", fmtMoney(data.finance.revenueMonth)],
+            ["Комиссия", fmtMoney(data.finance.commission)],
+            ["Выплаты партнёрам", fmtMoney(data.finance.partnerPayouts)],
+            ["Задолженности", fmtMoney(data.finance.debtTotal)],
+            ["Возвраты", `${data.finance.refundsCount} · ${fmtMoney(data.finance.refunds)}`],
+          ];
+        case "notifications":
+          return [
+            ["Событие", "Детали", "Время"],
+            ...data.notifications.map((n) => [n.title, n.detail, fmtDateTime(n.at)]),
+          ];
+        case "map":
+          return [
+            ["Страна", "Продажи", "Выручка"],
+            ...data.popularDestinations.map((d) => [d.name, d.sales, fmtMoney(d.revenue)]),
+          ];
+        case "departments":
+          return [
+            ["Подразделение", "Метрика", "Значение"],
+            ["Продажи", "Конверсия", `${data.departments.sales.conversion}%`],
+            ["Операционный отдел", "Подтверждено", data.departments.operations.confirmed],
+            ["Операционный отдел", "Нет мест", data.departments.operations.noAvailability],
+            ["Поддержка", "Обращений", data.departments.support.tickets],
+            ["Модерация", "Новых услуг", data.departments.moderation.newServices],
+          ];
+        case "events":
+          return [
+            ["Событие", "Детали", "Время"],
+            ...data.events.map((e) => [e.title, e.detail, fmtDateTime(e.at)]),
+          ];
+        default:
+          return [["Показатель", "Значение"], ["Период", data.periodLabel]];
+      }
+    };
+    const rows = rowsFor();
+    const base = `dashboard-${key}`;
+    if (format === "xls") exportExcel(`${base}.xls`, title, rows);
+    else if (format === "pdf") exportPDF(`${base}.pdf`, title, rows);
+    else exportPNG(`${base}.png`, title, rows);
   };
 
   /* ── Полноэкранный режим (Гл. 1.38): укрупнённый вид виджета ── */
@@ -832,6 +1188,24 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
   const capFirst = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
   return (
+    <WidgetActionsContext.Provider
+      value={{
+        // «Настроить» (Гл. 1.34, 1.33): открывает настройки виджета с периодом,
+        // страной и типом услуги — фильтры применяются к данным дашборда.
+        onConfigure: (key) => {
+          setConfigureFor(key);
+          setConfigurePeriod(period);
+          setConfigureCountry(widgetCountry);
+          setConfigureType(widgetType);
+        },
+        // «Дублировать» (Гл. 1.34): показывает копию виджета в секции «Дубликаты»
+        onDuplicate: (key) => {
+          if (duplicates.includes(key)) return; // повторное дублирование не нужно
+          logDashboardAction("duplicate", `Виджет «${WIDGET_META.find((w) => w.key === key)?.title ?? key}» продублирован`);
+          setDuplicates((prev) => (prev.includes(key) ? prev : [...prev, key]));
+        },
+      }}
+    >
     <div className="space-y-6">
       {/* ── Заголовок страницы (Гл. 1.6): приветствие + быстрые действия ── */}
       <div className="bg-gradient-to-br from-primary to-primary-dark text-white rounded-2xl p-5 lg:p-6 relative overflow-hidden">
@@ -943,6 +1317,35 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
               >
                 {activeWs === userDefaultWs ? "✅ Стартовое пространство" : "⭐ Сделать стартовым"}
               </button>
+              <button
+                onClick={() => {
+                  setHistoryItems(loadDashboardHistory());
+                  setHistoryOpen(true);
+                  setWsMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[var(--admin-bg)] transition-colors"
+              >
+                🕘 История изменений
+              </button>
+              <button
+                onClick={() => {
+                  loadTemplates();
+                  setTemplatesOpen(true);
+                  setWsMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[var(--admin-bg)] transition-colors"
+              >
+                📐 Шаблоны Dashboard
+              </button>
+              <button
+                onClick={() => {
+                  openShare();
+                  setWsMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-[var(--admin-bg)] transition-colors"
+              >
+                🔗 Поделиться дашбордом
+              </button>
               <div className="border-t border-[var(--admin-border)] my-1" />
               <button
                 onClick={() => (confirmReset ? resetWorkspace() : setConfirmReset(true))}
@@ -972,27 +1375,95 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
 
       {/* ── Панель инструментов: период данных + библиотека виджетов (Гл. 1.17, 1.32, 1.33) ── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="ac-tabs">
-          {PERIOD_OPTIONS.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => {
-                setPeriod(p.key);
-                load(p.key);
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="ac-tabs">
+            {PERIOD_OPTIONS.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => {
+                  setPeriod(p.key);
+                  load(p.key);
+                }}
+                disabled={p.key === period}
+                className={`ac-tab ${p.key === period ? "ac-tab-active" : ""}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {/* Настройка виджета (Гл. 1.33): страна и тип услуги фильтруют данные */}
+          <div className="flex items-center gap-1.5">
+            <select
+              value={widgetCountry}
+              onChange={(e) => {
+                const v = e.target.value;
+                setWidgetCountry(v);
+                logDashboardAction("filter", `Фильтр по стране: ${v || "все"}`);
+                load(period, v, widgetType);
               }}
-              disabled={p.key === period}
-              className={`ac-tab ${p.key === period ? "ac-tab-active" : ""}`}
+              className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-xl px-2 h-8 text-[11px] outline-none focus:border-primary transition-colors"
+              title="Фильтр по стране (Гл. 1.33)"
             >
-              {p.label}
-            </button>
-          ))}
+              <option value="">🌍 Все страны</option>
+              {(data?.popularDestinations ?? []).map((d) => (
+                <option key={d.code ?? d.name} value={d.code ?? ""}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={widgetType}
+              onChange={(e) => {
+                const v = e.target.value;
+                setWidgetType(v);
+                logDashboardAction("filter", `Фильтр по услуге: ${v || "все"}`);
+                load(period, widgetCountry, v);
+              }}
+              className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-xl px-2 h-8 text-[11px] outline-none focus:border-primary transition-colors"
+              title="Фильтр по типу услуги (Гл. 1.33)"
+            >
+              <option value="">🧩 Все услуги</option>
+              {(data?.salesByCategory ?? []).map((s) => (
+                <option key={s.type} value={s.type}>
+                  {s.icon} {s.label}
+                </option>
+              ))}
+            </select>
+            {(widgetCountry || widgetType) && (
+              <button
+                onClick={() => {
+                  setWidgetCountry("");
+                  setWidgetType("");
+                  logDashboardAction("filter", "Фильтры виджета сброшены");
+                  load(period, "", "");
+                }}
+                className="px-2 h-8 rounded-xl text-[11px] text-danger hover:bg-danger/10 transition-colors"
+                title="Сбросить фильтры"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
-        <button
-          onClick={() => setLibOpen(true)}
-          className="ac-btn ac-btn-secondary ac-btn-sm"
-        >
-          ➕ Добавить виджет
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setAiBuilderOpen(true);
+              setAiCompose(null);
+              setAiApplyMsg(null);
+            }}
+            className="ac-btn ac-btn-primary ac-btn-sm"
+            title="Опишите словами, что хотите видеть — AI соберёт дашборд (Гл. 1.42)"
+          >
+            ✨ AI-конструктор
+          </button>
+          <button
+            onClick={() => setLibOpen(true)}
+            className="ac-btn ac-btn-secondary ac-btn-sm"
+          >
+            ➕ Добавить виджет
+          </button>
+        </div>
       </div>
 
       {/* Избранные виджеты (Гл. 1.37) */}
@@ -1016,6 +1487,36 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
         </div>
       )}
 
+      {/* ── Входящий общий доступ (Гл. 1.40): баннер применения чужого макета ── */}
+      {incomingShare && (
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm">
+            <span className="font-semibold">🔗 Вам открыли доступ к макету дашборда</span>
+            <div className="text-xs text-[var(--admin-muted)] mt-0.5">
+              {incomingShare.from ? `От: ${incomingShare.from} · ` : ""}
+              пространство «{WORKSPACES.find((w) => w.key === incomingShare.workspace)?.label ?? "Главный"}»
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setIncomingShare(null);
+                window.history.replaceState({}, "", window.location.pathname);
+              }}
+              className="px-3 h-9 rounded-xl text-xs text-[var(--admin-muted)] hover:bg-[var(--admin-card)] transition-colors"
+            >
+              Отклонить
+            </button>
+            <button
+              onClick={applyIncomingShare}
+              className="px-4 h-9 rounded-xl bg-primary text-white text-xs font-medium hover:bg-primary-dark transition-colors"
+            >
+              Применить макет
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── KPI-панель (Гл. 1.7) ── */}
       {isVisible("kpi") &&
         sectionWrap(
@@ -1023,12 +1524,14 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
           <WidgetFrame
             title="Ключевые показатели"
             icon="📊"
+            widgetKey="kpi"
             subtitle={`за ${data.periodLabel}`}
             starred={isStar("kpi")}
             onStar={() => toggleStar("kpi")}
             onHide={() => hideWidget("kpi")}
             onFullscreen={() => setFullscreen("kpi")}
             onExport={() => exportWidget("kpi")}
+            onExportMore={(f) => exportWidgetMore("kpi", f)}
             onRefresh={() => load()}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
@@ -1068,11 +1571,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
             <WidgetFrame
               title="Мои задачи"
               icon="🎯"
+              widgetKey="tasks"
               starred={isStar("tasks")}
               onStar={() => toggleStar("tasks")}
               onHide={() => hideWidget("tasks")}
               onFullscreen={() => setFullscreen("tasks")}
               onExport={() => exportWidget("tasks")}
+              onExportMore={(f) => exportWidgetMore("tasks", f)}
             >
             {/* Счётчики по типам задач: общее число проблем каждого типа.
                 У оплатных типов — подпись «из них напомнено N» (заказы, по которым
@@ -1108,29 +1613,105 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
               })}
             </div>
             <div className="space-y-2">
-              {data.tasks.slice(0, 5).map((t) => (
-                <div key={t.id} className="p-2.5 rounded-xl bg-[var(--admin-bg)]">
-                  <div className="flex items-start gap-2">
-                    <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${t.priority === "high" ? "bg-danger" : "bg-[#f59e0b]"}`} />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm truncate">{t.title}</div>
-                      <div className="text-[11px] text-[var(--admin-muted)] mt-0.5">
-                        Заказ №{t.orderNumber} · {t.client}
-                      </div>
-                      <div className="flex items-center justify-between mt-1.5">
-                        <span className="text-[10px] text-[var(--admin-muted)]">⏰ {fmtDateTime(t.deadline)}</span>
-                        <Link
-                          href={`/admin/sales-execution?open=${t.id}&tab=overview`}
-                          className="text-[11px] text-primary font-medium hover:underline"
-                        >
-                          Открыть
-                        </Link>
+              {data.tasks
+                .filter((t) => !snoozedTasks.includes(t.id))
+                .slice(0, 5)
+                .map((t) => (
+                  <div key={t.id} className="p-2.5 rounded-xl bg-[var(--admin-bg)]">
+                    <div className="flex items-start gap-2">
+                      <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${t.priority === "high" ? "bg-danger" : "bg-[#f59e0b]"}`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm truncate">{t.title}</div>
+                        <div className="text-[11px] text-[var(--admin-muted)] mt-0.5">
+                          Заказ №{t.orderNumber} · {t.client}
+                          {taskAssignments[t.id] && (
+                            <span className="ml-1.5 text-primary">· ответственный: {taskAssignments[t.id]}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between mt-1.5 gap-2">
+                          <span className="text-[10px] text-[var(--admin-muted)]">⏰ {fmtDateTime(t.deadline)}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Назначить ответственного (Гл. 1.8) */}
+                            <div
+                              ref={(el) => {
+                                if (el) assignRefs.current.set(t.id, el);
+                                else assignRefs.current.delete(t.id);
+                              }}
+                              className="relative"
+                            >
+                              <button
+                                onClick={() => setAssignOpenFor((v) => (v === t.id ? null : t.id))}
+                                className="text-[11px] px-1.5 py-0.5 rounded text-[var(--admin-muted)] hover:text-primary hover:bg-[var(--admin-card)] transition-colors"
+                                title="Назначить ответственного"
+                              >
+                                👤
+                              </button>
+                              {assignOpenFor === t.id && (
+                                <div className="absolute right-0 top-6 w-48 bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-xl shadow-xl z-40 py-1 text-xs">
+                                  {MANAGERS.map((m) => (
+                                    <button
+                                      key={m}
+                                      onClick={() => {
+                                        logDashboardAction("task", `Задача №${t.orderNumber} назначена на ${m}`);
+                                        setTaskAssignments((prev) => ({ ...prev, [t.id]: m }));
+                                        setAssignOpenFor(null);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 hover:bg-[var(--admin-bg)] transition-colors"
+                                    >
+                                      {taskAssignments[t.id] === m ? "✓ " : ""}
+                                      {m}
+                                    </button>
+                                  ))}
+                                  {taskAssignments[t.id] && (
+                                    <button
+                                      onClick={() => {
+                                        setTaskAssignments((prev) => {
+                                          const next = { ...prev };
+                                          delete next[t.id];
+                                          return next;
+                                        });
+                                        setAssignOpenFor(null);
+                                      }}
+                                      className="w-full text-left px-3 py-1.5 text-danger hover:bg-danger/5 transition-colors"
+                                    >
+                                      Снять назначение
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            {/* Отложить (Гл. 1.8) */}
+                            <button
+                              onClick={() => {
+                                logDashboardAction("task", `Задача №${t.orderNumber} отложена`);
+                                setSnoozedTasks((prev) => (prev.includes(t.id) ? prev : [...prev, t.id]));
+                              }}
+                              className="text-[11px] px-1.5 py-0.5 rounded text-[var(--admin-muted)] hover:text-[#f59e0b] hover:bg-[var(--admin-card)] transition-colors"
+                              title="Отложить"
+                            >
+                              ⏸
+                            </button>
+                            <Link
+                              href={`/admin/sales-execution?open=${t.id}&tab=overview`}
+                              className="text-[11px] text-primary font-medium hover:underline"
+                            >
+                              Открыть
+                            </Link>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
               {!data.tasks.length && <div className="text-sm text-[var(--admin-muted)]">Нет задач, требующих внимания ✅</div>}
+              {snoozedTasks.length > 0 && (
+                <button
+                  onClick={() => setSnoozedTasks([])}
+                  className="w-full text-[11px] text-[var(--admin-muted)] hover:text-[var(--admin-text)] py-1.5 transition-colors"
+                >
+                  ⏸ Вернуть {snoozedTasks.length} отложенную(ых) задачу(и)
+                </button>
+              )}
             </div>
             </WidgetFrame>
           )}
@@ -1140,11 +1721,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
             <WidgetFrame
               title="Очереди"
               icon="📥"
+              widgetKey="queues"
               starred={isStar("queues")}
               onStar={() => toggleStar("queues")}
               onHide={() => hideWidget("queues")}
               onFullscreen={() => setFullscreen("queues")}
               onExport={() => exportWidget("queues")}
+              onExportMore={(f) => exportWidgetMore("queues", f)}
             >
               <div className="space-y-1.5">
                 {data.queues.map((q) => (
@@ -1164,7 +1747,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
 
           {/* Быстрые действия (Гл. 1.20) */}
           {isVisible("quick") && (
-            <WidgetFrame title="Быстрые действия" icon="⚡" starred={isStar("quick")} onStar={() => toggleStar("quick")} onHide={() => hideWidget("quick")}>
+            <WidgetFrame title="Быстрые действия" icon="⚡" widgetKey="quick" starred={isStar("quick")} onStar={() => toggleStar("quick")} onHide={() => hideWidget("quick")}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {quickActions.map((a) => (
                   <Link
@@ -1187,11 +1770,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
             <WidgetFrame
               title="AI Центр"
               icon="🤖"
+              widgetKey="ai"
               starred={isStar("ai")}
               onStar={() => toggleStar("ai")}
               onHide={() => hideWidget("ai")}
               onFullscreen={() => setFullscreen("ai")}
               onExport={() => exportWidget("ai")}
+              onExportMore={(f) => exportWidgetMore("ai", f)}
             >
               <div className="ac-tabs flex-wrap mb-3">
                 {(
@@ -1354,11 +1939,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
             <WidgetFrame
               title="Уведомления"
               icon="🔔"
+              widgetKey="notifications"
               starred={isStar("notifications")}
               onStar={() => toggleStar("notifications")}
               onHide={() => hideWidget("notifications")}
               onFullscreen={() => setFullscreen("notifications")}
               onExport={() => exportWidget("notifications")}
+              onExportMore={(f) => exportWidgetMore("notifications", f)}
             >
               <div className="space-y-2">
                 {data.notifications.slice(0, 6).map((n) => (
@@ -1387,11 +1974,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
             <WidgetFrame
               title="Сообщения"
               icon="💬"
+              widgetKey="messages"
               starred={isStar("messages")}
               onStar={() => toggleStar("messages")}
               onHide={() => hideWidget("messages")}
               onFullscreen={() => setFullscreen("messages")}
               onExport={() => exportWidget("messages")}
+              onExportMore={(f) => exportWidgetMore("messages", f)}
             >
               <div className="flex items-center gap-2 mb-3">
                 {/* Счётчик обновляется в фоне раз в минуту без перезагрузки дашборда */}
@@ -1435,11 +2024,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
             <WidgetFrame
               title="Календарь"
               icon="📅"
+              widgetKey="calendar"
               starred={isStar("calendar")}
               onStar={() => toggleStar("calendar")}
               onHide={() => hideWidget("calendar")}
               onFullscreen={() => setFullscreen("calendar")}
               onExport={() => exportWidget("calendar")}
+              onExportMore={(f) => exportWidgetMore("calendar", f)}
             >
             {[
               { label: "Просроченные", items: data.calendar.overdue, color: "text-danger" },
@@ -1485,12 +2076,14 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
               <WidgetFrame
                 title="Продажи"
                 icon="🧮"
+                widgetKey="sales"
                 subtitle={`за ${data.periodLabel}`}
                 starred={isStar("sales")}
                 onStar={() => toggleStar("sales")}
                 onHide={() => hideWidget("sales")}
                 onFullscreen={() => setFullscreen("sales")}
                 onExport={() => exportWidget("sales")}
+                onExportMore={(f) => exportWidgetMore("sales", f)}
               >
                 <SalesWidget data={data} />
               </WidgetFrame>
@@ -1499,11 +2092,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
               <WidgetFrame
                 title="Исполнение"
                 icon="⚙️"
+                widgetKey="execution"
                 starred={isStar("execution")}
                 onStar={() => toggleStar("execution")}
                 onHide={() => hideWidget("execution")}
                 onFullscreen={() => setFullscreen("execution")}
                 onExport={() => exportWidget("execution")}
+                onExportMore={(f) => exportWidgetMore("execution", f)}
               >
                 <ExecutionWidget data={data} />
               </WidgetFrame>
@@ -1513,11 +2108,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
                 <WidgetFrame
                   title="Финансы"
                   icon="💰"
+                  widgetKey="finance"
                   starred={isStar("finance")}
                   onStar={() => toggleStar("finance")}
                   onHide={() => hideWidget("finance")}
                   onFullscreen={() => setFullscreen("finance")}
                   onExport={() => exportWidget("finance")}
+                  onExportMore={(f) => exportWidgetMore("finance", f)}
                 >
                   <FinanceWidget data={data} />
                 </WidgetFrame>
@@ -1536,12 +2133,14 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
                 <WidgetFrame
                   title="Карта активности"
                   icon="🗺️"
+                  widgetKey="map"
                   subtitle="продажи по странам"
                   starred={isStar("map")}
                   onStar={() => toggleStar("map")}
                   onHide={() => hideWidget("map")}
                   onFullscreen={() => setFullscreen("map")}
                   onExport={() => exportWidget("map")}
+                  onExportMore={(f) => exportWidgetMore("map", f)}
                 >
                   <ActivityMap destinations={data.popularDestinations} periodLabel={data.periodLabel} />
                 </WidgetFrame>
@@ -1551,11 +2150,13 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
               <WidgetFrame
                 title="Активность пользователей"
                 icon="👥"
+                widgetKey="activity"
                 starred={isStar("activity")}
                 onStar={() => toggleStar("activity")}
                 onHide={() => hideWidget("activity")}
                 onFullscreen={() => setFullscreen("activity")}
                 onExport={() => exportWidget("activity")}
+                onExportMore={(f) => exportWidgetMore("activity", f)}
               >
                 <ActivityWidget data={data} />
               </WidgetFrame>
@@ -1570,12 +2171,14 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
           <WidgetFrame
             title="Decision Feed — Лента решений"
             icon="🧭"
+            widgetKey="decision"
             subtitle="проблема → влияние → рекомендуемое действие"
             starred={isStar("decision")}
             onStar={() => toggleStar("decision")}
             onHide={() => hideWidget("decision")}
             onFullscreen={() => setFullscreen("decision")}
             onExport={() => exportWidget("decision")}
+            onExportMore={(f) => exportWidgetMore("decision", f)}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {data.decisionFeed.map((d, i) => (
@@ -1625,6 +2228,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
             onHide={() => hideWidget("departments")}
             onFullscreen={() => setFullscreen("departments")}
             onExport={() => exportWidget("departments")}
+            onExportMore={(f) => exportWidgetMore("departments", f)}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <DeptCard
@@ -1667,7 +2271,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
       {isVisible("events") &&
         sectionWrap(
           "events",
-          <WidgetFrame title="Последние события платформы" icon="🕒" starred={isStar("events")} onStar={() => toggleStar("events")} onHide={() => hideWidget("events")} onFullscreen={() => setFullscreen("events")} onExport={() => exportWidget("events")}>
+          <WidgetFrame title="Последние события платформы" icon="🕒" widgetKey="events" starred={isStar("events")} onStar={() => toggleStar("events")} onHide={() => hideWidget("events")} onFullscreen={() => setFullscreen("events")} onExport={() => exportWidget("events")} onExportMore={(f) => exportWidgetMore("events", f)}>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
           {data.events.slice(0, 9).map((e) => {
             const icon = e.type === "order" ? "📦" : e.type === "user" ? "👤" : "⭐";
@@ -1710,7 +2314,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
       {isVisible("health") &&
         sectionWrap(
           "health",
-          <WidgetFrame title="Панель здоровья платформы" icon="🖥" starred={isStar("health")} onStar={() => toggleStar("health")} onHide={() => hideWidget("health")} onFullscreen={() => setFullscreen("health")} onExport={() => exportWidget("health")}>
+          <WidgetFrame title="Панель здоровья платформы" icon="🖥" widgetKey="health" starred={isStar("health")} onStar={() => toggleStar("health")} onHide={() => hideWidget("health")} onFullscreen={() => setFullscreen("health")} onExport={() => exportWidget("health")} onExportMore={(f) => exportWidgetMore("health", f)}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2">
           {Object.entries(data.health).map(([key, v]) => (
             <div key={key} className="flex items-center gap-2 text-sm">
@@ -1745,7 +2349,7 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
       {isVisible("footer") &&
         sectionWrap(
           "footer",
-          <WidgetFrame title="Нижняя панель Dashboard" icon="ℹ️" starred={isStar("footer")} onStar={() => toggleStar("footer")} onHide={() => hideWidget("footer")}>
+          <WidgetFrame title="Нижняя панель Dashboard" icon="ℹ️" widgetKey="footer" starred={isStar("footer")} onStar={() => toggleStar("footer")} onHide={() => hideWidget("footer")}>
             <div className="text-xs text-[var(--admin-muted)] flex flex-wrap items-center gap-x-6 gap-y-2">
         <span className="font-semibold text-[var(--admin-text)]">
           TravelHub {data.footer.version}
@@ -1787,6 +2391,252 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
         </div>
         </WidgetFrame>
         )}
+
+      {/* ── Дубликаты виджетов (Гл. 1.34): копии, созданные через контекстное меню ── */}
+      {duplicates.length > 0 && (
+        <section className="rounded-2xl border border-dashed border-[var(--admin-border)] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-sm text-[var(--admin-muted)]">📑 Дубликаты виджетов</h3>
+            <button
+              onClick={() => setDuplicates([])}
+              className="text-[11px] text-[var(--admin-muted)] hover:text-danger transition-colors"
+            >
+              Убрать все
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {duplicates.map((key) => (
+              <div key={key} className="relative">
+                <button
+                  onClick={() => setDuplicates((prev) => prev.filter((k) => k !== key))}
+                  className="absolute -top-2 -right-2 z-10 w-6 h-6 rounded-full bg-danger text-white text-xs flex items-center justify-center shadow-lg hover:bg-danger-dark transition-colors"
+                  title="Убрать дубликат"
+                >
+                  ✕
+                </button>
+                <WidgetFrame
+                  title={WIDGET_META.find((w) => w.key === key)?.title ?? key}
+                  icon={WIDGET_META.find((w) => w.key === key)?.icon ?? "📊"}
+                >
+                  {fullscreenView(key)}
+                </WidgetFrame>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Настройка виджета (Гл. 1.33, 1.34): период, страна, тип услуги ── */}
+      {configureFor && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setConfigureFor(null)}
+        >
+          <div
+            className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-[var(--admin-border)] flex items-center justify-between">
+              <h3 className="font-semibold text-sm">
+                ⚙️ Настройка виджета «{WIDGET_META.find((w) => w.key === configureFor)?.title ?? configureFor}»
+              </h3>
+              <button onClick={() => setConfigureFor(null)} className="text-[var(--admin-muted)] hover:text-[var(--admin-text)]">
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-muted)] block mb-1.5">Период</label>
+                <div className="ac-tabs flex-wrap">
+                  {PERIOD_OPTIONS.map((p) => (
+                    <button
+                      key={p.key}
+                      onClick={() => setConfigurePeriod(p.key)}
+                      className={`ac-tab ${configurePeriod === p.key ? "ac-tab-active" : ""}`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-muted)] block mb-1.5">Страна</label>
+                <select
+                  value={configureCountry}
+                  onChange={(e) => setConfigureCountry(e.target.value)}
+                  className="w-full bg-[var(--admin-bg)] border border-[var(--admin-border)] rounded-xl px-3 h-10 text-sm outline-none focus:border-primary transition-colors"
+                >
+                  <option value="">🌍 Все страны</option>
+                  {(data?.popularDestinations ?? []).map((d) => (
+                    <option key={d.code ?? d.name} value={d.code ?? ""}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-muted)] block mb-1.5">Тип услуги</label>
+                <select
+                  value={configureType}
+                  onChange={(e) => setConfigureType(e.target.value)}
+                  className="w-full bg-[var(--admin-bg)] border border-[var(--admin-border)] rounded-xl px-3 h-10 text-sm outline-none focus:border-primary transition-colors"
+                >
+                  <option value="">🧩 Все услуги</option>
+                  {(data?.salesByCategory ?? []).map((s) => (
+                    <option key={s.type} value={s.type}>
+                      {s.icon} {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="px-4 py-3 border-t border-[var(--admin-border)] flex items-center justify-end gap-2">
+              <button
+                onClick={() => setConfigureFor(null)}
+                className="px-3 h-9 rounded-xl text-xs text-[var(--admin-muted)] hover:bg-[var(--admin-bg)] transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => {
+                  setWidgetCountry(configureCountry);
+                  setWidgetType(configureType);
+                  const nextPeriod = configurePeriod !== period ? configurePeriod : period;
+                  if (configurePeriod !== period) setPeriod(configurePeriod);
+                  load(nextPeriod, configureCountry, configureType);
+                  logDashboardAction(
+                    "configure",
+                    `Виджет настроен: ${configurePeriod}, страна ${configureCountry || "все"}, услуга ${configureType || "все"}`
+                  );
+                  setConfigureFor(null);
+                }}
+                className="px-4 h-9 rounded-xl bg-primary text-white text-xs font-medium hover:bg-primary-dark transition-colors"
+              >
+                Применить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Совместный доступ (Гл. 1.40): выбор получателей и ссылка-макет ── */}
+      {shareOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShareOpen(false)}
+        >
+          <div
+            className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-[var(--admin-border)] flex items-center justify-between">
+              <h3 className="font-semibold text-sm">🔗 Поделиться дашбордом</h3>
+              <button onClick={() => setShareOpen(false)} className="text-[var(--admin-muted)] hover:text-[var(--admin-text)]">
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-[var(--admin-muted)]">
+                Выберите сотрудников — они получат ссылку на макет пространства «
+                {WORKSPACES.find((w) => w.key === activeWs)?.label}». Получатель применит его одним кликом.
+              </p>
+              {/* Список получателей */}
+              <div className="max-h-52 overflow-y-auto border border-[var(--admin-border)] rounded-xl divide-y divide-[var(--admin-border)]">
+                {staff.length === 0 && (
+                  <div className="text-xs text-[var(--admin-muted)] py-4 text-center">Загрузка сотрудников…</div>
+                )}
+                {staff.map((s) => {
+                  const checked = shareSelected.includes(s.id);
+                  return (
+                    <label
+                      key={s.id}
+                      className={`flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer transition-colors ${checked ? "bg-primary/5" : "hover:bg-[var(--admin-bg)]"}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() =>
+                          setShareSelected((prev) => (checked ? prev.filter((x) => x !== s.id) : [...prev, s.id]))
+                        }
+                        className="accent-[var(--primary)]"
+                      />
+                      <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                      <span className="text-[10px] text-[var(--admin-muted)] capitalize shrink-0">{s.role.toLowerCase()}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShareSelected(staff.map((s) => s.id))}
+                  className="text-[11px] text-primary hover:underline"
+                >
+                  Выбрать всех
+                </button>
+                <button
+                  onClick={() => setShareSelected([])}
+                  className="text-[11px] text-[var(--admin-muted)] hover:text-[var(--admin-text)] hover:underline"
+                >
+                  Сбросить
+                </button>
+              </div>
+              {shareLink && (
+                <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-bg)] p-3 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
+                    Ссылка-макет для {shareSelected.length} {ruPlural(shareSelected.length, "получателя", "получателей", "получателей")}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={shareLink}
+                      onFocus={(e) => e.target.select()}
+                      className="flex-1 min-w-0 bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-lg px-2.5 h-9 text-[10px] font-mono outline-none focus:border-primary transition-colors"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard
+                          .writeText(shareLink)
+                          .then(() => {
+                            setShareCopied(true);
+                            setTimeout(() => setShareCopied(false), 2000);
+                          })
+                          .catch(() => {
+                            /* clipboard недоступен */
+                          });
+                      }}
+                      className="px-3 h-9 rounded-lg bg-secondary text-white text-[11px] font-medium hover:opacity-90 transition-opacity shrink-0"
+                    >
+                      {shareCopied ? "✓ Скопировано" : "Копировать"}
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-[var(--admin-muted)]">
+                    Ссылка содержит сам макет (не привязана к аккаунту) — её можно отправить в чат или по почте.
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t border-[var(--admin-border)] flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShareOpen(false)}
+                className="px-3 h-9 rounded-xl text-xs text-[var(--admin-muted)] hover:bg-[var(--admin-bg)] transition-colors"
+              >
+                Закрыть
+              </button>
+              <button
+                onClick={() => {
+                  if (shareSelected.length === 0) return;
+                  buildShareLink();
+                  logDashboardAction("share", `Создана ссылка-макет для ${shareSelected.length} получателей`);
+                }}
+                disabled={shareSelected.length === 0}
+                className="px-4 h-9 rounded-xl bg-primary text-white text-xs font-medium hover:bg-primary-dark transition-colors disabled:opacity-40"
+              >
+                Создать ссылку
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Библиотека виджетов (Гл. 1.32) ── */}
       {libOpen && (
@@ -1938,6 +2788,241 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
         </div>
       )}
 
+      {/* ── AI-конструктор Dashboard (Гл. 1.42): сборка макета по текстовому запросу ── */}
+      {aiBuilderOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setAiBuilderOpen(false)}
+        >
+          <div
+            className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-[var(--admin-border)] flex items-center justify-between">
+              <h3 className="font-semibold text-sm">✨ AI-конструктор Dashboard</h3>
+              <button onClick={() => setAiBuilderOpen(false)} className="text-[var(--admin-muted)] hover:text-[var(--admin-text)]">
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-[var(--admin-muted)]">
+                Опишите словами, что хотите видеть на дашборде — AI соберёт нужные виджеты, период и рабочее
+                пространство. Без ручной настройки.
+              </p>
+              <textarea
+                value={aiBuilderQuery}
+                onChange={(e) => {
+                  setAiBuilderQuery(e.target.value);
+                  setAiCompose(null);
+                  setAiApplyMsg(null);
+                }}
+                placeholder="Например: хочу видеть продажи туров в Турцию, доход по отелям и проблемные бронирования"
+                rows={3}
+                className="w-full bg-[var(--admin-bg)] border border-[var(--admin-border)] rounded-xl px-3 py-2 text-sm outline-none focus:border-primary transition-colors resize-y"
+              />
+              {/* Примеры запросов */}
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  "Продажи и конверсия за неделю",
+                  "Доход, комиссии и возвраты за месяц",
+                  "Исполнение: документы, поставщики, просроченные",
+                  "Прогноз продаж и риски по Турции",
+                  "Активность пользователей и подразделения",
+                ].map((ex) => (
+                  <button
+                    key={ex}
+                    onClick={() => {
+                      setAiBuilderQuery(ex);
+                      setAiCompose(null);
+                      setAiApplyMsg(null);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-[var(--admin-bg)] text-[11px] text-[var(--admin-muted)] hover:text-primary hover:border-primary border border-transparent transition-colors"
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setAiCompose(aiComposeDashboard(aiBuilderQuery))}
+                  disabled={!aiBuilderQuery.trim()}
+                  className="px-4 h-9 rounded-xl bg-secondary text-white text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                >
+                  🤖 Собрать дашборд
+                </button>
+                {aiApplyMsg && (
+                  <span className="text-[11px] font-medium text-success">✓ Макет применён к дашборду</span>
+                )}
+              </div>
+              {/* Предпросмотр собранного макета */}
+              {aiCompose && (
+                <div className="rounded-xl border border-[var(--admin-border)] bg-[var(--admin-bg)] p-3 space-y-2.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
+                    Собранный макет
+                  </div>
+                  <div className="text-xs text-[var(--admin-text)]">{aiCompose.summary}</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {aiCompose.widgets.map((key) => {
+                      const m = WIDGET_META.find((w) => w.key === key);
+                      if (!m) return null;
+                      return (
+                        <span key={key} className="px-2 py-1 rounded-lg bg-[var(--admin-card)] border border-[var(--admin-border)] text-[11px]">
+                          {m.icon} {m.title}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {aiCompose.country && (
+                    <div className="text-[11px] text-[var(--admin-muted)]">
+                      🧭 Направление: {flagEmoji(aiCompose.country.code)} {aiCompose.country.name} — откроет карту и
+                      заказы по стране
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      const res = aiCompose;
+                      // Применяем собранный макет: показываем только выбранные виджеты
+                      logDashboardAction("ai", `AI-конструктор: ${res.summary}`);
+                      updateLayout((l) => ({
+                        ...l,
+                        hidden: WIDGET_META.map((w) => w.key).filter((k) => !res.widgets.includes(k)),
+                        order: l.order,
+                      }));
+                      if (res.workspace && WORKSPACES.some((w) => w.key === res.workspace)) setActiveWs(res.workspace);
+                      if (res.period) {
+                        setPeriod(res.period);
+                        load(res.period);
+                      }
+                      setAiApplyMsg("ok");
+                      if (aiApplyTimerRef.current) clearTimeout(aiApplyTimerRef.current);
+                      aiApplyTimerRef.current = setTimeout(() => setAiApplyMsg(null), 3000);
+                    }}
+                    className="w-full px-4 h-9 rounded-xl bg-primary text-white text-xs font-medium hover:bg-primary-dark transition-colors"
+                  >
+                    ✨ Применить к дашборду
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── История изменений Dashboard (Гл. 1.41) ── */}
+      {historyOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setHistoryOpen(false)}
+        >
+          <div
+            className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-[var(--admin-border)] flex items-center justify-between">
+              <h3 className="font-semibold text-sm">🕘 История изменений Dashboard</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    clearDashboardHistory();
+                    setHistoryItems([]);
+                  }}
+                  className="text-[11px] text-danger hover:underline"
+                >
+                  Очистить
+                </button>
+                <button onClick={() => setHistoryOpen(false)} className="text-[var(--admin-muted)] hover:text-[var(--admin-text)]">
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="p-3 overflow-y-auto max-h-[60vh] space-y-1">
+              {historyItems.length === 0 && (
+                <div className="text-sm text-[var(--admin-muted)] py-6 text-center">
+                  Изменений пока не было. Скрывайте виджеты, переставляйте секции, применяйте AI-конструктор — всё
+                  попадёт в этот журнал.
+                </div>
+              )}
+              {historyItems.map((h, i) => (
+                <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[var(--admin-bg)]">
+                  <span className="text-base shrink-0">
+                    {h.action === "ai" ? "✨" : h.action === "template" ? "📐" : h.action === "import" ? "📥" : h.action === "reset" ? "🔄" : "🖱"}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[13px]">{h.label}</div>
+                    <div className="text-[10px] text-[var(--admin-muted)]">{fmtDateTime(h.at)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Шаблоны Dashboard (Гл. 1.36): макеты для ролей ── */}
+      {templatesOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setTemplatesOpen(false)}
+        >
+          <div
+            className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-[var(--admin-border)] flex items-center justify-between">
+              <h3 className="font-semibold text-sm">📐 Шаблоны Dashboard</h3>
+              <button onClick={() => setTemplatesOpen(false)} className="text-[var(--admin-muted)] hover:text-[var(--admin-text)]">
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+              <p className="text-xs text-[var(--admin-muted)]">
+                Шаблон — сохранённый макет для роли. Новый сотрудник этой роли получит его как стартовый автоматически
+                (Гл. 1.36). Текущий макет пространства «{WORKSPACES.find((w) => w.key === activeWs)?.label}» можно
+                сохранить как шаблон.
+              </p>
+              {/* Сохранение текущего макета */}
+              <TemplateSaveRow onSave={saveTemplate} defaultRole="SALES_MANAGER" />
+              {templatesMsg && (
+                <div className={`text-xs rounded-xl px-3 py-2 ${templatesMsg.ok ? "text-success bg-success/5" : "text-danger bg-danger/5"}`}>
+                  {templatesMsg.ok ? "✓ " : "⚠️ "}
+                  {templatesMsg.text}
+                </div>
+              )}
+              {/* Список шаблонов */}
+              {templates.length === 0 && (
+                <div className="text-xs text-[var(--admin-muted)] py-4 text-center border border-dashed border-[var(--admin-border)] rounded-xl">
+                  Шаблонов пока нет — создайте первый из текущего макета
+                </div>
+              )}
+              {templates.map((t) => (
+                <div key={t.id} className="flex items-center justify-between gap-2 p-3 rounded-xl bg-[var(--admin-bg)]">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">
+                      {t.name} <span className="text-[10px] text-[var(--admin-muted)] ml-1 capitalize">({t.role.toLowerCase()})</span>
+                    </div>
+                    <div className="text-[10px] text-[var(--admin-muted)]">Создан {fmtDateTime(t.createdAt)}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => applyTemplate(t)}
+                      className="px-2.5 py-1 rounded-lg bg-primary text-white text-[11px] font-medium hover:bg-primary-dark transition-colors"
+                    >
+                      Применить
+                    </button>
+                    <button
+                      onClick={() => deleteTemplate(t.id, t.name)}
+                      className="px-2 py-1 rounded-lg text-[11px] text-danger hover:bg-danger/10 transition-colors"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Полноэкранный режим виджета (Гл. 1.38) ── */}
       {fullscreen && (
         <div
@@ -1973,7 +3058,8 @@ export default function CommandCenter({ defaultWorkspace = "main" }: { defaultWo
           </div>
         </div>
       )}
-      </div>
+    </div>
+    </WidgetActionsContext.Provider>
   );
 }
 
@@ -2365,6 +3451,52 @@ function ActivityWidget({ data }: { data: DashData }) {
         <Link href="/admin/users" className="text-primary font-medium hover:underline">
           Пользователи →
         </Link>
+      </div>
+    </div>
+  );
+}
+
+/** Роли, для которых можно создавать шаблоны Dashboard (Гл. 1.36). */
+const TEMPLATE_ROLES = ["ADMIN", "DIRECTOR", "SALES_MANAGER", "OPERATOR", "MODERATOR", "FINANCE", "MARKETER", "ANALYST"];
+
+/** Строка сохранения текущего макета как шаблона для роли (Гл. 1.36). */
+function TemplateSaveRow({ onSave, defaultRole }: { onSave: (name: string, role: string) => void; defaultRole: string }) {
+  const [name, setName] = useState("");
+  const [role, setRole] = useState(defaultRole);
+  return (
+    <div className="rounded-xl border border-[var(--admin-border)] p-3 space-y-2">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
+        Сохранить текущий макет как шаблон
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Название, напр. «Dashboard менеджера»"
+          className="flex-1 min-w-[180px] bg-[var(--admin-bg)] border border-[var(--admin-border)] rounded-xl px-3 h-9 text-xs outline-none focus:border-primary transition-colors"
+        />
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          className="bg-[var(--admin-bg)] border border-[var(--admin-border)] rounded-xl px-2 h-9 text-xs outline-none focus:border-primary transition-colors"
+        >
+          {TEMPLATE_ROLES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => {
+            if (!name.trim()) return;
+            onSave(name.trim(), role);
+            setName("");
+          }}
+          disabled={!name.trim()}
+          className="px-3 h-9 rounded-xl bg-secondary text-white text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+        >
+          💾 Сохранить
+        </button>
       </div>
     </div>
   );

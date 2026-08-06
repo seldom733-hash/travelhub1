@@ -59,6 +59,9 @@ type ServiceTypeName =
   | "TOUR" | "HOTEL" | "SANATORIUM" | "EXCURSION" | "GUIDE"
   | "TRANSFER" | "FLIGHT" | "TRAIN" | "PHOTOGRAPHER";
 
+type ServiceStatusName =
+  | "DRAFT" | "REVIEW" | "READY" | "PUBLISHED" | "SUSPENDED" | "ARCHIVED";
+
 const SERVICE_TYPE_WEIGHTS: [ServiceTypeName, number][] = [
   ["TOUR", 26], ["HOTEL", 22], ["EXCURSION", 12], ["GUIDE", 10], ["TRANSFER", 9],
   ["SANATORIUM", 7], ["FLIGHT", 6], ["TRAIN", 5], ["PHOTOGRAPHER", 3],
@@ -133,6 +136,11 @@ const DURATION_TPL: Record<ServiceTypeName, string[]> = {
 };
 
 const LANGUAGES = ["RU", "EN", "TR", "AZ", "GE", "DE", "FR", "IT", "ES", "TH", "EL"];
+
+/** SEO-описание услуги (Гл. 4.8): короткий маркетинговый текст. */
+function shortDescFor(geo: { country: string; city: string }): string {
+  return `Путешествие в ${geo.country}: ${geo.city}. Выгодное предложение от партнёра TravelHub — бронируйте онлайн.`;
+}
 
 // Популярные направления получают больше услуг (для «популярных направлений» в дашборде)
 const POPULAR_CODES = ["TR", "AE", "EG", "TH", "GE", "AZ", "RU", "IT", "ES", "GR"];
@@ -381,6 +389,65 @@ async function main() {
   let serviceSeq = 0;
   const serviceRecords: { id: string; price: number; discountPrice: number | null; currency: string }[] = [];
 
+  // ── Каталог (Гл. 4): жизненный цикл услуги (4.12), менеджер, квоты, SEO ──
+  // Статусы по спецификации: Черновик → Проверка/Согласование → Публикация →
+  // Активная продажа → Приостановка → Архив. Активные (PUBLISHED) услуги видны
+  // публичному каталогу (isActive = status === PUBLISHED || SUSPENDED).
+  const CATALOG_MANAGERS = ["Анна Смирнова", "Дмитрий Петров", "Ольга Козлова", "Игорь Волков", "Мария Соколова"];
+  const catalogManagerFor = (id: string): string => {
+    let h = 0;
+    for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return CATALOG_MANAGERS[h % CATALOG_MANAGERS.length];
+  };
+  // Ответственные сотрудники каталога (Гл. 4.5): реальные пользователи админки.
+  const catalogManagers = await prisma.user.findMany({
+    where: { role: { in: ["ADMIN", "SALES_MANAGER", "MODERATOR", "DIRECTOR", "OPERATOR"] }, isActive: true },
+    select: { id: true, firstName: true },
+  });
+  const managerFor = (id: string): string | null => {
+    if (!catalogManagers.length) return null;
+    let h = 0;
+    for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return catalogManagers[h % catalogManagers.length].id;
+  };
+  const CATEGORY_TPL: Record<ServiceTypeName, string[]> = {
+    TOUR: ["Пляжный", "Экскурсионный", "Семейный", "Премиум", "Горящий"],
+    HOTEL: ["Курортный", "Бутик", "SPA", "Семейный", "5★"],
+    SANATORIUM: ["Лечебный", "Оздоровительный", "Профилакторий"],
+    EXCURSION: ["Обзорная", "Пешая", "Гастро", "Ночная", "Природная"],
+    GUIDE: ["Личный гид", "Гид-переводчик", "Экскурсовод"],
+    TRANSFER: ["Аэропорт", "Индивидуальный", "Групповой"],
+    FLIGHT: ["Эконом", "Бизнес", "Прямой рейс"],
+    TRAIN: ["Скоростной", "Ночной", "Стандарт"],
+    PHOTOGRAPHER: ["Свадебная", "Портретная", "Репортажная", "Фототур"],
+  };
+  const CHANNELS_POOL = ["Сайт", "Мобильное приложение", "B2B-портал", "Внутренний каталог", "API для партнёров"];
+  const pickChannels = (): string[] => {
+    const n = randInt(1, 3);
+    const out: string[] = [];
+    while (out.length < n) {
+      const ch = pick(CHANNELS_POOL);
+      if (!out.includes(ch)) out.push(ch);
+    }
+    return out;
+  };
+  const STATUS_PLAN: ServiceStatusName[] = [];
+  const catalogStatusPlan: Array<[ServiceStatusName, number]> = [
+    ["PUBLISHED", 320],
+    ["DRAFT", 60],
+    ["REVIEW", 40],
+    ["READY", 35],
+    ["SUSPENDED", 25],
+    ["ARCHIVED", 20],
+  ];
+  for (const [s, n] of catalogStatusPlan) {
+    for (let i = 0; i < n; i++) STATUS_PLAN.push(s);
+  }
+  for (let i = STATUS_PLAN.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [STATUS_PLAN[i], STATUS_PLAN[j]] = [STATUS_PLAN[j], STATUS_PLAN[i]];
+  }
+
   const createService = async (providerId: string) => {
     serviceSeq++;
     const type = weightedType();
@@ -402,10 +469,31 @@ async function main() {
       "/8c1f6b8a-ab32-4328-bd69-dc88fa854597.png",
       "/placeholder.svg",
     ]);
-    const active = chance(0.95);
+    const status = STATUS_PLAN[serviceSeq % STATUS_PLAN.length];
+    // Публичный каталог показывает PUBLISHED и SUSPENDED (временно недоступные)
+    const active = status === "PUBLISHED" || status === "SUSPENDED";
+    const createdAt = serviceCreatedAt();
+    const manager = catalogManagerFor("svc-" + serviceSeq);
+    const managerId = managerFor("svc-" + serviceSeq);
+    // Квоты (Гл. 4.7): у услуг с вместимостью — квота, часть забронирована/в резерве
+    const hasQuota = ["TOUR", "HOTEL", "SANATORIUM", "EXCURSION", "TRANSFER"].includes(type) && chance(0.75);
+    const quotaTotal = hasQuota ? randInt(10, 400) : 0;
+    const quotaBooked = hasQuota ? randInt(0, Math.max(0, Math.floor(quotaTotal * 0.6))) : 0;
+    const quotaReserved = hasQuota ? randInt(0, Math.max(0, Math.floor((quotaTotal - quotaBooked) * 0.4))) : 0;
+    // Период продажи и оказания (Гл. 4.7): активные услуги — в текущем окне
+    const salesStart = new Date(createdAt.getTime() - randInt(5, 90) * DAY);
+    const salesEnd = new Date(Math.max(createdAt.getTime(), NOW.getTime()) + randInt(90, 400) * DAY);
+    const serviceStart = new Date(NOW.getTime() - randInt(0, 30) * DAY);
+    const serviceEnd = new Date(NOW.getTime() + randInt(120, 500) * DAY);
+    const tags = JSON.stringify([
+      ...(chance(0.5) ? [pick(["Семейный", "VIP", "Корпоративный", "Авторский", "Пакетный"])] : []),
+      ...(chance(0.3) ? ["Сезонный"] : []),
+    ]);
+    const channels = JSON.stringify(pickChannels());
 
     const svc = await prisma.service.create({
       data: {
+        code: `SVC-${String(serviceSeq).padStart(4, "0")}`,
         type,
         title: titleTpl,
         slug: `${type.toLowerCase()}-${String(serviceSeq).padStart(4, "0")}`,
@@ -435,11 +523,121 @@ async function main() {
         isHot,
         hotDiscount: isHot ? randInt(10, 40) : 0,
         providerId,
-        createdAt: serviceCreatedAt(),
+        createdAt,
+        // ── Каталог (Гл. 4) ──
+        status,
+        version: 1,
+        managerId,
+        publishedAt: status === "PUBLISHED" ? new Date(createdAt.getTime() + randInt(1, 30) * DAY) : null,
+        category: pick(CATEGORY_TPL[type]),
+        tags,
+        salesStart,
+        salesEnd,
+        serviceStart,
+        serviceEnd,
+        quotaTotal,
+        quotaBooked,
+        quotaReserved,
+        seoTitle: titleTpl,
+        seoDescription: shortDescFor(geo),
+        seoKeywords: [geo.country, geo.city, type.toLowerCase()].join(", "),
+        channels,
       },
     });
     if (active) {
       serviceRecords.push({ id: svc.id, price: svc.price, discountPrice: svc.discountPrice, currency: svc.currency || "USD" });
+    }
+    // История версий (Гл. 4.12): создание + переходы по жизненному циклу
+    const historyRows: {
+      version: number;
+      action: string;
+      from: string | null;
+      to: string | null;
+      actorName: string;
+      comment: string;
+      createdAt: Date;
+    }[] = [
+      {
+        version: 1,
+        action: "created",
+        from: null,
+        to: "DRAFT",
+        actorName: manager,
+        comment: "Карточка услуги создана",
+        createdAt,
+      },
+    ];
+    if (status === "REVIEW" || status === "READY" || status === "PUBLISHED" || status === "SUSPENDED" || status === "ARCHIVED") {
+      const t1 = new Date(createdAt.getTime() + randInt(1, 48) * 3600000);
+      historyRows.push({
+        version: 2,
+        action: "update",
+        from: "DRAFT",
+        to: "REVIEW",
+        actorName: manager,
+        comment: "Заполнены основные сведения, отправлено на согласование",
+        createdAt: t1,
+      });
+    }
+    if (status === "READY" || status === "PUBLISHED" || status === "SUSPENDED" || status === "ARCHIVED") {
+      const t2 = new Date(createdAt.getTime() + randInt(2, 96) * 3600000);
+      historyRows.push({
+        version: 3,
+        action: "update",
+        from: "REVIEW",
+        to: "READY",
+        actorName: manager,
+        comment: "Согласовано, готова к публикации",
+        createdAt: t2,
+      });
+    }
+    if (status === "PUBLISHED" || status === "SUSPENDED" || status === "ARCHIVED") {
+      const t3 = new Date(createdAt.getTime() + randInt(3, 120) * 3600000);
+      historyRows.push({
+        version: 4,
+        action: "publish",
+        from: "READY",
+        to: "PUBLISHED",
+        actorName: manager,
+        comment: "Опубликована, доступна для продажи",
+        createdAt: t3,
+      });
+    }
+    if (status === "SUSPENDED") {
+      const t4 = new Date(Math.min(createdAt.getTime() + randInt(10, 200) * 3600000, NOW.getTime() - 3600000));
+      historyRows.push({
+        version: 5,
+        action: "suspend",
+        from: "PUBLISHED",
+        to: "SUSPENDED",
+        actorName: manager,
+        comment: "Продажи приостановлены",
+        createdAt: t4,
+      });
+    }
+    if (status === "ARCHIVED") {
+      const t5 = new Date(Math.min(createdAt.getTime() + randInt(20, 300) * 3600000, NOW.getTime() - 3600000));
+      historyRows.push({
+        version: 6,
+        action: "archive",
+        from: "PUBLISHED",
+        to: "ARCHIVED",
+        actorName: manager,
+        comment: "Услуга архивирована",
+        createdAt: t5,
+      });
+    }
+    for (const h of historyRows) {
+      await prisma.serviceHistory.create({
+        data: { serviceId: svc.id, ...h, actorId: null, fields: null },
+      });
+    }
+    // Номер текущей редакции (Гл. 4.12) = последняя версия в журнале
+    if (historyRows.length > 1) {
+      await prisma.service.update({
+        where: { id: svc.id },
+        data: { version: historyRows[historyRows.length - 1].version },
+      });
     }
   };
 
@@ -447,6 +645,21 @@ async function main() {
     for (let s = 0; s < countsByPartner[p]; s++) {
       await createService(partnerIds[p]);
     }
+  }
+
+  // ── Связи между услугами (Гл. 4.9): 40% услуг получают 1–3 связанные ──
+  const allSvcRows = await prisma.service.findMany({ select: { id: true } });
+  const allSvcIds = allSvcRows.map((s) => s.id);
+  for (const sid of allSvcIds) {
+    if (!chance(0.4)) continue;
+    const n = randInt(1, 3);
+    const pool = allSvcIds.filter((x) => x !== sid);
+    const links: string[] = [];
+    while (links.length < n && pool.length) {
+      const l = pick(pool);
+      if (!links.includes(l)) links.push(l);
+    }
+    await prisma.service.update({ where: { id: sid }, data: { relatedIds: JSON.stringify(links) } });
   }
 
   // ── Активность покупателей: просмотры и бронирования ──
@@ -1256,6 +1469,623 @@ async function main() {
     await prisma.orderMessage.createMany({ data: orderMessageRows.slice(i, i + 1000) });
   }
 
+  // ── Журнал автоматизации (Гл. 3.16) и реестр исключений (Гл. 3.17) ──
+  // Персистентные записи привязаны к реальным заказам и видны в разделе
+  // «Продажи и исполнение»: журнал автоматических операций, исключения и журнал
+  // их обработки. Менеджер определяется той же ротацией, что и в реестре заказов
+  // (pickManager в admin-data.ts), чтобы фильтры и подписи совпадали.
+  await prisma.exceptionLogHistory.deleteMany({});
+  await prisma.automationLog.deleteMany({});
+  await prisma.exceptionLog.deleteMany({});
+
+  const seedOrders = await prisma.order.findMany({
+    select: { id: true, orderNumber: true, status: true, createdAt: true, updatedAt: true },
+  });
+
+  const seedManagers = ["Анна Смирнова", "Дмитрий Петров", "Ольга Козлова", "Игорь Волков", "Мария Соколова"];
+  const seedManagerFor = (id: string): string => {
+    let h = 0;
+    for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return seedManagers[h % seedManagers.length];
+  };
+  const seedDuration = (seed: string, min = 15, max = 950): number => {
+    let h = 0;
+    for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return min + (h % (max - min));
+  };
+  const seedSource = (seed: string): string => (seed.length % 4 === 0 ? "AI Center" : "Business Event Engine");
+
+  const automationLogRows: {
+    orderId: string | null;
+    event: string;
+    action: string;
+    result: string;
+    durationMs: number;
+    source: string;
+    actorName: string | null;
+    createdAt: Date;
+  }[] = [];
+  const exceptionLogRows: {
+    orderId: string | null;
+    type: string;
+    category: string;
+    criticality: string;
+    orderNumber: string | null;
+    manager: string;
+    status: string;
+    description: string;
+    aiSuggestion: string;
+    actorName: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }[] = [];
+  const exceptionHistoryRows: {
+    exceptionLogId: string;
+    action: string;
+    from: string | null;
+    to: string | null;
+    comment: string;
+    actorName: string;
+    createdAt: Date;
+  }[] = [];
+
+  const nowMs = Date.now();
+  for (const o of seedOrders) {
+    const manager = seedManagerFor(o.id);
+    const updatedAt = o.updatedAt.getTime();
+    const paid = ["PAID", "DOCUMENT_PREP", "READY", "COMPLETED"].includes(o.status);
+    const awaiting = ["AWAITING_PAYMENT", "PARTIALLY_PAID"].includes(o.status);
+
+    // Создание заказа → авто-назначение исполнителя (3.16)
+    automationLogRows.push({
+      orderId: o.id,
+      event: "Создание заказа",
+      action: `Авто-назначение исполнителя → ${manager}`,
+      result: "success",
+      durationMs: seedDuration(o.id + "a"),
+      source: "Business Event Engine",
+      actorName: manager,
+      createdAt: o.createdAt,
+    });
+
+    // Окончание срока SLA → повышение приоритета, задача, уведомление (3.16)
+    if (o.status === "OVERDUE") {
+      automationLogRows.push({
+        orderId: o.id,
+        event: "Окончание срока SLA",
+        action: `Повышение приоритета, создание задачи, уведомление руководителя (${o.orderNumber})`,
+        result: "success",
+        durationMs: seedDuration(o.id + "b"),
+        source: "Business Event Engine",
+        actorName: manager,
+        createdAt: new Date(updatedAt),
+      });
+    }
+
+    // Полная оплата → авто-переход статуса + генерация документов (3.16)
+    if (paid) {
+      automationLogRows.push({
+        orderId: o.id,
+        event: "Поступление полной оплаты",
+        action: "Авто-переход статуса → Оплачен · генерация ваучера, авиабилетов, страхового полиса",
+        result: "success",
+        durationMs: seedDuration(o.id + "c"),
+        source: seedSource(o.id + "c"),
+        actorName: manager,
+        createdAt: new Date(updatedAt),
+      });
+    }
+
+    // Приближение срока оплаты → авто-уведомление клиенту (3.16)
+    if (awaiting) {
+      automationLogRows.push({
+        orderId: o.id,
+        event: "Приближение срока оплаты",
+        action: "Авто-уведомление клиенту с ссылкой на оплату",
+        result: "success",
+        durationMs: seedDuration(o.id + "d"),
+        source: "Business Event Engine",
+        actorName: manager,
+        createdAt: new Date(updatedAt),
+      });
+    }
+
+    // Ошибка генерации документа → задача на повторную обработку (3.16)
+    if (o.id.length % 11 === 0) {
+      automationLogRows.push({
+        orderId: o.id,
+        event: "Ошибка генерации документа",
+        action: "Перевод в ручной режим · создана задача на повторную обработку",
+        result: "error",
+        durationMs: seedDuration(o.id + "e"),
+        source: "Business Event Engine",
+        actorName: manager,
+        createdAt: new Date(updatedAt),
+      });
+    }
+
+    // Исключительные ситуации (Гл. 3.17) — по фактическому статусу заказа
+    const hours = Math.max(1, Math.round((nowMs - o.createdAt.getTime()) / 3600000));
+    const exCreated = new Date(updatedAt);
+    const exUpdated = new Date(Math.min(updatedAt + ((o.id.length * 7) % 48) * 3600000, nowMs));
+    if (o.status === "OVERDUE") {
+      exceptionLogRows.push({
+        orderId: o.id,
+        type: "Нарушение SLA",
+        category: "Нарушения SLA",
+        criticality: "critical",
+        orderNumber: o.orderNumber,
+        manager,
+        status: "new",
+        description: `Срок обработки превышен (${hours} ч). Требуется немедленное действие и эскалация руководителю.`,
+        aiSuggestion: "Повысить приоритет до «Срочный», уведомить руководителя подразделения и запросить подтверждение у поставщика.",
+        actorName: manager,
+        createdAt: exCreated,
+        updatedAt: exUpdated,
+      });
+    } else if (o.status === "AWAITING_CONFIRMATION" && hours > 24) {
+      exceptionLogRows.push({
+        orderId: o.id,
+        type: "Нет ответа поставщика",
+        category: "Ошибки взаимодействия с поставщиками",
+        criticality: "high",
+        orderNumber: o.orderNumber,
+        manager,
+        status: "working",
+        description: `Поставщик не подтвердил бронь за ${hours} ч. Возможен срыв сроков.`,
+        aiSuggestion: "Предложить альтернативного поставщика или выполнить повторную попытку бронирования с повышением приоритета.",
+        actorName: manager,
+        createdAt: exCreated,
+        updatedAt: exUpdated,
+      });
+    } else if (o.status === "AWAITING_PAYMENT" && hours > 24) {
+      exceptionLogRows.push({
+        orderId: o.id,
+        type: "Задержка оплаты",
+        category: "Ошибки оплаты",
+        criticality: "medium",
+        orderNumber: o.orderNumber,
+        manager,
+        status: "new",
+        description: `Счёт не оплачен клиентом за ${hours} ч. Срок действия ссылки на оплату может истечь.`,
+        aiSuggestion: "Создать новую ссылку на оплату и напомнить клиенту; при отказе банка — предложить альтернативный способ оплаты.",
+        actorName: manager,
+        createdAt: exCreated,
+        updatedAt: exUpdated,
+      });
+    } else if (o.status === "REFUNDED" || o.status === "CANCELLED") {
+      exceptionLogRows.push({
+        orderId: o.id,
+        type: "Отмена / возврат",
+        category: "Ошибки бронирования",
+        criticality: "low",
+        orderNumber: o.orderNumber,
+        manager,
+        status: "closed",
+        description: `Заказ ${o.status === "REFUNDED" ? "возвращён" : "отменён"}. Возврат средств ${o.status === "REFUNDED" ? "оформлен" : "не требуется"}.`,
+        aiSuggestion: "Проанализировать причину отмены и предложить клиенту альтернативное предложение для удержания.",
+        actorName: manager,
+        createdAt: exCreated,
+        updatedAt: exUpdated,
+      });
+    }
+  }
+
+  // Системные исключения и события (детерминированные, Гл. 3.16/3.17)
+  const sysManager = seedManagerFor("sys-conf");
+  // Критическая эскалация со свежей датой: OVERDUE-заказы сидятся за 5–20 дней,
+  // поэтому их исключения не попадают в текущий календарный месяц — добавляем
+  // системную критическую эскалацию, чтобы панель исключений периода «месяц»
+  // показывала критический уровень (Гл. 3.17).
+  exceptionLogRows.push(
+    {
+      orderId: null,
+      type: "Срыв сроков исполнения",
+      category: "Нарушения SLA",
+      criticality: "critical",
+      orderNumber: "SYS-SLA",
+      manager: sysManager,
+      status: "working",
+      description: "Совокупная эскалация: по 2 заказам превышен норматив подтверждения поставщиков. Требуется вмешательство руководителя.",
+      aiSuggestion: "Распределить заявки между менеджерами и запросить у поставщиков подтверждение по приоритетным направлениям.",
+      actorName: sysManager,
+      createdAt: new Date(nowMs - 5 * 3600000),
+      updatedAt: new Date(nowMs - 2 * 3600000),
+    },
+    {
+      orderId: null,
+      type: "Интеграция недоступна",
+      category: "Ошибки интеграции",
+      criticality: "high",
+      orderNumber: "SYS-INT",
+      manager: "Системный администратор",
+      status: "working",
+      description: "API платёжного шлюза недоступен — повторные попытки автоматически поставлены в очередь.",
+      aiSuggestion: "Переключиться на резервный платёжный провайдер или продолжить попытки с экспоненциальной задержкой.",
+      actorName: "Системный администратор",
+      createdAt: new Date(nowMs - 2 * 3600000),
+      updatedAt: new Date(nowMs - 2 * 3600000),
+    },
+    {
+      orderId: null,
+      type: "Конфликт изменений",
+      category: "Конфликт данных",
+      criticality: "medium",
+      orderNumber: "SYS-CONF",
+      manager: sysManager,
+      status: "resolved",
+      description: "Два сотрудника одновременно редактировали заказ. Изменения объединены без потери данных.",
+      aiSuggestion: "Включить блокировку редактирования заказа вторым пользователем при активной сессии.",
+      actorName: sysManager,
+      createdAt: new Date(nowMs - 9 * 3600000),
+      updatedAt: new Date(nowMs - 3 * 3600000),
+    }
+  );
+  automationLogRows.push(
+    {
+      orderId: null,
+      event: "Синхронизация с поставщиками",
+      action: "Обновлены тарифы 3 партнёров, проверена доступность API",
+      result: "success",
+      durationMs: seedDuration("sync1"),
+      source: "Business Event Engine",
+      actorName: null,
+      createdAt: new Date(nowMs - 6 * 3600000),
+    },
+    {
+      orderId: null,
+      event: "Интеграция с платёжным шлюзом",
+      action: "Повторная попытка оплаты после ошибки банка",
+      result: "skipped",
+      durationMs: seedDuration("pay1"),
+      source: "Business Event Engine",
+      actorName: null,
+      createdAt: new Date(nowMs - 26 * 3600000),
+    },
+    {
+      orderId: null,
+      event: "AI-анализ портфеля заказов",
+      action: "Выявлен риск отмены по 2 заказам — рекомендации переданы менеджерам",
+      result: "success",
+      durationMs: seedDuration("ai1"),
+      source: "AI Center",
+      actorName: null,
+      createdAt: new Date(nowMs - 50 * 3600000),
+    }
+  );
+
+  for (let i = 0; i < automationLogRows.length; i += 1000) {
+    await prisma.automationLog.createMany({ data: automationLogRows.slice(i, i + 1000) });
+  }
+
+  // Журнал обработки исключений (Гл. 3.17): цепочки take/resolve/close по статусу
+  for (const ex of exceptionLogRows) {
+    const created = await prisma.exceptionLog.create({
+      data: ex,
+      select: { id: true },
+    });
+    const span = Math.max(ex.updatedAt.getTime() - ex.createdAt.getTime(), 3600000);
+    const chain: { action: string; from: string | null; to: string; comment: string; f: number }[] =
+      ex.status === "closed"
+        ? [
+            { action: "take", from: "new", to: "working", comment: "Взят в работу", f: 0.2 },
+            { action: "resolve", from: "working", to: "resolved", comment: "Помечен решённым", f: 0.6 },
+            { action: "close", from: "resolved", to: "closed", comment: "Закрыт", f: 0.9 },
+          ]
+        : ex.status === "resolved"
+        ? [
+            { action: "take", from: "new", to: "working", comment: "Взят в работу", f: 0.3 },
+            { action: "resolve", from: "working", to: "resolved", comment: "Помечен решённым", f: 0.7 },
+          ]
+        : ex.status === "working"
+        ? [{ action: "take", from: "new", to: "working", comment: "Взят в работу", f: 0.4 }]
+        : [];
+    for (const step of chain) {
+      exceptionHistoryRows.push({
+        exceptionLogId: created.id,
+        action: step.action,
+        from: step.from,
+        to: step.to,
+        comment: step.comment,
+        actorName: ex.actorName,
+        createdAt: new Date(ex.createdAt.getTime() + Math.floor(span * step.f)),
+      });
+    }
+  }
+  for (let i = 0; i < exceptionHistoryRows.length; i += 1000) {
+    await prisma.exceptionLogHistory.createMany({ data: exceptionHistoryRows.slice(i, i + 1000) });
+  }
+
+  // ── Журнал аудита (Гл. 3.18) ──
+  // Централизованная регистрация значимых действий: входы/выходы пользователей,
+  // создание и изменение заказов, финансовые операции, документооборот, события
+  // безопасности, интеграции и AI-анализ. Записи неизменяемы и используются для
+  // аудита, расследований и соответствия. Менеджеры — та же ротация, что и в
+  // реестре заказов (pickManager), чтобы подписи совпадали.
+  await prisma.auditLog.deleteMany({});
+
+  const auditStaff = await prisma.user.findMany({
+    where: { role: { in: ["ADMIN", "SALES_MANAGER", "OPERATOR", "DIRECTOR", "FINANCE", "MODERATOR", "ANALYST"] }, isActive: true },
+    select: { id: true, firstName: true, lastName: true, role: true, email: true },
+  });
+  const staffFor = (seed: string) => {
+    if (!auditStaff.length) return null;
+    let h = 0;
+    for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return auditStaff[h % auditStaff.length];
+  };
+  const auditDepartment = (role: string): string => {
+    const map: Record<string, string> = {
+      ADMIN: "Администрация",
+      DIRECTOR: "Руководство",
+      SALES_MANAGER: "Отдел продаж",
+      OPERATOR: "Отдел исполнения",
+      FINANCE: "Финансовый отдел",
+      MODERATOR: "Модерация",
+      ANALYST: "Аналитика",
+    };
+    return map[role] ?? "Система";
+  };
+
+  const auditRows: {
+    eventId: string;
+    userId: string | null;
+    actorName: string;
+    actorRole?: string | null;
+    department?: string | null;
+    category: string;
+    action: string;
+    objectType?: string | null;
+    objectId?: string | null;
+    objectNumber?: string | null;
+    fromData?: string | null;
+    toData?: string | null;
+    comment?: string | null;
+    source: string;
+    ip?: string | null;
+    userAgent?: string | null;
+    criticality: string;
+    createdAt: Date;
+  }[] = [];
+  let auditSeq = 0;
+  const auditPush = (r: Omit<typeof auditRows[number], "eventId">) => {
+    auditSeq++;
+    auditRows.push({ eventId: `AUD-${String(auditSeq).padStart(6, "0")}`, ...r });
+  };
+
+  const staffNames = auditStaff.map((s) => `${s.firstName} ${s.lastName ?? ""}`.trim());
+  const auditManagerFor = (seed: string): string => {
+    if (!staffNames.length) return "Система";
+    let h = 0;
+    for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return staffNames[h % staffNames.length];
+  };
+
+  const auditNowMs = Date.now();
+  // Входы/выходы сотрудников: 1–3 сессии в день на сотрудника за последние 60 дней
+  for (const staff of auditStaff) {
+    const sessions = 1 + (staff.id.length % 3);
+    for (let i = 0; i < sessions; i++) {
+      const dayAgo = randInt(0, 60);
+      const loginAt = new Date(auditNowMs - dayAgo * 86400000 - randInt(1, 12) * 3600000);
+      const logoutAt = new Date(loginAt.getTime() + randInt(2, 9) * 3600000);
+      const role = staff.role;
+      auditPush({
+        userId: staff.id,
+        actorName: `${staff.firstName} ${staff.lastName ?? ""}`.trim(),
+        actorRole: role,
+        department: auditDepartment(role),
+        category: "Безопасность",
+        action: "login",
+        objectType: "Пользователь",
+        objectId: staff.id,
+        objectNumber: staff.email,
+        comment: "Вход в систему",
+        source: "Web",
+        ip: `10.0.${randInt(0, 4)}.${randInt(2, 254)}`,
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0 Safari/537.36",
+        criticality: "info",
+        createdAt: loginAt,
+      });
+      auditPush({
+        userId: staff.id,
+        actorName: `${staff.firstName} ${staff.lastName ?? ""}`.trim(),
+        actorRole: role,
+        department: auditDepartment(role),
+        category: "Безопасность",
+        action: "logout",
+        objectType: "Пользователь",
+        objectId: staff.id,
+        objectNumber: staff.email,
+        comment: "Выход из системы",
+        source: "Web",
+        ip: `10.0.${randInt(0, 4)}.${randInt(2, 254)}`,
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128.0 Safari/537.36",
+        criticality: "info",
+        createdAt: logoutAt,
+      });
+    }
+  }
+
+  // События заказов: создание (из createdAt), оплата/возврат/статусы, документы
+  const auditOrders = await prisma.order.findMany({
+    select: { id: true, orderNumber: true, status: true, createdAt: true, updatedAt: true, amount: true, paidAmount: true },
+  });
+  const paidOrderStatuses = ["PAID", "DOCUMENT_PREP", "READY", "COMPLETED"];
+  const docsOrderStatuses = ["DOCUMENT_PREP", "READY", "COMPLETED"];
+  for (const o of auditOrders) {
+    const manager = auditManagerFor(o.id);
+    auditPush({
+      userId: staffFor(o.id)?.id ?? null,
+      actorName: manager,
+      actorRole: "SALES_MANAGER",
+      department: "Отдел продаж",
+      category: "Пользовательские действия",
+      action: "create",
+      objectType: "Заказ",
+      objectId: o.id,
+      objectNumber: o.orderNumber,
+      toData: JSON.stringify({ amount: o.amount, status: o.status }),
+      comment: "Заказ создан",
+      source: pick(["Web", "Mobile", "API"]),
+      ip: `10.0.${randInt(0, 4)}.${randInt(2, 254)}`,
+      userAgent: null,
+      criticality: "info",
+      createdAt: o.createdAt,
+    });
+    // Полная оплата → финансовое событие
+    if (paidOrderStatuses.includes(o.status) && o.paidAmount > 0) {
+      auditPush({
+        userId: staffFor(o.id + "pay")?.id ?? null,
+        actorName: auditManagerFor(o.id + "pay"),
+        actorRole: "FINANCE",
+        department: "Финансовый отдел",
+        category: "Финансовые операции",
+        action: "payment",
+        objectType: "Заказ",
+        objectId: o.id,
+        objectNumber: o.orderNumber,
+        toData: JSON.stringify({ paidAmount: o.paidAmount, amount: o.amount }),
+        comment: "Поступление оплаты по заказу",
+        source: pick(["Web", "API", "Integration"]),
+        ip: `10.0.${randInt(0, 4)}.${randInt(2, 254)}`,
+        userAgent: null,
+        criticality: "info",
+        createdAt: new Date(Math.min(o.updatedAt.getTime(), auditNowMs)),
+      });
+    }
+    // Возврат/отмена → событие с критичностью warning
+    if (o.status === "REFUNDED" || o.status === "CANCELLED") {
+      auditPush({
+        userId: staffFor(o.id + "ref")?.id ?? null,
+        actorName: auditManagerFor(o.id + "ref"),
+        actorRole: "FINANCE",
+        department: "Финансовый отдел",
+        category: "Финансовые операции",
+        action: o.status === "REFUNDED" ? "refund" : "status",
+        objectType: "Заказ",
+        objectId: o.id,
+        objectNumber: o.orderNumber,
+        fromData: JSON.stringify({ status: "PAID" }),
+        toData: JSON.stringify({ status: o.status }),
+        comment: o.status === "REFUNDED" ? "Оформлен возврат средств" : "Заказ отменён",
+        source: "Web",
+        ip: `10.0.${randInt(0, 4)}.${randInt(2, 254)}`,
+        userAgent: null,
+        criticality: "warning",
+        createdAt: o.updatedAt,
+      });
+    }
+    // Документооборот: ваучер для готовых к поездке
+    if (docsOrderStatuses.includes(o.status)) {
+      auditPush({
+        userId: staffFor(o.id + "doc")?.id ?? null,
+        actorName: auditManagerFor(o.id + "doc"),
+        actorRole: "OPERATOR",
+        department: "Отдел исполнения",
+        category: "Документооборот",
+        action: "document",
+        objectType: "Заказ",
+        objectId: o.id,
+        objectNumber: o.orderNumber,
+        toData: JSON.stringify({ document: "Ваучер", status: "Готов" }),
+        comment: "Сформирован ваучер по шаблону",
+        source: pick(["Web", "System"]),
+        ip: `10.0.${randInt(0, 4)}.${randInt(2, 254)}`,
+        userAgent: null,
+        criticality: "info",
+        createdAt: o.updatedAt,
+      });
+    }
+  }
+
+  // Системные события: интеграции, AI-анализ, безопасность (детерминированные)
+  const sysEvents: {
+    category: string;
+    action: string;
+    objectType: string;
+    comment: string;
+    criticality: string;
+    source: string;
+    hoursAgo: number;
+  }[] = [
+    {
+      category: "Интеграции",
+      action: "integration",
+      objectType: "Поставщик",
+      comment: "Синхронизация тарифов с партнёрами: обновлено 3 поставщика",
+      criticality: "info",
+      source: "Integration",
+      hoursAgo: 6,
+    },
+    {
+      category: "Интеграции",
+      action: "integration",
+      objectType: "Платёжный шлюз",
+      comment: "API платёжного шлюза недоступен — повторные попытки в очереди",
+      criticality: "error",
+      source: "Integration",
+      hoursAgo: 26,
+    },
+    {
+      category: "AI-события",
+      action: "ai",
+      objectType: "Портфель заказов",
+      comment: "AI-анализ: выявлен риск отмены по 2 заказам, рекомендации переданы менеджерам",
+      criticality: "info",
+      source: "AI",
+      hoursAgo: 50,
+    },
+    {
+      category: "Безопасность",
+      action: "security",
+      objectType: "Пользователь",
+      comment: "Обнаружено большое количество неудачных попыток входа (защита от перебора)",
+      criticality: "critical",
+      source: "System",
+      hoursAgo: 9,
+    },
+    {
+      category: "Пользовательские действия",
+      action: "bulk",
+      objectType: "Заказ",
+      comment: "Массовое изменение приоритета: 12 заказов",
+      criticality: "info",
+      source: "Web",
+      hoursAgo: 30,
+    },
+    {
+      category: "Документооборот",
+      action: "document",
+      objectType: "Договор",
+      comment: "Договор подписан электронной подписью",
+      criticality: "info",
+      source: "Web",
+      hoursAgo: 78,
+    },
+  ];
+  for (const ev of sysEvents) {
+    auditPush({
+      userId: staffFor(ev.comment)?.id ?? null,
+      actorName: ev.source === "System" || ev.source === "Integration" || ev.source === "AI" ? (ev.source === "AI" ? "AI Center" : ev.source === "Integration" ? "Business Event Engine" : "Система") : auditManagerFor(ev.comment),
+      actorRole: ev.source === "AI" ? "AI" : null,
+      department: ev.source === "AI" ? "AI Center" : ev.source === "Integration" ? "Интеграции" : ev.source === "System" ? "Система" : "Отдел продаж",
+      category: ev.category,
+      action: ev.action,
+      objectType: ev.objectType,
+      comment: ev.comment,
+      source: ev.source,
+      ip: ev.source === "Web" ? `10.0.${randInt(0, 4)}.${randInt(2, 254)}` : null,
+      userAgent: null,
+      criticality: ev.criticality,
+      createdAt: new Date(auditNowMs - ev.hoursAgo * 3600000),
+    });
+  }
+
+  for (let i = 0; i < auditRows.length; i += 1000) {
+    await prisma.auditLog.createMany({ data: auditRows.slice(i, i + 1000) });
+  }
+
   // ── Страны и города (без изменений) ──
   const uniqueCountries = countriesDatabase.filter((c, i, arr) => arr.findIndex(x => x.code === c.code) === i);
   console.log(`Seeding ${uniqueCountries.length} countries...`);
@@ -1294,6 +2124,10 @@ async function main() {
     orders: await prisma.order.count(),
     orderHistory: await prisma.orderHistory.count(),
     orderMessages: await prisma.orderMessage.count(),
+    automationLogs: await prisma.automationLog.count(),
+    exceptions: await prisma.exceptionLog.count(),
+    exceptionHistory: await prisma.exceptionLogHistory.count(),
+    auditLogs: await prisma.auditLog.count(),
   };
   console.log("Seed completed:", counts);
 }

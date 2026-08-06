@@ -1,13 +1,9 @@
-import SectionPlaceholder from "@/components/admin/SectionPlaceholder";
+import AuditCenter from "@/components/admin/AuditCenter";
 
-export const metadata = { title: "TravelHub — Система" };
+export const metadata = {
+  title: "TravelHub — Система · Журнал аудита",
+};
 
 export default function AdminSystemPage() {
-  return (
-    <SectionPlaceholder
-      icon="🖥"
-      title="Система"
-      description="Состояние системы: журналы, очереди, статусы сервисов, техническое обслуживание. Раздел находится в разработке."
-    />
-  );
+  return <AuditCenter />;
 }

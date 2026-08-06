@@ -45,7 +45,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
       <div className="flex flex-1 min-h-0">
         {/* Левое меню — закреплено (для ограниченных ролей — только их разделы) */}
-        <AdminSidebar role={user.role} />
+        <AdminSidebar role={user.role} user={user} />
 
         {/* Рабочая область */}
         <div className="flex-1 min-w-0 flex flex-col">

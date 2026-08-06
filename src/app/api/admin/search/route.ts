@@ -58,14 +58,30 @@ export async function GET(request: Request) {
         })),
       });
     }
+    // scope=clients возвращает покупателей для Customer 360° (Гл. 2.14.13)
+    if (scope === "clients") {
+      const clientUsers = await prisma.user.findMany({
+        where: { role: "BUYER", orders: { some: {} } },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        select: { id: true, firstName: true, lastName: true, email: true },
+      });
+      return NextResponse.json({
+        query: q,
+        clients: clientUsers.map((u) => ({
+          id: u.id,
+          name: `${u.firstName} ${u.lastName ?? ""}`.trim() || u.email,
+        })),
+      });
+    }
 
     if (q.length < 2) {
-      return NextResponse.json({ query: q, orders: [], users: [], services: [], bookings: [] });
+      return NextResponse.json({ query: q, orders: [], users: [], services: [], bookings: [], documents: [] });
     }
 
     const contains = { contains: q };
 
-    const [orders, users, services, bookings] = await Promise.all([
+    const [orders, users, services, bookings, documents] = await Promise.all([
       prisma.order.findMany({
         where: {
           OR: [
@@ -131,6 +147,18 @@ export async function GET(request: Request) {
           user: { select: { firstName: true, lastName: true } },
         },
       }),
+      // Документы (Гл. 1.5): события документооборота из журнала аудита —
+      // ваучеры, авиабилеты, договоры. Раздел «Документы» — заглушка, поэтому
+      // реальные записи о документах берём из категории «Документооборот».
+      prisma.auditLog.findMany({
+        where: {
+          category: "Документооборот",
+          OR: [{ comment: contains }, { objectNumber: contains }, { objectType: contains }, { actorName: contains }],
+        },
+        orderBy: { createdAt: "desc" },
+        take: LIMIT,
+        select: { id: true, eventId: true, comment: true, objectNumber: true, objectType: true, actorName: true, createdAt: true },
+      }),
     ]);
 
     return NextResponse.json({
@@ -167,6 +195,15 @@ export async function GET(request: Request) {
         amount: b.amount,
         href: b.orderId ? `/admin/sales-execution?open=${b.orderId}&tab=overview` : "/admin/bookings",
       })) : [],
+      documents: canUsersServices
+        ? documents.map((d) => ({
+            id: d.id,
+            label: d.objectNumber ? `Документ ${d.objectNumber}` : `Документ ${d.eventId}`,
+            detail: `${d.objectType ?? "Документ"} · ${d.comment ?? ""}`.slice(0, 90),
+            actor: d.actorName,
+            href: "/admin/documents",
+          }))
+        : [],
     });
   } catch (error) {
     return serverErrorResponse(error, "Admin search API error");

@@ -29,10 +29,13 @@ import {
   type TableBlock,
   type GeoRegion,
 } from "@/lib/analytics";
-import { BOOKING_STATUS_LABELS, ORDER_STATUS_LABELS } from "@/lib/admin-data";
+import { BOOKING_STATUS_LABELS, ORDER_STATUS_LABELS, MANAGERS } from "@/lib/admin-data";
+import { exportCSV, exportExcel, exportPDF, exportPNG } from "@/components/admin/dashboard-widgets";
 import ReportBuilder from "@/components/admin/ReportBuilder";
+import OperationsCenter from "@/components/admin/OperationsCenter";
 import AnalyticsSettings, {
   loadBiSettings,
+  saveBiSettings,
   DEFAULT_BI_SETTINGS,
   CURRENCY_SYMBOLS,
   AUTO_REFRESH_OPTIONS,
@@ -62,6 +65,7 @@ const TABS: { key: string; title: string; icon: string; section?: AnalyticsSecti
   { key: "marketing", title: "Маркетинг", icon: "📣", section: "marketing" },
   { key: "departments", title: "Подразделения", icon: "🏢", section: "departments" },
   { key: "ai", title: "AI Analytics", icon: "🤖", section: "ai" },
+  { key: "operations", title: "Оперативно", icon: "🚨" },
   { key: "reports", title: "Отчёты", icon: "🧾" },
   { key: "settings", title: "Настройки", icon: "⚙️" },
 ];
@@ -73,6 +77,18 @@ const CURRENCIES = ["USD", "AZN", "EUR", "TRY", "RUB", "GBP"];
 // Секции, где фильтры «Статус» и «Валюта» применяются к данным (Гл. 2.7).
 const STATUS_SECTIONS: AnalyticsSection[] = ["overview", "sales", "orders", "bookings", "finance", "catalog", "marketing"];
 const CURRENCY_SECTIONS: AnalyticsSection[] = ["overview", "sales", "orders", "bookings", "finance", "catalog", "marketing", "departments"];
+
+// Роль пользователя → раздел аналитики по умолчанию (Гл. 2.2: каждая роль
+// получает собственный набор аналитических панелей).
+const ROLE_DEFAULT_TAB: Record<string, string> = {
+  FINANCE: "finance",
+  MARKETER: "marketing",
+  ANALYST: "overview",
+  MODERATOR: "catalog",
+  PARTNER: "partners",
+  DIRECTOR: "overview",
+  ADMIN: "overview",
+};
 
 const SERVICE_TYPES = [
   { key: "TOUR", label: "Туры" },
@@ -110,12 +126,13 @@ function dataContextKey(
   city: string,
   type: string,
   partner: string,
+  manager: string,
   from: string,
   to: string,
   status: string,
   currency: string
 ): string {
-  return [section, period, country, city, type, partner, from, to, status, currency].join("|");
+  return [section, period, country, city, type, partner, manager, from, to, status, currency].join("|");
 }
 
 // Валюта отображения сумм — переключается из «Настроек аналитики» (localStorage).
@@ -129,6 +146,121 @@ const fmtMoney = (n: number) =>
   new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(Math.round(n)) + " " + activeCurrencySymbol;
 
 const fmtNumber = (n: number) => new Intl.NumberFormat("ru-RU").format(Math.round(n));
+
+/* ─── Сохранённые представления и журнал изменений BI (Гл. 2.6) ─── */
+
+const BI_VIEWS_KEY = "bi-saved-views";
+const BI_HISTORY_KEY = "bi-center-history";
+const BI_HISTORY_MAX = 60;
+
+interface BiSavedView {
+  name: string;
+  tab: string;
+  period: string;
+  country: string;
+  city: string;
+  type: string;
+  partner: string;
+  manager: string;
+  from: string;
+  to: string;
+  status: string;
+  currency: string;
+  savedAt: number;
+}
+
+interface BiHistoryEntry {
+  at: number;
+  action: string;
+  detail?: string;
+}
+
+/** Текущее представление (вкладка + фильтры) в виде сериализуемого объекта. */
+function currentViewState(state: {
+  tab: string;
+  period: string;
+  country: string;
+  city: string;
+  type: string;
+  partner: string;
+  manager: string;
+  from: string;
+  to: string;
+  status: string;
+  currency: string;
+}): Omit<BiSavedView, "name" | "savedAt"> {
+  return {
+    tab: state.tab,
+    period: state.period,
+    country: state.country,
+    city: state.city,
+    type: state.type,
+    partner: state.partner,
+    manager: state.manager,
+    from: state.from,
+    to: state.to,
+    status: state.status,
+    currency: state.currency,
+  };
+}
+
+function loadBiViews(): BiSavedView[] {
+  try {
+    const raw = localStorage.getItem(BI_VIEWS_KEY);
+    if (raw) return JSON.parse(raw) as BiSavedView[];
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
+function loadBiHistory(): BiHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(BI_HISTORY_KEY);
+    if (raw) return JSON.parse(raw) as BiHistoryEntry[];
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
+function persistBiViews(views: BiSavedView[]) {
+  try {
+    localStorage.setItem(BI_VIEWS_KEY, JSON.stringify(views));
+  } catch {
+    /* ignore */
+  }
+}
+
+function persistBiHistory(history: BiHistoryEntry[]) {
+  try {
+    localStorage.setItem(BI_HISTORY_KEY, JSON.stringify(history.slice(-BI_HISTORY_MAX)));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Собрать таблицу строк из данных раздела (KPI + таблицы) для экспорта (Гл. 2.6). */
+function buildExportRows(data: AnalyticsSectionData): { title: string; rows: (string | number)[][] }[] {
+  const out: { title: string; rows: (string | number)[][] }[] = [];
+  // KPI-панель: показатель / значение / изменение
+  const kpiRows: (string | number)[][] = [["Показатель", "Значение", "Изменение к прошлому"]];
+  for (const k of data.kpis) {
+    kpiRows.push([
+      k.title,
+      `${k.value}${k.unit ?? ""}`,
+      k.change !== undefined ? `${k.change >= 0 ? "+" : ""}${k.change.toFixed(1)}%` : "—",
+    ]);
+  }
+  out.push({ title: `${data.title} — KPI`, rows: kpiRows });
+  // Каждая таблица раздела
+  for (const t of data.tables) {
+    const rows: (string | number)[][] = [t.columns.map((c) => c.label)];
+    for (const r of t.rows) rows.push(t.columns.map((c) => r[c.key] ?? ""));
+    out.push({ title: t.title, rows });
+  }
+  return out;
+}
 
 // Форматирование значения KPI: unit «%» и прочие подписи («шт», «чел.», «ч»,
 // «×», «/100») добавляются как есть; БЕЗ unit значение считается денежным и
@@ -617,10 +749,20 @@ export default function BiCenter() {
   const [city, setCity] = useState("");
   const [type, setType] = useState("");
   const [partner, setPartner] = useState("");
+  const [manager, setManager] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [status, setStatus] = useState("");
   const [currency, setCurrency] = useState("");
+  // Сохранённые представления и журнал изменений BI (Гл. 2.6)
+  const [views, setViews] = useState<BiSavedView[]>([]);
+  const [history, setHistory] = useState<BiHistoryEntry[]>([]);
+  const [viewsOpen, setViewsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [newViewName, setNewViewName] = useState("");
+  // Персональный набор KPI (Гл. 2.8): попап выбора карточек текущего раздела
+  const [kpiMenuOpen, setKpiMenuOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [data, setData] = useState<AnalyticsSectionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -647,7 +789,18 @@ export default function BiCenter() {
       setSettings(s);
       const urlTab = new URLSearchParams(window.location.search).get("tab");
       const urlPeriod = new URLSearchParams(window.location.search).get("period");
-      if (urlTab && TABS.some((t) => t.key === urlTab)) setTab(urlTab);
+      if (urlTab && TABS.some((t) => t.key === urlTab)) {
+        setTab(urlTab);
+      } else {
+        // Раздел по умолчанию по роли пользователя (2.2)
+        fetch("/api/auth/me")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((u: { role?: string } | null) => {
+            const roleTab = u?.role ? ROLE_DEFAULT_TAB[u.role] : undefined;
+            if (roleTab && TABS.some((t) => t.key === roleTab)) setTab(roleTab);
+          })
+          .catch(() => {});
+      }
       setPeriod(urlPeriod ?? s.defaultPeriod);
     }, 0);
     return () => clearTimeout(timer);
@@ -741,6 +894,7 @@ export default function BiCenter() {
     if (city) params.set("city", city);
     if (type) params.set("type", type);
     if (partner) params.set("partnerId", partner);
+    if (manager) params.set("manager", manager);
     if (status) params.set("status", status);
     if (currency) params.set("currency", currency);
     fetch(`/api/admin/analytics/${section}?${params}`)
@@ -754,7 +908,7 @@ export default function BiCenter() {
         // Записываем значения KPI в историю (автообновление + «Обновить»),
         // ключ включает контекст, чтобы не смешивать периоды и фильтры.
         if (section) {
-          const ctx = dataContextKey(section, period, country, city, type, partner, from, to, status, currency);
+          const ctx = dataContextKey(section, period, country, city, type, partner, manager, from, to, status, currency);
           setKpiHistory((prev) => {
             const next = { ...prev };
             const now = Date.now();
@@ -783,7 +937,7 @@ export default function BiCenter() {
         setError(err instanceof Error ? err.message : "Неизвестная ошибка");
         setLoading(false);
       });
-  }, [section, period, country, city, type, partner, from, to, status, currency]);
+  }, [section, period, country, city, type, partner, manager, from, to, status, currency]);
 
   // Drill-down: клик по KPI → последние заказы/бронирования за период (Принцип 3).
   const handleDrill = useCallback(
@@ -868,11 +1022,30 @@ export default function BiCenter() {
     setCity("");
     setType("");
     setPartner("");
+    setManager("");
     setFrom("");
     setTo("");
     setStatus("");
     setCurrency("");
   };
+
+  // Загрузка сохранённых представлений и журнала изменений BI (Гл. 2.6).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setViews(loadBiViews());
+      setHistory(loadBiHistory());
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Журнал изменений BI (Гл. 2.6): фиксируем ключевые действия пользователя.
+  const logBi = useCallback((action: string, detail?: string) => {
+    setHistory((prev) => {
+      const next = [...prev, { at: Date.now(), action, detail }];
+      persistBiHistory(next);
+      return next;
+    });
+  }, []);
 
   // Статусы для активного раздела: заказы (overview/sales/orders/finance — все эти
   // модули строятся на заказах, Гл. 3) или бронирования.
@@ -889,6 +1062,7 @@ export default function BiCenter() {
     const partnerName = partners.find((p) => p.id === partner)?.name ?? partner;
     chips.push({ key: "partner", label: `Партнёр: ${partnerName}`, onClear: () => setPartner("") });
   }
+  if (manager) chips.push({ key: "manager", label: `Менеджер: ${manager}`, onClear: () => setManager("") });
   if (from && to) chips.push({ key: "custom", label: `Период: ${from} — ${to}`, onClear: () => { setFrom(""); setTo(""); } });
   if (status) chips.push({ key: "status", label: `Статус: ${statusOptions.find((o) => o.value === status)?.label ?? status}`, onClear: () => setStatus("") });
   if (currency) chips.push({ key: "currency", label: `Валюта: ${currency}`, onClear: () => setCurrency("") });
@@ -942,6 +1116,7 @@ export default function BiCenter() {
               if (city) params.set("city", city);
               if (type) params.set("type", type);
               if (partner) params.set("partnerId", partner);
+              if (manager) params.set("manager", manager);
               if (status) params.set("status", status);
               if (currency) params.set("currency", currency);
               const url = `${window.location.pathname}?${params.toString()}`;
@@ -958,8 +1133,8 @@ export default function BiCenter() {
           >
             🔗 Поделиться
           </button>
-          {/* «Обновить»/«Экспорт» — только для аналитических разделов (на инструментах
-              данные не загружаются, экспорт устаревшей секции вводил бы в заблуждение). */}
+          {/* «Обновить» — только для аналитических разделов (на инструментах
+              данные не загружаются). */}
           {section && (
             <button
               onClick={() => void load()}
@@ -968,21 +1143,170 @@ export default function BiCenter() {
               ↻ Обновить
             </button>
           )}
-          {section && (
+          {/* Сохранённые представления (Гл. 2.6 «Сохранить») */}
+          <div className="relative">
             <button
-              onClick={() => {
-                const json = JSON.stringify(data, null, 2);
-                const blob = new Blob([json], { type: "application/json" });
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                a.download = `bi-${section}-${period}.json`;
-                a.click();
-                URL.revokeObjectURL(a.href);
-              }}
-              className="ac-btn ac-btn-primary"
+              onClick={() => { setViewsOpen(!viewsOpen); setHistoryOpen(false); }}
+              className="ac-btn ac-btn-secondary"
+              title="Сохранить текущее представление (вкладка + фильтры)"
             >
-              ⬇ Экспорт
+              💾 Сохранить
             </button>
+            {viewsOpen && (
+              <div className="absolute right-0 mt-2 w-80 z-30 bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl shadow-xl p-3 space-y-2">
+                <div className="text-xs font-semibold">Сохранённые представления</div>
+                <div className="flex gap-2">
+                  <input
+                    value={newViewName}
+                    onChange={(e) => setNewViewName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const name = newViewName.trim();
+                        if (!name) return;
+                        const next = [...views.filter((v) => v.name !== name), { name, ...currentViewState({ tab, period, country, city, type, partner, manager, from, to, status, currency }), savedAt: Date.now() }];
+                        setViews(next);
+                        persistBiViews(next);
+                        setNewViewName("");
+                        logBi("Сохранить представление", name);
+                      }
+                    }}
+                    placeholder="Название представления…"
+                    className="ac-input flex-1"
+                  />
+                  <button
+                    onClick={() => {
+                      const name = newViewName.trim();
+                      if (!name) return;
+                      const next = [...views.filter((v) => v.name !== name), { name, ...currentViewState({ tab, period, country, city, type, partner, manager, from, to, status, currency }), savedAt: Date.now() }];
+                      setViews(next);
+                      persistBiViews(next);
+                      setNewViewName("");
+                      logBi("Сохранить представление", name);
+                    }}
+                    className="ac-btn ac-btn-primary"
+                  >
+                    ✓
+                  </button>
+                </div>
+                <div className="max-h-64 overflow-y-auto no-scrollbar space-y-1">
+                  {views.map((v) => (
+                    <div key={v.name} className="flex items-center justify-between gap-2 p-2 rounded-xl bg-[var(--admin-bg)]">
+                      <button
+                        onClick={() => {
+                          setTab(v.tab);
+                          setPeriod(v.period);
+                          setCountry(v.country);
+                          setCity(v.city);
+                          setType(v.type);
+                          setPartner(v.partner);
+                          setManager(v.manager);
+                          setFrom(v.from);
+                          setTo(v.to);
+                          setStatus(v.status);
+                          setCurrency(v.currency);
+                          setViewsOpen(false);
+                          logBi("Применить представление", v.name);
+                        }}
+                        className="flex-1 text-left text-xs truncate"
+                        title={`Применить: ${v.tab} · ${v.period}${v.country ? ` · ${v.country}` : ""}`}
+                      >
+                        {v.name}
+                        <span className="block text-[10px] text-[var(--admin-muted)]">
+                          {new Date(v.savedAt).toLocaleDateString("ru-RU")}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const next = views.filter((x) => x.name !== v.name);
+                          setViews(next);
+                          persistBiViews(next);
+                          logBi("Удалить представление", v.name);
+                        }}
+                        className="text-danger text-xs hover:bg-danger/10 rounded-lg p-1"
+                        title="Удалить"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  ))}
+                  {!views.length && <div className="text-[11px] text-[var(--admin-muted)]">Пока нет сохранённых представлений</div>}
+                </div>
+              </div>
+            )}
+          </div>
+          {/* История изменений BI (Гл. 2.6) */}
+          <button
+            onClick={() => { setHistoryOpen(true); setViewsOpen(false); }}
+            className="ac-btn ac-btn-secondary"
+            title="Журнал действий с представлениями BI Center"
+          >
+            🕘 История
+          </button>
+          {/* Экспорт (Гл. 2.6): JSON / CSV / Excel / PDF / PNG */}
+          {section && data && (
+            <div className="relative">
+              <button
+                onClick={() => setExportOpen(!exportOpen)}
+                className="ac-btn ac-btn-primary"
+              >
+                ⬇ Экспорт ▾
+              </button>
+              {exportOpen && (
+                <div className="absolute right-0 mt-2 w-44 z-30 bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl shadow-xl p-1.5 space-y-0.5">
+                  {([
+                    { key: "json", label: "📄 JSON (все данные)" },
+                    { key: "csv", label: "📊 CSV (таблицы)" },
+                    { key: "xls", label: "📗 Excel (таблицы)" },
+                    { key: "pdf", label: "📕 PDF (таблицы)" },
+                    { key: "png", label: "🖼 PNG (KPI)" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.key}
+                      onClick={() => {
+                        setExportOpen(false);
+                        const parts = buildExportRows(data);
+                        const base = `bi-${section}-${period}`;
+                        if (opt.key === "json") {
+                          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                          const a = document.createElement("a");
+                          a.href = URL.createObjectURL(blob);
+                          a.download = `${base}.json`;
+                          a.click();
+                          URL.revokeObjectURL(a.href);
+                        } else if (opt.key === "csv") {
+                          const all: (string | number)[][] = [[data.title, "", ""]];
+                          for (const p of parts) {
+                            all.push(["", "", ""]);
+                            for (const r of p.rows) all.push(r);
+                          }
+                          exportCSV(`${base}.csv`, all);
+                        } else if (opt.key === "xls") {
+                          const all: (string | number)[][] = [];
+                          for (const p of parts) {
+                            all.push([p.title, "", ""]);
+                            for (const r of p.rows) all.push(r);
+                          }
+                          exportExcel(`${base}.xls`, data.title, all);
+                        } else if (opt.key === "pdf") {
+                          const all: (string | number)[][] = [];
+                          for (const p of parts) {
+                            all.push([p.title, "", ""]);
+                            for (const r of p.rows) all.push(r);
+                          }
+                          exportPDF(`${base}.pdf`, data.title, all);
+                        } else {
+                          exportPNG(`${base}.png`, data.title, parts[0]?.rows ?? []);
+                        }
+                        logBi("Экспорт", `${opt.key.toUpperCase()} · ${data.title}`);
+                      }}
+                      className="w-full text-left text-xs px-2.5 py-2 rounded-xl hover:bg-[var(--admin-bg)] transition-colors"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           {/* «PDF / Печать» (2.6): печатная версия страницы через window.print */}
           {(section || tab === "reports") && (
@@ -991,7 +1315,7 @@ export default function BiCenter() {
               title="Экспорт в PDF — откройте печатную версию и сохраните в PDF"
               className="ac-btn ac-btn-inverse"
             >
-              🖨 PDF
+              🖨 Печать
             </button>
           )}
         </div>
@@ -1069,6 +1393,20 @@ export default function BiCenter() {
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
+          {/* Ответственный менеджер (Гл. 2.7) — применяется в разделах Продажи/Заказы */}
+          {(section === "sales" || section === "orders") && (
+            <select
+              value={manager}
+              onChange={(e) => setManager(e.target.value)}
+              className="ac-select max-w-44"
+              title="Фильтр по ответственному менеджеру (разделы Продажи и Заказы)"
+            >
+              <option value="">Менеджер: все</option>
+              {MANAGERS.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          )}
           {STATUS_SECTIONS.includes(section) && (
             <select
               value={status}
@@ -1111,7 +1449,7 @@ export default function BiCenter() {
               className="ac-input"
             />
           </label>
-          {(country || city || type || partner || from || to || status || currency) && (
+          {(country || city || type || partner || manager || from || to || status || currency) && (
             <button
               onClick={resetFilters}
               className="ac-btn ac-btn-danger"
@@ -1125,6 +1463,9 @@ export default function BiCenter() {
         </div>
       </div>
       )}
+
+      {/* ── Оперативные панели (Гл. 2: контроль-центры) ── */}
+      {!section && tab === "operations" && <OperationsCenter />}
 
       {/* ── Инструменты: Конструктор отчётов и Настройки аналитики ── */}
       {!section && tab === "reports" && <ReportBuilder />}
@@ -1160,7 +1501,56 @@ export default function BiCenter() {
               <h2 className="font-semibold text-sm text-[var(--admin-muted)]">
                 {data.title} — KPI <span className="text-[10px] text-primary">клик по карточке = детализация</span>
               </h2>
-              <span className="text-[11px] text-[var(--admin-muted)]">{data.periodLabel}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-[var(--admin-muted)]">{data.periodLabel}</span>
+                {/* Персональный набор KPI (Гл. 2.8): выбор видимых карточек */}
+                <div className="relative">
+                  <button
+                    onClick={() => setKpiMenuOpen(!kpiMenuOpen)}
+                    className="text-[11px] text-[var(--admin-muted)] hover:text-primary transition-colors"
+                    title="Настроить набор KPI (Гл. 2.8)"
+                  >
+                    ⚙️ Настроить KPI
+                  </button>
+                  {kpiMenuOpen && (
+                    <div className="absolute right-0 mt-1 w-72 z-30 bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl shadow-xl p-3 space-y-1 max-h-80 overflow-y-auto no-scrollbar">
+                      <div className="text-xs font-semibold mb-1">Видимые показатели</div>
+                      {data.kpis.map((k) => {
+                        const hidden = settings.hiddenKpis[section] ?? [];
+                        const isHidden = hidden.includes(k.key);
+                        return (
+                          <label key={k.key} className="flex items-center gap-2 text-[11px] py-1 px-1.5 rounded-lg hover:bg-[var(--admin-bg)] cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!isHidden}
+                              onChange={() => {
+                                const cur = settings.hiddenKpis[section] ?? [];
+                                const next = isHidden ? cur.filter((x) => x !== k.key) : [...cur, k.key];
+                                const patch = { ...settings, hiddenKpis: { ...settings.hiddenKpis, [section]: next } };
+                                setSettings(patch);
+                                saveBiSettings(patch);
+                              }}
+                            />
+                            <span className="truncate" title={k.title}>{k.title}</span>
+                          </label>
+                        );
+                      })}
+                      <div className="pt-2 mt-1 border-t border-[var(--admin-border)] flex gap-2">
+                        <button
+                          onClick={() => {
+                            const patch = { ...settings, hiddenKpis: { ...settings.hiddenKpis, [section]: [] } };
+                            setSettings(patch);
+                            saveBiSettings(patch);
+                          }}
+                          className="text-[11px] text-primary"
+                        >
+                          Показать все
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             {/* Плотность KPI из «Настроек аналитики» (2.3) */}
             <div
@@ -1172,9 +1562,11 @@ export default function BiCenter() {
                     : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
               }`}
             >
-              {data.kpis.map((k) => {
+              {data.kpis
+                .filter((k) => !(settings.hiddenKpis[section] ?? []).includes(k.key))
+                .map((k) => {
                 // История значений для текущего контекста (раздел + фильтры).
-                const historyKey = dataContextKey(section, period, country, city, type, partner, from, to, status, currency) + "|" + k.key;
+                const historyKey = dataContextKey(section, period, country, city, type, partner, manager, from, to, status, currency) + "|" + k.key;
                 return (
                   <KpiCardView key={k.key} kpi={k} history={kpiHistory[historyKey]?.values} onDrill={handleDrill} />
                 );
@@ -1248,6 +1640,54 @@ export default function BiCenter() {
         loading={drillLoading}
         onClose={() => setDrillKpi(null)}
       />
+
+      {/* ── Модалка истории изменений BI (Гл. 2.6) ── */}
+      {historyOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center p-4 pt-16 overflow-y-auto"
+          onClick={() => setHistoryOpen(false)}
+        >
+          <div
+            className="bg-[var(--admin-card)] border border-[var(--admin-border)] rounded-2xl shadow-2xl w-full max-w-lg p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="font-semibold">🕘 История изменений BI Center</h3>
+                <div className="text-[11px] text-[var(--admin-muted)] mt-0.5">
+                  Журнал действий с представлениями и экспортом (Гл. 2.6)
+                </div>
+              </div>
+              <button onClick={() => setHistoryOpen(false)} className="text-[var(--admin-muted)] hover:text-[var(--admin-text)] text-lg">
+                ✕
+              </button>
+            </div>
+            <div className="space-y-1.5 max-h-96 overflow-y-auto no-scrollbar pr-1">
+              {[...history].reverse().map((h, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs p-2 rounded-xl bg-[var(--admin-bg)]">
+                  <span className="text-[10px] text-[var(--admin-muted)] shrink-0 pt-0.5">
+                    {new Date(h.at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  <span className="font-medium">{h.action}</span>
+                  {h.detail && <span className="text-[var(--admin-muted)] truncate">· {h.detail}</span>}
+                </div>
+              ))}
+              {!history.length && <div className="py-8 text-center text-sm text-[var(--admin-muted)]">Журнал пуст</div>}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => {
+                  setHistory([]);
+                  persistBiHistory([]);
+                }}
+                className="px-3 h-8 rounded-lg bg-[var(--admin-bg)] border border-danger/30 text-xs font-medium text-danger hover:bg-danger/10 transition-colors"
+              >
+                🗑 Очистить журнал
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

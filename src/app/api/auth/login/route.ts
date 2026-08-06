@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword, setSessionCookie } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { recordAudit, requestContext } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,20 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+    const ctx = requestContext(request);
     if (!user || !verifyPassword(user.passwordHash, password)) {
+      // Гл. 3.18 «Безопасность»: неудачная попытка входа фиксируется в журнале аудита.
+      await recordAudit({
+        actorName: email.trim().toLowerCase(),
+        category: "Безопасность",
+        action: "login_failed",
+        objectType: "Пользователь",
+        objectNumber: email.trim().toLowerCase(),
+        comment: "Неудачная попытка входа в систему",
+        criticality: "warning",
+        ip: ctx.ip,
+        userAgent: ctx.userAgent,
+      });
       return NextResponse.json({ error: "Неверный email или пароль" }, { status: 401 });
     }
 
@@ -29,6 +43,20 @@ export async function POST(request: NextRequest) {
     }
 
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+
+    // Гл. 3.18 «Пользовательские действия»: успешный вход.
+    await recordAudit({
+      user,
+      category: "Безопасность",
+      action: "login",
+      objectType: "Пользователь",
+      objectId: user.id,
+      objectNumber: user.email,
+      comment: "Вход в систему",
+      source: "Web",
+      ip: ctx.ip,
+      userAgent: ctx.userAgent,
+    });
 
     await setSessionCookie(user.id);
     return NextResponse.json({

@@ -26,6 +26,82 @@ export const SERVICE_TYPE_ICONS: Record<string, string> = {
   PHOTOGRAPHER: "📸",
 };
 
+// ── Каталог услуг (Гл. 4) ──
+
+/** Статусы жизненного цикла услуги (Гл. 4.12): Черновик → … → Архив. */
+export const SERVICE_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Черновик",
+  REVIEW: "На согласовании",
+  READY: "Готова к публикации",
+  PUBLISHED: "Опубликована",
+  SUSPENDED: "Приостановлена",
+  ARCHIVED: "Архив",
+};
+
+export const SERVICE_STATUS_COLORS: Record<string, string> = {
+  DRAFT: "#94a3b8",
+  REVIEW: "#f59e0b",
+  READY: "#8b5cf6",
+  PUBLISHED: "#22c55e",
+  SUSPENDED: "#f97316",
+  ARCHIVED: "#6b7280",
+};
+
+/** Статус публикации (Гл. 4.10) — производный от жизненного цикла. */
+export function servicePublicationLabel(status: string): string {
+  const map: Record<string, string> = {
+    DRAFT: "Черновик",
+    REVIEW: "Подготовка",
+    READY: "Ожидает публикации",
+    PUBLISHED: "Опубликована",
+    SUSPENDED: "Приостановлена",
+    ARCHIVED: "Снята с публикации",
+  };
+  return map[status] ?? status;
+}
+
+export function servicePublicationColor(status: string): string {
+  const map: Record<string, string> = {
+    DRAFT: "#94a3b8",
+    REVIEW: "#f59e0b",
+    READY: "#8b5cf6",
+    PUBLISHED: "#22c55e",
+    SUSPENDED: "#f97316",
+    ARCHIVED: "#6b7280",
+  };
+  return map[status] ?? "#64748b";
+}
+
+/** Состояние доступности (Гл. 4.7): индикатор в таблице и карточке. */
+export function serviceAvailabilityLabel(service: {
+  status: string;
+  quotaTotal: number | null;
+  quotaBooked: number | null;
+  quotaReserved: number | null;
+}): { label: string; color: string } {
+  if (service.status === "ARCHIVED") return { label: "Архивирована", color: "#6b7280" };
+  if (service.status === "SUSPENDED") return { label: "Продажи приостановлены", color: "#f97316" };
+  if (service.status !== "PUBLISHED") return { label: "Недоступна", color: "#94a3b8" };
+  const total = service.quotaTotal ?? 0;
+  const available = total - (service.quotaBooked ?? 0) - (service.quotaReserved ?? 0);
+  if (total === 0) return { label: "Доступна", color: "#22c55e" };
+  if (available <= 0) return { label: "Нет свободных мест", color: "#ef4444" };
+  if (available <= Math.ceil(total * 0.1)) return { label: `Осталось мало мест · ${available}`, color: "#f59e0b" };
+  return { label: `Доступна · ${available}`, color: "#22c55e" };
+}
+
+/** Действия журнала версий карточки (Гл. 4.12). */
+export const SERVICE_HISTORY_ACTION_LABELS: Record<string, string> = {
+  created: "Создание",
+  update: "Изменение карточки",
+  publish: "Публикация",
+  unpublish: "Снятие с публикации",
+  suspend: "Приостановка",
+  archive: "Архивирование",
+  restore: "Восстановление версии",
+  price: "Изменение стоимости",
+};
+
 /** Полное имя пользователя (исполнителя действия в журнале бронирований). */
 export function actorDisplayName(user: { firstName: string; lastName: string | null }): string {
   return `${user.firstName} ${user.lastName ?? ""}`.trim() || "Администратор";
@@ -324,59 +400,140 @@ export function seriesTrendPct(values: number[]): number {
 
 /**
  * Бакетизация выручки по периоду.
- * День/вчера — по часам, неделя/месяц — по дням, квартал/год — по месяцам.
- * Окно меток ограничено границами периода, чтобы не было пустых бакетов.
+ * Сегодня/вчера — 3-часовые бакеты (8 точек), неделя — по дням (7 точек),
+ * месяц — декады по 10 дней (3–4 точки), квартал — по месяцам (3 точки),
+ * год — 12 месяцев. Для произвольного периода (custom) гранулярность
+ * подстраивается под длину диапазона: до 2.5 суток — часы, до 62 суток — дни,
+ * иначе — месяцы. Это сохраняет спарклайны KPI-карточек при drill-down на
+ * конкретный день (Гл. 3.6): суженный до суток custom-период даёт 24 часовых
+ * бакета, а не один месячный.
  */
 export function bucketize(
   rows: { at: Date; amount: number }[],
   period: PeriodKey,
   range?: { start: Date; end: Date }
-): { labels: string[]; values: number[] } {
+): { labels: string[]; values: number[]; starts: string[] } {
+  const gran = bucketGranularity(period, range);
+  const withDate = gran === "hour" && hourWithDate(period, range);
+  const starts = bucketStarts(period, range);
   const map = new Map<string, number>();
-  const add = (key: string, amount: number) => map.set(key, (map.get(key) ?? 0) + amount);
-  for (const r of rows) add(bucketKey(r.at, period), r.amount);
-
-  const labels: string[] = [];
-  const values: number[] = [];
-  for (const key of orderedKeys(period, range)) {
-    labels.push(key);
-    values.push(Math.round(map.get(key) ?? 0));
+  for (const r of rows) {
+    const key = bucketKey(r.at, gran, withDate);
+    map.set(key, (map.get(key) ?? 0) + r.amount);
   }
-  return { labels, values };
+  const labels = starts.map((d) => bucketKey(d, gran, withDate));
+  const values = labels.map((k) => Math.round(map.get(k) ?? 0));
+  // starts — ISO-метки начала каждого бакета: клиент использует их для
+  // drill-down (Гл. 3.6) — фильтр реестра по границам выбранной точки.
+  return { labels, values, starts: starts.map((d) => d.toISOString()) };
 }
 
-function bucketKey(d: Date, period: PeriodKey): string {
-  if (period === "today" || period === "yesterday") {
-    return `${String(d.getHours()).padStart(2, "0")}:00`;
+type BucketGranularity = "3h" | "hour" | "day" | "10d" | "month";
+
+// Гранулярность бакетов для периода. Для custom — по длине диапазона.
+function bucketGranularity(period: PeriodKey, range?: { start: Date; end: Date }): BucketGranularity {
+  if (period === "today" || period === "yesterday") return "3h";
+  if (period === "week") return "day";
+  if (period === "month") return "10d";
+  if (period === "custom" && range) {
+    const span = range.end.getTime() - range.start.getTime();
+    if (span <= 2.5 * 86400000) return "hour";
+    if (span <= 62 * 86400000) return "day";
   }
-  if (period === "week" || period === "month") {
+  return "month";
+}
+
+// Для часовых бакетов custom-периода, охватывающего несколько дней, ключ должен
+// включать дату, иначе часы разных дней сольются в один бакет.
+function hourWithDate(period: PeriodKey, range?: { start: Date; end: Date }): boolean {
+  if (!range) return false;
+  const s = range.start;
+  const e = range.end;
+  return s.getDate() !== e.getDate() || s.getMonth() !== e.getMonth() || s.getFullYear() !== e.getFullYear();
+}
+
+function bucketKey(d: Date, gran: BucketGranularity, withDate: boolean): string {
+  if (gran === "3h") {
+    const h = Math.floor(d.getHours() / 3) * 3;
+    return `${String(h).padStart(2, "0")}–${String(h + 3).padStart(2, "0")}`;
+  }
+  if (gran === "hour") {
+    const hh = `${String(d.getHours()).padStart(2, "0")}:00`;
+    return withDate ? `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")} ${hh}` : hh;
+  }
+  if (gran === "10d") {
+    const day = d.getDate();
+    const start = Math.floor((day - 1) / 10) * 10 + 1;
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const end = Math.min(start + 9, lastDay);
+    const s = String(start).padStart(2, "0");
+    return end > start ? `${s}–${String(end).padStart(2, "0")}` : s;
+  }
+  if (gran === "day") {
     return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
   }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function orderedKeys(period: PeriodKey, range?: { start: Date; end: Date }): string[] {
+/**
+ * Начало каждого бакета периода (Date[]) — по той же гранулярности, что и
+ * bucketize (единый источник меток для бакетизации).
+ */
+function bucketStarts(period: PeriodKey, range?: { start: Date; end: Date }): Date[] {
   const now = new Date();
-  const out: string[] = [];
-  if (period === "today" || period === "yesterday") {
-    for (let h = 0; h < 24; h++) out.push(`${String(h).padStart(2, "0")}:00`);
-  } else if (period === "week" || period === "month") {
-    const count = period === "week" ? 7 : 31;
-    for (let i = count - 1; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      out.push(`${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`);
+  const gran = bucketGranularity(period, range);
+  const r = range ?? { start: new Date(now.getFullYear(), now.getMonth() - 11, 1), end: now };
+  const out: Date[] = [];
+  if (gran === "3h") {
+    // Сегодня/вчера: 8 бакетов по 3 часа от полуночи (вся точка покрывает период)
+    const base = new Date(r.start.getFullYear(), r.start.getMonth(), r.start.getDate());
+    for (let h = 0; h < 24; h += 3) out.push(new Date(base.getFullYear(), base.getMonth(), base.getDate(), h));
+    return out;
+  }
+  if (gran === "hour") {
+    if (period === "today" || period === "yesterday") {
+      const base = new Date(r.start.getFullYear(), r.start.getMonth(), r.start.getDate());
+      for (let h = 0; h < 24; h++) out.push(new Date(base.getFullYear(), base.getMonth(), base.getDate(), h));
+    } else {
+      // custom: часы от начала до конца диапазона
+      const startMs = Math.floor(r.start.getTime() / 3600000) * 3600000;
+      for (let t = startMs; t <= r.end.getTime(); t += 3600000) out.push(new Date(t));
     }
-  } else {
-    // Квартал/год: месяцы в пределах выбранного диапазона (без пустых бакетов)
-    const start = range?.start ?? new Date(now.getFullYear(), now.getMonth() - 11, 1);
-    const end = range?.end ?? now;
-    const s = new Date(start.getFullYear(), start.getMonth(), 1);
-    const e = new Date(end.getFullYear(), end.getMonth(), 1);
-    let cursor = new Date(s);
-    while (cursor <= e) {
-      out.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`);
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    return out;
+  }
+  if (gran === "day") {
+    if (period === "week") {
+      // Неделя: 7 дней, заканчивая сегодняшним
+      for (let i = 6; i >= 0; i--) out.push(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i));
+    } else {
+      // custom: дни от начала до конца диапазона
+      const s = new Date(r.start.getFullYear(), r.start.getMonth(), r.start.getDate());
+      const e = new Date(r.end.getFullYear(), r.end.getMonth(), r.end.getDate());
+      for (let d = new Date(s); d <= e; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) out.push(new Date(d));
     }
+    return out;
+  }
+  if (gran === "10d") {
+    // Месяц: декады от 1-го числа до конца месяца (3–4 бакета)
+    const s = new Date(r.start.getFullYear(), r.start.getMonth(), 1);
+    const lastDay = new Date(s.getFullYear(), s.getMonth() + 1, 0);
+    for (let d = new Date(s); d <= lastDay; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 10)) out.push(new Date(d));
+    return out;
+  }
+  // Месяцы периода: квартал — весь квартал (3 месяца), год — 12 месяцев,
+  // custom — от месяца начала до месяца конца диапазона. Будущие месяцы
+  // периода включаются нулевыми бакетами, чтобы квартал всегда давал 3 точки.
+  const s = new Date(r.start.getFullYear(), r.start.getMonth(), 1);
+  const e =
+    period === "quarter"
+      ? new Date(r.start.getFullYear(), Math.floor(r.start.getMonth() / 3) * 3 + 2, 1)
+      : period === "year"
+      ? new Date(r.start.getFullYear(), 11, 1)
+      : new Date(r.end.getFullYear(), r.end.getMonth(), 1);
+  let cursor = new Date(s);
+  while (cursor <= e) {
+    out.push(new Date(cursor));
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
   }
   return out;
 }

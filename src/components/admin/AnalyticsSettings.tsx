@@ -16,6 +16,9 @@ export interface BiSettings {
   kpiDensity: "compact" | "comfortable" | "wide"; // колонок KPI
   aiDepth: "brief" | "full"; // краткие / полные AI-инсайты
   autoRefresh: number; // минуты: 0 = выключено, 1 | 5 | 15 | 30 | 60
+  /** Персональный набор видимых KPI (Гл. 2.8): раздел → ключи скрытых карточек.
+   *  Пусто = показаны все. Пользователь сам выбирает, какие показатели видеть. */
+  hiddenKpis: Record<string, string[]>;
 }
 
 export const BI_SETTINGS_KEY = "bi-center-settings";
@@ -30,7 +33,17 @@ export const DEFAULT_BI_SETTINGS: BiSettings = {
   kpiDensity: "comfortable",
   aiDepth: "full",
   autoRefresh: 0,
+  hiddenKpis: {},
 };
+
+/** Сохранить настройки аналитики (используется BiCenter при изменении KPI-набора). */
+export function saveBiSettings(settings: BiSettings) {
+  try {
+    localStorage.setItem(BI_SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    /* ignore */
+  }
+}
 
 // Интервалы автообновления BI Center (Гл. 2.8, «автообновление по таймеру»).
 export const AUTO_REFRESH_OPTIONS: { value: number; label: string }[] = [

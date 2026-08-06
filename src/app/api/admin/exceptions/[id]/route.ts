@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { actorDisplayName } from "@/lib/admin-data";
+import { recordAudit, requestContext } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +144,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         });
       }
       return u;
+    });
+
+    // Гл. 3.18: обработка исключения фиксируется в журнале аудита.
+    const ctx = requestContext(request);
+    await recordAudit({
+      user,
+      category: "Пользовательские действия",
+      action: "status",
+      objectType: "Исключение",
+      objectId: id,
+      objectNumber: exception.orderNumber ?? undefined,
+      fromData: { status: exception.status },
+      toData: { status: t.to },
+      comment: `Исключение «${exception.type}»: ${t.label}`,
+      source: "Web",
+      ip: ctx.ip,
+      userAgent: ctx.userAgent,
+      criticality: action === "close" ? "info" : "warning",
     });
 
     return NextResponse.json({
