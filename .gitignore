@@ -1,64 +1,35 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies
+node_modules/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
+# Builds
+dist/
+.next/
+out/
 *.tsbuildinfo
 next-env.d.ts
 
-/src/generated/prisma
+# Prisma generated client (regenerated via `prisma generate`)
+backend/src/generated/
 
-# sqlite database (local, seeded via tsx prisma/seed.ts)
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Databases & logs
 *.db
-*.db-journal
+*.db.bak
+*.log
+backend/backend-dev.log
+backend/backend-dev.err.log
+frontend/frontend-dev.log
 
-# server-side error reports log (POST /api/error-report)
-error-reports.log
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
 
-# AI-tooling artifacts (Freebuff/Claude/Windsurf local configs)
-.agents/
-.claude/
-.windsurf/
+# Freebuff local artifacts
 .freebuff/
 .freebuff-preview.log
-skills-lock.json
-
-# temp working files
-/tmp_*.txt
-
-# Word lock files (Office temp)
-~$*

@@ -1,0 +1,549 @@
+// ============================================================================
+// TravelHub Phase 1 — Prisma schema (PostgreSQL, multiSchema)
+//
+// Каждый бизнес-домен владеет ОТДЕЛЬНОЙ схемой БД (bounded context):
+//   events.*  — инфраструктура: transactional outbox + inbox идемпотентности
+//   catalog.* — Catalog Center: Product, Category, Tariff, Availability
+//   crm.*     — CRM mini: Customer, Contact, Company, Partner, Supplier
+//   order.*   — Order Center: Order, OrderItem, OrderTraveler, Fulfillment
+//   booking.* — Booking Center: Booking, Reservation, SupplierConfirmation, Passenger
+//
+// Правила (Baseline, Phase 1):
+//  - МЕЖДУ схемами НЕТ foreign keys — только ссылки по ID (productId, customerId, orderId).
+//  - Ни один домен не пишет в таблицы чужой схемы (только через события/API).
+//  - Канонические ID: PRD-*/ORD-*/BKG-*/CUS-* + 8 цифр (генерирует домен-владелец).
+//  - Audit by default: каждая схема имеет *_history таблицу.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["events", "catalog", "crm", "order", "booking"]
+}
+
+// ─────────────────────────────── events.* ────────────────────────────────
+
+enum OutboxStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+
+  @@schema("events")
+}
+
+/// Transactional outbox: доменное событие пишется атомарно с изменением сущности
+/// (в той же транзакции), после коммита публикуется подписчикам (publishPending).
+model OutboxEvent {
+  id            String       @id @default(uuid())
+  aggregateType String
+  aggregateId   String
+  eventType     String
+  payload       Json
+  correlationId String?
+  causationId   String?
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  error         String?
+  createdAt     DateTime     @default(now())
+  publishedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([aggregateType, aggregateId])
+  @@schema("events")
+}
+
+/// Inbox идемпотентных consumers: событие, уже обработанное consumer-ом,
+/// не обрабатывается повторно (unique consumerId+eventId).
+model InboxEvent {
+  id          String   @id @default(uuid())
+  consumerId  String
+  eventId     String
+  processedAt DateTime @default(now())
+
+  @@unique([consumerId, eventId])
+  @@schema("events")
+}
+
+/// Атомарный счётчик канонических бизнес-ID (PRD-/ORD-/BKG-/CUS-/TH-YYYY-...).
+/// Инкремент выполняется upsert-ом в транзакции домена-владельца.
+model BusinessSequence {
+  prefix String @id // "PRD", "ORD", "BKG", "CUS", "CNT", "CAT", "TRF", "TH-2026"
+  value  Int    @default(0)
+
+  @@schema("events")
+}
+
+// ─────────────────────────────── catalog.* ───────────────────────────────
+
+enum ProductStatus {
+  DRAFT
+  COMPLETE
+  REVIEWED
+  PUBLISHED
+  CHANGED
+  ARCHIVED
+
+  @@schema("catalog")
+}
+
+enum ProductType {
+  TOUR
+  HOTEL
+  SANATORIUM
+  FLIGHT
+  TRAIN
+  EXCURSION
+  GUIDE
+  TRANSFER
+  PHOTOGRAPHER
+
+  @@schema("catalog")
+}
+
+/// Product — единственный владелец: Catalog Center. Продуктовые данные
+/// никогда не копируются в Order/Booking (только productId).
+model Product {
+  id          String        @id @default(uuid())
+  code        String        @unique // PRD-00000001
+  type        ProductType
+  title       String
+  slug        String        @unique
+  description String?
+  status      ProductStatus @default(DRAFT)
+  version     Int           @default(1)
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdBy   String?
+  updatedBy   String?
+
+  tariffs      Tariff[]
+  availability Availability[]
+  history      ProductHistory[]
+
+  @@index([status])
+  @@schema("catalog")
+}
+
+model Category {
+  id       String     @id @default(uuid())
+  code     String     @unique // CAT-00000001
+  title    String
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+
+  @@schema("catalog")
+}
+
+model Tariff {
+  id        String   @id @default(uuid())
+  code      String   @unique // TRF-00000001
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  price     Decimal  @db.Decimal(12, 2)
+  currency  String   @default("USD")
+  validFrom DateTime?
+  validTo   DateTime?
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@schema("catalog")
+}
+
+model Availability {
+  id            String   @id @default(uuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tariffId      String?
+  date          DateTime
+  slotsTotal    Int      @default(0)
+  slotsBooked   Int      @default(0)
+  slotsReserved Int      @default(0)
+
+  @@unique([productId, tariffId, date])
+  @@schema("catalog")
+}
+
+/// Журнал аудита Catalog (audit by default).
+model ProductHistory {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  version   Int
+  action    String
+  from      String?
+  to        String?
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@schema("catalog")
+}
+
+// ─────────────────────────────── crm.* ───────────────────────────────────
+
+enum CustomerType {
+  PERSON
+  COMPANY
+
+  @@schema("crm")
+}
+
+enum EntityStatus {
+  ACTIVE
+  INACTIVE
+
+  @@schema("crm")
+}
+
+/// Customer — единственный владелец: CRM (SSOT клиентских мастер-данных).
+/// Order/Booking хранят только customerId.
+model Customer {
+  id          String       @id @default(uuid())
+  code        String       @unique // CUS-00000001
+  type        CustomerType @default(PERSON)
+  firstName   String?
+  lastName    String?
+  companyName String?
+  email       String       @unique
+  phone       String?
+  status      EntityStatus @default(ACTIVE)
+  version     Int          @default(1)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  contacts    Contact[]
+  history     CustomerHistory[]
+
+  @@index([status])
+  @@schema("crm")
+}
+
+model Contact {
+  id         String   @id @default(uuid())
+  code       String   @unique // CNT-00000001
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name       String
+  email      String?
+  phone      String?
+  role       String?
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+  @@schema("crm")
+}
+
+model Company {
+  id     String       @id @default(uuid())
+  code   String       @unique // COM-00000001
+  name   String
+  inn    String?
+  status EntityStatus @default(ACTIVE)
+
+  partners  Partner[]
+  suppliers Supplier[]
+
+  @@schema("crm")
+}
+
+model Partner {
+  id        String      @id @default(uuid())
+  code      String      @unique // PAR-00000001
+  companyId String?
+  company   Company?    @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  name      String
+  status    EntityStatus @default(ACTIVE)
+
+  @@schema("crm")
+}
+
+model Supplier {
+  id        String      @id @default(uuid())
+  code      String      @unique // SUP-00000001
+  companyId String?
+  company   Company?    @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  name      String
+  status    EntityStatus @default(ACTIVE)
+
+  @@schema("crm")
+}
+
+/// Журнал аудита CRM.
+model CustomerHistory {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  action     String
+  from       String?
+  to         String?
+  fields     Json?
+  actorId    String?
+  actorName  String?
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+  @@schema("crm")
+}
+
+// ─────────────────────────────── order.* ─────────────────────────────────
+
+enum OrderStatus {
+  NEW
+  IN_PROCESSING
+  WAITING_FOR_DATA
+  READY_FOR_BOOKING
+  SENT_TO_BOOKING
+  PARTIALLY_FULFILLED
+  FULFILLED
+  READY_TO_CLOSE
+  CLOSED
+  CANCELLED
+  PROBLEM
+  SUSPENDED
+
+  @@schema("order")
+}
+
+enum OrderPaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  REFUNDED
+
+  @@schema("order")
+}
+
+enum FulfillmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+
+  @@schema("order")
+}
+
+enum TravelerDataCompleteness {
+  INCOMPLETE
+  COMPLETE
+
+  @@schema("order")
+}
+
+/// Order — единственный владелец: Order Center.
+/// customerId — ссылка на CRM (без FK), productId — ссылка на Catalog (без FK).
+model Order {
+  id            String              @id @default(uuid())
+  code          String              @unique // ORD-00000001
+  number        String              @unique // TH-2026-000001
+  customerId    String // ссылка на CRM, без FK
+  status        OrderStatus         @default(NEW)
+  paymentStatus OrderPaymentStatus  @default(UNPAID)
+  currency      String              @default("USD")
+  amount        Decimal             @default(0) @db.Decimal(12, 2)
+  paidAmount    Decimal             @default(0) @db.Decimal(12, 2)
+  serviceDate   DateTime?
+  version       Int                 @default(1)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  createdBy     String?
+  updatedBy     String?
+
+  items      OrderItem[]
+  travelers  OrderTraveler[]
+  fulfillments Fulfillment[]
+  history    OrderHistory[]
+
+  @@index([status])
+  @@index([customerId])
+  @@schema("order")
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String // ссылка на Catalog, без FK
+  productCode String // снапшот канонического кода (PRD-*), не дублирование данных
+  title       String
+  type        String
+  quantity    Int      @default(1)
+  price       Decimal  @db.Decimal(12, 2)
+  currency    String   @default("USD")
+  amount      Decimal  @db.Decimal(12, 2)
+  serviceDate DateTime?
+
+  @@index([orderId])
+  @@schema("order")
+}
+
+model OrderTraveler {
+  id                String                  @id @default(uuid())
+  orderId           String
+  order             Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerId        String?
+  firstName         String
+  lastName          String
+  birthDate         DateTime?
+  citizenship       String?
+  gender            String?
+  passportNumber    String?
+  passportExpiry    DateTime?
+  dataCompleteness  TravelerDataCompleteness @default(INCOMPLETE)
+  version           Int                     @default(1)
+
+  @@index([orderId])
+  @@schema("order")
+}
+
+model Fulfillment {
+  id        String            @id @default(uuid())
+  orderId   String
+  order     Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    FulfillmentStatus @default(NOT_STARTED)
+  notes     String?
+
+  @@index([orderId])
+  @@schema("order")
+}
+
+/// Журнал аудита Order (audit by default).
+model OrderHistory {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  action    String
+  from      String?
+  to        String?
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@schema("order")
+}
+
+// ─────────────────────────────── booking.* ───────────────────────────────
+
+enum BookingStatus {
+  NEW
+  PREPARING_REQUEST
+  SENT_TO_SUPPLIER
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  IN_SERVICE
+  COMPLETED
+  NEEDS_CLARIFICATION
+  SUPPLIER_REJECTED
+  CHANGE_REQUESTED
+  CANCELLATION_REQUESTED
+  CANCELLED
+  PROBLEM
+
+  @@schema("booking")
+}
+
+enum ReservationStatus {
+  HELD
+  CONFIRMED
+  RELEASED
+
+  @@schema("booking")
+}
+
+/// Booking — единственный владелец: Booking Center.
+/// Создаётся ТОЛЬКО consumer-ом события BookingRequested (идемпотентно).
+model Booking {
+  id          String        @id @default(uuid())
+  code        String        @unique // BKG-00000001
+  orderId     String // ссылка на Order, без FK
+  productId   String // ссылка на Catalog, без FK
+  status      BookingStatus @default(NEW)
+  amount      Decimal       @default(0) @db.Decimal(12, 2)
+  serviceDate DateTime?
+  version     Int           @default(1)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  reservations         Reservation[]
+  supplierConfirmations SupplierConfirmation[]
+  passengers           Passenger[]
+  history              BookingHistory[]
+
+  @@index([orderId])
+  @@index([status])
+  @@schema("booking")
+}
+
+model Reservation {
+  id          String            @id @default(uuid())
+  bookingId   String
+  booking     Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  supplierId  String // ссылка на CRM Supplier, без FK
+  status      ReservationStatus @default(HELD)
+  notes       String?
+
+  @@index([bookingId])
+  @@schema("booking")
+}
+
+model SupplierConfirmation {
+  id                  String   @id @default(uuid())
+  bookingId           String
+  booking             Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  supplierId          String // ссылка на CRM Supplier, без FK
+  confirmationNumber  String?
+  payload             Json?
+  receivedAt          DateTime @default(now())
+
+  @@index([bookingId])
+  @@schema("booking")
+}
+
+/// Passenger создаётся для конкретного Booking на основании подтверждённых
+/// данных OrderTraveler. Passenger НЕ заменяет OrderTraveler.
+model Passenger {
+  id             String    @id @default(uuid())
+  bookingId      String
+  booking        Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  firstName      String
+  lastName       String
+  birthDate      DateTime?
+  citizenship    String?
+  gender         String?
+  passportNumber String?
+  passportExpiry DateTime?
+
+  @@index([bookingId])
+  @@schema("booking")
+}
+
+/// Журнал аудита Booking (audit by default).
+model BookingHistory {
+  id        String   @id @default(uuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  action    String
+  from      String?
+  to        String?
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
+  @@schema("booking")
+}
