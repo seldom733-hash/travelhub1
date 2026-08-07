@@ -2,15 +2,27 @@ const BASE = "/api/v1";
 
 const TOKEN_KEY = "travelhub.token";
 
+/** Подписка на изменение токена (login/logout) — для реактивных хуков. */
+type TokenListener = () => void;
+const tokenListeners = new Set<TokenListener>();
+const notifyToken = () => tokenListeners.forEach((l) => l());
+
+/** Реактивный стор токена: setToken/clear уведомляют подписчиков (useCurrentUser). */
 export const auth = {
   get token() {
     return typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_KEY) : null;
   },
   setToken(token: string) {
     window.localStorage.setItem(TOKEN_KEY, token);
+    notifyToken();
   },
   clear() {
     window.localStorage.removeItem(TOKEN_KEY);
+    notifyToken();
+  },
+  subscribe(listener: TokenListener): () => void {
+    tokenListeners.add(listener);
+    return () => tokenListeners.delete(listener);
   },
 };
 

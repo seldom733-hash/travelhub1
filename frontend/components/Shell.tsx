@@ -3,20 +3,37 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { api, auth, type AuthUser } from "@/lib/api";
+import { api, auth } from "@/lib/api";
+import { useCurrentUser } from "@/lib/use-user";
 
-const NAV = [
+interface NavItem {
+  href: string;
+  icon: string;
+  label: string;
+  /** Гранулярное право, открывающее раздел (RBAC Matrix §4). */
+  permission?: string;
+}
+
+const NAV: NavItem[] = [
   { href: "/", icon: "🏠", label: "Обзор" },
-  { href: "/catalog", icon: "📚", label: "Catalog Center" },
-  { href: "/orders", icon: "🧾", label: "Order Center" },
-  { href: "/bookings", icon: "📑", label: "Booking Center" },
-  { href: "/customers", icon: "🤝", label: "CRM mini" },
+  { href: "/catalog", icon: "📚", label: "Catalog Center", permission: "catalog.product.read" },
+  { href: "/orders", icon: "🧾", label: "Order Center", permission: "order.read" },
+  { href: "/bookings", icon: "📑", label: "Booking Center", permission: "booking.read" },
+  { href: "/customers", icon: "🤝", label: "CRM mini", permission: "crm.customer.read" },
 ];
+
+/** Маршрут → требуемое право (для редиректа при прямом переходе). */
+const ROUTE_PERMISSION: Record<string, string> = Object.fromEntries(
+  NAV.filter((n) => n.permission).map((n) => [n.href, n.permission as string]),
+);
+
+const canAccess = (user: { permissions: string[] } | null, permission?: string) =>
+  !permission || (user?.permissions.includes(permission) ?? false);
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const user = useCurrentUser();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -29,14 +46,16 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       router.replace("/login");
       return;
     }
-    api
-      .get<AuthUser>("/auth/me")
-      .then(setUser)
-      .catch(() => {
-        auth.clear();
-        router.replace("/login");
-      });
   }, [mounted, pathname, router]);
+
+  // Редирект с маршрута, на который у пользователя нет права.
+  useEffect(() => {
+    if (!mounted || pathname === "/login" || !user) return;
+    const required = ROUTE_PERMISSION[pathname];
+    if (required && !user.permissions.includes(required)) {
+      router.replace("/");
+    }
+  }, [mounted, pathname, user, router]);
 
   // До монтирования рендерим одинаковый заглушечный DOM (SSR = client, без hydration mismatch).
   if (!mounted) {
@@ -51,6 +70,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   if (!auth.token) {
     return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">Загрузка…</div>;
   }
+
+  const visibleNav = NAV.filter((item) => canAccess(user, item.permission));
+  const hiddenCount = NAV.length - visibleNav.length;
 
   const logout = () => {
     void api.post("/auth/logout").catch(() => undefined);
@@ -72,7 +94,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <nav className="flex-1 py-3">
-          {NAV.map((item) => {
+          {visibleNav.map((item) => {
             const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
               <Link
@@ -89,6 +111,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          {hiddenCount > 0 && (
+            <div className="mt-3 px-5 text-[10px] leading-relaxed text-slate-600">
+              {hiddenCount} раздел(ов) скрыто — нет прав доступа
+            </div>
+          )}
         </nav>
         <div className="border-t border-white/10 px-5 py-4">
           {user && (
