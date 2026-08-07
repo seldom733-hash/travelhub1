@@ -78,6 +78,20 @@ export const api = {
     }).then((r) => handle<T>(r)),
 };
 
+export interface PlatformUser {
+  id: string;
+  code: string;
+  username: string;
+  email: string | null;
+  fullName: string | null;
+  status: string;
+  role: { code: string; title: string };
+  partnerId: string | null;
+  customerId: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
+
 export interface Page<T> {
   items: T[];
   total: number;

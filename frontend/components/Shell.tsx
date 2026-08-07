@@ -20,6 +20,7 @@ const NAV: NavItem[] = [
   { href: "/orders", icon: "🧾", label: "Order Center", permission: "order.read" },
   { href: "/bookings", icon: "📑", label: "Booking Center", permission: "booking.read" },
   { href: "/customers", icon: "🤝", label: "CRM mini", permission: "crm.customer.read" },
+  { href: "/users", icon: "👥", label: "Пользователи", permission: "settings.write" },
 ];
 
 /** Маршрут → требуемое право (для редиректа при прямом переходе). */
