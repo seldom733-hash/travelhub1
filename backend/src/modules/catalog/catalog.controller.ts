@@ -1,8 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { Type } from "class-transformer";
 import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from "class-validator";
 import { ProductStatus, ProductType } from "../../generated/prisma/enums";
 import { CatalogService } from "./catalog.service";
+import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
+import { PermissionsGuard } from "../../security/auth/permissions.guard";
+import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
+import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 
 class TariffDto {
   @IsString()
@@ -99,58 +103,70 @@ class UpsertAvailabilityDto {
 
 /**
  * REST API (Phase 1): /api/v1/products → Catalog Center.
- * Каждый эндпоинт принадлежит только одному домену.
+ * RBAC (Phase 2): чтение — catalog.product.read; запись — catalog.product.write;
+ * публикация — catalog.product.publish (матрица: MODERATOR/ADMIN).
  */
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller()
 export class CatalogController {
   constructor(private readonly catalog: CatalogService) {}
 
   @Post("products")
-  createProduct(@Body() dto: CreateProductDto) {
-    return this.catalog.createProduct(dto, "api");
+  @RequirePermissions("catalog.product.write")
+  createProduct(@Body() dto: CreateProductDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.createProduct(dto, actor.username);
   }
 
   @Get("products")
+  @RequirePermissions("catalog.product.read")
   listProducts(@Query() query: ListProductsQuery) {
     return this.catalog.listProducts(query);
   }
 
   @Get("products/:id")
+  @RequirePermissions("catalog.product.read")
   getProduct(@Param("id") id: string) {
     return this.catalog.getProduct(id);
   }
 
   @Patch("products/:id")
-  updateProduct(@Param("id") id: string, @Body() dto: UpdateProductDto) {
-    return this.catalog.updateProduct(id, dto, "api");
+  @RequirePermissions("catalog.product.write")
+  updateProduct(@Param("id") id: string, @Body() dto: UpdateProductDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.updateProduct(id, dto, actor.username);
   }
 
   @Post("products/:id/publish")
-  publishProduct(@Param("id") id: string) {
-    return this.catalog.publishProduct(id, "api");
+  @RequirePermissions("catalog.product.publish")
+  publishProduct(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.publishProduct(id, actor.username);
   }
 
   @Post("products/:id/archive")
-  archiveProduct(@Param("id") id: string) {
-    return this.catalog.archiveProduct(id, "api");
+  @RequirePermissions("catalog.product.publish")
+  archiveProduct(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.archiveProduct(id, actor.username);
   }
 
   @Get("categories")
+  @RequirePermissions("catalog.product.read")
   listCategories() {
     return this.catalog.listCategories();
   }
 
   @Post("categories")
-  createCategory(@Body() dto: CreateCategoryDto) {
+  @RequirePermissions("catalog.category.write")
+  createCategory(@Body() dto: CreateCategoryDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.catalog.createCategory(dto.title);
   }
 
   @Get("products/:id/availability")
+  @RequirePermissions("catalog.product.read")
   listAvailability(@Param("id") id: string) {
     return this.catalog.listAvailability(id);
   }
 
   @Post("products/:id/availability")
+  @RequirePermissions("catalog.availability.write")
   upsertAvailability(@Param("id") id: string, @Body() dto: UpsertAvailabilityDto) {
     return this.catalog.upsertAvailability(id, dto);
   }

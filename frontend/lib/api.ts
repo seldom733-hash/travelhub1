@@ -1,6 +1,36 @@
 const BASE = "/api/v1";
 
+const TOKEN_KEY = "travelhub.token";
+
+export const auth = {
+  get token() {
+    return typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_KEY) : null;
+  },
+  setToken(token: string) {
+    window.localStorage.setItem(TOKEN_KEY, token);
+  },
+  clear() {
+    window.localStorage.removeItem(TOKEN_KEY);
+  },
+};
+
+export interface AuthUser {
+  id: string;
+  code: string;
+  username: string;
+  email: string | null;
+  fullName: string | null;
+  role: string;
+  roleTitle: string;
+  permissions: string[];
+}
+
 async function handle<T>(res: Response): Promise<T> {
+  if (res.status === 401 && !res.url.includes("/auth/login")) {
+    auth.clear();
+    if (typeof window !== "undefined") window.location.href = "/login";
+    throw new Error("Session expired");
+  }
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {
@@ -14,18 +44,24 @@ async function handle<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
+const headers = (extra?: Record<string, string>): Record<string, string> => {
+  const h: Record<string, string> = { ...(extra ?? {}) };
+  if (auth.token) h.Authorization = `Bearer ${auth.token}`;
+  return h;
+};
+
 export const api = {
-  get: <T>(path: string): Promise<T> => fetch(`${BASE}${path}`).then((r) => handle<T>(r)),
+  get: <T>(path: string): Promise<T> => fetch(`${BASE}${path}`, { headers: headers() }).then((r) => handle<T>(r)),
   post: <T>(path: string, body?: unknown): Promise<T> =>
     fetch(`${BASE}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: headers({ "Content-Type": "application/json" }),
       body: body ? JSON.stringify(body) : undefined,
     }).then((r) => handle<T>(r)),
   patch: <T>(path: string, body: unknown): Promise<T> =>
     fetch(`${BASE}${path}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: headers({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
     }).then((r) => handle<T>(r)),
 };

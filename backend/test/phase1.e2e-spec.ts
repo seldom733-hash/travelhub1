@@ -21,6 +21,7 @@ import { PrismaService } from "../src/prisma/prisma.service";
 describe("Phase 1 — Product → Order → Booking (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let http: request.Agent;
 
   // Created ids for cleanup
   const productIds: string[] = [];
@@ -35,6 +36,13 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+
+    // Phase 2: вход администратором (seed выполняется при старте AppModule);
+    // авторизованный agent подставляет Bearer во все последующие запросы.
+    const login = await request(app.getHttpServer()).post("/api/v1/auth/login").send({ username: "admin", password: "admin123" }).expect(200);
+    expect(login.body.accessToken).toBeTruthy();
+    http = request.agent(app.getHttpServer());
+    http.set("Authorization", `Bearer ${login.body.accessToken}`);
   });
 
   afterAll(async () => {
@@ -49,7 +57,7 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
 
   it("полный сценарий: Product → Customer → Order → Booking → статусы синхронизированы", async () => {
     // ── 1. Product создаётся и публикуется ────────────────────────────────────
-    const productRes = await request(app.getHttpServer())
+    const productRes = await http
       .post("/api/v1/products")
       .send({ type: "TOUR", title: "Test Tour Phase1", tariffs: [{ name: "Standard", price: 250 }] })
       .expect(201);
@@ -58,14 +66,14 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     expect(product.code).toMatch(/^PRD-\d{8}$/);
     expect(product.status).toBe("DRAFT");
 
-    await request(app.getHttpServer()).post(`/api/v1/products/${product.id}/publish`).expect(201);
-    const published = await request(app.getHttpServer()).get(`/api/v1/products/${product.id}`).expect(200);
+    await http.post(`/api/v1/products/${product.id}/publish`).expect(201);
+    const published = await http.get(`/api/v1/products/${product.id}`).expect(200);
     expect(published.body.status).toBe("PUBLISHED");
     expect(published.body.publishedAt).toBeTruthy();
     expect(published.body.tariffs.length).toBe(1);
 
     // ── 2. Customer создаётся ─────────────────────────────────────────────────
-    const customerRes = await request(app.getHttpServer())
+    const customerRes = await http
       .post("/api/v1/customers")
       .send({ type: "PERSON", firstName: "Айгюн", lastName: "Тестова", email: "phase1@test.local" })
       .expect(201);
@@ -74,7 +82,7 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     expect(customer.code).toMatch(/^CUS-\d{8}$/);
 
     // ── 3. bootstrap Order: ORD-* + TH-*, items + travelers ───────────────────
-    const orderRes = await request(app.getHttpServer())
+    const orderRes = await http
       .post("/api/v1/orders/bootstrap")
       .send({
         customerId: customer.id,
@@ -92,14 +100,14 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     expect(Number(order.amount)).toBe(250);
 
     // ── 4. Traveler сохранён и COMPLETE (есть паспорт) ────────────────────────
-    const orderDetail = await request(app.getHttpServer()).get(`/api/v1/orders/${order.id}`).expect(200);
+    const orderDetail = await http.get(`/api/v1/orders/${order.id}`).expect(200);
     expect(orderDetail.body.travelers).toHaveLength(1);
     expect(orderDetail.body.travelers[0].dataCompleteness).toBe("COMPLETE");
     expect(orderDetail.body.items).toHaveLength(1);
     expect(orderDetail.body.items[0].productCode).toBe(product.code);
 
     // ── 5. Нельзя перейти в READY_FOR_BOOKING без паспортных данных ──────────
-    await request(app.getHttpServer())
+    await http
       .post("/api/v1/orders/bootstrap")
       .send({
         customerId: customer.id,
@@ -111,55 +119,55 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
         const badOrder = r.body.order;
         orderIds.push(badOrder.id);
         // Принять в работу можно; переход в READY_FOR_BOOKING без паспорта запрещён.
-        await request(app.getHttpServer()).patch(`/api/v1/orders/${badOrder.id}`).send({ action: "process" }).expect(200);
-        await request(app.getHttpServer())
+        await http.patch(`/api/v1/orders/${badOrder.id}`).send({ action: "process" }).expect(200);
+        await http
           .patch(`/api/v1/orders/${badOrder.id}`)
           .send({ action: "confirm" })
           .expect(422);
       });
 
     // ── 6. Lifecycle: process → confirm → send (BookingRequested) ─────────────
-    await request(app.getHttpServer()).patch(`/api/v1/orders/${order.id}`).send({ action: "process" }).expect(200);
-    await request(app.getHttpServer()).patch(`/api/v1/orders/${order.id}`).send({ action: "confirm" }).expect(200);
-    const ready = await request(app.getHttpServer()).get(`/api/v1/orders/${order.id}`).expect(200);
+    await http.patch(`/api/v1/orders/${order.id}`).send({ action: "process" }).expect(200);
+    await http.patch(`/api/v1/orders/${order.id}`).send({ action: "confirm" }).expect(200);
+    const ready = await http.get(`/api/v1/orders/${order.id}`).expect(200);
     expect(ready.body.status).toBe("READY_FOR_BOOKING");
 
     // «Передать в Booking Center»
-    const sendRes = await request(app.getHttpServer()).patch(`/api/v1/orders/${order.id}`).send({ action: "send" }).expect(200);
+    const sendRes = await http.patch(`/api/v1/orders/${order.id}`).send({ action: "send" }).expect(200);
     expect(sendRes.body.status).toBe("SENT_TO_BOOKING");
 
     // ── 7. Booking создан consumer-ом (BKG-*) + Passenger ────────────────────
-    const bookings = await request(app.getHttpServer()).get(`/api/v1/bookings?orderId=${order.id}`).expect(200);
+    const bookings = await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200);
     expect(bookings.body.total).toBe(1);
     const booking = bookings.body.items[0];
     expect(booking.code).toMatch(/^BKG-\d{8}$/);
     expect(booking.status).toBe("NEW");
     expect(booking.orderId).toBe(order.id);
 
-    const bookingDetail = await request(app.getHttpServer()).get(`/api/v1/bookings/${booking.id}`).expect(200);
+    const bookingDetail = await http.get(`/api/v1/bookings/${booking.id}`).expect(200);
     expect(bookingDetail.body.passengers).toHaveLength(1);
     expect(bookingDetail.body.passengers[0].firstName).toBe("Айгюн");
     expect(bookingDetail.body.history[0].action).toBe("created");
 
     // ── 8. Идемпотентность: повторный send НЕ создаёт вторую бронь ────────────
-    await request(app.getHttpServer()).patch(`/api/v1/orders/${order.id}`).send({ action: "send" }).expect(409);
-    const bookingsAfter = await request(app.getHttpServer()).get(`/api/v1/bookings?orderId=${order.id}`).expect(200);
+    await http.patch(`/api/v1/orders/${order.id}`).send({ action: "send" }).expect(409);
+    const bookingsAfter = await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200);
     expect(bookingsAfter.body.total).toBe(1);
 
     // ── 9. BookingConfirmed → Order обновляет агрегированное состояние ────────
-    await request(app.getHttpServer()).patch(`/api/v1/bookings/${booking.id}`).send({ action: "send" }).expect(200);
-    const confirmed = await request(app.getHttpServer()).patch(`/api/v1/bookings/${booking.id}`).send({ action: "confirm" }).expect(200);
+    await http.patch(`/api/v1/bookings/${booking.id}`).send({ action: "send" }).expect(200);
+    const confirmed = await http.patch(`/api/v1/bookings/${booking.id}`).send({ action: "confirm" }).expect(200);
     expect(confirmed.body.status).toBe("CONFIRMED");
 
-    const orderAfterConfirm = await request(app.getHttpServer()).get(`/api/v1/orders/${order.id}`).expect(200);
+    const orderAfterConfirm = await http.get(`/api/v1/orders/${order.id}`).expect(200);
     expect(orderAfterConfirm.body.status).toBe("PARTIALLY_FULFILLED");
 
     // ── 10. Завершение: complete → FULFILLED → close → CLOSED ────────────────
-    await request(app.getHttpServer()).patch(`/api/v1/bookings/${booking.id}`).send({ action: "service" }).expect(200);
-    await request(app.getHttpServer()).patch(`/api/v1/bookings/${booking.id}`).send({ action: "complete" }).expect(200);
-    const orderFulfilled = await request(app.getHttpServer()).get(`/api/v1/orders/${order.id}`).expect(200);
+    await http.patch(`/api/v1/bookings/${booking.id}`).send({ action: "service" }).expect(200);
+    await http.patch(`/api/v1/bookings/${booking.id}`).send({ action: "complete" }).expect(200);
+    const orderFulfilled = await http.get(`/api/v1/orders/${order.id}`).expect(200);
     expect(orderFulfilled.body.status).toBe("FULFILLED");
-    await request(app.getHttpServer()).patch(`/api/v1/orders/${order.id}`).send({ action: "close" }).expect(200);
+    await http.patch(`/api/v1/orders/${order.id}`).send({ action: "close" }).expect(200);
 
     // ── 11. Трассировка: correlation/causation + аудит переходов ──────────────
     const events = await prisma.outboxEvent.findMany({
@@ -184,7 +192,7 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     expect(actions).not.toContain("booking_rejected");
 
     // ── 12. Финал: заказ закрыт ───────────────────────────────────────────────
-    const closed = await request(app.getHttpServer()).get(`/api/v1/orders/${order.id}`).expect(200);
+    const closed = await http.get(`/api/v1/orders/${order.id}`).expect(200);
     expect(closed.body.status).toBe("CLOSED");
   });
 });

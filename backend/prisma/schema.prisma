@@ -1,14 +1,15 @@
 // ============================================================================
-// TravelHub Phase 1 — Prisma schema (PostgreSQL, multiSchema)
+// TravelHub Phase 1+2 — Prisma schema (PostgreSQL, multiSchema)
 //
 // Каждый бизнес-домен владеет ОТДЕЛЬНОЙ схемой БД (bounded context):
-//   events.*  — инфраструктура: transactional outbox + inbox идемпотентности
-//   catalog.* — Catalog Center: Product, Category, Tariff, Availability
-//   crm.*     — CRM mini: Customer, Contact, Company, Partner, Supplier
-//   order.*   — Order Center: Order, OrderItem, OrderTraveler, Fulfillment
-//   booking.* — Booking Center: Booking, Reservation, SupplierConfirmation, Passenger
+//   events.*   — инфраструктура: transactional outbox + inbox идемпотентности
+//   catalog.*  — Catalog Center: Product, Category, Tariff, Availability
+//   crm.*      — CRM mini: Customer, Contact, Company, Partner, Supplier
+//   order.*    — Order Center: Order, OrderItem, OrderTraveler, Fulfillment
+//   booking.*  — Booking Center: Booking, Reservation, SupplierConfirmation, Passenger
+//   security.* — Auth+RBAC (Phase 2): User, Role, Permission, AuditLog
 //
-// Правила (Baseline, Phase 1):
+// Правила (Baseline, Phase 1+2):
 //  - МЕЖДУ схемами НЕТ foreign keys — только ссылки по ID (productId, customerId, orderId).
 //  - Ни один домен не пишет в таблицы чужой схемы (только через события/API).
 //  - Канонические ID: PRD-*/ORD-*/BKG-*/CUS-* + 8 цифр (генерирует домен-владелец).
@@ -22,7 +23,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["events", "catalog", "crm", "order", "booking"]
+  schemas  = ["events", "catalog", "crm", "order", "booking", "security"]
 }
 
 // ─────────────────────────────── events.* ────────────────────────────────
@@ -546,4 +547,111 @@ model BookingHistory {
 
   @@index([bookingId])
   @@schema("booking")
+}
+
+// ─────────────────────────────── security.* ────────────────────────────────
+// Auth + RBAC (Phase 2, Baseline 1.3): канонические роли ADMIN/DIRECTOR/FINANCE/
+// MARKETER/ANALYST/MODERATOR/SALES_MANAGER/OPERATOR/PARTNER/BUYER.
+// Пользователь имеет ОДНУ роль; права роли — granular permissions (не domain:write).
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+
+  @@schema("security")
+}
+
+/// Пользователь платформы (персонал / партнёр / покупатель).
+/// code — USR-* (канонический ID, генерация — security-домен).
+model User {
+  id           String     @id @default(uuid())
+  code         String     @unique // USR-00000001
+  username     String     @unique
+  email        String?    @unique
+  passwordHash String
+  fullName     String?
+  status       UserStatus @default(ACTIVE)
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  // Object scope (RBAC Matrix §3): PARTNER → partnerId, BUYER → customerId.
+  partnerId  String?
+  customerId String?
+
+  lastLoginAt DateTime?
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  auditLogs AuditLog[]
+
+  @@index([roleId])
+  @@index([status])
+  @@schema("security")
+}
+
+/// Каноническая роль (список ролей зафиксирован, новые — только через ADR).
+enum RoleCode {
+  ADMIN
+  DIRECTOR
+  FINANCE
+  MARKETER
+  ANALYST
+  MODERATOR
+  SALES_MANAGER
+  OPERATOR
+  PARTNER
+  BUYER
+
+  @@schema("security")
+}
+
+model Role {
+  id         String           @id @default(uuid())
+  code       RoleCode         @unique
+  title      String
+  users      User[]
+  permissions RolePermission[]
+
+  @@schema("security")
+}
+
+/// Granular permission (RBAC Matrix §4): например order.accept, booking.confirm.
+model Permission {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  description String?
+  roles       RolePermission[]
+
+  @@schema("security")
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@schema("security")
+}
+
+/// Аудит безопасности: вход/выход, смена роли, доступ/команды (RBAC Matrix §5).
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  username   String?
+  action     String
+  resource   String?
+  resourceId String?
+  details    Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@schema("security")
 }

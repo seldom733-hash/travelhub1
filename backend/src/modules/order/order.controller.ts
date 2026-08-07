@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { Type } from "class-transformer";
 import {
   IsArray,
@@ -11,6 +11,10 @@ import {
   ValidateNested,
 } from "class-validator";
 import { OrderService, type OrderAction } from "./order.service";
+import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
+import { PermissionsGuard } from "../../security/auth/permissions.guard";
+import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
+import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 
 class BootstrapItemDto {
   @IsString()
@@ -120,38 +124,58 @@ class ListOrdersQuery {
   pageSize?: number;
 }
 
+/** Права, необходимые для каждой команды жизненного цикла Order (RBAC Matrix §4). */
+const ACTION_PERMISSIONS: Record<OrderAction, string> = {
+  process: "order.accept",
+  markWaitingData: "order.edit_noncritical",
+  resumeProcessing: "order.edit_noncritical",
+  confirm: "order.edit_noncritical",
+  send: "order.request_booking",
+  complete: "order.edit_noncritical",
+  close: "order.close",
+  cancel: "order.cancel",
+  problem: "order.edit_noncritical",
+  suspend: "order.suspend",
+};
+
 /**
  * REST API: /api/v1/orders → Order Center.
- * POST /orders/bootstrap — временный служебный сценарий Phase 1; после Phase 2
- * основной Order создаётся consumer-ом OrderRequested (Sales Center).
+ * POST /orders/bootstrap — ADMIN-only exception (Phase 1 bootstrap, Phase 2 §4:
+ * «убрать из обычного UI; оставить только как ADMIN/import exception»).
  */
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller()
 export class OrderController {
   constructor(private readonly orders: OrderService) {}
 
   @Post("orders/bootstrap")
-  bootstrapOrder(@Body() dto: BootstrapOrderDto) {
-    return this.orders.bootstrapOrder(dto, "api");
+  @RequirePermissions("order.import")
+  bootstrapOrder(@Body() dto: BootstrapOrderDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.orders.bootstrapOrder(dto, actor.username);
   }
 
   @Get("orders")
+  @RequirePermissions("order.read")
   listOrders(@Query() query: ListOrdersQuery) {
     return this.orders.listOrders(query);
   }
 
   @Get("orders/:id")
+  @RequirePermissions("order.read")
   getOrder(@Param("id") id: string) {
     return this.orders.getOrder(id);
   }
 
   @Patch("orders/:id")
-  orderAction(@Param("id") id: string, @Body() dto: OrderActionDto) {
-    return this.orders.orderAction(id, dto.action, "api");
+  @RequirePermissions((req) => [ACTION_PERMISSIONS[req.body?.action as OrderAction] ?? "order.edit_noncritical"])
+  orderAction(@Param("id") id: string, @Body() dto: OrderActionDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.orders.orderAction(id, dto.action, actor.username);
   }
 
   @Patch("orders/:id/travelers")
-  updateTravelers(@Param("id") id: string, @Body() dto: UpdateTravelersDto) {
-    return this.orders.updateTravelers(id, dto.travelers, "api");
+  @RequirePermissions("order.edit_noncritical")
+  updateTravelers(@Param("id") id: string, @Body() dto: UpdateTravelersDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.orders.updateTravelers(id, dto.travelers, actor.username);
   }
 }
 
