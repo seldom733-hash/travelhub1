@@ -5,6 +5,7 @@ import { api, type PlatformUser } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
+import PanelFrame from "@/components/PanelFrame";
 
 const ROLES: { code: string; title: string }[] = [
   { code: "ADMIN", title: "Администратор" },
@@ -207,18 +208,11 @@ export default function UsersPage() {
 
       {/* Side Panel: создание пользователя */}
       {showCreate && (
-        <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
-          <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
-            <div>
-              <div className="text-lg font-bold text-slate-900">Создать пользователя</div>
-              <div className="text-xs text-slate-400">Персонал платформы (роль из матрицы RBAC)</div>
-            </div>
-            <button onClick={() => setShowCreate(false)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100">
-              ✕
-            </button>
-          </div>
-
-          <div className="space-y-4 p-5 text-sm">
+        <PanelFrame
+          title="Создать пользователя"
+          subtitle="Персонал платформы (роль из матрицы RBAC)"
+          onClose={() => setShowCreate(false)}
+        >
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Логин *</label>
               <input
@@ -282,8 +276,7 @@ export default function UsersPage() {
             <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
               🔐 Смена роли и статуса аудитируется в security.AuditLog. Новые роли не создаются — только канонические из RBAC Matrix.
             </div>
-          </div>
-        </aside>
+        </PanelFrame>
       )}
     </div>
   );

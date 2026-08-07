@@ -5,7 +5,23 @@ import { api, type Page, type Product } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
+import PanelFrame from "@/components/PanelFrame";
 import { useCan } from "@/lib/use-can";
+
+let tariffSeq = 0;
+const newTariff = () => ({ id: ++tariffSeq, name: "", price: "", currency: "RUB" });
+
+const PRODUCT_TYPES = [
+  { code: "TOUR", title: "Тур" },
+  { code: "HOTEL", title: "Отель" },
+  { code: "SANATORIUM", title: "Санаторий" },
+  { code: "FLIGHT", title: "Авиаперелёт" },
+  { code: "TRAIN", title: "Ж/д" },
+  { code: "EXCURSION", title: "Экскурсия" },
+  { code: "GUIDE", title: "Гид" },
+  { code: "TRANSFER", title: "Трансфер" },
+  { code: "PHOTOGRAPHER", title: "Фотограф" },
+];
 
 export default function CatalogPage() {
   const [data, setData] = useState<Page<Product> | null>(null);
@@ -14,9 +30,15 @@ export default function CatalogPage() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // Ролевой UI: публикация продукта — catalog.product.publish (матрица: ADMIN/MODERATOR).
+  // Ролевой UI: публикация — catalog.product.publish; создание — catalog.product.write (матрица: ADMIN/MODERATOR).
   const canPublish = useCan("catalog.product.publish");
   const canWrite = useCan("catalog.product.write");
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ type: "TOUR", title: "", slug: "", description: "" });
+  const [tariffs, setTariffs] = useState<{ id: number; name: string; price: string; currency: string }[]>([
+    newTariff(),
+  ]);
 
   const load = async () => {
     setBusy(true);
@@ -40,6 +62,7 @@ export default function CatalogPage() {
   }, [search, status]);
 
   const openDetail = async (id: string) => {
+    setShowCreate(false);
     const detail = await api.get<Product>(`/products/${id}`);
     setSelected(detail);
   };
@@ -54,6 +77,35 @@ export default function CatalogPage() {
     await api.post(`/products/${id}/archive`);
     await openDetail(id);
     await load();
+  };
+
+  const createProduct = async () => {
+    if (!form.title.trim()) {
+      setError("Укажите название продукта");
+      return;
+    }
+    setCreating(true);
+    setError("");
+    try {
+      const created = await api.post<Product>("/products", {
+        type: form.type,
+        title: form.title.trim(),
+        slug: form.slug.trim() || undefined,
+        description: form.description.trim() || undefined,
+        tariffs: tariffs
+          .filter((t) => t.name.trim() && t.price !== "" && !Number.isNaN(Number(t.price)))
+          .map((t) => ({ name: t.name.trim(), price: Number(t.price), currency: t.currency || "RUB" })),
+      });
+      setShowCreate(false);
+      setForm({ type: "TOUR", title: "", slug: "", description: "" });
+      setTariffs([newTariff()]);
+      await load();
+      setSelected(created);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const counts = {
@@ -71,12 +123,22 @@ export default function CatalogPage() {
           title="Catalog Center"
           breadcrumbs={["TravelHub", "Catalog Center"]}
           actions={
-            <button
-              onClick={() => void load()}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              ⟳ Обновить
-            </button>
+            <div className="flex items-center gap-2">
+              {canWrite && (
+                <button
+                  onClick={() => setShowCreate((v) => !v)}
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                >
+                  ＋ Создать продукт
+                </button>
+              )}
+              <button
+                onClick={() => void load()}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                ⟳ Обновить
+              </button>
+            </div>
           }
         />
 
@@ -158,8 +220,119 @@ export default function CatalogPage() {
         </div>
       </div>
 
-      {/* Side Panel */}
-      {selected && (
+      {/* Side Panel: создание продукта (catalog.product.write) */}
+      {showCreate && (
+        <PanelFrame title="Создать продукт" subtitle="Каталог услуг TravelHub" onClose={() => setShowCreate(false)}>
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Тип *</label>
+              <select
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+              >
+                {PRODUCT_TYPES.map((t) => (
+                  <option key={t.code} value={t.code}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Название *</label>
+              <input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                placeholder="Тур «Золотое кольцо»"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Slug (URL)</label>
+              <input
+                value={form.slug}
+                onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                placeholder="golden-ring-tour"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Описание</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={3}
+                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                placeholder="Краткое описание услуги…"
+              />
+            </div>
+
+            {/* Тарифы */}
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Тарифы</label>
+                <button
+                  type="button"
+                  onClick={() => setTariffs([...tariffs, newTariff()])}
+                  className="text-xs font-medium text-blue-600 hover:underline"
+                >
+                  ＋ добавить
+                </button>
+              </div>
+              <div className="space-y-2">
+                {tariffs.map((t) => (
+                  <div key={t.id} className="flex items-center gap-2">
+                    <input
+                      value={t.name}
+                      onChange={(e) => setTariffs(tariffs.map((x) => (x.id === t.id ? { ...x, name: e.target.value } : x)))}
+                      placeholder="Название"
+                      className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+                    />
+                    <input
+                      type="number"
+                      value={t.price}
+                      onChange={(e) =>
+                        setTariffs(tariffs.map((x) => (x.id === t.id ? { ...x, price: e.target.value } : x)))
+                      }
+                      placeholder="Цена"
+                      className="w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+                    />
+                    <input
+                      value={t.currency}
+                      onChange={(e) =>
+                        setTariffs(tariffs.map((x) => (x.id === t.id ? { ...x, currency: e.target.value } : x)))
+                      }
+                      className="w-16 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
+                    />
+                    {tariffs.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setTariffs(tariffs.filter((x) => x.id !== t.id))}
+                        className="text-slate-400 transition-colors hover:text-red-500"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => void createProduct()}
+              disabled={creating || !form.title.trim()}
+              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {creating ? "Создание…" : "Создать продукт"}
+            </button>
+
+            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
+              🔐 Требуется право <b>catalog.product.write</b> (матрица: ADMIN, MODERATOR). Публикация — отдельным шагом.
+            </div>
+        </PanelFrame>
+      )}
+
+      {/* Side Panel: детали продукта */}
+      {!showCreate && selected && (
         <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
           <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
             <div>
