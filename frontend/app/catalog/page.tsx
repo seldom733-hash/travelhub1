@@ -5,6 +5,7 @@ import { api, type Page, type Product } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
+import { useCan } from "@/lib/use-can";
 
 export default function CatalogPage() {
   const [data, setData] = useState<Page<Product> | null>(null);
@@ -13,6 +14,9 @@ export default function CatalogPage() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Ролевой UI: публикация продукта — catalog.product.publish (матрица: ADMIN/MODERATOR).
+  const canPublish = useCan("catalog.product.publish");
+  const canWrite = useCan("catalog.product.write");
 
   const load = async () => {
     setBusy(true);
@@ -42,6 +46,12 @@ export default function CatalogPage() {
 
   const publish = async (id: string) => {
     await api.post(`/products/${id}/publish`);
+    await openDetail(id);
+    await load();
+  };
+
+  const archive = async (id: string) => {
+    await api.post(`/products/${id}/archive`);
     await openDetail(id);
     await load();
   };
@@ -214,13 +224,26 @@ export default function CatalogPage() {
             </div>
 
             <div className="flex gap-2">
-              {selected.status !== "PUBLISHED" && (
+              {selected.status !== "PUBLISHED" && canPublish && (
                 <button
                   onClick={() => void publish(selected.id)}
                   className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
                 >
                   ✅ Опубликовать
                 </button>
+              )}
+              {selected.status === "PUBLISHED" && canPublish && (
+                <button
+                  onClick={() => void archive(selected.id)}
+                  className="flex-1 rounded-lg bg-slate-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-700"
+                >
+                  🗄 В архив
+                </button>
+              )}
+              {!canPublish && !canWrite && (
+                <div className="w-full rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-400">
+                  Изменение продукта недоступно для вашей роли
+                </div>
               )}
             </div>
           </div>

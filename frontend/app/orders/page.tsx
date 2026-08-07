@@ -5,15 +5,17 @@ import { api, type Order, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
+import { useCan } from "@/lib/use-can";
+import ActionButtons from "@/components/ActionButtons";
 
-const ACTIONS: { action: string; label: string; cls: string; only: string[] }[] = [
+const ACTIONS = [
   { action: "process", label: "Принять в работу", cls: "bg-sky-600 hover:bg-sky-700", only: ["NEW"] },
   { action: "confirm", label: "Готов к бронированию", cls: "bg-violet-600 hover:bg-violet-700", only: ["IN_PROCESSING", "WAITING_FOR_DATA"] },
   { action: "send", label: "Передать в Booking", cls: "bg-blue-600 hover:bg-blue-700", only: ["READY_FOR_BOOKING"] },
   { action: "complete", label: "Исполнен", cls: "bg-emerald-600 hover:bg-emerald-700", only: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"] },
   { action: "close", label: "Закрыть", cls: "bg-slate-700 hover:bg-slate-800", only: ["FULFILLED", "READY_TO_CLOSE"] },
   { action: "cancel", label: "Отменить", cls: "bg-red-600 hover:bg-red-700", only: ["NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "PROBLEM", "SUSPENDED"] },
-];
+] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
 export default function OrdersPage() {
   const [data, setData] = useState<Page<Order> | null>(null);
@@ -22,6 +24,20 @@ export default function OrdersPage() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Ролевой UI: доступные команды определяются granular permissions (RBAC Matrix §4).
+  const canAccept = useCan("order.accept");
+  const canEdit = useCan("order.edit_noncritical");
+  const canSendBooking = useCan("order.request_booking");
+  const canClose = useCan("order.close");
+  const canCancel = useCan("order.cancel");
+  const permOf: Record<string, boolean> = {
+    process: canAccept,
+    confirm: canEdit,
+    send: canSendBooking,
+    complete: canEdit,
+    close: canClose,
+    cancel: canCancel,
+  };
 
   const load = async () => {
     setBusy(true);
@@ -218,17 +234,7 @@ export default function OrdersPage() {
 
             <div>
               <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Команды (actions)</div>
-              <div className="flex flex-wrap gap-2">
-                {ACTIONS.filter((a) => a.only.includes(selected.status)).map((a) => (
-                  <button
-                    key={a.action}
-                    onClick={() => void runAction(a.action)}
-                    className={`rounded-lg px-3 py-2 text-xs font-semibold text-white transition-colors ${a.cls}`}
-                  >
-                    {a.label}
-                  </button>
-                ))}
-              </div>
+              <ActionButtons actions={ACTIONS} status={selected.status} permOf={permOf} onRun={(a) => void runAction(a)} />
             </div>
 
             <div>

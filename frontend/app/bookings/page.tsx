@@ -5,15 +5,17 @@ import { api, type Booking, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
+import { useCan } from "@/lib/use-can";
+import ActionButtons from "@/components/ActionButtons";
 
-const ACTIONS: { action: string; label: string; cls: string; only: string[] }[] = [
+const ACTIONS = [
   { action: "send", label: "Отправить поставщику", cls: "bg-cyan-600 hover:bg-cyan-700", only: ["NEW", "PREPARING_REQUEST"] },
   { action: "confirm", label: "Подтвердить", cls: "bg-emerald-600 hover:bg-emerald-700", only: ["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION"] },
   { action: "reject", label: "Отклонить", cls: "bg-red-600 hover:bg-red-700", only: ["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION"] },
   { action: "service", label: "Услуга началась", cls: "bg-indigo-600 hover:bg-indigo-700", only: ["CONFIRMED"] },
   { action: "complete", label: "Завершить", cls: "bg-emerald-700 hover:bg-emerald-800", only: ["IN_SERVICE"] },
   { action: "cancel", label: "Отменить", cls: "bg-slate-600 hover:bg-slate-700", only: ["NEW", "PREPARING_REQUEST", "SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION", "CONFIRMED", "IN_SERVICE"] },
-];
+] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
 export default function BookingsPage() {
   const [data, setData] = useState<Page<Booking> | null>(null);
@@ -21,6 +23,18 @@ export default function BookingsPage() {
   const [orderRef, setOrderRef] = useState<{ code: string; number: string; status: string } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Ролевой UI: права на команды Booking (RBAC Matrix §4).
+  const canSend = useCan("booking.send_supplier");
+  const canConfirm = useCan("booking.confirm");
+  const canCancel = useCan("booking.cancel");
+  const permOf: Record<string, boolean> = {
+    send: canSend,
+    confirm: canConfirm,
+    reject: canConfirm,
+    service: canConfirm,
+    complete: canConfirm,
+    cancel: canCancel,
+  };
 
   const load = async () => {
     setBusy(true);
@@ -176,17 +190,7 @@ export default function BookingsPage() {
 
             <div>
               <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Команды (actions)</div>
-              <div className="flex flex-wrap gap-2">
-                {ACTIONS.filter((a) => a.only.includes(selected.status)).map((a) => (
-                  <button
-                    key={a.action}
-                    onClick={() => void runAction(a.action)}
-                    className={`rounded-lg px-3 py-2 text-xs font-semibold text-white transition-colors ${a.cls}`}
-                  >
-                    {a.label}
-                  </button>
-                ))}
-              </div>
+              <ActionButtons actions={ACTIONS} status={selected.status} permOf={permOf} onRun={(a) => void runAction(a)} />
             </div>
 
             <div>
