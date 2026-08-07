@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { requireRole, FULL_ADMIN_ROLES } from "@/lib/admin-access";
+import { requireRole, CATALOG_ROLES } from "@/lib/admin-access";
 import { serverErrorResponse } from "@/lib/server-error";
 import { SERVICE_STATUS_LABELS } from "@/lib/admin-data";
 import { recordAudit, requestContext } from "@/lib/audit";
@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const denied = requireRole(user, FULL_ADMIN_ROLES);
+    const denied = requireRole(user, CATALOG_ROLES);
     if (denied) return denied;
 
     const { id } = await params;
@@ -33,6 +33,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       },
     });
     if (!service) return NextResponse.json({ error: "Услуга не найдена" }, { status: 404 });
+    // Object scope (RBAC Matrix §3): PARTNER видит только свои продукты.
+    if (user.role === "PARTNER" && service.providerId !== user.id) {
+      return NextResponse.json({ error: "Forbidden: доступ только к своим продуктам" }, { status: 403 });
+    }
 
     // Связанные услуги (Гл. 4.9): названия по id из relatedIds.
     let related: { id: string; code: string; title: string; type: string; price: number; currency: string; status: string }[] = [];
@@ -138,7 +142,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const denied = requireRole(user, FULL_ADMIN_ROLES);
+    const denied = requireRole(user, CATALOG_ROLES);
     if (denied) return denied;
 
     const { id } = await params;
@@ -151,6 +155,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const existing = await prisma.service.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Услуга не найдена" }, { status: 404 });
+    // Object scope (RBAC Matrix §3): PARTNER работает только со своими продуктами
+    // в статусе черновика/согласования и НЕ публикует напрямую (Baseline §14):
+    // публикация — прерогатива MODERATOR/ADMIN после модерации.
+    const action = typeof body.action === "string" ? body.action : "";
+    if (user.role === "PARTNER") {
+      if (existing.providerId !== user.id) {
+        return NextResponse.json({ error: "Forbidden: доступ только к своим продуктам" }, { status: 403 });
+      }
+      if (["publish", "unpublish", "suspend", "archive", "restore"].includes(action)) {
+        return NextResponse.json(
+          { error: "Forbidden: публикация выполняется после модерации (MODERATOR/ADMIN)" },
+          { status: 403 }
+        );
+      }
+      if (!["DRAFT", "REVIEW", "READY"].includes(existing.status)) {
+        return NextResponse.json({ error: "Недоступно: продукт не в статусе черновика" }, { status: 403 });
+      }
+    }
 
     // Поля карточки (Гл. 4.5–4.8): обновляются только переданные значения.
     const data: Record<string, unknown> = {};
@@ -241,7 +263,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     // Смена статуса жизненного цикла (Гл. 4.12): отдельное поле action.
-    const action = typeof body.action === "string" ? body.action : "";
+    // (action уже прочитан выше для проверки прав PARTNER)
     const VALID_STATUS = ["DRAFT", "REVIEW", "READY", "PUBLISHED", "SUSPENDED", "ARCHIVED"];
     let newStatus: string | null = null;
     let actionComment = "";

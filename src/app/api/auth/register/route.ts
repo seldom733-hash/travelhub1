@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { userBusinessCode } from "@/lib/ids";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +40,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Пользователь с таким email уже зарегистрирован" }, { status: 409 });
     }
 
+    // Канонический код пользователя (Baseline §0.8): CUS-* для клиентов/партнёров.
+    const userRows = await prisma.user.findMany({ select: { code: true } });
+    const userCode = userBusinessCode(userRole, userRows.map((u) => u.code).filter((c): c is string => !!c));
+
     const user = await prisma.user.create({
       data: {
+        code: userCode,
         email: cleanEmail,
         passwordHash: `hash:${password}`,
         firstName: cleanFirst,

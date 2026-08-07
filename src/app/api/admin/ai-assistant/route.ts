@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { SERVICE_TYPE_LABELS, fmtMoney, seriesTrendPct, ORDER_STATUS_GROUPS } from "@/lib/admin-data";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
-import { ALL_ADMIN_ROLES, requireRole } from "@/lib/admin-access";
+import { DASHBOARD_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const denied = requireRole(user, ALL_ADMIN_ROLES);
+    const denied = requireRole(user, DASHBOARD_ROLES);
     if (denied) return denied;
 
     const q = (new URL(request.url).searchParams.get("q") || "").trim().toLowerCase();

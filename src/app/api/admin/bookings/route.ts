@@ -13,10 +13,15 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { EXECUTION_ROLES, requireRole } from "@/lib/admin-access";
+import { nextBusinessCode } from "@/lib/ids";
 
 export const dynamic = "force-dynamic";
 
-const PAID: ("PAID" | "COMPLETED")[] = ["PAID", "COMPLETED"];
+// Канонические группы статусов брони (Baseline §0.5): оплата — измерение Order,
+// поэтому «оплаченные» в центре броней = подтверждённые/исполненные брони.
+const BOOKING_AWAITING = ["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION", "NEEDS_CLARIFICATION"] as const;
+const BOOKING_CONFIRMED = ["CONFIRMED", "IN_SERVICE", "COMPLETED"] as const;
+const BOOKING_CANCELLED = ["CANCELLED", "CANCELLATION_REQUESTED", "SUPPLIER_REJECTED"] as const;
 
 type PeriodKey = "today" | "yesterday" | "week" | "month" | "quarter" | "year" | "custom";
 
@@ -154,23 +159,23 @@ export async function GET(request: Request) {
     for (const r of statusRows) counts[r.status] = r._count;
     for (const r of prevStatusRows) prevCounts[r.status] = r._count;
 
-    // «Новые бронирования» — бронь «Ожидает подтверждения» (PENDING), Гл. 5.5.
-    const newBookings = counts["PENDING"] ?? 0;
-    const awaitingCount = (counts["PENDING"] ?? 0) + (counts["CONFIRMED"] ?? 0);
-    // «Оплаченные» — оплата оплачена: PAID + COMPLETED (завершённые тоже оплачены), Гл. 5.5.
-    const paidBookings = (counts["PAID"] ?? 0) + (counts["COMPLETED"] ?? 0);
+    // «Новые бронирования» — новые/в подготовке (Baseline §0.5).
+    const newBookings = (counts["NEW"] ?? 0) + (counts["PREPARING_REQUEST"] ?? 0);
+    const awaitingCount = BOOKING_AWAITING.reduce((a, s) => a + (counts[s] ?? 0), 0);
+    // «Подтверждённые» — подтверждены/в поездке/завершены.
+    const confirmedBookings = BOOKING_CONFIRMED.reduce((a, s) => a + (counts[s] ?? 0), 0);
     const completedCount = counts["COMPLETED"] ?? 0;
-    // «Подтверждённые» — только CONFIRMED (подтверждены, ждут оплаты), без оплаченных/завершённых.
-    const confirmedBookings = counts["CONFIRMED"] ?? 0;
-    const cancelledBookings = counts["REFUNDED"] ?? 0;
+    const cancelledBookings = BOOKING_CANCELLED.reduce((a, s) => a + (counts[s] ?? 0), 0);
     const totalBookings = statusRows.reduce((a, r) => a + r._count, 0);
+    // «Оплаченные» (КПИ) — подтверждённые/исполненные брони (оплата — на уровне Order).
+    const paidBookings = confirmedBookings;
 
     // ── KPI: конверсия бронирование → оплата ──
     const conversionRate = totalBookings ? (paidBookings / totalBookings) * 100 : 0;
 
-    // ── KPI: среднее время подтверждения (оценка по updatedAt-createdAt для оплаченных) ──
+    // ── KPI: среднее время подтверждения (оценка по updatedAt-createdAt для подтверждённых) ──
     const paidRows = await prisma.booking.findMany({
-      where: { ...bookingWhere, status: { in: PAID } },
+      where: { ...bookingWhere, status: { in: [...BOOKING_CONFIRMED] } },
       select: { createdAt: true, updatedAt: true },
     });
     let avgConfirmHours = 0;
@@ -182,7 +187,7 @@ export async function GET(request: Request) {
     // ── KPI: прогноз AI (ожидаемые бронирования/доход) ──
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const monthAgg = await prisma.booking.aggregate({
-      where: { status: { in: PAID }, createdAt: { gte: monthStart } },
+      where: { status: { in: [...BOOKING_CONFIRMED] }, createdAt: { gte: monthStart } },
       _sum: { amount: true },
       _count: true,
     });
@@ -192,13 +197,13 @@ export async function GET(request: Request) {
 
     // ── Финансовые показатели ──
     const [paidAgg, pendingAgg, refundAgg] = await Promise.all([
-      prisma.booking.aggregate({ where: { ...bookingWhere, status: { in: PAID } }, _sum: { amount: true }, _count: true }),
+      prisma.booking.aggregate({ where: { ...bookingWhere, status: { in: [...BOOKING_CONFIRMED] } }, _sum: { amount: true }, _count: true }),
       prisma.booking.aggregate({
-        where: { ...bookingWhere, status: { in: ["PENDING", "CONFIRMED"] } },
+        where: { ...bookingWhere, status: { in: [...BOOKING_AWAITING] } },
         _sum: { amount: true },
         _count: true,
       }),
-      prisma.booking.aggregate({ where: { ...bookingWhere, status: "REFUNDED" }, _sum: { amount: true }, _count: true }),
+      prisma.booking.aggregate({ where: { ...bookingWhere, status: { in: [...BOOKING_CANCELLED] } }, _sum: { amount: true }, _count: true }),
     ]);
     const financial = {
       totalAmount: Math.round((paidAgg._sum.amount ?? 0) + (pendingAgg._sum.amount ?? 0)),
@@ -304,7 +309,7 @@ export async function GET(request: Request) {
     const now = Date.now();
     // Риск-виджеты (проблемные брони, просроченные подтверждения, ожидающие оплаты)
     // не привязаны к выбранному периоду — это глобальные SLA-индикаторы.
-    const riskWhere: Record<string, unknown> = { status: { in: ["PENDING", "CONFIRMED"] } };
+    const riskWhere: Record<string, unknown> = { status: { in: [...BOOKING_AWAITING] } };
     if (hasServiceFilter) riskWhere.service = serviceFilter;
     const pendingRows = await prisma.booking.findMany({
       where: riskWhere,
@@ -373,7 +378,7 @@ export async function GET(request: Request) {
     // ── Ближайшие даты поездок (глобально, без привязки к периоду) ──
     const upcomingTrips = await prisma.booking.findMany({
       where: {
-        status: { in: PAID },
+        status: { in: [...BOOKING_CONFIRMED] },
         serviceDate: { gte: new Date(now - 86400000), lte: new Date(now + 30 * 86400000) },
         ...(hasServiceFilter ? { service: serviceFilter } : {}),
       },
@@ -433,6 +438,7 @@ export async function GET(request: Request) {
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
+        code: true,
         amount: true,
         status: true,
         serviceDate: true,
@@ -493,7 +499,7 @@ export async function GET(request: Request) {
 
     const bookings = tableRows.map((r) => ({
       id: r.id,
-      bookingNumber: `BK-${r.id.slice(-8).toUpperCase()}`,
+      bookingNumber: r.code ?? `BK-${r.id.slice(-8).toUpperCase()}`,
       // Номер заказа берём из реальной связи booking.order (не генерируем из id брони),
       // чтобы колонка «Заказ» совпадала с номером заказа в реестре заказов.
       orderId: r.order?.orderNumber ?? "—",
@@ -507,7 +513,11 @@ export async function GET(request: Request) {
       amount: r.amount,
       currency: r.service.currency || "USD",
       bookingStatus: r.status,
-      paymentStatus: r.status === "PAID" || r.status === "COMPLETED" ? "paid" : r.status === "PENDING" || r.status === "CONFIRMED" ? "pending" : "refunded",
+      paymentStatus: (BOOKING_CONFIRMED as readonly string[]).includes(r.status)
+        ? "paid"
+        : (BOOKING_CANCELLED as readonly string[]).includes(r.status)
+        ? "refunded"
+        : "pending",
       manager: pickManager(r.id),
       source: pickSource(r.id),
       unreadCount: unreadMap.get(r.id) ?? 0,
@@ -553,15 +563,15 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       kpi: {
-        newBookings: { value: newBookings, change: changePct(newBookings, prevCounts["PENDING"] ?? 0), detail: `${newBookings} ожидают подтверждения` },
-        confirmedBookings: { value: confirmedBookings, change: changePct(confirmedBookings, prevCounts["CONFIRMED"] ?? 0), detail: `${confirmedBookings} ждут оплаты` },
-        awaitingPayment: { value: awaitingCount, change: changePct(awaitingCount, (prevCounts["PENDING"] ?? 0) + (prevCounts["CONFIRMED"] ?? 0)), detail: `${fmtMoney(financial.pendingAmount)} в ожидании` },
-        paidBookings: { value: paidBookings, change: changePct(paidBookings, (prevCounts["PAID"] ?? 0) + (prevCounts["COMPLETED"] ?? 0)), detail: fmtMoney(financial.paidAmount) },
-        cancelledBookings: { value: cancelledBookings, change: changePct(cancelledBookings, prevCounts["REFUNDED"] ?? 0), detail: `${fmtMoney(financial.refundedAmount)} возвращено` },
+        newBookings: { value: newBookings, change: changePct(newBookings, (prevCounts["NEW"] ?? 0) + (prevCounts["PREPARING_REQUEST"] ?? 0)), detail: `${newBookings} новых броней` },
+        confirmedBookings: { value: confirmedBookings, change: changePct(confirmedBookings, BOOKING_CONFIRMED.reduce((a, s) => a + (prevCounts[s] ?? 0), 0)), detail: `${completedCount} завершено` },
+        awaitingPayment: { value: awaitingCount, change: changePct(awaitingCount, BOOKING_AWAITING.reduce((a, s) => a + (prevCounts[s] ?? 0), 0)), detail: `${fmtMoney(financial.pendingAmount)} в ожидании` },
+        paidBookings: { value: paidBookings, change: changePct(paidBookings, BOOKING_CONFIRMED.reduce((a, s) => a + (prevCounts[s] ?? 0), 0)), detail: fmtMoney(financial.paidAmount) },
+        cancelledBookings: { value: cancelledBookings, change: changePct(cancelledBookings, BOOKING_CANCELLED.reduce((a, s) => a + (prevCounts[s] ?? 0), 0)), detail: `${fmtMoney(financial.refundedAmount)} возвращено` },
         completedBookings: {
           value: completedCount,
           change: changePct(completedCount, prevCounts["COMPLETED"] ?? 0),
-          detail: paidBookings ? `${completedCount} из ${paidBookings} оплаченных завершено` : "Поездки завершены",
+          detail: paidBookings ? `${completedCount} из ${paidBookings} подтверждённых завершено` : "Поездки завершены",
         },
         conversion: { value: conversionRate, change: 0, detail: `${paidBookings} из ${totalBookings} броней` },
         avgConfirm: { value: avgConfirmHours, change: 0, detail: `Цель SLA: ${slaTargetHours} ч · Соблюдение ${slaCompliance}%` },
@@ -572,12 +582,11 @@ export async function GET(request: Request) {
           detail: `${attentionMessages} непрочитанных сообщений`,
         },
       },
-      // Воронка конверсии жизненного цикла (Гл. 5.5): создано → подтверждено → оплачено.
-      // Этапы накопительные: confirmed = CONFIRMED+PAID+COMPLETED, paid = PAID+COMPLETED.
+      // Воронка конверсии жизненного цикла (Baseline §0.5): создано → подтверждено → исполнено.
       funnel: {
         entry: totalBookings,
-        confirmed: confirmedBookings + paidBookings,
-        paid: paidBookings,
+        confirmed: confirmedBookings,
+        paid: completedCount,
       },
       bookingsSeries,
       bookingsByService,
@@ -624,7 +633,7 @@ export async function GET(request: Request) {
 /**
  * POST /api/admin/bookings
  * Тело: { userId, serviceId, serviceDate, amount?, source? }
- * Создаёт бронирование со статусом PENDING и возвращает созданную строку.
+ * Создаёт бронирование со статусом NEW (Baseline §0.5) и возвращает созданную строку.
  */
 export async function POST(request: Request) {
   try {
@@ -677,16 +686,20 @@ export async function POST(request: Request) {
 
     // Создание брони + запись в журнал истории — атомарно
     const created = await prisma.$transaction(async (tx) => {
+      // Канонический код бронирования BKG-* (Baseline §0.8)
+      const bkRows = await tx.booking.findMany({ select: { code: true } });
       const b = await tx.booking.create({
         data: {
+          code: nextBusinessCode("BKG", bkRows.map((x) => x.code)),
           userId,
           serviceId,
-          status: "PENDING",
+          status: "NEW",
           amount,
           serviceDate,
         },
         select: {
           id: true,
+          code: true,
           amount: true,
           status: true,
           serviceDate: true,
@@ -711,7 +724,7 @@ export async function POST(request: Request) {
           bookingId: b.id,
           action: "created",
           from: null,
-          to: "PENDING",
+          to: "NEW",
           actorId: user.id,
           actorName: actorDisplayName(user),
           comment: "Бронирование создано",
@@ -724,7 +737,7 @@ export async function POST(request: Request) {
           senderId: null,
           senderName: "Система",
           senderRole: "system",
-          text: bookingSystemMessage("PENDING"),
+          text: bookingSystemMessage("NEW"),
         },
       });
       return b;
@@ -736,7 +749,7 @@ export async function POST(request: Request) {
       message: `Бронирование создано: ${created.service.title}`,
       booking: {
         id: created.id,
-        bookingNumber: `BK-${created.id.slice(-8).toUpperCase()}`,
+        bookingNumber: created.code ?? `BK-${created.id.slice(-8).toUpperCase()}`,
         // Бронь, созданная без заказа, не привязана к заказу — показываем «—»
         // (заказ создаётся отдельно в реестре заказов).
         orderId: "—",

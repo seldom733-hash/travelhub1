@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { requireRole, FULL_ADMIN_ROLES } from "@/lib/admin-access";
+import { requireRole, CATALOG_ROLES } from "@/lib/admin-access";
 import { serverErrorResponse } from "@/lib/server-error";
 import { recordAudit, requestContext } from "@/lib/audit";
 import type { ServiceStatus } from "@/generated/prisma/enums";
@@ -18,7 +18,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const denied = requireRole(user, FULL_ADMIN_ROLES);
+    const denied = requireRole(user, CATALOG_ROLES);
     if (denied) return denied;
 
     const { id } = await params;
@@ -41,6 +41,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     ]);
     if (!service) return NextResponse.json({ error: "Услуга не найдена" }, { status: 404 });
     if (!target) return NextResponse.json({ error: "Версия не найдена" }, { status: 404 });
+    // Object scope (RBAC Matrix §3): PARTNER восстанавливает только свои продукты.
+    if (user.role === "PARTNER" && service.providerId !== user.id) {
+      return NextResponse.json({ error: "Forbidden: доступ только к своим продуктам" }, { status: 403 });
+    }
     if (version >= service.version) {
       return NextResponse.json({ error: "Можно восстановить только предыдущую редакцию" }, { status: 400 });
     }

@@ -1,9 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { ORDER_STATUS_GROUPS, changePct, bucketize, SERVICE_TYPE_LABELS } from "@/lib/admin-data";
+import { changePct, bucketize, SERVICE_TYPE_LABELS } from "@/lib/admin-data";
 import { type AnalyticsSectionData, type AnalyticsFilters, analyticsRange } from "@/lib/analytics";
-
-const PAID = [...ORDER_STATUS_GROUPS.paid] as const;
-const AWAITING = [...ORDER_STATUS_GROUPS.awaitingPayment] as const;
 
 /**
  * 2.13 Финансовая аналитика — единый центр финансового контроля.
@@ -35,24 +32,19 @@ export async function getFinanceData(f: AnalyticsFilters): Promise<AnalyticsSect
   }
 
   // Агрегаты уважают фильтр статуса: при выбранном статусе вся страница
-  // показывает данные только по нему (Гл. 2.7).
-  const paidStatus: { in: (typeof PAID)[number][] } | (typeof PAID)[number] = f.status
-    ? (f.status as (typeof PAID)[number])
-    : { in: [...PAID] };
-  const pendingStatus: { in: (typeof AWAITING)[number][] } | (typeof PAID)[number] = f.status
-    ? (f.status as (typeof PAID)[number])
-    : { in: [...AWAITING] };
-  const refundStatus: (typeof PAID)[number] | "REFUNDED" = f.status
-    ? (f.status as (typeof PAID)[number])
-    : "REFUNDED";
+  // показывает данные только по нему (Гл. 2.7). Оплата — отдельное измерение
+  // paymentStatus (Baseline §0.6).
+  const paidWhere: Record<string, unknown> = f.status ? { status: f.status } : { paymentStatus: "PAID" };
+  const pendingWhere: Record<string, unknown> = f.status ? { status: f.status } : { paymentStatus: { in: ["UNPAID", "PARTIALLY_PAID"] } };
+  const refundWhere: Record<string, unknown> = f.status ? { status: f.status } : { paymentStatus: "REFUNDED" };
 
   // ── KPI: выручка, комиссия, выплаты, возвраты ──
   const [paidAgg, prevPaidAgg, pendingAgg, refundAgg, prevRefundAgg] = await Promise.all([
-    prisma.order.aggregate({ where: { ...orderWhere, status: paidStatus }, _sum: { paidAmount: true }, _count: true }),
-    prisma.order.aggregate({ where: { ...prevOrderWhere, status: paidStatus }, _sum: { paidAmount: true }, _count: true }),
-    prisma.order.aggregate({ where: { ...orderWhere, status: pendingStatus }, _sum: { amount: true }, _count: true }),
-    prisma.order.aggregate({ where: { ...orderWhere, status: refundStatus }, _sum: { amount: true }, _count: true }),
-    prisma.order.aggregate({ where: { ...prevOrderWhere, status: refundStatus }, _sum: { amount: true }, _count: true }),
+    prisma.order.aggregate({ where: { ...orderWhere, ...paidWhere }, _sum: { paidAmount: true }, _count: true }),
+    prisma.order.aggregate({ where: { ...prevOrderWhere, ...paidWhere }, _sum: { paidAmount: true }, _count: true }),
+    prisma.order.aggregate({ where: { ...orderWhere, ...pendingWhere }, _sum: { amount: true }, _count: true }),
+    prisma.order.aggregate({ where: { ...orderWhere, ...refundWhere }, _sum: { amount: true }, _count: true }),
+    prisma.order.aggregate({ where: { ...prevOrderWhere, ...refundWhere }, _sum: { amount: true }, _count: true }),
   ]);
   const revenue = paidAgg._sum?.paidAmount ?? 0;
   const revenuePrev = prevPaidAgg._sum?.paidAmount ?? 0;
@@ -70,7 +62,7 @@ export async function getFinanceData(f: AnalyticsFilters): Promise<AnalyticsSect
   // периода (детерминированно от оборота), чтобы серия «Остаток» не была нулевой:
   // выплаты (88%) и комиссия уже учтены внутри поступлений, поэтому остаток = старт + acc − out.
   const paidRows = await prisma.order.findMany({
-    where: { ...orderWhere, status: paidStatus },
+    where: { ...orderWhere, ...paidWhere },
     select: { createdAt: true, paidAmount: true },
   });
   const inflowSeries = bucketize(paidRows.map((r) => ({ at: r.createdAt, amount: r.paidAmount ?? 0 })), f.period, range);
@@ -91,7 +83,7 @@ export async function getFinanceData(f: AnalyticsFilters): Promise<AnalyticsSect
 
   // ── Рентабельность услуг (2.13.8): по услугам оплаченных заказов ──
   const paidRowsWithServices = await prisma.order.findMany({
-    where: { ...orderWhere, status: paidStatus },
+    where: { ...orderWhere, ...paidWhere },
     select: {
       paidAmount: true,
       bookings: { select: { service: { select: { type: true, provider: { select: { companyName: true, firstName: true } } } } } },

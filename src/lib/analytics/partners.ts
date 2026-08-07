@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { changePct, SERVICE_TYPE_LABELS } from "@/lib/admin-data";
 import { type AnalyticsSectionData, type AnalyticsFilters, analyticsRange } from "@/lib/analytics";
 
-const PAID: ("PAID" | "COMPLETED")[] = ["PAID", "COMPLETED"];
+const PAID: ("CONFIRMED" | "IN_SERVICE" | "COMPLETED")[] = ["CONFIRMED", "IN_SERVICE", "COMPLETED"];
 
 /**
  * 2.15 Аналитика партнеров — оценка эффективности поставщиков платформы.
@@ -34,8 +34,8 @@ export async function getPartnersData(f: AnalyticsFilters): Promise<AnalyticsSec
     .map((p) => {
       const bookings = p.services.flatMap((s) => s.bookings);
       const total = bookings.length;
-      const confirmed = bookings.filter((b) => ["CONFIRMED", "PAID", "COMPLETED"].includes(b.status)).length;
-      const cancelled = bookings.filter((b) => b.status === "REFUNDED").length;
+      const confirmed = bookings.filter((b) => ["CONFIRMED", "IN_SERVICE", "COMPLETED"].includes(b.status)).length;
+      const cancelled = bookings.filter((b) => b.status === "CANCELLED" || b.status === "SUPPLIER_REJECTED").length;
       const revenue = bookings.filter((b) => PAID.includes(b.status as (typeof PAID)[number])).reduce((a, b) => a + b.amount, 0);
       const confirmPct = total ? Math.round((confirmed / total) * 100) : 0;
       const cancelPct = total ? Math.round((cancelled / total) * 100) : 0;

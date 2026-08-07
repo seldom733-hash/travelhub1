@@ -17,6 +17,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { SALES_ROLES, requireRole } from "@/lib/admin-access";
+import { emitOrderEvent, publishOrderEvents } from "@/lib/events";
 import {
   AUTOMATION_SCENARIOS,
   buildAutomationJournal,
@@ -25,6 +26,7 @@ import {
   exceptionStats,
 } from "@/lib/sales-automation";
 import { recordAudit, requestContext } from "@/lib/audit";
+import { nextBusinessCode, orderUserNumber } from "@/lib/ids";
 
 export const dynamic = "force-dynamic";
 
@@ -43,27 +45,39 @@ export function pickSource(id: string): string {
   return sources[h % sources.length];
 }
 
-// Статусы, считающиеся «оплаченными» / «ожидающими оплаты» / активными (Гл. 6.10)
-// Единый источник статусных групп — ORDER_STATUS_GROUPS из admin-data.ts
-// (используется и Dashboard, чтобы карточки и таблицы не расходились).
-const PAID_STATUSES = [...ORDER_STATUS_GROUPS.paid] as const;
-const AWAITING_STATUSES = [...ORDER_STATUS_GROUPS.awaitingPayment] as const;
+// Оплата — отдельное измерение (paymentStatus, Baseline §0.6); активные статусы —
+// из ORDER_STATUS_GROUPS (единый источник для реестра и Dashboard).
 const ACTIVE_STATUSES = [...ORDER_STATUS_GROUPS.active] as const;
 
-export function orderPaymentStatus(status: string): "paid" | "partially" | "pending" | "refunded" {
-  if (PAID_STATUSES.includes(status as (typeof PAID_STATUSES)[number])) return "paid";
-  if (status === "PARTIALLY_PAID") return "partially";
-  if (status === "REFUNDED" || status === "CANCELLED") return "refunded";
+export function orderPaymentStatus(payment: string): "paid" | "partially" | "pending" | "refunded" {
+  if (payment === "PAID") return "paid";
+  if (payment === "PARTIALLY_PAID") return "partially";
+  if (payment === "REFUNDED") return "refunded";
   return "pending";
 }
 
-// «Худший» статус брони в составе заказа (для колонки «Статус бронирования»)
+// «Худший» статус брони в составе заказа (для колонки «Статус бронирования»):
+// самый ранний этап канонического жизненного цикла (Baseline §0.5).
 export function worstBookingStatus(statuses: string[]): string {
-  const rank: Record<string, number> = { PENDING: 0, CONFIRMED: 1, PAID: 2, COMPLETED: 3, REFUNDED: 4 };
+  const rank: Record<string, number> = {
+    NEW: 0,
+    PREPARING_REQUEST: 1,
+    SENT_TO_SUPPLIER: 2,
+    AWAITING_CONFIRMATION: 3,
+    NEEDS_CLARIFICATION: 4,
+    CHANGE_REQUESTED: 5,
+    CONFIRMED: 6,
+    IN_SERVICE: 7,
+    COMPLETED: 8,
+    CANCELLED: 9,
+    CANCELLATION_REQUESTED: 9,
+    SUPPLIER_REJECTED: 9,
+    PROBLEM: 9,
+  };
   let worst = "COMPLETED";
   let worstRank = 99;
   for (const s of statuses) {
-    const r = rank[s] ?? 5;
+    const r = rank[s] ?? 9;
     if (r < worstRank) {
       worstRank = r;
       worst = s;
@@ -173,12 +187,16 @@ export async function GET(request: Request) {
     // ── Фильтры по заказу ──
     const orderWhere: Record<string, unknown> = { createdAt: { gte: range.start, lte: range.end } };
     if (priority) orderWhere.priority = priority; // фильтр приоритета (Гл. 3.9)
-    if (hasServiceFilter) orderWhere.bookings = { some: { service: serviceFilter } };
+    // Фильтр по услуге ищется и в бронях (исполненные), и в составе заказа
+    // OrderItem (до передачи в Booking Center, Baseline §3).
+    if (hasServiceFilter) {
+      orderWhere.OR = [{ bookings: { some: { service: serviceFilter } } }, { items: { some: { service: serviceFilter } } }];
+    }
     if (minPrice > 0) orderWhere.amount = { gte: minPrice };
     if (maxPrice > 0) orderWhere.amount = { ...(orderWhere.amount as object ?? {}), lte: maxPrice };
 
     const prevOrderWhere: Record<string, unknown> = { createdAt: { gte: range.prevStart, lte: range.prevEnd } };
-    if (hasServiceFilter) prevOrderWhere.bookings = { some: { service: serviceFilter } };
+    if (hasServiceFilter) prevOrderWhere.OR = [{ bookings: { some: { service: serviceFilter } } }, { items: { some: { service: serviceFilter } } }];
 
     // ── KPI: заказы по статусам ──
     const [statusRows, prevStatusRows] = await Promise.all([
@@ -193,28 +211,42 @@ export async function GET(request: Request) {
 
     const totalOrders = statusRows.reduce((a, r) => a + r._count, 0);
     const activeCount = ACTIVE_STATUSES.reduce((a, s) => a + (counts[s] ?? 0), 0);
-    const awaitingCount = AWAITING_STATUSES.reduce((a, s) => a + (counts[s] ?? 0), 0);
-    const paidCount = PAID_STATUSES.reduce((a, s) => a + (counts[s] ?? 0), 0);
     const cancelledCount = counts["CANCELLED"] ?? 0;
-    const refundedCount = counts["REFUNDED"] ?? 0;
-    // KPI по спецификации Заказ.docx (5.4): дополнительные показатели
+    const problemCount = (counts["PROBLEM"] ?? 0) + (counts["SUSPENDED"] ?? 0);
+    const sentToBookingCount = counts["SENT_TO_BOOKING"] ?? 0;
+    const fulfilledCount =
+      (counts["PARTIALLY_FULFILLED"] ?? 0) + (counts["FULFILLED"] ?? 0) + (counts["READY_TO_CLOSE"] ?? 0);
+    const closedCount = counts["CLOSED"] ?? 0;
+    // Оплата — отдельное измерение: считаем по paymentStatus.
+    const [paymentRows, prevPaymentRows] = await Promise.all([
+      prisma.order.groupBy({ by: ["paymentStatus"], where: orderWhere, _count: true }),
+      prisma.order.groupBy({ by: ["paymentStatus"], where: prevOrderWhere, _count: true }),
+    ]);
+    const payCounts: Record<string, number> = {};
+    const prevPayCounts: Record<string, number> = {};
+    for (const r of paymentRows) payCounts[r.paymentStatus] = r._count;
+    for (const r of prevPaymentRows) prevPayCounts[r.paymentStatus] = r._count;
+    const awaitingCount = (payCounts["UNPAID"] ?? 0) + (payCounts["PARTIALLY_PAID"] ?? 0);
+    const paidCount = (payCounts["PAID"] ?? 0) + (payCounts["PARTIALLY_PAID"] ?? 0);
+    const refundedCount = payCounts["REFUNDED"] ?? 0;
+    // KPI: дополнительные показатели по каноническому жизненному циклу
     const processingCount =
-      (counts["DRAFT"] ?? 0) + (counts["CREATED"] ?? 0) + (counts["PROCESSING"] ?? 0) + (counts["AWAITING_CONFIRMATION"] ?? 0);
-    const awaitingConfirmationCount = counts["AWAITING_CONFIRMATION"] ?? 0;
-    const readyCount = (counts["DOCUMENT_PREP"] ?? 0) + (counts["READY"] ?? 0);
-    const completedCount = counts["COMPLETED"] ?? 0;
+      (counts["NEW"] ?? 0) + (counts["IN_PROCESSING"] ?? 0) + (counts["WAITING_FOR_DATA"] ?? 0) + (counts["READY_FOR_BOOKING"] ?? 0);
+    const awaitingConfirmationCount = counts["WAITING_FOR_DATA"] ?? 0;
+    const readyCount = fulfilledCount;
+    const completedCount = closedCount;
     const prevProcessingCount =
-      (prevCounts["DRAFT"] ?? 0) + (prevCounts["CREATED"] ?? 0) + (prevCounts["PROCESSING"] ?? 0) + (prevCounts["AWAITING_CONFIRMATION"] ?? 0);
+      (prevCounts["NEW"] ?? 0) + (prevCounts["IN_PROCESSING"] ?? 0) + (prevCounts["WAITING_FOR_DATA"] ?? 0) + (prevCounts["READY_FOR_BOOKING"] ?? 0);
 
     // ── KPI: новые сегодня (за последние 24 часа, Гл. 5.4) ──
     const dayAgo = new Date(Date.now() - 24 * 3600000);
     const newTodayCount = await prisma.order.count({ where: { createdAt: { gte: dayAgo } } });
 
-    // ── KPI: финансовые агрегаты (за период) ──
+    // ── KPI: финансовые агрегаты (за период) — по paymentStatus ──
     const [paidAgg, awaitingAgg, refundAgg] = await Promise.all([
-      prisma.order.aggregate({ where: { ...orderWhere, status: { in: [...PAID_STATUSES] } }, _sum: { amount: true, paidAmount: true }, _count: true }),
-      prisma.order.aggregate({ where: { ...orderWhere, status: { in: [...AWAITING_STATUSES] } }, _sum: { amount: true }, _count: true }),
-      prisma.order.aggregate({ where: { ...orderWhere, status: "REFUNDED" }, _sum: { amount: true }, _count: true }),
+      prisma.order.aggregate({ where: { ...orderWhere, paymentStatus: "PAID" }, _sum: { amount: true, paidAmount: true }, _count: true }),
+      prisma.order.aggregate({ where: { ...orderWhere, paymentStatus: { in: ["UNPAID", "PARTIALLY_PAID"] } }, _sum: { amount: true }, _count: true }),
+      prisma.order.aggregate({ where: { ...orderWhere, paymentStatus: "REFUNDED" }, _sum: { amount: true }, _count: true }),
     ]);
     const financial = {
       totalAmount: Math.round((paidAgg._sum.amount ?? 0) + (awaitingAgg._sum.amount ?? 0)),
@@ -226,9 +258,9 @@ export async function GET(request: Request) {
     };
     const avgCheck = paidCount ? Math.round((paidAgg._sum.amount ?? 0) / paidCount) : 0;
 
-    // ── KPI: средний цикл заказа (updatedAt − createdAt по завершённым/оплаченным) ──
+    // ── KPI: средний цикл заказа (updatedAt − createdAt по исполненным/закрытым) ──
     const cycleRows = await prisma.order.findMany({
-      where: { ...orderWhere, status: { in: ["PAID", "DOCUMENT_PREP", "READY", "COMPLETED"] } },
+      where: { ...orderWhere, status: { in: ["FULFILLED", "READY_TO_CLOSE", "CLOSED"] } },
       select: { createdAt: true, updatedAt: true },
     });
     let avgCycleHours = 0;
@@ -240,7 +272,7 @@ export async function GET(request: Request) {
     // ── KPI: AI-прогноз ──
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const monthAgg = await prisma.order.aggregate({
-      where: { status: { in: [...PAID_STATUSES] }, createdAt: { gte: monthStart } },
+      where: { paymentStatus: "PAID", createdAt: { gte: monthStart } },
       _sum: { amount: true },
       _count: true,
     });
@@ -267,19 +299,19 @@ export async function GET(request: Request) {
         range
       );
     const kpiSeries: Record<string, { labels: string[]; values: number[]; starts: string[] }> = {
-      new: seriesFor(["DRAFT", "CREATED"]),
+      new: seriesFor(["NEW"]),
       active: seriesFor([...ACTIVE_STATUSES]),
-      provider: seriesFor(["AWAITING_CONFIRMATION"]),
-      payment: seriesFor(["AWAITING_PAYMENT", "PARTIALLY_PAID", "OVERDUE"]),
-      docs: seriesFor(["DOCUMENT_PREP", "READY"]),
-      overdue: seriesFor(["OVERDUE"]),
-      refunds: seriesFor(["REFUNDED", "CANCELLED"]),
+      provider: seriesFor(["WAITING_FOR_DATA"]),
+      payment: seriesFor(["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"]),
+      docs: seriesFor(["FULFILLED", "READY_TO_CLOSE"]),
+      overdue: seriesFor(["PROBLEM"]),
+      refunds: seriesFor(["CANCELLED"]),
     };
-    // SLA по бакетам: доля АКТИВНЫХ заказов без превышения норматива (OVERDUE —
+    // SLA по бакетам: доля АКТИВНЫХ заказов без превышения норматива (PROBLEM —
     // нарушение), как и KPI-карточка «Соблюдение SLA» (считается по активным).
     {
       const active = seriesFor([...ACTIVE_STATUSES]).values;
-      const breaches = seriesFor(["OVERDUE"]).values;
+      const breaches = seriesFor(["PROBLEM"]).values;
       kpiSeries.sla = {
         labels: ordersSeries.labels,
         values: active.map((a, i) => (a > 0 ? Math.round(((a - breaches[i]) / a) * 100) : 100)),
@@ -353,6 +385,22 @@ export async function GET(request: Request) {
             },
           },
         },
+        items: {
+          select: {
+            title: true,
+            type: true,
+            currency: true,
+            amount: true,
+            serviceDate: true,
+            service: {
+              select: {
+                country: true,
+                city: true,
+                provider: { select: { companyName: true, firstName: true, lastName: true } },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -393,13 +441,19 @@ export async function GET(request: Request) {
     const prevEscalatedCount = new Set(prevEscalatedRows.map((e) => e.orderId).filter(Boolean)).size;
 
     const orders = tableOrders.map((r) => {
-      const main = r.bookings[0];
-      const svc = main?.service;
+      // Состав: брони (исполнение) либо OrderItems (до передачи в Booking Center).
+      const bookingSvc = r.bookings[0]?.service;
+      const item = r.items[0];
+      const svc = bookingSvc ?? item?.service;
       const provider = svc?.provider;
+      const serviceTitle = bookingSvc?.title ?? item?.title ?? "—";
+      const serviceType = bookingSvc?.type ?? item?.type ?? "";
       const serviceDate = r.serviceDate
         ? r.serviceDate
         : r.bookings.length
         ? new Date(Math.min(...r.bookings.map((b) => b.serviceDate.getTime())))
+        : item?.serviceDate
+        ? item.serviceDate
         : null;
       return {
         id: r.id,
@@ -407,10 +461,10 @@ export async function GET(request: Request) {
         client: `${r.user.firstName} ${r.user.lastName ?? ""}`.trim(),
         partner: provider?.companyName || provider?.firstName || "—",
         provider: provider?.companyName || `${provider?.firstName ?? ""} ${provider?.lastName ?? ""}`.trim() || "—",
-        service: svc?.title || "—",
-        category: svc ? SERVICE_TYPE_LABELS[svc.type] || svc.type : "—",
-        categoryType: svc?.type || "",
-        servicesCount: r.bookings.length,
+        service: serviceTitle,
+        category: serviceType ? SERVICE_TYPE_LABELS[serviceType] || serviceType : "—",
+        categoryType: serviceType,
+        servicesCount: r.items.length || r.bookings.length,
         bookingsCount: r.bookings.length,
         amount: r.amount,
         paidAmount: r.paidAmount,
@@ -421,7 +475,7 @@ export async function GET(request: Request) {
         status: r.status,
         priority: r.priority,
         bookingStatus: worstBookingStatus(r.bookings.map((b) => b.status)),
-        paymentStatus: orderPaymentStatus(r.status),
+        paymentStatus: orderPaymentStatus(r.paymentStatus),
         manager: pickManager(r.id),
         source: r.source || pickSource(r.id),
         unreadCount: unreadMap.get(r.id) ?? 0,
@@ -545,8 +599,8 @@ export async function GET(request: Request) {
     const recentOrders = [...filteredOrders].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6);
     const problemOrders = [...filteredOrders]
       .filter((o) => {
-        if (o.status === "OVERDUE") return true;
-        if (AWAITING_STATUSES.includes(o.status as (typeof AWAITING_STATUSES)[number]) && o.serviceDate) {
+        if (o.status === "PROBLEM" || o.status === "SUSPENDED") return true;
+        if (o.paymentStatus === "pending" && o.serviceDate) {
           return new Date(o.serviceDate).getTime() - now < 3 * 86400000;
         }
         return false;
@@ -558,10 +612,10 @@ export async function GET(request: Request) {
         service: o.service,
         amount: o.amount,
         serviceDate: o.serviceDate,
-        urgency: o.status === "OVERDUE" ? "high" : "medium",
+        urgency: o.status === "PROBLEM" ? "high" : "medium",
       }));
     const overdueActions = [...filteredOrders]
-      .filter((o) => o.status === "OVERDUE" || (AWAITING_STATUSES.includes(o.status as (typeof AWAITING_STATUSES)[number]) && o.serviceDate && new Date(o.serviceDate).getTime() - now < 86400000))
+      .filter((o) => o.status === "PROBLEM" || o.status === "SUSPENDED")
       .slice(0, 5)
       .map((o) => ({
         id: o.id,
@@ -571,7 +625,7 @@ export async function GET(request: Request) {
         hours: Math.max(1, Math.round((now - new Date(o.createdAt).getTime()) / 3600000)),
       }));
     const pendingPayments = [...filteredOrders]
-      .filter((o) => AWAITING_STATUSES.includes(o.status as (typeof AWAITING_STATUSES)[number]))
+      .filter((o) => o.paymentStatus === "pending" || o.paymentStatus === "partially")
       .slice(0, 5)
       .map((o) => ({
         id: o.id,
@@ -581,7 +635,7 @@ export async function GET(request: Request) {
         createdAt: o.createdAt,
       }));
     const refunds = [...filteredOrders]
-      .filter((o) => o.status === "REFUNDED" || o.status === "CANCELLED")
+      .filter((o) => o.paymentStatus === "refunded" || o.status === "CANCELLED")
       .slice(0, 5)
       .map((o) => ({
         id: o.id,
@@ -594,7 +648,7 @@ export async function GET(request: Request) {
     const upcomingTrips = [...filteredOrders]
       .filter(
         (o) =>
-          PAID_STATUSES.includes(o.status as (typeof PAID_STATUSES)[number]) &&
+          o.paymentStatus === "paid" &&
           o.serviceDate &&
           new Date(o.serviceDate).getTime() >= now - 86400000 &&
           new Date(o.serviceDate).getTime() <= now + 30 * 86400000
@@ -653,13 +707,13 @@ export async function GET(request: Request) {
     // считается заказ в активном статусе, чей возраст превышает SLA-цель (48 ч),
     // а также любой заказ со статусом OVERDUE. Время обработки = updatedAt − createdAt.
     const QUEUE_SLA_GROUPS: Record<string, string[]> = {
-      new: ["DRAFT", "CREATED"],
-      check: ["PROCESSING"],
-      provider: ["AWAITING_CONFIRMATION"],
-      payment: ["AWAITING_PAYMENT", "PARTIALLY_PAID", "OVERDUE"],
-      docs: ["DOCUMENT_PREP", "READY"],
-      refunds: ["REFUNDED", "CANCELLED"],
-      overdue: ["OVERDUE"],
+      new: ["NEW"],
+      check: ["WAITING_FOR_DATA"],
+      provider: ["READY_FOR_BOOKING"],
+      payment: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"],
+      docs: ["FULFILLED", "READY_TO_CLOSE"],
+      refunds: ["CANCELLED"],
+      overdue: ["PROBLEM", "SUSPENDED"],
       all: Object.keys(counts),
     };
     const nowMs = Date.now();
@@ -672,8 +726,8 @@ export async function GET(request: Request) {
         continue;
       }
       const overdueCount = rows.filter((r) => {
-        if (r.status === "OVERDUE") return true;
-        if (["COMPLETED", "REFUNDED", "CANCELLED", "ARCHIVED"].includes(r.status)) return false;
+        if (r.status === "PROBLEM" || r.status === "SUSPENDED") return true;
+        if (["CLOSED", "CANCELLED"].includes(r.status)) return false;
         return nowMs - r.createdAt.getTime() > slaTargetMs;
       }).length;
       const totalMs = rows.reduce((a, r) => a + (r.updatedAt.getTime() - r.createdAt.getTime()), 0);
@@ -684,9 +738,8 @@ export async function GET(request: Request) {
       };
     }
 
-    // ── Воронка жизненного цикла (создано → подтверждено → оплачено) ──
-    const confirmedCount =
-      (counts["CONFIRMED"] ?? 0) + (counts["AWAITING_PAYMENT"] ?? 0) + (counts["PARTIALLY_PAID"] ?? 0) + paidCount;
+    // ── Воронка жизненного цикла (создано → исполнено → закрыто) ──
+    const confirmedCount = fulfilledCount + closedCount;
 
     // ── Автоматизация (Гл. 3.16) и исключения (Гл. 3.17) ──
     // Демо-журнал и реестр строятся из заказов периода (согласованы с KPI/реестром),
@@ -800,20 +853,22 @@ export async function GET(request: Request) {
         // KPI по спецификации Заказ.docx (5.4)
         totalOrders: { value: totalOrders, change: changePct(totalOrders, prevCountsTotal), detail: "Общее количество заказов" },
         newToday: { value: newTodayCount, change: 0, detail: "За последние 24 часа" },
-        awaitingProcessing: { value: processingCount, change: changePct(processingCount, prevProcessingCount), detail: `${counts["PROCESSING"] ?? 0} в обработке` },
-        awaitingConfirmation: { value: awaitingConfirmationCount, change: changePct(awaitingConfirmationCount, prevCounts["AWAITING_CONFIRMATION"] ?? 0), detail: "Партнёр ещё не ответил" },
-        ready: { value: readyCount, change: changePct(readyCount, (prevCounts["DOCUMENT_PREP"] ?? 0) + (prevCounts["READY"] ?? 0)), detail: "Все подтверждено" },
-        completed: { value: completedCount, change: changePct(completedCount, prevCounts["COMPLETED"] ?? 0), detail: "Завершённые услуги" },
+        awaitingProcessing: { value: processingCount, change: changePct(processingCount, prevProcessingCount), detail: `${counts["IN_PROCESSING"] ?? 0} в обработке` },
+        awaitingConfirmation: { value: awaitingConfirmationCount, change: changePct(awaitingConfirmationCount, prevCounts["WAITING_FOR_DATA"] ?? 0), detail: "Ожидают данные" },
+        ready: { value: readyCount, change: changePct(readyCount, (prevCounts["FULFILLED"] ?? 0) + (prevCounts["READY_TO_CLOSE"] ?? 0)), detail: "Исполнены и готовы к закрытию" },
+        completed: { value: completedCount, change: changePct(completedCount, prevCounts["CLOSED"] ?? 0), detail: "Закрытые заказы" },
         avgCheck: { value: avgCheck, change: 0, detail: "Средняя стоимость заказа" },
         platformRevenue: { value: financial.commission, change: 0, detail: "Комиссия платформы (12%)" },
         // Существующие показатели (остаются для обратной совместимости)
-        newOrders: { value: (counts["DRAFT"] ?? 0) + (counts["CREATED"] ?? 0) + (counts["AWAITING_CONFIRMATION"] ?? 0), change: changePct((counts["DRAFT"] ?? 0) + (counts["CREATED"] ?? 0) + (counts["AWAITING_CONFIRMATION"] ?? 0), (prevCounts["DRAFT"] ?? 0) + (prevCounts["CREATED"] ?? 0) + (prevCounts["AWAITING_CONFIRMATION"] ?? 0)), detail: `${totalOrders} всего за период` },
-        activeOrders: { value: activeCount, change: changePct(activeCount, ACTIVE_STATUSES.reduce((a, s) => a + (prevCounts[s] ?? 0), 0)), detail: `${counts["PROCESSING"] ?? 0} в обработке` },
-        awaitingPayment: { value: awaitingCount, change: changePct(awaitingCount, AWAITING_STATUSES.reduce((a, s) => a + (prevCounts[s] ?? 0), 0)), detail: `${fmtMoney(financial.pendingAmount)} в ожидании` },
-        paidOrders: { value: paidCount, change: changePct(paidCount, PAID_STATUSES.reduce((a, s) => a + (prevCounts[s] ?? 0), 0)), detail: `${fmtMoney(financial.paidAmount)} · средний чек ${fmtMoney(avgCheck)}` },
+        newOrders: { value: counts["NEW"] ?? 0, change: changePct(counts["NEW"] ?? 0, prevCounts["NEW"] ?? 0), detail: `${totalOrders} всего за период` },
+        activeOrders: { value: activeCount, change: changePct(activeCount, ACTIVE_STATUSES.reduce((a, s) => a + (prevCounts[s] ?? 0), 0)), detail: `${counts["IN_PROCESSING"] ?? 0} в обработке` },
+        awaitingPayment: { value: awaitingCount, change: changePct(awaitingCount, (prevPayCounts["UNPAID"] ?? 0) + (prevPayCounts["PARTIALLY_PAID"] ?? 0)), detail: `${fmtMoney(financial.pendingAmount)} в ожидании` },
+        paidOrders: { value: paidCount, change: changePct(paidCount, (prevPayCounts["PAID"] ?? 0) + (prevPayCounts["PARTIALLY_PAID"] ?? 0)), detail: `${fmtMoney(financial.paidAmount)} · средний чек ${fmtMoney(avgCheck)}` },
         cancelledOrders: { value: cancelledCount, change: changePct(cancelledCount, prevCounts["CANCELLED"] ?? 0), detail: totalOrders ? `${Math.round((cancelledCount / totalOrders) * 100)}% от всех заказов` : "0%" },
         avgCycle: { value: avgCycleHours, change: 0, detail: `Цель SLA: ${slaTargetHours} ч · Соблюдение ${slaCompliance}%` },
-        refunds: { value: refundedCount, change: changePct(refundedCount, prevCounts["REFUNDED"] ?? 0), detail: `${fmtMoney(financial.refundedAmount)} возвращено` },
+        refunds: { value: refundedCount, change: changePct(refundedCount, prevPayCounts["REFUNDED"] ?? 0), detail: `${fmtMoney(financial.refundedAmount)} возвращено` },
+        problem: { value: problemCount, change: changePct(problemCount, (prevCounts["PROBLEM"] ?? 0) + (prevCounts["SUSPENDED"] ?? 0)), detail: "Требуют решения менеджера" },
+        sentToBooking: { value: sentToBookingCount, change: changePct(sentToBookingCount, prevCounts["SENT_TO_BOOKING"] ?? 0), detail: "Переданы в Booking Center" },
         // Эскалации (Гл. 3.17): заказы с активными исключениями за период
         escalations: { value: escalatedCount, change: changePct(escalatedCount, prevEscalatedCount), detail: "Заказы с активными исключениями" },
         aiForecast: { value: forecastOrders, change: 0, detail: `Выручка ${fmtMoney(forecastRevenue)} · план ~${Math.round((monthAgg._count ? (forecastOrders / Math.max(1, monthAgg._count * 1.3)) * 100 : 0))}%` },
@@ -868,9 +923,13 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/admin/orders
- * Тело: { userId, serviceId, serviceDate, amount?, source? }
- * Создаёт заказ со статусом AWAITING_CONFIRMATION и первую бронь в составе,
- * атомарно пишет журнал истории и системное сообщение.
+ * Тело: { userId, serviceId, serviceDate, amount?, source?, priority?, items?, travelers? }
+ *
+ * Bootstrap-создание (Phase 1, временный сценарий): создаёт Заказ + OrderItems
+ * (состав) + OrderTraveler (туристы). Бронирования НЕ создаются напрямую —
+ * они появятся consumer-ом события BOOKING_REQUESTED при команде
+ * «Передать в Booking Center» (Baseline §9, Phase 1 DoD).
+ * correlationId = Order.code — сквозная трассировка процесса.
  */
 export async function POST(request: Request) {
   try {
@@ -894,8 +953,20 @@ export async function POST(request: Request) {
     const amountRaw = typeof body.amount === "number" ? body.amount : null;
     // Приоритет заказа (Гл. 3.10): валидируем против допустимых значений.
     const priority = (typeof body.priority === "string" && ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(body.priority) ? body.priority : undefined) as OrderPriority | undefined;
+    // Состав заказа: items: [{ serviceId, quantity?, price?, serviceDate? }] либо
+    // одиночная услуга serviceId (обратная совместимость с формой создания).
+    const rawItems = Array.isArray(body.items)
+      ? (body.items as { serviceId?: unknown; quantity?: unknown; price?: unknown; serviceDate?: unknown }[]).filter((i) => i && typeof i.serviceId === "string")
+      : serviceId
+      ? [{ serviceId }]
+      : [];
+    // Туристы заказа (опционально при создании): при отсутствии — один турист
+    // от имени клиента со статусом incomplete (паспортные данные заполняются в карточке).
+    const rawTravelers = Array.isArray(body.travelers)
+      ? (body.travelers as Record<string, unknown>[]).filter((t) => t && typeof t.firstName === "string" && typeof t.lastName === "string")
+      : [];
 
-    if (!userId || !serviceId) {
+    if (!userId || rawItems.length === 0) {
       return NextResponse.json({ error: "Укажите клиента и услугу" }, { status: 400 });
     }
     if (!serviceDate || isNaN(serviceDate.getTime())) {
@@ -907,73 +978,120 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Дата поездки не может быть в прошлом" }, { status: 400 });
     }
 
-    const [client, service] = await Promise.all([
+    const [client, services] = await Promise.all([
       prisma.user.findUnique({ where: { id: userId } }),
-      prisma.service.findUnique({ where: { id: serviceId } }),
+      prisma.service.findMany({ where: { id: { in: rawItems.map((i) => i.serviceId as string) } } }),
     ]);
     if (!client || client.role !== "BUYER") {
       return NextResponse.json({ error: "Клиент не найден" }, { status: 404 });
     }
-    if (!service || !service.isActive) {
-      return NextResponse.json({ error: "Услуга не найдена или неактивна" }, { status: 404 });
+    if (services.length !== rawItems.length) {
+      return NextResponse.json({ error: "Одна из услуг не найдена" }, { status: 404 });
+    }
+    if (services.some((s) => !s.isActive)) {
+      return NextResponse.json({ error: "Одна из услуг неактивна" }, { status: 404 });
     }
 
-    const amount = amountRaw && amountRaw > 0 ? Math.round(amountRaw * 100) / 100 : service.discountPrice ?? service.price;
+    // Сумма: переданная сумма либо сумма состава (услуги по фактическим ценам).
+    const itemsAmount = Math.round(
+      rawItems.reduce((acc, it, idx) => {
+        const svc = services[idx];
+        const qty = typeof it.quantity === "number" && it.quantity > 0 ? it.quantity : 1;
+        const price = typeof it.price === "number" && it.price > 0 ? it.price : svc.discountPrice ?? svc.price;
+        return acc + price * qty;
+      }, 0) * 100
+    ) / 100;
+    const amount = amountRaw && amountRaw > 0 ? Math.round(amountRaw * 100) / 100 : itemsAmount;
 
     const created = await prisma.$transaction(async (tx) => {
-      // Номер = максимальный существующий + 1 (не «последний по дате» — иначе
-      // при создании после заказов с более высокими номерами будет конфликт уникальности).
-      const rows = await tx.order.findMany({ select: { orderNumber: true } });
-      let seq = 1000;
-      for (const r of rows) {
-        const n = parseInt(r.orderNumber.replace("ORD-", ""), 10);
-        if (!isNaN(n) && n >= seq) seq = n + 1;
-      }
+      // Каноническая ID Policy (Baseline §0.8): внутренний код ORD-00000001
+      // и пользовательский номер TH-YYYY-###### — по максимальным существующим.
+      const rows = await tx.order.findMany({ select: { code: true, orderNumber: true } });
+      const code = nextBusinessCode("ORD", rows.map((r) => r.code));
+      const orderNumber = orderUserNumber(new Date().getFullYear(), rows.map((r) => r.orderNumber));
       const order = await tx.order.create({
         data: {
-          orderNumber: `ORD-${seq}`,
+          code,
+          orderNumber,
           userId,
-          status: "AWAITING_CONFIRMATION",
+          status: "NEW",
+          paymentStatus: "UNPAID",
           ...(priority ? { priority } : {}),
-          currency: service.currency || "USD",
+          currency: services[0].currency || "USD",
           amount,
           paidAmount: 0,
           serviceDate,
           source: typeof body.source === "string" && body.source ? body.source : "Создано в админке",
         },
-        select: { id: true, orderNumber: true, amount: true, status: true, createdAt: true, updatedAt: true, serviceDate: true },
+        select: { id: true, code: true, orderNumber: true, amount: true, status: true, createdAt: true, updatedAt: true, serviceDate: true },
       });
-      const booking = await tx.booking.create({
-        data: {
-          userId,
-          serviceId,
-          status: "PENDING",
-          amount,
-          serviceDate,
-          orderId: order.id,
-        },
-        select: { id: true },
-      });
-      await tx.bookingHistory.create({
-        data: {
-          bookingId: booking.id,
-          action: "created",
-          from: null,
-          to: "PENDING",
-          actorId: user.id,
-          actorName: actorDisplayName(user),
-          comment: "Бронирование создано в составе заказа",
-        },
-      });
+      // Состав заказа: OrderItem (Baseline §3) — по одной позиции на услугу.
+      const items: { serviceId: string; title: string }[] = [];
+      for (let idx = 0; idx < rawItems.length; idx++) {
+        const it = rawItems[idx];
+        const svc = services[idx];
+        const qty = typeof it.quantity === "number" && it.quantity > 0 ? it.quantity : 1;
+        const price = typeof it.price === "number" && it.price > 0 ? it.price : svc.discountPrice ?? svc.price;
+        const itemDate = typeof it.serviceDate === "string" ? new Date(it.serviceDate) : serviceDate;
+        await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            serviceId: svc.id,
+            title: svc.title,
+            type: svc.type,
+            quantity: qty,
+            price: Math.round(price * 100) / 100,
+            currency: svc.currency || "USD",
+            amount: Math.round(price * qty * 100) / 100,
+            serviceDate: itemDate,
+          },
+        });
+        items.push({ serviceId: svc.id, title: svc.title });
+      }
+      // Туристы заказа (Baseline §4): из payload либо один турист от имени клиента.
+      const travelers = rawTravelers.length
+        ? rawTravelers.map((t) => ({
+            orderId: order.id,
+            customerId: userId,
+            firstName: String(t.firstName),
+            lastName: String(t.lastName),
+            birthDate: typeof t.birthDate === "string" ? new Date(t.birthDate) : null,
+            citizenship: typeof t.citizenship === "string" && t.citizenship ? String(t.citizenship) : null,
+            gender: typeof t.gender === "string" && t.gender ? String(t.gender) : null,
+            passportNumber: typeof t.passportNumber === "string" && t.passportNumber ? String(t.passportNumber) : null,
+            passportExpiry: typeof t.passportExpiry === "string" ? new Date(t.passportExpiry) : null,
+            // Полнота данных: обязательные поля для бронирования.
+            dataCompleteness:
+              String(t.firstName).trim() && String(t.lastName).trim() && typeof t.passportNumber === "string" && t.passportNumber.trim()
+                ? "complete"
+                : "incomplete",
+          }))
+        : [
+            {
+              orderId: order.id,
+              customerId: userId,
+              firstName: client.firstName,
+              lastName: client.lastName ?? "",
+              birthDate: null,
+              citizenship: null,
+              gender: null,
+              passportNumber: null,
+              passportExpiry: null,
+              dataCompleteness: "incomplete",
+            },
+          ];
+      for (const t of travelers) {
+        await tx.orderTraveler.create({ data: t });
+      }
       await tx.orderHistory.create({
         data: {
           orderId: order.id,
           action: "created",
           from: null,
-          to: "AWAITING_CONFIRMATION",
+          to: "NEW",
           actorId: user.id,
           actorName: actorDisplayName(user),
-          comment: "Заказ создан",
+          comment: `Заказ создан: ${services.map((s) => s.title).join(", ")}`,
         },
       });
       await tx.orderMessage.create({
@@ -982,11 +1100,26 @@ export async function POST(request: Request) {
           senderId: null,
           senderName: "Система",
           senderRole: "system",
-          text: orderSystemMessage("AWAITING_CONFIRMATION"),
+          text: orderSystemMessage("NEW"),
         },
       });
-      return { order, bookingId: booking.id };
+      // Outbox (Гл. 6): событие создания заказа пишется атомарно с созданием;
+      // correlationId = код заказа — сквозная трассировка процесса (Baseline §13).
+      await emitOrderEvent(
+        tx,
+        order.id,
+        "ORDER_CREATED",
+        {
+          amount,
+          items: items.map((i) => i.serviceId),
+          actor: actorDisplayName(user),
+        },
+        { correlationId: code }
+      );
+      return { order };
     });
+    // Публикация события после коммита транзакции.
+    await publishOrderEvents();
 
     // Гл. 3.18: создание заказа фиксируется в журнале аудита.
     const ctx = requestContext(request);
@@ -998,7 +1131,7 @@ export async function POST(request: Request) {
       objectId: created.order.id,
       objectNumber: created.order.orderNumber,
       toData: { amount, serviceDate: serviceDate.toISOString(), priority: priority ?? "MEDIUM" },
-      comment: `Заказ создан: ${service.title} для ${client.firstName} ${client.lastName ?? ""}`.trim(),
+      comment: `Заказ создан: ${services.map((s) => s.title).join(", ")} для ${client.firstName} ${client.lastName ?? ""}`.trim(),
       source: "Web",
       ip: ctx.ip,
       userAgent: ctx.userAgent,

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { changePct, bucketize } from "@/lib/admin-data";
 import { type AnalyticsSectionData, type AnalyticsFilters, analyticsRange } from "@/lib/analytics";
 
-const PAID: ("PAID" | "COMPLETED")[] = ["PAID", "COMPLETED"];
+const PAID_ORDERS: ("FULFILLED" | "READY_TO_CLOSE" | "CLOSED")[] = ["FULFILLED", "READY_TO_CLOSE", "CLOSED"];
 
 /**
  * 2.14 CRM-аналитика (Клиенты).
@@ -22,24 +22,24 @@ export async function getCrmData(f: AnalyticsFilters): Promise<AnalyticsSectionD
   ]);
 
   // Повторные покупатели (2+ заказа)
-  const repeatBuyerIds = await prisma.order.groupBy({ by: ["userId"], _count: { _all: true } });
-  const repeatBuyers = repeatBuyerIds.filter((r) => r._count._all >= 2).length;
+  const repeatBuyerIds = await prisma.order.groupBy({ by: ["userId"], _count: { id: true } });
+  const repeatBuyers = repeatBuyerIds.filter((r) => r._count.id >= 2).length;
   const repeatPct = buyersWithOrders ? (repeatBuyers / buyersWithOrders) * 100 : 0;
 
   // Активные за период, VIP (по сумме покупок)
   const orderUsers = await prisma.order.groupBy({
     by: ["userId"],
-    where: { status: { in: [...PAID] } },
+    where: { status: { in: PAID_ORDERS } },
     _sum: { paidAmount: true },
-    _count: { _all: true },
+    _count: { id: true },
   });
   const vipUsers = orderUsers.filter((r) => (r._sum.paidAmount ?? 0) >= 1500).length;
-  const avgOrdersPerUser = orderUsers.length ? orderUsers.reduce((a, r) => a + r._count._all, 0) / orderUsers.length : 0;
+  const avgOrdersPerUser = orderUsers.length ? orderUsers.reduce((a, r) => a + r._count.id, 0) / orderUsers.length : 0;
 
   // LTV
   const totalRevenue = orderUsers.reduce((a, r) => a + (r._sum.paidAmount ?? 0), 0);
   const ltv = buyersWithOrders ? totalRevenue / buyersWithOrders : 0;
-  const avgCheck = orderUsers.length ? totalRevenue / orderUsers.reduce((a, r) => a + r._count._all, 0) : 0;
+  const avgCheck = orderUsers.length ? totalRevenue / orderUsers.reduce((a, r) => a + r._count.id, 0) : 0;
 
   // Retention / Churn (оценка)
   const retention = activeBuyers ? Math.round((activeBuyers / Math.max(1, buyersWithOrders)) * 100) : 0;
@@ -60,7 +60,7 @@ export async function getCrmData(f: AnalyticsFilters): Promise<AnalyticsSectionD
   });
   const rfm = { vip: 0, regular: 0, loyal: 0, new: 0, promising: 0, sleeping: 0, atRisk: 0, lost: 0 };
   for (const u of rfmRows) {
-    const paid = u.orders.filter((o) => (PAID as readonly string[]).includes(o.status));
+    const paid = u.orders.filter((o) => (PAID_ORDERS as readonly string[]).includes(o.status));
     const monetary = paid.reduce((a, o) => a + (o.paidAmount ?? 0), 0);
     const freq = paid.length;
     const last = paid.length ? Math.max(...paid.map((o) => o.createdAt.getTime())) : 0;
@@ -136,7 +136,7 @@ export async function getCrmData(f: AnalyticsFilters): Promise<AnalyticsSectionD
     ],
     rows: rfmRows
       .map((u) => {
-        const paid = u.orders.filter((o) => (PAID as readonly string[]).includes(o.status));
+        const paid = u.orders.filter((o) => (PAID_ORDERS as readonly string[]).includes(o.status));
         const spent = paid.reduce((a, o) => a + (o.paidAmount ?? 0), 0);
         return {
           name: u.id,

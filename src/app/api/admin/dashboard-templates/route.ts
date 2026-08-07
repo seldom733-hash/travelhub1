@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
-import { ALL_ADMIN_ROLES, FULL_ADMIN_ROLES, requireRole } from "@/lib/admin-access";
+import { DASHBOARD_ROLES, FULL_ADMIN_ROLES, requireRole } from "@/lib/admin-access";
 import { recordAudit, requestContext } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     // Чтение доступно всем ролям админки: авто-применение шаблона роли (Гл. 1.36)
     // выполняется на клиенте для любого сотрудника, не только администратора.
-    const denied = requireRole(user, ALL_ADMIN_ROLES);
+    const denied = requireRole(user, DASHBOARD_ROLES);
     if (denied) return denied;
 
     const { searchParams } = new URL(request.url);

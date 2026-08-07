@@ -3328,10 +3328,10 @@ function SalesWidget({ data }: { data: DashData }) {
 /* ─── Блок «Исполнение» (Гл. 1.12) ─── */
 function ExecutionWidget({ data }: { data: DashData }) {
   const rows: [string, string | number, string][] = [
-    ["В обработке", data.execution.inProcessing, "PROCESSING,CONFIRMED"],
-    ["Ждут ответа поставщика", data.execution.awaitingSupplier, "AWAITING_CONFIRMATION"],
-    ["Готовы документы", data.execution.docsReady, "DOCUMENT_PREP,READY"],
-    ["Просроченные", data.execution.overdue, "OVERDUE"],
+    ["В обработке", data.execution.inProcessing, "IN_PROCESSING,WAITING_FOR_DATA"],
+    ["Ждут ответа поставщика", data.execution.awaitingSupplier, "SENT_TO_BOOKING"],
+    ["Готовы документы", data.execution.docsReady, "FULFILLED,READY_TO_CLOSE"],
+    ["Проблемные", data.execution.overdue, "PROBLEM,SUSPENDED"],
     ["Среднее время обработки", data.execution.avgTime, ""],
   ];
   return (

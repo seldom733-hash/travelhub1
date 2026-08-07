@@ -21,7 +21,7 @@ export const ADMIN_MENU: AdminMenuItem[] = [
     icon: "🧳",
     label: "Продажи и исполнение",
     href: "/admin/sales-execution",
-    aliases: ["/admin/bookings"],
+    aliases: ["/admin/bookings", "/admin/sales"],
   },
   { icon: "📚", label: "Каталог услуг", href: "/admin/catalog" },
   { icon: "🤝", label: "CRM", href: "/admin/crm" },
@@ -43,14 +43,17 @@ export const ADMIN_MENU: AdminMenuItem[] = [
 ];
 
 /**
- * Доступ ролей к разделам админки (Гл. 1.2): менеджер по продажам — Dashboard
- * и «Продажи» (Гл. 3, Sales Center); операционист — Dashboard и «Исполнение»
- * (бронирования). Роли без записи (ADMIN, MODERATOR, PARTNER и пр.) — полный доступ.
+ * Доступ ролей к разделам админки (Гл. 1.2, RBAC Matrix): менеджер по продажам —
+ * Dashboard и «Продажи»; операционист — Dashboard и «Исполнение» (бронирования);
+ * PARTNER — только Dashboard и Каталог (собственный scope, Baseline §10 §13).
+ * Остальные полные роли (ADMIN, DIRECTOR, FINANCE, MARKETER, ANALYST, MODERATOR) —
+ * доступ в рамках прав (lib/permissions.ts).
  * Путь разрешён, если совпадает с префиксом раздела (сам раздел или его вкладка).
  */
 export const ROLE_ALLOWED_PREFIXES: Record<string, string[]> = {
-  SALES_MANAGER: ["/admin", "/admin/sales-execution"],
+  SALES_MANAGER: ["/admin", "/admin/sales-execution", "/admin/sales"],
   OPERATOR: ["/admin", "/admin/bookings"],
+  PARTNER: ["/admin", "/admin/catalog"],
 };
 
 /** Может ли роль открыть указанный путь админки (сам путь или вкладка). */
@@ -77,6 +80,10 @@ export function menuForRole(role: string): AdminMenuItem[] {
     const dashboard = full.find((i) => i.href === "/admin")!;
     const bookings = ADMIN_MENU.find((i) => i.href === "/admin/bookings")!;
     return [dashboard, { ...bookings, label: "Исполнение", hidden: false }];
+  }
+  // PARTNER: только Dashboard и Каталог (собственный scope).
+  if (role === "PARTNER") {
+    return full.filter((i) => i.href === "/admin" || i.href === "/admin/catalog");
   }
   return full;
 }

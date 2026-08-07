@@ -7,7 +7,7 @@ import { SERVICE_TYPE_LABELS } from "@/lib/admin-data";
  * история взаимодействия и AI-профиль.
  */
 
-const PAID: ("PAID" | "COMPLETED")[] = ["PAID", "COMPLETED"];
+const PAID: ("CONFIRMED" | "IN_SERVICE" | "COMPLETED")[] = ["CONFIRMED", "IN_SERVICE", "COMPLETED"];
 
 export interface Partner360Data {
   name: string;
@@ -65,8 +65,8 @@ export async function getPartner360Data(partnerId: string): Promise<Partner360Da
 
   const bookings = partner.services.flatMap((s) => s.bookings);
   const total = bookings.length;
-  const confirmed = bookings.filter((b) => ["CONFIRMED", "PAID", "COMPLETED"].includes(b.status)).length;
-  const cancelled = bookings.filter((b) => b.status === "REFUNDED").length;
+  const confirmed = bookings.filter((b) => ["CONFIRMED", "IN_SERVICE", "COMPLETED"].includes(b.status)).length;
+  const cancelled = bookings.filter((b) => b.status === "CANCELLED" || b.status === "SUPPLIER_REJECTED").length;
   const revenue = bookings.filter((b) => PAID.includes(b.status as (typeof PAID)[number])).reduce((a, b) => a + b.amount, 0);
   const confirmPct = total ? Math.round((confirmed / total) * 100) : 0;
   const cancelPct = total ? Math.round((cancelled / total) * 100) : 0;

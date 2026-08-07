@@ -3,8 +3,8 @@ import { ORDER_STATUS_GROUPS, changePct, bucketize } from "@/lib/admin-data";
 import { type AnalyticsSectionData, type AnalyticsFilters, analyticsRange } from "@/lib/analytics";
 
 const PAID_ORDER = [...ORDER_STATUS_GROUPS.paid] as const;
-const PAID_BOOKING = ["PAID", "COMPLETED"] as const;
-const CONFIRMED_BOOKING = ["CONFIRMED", "PAID", "COMPLETED"] as const;
+const PAID_BOOKING = ["CONFIRMED", "IN_SERVICE", "COMPLETED"] as const;
+const CONFIRMED_BOOKING = ["CONFIRMED", "IN_SERVICE", "COMPLETED"] as const;
 
 const DEPT_LABEL: Record<string, string> = {
   sales: "Коммерческий отдел",
@@ -85,7 +85,7 @@ export async function getDepartmentsData(f: AnalyticsFilters): Promise<Analytics
   const bookingsCount = bookings.length;
   const confirmedCount = bookings.filter((b) => (CONFIRMED_BOOKING as readonly string[]).includes(b.status)).length;
   const confirmedShare = bookingsCount ? (confirmedCount / bookingsCount) * 100 : 0;
-  const refundCount = bookings.filter((b) => b.status === "REFUNDED").length;
+  const refundCount = bookings.filter((b) => b.status === "CANCELLED" || b.status === "SUPPLIER_REJECTED").length;
   const refundRate = bookingsCount ? (refundCount / bookingsCount) * 100 : 0;
   const paidBookings = bookings.filter((b) => (PAID_BOOKING as readonly string[]).includes(b.status));
 

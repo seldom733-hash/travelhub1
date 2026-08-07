@@ -2,7 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { changePct, bucketize, SERVICE_TYPE_LABELS, SERVICE_TYPE_ICONS } from "@/lib/admin-data";
 import { type AnalyticsSectionData, type AnalyticsFilters, analyticsRange } from "@/lib/analytics";
 
-const PAID: ("PAID" | "COMPLETED")[] = ["PAID", "COMPLETED"];
+// Оплата — на уровне Order (Baseline §0.6); «оплаченные» брони: CONFIRMED/IN_SERVICE/COMPLETED.
+type BookingStatusFilter =
+  | "NEW" | "PREPARING_REQUEST" | "SENT_TO_SUPPLIER" | "AWAITING_CONFIRMATION"
+  | "CONFIRMED" | "IN_SERVICE" | "COMPLETED" | "NEEDS_CLARIFICATION"
+  | "SUPPLIER_REJECTED" | "CHANGE_REQUESTED" | "CANCELLATION_REQUESTED"
+  | "CANCELLED" | "PROBLEM";
+const PAID: ("CONFIRMED" | "IN_SERVICE" | "COMPLETED")[] = ["CONFIRMED", "IN_SERVICE", "COMPLETED"];
 
 /**
  * 2.16 Аналитика каталога услуг — сравнение категорий (2.16.4), география
@@ -33,8 +39,8 @@ export async function getCatalogData(f: AnalyticsFilters): Promise<AnalyticsSect
   }
 
   // Платёжные агрегаты уважают фильтр статуса (Гл. 2.7).
-  const paidStatus: { in: ("PAID" | "COMPLETED")[] } | "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED" =
-    f.status ? (f.status as "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED") : { in: PAID };
+  const paidStatus: { in: ("CONFIRMED" | "IN_SERVICE" | "COMPLETED")[] } | BookingStatusFilter =
+    f.status ? (f.status as BookingStatusFilter) : { in: PAID };
 
   // ── Каталог в целом ──
   const [totalServices, activeServices, paidRows, prevPaidRows, allBookingRows, viewsInPeriod] = await Promise.all([
@@ -51,7 +57,7 @@ export async function getCatalogData(f: AnalyticsFilters): Promise<AnalyticsSect
   const soldPrev = prevPaidRows.length;
   const avgCheck = sold ? revenue / sold : 0;
   const bookingsAll = allBookingRows.length;
-  const cancelled = allBookingRows.filter((b) => b.status === "REFUNDED").length;
+  const cancelled = allBookingRows.filter((b) => b.status === "CANCELLED" || b.status === "SUPPLIER_REJECTED").length;
   const cancelPct = bookingsAll ? (cancelled / bookingsAll) * 100 : 0;
   const conversion = viewsInPeriod ? (bookingsAll / viewsInPeriod) * 100 : 0;
 
@@ -74,7 +80,7 @@ export async function getCatalogData(f: AnalyticsFilters): Promise<AnalyticsSect
     const t = typeMap.get(r.serviceId) ?? "OTHER";
     const cur = catMap.get(t) ?? { count: 0, revenue: 0, cancelled: 0 };
     cur.count += 1;
-    if (r.status === "REFUNDED") cur.cancelled += 1;
+    if (r.status === "CANCELLED" || r.status === "SUPPLIER_REJECTED") cur.cancelled += 1;
     catMap.set(t, cur);
   }
   for (const r of paidRows) {

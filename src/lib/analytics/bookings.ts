@@ -2,7 +2,14 @@ import { prisma } from "@/lib/prisma";
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_COLORS, changePct, bucketize, SERVICE_TYPE_LABELS } from "@/lib/admin-data";
 import { type AnalyticsSectionData, type AnalyticsFilters, analyticsRange } from "@/lib/analytics";
 
-const PAID: ("PAID" | "COMPLETED")[] = ["PAID", "COMPLETED"];
+// Оплата вынесена на уровень Order (Baseline §0.6): «оплаченные» брони —
+// подтверждённые, в обслуживании и завершённые.
+type BookingStatusFilter =
+  | "NEW" | "PREPARING_REQUEST" | "SENT_TO_SUPPLIER" | "AWAITING_CONFIRMATION"
+  | "CONFIRMED" | "IN_SERVICE" | "COMPLETED" | "NEEDS_CLARIFICATION"
+  | "SUPPLIER_REJECTED" | "CHANGE_REQUESTED" | "CANCELLATION_REQUESTED"
+  | "CANCELLED" | "PROBLEM";
+const PAID: ("CONFIRMED" | "IN_SERVICE" | "COMPLETED")[] = ["CONFIRMED", "IN_SERVICE", "COMPLETED"];
 
 /**
  * 2.12 Аналитика бронирований — операционная деятельность отдела бронирования.
@@ -31,8 +38,8 @@ export async function getBookingsData(f: AnalyticsFilters): Promise<AnalyticsSec
   }
 
   // Платёжный агрегат уважает фильтр статуса (Гл. 2.7).
-  const paidStatus: { in: ("PAID" | "COMPLETED")[] } | "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED" =
-    f.status ? (f.status as "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED") : { in: PAID };
+  const paidStatus: { in: ("CONFIRMED" | "IN_SERVICE" | "COMPLETED")[] } | BookingStatusFilter =
+    f.status ? (f.status as BookingStatusFilter) : { in: PAID };
 
   const [statusRows, prevStatusRows, allRows, paidAgg] = await Promise.all([
     prisma.booking.groupBy({ by: ["status"], where: bookingWhere, _count: true }),
@@ -47,11 +54,12 @@ export async function getBookingsData(f: AnalyticsFilters): Promise<AnalyticsSec
   for (const r of prevStatusRows) prevCounts[r.status] = r._count;
 
   const received = allRows.length;
-  const confirmed = (counts["CONFIRMED"] ?? 0) + (counts["PAID"] ?? 0) + (counts["COMPLETED"] ?? 0);
-  const awaitingSupplier = counts["PENDING"] ?? 0;
-  const paid = (counts["PAID"] ?? 0) + (counts["COMPLETED"] ?? 0);
+  const confirmed = (counts["CONFIRMED"] ?? 0) + (counts["IN_SERVICE"] ?? 0) + (counts["COMPLETED"] ?? 0);
+  const awaitingSupplier =
+    (counts["NEW"] ?? 0) + (counts["PREPARING_REQUEST"] ?? 0) + (counts["SENT_TO_SUPPLIER"] ?? 0) + (counts["AWAITING_CONFIRMATION"] ?? 0);
+  const paid = (counts["CONFIRMED"] ?? 0) + (counts["IN_SERVICE"] ?? 0) + (counts["COMPLETED"] ?? 0);
   const completed = counts["COMPLETED"] ?? 0;
-  const cancelled = counts["REFUNDED"] ?? 0;
+  const cancelled = (counts["CANCELLED"] ?? 0) + (counts["SUPPLIER_REJECTED"] ?? 0);
   const successPct = received ? (confirmed / received) * 100 : 0;
   const cancelPct = received ? (cancelled / received) * 100 : 0;
   const revenue = paidAgg._sum.amount ?? 0;
@@ -84,8 +92,8 @@ export async function getBookingsData(f: AnalyticsFilters): Promise<AnalyticsSec
     const name = p?.companyName || `${p?.firstName ?? "Поставщик"}`;
     const cur = provMap.get(name) ?? { label: name, total: 0, confirmed: 0, cancelled: 0, revenue: 0 };
     cur.total += 1;
-    if (b.status === "CONFIRMED" || b.status === "PAID" || b.status === "COMPLETED") cur.confirmed += 1;
-    if (b.status === "REFUNDED") cur.cancelled += 1;
+    if (b.status === "CONFIRMED" || b.status === "IN_SERVICE" || b.status === "COMPLETED") cur.confirmed += 1;
+    if (b.status === "CANCELLED" || b.status === "SUPPLIER_REJECTED") cur.cancelled += 1;
     if ((PAID as readonly string[]).includes(b.status)) cur.revenue += b.amount;
     provMap.set(name, cur);
   }
@@ -119,7 +127,7 @@ export async function getBookingsData(f: AnalyticsFilters): Promise<AnalyticsSec
     "Несвоевременная оплата", "Изменение курса валют", "Ошибка оформления", "Прекращение продажи",
   ];
   const reasonMap = new Map<string, number>();
-  allRows.filter((b) => b.status === "REFUNDED").forEach((_, i) => {
+  allRows.filter((b) => b.status === "CANCELLED" || b.status === "SUPPLIER_REJECTED").forEach((_, i) => {
     const r = reasons[i % reasons.length];
     reasonMap.set(r, (reasonMap.get(r) ?? 0) + 1);
   });
@@ -159,7 +167,7 @@ export async function getBookingsData(f: AnalyticsFilters): Promise<AnalyticsSec
     periodLabel: range.start.toLocaleDateString("ru-RU", { month: "long", year: "numeric" }),
     kpis: [
       { key: "received", title: "Получено заказов", value: received, unit: " шт", change: changePct(received, Object.values(prevCounts).reduce((a, b) => a + b, 0)), tone: "neutral" },
-      { key: "confirmed", title: "Подтверждено", value: confirmed, unit: " шт", change: changePct(confirmed, (prevCounts["CONFIRMED"] ?? 0) + (prevCounts["PAID"] ?? 0) + (prevCounts["COMPLETED"] ?? 0)), tone: "positive" },
+      { key: "confirmed", title: "Подтверждено", value: confirmed, unit: " шт", change: changePct(confirmed, (prevCounts["CONFIRMED"] ?? 0) + (prevCounts["IN_SERVICE"] ?? 0) + (prevCounts["COMPLETED"] ?? 0)), tone: "positive" },
       { key: "awaiting", title: "Ожидают ответа", value: awaitingSupplier, unit: " шт", tone: awaitingSupplier > 0 ? "medium" as const : "neutral" },
       { key: "paid", title: "Получена оплата", value: paid, unit: " шт", tone: "positive" },
       { key: "completed", title: "Завершено оформление", value: completed, unit: " шт", tone: "positive" },

@@ -34,12 +34,24 @@ enum UserRole {
   MODERATOR
 }
 
+/// Жизненный цикл бронирования (Baseline §0.5, канонический): NEW →
+/// PREPARING_REQUEST → SENT_TO_SUPPLIER → AWAITING_CONFIRMATION → CONFIRMED →
+/// IN_SERVICE → COMPLETED. Ветви: NEEDS_CLARIFICATION, SUPPLIER_REJECTED,
+/// CHANGE_REQUESTED, CANCELLATION_REQUESTED, CANCELLED, PROBLEM.
 enum BookingStatus {
-  PENDING
+  NEW
+  PREPARING_REQUEST
+  SENT_TO_SUPPLIER
+  AWAITING_CONFIRMATION
   CONFIRMED
-  PAID
-  REFUNDED
+  IN_SERVICE
   COMPLETED
+  NEEDS_CLARIFICATION
+  SUPPLIER_REJECTED
+  CHANGE_REQUESTED
+  CANCELLATION_REQUESTED
+  CANCELLED
+  PROBLEM
 }
 
 /// Жизненный цикл услуги (Гл. 4.12): Черновик → Заполнение → Проверка →
@@ -54,10 +66,9 @@ enum ServiceStatus {
   ARCHIVED
 }
 
-/// Жизненный цикл заказа (Гл. 6.10): Черновик → Создан → В обработке →
-/// Ожидает подтверждения → Подтверждён → Ожидает оплаты → Частично оплачен →
-/// Оплачен → Подготовка документов → Готов к поездке → Завершён.
-/// Дополнительные статусы: Изменён, Возвращён, Отменён, Просрочен, Архивирован.
+/// Жизненный цикл заказа (Baseline §0.4, канонический): NEW → IN_PROCESSING →
+/// WAITING_FOR_DATA → READY_FOR_BOOKING → SENT_TO_BOOKING → PARTIALLY_FULFILLED →
+/// FULFILLED → READY_TO_CLOSE → CLOSED. Ветви: CANCELLED, PROBLEM, SUSPENDED.
 /// Приоритет заказа (Гл. 3.7, 3.8, 3.10): влияет на порядок в рабочих очередях.
 enum OrderPriority {
   LOW
@@ -66,27 +77,83 @@ enum OrderPriority {
   URGENT
 }
 
-enum OrderStatus {
-  DRAFT
-  CREATED
-  PROCESSING
-  AWAITING_CONFIRMATION
-  CONFIRMED
-  AWAITING_PAYMENT
+/// Финансовое состояние заказа (Baseline §0.6): оплата — отдельная от операционного
+/// жизненного цикла характеристика, которой владеет Finance. UI локализует код,
+/// backend хранит стабильный код.
+enum OrderPaymentStatus {
+  UNPAID
   PARTIALLY_PAID
   PAID
-  DOCUMENT_PREP
-  READY
-  COMPLETED
-  CHANGED
   REFUNDED
+}
+
+enum OrderStatus {
+  NEW
+  IN_PROCESSING
+  WAITING_FOR_DATA
+  READY_FOR_BOOKING
+  SENT_TO_BOOKING
+  PARTIALLY_FULFILLED
+  FULFILLED
+  READY_TO_CLOSE
+  CLOSED
   CANCELLED
-  OVERDUE
-  ARCHIVED
+  PROBLEM
+  SUSPENDED
+}
+
+/// Словарь доменных событий Order Center (Гл. 6 «Событийная модель»): события
+/// записываются в outbox (OrderEvent) в той же транзакции, что и изменение
+/// состояния, и публикуются подписчикам (Booking Center, уведомления, лента).
+enum OrderEventType {
+  ORDER_CREATED
+  ORDER_STATUS_CHANGED
+  ORDER_READY_FOR_BOOKING
+  ORDER_SENT_TO_BOOKING
+  ORDER_FULFILLED
+  ORDER_CLOSED
+  ORDER_CANCELLED
+  ORDER_PROBLEM
+  ORDER_PAYMENT_RECEIVED
+  ORDER_PAYMENT_REFUNDED
+  /// Команда Booking Center (Baseline §9): создание Booking инициирует ТОЛЬКО
+  /// BookingRequested. Публикуется при «Передать в Booking Center» из READY_FOR_BOOKING.
+  BOOKING_REQUESTED
+  BOOKING_CREATED
+  BOOKING_STATUS_CHANGED
+  BOOKING_SENT_TO_SUPPLIER
+  BOOKING_CONFIRMED
+  BOOKING_REJECTED
+  BOOKING_CHANGED
+  BOOKING_CANCELLED
+  /// Sales Center (Phase 2, Baseline §0.7): события предшествуют созданию Order,
+  /// поэтому orderId у них опционален — привязка через correlationId (sale.code).
+  QUOTE_ACCEPTED
+  SALE_COMPLETED
+  /// Команда Order Center: создание Order инициирует ТОЛЬКО OrderRequested.
+  ORDER_REQUESTED
+  /// Finance Center (Phase 2, Baseline §0.6): финансовые события, владелец — Finance.
+  PAYMENT_CREATED
+  PAYMENT_RECEIVED
+  PAYMENT_FAILED
+  REFUND_REQUESTED
+  REFUND_COMPLETED
+  INVOICE_ISSUED
+}
+
+/// Состояние события в outbox: PENDING — записано вместе с транзакцией, ещё не
+/// доставлено; PUBLISHED — успешно обработано подписчиками; FAILED — ошибка
+/// обработки (событие сохранено для повторной публикации).
+enum OrderEventStatus {
+  PENDING
+  PUBLISHED
+  FAILED
 }
 
 model User {
   id           String    @id @default(cuid())
+  /// Канонический ID (Baseline §0.8): USR-* для персонала, CUS-* для клиентов/партнёров.
+  code         String?   @unique
   email        String    @unique
   passwordHash String
   firstName    String
@@ -113,7 +180,7 @@ model User {
 
 model Service {
   id           String      @id @default(cuid())
-  /// Код услуги (Гл. 4.3, 4.5): формируется системой автоматически, напр. SVC-0001
+  /// Код услуги (Baseline §0.8): канонический ID PRD-00000001 (формируется системой, неизменяем)
   code         String      @unique
   type         ServiceType
   title        String
@@ -181,6 +248,8 @@ model Service {
   manager      User? @relation("ServiceManager", fields: [managerId], references: [id])
   reviews      Review[]
   bookings     Booking[]
+  items        OrderItem[]
+  quoteItems   QuoteItem[]
   serviceViews ServiceView[]
   history      ServiceHistory[]
 
@@ -215,11 +284,15 @@ model ServiceHistory {
 
 model Booking {
   id          String        @id @default(cuid())
+  /// Канонический ID бронирования (Baseline §0.8): BKG-00000001
+  code        String        @unique
   userId      String
   serviceId   String
-  status      BookingStatus @default(PENDING)
+  status      BookingStatus @default(NEW)
   amount      Float
   serviceDate DateTime
+  /// Версия для optimistic locking (Baseline §13): инкрементируется при каждом изменении.
+  version     Int           @default(1)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -227,6 +300,7 @@ model Booking {
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   history BookingHistory[]
   messages BookingMessage[]
+  passengers Passenger[]
   orderId String?
   order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
@@ -237,34 +311,146 @@ model Booking {
   @@index([orderId])
 }
 
+/// Пассажир конкретного Booking (Baseline §4): создаётся Booking Center на
+/// основании подтверждённых OrderTraveler данных. Passenger НЕ заменяет
+/// OrderTraveler — это разные сущности, владельцы разные.
+model Passenger {
+  id             String   @id @default(cuid())
+  bookingId      String
+  firstName      String
+  lastName       String
+  birthDate      DateTime?
+  citizenship    String?
+  gender         String?
+  passportNumber String?
+  passportExpiry DateTime?
+  createdAt      DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+}
+
+/// Позиция состава заказа (Baseline §3): Order владеет OrderItem — услуга,
+/// количество и цена, зафиксированные на момент формирования заказа.
+/// Booking создаётся позже (из OrderItem) событием BookingRequested.
+model OrderItem {
+  id          String      @id @default(cuid())
+  orderId     String
+  serviceId   String
+  title       String
+  type        ServiceType
+  quantity    Int         @default(1)
+  price       Float
+  currency    String      @default("USD")
+  amount      Float
+  serviceDate DateTime?
+  createdAt   DateTime    @default(now())
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([serviceId])
+}
+
+/// Участник заказа (Baseline §4): Order хранит туристов ДО Booking; на их
+/// основе Booking Center создаёт Passenger. dataCompleteness: complete | incomplete
+/// — готовность данных к бронированию (паспортные поля).
+model OrderTraveler {
+  id               String   @id @default(cuid())
+  orderId          String
+  customerId       String?
+  firstName        String
+  lastName         String
+  birthDate        DateTime?
+  citizenship      String?
+  gender           String?
+  passportNumber   String?
+  passportExpiry   DateTime?
+  /// complete | incomplete
+  dataCompleteness String   @default("incomplete")
+  version          Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+
 /// Заказ — центральная бизнес-сущность платформы (Гл. 6): объединяет клиента,
 /// одну или несколько услуг (через бронирования), платежи, документы, партнёров,
 /// менеджеров и историю взаимодействий.
 model Order {
   id          String        @id @default(cuid())
+  /// Канонический внутренний ID (Baseline §0.8): ORD-00000001
+  code        String        @unique
+  /// Пользовательский номер заказа (Baseline §0.8): TH-YYYY-######
   orderNumber String        @unique
   userId      String
-  status      OrderStatus   @default(CREATED)
+  status      OrderStatus   @default(NEW)
+  /// Финансовое состояние (Baseline §0.6): оплата отделена от жизненного цикла.
+  paymentStatus OrderPaymentStatus @default(UNPAID)
   priority    OrderPriority @default(MEDIUM)
   currency    String        @default("USD")
   amount      Float
   paidAmount  Float       @default(0)
   serviceDate DateTime?
   source      String      @default("Сайт")
+  /// Версия для optimistic locking (Baseline §13): инкрементируется при каждом изменении.
+  version     Int         @default(1)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookings Booking[]
+  items    OrderItem[]
+  travelers OrderTraveler[]
   history  OrderHistory[]
   messages OrderMessage[]
   automationLogs AutomationLog[]
   exceptionLogs  ExceptionLog[]
+  events   OrderEvent[]
+  payments Payment[]
+  refunds  Refund[]
+  invoices Invoice[]
+  commissions Commission[]
+  /// Сделка, породившая заказ (Phase 2, Sales Center): read-only для Sales.
+  sale     Sale?   @relation("SaleOrder")
 
   @@index([userId])
   @@index([status])
   @@index([createdAt])
   @@index([serviceDate])
+}
+
+/// Outbox доменных событий (Гл. 6, паттерн transactional outbox): событие пишется
+/// атомарно с изменением бизнес-сущности, затем публикуется в event bus.
+/// payload — JSON с контекстом (from/to, суммы, имена и т.п.).
+/// correlationId — сквозной ID бизнес-процесса (Order.code либо Sale.code);
+/// causationId — ID события-родителя. orderId опционален: события Sales Center
+/// (QUOTE_ACCEPTED, SALE_COMPLETED, ORDER_REQUESTED) предшествуют созданию Order.
+model OrderEvent {
+  id            String          @id @default(cuid())
+  orderId       String?
+  type          OrderEventType
+  payload       Json?
+  status        OrderEventStatus @default(PENDING)
+  error         String?
+  correlationId String?
+  causationId   String?
+  createdAt     DateTime        @default(now())
+  publishedAt   DateTime?
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@index([correlationId])
 }
 
 /// Сообщение переписки менеджера и клиента по заказу (вкладка «Коммуникации», Гл. 6.9).
@@ -529,4 +715,336 @@ model City {
 
   @@unique([countryCode, nameRu])
   @@index([countryCode])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 2 — Sales Center (Baseline §0.7): Lead → Opportunity → Quote → Sale
+// Владелец домена: Sales. Customer reference — CRM (User с кодом CUS-*).
+// Канонические ID: LED-*, OPP-*, QTE-*, SAL-* (Baseline §0.8).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Лид (Phase 2): потенциальный клиент до квалификации.
+/// status: NEW | QUALIFIED | DISQUALIFIED | CONVERTED | LOST
+/// qualification: cold | warm | hot
+model Lead {
+  id            String    @id @default(cuid())
+  /// Канонический ID лида (Baseline §0.8): LED-00000001
+  code          String    @unique
+  source        String    @default("Сайт")
+  /// Ссылка на клиента CRM (CUS-*); может быть null до создания клиента
+  customerId    String?
+  customerName  String
+  contactEmail  String?
+  contactPhone  String?
+  /// Интерес (услуги/направления)
+  interest      String?
+  /// Ответственный менеджер (владелец)
+  ownerId       String?
+  ownerName     String?
+  qualification String    @default("cold")
+  status        String    @default("NEW")
+  nextAction    String?
+  nextActionAt  DateTime?
+  /// Дедлайн SLA обработки лида
+  slaDueAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  history LeadHistory[]
+
+  @@index([status])
+  @@index([ownerId])
+  @@index([createdAt])
+}
+
+/// Журнал изменений лида (Phase 2): квалификация, конвертация, потеря.
+model LeadHistory {
+  id        String   @id @default(cuid())
+  leadId    String
+  action    String
+  from      String?
+  to        String?
+  comment   String?
+  actorId   String?
+  actorName String
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([createdAt])
+}
+
+/// Возможность (Phase 2): квалифицированная сделка.
+/// stage: QUALIFICATION | NEED_ANALYSIS | QUOTE | NEGOTIATION | WON | LOST
+model Opportunity {
+  id                String    @id @default(cuid())
+  /// Канонический ID возможности (Baseline §0.8): OPP-00000001
+  code              String    @unique
+  customerId        String
+  customerName      String
+  contactEmail      String?
+  contactPhone      String?
+  ownerId           String?
+  ownerName         String?
+  /// Потребность/контекст
+  need              String?
+  /// Ссылки на продукты (JSON-массив service id)
+  productsRef       String    @default("[]")
+  budget            Float?
+  currency          String    @default("USD")
+  expectedCloseDate DateTime?
+  /// Вероятность закрытия, %
+  probability       Int       @default(50)
+  stage             String    @default("QUALIFICATION")
+  nextAction        String?
+  nextActionAt      DateTime?
+  risks             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  quotes Quote[]
+
+  @@index([stage])
+  @@index([ownerId])
+  @@index([customerId])
+}
+
+/// Коммерческое предложение (Phase 2): собственные коммерческие условия + ссылки
+/// на Product (Catalog ownership не копируется). Версии: version инкрементируется
+/// при каждой новой редакции; items — снимок состава предложения.
+/// status: DRAFT | SENT | ACCEPTED | REJECTED
+model Quote {
+  id             String   @id @default(cuid())
+  /// Канонический ID предложения (Baseline §0.8): QTE-00000001
+  code           String   @unique
+  opportunityId  String
+  customerId     String
+  customerName   String
+  currency       String   @default("USD")
+  /// Номер версии предложения (Phase 2, §3 Quote: versions)
+  version        Int      @default(1)
+  discount       Float    @default(0)
+  fees           Float    @default(0)
+  validUntil     DateTime?
+  status         String   @default("DRAFT")
+  /// Согласование (approval): pending | approved | rejected
+  approval       String   @default("pending")
+  approvedBy     String?
+  acceptedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  items       QuoteItem[]
+  sale        Sale?
+
+  @@index([opportunityId])
+  @@index([status])
+}
+
+/// Позиция коммерческого предложения (Phase 2): снимок Product + количество и цена.
+model QuoteItem {
+  id        String      @id @default(cuid())
+  quoteId   String
+  serviceId String
+  title     String
+  type      ServiceType
+  quantity  Int         @default(1)
+  price     Float
+  amount    Float
+  createdAt DateTime    @default(now())
+
+  quote   Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+
+  @@index([quoteId])
+}
+
+/// Сделка (Phase 2): завершённая коммерческая сделка. После SaleCompleted
+/// публикуется OrderRequested — Order Center создаёт Order (см. events.ts).
+/// status: WON | LOST | CANCELLED
+model Sale {
+  id             String    @id @default(cuid())
+  /// Канонический ID сделки (Baseline §0.8): SAL-00000001
+  code           String    @unique
+  quoteId        String    @unique
+  customerId     String
+  customerName   String
+  amount         Float
+  currency       String    @default("USD")
+  status         String    @default("WON")
+  closedAt       DateTime?
+  /// Связанный заказ (Order Center): Sales видит его read-only (Baseline §5)
+  orderId        String?   @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  /// Связанный заказ (Order Center): Sales видит его read-only
+  order Order? @relation("SaleOrder", fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 2 — Finance Center (Baseline §0.6): владелец — Finance.
+// Канонические ID: PAY-*, RFD-*, INV-*, CMS-*, CUR-*, FXR-*, TAX-*, TXR-*.
+// Settings НЕ владеет Currency/Tax — только Finance.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Платёж (Phase 2): создаётся Finance на основании Order/Sale триггера.
+/// status: CREATED | RECEIVED | FAILED
+model Payment {
+  id         String   @id @default(cuid())
+  /// Канонический ID платежа (Baseline §0.8): PAY-00000001
+  code       String   @unique
+  orderId    String?
+  saleId     String?
+  customerId String?
+  amount     Float
+  currency   String   @default("USD")
+  method     String   @default("Банковский перевод")
+  status     String   @default("CREATED")
+  receivedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Возврат (Phase 2): RefundRequested → RefundCompleted.
+/// status: REQUESTED | COMPLETED | FAILED
+model Refund {
+  id         String   @id @default(cuid())
+  /// Канонический ID возврата (Baseline §0.8): RFD-00000001
+  code       String   @unique
+  orderId    String?
+  paymentId  String?
+  amount     Float
+  currency   String   @default("USD")
+  reason     String?
+  status     String   @default("REQUESTED")
+  completedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([status])
+}
+
+/// Счёт (Phase 2): InvoiceIssued → документ. status: DRAFT | ISSUED | PAID | VOID
+model Invoice {
+  id         String   @id @default(cuid())
+  /// Канонический ID счёта (Baseline §0.8): INV-00000001
+  code       String   @unique
+  orderId    String?
+  saleId     String?
+  customerId String?
+  amount     Float
+  currency   String   @default("USD")
+  status     String   @default("DRAFT")
+  issuedAt   DateTime?
+  dueAt      DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Комиссия партнёра/поставщика (Phase 2). status: PENDING | PAID
+model Commission {
+  id        String   @id @default(cuid())
+  /// Канонический ID комиссии (Baseline §0.8): CMS-00000001
+  code      String   @unique
+  orderId   String?
+  partnerId String?
+  amount    Float
+  currency  String   @default("USD")
+  rate      Float    @default(0)
+  status    String   @default("PENDING")
+  paidAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([status])
+}
+
+/// Валюта (Phase 2): справочник владеет ТОЛЬКО Finance. isBase — базовая валюта.
+model Currency {
+  id        String   @id @default(cuid())
+  /// Канонический ID валюты (Baseline §0.8): CUR-00000001
+  code      String   @unique
+  name      String
+  symbol    String
+  isBase    Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  ratesFrom ExchangeRate[] @relation("RateFrom")
+  ratesTo   ExchangeRate[] @relation("RateTo")
+}
+
+/// Валютный курс (Phase 2): исторический курс from → to на дату.
+model ExchangeRate {
+  id        String   @id @default(cuid())
+  /// Канонический ID курса (Baseline §0.8): FXR-00000001
+  code      String   @unique
+  fromCode  String
+  toCode    String
+  rate      Float
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  from Currency @relation("RateFrom", fields: [fromCode], references: [code])
+  to   Currency @relation("RateTo", fields: [toCode], references: [code])
+
+  @@unique([fromCode, toCode, date])
+  @@index([date])
+}
+
+/// Налог (Phase 2): ставка налога. владелец — Finance, не Settings.
+model Tax {
+  id        String   @id @default(cuid())
+  /// Канонический ID налога (Baseline §0.8): TAX-00000001
+  code      String   @unique
+  name      String
+  rate      Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  rules TaxRule[]
+}
+
+/// Правило применения налога (Phase 2): по стране/типу услуги.
+model TaxRule {
+  id        String  @id @default(cuid())
+  /// Канонический ID правила (Baseline §0.8): TXR-00000001
+  code      String  @unique
+  taxId     String
+  country   String?
+  serviceType String?
+  rateOverride Float?
+  isActive  Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  tax Tax @relation(fields: [taxId], references: [id], onDelete: Cascade)
+
+  @@index([taxId])
+  @@index([country])
 }

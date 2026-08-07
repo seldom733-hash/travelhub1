@@ -29,30 +29,38 @@ export async function getOrdersData(f: AnalyticsFilters): Promise<AnalyticsSecti
   }
 
   const PAID = [...ORDER_STATUS_GROUPS.paid] as const;
-  const [allRowsRaw, prevCount, statusRows] = await Promise.all([
-    prisma.order.findMany({ where: orderWhere, select: { id: true, status: true, amount: true, paidAmount: true, createdAt: true, serviceDate: true } }),
+  const [allRowsRaw, prevCount, statusRows, paymentRows] = await Promise.all([
+    prisma.order.findMany({ where: orderWhere, select: { id: true, status: true, paymentStatus: true, amount: true, paidAmount: true, createdAt: true, serviceDate: true } }),
     prisma.order.count({ where: prevOrderWhere }),
     prisma.order.groupBy({ by: ["status"], where: orderWhere, _count: true }),
+    prisma.order.groupBy({ by: ["paymentStatus"], where: orderWhere, _count: true }),
   ]);
   // Фильтр по ответственному менеджеру (Гл. 2.7)
   const allRows = f.manager ? allRowsRaw.filter((o) => pickManager(o.id) === f.manager) : allRowsRaw;
 
   const statusCounts: Record<string, number> = {};
   for (const r of statusRows) statusCounts[r.status] = r._count;
+  const paymentCounts: Record<string, number> = {};
+  for (const r of paymentRows) paymentCounts[r.paymentStatus] = r._count;
   const created = allRows.length;
   // При активном фильтре менеджера срезы статусов считаем из отфильтрованных
   // строк, иначе агрегаты по всему периоду разошлись бы с «Новые заказы» (Гл. 2.7).
   if (f.manager) {
     for (const o of allRows) statusCounts[o.status] = (statusCounts[o.status] ?? 0) + 1;
   }
-  const cancelled = (statusCounts["CANCELLED"] ?? 0) + (statusCounts["REFUNDED"] ?? 0);
-  const inWorkCount = (statusCounts["PROCESSING"] ?? 0) + (statusCounts["AWAITING_CONFIRMATION"] ?? 0) + (statusCounts["CONFIRMED"] ?? 0);
-  const awaitingCount = (statusCounts["AWAITING_PAYMENT"] ?? 0) + (statusCounts["PARTIALLY_PAID"] ?? 0) + (statusCounts["OVERDUE"] ?? 0);
-  const paidCount = (statusCounts["PAID"] ?? 0) + (statusCounts["DOCUMENT_PREP"] ?? 0) + (statusCounts["READY"] ?? 0) + (statusCounts["COMPLETED"] ?? 0);
-  const overdueCount = statusCounts["OVERDUE"] ?? 0;
-  const transferred = paidCount;
+  const cancelled = (statusCounts["CANCELLED"] ?? 0) + (paymentCounts["REFUNDED"] ?? 0);
+  const inWorkCount = (statusCounts["IN_PROCESSING"] ?? 0) + (statusCounts["WAITING_FOR_DATA"] ?? 0) + (statusCounts["READY_FOR_BOOKING"] ?? 0) + (statusCounts["SENT_TO_BOOKING"] ?? 0);
+  const awaitingCount = (paymentCounts["UNPAID"] ?? 0) + (paymentCounts["PARTIALLY_PAID"] ?? 0);
+  const paidCount = (paymentCounts["PAID"] ?? 0) + (paymentCounts["PARTIALLY_PAID"] ?? 0);
+  const problemCount = (statusCounts["PROBLEM"] ?? 0) + (statusCounts["SUSPENDED"] ?? 0);
+  const transferred =
+    (statusCounts["SENT_TO_BOOKING"] ?? 0) +
+    (statusCounts["PARTIALLY_FULFILLED"] ?? 0) +
+    (statusCounts["FULFILLED"] ?? 0) +
+    (statusCounts["READY_TO_CLOSE"] ?? 0) +
+    (statusCounts["CLOSED"] ?? 0);
   const conversion = created ? (paidCount / created) * 100 : 0;
-  const sla = created ? Math.max(0, Math.round(((created - overdueCount) / created) * 100)) : 100;
+  const sla = created ? Math.max(0, Math.round(((created - problemCount) / created) * 100)) : 100;
   const perManager = created ? created / MANAGERS.length : 0;
 
   // ── Среднее время обработки (2.11.4) из журнала OrderHistory ──
@@ -115,7 +123,7 @@ export async function getOrdersData(f: AnalyticsFilters): Promise<AnalyticsSecti
     "Клиент отказался", "Найден более выгодный вариант", "Изменение планов поездки", "Неподходящие даты",
     "Неподходящий бюджет", "Длительное ожидание", "Ошибка при оформлении", "Дублирующий заказ", "Прочие причины",
   ];
-  const cancelledOrders = allRows.filter((o) => o.status === "CANCELLED" || o.status === "REFUNDED");
+  const cancelledOrders = allRows.filter((o) => o.status === "CANCELLED" || o.paymentStatus === "REFUNDED");
   const reasonMap = new Map<string, number>();
   cancelledOrders.forEach((o, i) => {
     const r = reasons[i % reasons.length];
@@ -165,7 +173,7 @@ export async function getOrdersData(f: AnalyticsFilters): Promise<AnalyticsSecti
   });
 
   const ai: { level: "positive" | "medium" | "high" | "info"; title: string; detail: string }[] = [];
-  if (overdueCount > 0) ai.push({ level: "high", title: `${overdueCount} заказов просрочено`, detail: "Требуется решение менеджера" });
+  if (problemCount > 0) ai.push({ level: "high", title: `${problemCount} заказов в проблемном статусе`, detail: "Требуется решение менеджера" });
   if (avgHours > 0) ai.push({ level: "info", title: `Среднее время подтверждения: ${avgHours} ч`, detail: sla >= 80 ? "SLA соблюдается" : "SLA нарушается" });
   if (cancelled > 0) ai.push({ level: "medium", title: `${cancelled} отмен за период`, detail: `${Math.round((cancelled / Math.max(1, created)) * 100)}% от созданных` });
   ai.push({ level: "info", title: `Передано в бронирование: ${transferred}`, detail: `конверсия ${conversion.toFixed(0)}%` });
@@ -184,6 +192,7 @@ export async function getOrdersData(f: AnalyticsFilters): Promise<AnalyticsSecti
       { key: "sla", title: "Выполнение SLA", value: sla, unit: "%", tone: sla >= 80 ? "positive" : "negative" },
       { key: "perManager", title: "Заказов на менеджера", value: Math.round(perManager), unit: " шт", tone: "neutral" },
       { key: "cancelled", title: "Отменено", value: cancelled, unit: " шт", tone: cancelled > 0 ? "negative" : "positive", detail: `${Math.round((cancelled / Math.max(1, created)) * 100)}% от созданных` },
+      { key: "problem", title: "Проблемные", value: problemCount, unit: " шт", tone: problemCount > 0 ? "negative" : "positive" },
     ],
     funnels: [
       {

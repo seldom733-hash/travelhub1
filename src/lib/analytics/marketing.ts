@@ -2,7 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { changePct, bucketize, SERVICE_TYPE_LABELS } from "@/lib/admin-data";
 import { type AnalyticsSectionData, type AnalyticsFilters, analyticsRange } from "@/lib/analytics";
 
-const PAID: ("PAID" | "COMPLETED")[] = ["PAID", "COMPLETED"];
+type BookingStatusFilter =
+  | "NEW" | "PREPARING_REQUEST" | "SENT_TO_SUPPLIER" | "AWAITING_CONFIRMATION"
+  | "CONFIRMED" | "IN_SERVICE" | "COMPLETED" | "NEEDS_CLARIFICATION"
+  | "SUPPLIER_REJECTED" | "CHANGE_REQUESTED" | "CANCELLATION_REQUESTED"
+  | "CANCELLED" | "PROBLEM";
+const PAID: ("CONFIRMED" | "IN_SERVICE" | "COMPLETED")[] = ["CONFIRMED", "IN_SERVICE", "COMPLETED"];
 
 /** Каналы привлечения (2.17.5). */
 const CHANNELS = [
@@ -49,8 +54,8 @@ export async function getMarketingData(f: AnalyticsFilters): Promise<AnalyticsSe
   }
 
   // Платёжный агрегат уважает фильтр статуса (Гл. 2.7).
-  const paidStatus: { in: ("PAID" | "COMPLETED")[] } | "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED" =
-    f.status ? (f.status as "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED") : { in: PAID };
+  const paidStatus: { in: ("CONFIRMED" | "IN_SERVICE" | "COMPLETED")[] } | BookingStatusFilter =
+    f.status ? (f.status as BookingStatusFilter) : { in: PAID };
 
   const [views, prevViews, bookings, prevBookings, paidAgg, newUsers, prevNewUsers] = await Promise.all([
     prisma.serviceView.count({ where: viewWhere }),

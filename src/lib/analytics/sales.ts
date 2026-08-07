@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { ORDER_STATUS_GROUPS, changePct, bucketize, pickManager, SERVICE_TYPE_LABELS } from "@/lib/admin-data";
+import { changePct, bucketize, pickManager, SERVICE_TYPE_LABELS } from "@/lib/admin-data";
 import { type AnalyticsSectionData, type AnalyticsFilters, analyticsRange } from "@/lib/analytics";
 
 /**
@@ -28,16 +28,15 @@ export async function getSalesData(f: AnalyticsFilters): Promise<AnalyticsSectio
     prevOrderWhere.bookings = { some: { service: serviceFilter } };
   }
 
-  const PAID = [...ORDER_STATUS_GROUPS.paid] as const;
   // Платёжные агрегаты уважают фильтр статуса (Гл. 2.7): при выбранном статусе
   // конверсия и выручка считаются по отфильтрованному множеству.
-  const paidStatus: { in: ("PAID" | "DOCUMENT_PREP" | "READY" | "COMPLETED")[] } | (typeof PAID)[number] =
-    f.status ? (f.status as (typeof PAID)[number]) : { in: [...PAID] };
+  // Оплата — отдельное измерение (paymentStatus, Baseline §0.6).
+  const paidWhere: Record<string, unknown> = f.status ? { status: f.status } : { paymentStatus: "PAID" };
 
   const [ordersAllRaw, prevOrdersAll, paidRowsRaw] = await Promise.all([
-    prisma.order.findMany({ where: orderWhere, select: { id: true, status: true, amount: true, paidAmount: true, createdAt: true } }),
+    prisma.order.findMany({ where: orderWhere, select: { id: true, status: true, paymentStatus: true, amount: true, paidAmount: true, createdAt: true } }),
     prisma.order.count({ where: prevOrderWhere }),
-    prisma.order.findMany({ where: { ...orderWhere, status: paidStatus }, select: { id: true, amount: true, paidAmount: true, status: true, createdAt: true } }),
+    prisma.order.findMany({ where: { ...orderWhere, ...paidWhere }, select: { id: true, amount: true, paidAmount: true, status: true, createdAt: true } }),
   ]);
   // Фильтр по ответственному менеджеру (Гл. 2.7): ротация pickManager по id заказа
   const managerFiltered = <T extends { id: string }>(rows: T[]): T[] => (f.manager ? rows.filter((o) => pickManager(o.id) === f.manager) : rows);
@@ -51,7 +50,7 @@ export async function getSalesData(f: AnalyticsFilters): Promise<AnalyticsSectio
   const avgCheck = paidCount ? revenue / paidCount : 0;
   const conversion = created ? (paidCount / created) * 100 : 0;
   const cancelled = ordersAll.filter((o) => o.status === "CANCELLED").length;
-  const refunded = ordersAll.filter((o) => o.status === "REFUNDED").length;
+  const refunded = ordersAll.filter((o) => o.paymentStatus === "REFUNDED").length;
   const rejectPct = created ? ((cancelled + refunded) / created) * 100 : 0;
 
   // ── Эффективность менеджеров (2.10.6) ──
@@ -60,7 +59,7 @@ export async function getSalesData(f: AnalyticsFilters): Promise<AnalyticsSectio
     const m = pickManager(o.id);
     const cur = mgrMap.get(m) ?? { orders: 0, paid: 0, revenue: 0 };
     cur.orders += 1;
-    if ((PAID as readonly string[]).includes(o.status)) {
+    if (o.paymentStatus === "PAID") {
       cur.paid += 1;
       cur.revenue += o.paidAmount ?? 0;
     }
@@ -81,7 +80,7 @@ export async function getSalesData(f: AnalyticsFilters): Promise<AnalyticsSectio
     "Высокая цена", "Отсутствие мест", "Изменение стоимости поставщиком", "Клиент выбрал конкурента",
     "Неподходящие даты", "Длительное ожидание ответа", "Ошибка менеджера", "Прочие причины",
   ];
-  const cancelledIds = ordersAll.filter((o) => o.status === "CANCELLED" || o.status === "REFUNDED").map((o) => o.id);
+  const cancelledIds = ordersAll.filter((o) => o.status === "CANCELLED" || o.paymentStatus === "REFUNDED").map((o) => o.id);
   const reasonsMap = new Map<string, number>();
   cancelledIds.forEach((id, i) => {
     const r = reasons[i % reasons.length];

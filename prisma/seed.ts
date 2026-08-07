@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { countriesDatabase } from "../src/lib/countries-data";
+import { userBusinessCode } from "../src/lib/ids";
 
 const adapter = new PrismaBetterSqlite3({
   url: process.env.DATABASE_URL || "file:./dev.db",
@@ -364,6 +365,28 @@ async function main() {
 
   // ── 500 услуг, неравномерно распределённых между партнёрами ──
   // Идемпотентность: сид — источник данных услуг, поэтому перед созданием удаляем все.
+  // ── Канонические коды пользователей (Baseline §0.8): USR-* для персонала,
+  // CUS-* для клиентов/партнёров. Бэкфилл для записей без кода (fresh seed).
+  const codeLessUsers = await prisma.user.findMany({
+    where: { code: null },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, role: true },
+  });
+  if (codeLessUsers.length) {
+    const userCodes = await prisma.user.findMany({ select: { code: true } });
+    const allCodes = userCodes.map((u) => u.code).filter((c): c is string => !!c);
+    for (const u of codeLessUsers) {
+      const code = userBusinessCode(u.role, allCodes);
+      await prisma.user.update({ where: { id: u.id }, data: { code } });
+      allCodes.push(code);
+    }
+  }
+
+  // Идемпотентность: удаляем зависимые записи с onDelete: Restrict (OrderItem,
+  // QuoteItem) заранее — каскадные (Booking, ServiceHistory и др.) уйдут сами.
+  await prisma.orderItem.deleteMany({});
+  await prisma.quoteItem.deleteMany({});
+
   await prisma.service.deleteMany({});
 
   // Случайные веса (1..6) → одни партнёры получают много услуг, другие мало.
@@ -387,7 +410,7 @@ async function main() {
   }
 
   let serviceSeq = 0;
-  const serviceRecords: { id: string; price: number; discountPrice: number | null; currency: string }[] = [];
+  const serviceRecords: { id: string; type: ServiceTypeName; price: number; discountPrice: number | null; currency: string }[] = [];
 
   // ── Каталог (Гл. 4): жизненный цикл услуги (4.12), менеджер, квоты, SEO ──
   // Статусы по спецификации: Черновик → Проверка/Согласование → Публикация →
@@ -493,7 +516,7 @@ async function main() {
 
     const svc = await prisma.service.create({
       data: {
-        code: `SVC-${String(serviceSeq).padStart(4, "0")}`,
+        code: `PRD-${String(serviceSeq).padStart(8, "0")}`,
         type,
         title: titleTpl,
         slug: `${type.toLowerCase()}-${String(serviceSeq).padStart(4, "0")}`,
@@ -545,7 +568,7 @@ async function main() {
       },
     });
     if (active) {
-      serviceRecords.push({ id: svc.id, price: svc.price, discountPrice: svc.discountPrice, currency: svc.currency || "USD" });
+      serviceRecords.push({ id: svc.id, type, price: svc.price, discountPrice: svc.discountPrice, currency: svc.currency || "USD" });
     }
     // История версий (Гл. 4.12): создание + переходы по жизненному циклу
     const historyRows: {
@@ -692,14 +715,20 @@ async function main() {
   }
   const activeBookers = bookingBuyers.slice(0, 70);
 
-  type BookingStatusValue = "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED";
+  // Канонический код бронирования BKG-* (Baseline §0.8) — сквозной счётчик.
+  let bkgSeq = 0;
+
+  // Канонические статусы бронирования (Baseline §0.5): NEW → … → CONFIRMED →
+  // IN_SERVICE → COMPLETED; ветви CANCELLED. Оплата — на уровне Order (§0.6),
+  // поэтому «оплаченные» брони сидим как CONFIRMED.
+  type BookingStatusValue = "NEW" | "CONFIRMED" | "IN_SERVICE" | "COMPLETED" | "CANCELLED";
   const statuses: BookingStatusValue[] = [];
   const statusPlan: Array<[BookingStatusValue, number]> = [
-    ["REFUNDED", 5],
-    ["PENDING", 10],
-    ["CONFIRMED", 12],
-    ["PAID", 55],
-    ["COMPLETED", 48],
+    ["CANCELLED", 5],
+    ["NEW", 10],
+    ["CONFIRMED", 67],
+    ["IN_SERVICE", 5],
+    ["COMPLETED", 43],
   ];
   for (const [s, n] of statusPlan) {
     for (let i = 0; i < n; i++) statuses.push(s);
@@ -724,11 +753,11 @@ async function main() {
   for (const bk of bookings) {
     const svc = pick(serviceRecords);
     let serviceDate: Date;
-    if (bk.status === "PAID") {
+    if (bk.status === "CONFIRMED") {
       // «Ждут даты» — дата услуги после 01.08.2026.
       serviceDate = dateBetween(AFTER_AUG, new Date("2026-12-31"));
-    } else if (bk.status === "PENDING" || bk.status === "CONFIRMED") {
-      // Ожидание оплаты / подтверждено — будущая дата услуги (до 3 месяцев).
+    } else if (bk.status === "NEW" || bk.status === "IN_SERVICE") {
+      // Ожидание подтверждения / в обслуживании — будущая дата услуги (до 3 месяцев).
       serviceDate = dateBetween(NOW, new Date(NOW.getTime() + 90 * DAY));
     } else {
       // Возврат / завершено — услуга уже оказана: между регистрацией и сегодня.
@@ -747,6 +776,7 @@ async function main() {
     );
     await prisma.booking.create({
       data: {
+        code: `BKG-${String(++bkgSeq).padStart(8, "0")}`,
         userId: bk.buyerId,
         serviceId: svc.id,
         status: bk.status,
@@ -821,7 +851,7 @@ async function main() {
     const svc = pick(serviceRecords);
     const r = rand();
     const status: BookingStatusValue =
-      r < 0.35 ? "PAID" : r < 0.62 ? "COMPLETED" : r < 0.78 ? "PENDING" : r < 0.92 ? "CONFIRMED" : "REFUNDED";
+      r < 0.35 ? "CONFIRMED" : r < 0.62 ? "COMPLETED" : r < 0.78 ? "NEW" : r < 0.92 ? "CONFIRMED" : "CANCELLED";
     // Дата создания: сегодня (10%), за неделю (20%), за месяц (30%), остальное в течение 2026
     const cr = rand();
     const createdAt: Date =
@@ -834,7 +864,7 @@ async function main() {
         : dateBetween(new Date("2026-01-01"), new Date("2026-07-01"));
     // Дата услуги: для завершённых/возвратов — в прошлом после создания,
     // для PAID/PENDING/CONFIRMED — в будущем (после 01.08.2026)
-    const isPast = status === "COMPLETED" || status === "REFUNDED";
+    const isPast = status === "COMPLETED" || status === "CANCELLED";
     const serviceDate: Date = isPast
       ? dateBetween(
           new Date(Math.min(createdAt.getTime() + DAY, NOW.getTime() - DAY)),
@@ -853,6 +883,7 @@ async function main() {
   for (const bk of extraBookings) {
     await prisma.booking.create({
       data: {
+        code: `BKG-${String(++bkgSeq).padStart(8, "0")}`,
         userId: bk.userId,
         serviceId: bk.serviceId,
         status: bk.status,
@@ -873,18 +904,18 @@ async function main() {
     createdAgoHours: [number, number];
     serviceDateInDays: [number, number];
   }> = [
-    // Ближайшие поездки (PAID, дата через 1–25 дней)
-    { count: 8, status: "PAID", createdAgoHours: [3 * 24, 20 * 24], serviceDateInDays: [1, 25] },
-    // Ожидают оплаты / подтверждены, дата скоро → «Проблемные бронирования» (0–3 дня)
-    { count: 6, status: "PENDING", createdAgoHours: [2 * 24, 10 * 24], serviceDateInDays: [0, 3] },
-    // Просроченные подтверждения (CONFIRMED давно созданы, но без оплаты)
+    // Ближайшие поездки (CONFIRMED, дата через 1–25 дней)
+    { count: 8, status: "CONFIRMED", createdAgoHours: [3 * 24, 20 * 24], serviceDateInDays: [1, 25] },
+    // Ожидают подтверждения, дата скоро → «Проблемные бронирования» (0–3 дня)
+    { count: 6, status: "NEW", createdAgoHours: [2 * 24, 10 * 24], serviceDateInDays: [0, 3] },
+    // Просроченные подтверждения (CONFIRMED давно созданы)
     { count: 5, status: "CONFIRMED", createdAgoHours: [50 * 24, 90 * 24], serviceDateInDays: [7, 60] },
-    // Свежие ожидающие оплаты (PENDING, созданы 1–3 дня назад)
-    { count: 7, status: "PENDING", createdAgoHours: [12, 3 * 24], serviceDateInDays: [10, 60] },
+    // Свежие ожидающие подтверждения (NEW, созданы 1–3 дня назад)
+    { count: 7, status: "NEW", createdAgoHours: [12, 3 * 24], serviceDateInDays: [10, 60] },
     // Подтверждённые сегодня/на этой неделе
     { count: 6, status: "CONFIRMED", createdAgoHours: [2, 5 * 24], serviceDateInDays: [5, 45] },
-    // Свежие оплаченные сегодня
-    { count: 5, status: "PAID", createdAgoHours: [1, 8], serviceDateInDays: [15, 70] },
+    // Свежие подтверждённые сегодня
+    { count: 5, status: "CONFIRMED", createdAgoHours: [1, 8], serviceDateInDays: [15, 70] },
   ];
   for (const t of bcTargets) {
     for (let i = 0; i < t.count; i++) {
@@ -895,6 +926,7 @@ async function main() {
       const serviceDate = new Date(NOW.getTime() + randInt(t.serviceDateInDays[0], t.serviceDateInDays[1]) * DAY);
       await prisma.booking.create({
         data: {
+          code: `BKG-${String(++bkgSeq).padStart(8, "0")}`,
           userId: buyer.id,
           serviceId: svc.id,
           status: t.status,
@@ -939,30 +971,30 @@ async function main() {
       bookingId: b.id,
       action: "created",
       from: null,
-      to: "PENDING",
+      to: "NEW",
       actorName: clientName,
       comment: "Бронирование создано",
       createdAt: b.createdAt,
     });
-    if (b.status === "CONFIRMED" || b.status === "PAID" || b.status === "COMPLETED") {
+    if (b.status === "CONFIRMED" || b.status === "IN_SERVICE" || b.status === "COMPLETED") {
       historyRows.push({
         bookingId: b.id,
         action: "confirm",
-        from: "PENDING",
+        from: "NEW",
         to: "CONFIRMED",
         actorName: pick(MANAGER_POOL),
         comment: "Подтверждено поставщиком",
         createdAt: at(0.35),
       });
     }
-    if (b.status === "PAID" || b.status === "COMPLETED") {
+    if (b.status === "IN_SERVICE" || b.status === "COMPLETED") {
       historyRows.push({
         bookingId: b.id,
-        action: "pay",
+        action: "in_service",
         from: "CONFIRMED",
-        to: "PAID",
+        to: "IN_SERVICE",
         actorName: pick(MANAGER_POOL),
-        comment: "Оплата получена",
+        comment: "Услуга оказывается",
         createdAt: at(0.6),
       });
     }
@@ -970,21 +1002,21 @@ async function main() {
       historyRows.push({
         bookingId: b.id,
         action: "complete",
-        from: "PAID",
+        from: "IN_SERVICE",
         to: "COMPLETED",
         actorName: pick(MANAGER_POOL),
         comment: "Поездка завершена",
         createdAt: at(0.9),
       });
     }
-    if (b.status === "REFUNDED") {
+    if (b.status === "CANCELLED") {
       historyRows.push({
         bookingId: b.id,
         action: "cancel",
-        from: "PAID",
-        to: "REFUNDED",
+        from: "CONFIRMED",
+        to: "CANCELLED",
         actorName: pick(MANAGER_POOL),
-        comment: "Отменено, средства возвращены",
+        comment: "Отменено",
         createdAt: at(0.5),
       });
     }
@@ -1033,33 +1065,33 @@ async function main() {
     createdAt: Date;
   }[] = [];
   const msgCountFor = (status: string): number => {
-    if (status === "COMPLETED" || status === "REFUNDED") return randInt(2, 4);
-    if (status === "PAID") return randInt(1, 3);
+    if (status === "COMPLETED" || status === "CANCELLED") return randInt(2, 4);
+    if (status === "CONFIRMED" || status === "IN_SERVICE") return randInt(1, 3);
     return randInt(1, 2);
   };
   // Автоматические системные сообщения по статусу (Гл. 5.9): создание →
-  // подтверждение → оплата → завершение (или отмена). Временные метки совпадают
-  // с журналом истории, чтобы хронология чата и журнала согласовывались.
+  // подтверждение → обслуживание → завершение (или отмена). Временные метки
+  // совпадают с журналом истории, чтобы хронология чата и журнала согласовывались.
   const SYSTEM_EVENTS: Record<string, { text: string; f: number }[]> = {
-    PENDING: [{ text: "Бронирование создано и ожидает подтверждения", f: 0 }],
+    NEW: [{ text: "Бронирование создано и ожидает подтверждения", f: 0 }],
     CONFIRMED: [
       { text: "Бронирование создано и ожидает подтверждения", f: 0 },
       { text: "Бронирование подтверждено ✅", f: 0.35 },
     ],
-    PAID: [
+    IN_SERVICE: [
       { text: "Бронирование создано и ожидает подтверждения", f: 0 },
       { text: "Бронирование подтверждено ✅", f: 0.35 },
-      { text: "Оплата получена 💳", f: 0.6 },
+      { text: "Услуга оказывается 🧳", f: 0.6 },
     ],
     COMPLETED: [
       { text: "Бронирование создано и ожидает подтверждения", f: 0 },
       { text: "Бронирование подтверждено ✅", f: 0.35 },
-      { text: "Оплата получена 💳", f: 0.6 },
+      { text: "Услуга оказывается 🧳", f: 0.6 },
       { text: "Поездка завершена 🎉", f: 0.9 },
     ],
-    REFUNDED: [
+    CANCELLED: [
       { text: "Бронирование создано и ожидает подтверждения", f: 0 },
-      { text: "Бронирование отменено, средства возвращены ↩️", f: 0.5 },
+      { text: "Бронирование отменено ↩️", f: 0.5 },
     ],
   };
   for (const b of messageBookings) {
@@ -1070,7 +1102,7 @@ async function main() {
     // «создано» прочитано (админ видел), статусные переходы — непрочитанные, чтобы
     // бейджи на вкладке и в таблице были заполнены (Гл. 5.9).
     // У завершённых/возвращённых броней всё прочитано — работа по ним закрыта.
-    const terminal = b.status === "COMPLETED" || b.status === "REFUNDED";
+    const terminal = b.status === "COMPLETED" || b.status === "CANCELLED";
     const events: { at: number; senderName: string; senderRole: string; text: string; isRead: boolean }[] =
       (SYSTEM_EVENTS[b.status] ?? []).map((e) => ({
         at: e.f,
@@ -1112,29 +1144,33 @@ async function main() {
   // заказы с фиксированными статусами жизненного цикла (Гл. 6.10), чтобы виджеты
   // реестр заказов был заполнен.
   await prisma.order.deleteMany({});
+  // Канонические статусы заказа (Baseline §0.4): NEW → IN_PROCESSING →
+  // WAITING_FOR_DATA → READY_FOR_BOOKING → SENT_TO_BOOKING → PARTIALLY_FULFILLED
+  // → FULFILLED → READY_TO_CLOSE → CLOSED; ветви CANCELLED/PROBLEM/SUSPENDED.
   type OrderStatusValue =
-    | "DRAFT" | "CREATED" | "PROCESSING" | "AWAITING_CONFIRMATION" | "CONFIRMED"
-    | "AWAITING_PAYMENT" | "PARTIALLY_PAID" | "PAID" | "DOCUMENT_PREP" | "READY"
-    | "COMPLETED" | "CHANGED" | "REFUNDED" | "CANCELLED" | "OVERDUE" | "ARCHIVED";
+    | "NEW" | "IN_PROCESSING" | "WAITING_FOR_DATA" | "READY_FOR_BOOKING" | "SENT_TO_BOOKING"
+    | "PARTIALLY_FULFILLED" | "FULFILLED" | "READY_TO_CLOSE" | "CLOSED"
+    | "CANCELLED" | "PROBLEM" | "SUSPENDED";
   const orderSources = ["Сайт", "Мобильное приложение", "Партнёр", "Call-центр", "Telegram-бот", "WhatsApp"];
-  // Приоритет заказа по статусу (Гл. 3.7): просроченные — срочные, активные
+  // Приоритет заказа по статусу (Гл. 3.7): проблемные — срочные, активные
   // этапы — высокий, завершённые/отменённые — низкий.
   const orderPriorityForStatus = (s: string): string => {
-    if (s === "OVERDUE") return "URGENT";
-    if (["AWAITING_CONFIRMATION", "PROCESSING", "AWAITING_PAYMENT", "PARTIALLY_PAID", "CONFIRMED", "CHANGED"].includes(s)) return "HIGH";
-    if (["COMPLETED", "REFUNDED", "CANCELLED", "ARCHIVED"].includes(s)) return "LOW";
+    if (s === "PROBLEM") return "URGENT";
+    if (["NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED"].includes(s)) return "HIGH";
+    if (["CLOSED", "CANCELLED", "SUSPENDED"].includes(s)) return "LOW";
     return "MEDIUM";
   };
   const orderStatusFromBookings = (items: { status: string }[]): OrderStatusValue => {
     const st = new Set(items.map((b) => b.status));
     const has = (s: string) => st.has(s);
-    if (has("REFUNDED")) return "REFUNDED";
-    if (st.size === 1 && has("COMPLETED")) return "COMPLETED";
-    if (has("COMPLETED") || has("PAID")) return has("PENDING") || has("CONFIRMED") ? "PARTIALLY_PAID" : "PAID";
-    if (st.size === 1 && has("CONFIRMED")) return "AWAITING_PAYMENT";
-    if (has("CONFIRMED")) return "CONFIRMED";
-    if (st.size === 1 && has("PENDING")) return "AWAITING_CONFIRMATION";
-    return "CREATED";
+    if (has("CANCELLED")) return "CANCELLED";
+    if (st.size === 1 && has("COMPLETED")) return "CLOSED";
+    if (has("COMPLETED")) return has("NEW") || has("CONFIRMED") ? "PARTIALLY_FULFILLED" : "FULFILLED";
+    if (st.size === 1 && has("CONFIRMED")) return "FULFILLED";
+    if (has("CONFIRMED")) return "SENT_TO_BOOKING";
+    if (st.size === 1 && has("NEW")) return "NEW";
+    if (has("NEW")) return "IN_PROCESSING";
+    return "NEW";
   };
   const bookingPool = await prisma.booking.findMany({
     select: { id: true, userId: true, amount: true, status: true, serviceDate: true, createdAt: true, updatedAt: true },
@@ -1165,17 +1201,21 @@ async function main() {
     const amount = Math.round(g.items.reduce((a, b) => a + b.amount, 0) * 100) / 100;
     const paidAmount =
       Math.round(
-        g.items.filter((b) => b.status === "PAID" || b.status === "COMPLETED").reduce((a, b) => a + b.amount, 0) * 100
+        g.items.filter((b) => b.status === "CONFIRMED" || b.status === "IN_SERVICE" || b.status === "COMPLETED").reduce((a, b) => a + b.amount, 0) * 100
       ) / 100;
     const status = orderStatusFromBookings(g.items);
+    const paymentStatus =
+      status === "CANCELLED" ? "UNPAID" : paidAmount >= amount ? "PAID" : paidAmount > 0 ? "PARTIALLY_PAID" : "UNPAID";
     const serviceDate = new Date(Math.min(...g.items.map((b) => b.serviceDate.getTime())));
     const createdAt = new Date(Math.min(...g.items.map((b) => b.createdAt.getTime())));
     const updatedAt = new Date(Math.max(...g.items.map((b) => b.updatedAt.getTime())));
     const created = await prisma.order.create({
       data: {
-        orderNumber: `ORD-${String(1000 + ordIdx)}`,
+        code: `ORD-${String(ordIdx).padStart(8, "0")}`,
+        orderNumber: `TH-${NOW.getFullYear()}-${String(1000 + ordIdx).padStart(6, "0")}`,
         userId: g.userId,
         status,
+        paymentStatus,
         priority: orderPriorityForStatus(status) as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
         currency: "USD",
         amount,
@@ -1195,35 +1235,33 @@ async function main() {
 
   // ── Целевые заказы по статусам жизненного цикла (для реестра заказов) ──
   const bookingStatusFor = (s: OrderStatusValue): BookingStatusValue => {
-    if (s === "COMPLETED" || s === "ARCHIVED") return "COMPLETED";
-    if (s === "REFUNDED" || s === "CANCELLED") return "REFUNDED";
-    if (s === "PAID" || s === "DOCUMENT_PREP" || s === "READY") return "PAID";
-    if (s === "PARTIALLY_PAID") return "PAID";
-    if (s === "AWAITING_PAYMENT") return "CONFIRMED";
-    return "PENDING";
+    if (s === "CLOSED") return "COMPLETED";
+    if (s === "CANCELLED" || s === "PROBLEM" || s === "SUSPENDED") return "CANCELLED";
+    if (s === "FULFILLED" || s === "READY_TO_CLOSE") return "IN_SERVICE";
+    if (s === "PARTIALLY_FULFILLED" || s === "SENT_TO_BOOKING") return "CONFIRMED";
+    return "NEW";
   };
   const orderTargets: Array<{
     count: number;
     status: OrderStatusValue;
+    payment: "UNPAID" | "PARTIALLY_PAID" | "PAID" | "REFUNDED";
     createdAgoHours: [number, number];
     serviceDateInDays: [number, number];
   }> = [
-    { count: 4, status: "DRAFT", createdAgoHours: [2, 24], serviceDateInDays: [20, 60] },
-    { count: 5, status: "CREATED", createdAgoHours: [6, 48], serviceDateInDays: [10, 45] },
-    { count: 5, status: "PROCESSING", createdAgoHours: [12, 72], serviceDateInDays: [5, 40] },
-    { count: 5, status: "AWAITING_CONFIRMATION", createdAgoHours: [4, 36], serviceDateInDays: [3, 30] },
-    { count: 5, status: "CONFIRMED", createdAgoHours: [24, 96], serviceDateInDays: [7, 45] },
-    { count: 6, status: "AWAITING_PAYMENT", createdAgoHours: [12, 60], serviceDateInDays: [5, 35] },
-    { count: 4, status: "PARTIALLY_PAID", createdAgoHours: [48, 120], serviceDateInDays: [10, 50] },
-    { count: 5, status: "PAID", createdAgoHours: [6, 72], serviceDateInDays: [2, 30] },
-    { count: 4, status: "DOCUMENT_PREP", createdAgoHours: [72, 160], serviceDateInDays: [5, 25] },
-    { count: 4, status: "READY", createdAgoHours: [96, 200], serviceDateInDays: [1, 14] },
-    { count: 5, status: "COMPLETED", createdAgoHours: [240, 720], serviceDateInDays: [-30, -1] },
-    { count: 3, status: "CHANGED", createdAgoHours: [48, 144], serviceDateInDays: [10, 40] },
-    { count: 4, status: "REFUNDED", createdAgoHours: [120, 400], serviceDateInDays: [-20, -2] },
-    { count: 4, status: "CANCELLED", createdAgoHours: [60, 300], serviceDateInDays: [5, 30] },
-    { count: 4, status: "OVERDUE", createdAgoHours: [120, 500], serviceDateInDays: [2, 20] },
-    { count: 3, status: "ARCHIVED", createdAgoHours: [700, 1500], serviceDateInDays: [-90, -10] },
+    { count: 4, status: "NEW", payment: "UNPAID", createdAgoHours: [2, 24], serviceDateInDays: [20, 60] },
+    { count: 5, status: "IN_PROCESSING", payment: "UNPAID", createdAgoHours: [6, 48], serviceDateInDays: [10, 45] },
+    { count: 5, status: "WAITING_FOR_DATA", payment: "UNPAID", createdAgoHours: [4, 36], serviceDateInDays: [3, 30] },
+    { count: 5, status: "READY_FOR_BOOKING", payment: "UNPAID", createdAgoHours: [24, 96], serviceDateInDays: [7, 45] },
+    { count: 6, status: "SENT_TO_BOOKING", payment: "PARTIALLY_PAID", createdAgoHours: [12, 60], serviceDateInDays: [5, 35] },
+    { count: 4, status: "PARTIALLY_FULFILLED", payment: "PARTIALLY_PAID", createdAgoHours: [48, 120], serviceDateInDays: [10, 50] },
+    { count: 5, status: "FULFILLED", payment: "PAID", createdAgoHours: [6, 72], serviceDateInDays: [2, 30] },
+    { count: 4, status: "READY_TO_CLOSE", payment: "PAID", createdAgoHours: [96, 200], serviceDateInDays: [1, 14] },
+    { count: 5, status: "CLOSED", payment: "PAID", createdAgoHours: [240, 720], serviceDateInDays: [-30, -1] },
+    { count: 3, status: "IN_PROCESSING", payment: "UNPAID", createdAgoHours: [48, 144], serviceDateInDays: [10, 40] },
+    { count: 4, status: "CLOSED", payment: "REFUNDED", createdAgoHours: [120, 400], serviceDateInDays: [-20, -2] },
+    { count: 4, status: "CANCELLED", payment: "UNPAID", createdAgoHours: [60, 300], serviceDateInDays: [5, 30] },
+    { count: 4, status: "PROBLEM", payment: "PARTIALLY_PAID", createdAgoHours: [120, 500], serviceDateInDays: [2, 20] },
+    { count: 3, status: "SUSPENDED", payment: "UNPAID", createdAgoHours: [700, 1500], serviceDateInDays: [-90, -10] },
   ];
   for (const t of orderTargets) {
     for (let i = 0; i < t.count; i++) {
@@ -1234,17 +1272,19 @@ async function main() {
       const serviceDate = new Date(NOW.getTime() + randInt(t.serviceDateInDays[0], t.serviceDateInDays[1]) * DAY);
       const amount = Math.round((svc.discountPrice ?? svc.price) * randInt(1, 2) * 100) / 100;
       const paidAmount =
-        ["PAID", "PARTIALLY_PAID", "DOCUMENT_PREP", "READY", "COMPLETED"].includes(t.status)
-          ? t.status === "PARTIALLY_PAID"
+        t.payment === "PAID" || t.payment === "REFUNDED"
+          ? amount
+          : t.payment === "PARTIALLY_PAID"
             ? Math.round(amount * 0.5 * 100) / 100
-            : amount
-          : 0;
+            : 0;
       ordIdx++;
       const created = await prisma.order.create({
         data: {
-          orderNumber: `ORD-${String(1000 + ordIdx)}`,
+          code: `ORD-${String(ordIdx).padStart(8, "0")}`,
+          orderNumber: `TH-${NOW.getFullYear()}-${String(1000 + ordIdx).padStart(6, "0")}`,
           userId: buyer.id,
           status: t.status,
+          paymentStatus: t.payment,
           priority: orderPriorityForStatus(t.status) as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
           currency: svc.currency || "USD",
           amount,
@@ -1261,6 +1301,7 @@ async function main() {
         const bkSvc = pick(serviceRecords);
         const booking = await prisma.booking.create({
           data: {
+            code: `BKG-${String(++bkgSeq).padStart(8, "0")}`,
             userId: buyer.id,
             serviceId: bkSvc.id,
             status: bookingStatusFor(t.status),
@@ -1275,7 +1316,7 @@ async function main() {
             bookingId: booking.id,
             action: "created",
             from: null,
-            to: "PENDING",
+            to: "NEW",
             actorName: "Система",
             comment: "Бронирование создано в составе заказа",
             createdAt,
@@ -1295,82 +1336,132 @@ async function main() {
     }
   }
 
+  // ── Состав заказа и туристы (Baseline §3/§4): OrderItem + OrderTraveler ──
+  // Бэкфилл для всех заказов: позиции — из броней (услуги), туристы — клиент +
+  // детерминированный набор паспортных данных (dataCompleteness = complete), чтобы
+  // канонические preconditions (confirm/send) не блокировали демо-флоу.
+  // Runtime-заказы создают items/travelers на этапе создания (POST /orders).
+  {
+    const seedOrders = await prisma.order.findMany({
+      include: { user: true, bookings: { include: { service: true } } },
+    });
+    let travSeq = 0;
+    for (const o of seedOrders) {
+      const itemCount = await prisma.orderItem.count({ where: { orderId: o.id } });
+      if (!itemCount) {
+        for (const b of o.bookings) {
+          const price = b.service.discountPrice ?? b.service.price;
+          await prisma.orderItem.create({
+            data: {
+              orderId: o.id,
+              serviceId: b.serviceId,
+              title: b.service.title,
+              type: b.service.type,
+              quantity: 1,
+              price,
+              currency: b.service.currency || "USD",
+              amount: b.amount || price,
+              serviceDate: b.serviceDate,
+            },
+          });
+        }
+      }
+      const travelerCount = await prisma.orderTraveler.count({ where: { orderId: o.id } });
+      if (!travelerCount) {
+        const n = 1 + (o.id.charCodeAt(o.id.length - 1) % 2); // 1–2 туриста
+        const companions = ["Мария", "Алексей", "Елена", "Дмитрий"];
+        for (let i = 0; i < n; i++) {
+          travSeq++;
+          const fn = i === 0 ? o.user.firstName : companions[(o.id.charCodeAt(1) + i) % companions.length];
+          const ln = i === 0 ? (o.user.lastName ?? "Петров") : "Смирнова";
+          const birthYear = 1975 + ((travSeq * 7) % 25);
+          await prisma.orderTraveler.create({
+            data: {
+              orderId: o.id,
+              customerId: o.userId,
+              firstName: fn,
+              lastName: ln,
+              birthDate: new Date(`${birthYear}-${String(1 + (travSeq % 12)).padStart(2, "0")}-15`),
+              citizenship: "RU",
+              gender: i === 0 ? "M" : "F",
+              passportNumber: `P${String(100000000 + travSeq * 17)}`,
+              passportExpiry: new Date("2031-01-01"),
+              dataCompleteness: "complete",
+            },
+          });
+        }
+      }
+    }
+  }
+
   // ── Журнал изменений заказов и переписка по заказам (Гл. 6.9) ──
   // Шаги жизненного цикла для каждого статуса: history (action/from/to/comment)
   // и системные сообщения чата совпадают по времени, чтобы хронологии сходились.
   type OrderStep = { action: string; from: string | null; to: string; comment: string; text: string; f: number };
   const ORDER_STEPS: Record<string, OrderStep[]> = {
-    DRAFT: [{ action: "created", from: null, to: "DRAFT", comment: "Заказ создан как черновик", text: "Заказ создан как черновик", f: 0 }],
-    CREATED: [{ action: "created", from: null, to: "CREATED", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 }],
-    PROCESSING: [
-      { action: "created", from: null, to: "CREATED", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 },
-      { action: "process", from: "CREATED", to: "PROCESSING", comment: "Заказ принят в обработку", text: "Заказ принят в обработку", f: 0.3 },
+    NEW: [{ action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 }],
+    IN_PROCESSING: [
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 },
+      { action: "process", from: "NEW", to: "IN_PROCESSING", comment: "Заказ принят в обработку", text: "Заказ принят в обработку", f: 0.3 },
     ],
-    AWAITING_CONFIRMATION: [
-      { action: "created", from: null, to: "AWAITING_CONFIRMATION", comment: "Заказ создан", text: "Заказ создан и ожидает подтверждения", f: 0 },
+    WAITING_FOR_DATA: [
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 },
+      { action: "process", from: "NEW", to: "IN_PROCESSING", comment: "Заказ принят в обработку", text: "Заказ принят в обработку", f: 0.3 },
+      { action: "wait_data", from: "IN_PROCESSING", to: "WAITING_FOR_DATA", comment: "Запрошены недостающие данные", text: "Ожидание недостающих данных клиента", f: 0.5 },
     ],
-    CONFIRMED: [
-      { action: "created", from: null, to: "AWAITING_CONFIRMATION", comment: "Заказ создан", text: "Заказ создан и ожидает подтверждения", f: 0 },
-      { action: "confirm", from: "AWAITING_CONFIRMATION", to: "CONFIRMED", comment: "Заказ подтверждён", text: "Заказ подтверждён ✅", f: 0.4 },
+    READY_FOR_BOOKING: [
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 },
+      { action: "process", from: "NEW", to: "IN_PROCESSING", comment: "Заказ принят в обработку", text: "Заказ принят в обработку", f: 0.3 },
+      { action: "ready", from: "IN_PROCESSING", to: "READY_FOR_BOOKING", comment: "Заказ готов к бронированию", text: "Заказ готов к бронированию ✅", f: 0.5 },
     ],
-    AWAITING_PAYMENT: [
-      { action: "created", from: null, to: "AWAITING_CONFIRMATION", comment: "Заказ создан", text: "Заказ создан и ожидает подтверждения", f: 0 },
-      { action: "confirm", from: "AWAITING_CONFIRMATION", to: "CONFIRMED", comment: "Заказ подтверждён", text: "Заказ подтверждён ✅", f: 0.4 },
-      { action: "pay_request", from: "CONFIRMED", to: "AWAITING_PAYMENT", comment: "Выставлен счёт на оплату", text: "Ожидается оплата заказа", f: 0.5 },
+    SENT_TO_BOOKING: [
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 },
+      { action: "process", from: "NEW", to: "IN_PROCESSING", comment: "Заказ принят в обработку", text: "Заказ принят в обработку", f: 0.3 },
+      { action: "ready", from: "IN_PROCESSING", to: "READY_FOR_BOOKING", comment: "Заказ готов к бронированию", text: "Заказ готов к бронированию ✅", f: 0.5 },
+      { action: "send", from: "READY_FOR_BOOKING", to: "SENT_TO_BOOKING", comment: "Передан в Booking Center", text: "Заказ передан в бронирование 🚀", f: 0.6 },
     ],
-    PARTIALLY_PAID: [
-      { action: "created", from: null, to: "AWAITING_CONFIRMATION", comment: "Заказ создан", text: "Заказ создан и ожидает подтверждения", f: 0 },
-      { action: "confirm", from: "AWAITING_CONFIRMATION", to: "CONFIRMED", comment: "Заказ подтверждён", text: "Заказ подтверждён ✅", f: 0.4 },
-      { action: "pay", from: "CONFIRMED", to: "PARTIALLY_PAID", comment: "Частичная оплата получена", text: "Частичная оплата получена 💳", f: 0.55 },
+    PARTIALLY_FULFILLED: [
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 },
+      { action: "process", from: "NEW", to: "IN_PROCESSING", comment: "Заказ принят в обработку", text: "Заказ принят в обработку", f: 0.3 },
+      { action: "ready", from: "IN_PROCESSING", to: "READY_FOR_BOOKING", comment: "Заказ готов к бронированию", text: "Заказ готов к бронированию ✅", f: 0.5 },
+      { action: "send", from: "READY_FOR_BOOKING", to: "SENT_TO_BOOKING", comment: "Передан в Booking Center", text: "Заказ передан в бронирование 🚀", f: 0.6 },
+      { action: "partial", from: "SENT_TO_BOOKING", to: "PARTIALLY_FULFILLED", comment: "Часть услуг забронирована", text: "Часть услуг забронирована 📌", f: 0.75 },
     ],
-    PAID: [
-      { action: "created", from: null, to: "AWAITING_CONFIRMATION", comment: "Заказ создан", text: "Заказ создан и ожидает подтверждения", f: 0 },
-      { action: "confirm", from: "AWAITING_CONFIRMATION", to: "CONFIRMED", comment: "Заказ подтверждён", text: "Заказ подтверждён ✅", f: 0.4 },
-      { action: "pay", from: "CONFIRMED", to: "PAID", comment: "Заказ оплачен", text: "Заказ оплачен 💳", f: 0.6 },
+    FULFILLED: [
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 },
+      { action: "process", from: "NEW", to: "IN_PROCESSING", comment: "Заказ принят в обработку", text: "Заказ принят в обработку", f: 0.3 },
+      { action: "ready", from: "IN_PROCESSING", to: "READY_FOR_BOOKING", comment: "Заказ готов к бронированию", text: "Заказ готов к бронированию ✅", f: 0.5 },
+      { action: "send", from: "READY_FOR_BOOKING", to: "SENT_TO_BOOKING", comment: "Передан в Booking Center", text: "Заказ передан в бронирование 🚀", f: 0.6 },
+      { action: "fulfill", from: "SENT_TO_BOOKING", to: "FULFILLED", comment: "Услуги забронированы и подтверждены", text: "Все услуги подтверждены ✅", f: 0.85 },
     ],
-    DOCUMENT_PREP: [
-      { action: "created", from: null, to: "AWAITING_CONFIRMATION", comment: "Заказ создан", text: "Заказ создан и ожидает подтверждения", f: 0 },
-      { action: "confirm", from: "AWAITING_CONFIRMATION", to: "CONFIRMED", comment: "Заказ подтверждён", text: "Заказ подтверждён ✅", f: 0.4 },
-      { action: "pay", from: "CONFIRMED", to: "PAID", comment: "Заказ оплачен", text: "Заказ оплачен 💳", f: 0.6 },
-      { action: "docs", from: "PAID", to: "DOCUMENT_PREP", comment: "Готовятся документы", text: "Готовятся документы 📄", f: 0.7 },
+    READY_TO_CLOSE: [
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 },
+      { action: "process", from: "NEW", to: "IN_PROCESSING", comment: "Заказ принят в обработку", text: "Заказ принят в обработку", f: 0.3 },
+      { action: "ready", from: "IN_PROCESSING", to: "READY_FOR_BOOKING", comment: "Заказ готов к бронированию", text: "Заказ готов к бронированию ✅", f: 0.5 },
+      { action: "send", from: "READY_FOR_BOOKING", to: "SENT_TO_BOOKING", comment: "Передан в Booking Center", text: "Заказ передан в бронирование 🚀", f: 0.6 },
+      { action: "fulfill", from: "SENT_TO_BOOKING", to: "FULFILLED", comment: "Услуги забронированы и подтверждены", text: "Все услуги подтверждены ✅", f: 0.85 },
+      { action: "ready_close", from: "FULFILLED", to: "READY_TO_CLOSE", comment: "Готов к закрытию", text: "Заказ готов к закрытию 📄", f: 0.9 },
     ],
-    READY: [
-      { action: "created", from: null, to: "AWAITING_CONFIRMATION", comment: "Заказ создан", text: "Заказ создан и ожидает подтверждения", f: 0 },
-      { action: "confirm", from: "AWAITING_CONFIRMATION", to: "CONFIRMED", comment: "Заказ подтверждён", text: "Заказ подтверждён ✅", f: 0.4 },
-      { action: "pay", from: "CONFIRMED", to: "PAID", comment: "Заказ оплачен", text: "Заказ оплачен 💳", f: 0.6 },
-      { action: "docs", from: "PAID", to: "DOCUMENT_PREP", comment: "Готовятся документы", text: "Готовятся документы 📄", f: 0.7 },
-      { action: "ready", from: "DOCUMENT_PREP", to: "READY", comment: "Заказ готов к поездке", text: "Заказ готов к поездке 🎒", f: 0.8 },
-    ],
-    COMPLETED: [
-      { action: "created", from: null, to: "AWAITING_CONFIRMATION", comment: "Заказ создан", text: "Заказ создан и ожидает подтверждения", f: 0 },
-      { action: "confirm", from: "AWAITING_CONFIRMATION", to: "CONFIRMED", comment: "Заказ подтверждён", text: "Заказ подтверждён ✅", f: 0.4 },
-      { action: "pay", from: "CONFIRMED", to: "PAID", comment: "Заказ оплачен", text: "Заказ оплачен 💳", f: 0.6 },
-      { action: "complete", from: "PAID", to: "COMPLETED", comment: "Заказ завершён", text: "Заказ завершён 🎉", f: 0.9 },
-    ],
-    CHANGED: [
-      { action: "created", from: null, to: "CREATED", comment: "Заказ создан", text: "Заказ создан", f: 0 },
-      { action: "update", from: "CREATED", to: "CHANGED", comment: "Заказ изменён менеджером", text: "Заказ изменён менеджером ✏️", f: 0.5 },
-    ],
-    REFUNDED: [
-      { action: "created", from: null, to: "AWAITING_CONFIRMATION", comment: "Заказ создан", text: "Заказ создан и ожидает подтверждения", f: 0 },
-      { action: "confirm", from: "AWAITING_CONFIRMATION", to: "CONFIRMED", comment: "Заказ подтверждён", text: "Заказ подтверждён ✅", f: 0.4 },
-      { action: "pay", from: "CONFIRMED", to: "PAID", comment: "Заказ оплачен", text: "Заказ оплачен 💳", f: 0.6 },
-      { action: "refund", from: "PAID", to: "REFUNDED", comment: "Оформлен возврат", text: "Оформлен возврат ↩️", f: 0.75 },
+    CLOSED: [
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан и передан в работу", f: 0 },
+      { action: "process", from: "NEW", to: "IN_PROCESSING", comment: "Заказ принят в обработку", text: "Заказ принят в обработку", f: 0.3 },
+      { action: "ready", from: "IN_PROCESSING", to: "READY_FOR_BOOKING", comment: "Заказ готов к бронированию", text: "Заказ готов к бронированию ✅", f: 0.5 },
+      { action: "send", from: "READY_FOR_BOOKING", to: "SENT_TO_BOOKING", comment: "Передан в Booking Center", text: "Заказ передан в бронирование 🚀", f: 0.6 },
+      { action: "fulfill", from: "SENT_TO_BOOKING", to: "FULFILLED", comment: "Услуги забронированы и подтверждены", text: "Все услуги подтверждены ✅", f: 0.85 },
+      { action: "ready_close", from: "FULFILLED", to: "READY_TO_CLOSE", comment: "Готов к закрытию", text: "Заказ готов к закрытию 📄", f: 0.9 },
+      { action: "close", from: "READY_TO_CLOSE", to: "CLOSED", comment: "Заказ закрыт", text: "Заказ закрыт 🎉", f: 0.95 },
     ],
     CANCELLED: [
-      { action: "created", from: null, to: "CREATED", comment: "Заказ создан", text: "Заказ создан", f: 0 },
-      { action: "cancel", from: "CREATED", to: "CANCELLED", comment: "Заказ отменён", text: "Заказ отменён ❌", f: 0.5 },
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан", f: 0 },
+      { action: "cancel", from: "NEW", to: "CANCELLED", comment: "Заказ отменён", text: "Заказ отменён ❌", f: 0.5 },
     ],
-    OVERDUE: [
-      { action: "created", from: null, to: "AWAITING_CONFIRMATION", comment: "Заказ создан", text: "Заказ создан и ожидает подтверждения", f: 0 },
-      { action: "confirm", from: "AWAITING_CONFIRMATION", to: "CONFIRMED", comment: "Заказ подтверждён", text: "Заказ подтверждён ✅", f: 0.4 },
-      { action: "pay_request", from: "CONFIRMED", to: "AWAITING_PAYMENT", comment: "Выставлен счёт на оплату", text: "Ожидается оплата заказа", f: 0.5 },
-      { action: "overdue", from: "AWAITING_PAYMENT", to: "OVERDUE", comment: "Заказ просрочен", text: "Заказ просрочен — требуется действие ⏰", f: 0.7 },
+    PROBLEM: [
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан", f: 0 },
+      { action: "problem", from: "NEW", to: "PROBLEM", comment: "Проблемная ситуация", text: "Проблемная ситуация — требуется действие ⏰", f: 0.5 },
     ],
-    ARCHIVED: [
-      { action: "created", from: null, to: "CREATED", comment: "Заказ создан", text: "Заказ создан", f: 0 },
-      { action: "complete", from: "CREATED", to: "COMPLETED", comment: "Заказ завершён", text: "Заказ завершён 🎉", f: 0.8 },
-      { action: "archive", from: "COMPLETED", to: "ARCHIVED", comment: "Заказ архивирован", text: "Заказ архивирован 📦", f: 0.95 },
+    SUSPENDED: [
+      { action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан", f: 0 },
+      { action: "suspend", from: "NEW", to: "SUSPENDED", comment: "Заказ приостановлен", text: "Заказ приостановлен ⏸️", f: 0.5 },
     ],
   };
   await prisma.orderHistory.deleteMany({});
@@ -1418,7 +1509,7 @@ async function main() {
     createdAt: Date;
   }[] = [];
   for (const o of allOrders) {
-    const steps = ORDER_STEPS[o.status] ?? [{ action: "created", from: null, to: "CREATED", comment: "Заказ создан", text: "Заказ создан", f: 0 }];
+    const steps = ORDER_STEPS[o.status] ?? [{ action: "created", from: null, to: "NEW", comment: "Заказ создан", text: "Заказ создан", f: 0 }];
     const span = Math.max(o.updatedAt.getTime() - o.createdAt.getTime(), 3600000);
     const at = (f: number) => new Date(o.createdAt.getTime() + Math.floor(span * f));
     const clientName = `${o.user.firstName} ${o.user.lastName ?? ""}`.trim() || "Клиент";
@@ -1433,7 +1524,7 @@ async function main() {
         createdAt: at(s.f),
       });
     }
-    const terminal = ["COMPLETED", "REFUNDED", "CANCELLED", "ARCHIVED"].includes(o.status);
+    const terminal = ["CLOSED", "CANCELLED", "SUSPENDED"].includes(o.status);
     for (const s of steps) {
       orderMessageRows.push({
         orderId: o.id,
@@ -1444,7 +1535,7 @@ async function main() {
         createdAt: at(s.f),
       });
     }
-    if (o.status !== "DRAFT" && o.status !== "ARCHIVED") {
+    if (o.status !== "NEW" && o.status !== "SUSPENDED") {
       const n = terminal ? randInt(1, 2) : randInt(1, 3);
       let isClient = chance(0.5);
       for (let i = 0; i < n; i++) {
@@ -1479,7 +1570,7 @@ async function main() {
   await prisma.exceptionLog.deleteMany({});
 
   const seedOrders = await prisma.order.findMany({
-    select: { id: true, orderNumber: true, status: true, createdAt: true, updatedAt: true },
+    select: { id: true, orderNumber: true, status: true, paymentStatus: true, createdAt: true, updatedAt: true },
   });
 
   const seedManagers = ["Анна Смирнова", "Дмитрий Петров", "Ольга Козлова", "Игорь Волков", "Мария Соколова"];
@@ -1533,8 +1624,8 @@ async function main() {
   for (const o of seedOrders) {
     const manager = seedManagerFor(o.id);
     const updatedAt = o.updatedAt.getTime();
-    const paid = ["PAID", "DOCUMENT_PREP", "READY", "COMPLETED"].includes(o.status);
-    const awaiting = ["AWAITING_PAYMENT", "PARTIALLY_PAID"].includes(o.status);
+    const paid = o.paymentStatus === "PAID" || o.paymentStatus === "REFUNDED";
+    const awaiting = o.paymentStatus === "UNPAID" || o.paymentStatus === "PARTIALLY_PAID";
 
     // Создание заказа → авто-назначение исполнителя (3.16)
     automationLogRows.push({
@@ -1549,7 +1640,7 @@ async function main() {
     });
 
     // Окончание срока SLA → повышение приоритета, задача, уведомление (3.16)
-    if (o.status === "OVERDUE") {
+    if (o.status === "PROBLEM") {
       automationLogRows.push({
         orderId: o.id,
         event: "Окончание срока SLA",
@@ -1608,7 +1699,7 @@ async function main() {
     const hours = Math.max(1, Math.round((nowMs - o.createdAt.getTime()) / 3600000));
     const exCreated = new Date(updatedAt);
     const exUpdated = new Date(Math.min(updatedAt + ((o.id.length * 7) % 48) * 3600000, nowMs));
-    if (o.status === "OVERDUE") {
+    if (o.status === "PROBLEM") {
       exceptionLogRows.push({
         orderId: o.id,
         type: "Нарушение SLA",
@@ -1623,7 +1714,7 @@ async function main() {
         createdAt: exCreated,
         updatedAt: exUpdated,
       });
-    } else if (o.status === "AWAITING_CONFIRMATION" && hours > 24) {
+    } else if (o.status === "SENT_TO_BOOKING" && hours > 24) {
       exceptionLogRows.push({
         orderId: o.id,
         type: "Нет ответа поставщика",
@@ -1638,7 +1729,7 @@ async function main() {
         createdAt: exCreated,
         updatedAt: exUpdated,
       });
-    } else if (o.status === "AWAITING_PAYMENT" && hours > 24) {
+    } else if (o.paymentStatus === "UNPAID" && o.status !== "NEW" && o.status !== "IN_PROCESSING" && hours > 24) {
       exceptionLogRows.push({
         orderId: o.id,
         type: "Задержка оплаты",
@@ -1653,7 +1744,7 @@ async function main() {
         createdAt: exCreated,
         updatedAt: exUpdated,
       });
-    } else if (o.status === "REFUNDED" || o.status === "CANCELLED") {
+    } else if (o.status === "CANCELLED" || o.paymentStatus === "REFUNDED") {
       exceptionLogRows.push({
         orderId: o.id,
         type: "Отмена / возврат",
@@ -1662,7 +1753,7 @@ async function main() {
         orderNumber: o.orderNumber,
         manager,
         status: "closed",
-        description: `Заказ ${o.status === "REFUNDED" ? "возвращён" : "отменён"}. Возврат средств ${o.status === "REFUNDED" ? "оформлен" : "не требуется"}.`,
+        description: `Заказ ${o.paymentStatus === "REFUNDED" ? "возвращён" : "отменён"}. Возврат средств ${o.paymentStatus === "REFUNDED" ? "оформлен" : "не требуется"}.`,
         aiSuggestion: "Проанализировать причину отмены и предложить клиенту альтернативное предложение для удержания.",
         actorName: manager,
         createdAt: exCreated,
@@ -1796,6 +1887,51 @@ async function main() {
     await prisma.exceptionLogHistory.createMany({ data: exceptionHistoryRows.slice(i, i + 1000) });
   }
 
+  // ── Outbox доменных событий (Гл. 6): историческая лента событий Order Center ──
+  // Для каждого заказа — событие создания и событие ключевого перехода его
+  // жизненного цикла (публикуются в ленту «Последние события», Гл. 5.3).
+  await prisma.orderEvent.deleteMany({});
+  const eventOrders = await prisma.order.findMany({
+    select: { id: true, orderNumber: true, status: true, paymentStatus: true, amount: true, createdAt: true },
+  });
+  const eventStatusMap: Record<string, string> = {
+    SENT_TO_BOOKING: "ORDER_SENT_TO_BOOKING",
+    PARTIALLY_FULFILLED: "ORDER_SENT_TO_BOOKING",
+    FULFILLED: "ORDER_FULFILLED",
+    READY_TO_CLOSE: "ORDER_FULFILLED",
+    CLOSED: "ORDER_CLOSED",
+    CANCELLED: "ORDER_CANCELLED",
+    PROBLEM: "ORDER_PROBLEM",
+    READY_FOR_BOOKING: "ORDER_READY_FOR_BOOKING",
+  };
+  const eventRows = eventOrders.flatMap((o) => {
+    return [
+      {
+        orderId: o.id,
+        type: "ORDER_CREATED" as never,
+        payload: { amount: o.amount },
+        status: "PUBLISHED" as never,
+        createdAt: new Date(o.createdAt.getTime() - 3 * 3600000),
+        publishedAt: o.createdAt,
+      },
+      {
+        orderId: o.id,
+        type: (eventStatusMap[o.status] ?? "ORDER_STATUS_CHANGED") as never,
+        payload: {
+          to: o.status,
+          ...(o.paymentStatus === "PAID" ? { paymentStatus: o.paymentStatus } : {}),
+          amount: o.amount,
+        },
+        status: "PUBLISHED" as never,
+        createdAt: o.createdAt,
+        publishedAt: o.createdAt,
+      },
+    ];
+  });
+  for (let i = 0; i < eventRows.length; i += 500) {
+    await prisma.orderEvent.createMany({ data: eventRows.slice(i, i + 500) });
+  }
+
   // ── Журнал аудита (Гл. 3.18) ──
   // Централизованная регистрация значимых действий: входы/выходы пользователей,
   // создание и изменение заказов, финансовые операции, документооборот, события
@@ -1909,10 +2045,10 @@ async function main() {
 
   // События заказов: создание (из createdAt), оплата/возврат/статусы, документы
   const auditOrders = await prisma.order.findMany({
-    select: { id: true, orderNumber: true, status: true, createdAt: true, updatedAt: true, amount: true, paidAmount: true },
+    select: { id: true, orderNumber: true, status: true, paymentStatus: true, createdAt: true, updatedAt: true, amount: true, paidAmount: true },
   });
-  const paidOrderStatuses = ["PAID", "DOCUMENT_PREP", "READY", "COMPLETED"];
-  const docsOrderStatuses = ["DOCUMENT_PREP", "READY", "COMPLETED"];
+  const paidOrderStatuses = ["FULFILLED", "READY_TO_CLOSE", "CLOSED"];
+  const docsOrderStatuses = ["FULFILLED", "READY_TO_CLOSE", "CLOSED"];
   for (const o of auditOrders) {
     const manager = auditManagerFor(o.id);
     auditPush({
@@ -1955,20 +2091,20 @@ async function main() {
       });
     }
     // Возврат/отмена → событие с критичностью warning
-    if (o.status === "REFUNDED" || o.status === "CANCELLED") {
+    if (o.status === "CANCELLED" || o.paymentStatus === "REFUNDED") {
       auditPush({
         userId: staffFor(o.id + "ref")?.id ?? null,
         actorName: auditManagerFor(o.id + "ref"),
         actorRole: "FINANCE",
         department: "Финансовый отдел",
         category: "Финансовые операции",
-        action: o.status === "REFUNDED" ? "refund" : "status",
+        action: o.paymentStatus === "REFUNDED" ? "refund" : "status",
         objectType: "Заказ",
         objectId: o.id,
         objectNumber: o.orderNumber,
-        fromData: JSON.stringify({ status: "PAID" }),
-        toData: JSON.stringify({ status: o.status }),
-        comment: o.status === "REFUNDED" ? "Оформлен возврат средств" : "Заказ отменён",
+        fromData: JSON.stringify({ status: "FULFILLED", paymentStatus: "PAID" }),
+        toData: JSON.stringify({ status: o.status, paymentStatus: o.paymentStatus }),
+        comment: o.paymentStatus === "REFUNDED" ? "Оформлен возврат средств" : "Заказ отменён",
         source: "Web",
         ip: `10.0.${randInt(0, 4)}.${randInt(2, 254)}`,
         userAgent: null,
@@ -2107,6 +2243,334 @@ async function main() {
     }
   }
 
+  // ── Phase 2: Sales Center (Lead → Opportunity → Quote → Sale) ──
+  // Идемпотентность: удаляем и создаём заново (сид — источник данных).
+  await prisma.sale.deleteMany({});
+  await prisma.quoteItem.deleteMany({});
+  await prisma.quote.deleteMany({});
+  await prisma.opportunity.deleteMany({});
+  await prisma.leadHistory.deleteMany({});
+  await prisma.lead.deleteMany({});
+
+  const SALES_MANAGERS = ["Айхан Рагимов", "Лейла Алиева", "Надир Сулейманов"];
+  const LEAD_SOURCES = ["Сайт", "Call-центр", "Telegram-бот", "WhatsApp", "Партнёр", "Реклама"];
+  const INTERESTS = ["Тур в Турцию", "Отель 5★ в Дубае", "Экскурсии по Грузии", "Санаторий в Баку", "Гид в Стамбуле", "Трансфер из аэропорта"];
+
+  // Лиды: 40 шт. — новые, квалифицированные, конвертированные, отклонённые.
+  const leadRows: { id: string; code: string; createdAt: Date }[] = [];
+  let ledSeq = 0;
+  const leadStatusPlan: Array<["NEW" | "QUALIFIED" | "CONVERTED" | "DISQUALIFIED", number]> = [
+    ["NEW", 18], ["QUALIFIED", 10], ["CONVERTED", 6], ["DISQUALIFIED", 6],
+  ];
+  const leadStatuses: Array<"NEW" | "QUALIFIED" | "CONVERTED" | "DISQUALIFIED"> = [];
+  for (const [s, n] of leadStatusPlan) {
+    for (let i = 0; i < n; i++) leadStatuses.push(s);
+  }
+  for (let i = leadStatuses.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [leadStatuses[i], leadStatuses[j]] = [leadStatuses[j], leadStatuses[i]];
+  }
+  for (const st of leadStatuses) {
+    const n = randomName();
+    const createdAt = dateBetween(new Date(NOW.getTime() - 60 * DAY), NOW);
+    const lead = await prisma.lead.create({
+      data: {
+        code: `LED-${String(++ledSeq).padStart(8, "0")}`,
+        source: pick(LEAD_SOURCES),
+        customerId: pick(buyerRecords).id,
+        customerName: `${n.firstName} ${n.lastName}`,
+        contactEmail: `lead${ledSeq}@mail.com`,
+        contactPhone: `+9945${randInt(1000000, 9999999)}`,
+        interest: pick(INTERESTS),
+        ownerId: pick(catalogManagers).id,
+        ownerName: pick(SALES_MANAGERS),
+        qualification: pick(["cold", "warm", "hot"]),
+        status: st,
+        nextAction: st === "NEW" ? pick(["Позвонить клиенту", "Отправить каталог", "Согласовать бюджет"]) : null,
+        nextActionAt: st === "NEW" ? new Date(NOW.getTime() + randInt(6, 72) * 3600000) : null,
+        slaDueAt: new Date(createdAt.getTime() + 72 * 3600000),
+        createdAt,
+      },
+    });
+    leadRows.push({ id: lead.id, code: lead.code, createdAt });
+    await prisma.leadHistory.create({
+      data: {
+        leadId: lead.id,
+        action: "created",
+        from: null,
+        to: st,
+        actorId: null,
+        actorName: "Система",
+        comment: "Лид создан",
+        createdAt,
+      },
+    });
+  }
+
+  // Возможности: из квалифицированных лидов и напрямую.
+  const oppRows: { id: string; code: string; customerId: string; customerName: string; createdAt: Date }[] = [];
+  let oppSeq = 0;
+  const oppStages = ["QUALIFICATION", "NEED_ANALYSIS", "QUOTE", "NEGOTIATION", "WON", "LOST"];
+  for (let i = 0; i < 22; i++) {
+    const n = randomName();
+    const buyer = pick(buyerRecords);
+    const stage = pick(oppStages);
+    const budget = randInt(800, 8000);
+    const createdAt = dateBetween(new Date(NOW.getTime() - 50 * DAY), NOW);
+    const opp = await prisma.opportunity.create({
+      data: {
+        code: `OPP-${String(++oppSeq).padStart(8, "0")}`,
+        customerId: buyer.id,
+        customerName: `${n.firstName} ${n.lastName}`,
+        contactEmail: `opp${oppSeq}@mail.com`,
+        contactPhone: `+9945${randInt(1000000, 9999999)}`,
+        ownerId: pick(catalogManagers).id,
+        ownerName: pick(SALES_MANAGERS),
+        need: pick(INTERESTS),
+        productsRef: JSON.stringify([]),
+        budget,
+        currency: "USD",
+        expectedCloseDate: new Date(NOW.getTime() + randInt(7, 60) * DAY),
+        probability: stage === "WON" ? 100 : stage === "LOST" ? 0 : randInt(15, 85),
+        stage,
+        nextAction: chance(0.6) ? pick(["Согласовать условия", "Подготовить предложение", "Перезвонить клиенту"]) : null,
+        nextActionAt: chance(0.5) ? new Date(NOW.getTime() + randInt(6, 72) * 3600000) : null,
+        risks: chance(0.3) ? "Возможен срыв сроков" : null,
+        createdAt,
+      },
+    });
+    oppRows.push({ id: opp.id, code: opp.code, customerId: buyer.id, customerName: `${n.firstName} ${n.lastName}`, createdAt });
+  }
+
+  // Предложения: 14 шт. (версии, статусы DRAFT/SENT/ACCEPTED/REJECTED).
+  const quoteRows: { id: string; code: string; customerId: string; createdAt: Date }[] = [];
+  let qteSeq = 0;
+  const quoteStatusPlan: Array<["DRAFT" | "SENT" | "ACCEPTED" | "REJECTED", number]> = [
+    ["DRAFT", 3], ["SENT", 5], ["ACCEPTED", 4], ["REJECTED", 2],
+  ];
+  const quoteStatuses: Array<"DRAFT" | "SENT" | "ACCEPTED" | "REJECTED"> = [];
+  for (const [s, n] of quoteStatusPlan) {
+    for (let i = 0; i < n; i++) quoteStatuses.push(s);
+  }
+  const saleRows: { id: string; code: string; customerId: string; amount: number; createdAt: Date }[] = [];
+  let salSeq = 0;
+  for (const st of quoteStatuses) {
+    const opp = pick(oppRows);
+    const svc = pick(serviceRecords);
+    const qty = randInt(1, 3);
+    const price = svc.discountPrice ?? svc.price;
+    const amount = Math.round(price * qty * 100) / 100;
+    const createdAt = dateBetween(new Date(opp.createdAt.getTime()), NOW);
+    // Имя клиента берём из возможности — Quote.customerId совпадает с customerName.
+    const customerName = opp.customerName;
+    const quote = await prisma.quote.create({
+      data: {
+        code: `QTE-${String(++qteSeq).padStart(8, "0")}`,
+        opportunityId: opp.id,
+        customerId: opp.customerId,
+        customerName,
+        currency: "USD",
+        version: chance(0.3) ? 2 : 1,
+        discount: chance(0.4) ? Math.round(amount * 0.05 * 100) / 100 : 0,
+        fees: 0,
+        validUntil: new Date(NOW.getTime() + 14 * DAY),
+        status: st,
+        approval: st === "ACCEPTED" ? "approved" : st === "REJECTED" ? "rejected" : "pending",
+        approvedBy: st === "ACCEPTED" || st === "REJECTED" ? pick(SALES_MANAGERS) : null,
+        acceptedAt: st === "ACCEPTED" ? new Date(createdAt.getTime() + randInt(1, 5) * DAY) : null,
+        createdAt,
+      },
+    });
+    await prisma.quoteItem.create({
+      data: {
+        quoteId: quote.id,
+        serviceId: svc.id,
+        title: "Услуга TravelHub",
+        type: svc.type ?? "TOUR",
+        quantity: qty,
+        price,
+        amount,
+      },
+    });
+    quoteRows.push({ id: quote.id, code: quote.code, customerId: opp.customerId, createdAt });
+    if (st === "ACCEPTED") {
+      // Принятое предложение → сделка (SAL-*).
+      const sale = await prisma.sale.create({
+        data: {
+          code: `SAL-${String(++salSeq).padStart(8, "0")}`,
+          quoteId: quote.id,
+          customerId: opp.customerId,
+          customerName,
+          amount: amount - (quote.discount || 0) + (quote.fees || 0),
+          currency: "USD",
+          status: "WON",
+          closedAt: quote.acceptedAt ?? createdAt,
+          createdAt,
+        },
+      });
+      saleRows.push({ id: sale.id, code: sale.code, customerId: opp.customerId, amount, createdAt });
+    }
+  }
+
+  // ── Phase 2: Finance Center (Payment/Refund/Invoice/Commission/Currency/Tax) ──
+  await prisma.payment.deleteMany({});
+  await prisma.refund.deleteMany({});
+  await prisma.invoice.deleteMany({});
+  await prisma.commission.deleteMany({});
+  await prisma.exchangeRate.deleteMany({});
+  await prisma.taxRule.deleteMany({});
+  await prisma.tax.deleteMany({});
+  await prisma.currency.deleteMany({});
+
+  // Валюты (владелец — Finance, Baseline §0.6).
+  await Promise.all([
+    prisma.currency.create({ data: { code: "CUR-00000001", name: "Доллар США", symbol: "$", isBase: true, isActive: true } }),
+    prisma.currency.create({ data: { code: "CUR-00000002", name: "Евро", symbol: "€", isBase: false, isActive: true } }),
+    prisma.currency.create({ data: { code: "CUR-00000003", name: "Азербайджанский манат", symbol: "₼", isBase: false, isActive: true } }),
+    prisma.currency.create({ data: { code: "CUR-00000004", name: "Турецкая лира", symbol: "₺", isBase: false, isActive: true } }),
+  ]);
+  await prisma.exchangeRate.createMany({
+    data: [
+      { code: "FXR-00000001", fromCode: "CUR-00000001", toCode: "CUR-00000002", rate: 0.92, date: new Date() },
+      { code: "FXR-00000002", fromCode: "CUR-00000001", toCode: "CUR-00000003", rate: 1.7, date: new Date() },
+      { code: "FXR-00000003", fromCode: "CUR-00000001", toCode: "CUR-00000004", rate: 34.2, date: new Date() },
+    ],
+  });
+  const taxes = await Promise.all([
+    prisma.tax.create({ data: { code: "TAX-00000001", name: "НДС", rate: 12, isActive: true } }),
+    prisma.tax.create({ data: { code: "TAX-00000002", name: "Налог на проживание", rate: 5, isActive: true } }),
+  ]);
+  await prisma.taxRule.createMany({
+    data: [
+      { code: "TXR-00000001", taxId: taxes[0].id, country: null, serviceType: null, rateOverride: null, isActive: true },
+      { code: "TXR-00000002", taxId: taxes[1].id, country: "Турция", serviceType: "HOTEL", rateOverride: 8, isActive: true },
+    ],
+  });
+
+  // Платежи: по реальным заказам (PAID/PARTIALLY_PAID) + свежие в CREATED.
+  const ordersForFinance = await prisma.order.findMany({
+    select: { id: true, orderNumber: true, amount: true, paymentStatus: true, userId: true, createdAt: true },
+    take: 60,
+  });
+  let paySeq = 0;
+  let rfdSeq = 0;
+  let invSeq = 0;
+  let cmsSeq = 0;
+  for (const o of ordersForFinance) {
+    const amount = o.paymentStatus === "PAID" ? o.amount : o.amount * 0.5;
+    const pay = await prisma.payment.create({
+      data: {
+        code: `PAY-${String(++paySeq).padStart(8, "0")}`,
+        orderId: o.id,
+        customerId: o.userId ?? null,
+        amount: Math.round(amount * 100) / 100,
+        currency: "USD",
+        method: pick(["Банковский перевод", "Карта", "Наличные", "Онлайн-оплата"]),
+        status: o.paymentStatus === "PAID" || o.paymentStatus === "PARTIALLY_PAID" ? "RECEIVED" : "CREATED",
+        receivedAt: o.paymentStatus === "PAID" || o.paymentStatus === "PARTIALLY_PAID" ? o.createdAt : null,
+        createdAt: o.createdAt,
+      },
+    });
+    if (o.paymentStatus === "REFUNDED") {
+      await prisma.refund.create({
+        data: {
+          code: `RFD-${String(++rfdSeq).padStart(8, "0")}`,
+          orderId: o.id,
+          paymentId: pay.id,
+          amount: Math.round(o.amount * 100) / 100,
+          currency: "USD",
+          reason: "Отмена бронирования",
+          status: "COMPLETED",
+          completedAt: new Date(o.createdAt.getTime() + DAY),
+          createdAt: o.createdAt,
+        },
+      });
+    }
+    if (o.paymentStatus === "PAID" || o.paymentStatus === "PARTIALLY_PAID") {
+      await prisma.invoice.create({
+        data: {
+          code: `INV-${String(++invSeq).padStart(8, "0")}`,
+          orderId: o.id,
+          customerId: o.userId ?? null,
+          amount: Math.round(o.amount * 100) / 100,
+          currency: "USD",
+          status: "PAID",
+          issuedAt: new Date(o.createdAt.getTime() + 3600000),
+          dueAt: new Date(o.createdAt.getTime() + 3 * DAY),
+          createdAt: o.createdAt,
+        },
+      });
+      await prisma.commission.create({
+        data: {
+          code: `CMS-${String(++cmsSeq).padStart(8, "0")}`,
+          orderId: o.id,
+          partnerId: null,
+          amount: Math.round(o.amount * 0.12 * 100) / 100,
+          currency: "USD",
+          rate: 0.12,
+          status: chance(0.6) ? "PAID" : "PENDING",
+          paidAt: chance(0.6) ? new Date(o.createdAt.getTime() + 2 * DAY) : null,
+          createdAt: o.createdAt,
+        },
+      });
+    }
+  }
+  // Возвраты: по заказам с paymentStatus REFUNDED (в т.ч. целевые из Phase 1 сида).
+  // Создаём и платёж, если его нет (REFUNDED-заказы могли не попасть в выборку выше).
+  const refundOrders = await prisma.order.findMany({
+    where: { paymentStatus: "REFUNDED" },
+    select: { id: true, orderNumber: true, amount: true, userId: true, createdAt: true },
+  });
+  for (const o of refundOrders) {
+    let pay = await prisma.payment.findFirst({ where: { orderId: o.id }, select: { id: true } });
+    if (!pay) {
+      pay = await prisma.payment.create({
+        data: {
+          code: `PAY-${String(++paySeq).padStart(8, "0")}`,
+          orderId: o.id,
+          customerId: o.userId ?? null,
+          amount: Math.round(o.amount * 100) / 100,
+          currency: "USD",
+          method: "Банковский перевод",
+          status: "REFUNDED",
+          receivedAt: o.createdAt,
+          createdAt: o.createdAt,
+        },
+        select: { id: true },
+      });
+    }
+    await prisma.refund.create({
+      data: {
+        code: `RFD-${String(++rfdSeq).padStart(8, "0")}`,
+        orderId: o.id,
+        paymentId: pay.id,
+        amount: Math.round(o.amount * 100) / 100,
+        currency: "USD",
+        reason: "Отмена бронирования",
+        status: "COMPLETED",
+        completedAt: new Date(o.createdAt.getTime() + DAY),
+        createdAt: o.createdAt,
+      },
+    });
+  }
+
+  // Несколько «свежих» платежей в статусе CREATED (очередь Finance).
+  for (let i = 0; i < 5; i++) {
+    const o = pick(ordersForFinance);
+    await prisma.payment.create({
+      data: {
+        code: `PAY-${String(++paySeq).padStart(8, "0")}`,
+        orderId: o.id,
+        customerId: o.userId ?? null,
+        amount: Math.round(o.amount * 0.5 * 100) / 100,
+        currency: "USD",
+        method: "Банковский перевод",
+        status: "CREATED",
+        createdAt: new Date(NOW.getTime() - randInt(1, 24) * 3600000),
+      },
+    });
+  }
+
   const counts = {
     countries: await prisma.country.count(),
     cities: await prisma.city.count(),
@@ -2128,6 +2592,16 @@ async function main() {
     exceptions: await prisma.exceptionLog.count(),
     exceptionHistory: await prisma.exceptionLogHistory.count(),
     auditLogs: await prisma.auditLog.count(),
+    leads: await prisma.lead.count(),
+    opportunities: await prisma.opportunity.count(),
+    quotes: await prisma.quote.count(),
+    sales: await prisma.sale.count(),
+    payments: await prisma.payment.count(),
+    refunds: await prisma.refund.count(),
+    invoices: await prisma.invoice.count(),
+    commissions: await prisma.commission.count(),
+    currencies: await prisma.currency.count(),
+    taxes: await prisma.tax.count(),
   };
   console.log("Seed completed:", counts);
 }

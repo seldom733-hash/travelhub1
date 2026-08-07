@@ -2,29 +2,37 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
+import { EXECUTION_ROLES, requireRole } from "@/lib/admin-access";
 import { SERVICE_TYPE_LABELS, actorDisplayName, bookingSystemMessage } from "@/lib/admin-data";
 import { pickManager, pickSource } from "@/app/api/admin/bookings/route";
+import { emitOrderEvent, publishOrderEvents } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
 /**
  * PATCH /api/admin/bookings/[id]
- * Тело: { action: "confirm" | "pay" | "cancel" | "complete" | "update" }
+ * Тело: { action: "send" | "confirm" | "complete" | "cancel" | "update" }
  *
- * Жизненный цикл (Гл. 5.7):
- *   PENDING   → CONFIRMED   (action: "confirm"  — подтвердить бронирование)
- *   CONFIRMED → PAID        (action: "pay"      — отправить на оплату / оплачено)
- *   PENDING   → PAID        (action: "pay"      — допускается без промежуточного шага)
- *   PAID      → COMPLETED   (action: "complete" — завершить поездку)
- *   PENDING/CONFIRMED/PAID → REFUNDED (action: "cancel" — отменить/возврат)
- *   Любой (кроме REFUNDED) → правка serviceDate/amount (action: "update")
+ * Жизненный цикл (Baseline §0.5, канонический):
+ *   NEW → PREPARING_REQUEST → SENT_TO_SUPPLIER → AWAITING_CONFIRMATION →
+ *   CONFIRMED → IN_SERVICE → COMPLETED. Ветви: NEEDS_CLARIFICATION,
+ *   SUPPLIER_REJECTED, CHANGE_REQUESTED, CANCELLATION_REQUESTED, CANCELLED, PROBLEM.
+ *
+ *   action "send"     — NEW/PREPARING_REQUEST → SENT_TO_SUPPLIER (запрос поставщику)
+ *   action "confirm"  — SENT_TO_SUPPLIER/AWAITING_CONFIRMATION → CONFIRMED
+ *   action "service"  — CONFIRMED → IN_SERVICE (услуга началась)
+ *   action "complete" — IN_SERVICE → COMPLETED (поездка завершена)
+ *   action "reject"   — AWAITING_CONFIRMATION → SUPPLIER_REJECTED
+ *   action "cancel"   — активная бронь → CANCELLED
+ *   action "problem"  — активная бронь → PROBLEM
+ *   Любой (кроме CANCELLED/COMPLETED) → правка serviceDate/amount (action: "update")
  */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const denied = requireRole(user, EXECUTION_ROLES);
+    if (denied) return denied;
 
     const { id } = await params;
     let body: { action?: unknown; serviceDate?: unknown; amount?: unknown };
@@ -35,7 +43,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const action = body.action;
-    if (typeof action !== "string" || !["confirm", "pay", "cancel", "complete", "update"].includes(action)) {
+    if (typeof action !== "string" || !["send", "confirm", "service", "complete", "reject", "cancel", "problem", "update"].includes(action)) {
       return NextResponse.json({ error: "Недопустимое действие" }, { status: 400 });
     }
 
@@ -46,8 +54,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     // ── Действие update: правка даты поездки и/или суммы (Гл. 5.4 «Изменить») ──
     if (action === "update") {
-      if (booking.status === "REFUNDED") {
-        return NextResponse.json({ error: "Возвращённое бронирование нельзя редактировать" }, { status: 409 });
+      if (booking.status === "CANCELLED" || booking.status === "COMPLETED") {
+        return NextResponse.json({ error: "Завершённое или отменённое бронирование нельзя редактировать" }, { status: 409 });
       }
       const data: { serviceDate?: Date; amount?: number } = {};
       const serviceDateRaw = typeof body.serviceDate === "string" ? new Date(body.serviceDate) : null;
@@ -84,12 +92,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           data,
           select: {
             id: true,
+            code: true,
             amount: true,
             status: true,
             serviceDate: true,
             createdAt: true,
             updatedAt: true,
             user: { select: { firstName: true, lastName: true, email: true } },
+            order: { select: { orderNumber: true } },
             service: {
               select: {
                 title: true,
@@ -126,8 +136,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         message: "Бронирование изменено",
         booking: {
           id: updated.id,
-          bookingNumber: `BK-${updated.id.slice(-8).toUpperCase()}`,
-          orderId: `ORD-${updated.id.slice(-6).toUpperCase()}`,
+          bookingNumber: updated.code,
+          orderId: updated.order?.orderNumber ?? "—",
           client: `${updated.user.firstName} ${updated.user.lastName ?? ""}`.trim(),
           partner: updated.service.provider?.companyName || updated.service.provider?.firstName || "—",
           provider: updated.service.provider?.companyName || `${updated.service.provider?.firstName ?? ""} ${updated.service.provider?.lastName ?? ""}`.trim() || "—",
@@ -139,11 +149,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           currency: updated.service.currency || "USD",
           bookingStatus: updated.status,
           paymentStatus:
-            updated.status === "PAID" || updated.status === "COMPLETED"
+            updated.status === "CONFIRMED" || updated.status === "IN_SERVICE" || updated.status === "COMPLETED"
               ? "paid"
-              : updated.status === "PENDING" || updated.status === "CONFIRMED"
-              ? "pending"
-              : "refunded",
+              : updated.status === "CANCELLED" || updated.status === "CANCELLATION_REQUESTED"
+              ? "refunded"
+              : "pending",
           manager: pickManager(updated.id),
           source: pickSource(updated.id),
           unreadCount: unreadBefore,
@@ -154,13 +164,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       });
     }
 
-    // Валидация перехода по жизненному циклу
+    // Валидация перехода по жизненному циклу (Baseline §0.5)
     const from = booking.status;
     let to: string | null = null;
-    if (action === "confirm" && from === "PENDING") to = "CONFIRMED";
-    else if (action === "pay" && (from === "CONFIRMED" || from === "PENDING")) to = "PAID";
-    else if (action === "complete" && from === "PAID") to = "COMPLETED";
-    else if (action === "cancel" && (from === "PENDING" || from === "CONFIRMED" || from === "PAID")) to = "REFUNDED";
+    if (action === "send" && (from === "NEW" || from === "PREPARING_REQUEST")) to = "SENT_TO_SUPPLIER";
+    else if (action === "confirm" && (from === "SENT_TO_SUPPLIER" || from === "AWAITING_CONFIRMATION")) to = "CONFIRMED";
+    else if (action === "service" && from === "CONFIRMED") to = "IN_SERVICE";
+    else if (action === "complete" && from === "IN_SERVICE") to = "COMPLETED";
+    else if (action === "reject" && from === "AWAITING_CONFIRMATION") to = "SUPPLIER_REJECTED";
+    else if (action === "problem" && from !== "CANCELLED" && from !== "COMPLETED") to = "PROBLEM";
+    else if (action === "cancel" && from !== "CANCELLED" && from !== "COMPLETED") to = "CANCELLED";
 
     if (!to) {
       return NextResponse.json(
@@ -173,7 +186,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const updated = await prisma.$transaction(async (tx) => {
       const u = await tx.booking.update({
         where: { id },
-        data: { status: to as "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED" },
+        data: { status: to as never },
         select: { id: true, status: true, amount: true, updatedAt: true },
       });
       await tx.bookingHistory.create({
@@ -197,8 +210,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           text: bookingSystemMessage(to),
         },
       });
+      // Outbox (Гл. 6): событие бронирования пишется атомарно с переходом;
+      // привязка к заказу позволяет Booking Center синхронизировать заказ.
+      if (booking.orderId) {
+        await emitOrderEvent(
+          tx,
+          booking.orderId,
+          action === "send" ? "BOOKING_SENT_TO_SUPPLIER" : action === "confirm" ? "BOOKING_CONFIRMED" : "BOOKING_STATUS_CHANGED",
+          { bookingId: id, bookingCode: booking.code, from, to, actor: actorDisplayName(user) }
+        );
+      }
       return u;
     });
+    await publishOrderEvents();
 
     return NextResponse.json({
       ok: true,
@@ -218,10 +242,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 function bookingStatusMessage(to: string): string {
   const map: Record<string, string> = {
+    SENT_TO_SUPPLIER: "Запрос отправлен поставщику",
     CONFIRMED: "Бронирование подтверждено",
-    PAID: "Бронирование оплачено",
+    IN_SERVICE: "Услуга началась — бронь в поездке",
     COMPLETED: "Бронирование завершено",
-    REFUNDED: "Бронирование отменено, средства возвращены",
+    SUPPLIER_REJECTED: "Поставщик отклонил запрос",
+    CANCELLED: "Бронирование отменено",
+    PROBLEM: "Бронирование переведено в проблемные",
   };
   return map[to] ?? `Статус обновлён: ${to}`;
 }

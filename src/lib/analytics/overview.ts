@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import {
-  ORDER_STATUS_GROUPS,
   SERVICE_TYPE_LABELS,
   SERVICE_TYPE_ICONS,
   changePct,
@@ -13,8 +12,6 @@ import {
   type PulseItem,
   analyticsRange,
 } from "@/lib/analytics";
-
-const PAID = [...ORDER_STATUS_GROUPS.paid] as const;
 
 /**
  * 2.9 Общая аналитика — главный аналитический экран платформы.
@@ -50,28 +47,27 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
 
   // Платёжные агрегаты уважают фильтр статуса: при выбранном статусе вся страница
   // показывает данные только по нему, иначе — только оплаченные (Гл. 2.7).
-  const paidStatus: { in: (typeof PAID)[number][] } | (typeof PAID)[number] = f.status
-    ? (f.status as (typeof PAID)[number])
-    : { in: [...PAID] };
+  // Оплата — отдельное измерение (paymentStatus, Baseline §0.6).
+  const paidWhere: Record<string, unknown> = f.status ? { status: f.status } : { paymentStatus: "PAID" };
 
   // ── KPI: выручка, продажи, заказы, средний чек, прибыль ──
   const [paidAgg, prevPaidAgg, ordersAgg, prevOrdersAgg] = await Promise.all([
-    prisma.order.aggregate({ where: { ...orderWhere, status: paidStatus }, _sum: { paidAmount: true }, _count: true, _avg: { paidAmount: true } }),
-    prisma.order.aggregate({ where: { ...prevOrderWhere, status: paidStatus }, _sum: { paidAmount: true }, _count: true, _avg: { paidAmount: true } }),
+    prisma.order.aggregate({ where: { ...orderWhere, ...paidWhere }, _sum: { paidAmount: true }, _count: true, _avg: { paidAmount: true } }),
+    prisma.order.aggregate({ where: { ...prevOrderWhere, ...paidWhere }, _sum: { paidAmount: true }, _count: true, _avg: { paidAmount: true } }),
     prisma.order.aggregate({ where: orderWhere, _count: true }),
     prisma.order.aggregate({ where: prevOrderWhere, _count: true }),
   ]);
-  const revenue = paidAgg._sum.paidAmount ?? 0;
-  const revenuePrev = prevPaidAgg._sum.paidAmount ?? 0;
-  const salesCount = paidAgg._count;
-  const avgCheck = paidAgg._avg.paidAmount ?? 0;
+  const revenue = paidAgg._sum?.paidAmount ?? 0;
+  const revenuePrev = prevPaidAgg._sum?.paidAmount ?? 0;
+  const salesCount = paidAgg._count ?? 0;
+  const avgCheck = paidAgg._avg?.paidAmount ?? 0;
 
   // ── KPI: заказы по статусам, отмены, возвраты ──
   const [statusRows, prevStatusRows, refundAgg, prevRefundAgg] = await Promise.all([
     prisma.order.groupBy({ by: ["status"], where: orderWhere, _count: true }),
     prisma.order.groupBy({ by: ["status"], where: prevOrderWhere, _count: true }),
-    prisma.order.aggregate({ where: { ...orderWhere, status: "REFUNDED" }, _sum: { amount: true }, _count: true }),
-    prisma.order.aggregate({ where: { ...prevOrderWhere, status: "REFUNDED" }, _sum: { amount: true }, _count: true }),
+    prisma.order.aggregate({ where: { ...orderWhere, paymentStatus: "REFUNDED" }, _sum: { amount: true }, _count: true }),
+    prisma.order.aggregate({ where: { ...prevOrderWhere, paymentStatus: "REFUNDED" }, _sum: { amount: true }, _count: true }),
   ]);
   const counts: Record<string, number> = {};
   for (const r of statusRows) counts[r.status] = r._count;
@@ -90,7 +86,7 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
   const viewWhere = { viewedAt: { gte: range.start, lte: range.end }, ...(hasViewFilter ? { service: viewFilter } : {}) };
   const [viewsInPeriod, paidInPeriod] = await Promise.all([
     prisma.serviceView.count({ where: viewWhere }),
-    prisma.order.count({ where: { ...orderWhere, status: paidStatus } }),
+    prisma.order.count({ where: { ...orderWhere, ...paidWhere } }),
   ]);
   const conversion = ordersAgg._count ? (paidInPeriod / ordersAgg._count) * 100 : 0;
 
@@ -99,7 +95,7 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
     prisma.user.count({ where: { createdAt: { gte: range.start, lte: range.end } } }),
     prisma.user.count({ where: { createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
     prisma.user.count({ where: { role: "BUYER", orders: { some: {} } } }),
-    prisma.order.aggregate({ where: { status: { in: [...PAID] } }, _sum: { paidAmount: true } }),
+    prisma.order.aggregate({ where: { paymentStatus: "PAID" }, _sum: { paidAmount: true } }),
   ]);
   // Повторные покупатели — клиенты с 2+ заказами
   const repeatBuyerIds = await prisma.order.groupBy({ by: ["userId"], _count: { _all: true } });
@@ -113,7 +109,7 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
 
   // ── Серии: выручка, заказы, новые клиенты ──
   const paidRows = await prisma.order.findMany({
-    where: { ...orderWhere, status: paidStatus },
+    where: { ...orderWhere, ...paidWhere },
     select: {
       createdAt: true,
       paidAmount: true,
@@ -214,15 +210,15 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
   // 9. Доступность интеграций (оценка из журнала автоматизации).
   const planFactor = Math.min(100, Math.round((revenue / Math.max(1, revenuePrev || revenue)) * 100));
   const convFactor = Math.min(100, Math.round(conversion));
-  const [overdueCount, orderCountForSla, confirmedBookings, allBookingsForSla, reviewStats, automationErrors] = await Promise.all([
-    prisma.order.count({ where: { ...orderWhere, status: "OVERDUE" } }),
+  const [problemCount, orderCountForSla, confirmedBookings, allBookingsForSla, reviewStats, automationErrors] = await Promise.all([
+    prisma.order.count({ where: { ...orderWhere, status: "PROBLEM" } }),
     prisma.order.count({ where: orderWhere }),
-    prisma.booking.count({ where: { createdAt: { gte: range.start, lte: range.end }, status: { in: ["CONFIRMED", "PAID", "COMPLETED"] } } }),
+    prisma.booking.count({ where: { createdAt: { gte: range.start, lte: range.end }, status: { in: ["CONFIRMED", "IN_SERVICE", "COMPLETED"] } } }),
     prisma.booking.count({ where: { createdAt: { gte: range.start, lte: range.end } } }),
     prisma.review.aggregate({ where: { createdAt: { gte: range.start, lte: range.end } }, _avg: { rating: true }, _count: true }),
     prisma.automationLog.count({ where: { createdAt: { gte: range.start, lte: range.end }, result: "error" } }),
   ]);
-  const slaFactor = orderCountForSla ? Math.max(0, 100 - Math.round((overdueCount / orderCountForSla) * 100)) : 100;
+  const slaFactor = orderCountForSla ? Math.max(0, 100 - Math.round((problemCount / orderCountForSla) * 100)) : 100;
   const bookingFactor = allBookingsForSla ? Math.round((confirmedBookings / allBookingsForSla) * 100) : 100;
   const profitFactor = Math.min(100, Math.round(72 + Math.max(0, Math.min(28, seriesTrendPct(revenueSeries.values)) * 0.5)));
   const refundFactor = Math.max(0, 100 - Math.round(refundPct * 12));
@@ -276,7 +272,7 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
     prisma.order.findMany({ where: { createdAt: { gte: dayAgo } }, orderBy: { createdAt: "desc" }, take: 3, select: { createdAt: true, orderNumber: true, amount: true } }),
     prisma.booking.findMany({ where: { createdAt: { gte: dayAgo } }, orderBy: { createdAt: "desc" }, take: 3, select: { createdAt: true, amount: true, status: true } }),
     prisma.user.findMany({ where: { createdAt: { gte: dayAgo } }, orderBy: { createdAt: "desc" }, take: 3, select: { createdAt: true, firstName: true, role: true } }),
-    prisma.order.findMany({ where: { status: "REFUNDED", updatedAt: { gte: dayAgo } }, orderBy: { updatedAt: "desc" }, take: 2, select: { updatedAt: true, amount: true } }),
+    prisma.order.findMany({ where: { paymentStatus: "REFUNDED", updatedAt: { gte: dayAgo } }, orderBy: { updatedAt: "desc" }, take: 2, select: { updatedAt: true, amount: true } }),
     prisma.orderMessage.count({ where: { createdAt: { gte: dayAgo } } }),
   ]);
   const pulse: PulseItem[] = [];
@@ -299,6 +295,7 @@ export async function getOverviewData(f: AnalyticsFilters): Promise<AnalyticsSec
       { key: "orders", title: "Заказы", value: ordersAgg._count, unit: " шт", change: changePct(ordersAgg._count, prevOrdersAgg._count), tone: "neutral" },
       { key: "avgCheck", title: "Средний чек", value: avgCheck, change: changePct(avgCheck, prevPaidAgg._avg.paidAmount ?? 0), tone: "neutral" },
       { key: "conversion", title: "Конверсия", value: conversion, unit: "%", tone: conversion >= 40 ? "positive" : "negative", detail: `${paidInPeriod} оплат из ${ordersAgg._count} заказов` },
+      { key: "problem", title: "Проблемные заказы", value: problemCount, unit: " шт", tone: problemCount > 0 ? "negative" : "positive" },
       { key: "profit", title: "Прибыль платформы", value: Math.round(revenue * 0.12), change: changePct(revenue * 0.12, revenuePrev * 0.12), tone: "positive", detail: "комиссия 12%" },
       { key: "refunds", title: "Возвраты", value: refunds, change: changePct(refunds, prevRefundAgg._count), tone: refunds > prevRefundAgg._count ? "negative" : "positive", detail: `${refundRate.toFixed(1)}% от выручки` },
       { key: "newUsers", title: "Новые клиенты", value: newUsers, unit: " чел.", change: changePct(newUsers, prevNewUsers), spark: usersSeries.values, tone: "neutral" },

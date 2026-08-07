@@ -156,6 +156,8 @@ interface OrdersResponse {
 
 // ── Константы очередей и приоритетов (Гл. 3.7, 3.8) ──
 
+// Очереди (Гл. 3.7) на канонических статусах Baseline §0.4. Оплата — отдельное
+// измерение paymentStatus, поэтому «Ожидание оплаты» заменено на этапы бронирования.
 const QUEUES: {
   key: string;
   icon: string;
@@ -163,13 +165,14 @@ const QUEUES: {
   statuses: string;
   color: string;
 }[] = [
-  { key: "new", icon: "🆕", title: "Новые", statuses: "DRAFT,CREATED", color: "from-blue-500 to-indigo-600" },
-  { key: "check", icon: "🔍", title: "Проверка наличия", statuses: "PROCESSING", color: "from-cyan-500 to-teal-600" },
-  { key: "provider", icon: "🤝", title: "Ожидание поставщика", statuses: "AWAITING_CONFIRMATION", color: "from-violet-500 to-purple-600" },
-  { key: "payment", icon: "⏳", title: "Ожидание оплаты", statuses: "AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE", color: "from-amber-500 to-orange-600" },
-  { key: "docs", icon: "📄", title: "Документы", statuses: "DOCUMENT_PREP,READY", color: "from-sky-500 to-blue-600" },
-  { key: "refunds", icon: "↩️", title: "Возвраты", statuses: "REFUNDED,CANCELLED", color: "from-rose-500 to-red-600" },
-  { key: "overdue", icon: "⏰", title: "Просрочено", statuses: "OVERDUE", color: "from-red-500 to-rose-600" },
+  { key: "new", icon: "🆕", title: "Новые", statuses: "NEW", color: "from-blue-500 to-indigo-600" },
+  { key: "check", icon: "🔍", title: "В обработке", statuses: "IN_PROCESSING,WAITING_FOR_DATA", color: "from-cyan-500 to-teal-600" },
+  { key: "provider", icon: "🤝", title: "Ожидание поставщика", statuses: "SENT_TO_BOOKING", color: "from-violet-500 to-purple-600" },
+  { key: "booking", icon: "🚀", title: "Готовы к бронированию", statuses: "READY_FOR_BOOKING,PARTIALLY_FULFILLED", color: "from-sky-500 to-blue-600" },
+  { key: "fulfilled", icon: "✅", title: "Исполнены", statuses: "FULFILLED,READY_TO_CLOSE", color: "from-emerald-500 to-teal-600" },
+  { key: "closed", icon: "🎉", title: "Закрыты", statuses: "CLOSED", color: "from-slate-500 to-slate-700" },
+  { key: "problem", icon: "⏰", title: "Проблемные", statuses: "PROBLEM,SUSPENDED", color: "from-red-500 to-rose-600" },
+  { key: "refunds", icon: "↩️", title: "Отмены", statuses: "CANCELLED", color: "from-rose-500 to-red-600" },
   { key: "all", icon: "👥", title: "Все мои", statuses: "", color: "from-slate-500 to-slate-700" },
 ];
 
@@ -177,15 +180,20 @@ const QUEUES: {
 // Колонки соответствуют этапам жизненного цикла заказа; карточку можно
 // перетащить только в колонку допустимого перехода (KANBAN_MOVES зеркалит
 // TRANSITIONS из /api/admin/orders/[id]/route.ts, Гл. 3.15).
+// Колонки Kanban (Гл. 3.7) — канонический жизненный цикл Baseline §0.4:
+// NEW → IN_PROCESSING → WAITING_FOR_DATA → READY_FOR_BOOKING → SENT_TO_BOOKING
+// → PARTIALLY_FULFILLED → FULFILLED → READY_TO_CLOSE → CLOSED; ветви PROBLEM/SUSPENDED/CANCELLED.
 const KANBAN_COLUMNS: { key: string; title: string; statuses: string[]; color: string }[] = [
-  { key: "new", title: "🆕 Новые", statuses: ["DRAFT", "CREATED"], color: "#3b82f6" },
-  { key: "check", title: "🔍 Проверка", statuses: ["PROCESSING"], color: "#06b6d4" },
-  { key: "provider", title: "🤝 Поставщик", statuses: ["AWAITING_CONFIRMATION"], color: "#8b5cf6" },
-  { key: "confirmed", title: "✅ Подтверждён", statuses: ["CONFIRMED"], color: "#16a34a" },
-  { key: "payment", title: "💳 Оплата", statuses: ["AWAITING_PAYMENT", "PARTIALLY_PAID", "PAID", "OVERDUE"], color: "#f97316" },
-  { key: "docs", title: "📄 Документы", statuses: ["DOCUMENT_PREP", "READY"], color: "#14b8a6" },
-  { key: "done", title: "🎉 Завершён", statuses: ["COMPLETED"], color: "#10b981" },
-  { key: "refunds", title: "↩️ Возвраты", statuses: ["REFUNDED", "CANCELLED"], color: "#f43f5e" },
+  { key: "new", title: "🆕 Новые", statuses: ["NEW"], color: "#3b82f6" },
+  { key: "check", title: "🔍 В обработке", statuses: ["IN_PROCESSING", "WAITING_FOR_DATA"], color: "#06b6d4" },
+  { key: "ready", title: "🚀 Готов к бронированию", statuses: ["READY_FOR_BOOKING"], color: "#8b5cf6" },
+  { key: "sent", title: "🤝 Передан в бронирование", statuses: ["SENT_TO_BOOKING"], color: "#14b8a6" },
+  { key: "partial", title: "📌 Частично исполнен", statuses: ["PARTIALLY_FULFILLED"], color: "#eab308" },
+  { key: "fulfilled", title: "✅ Исполнен", statuses: ["FULFILLED"], color: "#16a34a" },
+  { key: "close", title: "📄 Готов к закрытию", statuses: ["READY_TO_CLOSE"], color: "#0d9488" },
+  { key: "done", title: "🎉 Закрыт", statuses: ["CLOSED"], color: "#64748b" },
+  { key: "problem", title: "⏰ Проблемные", statuses: ["PROBLEM", "SUSPENDED"], color: "#dc2626" },
+  { key: "refunds", title: "↩️ Отмены", statuses: ["CANCELLED"], color: "#f43f5e" },
 ];
 
 // Статус → колонка Kanban (для быстрого поиска колонки целевого статуса)
@@ -196,59 +204,44 @@ for (const col of KANBAN_COLUMNS) {
 
 // Допустимые перемещения: статус → [{ action, toStatus, label }].
 // Зеркалит TRANSITIONS бэкенда (confirm/pay/complete/cancel/refund + process/send).
+// Переходы зеркалят TRANSITIONS бэкенда /api/admin/orders/[id] (Baseline §0.4).
 const KANBAN_MOVES: Record<string, { action: string; toStatus: string; label: string }[]> = {
-  DRAFT: [
-    { action: "process", toStatus: "PROCESSING", label: "Принять в работу" },
+  NEW: [
+    { action: "process", toStatus: "IN_PROCESSING", label: "Принять в работу" },
     { action: "cancel", toStatus: "CANCELLED", label: "Отменить" },
   ],
-  CREATED: [
-    { action: "process", toStatus: "PROCESSING", label: "Принять в работу" },
+  IN_PROCESSING: [
+    { action: "confirm", toStatus: "READY_FOR_BOOKING", label: "Готов к бронированию" },
     { action: "cancel", toStatus: "CANCELLED", label: "Отменить" },
   ],
-  CHANGED: [
-    { action: "process", toStatus: "PROCESSING", label: "Принять в работу" },
+  WAITING_FOR_DATA: [
+    { action: "confirm", toStatus: "READY_FOR_BOOKING", label: "Готов к бронированию" },
     { action: "cancel", toStatus: "CANCELLED", label: "Отменить" },
   ],
-  PROCESSING: [
-    { action: "send", toStatus: "AWAITING_CONFIRMATION", label: "Отправить поставщику" },
-    { action: "confirm", toStatus: "CONFIRMED", label: "Подтвердить" },
+  READY_FOR_BOOKING: [
+    { action: "send", toStatus: "SENT_TO_BOOKING", label: "Передать в Booking Center" },
     { action: "cancel", toStatus: "CANCELLED", label: "Отменить" },
   ],
-  AWAITING_CONFIRMATION: [
-    { action: "confirm", toStatus: "CONFIRMED", label: "Подтвердить" },
+  SENT_TO_BOOKING: [
+    { action: "complete", toStatus: "FULFILLED", label: "Забронировано и подтверждено" },
     { action: "cancel", toStatus: "CANCELLED", label: "Отменить" },
   ],
-  CONFIRMED: [
-    { action: "pay", toStatus: "PAID", label: "Оплачен" },
+  PARTIALLY_FULFILLED: [
+    { action: "complete", toStatus: "FULFILLED", label: "Исполнить полностью" },
     { action: "cancel", toStatus: "CANCELLED", label: "Отменить" },
   ],
-  AWAITING_PAYMENT: [
-    { action: "pay", toStatus: "PAID", label: "Оплачен" },
-    { action: "refund", toStatus: "REFUNDED", label: "Возврат" },
+  FULFILLED: [
+    { action: "close", toStatus: "CLOSED", label: "Закрыть заказ" },
     { action: "cancel", toStatus: "CANCELLED", label: "Отменить" },
   ],
-  PARTIALLY_PAID: [
-    { action: "pay", toStatus: "PAID", label: "Оплачен" },
-    { action: "refund", toStatus: "REFUNDED", label: "Возврат" },
+  READY_TO_CLOSE: [
+    { action: "close", toStatus: "CLOSED", label: "Закрыть заказ" },
     { action: "cancel", toStatus: "CANCELLED", label: "Отменить" },
   ],
-  PAID: [
-    { action: "complete", toStatus: "COMPLETED", label: "Завершить" },
-    { action: "refund", toStatus: "REFUNDED", label: "Возврат" },
-  ],
-  DOCUMENT_PREP: [
-    { action: "complete", toStatus: "COMPLETED", label: "Завершить" },
-    { action: "refund", toStatus: "REFUNDED", label: "Возврат" },
-  ],
-  READY: [
-    { action: "complete", toStatus: "COMPLETED", label: "Завершить" },
-    { action: "refund", toStatus: "REFUNDED", label: "Возврат" },
-  ],
-  OVERDUE: [{ action: "cancel", toStatus: "CANCELLED", label: "Отменить" }],
-  COMPLETED: [],
-  REFUNDED: [],
+  PROBLEM: [{ action: "process", toStatus: "IN_PROCESSING", label: "Вернуть в работу" }],
+  SUSPENDED: [{ action: "process", toStatus: "IN_PROCESSING", label: "Возобновить" }],
+  CLOSED: [],
   CANCELLED: [],
-  ARCHIVED: [],
 };
 
 const PRIORITY_META: Record<string, { label: string; color: string; stars: string }> = {
@@ -270,21 +263,16 @@ const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABELS).map(([value, label]) 
 
 // Действия, доступные для статуса (Гл. 3.4 «Работа по этапам»)
 const ACTIONS_BY_STATUS: Record<string, { action: string; label: string; cls: string }[]> = {
-  DRAFT: [{ action: "process", label: "Принять в работу", cls: "text-blue-600" }],
-  CREATED: [{ action: "process", label: "Принять в работу", cls: "text-blue-600" }],
-  PROCESSING: [
-    { action: "send", label: "Отправить поставщику", cls: "text-cyan-600" },
-    { action: "confirm", label: "Подтвердить", cls: "text-violet-600" },
-  ],
-  AWAITING_CONFIRMATION: [{ action: "confirm", label: "Подтвердить", cls: "text-violet-600" }],
-  CONFIRMED: [{ action: "pay", label: "Оплачен", cls: "text-emerald-600" }],
-  AWAITING_PAYMENT: [{ action: "pay", label: "Оплачен", cls: "text-emerald-600" }],
-  PARTIALLY_PAID: [{ action: "pay", label: "Оплачен", cls: "text-emerald-600" }],
-  PAID: [{ action: "complete", label: "Завершить", cls: "text-teal-600" }],
-  DOCUMENT_PREP: [{ action: "complete", label: "Завершить", cls: "text-teal-600" }],
-  READY: [{ action: "complete", label: "Завершить", cls: "text-teal-600" }],
-  CHANGED: [{ action: "process", label: "Принять в работу", cls: "text-blue-600" }],
-  OVERDUE: [{ action: "cancel", label: "Отменить", cls: "text-rose-600" }],
+  NEW: [{ action: "process", label: "Принять в работу", cls: "text-blue-600" }],
+  IN_PROCESSING: [{ action: "confirm", label: "Готов к бронированию", cls: "text-violet-600" }],
+  WAITING_FOR_DATA: [{ action: "confirm", label: "Готов к бронированию", cls: "text-violet-600" }],
+  READY_FOR_BOOKING: [{ action: "send", label: "Передать в Booking Center", cls: "text-cyan-600" }],
+  SENT_TO_BOOKING: [{ action: "complete", label: "Подтверждено поставщиком", cls: "text-teal-600" }],
+  PARTIALLY_FULFILLED: [{ action: "complete", label: "Исполнить полностью", cls: "text-teal-600" }],
+  FULFILLED: [{ action: "close", label: "Закрыть заказ", cls: "text-emerald-600" }],
+  READY_TO_CLOSE: [{ action: "close", label: "Закрыть заказ", cls: "text-emerald-600" }],
+  PROBLEM: [{ action: "process", label: "Вернуть в работу", cls: "text-blue-600" }],
+  SUSPENDED: [{ action: "process", label: "Возобновить", cls: "text-blue-600" }],
 };
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -296,59 +284,56 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 // Состояние документов по статусу заказа (Гл. 3.8, колонка «Документы»)
 const DOCS_LABELS: Record<string, string> = {
-  DRAFT: "Нет",
-  CREATED: "Нет",
-  PROCESSING: "—",
-  AWAITING_CONFIRMATION: "—",
-  CONFIRMED: "—",
-  AWAITING_PAYMENT: "—",
-  PARTIALLY_PAID: "—",
-  PAID: "Готовятся",
-  DOCUMENT_PREP: "Готовятся",
-  READY: "Готовы",
-  COMPLETED: "Отправлены",
-  CHANGED: "—",
-  REFUNDED: "—",
+  NEW: "Нет",
+  IN_PROCESSING: "—",
+  WAITING_FOR_DATA: "—",
+  READY_FOR_BOOKING: "—",
+  SENT_TO_BOOKING: "—",
+  PARTIALLY_FULFILLED: "Готовятся",
+  FULFILLED: "Готовы",
+  READY_TO_CLOSE: "Готовы",
+  CLOSED: "Отправлены",
   CANCELLED: "—",
-  OVERDUE: "—",
-  ARCHIVED: "Отправлены",
+  PROBLEM: "—",
+  SUSPENDED: "—",
 };
 
-// Этапы жизненного цикла заказа (Гл. 3.1, 3.10)
+// Этапы жизненного цикла заказа (Гл. 3.1, 3.10) — канонические стадии Baseline §0.4
 const LIFECYCLE = [
-  { key: "CREATED", label: "Создан" },
-  { key: "CHECK", label: "Проверка" },
-  { key: "CONFIRMED", label: "Подтверждение" },
-  { key: "PAID", label: "Оплата" },
-  { key: "DOCS", label: "Документы" },
-  { key: "COMPLETED", label: "Исполнен" },
+  { key: "NEW", label: "Создан" },
+  { key: "IN_PROCESSING", label: "В обработке" },
+  { key: "READY_FOR_BOOKING", label: "Готов к бронированию" },
+  { key: "SENT_TO_BOOKING", label: "В бронировании" },
+  { key: "FULFILLED", label: "Исполнен" },
+  { key: "READY_TO_CLOSE", label: "Готов к закрытию" },
+  { key: "CLOSED", label: "Закрыт" },
 ];
 
 const STAGE_OF: Record<string, number> = {
-  DRAFT: 0,
-  CREATED: 0,
-  PROCESSING: 1,
-  CHANGED: 1,
-  AWAITING_CONFIRMATION: 2,
-  CONFIRMED: 2,
-  OVERDUE: 2,
-  AWAITING_PAYMENT: 3,
-  PARTIALLY_PAID: 3,
-  PAID: 3,
-  DOCUMENT_PREP: 4,
-  READY: 4,
-  COMPLETED: 5,
+  NEW: 0,
+  IN_PROCESSING: 1,
+  WAITING_FOR_DATA: 1,
+  READY_FOR_BOOKING: 2,
+  SENT_TO_BOOKING: 3,
+  PARTIALLY_FULFILLED: 4,
+  FULFILLED: 4,
+  READY_TO_CLOSE: 5,
+  CLOSED: 6,
+  CANCELLED: 6,
+  PROBLEM: 1,
+  SUSPENDED: 1,
 };
 
 // ── Контроль исполнения (Гл. 3.4): SLA-лимиты по этапам жизненного цикла ──
 // Допустимое время (часов) на каждый этап. В сумме — целевой цикл заказа.
 const STAGE_SLA_HOURS: Record<string, number> = {
-  CREATED: 4,
-  CHECK: 24,
-  CONFIRMED: 24,
-  PAID: 72,
-  DOCS: 24,
-  COMPLETED: 24,
+  NEW: 4,
+  IN_PROCESSING: 24,
+  READY_FOR_BOOKING: 24,
+  SENT_TO_BOOKING: 48,
+  FULFILLED: 72,
+  READY_TO_CLOSE: 24,
+  CLOSED: 24,
 };
 
 // Подразделение по имени менеджера (детерминированно, Гл. 3.4 «Контроль исполнения»)
@@ -832,7 +817,7 @@ export default function SalesExecution() {
         key: "new",
         icon: "🆕",
         title: "Новые заказы",
-        value: statusCount(["DRAFT", "CREATED"]),
+        value: statusCount(["NEW"]),
         change: kpi.newOrders?.change ?? 0,
         detail: `+${kpi.newToday?.value ?? 0} за 24 ч`,
         statuses: "DRAFT,CREATED",
@@ -854,8 +839,8 @@ export default function SalesExecution() {
         title: "Ожидают поставщика",
         value: kpi.awaitingConfirmation?.value ?? 0,
         change: kpi.awaitingConfirmation?.change ?? 0,
-        detail: "Партнёр ещё не ответил",
-        statuses: "AWAITING_CONFIRMATION",
+        detail: "Передан в Booking Center",
+        statuses: "SENT_TO_BOOKING",
         color: "#8b5cf6",
       },
       {
@@ -865,37 +850,39 @@ export default function SalesExecution() {
         value: kpi.awaitingPayment?.value ?? 0,
         change: kpi.awaitingPayment?.change ?? 0,
         detail: `${fmtMoney(data?.financial?.pendingAmount ?? 0)} в ожидании`,
-        statuses: "AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE",
+        // Оплата — отдельное измерение paymentStatus; карточка открывает очередь
+        // активных этапов бронирования (Baseline §0.6).
+        statuses: "READY_FOR_BOOKING,SENT_TO_BOOKING,PARTIALLY_FULFILLED",
         color: "#f97316",
       },
       {
         key: "docs",
         icon: "📄",
-        title: "Документы готовы",
+        title: "Исполнены и готовы к закрытию",
         value: kpi.ready?.value ?? 0,
         change: kpi.ready?.change ?? 0,
-        detail: "Подготовка и готовые",
-        statuses: "DOCUMENT_PREP,READY",
+        detail: "Все услуги подтверждены",
+        statuses: "FULFILLED,READY_TO_CLOSE",
         color: "#14b8a6",
       },
       {
         key: "overdue",
         icon: "⏰",
-        title: "Просрочено",
-        value: statusCount(["OVERDUE"]),
+        title: "Проблемные",
+        value: statusCount(["PROBLEM", "SUSPENDED"]),
         change: kpi.avgCycle?.change ?? 0,
         detail: "Требуется немедленное действие",
-        statuses: "OVERDUE",
+        statuses: "PROBLEM,SUSPENDED",
         color: "#dc2626",
       },
       {
         key: "refunds",
         icon: "↩️",
-        title: "Возвраты",
+        title: "Отмены и возвраты",
         value: kpi.refunds?.value ?? 0,
         change: kpi.refunds?.change ?? 0,
         detail: `${fmtMoney(data?.financial?.refundedAmount ?? 0)} возвращено`,
-        statuses: "REFUNDED,CANCELLED",
+        statuses: "CANCELLED",
         color: "#f43f5e",
       },
       {
@@ -1583,11 +1570,12 @@ export default function SalesExecution() {
               { label: "Сегодня", action: () => applyPeriod("today") },
               { label: "Вчера", action: () => applyPeriod("yesterday") },
               { label: "Мои заказы", statuses: "" },
-              { label: "Новые", statuses: "DRAFT,CREATED" },
-              { label: "Ожидают оплаты", statuses: "AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE" },
-              { label: "Ожидают поставщика", statuses: "AWAITING_CONFIRMATION" },
-              { label: "Просроченные", statuses: "OVERDUE" },
-              { label: "Возвраты", statuses: "REFUNDED,CANCELLED" },
+              { label: "Новые", statuses: "NEW" },
+              { label: "В обработке", statuses: "IN_PROCESSING,WAITING_FOR_DATA" },
+              { label: "Готовы к бронированию", statuses: "READY_FOR_BOOKING" },
+              { label: "В бронировании", statuses: "SENT_TO_BOOKING" },
+              { label: "Проблемные", statuses: "PROBLEM,SUSPENDED" },
+              { label: "Отмены", statuses: "CANCELLED" },
               { label: "🚨 Эскалированные", active: escalated, action: toggleEscalated },
             ].map((f) => (
               <button
@@ -1760,7 +1748,7 @@ export default function SalesExecution() {
             <BulkBtn onClick={() => runBulk("pay")} disabled={bulkBusy} label="💳 На оплату" />
             <BulkBtn onClick={() => runBulk("complete")} disabled={bulkBusy} label="🎉 Завершить" />
             <BulkBtn onClick={() => runBulk("cancel")} disabled={bulkBusy} label="✕ Отменить" />
-            <BulkBtn onClick={() => runBulk("archive")} disabled={bulkBusy} label="📦 Архив" />
+            <BulkBtn onClick={() => runBulk("close")} disabled={bulkBusy} label="📄 Закрыть" />
             <BulkBtn onClick={exportSelectedCsv} disabled={bulkBusy} label="📤 Экспорт" />
             <select
               onChange={(e) => {
@@ -1855,11 +1843,11 @@ export default function SalesExecution() {
                   )}
               {orders.map((o) => {
                 const p = PRIORITY_META[o.priority] ?? PRIORITY_META.MEDIUM;
-                const slaColor = o.status === "OVERDUE" ? "#dc2626" : o.status === "AWAITING_CONFIRMATION" || o.status === "AWAITING_PAYMENT" ? "#f59e0b" : "#22c55e";
-                // Подсветка строк: просроченные — сильная красная подложка,
+                const slaColor = o.status === "PROBLEM" || o.status === "SUSPENDED" ? "#dc2626" : o.status === "SENT_TO_BOOKING" || o.status === "WAITING_FOR_DATA" ? "#f59e0b" : "#22c55e";
+                // Подсветка строк: проблемные — сильная красная подложка,
                 // эскалированные (Гл. 3.17) — лёгкая красная (светлее),
                 // чтобы заказы, требующие внимания, выделялись без клика.
-                const rowBg = o.status === "OVERDUE" ? "bg-red-50/40" : o.escalated ? "bg-red-50/30" : "";
+                const rowBg = o.status === "PROBLEM" || o.status === "SUSPENDED" ? "bg-red-50/40" : o.escalated ? "bg-red-50/30" : "";
                 return (
                   <tr
                     key={o.id}
@@ -1925,7 +1913,7 @@ export default function SalesExecution() {
                     <td className="ac-td">{DOCS_LABELS[o.status] ?? "—"}</td>
                     <td className="ac-td">
                       <span className="text-xs font-bold" style={{ color: slaColor }}>
-                        {o.status === "OVERDUE" ? "✕" : "✓"} {o.status === "OVERDUE" ? "0%" : "100%"}
+                        {o.status === "PROBLEM" || o.status === "SUSPENDED" ? "✕" : "✓"} {o.status === "PROBLEM" || o.status === "SUSPENDED" ? "0%" : "100%"}
                       </span>
                     </td>
                     {/* Контекстные действия (Гл. 3.8): панель при наведении на строку */}
@@ -2147,10 +2135,10 @@ function QuickActionsMenu({
   const [open, setOpen] = useState(false);
   const items = [
     { icon: "➕", label: "Создать заказ", run: onNewOrder },
-    { icon: "🔍", label: "Проверить наличие", statuses: "PROCESSING" },
-    { icon: "🧾", label: "Создать счёт", statuses: "AWAITING_PAYMENT,PARTIALLY_PAID", tab: "finance" },
-    { icon: "📤", label: "Отправить документы", statuses: "DOCUMENT_PREP,READY", tab: "docs" },
-    { icon: "↩️", label: "Создать возврат", statuses: "REFUNDED,CANCELLED" },
+    { icon: "🔍", label: "В обработке", statuses: "IN_PROCESSING,WAITING_FOR_DATA" },
+    { icon: "🧾", label: "Готовы к бронированию", statuses: "READY_FOR_BOOKING", tab: "finance" },
+    { icon: "📤", label: "Исполнены", statuses: "FULFILLED,READY_TO_CLOSE", tab: "docs" },
+    { icon: "↩️", label: "Отмены", statuses: "CANCELLED" },
     { icon: "📋", label: "Перейти в рабочую очередь", run: onGoQueue },
     { icon: "🤖", label: "Запустить AI-анализ", run: onAi },
   ] as { icon: string; label: string; statuses?: string; tab?: string; run?: () => void }[];
@@ -2617,6 +2605,7 @@ function KanbanBoard({
 interface OrderCardData {
   id: string;
   orderNumber: string;
+  version: number;
   client: string;
   clientEmail: string;
   clientPhone: string;
@@ -2641,6 +2630,35 @@ interface OrderCardData {
   manager: string;
   createdAt: string;
   updatedAt: string;
+  // Состав заказа (Baseline §3, OrderItem): канонический состав до/вместо броней.
+  items: {
+    id: string;
+    title: string;
+    type: string;
+    category: string;
+    quantity: number;
+    price: number;
+    currency: string;
+    amount: number;
+    serviceDate: string | null;
+    serviceId: string;
+    direction: string;
+    provider: string;
+  }[];
+  // Туристы заказа (Baseline §4, OrderTraveler) + готовность к бронированию.
+  travelers: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    birthDate: string | null;
+    citizenship: string | null;
+    gender: string | null;
+    passportNumber: string | null;
+    passportExpiry: string | null;
+    dataCompleteness: string;
+    version: number;
+  }[];
+  bookingReady: { ready: boolean; reason: string; complete: number; total: number };
   bookings: {
     id: string;
     bookingNumber: string;
@@ -2678,6 +2696,7 @@ interface OrderCardData {
 const CARD_TABS = [
   { key: "overview", label: "📋 Общая" },
   { key: "client", label: "👤 Клиент" },
+  { key: "travelers", label: "👥 Туристы" },
   { key: "services", label: "🧩 Услуги" },
   { key: "bookings", label: "🔖 Бронирования" },
   { key: "finance", label: "💰 Финансы" },
@@ -2783,8 +2802,8 @@ function OrderCard({
         setEditAmount(String(o.order.amount));
         // AI-инсайты (Гл. 3.10, вкладка AI)
         const ins: { level: string; title: string; effect: string }[] = [];
-        if (o.order.status === "OVERDUE") {
-          ins.push({ level: "high", title: "Заказ просрочен", effect: "Свяжитесь с поставщиком и клиентом, уточните новые сроки" });
+        if (o.order.status === "PROBLEM" || o.order.status === "SUSPENDED") {
+          ins.push({ level: "high", title: "Проблемный заказ", effect: "Свяжитесь с поставщиком и клиентом, уточните новые сроки" });
         }
         if (o.order.paymentStatus === "pending" && o.order.financial?.pendingAmount > 0) {
           ins.push({
@@ -2793,7 +2812,7 @@ function OrderCard({
             effect: `${fmtMoney(o.order.financial.pendingAmount)} к получению · отправьте напоминание клиенту`,
           });
         }
-        if (o.order.status === "AWAITING_CONFIRMATION") {
+        if (o.order.status === "SENT_TO_BOOKING") {
           ins.push({ level: "medium", title: "Ждём подтверждения поставщика", effect: "Среднее время ответа 4–8 часов · при задержке предложите альтернативу" });
         }
         ins.push(
@@ -2819,7 +2838,7 @@ function OrderCard({
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, version: order?.version }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Ошибка");
@@ -2952,8 +2971,18 @@ function OrderCard({
   const p = PRIORITY_META[order.priority] ?? PRIORITY_META.MEDIUM;
   const stage = STAGE_OF[order.status] ?? 0;
   const actions = ACTIONS_BY_STATUS[order.status] ?? [];
-  const isClosed = ["COMPLETED", "CANCELLED", "REFUNDED", "ARCHIVED"].includes(order.status);
-  const docsReady = ["PAID", "DOCUMENT_PREP", "READY", "COMPLETED"].includes(order.status);
+  const isClosed = ["CLOSED", "CANCELLED"].includes(order.status);
+  const docsReady = ["FULFILLED", "READY_TO_CLOSE", "CLOSED"].includes(order.status);
+  // Действия, требующие готовности туристов (Baseline §4): confirm (→ Готов к
+  // бронированию) и send (→ Передать в Booking Center) блокируются с причиной,
+  // пока не заполнены паспортные данные (Screen Design Brief §25).
+  const isActionBlocked = (a: string): boolean =>
+    (a === "confirm" || a === "send") && !!order.bookingReady && !order.bookingReady.ready;
+  // Перезагрузка карточки после изменения туристов.
+  const reloadOrder = async () => {
+    const r = await fetch(`/api/admin/orders/${orderId}`);
+    if (r.ok) setOrder((await r.json()).order);
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start justify-center p-4 overflow-y-auto no-scrollbar">
@@ -3010,16 +3039,21 @@ function OrderCard({
                 {actions.map((a) => (
                   <button
                     key={a.action}
-                    onClick={() => runAction(a.action)}
-                    className={`ac-btn ac-btn-sm bg-[var(--admin-bg)] border border-[var(--admin-border)] hover:border-primary ${a.cls}`}
+                    onClick={() => !isActionBlocked(a.action) && runAction(a.action)}
+                    disabled={isActionBlocked(a.action)}
+                    title={isActionBlocked(a.action) ? (order.bookingReady?.reason ?? "Данные туристов не заполнены") : undefined}
+                    className={`ac-btn ac-btn-sm bg-[var(--admin-bg)] border border-[var(--admin-border)] hover:border-primary ${a.cls} ${
+                      isActionBlocked(a.action) ? "opacity-45 cursor-not-allowed" : ""
+                    }`}
                   >
                     {a.label}
+                    {isActionBlocked(a.action) && <span className="ml-1 text-[10px]">🔒</span>}
                   </button>
                 ))}
                 <button onClick={() => onTab("docs")} className="ac-btn ac-btn-secondary ac-btn-sm">📄 Документы</button>
                 <button onClick={openMessages} className="ac-btn ac-btn-secondary ac-btn-sm">📧 Отправить клиенту</button>
                 <button onClick={() => setEditing(true)} className="ac-btn ac-btn-primary ac-btn-sm">✏️ Редактировать</button>
-                {["PAID", "DOCUMENT_PREP", "READY"].includes(order.status) && (
+                {["FULFILLED", "READY_TO_CLOSE"].includes(order.status) && (
                   <button onClick={() => runAction("refund")} className="ac-btn ac-btn-danger ac-btn-sm">
                     ↩️ Возврат
                   </button>
@@ -3041,7 +3075,7 @@ function OrderCard({
             {LIFECYCLE.map((s, i) => {
               const done = i < stage;
               const current = i === stage;
-              const failed = order.status === "OVERDUE" && i >= stage;
+              const failed = (order.status === "PROBLEM" || order.status === "SUSPENDED") && i >= stage;
               return (
                 <div key={s.key} className="flex items-center flex-1 last:flex-none">
                   <div className="flex flex-col items-center gap-1">
@@ -3094,6 +3128,7 @@ function OrderCard({
         <div className="px-5 py-4 min-h-[280px] max-h-[55vh] overflow-y-auto no-scrollbar">
           {tab === "overview" && <OverviewTab order={order} onEdit={() => setEditing(true)} onTab={onTab} onRunSlaAction={runSlaAction} />}
           {tab === "client" && <ClientTab order={order} onRunSlaAction={runSlaAction} />}
+          {tab === "travelers" && <TravelersTab order={order} onChanged={reloadOrder} />}
           {tab === "services" && <ServicesTab order={order} onRunSlaAction={runSlaAction} />}
           {tab === "bookings" && <BookingsTab order={order} />}
           {tab === "finance" && <FinanceTab order={order} onRunSlaAction={runSlaAction} />}
@@ -3101,7 +3136,7 @@ function OrderCard({
             <div className="space-y-3">
               {/* Сводная информация (3.12) */}
               {(() => {
-                const ready = order.status === "READY" || order.status === "COMPLETED";
+                const ready = order.status === "FULFILLED" || order.status === "READY_TO_CLOSE" || order.status === "CLOSED";
                 const list = DOC_TYPES.map((d) => {
                   const generated = docsGenerated.includes(d);
                   const isReady = generated || ready;
@@ -3304,8 +3339,8 @@ function buildSlaData(order: OrderCardData) {
   const stage = STAGE_OF[order.status] ?? 0;
   const createdAtMs = new Date(order.createdAt).getTime();
   const now = Date.now();
-  const isClosed = ["COMPLETED", "CANCELLED", "REFUNDED", "ARCHIVED"].includes(order.status);
-  const isOverdue = order.status === "OVERDUE";
+  const isClosed = ["CLOSED", "CANCELLED"].includes(order.status);
+  const isOverdue = order.status === "PROBLEM" || order.status === "SUSPENDED";
 
   const fmtH = (ms: number) => {
     const h = ms / 3600000;
@@ -3930,7 +3965,170 @@ function ClientTab({ order, onRunSlaAction }: { order: OrderCardData; onRunSlaAc
   );
 }
 
+/**
+ * Вкладка «Туристы» (Baseline §4, OrderTraveler): участники заказа ДО Booking.
+ * Заполнение паспортных данных управляет готовностью к бронированию
+ * (bookingReady) — действие «Передать в Booking Center» блокируется с причиной,
+ * пока данные неполные (Screen Design Brief §25).
+ */
+interface TravelerRow {
+  id: string;
+  firstName: string;
+  lastName: string;
+  birthDate: string | null;
+  citizenship: string | null;
+  gender: string | null;
+  passportNumber: string | null;
+  passportExpiry: string | null;
+  dataCompleteness: string;
+}
+
+function TravelersTab({ order, onChanged }: { order: OrderCardData; onChanged: () => Promise<void> }) {
+  const [rows, setRows] = useState<TravelerRow[]>(() => order.travelers.map((t) => ({ ...t })));
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Синхронизация с данными карточки (после перезагрузки).
+  useEffect(() => {
+    // setState в микротаске — синхронный вызов ловит react-hooks/set-state-in-effect
+    void Promise.resolve().then(() => {
+      setRows(order.travelers.map((t) => ({ ...t })));
+    });
+  }, [order.travelers]);
+
+  const patchRow = (i: number, k: keyof TravelerRow, v: string | null) => {
+    setRows((r) => r.map((row, idx) => (idx === i ? { ...row, [k]: v } : row)));
+  };
+  const addRow = () => {
+    setRows((r) => [
+      ...r,
+      { id: "", firstName: "", lastName: "", birthDate: null, citizenship: "", gender: "M", passportNumber: "", passportExpiry: null, dataCompleteness: "incomplete" },
+    ]);
+  };
+  const removeRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
+
+  const save = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "travelers", travelers: rows, version: order.version }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Ошибка сохранения");
+      setMsg({ ok: true, text: j.message || "Туристы сохранены" });
+      await onChanged();
+    } catch (e) {
+      setMsg({ ok: false, text: errText(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const br = order.bookingReady;
+  const inputCls =
+    "w-full h-9 px-2 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-bg)] text-xs text-[var(--admin-text)] outline-none focus:border-primary transition-colors";
+
+  return (
+    <div className="space-y-4">
+      {/* Индикатор готовности к бронированию (Screen Design Brief §25) */}
+      <div
+        className={`rounded-xl px-4 py-3 text-xs border ${
+          br?.ready
+            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700"
+            : "bg-amber-500/10 border-amber-500/30 text-amber-700"
+        }`}
+      >
+        {br?.ready
+          ? `✅ Данные туристов заполнены (${br.complete}/${br.total}) — заказ можно передать в Booking Center`
+          : `⚠️ ${br?.reason || "Заполните паспортные данные туристов"}`}
+      </div>
+
+      {rows.length === 0 && (
+        <div className="text-xs text-[var(--admin-muted)]">Туристов пока нет — добавьте участников поездки.</div>
+      )}
+
+      {rows.map((t, i) => (
+        <div key={i} className="rounded-xl border border-[var(--admin-border)] p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
+              Турист {i + 1}{" "}
+              {t.passportNumber
+                ? <span className="text-emerald-600">· паспортные данные ✓</span>
+                : <span className="text-amber-600">· данные неполные</span>}
+            </span>
+            <button onClick={() => removeRow(i)} className="text-xs text-red-500 hover:underline" title="Удалить">
+              ✕ Удалить
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <input className={inputCls} placeholder="Имя *" value={t.firstName} onChange={(e) => patchRow(i, "firstName", e.target.value)} />
+            <input className={inputCls} placeholder="Фамилия *" value={t.lastName} onChange={(e) => patchRow(i, "lastName", e.target.value)} />
+            <input
+              className={inputCls}
+              type="date"
+              value={t.birthDate ?? ""}
+              onChange={(e) => patchRow(i, "birthDate", e.target.value || null)}
+            />
+            <input className={inputCls} placeholder="Гражданство" value={t.citizenship ?? ""} onChange={(e) => patchRow(i, "citizenship", e.target.value)} />
+            <select
+              className={inputCls}
+              value={t.gender ?? "M"}
+              onChange={(e) => patchRow(i, "gender", e.target.value)}
+            >
+              <option value="M">Мужской</option>
+              <option value="F">Женский</option>
+            </select>
+            <input
+              className={inputCls}
+              placeholder="№ паспорта *"
+              value={t.passportNumber ?? ""}
+              onChange={(e) => patchRow(i, "passportNumber", e.target.value)}
+            />
+            <input
+              className={inputCls}
+              type="date"
+              value={t.passportExpiry ?? ""}
+              onChange={(e) => patchRow(i, "passportExpiry", e.target.value || null)}
+            />
+          </div>
+        </div>
+      ))}
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <button onClick={addRow} className="ac-btn ac-btn-secondary ac-btn-sm">
+          ➕ Добавить туриста
+        </button>
+        <button onClick={save} disabled={busy || rows.length === 0} className="ac-btn ac-btn-primary ac-btn-sm">
+          {busy ? "Сохранение…" : "💾 Сохранить туристов"}
+        </button>
+        {msg && (
+          <span className={`text-xs ${msg.ok ? "text-emerald-600" : "text-red-500"}`}>{msg.text}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ServicesTab({ order, onRunSlaAction }: { order: OrderCardData; onRunSlaAction?: (action: "raise_priority" | "escalate" | "notify_manager") => void }) {
+  // Состав заказа (Baseline §3): OrderItems — канонический состав. Бронирования
+  // появляются после «Передать в Booking Center» (событие BookingRequested).
+  const composition = order.items.length ? order.items : order.bookings.map((b) => ({
+    id: b.id,
+    title: b.service,
+    type: b.categoryType,
+    category: b.category,
+    quantity: 1,
+    price: b.amount,
+    currency: b.currency,
+    amount: b.amount,
+    serviceDate: b.serviceDate,
+    serviceId: "",
+    direction: b.direction,
+    provider: "",
+  }));
   return (
     <div className="space-y-3">
       {/* Компактный контроль исполнения (Гл. 3.4) */}
@@ -3950,6 +4148,35 @@ function ServicesTab({ order, onRunSlaAction }: { order: OrderCardData; onRunSla
           </div>
         </div>
       </div>
+
+      {/* Состав заказа (Baseline §3): OrderItem — позиции, зафиксированные при создании */}
+      {composition.length > 0 ? (
+        <div className="space-y-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
+            Состав заказа · {composition.length}
+          </div>
+          {composition.map((it, i) => (
+            <div key={it.id || i} className="flex items-center justify-between p-3 rounded-xl bg-[var(--admin-bg)]">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base">{SERVICE_TYPE_ICONS[it.type] ?? "🧩"}</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold truncate">{it.title}</div>
+                  <div className="text-[10px] text-[var(--admin-muted)]">
+                    {it.category} · {it.direction || "—"}
+                    {it.quantity > 1 ? ` · ×${it.quantity}` : ""}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right shrink-0 ml-3">
+                <div className="text-xs font-bold">{fmtMoney(it.amount)} {it.currency}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center text-sm text-[var(--admin-muted)] py-8">Состав заказа пуст</div>
+      )}
+
       {order.bookings.length > 1 && (
         <div className="text-[11px] text-[var(--admin-muted)]">
           В заказ входит {order.bookings.length} бронирований — см. вкладку «Бронирования».
@@ -3963,7 +4190,9 @@ function BookingsTab({ order }: { order: OrderCardData }) {
   return (
     <div className="space-y-2">
       {order.bookings.length === 0 && (
-        <div className="text-center text-sm text-[var(--admin-muted)] py-10">Бронирований нет</div>
+        <div className="text-center text-sm text-[var(--admin-muted)] py-10">
+          Бронирований нет — они создаются после команды «Передать в Booking Center»
+        </div>
       )}
       {order.bookings.map((b) => (
         <div key={b.id} className="flex items-center justify-between p-3 rounded-xl bg-[var(--admin-bg)]">
@@ -3994,7 +4223,7 @@ function FinanceTab({ order, onRunSlaAction }: { order: OrderCardData; onRunSlaA
   const pending = Math.max(0, total - paid);
   const commission = f?.commission ?? order.commission;
   const payout = f?.expectedPayouts ?? Math.max(0, total - commission);
-  const isRefund = ["REFUNDED", "CANCELLED"].includes(order.status);
+  const isRefund = order.paymentStatus === "refunded" || order.status === "CANCELLED";
 
   // Счета (Гл. 3.11): выставляются на сумму заказа, статус зависит от оплаты
   const invoiceStatus = isRefund

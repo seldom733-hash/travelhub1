@@ -4,43 +4,46 @@ import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { actorDisplayName, orderSystemMessage } from "@/lib/admin-data";
 import { recordAudit, requestContext } from "@/lib/audit";
+import { emitOrderEvent, publishOrderEvents } from "@/lib/events";
+import { SALES_ROLES, ORDER_LIFECYCLE_ROLES, ORDER_PAYMENT_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
 const MAX_IDS = 100;
 
-type BulkAction = "confirm" | "pay" | "complete" | "cancel" | "archive" | "assign_manager" | "set_priority";
+type BulkAction = "confirm" | "send" | "complete" | "close" | "cancel" | "pay" | "refund" | "assign_manager" | "set_priority";
 
 const PRIORITY_VALUES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 // Допустимые исходные статусы и целевой статус для каждого массового действия
+// (канонический жизненный цикл Baseline §0.4).
 type OrderStatusValue =
-  | "DRAFT" | "CREATED" | "PROCESSING" | "AWAITING_CONFIRMATION" | "CONFIRMED"
-  | "AWAITING_PAYMENT" | "PARTIALLY_PAID" | "PAID" | "DOCUMENT_PREP" | "READY"
-  | "COMPLETED" | "CHANGED" | "REFUNDED" | "CANCELLED" | "OVERDUE" | "ARCHIVED";
+  | "NEW" | "IN_PROCESSING" | "WAITING_FOR_DATA" | "READY_FOR_BOOKING" | "SENT_TO_BOOKING"
+  | "PARTIALLY_FULFILLED" | "FULFILLED" | "READY_TO_CLOSE" | "CLOSED"
+  | "CANCELLED" | "PROBLEM" | "SUSPENDED";
 
-const TRANSITIONS: Record<Exclude<BulkAction, "assign_manager" | "set_priority">, { from: OrderStatusValue[]; to: OrderStatusValue }> = {
-  confirm: { from: ["AWAITING_CONFIRMATION", "PROCESSING"], to: "CONFIRMED" },
-  pay: { from: ["CONFIRMED", "AWAITING_PAYMENT", "PARTIALLY_PAID"], to: "PAID" },
-  complete: { from: ["PAID", "DOCUMENT_PREP", "READY"], to: "COMPLETED" },
+type OrderPaymentValue = "UNPAID" | "PARTIALLY_PAID" | "PAID" | "REFUNDED";
+
+const TRANSITIONS: Record<Exclude<BulkAction, "assign_manager" | "set_priority" | "pay" | "refund">, { from: OrderStatusValue[]; to: OrderStatusValue }> = {
+  confirm: { from: ["IN_PROCESSING", "WAITING_FOR_DATA"], to: "READY_FOR_BOOKING" },
+  send: { from: ["READY_FOR_BOOKING"], to: "SENT_TO_BOOKING" },
+  complete: { from: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"], to: "FULFILLED" },
+  close: { from: ["FULFILLED", "READY_TO_CLOSE"], to: "CLOSED" },
   cancel: {
     from: [
-      "DRAFT",
-      "CREATED",
-      "PROCESSING",
-      "AWAITING_CONFIRMATION",
-      "CONFIRMED",
-      "AWAITING_PAYMENT",
-      "PARTIALLY_PAID",
-      "PAID",
-      "DOCUMENT_PREP",
-      "READY",
-      "CHANGED",
-      "OVERDUE",
+      "NEW",
+      "IN_PROCESSING",
+      "WAITING_FOR_DATA",
+      "READY_FOR_BOOKING",
+      "SENT_TO_BOOKING",
+      "PARTIALLY_FULFILLED",
+      "FULFILLED",
+      "READY_TO_CLOSE",
+      "PROBLEM",
+      "SUSPENDED",
     ],
     to: "CANCELLED",
   },
-  archive: { from: ["COMPLETED", "CANCELLED", "REFUNDED"], to: "ARCHIVED" },
 };
 
 /**
@@ -52,9 +55,12 @@ const TRANSITIONS: Record<Exclude<BulkAction, "assign_manager" | "set_priority">
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    // Раздел «Продажи» (SALES_ROLES); финансовые и lifecycle-действия — по своим матрицам.
+    const denied = requireRole(user, SALES_ROLES);
+    if (denied) return denied;
 
     let body: { action?: unknown; ids?: unknown; value?: unknown };
     try {
@@ -66,8 +72,21 @@ export async function POST(request: Request) {
     const action = body.action;
     const isAssignManager = action === "assign_manager";
     const isSetPriority = action === "set_priority";
-    if (typeof action !== "string" || !(isAssignManager || isSetPriority || action in TRANSITIONS)) {
+    const isFinancial = action === "pay" || action === "refund";
+    if (
+      typeof action !== "string" ||
+      !(isAssignManager || isSetPriority || isFinancial || action in TRANSITIONS)
+    ) {
       return NextResponse.json({ error: "Недопустимое действие" }, { status: 400 });
+    }
+    // Action-level RBAC (RBAC Matrix): lifecycle-переходы и финансовые операции
+    // разрешены только ролям из соответствующих матриц.
+    if (isFinancial) {
+      const finDenied = requireRole(user, ORDER_PAYMENT_ROLES);
+      if (finDenied) return finDenied;
+    } else if (!isAssignManager && !isSetPriority) {
+      const lcDenied = requireRole(user, ORDER_LIFECYCLE_ROLES);
+      if (lcDenied) return lcDenied;
     }
     const managerValue = isAssignManager && typeof body.value === "string" && body.value ? body.value : "";
     if (isAssignManager && !managerValue) {
@@ -85,7 +104,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Не выбраны заказы" }, { status: 400 });
     }
 
-    const t = isAssignManager || isSetPriority ? null : TRANSITIONS[action as Exclude<BulkAction, "assign_manager" | "set_priority">];
+    const t =
+      isAssignManager || isSetPriority || isFinancial
+        ? null
+        : TRANSITIONS[action as Exclude<BulkAction, "assign_manager" | "set_priority" | "pay" | "refund">];
 
     const processed = await prisma.$transaction(async (tx) => {
       const rows = await tx.order.findMany({
@@ -94,7 +116,7 @@ export async function POST(request: Request) {
       });
       let count = 0;
       for (const r of rows) {
-        if (!isAssignManager && !isSetPriority && !t!.from.includes(r.status as OrderStatusValue)) continue;
+        if (!isAssignManager && !isSetPriority && !isFinancial && !t!.from.includes(r.status as OrderStatusValue)) continue;
         if (isSetPriority) {
           // Смена приоритета (Гл. 3.8 «Массовые операции»): обновляем поле priority,
           // фиксируем в журнале и системном сообщении.
@@ -150,7 +172,44 @@ export async function POST(request: Request) {
           count++;
           continue;
         }
-        await tx.order.update({ where: { id: r.id }, data: { status: t!.to, ...(action === "pay" ? { paidAmount: r.amount } : {}) } });
+        if (action === "pay" || action === "refund") {
+          // Оплата/возврат — финансовое измерение (Baseline §0.6)
+          const paymentStatus: OrderPaymentValue = action === "pay" ? "PAID" : "REFUNDED";
+          await tx.order.update({
+            where: { id: r.id },
+            data: { paymentStatus: paymentStatus as never, paidAmount: action === "pay" ? r.amount : 0 },
+          });
+          await tx.orderHistory.create({
+            data: {
+              orderId: r.id,
+              action,
+              from: r.status,
+              to: r.status,
+              fields: JSON.stringify({ paymentStatus }),
+              actorId: user.id,
+              actorName: actorDisplayName(user),
+              comment: bulkMessage(action),
+            },
+          });
+          await tx.orderMessage.create({
+            data: {
+              orderId: r.id,
+              senderId: null,
+              senderName: "Система",
+              senderRole: "system",
+              text: orderSystemMessage(action === "pay" ? "READY_FOR_BOOKING" : "CLOSED"),
+            },
+          });
+          // Outbox (Гл. 6): финансовое событие атомарно с операцией.
+          await emitOrderEvent(tx, r.id, action === "pay" ? "ORDER_PAYMENT_RECEIVED" : "ORDER_PAYMENT_REFUNDED", {
+            paymentStatus,
+            amount: r.amount,
+            actor: actorDisplayName(user),
+          });
+          count++;
+          continue;
+        }
+        await tx.order.update({ where: { id: r.id }, data: { status: t!.to as never } });
         await tx.orderHistory.create({
           data: {
             orderId: r.id,
@@ -171,10 +230,19 @@ export async function POST(request: Request) {
             text: orderSystemMessage(t!.to),
           },
         });
+        // Outbox (Гл. 6): событие перехода пишется атомарно с изменением статуса.
+        await emitOrderEvent(tx, r.id, action === "send" ? "ORDER_SENT_TO_BOOKING" : action === "confirm" ? "ORDER_READY_FOR_BOOKING" : action === "complete" ? "ORDER_FULFILLED" : action === "close" ? "ORDER_CLOSED" : action === "cancel" ? "ORDER_CANCELLED" : "ORDER_STATUS_CHANGED", {
+          from: r.status,
+          to: t!.to,
+          actor: actorDisplayName(user),
+        });
         count++;
       }
       return count;
     });
+
+    // Публикация outbox-событий после коммита массовой операции (Гл. 6).
+    await publishOrderEvents();
 
     const skipped = ids.length - processed;
 
@@ -212,10 +280,12 @@ export async function POST(request: Request) {
 function bulkMessage(action: string): string {
   const map: Record<string, string> = {
     confirm: "Массовое подтверждение заказов",
-    pay: "Массовая оплата заказов",
-    complete: "Массовое завершение заказов",
+    send: "Массовая передача в бронирование",
+    complete: "Массовое исполнение заказов",
+    close: "Массовое закрытие заказов",
     cancel: "Массовая отмена заказов",
-    archive: "Массовая архивация заказов",
+    pay: "Массовая оплата заказов",
+    refund: "Массовый возврат средств",
     assign_manager: "Назначение менеджера",
     set_priority: "Изменение приоритета заказов",
   };

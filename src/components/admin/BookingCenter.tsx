@@ -81,7 +81,7 @@ interface BookingsData {
 const QUICK_ACTIONS = [
   { icon: "➕", label: "Создать бронирование", color: "bg-primary" },
   { icon: "✅", label: "Подтвердить", color: "bg-emerald-500" },
-  { icon: "💳", label: "Отправить на оплату", color: "bg-blue-500" },
+  { icon: "🚀", label: "Отправить поставщику", color: "bg-blue-500" },
   { icon: "✏️", label: "Изменить", color: "bg-violet-500" },
   { icon: "❌", label: "Отменить", color: "bg-red-500" },
   { icon: "📤", label: "Экспорт", color: "bg-gray-500" },
@@ -93,30 +93,46 @@ const QUICK_ACTIONS = [
 
 /* ─── Статусы и жизненный цикл (Гл. 5.7) ─── */
 const LIFECYCLE = [
-  "Черновик",
   "Создано",
+  "Отправлено поставщику",
   "Ожидает подтверждения",
   "Подтверждено",
-  "Ожидает оплаты",
-  "Оплачено",
-  "Подготовка документов",
+  "В обслуживании",
   "Завершено",
 ];
 
+// Канонические статусы бронирования (Baseline §0.5). Оплата — на уровне Order,
+// поэтому отдельного «Оплачено» у брони нет: после подтверждения она сразу в работе.
 const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Ожидает подтверждения",
-  CONFIRMED: "Подтверждено",
-  PAID: "Оплачено",
-  REFUNDED: "Возвращено",
-  COMPLETED: "Завершено",
+  NEW: "Новая",
+  PREPARING_REQUEST: "Готовим запрос",
+  SENT_TO_SUPPLIER: "Отправлена поставщику",
+  AWAITING_CONFIRMATION: "Ожидает подтверждения",
+  CONFIRMED: "Подтверждена",
+  IN_SERVICE: "В обслуживании",
+  COMPLETED: "Завершена",
+  NEEDS_CLARIFICATION: "Требует уточнения",
+  SUPPLIER_REJECTED: "Отказ поставщика",
+  CHANGE_REQUESTED: "Запрошены изменения",
+  CANCELLATION_REQUESTED: "Запрос отмены",
+  CANCELLED: "Отменена",
+  PROBLEM: "Проблемная",
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  PENDING: "bg-amber-100 text-amber-700",
+  NEW: "bg-amber-100 text-amber-700",
+  PREPARING_REQUEST: "bg-sky-100 text-sky-700",
+  SENT_TO_SUPPLIER: "bg-violet-100 text-violet-700",
+  AWAITING_CONFIRMATION: "bg-amber-100 text-amber-700",
   CONFIRMED: "bg-blue-100 text-blue-700",
-  PAID: "bg-emerald-100 text-emerald-700",
-  REFUNDED: "bg-red-100 text-red-700",
-  COMPLETED: "bg-cyan-100 text-cyan-700",
+  IN_SERVICE: "bg-indigo-100 text-indigo-700",
+  COMPLETED: "bg-emerald-100 text-emerald-700",
+  NEEDS_CLARIFICATION: "bg-orange-100 text-orange-700",
+  SUPPLIER_REJECTED: "bg-red-100 text-red-700",
+  CHANGE_REQUESTED: "bg-orange-100 text-orange-700",
+  CANCELLATION_REQUESTED: "bg-orange-100 text-orange-700",
+  CANCELLED: "bg-red-100 text-red-700",
+  PROBLEM: "bg-red-100 text-red-700",
 };
 
 const PAY_STYLES: Record<string, string> = {
@@ -159,15 +175,16 @@ const PERIODS = [
 
 const BOOKING_STATUSES = [
   { key: "", label: "Все статусы" },
-  { key: "PENDING", label: "Ожидает подтверждения" },
-  { key: "CONFIRMED", label: "Подтверждено" },
-  { key: "PAID", label: "Оплачено" },
-  { key: "REFUNDED", label: "Возвращено" },
-  { key: "COMPLETED", label: "Завершено" },
-  // Группы в таблице соответствуют KPI-карточкам по оплате: «Ожидают оплаты (все)»
-  // = PENDING,CONFIRMED и «Оплаченные (все)» = PAID,COMPLETED (Гл. 5.5).
-  { key: "PENDING,CONFIRMED", label: "Ожидают оплаты (все)" },
-  { key: "PAID,COMPLETED", label: "Оплаченные (все)" },
+  { key: "NEW", label: "Новые" },
+  { key: "PREPARING_REQUEST", label: "Готовим запрос" },
+  { key: "SENT_TO_SUPPLIER", label: "Отправлены поставщику" },
+  { key: "AWAITING_CONFIRMATION", label: "Ожидают подтверждения" },
+  { key: "CONFIRMED", label: "Подтверждены" },
+  { key: "IN_SERVICE", label: "В обслуживании" },
+  { key: "COMPLETED", label: "Завершены" },
+  // Группы (Гл. 5.5): «Ожидают подтверждения (все)» и «Активные (все)».
+  { key: "NEW,SENT_TO_SUPPLIER,AWAITING_CONFIRMATION", label: "Ожидают подтверждения (все)" },
+  { key: "CONFIRMED,IN_SERVICE,COMPLETED", label: "Активные (все)" },
 ];
 
 const PAYMENT_STATUSES = [
@@ -316,7 +333,7 @@ function BookingDetailSidebar({
 }: {
   booking: BookingRow;
   onClose: () => void;
-  onAction: (action: "confirm" | "pay" | "cancel" | "complete") => void;
+  onAction: (action: "send" | "confirm" | "service" | "complete" | "cancel" | "problem") => void;
   onEdit: () => void;
   acting: string | null;
   historyVersion: number;
@@ -436,16 +453,20 @@ function BookingDetailSidebar({
     }
   };
 
-  const isRefunded = booking.bookingStatus === "REFUNDED";
+  const isRefunded = booking.bookingStatus === "CANCELLED" || booking.bookingStatus === "SUPPLIER_REJECTED";
   const stageIndex = isRefunded
     ? -1
     : booking.bookingStatus === "COMPLETED"
-    ? 7
-    : booking.bookingStatus === "PAID"
     ? 5
+    : booking.bookingStatus === "IN_SERVICE"
+    ? 4
     : booking.bookingStatus === "CONFIRMED"
     ? 3
-    : 2;
+    : booking.bookingStatus === "AWAITING_CONFIRMATION"
+    ? 2
+    : booking.bookingStatus === "SENT_TO_SUPPLIER" || booking.bookingStatus === "PREPARING_REQUEST"
+    ? 1
+    : 0;
 
   const tabs = [
     { key: "overview", label: "Обзор" },
@@ -483,7 +504,7 @@ function BookingDetailSidebar({
           {isRefunded && (
             <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-red-50 border border-red-100 text-xs">
               <span>↩️</span>
-              <span className="font-medium text-red-700">Бронирование возвращено — вне линейного жизненного цикла</span>
+              <span className="font-medium text-red-700">Бронирование отменено — вне линейного жизненного цикла</span>
             </div>
           )}
           <div className="mt-4 flex items-center gap-1 overflow-x-auto no-scrollbar pb-1">
@@ -549,37 +570,44 @@ function BookingDetailSidebar({
               </InfoBlock>
               <div className="flex gap-2">
                 <button
-                  onClick={() => onAction("confirm")}
-                  disabled={busy || booking.bookingStatus !== "PENDING"}
+                  onClick={() => onAction("send")}
+                  disabled={busy || !["NEW", "PREPARING_REQUEST"].includes(booking.bookingStatus)}
                   className={`flex-1 h-10 rounded-xl text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                    acting === "confirm" ? "bg-primary-dark" : "bg-primary hover:bg-primary-dark"
+                    acting === "send" ? "bg-primary-dark" : "bg-primary hover:bg-primary-dark"
                   }`}
                 >
-                  {acting === "confirm" ? "Подтверждаем…" : "Подтвердить"}
+                  {acting === "send" ? "Отправляем…" : "Отправить поставщику"}
                 </button>
                 <button
-                  onClick={() => onAction("pay")}
-                  disabled={busy || !["PENDING", "CONFIRMED"].includes(booking.bookingStatus)}
+                  onClick={() => onAction("confirm")}
+                  disabled={busy || !["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION"].includes(booking.bookingStatus)}
                   className={`flex-1 h-10 rounded-xl border text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                    acting === "pay"
+                    acting === "confirm"
                       ? "bg-blue-600 text-white border-blue-600"
                       : "border-[var(--admin-border)] text-[var(--admin-muted)] hover:bg-[var(--admin-bg)]"
                   }`}
                 >
-                  {acting === "pay" ? "Отправляем…" : "Отправить на оплату"}
+                  {acting === "confirm" ? "Подтверждаем…" : "Подтвердить"}
                 </button>
               </div>
               <div className="flex gap-2">
                 <button
+                  onClick={() => onAction("service")}
+                  disabled={busy || booking.bookingStatus !== "CONFIRMED"}
+                  className="ac-btn ac-btn-secondary flex-1"
+                >
+                  Начать обслуживание
+                </button>
+                <button
                   onClick={() => onAction("complete")}
-                  disabled={busy || booking.bookingStatus !== "PAID"}
+                  disabled={busy || booking.bookingStatus !== "IN_SERVICE"}
                   className="ac-btn ac-btn-secondary flex-1"
                 >
                   Завершить поездку
                 </button>
                 <button
                   onClick={() => onAction("cancel")}
-                  disabled={busy || !["PENDING", "CONFIRMED", "PAID"].includes(booking.bookingStatus)}
+                  disabled={busy || ["CANCELLED", "COMPLETED"].includes(booking.bookingStatus)}
                   className="ac-btn ac-btn-danger flex-1"
                 >
                   Отменить
@@ -587,7 +615,7 @@ function BookingDetailSidebar({
               </div>
               <button
                 onClick={onEdit}
-                disabled={busy || booking.bookingStatus === "REFUNDED"}
+                disabled={busy || booking.bookingStatus === "CANCELLED" || booking.bookingStatus === "COMPLETED"}
                 className="ac-btn w-full border-violet-200 text-violet-600 hover:bg-violet-50"
               >
                 ✏️ Изменить даты и сумму
@@ -1307,7 +1335,7 @@ export default function BookingCenter() {
 
   // ── Действия с бронированием (PATCH /api/admin/bookings/[id]) ──
   const runBookingAction = useCallback(
-    async (id: string, action: "confirm" | "pay" | "cancel" | "complete") => {
+    async (id: string, action: "send" | "confirm" | "service" | "complete" | "cancel" | "problem") => {
       setActing(action);
       setActionMsg(null);
       try {
@@ -1334,9 +1362,9 @@ export default function BookingCenter() {
                   ...prev,
                   bookingStatus: json.booking.status as string,
                   paymentStatus:
-                    json.booking.status === "PAID" || json.booking.status === "COMPLETED"
+                    json.booking.status === "CONFIRMED" || json.booking.status === "IN_SERVICE" || json.booking.status === "COMPLETED"
                       ? "paid"
-                      : json.booking.status === "REFUNDED"
+                      : json.booking.status === "CANCELLED" || json.booking.status === "SUPPLIER_REJECTED"
                       ? "refunded"
                       : "pending",
                 }
@@ -1354,8 +1382,8 @@ export default function BookingCenter() {
     [fetchData]
   );
 
-  // Быстрое действие «Подтвердить/Отменить/Отправить на оплату» работает по выбранной строке
-  const quickActionOnSelection = async (action: "confirm" | "cancel" | "pay") => {
+  // Быстрое действие «Подтвердить/Отменить/Отправить поставщику» по выбранной строке
+  const quickActionOnSelection = async (action: "confirm" | "cancel" | "send") => {
     if (!selectedBooking) {
       setActionMsg({ ok: false, text: "Сначала выберите бронирование в таблице" });
       return;
@@ -1481,9 +1509,9 @@ export default function BookingCenter() {
           subtitle: data.kpi.newBookings.detail,
           icon: "🆕",
           color: "from-blue-500 to-indigo-500",
-          // Клик по карточке фильтрует по статусу PENDING — «Ожидает подтверждения» (Гл. 5.5)
-          onClick: () => toggleStatusFilter("PENDING"),
-          active: filters.status === "PENDING",
+          // Клик по карточке фильтрует по статусам NEW/SENT_TO_SUPPLIER — «Новые» (Гл. 5.5)
+          onClick: () => toggleStatusFilter("NEW,SENT_TO_SUPPLIER"),
+          active: filters.status === "NEW,SENT_TO_SUPPLIER",
         },
         {
           title: "Подтверждённые",
@@ -1499,30 +1527,28 @@ export default function BookingCenter() {
           active: filters.status === "CONFIRMED",
         },
         {
-          title: "Ожидают оплаты",
+          title: "Ожидают подтверждения",
           value: String(data.kpi.awaitingPayment.value),
           change: `${data.kpi.awaitingPayment.change >= 0 ? "+" : ""}${data.kpi.awaitingPayment.change.toFixed(0)}%`,
           changeType: data.kpi.awaitingPayment.change > 0 ? "down" : "up",
           subtitle: data.kpi.awaitingPayment.detail,
           icon: "⏳",
           color: "from-amber-500 to-orange-500",
-          // Клик по карточке фильтрует по группе PENDING,CONFIRMED — той же, по которой
-          // считается KPI, чтобы число карточки совпадало с таблицей (Гл. 5.5)
-          onClick: () => toggleStatusFilter("PENDING,CONFIRMED"),
-          active: filters.status === "PENDING,CONFIRMED",
+          // Клик по карточке фильтрует по группе NEW,SENT_TO_SUPPLIER,AWAITING_CONFIRMATION
+          onClick: () => toggleStatusFilter("NEW,SENT_TO_SUPPLIER,AWAITING_CONFIRMATION"),
+          active: filters.status === "NEW,SENT_TO_SUPPLIER,AWAITING_CONFIRMATION",
         },
         {
-          title: "Оплаченные",
+          title: "Подтверждённые",
           value: String(data.kpi.paidBookings.value),
           change: `${data.kpi.paidBookings.change >= 0 ? "+" : ""}${data.kpi.paidBookings.change.toFixed(0)}%`,
           changeType: data.kpi.paidBookings.change >= 0 ? "up" : "down",
           subtitle: data.kpi.paidBookings.detail,
-          icon: "💳",
+          icon: "✅",
           color: "from-cyan-500 to-blue-500",
-          // Клик по карточке фильтрует по группе PAID,COMPLETED — «Оплата = оплачена»,
-          // той же, по которой считается KPI, чтобы число карточки совпадало с таблицей (Гл. 5.5)
-          onClick: () => toggleStatusFilter("PAID,COMPLETED"),
-          active: filters.status === "PAID,COMPLETED",
+          // Клик по карточке фильтрует по группе CONFIRMED,IN_SERVICE,COMPLETED (Гл. 5.5)
+          onClick: () => toggleStatusFilter("CONFIRMED,IN_SERVICE,COMPLETED"),
+          active: filters.status === "CONFIRMED,IN_SERVICE,COMPLETED",
         },
         {
           title: "Отменённые",
@@ -1532,9 +1558,9 @@ export default function BookingCenter() {
           subtitle: data.kpi.cancelledBookings.detail,
           icon: "❌",
           color: "from-red-500 to-rose-500",
-          // Клик по карточке фильтрует по статусу REFUNDED (Гл. 5.5)
-          onClick: () => toggleStatusFilter("REFUNDED"),
-          active: filters.status === "REFUNDED",
+          // Клик по карточке фильтрует по статусам CANCELLED/SUPPLIER_REJECTED (Гл. 5.5)
+          onClick: () => toggleStatusFilter("CANCELLED,SUPPLIER_REJECTED"),
+          active: filters.status === "CANCELLED,SUPPLIER_REJECTED",
         },
         {
           title: "Завершённые",
@@ -1591,17 +1617,17 @@ export default function BookingCenter() {
     [data]
   );
 
-  // Диаграмма «Статусы бронирований»: все сегменты — по полному периоду. «Оплачено»
-  // здесь только PAID (завершённые вынесены отдельным сегментом COMPLETED), т.к. KPI
-  // «Оплаченные» = PAID + COMPLETED и без вычитания сегменты задвоили бы завершённых.
+  // Диаграмма «Статусы бронирований»: все сегменты — по полному периоду.
+  // «Подтверждено» = подтверждённые и в обслуживании, завершённые вынесены
+  // отдельным сегментом (Гл. 5.5).
   const statusDonutData = useMemo(
     () =>
       data
         ? [
-            { label: "Ожидает", value: data.kpi.awaitingPayment.value, color: "#f59e0b" },
-            { label: "Оплачено", value: Math.max(0, data.kpi.paidBookings.value - data.kpi.completedBookings.value), color: "#22c55e" },
+            { label: "Ожидают подтверждения", value: data.kpi.awaitingPayment.value, color: "#f59e0b" },
+            { label: "Подтверждено", value: Math.max(0, data.kpi.paidBookings.value - data.kpi.completedBookings.value), color: "#22c55e" },
             { label: "Завершено", value: data.kpi.completedBookings.value, color: "#14b8a6" },
-            { label: "Возвращено", value: data.kpi.cancelledBookings.value, color: "#ef4444" },
+            { label: "Отменено", value: data.kpi.cancelledBookings.value, color: "#ef4444" },
           ]
         : [],
     [data]
@@ -1685,7 +1711,7 @@ export default function BookingCenter() {
   };
   const clearSelection = () => setSelectedIds([]);
 
-  const runBulkAction = async (action: "confirm" | "pay" | "cancel") => {
+  const runBulkAction = async (action: "confirm" | "send" | "cancel") => {
     if (!selectedIds.length) return;
     setBulkRunning(action);
     setActionMsg(null);
@@ -1763,7 +1789,7 @@ export default function BookingCenter() {
                   }
                 }
                 if (action.label === "Подтвердить") void quickActionOnSelection("confirm");
-                if (action.label === "Отправить на оплату") void quickActionOnSelection("pay");
+                if (action.label === "Отправить поставщику") void quickActionOnSelection("send");
                 if (action.label === "Отменить") void quickActionOnSelection("cancel");
               }}
               className={`ac-btn shrink-0 text-white ${action.color} hover:opacity-90`}
@@ -1935,10 +1961,10 @@ export default function BookingCenter() {
           <div className="flex items-center gap-1.5 mb-3 flex-wrap">
             <span className="text-[11px] text-[var(--admin-muted)]">Быстрые:</span>
             {[
-              { label: "Ожидают оплаты", f: { status: "PENDING,CONFIRMED" } },
-              { label: "Оплачено сегодня", f: { paymentStatus: "paid" } },
-              { label: "Просроченные", f: { status: "PENDING" } },
-              { label: "Возвраты", f: { status: "REFUNDED" } },
+              { label: "Новые", f: { status: "NEW,SENT_TO_SUPPLIER" } },
+              { label: "Ожидают подтверждения", f: { status: "AWAITING_CONFIRMATION" } },
+              { label: "В обслуживании", f: { status: "IN_SERVICE" } },
+              { label: "Отмены", f: { status: "CANCELLED,SUPPLIER_REJECTED" } },
               { label: "💬 Требуют внимания", f: { needsAttention: true } },
             ].map((qf) => (
               <button
@@ -2289,11 +2315,11 @@ export default function BookingCenter() {
                       {bulkRunning === "confirm" ? "Подтверждаем…" : `✅ Подтвердить (${selectedIds.length})`}
                     </button>
                     <button
-                      onClick={() => void runBulkAction("pay")}
+                      onClick={() => void runBulkAction("send")}
                       disabled={bulkRunning !== null}
                       className="ac-btn ac-btn-sm bg-blue-500 text-white hover:bg-blue-600"
                     >
-                      {bulkRunning === "pay" ? "Отправляем…" : `💳 На оплату (${selectedIds.length})`}
+                      {bulkRunning === "send" ? "Отправляем…" : `🚀 Отправить поставщику (${selectedIds.length})`}
                     </button>
                     <button
                       onClick={() => void runBulkAction("cancel")}

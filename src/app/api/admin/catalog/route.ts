@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { requireRole, FULL_ADMIN_ROLES } from "@/lib/admin-access";
+import { requireRole, CATALOG_ROLES } from "@/lib/admin-access";
 import { serverErrorResponse } from "@/lib/server-error";
 import { SERVICE_STATUS_LABELS, SERVICE_TYPE_LABELS } from "@/lib/admin-data";
 import { ruPlural } from "@/lib/admin-data";
 import { recordAudit, requestContext } from "@/lib/audit";
+import { nextBusinessCode } from "@/lib/ids";
 
 /**
  * Catalog Center (Гл. 4): единый реестр услуг платформы.
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const denied = requireRole(user, FULL_ADMIN_ROLES);
+    const denied = requireRole(user, CATALOG_ROLES);
     if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
@@ -39,6 +40,8 @@ export async function GET(request: Request) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "15", 10)));
 
     const where: Record<string, unknown> = {};
+    // Object scope (RBAC Matrix §3): PARTNER видит только свои продукты.
+    if (user.role === "PARTNER") where.providerId = user.id;
     if (search) {
       where.OR = [
         { title: { contains: search } },
@@ -199,7 +202,7 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const denied = requireRole(user, FULL_ADMIN_ROLES);
+    const denied = requireRole(user, CATALOG_ROLES);
     if (denied) return denied;
 
     let body: Record<string, unknown>;
@@ -220,14 +223,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Некорректный тип услуги" }, { status: 400 });
     }
 
-    // Код услуги = максимальный + 1 (Гл. 4.3): детерминированно и без конфликтов.
+    // Код услуги = канонический PRD-* (Baseline §0.8): максимальный + 1.
     const rows = await prisma.service.findMany({ select: { code: true } });
-    let seq = 0;
-    for (const r of rows) {
-      const n = parseInt(r.code.replace("SVC-", ""), 10);
-      if (!isNaN(n) && n > seq) seq = n;
-    }
-    const code = `SVC-${String(seq + 1).padStart(4, "0")}`;
+    const code = nextBusinessCode("PRD", rows.map((r) => r.code));
+    // Slug-суффикс — порядковый номер из кода (PRD-00000042 → tour-0042).
+    const codeSeq = Number.parseInt(code.split("-")[1] ?? "0", 10);
 
     const created = await prisma.$transaction(async (tx) => {
       const svc = await tx.service.create({
@@ -235,7 +235,7 @@ export async function POST(request: Request) {
           code,
           type: type as never,
           title,
-          slug: `${type.toLowerCase()}-${String(seq + 1).padStart(4, "0")}`,
+          slug: `${type.toLowerCase()}-${String(codeSeq).padStart(4, "0")}`,
           price,
           currency: typeof body.currency === "string" && body.currency ? body.currency : "USD",
           discountPrice: typeof body.discountPrice === "number" ? body.discountPrice : null,
@@ -249,6 +249,8 @@ export async function POST(request: Request) {
           languages: typeof body.languages === "string" ? body.languages : null,
           status: "DRAFT",
           version: 1,
+          // PARTNER создаёт продукт от своего имени (object scope, RBAC Matrix §3).
+          providerId: user.role === "PARTNER" ? user.id : typeof body.providerId === "string" && body.providerId ? body.providerId : null,
           managerId: typeof body.managerId === "string" && body.managerId ? body.managerId : user.id,
           category: typeof body.category === "string" && body.category ? body.category : null,
           quotaTotal: typeof body.quotaTotal === "number" ? body.quotaTotal : null,

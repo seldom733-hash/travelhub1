@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
-import { ALL_ADMIN_ROLES, requireRole } from "@/lib/admin-access";
+import { DASHBOARD_ROLES, requireRole } from "@/lib/admin-access";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const denied = requireRole(user, ALL_ADMIN_ROLES);
+    const denied = requireRole(user, DASHBOARD_ROLES);
     if (denied) return denied;
 
     const staff = await prisma.user.findMany({

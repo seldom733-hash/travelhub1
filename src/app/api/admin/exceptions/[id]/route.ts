@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { actorDisplayName } from "@/lib/admin-data";
+import { ORDER_LIFECYCLE_ROLES, requireRole } from "@/lib/admin-access";
 import { recordAudit, requestContext } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const user = await getCurrentUser();
     if (!user || user.role === "BUYER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    // RBAC Matrix §3: обработка исключений (эскалаций) — операционный контур
+    // Order/Booking (OPERATOR/ADMIN/DIRECTOR); SALES_MANAGER — linked read.
+    const denied = requireRole(user, ORDER_LIFECYCLE_ROLES);
+    if (denied) {
+      return NextResponse.json({ error: "Forbidden: обработка исключений доступна OPERATOR/ADMIN/DIRECTOR" }, { status: 403 });
     }
 
     const { id } = await params;

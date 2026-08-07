@@ -96,7 +96,6 @@ export interface OperationsData {
   marketingEfficiency: { value: number; label: string; factors: { label: string; effect: "up" | "down"; weight: number }[] };
 }
 
-const PAID: ("PAID" | "COMPLETED")[] = ["PAID", "COMPLETED"];
 const VIP_THRESHOLD = 1500;
 
 export async function getOperationsData(): Promise<OperationsData> {
@@ -107,20 +106,20 @@ export async function getOperationsData(): Promise<OperationsData> {
   const todayStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
 
   // ── Общие данные: заказы, бронирования, исключения, сообщения ──
-  const [recentOrders, activeOrders, todayPaidOrders, overdueOrders, pendingBookings, awaitingBookingRows, exceptionRows, unreadOrderMsgs, unreadBookingMsgs, recentPartners, partnerRows, campaignSpend] = await Promise.all([
+  const [recentOrders, activeOrders, todayPaidOrders, problemOrders, awaitingSupplierBookings, awaitingBookingRows, exceptionRows, unreadOrderMsgs, unreadBookingMsgs, recentPartners, partnerRows, campaignSpend] = await Promise.all([
     prisma.order.findMany({ where: { createdAt: { gte: hourAgo } }, select: { id: true } }),
     prisma.order.findMany({
-      where: { status: { in: ["CREATED", "PROCESSING", "AWAITING_CONFIRMATION", "CONFIRMED", "AWAITING_PAYMENT", "PARTIALLY_PAID"] } },
+      where: { status: { in: ["NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED"] } },
       select: { id: true, orderNumber: true, status: true, amount: true, priority: true, createdAt: true, user: { select: { firstName: true, lastName: true } } },
     }),
-    prisma.order.findMany({ where: { createdAt: { gte: todayStart }, status: { in: [...PAID] } }, select: { paidAmount: true } }),
-    prisma.order.count({ where: { status: "OVERDUE" } }),
-    prisma.booking.count({ where: { status: "PENDING" } }),
+    prisma.order.findMany({ where: { createdAt: { gte: todayStart }, paymentStatus: "PAID" }, select: { paidAmount: true } }),
+    prisma.order.count({ where: { status: "PROBLEM" } }),
+    prisma.booking.count({ where: { status: { in: ["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION"] } } }),
     prisma.booking.findMany({
-      where: { status: "PENDING" },
+      where: { status: { in: ["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION"] } },
       orderBy: { createdAt: "asc" },
       take: 5,
-      select: { id: true, amount: true, createdAt: true, service: { select: { title: true } } },
+      select: { id: true, amount: true, createdAt: true, status: true, service: { select: { title: true } } },
     }),
     prisma.exceptionLog.findMany({ where: { status: { in: ["new", "working"] } }, orderBy: { createdAt: "desc" }, take: 20 }),
     prisma.orderMessage.count({ where: { isRead: false, senderRole: { in: ["client", "system"] } } }),
@@ -143,8 +142,8 @@ export async function getOperationsData(): Promise<OperationsData> {
   const radarAiNote =
     urgentExceptions > 0
       ? `Критических эскалаций: ${urgentExceptions}. Рекомендуется вмешательство руководителя.`
-      : overdueOrders > 0
-        ? `${overdueOrders} заказов просрочено по SLA — проверить очередь.`
+      : problemOrders > 0
+        ? `${problemOrders} заказов в проблемном статусе — проверить очередь.`
         : "Радар спокоен: SLA соблюдается, критических эскалаций нет.";
 
   // ── 2.11.11 Очередь заказов (Kanban) ──
@@ -158,43 +157,43 @@ export async function getOperationsData(): Promise<OperationsData> {
     ageHours: Math.max(1, Math.round((now - o.createdAt.getTime()) / 3600000)),
   });
   const queue: OperationsQueueColumn[] = [
-    { key: "created", title: "Новые", icon: "🆕", color: "#3b82f6", orders: activeOrders.filter((o) => o.status === "CREATED").map(toQueueOrder) },
-    { key: "processing", title: "В работе", icon: "⚙️", color: "#06b6d4", orders: activeOrders.filter((o) => o.status === "PROCESSING" || o.status === "AWAITING_CONFIRMATION").map(toQueueOrder) },
-    { key: "confirmed", title: "Подтверждены", icon: "✅", color: "#8b5cf6", orders: activeOrders.filter((o) => o.status === "CONFIRMED").map(toQueueOrder) },
-    { key: "payment", title: "Ожидают оплаты", icon: "💳", color: "#f59e0b", orders: activeOrders.filter((o) => o.status === "AWAITING_PAYMENT" || o.status === "PARTIALLY_PAID").map(toQueueOrder) },
+    { key: "created", title: "Новые", icon: "🆕", color: "#3b82f6", orders: activeOrders.filter((o) => o.status === "NEW").map(toQueueOrder) },
+    { key: "processing", title: "В работе", icon: "⚙️", color: "#06b6d4", orders: activeOrders.filter((o) => o.status === "IN_PROCESSING" || o.status === "WAITING_FOR_DATA").map(toQueueOrder) },
+    { key: "confirmed", title: "Готовы к бронированию", icon: "✅", color: "#8b5cf6", orders: activeOrders.filter((o) => o.status === "READY_FOR_BOOKING").map(toQueueOrder) },
+    { key: "payment", title: "В бронировании", icon: "💳", color: "#f59e0b", orders: activeOrders.filter((o) => o.status === "SENT_TO_BOOKING" || o.status === "PARTIALLY_FULFILLED").map(toQueueOrder) },
   ];
 
   // ── 2.12.12 Центр контроля бронирований + Supplier Reliability Index ──
-  const slaRiskBookings = pendingBookings; // PENDING = ожидает ответа поставщика
+  const slaRiskBookings = awaitingSupplierBookings; // ожидает ответа поставщика
   const priceChangeEvents = await prisma.bookingHistory.count({
     where: { createdAt: { gte: dayAgo }, action: "update", fields: { contains: "amount" } },
   });
-  const [readyToPay, paidBookings, vipBookings] = await Promise.all([
+  const [confirmedBookings, inServiceBookings, vipBookings] = await Promise.all([
     prisma.booking.count({ where: { status: "CONFIRMED" } }),
-    prisma.booking.count({ where: { status: "PAID" } }),
-    prisma.booking.count({ where: { status: { in: [...PAID] }, amount: { gte: VIP_THRESHOLD } } }),
+    prisma.booking.count({ where: { status: { in: ["CONFIRMED", "IN_SERVICE", "COMPLETED"] } } }),
+    prisma.booking.count({ where: { status: { in: ["CONFIRMED", "IN_SERVICE", "COMPLETED"] }, amount: { gte: VIP_THRESHOLD } } }),
   ]);
   const bookingCenter: OperationsBookingCenter = {
-    awaitingSupplier: pendingBookings,
+    awaitingSupplier: awaitingSupplierBookings,
     slaRisk: slaRiskBookings,
     priceChanges: priceChangeEvents,
-    readyToPay,
-    awaitingDocs: paidBookings,
+    readyToPay: confirmedBookings,
+    awaitingDocs: inServiceBookings,
     vipBookings,
-    critical: pendingBookings + priceChangeEvents,
+    critical: awaitingSupplierBookings + priceChangeEvents,
     top: awaitingBookingRows.map((b) => ({
       id: b.id,
       service: b.service.title,
       amount: b.amount,
-      status: "PENDING",
+      status: b.status,
       ageHours: Math.max(1, Math.round((now - b.createdAt.getTime()) / 3600000)),
     })),
   };
   const supplierReliability = partnerRows
     .map((p) => {
       const bookings = p.services.flatMap((s) => s.bookings);
-      const confirmed = bookings.filter((b) => ["CONFIRMED", "PAID", "COMPLETED"].includes(b.status)).length;
-      const cancelled = bookings.filter((b) => b.status === "REFUNDED").length;
+      const confirmed = bookings.filter((b) => ["CONFIRMED", "IN_SERVICE", "COMPLETED"].includes(b.status)).length;
+      const cancelled = bookings.filter((b) => b.status === "CANCELLED").length;
       const total = bookings.length;
       const score = total
         ? Math.max(0, Math.min(100, Math.round((confirmed / total) * 60 + Math.max(0, (total - cancelled) / Math.max(1, total)) * 30 + Math.min(10, total))))
@@ -211,8 +210,8 @@ export async function getOperationsData(): Promise<OperationsData> {
   // ── 2.13.12 Центр финансового контроля + Financial Stability Index ──
   const todayInflow = todayPaidOrders.reduce((a, o) => a + (o.paidAmount ?? 0), 0);
   const payoutsDue = Math.round(todayInflow * 0.88);
-  const refundsAwaiting = await prisma.order.count({ where: { status: "REFUNDED", updatedAt: { gte: dayAgo } } });
-  const overdueInvoices = await prisma.order.count({ where: { status: "AWAITING_PAYMENT", createdAt: { lte: new Date(now - 3 * 86400000) } } });
+  const refundsAwaiting = await prisma.order.count({ where: { paymentStatus: "REFUNDED", updatedAt: { gte: dayAgo } } });
+  const overdueInvoices = await prisma.order.count({ where: { paymentStatus: { in: ["UNPAID", "PARTIALLY_PAID"] }, createdAt: { lte: new Date(now - 3 * 86400000) } } });
   const highValueDeals = await prisma.order.count({ where: { amount: { gte: 3000 }, createdAt: { gte: dayAgo } } });
   const anomalies = exceptionRows.filter((e) => e.category === "Ошибки оплаты" || e.category === "Нарушения SLA").length;
   const balanceForecast = [7, 30, 90].map((days) => {
@@ -253,7 +252,7 @@ export async function getOperationsData(): Promise<OperationsData> {
     newPartners: recentPartners,
     awaitingModeration,
     slaViolations,
-    risingCancellations: await prisma.booking.count({ where: { status: "REFUNDED", createdAt: { gte: dayAgo } } }),
+    risingCancellations: await prisma.booking.count({ where: { status: "CANCELLED", createdAt: { gte: dayAgo } } }),
     priceChanges: priceChangeEvents,
     highGrowth: partnerRows.filter((p) => p.services.some((s) => s.bookings.length >= 2)).length,
   };
@@ -325,7 +324,7 @@ export async function getOperationsData(): Promise<OperationsData> {
       last60min: recentOrders.length,
       managerLoad,
       unansweredMessages: unreadOrderMsgs + unreadBookingMsgs,
-      slaRiskOrders: overdueOrders,
+      slaRiskOrders: problemOrders,
       vipWaiting,
       urgentExceptions,
       aiNote: radarAiNote,

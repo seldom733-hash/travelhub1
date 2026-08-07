@@ -12,28 +12,31 @@ import {
   ruPlural,
   fmtMoney,
   ORDER_STATUS_GROUPS,
+  ORDER_STATUS_LABELS,
+  BOOKING_STATUS_LABELS,
   pickManager,
 } from "@/lib/admin-data";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { getDashboardMessages } from "@/lib/dashboard-messages";
-import { ALL_ADMIN_ROLES, requireRole } from "@/lib/admin-access";
+import { DASHBOARD_ROLES, requireRole } from "@/lib/admin-access";
+import { getRecentOrderEvents, ORDER_EVENT_LABELS } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
-// Единый источник статусных групп — ORDER_STATUS_GROUPS из admin-data.ts
-// (используется и в реестре заказов, чтобы карточки и таблицы не расходились).
-const PAID_STATUSES = [...ORDER_STATUS_GROUPS.paid] as const;
-const AWAITING_STATUSES = [...ORDER_STATUS_GROUPS.awaitingPayment] as const;
+// Оплата — отдельное измерение (paymentStatus, Baseline §0.6): доходные агрегаты
+// фильтруют по paymentStatus, операционные — по статусу жизненного цикла.
 const ACTIVE_STATUSES = [...ORDER_STATUS_GROUPS.active] as const;
+const PAID_PAYMENTS = ["PAID"] as const;
+const AWAITING_PAYMENTS = ["UNPAID", "PARTIALLY_PAID"] as const;
 
 /** Все статусы заказа (для очередей). */
+type OrderPaymentStatus = "UNPAID" | "PARTIALLY_PAID" | "PAID" | "REFUNDED";
+
 type OrderStatusValue =
   | (typeof ACTIVE_STATUSES)[number]
-  | "COMPLETED"
-  | "REFUNDED"
-  | "CANCELLED"
-  | "ARCHIVED";
+  | "CLOSED"
+  | "CANCELLED";
 
 /** Количество новых пользователей за период (для спарклайна). */
 async function userSeries(range: { start: Date; end: Date }, role?: "ADMIN" | "BUYER" | "PARTNER") {
@@ -66,7 +69,7 @@ export async function GET(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const denied = requireRole(user, ALL_ADMIN_ROLES);
+    const denied = requireRole(user, DASHBOARD_ROLES);
     if (denied) return denied;
 
     const { searchParams } = new URL(request.url);
@@ -116,13 +119,13 @@ export async function GET(request: Request) {
       await Promise.all([
         prisma.order.count({ where: { ...orderFilter, status: { in: [...ACTIVE_STATUSES] }, createdAt: { gte: range.start, lte: range.end } } }),
         prisma.order.count({ where: { ...orderFilter, status: { in: [...ACTIVE_STATUSES] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
-        prisma.order.count({ where: { ...orderFilter, status: "AWAITING_CONFIRMATION", createdAt: { gte: range.start, lte: range.end } } }),
-        prisma.order.count({ where: { ...orderFilter, status: "AWAITING_CONFIRMATION", createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
-        prisma.order.count({ where: { ...orderFilter, status: { in: [...AWAITING_STATUSES] }, createdAt: { gte: range.start, lte: range.end } } }),
-        prisma.order.count({ where: { ...orderFilter, status: { in: [...AWAITING_STATUSES] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
-        prisma.order.count({ where: { ...orderFilter, status: "COMPLETED", createdAt: { gte: range.start, lte: range.end } } }),
-        prisma.order.count({ where: { ...orderFilter, status: "COMPLETED", createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
-        prisma.order.count({ where: { ...orderFilter, status: "OVERDUE", createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.order.count({ where: { ...orderFilter, status: { in: ["WAITING_FOR_DATA", "SENT_TO_BOOKING"] }, createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.order.count({ where: { ...orderFilter, status: { in: ["WAITING_FOR_DATA", "SENT_TO_BOOKING"] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
+        prisma.order.count({ where: { ...orderFilter, paymentStatus: { in: [...AWAITING_PAYMENTS] }, createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.order.count({ where: { ...orderFilter, paymentStatus: { in: [...AWAITING_PAYMENTS] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
+        prisma.order.count({ where: { ...orderFilter, status: { in: ["FULFILLED", "READY_TO_CLOSE", "CLOSED"] }, createdAt: { gte: range.start, lte: range.end } } }),
+        prisma.order.count({ where: { ...orderFilter, status: { in: ["FULFILLED", "READY_TO_CLOSE", "CLOSED"] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } } }),
+        prisma.order.count({ where: { ...orderFilter, status: "PROBLEM", createdAt: { gte: range.start, lte: range.end } } }),
       ]);
 
     // ── KPI: все карточки считаются за выбранный период (как в реестре заказов,
@@ -136,12 +139,12 @@ export async function GET(request: Request) {
     // ── KPI: доход за период, комиссия ──
     const [periodRev, prevPeriodRev] = await Promise.all([
       prisma.order.aggregate({
-        where: { ...orderFilter, status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+        where: { ...orderFilter, paymentStatus: { in: [...PAID_PAYMENTS] }, createdAt: { gte: range.start, lte: range.end } },
         _sum: { paidAmount: true },
         _count: true,
       }),
       prisma.order.aggregate({
-        where: { ...orderFilter, status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } },
+        where: { ...orderFilter, paymentStatus: { in: [...PAID_PAYMENTS] }, createdAt: { gte: range.prevStart, lte: range.prevEnd } },
         _sum: { paidAmount: true },
         _count: true,
       }),
@@ -174,7 +177,7 @@ export async function GET(request: Request) {
       userSeries(range),
       userSeries(range, "PARTNER"),
       prisma.order.findMany({
-        where: { ...orderFilter, status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+        where: { ...orderFilter, paymentStatus: { in: [...PAID_PAYMENTS] }, createdAt: { gte: range.start, lte: range.end } },
         select: { createdAt: true, paidAmount: true },
       }),
     ]);
@@ -218,14 +221,14 @@ export async function GET(request: Request) {
       prisma.order.count({
         where: {
           ...orderFilter,
-          status: "AWAITING_CONFIRMATION",
+          status: "SENT_TO_BOOKING",
           createdAt: { gte: range.start, lte: new Date(Date.now() - 48 * 3600000) },
         },
       }),
       prisma.order.count({
         where: {
           ...orderFilter,
-          status: { in: ["AWAITING_PAYMENT", "PARTIALLY_PAID"] },
+          paymentStatus: { in: ["UNPAID", "PARTIALLY_PAID"] },
           createdAt: { gte: range.start, lte: new Date(Date.now() - 72 * 3600000) },
         },
       }),
@@ -234,7 +237,7 @@ export async function GET(request: Request) {
     // ── Продажи по типам услуг и направлениям (кольцевая диаграмма + AI-рекомендации) ──
     const salesByTypeRows = await prisma.order.groupBy({
       by: ["id"],
-      where: { ...orderFilter, status: { in: [...PAID_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+      where: { ...orderFilter, paymentStatus: { in: [...PAID_PAYMENTS] }, createdAt: { gte: range.start, lte: range.end } },
       _sum: { paidAmount: true },
     });
     const orderIds = salesByTypeRows.map((r) => r.id);
@@ -290,20 +293,28 @@ export async function GET(request: Request) {
       .sort((a, b) => b.sales - a.sales || b.revenue - a.revenue);
 
     // ── Очереди (Гл. 1.21) ──
-    const queueGroups: { key: string; label: string; statuses: OrderStatusValue[] }[] = [
-      { key: "new", label: "Новые заявки", statuses: ["CREATED", "DRAFT"] },
-      { key: "check", label: "Ожидают проверки", statuses: ["AWAITING_CONFIRMATION"] },
-      { key: "pay", label: "Ожидают оплаты", statuses: [...AWAITING_STATUSES] },
-      { key: "ops", label: "Операционный отдел", statuses: ["PROCESSING", "CONFIRMED"] },
-      { key: "docs", label: "Готовы документы", statuses: ["DOCUMENT_PREP", "READY"] },
-      { key: "refund", label: "Возвраты", statuses: ["REFUNDED"] },
+    // Очереди (Гл. 1.21) — канонические статусы Baseline §0.7. Очередь «Ожидают
+    // оплаты» и «Возвраты» фильтруют по paymentStatus (оплата — отдельное измерение).
+    const queueGroups: { key: string; label: string; statuses: OrderStatusValue[]; payments?: OrderPaymentStatus[] }[] = [
+      { key: "new", label: "Новые заявки", statuses: ["NEW"] },
+      { key: "check", label: "Ожидают данные", statuses: ["WAITING_FOR_DATA"] },
+      { key: "ready", label: "Готовы к бронированию", statuses: ["READY_FOR_BOOKING"] },
+      { key: "sent", label: "В бронировании", statuses: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"] },
+      { key: "fulfilled", label: "Исполнены", statuses: ["FULFILLED", "READY_TO_CLOSE"] },
+      { key: "pay", label: "Ожидают оплаты", statuses: ["NEW"], payments: [...AWAITING_PAYMENTS] },
+      { key: "problem", label: "Проблемные", statuses: ["PROBLEM", "SUSPENDED"] },
+      { key: "refund", label: "Возвраты", statuses: ["CLOSED", "CANCELLED"], payments: ["REFUNDED"] },
     ];
     // Очереди считаем за период (как KPI), чтобы число совпадало с записями
     // отфильтрованного реестра заказов, куда ведёт клик.
     const queueCounts = await Promise.all(
       queueGroups.map((g) =>
         prisma.order.count({
-          where: { ...orderFilter, status: { in: g.statuses }, createdAt: { gte: range.start, lte: range.end } },
+          where: {
+            ...orderFilter,
+            ...(g.payments ? { paymentStatus: { in: g.payments } } : { status: { in: g.statuses } }),
+            createdAt: { gte: range.start, lte: range.end },
+          },
         })
       )
     );
@@ -317,18 +328,15 @@ export async function GET(request: Request) {
     // оплату) → если через 24ч статус не изменился, задача возвращается эскалацией
     // «Клиент не отвечает — позвонить» (high). Считается только сообщение менеджера
     // (senderRole = manager) — системные сообщения напоминанием не являются.
-    const TASK_STATUSES = ["OVERDUE", "AWAITING_CONFIRMATION", "AWAITING_PAYMENT", "PARTIALLY_PAID"] as const;
-    const ESCALATION_STATUSES = ["AWAITING_PAYMENT", "PARTIALLY_PAID"] as const;
+    const TASK_STATUSES = ["PROBLEM", "SENT_TO_BOOKING", "WAITING_FOR_DATA"] as const;
+    const ESCALATION_PAYMENTS = ["UNPAID", "PARTIALLY_PAID"] as const;
     // Окно «напоминание отправлено»: задача по оплате скрыта, пока менеджер написал
     // клиенту < 24ч назад; по истечении окна без оплаты она возвращается эскалацией.
     const REMINDER_WINDOW_MS = 24 * 3600000;
     const TASK_META: Record<string, { title: string; prio: string; tab: string; chip: string }> = {
-      OVERDUE: { title: "Просрочен — принять решение", prio: "high", tab: "overview", chip: "Просроченные" },
-      AWAITING_CONFIRMATION: { title: "Подтвердить заказ у поставщика", prio: "high", tab: "overview", chip: "Подтверждения" },
-      // Оплатные задачи открывают карточку сразу на вкладке «Коммуникации» (tab = messages),
-      // где менеджер отправляет клиенту сообщение-напоминание об оплате.
-      AWAITING_PAYMENT: { title: "Напомнить клиенту об оплате", prio: "medium", tab: "messages", chip: "Ожидают оплаты" },
-      PARTIALLY_PAID: { title: "Добить оплату по заказу", prio: "medium", tab: "messages", chip: "Частичная оплата" },
+      PROBLEM: { title: "Проблемный заказ — принять решение", prio: "high", tab: "overview", chip: "Проблемные" },
+      SENT_TO_BOOKING: { title: "Проверить бронирование у поставщика", prio: "high", tab: "overview", chip: "В бронировании" },
+      WAITING_FOR_DATA: { title: "Запросить недостающие данные", prio: "medium", tab: "messages", chip: "Ожидают данные" },
     };
     const ESCALATED: { title: string; prio: string; tab: string } = {
       title: "Клиент не отвечает — позвонить",
@@ -336,30 +344,31 @@ export async function GET(request: Request) {
       // Эскалация — тоже через переписку: в карточке открываем «Коммуникации»
       tab: "messages",
     };
+    // Эскалация по оплате: заказы с неоплаченным остатком, где менеджер уже
+    // напоминал клиенту более 24 ч назад без результата.
     const [taskTypeCounts, taskReminded, taskNotReminded, taskPool] = await Promise.all([
       prisma.order.groupBy({
         by: ["status"],
         where: { ...orderFilter, status: { in: [...TASK_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
         _count: { _all: true },
       }),
-      // Сколько из них уже «напомнили»: по оплатным заказам периода есть хотя бы одно
-      // сообщение менеджера (senderRole = manager). Показывается в чипе «из них напомнено N».
+      // Сколько из них уже «напомнили»: по заказам с неоплаченным остатком есть хотя бы
+      // одно сообщение менеджера (senderRole = manager). Чип «из них напомнено N».
       prisma.order.groupBy({
         by: ["status"],
         where: {
           ...orderFilter,
-          status: { in: [...ESCALATION_STATUSES] },
+          paymentStatus: { in: [...ESCALATION_PAYMENTS] },
           createdAt: { gte: range.start, lte: range.end },
           messages: { some: { senderRole: "manager" } },
         },
         _count: { _all: true },
       }),
-      // Заказы БЕЗ напоминания: оплатные статусы периода, ни одного сообщения менеджера.
-      // Их номера показываются в тултипе чипа «по каким заказам напоминание не отправлено».
+      // Заказы БЕЗ напоминания: неоплаченные заказы периода без сообщений менеджера.
       prisma.order.findMany({
         where: {
           ...orderFilter,
-          status: { in: [...ESCALATION_STATUSES] },
+          paymentStatus: { in: [...ESCALATION_PAYMENTS] },
           createdAt: { gte: range.start, lte: range.end },
           messages: { none: { senderRole: "manager" } },
         },
@@ -372,14 +381,23 @@ export async function GET(request: Request) {
         },
       }),
       prisma.order.findMany({
-        where: { ...orderFilter, status: { in: [...TASK_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+        where: {
+          ...orderFilter,
+          OR: [
+            { status: { in: [...TASK_STATUSES] } },
+            { paymentStatus: { in: [...ESCALATION_PAYMENTS] } },
+          ],
+          createdAt: { gte: range.start, lte: range.end },
+        },
         orderBy: { serviceDate: "asc" },
         take: 40,
         select: {
           id: true,
           orderNumber: true,
           status: true,
+          paymentStatus: true,
           amount: true,
+          paidAmount: true,
           serviceDate: true,
           createdAt: true,
           user: { select: { firstName: true, lastName: true } },
@@ -388,10 +406,12 @@ export async function GET(request: Request) {
     ]);
     // Группируем «ненапомненные» заказы по статусу для тултипа чипа
     const notRemindedByStatus = new Map<string, { orderNumber: string; client: string }[]>();
+    // Заказы без напоминания об оплате группируем под чипом «WAITING_FOR_DATA»
+    // (единственная задача, где напоминание по оплате имеет смысл).
     for (const o of taskNotReminded) {
-      const arr = notRemindedByStatus.get(o.status) ?? [];
+      const arr = notRemindedByStatus.get("WAITING_FOR_DATA") ?? [];
       arr.push({ orderNumber: o.orderNumber, client: `${o.user.firstName} ${o.user.lastName ?? ""}`.trim() });
-      notRemindedByStatus.set(o.status, arr);
+      notRemindedByStatus.set("WAITING_FOR_DATA", arr);
     }
     // Последнее сообщение МЕНЕДЖЕРА по каждому заказу (для «напомнил/не отвечает»).
     // Системные сообщения напоминанием не считаются — только реальные письма менеджера.
@@ -412,7 +432,7 @@ export async function GET(request: Request) {
     // из списка: напоминание выполнено, ждём оплату. Через 24ч без изменения статуса
     // задача вернётся эскалацией «Клиент не отвечает — позвонить».
     const remindedRecently = (o: (typeof taskPool)[number]) => {
-      if (!(ESCALATION_STATUSES as readonly string[]).includes(o.status)) return false;
+      if (!(ESCALATION_PAYMENTS as readonly string[]).includes(o.paymentStatus)) return false;
       const last = lastManagerMsg.get(o.id);
       return last ? Date.now() - last < REMINDER_WINDOW_MS : false;
     };
@@ -420,7 +440,10 @@ export async function GET(request: Request) {
     for (const status of TASK_STATUSES) {
       let taken = 0;
       for (const o of taskPool) {
-        if (o.status !== status || taken >= 2) continue;
+        const isStatusTask = o.status === status;
+        const isPaymentTask = status === "WAITING_FOR_DATA" && (ESCALATION_PAYMENTS as readonly string[]).includes(o.paymentStatus);
+        if (!isStatusTask && !isPaymentTask) continue;
+        if (taken >= 2) continue;
         if (remindedRecently(o)) continue; // напоминание отправлено — ждём оплату
         mixedOrders.push(o);
         taken++;
@@ -428,8 +451,8 @@ export async function GET(request: Request) {
     }
     const tasks = mixedOrders.map((o) => {
       const meta = TASK_META[o.status] ?? { title: "Обработать заказ", prio: "medium", tab: "overview", chip: "Прочие" };
-      // Проверка эскалации: заказ в статусе оплаты, последнее сообщение менеджера > 24ч назад
-      const escalated = (ESCALATION_STATUSES as readonly string[]).includes(o.status) && (() => {
+      // Проверка эскалации: неоплаченный остаток, последнее сообщение менеджера > 24ч назад
+      const escalated = (ESCALATION_PAYMENTS as readonly string[]).includes(o.paymentStatus) && (() => {
         const last = lastManagerMsg.get(o.id);
         return last ? Date.now() - last > REMINDER_WINDOW_MS : false;
       })();
@@ -449,11 +472,8 @@ export async function GET(request: Request) {
       status,
       label: TASK_META[status].chip,
       count: taskTypeCounts.find((r) => r.status === status)?._count._all ?? 0,
-      // «из них напомнено N» — только для оплатных статусов, где напоминание имеет смысл.
-      // Напомнено = есть ЛЮБОЕ сообщение менеджера (в т.ч. > 24ч — такие уже эскалированы
-      // в «Клиент не отвечает»), поэтому reminded не равен числу скрытых из списка задач
-      // (remindedRecently считает только сообщения моложе 24 часов).
-      reminded: taskReminded.find((r) => r.status === status)?._count._all ?? 0,
+      // «из них напомнено N» — по всем неоплаченным заказам периода с напоминанием.
+      reminded: taskReminded.reduce((a, r) => a + r._count._all, 0),
       // Заказы, по которым напоминание ещё не отправлено (для тултипа чипа)
       notReminded: notRemindedByStatus.get(status) ?? [],
     }));
@@ -517,9 +537,10 @@ export async function GET(request: Request) {
       aiRecommendations.push({
         level: "medium",
         title: `${awaitingPay} ${ruPlural(awaitingPay, "заказ ожидает", "заказа ожидают", "заказов ожидают")} оплаты`,
-        effect: fmtMoney(
-          taskPool.filter((o) => AWAITING_STATUSES.includes(o.status as (typeof AWAITING_STATUSES)[number])).reduce((a, o) => a + o.amount, 0)
-        ) + " в работе",
+        effect:
+          fmtMoney(
+            taskPool.filter((o) => (AWAITING_PAYMENTS as readonly string[]).includes(o.paymentStatus)).reduce((a, o) => a + (o.amount - (o.paidAmount ?? 0)), 0)
+          ) + " к доплате",
         action: "Отправить напоминания клиентам",
       });
     }
@@ -558,11 +579,10 @@ export async function GET(request: Request) {
     if (revenueToday > 0) {
       aiSummary.push({ text: `Доход за период ${fmtMoney(revenueToday)}` });
     }
-    // AWAITING_STATUSES уже включает OVERDUE, поэтому не прибавляем overdue повторно.
     if (attentionCount > 0) {
       aiSummary.push({
         text: `${attentionCount} ${ruPlural(attentionCount, "заказ требует", "заказа требуют", "заказов требуют")} внимания`,
-        href: "/admin/sales-execution?status=AWAITING_CONFIRMATION,AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE",
+        href: "/admin/sales-execution?status=WAITING_FOR_DATA,SENT_TO_BOOKING,PROBLEM",
       });
     }
     const hasAnomaly = aiWarnings.length > 0 || aiRecommendations.some((r) => r.level === "high");
@@ -589,12 +609,12 @@ export async function GET(request: Request) {
       }),
     ]);
     const ORDER_NOTIFY: Record<string, { type: string; title: string }> = {
-      CREATED: { type: "order", title: "Создан новый заказ" },
-      CONFIRMED: { type: "confirm", title: "Заказ подтверждён" },
-      AWAITING_PAYMENT: { type: "pay", title: "Ожидается оплата" },
-      PAID: { type: "paid", title: "Поступила оплата" },
-      REFUNDED: { type: "refund", title: "Оформлен возврат" },
-      COMPLETED: { type: "done", title: "Заказ выполнен" },
+      NEW: { type: "order", title: "Создан новый заказ" },
+      READY_FOR_BOOKING: { type: "confirm", title: "Заказ готов к бронированию" },
+      SENT_TO_BOOKING: { type: "pay", title: "Передан в бронирование" },
+      FULFILLED: { type: "paid", title: "Заказ исполнен" },
+      CLOSED: { type: "done", title: "Заказ закрыт" },
+      PROBLEM: { type: "refund", title: "Проблемный заказ" },
     };
     const notifications = [
       ...recentOrders.map((o) => {
@@ -719,9 +739,9 @@ export async function GET(request: Request) {
       await Promise.all([
         prisma.order.count({ where: { ...orderFilter, createdAt: { gte: monthStart } } }),
         prisma.order.count({
-          where: { ...orderFilter, status: { in: ["CONFIRMED", ...PAID_STATUSES] }, createdAt: { gte: monthStart } },
+          where: { ...orderFilter, status: { in: ["FULFILLED", "READY_TO_CLOSE", "CLOSED"] }, createdAt: { gte: monthStart } },
         }),
-        prisma.order.count({ where: { ...orderFilter, status: "CHANGED", createdAt: { gte: monthStart } } }),
+        prisma.order.count({ where: { ...orderFilter, status: "PROBLEM", createdAt: { gte: monthStart } } }),
         prisma.service.count({ where: { createdAt: { gte: monthStart } } }),
         prisma.service.count({ where: { isActive: false } }),
         prisma.orderMessage.count({ where: { senderRole: "client" } }),
@@ -754,11 +774,9 @@ export async function GET(request: Request) {
     // Менеджеры назначаются детерминированно (pickManager), как в реестре заказов.
     const salesRows = await prisma.order.findMany({
       where: { createdAt: { gte: range.start, lte: range.end } },
-      select: { id: true, status: true, amount: true, paidAmount: true },
+      select: { id: true, status: true, paymentStatus: true, amount: true, paidAmount: true },
     });
-    const salesPaidRows = salesRows.filter((o) =>
-      (PAID_STATUSES as readonly string[]).includes(o.status)
-    );
+    const salesPaidRows = salesRows.filter((o) => o.paymentStatus === "PAID");
     const paidAmountPeriod = salesPaidRows.reduce((a, o) => a + (o.paidAmount ?? 0), 0);
     const salesAvgCheck = salesPaidRows.length ? Math.round(paidAmountPeriod / salesPaidRows.length) : 0;
     const salesConversion = salesRows.length ? Math.round((salesPaidRows.length / salesRows.length) * 100) : 0;
@@ -787,10 +805,10 @@ export async function GET(request: Request) {
     // поставщика, готовы к выдаче документов, просроченные, среднее время.
     const [execProcessing, execDocsReady] = await Promise.all([
       prisma.order.count({
-        where: { status: { in: ["PROCESSING", "CONFIRMED"] }, createdAt: { gte: range.start, lte: range.end } },
+        where: { status: { in: ["IN_PROCESSING", "WAITING_FOR_DATA"] }, createdAt: { gte: range.start, lte: range.end } },
       }),
       prisma.order.count({
-        where: { status: { in: ["DOCUMENT_PREP", "READY"] }, createdAt: { gte: range.start, lte: range.end } },
+        where: { status: { in: ["FULFILLED", "READY_TO_CLOSE"] }, createdAt: { gte: range.start, lte: range.end } },
       }),
     ]);
     const execution = {
@@ -805,15 +823,15 @@ export async function GET(request: Request) {
     // возвраты и ожидаемые поступления — всё из реальных данных заказов.
     const [refundsMonth, awaitingMoney, recentLogins, onlineUsers, inactiveUsers, managerActivity] =
       await Promise.all([
-        // Возвраты за период: сумма заказов со статусом REFUNDED
+        // Возвраты за период: сумма заказов с paymentStatus = REFUNDED
         prisma.order.aggregate({
-          where: { status: "REFUNDED", createdAt: { gte: range.start, lte: range.end } },
+          where: { paymentStatus: "REFUNDED", createdAt: { gte: range.start, lte: range.end } },
           _sum: { amount: true },
           _count: true,
         }),
-        // Ожидаемые поступления: суммы заказов, ждущих оплаты (в т.ч. просроченных)
+        // Ожидаемые поступления: суммы заказов, ждущих оплаты
         prisma.order.findMany({
-          where: { status: { in: [...AWAITING_STATUSES] }, createdAt: { gte: range.start, lte: range.end } },
+          where: { paymentStatus: { in: [...AWAITING_PAYMENTS] }, createdAt: { gte: range.start, lte: range.end } },
           select: { amount: true, paidAmount: true, status: true },
         }),
         // Последние входы (Гл. 1.16) — для блока «Активность пользователей»
@@ -878,8 +896,8 @@ export async function GET(request: Request) {
         level: "high",
         title: `${overdue} ${ruPlural(overdue, "заказ просрочен", "заказа просрочено", "заказов просрочено")}`,
         impact: `Могут быть отменены или вызвать негатив клиентов`,
-        action: "Принять решение по просроченным заказам",
-        href: "/admin/sales-execution?status=OVERDUE",
+        action: "Принять решение по проблемным заказам",
+        href: "/admin/sales-execution?status=PROBLEM",
       });
     }
     if (staleConfirmations > 0) {
@@ -888,7 +906,7 @@ export async function GET(request: Request) {
         title: `${staleConfirmations} ${ruPlural(staleConfirmations, "подтверждение ждёт", "подтверждения ждут", "подтверждений ждут")} более 48 ч`,
         impact: `Клиенты могут не успеть к дате поездки`,
         action: "Связаться с поставщиком и ускорить ответ",
-        href: "/admin/sales-execution?status=AWAITING_CONFIRMATION",
+        href: "/admin/sales-execution?status=SENT_TO_BOOKING",
       });
     }
     if (stalePayments > 0) {
@@ -899,7 +917,7 @@ export async function GET(request: Request) {
           awaitingMoney.filter((o) => o.paidAmount < o.amount).reduce((a, o) => a + (o.amount - o.paidAmount), 0)
         )} ожидаемых поступлений`,
         action: "Отправить клиентам напоминания об оплате",
-        href: "/admin/sales-execution?status=AWAITING_PAYMENT,PARTIALLY_PAID,OVERDUE",
+        href: "/admin/sales-execution?payment=UNPAID,PARTIALLY_PAID",
       });
     }
     if (refundsMonth._count > 0) {
@@ -908,7 +926,7 @@ export async function GET(request: Request) {
         title: `${refundsMonth._count} ${ruPlural(refundsMonth._count, "возврат за", "возврата за", "возвратов за")} период`,
         impact: `Сумма возвратов ${fmtMoney(refundsMonth._sum.amount ?? 0)}`,
         action: "Проверить причины возвратов",
-        href: "/admin/sales-execution?status=REFUNDED",
+        href: "/admin/sales-execution?payment=REFUNDED",
       });
     }
     if (decisionFeed.length === 0) {
@@ -922,7 +940,29 @@ export async function GET(request: Request) {
     }
 
     // ── Последние события платформы (Гл. 1.27) ──
+    // Реальные доменные события из outbox (Гл. 6) — сверху, затем системные события.
+    const eventFeed = await getRecentOrderEvents(6);
+    const eventLabel = (code?: unknown): string => {
+      if (typeof code !== "string") return "";
+      return ORDER_STATUS_LABELS[code] ?? BOOKING_STATUS_LABELS[code] ?? code;
+    };
     const events = [
+      ...eventFeed.map((ev) => {
+        const p = (ev.payload ?? {}) as { from?: string; to?: string; amount?: number; orderNumber?: string; saleCode?: string };
+        const from = eventLabel(p.from);
+        const to = eventLabel(p.to);
+        const detail =
+          from && to ? `${from} → ${to}` : typeof p.amount === "number" ? fmtMoney(p.amount) : "—";
+        const orderRef = ev.order?.orderNumber ?? p.orderNumber ?? p.saleCode ?? "—";
+        return {
+          id: `ev-${ev.id}`,
+          type: "order",
+          title: `${ORDER_EVENT_LABELS[ev.type] ?? ev.type} · ${orderRef}`,
+          detail,
+          at: ev.createdAt,
+          href: ev.orderId ? `/admin/sales-execution?open=${ev.orderId}&tab=overview` : "/admin/sales",
+        };
+      }),
       ...recentOrders.map((o) => ({
         id: `oe-${o.id}`,
         type: "order",
@@ -978,7 +1018,7 @@ export async function GET(request: Request) {
     })();
     // Очередь — реальные заказы, ожидающие обработки (новые + на подтверждении)
     const queueOrders = await prisma.order.count({
-      where: { status: { in: ["DRAFT", "CREATED", "AWAITING_CONFIRMATION"] } },
+      where: { status: { in: ["NEW", "WAITING_FOR_DATA", "READY_FOR_BOOKING"] } },
     });
     const system = {
       cpu: cpuPct,

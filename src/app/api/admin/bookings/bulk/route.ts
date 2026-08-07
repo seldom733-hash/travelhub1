@@ -3,33 +3,36 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { serverErrorResponse } from "@/lib/server-error";
 import { actorDisplayName, bookingSystemMessage } from "@/lib/admin-data";
+import { EXECUTION_ROLES, requireRole } from "@/lib/admin-access";
+import { emitOrderEvent, publishOrderEvents } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
 const MAX_IDS = 100;
 
-type BulkAction = "confirm" | "pay" | "cancel";
+type BulkAction = "send" | "confirm" | "cancel";
 
 // Допустимые исходные статусы и целевой статус для каждого массового действия
-type BookingStatusValue = "PENDING" | "CONFIRMED" | "PAID" | "REFUNDED" | "COMPLETED";
+// (канонический жизненный цикл Baseline §0.5)
+type BookingStatusValue = "NEW" | "PREPARING_REQUEST" | "SENT_TO_SUPPLIER" | "AWAITING_CONFIRMATION" | "CONFIRMED" | "IN_SERVICE" | "COMPLETED" | "NEEDS_CLARIFICATION" | "SUPPLIER_REJECTED" | "CHANGE_REQUESTED" | "CANCELLATION_REQUESTED" | "CANCELLED" | "PROBLEM";
 const TRANSITIONS: Record<BulkAction, { from: BookingStatusValue[]; to: BookingStatusValue }> = {
-  confirm: { from: ["PENDING"], to: "CONFIRMED" },
-  pay: { from: ["PENDING", "CONFIRMED"], to: "PAID" },
-  cancel: { from: ["PENDING", "CONFIRMED", "PAID"], to: "REFUNDED" },
+  send: { from: ["NEW", "PREPARING_REQUEST"], to: "SENT_TO_SUPPLIER" },
+  confirm: { from: ["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION"], to: "CONFIRMED" },
+  cancel: { from: ["NEW", "PREPARING_REQUEST", "SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION", "CONFIRMED", "IN_SERVICE"], to: "CANCELLED" },
 };
 
 /**
  * POST /api/admin/bookings/bulk
- * Тело: { action: "confirm" | "pay" | "cancel", ids: string[] }
+ * Тело: { action: "send" | "confirm" | "cancel", ids: string[] }
  * Выполняет действие над всеми подходящими бронями (недопустимые — пропускает),
  * атомарно пишет записи в журнал истории. Возвращает количество обработанных.
  */
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role === "BUYER") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const denied = requireRole(user, EXECUTION_ROLES);
+    if (denied) return denied;
 
     let body: { action?: unknown; ids?: unknown };
     try {
@@ -55,7 +58,7 @@ export async function POST(request: Request) {
     const processed = await prisma.$transaction(async (tx) => {
       const rows = await tx.booking.findMany({
         where: { id: { in: ids } },
-        select: { id: true, status: true },
+        select: { id: true, status: true, code: true, orderId: true },
       });
       let count = 0;
       for (const r of rows) {
@@ -82,10 +85,20 @@ export async function POST(request: Request) {
             text: bookingSystemMessage(t.to),
           },
         });
+        // Outbox (Гл. 6): событие бронирования для связанного заказа.
+        if (r.orderId) {
+          await emitOrderEvent(
+            tx,
+            r.orderId,
+            action === "send" ? "BOOKING_SENT_TO_SUPPLIER" : action === "confirm" ? "BOOKING_CONFIRMED" : "BOOKING_STATUS_CHANGED",
+            { bookingId: r.id, bookingCode: r.code, from: r.status, to: t.to, actor: actorDisplayName(user) }
+          );
+        }
         count++;
       }
       return count;
     });
+    await publishOrderEvents();
 
     const skipped = ids.length - processed;
     return NextResponse.json({
@@ -104,8 +117,8 @@ export async function POST(request: Request) {
 
 function bulkMessage(action: string): string {
   const map: Record<string, string> = {
+    send: "Массовая отправка запроса поставщику",
     confirm: "Массовое подтверждение",
-    pay: "Массовая отправка на оплату",
     cancel: "Массовая отмена",
   };
   return map[action] ?? `Массовое действие: ${action}`;

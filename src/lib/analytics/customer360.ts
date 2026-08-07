@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
  * любимые направления и AI-профиль (вероятность следующей покупки).
  */
 
-const PAID: ("PAID" | "COMPLETED")[] = ["PAID", "COMPLETED"];
+const PAID: ("FULFILLED" | "READY_TO_CLOSE" | "CLOSED")[] = ["FULFILLED", "READY_TO_CLOSE", "CLOSED"];
 
 export interface Customer360Data {
   name: string;
@@ -48,6 +48,7 @@ export async function getCustomer360Data(userId: string): Promise<Customer360Dat
           amount: true,
           paidAmount: true,
           status: true,
+          paymentStatus: true,
           createdAt: true,
           bookings: { select: { service: { select: { type: true, country: true, city: true, title: true } } } },
         },
@@ -59,7 +60,7 @@ export async function getCustomer360Data(userId: string): Promise<Customer360Dat
 
   const paidOrders = user.orders.filter((o) => (PAID as readonly string[]).includes(o.status));
   const totalSpent = paidOrders.reduce((a, o) => a + (o.paidAmount ?? 0), 0);
-  const refunds = user.orders.filter((o) => o.status === "REFUNDED").length;
+  const refunds = user.orders.filter((o) => o.paymentStatus === "REFUNDED").length;
   const avgCheck = paidOrders.length ? totalSpent / paidOrders.length : 0;
 
   const favMap = new Map<string, number>();

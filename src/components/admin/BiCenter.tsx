@@ -707,7 +707,8 @@ function DrillDownModal({
           <div className="space-y-1.5 max-h-96 overflow-y-auto no-scrollbar pr-1">
             {rows.map((r) => {
               // Глубокий переход: заказы → карточка в реестре, бронирования → Booking Center
-              const isOrder = r.type === "order" || !!r.label.match(/^ORD-/);
+              // (пользовательский номер заказа — TH-YYYY-######, внутренний код — ORD-*)
+              const isOrder = r.type === "order" || !!r.label.match(/^(ORD|TH)-/);
               const href = isOrder
                 ? `/admin/sales-execution?open=${r.id}&tab=overview`
                 : `/admin/bookings?open=${r.id}`;

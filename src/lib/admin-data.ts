@@ -110,118 +110,153 @@ export function actorDisplayName(user: { firstName: string; lastName: string | n
 /**
  * Текст автоматического системного сообщения в переписке при смене статуса
  * брони (вкладка «Переписка», Гл. 5.9). Пишется в BookingMessage с senderRole = "system".
+ * Статусы — канонические коды Baseline §0.5 (UI локализует, backend хранит code).
  */
 export function bookingSystemMessage(status: string): string {
   const map: Record<string, string> = {
-    PENDING: "Бронирование создано и ожидает подтверждения",
+    NEW: "Бронирование создано",
+    PREPARING_REQUEST: "Готовится запрос поставщику",
+    SENT_TO_SUPPLIER: "Запрос отправлен поставщику",
+    AWAITING_CONFIRMATION: "Ожидается подтверждение поставщика",
     CONFIRMED: "Бронирование подтверждено ✅",
-    PAID: "Оплата получена 💳",
+    IN_SERVICE: "Услуга оказана (в поездке) 🧳",
     COMPLETED: "Поездка завершена 🎉",
-    REFUNDED: "Бронирование отменено, средства возвращены ↩️",
+    NEEDS_CLARIFICATION: "Требуются уточнения",
+    SUPPLIER_REJECTED: "Поставщик отклонил запрос",
+    CHANGE_REQUESTED: "Запрошены изменения",
+    CANCELLATION_REQUESTED: "Запрошена отмена",
+    CANCELLED: "Бронирование отменено",
+    PROBLEM: "Проблемная ситуация",
   };
   return map[status] ?? `Статус брони изменён: ${status}`;
 }
 
+/** Канонические коды статусов бронирования (Baseline §0.5) для фильтров аналитики. */
+export type BookingStatusFilter =
+  | "NEW" | "PREPARING_REQUEST" | "SENT_TO_SUPPLIER" | "AWAITING_CONFIRMATION"
+  | "CONFIRMED" | "IN_SERVICE" | "COMPLETED" | "NEEDS_CLARIFICATION"
+  | "SUPPLIER_REJECTED" | "CHANGE_REQUESTED" | "CANCELLATION_REQUESTED"
+  | "CANCELLED" | "PROBLEM";
+
 export const BOOKING_STATUS_LABELS: Record<string, string> = {
-  PENDING: "Ожидает подтверждения",
+  NEW: "Новая",
+  PREPARING_REQUEST: "Готовится запрос",
+  SENT_TO_SUPPLIER: "Отправлено поставщику",
+  AWAITING_CONFIRMATION: "Ожидает подтверждения",
   CONFIRMED: "Подтверждено",
-  PAID: "Оплачен",
-  REFUNDED: "Возврат",
-  COMPLETED: "Завершён",
+  IN_SERVICE: "В поездке",
+  COMPLETED: "Завершено",
+  NEEDS_CLARIFICATION: "Требует уточнения",
+  SUPPLIER_REJECTED: "Поставщик отклонил",
+  CHANGE_REQUESTED: "Изменение запрошено",
+  CANCELLATION_REQUESTED: "Отмена запрошена",
+  CANCELLED: "Отменено",
+  PROBLEM: "Проблема",
 };
 
 export const BOOKING_STATUS_COLORS: Record<string, string> = {
-  PENDING: "#f59e0b",
-  CONFIRMED: "#3b82f6",
-  PAID: "#22c55e",
-  REFUNDED: "#ef4444",
-  COMPLETED: "#06b6d4",
+  NEW: "#94a3b8",
+  PREPARING_REQUEST: "#8b5cf6",
+  SENT_TO_SUPPLIER: "#3b82f6",
+  AWAITING_CONFIRMATION: "#f59e0b",
+  CONFIRMED: "#22c55e",
+  IN_SERVICE: "#06b6d4",
+  COMPLETED: "#10b981",
+  NEEDS_CLARIFICATION: "#f59e0b",
+  SUPPLIER_REJECTED: "#ef4444",
+  CHANGE_REQUESTED: "#a3e635",
+  CANCELLATION_REQUESTED: "#f97316",
+  CANCELLED: "#f43f5e",
+  PROBLEM: "#dc2626",
 };
 
 // ── Заказы (Гл. 6) ──
 
 export const ORDER_STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Черновик",
-  CREATED: "Создан",
-  PROCESSING: "В обработке",
-  AWAITING_CONFIRMATION: "Ожидает подтверждения",
-  CONFIRMED: "Подтверждён",
-  AWAITING_PAYMENT: "Ожидает оплаты",
-  PARTIALLY_PAID: "Частично оплачен",
-  PAID: "Оплачен",
-  DOCUMENT_PREP: "Подготовка документов",
-  READY: "Готов к поездке",
-  COMPLETED: "Завершён",
-  CHANGED: "Изменён",
-  REFUNDED: "Возвращён",
+  NEW: "Новый",
+  IN_PROCESSING: "В обработке",
+  WAITING_FOR_DATA: "Ожидает данные",
+  READY_FOR_BOOKING: "Готов к бронированию",
+  SENT_TO_BOOKING: "Передан в бронирование",
+  PARTIALLY_FULFILLED: "Частично исполнен",
+  FULFILLED: "Исполнен",
+  READY_TO_CLOSE: "Готов к закрытию",
+  CLOSED: "Закрыт",
   CANCELLED: "Отменён",
-  OVERDUE: "Просрочен",
-  ARCHIVED: "Архивирован",
+  PROBLEM: "Проблемный",
+  SUSPENDED: "Приостановлен",
 };
 
 export const ORDER_STATUS_COLORS: Record<string, string> = {
-  DRAFT: "#94a3b8",
-  CREATED: "#64748b",
-  PROCESSING: "#3b82f6",
-  AWAITING_CONFIRMATION: "#f59e0b",
-  CONFIRMED: "#8b5cf6",
-  AWAITING_PAYMENT: "#f97316",
+  NEW: "#94a3b8",
+  IN_PROCESSING: "#3b82f6",
+  WAITING_FOR_DATA: "#8b5cf6",
+  READY_FOR_BOOKING: "#06b6d4",
+  SENT_TO_BOOKING: "#14b8a6",
+  PARTIALLY_FULFILLED: "#eab308",
+  FULFILLED: "#22c55e",
+  READY_TO_CLOSE: "#10b981",
+  CLOSED: "#6b7280",
+  CANCELLED: "#f43f5e",
+  PROBLEM: "#dc2626",
+  SUSPENDED: "#f97316",
+};
+
+/** Финансовое состояние заказа (Baseline §0.6): отдельно от жизненного цикла. */
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  UNPAID: "Не оплачен",
+  PARTIALLY_PAID: "Частично оплачен",
+  PAID: "Оплачен",
+  REFUNDED: "Возврат",
+};
+
+export const PAYMENT_STATUS_COLORS: Record<string, string> = {
+  UNPAID: "#f97316",
   PARTIALLY_PAID: "#eab308",
   PAID: "#22c55e",
-  DOCUMENT_PREP: "#14b8a6",
-  READY: "#06b6d4",
-  COMPLETED: "#10b981",
-  CHANGED: "#a3e635",
   REFUNDED: "#ef4444",
-  CANCELLED: "#f43f5e",
-  OVERDUE: "#dc2626",
-  ARCHIVED: "#6b7280",
 };
 
 /**
  * Текст автоматического системного сообщения в переписке по заказу при смене
  * статуса (вкладка «Коммуникации», Гл. 6.9). Пишется в OrderMessage с senderRole = "system".
+ * Статусы — канонические коды Baseline §0.4.
  */
 export function orderSystemMessage(status: string): string {
   const map: Record<string, string> = {
-    CREATED: "Заказ создан и передан в работу",
-    PROCESSING: "Заказ принят в обработку",
-    AWAITING_CONFIRMATION: "Заказ создан и ожидает подтверждения",
-    CONFIRMED: "Заказ подтверждён ✅",
-    AWAITING_PAYMENT: "Ожидается оплата заказа",
-    PARTIALLY_PAID: "Частичная оплата получена 💳",
-    PAID: "Заказ оплачен 💳",
-    DOCUMENT_PREP: "Готовятся документы 📄",
-    READY: "Заказ готов к поездке 🎒",
-    COMPLETED: "Заказ завершён 🎉",
-    CHANGED: "Заказ изменён ✏️",
-    REFUNDED: "Оформлен возврат ↩️",
+    NEW: "Заказ создан и передан в работу",
+    IN_PROCESSING: "Заказ принят в обработку",
+    WAITING_FOR_DATA: "Заказ ожидает недостающие данные",
+    READY_FOR_BOOKING: "Заказ готов к бронированию",
+    SENT_TO_BOOKING: "Заказ передан в Booking Center",
+    PARTIALLY_FULFILLED: "Часть услуг забронирована",
+    FULFILLED: "Все услуги забронированы и подтверждены ✅",
+    READY_TO_CLOSE: "Заказ готов к закрытию",
+    CLOSED: "Заказ закрыт 🎉",
     CANCELLED: "Заказ отменён ❌",
-    OVERDUE: "Заказ просрочен — требуется действие ⏰",
-    ARCHIVED: "Заказ архивирован 📦",
+    PROBLEM: "Проблемная ситуация — требуется действие ⏰",
+    SUSPENDED: "Заказ приостановлен",
   };
   return map[status] ?? `Статус заказа изменён: ${status}`;
 }
 
-/** Группы статусов заказа для фильтров и виджетов. */
+/** Группы статусов заказа для фильтров и виджетов (Baseline §0.4/0.7). */
 export const ORDER_STATUS_GROUPS = {
   active: [
-    "DRAFT",
-    "CREATED",
-    "PROCESSING",
-    "AWAITING_CONFIRMATION",
-    "CONFIRMED",
-    "AWAITING_PAYMENT",
-    "PARTIALLY_PAID",
-    "PAID",
-    "DOCUMENT_PREP",
-    "READY",
-    "CHANGED",
-    "OVERDUE",
+    "NEW",
+    "IN_PROCESSING",
+    "WAITING_FOR_DATA",
+    "READY_FOR_BOOKING",
+    "SENT_TO_BOOKING",
+    "PARTIALLY_FULFILLED",
+    "FULFILLED",
+    "READY_TO_CLOSE",
+    "PROBLEM",
+    "SUSPENDED",
   ],
-  paid: ["PAID", "DOCUMENT_PREP", "READY", "COMPLETED"],
-  awaitingPayment: ["AWAITING_PAYMENT", "PARTIALLY_PAID", "OVERDUE"],
-  terminal: ["COMPLETED", "REFUNDED", "CANCELLED", "ARCHIVED"],
+  paid: ["FULFILLED", "READY_TO_CLOSE", "CLOSED"],
+  awaitingPayment: ["READY_FOR_BOOKING", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED"],
+  terminal: ["CLOSED", "CANCELLED"],
 } as const;
 
 /**
