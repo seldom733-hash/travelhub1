@@ -65,9 +65,15 @@ export default function BookingsPage() {
 
   const runAction = async (action: string) => {
     if (!selected) return;
-    await api.patch(`/bookings/${selected.id}`, { action });
-    await openDetail(selected.id);
-    await load();
+    setError("");
+    try {
+      await api.patch(`/bookings/${selected.id}`, { action });
+      await openDetail(selected.id);
+      await load();
+    } catch (e) {
+      // 403 возможен при смене роли на лету или дрейфе маппинга прав → показываем баннер
+      setError((e as Error).message);
+    }
   };
 
   const counts = {

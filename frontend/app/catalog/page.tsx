@@ -102,15 +102,26 @@ export default function CatalogPage() {
   };
 
   const publish = async (id: string) => {
-    await api.post(`/products/${id}/publish`);
-    await openDetail(id);
-    await load();
+    setError("");
+    try {
+      await api.post(`/products/${id}/publish`);
+      await openDetail(id);
+      await load();
+    } catch (e) {
+      // 403 при смене роли на лету → баннер вместо тихого сбоя
+      setError((e as Error).message);
+    }
   };
 
   const archive = async (id: string) => {
-    await api.post(`/products/${id}/archive`);
-    await openDetail(id);
-    await load();
+    setError("");
+    try {
+      await api.post(`/products/${id}/archive`);
+      await openDetail(id);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
   };
 
   const createProduct = async () => {

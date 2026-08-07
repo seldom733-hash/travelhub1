@@ -23,10 +23,15 @@ export default function ActionButtons({
   permOf: Record<string, boolean>;
   onRun: (action: string) => void;
 }) {
-  const available = actions.filter((a) => a.only.includes(status) && permOf[a.action]);
+  // Команды, применимые к статусу, и из них — разрешённые ролью (RBAC Matrix §4).
+  const forStatus = actions.filter((a) => a.only.includes(status));
+  const available = forStatus.filter((a) => permOf[a.action]);
 
   if (available.length === 0) {
-    return <div className="text-xs text-slate-400">Нет доступных команд для вашей роли</div>;
+    if (forStatus.length === 0) {
+      return <div className="text-xs text-slate-400">Для текущего статуса команд нет</div>;
+    }
+    return <div className="text-xs text-slate-400">Нет прав на команды для вашей роли</div>;
   }
 
   return (
