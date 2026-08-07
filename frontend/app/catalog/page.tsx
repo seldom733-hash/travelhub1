@@ -6,10 +6,8 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
 import PanelFrame from "@/components/PanelFrame";
+import TariffEditor, { newTariffDraft, tariffDraftsFrom, type TariffDraft } from "@/components/TariffEditor";
 import { useCan } from "@/lib/use-can";
-
-let tariffSeq = 0;
-const newTariff = () => ({ id: ++tariffSeq, name: "", price: "", currency: "RUB" });
 
 const PRODUCT_TYPES = [
   { code: "TOUR", title: "Тур" },
@@ -36,9 +34,11 @@ export default function CatalogPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ type: "TOUR", title: "", slug: "", description: "" });
-  const [tariffs, setTariffs] = useState<{ id: number; name: string; price: string; currency: string }[]>([
-    newTariff(),
-  ]);
+  const [tariffs, setTariffs] = useState<TariffDraft[]>([newTariffDraft()]);
+  // Ролевой UI: редактирование продукта — catalog.product.write (PATCH /products/:id).
+  // UpdateProductDto поддерживает только title/description/tariffs (slug — только при создании).
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ title: "", description: "" });
 
   const load = async () => {
     setBusy(true);
@@ -63,8 +63,42 @@ export default function CatalogPage() {
 
   const openDetail = async (id: string) => {
     setShowCreate(false);
+    setEditing(false);
     const detail = await api.get<Product>(`/products/${id}`);
     setSelected(detail);
+  };
+
+  const openEdit = () => {
+    if (!selected) return;
+    setEditing(true);
+    setEditForm({ title: selected.title, description: selected.description ?? "" });
+    setTariffs(tariffDraftsFrom(selected.tariffs ?? []));
+  };
+
+  const saveEdit = async () => {
+    if (!selected) return;
+    if (!editForm.title.trim()) {
+      setError("Укажите название продукта");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await api.patch(`/products/${selected.id}`, {
+        title: editForm.title.trim(),
+        description: editForm.description.trim() || undefined,
+        tariffs: tariffs
+          .filter((t) => t.name.trim() && t.price !== "" && !Number.isNaN(Number(t.price)))
+          .map((t) => ({ name: t.name.trim(), price: Number(t.price), currency: t.currency || "RUB" })),
+      });
+      setEditing(false);
+      await openDetail(selected.id);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const publish = async (id: string) => {
@@ -98,7 +132,7 @@ export default function CatalogPage() {
       });
       setShowCreate(false);
       setForm({ type: "TOUR", title: "", slug: "", description: "" });
-      setTariffs([newTariff()]);
+      setTariffs([newTariffDraft()]);
       await load();
       setSelected(created);
     } catch (e) {
@@ -126,7 +160,10 @@ export default function CatalogPage() {
             <div className="flex items-center gap-2">
               {canWrite && (
                 <button
-                  onClick={() => setShowCreate((v) => !v)}
+                  onClick={() => {
+                    setEditing(false);
+                    setShowCreate((v) => !v);
+                  }}
                   className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
                 >
                   ＋ Создать продукт
@@ -267,55 +304,7 @@ export default function CatalogPage() {
             </div>
 
             {/* Тарифы */}
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <label className="text-xs font-medium uppercase tracking-wide text-slate-400">Тарифы</label>
-                <button
-                  type="button"
-                  onClick={() => setTariffs([...tariffs, newTariff()])}
-                  className="text-xs font-medium text-blue-600 hover:underline"
-                >
-                  ＋ добавить
-                </button>
-              </div>
-              <div className="space-y-2">
-                {tariffs.map((t) => (
-                  <div key={t.id} className="flex items-center gap-2">
-                    <input
-                      value={t.name}
-                      onChange={(e) => setTariffs(tariffs.map((x) => (x.id === t.id ? { ...x, name: e.target.value } : x)))}
-                      placeholder="Название"
-                      className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
-                    />
-                    <input
-                      type="number"
-                      value={t.price}
-                      onChange={(e) =>
-                        setTariffs(tariffs.map((x) => (x.id === t.id ? { ...x, price: e.target.value } : x)))
-                      }
-                      placeholder="Цена"
-                      className="w-24 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
-                    />
-                    <input
-                      value={t.currency}
-                      onChange={(e) =>
-                        setTariffs(tariffs.map((x) => (x.id === t.id ? { ...x, currency: e.target.value } : x)))
-                      }
-                      className="w-16 rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-blue-400"
-                    />
-                    {tariffs.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setTariffs(tariffs.filter((x) => x.id !== t.id))}
-                        className="text-slate-400 transition-colors hover:text-red-500"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <TariffEditor value={tariffs} onChange={setTariffs} />
 
             <button
               onClick={() => void createProduct()}
@@ -345,81 +334,130 @@ export default function CatalogPage() {
             </button>
           </div>
 
-          <div className="space-y-5 p-5 text-sm">
-            {selected.status === "PUBLISHED" && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-                ✅ Опубликован — доступен для заказов
+          {editing ? (
+            <div className="space-y-4 p-5 text-sm">
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                ✏️ Редактирование: PATCH /products/:id — требуется право catalog.product.write
               </div>
-            )}
-
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">О продукте</div>
-              <p className="text-slate-600">{selected.description ?? "Без описания"}</p>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg bg-slate-50 px-3 py-2">
-                  <div className="text-slate-400">Тип</div>
-                  <div className="font-medium text-slate-700">{selected.type}</div>
-                </div>
-                <div className="rounded-lg bg-slate-50 px-3 py-2">
-                  <div className="text-slate-400">Версия</div>
-                  <div className="font-medium text-slate-700">v{selected.version}</div>
-                </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Название *</label>
+                <input
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Описание</label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                />
+              </div>
+              <TariffEditor value={tariffs} onChange={setTariffs} />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void saveEdit()}
+                  disabled={busy || !editForm.title.trim()}
+                  className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busy ? "Сохранение…" : "💾 Сохранить"}
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Отмена
+                </button>
               </div>
             </div>
+          ) : (
+            <div className="space-y-5 p-5 text-sm">
+              {canWrite && (
+                <button
+                  onClick={openEdit}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:border-blue-300 hover:text-blue-600"
+                >
+                  ✏️ Редактировать
+                </button>
+              )}
+              {selected.status === "PUBLISHED" && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                  ✅ Опубликован — доступен для заказов
+                </div>
+              )}
 
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Тарифы</div>
-              {(selected.tariffs ?? []).length === 0 && <div className="text-slate-400">Тарифы не заданы</div>}
-              <div className="space-y-1.5">
-                {(selected.tariffs ?? []).map((t) => (
-                  <div key={t.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
-                    <span className="font-mono text-xs text-slate-500">{t.code}</span>
-                    <span className="font-medium text-slate-700">
-                      {Number(t.price).toFixed(2)} {t.currency}
-                    </span>
+              <div>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">О продукте</div>
+                <p className="text-slate-600">{selected.description ?? "Без описания"}</p>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg bg-slate-50 px-3 py-2">
+                    <div className="text-slate-400">Тип</div>
+                    <div className="font-medium text-slate-700">{selected.type}</div>
                   </div>
-                ))}
+                  <div className="rounded-lg bg-slate-50 px-3 py-2">
+                    <div className="text-slate-400">Версия</div>
+                    <div className="font-medium text-slate-700">v{selected.version}</div>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">История (audit)</div>
-              <div className="space-y-1.5">
-                {(selected.history ?? []).slice(0, 6).map((h) => (
-                  <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                    <div className="font-medium text-slate-600">
-                      {h.action} {h.to && <span className="text-slate-400">→ {h.to}</span>}
+              <div>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Тарифы</div>
+                {(selected.tariffs ?? []).length === 0 && <div className="text-slate-400">Тарифы не заданы</div>}
+                <div className="space-y-1.5">
+                  {(selected.tariffs ?? []).map((t) => (
+                    <div key={t.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
+                      <span className="font-mono text-xs text-slate-500">{t.code}</span>
+                      <span className="font-medium text-slate-700">
+                        {Number(t.price).toFixed(2)} {t.currency}
+                      </span>
                     </div>
-                    <div className="text-slate-400">{h.comment}</div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">История (audit)</div>
+                <div className="space-y-1.5">
+                  {(selected.history ?? []).slice(0, 6).map((h) => (
+                    <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                      <div className="font-medium text-slate-600">
+                        {h.action} {h.to && <span className="text-slate-400">→ {h.to}</span>}
+                      </div>
+                      <div className="text-slate-400">{h.comment}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {selected.status !== "PUBLISHED" && canPublish && (
+                  <button
+                    onClick={() => void publish(selected.id)}
+                    className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+                  >
+                    ✅ Опубликовать
+                  </button>
+                )}
+                {selected.status === "PUBLISHED" && canPublish && (
+                  <button
+                    onClick={() => void archive(selected.id)}
+                    className="flex-1 rounded-lg bg-slate-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-700"
+                  >
+                    🗄 В архив
+                  </button>
+                )}
+                {!canPublish && !canWrite && (
+                  <div className="w-full rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-400">
+                    Изменение продукта недоступно для вашей роли
                   </div>
-                ))}
+                )}
               </div>
             </div>
-
-            <div className="flex gap-2">
-              {selected.status !== "PUBLISHED" && canPublish && (
-                <button
-                  onClick={() => void publish(selected.id)}
-                  className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
-                >
-                  ✅ Опубликовать
-                </button>
-              )}
-              {selected.status === "PUBLISHED" && canPublish && (
-                <button
-                  onClick={() => void archive(selected.id)}
-                  className="flex-1 rounded-lg bg-slate-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-700"
-                >
-                  🗄 В архив
-                </button>
-              )}
-              {!canPublish && !canWrite && (
-                <div className="w-full rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-400">
-                  Изменение продукта недоступно для вашей роли
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </aside>
       )}
     </div>

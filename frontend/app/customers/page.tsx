@@ -25,6 +25,10 @@ export default function CustomersPage() {
     email: "",
     phone: "",
   });
+  // Ролевой UI: редактирование клиента — crm.customer.write (PATCH /customers/:id).
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState({ firstName: "", lastName: "", companyName: "", phone: "" });
 
   const load = async () => {
     try {
@@ -44,8 +48,49 @@ export default function CustomersPage() {
 
   const openDetail = async (id: string) => {
     setShowCreate(false);
+    setEditing(false);
     const detail = await api.get<Customer>(`/customers/${id}`);
     setSelected(detail);
+  };
+
+  const openEdit = () => {
+    if (!selected) return;
+    setEditing(true);
+    setEditForm({
+      firstName: selected.firstName ?? "",
+      lastName: selected.lastName ?? "",
+      companyName: selected.companyName ?? "",
+      phone: selected.phone ?? "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!selected) return;
+    if (selected.type === "COMPANY" && !editForm.companyName.trim()) {
+      setError("Укажите название компании");
+      return;
+    }
+    if (selected.type === "PERSON" && !editForm.firstName.trim() && !editForm.lastName.trim()) {
+      setError("Укажите имя или фамилию");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await api.patch(`/customers/${selected.id}`, {
+        firstName: editForm.firstName.trim() || undefined,
+        lastName: editForm.lastName.trim() || undefined,
+        companyName: editForm.companyName.trim() || undefined,
+        phone: editForm.phone.trim() || undefined,
+      });
+      setEditing(false);
+      await openDetail(selected.id);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const createCustomer = async () => {
@@ -99,7 +144,10 @@ export default function CustomersPage() {
             <div className="flex items-center gap-2">
               {canWrite && (
                 <button
-                  onClick={() => setShowCreate((v) => !v)}
+                  onClick={() => {
+                    setEditing(false);
+                    setShowCreate((v) => !v);
+                  }}
                   className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
                 >
                   ＋ Создать клиента
@@ -275,30 +323,102 @@ export default function CustomersPage() {
             </button>
           </div>
 
-          <div className="space-y-4 p-5 text-sm">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-lg bg-slate-50 px-3 py-2">
-                <div className="text-slate-400">Email</div>
-                <div className="break-all font-medium text-slate-700">{selected.email}</div>
+          {editing ? (
+            <div className="space-y-4 p-5 text-sm">
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                ✏️ Редактирование: PATCH /customers/:id — требуется право crm.customer.write
               </div>
-              <div className="rounded-lg bg-slate-50 px-3 py-2">
-                <div className="text-slate-400">Телефон</div>
-                <div className="font-medium text-slate-700">{selected.phone ?? "—"}</div>
+              {selected.type === "PERSON" ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Имя</label>
+                    <input
+                      value={editForm.firstName}
+                      onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Фамилия</label>
+                    <input
+                      value={editForm.lastName}
+                      onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Компания *</label>
+                  <input
+                    value={editForm.companyName}
+                    onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Телефон</label>
+                <input
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                  placeholder="+7 900 000-00-00"
+                />
               </div>
-              <div className="rounded-lg bg-slate-50 px-3 py-2">
-                <div className="text-slate-400">Тип</div>
-                <div className="font-medium text-slate-700">{selected.type === "COMPANY" ? "Компания" : "Физлицо"}</div>
+              <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                Email и тип клиента не редактируются (SSOT мастер-данных).
               </div>
-              <div className="rounded-lg bg-slate-50 px-3 py-2">
-                <div className="text-slate-400">Создан</div>
-                <div className="font-medium text-slate-700">{new Date(selected.createdAt).toLocaleDateString("ru")}</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void saveEdit()}
+                  disabled={saving}
+                  className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? "Сохранение…" : "💾 Сохранить"}
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Отмена
+                </button>
               </div>
             </div>
+          ) : (
+            <div className="space-y-4 p-5 text-sm">
+              {canWrite && (
+                <button
+                  onClick={openEdit}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:border-blue-300 hover:text-blue-600"
+                >
+                  ✏️ Редактировать
+                </button>
+              )}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                  <div className="text-slate-400">Email</div>
+                  <div className="break-all font-medium text-slate-700">{selected.email}</div>
+                </div>
+                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                  <div className="text-slate-400">Телефон</div>
+                  <div className="font-medium text-slate-700">{selected.phone ?? "—"}</div>
+                </div>
+                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                  <div className="text-slate-400">Тип</div>
+                  <div className="font-medium text-slate-700">{selected.type === "COMPANY" ? "Компания" : "Физлицо"}</div>
+                </div>
+                <div className="rounded-lg bg-slate-50 px-3 py-2">
+                  <div className="text-slate-400">Создан</div>
+                  <div className="font-medium text-slate-700">{new Date(selected.createdAt).toLocaleDateString("ru")}</div>
+                </div>
+              </div>
 
-            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-              📌 SSOT клиентских мастер-данных: Order/Booking ссылаются на этого клиента по ID, не дублируя данные.
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                📌 SSOT клиентских мастер-данных: Order/Booking ссылаются на этого клиента по ID, не дублируя данные.
+              </div>
             </div>
-          </div>
+          )}
         </aside>
       )}
     </div>
