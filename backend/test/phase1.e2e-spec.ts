@@ -7,8 +7,10 @@
  *
  * Дополнительно: идемпотентность consumer-а, correlation/causation трассировка,
  * аудит переходов, канонические ID (PRD-/CUS-/ORD-/TH-/BKG-).
+ *
+ * Test DB: jest `setupFiles` (test/e2e.env.ts) подставляет изолированную
+ * тестовую БД (TEST_DATABASE_URL) до импорта AppModule — dev-БД не используется.
  */
-process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/travelhub1";
 
 import "reflect-metadata";
 import { INestApplication, ValidationPipe } from "@nestjs/common";

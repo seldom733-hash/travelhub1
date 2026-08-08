@@ -12,6 +12,8 @@ export const PERMISSIONS = {
   "catalog.product.publish": "Публикация/архивация продукта",
   "catalog.product.submit_moderation": "Отправка продукта на модерацию",
   "catalog.category.write": "Управление категориями",
+  "catalog.category_schema.read": "Чтение Category Schema (конфигурации категорий)",
+  "catalog.category_schema.write": "Управление Category Schema (только ADMIN)",
   "catalog.availability.write": "Управление availability",
 
   // ── CRM ───────────────────────────────────────────────────────────────
@@ -92,6 +94,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
 
   DIRECTOR: [
     "catalog.product.read",
+    "catalog.category_schema.read",
     "crm.customer.read",
     "order.read",
     "booking.read",
@@ -172,6 +175,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "catalog.product.publish",
     "catalog.product.submit_moderation",
     "catalog.category.write",
+    "catalog.category_schema.read",
     "catalog.availability.write",
     "crm.customer.read",
     "moderation.review",

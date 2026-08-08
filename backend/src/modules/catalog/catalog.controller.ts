@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { Type } from "class-transformer";
-import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from "class-validator";
+import { IsArray, IsEnum, IsNumber, IsObject, IsOptional, IsString, Min, ValidateNested } from "class-validator";
 import { ProductStatus, ProductType } from "../../generated/prisma/enums";
 import { CatalogService } from "./catalog.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
@@ -40,6 +40,15 @@ class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => TariffDto)
   tariffs?: TariffDto[];
+
+  // Step 1.1: категория + category-specific attributes (валидируются в сервисе по ACTIVE schema).
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsObject()
+  attributes?: Record<string, unknown>;
 }
 
 class UpdateProductDto {
@@ -56,6 +65,14 @@ class UpdateProductDto {
   @ValidateNested({ each: true })
   @Type(() => TariffDto)
   tariffs?: TariffDto[];
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsObject()
+  attributes?: Record<string, unknown>;
 }
 
 class ListProductsQuery {
@@ -87,6 +104,62 @@ class ListProductsQuery {
 class CreateCategoryDto {
   @IsString()
   title!: string;
+
+  // Стабильный технический identifier: обязателен, не выводится из title.
+  @IsString()
+  slug!: string;
+}
+
+class UpdateCategoryDto {
+  @IsString()
+  title!: string;
+}
+
+class CreateCategorySchemaDto {
+  @IsString()
+  categoryId!: string;
+
+  @IsArray()
+  attributes!: unknown[];
+
+  @IsOptional()
+  @IsObject()
+  availability?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  tariffRules?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  mediaRequirements?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  pdpSections?: string[];
+}
+
+class UpdateCategorySchemaDto {
+  @IsArray()
+  attributes!: unknown[];
+
+  @IsOptional()
+  @IsObject()
+  availability?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  tariffRules?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  mediaRequirements?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  pdpSections?: string[];
 }
 
 class UpsertAvailabilityDto {
@@ -155,8 +228,71 @@ export class CatalogController {
 
   @Post("categories")
   @RequirePermissions("catalog.category.write")
-  createCategory(@Body() dto: CreateCategoryDto, @CurrentUser() actor: AuthedRequest["user"]) {
-    return this.catalog.createCategory(dto.title);
+  createCategory(@Body() dto: CreateCategoryDto) {
+    return this.catalog.createCategory(dto.title, dto.slug);
+  }
+
+  @Patch("categories/:id")
+  @RequirePermissions("catalog.category.write")
+  updateCategory(@Param("id") id: string, @Body() dto: UpdateCategoryDto) {
+    return this.catalog.updateCategoryTitle(id, dto.title);
+  }
+
+  // ── Category Schema (Step 1.1) ─────────────────────────────────────────────
+
+  @Get("category-schemas")
+  @RequirePermissions("catalog.category_schema.read")
+  listCategorySchemas(@Query("categoryId") categoryId?: string) {
+    return this.catalog.listCategorySchemas(categoryId);
+  }
+
+  @Get("category-schemas/:id")
+  @RequirePermissions("catalog.category_schema.read")
+  getCategorySchema(@Param("id") id: string) {
+    return this.catalog.getCategorySchema(id);
+  }
+
+  @Post("category-schemas")
+  @RequirePermissions("catalog.category_schema.write")
+  createCategorySchema(@Body() dto: CreateCategorySchemaDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.createCategorySchema({
+      categoryId: dto.categoryId,
+      config: {
+        attributes: dto.attributes,
+        availability: dto.availability,
+        tariffRules: dto.tariffRules,
+        mediaRequirements: dto.mediaRequirements,
+        pdpSections: dto.pdpSections,
+      },
+      actorId: actor.username,
+    });
+  }
+
+  @Patch("category-schemas/:id")
+  @RequirePermissions("catalog.category_schema.write")
+  updateCategorySchema(@Param("id") id: string, @Body() dto: UpdateCategorySchemaDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.updateCategorySchema(id, {
+      config: {
+        attributes: dto.attributes,
+        availability: dto.availability,
+        tariffRules: dto.tariffRules,
+        mediaRequirements: dto.mediaRequirements,
+        pdpSections: dto.pdpSections,
+      },
+      actorId: actor.username,
+    });
+  }
+
+  @Post("category-schemas/:id/activate")
+  @RequirePermissions("catalog.category_schema.write")
+  activateCategorySchema(@Param("id") id: string) {
+    return this.catalog.activateCategorySchema(id);
+  }
+
+  @Post("category-schemas/:id/deprecate")
+  @RequirePermissions("catalog.category_schema.write")
+  deprecateCategorySchema(@Param("id") id: string) {
+    return this.catalog.deprecateCategorySchema(id);
   }
 
   @Get("products/:id/availability")

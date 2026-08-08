@@ -272,6 +272,8 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "catalog.product.publish": "Публикация/архивация продукта",
   "catalog.product.submit_moderation": "Отправка продукта на модерацию",
   "catalog.category.write": "Управление категориями",
+  "catalog.category_schema.read": "Чтение Category Schema (конфигурации категорий)",
+  "catalog.category_schema.write": "Управление Category Schema (только ADMIN)",
   "catalog.availability.write": "Управление availability",
   "crm.customer.read": "Чтение клиентов",
   "crm.customer.write": "Создание/изменение клиентов",

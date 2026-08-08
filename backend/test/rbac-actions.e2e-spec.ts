@@ -5,10 +5,12 @@
  *  - BUYER и SALES_MANAGER имеют order.read / booking.read, но НЕ имеют ни одного
  *    действия (accept/edit_noncritical/request_booking/close/cancel, send_supplier/confirm/cancel)
  *    → 403 на КАЖДОЕ действие PATCH /orders/:id и PATCH /bookings/:id;
- *  - OPERATOR (полный набор прав Order/Booking) — 200 (позитивный контроль,
- *    guard работает в обе стороны, а не отключает всё).
+ *  - OPERATOR (полный набор прав Order/Booking) — 200 (позитивный контроль, *  guard работает в обе стороны, а не отключает всё).
+ *
+ * Test DB: jest `setupFiles` (test/e2e.env.ts) подставляет изолированную
+ * тестовую БД (TEST_DATABASE_URL) до импорта AppModule — dev-БД не используется.
  */
-process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/travelhub1";
+
 
 import "reflect-metadata";
 import { INestApplication, ValidationPipe } from "@nestjs/common";

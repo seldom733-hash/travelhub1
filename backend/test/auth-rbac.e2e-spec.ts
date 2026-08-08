@@ -8,8 +8,10 @@
  *  - смена роли (ADMIN) применяется сразу (права читаются из БД);
  *  - bootstrap Order — ADMIN-only exception (order.import);
  *  - аудит auth.login / user.role_changed.
+ *
+ * Test DB: jest `setupFiles` (test/e2e.env.ts) подставляет изолированную
+ * тестовую БД (TEST_DATABASE_URL) до импорта AppModule — dev-БД не используется.
  */
-process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/travelhub1";
 
 import "reflect-metadata";
 import { INestApplication, ValidationPipe } from "@nestjs/common";

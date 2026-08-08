@@ -10,7 +10,8 @@
  *    но НЕ crm.customer.write → 403 на CRM;
  *  - ADMIN — позитивный контроль на company/partner/supplier (никто из трёх ролей их не имеет).
  */
-process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/travelhub1";
+// Test DB: jest `setupFiles` (test/e2e.env.ts) подставляет изолированную
+// тестовую БД (TEST_DATABASE_URL) до импорта AppModule — dev-БД не используется.
 
 import "reflect-metadata";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
@@ -155,8 +156,8 @@ describe("Phase 2 — RBAC: запись Catalog/CRM закрыта по пра�
     await salesAgent.post(`/api/v1/products/${product.id}/availability`).send({ date: "2026-12-31", slotsTotal: 5 }).expect(403);
     await modAgent.post(`/api/v1/products/${product.id}/availability`).send({ date: "2026-12-31", slotsTotal: 5 }).expect(201);
 
-    // категория: MODERATOR (catalog.category.write) → 201
-    const category = (await modAgent.post("/api/v1/categories").send({ title: `403 Cat ${stamp}` }).expect(201)).body;
+    // категория: MODERATOR (catalog.category.write) → 201 (slug обязателен, явный)
+    const category = (await modAgent.post("/api/v1/categories").send({ title: `403 Cat ${stamp}`, slug: `403-cat-${stamp}` }).expect(201)).body;
     if (category?.id) created.categories.push(category.id);
   });
 

@@ -105,8 +105,30 @@ enum ProductType {
   @@schema("catalog")
 }
 
+enum CategoryStatus {
+  ACTIVE
+  INACTIVE
+
+  @@schema("catalog")
+}
+
+/// Жизненный цикл Category Schema (Step 1.1): DRAFT → ACTIVE → DEPRECATED.
+/// ACTIVE — валидация продуктов категории; одновременно одна ACTIVE на категорию.
+enum CategorySchemaStatus {
+  DRAFT
+  ACTIVE
+  DEPRECATED
+
+  @@schema("catalog")
+}
+
 /// Product — единственный владелец: Catalog Center. Продуктовые данные
 /// никогда не копируются в Order/Booking (только productId).
+///
+/// Step 1.1 (Category Schema foundation): Product остаётся ОДНОЙ универсальной
+/// сущностью для всех категорий туристических услуг. categoryId + attributes
+/// (валидированные по ACTIVE Category Schema) добавляют category-specific данные
+/// без создания отдельных Product-сущностей/доменов на категорию.
 model Product {
   id          String        @id @default(uuid())
   code        String        @unique // PRD-00000001
@@ -122,22 +144,75 @@ model Product {
   createdBy   String?
   updatedBy   String?
 
+  // Category Schema foundation (Step 1.1): категория + снапшот версии schema,
+  // по которой валидировались attributes (не меняет молча смысл Product при
+  // изменении Category Schema) + сами attributes (JSONB, валидированный).
+  categoryId        String?
+  category          Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categorySchemaId  String?
+  categorySchema    CategorySchema? @relation(fields: [categorySchemaId], references: [id], onDelete: SetNull)
+  attributes        Json?
+
   tariffs      Tariff[]
   availability Availability[]
   history      ProductHistory[]
 
   @@index([status])
+  @@index([categoryId])
   @@schema("catalog")
 }
 
+/// Категория каталога (Step 1.1). `slug` — стабильный технический идентификатор
+/// ("tours", "accommodation"), `title` — отображаемое имя по умолчанию
+/// (локализация RU/AZ/EN — отдельный слой, не технический id).
 model Category {
-  id       String     @id @default(uuid())
-  code     String     @unique // CAT-00000001
-  title    String
+  id       String         @id @default(uuid())
+  code     String         @unique // CAT-00000001
+  slug     String         @unique // стабильный технический id: "tours", "accommodation"
+  title    String         // display name по умолчанию (локализация отдельно)
+  status   CategoryStatus @default(ACTIVE)
   parentId String?
-  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children Category[] @relation("CategoryTree")
+  parent   Category?      @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[]     @relation("CategoryTree")
 
+  schemas  CategorySchema[]
+  products Product[]
+
+  @@schema("catalog")
+}
+
+/// Category Schema (Step 1.1) — версионируемая конфигурация категории.
+/// Позволяет категории определять: attribute definitions (обязательность, тип,
+/// enum/options, searchable/filterable), availability/tariff requirements,
+/// media requirements (Step 1.2, пока только конфигурация) и секции PDP.
+/// Один универсальный Product + Category + Schema — без отдельных bounded
+/// contexts на категорию (Hotel/Tour/Transfer/...).
+model CategorySchema {
+  id         String               @id @default(uuid())
+  categoryId String
+  category   Category             @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  version    Int                  @default(1)
+  status     CategorySchemaStatus @default(DRAFT)
+
+  /// Определения attribute: [{ key, label, type, required, searchable, filterable, options?, min?, max?, pattern? }]
+  attributes Json
+  /// Требования availability (дата/слоты) — конфигурация.
+  availability Json?
+  /// Требования Tariff/Option (обязательные опции и т.п.) — конфигурация.
+  tariffRules Json?
+  /// Требования media для Step 1.2: minImages/maxImages/primaryImageRequired/allowedMediaTypes/videoAllowed.
+  mediaRequirements Json?
+  /// Логические секции Product Detail Page (overview/gallery/itinerary/...).
+  pdpSections Json?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@unique([categoryId, version])
+  @@index([status])
   @@schema("catalog")
 }
 
