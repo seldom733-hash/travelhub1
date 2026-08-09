@@ -107,12 +107,14 @@ Storefront = paid SaaS subscription/plan/entitlement.
 `NONE / ACTIVE / SUSPENDED / EXPIRED`; public Storefront требует
 lifecycle ACTIVE + entitlement ACTIVE. Billing позже становится
 authoritative, Catalog entitlement --- projection/read state.
+**Статус: APPROVED (реализовано в Step 1.12.1/1.12.2, ADR-0006, DD-003…DD-014).**
 
 · **Step 1.12.1B --- Product Publication Channel Foundation**\
 `ProductPublicationChannel`: `MARKETPLACE`, `PARTNER_STOREFRONT`.
 Publication channel отделён от Product lifecycle и от будущего
 acquisition/sales channel. Один Product может быть Marketplace-only,
 Storefront-only, BOTH или ни в одном канале.
+**Статус: APPROVED (реализовано в Step 1.12.1, REVIEW FIX 3/4; e2e storefront).**
 
 · **Step 1.12.2 --- Partner Storefront Frontend, Business Identity &
 Public Experience**\
@@ -120,19 +122,21 @@ Public Experience**\
 identity, structured business contacts только в Storefront context,
 logo/hero/branding, preview, entitlement UX, Product distribution UX,
 RU/AZ/EN, SEO/accessibility baseline. Marketplace contact leakage = 0.\
-**Статус: PROMPT READY / следующий выполняемый шаг.**
+**Статус: APPROVED после REVIEW FIXES (FIX 1 ValidationPipe, FIX 2 PDP metadata).**
 
 · **Step 1.12.2A --- Storefront Business Identity Boundary**\
 `PublicSellerProfile` остаётся Marketplace identity. Storefront получает
 собственную business projection: businessName, tagline, description,
 geography, structured contacts, branding. Raw CRM Partner не
 публикуется.
+**Статус: APPROVED (реализовано в Step 1.12.2; ADR-0006, ADR-0005 не затронута).**
 
 · **Step 1.12.2B --- Storefront Contact Disclosure Policy**\
 Storefront может показывать phone/email/website/WhatsApp/social links
 как структурированные Storefront-owned поля при ACTIVE entitlement.
 Product text не становится каналом для контактов. Marketplace
 anti-disintermediation не ослабляется.
+**Статус: APPROVED (реализовано в Step 1.12.2; Marketplace leakage = 0, e2e).**
 
 · **Step 1.12.3 --- Storefront / Marketplace Channel & Analytics
 Instrumentation Foundation**\
@@ -146,6 +150,7 @@ behavioral events, anonymous/authenticated session context,
 · **Step 1.13 --- Buyer Cabinet Foundation**\
 Свои будущие Orders/Bookings/Documents/Payments/Support read models;
 безопасный BUYER own-scope. Без преждевременной Finance/Sales логики.
+**Статус: APPROVED (e2e buyer-cabinet; own read models, controlled-empty, IDOR закрыт).**
 
 · **Step 1.13A --- Temporal & Analytics Readiness Foundation**\
 Аудит всех существующих models/tables на `createdAt`, `updatedAt`,
@@ -153,38 +158,41 @@ lifecycle timestamps и history/events. Добавить отсутствующ�
 `publishedAt`, `submittedAt`, `reviewStartedAt`, `approvedAt`,
 `rejectedAt`, `archivedAt`, `cancelledAt`, `completedAt` там, где они
 имеют реальный lifecycle-смысл. `updatedAt` не заменяет историю.
+**Статус: APPROVED (temporal-readiness.md + e2e temporal-readiness; legacy NULL без фабрикаций).**
 
 · **Step 1.13B --- Marketplace Behavioral Events Foundation**\
 `MarketplaceViewed`, `SearchPerformed`, `CategoryViewed`,
 `ProductImpression`, `ProductViewed`, `StorefrontViewed`; `occurredAt`,
 actor/anonymousSession, entity context, source/channel, trace context.
+**Статус: APPROVED (MarketplaceBehavioralEvent, ADR-0008; e2e marketplace-behavioral).**
 
 · **Step 1.14 --- Canonical Order Events**\
 `OrderReadyForBooking`, `OrderFulfilled`, `OrderClosed`,
 cleanup/deprecation generic `OrderStatusChanged` там, где он подменяет
 канонические события.\
-**Статус: не начат.**
+**Статус: APPROVED (e2e order-canonical-events; generic `OrderStatusChanged` не подменяет канонические).**
 
 · **Step 1.15 --- Correlation / Request ID Infrastructure**\
 `correlationId`, `causationId`, HTTP request-id middleware, propagation
 в events/audit/logs.\
-**Статус: не начат.**
+**Статус: APPROVED (ADR-0009; request-context middleware + e2e; ALS без cross-request leak).**
 
 · **Step 1.15A --- Business Event Temporal Contract**\
 Event envelope: `eventId`, `eventType`, `occurredAt`, `correlationId`,
 `causationId`, actor/system actor, `entityId`, source/channel,
 version/metadata.
+**Статус: APPROVED (ADR-0010; envelope + e2e business-event-envelope; occurredAt = createdAt, actor SYSTEM/USER/UNKNOWN).**
 
 · **Step 1.16 --- Communication Foundation**\
 `Communication = CML-*`, cross-domain communication model для
 CRM/Order/Booking/Support вместо legacy message fragments.\
-**Статус: не начат.**
+**Статус: APPROVED после STRICT REVIEW FIXES (ADR-0011; CML-*, participant↔context, 20-way concurrency).**
 
 · **Step 1.17 --- Phase 1 Hardening / Security / Regression**\
 Полный regression, RBAC/object-scope/IDOR, public/private boundaries,
 pagination/filter/sort, error model, migration safety, observability,
 performance/security; Partner/Seller/Storefront включены.\
-**Статус: не начат.**
+**Статус: APPROVED после STRICT REVIEW FIXES (FIX 1 PARTNER internal-read revoke; RBAC staff-scope audit; PII redaction).**
 
 · **Step 1.18 --- Phase 1 Exit Audit**\
 GAP-анализ против актуального Master/Baseline, Phase 1 DoD,

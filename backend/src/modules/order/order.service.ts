@@ -10,6 +10,7 @@ import {
 } from "../../eventbus/domain-events";
 import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
+import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
 
 export interface BootstrapOrderInput {
   customerId: string;
@@ -199,7 +200,10 @@ export class OrderService {
     return result;
   }
 
-  async listOrders(query: { status?: string; customerId?: string; search?: string; page?: number; pageSize?: number }) {
+  async listOrders(
+    query: { status?: string; customerId?: string; search?: string; page?: number; pageSize?: number },
+    viewer?: TravelerViewer,
+  ) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const where: Prisma.OrderWhereInput = {
@@ -219,10 +223,16 @@ export class OrderService {
       }),
       this.prisma.order.count({ where }),
     ]);
-    return { items, total, page, pageSize };
+    // Step 1.17: field-level redaction — traveler PII виден только OPERATOR/ADMIN.
+    return {
+      items: items.map((o) => ({ ...o, travelers: redactTravelersPii(o.travelers ?? [], viewer) })),
+      total,
+      page,
+      pageSize,
+    };
   }
 
-  async getOrder(id: string) {
+  async getOrder(id: string, viewer?: TravelerViewer) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -233,7 +243,8 @@ export class OrderService {
       },
     });
     if (!order) throw new NotFoundError(`Order ${id} not found`);
-    return order;
+    // Step 1.17: field-level redaction — traveler PII виден только OPERATOR/ADMIN.
+    return { ...order, travelers: redactTravelersPii(order.travelers ?? [], viewer) };
   }
 
   async updateTravelers(orderId: string, travelers: TravelerUpdateInput[], actor?: string) {

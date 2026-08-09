@@ -17,6 +17,14 @@
 | `TH-YYYY-######` | Order (пользовательский номер) | Order |
 | `BKG-` | Booking | Booking |
 | `CML-` | Communication | Communication |
+| `SELL-` | PublicSellerProfile | Catalog (seller identity) |
+| `SPP-` | Seller profile proposal | Catalog (seller identity) |
+| `SF-` | PartnerStorefront | Catalog (storefront) |
+| `APP-` | PartnerApplication | Security (onboarding) |
+| `USR-` | User (staff/role accounts) | Security |
+
+*Exit Audit Step 1.18:* таблица синхронизирована с фактическим реестром
+`IdsService.nextCode` (PRD/CAT/TRF/CUS/CNT/COM/PAR/SUP/ORD/TH/BKG/CML/SELL/SPP/SF/APP/USR).
 
 Формат: `PREFIX-` + число, дополненное слева нулями (8 цифр; для
 `TH-YYYY-######` — 6 цифр, последовательность сквозная по году).

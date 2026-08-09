@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { NotFoundError } from "../../shared/errors";
+import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
 
 /**
  * Read-only доступ к данным Booking Center для других доменов
@@ -19,15 +20,17 @@ export class BookingQueryService {
   }
 
   /** Полные брони заказа (список связанных сущностей). */
-  async getByOrderId(orderId: string) {
-    return this.prisma.booking.findMany({
+  async getByOrderId(orderId: string, viewer?: TravelerViewer) {
+    const rows = await this.prisma.booking.findMany({
       where: { orderId },
       orderBy: { createdAt: "asc" },
       include: { passengers: true },
     });
+    // Step 1.17: field-level redaction — passenger PII виден только OPERATOR/ADMIN.
+    return rows.map((b) => ({ ...b, passengers: redactTravelersPii(b.passengers ?? [], viewer) }));
   }
 
-  async getById(id: string) {
+  async getById(id: string, viewer?: TravelerViewer) {
     const booking = await this.prisma.booking.findUnique({
       where: { id },
       include: {
@@ -38,6 +41,7 @@ export class BookingQueryService {
       },
     });
     if (!booking) throw new NotFoundError(`Booking ${id} not found`);
-    return booking;
+    // Step 1.17: field-level redaction — passenger PII виден только OPERATOR/ADMIN.
+    return { ...booking, passengers: redactTravelersPii(booking.passengers ?? [], viewer) };
   }
 }

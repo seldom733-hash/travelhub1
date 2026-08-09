@@ -156,14 +156,14 @@ export class OrderController {
 
   @Get("orders")
   @RequirePermissions("order.read")
-  listOrders(@Query() query: ListOrdersQuery) {
-    return this.orders.listOrders(query);
+  listOrders(@Query() query: ListOrdersQuery, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.orders.listOrders(query, actor);
   }
 
   @Get("orders/:id")
   @RequirePermissions("order.read")
-  getOrder(@Param("id") id: string) {
-    return this.orders.getOrder(id);
+  getOrder(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.orders.getOrder(id, actor);
   }
 
   @Patch("orders/:id")

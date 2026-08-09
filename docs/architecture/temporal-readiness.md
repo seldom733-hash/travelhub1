@@ -172,6 +172,28 @@ lifecycle'ов здесь НЕ вводится.
 Новых кандидатов DD-021+ не требуется: решения приняты в рамках существующих
 ADR (0001/0003/0007/0008) без изменения ownership. Architecture decision не нужен.
 
+## 15. Reconciliation — Step 1.18A Analytics Readiness (2026-08-10)
+
+Глубокий аудит 1.18A подтвердил все claims этого документа (entitlement NO GAP
+via AuditLog; Partner create/link NO GAP via events; Category legacy NULL;
+updatedAt discipline). Два уточнения для честности:
+
+1. **ProductPublicationChannel history**: колонка `createdAt` — момент первой
+   установки канала (current-state); изменения каналов фиксируются в
+   `ProductHistory channels.updated` (from/to). Метрика «сколько Product реально
+   доступно в канале на дату X»: **current-state analytics ready; полная
+   historical channel availability по дням — ограничена** (нужна отдельная
+   channel-history таблица, если Phase 2 потребует; не требование Phase 1).
+   Ряд матрицы остаётся READY (transitions), с классификацией в
+   `analytics-readiness.md §2/§3`.
+2. **Storefront content history** (businessName/tagline/description/contacts):
+   `storefront.updated` AuditLog без full diff; полная версионная история
+   текстов не хранится — **non-critical gap** (критичные факты: public lifecycle,
+   entitlement, traffic, product views, contact clicks — восстановимы).
+
+Полный artifact: `docs/architecture/analytics-readiness.md` (readiness matrix,
+reliable-from horizons, data coverage, funnels, privacy boundary, debt owners).
+
 ---
 
-`PHASE 1 STEP 1.13A TEMPORAL READINESS DOCUMENT — v1`
+`PHASE 1 STEP 1.13A TEMPORAL READINESS DOCUMENT — v1 (+1.18A reconciliation)`

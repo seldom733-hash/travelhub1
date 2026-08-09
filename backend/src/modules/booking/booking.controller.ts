@@ -67,8 +67,8 @@ export class BookingController {
 
   @Get("bookings/:id")
   @RequirePermissions("booking.read")
-  getBooking(@Param("id") id: string) {
-    return this.bookings.getBooking(id);
+  getBooking(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.bookings.getBooking(id, actor);
   }
 
   @Patch("bookings/:id")

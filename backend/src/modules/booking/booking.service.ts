@@ -75,8 +75,8 @@ export class BookingService {
     return { items, total, page, pageSize };
   }
 
-  async getBooking(id: string) {
-    return this.query.getById(id);
+  async getBooking(id: string, viewer?: import("../../shared/pii").TravelerViewer) {
+    return this.query.getById(id, viewer);
   }
 
   /** Команда жизненного цикла бронирования. */

@@ -158,7 +158,6 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "account.profile.read",
     "account.profile.update",
     "catalog.product.read",
-    "catalog.product.read",
     "catalog.category_schema.read",
     "crm.customer.read",
     "order.read",
@@ -187,7 +186,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "account.profile.read",
     "account.profile.update",
     "catalog.product.read",
-    "crm.customer.read",
+    // Step 1.17 review: crm.customer.read отозван — Phase 1 не имеет finance-контракта,
+    // которому нужен доступ к клиентским master-данным (invoice/payment endpoints Phase 2).
+    // Роль читает финансовые данные через order.read/booking.read (суммы) и получит
+    // customer-контекст вместе с Phase-2 finance endpoints по принципу grant-with-endpoint.
     "order.read",
     "booking.read",
     "sales.sale.read",
@@ -212,7 +214,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "account.profile.read",
     "account.profile.update",
     "catalog.product.read",
-    "crm.customer.read",
+    // Step 1.17 review: crm.customer.read отозван — Phase 1 не имеет маркетинговых
+    // endpoints (leads/opportunities — Phase 2); клиентские master-данные с PII
+    // не выдаются без текущего контракта.
     "sales.lead.read",
     "sales.opportunity.read",
     "sales.sale.read",
@@ -225,7 +229,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "account.profile.read",
     "account.profile.update",
     "catalog.product.read",
-    "crm.customer.read",
+    // Step 1.17 review: crm.customer.read отозван — Phase 1 не имеет analytics endpoints;
+    // агрегаты строятся на order.read/booking.read/product.read, а customer-детали
+    // (контакты/PII) выдаются только вместе с Phase-2 analytics контрактом.
     "order.read",
     "booking.read",
     "sales.lead.read",
@@ -345,13 +351,15 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "catalog.media.delete_own",
     "catalog.media.reorder_own",
     "catalog.media.set_primary_own",
-    "crm.customer.read",
-    "order.read",
-    "booking.read",
-    "sales.sale.read",
-    "finance.payment.read",
-    "documents.read",
-    "support.read",
+    // Step 1.17 REVIEW FIX: PARTNER НЕ получает internal unscoped read-контракты
+    // (crm.customer.read / order.read / booking.read) — они открывают ЧУЖИЕ
+    // customers (контакты), orders (traveler PII) и bookings (passenger PII)
+    // без object-scope (та же семантика, что revoke для BUYER в Step 1.13: эти
+    // контракты — internal/unscoped, только staff-роли). Phase-2 резервные права
+    // (sales.sale.read / finance.payment.read / documents.read / support.read)
+    // у PARTNER тоже отсутствуют — внешний контур получает только own-scope
+    // read-модели (account.*.read_own / communication.read_own), а не будущие
+    // internal-контракты по умолчанию.
     // Step 1.10: PARTNER управляет СВОЕЙ PartnerApplication (onboarding), пока
     // partnerId не назначен. Selling-доступ выдаётся ТОЛЬКО approve (см. gates).
     "partner.onboarding.read_own",

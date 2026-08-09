@@ -220,4 +220,32 @@ describe("Phase 2 — RBAC: запись Catalog/CRM закрыта по пра�
     const supplier = (await adminAgent.post("/api/v1/suppliers").send({ name: `403 Supplier ${stamp}` }).expect(201)).body;
     if (supplier?.id) created.suppliers.push(supplier.id);
   });
+
+  it("Step 1.17: FINANCE/ANALYST/MARKETER НЕ имеют crm.customer.read (нет Phase-1 контракта на клиентские PII)", async () => {
+    const admin = await login("admin", "admin123");
+    const adminAgent = await agent(admin.accessToken);
+
+    for (const [role, uname, pwd] of [
+      [RoleCode.FINANCE, `rscfin${stamp}`, "finpass123"],
+      [RoleCode.ANALYST, `rscana${stamp}`, "anapass123"],
+      [RoleCode.MARKETER, `rscmar${stamp}`, "marpass123"],
+    ] as const) {
+      const user = (
+        await adminAgent.post("/api/v1/users").send({ username: uname, password: pwd, roleCode: role }).expect(201)
+      ).body;
+      created.users.push(user.id);
+      const session = await login(uname, pwd);
+
+      // Permission отсутствует в токене/БД.
+      expect(session.user.permissions).not.toContain("crm.customer.read");
+      // HTTP: полный список клиентов недоступен.
+      await (await agent(session.accessToken)).get("/api/v1/customers").expect(403);
+      await (await agent(session.accessToken)).get("/api/v1/customers/00000000-0000-0000-0000-000000000000").expect(403);
+    }
+
+    // Positive control: ANALYST сохраняет order.read (агрегаты аналитики) — регрессия auth-rbac.
+    const analyst = await login(`rscana${stamp}`, "anapass123");
+    expect(analyst.user.permissions).toContain("order.read");
+    await (await agent(analyst.accessToken)).get("/api/v1/orders").expect(200);
+  });
 });
