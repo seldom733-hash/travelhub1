@@ -1,0 +1,33 @@
+# TravelHub — локальная инфраструктура (Phase 1 Step 1.2)
+#
+# MinIO: локальный S3-compatible object storage для ProductMedia.
+# Подними:  docker compose up -d minio
+# Консоль:  http://localhost:9001  (MINIO_ROOT_USER / MINIO_ROOT_PASSWORD)
+# S3 API:   http://localhost:9000  (S3_ENDPOINT=http://localhost:9000, forcePathStyle)
+#
+# ВНИМАНИЕ: e2e-тесты НЕ используют этот контейнер — они стартуют изолированный
+# standalone MinIO (test/e2e.minio.ts) с отдельным bucket `travelhub-media-test`,
+# поэтому dev/prod storage тестами не затрагивается.
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: travelhub-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  minio-data:

@@ -18,6 +18,7 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { AppExceptionFilter } from "../src/shared/exception.filter";
+import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 
 describe("Phase 1 — Product → Order → Booking (e2e)", () => {
@@ -34,7 +35,7 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
@@ -137,6 +138,9 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     // «Передать в Booking Center»
     const sendRes = await http.patch(`/api/v1/orders/${order.id}`).send({ action: "send" }).expect(200);
     expect(sendRes.body.status).toBe("SENT_TO_BOOKING");
+    // Step 1.15: сервер-authoritative requestId в response header.
+    const sendRequestId = sendRes.headers["x-request-id"] as string;
+    expect(sendRequestId).toBeTruthy();
 
     // ── 7. Booking создан consumer-ом (BKG-*) + Passenger ────────────────────
     const bookings = await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200);
@@ -172,21 +176,32 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     await http.patch(`/api/v1/orders/${order.id}`).send({ action: "close" }).expect(200);
 
     // ── 11. Трассировка: correlation/causation + аудит переходов ──────────────
+    // Step 1.15: correlation — техническая цепочка (requestId команды),
+    // НЕ business-код заказа. События Booking-домена имеют aggregateId = booking.id,
+    // поэтому выбираем события обоих агрегатов (Order + Booking) заказа.
     const events = await prisma.outboxEvent.findMany({
-      where: { OR: [{ correlationId: order.code }, { aggregateId: order.id }] },
+      where: { OR: [{ aggregateId: order.id }, { aggregateId: booking.id }] },
       orderBy: { createdAt: "asc" },
     });
     const types = events.map((e) => e.eventType);
     expect(types).toContain("OrderCreated");
-    expect(types).toContain("OrderApproved");
+    // Step 1.14: canonical факт «готов к бронированию» (бывш. OrderApproved).
+    expect(types).toContain("OrderReadyForBooking");
+    expect(types).not.toContain("OrderApproved");
     expect(types).toContain("BookingRequested");
     expect(types).toContain("BookingCreated");
     expect(types).toContain("BookingConfirmed");
+    // Step 1.14: canonical факты fulfillment/close присутствуют ровно по одному.
+    expect(types.filter((t) => t === "OrderFulfilled")).toHaveLength(1);
+    expect(types.filter((t) => t === "OrderClosed")).toHaveLength(1);
 
     const bookingRequested = events.find((e) => e.eventType === "BookingRequested");
     const bookingCreated = events.find((e) => e.eventType === "BookingCreated");
     expect(bookingCreated?.causationId).toBe(bookingRequested?.id);
-    expect(bookingCreated?.correlationId).toBe(order.code);
+    // Step 1.15: child event наследует correlation родителя (= requestId send-команды);
+    // business-код заказа больше НЕ используется как correlationId.
+    expect(bookingRequested?.correlationId).toBe(sendRequestId);
+    expect(bookingCreated?.correlationId).toBe(bookingRequested?.correlationId);
 
     const history = await prisma.orderHistory.findMany({ where: { orderId: order.id }, orderBy: { createdAt: "asc" } });
     const actions = history.map((h) => h.action);

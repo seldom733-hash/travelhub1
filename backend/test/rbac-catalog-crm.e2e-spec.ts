@@ -5,9 +5,11 @@
  *  - BUYER (регистрация): только чтение → 403 на ВСЕ write-эндпоинты;
  *  - SALES_MANAGER: crm.customer.write / crm.contact.write (201 на customers/contacts),
  *    но НЕ catalog.* и НЕ company/partner/supplier → 403;
- *  - MODERATOR: catalog.product.write/publish, catalog.category.write,
- *    catalog.availability.write (201 на products/categories/availability),
- *    но НЕ crm.customer.write → 403 на CRM;
+ *  - MODERATOR (Step 1.3 review fix): ТОЛЬКО moderation-права — review/approve/
+ *    reject/request_changes + read_for_moderation; БЕЗ catalog.product.write и БЕЗ
+ *    catalog.product.publish (direct publish → 403; publish только через controlled
+ *    transition после moderation decision); БЕЗ category/availability write;
+ *    НЕ crm.customer.write → 403 на CRM;
  *  - ADMIN — позитивный контроль на company/partner/supplier (никто из трёх ролей их не имеет).
  */
 // Test DB: jest `setupFiles` (test/e2e.env.ts) подставляет изолированную
@@ -19,6 +21,7 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { AppExceptionFilter } from "../src/shared/exception.filter";
+import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
 
@@ -60,7 +63,7 @@ describe("Phase 2 — RBAC: запись Catalog/CRM закрыта по пра�
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
@@ -69,7 +72,7 @@ describe("Phase 2 — RBAC: запись Catalog/CRM закрыта по пра�
 
     const reg = await request(app.getHttpServer())
       .post("/api/v1/auth/register")
-      .send({ username: buyerUsername, password: "buyerpass123", fullName: "Покупатель" })
+      .send({ username: buyerUsername, email: `${buyerUsername}@test.local`, password: "buyerpass123", fullName: "Покупатель" })
       .expect(201);
     created.users.push(reg.body.user.id);
     buyerAgent = await agent(reg.body.accessToken);
@@ -113,51 +116,68 @@ describe("Phase 2 — RBAC: запись Catalog/CRM закрыта по пра�
     expect(sales.user.permissions).not.toContain("crm.company.write");
 
     const mod = await login(modUsername, "modpass123");
-    expect(mod.user.permissions).toContain("catalog.product.write");
-    expect(mod.user.permissions).toContain("catalog.product.publish");
-    expect(mod.user.permissions).toContain("catalog.category.write");
-    expect(mod.user.permissions).toContain("catalog.availability.write");
+    expect(mod.user.permissions).not.toContain("catalog.product.write"); // Step 1.3
+    expect(mod.user.permissions).not.toContain("catalog.product.publish"); // Step 1.3 fix: только moderation
+    expect(mod.user.permissions).not.toContain("catalog.product.read"); // нет unrestricted internal read
+    expect(mod.user.permissions).not.toContain("catalog.category.write");
+    expect(mod.user.permissions).not.toContain("catalog.availability.write");
+    expect(mod.user.permissions).toContain("catalog.product.read_for_moderation");
+    expect(mod.user.permissions).toContain("catalog.media.read_for_moderation");
+    expect(mod.user.permissions).toContain("moderation.review");
+    expect(mod.user.permissions).toContain("moderation.approve");
+    expect(mod.user.permissions).toContain("moderation.reject");
+    expect(mod.user.permissions).toContain("moderation.request_changes");
     expect(mod.user.permissions).not.toContain("crm.customer.write");
   });
 
-  it("Catalog: BUYER/SALES_MANAGER → 403 на все write; MODERATOR → 201/200", async () => {
-    // BUYER/SALES не могут создавать продукты и категории
+  it("Catalog: BUYER/SALES/MODERATOR → 403 на create/PATCH/publish/archive/availability/category; ADMIN — positive control", async () => {
+    // BUYER/SALES/MODERATOR не могут создавать продукты (Step 1.3: у MODERATOR нет product.write)
     await buyerAgent.post("/api/v1/products").send({ type: "TOUR", title: "No" }).expect(403);
     await salesAgent.post("/api/v1/products").send({ type: "TOUR", title: "No" }).expect(403);
+    await modAgent.post("/api/v1/products").send({ type: "TOUR", title: "No" }).expect(403);
     await buyerAgent.post("/api/v1/categories").send({ title: "No" }).expect(403);
     await salesAgent.post("/api/v1/categories").send({ title: "No" }).expect(403);
 
-    // MODERATOR (catalog.product.write) создаёт продукт — позитивный контроль
+    // Продукт создаёт ADMIN (system-owned); MODERATOR читает для модерации
     const product = (
-      await modAgent
+      await adminAgent
         .post("/api/v1/products")
         .send({ type: "TOUR", title: `403 Cat ${stamp}`, tariffs: [{ name: "S", price: 100 }] })
         .expect(201)
     ).body.product;
     created.products.push(product.id);
+    await modAgent.get(`/api/v1/products/${product.id}`).expect(200);
 
-    // PATCH: BUYER/SALES → 403, MODERATOR → 200
+    // PATCH: BUYER/SALES → 403; MODERATOR → 403 (нет catalog.product.write, Step 1.3); ADMIN → 200
     await buyerAgent.patch(`/api/v1/products/${product.id}`).send({ title: "Hack" }).expect(403);
     await salesAgent.patch(`/api/v1/products/${product.id}`).send({ title: "Hack" }).expect(403);
-    await modAgent.patch(`/api/v1/products/${product.id}`).send({ title: `403 Cat updated ${stamp}` }).expect(200);
+    await modAgent.patch(`/api/v1/products/${product.id}`).send({ title: "Hack" }).expect(403);
+    await adminAgent.patch(`/api/v1/products/${product.id}`).send({ title: `403 Cat updated ${stamp}` }).expect(200);
 
-    // publish: BUYER/SALES → 403, MODERATOR (catalog.product.publish) → 201
+    // publish: BUYER/SALES/MODERATOR → 403 (MODERATOR без catalog.product.publish, Step 1.3 fix);
+    // ADMIN (controlled publish transition) → 201
     await buyerAgent.post(`/api/v1/products/${product.id}/publish`).expect(403);
     await salesAgent.post(`/api/v1/products/${product.id}/publish`).expect(403);
-    await modAgent.post(`/api/v1/products/${product.id}/publish`).expect(201);
+    await modAgent.post(`/api/v1/products/${product.id}/publish`).expect(403);
+    await adminAgent.post(`/api/v1/products/${product.id}/publish`).expect(201);
+    // MODERATOR read_for_moderation: читает даже PUBLISHED/чужие продукты
+    await modAgent.get(`/api/v1/products/${product.id}`).expect(200);
 
-    // archive: BUYER/SALES → 403, MODERATOR → 201
+    // archive: BUYER/SALES/MODERATOR → 403, ADMIN → 201
     await buyerAgent.post(`/api/v1/products/${product.id}/archive`).expect(403);
     await salesAgent.post(`/api/v1/products/${product.id}/archive`).expect(403);
-    await modAgent.post(`/api/v1/products/${product.id}/archive`).expect(201);
+    await modAgent.post(`/api/v1/products/${product.id}/archive`).expect(403);
+    await adminAgent.post(`/api/v1/products/${product.id}/archive`).expect(201);
 
-    // availability: BUYER/SALES → 403, MODERATOR (catalog.availability.write) → 201
+    // availability: BUYER/SALES/MODERATOR → 403 (без catalog.availability.write), ADMIN → 201
     await buyerAgent.post(`/api/v1/products/${product.id}/availability`).send({ date: "2026-12-31", slotsTotal: 5 }).expect(403);
     await salesAgent.post(`/api/v1/products/${product.id}/availability`).send({ date: "2026-12-31", slotsTotal: 5 }).expect(403);
-    await modAgent.post(`/api/v1/products/${product.id}/availability`).send({ date: "2026-12-31", slotsTotal: 5 }).expect(201);
+    await modAgent.post(`/api/v1/products/${product.id}/availability`).send({ date: "2026-12-31", slotsTotal: 5 }).expect(403);
+    await adminAgent.post(`/api/v1/products/${product.id}/availability`).send({ date: "2026-12-31", slotsTotal: 5 }).expect(201);
 
-    // категория: MODERATOR (catalog.category.write) → 201 (slug обязателен, явный)
-    const category = (await modAgent.post("/api/v1/categories").send({ title: `403 Cat ${stamp}`, slug: `403-cat-${stamp}` }).expect(201)).body;
+    // категория: MODERATOR → 403 (без catalog.category.write, Step 1.3 fix); ADMIN → 201
+    await modAgent.post("/api/v1/categories").send({ title: `403 Cat ${stamp}`, slug: `403-cat-${stamp}` }).expect(403);
+    const category = (await adminAgent.post("/api/v1/categories").send({ title: `403 Cat ${stamp}`, slug: `403-cat-${stamp}` }).expect(201)).body;
     if (category?.id) created.categories.push(category.id);
   });
 

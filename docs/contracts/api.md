@@ -1,7 +1,21 @@
 # REST API — /api/v1/{domain}/...
 
 Каждый эндпоинт принадлежит **ровно одному домену**. Глобальный префикс
-`/api/v1`. Ошибки: единая форма `{ statusCode, message }`.
+`/api/v1`. Ошибки: единая форма `{ statusCode, message, requestId }`.
+
+## Request ID (Step 1.15)
+
+Каждый HTTP response (включая ошибки и public anonymous endpoints) возвращает
+канонический заголовок `X-Request-Id` — server-authoritative UUID v4.
+
+- Входной `X-Request-Id` от клиента принимается **только** если это валидный
+  UUID v4 (≤64 симв.) — documented diagnostic contract (ADR-0009): он становится
+  requestId запроса. Невалидный/oversized/дубликат — сервер генерирует свой.
+- `X-Correlation-Id` от клиента НЕ принимается как authoritative: сервер сам
+  назначает correlation (см. `docs/contracts/events.md`, ADR-0009).
+- Тело ошибки содержит `requestId` для связи с server logs (без stack/internal
+  leakage, без PII).
+- `requestId` ≠ behavioral `eventId` ≠ `sessionId`.
 
 ## Аутентификация и RBAC (Phase 2)
 
@@ -74,9 +88,13 @@ PATCH  /api/v1/orders/:id         action: process | markWaitingData | resumeProc
 PATCH  /api/v1/orders/:id/travelers  обновление паспортных данных — order.edit_noncritical
 ```
 
-Действия и события:
-`confirm` → `OrderApproved`; `send` («Передать в Booking Center») →
-`BookingRequested`; `cancel` → `OrderCancelled`; прочие → `OrderStatusChanged`.
+Действия и события (Step 1.14 — canonical Order events):
+`confirm` → `OrderReadyForBooking` (факт); `send` («Передать в Booking Center») →
+`BookingRequested` (command); `complete` → `OrderFulfilled` (факт);
+`close` → `OrderClosed` (факт); `cancel` → `OrderCancelled` (факт);
+прочие (process/markWaitingData/resumeProcessing/problem/suspend) →
+`OrderStatusChanged` (технический). События пишутся атомарно с переходом
+(state + OrderHistory + outbox в одной транзакции).
 
 ## Booking Center (владелец Booking/Reservation/SupplierConfirmation/Passenger)
 

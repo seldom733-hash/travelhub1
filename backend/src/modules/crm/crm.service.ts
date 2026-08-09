@@ -2,9 +2,10 @@ import { Injectable } from "@nestjs/common";
 import type { Prisma, CustomerType, EntityStatus } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
-import { DomainEvents, type CustomerEventPayload } from "../../eventbus/domain-events";
+import { DomainEvents, type CustomerEventPayload, type PartnerEventPayload } from "../../eventbus/domain-events";
 import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError } from "../../shared/errors";
+import { normalizeEmail } from "../../shared/field-validation";
 
 export interface CreateCustomerInput {
   type?: CustomerType;
@@ -35,6 +36,29 @@ export interface CustomerListQuery {
   status?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface EnsureBuyerCustomerInput {
+  /** Canonical identity key (нормализованный email) — deterministic match. */
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  actorUserId?: string;
+}
+
+export interface CreateOrLinkPartnerInput {
+  /** Display name (brand). НЕ identity-ключ (no merge по имени). */
+  name: string;
+  /** INDIVIDUAL — канонический ключ (нормализованный email). */
+  contactEmail?: string;
+  /** COMPANY — канонический ключ (регистрационный номер). */
+  registrationNumber?: string;
+  taxId?: string;
+  companyId?: string;
+  /** Authoritative country (2-letter code) — системная identity, не locale-значение. */
+  countryCode?: string;
+  actorUserId?: string;
 }
 
 /**
@@ -84,6 +108,9 @@ export class CrmService {
         },
       });
 
+      // STRICT REVIEW FIX (PII minimization): email убран из payload — у
+      // CustomerCreated НЕТ consumer-ов, email остаётся в CRM master-data (по
+      // customerId можно прочитать по ID, ADR-0001). Payload: canonical refs.
       const eventId = await this.eventBus.emit(tx, {
         aggregateType: "Customer",
         aggregateId: customer.id,
@@ -92,7 +119,6 @@ export class CrmService {
           customerId: customer.id,
           code: customer.code,
           name: customer.companyName ?? `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim(),
-          email: customer.email,
         } as CustomerEventPayload,
       });
 
@@ -182,7 +208,6 @@ export class CrmService {
           customerId: id,
           code: customer.code,
           name: customer.companyName ?? `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim(),
-          email: customer.email,
           changedFields: Object.keys(input),
         } as CustomerEventPayload,
       });
@@ -192,6 +217,162 @@ export class CrmService {
 
     await this.eventBus.publishPending();
     return result;
+  }
+
+  /**
+   * Step 1.9 — CRM-owned application command для BUYER identity link.
+   *
+   * create-or-link crm.Customer по КАНОНИЧЕСКОМУ ключу (нормализованный email,
+   * Customer.email @unique):
+   *  - существует однозначный Customer с таким email → reuse (link), НЕ merge;
+   *  - нет → создать ровно одного Customer;
+   *  - retry/повтор регистрации никогда не создаёт дубликат (unique + reuse);
+   *  - НЕМБИГУОЗНЫЙ legacy match НЕ merge'ится автоматически (только email
+   *    считаем deterministic; имя/телефон не являются ключом связи);
+   *  - работает в транзакции вызывающего (tx): вся orchestration регистрации
+   *    (User + Customer + link) атомарна, иначе регистрация падает целиком.
+   *
+   * Владелец Customer — CRM: пишет crm.* только этот сервис, вызванный как
+   * application service из Auth (security не трогает crm.Customer напрямую).
+   */
+  async ensureCustomerForBuyer(
+    tx: Prisma.TransactionClient,
+    input: EnsureBuyerCustomerInput,
+  ): Promise<{ customerId: string; created: boolean }> {
+    const email = normalizeEmail(input.email);
+
+    // Deterministic reuse: ровно один Customer на email (unique constraint).
+    const existing = await tx.customer.findUnique({ where: { email }, select: { id: true } });
+    if (existing) return { customerId: existing.id, created: false };
+
+    const code = await this.ids.nextCode(tx, "CUS");
+    const customer = await tx.customer.create({
+      data: {
+        code,
+        type: "PERSON",
+        firstName: input.firstName ?? null,
+        lastName: input.lastName ?? null,
+        email,
+        phone: input.phone ?? null,
+        status: "ACTIVE",
+        version: 1,
+      },
+      select: { id: true, code: true },
+    });
+
+    await tx.customerHistory.create({
+      data: {
+        customerId: customer.id,
+        action: "created",
+        to: "ACTIVE",
+        actorId: input.actorUserId ?? null,
+        actorName: input.actorUserId ?? null,
+        comment: "Buyer self-registration (Step 1.9)",
+      },
+    });
+
+    await this.eventBus.emit(tx, {
+      aggregateType: "Customer",
+      aggregateId: customer.id,
+      eventType: DomainEvents.CustomerCreated,
+      payload: {
+        customerId: customer.id,
+        code: customer.code,
+        name: `${input.firstName ?? ""} ${input.lastName ?? ""}`.trim(),
+      } as CustomerEventPayload,
+    });
+
+    return { customerId: customer.id, created: true };
+  }
+
+  /**
+   * Step 1.9 — sync email на связанном Customer (identity-поле владеет security;
+   * Customer.email синхронизируется ОДНИМ CRM-owned command, чтобы канонический
+   * ключ связи оставался детерминированным). Провал → 404/409, без частичных правок.
+   */
+  async updateCustomerEmail(customerId: string, email: string): Promise<void> {
+    const normalized = normalizeEmail(email);
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.customer.findUnique({ where: { id: customerId }, select: { id: true } });
+      if (!existing) throw new NotFoundError(`Customer ${customerId} not found`);
+      const dup = await tx.customer.findUnique({ where: { email: normalized }, select: { id: true } });
+      if (dup && dup.id !== customerId) throw new ConflictError("Email already used by another customer");
+      await tx.customer.update({ where: { id: customerId }, data: { email: normalized, version: { increment: 1 } } });
+      await tx.customerHistory.create({
+        data: {
+          customerId,
+          action: "update",
+          fields: { email: normalized } as Prisma.InputJsonValue,
+          comment: "Email synced from User identity (Step 1.9)",
+        },
+      });
+    });
+  }
+
+  /**
+   * Step 1.10 — CRM-owned application command для Partner activation
+   * (create-or-link crm.Partner). Вызывается ТОЛЬКО из approve-оркестрации
+   * (PartnerOnboardingService) внутри её транзакции (tx): CRM остаётся
+   * владельцем Partner, security НЕ пишет в crm.* напрямую (ADR-0004).
+   *
+   * Deterministic matching (ADR-0004 §9):
+   *  - INDIVIDUAL → contactEmail (нормализованный, partial unique в БД);
+   *  - COMPANY   → registrationNumber (partial unique в БД);
+   *  - НЕ merge по brand/display name; ambiguous/no key → создать новый Partner
+   *    (нет ключа = нет кандидата для ошибочного link);
+   *  - retry approve идемпотентен: повторный create с тем же ключом физически
+   *    невозможен (DB partial unique) + reuse существующего.
+   */
+  async createOrLinkPartner(
+    tx: Prisma.TransactionClient,
+    input: CreateOrLinkPartnerInput,
+  ): Promise<{ partnerId: string; created: boolean }> {
+    const contactEmail = input.contactEmail ? normalizeEmail(input.contactEmail) : undefined;
+    // Deterministic reuse: ровно один Partner на ключ (DB partial unique).
+    if (contactEmail) {
+      const existing = await tx.partner.findUnique({ where: { contactEmail }, select: { id: true } });
+      if (existing) return { partnerId: existing.id, created: false };
+    }
+    if (input.registrationNumber) {
+      const existing = await tx.partner.findUnique({
+        where: { registrationNumber: input.registrationNumber },
+        select: { id: true },
+      });
+      if (existing) return { partnerId: existing.id, created: false };
+    }
+
+    const code = await this.ids.nextCode(tx, "PAR");
+    const partner = await tx.partner.create({
+      data: {
+        code,
+        name: input.name,
+        companyId: input.companyId ?? null,
+        contactEmail: contactEmail ?? null,
+        registrationNumber: input.registrationNumber ?? null,
+        taxId: input.taxId ?? null,
+        countryCode: input.countryCode ?? null,
+        status: "ACTIVE",
+      },
+      select: { id: true, code: true, name: true },
+    });
+
+    // STRICT REVIEW FIX (PII minimization): contactEmail/registrationNumber убраны
+    // из payload — единственный consumer (Catalog seller profile) использует только
+    // partnerId (countryCode читает из CRM по ID). Канонические identity-ключи
+    // остаются в CRM master-data.
+    await this.eventBus.emit(tx, {
+      aggregateType: "Partner",
+      aggregateId: partner.id,
+      eventType: DomainEvents.PartnerCreated,
+      payload: {
+        partnerId: partner.id,
+        code: partner.code,
+        name: partner.name,
+        source: "partner_onboarding",
+      } as PartnerEventPayload,
+    });
+
+    return { partnerId: partner.id, created: true };
   }
 
   // ── Contact / Company / Partner / Supplier ─────────────────────────────────
@@ -222,10 +403,10 @@ export class CrmService {
     return this.prisma.company.findMany({ orderBy: { name: "asc" } });
   }
 
-  async createPartner(name: string, companyId?: string) {
+  async createPartner(name: string, companyId?: string, countryCode?: string) {
     return this.prisma.$transaction(async (tx) => {
       const code = await this.ids.nextCode(tx, "PAR");
-      return tx.partner.create({ data: { code, name, companyId: companyId ?? null, status: "ACTIVE" } });
+      return tx.partner.create({ data: { code, name, companyId: companyId ?? null, countryCode: countryCode ?? null, status: "ACTIVE" } });
     });
   }
 

@@ -1,11 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
+import { FilesInterceptor } from "@nestjs/platform-express";
 import { Type } from "class-transformer";
 import { IsArray, IsEnum, IsNumber, IsObject, IsOptional, IsString, Min, ValidateNested } from "class-validator";
-import { ProductStatus, ProductType } from "../../generated/prisma/enums";
+import { ProductStatus, ProductType, PublicationChannel, RoleCode } from "../../generated/prisma/enums";
 import { CatalogService } from "./catalog.service";
+import { ProductMediaService } from "./media/product-media.service";
+import { ValidationDomainError } from "../../shared/errors";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
-import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
+import { CurrentUser, Public, RequirePermissions } from "../../security/auth/decorators";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 
 class TariffDto {
@@ -49,6 +52,23 @@ class CreateProductDto {
   @IsOptional()
   @IsObject()
   attributes?: Record<string, unknown>;
+
+  // Step 1.3: explicit ownership override — ТОЛЬКО для staff/ADMIN (catalog.product.write),
+  // аудируется. PARTNER: значение ИГНОРИРУЕТСЯ (scope берётся из actor context).
+  @IsOptional()
+  @IsString()
+  partnerId?: string;
+
+  @IsOptional()
+  @IsString()
+  ownershipReason?: string;
+}
+
+class SetChannelsDto {
+  // Step 1.12.1 REVIEW FIX 3/4: явные каналы публикации canonical Product.
+  @IsArray()
+  @IsEnum(PublicationChannel, { each: true })
+  channels!: PublicationChannel[];
 }
 
 class UpdateProductDto {
@@ -99,6 +119,21 @@ class ListProductsQuery {
   @IsNumber()
   @Min(1)
   pageSize?: number;
+
+  // Step 1.8 (Partner Cabinet): server-side фильтры/сортировка My Products.
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  /** Lifecycle-фильтр: draft | in_moderation | changes_requested | published | archived. */
+  @IsOptional()
+  @IsString()
+  filter?: string;
+
+  /** Сортировка: updated_desc (default) | updated_asc | created_desc | title_asc. */
+  @IsOptional()
+  @IsString()
+  sort?: string;
 }
 
 class CreateCategoryDto {
@@ -174,38 +209,79 @@ class UpsertAvailabilityDto {
   slotsTotal!: number;
 }
 
+class UpdateMediaDto {
+  @IsOptional()
+  @IsString()
+  caption?: string;
+
+  @IsOptional()
+  @IsString()
+  altText?: string;
+}
+
+class ReorderMediaDto {
+  @IsArray()
+  @IsString({ each: true })
+  orderedIds!: string[];
+}
+
 /**
  * REST API (Phase 1): /api/v1/products → Catalog Center.
- * RBAC (Phase 2): чтение — catalog.product.read; запись — catalog.product.write;
- * публикация — catalog.product.publish (матрица: MODERATOR/ADMIN).
+ * RBAC (Phase 2 + Step 1.3): объектный scope PARTNER проверяется на backend:
+ *  - PARTNER читает/пишет ТОЛЬКО свои Product (read_own/update_own_draft/create_own);
+ *  - MODERATOR — moderation-read (read_for_moderation), без write за PARTNER;
+ *  - staff/ADMIN — catalog.product.read / catalog.product.write (explicit permissions);
+ *  - публикация/архивация — catalog.product.publish (PARTNER не имеет → 403).
  */
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller()
 export class CatalogController {
-  constructor(private readonly catalog: CatalogService) {}
+  constructor(
+    private readonly catalog: CatalogService,
+    private readonly media: ProductMediaService,
+  ) {}
 
+  /**
+   * Создание Product: PARTNER — catalog.product.create_own (draft, partnerId из актора);
+   * staff/ADMIN — catalog.product.write (+ explicit partnerId ownership override, аудируется).
+   */
   @Post("products")
-  @RequirePermissions("catalog.product.write")
+  @RequirePermissions((req: AuthedRequest) =>
+    req.user.role === RoleCode.PARTNER ? ["catalog.product.create_own"] : ["catalog.product.write"],
+  )
   createProduct(@Body() dto: CreateProductDto, @CurrentUser() actor: AuthedRequest["user"]) {
-    return this.catalog.createProduct(dto, actor.username);
+    return this.catalog.createProduct(dto, actor);
   }
 
   @Get("products")
-  @RequirePermissions("catalog.product.read")
-  listProducts(@Query() query: ListProductsQuery) {
-    return this.catalog.listProducts(query);
+  @RequirePermissions(productReadScope)
+  listProducts(@Query() query: ListProductsQuery, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.listProducts(query, actor);
   }
 
   @Get("products/:id")
-  @RequirePermissions("catalog.product.read")
-  getProduct(@Param("id") id: string) {
-    return this.catalog.getProduct(id);
+  @RequirePermissions(productReadScope)
+  getProduct(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.getProduct(id, actor);
   }
 
   @Patch("products/:id")
-  @RequirePermissions("catalog.product.write")
+  @RequirePermissions((req: AuthedRequest) =>
+    req.user.role === RoleCode.PARTNER ? ["catalog.product.update_own_draft"] : ["catalog.product.write"],
+  )
   updateProduct(@Param("id") id: string, @Body() dto: UpdateProductDto, @CurrentUser() actor: AuthedRequest["user"]) {
-    return this.catalog.updateProduct(id, dto, actor.username);
+    return this.catalog.updateProduct(id, dto, actor);
+  }
+
+  /**
+   * Step 1.12.1 REVIEW FIX 3/4: явные каналы публикации canonical Product
+   * (MARKETPLACE / PARTNER_STOREFRONT). PARTNER — только свои Product (own-scope);
+   * каналы отделены от lifecycle; изменение аудируется (ProductHistory).
+   */
+  @Put("products/:id/channels")
+  @RequirePermissions("catalog.product.channels_own")
+  setChannels(@Param("id") id: string, @Body() dto: SetChannelsDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.setProductChannels(id, dto.channels as unknown as string[], actor);
   }
 
   @Post("products/:id/publish")
@@ -296,9 +372,9 @@ export class CatalogController {
   }
 
   @Get("products/:id/availability")
-  @RequirePermissions("catalog.product.read")
-  listAvailability(@Param("id") id: string) {
-    return this.catalog.listAvailability(id);
+  @RequirePermissions(productReadScope)
+  listAvailability(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.listAvailability(id, actor);
   }
 
   @Post("products/:id/availability")
@@ -306,6 +382,96 @@ export class CatalogController {
   upsertAvailability(@Param("id") id: string, @Body() dto: UpsertAvailabilityDto) {
     return this.catalog.upsertAvailability(id, dto);
   }
+
+  // ── ProductMedia (Step 1.2) ────────────────────────────────────────────────
+  // RBAC Matrix §3.1: PARTNER — только собственные Product (object scope в сервисе);
+  // ADMIN — любые; MODERATOR — read_for_moderation (без write за PARTNER).
+
+  @Post("products/:id/media")
+  @RequirePermissions("catalog.media.upload_own")
+  @UseInterceptors(FilesInterceptor("files", 20, { limits: { fileSize: 15 * 1024 * 1024 } }))
+  uploadMedia(
+    @Param("id") id: string,
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.media.uploadMedia(id, files ?? [], actor);
+  }
+
+  @Get("products/:id/media")
+  @RequirePermissions(productReadScope)
+  listMedia(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.media.listMedia(id, actor);
+  }
+
+  @Patch("products/:id/media/:mediaId")
+  @RequirePermissions("catalog.media.update_own")
+  updateMedia(
+    @Param("id") id: string,
+    @Param("mediaId") mediaId: string,
+    @Body() dto: UpdateMediaDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.media.updateMedia(id, mediaId, dto, actor);
+  }
+
+  @Delete("products/:id/media/:mediaId")
+  @RequirePermissions("catalog.media.delete_own")
+  deleteMedia(@Param("id") id: string, @Param("mediaId") mediaId: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.media.deleteMedia(id, mediaId, actor);
+  }
+
+  @Post("products/:id/media/:mediaId/set-primary")
+  @RequirePermissions("catalog.media.set_primary_own")
+  setPrimary(@Param("id") id: string, @Param("mediaId") mediaId: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.media.setPrimary(id, mediaId, actor);
+  }
+
+  @Post("products/:id/media/reorder")
+  @RequirePermissions("catalog.media.reorder_own")
+  reorderMedia(@Param("id") id: string, @Body() dto: ReorderMediaDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.media.reorder(id, dto.orderedIds, actor);
+  }
+
+  @Post("products/:id/media/:mediaId/replace")
+  @RequirePermissions("catalog.media.update_own")
+  @UseInterceptors(FilesInterceptor("file", 1, { limits: { fileSize: 15 * 1024 * 1024 } }))
+  replaceMedia(
+    @Param("id") id: string,
+    @Param("mediaId") mediaId: string,
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    const file = files && files.length > 0 ? files[0] : undefined;
+    if (!file) throw new ValidationDomainError("Missing file");
+    return this.media.replaceMedia(id, mediaId, file, actor);
+  }
+
+  @Post("products/:id/media/:mediaId/preview")
+  // Владелец (update_own) или модератор (read_for_moderation).
+  @RequirePermissions((req: AuthedRequest) =>
+    req.user.permissions.includes("catalog.media.read_for_moderation") ? ["catalog.media.read_for_moderation"] : ["catalog.media.update_own"],
+  )
+  signedPreview(
+    @Param("id") id: string,
+    @Param("mediaId") mediaId: string,
+    @Query("derivative") derivative: "original" | "large" | "thumb" | undefined,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.media.signedPreviewUrl(id, mediaId, actor, derivative ?? "large");
+  }
+
+}
+
+/**
+ * Права чтения Product/Media по контуру роли (Step 1.3 §11 — раздельные контуры,
+ * без единого unrestricted read): PARTNER → read_own; MODERATOR → read_for_moderation;
+ * staff/ADMIN/BUYER → catalog.product.read.
+ */
+function productReadScope(req: AuthedRequest): string[] {
+  if (req.user.role === RoleCode.PARTNER) return ["catalog.product.read_own"];
+  if (req.user.role === RoleCode.MODERATOR) return ["catalog.product.read_for_moderation"];
+  return ["catalog.product.read"];
 }
 
 export { ProductStatus };

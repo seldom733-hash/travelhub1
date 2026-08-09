@@ -1,12 +1,12 @@
 import { Injectable } from "@nestjs/common";
-import type { Prisma, OrderStatus, OrderTraveler } from "../../generated/prisma/client";
+import type { Prisma, OrderStatus } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import {
   DomainEvents,
   type BookingRequestedPayload,
-  type OrderApprovedPayload,
   type OrderEventPayload,
+  type OrderRefPayload,
 } from "../../eventbus/domain-events";
 import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
@@ -80,7 +80,9 @@ const ACTION_LABELS: Record<OrderAction, string> = {
 /**
  * Order Center — единственный владелец Order/OrderItem/OrderTraveler/Fulfillment.
  * Не владеет Customer/Product/Booking (только ID-ссылки).
- * Публикует: OrderCreated, OrderApproved, OrderCancelled, BookingRequested.
+ * Публикует (Step 1.14 canonical): OrderCreated, OrderReadyForBooking (confirm),
+ * OrderFulfilled (complete/reconcile), OrderClosed (close), OrderCancelled (cancel),
+ * BookingRequested (send, command), OrderStatusChanged (только технические переходы).
  * Подписан на: BookingConfirmed, BookingRejected (агрегированное состояние).
  */
 @Injectable()
@@ -174,6 +176,8 @@ export class OrderService {
         },
       });
 
+      // Step 1.15: correlationId НЕ является business entity ID (order.code) —
+      // он наследуется из request context (HTTP flow: correlation = requestId).
       const eventId = await this.eventBus.emit(tx, {
         aggregateType: "Order",
         aggregateId: order.id,
@@ -186,7 +190,6 @@ export class OrderService {
           amount: order.amount.toString(),
           currency,
         } as OrderEventPayload,
-        correlationId: order.code,
       });
 
       return { order, eventId };
@@ -282,9 +285,11 @@ export class OrderService {
     if (!transition) throw new ValidationDomainError(`Unknown action: ${action}`);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // travelers нужны для confirm (проверка полноты данных); items больше НЕ
+      // читаются здесь (payload BookingRequested минимизирован — STRICT REVIEW FIX).
       const order = await tx.order.findUnique({
         where: { id: orderId },
-        include: { items: true, travelers: true },
+        include: { travelers: true },
       });
       if (!order) throw new NotFoundError(`Order ${orderId} not found`);
       if (!transition.from.includes(order.status)) {
@@ -301,9 +306,19 @@ export class OrderService {
         }
       }
 
-      const updated = await tx.order.update({
-        where: { id: orderId },
+      // Optimistic concurrency (Step 1.14 §19): переход применяется только если
+      // статус/версия не изменились с момента чтения. Два concurrent/retry вызова
+      // одного перехода → ровно ОДИН выигрывает, остальные получают ConflictError,
+      // и canonical event не создаётся дважды как два business facts.
+      const updatedRows = await tx.order.updateMany({
+        where: { id: orderId, status: order.status, version: order.version },
         data: { status: transition.to, version: { increment: 1 }, updatedBy: actor ?? null },
+      });
+      if (updatedRows.count !== 1) {
+        throw new ConflictError(`Order ${order.code} was concurrently modified; retry transition ${action}`);
+      }
+      const updated = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
         select: { id: true, code: true, number: true, customerId: true, status: true, version: true },
       });
 
@@ -319,46 +334,53 @@ export class OrderService {
         },
       });
 
-      const meta = { correlationId: order.code, causationId: null as string | null };
-
+      // Step 1.15: correlation/causation НЕ указываются явно — они наследуются
+      // из request context (correlation = requestId HTTP-команды, causation = null).
       switch (action) {
         case "confirm": {
+          // Step 1.14: факт «готов к бронированию» (canonical, бывш. OrderApproved).
+          // Booking НЕ запускается этим событием — только BookingRequested (send).
           await this.eventBus.emit(tx, {
             aggregateType: "Order",
             aggregateId: orderId,
-            eventType: DomainEvents.OrderApproved,
-            payload: { orderId, code: order.code, customerId: order.customerId } as OrderApprovedPayload,
-            ...meta,
+            eventType: DomainEvents.OrderReadyForBooking,
+            payload: { orderId, code: order.code, customerId: order.customerId } as OrderRefPayload,
+          });
+          break;
+        }
+        case "complete": {
+          await this.eventBus.emit(tx, {
+            aggregateType: "Order",
+            aggregateId: orderId,
+            eventType: DomainEvents.OrderFulfilled,
+            payload: { orderId, code: order.code, customerId: order.customerId } as OrderRefPayload,
+          });
+          break;
+        }
+        case "close": {
+          await this.eventBus.emit(tx, {
+            aggregateType: "Order",
+            aggregateId: orderId,
+            eventType: DomainEvents.OrderClosed,
+            payload: { orderId, code: order.code, customerId: order.customerId } as OrderRefPayload,
           });
           break;
         }
         case "send": {
+          // STRICT REVIEW FIX (PII minimization): command-payload содержит ТОЛЬКО
+          // canonical refs. Consumer (BookingSubscribers) читает order.items и
+          // order.travelers из БД по orderId (READ-only, ADR-0001) — items/travelers
+          // в payload были редундантны и несли паспортные данные в durable Outbox.
           const payload: BookingRequestedPayload = {
             orderId,
             orderCode: order.code,
             customerId: order.customerId,
-            items: order.items.map((i) => ({
-              productId: i.productId,
-              productCode: i.productCode,
-              title: i.title,
-              quantity: i.quantity,
-              serviceDate: i.serviceDate?.toISOString() ?? null,
-            })),
-            travelers: order.travelers.map((t: OrderTraveler) => ({
-              firstName: t.firstName,
-              lastName: t.lastName,
-              birthDate: t.birthDate?.toISOString() ?? null,
-              citizenship: t.citizenship ?? null,
-              gender: t.gender ?? null,
-              passportNumber: t.passportNumber ?? null,
-            })),
           };
           await this.eventBus.emit(tx, {
             aggregateType: "Order",
             aggregateId: orderId,
             eventType: DomainEvents.BookingRequested,
             payload,
-            ...meta,
           });
           break;
         }
@@ -367,8 +389,7 @@ export class OrderService {
             aggregateType: "Order",
             aggregateId: orderId,
             eventType: DomainEvents.OrderCancelled,
-            payload: { orderId, code: order.code, customerId: order.customerId } as OrderApprovedPayload,
-            ...meta,
+            payload: { orderId, code: order.code, customerId: order.customerId } as OrderRefPayload,
           });
           break;
         }
@@ -378,7 +399,6 @@ export class OrderService {
             aggregateId: orderId,
             eventType: DomainEvents.OrderStatusChanged,
             payload: { from: order.status, to: transition.to, actor } as Prisma.InputJsonValue,
-            ...meta,
           });
         }
       }

@@ -22,6 +22,7 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { AppExceptionFilter } from "../src/shared/exception.filter";
+import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
 
@@ -80,7 +81,7 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
@@ -105,6 +106,30 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
     await prisma.categorySchema.deleteMany({ where: { id: { in: created.schemas } } });
     await prisma.category.deleteMany({ where: { id: { in: created.categories } } });
     await prisma.user.deleteMany({ where: { id: { in: created.users } } });
+
+    // Test hygiene (jest size-order flake): этот spec активировал СВОИ версии schema
+    // поверх канонических seed v1 (accommodation/flights), оставив канонические
+    // категории без ACTIVE schema. Восстанавливаем seed-состояние (v1 → ACTIVE),
+    // чтобы последующие suite (partner-schema-read) видели ACTIVE каноническую схему.
+    for (const slug of ["accommodation", "tours", "flights"]) {
+      const cat = await prisma.category.findUnique({ where: { slug }, select: { id: true } });
+      if (!cat) continue;
+      const activeCount = await prisma.categorySchema.count({ where: { categoryId: cat.id, status: "ACTIVE" } });
+      if (activeCount === 0) {
+        const seed = await prisma.categorySchema.findFirst({
+          where: { categoryId: cat.id },
+          orderBy: { version: "asc" },
+          select: { id: true },
+        });
+        if (seed) {
+          // Step 1.13A: восстановление канонического seed (ACTIVE) очищает
+          // lifecycle-артефакты теста (deprecatedAt), чтобы temporal-модель
+          // оставалась консистентной для следующих suite.
+          await prisma.categorySchema.update({ where: { id: seed.id }, data: { status: "ACTIVE", deprecatedAt: null } });
+        }
+      }
+    }
+
     await app.close();
   });
 
@@ -126,7 +151,7 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
     expect(active.mediaRequirements?.primaryImageRequired).toBe(true);
     expect(Array.isArray(active.pdpSections)).toBe(true);
 
-    // media endpoints отсутствуют (Step 1.2 не реализован) → 404
+    // media endpoints существуют (Step 1.2): несуществующий продукт → 404
     await adminAgent.post("/api/v1/products/some-id/media").send({}).expect(404);
   });
 
@@ -197,7 +222,8 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
 
     await moderatorAgent.post("/api/v1/category-schemas").send({ categoryId: accId, attributes: [] }).expect(403);
     await moderatorAgent.patch("/api/v1/category-schemas/some-id").send({ attributes: [] }).expect(403);
-    await moderatorAgent.get("/api/v1/category-schemas").expect(200);
+    // Step 1.3 fix: MODERATOR имеет ТОЛЬКО moderation-права (нет category_schema.read).
+    await moderatorAgent.get("/api/v1/category-schemas").expect(403);
   });
 
   it("7. изменение schema не удаляет существующий Product (snapshot версии)", async () => {
@@ -267,12 +293,12 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
     expect(patched.mediaRequirements?.minImages).toBe(4);
     expect(patched.mediaRequirements?.videoAllowed).toBe(false);
 
-    // media endpoints не существуют
-    await adminAgent.post(`/api/v1/products/${created.products[0]}/media`).send({}).expect(404);
+    // media endpoints существуют (Step 1.2): upload без файлов → controlled 422
+    await adminAgent.post(`/api/v1/products/${created.products[0]}/media`).send({}).expect(422);
   });
 
   it("9. новая категория добавляется без новой Product entity/таблицы", async () => {
-    const cat = (await moderatorAgent.post("/api/v1/categories").send({ title: `Diving ${stamp}`, slug: `diving-${stamp}` }).expect(201)).body as { id: string; slug: string };
+    const cat = (await adminAgent.post("/api/v1/categories").send({ title: `Diving ${stamp}`, slug: `diving-${stamp}` }).expect(201)).body as { id: string; slug: string };
     created.categories.push(cat.id);
     expect(cat.slug).toBe(`diving-${stamp}`);
 
@@ -308,26 +334,26 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
 
   it("11. custom Category: slug обязателен, стабилен и уникален (title не источник identity)", async () => {
     // без slug → 400 (validation error)
-    await moderatorAgent.post("/api/v1/categories").send({ title: "No Slug" }).expect(400);
+    await adminAgent.post("/api/v1/categories").send({ title: "No Slug" }).expect(400);
     // невалидный slug → 422 (service validation)
-    await moderatorAgent.post("/api/v1/categories").send({ title: "Bad Slug", slug: "Bad Slug!" }).expect(422);
+    await adminAgent.post("/api/v1/categories").send({ title: "Bad Slug", slug: "Bad Slug!" }).expect(422);
 
     // валидный slug → 201
     const cat = (
-      await moderatorAgent.post("/api/v1/categories").send({ title: "Safari", slug: `safari-${stamp}` }).expect(201)
+      await adminAgent.post("/api/v1/categories").send({ title: "Safari", slug: `safari-${stamp}` }).expect(201)
     ).body as { id: string; slug: string; title: string };
     created.categories.push(cat.id);
     expect(cat.slug).toBe(`safari-${stamp}`);
 
     // изменение title → slug остаётся прежним
     const updated = (
-      await moderatorAgent.patch(`/api/v1/categories/${cat.id}`).send({ title: "Safari Tours" }).expect(200)
+      await adminAgent.patch(`/api/v1/categories/${cat.id}`).send({ title: "Safari Tours" }).expect(200)
     ).body as { id: string; slug: string; title: string };
     expect(updated.title).toBe("Safari Tours");
     expect(updated.slug).toBe(`safari-${stamp}`);
 
     // duplicate slug → 409 (conflict)
-    await moderatorAgent.post("/api/v1/categories").send({ title: "Other Safari", slug: `safari-${stamp}` }).expect(409);
+    await adminAgent.post("/api/v1/categories").send({ title: "Other Safari", slug: `safari-${stamp}` }).expect(409);
   });
 
   it("10. lifecycle schema: DRAFT → PATCH → ACTIVE → DEPRECATED; повторная активация — 409", async () => {

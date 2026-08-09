@@ -1,5 +1,5 @@
 import { ValidationDomainError } from "../../shared/errors";
-import { validateAttributes, validateCategorySlug, validateSchemaConfig, type AttributeDef } from "./category-schema.validation";
+import { toCategoryEditorContract, validateAttributes, validateCategorySlug, validateSchemaConfig, type AttributeDef } from "./category-schema.validation";
 
 describe("Category Schema validation (Step 1.1)", () => {
   const defs: AttributeDef[] = [
@@ -134,6 +134,89 @@ describe("Category Schema validation (Step 1.1)", () => {
 
     it("отклоняет pdpSections с не-строками", () => {
       expect(() => validateSchemaConfig({ attributes: [], pdpSections: ["ok", 42] })).toThrow(/pdpSections/);
+    });
+  });
+
+  describe("toCategoryEditorContract (Step 1.8 Partner-safe editor contract)", () => {
+    it("маппит только whitelist-поля attributes и requirements", () => {
+      const out = toCategoryEditorContract({
+        category: { id: "cat1", code: "CAT-1", slug: "tours", title: "Tours" },
+        schema: {
+          id: "sch1",
+          version: 1,
+          attributes: [
+            { key: "days", type: "integer", required: true, min: 1, max: 30 },
+            { key: "language", label: "Language", type: "enum", options: ["ru", "en"], filterable: true },
+          ],
+          availability: { required: true },
+          tariffRules: { required: true, minTariffs: 1 },
+          mediaRequirements: { minImages: 5, maxImages: 15, primaryImageRequired: true, allowedMediaTypes: ["image/jpeg"], videoAllowed: false },
+          pdpSections: ["overview", "gallery"],
+        },
+      });
+      expect(out.category).toEqual({ id: "cat1", code: "CAT-1", slug: "tours", title: "Tours" });
+      expect(out.schema.status).toBe("ACTIVE");
+      expect(out.schema.attributes[0]).toEqual({ key: "days", type: "integer", required: true, min: 1, max: 30 });
+      expect(out.schema.attributes[1]).toEqual({ key: "language", label: "Language", type: "enum", options: ["ru", "en"], filterable: true });
+      expect(out.schema.mediaRequirements).toEqual({
+        minImages: 5,
+        maxImages: 15,
+        primaryImageRequired: true,
+        allowedMediaTypes: ["image/jpeg"],
+      });
+      expect(out.schema.availability).toEqual({ required: true });
+      expect(out.schema.tariffRules).toEqual({ required: true, minTariffs: 1 });
+      expect(out.schema.pdpSections).toEqual(["overview", "gallery"]);
+    });
+
+    it("не пропускает внутренние/audit поля (createdBy/createdAt/updatedAt/admin)", () => {
+      const out = toCategoryEditorContract({
+        category: { id: "cat1", code: "CAT-1", slug: "tours", title: "Tours" },
+        schema: {
+          id: "sch1",
+          version: 1,
+          attributes: [
+            {
+              key: "days",
+              type: "integer",
+              // внутренние ключи не должны пройти
+              createdBy: "user-1",
+              createdAt: "2026-01-01",
+              adminOnly: true,
+            },
+          ],
+          availability: null,
+          tariffRules: null,
+          mediaRequirements: { internalFlag: true, videoAllowed: true },
+          pdpSections: null,
+        },
+      });
+      expect(out.schema.attributes[0]).toEqual({ key: "days", type: "integer" });
+      expect(out.schema.mediaRequirements).toEqual({ videoAllowed: true });
+      const json = JSON.stringify(out);
+      expect(json).not.toContain("createdBy");
+      expect(json).not.toContain("createdAt");
+      expect(json).not.toContain("updatedAt");
+      expect(json).not.toContain("adminOnly");
+      expect(json).not.toContain("internalFlag");
+    });
+
+    it("не отдаёт id внутренней схемы/версию как данные категории и игнорирует не-массивы", () => {
+      const out = toCategoryEditorContract({
+        category: { id: "cat1", code: "CAT-1", slug: "tours", title: "Tours" },
+        schema: {
+          id: "sch-secret",
+          version: 2,
+          attributes: "nope" as unknown,
+          availability: null,
+          tariffRules: "x" as unknown,
+          mediaRequirements: null,
+          pdpSections: ["ok", 42, "gallery"] as unknown,
+        },
+      });
+      expect(out.schema.attributes).toEqual([]);
+      expect(out.schema.tariffRules).toBeNull();
+      expect(out.schema.pdpSections).toEqual(["ok", "gallery"]);
     });
   });
 });

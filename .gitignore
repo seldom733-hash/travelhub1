@@ -33,3 +33,8 @@ Thumbs.db
 # Freebuff local artifacts
 .freebuff/
 .freebuff-preview.log
+
+# Local S3-compatible tooling (standalone MinIO binary for e2e) + uploads
+.tools/
+backend/uploads/
+uploads/

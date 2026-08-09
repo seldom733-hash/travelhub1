@@ -19,6 +19,9 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  // Partial indexes (review fix Step 1.2): DB-level invariant — не более одного
+  // primary media на Product (CREATE UNIQUE INDEX ... WHERE "isPrimary" = true).
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -46,6 +49,10 @@ model OutboxEvent {
   payload       Json
   correlationId String?
   causationId   String?
+  /// Step 1.15A: typed business event actor (BusinessEventActor JSON:
+  /// {type: "USER"|"SYSTEM"|"UNKNOWN", id?}). NULL — legacy/unknown, без
+  /// backfill. НЕ включает username/email/permissions (только canonical ID).
+  actor         Json?
   status        OutboxStatus @default(PENDING)
   attempts      Int          @default(0)
   error         String?
@@ -122,6 +129,41 @@ enum CategorySchemaStatus {
   @@schema("catalog")
 }
 
+/// Тип медиа-файла Product (Step 1.2). На шаге реализуются только изображения;
+/// VIDEO остаётся capability/configuration будущего pipeline (videoAllowed в Category Schema).
+enum MediaType {
+  IMAGE
+  VIDEO
+
+  @@schema("catalog")
+}
+
+/// Lifecycle медиа (Step 1.2, согласован с Product lifecycle).
+/// DRAFT — загружено/заменено, ещё НЕ опубликовано (не появляется в public read);
+/// PUBLISHED — видно в public read (прошло разрешённый publish transition);
+/// ARCHIVED — удалено из публичного контура (soft delete / исторический asset).
+/// Invariant: физическая загрузка файла != публикация файла.
+enum MediaStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
+  @@schema("catalog")
+}
+
+/// Moderation workflow (Step 1.4): статус submission Product на модерацию.
+/// SUBMITTED → (assign) → IN_REVIEW → APPROVED | REJECTED | CHANGES_REQUESTED.
+/// Решение всегда относится к конкретному submission/productVersion (snapshot).
+enum ModerationSubmissionStatus {
+  SUBMITTED
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+
+  @@schema("catalog")
+}
+
 /// Product — единственный владелец: Catalog Center. Продуктовые данные
 /// никогда не копируются в Order/Booking (только productId).
 ///
@@ -156,15 +198,53 @@ model Product {
   tariffs      Tariff[]
   availability Availability[]
   history      ProductHistory[]
+  media        ProductMedia[]
+  moderation   ModerationSubmission[]
+  draft        ProductDraft?
+  /// Каналы публикации (REVIEW FIX 3): canonical Product используется Marketplace
+  /// и/или Partner Storefront. Пустое множество = ни один публичный канал.
+  publicationChannels ProductPublicationChannel[]
+
+  // Владелец-партнёр (RBAC object scope, Step 1.2/1.3): PARTNER управляет только
+  // собственными продуктами (product.partnerId == actor.partnerId). Значение
+  // устанавливается СЕРВЕРОМ из actor context (никогда не из body/query).
+  // null = system/admin-owned (legacy/unowned Product НЕ привязываются к Partner
+  // «наугад»). Ссылка по ID без FK — партнёр живёт в crm.*, между схемами FK
+  // запрещены (ADR-0001); орфанные ссылки валидируются при установке в сервисе.
+  partnerId String?
 
   @@index([status])
   @@index([categoryId])
+  @@index([partnerId])
+  @@schema("catalog")
+}
+
+/// Канал публикации canonical Product (Step 1.12.1 REVIEW FIX 3/4).
+/// Publication channel ≠ lifecycle/status Product: Product PUBLISHED может быть
+/// виден только в выбранных каналах (или ни в одном). Один Product никогда не
+/// копируется для канала — здесь только разрешение показа в контексте канала.
+/// Default при создании Product — MARKETPLACE (обратная совместимость);
+/// PARTNER_STOREFRONT добавляется явно (own-scope, аудит).
+model ProductPublicationChannel {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  channel   PublicationChannel
+  createdAt DateTime @default(now())
+  createdById String?
+
+  @@unique([productId, channel])
+  @@index([channel])
   @@schema("catalog")
 }
 
 /// Категория каталога (Step 1.1). `slug` — стабильный технический идентификатор
 /// ("tours", "accommodation"), `title` — отображаемое имя по умолчанию
 /// (локализация RU/AZ/EN — отдельный слой, не технический id).
+///
+/// Step 1.13A: entity time (createdAt/updatedAt) — базовый temporal-контракт.
+/// Legacy-строки (канонический seed до миграции) могут иметь NULL createdAt
+/// (историческое значение неизвестно) — NULL = LEGACY UNKNOWN, без fake backfill.
 model Category {
   id       String         @id @default(uuid())
   code     String         @unique // CAT-00000001
@@ -178,6 +258,9 @@ model Category {
   schemas  CategorySchema[]
   products Product[]
 
+  createdAt DateTime?
+  updatedAt DateTime? @updatedAt
+
   @@schema("catalog")
 }
 
@@ -187,6 +270,12 @@ model Category {
 /// media requirements (Step 1.2, пока только конфигурация) и секции PDP.
 /// Один универсальный Product + Category + Schema — без отдельных bounded
 /// contexts на категорию (Hotel/Tour/Transfer/...).
+///
+/// Step 1.13A: lifecycle timestamps (activatedAt/deprecatedAt) — РЕАЛЬНЫЕ
+/// переходы DRAFT→ACTIVE→DEPRECATED, НЕ updatedAt (temporal taxonomy §3/§4).
+/// NULL = milestone ещё не происходил ИЛИ историческое значение неизвестно
+/// (legacy ACTIVE schema до миграции). Повторные циклы невозможны (одна ACTIVE
+/// на категорию; DEPRECATED не реактивируется) — колонки достаточны, без history.
 model CategorySchema {
   id         String               @id @default(uuid())
   categoryId String
@@ -208,6 +297,10 @@ model CategorySchema {
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  /// Step 1.13A: момент перехода DRAFT→ACTIVE (реальный lifecycle, не updatedAt).
+  activatedAt DateTime?
+  /// Step 1.13A: момент перехода ACTIVE→DEPRECATED (реальный lifecycle, не updatedAt).
+  deprecatedAt DateTime?
 
   products Product[]
 
@@ -246,6 +339,556 @@ model Availability {
   @@unique([productId, tariffId, date])
   @@schema("catalog")
 }
+
+/// Медиа Product (Step 1.2). Принадлежит Catalog (не отдельный domain).
+/// binary-файлы — в Object Storage (S3-compatible), здесь только metadata + storage keys.
+/// Три ключа (derivatives): original + large.webp + thumb.webp.
+/// Внутренние storage keys НЕ публикуются: API отдаёт signed preview URL (абстракция).
+model ProductMedia {
+  id           String      @id @default(uuid())
+  productId    String
+  product      Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type         MediaType   @default(IMAGE)
+
+  originalStorageKey    String @unique
+  largeStorageKey       String
+  thumbnailStorageKey   String
+  originalFileName      String
+  mimeType              String
+  size                  Int
+  width                 Int?
+  height                Int?
+  sortOrder             Int    @default(0)
+  isPrimary             Boolean @default(false)
+  caption               String?
+  altText               String?
+  status                MediaStatus @default(DRAFT)
+  createdById           String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([productId])
+  @@index([status])
+  // DB-level invariant (review fix): partial unique index — для одного Product
+  // ФИЗИЧЕСКИ невозможно иметь более одного isPrimary=true, даже при concurrent
+  // writes (раньше инвариант гарантировался только application-транзакцией).
+  @@unique([productId], where: { isPrimary: true }, map: "ProductMedia_one_primary_per_product")
+  @@schema("catalog")
+}
+
+/// Content change proposal (Step 1.4 review fix): draft/version N+1 для PUBLISHED Product.
+/// Live Product остаётся approved N (published); PARTNER готовит изменения контента N+1
+/// в ОТДЕЛЬНОЙ строке (НЕ второй Product, без нового PRD-* кода). media N+1 стейджится
+/// как DRAFT media у того же Product. Одновременно один draft на Product (unique productId).
+///
+/// Инварианты:
+///  - live approved N не изменяется, пока существует draft (public N остаётся published);
+///  - draft.version инкрементируется на каждую правку — submission фиксирует проверяемую
+///    ревизию; approve применяет draft к live (version N+1) и удаляет draft;
+///  - reject/request_changes НЕ трогают live N и НЕ удаляют draft (PARTNER продолжает правки).
+model ProductDraft {
+  id          String   @id @default(uuid())
+  productId   String   @unique
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  /// Категория + схема-снапшот черновика (валидируется на PATCH черновика).
+  categoryId        String?
+  categorySchemaId  String?
+  attributes        Json?
+  /// Тарифы N+1 (JSON payload; применяются на approve — заменяют live tariffs).
+  tariffs     Json?
+  /// Ревизия черновика: 1,2,3… на каждую правку PARTNER-а.
+  version     Int      @default(1)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@schema("catalog")
+}
+
+/// Moderation submission (Step 1.4) — Product review process. Moderation НЕ
+/// становится владельцем Product: решение относится к immutable snapshot/version,
+/// а фактический publish transition выполняет CatalogService (controlled command).
+///
+/// Инварианты:
+///  - snapshot immutable после submit (JSON-копия проверяемой версии, без storage
+///    secrets/ключей — только поля + media metadata);
+///  - для одного Product физически не более одной АКТИВНОЙ submission
+///    (SUBMITTED или IN_REVIEW) — ЕДИНЫЙ partial unique index по isActiveSubmission
+///    (Step 1.4 review fix: два раздельных индекса по status позволяли держать одну
+///    SUBMITTED И одну IN_REVIEW одновременно);
+///  - решение фиксируется CAS-переходом (только одно финальное решение побеждает).
+model ModerationSubmission {
+  id           String   @id @default(uuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// Проверяемая версия Product (snapshot). Решение относится к ней, а не к live row.
+  productVersion Int
+  /// Для change proposal (PUBLISHED): ревизия ProductDraft, проверяемая этой submission.
+  /// null — для обычной submission нового Product (DRAFT → COMPLETE).
+  draftVersion    Int?
+  submittedById   String?
+  submittedByUsername String?
+  submittedAt     DateTime @default(now())
+  status          ModerationSubmissionStatus @default(SUBMITTED)
+  /// Managed-флаг «активная submission» (SUBMITTED/IN_REVIEW). Устанавливается
+  /// атомарно в тех же переходах, что и status. DB-level единый инвариант — partial
+  /// unique index ниже (шаблон тот же, что и ProductMedia.isPrimary).
+  isActiveSubmission Boolean @default(false)
+  assignedModeratorId String?
+  assignedModeratorUsername String?
+  reviewStartedAt DateTime?
+  decidedAt       DateTime?
+  reasonCode      String?
+  comment         String?
+  /// Immutable JSON snapshot проверяемой версии (fields + category/schema ref +
+  /// attributes + tariffs + availability + media metadata, БЕЗ storage keys).
+  snapshot        Json
+  previousSubmissionId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([productId])
+  @@index([status])
+  @@index([isActiveSubmission])
+  @@index([submittedAt])
+  @@index([assignedModeratorId])
+  // ЕДИНЫЙ DB-level инвариант активной submission (Step 1.4 review fix): для одного
+  // Product физически не более одной строки с isActiveSubmission=true, независимо от
+  // того SUBMITTED это или IN_REVIEW. Апп-уровень тоже проверяет внутри tx.
+  @@unique([productId], where: { isActiveSubmission: true }, map: "ModerationSubmission_one_active_per_product")
+  @@schema("catalog")
+}
+
+/// Публичная идентичность продавца на Marketplace (Phase 1 Step 1.11).
+/// ОТДЕЛЬНАЯ projection от crm.Partner: marketplace НИКОГДА не публикует raw CRM
+/// Partner (legalName/taxId/phone/email/website/socials/address/notes).
+///
+/// Поля: только seller-safe данные + controlled visibility. Даже PUBLIC_BRAND не
+/// раскрывает контакты/юр. данные автоматически. Каталог владеет этой проекцией
+/// (catalog.* — собственная схема); CRM Partner остаётся CRM-owned; сюда пишет
+/// ТОЛЬКО Catalog (события PartnerCreated + детерминированный backfill).
+///
+/// status — публичное состояние профиля: APPROVED (виден согласно visibilityMode)
+/// или HIDDEN (идентичность скрыта модератором; консервативный fallback — вообще
+/// не показывать продавца, не «anonymous label»). Изменения контента/видимости
+/// идут ТОЛЬКО через PublicSellerProfileProposal (moderated, no silent overwrite).
+enum SellerVisibilityMode {
+  ANONYMOUS
+  VERIFIED_ALIAS
+  PUBLIC_BRAND
+
+  @@schema("catalog")
+}
+
+/// Публичное состояние PublicSellerProfile (Step 1.11 §15, проекция на профиль).
+enum SellerProfileStatus {
+  APPROVED
+  HIDDEN
+
+  @@schema("catalog")
+}
+
+/// Lifecycle предложения изменения публичной идентичности (Step 1.11 §15):
+/// PARTNER предлагает, MODERATOR решает. Полный lifecycle модерации — здесь.
+enum SellerProposalStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+
+  @@schema("catalog")
+}
+
+/// Жизненный цикл Partner Storefront (Step 1.12.1):
+///  - DRAFT    — создана явной командой PARTNER, публично НЕ существует;
+///  - ACTIVE   — публична (появляется в public контуре);
+///  - INACTIVE — деактивирована (публично НЕ существует, запись сохраняется).
+/// Создание витрины НЕ делает её публичной автоматически; deactivate НЕ удаляет.
+/// Повторные activate/deactivate детерминированы (no-op при том же состоянии).
+enum StorefrontStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+
+  @@schema("catalog")
+}
+
+/// Коммерческий entitlement Storefront (Step 1.12.1 REVIEW FIX 2). Storefront —
+/// платный SaaS-продукт TravelHub, НЕ бесплатная capability любого PARTNER:
+/// публичная activation требует `entitlementStatus = ACTIVE`.
+///  - NONE      — entitlement не предоставлен (default; DRAFT можно вести, публикация нельзя);
+///  - ACTIVE    — публикация разрешена;
+///  - SUSPENDED — приостановлен (публичная витрина скрывается, данные сохраняются);
+///  - EXPIRED   — истёк (публичная витрина скрывается, данные сохраняются).
+/// На Step 1.12.1 реального Billing/PSP НЕТ: это минимальный entitlement-ready
+/// контракт, который ПОЗЖЕ станет authoritative от Billing domain (через события).
+/// Сейчас управляется ЯВНОЙ операционной командой (ADMIN) — без фиктивных
+/// Payment/Invoice. НЕ заменяется User.status / crm.Partner.status / Product.status.
+enum StorefrontEntitlementStatus {
+  NONE
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+
+  @@schema("catalog")
+}
+
+/// Каналы публикации canonical Catalog.Product (Step 1.12.1 REVIEW FIX 3/4).
+/// Publication channel ОТДЕЛЁН от lifecycle/status Product: один Product может
+/// быть опубликован в любом подмножестве каналов (или ни в одном). Копии Product
+/// НЕ создаются — канал это только разрешение показа canonical Product в контексте.
+enum PublicationChannel {
+  MARKETPLACE
+  PARTNER_STOREFRONT
+
+  @@schema("catalog")
+}
+
+/// Публичный профиль продавца (Step 1.11). partnerId — ссылка на crm.Partner без
+/// FK (межсхемные FK запрещены). publicId (SELL-*) — стабильный публичный
+/// идентификатор, НЕ partnerId: по partnerId публичный контур не ищет.
+model PublicSellerProfile {
+  id        String   @id @default(uuid())
+  /// Публичный идентификатор продавца (SELL-*), генерирует Catalog.
+  publicId  String   @unique
+  /// Ссылка на crm.Partner (без FK). Каноническая связь: один профиль на Partner.
+  partnerId String   @unique
+  status    SellerProfileStatus @default(APPROVED)
+  /// Консервативный default: ANONYMOUS. Переключение — только через moderated
+  /// proposal (PARTNER не может сам переключить себя в PUBLIC_BRAND/VERIFIED_ALIAS).
+  visibilityMode SellerVisibilityMode @default(ANONYMOUS)
+
+  /// Approved seller-safe поля (применяются из APPROVED proposal, никогда raw CRM).
+  publicDisplayName String?
+  publicDescription String?
+  publicLogoMediaId String?
+  /// AUTHORITATIVE geography (FIX 2): только коды, никогда locale-значения.
+  /// countryCode — системная identity из crm.Partner (копируется при создании/
+  /// approve; proposal НЕ может её подменить). cityCode — код из канонического
+  /// справочника Catalog (должен принадлежать стране партнёра). Локализация
+  /// (RU/AZ/EN display label) — обязанность клиента по кодам, не хранится здесь.
+  countryCode String?
+  cityCode    String?
+
+  /// Партнёр прошёл проверку (onboarding approve / существующий ACTIVE Partner).
+  verified Boolean @default(true)
+  /// Дата вступления (memberSince) — момент создания профиля.
+  memberSince DateTime @default(now())
+  /// Время/автор последнего утверждённого изменения видимости/контента.
+  approvedAt DateTime?
+  approvedById String?
+  approvedByUsername String?
+
+  /// CAS-версия (stale-решения отклоняются 409).
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proposals PublicSellerProfileProposal[]
+
+  @@index([status])
+  @@index([visibilityMode])
+  @@schema("catalog")
+}
+
+/// Предложение изменения публичной идентичности (Step 1.11 §16): Published N →
+/// proposal N+1 → moderation → approve → public N+1. No silent overwrite: поля
+/// профиля меняются ТОЛЬКО при APPROVED proposal.
+///
+/// PARTNER не может self-approve и не может сам запросить PUBLIC_BRAND как
+/// немедленное переключение — requestedVisibilityMode ограничен VERIFIED_ALIAS;
+/// решение PUBLIC_BRAND принимает MODERATOR (approve_brand).
+model PublicSellerProfileProposal {
+  id        String   @id @default(uuid())
+  code      String   @unique // SPP-00000001
+  profileId String
+  profile   PublicSellerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  status    SellerProposalStatus @default(DRAFT)
+  /// CAS-версия предложения (stale-редактирование/решения → 409).
+  version   Int @default(1)
+
+  /// Запрашиваемые PARTNER-ом поля (только seller-safe).
+  /// Страна в предложении ОТСУТСТВУЕТ: country — системная identity crm.Partner,
+  /// proposal не может подменить её locale-значением. Город — код из
+  /// канонического справочника (cityCode), валидируется по стране партнёра.
+  requestedDisplayName String?
+  requestedDescription String?
+  requestedLogoMediaId String?
+  requestedCityCode    String?
+  /// Что PARTNER запрашивает: только VERIFIED_ALIAS (свой alias). PUBLIC_BRAND
+  /// устанавливается решением MODERATOR (поле approvedVisibilityMode).
+  requestedVisibilityMode SellerVisibilityMode @default(VERIFIED_ALIAS)
+
+  /// Решение MODERATOR: какой режим фактически утверждён (alias или brand).
+  approvedVisibilityMode SellerVisibilityMode?
+  submittedById String?
+  submittedByUsername String?
+  submittedAt DateTime?
+  reviewedAt DateTime?
+  reviewedById String?
+  reviewedByUsername String?
+  decisionReason String?
+  decisionComment String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([profileId])
+  @@schema("catalog")
+}
+
+/// Partner Storefront (Phase 1 Step 1.12.1) — персональная публичная витрина
+/// PARTNER. Catalog-owned (как и весь catalog.*). НЕ является вторым Catalog /
+/// копией Product: витрина ТОЛЬКО ссылается на существующие catalog.Product
+/// (один Product используется и Marketplace, и Storefront — никаких
+/// storefront-specific копий).
+///
+/// Инварианты:
+///  - максимум ОДНА витрина на Partner (partnerId @unique, DB-level);
+///  - slug normalized/URL-safe/immutable, @unique (race → controlled 409);
+///  - lifecycle DRAFT → ACTIVE → INACTIVE; создание НЕ публикует автоматически;
+///    DRAFT/INACTIVE публично не существуют (public контур фильтрует status);
+///  - deactivate НЕ удаляет; повторные activate/deactivate детерминированы;
+///  - partnerId — ссылка на crm.Partner БЕЗ FK (межсхемные FK запрещены ADR-0001);
+///    каноническая связь: один storefront на Partner; здесь НЕ копируется CRM
+///    (name/email/phone/юр. данные остаются в crm.Partner);/// - businessName/tagline/description проходят anti-disintermediation до активации;
+/// - business identity (Step 1.12.2): businessName + контакты — Storefront-owned
+///   (это платный SaaS-сайт PARTNER), НЕ привязаны к PublicSellerProfile;
+///   Marketplace показывает ТОЛЬКО Step 1.11 seller projection — storefront
+///   businessName/контакты в Marketplace не попадают;
+/// - countryCode — системная identity из crm.Partner (locale-независима, НЕ
+///   устанавливается PARTNER); cityCode — код канонического справочника Catalog
+///   и обязан принадлежать стране витрины;
+/// - lifecycle timestamps: activatedAt/deactivatedAt — реальные бизнес-переходы
+///   (НЕ updatedAt), + actor (activatedById/deactivatedById).
+model PartnerStorefront {
+  id        String   @id @default(uuid())
+  /// Стабильный публичный код (SF-00000001), генерирует Catalog (IdsService).
+  code      String   @unique
+  /// Ссылка на crm.Partner (без FK). Одна витрина на Partner.
+  partnerId String   @unique
+  /// Публичный slug: normalized, URL-safe, immutable после создания.
+  slug      String   @unique
+  status    StorefrontStatus @default(DRAFT)
+  /// Коммерческий entitlement (REVIEW FIX 2). PUBLIC activation требует ACTIVE.
+  /// SUSPENDED/EXPIRED скрывают публичную витрину без удаления данных.
+  entitlementStatus StorefrontEntitlementStatus @default(NONE)
+  /// Storefront business identity (Step 1.12.2 §3): ИМЯ бизнеса на платном
+  /// сайте PARTNER. НЕ привязано к seller profile; anti-disintermediation
+  /// применяется на запись. В Marketplace контур НЕ попадает.
+  businessName String?
+  tagline     String?
+  description String?
+  /// Локаль контента витрины по умолчанию (ru/az/en). НЕ является country code.
+  defaultLocale String @default("ru")
+
+  /// География витрины (коды, locale-независимы). countryCode — системная
+  /// identity из crm.Partner (записывается сервисом, НЕ из body); cityCode —
+  /// код справочника Catalog, обязан принадлежать countryCode.
+  countryCode String?
+  cityCode    String?
+
+  /// Structured business contacts (Step 1.12.2 §4) — публикуются ТОЛЬКО в
+  /// Storefront-контексте (ACTIVE + entitlement ACTIVE). В Marketplace/CRM/
+  /// PublicSellerProfile не попадают. Валидация: формат email/phone/URL.
+  publicPhone  String?
+  publicEmail  String?
+  websiteUrl   String?
+  whatsapp     String?
+  socialLinks  Json?
+
+  /// Branding (Step 1.12.2 §5): hero heading/subheading + безопасный theme
+  /// preset (whitelist). Arbitrary CSS/JS/HTML запрещён. Логотип/hero-изображения
+  /// — отдельная модель StorefrontMedia (private storage, controlled upload).
+  heroHeading    String?
+  heroSubheading String?
+  themePreset    String @default("default")
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  /// Моменты РЕАЛЬНЫХ lifecycle-переходов (не updatedAt).
+  activatedAt   DateTime?
+  deactivatedAt DateTime?
+  createdById   String?
+  updatedById   String?
+  activatedById   String?
+  deactivatedById String?
+
+  /// Storefront-owned media (logo/hero) — private storage, controlled upload.
+  media StorefrontMedia[]
+
+  @@index([status])
+  @@schema("catalog")
+}
+
+/// Тип Storefront-медиа: LOGO (квадратный логотип) / HERO (баннер витрины).
+/// Один файл на kind (replace-семантика) — unique [storefrontId, kind].
+enum StorefrontMediaKind {
+  LOGO
+  HERO
+
+  @@schema("catalog")
+}
+
+/// Storefront-owned media (Step 1.12.2 §5/§6). ProductMedia семантически не
+/// подходит (это media продукта Marketplace), поэтому Storefront имеет собственный
+/// media-контракт: private storage, controlled upload (MIME/size), стабильный
+/// public URL только при ACTIVE + entitlement ACTIVE витрине; staged/private
+/// объекты не публичны; storage keys/bucket/credentials в public JSON отсутствуют.
+/// Media не публикуется автоматически при upload — публичность определяется
+/// состоянием витрины (public predicate), а не статусом самого файла.
+model StorefrontMedia {
+  id         String   @id @default(uuid())
+  storefrontId String
+  kind       StorefrontMediaKind
+  /// Private storage key (никогда не публикуется наружу).
+  storageKey String
+  mimeType   String
+  size       Int
+  width      Int?
+  height     Int?
+  originalFileName String
+  createdAt  DateTime @default(now())
+  createdById String?
+
+  storefront PartnerStorefront @relation(fields: [storefrontId], references: [id])
+
+  @@unique([storefrontId, kind])
+  @@index([storefrontId])
+  @@schema("catalog")
+}
+
+/// Behavioral event types public Storefront (Step 1.12.3). НЕ business domain
+/// events (outbox) и НЕ AuditLog: это анонимная поведенческая телеметрия
+/// посетителя. Marketplace behavioral events (1.13B) — отдельный будущий шаг,
+/// эти имена не конфликтуют (namespace `STOREFRONT_*`).
+enum StorefrontBehavioralEventType {
+  STOREFRONT_VIEWED
+  STOREFRONT_PRODUCT_IMPRESSION
+  STOREFRONT_PRODUCT_VIEWED
+  STOREFRONT_CONTACT_CLICKED
+
+  @@schema("catalog")
+}
+
+/// Acquisition/source context (Step 1.12.3 §1/§16). Отличается от publication
+/// channel: publication — где Product разрешён, acquisition — через какой
+/// пользовательский контекст возникло конкретное взаимодействие. Для Storefront
+/// events источник сервером фиксируется как PARTNER_STOREFRONT (endpoint
+/// storefront-scoped; DIRECT — только при будущем referral/entry-контракте,
+/// сейчас не симулируется). MARKETPLACE — зарезервирован для Step 1.13B.
+enum AcquisitionSource {
+  MARKETPLACE
+  PARTNER_STOREFRONT
+  DIRECT
+
+  @@schema("catalog")
+}
+
+/// Privacy-safe behavioral event (Step 1.12.3 §4/§5/§10/§22/§23).
+///  - eventId — client-generated UUID: dedup (unique); повторная доставка того же
+///    eventId не удваивает будущие метрики;
+///  - occurredAt — фактическое UTC-время действия пользователя (client), окно
+///    clock-skew ограничено сервером; receivedAt — отдельная server-семантика;
+///  - storefrontId/productId — canonical IDs, резолвятся сервером из slug'ов
+///    (клиент не может forged identity);
+///  - sessionId — opaque non-PII anonymous session; без fingerprinting,
+///    без cross-device identity graph, без raw IP;
+///  - acquisitionSource — authoritative server context (PARTNER_STOREFRONT);
+///  - payload — строгий per-eventType whitelist (contactType/platform/placement),
+///    НИКОГДА contact values / email / phone / URL / raw IP / tokens;
+///  - createdById НЕТ: события анонимны (AuditLog ≠ behavioral analytics).
+///  НЕ FK между bounded contexts (ADR-0001): storefrontId/productId — ссылки
+///  по ID без relations (таблица в catalog, но события не lifecycle-связаны).
+model StorefrontBehavioralEvent {
+  id              String   @id @default(uuid())
+  eventId         String   @unique
+  eventType       StorefrontBehavioralEventType
+  occurredAt      DateTime
+  receivedAt      DateTime @default(now())
+  storefrontId    String
+  productId       String?
+  sessionId       String
+  acquisitionSource AcquisitionSource
+  locale          String
+  path            String
+  payload         Json?
+
+  @@index([storefrontId, occurredAt])
+  @@index([eventType, occurredAt])
+  @@index([productId])
+  @@index([sessionId])
+  @@index([acquisitionSource, occurredAt])
+  @@schema("catalog")
+}
+
+/// Behavioral event types public Marketplace (Phase 1 Step 1.13B). Тот же
+/// namespace-паттерн, что у Storefront (Step 1.12.3), но MARKETPLACE_*:
+///  - MARKETPLACE_VIEWED             — публичная Marketplace home реально открыта;
+///  - MARKETPLACE_PRODUCT_IMPRESSION — карточка Product реально отрисована в grid
+///    (rendered-card семантика, как у Storefront; viewport — deferred);
+///  - MARKETPLACE_PRODUCT_VIEWED     — открыт публичный Marketplace PDP;
+///  - MARKETPLACE_SEARCH_PERFORMED   — пользователь выполнил committed search
+///    (submit/committed URL state; НЕ каждый keystroke);
+///  - MARKETPLACE_CATEGORY_VIEWED    — открыта публичная category surface;
+///  - MARKETPLACE_FILTER_APPLIED     — применён фильтр (whitelist key+value);
+///  - MARKETPLACE_SORT_CHANGED       — изменена сортировка (whitelist enum);
+///  - MARKETPLACE_CTA_CLICKED        — клик по реальному CTA Marketplace PDP
+///    (намерение; НЕ Order/Booking/Payment — их нет).
+enum MarketplaceBehavioralEventType {
+  MARKETPLACE_VIEWED
+  MARKETPLACE_PRODUCT_IMPRESSION
+  MARKETPLACE_PRODUCT_VIEWED
+  MARKETPLACE_SEARCH_PERFORMED
+  MARKETPLACE_CATEGORY_VIEWED
+  MARKETPLACE_FILTER_APPLIED
+  MARKETPLACE_SORT_CHANGED
+  MARKETPLACE_CTA_CLICKED
+
+  @@schema("catalog")
+}
+
+/// Privacy-safe Marketplace behavioral event (Phase 1 Step 1.13B). Та же
+/// semantic discipline, что у StorefrontBehavioralEvent (Step 1.12.3):
+///  - eventId — client UUID, dedup (unique); retry не удваивает метрики;
+///  - occurredAt — client UTC в clock-skew окне; receivedAt — server;
+///  - productId/categoryId — canonical, резолвятся СЕРВЕРОМ из slug'ов через
+///    публичные predicates (клиент не может forged identity);
+///  - sessionId — opaque non-PII anonymous session (без fingerprinting/cross-
+///    device graph/raw IP);
+///  - acquisitionSource — server-authoritative MARKETPLACE (клиент не может
+///    forged); publication channel продукта источник не меняет;
+///  - payload — строгий per-eventType whitelist; search query НЕ хранится raw
+///    без privacy guard; НИКОГДА email/phone/URL/contact/токены/User/CRM ids;
+///  - createdById НЕТ: анонимная телеметрия, не AuditLog, не outbox.
+model MarketplaceBehavioralEvent {
+  id              String   @id @default(uuid())
+  eventId         String   @unique
+  eventType       MarketplaceBehavioralEventType
+  occurredAt      DateTime
+  receivedAt      DateTime @default(now())
+  productId       String?
+  categoryId      String?
+  sessionId       String
+  acquisitionSource AcquisitionSource
+  locale          String
+  path            String
+  payload         Json?
+
+  @@index([eventType, occurredAt])
+  @@index([productId, occurredAt])
+  @@index([categoryId, occurredAt])
+  @@index([sessionId])
+  @@index([acquisitionSource, occurredAt])
+  @@schema("catalog")
+}
+
 
 /// Журнал аудита Catalog (audit by default).
 model ProductHistory {
@@ -341,6 +984,24 @@ model Partner {
   name      String
   status    EntityStatus @default(ACTIVE)
 
+  // Step 1.10 — authoritative business identifiers for deterministic
+  // create-or-link (Partner onboarding). НЕ являются display-полями:
+  //  - contactEmail      — канонический ключ INDIVIDUAL (нормализованный email);
+  //  - registrationNumber — канонический ключ COMPANY (регистрационный номер);
+  //  - taxId             — справочное поле (INN и т.п.), НЕ ключ связи.
+  // Partial unique: ровно один Partner на ключ, когда ключ задан (DB-level
+  // идемпотентность — retry approve не создаёт duplicate Partner).
+  contactEmail       String?
+  registrationNumber String?
+  taxId              String?
+  /// Authoritative country (Step 1.11 FIX 2): системная identity из onboarding
+  /// application (2-letter code, e.g. AZ/RU). НЕ display-поле и НЕ locale:
+  /// локализованный label вычисляет клиент по коду. Может быть null для legacy
+  /// Partner (тогда seller profile без countryCode — консервативно).
+  countryCode        String?
+
+  @@unique([contactEmail], where: { contactEmail: { not: null } }, map: "Partner_unique_contactEmail")
+  @@unique([registrationNumber], where: { registrationNumber: { not: null } }, map: "Partner_unique_registrationNumber")
   @@schema("crm")
 }
 
@@ -637,6 +1298,28 @@ enum UserStatus {
   @@schema("security")
 }
 
+/// Тип заявителя Partner onboarding (Step 1.10): физлицо или юрлицо.
+enum ApplicantType {
+  INDIVIDUAL
+  COMPANY
+
+  @@schema("security")
+}
+
+/// Lifecycle PartnerApplication (Step 1.10 §5). Backend-коды стабильны,
+/// UI-лейблы локализуются (RU/AZ/EN).
+enum PartnerApplicationStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  CANCELLED
+
+  @@schema("security")
+}
+
 /// Пользователь платформы (персонал / партнёр / покупатель).
 /// code — USR-* (канонический ID, генерация — security-домен).
 model User {
@@ -659,10 +1342,81 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  auditLogs AuditLog[]
+  auditLogs           AuditLog[]
+  partnerApplications PartnerApplication[]
 
   @@index([roleId])
   @@index([status])
+  @@schema("security")
+}
+
+/// Partner onboarding application (Step 1.10) — заявка внешнего продавца на
+/// регистрацию/активацию Partner. Живёт в security.* (onboarding identity),
+/// НЕ параллельная Partner entity: crm.Partner создаётся/линкуется ТОЛЬКО на
+/// approve через CRM-owned service; User.partnerId — единственная связь.
+///
+/// Статусы не смешивать: User.status / PartnerApplication.status /
+/// crm.Partner.status / Product.status / ModerationSubmission.status.
+/// Payment/KYC onboarding — отдельный будущий этап (здесь не хранится).
+model PartnerApplication {
+  id           String                  @id @default(uuid())
+  code         String                  @unique // APP-00000001
+  userId       String
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Ссылка на crm.Partner (без FK) — заполняется только на approve.
+  partnerId    String?
+  status       PartnerApplicationStatus @default(DRAFT)
+
+  applicantType ApplicantType
+  /// Юрлицо: legal/company name.
+  legalName    String?
+  /// Отображаемое имя бренда/партнёра (обязательно). НЕ identity-ключ.
+  brandName    String
+  country      String
+  registrationNumber String?
+  taxId        String?
+  website      String?
+  contactEmail String
+  contactPhone String?
+  address      String?
+  businessDescription String?
+  /// Onboarding-метаданные: slugs ACTIVE категорий, которые заявитель планирует
+  /// продавать. НЕ даёт ownership Product (это не Product-привязка).
+  serviceCategories Json?
+  termsAccepted Boolean              @default(false)
+
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  reviewedById String?
+  reviewedByUsername String?
+  decisionReason String?
+  /// Оптимистичный замок (CAS): stale-правки/решения отклоняются (409).
+  version     Int                   @default(1)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  history PartnerApplicationHistory[]
+
+  @@index([status])
+  @@index([userId])
+  @@schema("security")
+}
+
+/// Журнал PartnerApplication (audit by default) — полная история решений.
+model PartnerApplicationHistory {
+  id            String   @id @default(uuid())
+  applicationId String
+  application   PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  action        String
+  from          String?
+  to            String?
+  fields        Json?
+  actorId       String?
+  actorName     String?
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  @@index([applicationId])
   @@schema("security")
 }
 

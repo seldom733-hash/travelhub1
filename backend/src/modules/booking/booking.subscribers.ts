@@ -101,13 +101,28 @@ export class BookingSubscribers implements OnModuleInit {
           created.push({ id: booking.id, code: booking.code });
         }
 
+        // STRICT REVIEW FIX (invariant proof, §16): created непуст — invariant
+        // выше (early return при order.items.length === 0 ⇒ items ≥ 1 ⇒ ровно
+        // одна Booking на item). Тем не менее делаем контролируемый guard:
+        // пустой результат — не runtime TypeError, а no-op (inbox отметится,
+        // повторная доставка ничего не создаст).
+        const first = created[0];
+        if (!first) {
+          await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
+          return;
+        }
+
         // Событие-результат (связь по correlation/causation).
+        // Step 1.15: correlation наследуется из родительского события BookingRequested
+        // (business код заказа НЕ используется как correlationId); causation = parent id.
+        // Step 1.15A §20: entityId (aggregateId) — canonical booking ID (first.id),
+        // пустой ID запрещён валидатором emitResult.
         await this.eventBus.emitResult(tx, {
           aggregateType: "Booking",
-          aggregateId: created[0]?.id ?? "",
+          aggregateId: first.id,
           eventType: DomainEvents.BookingCreated,
           payload: { count: created.length, bookings: created, orderId: order.id } as PrismaInput,
-          correlationId: ev.correlationId ?? order.code,
+          correlationId: ev.correlationId,
           causationId: ev.id,
         });
 

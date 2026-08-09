@@ -4,6 +4,7 @@ import { JwtService } from "@nestjs/jwt";
 import { Request } from "express";
 import { AuthService, type AuthUser } from "./auth.service";
 import { IS_PUBLIC_KEY } from "./decorators";
+import { setRequestActor } from "../../shared/request-context";
 
 export interface AuthedRequest extends Request {
   user: AuthUser;
@@ -38,6 +39,10 @@ export class JwtAuthGuard implements CanActivate {
 
     // Права загружаются из БД на каждый запрос — смена роли применяется сразу.
     request.user = await this.auth.me(payload.sub);
+    // Step 1.15A §10: authenticated actor в request context (внутри ALS-scope
+    // middleware-а) — envelope.actor = {type:"USER", id} для бизнес-событий
+    // этого запроса. Только canonical userId, без username/email/permissions.
+    setRequestActor({ type: "USER", id: request.user.id });
     return true;
   }
 

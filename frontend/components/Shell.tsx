@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, auth } from "@/lib/api";
 import { useCurrentUser } from "@/lib/use-user";
+import { homeForRole, isExternalRole } from "@/lib/routes";
 
 interface NavItem {
   href: string;
@@ -14,13 +15,20 @@ interface NavItem {
   permission?: string;
 }
 
+/**
+ * PHASE 1 STEP 1.6 — internal navigation: ВСЕ пункты ведут на /app/*.
+ * Public витрина доступна по ссылке «На витрину» (наружу), но sidebar ведёт
+ * только на внутренние Work Centers (§14).
+ */
 const NAV: NavItem[] = [
-  { href: "/", icon: "🏠", label: "Обзор" },
-  { href: "/catalog", icon: "📚", label: "Catalog Center", permission: "catalog.product.read" },
-  { href: "/orders", icon: "🧾", label: "Order Center", permission: "order.read" },
-  { href: "/bookings", icon: "📑", label: "Booking Center", permission: "booking.read" },
-  { href: "/customers", icon: "🤝", label: "CRM mini", permission: "crm.customer.read" },
-  { href: "/users", icon: "👥", label: "Пользователи", permission: "settings.write" },
+  { href: "/app/dashboard", icon: "🏠", label: "Рабочий стол" },
+  { href: "/app/catalog", icon: "📚", label: "Catalog Center", permission: "catalog.product.read" },
+  { href: "/app/orders", icon: "🧾", label: "Order Center", permission: "order.read" },
+  { href: "/app/bookings", icon: "📑", label: "Booking Center", permission: "booking.read" },
+  { href: "/app/crm", icon: "🤝", label: "CRM mini", permission: "crm.customer.read" },
+  { href: "/app/partners/onboarding", icon: "📋", label: "Partner onboarding", permission: "partner.onboarding.review" },
+  { href: "/app/seller-profiles", icon: "🛡", label: "Seller profiles", permission: "seller_public_profile.review" },
+  { href: "/app/users", icon: "👥", label: "Пользователи", permission: "settings.write" },
 ];
 
 /** Маршрут → требуемое право (для редиректа при прямом переходе). */
@@ -30,6 +38,9 @@ const ROUTE_PERMISSION: Record<string, string> = Object.fromEntries(
 
 const canAccess = (user: { permissions: string[] } | null, permission?: string) =>
   !permission || (user?.permissions.includes(permission) ?? false);
+
+const isDashboardPath = (href: string, pathname: string) =>
+  href === "/app/dashboard" ? pathname === "/app" || pathname === "/app/dashboard" : pathname.startsWith(href);
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -41,34 +52,42 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
+  // Auth boundary: anonymous /app/* перехватывается middleware (server-side).
+  // Клиентский !auth.token-guard убран: во время гидратации чтение localStorage
+  // может разойтись с загрузкой user (race) → ложный logout. Отсутствие сессии
+  // на защищённом пути обрабатывает useCurrentUser (path-guarded fallback).
+
+  // Step 1.6 §11 + Step 1.8 + Step 1.13: внешние роли НЕ получают employee Work
+  // Centers. PARTNER → /partner (Partner Cabinet), BUYER → /account (Buyer Cabinet).
+  // pathname в deps: редирект повторяется, если другой эффект успел перевести
+  // на /app/* до срабатывания этой проверки (race двух router.replace).
   useEffect(() => {
-    if (!mounted || pathname === "/login") return;
-    if (!auth.token) {
-      router.replace("/login");
-      return;
+    if (!mounted || !user) return;
+    if (isExternalRole(user.role)) {
+      router.replace(homeForRole(user.role));
     }
-  }, [mounted, pathname, router]);
+  }, [mounted, pathname, user, router]);
 
   // Редирект с маршрута, на который у пользователя нет права.
   useEffect(() => {
-    if (!mounted || pathname === "/login" || !user) return;
+    if (!mounted || !user) return;
+    // Внешние роли никогда не перенаправляются на /app/* (в т.ч. при нехватке прав).
+    if (isExternalRole(user.role)) {
+      router.replace(homeForRole(user.role));
+      return;
+    }
     const required = ROUTE_PERMISSION[pathname];
     if (required && !user.permissions.includes(required)) {
-      router.replace("/");
+      router.replace("/app/dashboard");
     }
   }, [mounted, pathname, user, router]);
 
   // До монтирования рендерим одинаковый заглушечный DOM (SSR = client, без hydration mismatch).
-  if (!mounted) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">Загрузка…</div>;
-  }
-
-  // Логин-страница рендерится без сайдбара.
-  if (pathname === "/login") {
-    return <>{children}</>;
-  }
-
-  if (!auth.token) {
+  // Children НЕ рендерятся, пока user не разрешён: (a) без токена — boundary → /login;
+  // (b) внешние роли (PARTNER/BUYER) никогда не получают внутренние Work Centers —
+  // рендер детей блокирован до редиректа (review: исключает вспышку внутреннего UI
+  // и лишние internal API-запросы от внешней роли). BUYER → /account (Step 1.13).
+  if (!mounted || !auth.token || !user || isExternalRole(user.role)) {
     return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">Загрузка…</div>;
   }
 
@@ -85,18 +104,18 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       {/* ── Sidebar ── */}
       <aside className="thin-scroll sticky top-0 flex h-screen w-60 shrink-0 flex-col overflow-y-auto bg-slate-900 text-slate-200">
-        <div className="flex items-center gap-2.5 border-b border-white/10 px-5 py-4">
+        <Link href="/app/dashboard" className="flex items-center gap-2.5 border-b border-white/10 px-5 py-4">
           <div className="flex size-9 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white">T</div>
           <div>
             <div className="text-base font-bold text-white">
               Travel<span className="text-blue-400">Hub</span>
             </div>
-            <div className="text-[10px] text-slate-400">Phase 2 · Auth + RBAC</div>
+            <div className="text-[10px] text-slate-400">Internal App</div>
           </div>
-        </div>
+        </Link>
         <nav className="flex-1 py-3">
           {visibleNav.map((item) => {
-            const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            const active = isDashboardPath(item.href, pathname);
             return (
               <Link
                 key={item.href}
@@ -127,6 +146,12 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           )}
+          <Link
+            href="/"
+            className="mb-2 block w-full rounded-lg border border-white/10 px-3 py-1.5 text-center text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+          >
+            На витрину →
+          </Link>
           <button
             onClick={logout}
             className="w-full rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"

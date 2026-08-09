@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { Type } from "class-transformer";
-import { IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
 import { RoleCode, UserStatus } from "../generated/prisma/enums";
 import { SecurityService } from "./security.service";
 import { JwtAuthGuard } from "./auth/jwt-auth.guard";
@@ -46,6 +46,12 @@ class CreateStaffDto {
 
   @IsEnum(RoleCode)
   roleCode!: RoleCode;
+
+  // Step 1.2 (RBAC object scope): ADMIN может назначить партнёра (CRM PAR-* id)
+  // — PARTNER управляет только собственными Product/media (product.partnerId == user.partnerId).
+  @IsOptional()
+  @IsString()
+  partnerId?: string;
 }
 
 class AssignRoleDto {
@@ -56,6 +62,14 @@ class AssignRoleDto {
 class SetStatusDto {
   @IsEnum(UserStatus)
   status!: UserStatus;
+}
+
+class ReconcileBuyersDto {
+  /** dry-run: только отчёт, без изменений (review Step 1.9). */
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  dryRun?: boolean;
 }
 
 /**
@@ -76,7 +90,7 @@ export class UsersController {
   @Post()
   @RequirePermissions("settings.write")
   createStaff(@Body() dto: CreateStaffDto, @CurrentUser() actor: AuthedRequest["user"]) {
-    return this.security.createStaff({ ...dto, partnerId: undefined, customerId: undefined });
+    return this.security.createStaff({ ...dto, partnerId: dto.partnerId, customerId: undefined });
   }
 
   @Patch(":id/role")
@@ -89,5 +103,29 @@ export class UsersController {
   @RequirePermissions("settings.write")
   setStatus(@Param("id") id: string, @Body() dto: SetStatusDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.security.setStatus(id, dto.status, actor.id);
+  }
+
+  /**
+   * Step 1.9 (review) — явная idempotent migration/repair command для legacy
+   * BUYER без валидного customerId. НЕ startup backfill: вызывается оператором
+   * (ADMIN) явно, с dry-run/report и аудитом результата.
+   */
+  @Post("reconcile-buyer-customers")
+  @RequirePermissions("settings.write")
+  async reconcileBuyerCustomers(
+    @Body() dto: ReconcileBuyersDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    const dryRun = dto.dryRun ?? false;
+    const result = await this.security.repairBuyerCustomers(dryRun);
+    await this.security.audit(undefined, {
+      userId: actor.id,
+      username: actor.username,
+      action: dryRun ? "user.buyer_customer_repair_dryrun" : "user.buyer_customer_repair",
+      resource: "User",
+      resourceId: null,
+      details: result,
+    });
+    return result;
   }
 }

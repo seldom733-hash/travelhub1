@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
 import { PrismaService } from "../prisma/prisma.service";
 import { IdsService } from "../shared/ids.service";
+import { CrmService } from "../modules/crm/crm.service";
 import {
   ALL_PERMISSIONS,
   ROLE_PERMISSIONS,
@@ -9,6 +10,8 @@ import {
 } from "./permissions.constants";
 import { RoleCode, UserStatus } from "../generated/prisma/enums";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../shared/errors";
+import { normalizeEmail } from "../shared/field-validation";
+import { getRequestContext } from "../shared/request-context";
 import type { Prisma } from "../generated/prisma/client";
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME ?? "admin";
@@ -29,11 +32,17 @@ export class SecurityService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ids: IdsService,
+    private readonly crm: CrmService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     await this.seedRoles();
     await this.seedAdmin();
+    // НЕ выполняем legacy Buyer↔Customer reconciliation при старте (review
+    // Step 1.9): runtime startup backfill не нужен — новые BUYER всегда
+    // получают Customer внутри registration orchestration (AuthService.register).
+    // Legacy repair — отдельная явная idempotent command (dry-run/report):
+    //   POST /api/v1/users/reconcile-buyer-customers  (см. repairBuyerCustomers).
   }
 
   /** Создание канонических ролей и прав (идемпотентно). */
@@ -56,7 +65,9 @@ export class SecurityService implements OnModuleInit {
       });
     }
 
-    // Роль → права (матрица §2).
+    // Роль → права (матрица §2). Матрица АВТОРИТЕТНА: ссылки, которых больше нет
+    // в матрице (Step 1.3: MODERATOR −catalog.product.write, PARTNER −catalog.product.read),
+    // отзываются — иначе dev-БД не сойдётся с новой матрицей при повторном seed.
     for (const [role, perms] of Object.entries(ROLE_PERMISSIONS) as [RoleCode, PermissionCode[]][]) {
       const roleRow = await this.prisma.role.findUniqueOrThrow({ where: { code: role }, select: { id: true } });
       const permRows = await this.prisma.permission.findMany({
@@ -73,6 +84,14 @@ export class SecurityService implements OnModuleInit {
         await this.prisma.rolePermission.createMany({
           data: toAdd.map((p) => ({ roleId: roleRow.id, permissionId: p.id })),
         });
+      }
+      const matrixSet = new Set(permRows.map((p) => p.id));
+      const toRevoke = existingLinks.filter((l) => !matrixSet.has(l.permissionId));
+      if (toRevoke.length > 0) {
+        await this.prisma.rolePermission.deleteMany({
+          where: { roleId: roleRow.id, permissionId: { in: toRevoke.map((l) => l.permissionId) } },
+        });
+        this.logger.log(`Revoked ${toRevoke.length} stale permission(s) from role ${role}`);
       }
     }
     this.logger.log("RBAC roles/permissions seeded");
@@ -188,6 +207,10 @@ export class SecurityService implements OnModuleInit {
   /**
    * Запись в журнал аудита. Может выполняться в рамках транзакции вызывающего
    * (передать tx) либо отдельной записью (tx опущен).
+   *
+   * Step 1.15 §10: если активен request context — в details безопасно добавляется
+   * ссылка { requestId, correlationId } для связи AuditLog с logs/outbox chain.
+   * Это reference, а не event store: AuditLog остаётся журналом действий.
    */
   async audit(
     tx: Prisma.TransactionClient | undefined,
@@ -202,7 +225,13 @@ export class SecurityService implements OnModuleInit {
     },
   ): Promise<void> {
     const client = (tx ?? this.prisma) as Prisma.TransactionClient;
-    const details = entry.details as Prisma.InputJsonValue | undefined;
+    const ctx = getRequestContext();
+    // Step 1.15: correlation — безопасный reference в details (только когда
+    // контекст активен). Без details и без контекста — SQL NULL (как раньше),
+    // никакой пустой object/backfill.
+    const correlation = ctx ? { correlation: { requestId: ctx.requestId, correlationId: ctx.correlationId } } : undefined;
+    const details: Prisma.InputJsonValue | undefined =
+      entry.details || correlation ? ({ ...(entry.details ?? {}), ...(correlation ?? {}) } as Prisma.InputJsonValue) : undefined;
     await client.auditLog.create({
       data: {
         userId: entry.userId ?? null,
@@ -214,6 +243,86 @@ export class SecurityService implements OnModuleInit {
         ip: entry.ip ?? null,
       },
     });
+  }
+
+  /**
+   * Step 1.9 (Clarification §7, review fix) — ЯВНАЯ idempotent migration/repair
+   * command для legacy BUYER без валидного customerId. НЕ вызывается из
+   * runtime lifecycle (onModuleInit): новые BUYER всегда получают Customer в
+   * registration orchestration, поэтому startup backfill не нужен.
+   *
+   * Контракт (сохраняет все требования Clarification):
+   *  - deterministic matching: link только по нормализованному email
+   *    (однозначный Customer.email UNIQUE);
+   *  - no guessing: BUYER без email — skippedNoEmail (нет канонического ключа),
+   *    Customer «наугад» не создаётся;
+   *  - ambiguous match → NO auto-merge: имя/телефон не являются ключом связи;
+   *  - broken reference: customerId указывает на несуществующий Customer —
+   *    однозначно мёртвая ссылка (не guessing), очищается и ремонтируется по
+   *    email в том же прогоне;
+   *  - transaction safety: create + link одной транзакцией на пользователя
+   *    (нет окна «Customer создан, User не связан»);
+   *  - dry-run/report: при dryRun=true выполняются ТОЛЬКО чтения и возвращается
+   *    отчёт { scanned, linked, created, skippedNoEmail, brokenRefs, dryRun }
+   *    без каких-либо изменений;
+   *  - audit: реальный прогон аудируется вызывающим (контроллер пишет AuditLog
+   *    с полным результатом).
+   */
+  async repairBuyerCustomers(dryRun = false): Promise<{
+    scanned: number;
+    linked: number;
+    created: number;
+    skippedNoEmail: number;
+    brokenRefs: number;
+    dryRun: boolean;
+  }> {
+    const buyers = await this.prisma.user.findMany({
+      where: { role: { code: RoleCode.BUYER } },
+      select: { id: true, username: true, email: true, customerId: true },
+    });
+    let linked = 0;
+    let created = 0;
+    let skippedNoEmail = 0;
+    let brokenRefs = 0;
+    for (const b of buyers) {
+      // Уже валидная связь (Customer существует) — пропускаем.
+      if (b.customerId) {
+        const exists = await this.prisma.customer.findUnique({ where: { id: b.customerId }, select: { id: true } });
+        if (exists) continue;
+        // Мёртвая ссылка: Customer не существует (однозначно). Чистим и ремонтируем.
+        brokenRefs += 1;
+        if (!dryRun) {
+          await this.prisma.user.update({ where: { id: b.id }, data: { customerId: null } });
+        }
+      }
+      if (!b.email) {
+        skippedNoEmail += 1; // без email нет канонического ключа — no guessing
+        continue;
+      }
+      const email = normalizeEmail(b.email);
+      const linkedCustomer = await this.prisma.customer.findUnique({ where: { email }, select: { id: true } });
+      if (linkedCustomer) {
+        linked += 1;
+        if (!dryRun) {
+          await this.prisma.user.update({ where: { id: b.id }, data: { customerId: linkedCustomer.id } });
+        }
+        continue;
+      }
+      created += 1;
+      if (!dryRun) {
+        // Create + link ОДНОЙ транзакцией через CRM-owned command.
+        await this.prisma.$transaction(async (tx) => {
+          const { customerId } = await this.crm.ensureCustomerForBuyer(tx, { email, actorUserId: b.id });
+          await tx.user.update({ where: { id: b.id }, data: { customerId } });
+        });
+      }
+    }
+    if (!dryRun && buyers.length > 0) {
+      this.logger.log(
+        `Buyer↔Customer repair: scanned=${buyers.length} linked=${linked} created=${created} skippedNoEmail=${skippedNoEmail} brokenRefs=${brokenRefs}`,
+      );
+    }
+    return { scanned: buyers.length, linked, created, skippedNoEmail, brokenRefs, dryRun };
   }
 
   /** Создание пользователя персонала (ADMIN). */
@@ -267,14 +376,44 @@ const ROLE_TITLES: Record<RoleCode, string> = {
 };
 
 const PERMISSION_DESCRIPTIONS: Record<string, string> = {
+  "account.profile.read": "Чтение собственного профиля/аккаунта (own-scope)",
+  "account.profile.update": "Обновление собственного профиля (own-scope)",
+  "partner.onboarding.read_own": "Чтение собственной PartnerApplication (own-scope)",
+  "partner.onboarding.update_own": "Редактирование собственной PartnerApplication (own-scope)",
+  "partner.onboarding.submit_own": "Отправка собственной PartnerApplication на review",
+  "partner.onboarding.review": "Review очереди PartnerApplication (start/approve/reject/request changes)",
+  "seller_public_profile.read_own": "Чтение собственного PublicSellerProfile/предложений (own-scope)",
+  "seller_public_profile.propose": "Создание/редактирование/отправка предложения публичной идентичности (own-scope)",
+  "storefront.read_own": "Чтение собственной Partner Storefront (own-scope)",
+  "storefront.create_own": "Создание собственной Partner Storefront (own-scope, explicit provisioning)",
+  "storefront.update_own": "Редактирование собственной Partner Storefront (own-scope)",
+  "storefront.activate_own": "Активация/деактивация собственной Partner Storefront (own-scope)",
+  "storefront.entitlement.manage": "Управление Storefront entitlement (операционная команда; граница будущего Billing domain)",
+  "seller_public_profile.review": "Review очереди предложений публичной идентичности",
+  "seller_public_profile.approve_alias": "Утверждение VERIFIED_ALIAS (alias продавца)",
+  "seller_public_profile.approve_brand": "Утверждение PUBLIC_BRAND (реальный бренд)",
+  "seller_public_profile.request_changes": "Запрос изменений в предложении публичной идентичности",
+  "seller_public_profile.hide_identity": "Скрытие/восстановление публичной идентичности продавца",
   "catalog.product.read": "Чтение продуктов",
+  "catalog.product.read_for_moderation": "Чтение продуктов для модерации",
   "catalog.product.write": "Создание/изменение продуктов",
   "catalog.product.publish": "Публикация/архивация продукта",
   "catalog.product.submit_moderation": "Отправка продукта на модерацию",
+  "catalog.product.create_own": "Создание собственного draft Product (PARTNER)",
+  "catalog.product.update_own_draft": "Редактирование собственного draft Product (PARTNER)",
+  "catalog.product.read_own": "Чтение собственных продуктов (PARTNER)",
+  "catalog.product.channels_own": "Управление каналами публикации собственного Product (own-scope)",
   "catalog.category.write": "Управление категориями",
   "catalog.category_schema.read": "Чтение Category Schema (конфигурации категорий)",
   "catalog.category_schema.write": "Управление Category Schema (только ADMIN)",
+  "catalog.category_schema.read_active_for_product_edit": "Чтение ACTIVE Category Schema для формы создания Product (PARTNER)",
   "catalog.availability.write": "Управление availability",
+  "catalog.media.upload_own": "Загрузка media собственного Product",
+  "catalog.media.update_own": "Обновление media собственного Product",
+  "catalog.media.delete_own": "Удаление media собственного Product",
+  "catalog.media.reorder_own": "Изменение порядка media собственного Product",
+  "catalog.media.set_primary_own": "Назначение primary image собственного Product",
+  "catalog.media.read_for_moderation": "Чтение media для модерации",
   "crm.customer.read": "Чтение клиентов",
   "crm.customer.write": "Создание/изменение клиентов",
   "crm.contact.write": "Управление контактами",
@@ -327,4 +466,5 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "moderation.review": "Ревью модерации",
   "moderation.approve": "Одобрение модерации",
   "moderation.reject": "Отклонение модерации",
+  "moderation.request_changes": "Запрос изменений в модерации",
 };

@@ -1,0 +1,150 @@
+====================================================================================================
+1. ПОЛЬЗОВАТЕЛИ (security.User) — все авторизованные аккаунты платформы
+   Всего: 42
+====================================================================================================
+CODE          |USERNAME              |EMAIL                           |FULL NAME                 |ROLE           |STATUS    |CUSTOMER                                |PARTNER                                 |CREATED AT
+----------------------------------------------------------------------------------------------------
+USR-00000001  |admin                 |                                |Administrator             |ADMIN          |ACTIVE    |                                        |                                        |2026-08-07T19:47:28.453Z
+USR-00000017  |buyer_demo            |                                |���������� ����           |BUYER          |ACTIVE    |                                        |                                        |2026-08-07T20:04:24.888Z
+USR-00000018  |moderator_demo        |                                |                          |MODERATOR      |ACTIVE    |                                        |                                        |2026-08-07T20:10:59.710Z
+USR-00000019  |ui_operator           |                                |                          |ANALYST        |ACTIVE    |                                        |                                        |2026-08-07T20:26:28.449Z
+USR-00000020  |mod_create            |                                |mod_create                |MODERATOR      |ACTIVE    |                                        |                                        |2026-08-07T20:35:21.473Z
+USR-00000021  |sales_create          |                                |sales_create              |SALES_MANAGER  |ACTIVE    |                                        |                                        |2026-08-07T20:35:22.068Z
+USR-00000022  |op_create             |                                |Op                        |OPERATOR       |ACTIVE    |                                        |                                        |2026-08-07T20:56:05.130Z
+USR-00000062  |buyer_verify          |                                |                          |BUYER          |INACTIVE  |                                        |                                        |2026-08-08T11:13:31.042Z
+USR-00000063  |partner_verify        |                                |                          |PARTNER        |INACTIVE  |                                        |                                        |2026-08-08T11:13:31.284Z
+USR-00000064  |step18_partner        |                                |Step18 Partner            |PARTNER        |ACTIVE    |                                        |aa70b379-5d42-4f33-94b5-067fb6b31281    |2026-08-08T13:11:45.455Z
+USR-00000065  |step19smoke1786202890@test.local|step19smoke1786202890@test.local|����� �����               |BUYER          |ACTIVE    |69172981-c705-49e2-a726-69847df8a1b8    |                                        |2026-08-08T15:28:10.617Z
+USR-00000066  |buyer1786203394@test.local|buyer1786203394@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |5a8d7179-9ac3-4ddd-9e37-1648b2a92d3a    |                                        |2026-08-08T15:36:39.830Z
+USR-00000067  |buyer1786203448@test.local|buyer1786203448@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |a288e0b3-fbf5-42d0-82eb-5a98bf4cb0c3    |                                        |2026-08-08T15:37:34.518Z
+USR-00000068  |buyer1786203552@test.local|buyer1786203552@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |80e25775-eaf1-4000-8975-da57aa3ae657    |                                        |2026-08-08T15:39:18.651Z
+USR-00000069  |buyer1786203603@test.local|buyer1786203603@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |e3302a4d-9e37-4b4e-a3b3-3d90a798ef64    |                                        |2026-08-08T15:40:08.887Z
+USR-00000070  |buyer1786203746@test.local|buyer1786203746@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |e102499e-3a82-463f-a7f2-0e761b4a6d63    |                                        |2026-08-08T15:42:32.217Z
+USR-00000071  |buyer1786203798@test.local|buyer1786203798@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |f4f45fee-7bcb-499f-a0c4-00ae07403ab0    |                                        |2026-08-08T15:43:23.930Z
+USR-00000072  |buyer1786203902@test.local|buyer1786203902@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |097b57f2-4f8e-4cc3-b70a-8c6a02737a18    |                                        |2026-08-08T15:45:08.186Z
+USR-00000073  |buyer21786203916@test.local|buyer21786203916@test.local     |Обновлённое Имя           |BUYER          |ACTIVE    |a6235229-9e2c-4690-87b1-b28a2b3375c4    |                                        |2026-08-08T15:45:16.478Z
+USR-00000074  |buyer1786203948@test.local|buyer1786203948@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |215bef3e-f2ed-498d-b674-b9bcbb27a81c    |                                        |2026-08-08T15:45:53.586Z
+USR-00000075  |buyer21786203961@test.local|buyer21786203961@test.local     |Обновлённое Имя           |BUYER          |ACTIVE    |b96c6809-5819-4be5-a2fc-a067b8586216    |                                        |2026-08-08T15:46:01.725Z
+USR-00000076  |buyer1786204049@test.local|buyer1786204049@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |6166837e-18a0-4bf1-957a-67d6598604fa    |                                        |2026-08-08T15:47:35.430Z
+USR-00000077  |buyer21786204063@test.local|buyer21786204063@test.local     |Обновлённое Имя           |BUYER          |ACTIVE    |2a593761-60eb-4a40-b45a-a1d5617d0102    |                                        |2026-08-08T15:47:43.486Z
+USR-00000078  |buyer1786204095@test.local|buyer1786204095@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |05ccb018-8252-4028-9f02-71ed0f0d510a    |                                        |2026-08-08T15:48:21.375Z
+USR-00000079  |buyer21786204109@test.local|buyer21786204109@test.local     |Обновлённое Имя           |BUYER          |ACTIVE    |ef9902aa-a99a-4778-849c-b8ebfa1882ac    |                                        |2026-08-08T15:48:29.460Z
+USR-00000080  |buyer1786204140@test.local|buyer1786204140@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |a5576cdd-948c-41f3-895a-5034672b6b05    |                                        |2026-08-08T15:49:06.163Z
+USR-00000081  |buyer21786204153@test.local|buyer21786204153@test.local     |Обновлённое Имя           |BUYER          |ACTIVE    |af794bb3-832f-45dc-9928-6bff4ce60f34    |                                        |2026-08-08T15:49:14.312Z
+USR-00000082  |buyer1786204212@test.local|buyer1786204212@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |29afc436-df66-4bf7-9ced-e8c83c579eed    |                                        |2026-08-08T15:50:17.924Z
+USR-00000083  |buyer21786204225@test.local|buyer21786204225@test.local     |Обновлённое Имя           |BUYER          |ACTIVE    |a247d16c-abc1-4039-a51c-eac9a37937f4    |                                        |2026-08-08T15:50:26.034Z
+USR-00000084  |dbg1786204267@test.local|dbg1786204267@test.local        |Тестовый Покупатель       |BUYER          |ACTIVE    |8109087d-4f7f-4aa8-995d-8d01d3d01da0    |                                        |2026-08-08T15:51:07.634Z
+USR-00000085  |buyer1786204300@test.local|buyer1786204300@test.local      |Браузер Покупатель        |BUYER          |ACTIVE    |be61be43-1dd8-48d9-b165-0bf5b7894cb9    |                                        |2026-08-08T15:51:45.928Z
+USR-00000086  |buyer21786204313@test.local|buyer21786204313@test.local     |Обновлённое Имя           |BUYER          |ACTIVE    |67bac5b2-52c6-44b0-9ab6-c7d92d0834d8    |                                        |2026-08-08T15:51:54.089Z
+USR-00000096  |smoke_1786266741096@t.local|smoke_1786266741096@t.local     |Смоук Тестов              |BUYER          |ACTIVE    |8bdb8b8a-6653-461b-9cf0-5ce74b4f1b4f    |                                        |2026-08-09T09:12:38.601Z
+USR-00000097  |smoke_1786266821837@t.local|smoke_1786266821837@t.local     |Смоук Тестов              |BUYER          |ACTIVE    |14b3c93e-db0e-4aca-99a2-80c543000bcf    |                                        |2026-08-09T09:13:45.328Z
+USR-00000098  |smoke_1786266917272@t.local|smoke_1786266917272@t.local     |Смоук Тестов              |BUYER          |ACTIVE    |76753286-ed9c-4171-81f8-601b1625ca8f    |                                        |2026-08-09T09:15:20.968Z
+USR-00000099  |sr_1786268593         |sr_1786268593@t.local           |                          |BUYER          |ACTIVE    |dd40b3b6-6e34-47bb-8a92-db856bbc76c3    |                                        |2026-08-09T09:43:13.655Z
+USR-00000100  |srp_1786268593        |                                |                          |PARTNER        |ACTIVE    |                                        |                                        |2026-08-09T09:43:16.124Z
+USR-00000101  |srm_1786268593        |                                |                          |MODERATOR      |ACTIVE    |                                        |                                        |2026-08-09T09:43:16.726Z
+USR-00000102  |strict_1786268622997@t.local|strict_1786268622997@t.local    |Строгий Ревью             |BUYER          |ACTIVE    |ce1d4528-0093-4cf7-863d-c5383efafeb2    |                                        |2026-08-09T09:43:48.694Z
+USR-00000103  |dbg_1786268653383@t.local|dbg_1786268653383@t.local       |A B                       |BUYER          |ACTIVE    |ddde1d49-94e9-4f85-886f-b6d3ea3fc7d0    |                                        |2026-08-09T09:44:16.062Z
+USR-00000104  |strict_1786268673115@t.local|strict_1786268673115@t.local    |Строгий Ревью             |BUYER          |ACTIVE    |f5326c0b-ace5-475a-aa1f-28404c5c8ed7    |                                        |2026-08-09T09:44:35.876Z
+USR-00000105  |strict_1786268701677@t.local|strict_1786268701677@t.local    |Строгий Ревью             |BUYER          |ACTIVE    |0254a2fb-a9d9-4655-9c8a-f602c9601d89    |                                        |2026-08-09T09:45:04.170Z
+
+====================================================================================================
+2. КЛИЕНТЫ (crm.Customer) — покупатели / лица CRM
+   Всего: 34
+====================================================================================================
+CODE          |TYPE      |FIRST NAME          |LAST NAME           |COMPANY                   |EMAIL                             |PHONE             |STATUS    |CREATED AT
+----------------------------------------------------------------------------------------------------
+CUS-00000004  |PERSON    |�����               |��������            |                          |aygun@example.com                 |+994500000001     |ACTIVE    |2026-08-07T19:24:06.687Z
+CUS-00000007  |PERSON    |RBAC                |Customer            |                          |rbac@test.local                   |                  |ACTIVE    |2026-08-07T19:48:31.130Z
+CUS-00000013  |PERSON    |API                 |                    |                          |api-check@th.local                |                  |ACTIVE    |2026-08-07T20:35:02.956Z
+CUS-00000014  |PERSON    |+7 999 111 22 33    |                    |                          |sales-check@th.local              |+7 900 000 00 00  |ACTIVE    |2026-08-07T20:35:24.093Z
+CUS-00000037  |PERSON    |�����               |�����               |                          |step19smoke1786202890@test.local  |                  |ACTIVE    |2026-08-08T15:28:10.643Z
+CUS-00000038  |PERSON    |Браузер             |Покупатель          |                          |buyer1786203394@test.local        |                  |ACTIVE    |2026-08-08T15:36:39.851Z
+CUS-00000039  |PERSON    |Браузер             |Покупатель          |                          |buyer1786203448@test.local        |                  |ACTIVE    |2026-08-08T15:37:34.535Z
+CUS-00000040  |PERSON    |Браузер             |Покупатель          |                          |buyer1786203552@test.local        |                  |ACTIVE    |2026-08-08T15:39:18.669Z
+CUS-00000041  |PERSON    |Браузер             |Покупатель          |                          |buyer1786203603@test.local        |                  |ACTIVE    |2026-08-08T15:40:08.907Z
+CUS-00000042  |PERSON    |Браузер             |Покупатель          |                          |buyer1786203746@test.local        |                  |ACTIVE    |2026-08-08T15:42:32.234Z
+CUS-00000043  |PERSON    |Браузер             |Покупатель          |                          |buyer1786203798@test.local        |                  |ACTIVE    |2026-08-08T15:43:23.946Z
+CUS-00000044  |PERSON    |Браузер             |Покупатель          |                          |buyer1786203902@test.local        |                  |ACTIVE    |2026-08-08T15:45:08.201Z
+CUS-00000045  |PERSON    |Обновлённое         |Имя                 |                          |buyer21786203916@test.local       |+994501112233     |ACTIVE    |2026-08-08T15:45:16.497Z
+CUS-00000046  |PERSON    |Браузер             |Покупатель          |                          |buyer1786203948@test.local        |                  |ACTIVE    |2026-08-08T15:45:53.607Z
+CUS-00000047  |PERSON    |Обновлённое         |Имя                 |                          |buyer21786203961@test.local       |+994501112233     |ACTIVE    |2026-08-08T15:46:01.743Z
+CUS-00000048  |PERSON    |Браузер             |Покупатель          |                          |buyer1786204049@test.local        |                  |ACTIVE    |2026-08-08T15:47:35.447Z
+CUS-00000049  |PERSON    |Обновлённое         |Имя                 |                          |buyer21786204063@test.local       |+994501112233     |ACTIVE    |2026-08-08T15:47:43.505Z
+CUS-00000050  |PERSON    |Браузер             |Покупатель          |                          |buyer1786204095@test.local        |                  |ACTIVE    |2026-08-08T15:48:21.393Z
+CUS-00000051  |PERSON    |Обновлённое         |Имя                 |                          |buyer21786204109@test.local       |+994501112233     |ACTIVE    |2026-08-08T15:48:29.477Z
+CUS-00000052  |PERSON    |Браузер             |Покупатель          |                          |buyer1786204140@test.local        |                  |ACTIVE    |2026-08-08T15:49:06.181Z
+CUS-00000053  |PERSON    |Обновлённое         |Имя                 |                          |buyer21786204153@test.local       |+994501112233     |ACTIVE    |2026-08-08T15:49:14.319Z
+CUS-00000054  |PERSON    |Браузер             |Покупатель          |                          |buyer1786204212@test.local        |                  |ACTIVE    |2026-08-08T15:50:17.946Z
+CUS-00000055  |PERSON    |Обновлённое         |Имя                 |                          |buyer21786204225@test.local       |+994501112233     |ACTIVE    |2026-08-08T15:50:26.049Z
+CUS-00000056  |PERSON    |Тестовый            |Покупатель          |                          |dbg1786204267@test.local          |                  |ACTIVE    |2026-08-08T15:51:07.687Z
+CUS-00000057  |PERSON    |Браузер             |Покупатель          |                          |buyer1786204300@test.local        |                  |ACTIVE    |2026-08-08T15:51:45.945Z
+CUS-00000058  |PERSON    |Обновлённое         |Имя                 |                          |buyer21786204313@test.local       |+994501112233     |ACTIVE    |2026-08-08T15:51:54.107Z
+CUS-00000060  |PERSON    |Смоук               |Тестов              |                          |smoke_1786266741096@t.local       |                  |ACTIVE    |2026-08-09T09:12:38.676Z
+CUS-00000061  |PERSON    |Смоук               |Тестов              |                          |smoke_1786266821837@t.local       |                  |ACTIVE    |2026-08-09T09:13:45.342Z
+CUS-00000062  |PERSON    |Смоук               |Тестов              |                          |smoke_1786266917272@t.local       |                  |ACTIVE    |2026-08-09T09:15:20.986Z
+CUS-00000063  |PERSON    |                    |                    |                          |sr_1786268593@t.local             |                  |ACTIVE    |2026-08-09T09:43:13.676Z
+CUS-00000064  |PERSON    |Строгий             |Ревью               |                          |strict_1786268622997@t.local      |                  |ACTIVE    |2026-08-09T09:43:48.708Z
+CUS-00000065  |PERSON    |A                   |B                   |                          |dbg_1786268653383@t.local         |                  |ACTIVE    |2026-08-09T09:44:16.073Z
+CUS-00000066  |PERSON    |Строгий             |Ревью               |                          |strict_1786268673115@t.local      |                  |ACTIVE    |2026-08-09T09:44:35.888Z
+CUS-00000067  |PERSON    |Строгий             |Ревью               |                          |strict_1786268701677@t.local      |                  |ACTIVE    |2026-08-09T09:45:04.182Z
+
+====================================================================================================
+3. ПАРТНЁРЫ (crm.Partner) — продавцы платформы
+   Всего: 1
+====================================================================================================
+CODE          |NAME                          |STATUS    |EMAIL                           |REG.NUMBER        |TAX ID        |COUNTRY   |COMPANY                   
+----------------------------------------------------------------------------------------------------
+PAR-00000004  |Step18 Browser Partner        |ACTIVE    |                                |                  |              |          |                          
+
+====================================================================================================
+4. КОМПАНИИ (crm.Company)
+   Всего: 0
+====================================================================================================
+CODE          |NAME                                    |INN             |STATUS    
+----------------------------------------------------------------------------------------------------
+
+====================================================================================================
+5. СВЯЗКИ: User → Customer / Partner (object scope, RBAC §3)
+====================================================================================================
+USR-00000001   admin                  → — (staff/system)
+USR-00000017   buyer_demo             → — (staff/system)
+USR-00000018   moderator_demo         → — (staff/system)
+USR-00000019   ui_operator            → — (staff/system)
+USR-00000020   mod_create             → — (staff/system)
+USR-00000021   sales_create           → — (staff/system)
+USR-00000022   op_create              → — (staff/system)
+USR-00000062   buyer_verify           → — (staff/system)
+USR-00000063   partner_verify         → — (staff/system)
+USR-00000064   step18_partner         → PARTNER: aa70b379-5d42-4f33-94b5-067fb6b31281
+USR-00000065   step19smoke1786202890@test.local → CUSTOMER: 69172981-c705-49e2-a726-69847df8a1b8
+USR-00000066   buyer1786203394@test.local → CUSTOMER: 5a8d7179-9ac3-4ddd-9e37-1648b2a92d3a
+USR-00000067   buyer1786203448@test.local → CUSTOMER: a288e0b3-fbf5-42d0-82eb-5a98bf4cb0c3
+USR-00000068   buyer1786203552@test.local → CUSTOMER: 80e25775-eaf1-4000-8975-da57aa3ae657
+USR-00000069   buyer1786203603@test.local → CUSTOMER: e3302a4d-9e37-4b4e-a3b3-3d90a798ef64
+USR-00000070   buyer1786203746@test.local → CUSTOMER: e102499e-3a82-463f-a7f2-0e761b4a6d63
+USR-00000071   buyer1786203798@test.local → CUSTOMER: f4f45fee-7bcb-499f-a0c4-00ae07403ab0
+USR-00000072   buyer1786203902@test.local → CUSTOMER: 097b57f2-4f8e-4cc3-b70a-8c6a02737a18
+USR-00000073   buyer21786203916@test.local → CUSTOMER: a6235229-9e2c-4690-87b1-b28a2b3375c4
+USR-00000074   buyer1786203948@test.local → CUSTOMER: 215bef3e-f2ed-498d-b674-b9bcbb27a81c
+USR-00000075   buyer21786203961@test.local → CUSTOMER: b96c6809-5819-4be5-a2fc-a067b8586216
+USR-00000076   buyer1786204049@test.local → CUSTOMER: 6166837e-18a0-4bf1-957a-67d6598604fa
+USR-00000077   buyer21786204063@test.local → CUSTOMER: 2a593761-60eb-4a40-b45a-a1d5617d0102
+USR-00000078   buyer1786204095@test.local → CUSTOMER: 05ccb018-8252-4028-9f02-71ed0f0d510a
+USR-00000079   buyer21786204109@test.local → CUSTOMER: ef9902aa-a99a-4778-849c-b8ebfa1882ac
+USR-00000080   buyer1786204140@test.local → CUSTOMER: a5576cdd-948c-41f3-895a-5034672b6b05
+USR-00000081   buyer21786204153@test.local → CUSTOMER: af794bb3-832f-45dc-9928-6bff4ce60f34
+USR-00000082   buyer1786204212@test.local → CUSTOMER: 29afc436-df66-4bf7-9ced-e8c83c579eed
+USR-00000083   buyer21786204225@test.local → CUSTOMER: a247d16c-abc1-4039-a51c-eac9a37937f4
+USR-00000084   dbg1786204267@test.local → CUSTOMER: 8109087d-4f7f-4aa8-995d-8d01d3d01da0
+USR-00000085   buyer1786204300@test.local → CUSTOMER: be61be43-1dd8-48d9-b165-0bf5b7894cb9
+USR-00000086   buyer21786204313@test.local → CUSTOMER: 67bac5b2-52c6-44b0-9ab6-c7d92d0834d8
+USR-00000096   smoke_1786266741096@t.local → CUSTOMER: 8bdb8b8a-6653-461b-9cf0-5ce74b4f1b4f
+USR-00000097   smoke_1786266821837@t.local → CUSTOMER: 14b3c93e-db0e-4aca-99a2-80c543000bcf
+USR-00000098   smoke_1786266917272@t.local → CUSTOMER: 76753286-ed9c-4171-81f8-601b1625ca8f
+USR-00000099   sr_1786268593          → CUSTOMER: dd40b3b6-6e34-47bb-8a92-db856bbc76c3
+USR-00000100   srp_1786268593         → — (staff/system)
+USR-00000101   srm_1786268593         → — (staff/system)
+USR-00000102   strict_1786268622997@t.local → CUSTOMER: ce1d4528-0093-4cf7-863d-c5383efafeb2
+USR-00000103   dbg_1786268653383@t.local → CUSTOMER: ddde1d49-94e9-4f85-886f-b6d3ea3fc7d0
+USR-00000104   strict_1786268673115@t.local → CUSTOMER: f5326c0b-ace5-475a-aa1f-28404c5c8ed7
+USR-00000105   strict_1786268701677@t.local → CUSTOMER: 0254a2fb-a9d9-4655-9c8a-f602c9601d89

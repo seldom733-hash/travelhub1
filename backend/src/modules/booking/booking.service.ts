@@ -109,11 +109,9 @@ export class BookingService {
         },
       });
 
-      // Сквозная трассировка процесса: correlationId = код Order (Baseline §13),
-      // чтобы цепочка Order → Booking собиралась по correlationId.
-      const orderRef = await tx.order.findUnique({ where: { id: booking.orderId }, select: { code: true } });
-      const meta = { correlationId: orderRef?.code ?? booking.code, causationId: null as string | null };
-
+      // Step 1.15: correlation/causation НЕ указываются явно — они наследуются
+      // из request context (correlation = requestId HTTP-команды, causation = null).
+      // НЕ используем business-код (Order.code/Booking.code) как correlationId.
       switch (action) {
         case "confirm": {
           await this.eventBus.emit(tx, {
@@ -126,7 +124,6 @@ export class BookingService {
               orderId: booking.orderId,
               productId: booking.productId,
             } as BookingEventPayload,
-            ...meta,
           });
           break;
         }
@@ -142,7 +139,6 @@ export class BookingService {
               productId: booking.productId,
               reason: "Поставщик отклонил запрос",
             } as BookingEventPayload,
-            ...meta,
           });
           break;
         }
@@ -157,7 +153,6 @@ export class BookingService {
               orderId: booking.orderId,
               productId: booking.productId,
             } as BookingEventPayload,
-            ...meta,
           });
           break;
         }
@@ -174,7 +169,6 @@ export class BookingService {
               orderId: booking.orderId,
               code: booking.code,
             } as Prisma.InputJsonValue,
-            ...meta,
           });
         }
       }

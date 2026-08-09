@@ -19,6 +19,7 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { AppExceptionFilter } from "../src/shared/exception.filter";
+import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
 
@@ -49,7 +50,7 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
@@ -63,7 +64,7 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     await app.close();
   });
 
-  it("seed создал роли, права и администратора", async () => {
+  it("seed создал роли, права и администратора (ACTIVE, роль ADMIN)", async () => {
     const roles = await prisma.role.findMany();
     expect(roles.map((r) => r.code)).toEqual(expect.arrayContaining(Object.values(RoleCode)));
     const perms = await prisma.permission.count();
@@ -72,6 +73,47 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     expect(admin).toBeTruthy();
     expect(admin!.role.code).toBe(RoleCode.ADMIN);
     expect(admin!.code).toMatch(/^USR-\d{8}$/);
+    expect(admin!.status).toBe("ACTIVE");
+    expect(admin!.passwordHash).toBeTruthy();
+  });
+
+  it("ADMIN regression check (Step 1.5 Review): active, role=ADMIN, полный набор прав, login + /auth/me", async () => {
+    // 1) Существующий канонический ADMIN user: активен, роль ADMIN.
+    const admin = await prisma.user.findUnique({
+      where: { username: "admin" },
+      include: { role: { include: { permissions: { include: { permission: true } } } } },
+    });
+    expect(admin).toBeTruthy();
+    expect(admin!.status).toBe("ACTIVE");
+    expect(admin!.role.code).toBe("ADMIN");
+
+    // 2) RBAC reconciliation (seedRoles при старте) НЕ деактивирует пользователя и
+    //    stale-permission cleanup НЕ ломает role→permission mapping: ADMIN имеет
+    //    ВСЕ права из каталога (ни одно не потеряно).
+    const allPermissions = await prisma.permission.count();
+    const adminPerms = admin!.role.permissions.map((rp) => rp.permission.code);
+    expect(adminPerms.length).toBe(allPermissions);
+    expect(adminPerms).toContain("settings.write");
+    expect(adminPerms).toContain("catalog.product.write");
+    expect(adminPerms).toContain("catalog.product.publish");
+    expect(adminPerms).toContain("moderation.approve");
+    expect(adminPerms).toContain("order.import");
+    expect(adminPerms).toContain("catalog.media.upload_own");
+
+    // 3) login работает и возвращает полный набор прав.
+    const session = await login("admin", "admin123");
+    expect(session.user.role).toBe("ADMIN");
+    expect(session.user.permissions).toHaveLength(allPermissions);
+
+    // 4) /auth/me работает: активный канонический ADMIN.
+    const me = await request(app.getHttpServer())
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .expect(200);
+    expect(me.body.username).toBe("admin");
+    expect(me.body.status).toBe("ACTIVE");
+    expect(me.body.role).toBe("ADMIN");
+    expect(me.body.permissions).toHaveLength(allPermissions);
   });
 
   it("логин администратора выдаёт JWT и полный набор прав", async () => {
@@ -97,26 +139,28 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     await request(app.getHttpServer()).post("/api/v1/auth/login").send({ username: "admin", password: "wrong" }).expect(401);
   });
 
-  it("регистрация создаёт BUYER: читает Catalog, писать не может", async () => {
+  it("регистрация создаёт BUYER: БЕЗ internal Catalog read (Step 1.3 fix), писать не может", async () => {
     const reg = await request(app.getHttpServer())
       .post("/api/v1/auth/register")
-      .send({ username: `buyer1${stamp}`, password: "buyerpass123", fullName: "Покупатель Тест" })
+      .send({ username: `buyer1${stamp}`, email: `buyer1${stamp}@test.local`, password: "buyerpass123", fullName: "Покупатель Тест" })
       .expect(201);
     const buyer = reg.body.user;
     expect(buyer.role).toBe("BUYER");
     created.users.push(buyer.id);
-    expect(buyer.permissions).toContain("catalog.product.read");
+    // Step 1.3 review fix: BUYER не имеет unrestricted catalog.product.read
+    // (internal/draft Product недоступны до Public Marketplace).
+    expect(buyer.permissions).not.toContain("catalog.product.read");
     expect(buyer.permissions).not.toContain("catalog.product.write");
 
     const buyerAgent = await agent(reg.body.accessToken);
-    await buyerAgent.get("/api/v1/products").expect(200);
+    await buyerAgent.get("/api/v1/products").expect(403);
     await buyerAgent.post("/api/v1/products").send({ type: "TOUR", title: "Forbidden Tour" }).expect(403);
   });
 
   it("bootstrap Order — только ADMIN (order.import)", async () => {
     const reg = await request(app.getHttpServer())
       .post("/api/v1/auth/register")
-      .send({ username: `buyer2${stamp}`, password: "buyerpass123" })
+      .send({ username: `buyer2${stamp}`, email: `buyer2${stamp}@test.local`, password: "buyerpass123" })
       .expect(201);
     created.users.push(reg.body.user.id);
 

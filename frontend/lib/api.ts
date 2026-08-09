@@ -1,11 +1,23 @@
 const BASE = "/api/v1";
 
 const TOKEN_KEY = "travelhub.token";
+/** Cookie-зеркало токена для server-side auth boundary (middleware.ts, Step 1.6 §10). */
+const AUTH_COOKIE = "travelhub.auth";
 
 /** Подписка на изменение токена (login/logout) — для реактивных хуков. */
 type TokenListener = () => void;
 const tokenListeners = new Set<TokenListener>();
 const notifyToken = () => tokenListeners.forEach((l) => l());
+
+const setAuthCookie = (token: string) => {
+  if (typeof document === "undefined") return;
+  document.cookie = `${AUTH_COOKIE}=${encodeURIComponent(token)}; path=/; SameSite=Lax`;
+};
+
+const clearAuthCookie = () => {
+  if (typeof document === "undefined") return;
+  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
+};
 
 /** Реактивный стор токена: setToken/clear уведомляют подписчиков (useCurrentUser). */
 export const auth = {
@@ -14,10 +26,12 @@ export const auth = {
   },
   setToken(token: string) {
     window.localStorage.setItem(TOKEN_KEY, token);
+    setAuthCookie(token);
     notifyToken();
   },
   clear() {
     window.localStorage.removeItem(TOKEN_KEY);
+    clearAuthCookie();
     notifyToken();
   },
   subscribe(listener: TokenListener): () => void {
@@ -34,13 +48,20 @@ export interface AuthUser {
   fullName: string | null;
   role: string;
   roleTitle: string;
+  /** Step 1.10: объектный scope PARTNER (null = pending onboarding / legacy без link). */
+  partnerId: string | null;
+  customerId: string | null;
   permissions: string[];
 }
 
 async function handle<T>(res: Response): Promise<T> {
   if (res.status === 401 && !res.url.includes("/auth/login")) {
     auth.clear();
-    if (typeof window !== "undefined") window.location.href = "/login";
+    if (typeof window !== "undefined") {
+      // Сохраняем deep-link в ?next=, чтобы после повторного входа вернуться (review).
+      const here = window.location.pathname + window.location.search;
+      window.location.href = `/login?next=${encodeURIComponent(here)}`;
+    }
     throw new Error("Session expired");
   }
   if (!res.ok) {
@@ -76,6 +97,13 @@ export const api = {
       headers: headers({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
     }).then((r) => handle<T>(r)),
+  put: <T>(path: string, body: unknown): Promise<T> =>
+    fetch(`${BASE}${path}`, {
+      method: "PUT",
+      headers: headers({ "Content-Type": "application/json" }),
+      body: JSON.stringify(body),
+    }).then((r) => handle<T>(r)),
+  del: <T>(path: string): Promise<T> => fetch(`${BASE}${path}`, { method: "DELETE", headers: headers() }).then((r) => handle<T>(r)),
 };
 
 export interface PlatformUser {

@@ -10,8 +10,11 @@
 | Документ | Описание |
 |---|---|
 | `architecture/README.md` | Этот индекс |
+| `architecture/temporal-readiness.md` | Temporal & Analytics Readiness (Step 1.13A): taxonomy, source-of-truth matrix, gaps |
 | `adr/ADR-0001-modular-monolith.md` | Выбор архитектуры и стека |
 | `adr/ADR-0002-auth-rbac.md` | Аутентификация и RBAC (Phase 2) |
+| `adr/ADR-0009-correlation-request-context.md` | Correlation / Request ID infrastructure (Step 1.15) |
+| `adr/ADR-0010-business-event-envelope.md` | Business Event Envelope (Step 1.15A): actor/entityId/occurredAt, writer + consumer contract |
 | `contracts/events.md` | Event Catalog + контракты payload |
 | `contracts/api.md` | REST API, API Ownership и права доступа |
 | `contracts/ids.md` | Каноническая ID Policy |
@@ -26,7 +29,11 @@
   `booking`, `security`. Без FK между схемами — только ссылки по ID.
   ORM — Prisma 7 (multiSchema), миграции в `backend/prisma/migrations/`.
 - **Event Bus** — transactional outbox (`events.OutboxEvent`) + in-process
-  диспетчер + inbox идемпотентности (`events.InboxEvent`).
+  диспетчер + inbox идемпотентности (`events.InboxEvent`). Correlation/causation
+  наследуются из request context (Step 1.15, ADR-0009).
+- **Request context** — AsyncLocalStorage (`backend/src/shared/request-context.ts`)
+  + middleware: server-authoritative `X-Request-Id`, correlation=requestId для
+  HTTP flow, consumer context (inherited correlation, causation=parent eventId).
 - **Auth/RBAC** — JWT (`@nestjs/jwt`) + bcrypt; глобальные
   `JwtAuthGuard`/`PermissionsGuard`; каталог прав и маппинг ролей в
   `backend/src/security/permissions.constants.ts`; аудит в `security.AuditLog`.

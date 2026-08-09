@@ -1,5 +1,6 @@
-import { Module } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
+import { RequestContextMiddleware } from "./shared/request-context.middleware";
 import { PrismaModule } from "./prisma/prisma.module";
 import { EventBusModule } from "./eventbus/eventbus.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
@@ -24,4 +25,12 @@ import { PermissionsGuard } from "./security/auth/permissions.guard";
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  // Step 1.15 §5: единый server-authoritative request context для КАЖДОГО HTTP
+  // запроса (включая public anonymous endpoints). Регистрация здесь (а не в
+  // main.ts) гарантирует одинаковое поведение в prod и e2e (Nest TestingModule
+  // применяет middleware из AppModule.configure при app.init()).
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RequestContextMiddleware).forRoutes("*");
+  }
+}

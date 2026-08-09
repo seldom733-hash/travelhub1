@@ -40,7 +40,7 @@ export class OrderSubscribers implements OnModuleInit {
     try {
       await this.prisma.$transaction(async (tx) => {
         if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: CONSUMER_ID, eventId: ev.id } } })) return;
-        await this.reconcileOrder(tx, p.orderId, ev.id, `BookingConfirmed (${p.code})`);
+        await this.reconcileOrder(tx, p.orderId, ev.id, `BookingConfirmed (${p.code})`, ev.correlationId);
         await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
       });
     } catch (err) {
@@ -58,7 +58,7 @@ export class OrderSubscribers implements OnModuleInit {
     try {
       await this.prisma.$transaction(async (tx) => {
         if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: CONSUMER_ID, eventId: ev.id } } })) return;
-        await this.reconcileOrder(tx, p.orderId!, ev.id, `BookingStatusChanged → ${p.to} (${p.code ?? p.bookingId})`);
+        await this.reconcileOrder(tx, p.orderId!, ev.id, `BookingStatusChanged → ${p.to} (${p.code ?? p.bookingId})`, ev.correlationId);
         await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
       });
     } catch (err) {
@@ -82,30 +82,42 @@ export class OrderSubscribers implements OnModuleInit {
           return;
         }
 
-        await tx.order.update({
-          where: { id: order.id },
+        // REVIEW FIX (Step 1.14 §12): CAS — два конкурентных BookingRejected
+        // (или reconcile/complete в этот же момент) не создают две записи
+        // PROBLEM/истории/события — ровно один победитель.
+        // Намеренная семантика: если между чтением и update заказ конкурентно
+        // ушёл в FULFILLED/CLOSED (CAS проиграл) — reject НЕ затирает
+        // каноническое состояние (факт уже зафиксирован победителем).
+        const updatedRows = await tx.order.updateMany({
+          where: { id: order.id, status: order.status, version: order.version },
           data: { status: "PROBLEM", version: { increment: 1 } },
         });
-        await tx.orderHistory.create({
-          data: {
-            orderId: order.id,
-            action: "booking_rejected",
-            from: order.status,
-            to: "PROBLEM",
-            actorId: null,
-            actorName: "Система",
-            comment: `Бронирование отклонено (${p.code}): ${p.reason ?? "нет причины"}`,
-          },
-        });
-        await this.eventBus.emitResult(tx, {
-          aggregateType: "Order",
-          aggregateId: order.id,
-          eventType: DomainEvents.OrderStatusChanged,
-          payload: { from: order.status, to: "PROBLEM", reason: "BookingRejected", bookingCode: p.code },
-          correlationId: order.code,
-          causationId: ev.id,
-        });
+        if (updatedRows.count === 1) {
+          await tx.orderHistory.create({
+            data: {
+              orderId: order.id,
+              action: "booking_rejected",
+              from: order.status,
+              to: "PROBLEM",
+              actorId: null,
+              actorName: "Система",
+              comment: `Бронирование отклонено (${p.code}): ${p.reason ?? "нет причины"}`,
+            },
+          });
+          // Step 1.15: correlation наследуется (контекст consumer-а уже несёт
+          // correlationId родительского события, causationId = ev.id) — business
+          // код заказа НЕ используется как correlationId.
+          await this.eventBus.emitResult(tx, {
+            aggregateType: "Order",
+            aggregateId: order.id,
+            eventType: DomainEvents.OrderStatusChanged,
+            payload: { from: order.status, to: "PROBLEM", reason: "BookingRejected", bookingCode: p.code },
+            correlationId: ev.correlationId,
+            causationId: ev.id,
+          });
+        }
 
+        // Событие обработано (иначе повторная доставка не создаст side effect).
         await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
       });
     } catch (err) {
@@ -120,6 +132,7 @@ export class OrderSubscribers implements OnModuleInit {
     orderId: string,
     eventId: string,
     reason: string,
+    correlationId: string | null,
   ): Promise<void> {
     const order = await tx.order.findUnique({ where: { id: orderId } });
     if (!order || ["CLOSED", "CANCELLED", "FULFILLED"].includes(order.status)) return;
@@ -136,10 +149,17 @@ export class OrderSubscribers implements OnModuleInit {
     }
 
     if (target && target !== order.status) {
-      await tx.order.update({
-        where: { id: orderId },
+      // REVIEW FIX (Step 1.14 §12): CAS — переход применяется только если
+      // status/version не изменились с момента чтения. Гонка reconcile vs
+      // explicit `complete` (или двух reconcile) → ровно ОДИН победитель
+      // пишет state+history+canonical event; второй не создаёт duplicate
+      // OrderFulfilled (как в orderAction.orderAction).
+      const updatedRows = await tx.order.updateMany({
+        where: { id: orderId, status: order.status, version: order.version },
         data: { status: target, version: { increment: 1 } },
       });
+      if (updatedRows.count !== 1) return; // другой transition уже победил — факт существует
+
       await tx.orderHistory.create({
         data: {
           orderId,
@@ -151,12 +171,22 @@ export class OrderSubscribers implements OnModuleInit {
           comment: `Агрегированное состояние по событию: ${reason}`,
         },
       });
+      // Step 1.14: →FULFILLED — canonical OrderFulfilled (fact);
+      // →PARTIALLY_FULFILLED — технический OrderStatusChanged (canonical нет).
+      const eventType =
+        target === "FULFILLED" ? DomainEvents.OrderFulfilled : DomainEvents.OrderStatusChanged;
+      const payload =
+        target === "FULFILLED"
+          ? { orderId, code: order.code, customerId: order.customerId }
+          : { from: order.status, to: target, reason };
+      // Step 1.15: correlation наследуется из родительского события,
+      // causation = parent eventId — business код заказа НЕ используется как correlation.
       await this.eventBus.emitResult(tx, {
         aggregateType: "Order",
         aggregateId: orderId,
-        eventType: DomainEvents.OrderStatusChanged,
-        payload: { from: order.status, to: target, reason },
-        correlationId: order.code,
+        eventType,
+        payload,
+        correlationId,
         causationId: eventId,
       });
     }

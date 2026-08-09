@@ -110,6 +110,10 @@ class CreatePartnerDto {
   @IsOptional()
   @IsString()
   companyId?: string;
+
+  @IsOptional()
+  @IsString()
+  countryCode?: string;
 }
 
 class CreateSupplierDto {
@@ -178,7 +182,7 @@ export class CrmController {
   @Post("partners")
   @RequirePermissions("crm.partner.write")
   createPartner(@Body() dto: CreatePartnerDto) {
-    return this.crm.createPartner(dto.name, dto.companyId);
+    return this.crm.createPartner(dto.name, dto.companyId, dto.countryCode);
   }
 
   @Get("suppliers")

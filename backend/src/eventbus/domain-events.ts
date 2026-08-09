@@ -3,8 +3,10 @@
  *
  * Издатели:
  *   Catalog: ProductCreated, ProductPublished, ProductArchived
- *   CRM:     CustomerCreated, CustomerUpdated
- *   Order:   OrderCreated, OrderApproved, OrderCancelled, BookingRequested
+ *   CRM:     CustomerCreated, CustomerUpdated, PartnerCreated
+ *   Order:   OrderCreated, OrderReadyForBooking, OrderFulfilled, OrderClosed,
+ *            OrderCancelled, OrderStatusChanged (технические переходы),
+ *            BookingRequested (command в Booking domain)
  *   Booking: BookingCreated, BookingConfirmed, BookingRejected, BookingCancelled
  *
  * Подписчики:
@@ -12,6 +14,19 @@
  *   Booking ← BookingRequested (создание Booking + Passenger)
  *
  * Order НИКОГДА не пишет в таблицы Booking и наоборот — только события + чтение.
+ *
+ * Canonical Order events (Step 1.14):
+ *  - OrderReadyForBooking — факт: Order достиг READY_FOR_BOOKING (transition
+ *    `confirm`). ПЕРЕИМЕНОВАН из OrderApproved (та же семантика/переход, без
+ *    потребителей). Это НЕ command в Booking: Booking запускается отдельным
+ *    событием BookingRequested (transition `send`).
+ *  - OrderFulfilled — факт: Order перешёл в FULFILLED (`complete` action ИЛИ
+ *    reconcileOrder по всем терминальным броням).
+ *  - OrderClosed — факт: Order перешёл в CLOSED (`close` action; CLOSED ≠
+ *    CANCELLED ≠ FULFILLED).
+ *  - OrderStatusChanged — остаётся ТОЛЬКО для технических/исторических
+ *    переходов (process/markWaitingData/resumeProcessing/problem/suspend/
+ *    PARTIALLY_FULFILLED/PROBLEM); canonical facts на него не мапятся.
  */
 export const DomainEvents = {
   // Catalog
@@ -21,9 +36,12 @@ export const DomainEvents = {
   // CRM
   CustomerCreated: "CustomerCreated",
   CustomerUpdated: "CustomerUpdated",
+  PartnerCreated: "PartnerCreated",
   // Order
   OrderCreated: "OrderCreated",
-  OrderApproved: "OrderApproved",
+  OrderReadyForBooking: "OrderReadyForBooking",
+  OrderFulfilled: "OrderFulfilled",
+  OrderClosed: "OrderClosed",
   OrderCancelled: "OrderCancelled",
   OrderStatusChanged: "OrderStatusChanged",
   BookingRequested: "BookingRequested",
@@ -36,6 +54,88 @@ export const DomainEvents = {
 } as const;
 
 export type DomainEventType = (typeof DomainEvents)[keyof typeof DomainEvents];
+
+// ── Business Event Envelope (Step 1.15A) ─────────────────────────────────────
+//
+// Канонический envelope для cross-domain business events. Семантика полей —
+// ADR-0010. Кратко:
+//  - eventId/eventType/correlationId/causationId — как в Step 1.15;
+//  - occurredAt — фактическое время business fact; для Phase 1 = Outbox
+//    createdAt (событие пишется атомарно с transition в одной транзакции),
+//    проектция выполняется при чтении (OutboxEnvelope.occurredAt);
+//  - actor — typed actor (USER/SYSTEM/UNKNOWN), НЕ raw User/username;
+//  - entityId/entityType — canonical aggregate (из Outbox aggregateId/aggregateType);
+//  - source/version/metadata — ОТСУТСТВУЮТ в v1: нет authoritative значения
+//    (source/channel не угадывается), нет реальной entity/event version,
+//    metadata не нужна. Добавляются только при реальной необходимости (§12-14).
+
+export type BusinessEventActor =
+  | { type: "USER"; id: string }
+  | { type: "SYSTEM"; id?: string }
+  | { type: "UNKNOWN" };
+
+export interface BusinessEventEnvelope<TPayload = unknown> {
+  eventId: string;
+  eventType: string;
+  /** UTC ISO instant — фактическое время business fact (= outbox createdAt). */
+  occurredAt: string;
+  correlationId: string | null;
+  causationId: string | null;
+  actor: BusinessEventActor | null;
+  entityId: string;
+  entityType: string;
+  payload: TPayload;
+}
+
+/**
+ * Валидация canonical writer input (§18/§20): НЕ допускаем empty IDs,
+ * пустые eventType, undefined payload, некорректный actor. Вызывается в
+ * EventBusService.emit/emitResult ДО persist — невалидное событие не пишется.
+ * eventId не валидируется (генерация UUID — ответственность Outbox).
+ */
+export function assertValidBusinessEventWrite(write: {
+  aggregateType: string;
+  aggregateId: string;
+  eventType: string;
+  payload: unknown;
+  actor?: BusinessEventActor | null;
+}): void {
+  if (typeof write.aggregateType !== "string" || write.aggregateType.trim().length === 0) {
+    throw new Error(`[eventbus] aggregateType must be a non-empty string, got: ${String(write.aggregateType)}`);
+  }
+  if (typeof write.aggregateId !== "string" || write.aggregateId.trim().length === 0) {
+    throw new Error(`[eventbus] aggregateId (entityId) must be a non-empty string, got: ${String(write.aggregateId)}`);
+  }
+  // STRICT REVIEW FIX: eventType должен быть canonical registry (никаких
+  // случайных/опечатанных типов в durable ленте; §6/§24).
+  if (typeof write.eventType !== "string" || !(Object.values(DomainEvents) as string[]).includes(write.eventType)) {
+    throw new Error(`[eventbus] eventType must be a canonical DomainEvents value, got: ${String(write.eventType)}`);
+  }
+  if (write.payload === undefined || write.payload === null) {
+    throw new Error(`[eventbus] payload must be defined for ${write.eventType}`);
+  }
+  if (write.actor !== undefined && write.actor !== null && !isValidActor(write.actor)) {
+    throw new Error(`[eventbus] invalid actor for ${write.eventType}: ${JSON.stringify(write.actor)}`);
+  }
+}
+
+/**
+ * Строгая shape-валидация actor (§9): ТОЛЬКО разрешённые ключи, без лишних
+ * полей (нельзя подсунуть email/name/roles в envelope actor); USER требует
+ * non-empty id; UNKNOWN — без id.
+ */
+function isValidActor(actor: BusinessEventActor): boolean {
+  const keys = Object.keys(actor).sort().join(",");
+  if (actor.type === "USER") {
+    return keys === "id,type" && typeof actor.id === "string" && actor.id.trim().length > 0;
+  }
+  if (actor.type === "SYSTEM") {
+    if (keys === "type") return true;
+    return keys === "id,type" && typeof actor.id === "string" && actor.id.trim().length > 0;
+  }
+  // UNKNOWN — только {type:"UNKNOWN"}, без id и без extra keys.
+  return actor.type === "UNKNOWN" && keys === "type";
+}
 
 // ── Payload-контракты ────────────────────────────────────────────────────────
 
@@ -50,8 +150,14 @@ export interface CustomerEventPayload {
   customerId: string;
   code: string;
   name: string;
-  email: string;
   changedFields?: string[];
+}
+
+export interface PartnerEventPayload {
+  partnerId: string;
+  code: string;
+  name: string;
+  source: string; // "partner_onboarding" | "crm_center"
 }
 
 export interface OrderEventPayload {
@@ -63,35 +169,24 @@ export interface OrderEventPayload {
   currency: string;
 }
 
-export interface OrderApprovedPayload {
+/** Канонический Order ref (Step 1.14): минимальный payload для факт-событий
+ *  (ReadyForBooking / Fulfilled / Closed / Cancelled). Без PII, без raw Prisma. */
+export interface OrderRefPayload {
   orderId: string;
   code: string;
   customerId: string;
 }
 
-export interface OrderItemRef {
-  productId: string;
-  productCode: string;
-  title: string;
-  quantity: number;
-  serviceDate?: string | null;
-}
-
-export interface OrderTravelerRef {
-  firstName: string;
-  lastName: string;
-  birthDate?: string | null;
-  citizenship?: string | null;
-  gender?: string | null;
-  passportNumber?: string | null;
-}
-
+/**
+ * Минимальный command-payload (STRICT REVIEW FIX, PII minimization): consumer
+ * (BookingSubscribers) читает order.items/order.travelers из БД по orderId
+ * (READ-only, ADR-0001) — items/travelers в payload были РЕДУНДАНТНЫ и несли
+ * паспортные данные туристов в durable Outbox. Остаются только canonical refs.
+ */
 export interface BookingRequestedPayload {
   orderId: string;
   orderCode: string;
   customerId: string;
-  items: OrderItemRef[];
-  travelers: OrderTravelerRef[];
 }
 
 export interface BookingEventPayload {

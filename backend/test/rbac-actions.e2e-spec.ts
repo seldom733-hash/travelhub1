@@ -2,8 +2,12 @@
  * E2E: RBAC Matrix §4 — granular permissions на действия жизненного цикла Order/Booking.
  *
  * Фиксирует результаты аудита ролевого UI:
- *  - BUYER и SALES_MANAGER имеют order.read / booking.read, но НЕ имеют ни одного
- *    действия (accept/edit_noncritical/request_booking/close/cancel, send_supplier/confirm/cancel)
+ *  - Step 1.13: BUYER НЕ имеет internal order.read / booking.read (отозваны — это
+ *    internal read-контракты), только узкие own-scope права Buyer Cabinet
+ *    (account.order.read_own / account.booking.read_own). SALES_MANAGER сохраняет
+ *    order.read / booking.read (internal read);
+ *  - ни BUYER, ни SALES_MANAGER не имеют ни одного действия
+ *    (accept/edit_noncritical/request_booking/close/cancel, send_supplier/confirm/cancel)
  *    → 403 на КАЖДОЕ действие PATCH /orders/:id и PATCH /bookings/:id;
  *  - OPERATOR (полный набор прав Order/Booking) — 200 (позитивный контроль, *  guard работает в обе стороны, а не отключает всё).
  *
@@ -18,6 +22,7 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { AppExceptionFilter } from "../src/shared/exception.filter";
+import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
 
@@ -71,7 +76,7 @@ describe("Phase 2 — RBAC: действия Order/Booking закрыты по �
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
@@ -81,7 +86,7 @@ describe("Phase 2 — RBAC: действия Order/Booking закрыты по �
 
     const reg = await request(app.getHttpServer())
       .post("/api/v1/auth/register")
-      .send({ username: buyerUsername, password: "buyerpass123", fullName: "Покупатель 403" })
+      .send({ username: buyerUsername, email: `${buyerUsername}@test.local`, password: "buyerpass123", fullName: "Покупатель 403" })
       .expect(201);
     created.users.push(reg.body.user.id);
     buyerAgent = await agent(reg.body.accessToken);
@@ -109,11 +114,16 @@ describe("Phase 2 — RBAC: действия Order/Booking закрыты по �
     await app.close();
   });
 
-  it("BUYER и SALES_MANAGER не имеют прав на команды Order/Booking (read-only)", async () => {
+  it("BUYER не имеет internal order.read/booking.read, только own-scope Buyer Cabinet права; SALES_MANAGER сохраняет internal read", async () => {
     const buyer = await login(buyerUsername, "buyerpass123");
     expect(buyer.user.role).toBe("BUYER");
-    expect(buyer.user.permissions).toContain("order.read");
-    expect(buyer.user.permissions).toContain("booking.read");
+    // Step 1.13: узкие own-scope права вместо internal read-контрактов.
+    expect(buyer.user.permissions).toContain("account.order.read_own");
+    expect(buyer.user.permissions).toContain("account.booking.read_own");
+    expect(buyer.user.permissions).not.toContain("order.read");
+    expect(buyer.user.permissions).not.toContain("booking.read");
+    expect(buyer.user.permissions).not.toContain("crm.customer.read");
+    expect(buyer.user.permissions).not.toContain("finance.payment.read");
     for (const p of ACTION_PERMS) expect(buyer.user.permissions).not.toContain(p);
 
     const sales = await login(salesUsername, "salespass123");

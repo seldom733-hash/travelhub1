@@ -178,6 +178,114 @@ export function validateSchemaConfig(input: unknown): CategorySchemaConfig {
  * отсутствии обязательного attribute, нарушении enum/min/max/pattern.
  * Возвращает провалидированный объект values.
  */
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 1.8 (clarification): Partner-safe editor contract — ACTIVE Category Schema
+// для dynamic Product form/editor. PARTNER получает ТОЛЬКО этот контракт через
+// отдельный Partner endpoint (НЕ внутреннее category_schema.read). Контракт
+// содержит только данные, нужные редактору Product: attributes (тип/required/
+// options/min/max/pattern), availability/tariff/media requirements и pdpSections.
+// НИКОГДА не отдаёт: DRAFT/DEPRECATED схемы, admin/internal metadata,
+// createdBy/audit-поля, raw Prisma-объект.
+// ---------------------------------------------------------------------------
+
+export interface CategoryEditorAttribute {
+  key: string;
+  label?: string;
+  type: AttributeType;
+  required?: boolean;
+  searchable?: boolean;
+  filterable?: boolean;
+  options?: string[];
+  min?: number;
+  max?: number;
+  pattern?: string;
+}
+
+export interface CategoryEditorMediaRequirements {
+  minImages?: number;
+  maxImages?: number;
+  primaryImageRequired?: boolean;
+  allowedMediaTypes?: string[];
+  videoAllowed?: boolean;
+}
+
+/** Partner-safe editor contract (Step 1.8 clarification). */
+export interface CategoryEditorSchemaContract {
+  category: { id: string; code: string; slug: string; title: string };
+  schema: {
+    id: string;
+    version: number;
+    status: "ACTIVE";
+    attributes: CategoryEditorAttribute[];
+    availability: Record<string, unknown> | null;
+    tariffRules: Record<string, unknown> | null;
+    mediaRequirements: CategoryEditorMediaRequirements | null;
+    pdpSections: string[] | null;
+  };
+}
+
+/**
+ * Whitelist-маппер CategorySchema → Partner-safe editor contract.
+ * Каждый attribute пересобирается ТОЛЬКО из известных полей (whitelist) — любые
+ * лишние ключи (внутренние/audit) не проходят. mediaRequirements также отдаётся
+ * через whitelist. availability/tariffRules — конфигурация (без внутренних полей).
+ */
+export function toCategoryEditorContract(input: {
+  category: { id: string; code: string; slug: string; title: string };
+  schema: {
+    id: string;
+    version: number;
+    attributes: unknown;
+    availability: unknown;
+    tariffRules: unknown;
+    mediaRequirements: unknown;
+    pdpSections: unknown;
+  };
+}): CategoryEditorSchemaContract {
+  const { category, schema } = input;
+  const attributes: CategoryEditorAttribute[] = (Array.isArray(schema.attributes) ? schema.attributes : []).map((raw) => {
+    const attr = (isPlainObject(raw) ? raw : {}) as Record<string, unknown>;
+    const def: CategoryEditorAttribute = { key: typeof attr.key === "string" ? attr.key : "", type: "string" };
+    if (typeof attr.label === "string") def.label = attr.label;
+    if (typeof attr.type === "string" && (ATTRIBUTE_TYPES as readonly string[]).includes(attr.type)) {
+      def.type = attr.type as AttributeType;
+    }
+    if (attr.required === true) def.required = true;
+    if (attr.searchable === true) def.searchable = true;
+    if (attr.filterable === true) def.filterable = true;
+    if (Array.isArray(attr.options)) def.options = attr.options.filter((o): o is string => typeof o === "string");
+    if (typeof attr.min === "number") def.min = attr.min;
+    if (typeof attr.max === "number") def.max = attr.max;
+    if (typeof attr.pattern === "string") def.pattern = attr.pattern;
+    return def;
+  });
+
+  const mr = isPlainObject(schema.mediaRequirements) ? (schema.mediaRequirements as Record<string, unknown>) : null;
+  const mediaRequirements: CategoryEditorMediaRequirements | null = mr
+    ? {
+        ...(typeof mr.minImages === "number" ? { minImages: mr.minImages } : {}),
+        ...(typeof mr.maxImages === "number" ? { maxImages: mr.maxImages } : {}),
+        ...(mr.primaryImageRequired === true ? { primaryImageRequired: true } : {}),
+        ...(Array.isArray(mr.allowedMediaTypes) ? { allowedMediaTypes: mr.allowedMediaTypes.filter((t): t is string => typeof t === "string") } : {}),
+        ...(mr.videoAllowed === true ? { videoAllowed: true } : {}),
+      }
+    : null;
+
+  return {
+    category,
+    schema: {
+      id: schema.id,
+      version: schema.version,
+      status: "ACTIVE",
+      attributes,
+      availability: isPlainObject(schema.availability) ? (schema.availability as Record<string, unknown>) : null,
+      tariffRules: isPlainObject(schema.tariffRules) ? (schema.tariffRules as Record<string, unknown>) : null,
+      mediaRequirements,
+      pdpSections: Array.isArray(schema.pdpSections) ? (schema.pdpSections as string[]).filter((s): s is string => typeof s === "string") : null,
+    },
+  };
+}
+
 export function validateAttributes(
   schema: Pick<CategorySchemaConfig, "attributes">,
   attributes: unknown,

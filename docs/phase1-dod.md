@@ -22,7 +22,8 @@
 - [x] Журнал изменений (audit) для Product, Customer, Order, Booking
       (*_history таблицы + записи при каждом переходе).
 - [x] Трассировка: correlationId = Order.code, causationId связывает цепочку
-      `OrderApproved → BookingRequested → BookingCreated → BookingConfirmed`.
+      `OrderReadyForBooking → BookingRequested → BookingCreated → BookingConfirmed`
+      (Step 1.14: бывш. `OrderApproved` переименован в canonical `OrderReadyForBooking`).
 - [x] E2E-тест полного сценария (Jest + Supertest) проходит.
 
 ## Сквозной сценарий (проверено e2e)
@@ -33,7 +34,7 @@ POST /products/:id/publish → PUBLISHED (ProductPublished)
 POST /customers → CUS-00000001 (CustomerCreated)
 POST /orders/bootstrap → ORD-00000001 + TH-2026-000001 (OrderCreated)
 PATCH /orders/:id {action: process} → IN_PROCESSING
-PATCH /orders/:id {action: confirm} → READY_FOR_BOOKING (OrderApproved)
+PATCH /orders/:id {action: confirm} → READY_FOR_BOOKING (OrderReadyForBooking)
 PATCH /orders/:id {action: send}    → SENT_TO_BOOKING (BookingRequested)
   → consumer создаёт BKG-00000001 + Passenger
 PATCH /bookings/:id {action: send}    → SENT_TO_SUPPLIER
@@ -42,7 +43,8 @@ PATCH /bookings/:id {action: confirm} → CONFIRMED (BookingConfirmed)
 PATCH /bookings/:id {action: service} → IN_SERVICE
 PATCH /bookings/:id {action: complete} → COMPLETED
   → Order → FULFILLED
-PATCH /orders/:id {action: close} → CLOSED
+PATCH /orders/:id {action: complete} → FULFILLED (OrderFulfilled)
+PATCH /orders/:id {action: close} → CLOSED (OrderClosed)
 ```
 
 ## За пределами Phase 1 (следующие фазы)
