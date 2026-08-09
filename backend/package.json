@@ -1,6 +1,6 @@
 {
   "name": "travelhub-backend",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "private": true,
   "description": "TravelHub Phase 1 — modular monolith (NestJS) with per-domain PostgreSQL schemas",
   "scripts": {
