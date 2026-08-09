@@ -15,6 +15,7 @@
 | `adr/ADR-0002-auth-rbac.md` | Аутентификация и RBAC (Phase 2) |
 | `adr/ADR-0009-correlation-request-context.md` | Correlation / Request ID infrastructure (Step 1.15) |
 | `adr/ADR-0010-business-event-envelope.md` | Business Event Envelope (Step 1.15A): actor/entityId/occurredAt, writer + consumer contract |
+| `adr/ADR-0011-communication-foundation.md` | Communication Foundation (Step 1.16): canonical cross-domain CML-*, новый bounded context `communication.*` |
 | `contracts/events.md` | Event Catalog + контракты payload |
 | `contracts/api.md` | REST API, API Ownership и права доступа |
 | `contracts/ids.md` | Каноническая ID Policy |
@@ -26,8 +27,8 @@
   `CrmModule`, `OrderModule`, `BookingModule`, `SecurityModule`, глобальные
   `PrismaModule` и `EventBusModule`. REST `/api/v1/{domain}/...`.
 - **БД** — PostgreSQL, схема на домен: `events`, `catalog`, `crm`, `order`,
-  `booking`, `security`. Без FK между схемами — только ссылки по ID.
-  ORM — Prisma 7 (multiSchema), миграции в `backend/prisma/migrations/`.
+  `booking`, `security`, `communication`. Без FK между схемами — только ссылки
+  по ID. ORM — Prisma 7 (multiSchema), миграции в `backend/prisma/migrations/`.
 - **Event Bus** — transactional outbox (`events.OutboxEvent`) + in-process
   диспетчер + inbox идемпотентности (`events.InboxEvent`). Correlation/causation
   наследуются из request context (Step 1.15, ADR-0009).

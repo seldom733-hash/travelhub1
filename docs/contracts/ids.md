@@ -16,6 +16,7 @@
 | `ORD-` | Order (внутренний) | Order |
 | `TH-YYYY-######` | Order (пользовательский номер) | Order |
 | `BKG-` | Booking | Booking |
+| `CML-` | Communication | Communication |
 
 Формат: `PREFIX-` + число, дополненное слева нулями (8 цифр; для
 `TH-YYYY-######` — 6 цифр, последовательность сквозная по году).

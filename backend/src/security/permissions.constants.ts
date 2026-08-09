@@ -83,6 +83,15 @@ export const PERMISSIONS = {
   "finance.exchange_rate.manage": "Управление курсами",
   "finance.tax.manage": "Управление налогами",
 
+  // ── Communication (Step 1.16, canonical CML-*) ─────────────────────────
+  // Узкие права: internal staff — read/create (заметки и зафиксированные
+  // сообщения по business context); BUYER/PARTNER — только own-scope
+  // read_own (не-NOTE/не-INTERNAL по доказанной linkage). Никакой permission
+  // explosion, никаких широких internal CRM прав через communication (§34).
+  "communication.read": "Чтение communications (internal staff, cross-domain context)",
+  "communication.create": "Создание communication по business context (internal staff)",
+  "communication.read_own": "Чтение собственных communications (BUYER/PARTNER own-scope)",
+
   // ── Account / own profile (Step 1.9, granular own-scope) ──────────────
   "account.profile.read": "Чтение собственного профиля/аккаунта (own-scope)",
   "account.profile.update": "Обновление собственного профиля (own-scope)",
@@ -170,6 +179,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "reports.read",
     // Step 1.10: DIRECTOR участвует в review Partner onboarding.
     "partner.onboarding.review",
+    // Step 1.16: DIRECTOR читает communications (cross-domain контекст).
+    "communication.read",
   ],
 
   FINANCE: [
@@ -283,6 +294,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.invoice.read",
     "support.read",
     "documents.read",
+    // Step 1.16: SALES_MANAGER фиксирует/читает коммуникации по клиентам.
+    "communication.read",
+    "communication.create",
   ],
 
   OPERATOR: [
@@ -308,6 +322,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "support.write",
     "documents.read",
     "documents.write",
+    // Step 1.16: OPERATOR фиксирует коммуникации по Order/Booking/Customer.
+    "communication.read",
+    "communication.create",
   ],
 
   // Step 1.3: PARTNER НЕ имеет unrestricted catalog.product.read — только
@@ -351,6 +368,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "storefront.create_own",
     "storefront.update_own",
     "storefront.activate_own",
+    // Step 1.16: PARTNER читает communications своего Partner-контекста
+    // (own-scope, не-NOTE/не-INTERNAL). Никаких широких internal прав.
+    "communication.read_own",
   ],
 
   // Step 1.3 review fix: BUYER БЕЗ unrestricted internal catalog.product.read —
@@ -370,5 +390,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "account.payment.read_own",
     "account.document.read_own",
     "account.support.read_own",
+    // Step 1.16: BUYER читает communications своего Customer-контекста
+    // (own-scope, не-NOTE/не-INTERNAL).
+    "communication.read_own",
   ],
 };

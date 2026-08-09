@@ -46,6 +46,68 @@ PATCH  /api/v1/users/:id/status блокировка/активация (ауд�
 | Order | `order.read` | по action: `order.accept`, `order.edit_noncritical`, `order.request_booking`, `order.suspend`, `order.cancel`, `order.close` | `POST /orders/bootstrap` — только `order.import` (ADMIN exception) |
 | Booking | `booking.read` | по action: `booking.send_supplier`, `booking.confirm`, `booking.cancel` | создание только через событие `BookingRequested` |
 
+## Communication (Step 1.16 — владелец communication.*, CML-*, ADR-0011)
+
+Каноническая cross-domain Communication: единый факт коммуникации, связанный с
+business context (CUSTOMER/PARTNER/ORDER/BOOKING) через typed reference
+(contextType+contextId, БЕЗ FK). Один bounded context `communication.*`
+(ADR-0011); legacy chat-таблиц нет; `/account/support` остаётся controlled
+empty (Support domain — Phase 3).
+
+```text
+POST   /api/v1/communications            создать (CML-*) — communication.create (internal staff)
+GET    /api/v1/communications            список: ?contextType=&contextId=&type=&direction=&page=&pageSize= — communication.read
+GET    /api/v1/communications/own        own-scope (BUYER: свой Customer; PARTNER: свой Partner) — communication.read_own
+GET    /api/v1/communications/:code      detail: staff → любой; BUYER/PARTNER → own-scope, иначе neutral 404
+```
+
+Create-contract (whitelist DTO + raw-body forbidden keys → 422):
+
+```jsonc
+{
+  "type": "MESSAGE | NOTE",        // NOTE ⇒ direction INTERNAL (внутренняя заметка)
+  "direction": "INBOUND | OUTBOUND | INTERNAL",
+  "subject": "?",                  // ≤200, plain text
+  "body": "...",                   // 1..4000, plain text, БЕЗ HTML (422)
+  "contextType": "CUSTOMER | PARTNER | ORDER | BOOKING",
+  "contextId": "<canonical id>",   // server-side existence check (422)
+  "sender": { "type": "USER|CUSTOMER|PARTNER|SYSTEM", "id": "?" },
+  "recipient": { "type": "USER|CUSTOMER|PARTNER", "id": "..." }
+}
+```
+
+Правила (Step 1.16):
+
+- клиент НЕ может передать `code/id/status/actorUserId/actorId/createdBy/occurredAt/
+  createdAt/requestId/correlationId/customerId/partnerId/system` (forbidden → 422,
+  whitelist → 400);
+- `occurredAt` всегда server-side UTC (= createdAt для server-created record);
+- объектный scope: BUYER видит только context=CUSTOMER==actor.customerId,
+  PARTNER — context=PARTNER==actor.partnerId, и только не-NOTE/не-INTERNAL;
+  внутренние заметки (NOTE) клиентам не отдаются (neutral 404). Communications
+  по собственным ORDER/BOOKING BUYER/PARTNER сейчас не видят — intentional
+  limitation foundation (ADR-0011 Amendment §4);
+- контекст и participants проверяются server-side (cross-domain READ по ID,
+  ADR-0001); forged context/participant → 422;
+- **direction ↔ participant policy (impersonation closure)**: NOTE — sender
+  внутренний USER, без recipient; MESSAGE INBOUND — sender внешний
+  (CUSTOMER/PARTNER), recipient внутренний USER; MESSAGE OUTBOUND — sender
+  внутренний USER, recipient внешний (CUSTOMER/PARTNER). SYSTEM participant
+  из HTTP — 422;
+- **participant ↔ context consistency (existence ≠ authorization)**: CUSTOMER/
+  PARTNER refs должны соответствовать контексту (CUSTOMER-контекст == contextId,
+  PARTNER-контекст == contextId, ORDER — владелец заказа, BOOKING — владелец
+  брони); нарушение → 422;
+- DTO whitelist: БЕЗ actorUserId/requestId/correlationId/updatedAt/version;
+  own-view режет internal USER ids;
+- AuditLog: `communication.created` (без body — PII minimization);
+- событие `CommunicationCreated` НЕ эмитится (нет consumer-а, §19);
+- пагинация: page/pageSize (cap 50), total, hasMore, детерминированный порядок
+  (occurredAt desc, code asc);
+- права: `communication.read` (DIRECTOR/OPERATOR/SALES_MANAGER/ADMIN),
+  `communication.create` (OPERATOR/SALES_MANAGER/ADMIN),
+  `communication.read_own` (BUYER/PARTNER). MODERATOR/FINANCE и др. — без прав.
+
 ## Catalog Center (владелец Product/Tariff/Availability/Category)
 
 ```text

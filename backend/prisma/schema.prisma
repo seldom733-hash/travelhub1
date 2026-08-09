@@ -26,7 +26,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["events", "catalog", "crm", "order", "booking", "security"]
+  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication"]
 }
 
 // ─────────────────────────────── events.* ────────────────────────────────
@@ -1283,6 +1283,131 @@ model BookingHistory {
 
   @@index([bookingId])
   @@schema("booking")
+}
+
+// ─────────────────────────── communication.* ────────────────────────────────
+// Canonical cross-domain Communication model (Step 1.16, ADR-0011).
+// ЕДИНСТВЕННЫЙ владелец: communication.* (новый минимальный bounded context).
+// НЕ владеет Order/Booking/CRM/Support lifecycle; не event bus; не AuditLog;
+// не behavioral event store (§3). Ссылки на другие домены — ТОЛЬКО typed
+// context references (contextType+contextId), БЕЗ cross-schema FK (ADR-0001),
+// БЕЗ raw Prisma snapshot (§10/§22).
+
+enum CommunicationType {
+  /// Обычное сообщение (например, зафиксированная переписка/звонок).
+  MESSAGE
+  /// Внутренняя заметка персонала (НИКОГДА не отдаётся BUYER/PARTNER, §36).
+  NOTE
+
+  @@schema("communication")
+}
+
+/// Канал описывает транспорт/поверхность, а НЕ business context (§7).
+/// EMAIL/PHONE/WHATSAPP НЕ объявляются, пока TravelHub реально не отправляет/
+/// не принимает их (без имитации интеграций).
+enum CommunicationChannel {
+  PLATFORM
+
+  @@schema("communication")
+}
+
+/// Направление (§8). Для platform-переписки между сторонами может
+/// понадобиться participant-based semantics — в foundation только INBOUND/
+/// OUTBOUND/INTERNAL по фактическим use-cases (запись факта коммуникации).
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+  /// Внутренняя заметка/действие без внешней стороны.
+  INTERNAL
+
+  @@schema("communication")
+}
+
+/// Lifecycle самой Communication (§9), НЕ Order/Booking/Lead/Support status.
+/// READ/DELIVERED не создаются (нет фактических receipts, §43).
+/// ARCHIVED — RESERVED state (ADR-0011 Amendment §5): producer/endpoint пока
+/// отсутствуют (archive — future retention/privacy flow); client forged status
+/// заблокирован (forbidden key).
+enum CommunicationStatus {
+  ACTIVE
+  ARCHIVED
+
+  @@schema("communication")
+}
+
+/// Canonical typed context reference (§10): один primary context на
+/// Communication. SUPPORT отложен — Support domain ещё не реализован (§30),
+/// extension-ready без симуляции Ticket/SLA.
+enum CommunicationContextType {
+  CUSTOMER
+  PARTNER
+  ORDER
+  BOOKING
+
+  @@schema("communication")
+}
+
+/// Минимальный typed participant contract (§12): ТОЛЬКО реально поддерживаемые
+/// identities (USER/CUSTOMER/PARTNER/SYSTEM) + canonical ID. Не копирует raw
+/// User/CRM entity (§22).
+enum CommunicationParticipantType {
+  USER
+  CUSTOMER
+  PARTNER
+  SYSTEM
+
+  @@schema("communication")
+}
+
+/// Каноническая Communication (CML-*): единый факт коммуникации, способный
+/// связывать cross-domain business contexts без владения ими.
+model Communication {
+  id   String @id @default(uuid())
+  code String @unique // CML-00000001 — immutable, server-generated (§4)
+
+  type      CommunicationType
+  channel   CommunicationChannel  @default(PLATFORM)
+  direction CommunicationDirection
+  status    CommunicationStatus   @default(ACTIVE)
+
+  /// Опциональный заголовок (≤200).
+  subject String?
+  /// Plain text (1..4000), БЕЗ arbitrary HTML; XSS-safe; Unicode RU/AZ/EN (§14).
+  body String
+
+  /// Canonical typed context reference (БЕЗ FK). NULL только если контекст
+  /// не определён — по факту create всегда передаёт контекст (§10).
+  contextType CommunicationContextType?
+  contextId   String?
+
+  /// Actor = кто совершил system action (§13) — canonical security.User id.
+  /// НЕ путать с sender/recipient (иногда совпадают, но это не правило).
+  actorUserId String?
+
+  /// Typed participants (§12/§13): canonical ID + тип, без raw snapshot.
+  senderType    CommunicationParticipantType?
+  senderId      String?
+  recipientType CommunicationParticipantType?
+  recipientId   String?
+
+  /// Честное время факта (§16/§17): server-side UTC. Для server-created
+  /// PLATFORM record = createdAt (атомарно с фактом). Client-supplied
+  /// occurredAt НЕ принимается (нет trust policy).
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  /// Row-level change tracking (например, archive). НИКОГДА не milestone
+  /// (sent/read/delivered time) — §16/§58.
+  updatedAt DateTime @updatedAt
+
+  /// Step 1.15 correlation — диагностическая reference, НЕ competing tracing
+  /// model (§18): requestId + correlationId из активного request context.
+  requestId    String?
+  correlationId String?
+
+  @@index([contextType, contextId])
+  @@index([occurredAt])
+  @@index([direction, status])
+  @@schema("communication")
 }
 
 // ─────────────────────────────── security.* ────────────────────────────────

@@ -376,6 +376,9 @@ const ROLE_TITLES: Record<RoleCode, string> = {
 };
 
 const PERMISSION_DESCRIPTIONS: Record<string, string> = {
+  "communication.read": "Чтение communications (internal staff, cross-domain context)",
+  "communication.create": "Создание communication по business context (internal staff)",
+  "communication.read_own": "Чтение собственных communications (BUYER/PARTNER own-scope)",
   "account.profile.read": "Чтение собственного профиля/аккаунта (own-scope)",
   "account.profile.update": "Обновление собственного профиля (own-scope)",
   "partner.onboarding.read_own": "Чтение собственной PartnerApplication (own-scope)",

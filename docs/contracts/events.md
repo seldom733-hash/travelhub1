@@ -141,3 +141,12 @@ reconcile — OrderFulfilled пишется атомарно с переходо
 
 Реализация: `backend/src/eventbus/eventbus.service.ts`,
 `backend/src/eventbus/domain-events.ts`.
+
+## Communication (Step 1.16)
+
+`CommunicationCreated` **НЕ эмитится**: у Communication нет реального consumer-а
+(Step 1.16 §19 — event taxonomy «на будущее» запрещена). Communication —
+durable fact в `communication.Communication` (CML-*, ADR-0011), аудируется в
+AuditLog без body. Если появится реальный consumer — событие добавляется в
+canonical registry по envelope ADR-0010 с payload из references/minimal
+metadata (БЕЗ body/PII, §21/§54).
