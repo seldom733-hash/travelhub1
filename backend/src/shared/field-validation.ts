@@ -99,6 +99,83 @@ export const STOREFRONT_CREATE_FORBIDDEN_KEYS = [
 export const STOREFRONT_UPDATE_FORBIDDEN_KEYS = [...STOREFRONT_CREATE_FORBIDDEN_KEYS, "slug"] as const;
 
 /**
+ * Поля SellerCapability, которые клиент НИКОГДА не может передать (Step 2.2A):
+ * ownership (sellerId), identity (id/code/categoryId immutable после создания),
+ * lifecycle/entitlement/version/timestamps/audit — серверные. acceptsBuyerRequests
+ * на create НЕ принимается (безопасный default false; enable — явной командой
+ * accept-requests).
+ */
+export const CAPABILITY_CREATE_FORBIDDEN_KEYS = [
+  "id",
+  "code",
+  "sellerId",
+  "partnerId",
+  "ownerId",
+  "status",
+  "version",
+  "acceptsBuyerRequests",
+  "createdAt",
+  "updatedAt",
+  "activatedAt",
+  "deactivatedAt",
+  "createdById",
+  "categorySlug",
+] as const;
+/** PATCH destinations: categoryId также immutable (смена категории = deactivate + create). */
+export const CAPABILITY_UPDATE_FORBIDDEN_KEYS = [...CAPABILITY_CREATE_FORBIDDEN_KEYS, "categoryId"] as const;
+
+/**
+ * Поля BuyerRequest, которые клиент НИКОГДА не может передать (Step 2.2B):
+ * ownership (buyerId/customerId/ownerId), identity (id/code), lifecycle/status,
+ * version (кроме expectedVersion — отдельное поле), acquisitionSource
+ * (серверный BUYER_REQUEST), createdBy/timestamps, matching/distribution и
+ * seller-поля (2.2C+), correlation/causation, entitlement.
+ */
+export const REQUEST_CREATE_FORBIDDEN_KEYS = [
+  "id",
+  "code",
+  "buyerId",
+  "customerId",
+  "ownerId",
+  "status",
+  "version",
+  "acquisitionSource",
+  "source",
+  "createdBy",
+  "createdAt",
+  "updatedAt",
+  "submittedAt",
+  "cancelledAt",
+  "categorySlug",
+  "matchedSellerIds",
+  "distributionState",
+  "sellerIds",
+  "correlationId",
+  "causationId",
+  "entitlementStatus",
+] as const;
+/** PATCH: categoryId редактируется в DRAFT (черновик Buyer-а) — остальные серверные поля запрещены. */
+export const REQUEST_UPDATE_FORBIDDEN_KEYS = REQUEST_CREATE_FORBIDDEN_KEYS;
+
+/**
+ * Lifecycle-команды (submit/cancel) принимают ТОЛЬКО expectedVersion.
+ * Все demand/ownership/lifecycle/source/temporal ключи запрещены → 422 (loud),
+ * а не silent-strip через whitelist — серверные поля не client-authoritative.
+ */
+export const REQUEST_LIFECYCLE_FORBIDDEN_KEYS = [
+  ...REQUEST_CREATE_FORBIDDEN_KEYS,
+  "categoryId",
+  "destinations",
+  "serviceDateFrom",
+  "serviceDateTo",
+  "adults",
+  "children",
+  "infants",
+  "budget",
+  "preferences",
+] as const;
+
+/**
  * Отклоняет запрос, содержащий запрещённые ключи (масс-assignment / role injection /
  * forged customerId/partnerId). Возвращает список задетых ключей (пусто — ок).
  * Чистая функция: не бросает сама (бросают сервисы), чтобы тестировать без Nest.

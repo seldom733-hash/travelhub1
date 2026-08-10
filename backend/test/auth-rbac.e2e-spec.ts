@@ -57,6 +57,26 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
   });
 
   afterAll(async () => {
+    // Shared-DB isolation (STRICT REVIEW 2.5B): bootstrap-заказы эмитят
+    // OrderCreated (causation=null) — чистим outbox + inbox своих заказов,
+    // иначе строки утекают в общий events.OutboxEvent.
+    if (created.orders.length > 0) {
+      const orderEvents = await prisma.outboxEvent.findMany({
+        where: { aggregateId: { in: created.orders } },
+        select: { id: true },
+      });
+      const eventIds = orderEvents.map((e) => e.id);
+      if (eventIds.length > 0) {
+        await prisma.inboxEvent.deleteMany({ where: { eventId: { in: eventIds } } });
+      }
+      await prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: created.orders } } });
+      // Shared-DB isolation (STRICT REVIEW 2.5B): child BookingCreated имеет
+      // aggregateId = bookingId (НЕ orderId) — вычищаем по payload.orderId.
+      await prisma.outboxEvent.deleteMany({
+        where: { eventType: "BookingCreated", OR: created.orders.map((id) => ({ payload: { path: ["orderId"], equals: id } })) },
+      });
+      await prisma.booking.deleteMany({ where: { orderId: { in: created.orders } } });
+    }
     await prisma.order.deleteMany({ where: { id: { in: created.orders } } });
     await prisma.product.deleteMany({ where: { id: { in: created.products } } });
     await prisma.customer.deleteMany({ where: { id: { in: created.customers } } });

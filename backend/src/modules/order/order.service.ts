@@ -247,6 +247,10 @@ export class OrderService {
           serviceDate: input.serviceDate ? new Date(input.serviceDate) : null,
           version: 1,
           submittedAt,
+          // Step 2.5B: bootstrap = server-assisted internal entry → canonical
+          // MANUAL/DIRECT (server-derived, та же семантика, что у Checkout
+          // foundation; клиент не может forge — поля в DTO нет).
+          acquisitionSource: SalesAcquisitionSource.DIRECT,
           createdBy: actor ?? null,
           updatedBy: actor ?? null,
         },

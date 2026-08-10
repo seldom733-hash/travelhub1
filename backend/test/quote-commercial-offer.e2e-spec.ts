@@ -547,8 +547,11 @@ describe("Phase 2 Step 2.3 — Quote & Commercial Offer Flow (e2e)", () => {
     const d = await getDetail(sm.accessToken, q.code);
     if (d.status === "ISSUED") {
       expect(d.total).toBe(d.subtotal); // NONE discount
-      const expected = d.items.reduce((s, i) => s + Number(i.amount), 0).toFixed(2);
-      expect(d.subtotal).toBe(expected);
+      // Decimal-сериализация нормализует trailing zeros ("25" vs "25.00") —
+      // сравнение числовое, а не строковое (format-agnostic).
+      const expected = d.items.reduce((s, i) => s + Number(i.amount), 0);
+      expect(Number(d.subtotal)).toBeCloseTo(expected, 2);
+      expect(Number(d.total)).toBeCloseTo(expected, 2);
     } else {
       expect(d.status).toBe("DRAFT");
     }

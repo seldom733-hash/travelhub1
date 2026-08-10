@@ -85,6 +85,19 @@ describe("Phase 2 Step 2.0 — Phase 2 entry audit (e2e)", () => {
   });
 
   afterAll(async () => {
+    // Shared-DB isolation (STRICT REVIEW 2.5B): bootstrap-заказы эмитят
+    // OrderCreated (causation=null) — чистим outbox + inbox своих заказов.
+    if (created.orders.length > 0) {
+      const orderEvents = await prisma.outboxEvent.findMany({
+        where: { aggregateId: { in: created.orders } },
+        select: { id: true },
+      });
+      const eventIds = orderEvents.map((e) => e.id);
+      if (eventIds.length > 0) {
+        await prisma.inboxEvent.deleteMany({ where: { eventId: { in: eventIds } } });
+      }
+      await prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: created.orders } } });
+    }
     await prisma.booking.deleteMany({ where: { orderId: { in: created.orders } } });
     await prisma.order.deleteMany({ where: { id: { in: created.orders } } });
     await prisma.partnerStorefront.deleteMany({ where: { id: { in: created.storefronts } } });

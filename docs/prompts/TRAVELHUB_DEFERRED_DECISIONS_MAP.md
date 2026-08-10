@@ -664,6 +664,36 @@ step (period-aware price display).
 
 ------------------------------------------------------------------------
 
+## DD-030 --- Reverse Marketplace: Proposal → Sales conversion point
+
+**Status:** DEFERRED (ADR-0012 §5/§14)
+
+**Still Open (ADR-0012):** в какой canonical Sales stage конвертируется
+принятый Seller Proposal — Lead vs Opportunity vs Quote (или иной
+существующий stage). ADR-0012 фиксирует границы reverse.* и инвариант
+«Distribution ≠ Lead creation» (6 meaningful-engagement ответов НЕ
+создают 70/25 Leads), но сам conversion point сознательно НЕ
+резолвится в ADR: он должен быть решён отдельным Proposal→Sales
+architecture decision ДО Step 2.2F (gate DD-030).
+
+**Already Decided (ADR-0012):** reverse.* — отдельный bounded context
+без параллельного pipeline; Seller Proposal переходит в canonical Sales
+ТОЛЬКО через согласованный conversion point; 2.2A–2.2E реализуемы без
+premature conversion-решения; никакой дублирующей модели конверсии в
+reverse.*.
+
+**Do Not Implement Yet:** Proposal→Sales конверсия, Lead/Opportunity/
+Quote автосоздание из BuyerRequest/Proposal, конверсионные метрики.
+
+**Return Point:** Step 2.2F (Seller Proposal → Canonical Sales
+Conversion).
+
+**Resolution trigger:** отдельный архитектурный decision ДО начала
+2.2F; реконсиляция с существующими Sales-стадиями (Lead/Opportunity/
+Quote), а не изобретение дублирующей модели.
+
+------------------------------------------------------------------------
+
 # Правило пополнения
 
 1.  Новый отложенный вопрос → следующий `DD-XXX`.
@@ -684,12 +714,12 @@ Deferred Decisions Map не отменяет действующий ADR.
 
 # Current Register State
 
--   Total: **29**
--   DEFERRED: **28**
+-   Total: **30**
+-   DEFERRED: **29**
 -   IN_REVIEW: **0**
 -   DECIDED: **1**
 -   SUPERSEDED: **0**
--   Next ID: **DD-030**
+-   Next ID: **DD-031**
 
 ------------------------------------------------------------------------
 

@@ -143,6 +143,19 @@ describe("Step 1.17 — PII redaction: traveler/passenger в order/booking read 
   });
 
   afterAll(async () => {
+    // Shared-DB isolation (STRICT REVIEW 2.5B): bootstrap-заказы эмитят
+    // OrderCreated (causation=null) — чистим outbox + inbox своих заказов.
+    if (created.orders.length > 0) {
+      const orderEvents = await prisma.outboxEvent.findMany({
+        where: { aggregateId: { in: created.orders } },
+        select: { id: true },
+      });
+      const eventIds = orderEvents.map((e) => e.id);
+      if (eventIds.length > 0) {
+        await prisma.inboxEvent.deleteMany({ where: { eventId: { in: eventIds } } });
+      }
+      await prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: created.orders } } });
+    }
     await prisma.passenger.deleteMany({ where: { id: { in: created.passengers } } });
     await prisma.booking.deleteMany({ where: { id: { in: created.bookings } } });
     await prisma.orderTraveler.deleteMany({ where: { id: { in: created.travelers } } });

@@ -114,6 +114,13 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
     // Очистка в обратном порядке зависимостей.
     await prisma.booking.deleteMany({ where: { orderId: { in: created.orders } } });
     await prisma.order.deleteMany({ where: { id: { in: created.orders } } });
+    // Shared-DB isolation (STRICT REVIEW 2.5B): child BookingCreated имеет
+    // aggregateId = bookingId (НЕ orderId) — вычищаем по payload.orderId.
+    if (created.orders.length > 0) {
+      await prisma.outboxEvent.deleteMany({
+        where: { eventType: "BookingCreated", OR: created.orders.map((id) => ({ payload: { path: ["orderId"], equals: id } })) },
+      });
+    }
     await prisma.outboxEvent.deleteMany({
       where: { OR: [{ aggregateId: { in: created.orders } }, { aggregateId: { in: created.products } }, { aggregateId: { in: created.customers } }] },
     });

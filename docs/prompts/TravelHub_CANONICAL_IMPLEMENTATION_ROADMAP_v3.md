@@ -285,7 +285,7 @@ ownership/lifecycle.
 API, queues, filters, KPI/read models, actions, audit, RBAC. Sales не
 владеет Order/Booking logic.
 
-· **Step 2.2A --- Seller Commercial Capabilities & Destination Coverage** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Reverse Marketplace, post-baseline addition)\
+· **Step 2.2A --- Seller Commercial Capabilities & Destination Coverage** ✅ STRICT REVIEW COMPLETED — APPROVED (WITH REVIEW FIXES; Roadmap Amendment: Reverse Marketplace, post-baseline addition; reverse.*, ADR-0012)\
 Независимый capability-профиль Seller-а: сервисные категории/типы, которые Seller может продавать и на
 которые отвечать; покрываемые дестинации; приём Buyer Requests
 ON/OFF; active/lifecycle state; entitlement/capability eligibility;
@@ -305,9 +305,9 @@ pricing authority или availability authority (не заменяют Product/
 Tariff/Availability; заказы через них не создают capacity-резервации вне
 canonical flows).
 
-· **Step 2.2B --- Buyer Request / Reverse Marketplace Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition)\
-Каноническая buyer-demand сущность, рабочее имя `BuyerRequest`, рабочий префикс `BRQ-*` (регистрация в ID-registry при
-реализации). Может содержать category-dependent: service type/category;
+· **Step 2.2B --- Buyer Request / Reverse Marketplace Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (Roadmap Amendment, post-baseline addition; reverse.*, ADR-0012)\
+Каноническая buyer-demand сущность, финальное имя `BuyerRequest`, префикс `BRQ-*` (зарегистрирован в ID-registry при
+реализации 2.2B). Может содержать category-dependent: service type/category;
 destination; dates/range/flexibility; travelers; budget/currency;
 preferences/requirements; безопасный free-form requirements; lifecycle /
 timestamps; buyer own-scope; privacy; audit/history; source/acquisition
@@ -355,7 +355,7 @@ Amend 3.37A (Chat Completion поддерживает BuyerRequest/Proposal, н�
 только Order/Booking) и 3.37B (anti-disintermediation распространяется
 на pre-sale request chat).
 
-· **Step 2.2F --- Proposal → Canonical Sales Conversion** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition)\
+· **Step 2.2F --- Proposal → Canonical Sales Conversion** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition; gate DD-030: Proposal→Sales conversion target resolved ДО начала 2.2F)\
 При выборе Buyer-ом proposal НЕ создаются
 BuyerRequestOrder/ProposalOrder/ReverseMarketplaceOrder/отдельные
 Checkout/Payment/Booking (инвариант 8). Target:
@@ -398,7 +398,7 @@ travelers + fulfillment + history + OrderCreated result-event), frozen\
 commercial snapshot на Order (subtotal/discount/payment terms/acquisition\
 source, без reprice), OrderTraveler-снапшот из CheckoutIntent (READ-only, без\
 PII), correlation/causation lineage из OrderRequested, bootstrap coexistence\
-(Step 2.6 удалит). 2.5B/2.6/2.7 НЕ реализованы. Миграция\
+(Step 2.6 удалит). 2.6/2.7 НЕ реализованы. Миграция\
 `add_order_creation_consumer` (Order.customerId nullable + snapshot/refs).
 
 · **Step 2.5A --- Order Temporal Contract** ✅ DONE\
@@ -409,9 +409,9 @@ PII), correlation/causation lineage из OrderRequested, bootstrap coexistence\
 `add_order_temporal_contract`), `submittedAt` на обоих create-путях (consumer\
 + bootstrap), `confirmedAt/fulfilledAt/closedAt/cancelledAt` на переходах\
 + reconcile через booking-события, e2e `order-temporal-contract` (10).\
-2.5B/2.6/2.7 НЕ реализованы.
+2.6/2.7 НЕ реализованы.
 
-· **Step 2.5B --- Sales / Acquisition Channel Propagation**\
+· **Step 2.5B --- Sales / Acquisition Channel Propagation** ✅ DONE\
 Неизменяемый transaction context минимум: `MARKETPLACE`,
 `PARTNER_STOREFRONT`, позднее `PARTNER_CUSTOM_DOMAIN`, `API`,
 `MANUAL/DIRECT` + **`BUYER_REQUEST`** (Roadmap Amendment, рабочее имя;
@@ -419,7 +419,12 @@ PII), correlation/causation lineage из OrderRequested, bootstrap coexistence\
 `BUYER_REQUEST` распространяется immutably, где применимо:
 `BuyerRequest/Proposal → Quote/Sale → Order → Booking → Payment →
 Settlement → Analytics` (инвариант 9). Publication channel остаётся
-отличным от acquisition channel.
+отличным от acquisition channel.\
+Реализовано: `SalesAcquisitionSource` + `BUYER_REQUEST` (аддитивно),
+bootstrap → server-derived DIRECT, `Booking.acquisitionSource` (frozen ref из\
+Order, READ-only ADR-0001), миграция `add_acquisition_source_propagation`,\
+e2e `acquisition-source-propagation` (10). Payment/Settlement/Analytics\
+propagation — будущие owner-steps; 2.6/2.7/2.8 НЕ реализованы.
 
 · **Step 2.6 --- Remove Bootstrap Order Creation**\
 Удалить временный `/orders/bootstrap`; обычный Order только canonical
@@ -1275,6 +1280,158 @@ Deferred Decisions это зафиксировано как explicit prerequisit
 6.  После утверждения нового архитектурного решения этот файл должен
     обновляться, чтобы решение не оставалось только в переписке.
 
+## CURRENT CANONICAL EXECUTION SEQUENCE (Roadmap Amendment: Execution Sequence)
+
+Этот раздел — **авторитетная операционная последовательность реализации**.
+Логическая нумерация Steps и фактический порядок выполнения — разные
+понятия. Следующий implementation-шаг определяется ТОЛЬКО из этого раздела,
+не из истории чата/памяти/числовой нумерации/предположений агента.
+
+**Single Source of Truth rule:** при конфликте истории чата, старого prompt-а,
+отчёта агента, числовой нумерации или памяти с `CURRENT CANONICAL
+EXECUTION SEQUENCE` — канонический Roadmap побеждает. Перед генерацией
+каждого implementation prompt-а агент обязан прочитать этот раздел; перед
+каждым STRICT REVIEW prompt-ом — сверить, что цель является текущим
+активным элементом последовательности.
+
+**SSOT nuance (не override инвариантов):** execution sequence определяет
+ХРОНОЛОГИЮ, но не отменяет архитектурные инварианты/зависимости,
+зафиксированные в этом же Roadmap (ownership, ADR-gates, canonical pipeline
+rules). Если execution sequence конфликтует с явной канонической
+зависимостью/инвариантом — это ПРОТИВОРЕЧИЕ Roadmap, требующее
+исправления, а не разрешение игнорировать зависимость.
+
+**Prompt-generation rule:** перед генерацией/исполнением любого будущего
+implementation prompt-а агент обязан: (1) прочитать канонический Roadmap;
+(2) прочитать этот раздел; (3) сверить approval требуемых prerequisite-ов;
+(4) сверить, что цель — уникальный NEXT item. Перед генерацией STRICT
+REVIEW — сверить, что цель соответствует только что завершённому активному
+implementation/documentation item-у. Старые prompt-ы не выполняются вне
+последовательности.
+
+**Parallel execution rule:** по умолчанию может начинаться ТОЛЬКО уникальный
+NEXT item. Параллельность не подразумевается; если позднее разрешена —
+Roadmap обязан явно пометить набор как `PARALLEL-ALLOWED`. В текущей
+последовательности после approval этого amendment единственный NEXT —
+Reverse Marketplace ADR.
+
+**Strict Review pairing rule:** каждый implementation Step требует
+ОТДЕЛЬНОГО STRICT REVIEW перед началом следующего implementation Step,
+если Step явно не помечен как documentation-only с иным механизмом
+approval. Последовательность: `Implementation → Strict Review → APPROVED →
+next item`. `IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW` — НЕ
+достаточно для продвижения; `CHANGES REQUIRED` / `ARCHITECTURE DECISION
+REQUIRED` блокируют продвижение.
+
+**Amendment rule:** любой будущий Roadmap Amendment, меняющий зависимости
+или порядок выполнения (новые Steps, изменённые prerequisites, ADR-gate,
+смена return point), ОБЯЗАН в том же amendment обновить этот раздел.
+Amendment неполон, если добавляет Steps/меняет prerequisites/создаёт
+ADR-gate/меняет return point без обновления последовательности. STRICT
+REVIEW такого amendment обязан проверить, что обновление последовательности
+выполнено и согласовано.
+
+**Status semantics (операционные статусы):**
+- ✅ APPROVED / DONE — только после требуемого STRICT REVIEW approval;
+  реализация сама по себе НЕ означает DONE;
+- 🔍 STRICT REVIEW IN PROGRESS / PENDING;
+- ▶ NEXT;
+- ⏳ PLANNED;
+- ⛔ BLOCKED BY PREREQUISITE;
+- ⚠ ARCHITECTURE DECISION REQUIRED.
+
+DONE-семантика применяется с этого amendment (prospective); исторические
+✅ DONE-маркеры (Steps 2.1–2.5B) установлены в рамках той же конвенции
+implementation → strict review → approval и остаются валидными.
+
+### Текущее состояние (verified 2026-08-10)
+
+| Item | Status |
+|---|---|
+| Step 2.5 — Order Creation Consumer | ✅ DONE (committed 3afefc8) |
+| Step 2.5A — Order Temporal Contract | ✅ DONE (committed 3afefc8) |
+| Service Templates / Period Pricing & Availability Amendment | ✅ APPROVED WITH REVIEW FIXES (docs) |
+| Step 2.5B — Acquisition Source Propagation | ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (реализация не коммичена, dirty tree) |
+| Reverse Marketplace ADR (ADR-0012) | ✅ APPROVED (ADR-0012 STRICT REVIEW, docs/adr/ADR-0012) |
+
+**Current completed boundary:** Steps 2.5 / 2.5A / 2.5B (2.5B — review
+approved; commit ожидает явной команды) + Reverse Marketplace ADR-0012
+✅ APPROVED (STRICT REVIEW) + Step 2.2A ✅ STRICT REVIEW COMPLETED —
+APPROVED + Step 2.2B ✅ STRICT REVIEW COMPLETED — APPROVED WITH
+REVIEW FIXES (BuyerRequest foundation; FIX 1: recursive preferences
+PII-скан; FIX 2: lifecycle-команды loud-422 на forged keys; FIX 3–5:
+race final-state/category-snapshot/nested-PII e2e; doc: PAX
+category-neutrality + destination source).
+
+**Currently active item:** Step 2.2C — NOT IMPLEMENTED (blocked до
+отдельного implementation-промпта).
+
+**Exact NEXT item:** `PHASE 2 — STEP 2.2C — MATCHING & DISTRIBUTION`
+(единственный NEXT; 2.2B STRICT REVIEW завершён, approval дан).
+
+### Полная авторитетная последовательность после 2.5B
+
+1.  **Reverse Marketplace ADR** — ✅ DONE (ADR-0012 создан; hard
+    prerequisite: `Reverse Marketplace ADR APPROVED` — обязательное условие
+    ДЛЯ НАЧАЛА Step 2.2A (не только перед 2.2B). Никакая реализация
+    `reverse.*` (schema/module/entity) до approval ADR.)
+2.  **Reverse Marketplace ADR — STRICT REVIEW** — ✅ DONE (APPROVED WITH
+    REVIEW FIXES; ADR-0012 → Accepted)
+3.  **Step 2.2A — Seller Commercial Capabilities & Destination Coverage** ✅ STRICT REVIEW COMPLETED — APPROVED
+    (limited-scope rule: capabilities — легковесные seller-declared
+    декларации (destination coverage + service categories); capability ≠
+    inventory; matching НЕ зависит от live Product/inventory и НЕ требует
+    нормализованных unit/tariff/period структур 1.8A–D; DD-028 может
+    обеспечить словарь destinations при design 2.2A — не блокер)
+4.  **Step 2.2A — STRICT REVIEW** — ✅ DONE (APPROVED WITH REVIEW FIXES)
+5.  **Step 2.2B — Buyer Request / Reverse Marketplace Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES
+6.  **Step 2.2B — STRICT REVIEW** ✅ DONE (APPROVED WITH REVIEW FIXES)
+7.  **Step 2.2C — Buyer Request Matching & Distribution** ▶ NEXT
+8.  **Step 2.2C — STRICT REVIEW**
+9.  **Step 2.2D — Seller Proposal Foundation**
+10. **Step 2.2D — STRICT REVIEW**
+11. **Step 2.2E — Buyer Request / Proposal Communication**
+12. **Step 2.2E — STRICT REVIEW**
+13. **Step 2.2F — Proposal → Canonical Sales Conversion** (gate DD-030:
+    Proposal→Sales conversion target — Lead vs Opportunity vs Quote —
+    resolved ДО начала 2.2F)
+14. **Step 2.2F — STRICT REVIEW**
+15. **Service Templates return point (conditional):** разрешить
+    implementation-time gates DD-025/Step 1.8A, DD-024/Step 1.8B,
+    DD-026/Step 1.8C, DD-027/Step 1.8C (multi-date holds → 2.4/2.5
+    contract), DD-028 taxonomy ownership, DD-029 multi-currency display.
+16. **Step 1.8A — Service Template / Seller Commercial Structure Foundation**
+17. **Step 1.8A — STRICT REVIEW**
+18. **Step 1.8B — Tariff / Commercial Variant Foundation**
+19. **Step 1.8B — STRICT REVIEW**
+20. **Step 1.8C — Period Pricing & Period Availability Foundation**
+21. **Step 1.8C — STRICT REVIEW**
+22. **Step 1.8D — Commercial Restrictions / Overrides Foundation**
+23. **Step 1.8D — STRICT REVIEW**
+
+**Step 2.8A conditional dependency (детерминированный дефолт):** date-based
+period pricing/availability НЕ требует Step 2.8A; time-slot / exact
+departure / timezone-aware availability ЗАВИСИТ от Step 2.8A time model.
+**Детерминированное поведение:** на этом этапе Step 1.8C ОГРАНИЧЕН
+date-based семантикой; time-slot-часть явно отложена и реализуется только
+после выполнения Step 2.8A (в основной последовательности после возврата).
+Никакого перехода к 2.8A раньше времени по усмотрению агента — если дизайн
+1.8C всё же потребует time-slot, это БЛОКИРУЕТ продвижение и требует
+отдельного решения (не «молчаливого jump»).
+
+**Return to original Phase 2 sequence:** после блоков Reverse Marketplace
+(2.2A–2.2F) и Commercial Modeling (1.8A–1.8D) —
+
+`RETURN TO ORIGINAL SEQUENCE AT: Step 2.6 (Remove Bootstrap Order Creation)`
+
+Rationale: 2.6 зависит только от 2.5/2.5A/2.5B (canonical Order creation +
+propagation — complete) и НЕ имеет зависимостей на 2.2A–2.2F / 1.8A–1.8D
+(Reverse Marketplace dependency analysis: 2.2A–F не блокируют Order consumer;
+Service Templates analysis: 1.8A–D требуются до 3.29/3.29I UI, что
+удовлетворяется независимо от позиции). Далее основная последовательность
+продолжается: 2.6 → 2.7 → 2.8 → 2.8A (time model) → 2.9 → 2.9A → … →
+3.29 серия (Partner Cabinet Full).
+
 ## Dependency Analysis (Roadmap Amendment: Reverse Marketplace)
 
 Текущее состояние на момент amendment:
@@ -1305,8 +1462,10 @@ channel-значений и не требует изменения 2.5/2.5A. Ж�
 **Prerequisite для 2.2A–2.2F (STRICT REVIEW):** перед началом реализации
 Reverse Marketplace требуется **формальный ADR** о введении нового
 bounded context `reverse.*` (новое PostgreSQL-схема-домен по ADR-0001;
-прецедент — ADR-0011 для `communication.*`). До этого ADR ownership
-Reverse Marketplace сущностей — RECOMMENDED (не closed verdict). Это
+прецедент — ADR-0011 для `communication.*`). **Создан и утверждён:
+`docs/adr/ADR-0012-reverse-marketplace-bounded-context.md`** (✅ APPROVED
+— ADR-0012 STRICT REVIEW). Ownership Reverse Marketplace сущностей закрыт
+решением ADR-0012 (не «recommended»); prerequisite выполнен. Это
 единственный блокирующий prerequisite для 2.2A–2.2F; Step 2.5 он НЕ
 затрагивает.
 

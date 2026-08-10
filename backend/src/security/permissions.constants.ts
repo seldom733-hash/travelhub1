@@ -102,6 +102,19 @@ export const PERMISSIONS = {
   "communication.create": "Создание communication по business context (internal staff)",
   "communication.read_own": "Чтение собственных communications (BUYER/PARTNER own-scope)",
 
+  // ── Reverse Marketplace capabilities (Step 2.2A, reverse.*) ────────────
+  // Узкие own-scope права PARTNER: управление СВОИМИ Seller Commercial
+  // Capability declarations (service categories + destination coverage +
+  // accepts-requests + lifecycle). Никаких широких internal прав; BUYER и
+  // staff-роли (кроме ADMIN по convention ALL_PERMISSIONS) НЕ получают —
+  // partner-own контракт дополнительно гейтится ролью в сервисе (403).
+  "reverse.capability.read_own": "Чтение собственных Seller Commercial Capabilities (own-scope)",
+  "reverse.capability.write_own": "Создание/изменение/деактивация собственных Seller Commercial Capabilities (own-scope)",
+  // Step 2.2B: BuyerRequest — BUYER own-scope. PARTNER/Seller НЕ получают
+  // (доступ к запросам — только после server-authoritative distribution 2.2C).
+  "reverse.request.read_own": "Чтение собственных Buyer Requests (BUYER own-scope)",
+  "reverse.request.write_own": "Создание/изменение/сабмит/отмена собственных Buyer Requests (BUYER own-scope)",
+
   // ── Account / own profile (Step 1.9, granular own-scope) ──────────────
   "account.profile.read": "Чтение собственного профиля/аккаунта (own-scope)",
   "account.profile.update": "Обновление собственного профиля (own-scope)",
@@ -404,6 +417,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // Step 1.16: PARTNER читает communications своего Partner-контекста
     // (own-scope, не-NOTE/не-INTERNAL). Никаких широких internal прав.
     "communication.read_own",
+    // Step 2.2A: PARTNER управляет СВОИМИ Reverse Marketplace capabilities
+    // (own-scope). Узкие права — без internal Catalog/Sales/CRM прав.
+    "reverse.capability.read_own",
+    "reverse.capability.write_own",
   ],
 
   // Step 1.3 review fix: BUYER БЕЗ unrestricted internal catalog.product.read —
@@ -418,6 +435,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
   BUYER: [
     "account.profile.read",
     "account.profile.update",
+    // Step 2.2B: BUYER создаёт/управляет своими Buyer Requests (own-scope).
+    "reverse.request.read_own",
+    "reverse.request.write_own",
     "account.order.read_own",
     "account.booking.read_own",
     "account.payment.read_own",

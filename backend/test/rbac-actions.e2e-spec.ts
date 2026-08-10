@@ -120,6 +120,11 @@ describe("Phase 2 — RBAC: действия Order/Booking закрыты по �
         await prisma.inboxEvent.deleteMany({ where: { eventId: { in: eventIds } } });
       }
       await prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: created.orders } } });
+      // Shared-DB isolation (STRICT REVIEW 2.5B): child BookingCreated имеет
+      // aggregateId = bookingId (НЕ orderId) — вычищаем по payload.orderId.
+      await prisma.outboxEvent.deleteMany({
+        where: { eventType: "BookingCreated", OR: created.orders.map((id) => ({ payload: { path: ["orderId"], equals: id } })) },
+      });
       // Брони удаляем явно (не полагаемся на каскад Order → Booking).
       await prisma.booking.deleteMany({ where: { orderId: { in: created.orders } } });
       await prisma.order.deleteMany({ where: { id: { in: created.orders } } });

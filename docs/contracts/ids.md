@@ -28,6 +28,8 @@
 | `SAL-` | Sale | Sales |
 | `CKT-` | CheckoutIntent (commercial intent) | Sales |
 | `RSR-` | AvailabilityReservation (capacity hold) | Catalog |
+| `CAP-` | SellerCapability (commercial capability) | Reverse Marketplace (reverse.*) |
+| `BRQ-` | BuyerRequest (demand entry) | Reverse Marketplace (reverse.*) |
 
 *Exit Audit Step 1.18:* таблица синхронизирована с фактическим реестром
 `IdsService.nextCode` (PRD/CAT/TRF/CUS/CNT/COM/PAR/SUP/ORD/TH/BKG/CML/SELL/SPP/SF/APP/USR).
@@ -38,6 +40,11 @@
 *Step 2.4 (полный реестр):* `PRD/CAT/TRF/CUS/CNT/COM/PAR/SUP/ORD/TH/BKG/CML/SELL/SPP/SF/APP/USR/LED/OPP/QTE/SAL/CKT/RSR`.
 *Step 2.5:* ORD-*/TH-YYYY-###### создаются canonical OrderRequested consumer-ом
 (тот же `IdsService`); год TH-* — по UTC (canonical time-конвенция).
+*Step 2.2A:* добавлен CAP- (SellerCapability, reverse.*, Phase 2) — коммерческие
+capability declarations.
+*Step 2.2B:* зарегистрирован BRQ- (BuyerRequest, reverse.*) — канонический
+buyer-demand префикс (финальная регистрация в точке реализации 2.2B).
+Proposal prefix НЕ регистрируется (Step 2.2D).
 
 Формат: `PREFIX-` + число, дополненное слева нулями (8 цифр; для
 `TH-YYYY-######` — 6 цифр, последовательность сквозная по году).

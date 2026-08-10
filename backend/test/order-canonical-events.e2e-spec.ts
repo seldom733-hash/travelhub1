@@ -89,6 +89,13 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
     const orderEventIds = (await prisma.outboxEvent.findMany({ where: { aggregateId: { in: orderIds } }, select: { id: true } })).map((e) => e.id);
     await prisma.inboxEvent.deleteMany({ where: { eventId: { in: orderEventIds } } });
     await prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: orderIds } } });
+    // Shared-DB isolation (STRICT REVIEW 2.5B): child BookingCreated имеет
+    // aggregateId = bookingId (НЕ orderId) — вычищаем по payload.orderId.
+    if (orderIds.length > 0) {
+      await prisma.outboxEvent.deleteMany({
+        where: { eventType: "BookingCreated", OR: orderIds.map((id) => ({ payload: { path: ["orderId"], equals: id } })) },
+      });
+    }
     await prisma.booking.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
     await prisma.product.deleteMany({ where: { id: { in: productIds } } });

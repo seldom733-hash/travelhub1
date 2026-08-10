@@ -68,6 +68,9 @@ export class BookingSubscribers implements OnModuleInit {
               status: "NEW",
               amount: item.amount,
               serviceDate: item.serviceDate ?? order.serviceDate,
+              // Step 2.5B: frozen acquisition source из Order (READ-only,
+              // ADR-0001 — Booking НЕ ре-выводит source; копия canonical факта).
+              acquisitionSource: order.acquisitionSource ?? null,
               version: 1,
             },
             select: { id: true, code: true },
