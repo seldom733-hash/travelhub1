@@ -73,6 +73,12 @@ export const PERMISSIONS = {
   // count-based операционные метрики БЕЗ raw entity labels/IDs — для ролей,
   // которым не нужны raw Lead/Opportunity/Quote/Sale details (ANALYST/MARKETER).
   "sales.kpi.read": "Чтение агрегированного Sales read model (KPI, count-based)",
+  // Step 2.3A: Checkout / Commercial Intent context (sales.*). Internal
+  // staff-assisted flow; read = detail/history/list, write = create/update/
+  // revalidate/cancel. Aggregate-only роли и BUYER/PARTNER/FINANCE НЕ получают
+  // raw checkout context (PII-adjacent travelers, frozen money snapshot).
+  "sales.checkout.read": "Чтение checkout commercial intent context",
+  "sales.checkout.write": "Управление checkout commercial intent context",
 
   // ── Finance (Phase 2, каталог прав зарезервирован) ───────────────────
   "finance.payment.read": "Чтение платежей",
@@ -171,6 +177,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "sales.quote.read",
     "sales.sale.read",
     "sales.kpi.read",
+    // Step 2.3A: DIRECTOR — read-only checkout context (коммерческое намерение
+    // по клиентам; без write-команд).
+    "sales.checkout.read",
     "finance.payment.read",
     "finance.refund.read",
     "finance.invoice.read",
@@ -307,6 +316,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "sales.sale.write",
     "sales.sale.complete",
     "sales.kpi.read",
+    // Step 2.3A: SALES_MANAGER — полный operational доступ к checkout intents
+    // (create/update/revalidate/cancel + read).
+    "sales.checkout.read",
+    "sales.checkout.write",
     "finance.payment.read",
     "finance.refund.read",
     "finance.invoice.read",

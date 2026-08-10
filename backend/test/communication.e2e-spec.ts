@@ -56,10 +56,11 @@ describe("Phase 1 Step 1.16 — Communication Foundation (e2e)", () => {
     customers: string[];
     products: string[];
     orders: string[];
+    bookings: string[];
     partners: string[];
     communications: string[];
     auditLogs: string[];
-  } = { users: [], customers: [], products: [], orders: [], partners: [], communications: [], auditLogs: [] };
+  } = { users: [], customers: [], products: [], orders: [], bookings: [], partners: [], communications: [], auditLogs: [] };
 
   const register = (body: Record<string, unknown>) => request(app.getHttpServer()).post("/api/v1/auth/register").send(body);
 
@@ -125,6 +126,7 @@ describe("Phase 1 Step 1.16 — Communication Foundation (e2e)", () => {
 
     const booking = await prisma.booking.findFirst({ where: { orderId: order.id }, select: { id: true } });
     if (!booking) throw new Error("Booking not created by consumer");
+    created.bookings.push(booking.id);
     return { orderId: order.id, bookingId: booking.id };
   };
 
@@ -147,7 +149,18 @@ describe("Phase 1 Step 1.16 — Communication Foundation (e2e)", () => {
     await prisma.booking.deleteMany({ where: { orderId: { in: created.orders } } });
     await prisma.order.deleteMany({ where: { id: { in: created.orders } } });
     await prisma.outboxEvent.deleteMany({
-      where: { OR: [{ aggregateId: { in: created.orders } }, { aggregateId: { in: created.products } }, { aggregateId: { in: created.customers } }, { aggregateId: { in: created.partners } }] },
+      // Shared-DB isolation: чистка по ВСЕМ aggregateId этой спеки, включая child
+      // BookingCreated (aggregateId = bookingId, НЕ orderId) — иначе строки утекают
+      // в события.OutboxEvent и ломают абсолютные счётчики следующих спек.
+      where: {
+        OR: [
+          { aggregateId: { in: created.orders } },
+          { aggregateId: { in: created.bookings } },
+          { aggregateId: { in: created.products } },
+          { aggregateId: { in: created.customers } },
+          { aggregateId: { in: created.partners } },
+        ],
+      },
     });
     await prisma.product.deleteMany({ where: { id: { in: created.products } } });
     await prisma.customer.deleteMany({ where: { id: { in: created.customers } } });

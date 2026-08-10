@@ -447,6 +447,8 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "sales.sale.write": "Управление продажами",
   "sales.sale.complete": "Завершение продажи",
   "sales.kpi.read": "Чтение агрегированного Sales read model (KPI, count-based)",
+  "sales.checkout.read": "Чтение checkout commercial intent context",
+  "sales.checkout.write": "Управление checkout commercial intent context",
   "finance.payment.read": "Чтение платежей",
   "finance.payment.write": "Управление платежами",
   "finance.refund.read": "Чтение возвратов",

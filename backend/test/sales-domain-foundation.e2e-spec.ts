@@ -298,8 +298,13 @@ describe("Phase 2 Step 2.1 — Sales Domain Foundation (e2e)", () => {
       agent(sm.accessToken).post(`/api/v1/sales/leads/${lead2.code}/transition`).send({ status: "QUALIFIED" }),
     ]);
     const statuses = results.map((r) => (r.status === "fulfilled" ? r.value.status : "rejected"));
+    // Ровно один победитель; второй — 409 (CAS при конкурентном read) ЛИБО 422
+    // (запрос сериализовался и увидел уже применённый переход — детерминированный
+    // terminal/transition-guard). В обоих случаях milestone ровно один (ниже).
     expect(statuses.filter((s) => s === 201)).toHaveLength(1);
-    expect(statuses.filter((s) => s === 409)).toHaveLength(1);
+    const loser = statuses.filter((s) => s !== 201);
+    expect(loser).toHaveLength(1);
+    expect(loser[0] === 409 || loser[0] === 422).toBe(true);
     const h = await prisma.leadHistory.findMany({ where: { leadId: lead2.id, action: "status_changed" } });
     expect(h).toHaveLength(1); // ровно один milestone, никаких дубликатов
 

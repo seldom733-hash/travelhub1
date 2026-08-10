@@ -399,6 +399,59 @@ Model) + Step 3.13 (Users & Access Center UI).
 
 ------------------------------------------------------------------------
 
+## DD-022 --- Availability Reservation / Locking Owner & Contract
+
+**Status:** DEFERRED
+
+**Already Decided (Step 2.3A):** до Step 2.3A/2.4 availability — read-only
+"checked, not reserved". CheckoutIntent НЕ подтверждает и НЕ гарантирует
+доступность и НЕ пишет в catalog.Availability (ADR-0001: Sales пишет только
+в sales.*). Каждый ответ честно несёт `availability.state =
+CHECKED_NOT_RESERVED` + `semantics` (checked, not reserved; no capacity hold)
+и вычисляется заново при каждом чтении (никакого stale "available=true").
+Владелец резервирования/блокировки capacity — граница Order/Booking
+(Step 2.4/2.5): hold обязан координироваться с Order/Booking/Payment
+state, поэтому вводится там, а не раньше.
+
+**Still Open:** atomic conditional reservation (available >= requested в
+одной транзакции), server-owned expiresAt + TTL, release/expiry/cleanup,
+retry/idempotency hold-ов, partial unique index (один активный hold),
+failure atomicity при персисте intent+reservation+history.
+
+**Do Not Implement Yet:** никаких записей capacity из Sales; никакого
+hold-контракта до Step 2.4 (safe read-only семантика достаточна для
+authoritative checkout intent).
+
+**Return Point:** Step 2.4 (Sale Completion → OrderRequested) / Step 2.8A
+(Booking service date/time model, capacity/slot reservation).
+
+------------------------------------------------------------------------
+
+## DD-023 --- Canonical Product Options Model & Option Pricing
+
+**Status:** DEFERRED
+
+**Already Decided (Step 2.3A):** каноническая catalog options entity
+(selectable priced options: экскурсии, доп. услуги, страховки и т.п.)
+отсутствует. Roadmap 2.3A упоминает options в checkout context, но invent
+arbitrary JSON options или выдумывать option pricing запрещено (Step 2.3A
+§21/§22). CheckoutIntent опции НЕ вводит; попытка передать `options` в
+запросе → явный 422 (forbidden key), не молчаливый ignore. Client может
+передавать только canonical option IDs с server-resolved pricing — когда
+такая модель появится.
+
+**Still Open:** Catalog-owned options entity (тип/цена/доступность),
+Category Schema option definitions, option price authority (Decimal(12,2),
+half-up), snapshot option selection в Checkout/Quote, capacity для опций.
+
+**Do Not Implement Yet:** options в CheckoutIntent/Quote до появления
+canonical Catalog options модели.
+
+**Return Point:** Step 2.7/3.31 (Marketplace Checkout composition) при
+наличии канонической options-модели в Catalog.
+
+------------------------------------------------------------------------
+
 # Правило пополнения
 
 1.  Новый отложенный вопрос → следующий `DD-XXX`.
@@ -419,12 +472,12 @@ Deferred Decisions Map не отменяет действующий ADR.
 
 # Current Register State
 
--   Total: **21**
--   DEFERRED: **21**
+-   Total: **23**
+-   DEFERRED: **23**
 -   IN_REVIEW: **0**
 -   DECIDED: **0**
 -   SUPERSEDED: **0**
--   Next ID: **DD-022**
+-   Next ID: **DD-024**
 
 ------------------------------------------------------------------------
 

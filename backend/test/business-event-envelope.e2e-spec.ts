@@ -110,6 +110,14 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
     const orderEventIds = (await prisma.outboxEvent.findMany({ where: { aggregateId: { in: orderIds } }, select: { id: true } })).map((e) => e.id);
     await prisma.inboxEvent.deleteMany({ where: { eventId: { in: [...orderEventIds, ...legacyEventIds] } } });
     await prisma.outboxEvent.deleteMany({ where: { OR: [{ aggregateId: { in: orderIds } }, { id: { in: legacyEventIds } }] } });
+    // Shared-DB isolation: child BookingCreated имеет aggregateId = bookingId (НЕ orderId),
+    // payload содержит orderId — удаляем по payload (equals на JSON path), чтобы не
+    // оставлять строки в общей events.OutboxEvent (абсолютные outbox-счётчики других спек).
+    if (orderIds.length > 0) {
+      await prisma.outboxEvent.deleteMany({
+        where: { eventType: "BookingCreated", OR: orderIds.map((id) => ({ payload: { path: ["orderId"], equals: id } })) },
+      });
+    }
     await prisma.booking.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
     await prisma.product.deleteMany({ where: { id: { in: productIds } } });

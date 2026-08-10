@@ -624,6 +624,11 @@ describe("Phase 2 Step 2.3 — Quote & Commercial Offer Flow (e2e)", () => {
     const { productId, tariffs } = await createProduct(`QC Iso ${stamp}`, [{ name: "S", price: 60 }]);
     const ordersBefore = await prisma.order.count();
     const bookingsBefore = await prisma.booking.count();
+    // Shared-DB isolation (serial e2e, порядок readdir не гарантирован): чужие
+    // спеки (auth-rbac/phase1/communication/...) создают Order/Booking и чистят
+    // свои outbox-строки, но мы проверяем ДЕЛЬТУ: issue этой спеки не создаёт
+    // новых OrderRequested/OrderCreated/BookingCreated-строк (не global zero).
+    const outboxBefore = await prisma.outboxEvent.count({ where: { eventType: { in: ["OrderRequested", "OrderCreated", "BookingCreated"] } } });
     // Payment/Finance: отдельной Payment-сущности в схеме НЕТ (Phase 2.0 audit,
     // честная absence) — issue физически не может создать Payment rows.
 
@@ -634,8 +639,8 @@ describe("Phase 2 Step 2.3 — Quote & Commercial Offer Flow (e2e)", () => {
 
     expect(await prisma.order.count()).toBe(ordersBefore);
     expect(await prisma.booking.count()).toBe(bookingsBefore);
-    const outbox = await prisma.outboxEvent.findMany({ where: { eventType: { in: ["OrderRequested", "OrderCreated", "BookingCreated"] } } });
-    expect(outbox.length).toBe(0);
+    const outboxAfter = await prisma.outboxEvent.count({ where: { eventType: { in: ["OrderRequested", "OrderCreated", "BookingCreated"] } } });
+    expect(outboxAfter).toBe(outboxBefore);
     // Никакой capacity reservation: Availability для продукта не создаётся и не меняется.
     expect(await prisma.availability.count({ where: { productId } })).toBe(0);
 

@@ -1,5 +1,11 @@
 import { ValidationDomainError } from "../../shared/errors";
-import { LeadStatus, OpportunityStatus, QuoteStatus, SaleStatus } from "../../generated/prisma/enums";
+import {
+  CheckoutStatus,
+  LeadStatus,
+  OpportunityStatus,
+  QuoteStatus,
+  SaleStatus,
+} from "../../generated/prisma/enums";
 import type { Prisma } from "../../generated/prisma/client";
 
 /**
@@ -48,6 +54,12 @@ export interface QuoteListQueryInput extends SalesListQueryInput {
 export interface SaleListQueryInput extends SalesListQueryInput {
   quoteId?: string;
   opportunityId?: string;
+  customerId?: string;
+}
+
+export interface CheckoutListQueryInput extends SalesListQueryInput {
+  status?: CheckoutStatus;
+  quoteId?: string;
   customerId?: string;
 }
 
@@ -132,6 +144,16 @@ export function buildSaleListWhere(f: SaleListQueryInput): Prisma.SaleWhereInput
   return {
     ...(f.quoteId ? { quoteId: f.quoteId } : {}),
     ...(f.opportunityId ? { opportunityId: f.opportunityId } : {}),
+    ...(f.customerId ? { customerId: f.customerId } : {}),
+    ...(f.code ? { code: f.code } : {}),
+    ...createdAtRange(f.from, f.to),
+  };
+}
+
+export function buildCheckoutListWhere(f: CheckoutListQueryInput): Prisma.CheckoutIntentWhereInput {
+  return {
+    ...(f.status ? { status: f.status } : {}),
+    ...(f.quoteId ? { quoteId: f.quoteId } : {}),
     ...(f.customerId ? { customerId: f.customerId } : {}),
     ...(f.code ? { code: f.code } : {}),
     ...createdAtRange(f.from, f.to),

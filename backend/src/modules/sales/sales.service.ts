@@ -6,12 +6,14 @@ import { ConflictError, NotFoundError, ValidationDomainError } from "../../share
 import { isoUtc } from "../../shared/temporal";
 import type { Prisma } from "../../generated/prisma/client";
 import {
+  CheckoutStatus,
   LeadStatus,
   OpportunityStatus,
   ProductStatus,
   QuoteDiscountType,
   QuoteStatus,
   RoleCode,
+  SalesAcquisitionSource,
   SaleStatus,
 } from "../../generated/prisma/enums";
 import {
@@ -20,6 +22,7 @@ import {
   assertQuoteComposable,
   assertQuoteTransition,
 } from "./sales.validation";
+import { classifyAvailability, isDateOnly, parseServiceDate, quoteExpiry } from "./sales.checkout";
 import {
   discountAmountOf,
   lineAmount,
@@ -28,6 +31,7 @@ import {
   validateDiscountValue,
 } from "./sales.money";
 import {
+  buildCheckoutListWhere,
   buildLeadListWhere,
   buildOpportunityListWhere,
   buildQuoteListWhere,
@@ -35,6 +39,7 @@ import {
   createdAtRange,
   salesOrderBy,
   SALES_QUEUES,
+  type CheckoutListQueryInput,
   type LeadListQueryInput,
   type OpportunityListQueryInput,
   type QuoteListQueryInput,
@@ -42,16 +47,17 @@ import {
   type SalesQueueKey,
 } from "./sales.filters";
 import type {
-  LeadDto,
-  OpportunityDto,
-  QuoteDetailDto,
-  QuoteDto,
-  QuoteItemDto,
-  QuoteTravelerDto,
+  CheckoutIntentAvailabilityDto,
+  CheckoutIntentDetailDto,
+  CheckoutIntentDto,
   SaleDto,
   SalesHistoryItemDto,
   SalesKpiDto,
   SalesListResult,
+  LeadDto,
+  OpportunityDto,
+  QuoteDetailDto,
+  QuoteDto,
 } from "./sales.contracts";
 
 const PAGE_SIZE_MAX = 50;
@@ -531,15 +537,7 @@ export class SalesService {
     const row = await this.prisma.quote.findUnique({ where: { code } });
     if (!row) throw new NotFoundError(`Quote ${code} not found`);
     assertQuoteComposable(row.status);
-    if (travelers.length > 50) throw new ValidationDomainError("Too many travelers (max 50)");
-    for (const t of travelers) {
-      if (t.firstName.trim().length === 0 || t.firstName.length > 100) throw new ValidationDomainError("firstName must be 1..100 chars");
-      if (t.lastName.trim().length === 0 || t.lastName.length > 100) throw new ValidationDomainError("lastName must be 1..100 chars");
-      if (t.birthDate && !isDateOnly(t.birthDate)) throw new ValidationDomainError("birthDate must be a calendar date (YYYY-MM-DD)");
-      if (t.birthDate && new Date(`${t.birthDate}T00:00:00.000Z`).getTime() > Date.now()) {
-        throw new ValidationDomainError("birthDate must not be in the future");
-      }
-    }
+    this.assertTravelersValid(travelers);
 
     await this.prisma.$transaction(async (tx) => {
       const res = await tx.quote.updateMany({ where: { id: row.id, version: row.version }, data: { version: { increment: 1 } } });
@@ -669,6 +667,282 @@ export class SalesService {
     const row = await this.prisma.sale.findUnique({ where: { code } });
     if (!row) throw new NotFoundError(`Sale ${code} not found`);
     return this.toSaleDto(row);
+  }
+
+  /* ── Step 2.3A — Checkout / Commercial Intent (sales.*) ──────────────────── */
+
+  /**
+   * Step 2.3A: create authoritative checkout intent из ISSUED Quote.
+   * Binding-price: frozen Quote totals (currency/subtotal/discount/total) копируются
+   * server-side и immutable — frontend НЕ источник цены (§5). БЕЗ reprice от
+   * Catalog (один price authority, §9/§45). Quote должен быть ISSUED и не expired
+   * (validUntil > now, §46). Никаких Order/Booking/Payment/OrderRequested/Sale
+   * completion side effects; availability — read-only "checked, not reserved" (§15).
+   */
+  async createCheckoutIntent(
+    input: {
+      quoteId: string;
+      customerId?: string | null;
+      serviceDate?: string | null;
+      travelers?: Array<{ firstName: string; lastName: string; birthDate?: string | null }> | null;
+    },
+    actor: Actor,
+  ): Promise<CheckoutIntentDetailDto> {
+    const quote = await this.prisma.quote.findUnique({
+      where: { id: input.quoteId },
+      include: {
+        items: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+        travelers: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+      },
+    });
+    if (!quote) throw new NotFoundError(`Quote ${input.quoteId} not found`);
+    if (quote.status !== QuoteStatus.ISSUED) {
+      throw new ValidationDomainError(`Quote ${quote.code} is ${quote.status}; checkout requires an issued quote`);
+    }
+    if (!quote.validUntil || quote.validUntil <= new Date()) {
+      throw new ValidationDomainError(`Quote ${quote.code} has expired; cannot create checkout intent`);
+    }
+    if (quote.subtotal === null || quote.total === null) {
+      throw new ValidationDomainError(`Quote ${quote.code} has no frozen totals`);
+    }
+
+    // Customer scope: default = Quote customer; override — business reference
+    // (staff-assisted, server validates existence; не расширяет права, §29/§62).
+    const customerId = input.customerId === undefined || input.customerId === null ? quote.customerId : input.customerId;
+    await this.assertOptionalCustomer(customerId);
+
+    // Service date — опциональна на create (без даты availability = NOT_SPECIFIED).
+    const serviceDate = input.serviceDate ? parseServiceDate(input.serviceDate) : null;
+
+    // Travelers: если не переданы — наследуются из Quote (editing allowed, §20).
+    const travelers =
+      input.travelers ??
+      quote.travelers.map((t) => ({
+        firstName: t.firstName,
+        lastName: t.lastName,
+        birthDate: t.birthDate ? t.birthDate.toISOString().slice(0, 10) : null,
+      }));
+    this.assertTravelersValid(travelers);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const code = await this.ids.nextCode(tx, "CKT");
+      const row = await tx.checkoutIntent.create({
+        data: {
+          code,
+          quoteId: quote.id,
+          customerId: customerId ?? null,
+          status: CheckoutStatus.ACTIVE,
+          currency: quote.currency,
+          subtotal: quote.subtotal as Prisma.Decimal,
+          discountType: quote.discountType,
+          discountValue: quote.discountValue,
+          discountAmount: quote.discountAmount,
+          total: quote.total as Prisma.Decimal,
+          serviceDate,
+          // Server-derived acquisition source: internal-assisted entry (2.5B
+          // propagation); client hint не принимается (§24/§26).
+          acquisitionSource: SalesAcquisitionSource.DIRECT,
+          createdById: actor.id,
+        },
+      });
+      if (travelers.length > 0) {
+        await tx.checkoutIntentTraveler.createMany({
+          data: travelers.map((t) => ({
+            checkoutIntentId: row.id,
+            firstName: t.firstName.trim(),
+            lastName: t.lastName.trim(),
+            birthDate: t.birthDate ? new Date(`${t.birthDate}T00:00:00.000Z`) : null,
+          })),
+        });
+      }
+      await this.writeHistory(tx, "checkoutIntentHistory", row.id, "created", null, row.status, actor, {
+        quoteCode: quote.code,
+        currency: quote.currency,
+        total: String(quote.total),
+        serviceDate: serviceDate ? serviceDate.toISOString().slice(0, 10) : null,
+        acquisitionSource: row.acquisitionSource,
+      });
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "sales.checkout.created",
+        resource: "CheckoutIntent",
+        resourceId: row.id,
+        details: { code: row.code, quoteCode: quote.code, total: String(quote.total) },
+      });
+      return row;
+    });
+    this.logger.log(`CheckoutIntent ${created.code} created for Quote ${quote.code} by ${actor.username}`);
+    return this.getCheckoutIntentDetail(created.code);
+  }
+
+  async listCheckoutIntents(query: CheckoutListQueryInput): Promise<SalesListResult<CheckoutIntentDto>> {
+    const { p, ps } = this.pagination(query.page, query.pageSize);
+    const where = buildCheckoutListWhere(query);
+    const orderBy = salesOrderBy(query.sort, query.order) as Prisma.CheckoutIntentOrderByWithRelationInput[];
+    const [items, total] = await Promise.all([
+      this.prisma.checkoutIntent.findMany({ where, orderBy, skip: (p - 1) * ps, take: ps }),
+      this.prisma.checkoutIntent.count({ where }),
+    ]);
+    // Batch quote meta (quoteCode + validity) — один запрос, без N+1.
+    const quoteIds = [...new Set(items.map((i) => i.quoteId))];
+    const quotes =
+      quoteIds.length > 0
+        ? await this.prisma.quote.findMany({ where: { id: { in: quoteIds } }, select: { id: true, code: true, validUntil: true } })
+        : [];
+    const quoteMap = new Map(quotes.map((q) => [q.id, q]));
+    return {
+      items: items.map((r) => this.toCheckoutIntentDto(r, this.checkoutQuoteMeta(quoteMap.get(r.quoteId) ?? null))),
+      total,
+      page: p,
+      pageSize: ps,
+      hasMore: p * ps < total,
+    };
+  }
+
+  async getCheckoutIntentByCode(code: string): Promise<CheckoutIntentDetailDto> {
+    return this.getCheckoutIntentDetail(code);
+  }
+
+  async checkoutIntentHistory(code: string, page = 1, pageSize = PAGE_SIZE_DEFAULT): Promise<SalesListResult<SalesHistoryItemDto>> {
+    const row = await this.prisma.checkoutIntent.findUnique({ where: { code }, select: { id: true } });
+    if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
+    return this.entityHistory("checkoutIntentHistory", row.id, page, pageSize);
+  }
+
+  /** Travelers: replace-all (как Quote travelers), CAS по version, без PII в history. */
+  async setCheckoutTravelers(
+    code: string,
+    travelers: Array<{ firstName: string; lastName: string; birthDate?: string | null }>,
+    expectedVersion: number,
+    actor: Actor,
+  ): Promise<CheckoutIntentDetailDto> {
+    const row = await this.prisma.checkoutIntent.findUnique({ where: { code } });
+    if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
+    this.assertCheckoutMutable(row);
+    this.assertTravelersValid(travelers);
+
+    await this.prisma.$transaction(async (tx) => {
+      const res = await tx.checkoutIntent.updateMany({
+        where: { id: row.id, version: expectedVersion },
+        data: { version: { increment: 1 } },
+      });
+      if (res.count === 0) throw new ConflictError(`CheckoutIntent ${code} was modified concurrently; retry`);
+      await tx.checkoutIntentTraveler.deleteMany({ where: { checkoutIntentId: row.id } });
+      if (travelers.length > 0) {
+        await tx.checkoutIntentTraveler.createMany({
+          data: travelers.map((t) => ({
+            checkoutIntentId: row.id,
+            firstName: t.firstName.trim(),
+            lastName: t.lastName.trim(),
+            birthDate: t.birthDate ? new Date(`${t.birthDate}T00:00:00.000Z`) : null,
+          })),
+        });
+      }
+      await this.writeHistory(tx, "checkoutIntentHistory", row.id, "travelers_changed", null, null, actor, {
+        count: travelers.length,
+      });
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "sales.checkout.travelers_changed",
+        resource: "CheckoutIntent",
+        resourceId: row.id,
+        details: { code: row.code, count: travelers.length },
+      });
+    });
+    return this.getCheckoutIntentDetail(code);
+  }
+
+  /** Service date: date-only (UTC midnight), НЕ в прошлом; availability пересчитывается. */
+  async setCheckoutServiceDate(code: string, serviceDate: string, expectedVersion: number, actor: Actor): Promise<CheckoutIntentDetailDto> {
+    const row = await this.prisma.checkoutIntent.findUnique({ where: { code } });
+    if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
+    this.assertCheckoutMutable(row);
+    const parsed = parseServiceDate(serviceDate);
+
+    await this.prisma.$transaction(async (tx) => {
+      const res = await tx.checkoutIntent.updateMany({
+        where: { id: row.id, version: expectedVersion },
+        data: { serviceDate: parsed, version: { increment: 1 } },
+      });
+      if (res.count === 0) throw new ConflictError(`CheckoutIntent ${code} was modified concurrently; retry`);
+      await this.writeHistory(tx, "checkoutIntentHistory", row.id, "service_date_changed", null, null, actor, {
+        serviceDate: parsed.toISOString().slice(0, 10),
+      });
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "sales.checkout.service_date_changed",
+        resource: "CheckoutIntent",
+        resourceId: row.id,
+        details: { code: row.code, serviceDate: parsed.toISOString().slice(0, 10) },
+      });
+    });
+    return this.getCheckoutIntentDetail(code);
+  }
+
+  /**
+   * Revalidate: свежая availability-проверка + честная quote validity (§46/§68).
+   * Цена НЕ пересчитывается (binding-price = frozen Quote; никакого reprice).
+   * CAS без изменения version (read-like): stale/cancelled intent → 409.
+   */
+  async revalidateCheckoutIntent(code: string, expectedVersion: number, actor: Actor): Promise<CheckoutIntentDetailDto> {
+    const row = await this.prisma.checkoutIntent.findUnique({ where: { code } });
+    if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
+    this.assertCheckoutMutable(row);
+    const availability = await this.availabilityFor(await this.checkoutQuoteItems(row.quoteId), row.serviceDate);
+
+    await this.prisma.$transaction(async (tx) => {
+      // CAS без изменения state: updateMany с пустым data берёт row lock и даёт
+      // count=0 при несовпадении version (409). Намеренно НЕ инкрементирует
+      // version — revalidate read-like: параллельные revalidate оба валидны и
+      // оба фиксируют свой availability-fact в history (semantics документированы).
+      const res = await tx.checkoutIntent.updateMany({ where: { id: row.id, version: expectedVersion }, data: {} });
+      if (res.count === 0) throw new ConflictError(`CheckoutIntent ${code} was modified concurrently; retry`);
+      await this.writeHistory(tx, "checkoutIntentHistory", row.id, "availability_checked", null, null, actor, {
+        state: availability.state,
+        level: aggregateAvailabilityLevel(availability.items),
+        itemCount: availability.items.length,
+      });
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "sales.checkout.revalidated",
+        resource: "CheckoutIntent",
+        resourceId: row.id,
+        details: { code: row.code, state: availability.state, level: aggregateAvailabilityLevel(availability.items) },
+      });
+    });
+    return this.getCheckoutIntentDetail(code);
+  }
+
+  /** Cancel: терминальный переход ACTIVE → CANCELLED (повтор → 422, детерминированно). */
+  async cancelCheckoutIntent(code: string, expectedVersion: number, actor: Actor): Promise<CheckoutIntentDetailDto> {
+    const row = await this.prisma.checkoutIntent.findUnique({ where: { code } });
+    if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
+    if (row.status !== CheckoutStatus.ACTIVE) {
+      throw new ValidationDomainError(`CheckoutIntent ${code} is already ${row.status}`);
+    }
+    const now = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      const res = await tx.checkoutIntent.updateMany({
+        where: { id: row.id, version: expectedVersion },
+        data: { status: CheckoutStatus.CANCELLED, cancelledAt: now, version: { increment: 1 } },
+      });
+      if (res.count === 0) throw new ConflictError(`CheckoutIntent ${code} was modified concurrently; retry`);
+      await this.writeHistory(tx, "checkoutIntentHistory", row.id, "cancelled", row.status, CheckoutStatus.CANCELLED, actor, {});
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "sales.checkout.cancelled",
+        resource: "CheckoutIntent",
+        resourceId: row.id,
+        details: { code: row.code, from: row.status, to: CheckoutStatus.CANCELLED },
+      });
+    });
+    return this.getCheckoutIntentDetail(code);
   }
 
   /* ── History (Step 2.2, entity-scoped immutable projection) ─────────────── */
@@ -874,14 +1148,22 @@ export class SalesService {
 
   /** Entity-scoped history read model (immutable, ordered asc, paginated). */
   private async entityHistory(
-    model: "leadHistory" | "opportunityHistory" | "quoteHistory" | "saleHistory",
+    model: "leadHistory" | "opportunityHistory" | "quoteHistory" | "saleHistory" | "checkoutIntentHistory",
     entityId: string,
     page: number,
     pageSize: number,
   ): Promise<SalesListResult<SalesHistoryItemDto>> {
     const { p, ps } = this.pagination(page, pageSize);
     const idField =
-      model === "leadHistory" ? "leadId" : model === "opportunityHistory" ? "opportunityId" : model === "quoteHistory" ? "quoteId" : "saleId";
+      model === "leadHistory"
+        ? "leadId"
+        : model === "opportunityHistory"
+          ? "opportunityId"
+          : model === "quoteHistory"
+            ? "quoteId"
+            : model === "saleHistory"
+              ? "saleId"
+              : "checkoutIntentId";
     const client = this.prisma as any;
     const [rows, total] = await Promise.all([
       client[model].findMany({ where: { [idField]: entityId }, orderBy: { createdAt: "asc" }, skip: (p - 1) * ps, take: ps }),
@@ -907,7 +1189,7 @@ export class SalesService {
   /** History (audit by default) — без PII и без полного sensitive snapshot. */
   private async writeHistory(
     tx: Prisma.TransactionClient,
-    model: "leadHistory" | "opportunityHistory" | "quoteHistory" | "saleHistory",
+    model: "leadHistory" | "opportunityHistory" | "quoteHistory" | "saleHistory" | "checkoutIntentHistory",
     entityId: string,
     action: string,
     from: string | null,
@@ -923,7 +1205,9 @@ export class SalesService {
             ? { opportunityId: entityId }
             : model === "quoteHistory"
               ? { quoteId: entityId }
-              : { saleId: entityId }),
+              : model === "saleHistory"
+                ? { saleId: entityId }
+                : { checkoutIntentId: entityId }),
         action,
         from,
         to,
@@ -1196,6 +1480,199 @@ export class SalesService {
     };
   }
 
+  /* ── Step 2.3A — Checkout internals ─────────────────────────────────────── */
+
+  /** Только ACTIVE intent мутабелен (cancelled — терминал). */
+  private assertCheckoutMutable(row: { status: CheckoutStatus; code: string }): void {
+    if (row.status !== CheckoutStatus.ACTIVE) {
+      throw new ValidationDomainError(`CheckoutIntent ${row.code} is ${row.status}`);
+    }
+  }
+
+  /** Traveler context (минимум, §20/§42): count ≤ 50, имена 1..100, birthDate date-only + не future. */
+  private assertTravelersValid(travelers: Array<{ firstName: string; lastName: string; birthDate?: string | null }>): void {
+    if (travelers.length > 50) throw new ValidationDomainError("Too many travelers (max 50)");
+    for (const t of travelers) {
+      if (t.firstName.trim().length === 0 || t.firstName.length > 100) throw new ValidationDomainError("firstName must be 1..100 chars");
+      if (t.lastName.trim().length === 0 || t.lastName.length > 100) throw new ValidationDomainError("lastName must be 1..100 chars");
+      if (t.birthDate && !isDateOnly(t.birthDate)) throw new ValidationDomainError("birthDate must be a calendar date (YYYY-MM-DD)");
+      if (t.birthDate && new Date(`${t.birthDate}T00:00:00.000Z`).getTime() > Date.now()) {
+        throw new ValidationDomainError("birthDate must not be in the future");
+      }
+    }
+  }
+
+  /** Quote meta для проекции: code + честная validity (frozen price, staleness). */
+  private checkoutQuoteMeta(quote: { code: string; validUntil: Date | null } | null): {
+    quoteCode: string;
+    quoteValidUntil: Date | null;
+    quoteExpired: boolean;
+    priceAuthoritative: boolean;
+  } {
+    if (!quote) return { quoteCode: "", quoteValidUntil: null, quoteExpired: true, priceAuthoritative: false };
+    return { quoteCode: quote.code, quoteValidUntil: quote.validUntil, ...quoteExpiry(quote.validUntil) };
+  }
+
+  private async checkoutQuoteItems(quoteId: string): Promise<
+    Array<{ id: string; productId: string; productCode: string; productTitle: string; tariffId: string; tariffCode: string; quantity: number }>
+  > {
+    return this.prisma.quoteItem.findMany({
+      where: { quoteId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        productId: true,
+        productCode: true,
+        productTitle: true,
+        tariffId: true,
+        tariffCode: true,
+        quantity: true,
+      },
+    });
+  }
+
+  /**
+   * Availability read-model (read-only, "checked, not reserved"): по каждому
+   * quote item (productId, tariffId, serviceDate) — фактические catalog.Availability
+   * счётчики; capacity НЕ резервируется и НЕ пишется (ADR-0001). Без serviceDate —
+   * честный NOT_SPECIFIED. Один batched findMany (unique index) — без N+1.
+   */
+  private async availabilityFor(
+    items: Array<{ id: string; productId: string; productCode: string; productTitle: string; tariffId: string; tariffCode: string; quantity: number }>,
+    serviceDate: Date | null,
+  ): Promise<CheckoutIntentAvailabilityDto> {
+    if (!serviceDate) {
+      return { state: "NOT_SPECIFIED", checkedAt: null, semantics: CHECKOUT_AVAILABILITY_SEMANTICS, items: [] };
+    }
+    // Guard: пустой OR не должен молча матчить всё (ISSUE требует >=1 item, но
+    // хелпер должен оставаться безопасным при повторном использовании).
+    const rows = await this.prisma.availability.findMany({
+      where: { date: serviceDate, ...(items.length > 0 ? { OR: items.map((i) => ({ productId: i.productId, tariffId: i.tariffId })) } : {}) },
+      select: { productId: true, tariffId: true, slotsTotal: true, slotsBooked: true, slotsReserved: true },
+    });
+    const byKey = new Map(rows.map((r) => [`${r.productId}:${r.tariffId}`, r]));
+    const itemDtos = items.map((i) => {
+      const row = byKey.get(`${i.productId}:${i.tariffId}`) ?? null;
+      const cls = classifyAvailability(i.quantity, row);
+      return {
+        itemId: i.id,
+        productId: i.productId,
+        productCode: i.productCode,
+        productTitle: i.productTitle,
+        tariffId: i.tariffId,
+        tariffCode: i.tariffCode,
+        quantity: i.quantity,
+        required: i.quantity,
+        slotsTotal: row?.slotsTotal ?? null,
+        slotsBooked: row?.slotsBooked ?? null,
+        slotsReserved: row?.slotsReserved ?? null,
+        availableSlots: cls.availableSlots,
+        level: cls.level,
+      };
+    });
+    return { state: "CHECKED_NOT_RESERVED", checkedAt: isoUtc(new Date()), semantics: CHECKOUT_AVAILABILITY_SEMANTICS, items: itemDtos };
+  }
+
+  /** Детальная проекция (travelers + свежая availability + quote validity). */
+  private async getCheckoutIntentDetail(code: string): Promise<CheckoutIntentDetailDto> {
+    const row = await this.prisma.checkoutIntent.findUnique({
+      where: { code },
+      include: { travelers: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+    });
+    if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
+    const quote = await this.prisma.quote.findUnique({
+      where: { id: row.quoteId },
+      select: { code: true, validUntil: true },
+    });
+    if (!quote) throw new NotFoundError(`Quote for CheckoutIntent ${code} not found`); // defensive (Restrict FK)
+    const items = await this.checkoutQuoteItems(row.quoteId);
+    const availability = await this.availabilityFor(items, row.serviceDate);
+    return this.toCheckoutIntentDetailDto(row, this.checkoutQuoteMeta(quote), availability);
+  }
+
+  private toCheckoutIntentDto(
+    row: {
+      id: string;
+      code: string;
+      customerId: string | null;
+      status: CheckoutStatus;
+      version: number;
+      currency: string;
+      subtotal: Prisma.Decimal;
+      discountType: QuoteDiscountType;
+      discountValue: Prisma.Decimal | null;
+      discountAmount: Prisma.Decimal | null;
+      total: Prisma.Decimal;
+      serviceDate: Date | null;
+      acquisitionSource: SalesAcquisitionSource;
+      cancelledAt: Date | null;
+      createdById: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    },
+    meta: { quoteCode: string; quoteValidUntil: Date | null; quoteExpired: boolean; priceAuthoritative: boolean },
+  ): CheckoutIntentDto {
+    return {
+      id: row.id,
+      code: row.code,
+      quoteCode: meta.quoteCode,
+      customerId: row.customerId,
+      status: row.status,
+      version: row.version,
+      currency: row.currency,
+      subtotal: String(row.subtotal),
+      discountType: row.discountType,
+      discountValue: row.discountValue ? String(row.discountValue) : null,
+      discountAmount: row.discountAmount ? String(row.discountAmount) : null,
+      total: String(row.total),
+      serviceDate: row.serviceDate ? row.serviceDate.toISOString().slice(0, 10) : null,
+      acquisitionSource: row.acquisitionSource,
+      cancelledAt: row.cancelledAt ? isoUtc(row.cancelledAt) : null,
+      createdById: row.createdById,
+      createdAt: isoUtc(row.createdAt),
+      updatedAt: isoUtc(row.updatedAt),
+      quoteValidUntil: meta.quoteValidUntil ? isoUtc(meta.quoteValidUntil) : null,
+      quoteExpired: meta.quoteExpired,
+      priceAuthoritative: meta.priceAuthoritative,
+    };
+  }
+
+  private toCheckoutIntentDetailDto(
+    row: {
+      id: string;
+      code: string;
+      customerId: string | null;
+      status: CheckoutStatus;
+      version: number;
+      currency: string;
+      subtotal: Prisma.Decimal;
+      discountType: QuoteDiscountType;
+      discountValue: Prisma.Decimal | null;
+      discountAmount: Prisma.Decimal | null;
+      total: Prisma.Decimal;
+      serviceDate: Date | null;
+      acquisitionSource: SalesAcquisitionSource;
+      cancelledAt: Date | null;
+      createdById: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      travelers: Array<{ id: string; firstName: string; lastName: string; birthDate: Date | null }>;
+    },
+    meta: { quoteCode: string; quoteValidUntil: Date | null; quoteExpired: boolean; priceAuthoritative: boolean },
+    availability: CheckoutIntentAvailabilityDto,
+  ): CheckoutIntentDetailDto {
+    return {
+      ...this.toCheckoutIntentDto(row, meta),
+      travelers: row.travelers.map((t) => ({
+        id: t.id,
+        firstName: t.firstName,
+        lastName: t.lastName,
+        birthDate: t.birthDate ? isoUtc(t.birthDate) : null,
+      })),
+      availability,
+    };
+  }
+
   private toSaleDto(row: {
     id: string;
     code: string;
@@ -1224,14 +1701,20 @@ export class SalesService {
 }
 
 /**
- * Календарная дата YYYY-MM-DD (без time-компонента/timezone). Используется для
- * birthDate: исключает timezone day-shift (Prisma DateTime хранит UTC instant),
- * а также невалидные календарные даты (2023-02-30 и т.п.).
+ * Честная семантика availability в каждом ответе (read-only, §15): никакого
+ * "available=true" без documented semantics; reservation/locking — Step 2.4.
  */
-function isDateOnly(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const d = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+const CHECKOUT_AVAILABILITY_SEMANTICS =
+  "checked, not reserved — read-only capacity snapshot; no capacity hold (reservation/locking owner is the Order/Booking boundary, Step 2.4)";
+
+/**
+ * Агрегированный level для history/audit (без PII): UNAVAILABLE, если хоть один
+ * item недоступен; иначе AVAILABLE если все; иначе NOT_CONFIGURED.
+ */
+function aggregateAvailabilityLevel(items: Array<{ level: "AVAILABLE" | "UNAVAILABLE" | "NOT_CONFIGURED" }>): string {
+  if (items.some((i) => i.level === "UNAVAILABLE")) return "UNAVAILABLE";
+  if (items.length > 0 && items.every((i) => i.level === "AVAILABLE")) return "AVAILABLE";
+  return "NOT_CONFIGURED";
 }
 
 /** Статус-счётчики groupBy → Record<status, count> с zero-fill по всем enum-значениям. */

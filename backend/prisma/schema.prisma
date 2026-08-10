@@ -1803,10 +1803,12 @@ model Quote {
   /// Итог = subtotal - discountAmount (>= 0). Персистится при ISSUE (immutable).
   total Decimal? @db.Decimal(12, 2)
 
-  sale      Sale?
-  history   QuoteHistory[]
-  items     QuoteItem[]
-  travelers QuoteTraveler[]
+  sale            Sale?
+  history         QuoteHistory[]
+  items           QuoteItem[]
+  travelers       QuoteTraveler[]
+  /// Step 2.3A: коммерческие intents, производные от ISSUED Quote.
+  checkoutIntents CheckoutIntent[]
 
   @@index([status])
   @@index([opportunityId])
@@ -1939,5 +1941,126 @@ model SaleHistory {
   createdAt DateTime @default(now())
 
   @@index([saleId])
+  @@schema("sales")
+}
+
+// ─────────────────────── sales.* — Step 2.3A Checkout ───────────────────────
+// Checkout / Commercial Intent Foundation (Step 2.3A, см. docs/architecture/
+// checkout-commercial-intent.md). Владелец — Sales (sales.*, ADR-0001):
+// НЕ новый bounded context и НЕ Order pre-state.
+//
+// Инварианты:
+//  - CheckoutIntent создаётся ТОЛЬКО из ISSUED Quote (binding-price: frozen
+//    Quote totals, БЕЗ reprice от Catalog — один price authority §9);
+//  - frontend НЕ источник цены: money-поля server-copied из Quote и immutable;
+//  - availability — read-only "checked, not reserved": Sales НЕ пишет
+//    catalog.Availability (ADR-0001); reservation/locking owner — Order/Booking
+//    boundary (Step 2.4), здесь только честный read-model (§12–§15, DD-022);
+//  - acquisitionSource — server-derived (internal-assisted = DIRECT), immutable;
+//  - options — НЕ введены (каноническая catalog options модель отсутствует,
+//    DD-023; запрещено invent arbitrary JSON options §21);
+//  - payment terms — НЕ введены (Step 2.3B); Sale completion/OrderRequested —
+//    Step 2.4 (здесь отсутствуют);
+//  - serviceDate — date-only (YYYY-MM-DD → UTC midnight); time-slot/timezone —
+//    Step 2.8A (IANA timezone), не симулируется.
+
+/// Lifecycle CheckoutIntent (2.3A foundation): ACTIVE → CANCELLED.
+/// БЕЗ PAID/COMPLETED/ORDERED/BOOKED/FULFILLED (Step 2.4+, §32).
+enum CheckoutStatus {
+  ACTIVE
+  CANCELLED
+
+  @@schema("sales")
+}
+
+/// Канонические acquisition source values (Step 2.5B): MARKETPLACE /
+/// PARTNER_STOREFRONT / DIRECT (internal/manual). Schema-local enum (Prisma
+/// multiSchema запрещает cross-schema enum ref); расширяется в 2.5B.
+enum SalesAcquisitionSource {
+  MARKETPLACE
+  PARTNER_STOREFRONT
+  DIRECT
+
+  @@schema("sales")
+}
+
+/// Authoritative checkout/commercial-intent context (Step 2.3A).
+model CheckoutIntent {
+  id          String   @id @default(uuid())
+  code        String   @unique // CKT-00000001 (IdsService, атомарный счётчик)
+  /// ISSUED Quote (обязателен): binding-price источник. Restrict — Quote с
+  /// привязанным intent не удаляется.
+  quoteId     String
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  /// crm.Customer ref (без FK). По умолчанию наследуется из Quote; staff может
+  /// задать при создании (server валидирует existence). Scope фиксирован после
+  /// создания (нет customer-мутации).
+  customerId  String?
+  status      CheckoutStatus @default(ACTIVE)
+  version     Int      @default(1)
+
+  // ── Frozen commercial snapshot (server-copied из issued Quote, immutable) ──
+  /// Единая валюта (из Quote; frontend не передаёт).
+  currency     String
+  /// Итог строк (без скидки) — Quote.subtotal (frozen).
+  subtotal     Decimal  @db.Decimal(12, 2)
+  discountType QuoteDiscountType @default(NONE)
+  discountValue Decimal? @db.Decimal(12, 2)
+  discountAmount Decimal? @db.Decimal(12, 2)
+  /// Итог = subtotal - discountAmount (frozen; НЕ paid amount — §49).
+  total        Decimal  @db.Decimal(12, 2)
+
+  // ── Service context ──
+  /// Дата услуги: date-only (YYYY-MM-DD → UTC midnight). Time/timezone — 2.8A.
+  serviceDate  DateTime?
+  /// Server-derived acquisition source (internal-assisted = DIRECT), immutable.
+  acquisitionSource SalesAcquisitionSource @default(DIRECT)
+
+  cancelledAt  DateTime?
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  travelers CheckoutIntentTraveler[]
+  history   CheckoutIntentHistory[]
+
+  @@index([status])
+  @@index([quoteId])
+  @@index([customerId])
+  @@index([status, createdAt])
+  @@schema("sales")
+}
+
+/// Traveler контекст intent (минимум: имя + опциональная дата рождения;
+/// наследуется из QuoteTraveler при создании, редактируем отдельной командой).
+/// Без passport/document/payment данных (privacy §42).
+model CheckoutIntentTraveler {
+  id               String         @id @default(uuid())
+  checkoutIntentId String
+  checkoutIntent   CheckoutIntent @relation(fields: [checkoutIntentId], references: [id], onDelete: Cascade)
+  firstName        String
+  lastName         String
+  birthDate        DateTime?
+  createdAt        DateTime       @default(now())
+
+  @@index([checkoutIntentId])
+  @@schema("sales")
+}
+
+/// Журнал CheckoutIntent (audit by default, без PII/raw body).
+model CheckoutIntentHistory {
+  id               String         @id @default(uuid())
+  checkoutIntentId String
+  checkoutIntent   CheckoutIntent @relation(fields: [checkoutIntentId], references: [id], onDelete: Cascade)
+  action           String
+  from             String?
+  to               String?
+  fields           Json?
+  actorId          String?
+  actorName        String?
+  comment          String?
+  createdAt        DateTime       @default(now())
+
+  @@index([checkoutIntentId])
   @@schema("sales")
 }

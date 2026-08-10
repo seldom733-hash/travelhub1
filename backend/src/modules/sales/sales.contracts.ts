@@ -4,7 +4,14 @@
  * BUYER/PARTNER не имеют sales-прав (403); PII не копируется в Sales.
  */
 
-import type { LeadStatus, OpportunityStatus, QuoteStatus, SaleStatus } from "../../generated/prisma/enums";
+import type {
+  CheckoutStatus,
+  LeadStatus,
+  OpportunityStatus,
+  QuoteStatus,
+  SalesAcquisitionSource,
+  SaleStatus,
+} from "../../generated/prisma/enums";
 
 export interface SalesEntityDto {
   id: string;
@@ -92,6 +99,66 @@ export interface SalesListResult<T> {
   page: number;
   pageSize: number;
   hasMore: boolean;
+}
+
+/** Step 2.3A: traveler контекст checkout intent (минимум, без PII-расширения). */
+export interface CheckoutIntentTravelerDto {
+  id: string;
+  firstName: string;
+  lastName: string;
+  birthDate: string | null;
+}
+
+/** Step 2.3A: availability per quote item (read-only "checked, not reserved"). */
+export interface CheckoutAvailabilityItemDto {
+  itemId: string;
+  productId: string;
+  productCode: string;
+  productTitle: string;
+  tariffId: string;
+  tariffCode: string;
+  quantity: number;
+  required: number;
+  slotsTotal: number | null;
+  slotsBooked: number | null;
+  slotsReserved: number | null;
+  availableSlots: number | null;
+  level: "AVAILABLE" | "UNAVAILABLE" | "NOT_CONFIGURED";
+}
+
+/** Step 2.3A: честный availability read-model (НЕ reservation). */
+export interface CheckoutIntentAvailabilityDto {
+  state: "CHECKED_NOT_RESERVED" | "NOT_SPECIFIED";
+  checkedAt: string | null;
+  semantics: string;
+  items: CheckoutAvailabilityItemDto[];
+}
+
+/** Step 2.3A: CheckoutIntent projection (whitelist, frozen commercial snapshot). */
+export interface CheckoutIntentDto extends SalesEntityDto {
+  quoteCode: string;
+  customerId: string | null;
+  status: CheckoutStatus;
+  acquisitionSource: SalesAcquisitionSource;
+  currency: string;
+  subtotal: string;
+  discountType: string;
+  discountValue: string | null;
+  discountAmount: string | null;
+  total: string;
+  serviceDate: string | null;
+  cancelledAt: string | null;
+  createdById: string | null;
+  // Quote validity (server-side, честная staleness — §46/§68).
+  quoteValidUntil: string | null;
+  quoteExpired: boolean;
+  priceAuthoritative: boolean;
+}
+
+/** Step 2.3A: детальная проекция (включая travelers + свежий availability). */
+export interface CheckoutIntentDetailDto extends CheckoutIntentDto {
+  travelers: CheckoutIntentTravelerDto[];
+  availability: CheckoutIntentAvailabilityDto;
 }
 
 /** History projection (immutable, entity-scoped, paginated). */
