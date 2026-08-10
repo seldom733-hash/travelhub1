@@ -8,6 +8,8 @@ import type {
   CheckoutStatus,
   LeadStatus,
   OpportunityStatus,
+  PaymentPrepaymentType,
+  PaymentScheme,
   QuoteStatus,
   SalesAcquisitionSource,
   SaleStatus,
@@ -134,6 +136,15 @@ export interface CheckoutIntentAvailabilityDto {
   items: CheckoutAvailabilityItemDto[];
 }
 
+/** Step 2.3B: payment terms projection (whitelist; NULL = not selected). */
+export interface PaymentTermsDto {
+  scheme: PaymentScheme;
+  prepaymentType: PaymentPrepaymentType | null;
+  prepaymentValue: string | null;
+  initialAmount: string;
+  remainingAmount: string;
+}
+
 /** Step 2.3A: CheckoutIntent projection (whitelist, frozen commercial snapshot). */
 export interface CheckoutIntentDto extends SalesEntityDto {
   quoteCode: string;
@@ -149,6 +160,9 @@ export interface CheckoutIntentDto extends SalesEntityDto {
   serviceDate: string | null;
   cancelledAt: string | null;
   createdById: string | null;
+  // Step 2.3B: коммерческие условия оплаты (server-derived). NULL = not selected
+  // (никакой подразумеваемой схемы; existing rows без backfill).
+  paymentTerms: PaymentTermsDto | null;
   // Quote validity (server-side, честная staleness — §46/§68).
   quoteValidUntil: string | null;
   quoteExpired: boolean;

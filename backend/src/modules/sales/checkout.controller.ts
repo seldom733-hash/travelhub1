@@ -14,6 +14,7 @@ import {
   MinLength,
   ValidateNested,
 } from "class-validator";
+import { PaymentPrepaymentType, PaymentScheme } from "../../generated/prisma/enums";
 import { Type } from "class-transformer";
 import { Request } from "express";
 import { SalesService } from "./sales.service";
@@ -30,6 +31,7 @@ import {
   CHECKOUT_SERVICE_DATE_FORBIDDEN_KEYS,
   CHECKOUT_TRAVELER_ITEM_FORBIDDEN_KEYS,
   CHECKOUT_TRAVELERS_FORBIDDEN_KEYS,
+  PAYMENT_TERMS_FORBIDDEN_KEYS,
 } from "./sales.validation";
 import { SALES_SORT_FIELDS } from "./sales.filters";
 
@@ -100,6 +102,26 @@ class SetCheckoutServiceDateDto {
 
 /** Revalidate/cancel: только expectedVersion (CAS). */
 class CheckoutVersionDto {
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+}
+
+/** Step 2.3B: payment terms — только user-selectable scheme-параметры + CAS.
+ *  Derived amounts (initial/remaining) server-computed из frozen total. */
+class SetPaymentTermsDto {
+  @IsEnum(PaymentScheme)
+  scheme!: PaymentScheme;
+
+  @IsOptional()
+  @IsEnum(PaymentPrepaymentType)
+  prepaymentType?: PaymentPrepaymentType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  prepaymentValue?: string;
+
   @IsInt()
   @Min(1)
   expectedVersion!: number;
@@ -263,5 +285,22 @@ export class CheckoutController {
   ) {
     assertNoForbiddenKeys(req.body, CHECKOUT_CANCEL_FORBIDDEN_KEYS);
     return this.sales.cancelCheckoutIntent(code, dto.expectedVersion, { id: actor.id, username: actor.username });
+  }
+
+  @Put(":code/payment-terms")
+  @RequirePermissions("sales.checkout.write")
+  updatePaymentTerms(
+    @Param("code") code: string,
+    @Body() dto: SetPaymentTermsDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Req() req: Request,
+  ) {
+    assertNoForbiddenKeys(req.body, PAYMENT_TERMS_FORBIDDEN_KEYS);
+    return this.sales.setCheckoutPaymentTerms(
+      code,
+      { scheme: dto.scheme, prepaymentType: dto.prepaymentType ?? null, prepaymentValue: dto.prepaymentValue ?? null },
+      dto.expectedVersion,
+      { id: actor.id, username: actor.username },
+    );
   }
 }

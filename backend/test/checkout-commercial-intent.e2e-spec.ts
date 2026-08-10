@@ -19,8 +19,10 @@
  * 11.  cancel: терминал (повторный cancel → 422), мутации после cancel → 422;
  * 12.  history/audit: created → travelers_changed → service_date_changed →
  *      availability_checked → cancelled; без PII; audit entries;
- * 13.  изоляция: Order/Booking/Payment не создаются; outbox без OrderRequested;
- *      Sale остаётся OPEN (не completed);
+ * 13.  изоляция: Order/Booking/Payment не создаются; outbox без OrderRequested
+ *      (дельта); Sale остаётся OPEN (не completed);
+ * 13b. CKT canonical ID: 20 параллельных create → 20 уникальных кодов
+ *      (BusinessSequence atomic, §6/§36.1);
  * 14.  privacy + error model: без email/phone/requestId в entity responses;
  *      404/409/422 с requestId и без stack/Prisma SQL.
  */
@@ -666,6 +668,12 @@ describe("Phase 2 Step 2.3A — Checkout / Commercial Intent Foundation (e2e)", 
 
     const ordersBefore = await prisma.order.count();
     const bookingsBefore = await prisma.booking.count();
+    // Shared-DB isolation (serial e2e): дельта ДО создания intent — checkout не
+    // создаёт НОВЫХ OrderRequested/OrderCreated/BookingRequested/BookingCreated-
+    // строк (не global zero; чужие спеки чистят свои outbox-строки, но порядок
+    // readdir на Windows не гарантирован). BookingCreated включён для консистент-
+    // ности с quote-спекой (child событие с aggregateId=bookingId).
+    const outboxBefore = await prisma.outboxEvent.count({ where: { eventType: { in: ["OrderRequested", "OrderCreated", "BookingRequested", "BookingCreated"] } } });
 
     const intent = (await createIntent(sm.accessToken, { quoteId: quote.id, serviceDate: futureDate() }).expect(201)).body as { id: string; code: string; version: number };
     created.checkouts.push(intent.id);
@@ -681,8 +689,24 @@ describe("Phase 2 Step 2.3A — Checkout / Commercial Intent Foundation (e2e)", 
     expect(await prisma.order.count()).toBe(ordersBefore);
     expect(await prisma.booking.count()).toBe(bookingsBefore);
     // Никаких Payment/Finance side effects (модели payment отсутствуют — см. schema).
-    const outbox = await prisma.outboxEvent.findMany({ where: { eventType: { in: ["OrderRequested", "OrderCreated", "BookingRequested"] } } });
-    expect(outbox.length).toBe(0);
+    const outboxAfter = await prisma.outboxEvent.count({ where: { eventType: { in: ["OrderRequested", "OrderCreated", "BookingRequested", "BookingCreated"] } } });
+    expect(outboxAfter).toBe(outboxBefore);
+  });
+
+  // ── 13b. CKT canonical ID concurrency (§6/§36.1) ───────────────────────────
+
+  it("13b. CKT: 20 параллельных create → 20 уникальных кодов (BusinessSequence atomic)", async () => {
+    const sm = await createStaff("ck_conc", RoleCode.SALES_MANAGER);
+    const fx = await createProduct("conc", 200);
+    const quote = await issueQuote(sm.accessToken, fx);
+
+    const responses = await Promise.all(
+      Array.from({ length: 20 }, () => createIntent(sm.accessToken, { quoteId: quote.id }).expect(201)),
+    );
+    const codes = responses.map((r) => String((r.body as { code: string }).code));
+    expect(new Set(codes).size).toBe(20);
+    for (const c of codes) expect(c).toMatch(/^CKT-\d{8}$/);
+    for (const r of responses) created.checkouts.push(String((r.body as { id: string }).id));
   });
 
   // ── 14. Privacy + error model ─────────────────────────────────────────────

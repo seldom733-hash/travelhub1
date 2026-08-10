@@ -9,6 +9,7 @@ import {
   CheckoutStatus,
   LeadStatus,
   OpportunityStatus,
+  PaymentScheme,
   ProductStatus,
   QuoteDiscountType,
   QuoteStatus,
@@ -23,6 +24,7 @@ import {
   assertQuoteTransition,
 } from "./sales.validation";
 import { classifyAvailability, isDateOnly, parseServiceDate, quoteExpiry } from "./sales.checkout";
+import { computePaymentTerms } from "./sales.payment-terms";
 import {
   discountAmountOf,
   lineAmount,
@@ -50,6 +52,7 @@ import type {
   CheckoutIntentAvailabilityDto,
   CheckoutIntentDetailDto,
   CheckoutIntentDto,
+  PaymentTermsDto,
   SaleDto,
   SalesHistoryItemDto,
   SalesKpiDto,
@@ -945,6 +948,64 @@ export class SalesService {
     return this.getCheckoutIntentDetail(code);
   }
 
+  /**
+   * Step 2.3B: set payment terms (authoritative commercial conditions).
+   * Server-derived amounts из frozen Checkout total (НЕ frontend, НЕ Catalog
+   * reprice). CAS по expectedVersion; ACTIVE only (CANCELLED → 422); history +
+   * audit без PII. Payment Terms НЕ Payment/PSP и не меняют Checkout total.
+   */
+  async setCheckoutPaymentTerms(
+    code: string,
+    input: {
+      scheme: PaymentScheme;
+      prepaymentType?: "PERCENTAGE" | "FIXED" | null;
+      prepaymentValue?: string | null;
+    },
+    expectedVersion: number,
+    actor: Actor,
+  ): Promise<CheckoutIntentDetailDto> {
+    const row = await this.prisma.checkoutIntent.findUnique({ where: { code } });
+    if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
+    this.assertCheckoutMutable(row);
+    // Money authority: frozen Checkout total (binding price). Payment terms НЕ
+    // меняют total и НЕ читают текущую Catalog/Tariff цену (§12).
+    const computed = computePaymentTerms(row.total, {
+      scheme: input.scheme,
+      prepaymentType: input.prepaymentType ?? null,
+      prepaymentValue: input.prepaymentValue ?? null,
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      const res = await tx.checkoutIntent.updateMany({
+        where: { id: row.id, version: expectedVersion },
+        data: {
+          paymentScheme: computed.scheme,
+          prepaymentType: computed.prepaymentType,
+          prepaymentValue: computed.prepaymentValue,
+          initialAmount: computed.initialAmount,
+          remainingAmount: computed.remainingAmount,
+          version: { increment: 1 },
+        },
+      });
+      if (res.count === 0) throw new ConflictError(`CheckoutIntent ${code} was modified concurrently; retry`);
+      await this.writeHistory(tx, "checkoutIntentHistory", row.id, "payment_terms_changed", row.paymentScheme, computed.scheme, actor, {
+        scheme: computed.scheme,
+        prepaymentType: computed.prepaymentType ?? null,
+        initialAmount: String(computed.initialAmount),
+        remainingAmount: String(computed.remainingAmount),
+      });
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "sales.checkout.payment_terms_changed",
+        resource: "CheckoutIntent",
+        resourceId: row.id,
+        details: { code: row.code, from: row.paymentScheme ?? null, to: computed.scheme },
+      });
+    });
+    return this.getCheckoutIntentDetail(code);
+  }
+
   /* ── History (Step 2.2, entity-scoped immutable projection) ─────────────── */
 
   async leadHistory(code: string, page = 1, pageSize = PAGE_SIZE_DEFAULT): Promise<SalesListResult<SalesHistoryItemDto>> {
@@ -1605,6 +1666,11 @@ export class SalesService {
       total: Prisma.Decimal;
       serviceDate: Date | null;
       acquisitionSource: SalesAcquisitionSource;
+      paymentScheme: PaymentScheme | null;
+      prepaymentType: "PERCENTAGE" | "FIXED" | null;
+      prepaymentValue: Prisma.Decimal | null;
+      initialAmount: Prisma.Decimal | null;
+      remainingAmount: Prisma.Decimal | null;
       cancelledAt: Date | null;
       createdById: string | null;
       createdAt: Date;
@@ -1631,9 +1697,28 @@ export class SalesService {
       createdById: row.createdById,
       createdAt: isoUtc(row.createdAt),
       updatedAt: isoUtc(row.updatedAt),
+      paymentTerms: this.toPaymentTermsDto(row),
       quoteValidUntil: meta.quoteValidUntil ? isoUtc(meta.quoteValidUntil) : null,
       quoteExpired: meta.quoteExpired,
       priceAuthoritative: meta.priceAuthoritative,
+    };
+  }
+
+  /** Step 2.3B: payment terms projection. NULL = not selected (честно, без fake zero schedule). */
+  private toPaymentTermsDto(row: {
+    paymentScheme: PaymentScheme | null;
+    prepaymentType: "PERCENTAGE" | "FIXED" | null;
+    prepaymentValue: Prisma.Decimal | null;
+    initialAmount: Prisma.Decimal | null;
+    remainingAmount: Prisma.Decimal | null;
+  }): PaymentTermsDto | null {
+    if (!row.paymentScheme || row.initialAmount === null || row.remainingAmount === null) return null;
+    return {
+      scheme: row.paymentScheme,
+      prepaymentType: row.prepaymentType,
+      prepaymentValue: row.prepaymentValue ? String(row.prepaymentValue) : null,
+      initialAmount: String(row.initialAmount),
+      remainingAmount: String(row.remainingAmount),
     };
   }
 
@@ -1652,6 +1737,11 @@ export class SalesService {
       total: Prisma.Decimal;
       serviceDate: Date | null;
       acquisitionSource: SalesAcquisitionSource;
+      paymentScheme: PaymentScheme | null;
+      prepaymentType: "PERCENTAGE" | "FIXED" | null;
+      prepaymentValue: Prisma.Decimal | null;
+      initialAmount: Prisma.Decimal | null;
+      remainingAmount: Prisma.Decimal | null;
       cancelledAt: Date | null;
       createdById: string | null;
       createdAt: Date;

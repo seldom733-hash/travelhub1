@@ -153,7 +153,13 @@ describe("Phase 1 Step 1.11 — SellerProfileRepair (explicit, no startup backfi
     expect(createdAudits.length).toBeGreaterThanOrEqual(1);
     expect(createdAudits[0].username).toBe("seller-profile-repair");
 
-    const summary = await prisma.auditLog.findMany({ where: { action: "seller_profile.repair" } });
+    // orderBy createdAt: findMany без orderBy возвращает строки в недетерминированном
+    // порядке (id = случайный UUID) — в shared-DB прогоне это flaky. Берём ПОСЛЕДНЮЮ
+    // по времени запись (итог последнего repair), как и задумано assertion-ом.
+    const summary = await prisma.auditLog.findMany({
+      where: { action: "seller_profile.repair" },
+      orderBy: { createdAt: "asc" },
+    });
     expect(summary.length).toBeGreaterThanOrEqual(1);
     expect((summary[summary.length - 1].details as { scanned: number }).scanned).toBeGreaterThanOrEqual(3);
 

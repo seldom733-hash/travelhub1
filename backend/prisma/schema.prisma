@@ -1984,6 +1984,36 @@ enum SalesAcquisitionSource {
   @@schema("sales")
 }
 
+/// Канонические payment schemes (Step 2.3B, Roadmap v3). Описывают ОБЯЗАТЕЛЬСТВО
+/// покупателя и график/условия оплаты, НЕ Payment/PSP/authorization/capture.
+/// Due semantics несёт сам enum (BEFORE_SERVICE / AT_SERVICE) — без fake
+/// due timestamp (time-model — 2.8A; due-date/reminders — 2.12F/Finance).
+enum PaymentScheme {
+  /// Вся сумма к оплате сейчас; remaining = 0. Без параметров.
+  FULL_PREPAYMENT
+  /// Предоплата (PERCENTAGE|FIXED) сейчас, строго 0 < initial < total;
+  /// остаток — до оказания услуги (BEFORE_SERVICE).
+  PARTIAL_PREPAYMENT
+  /// Задаток (PERCENTAGE|FIXED), ЧАСТЬ total (Roadmap 2.12F: «Deposit, 30/70»);
+  /// remaining = total - initial — при оказании услуги (AT_SERVICE).
+  DEPOSIT
+  /// 0 сейчас, вся сумма до оказания услуги (BEFORE_SERVICE).
+  PAY_LATER
+  /// 0 сейчас, вся сумма при оказании услуги (AT_SERVICE; отличим от PAY_LATER).
+  PAY_AT_SERVICE
+
+  @@schema("sales")
+}
+
+/// Как задаётся prepayment для PARTIAL_PREPAYMENT / DEPOSIT (дискриминированный
+/// контракт: тип НЕ угадывается по значению).
+enum PaymentPrepaymentType {
+  PERCENTAGE
+  FIXED
+
+  @@schema("sales")
+}
+
 /// Authoritative checkout/commercial-intent context (Step 2.3A).
 model CheckoutIntent {
   id          String   @id @default(uuid())
@@ -2009,6 +2039,24 @@ model CheckoutIntent {
   discountAmount Decimal? @db.Decimal(12, 2)
   /// Итог = subtotal - discountAmount (frozen; НЕ paid amount — §49).
   total        Decimal  @db.Decimal(12, 2)
+
+  // ── Step 2.3B — Payment Terms (коммерческие условия, server-derived) ──
+  /// Выбранная схема оплаты. NULL = payment terms not selected (честно, НЕ
+  /// подразумевается дефолтная схема; никакого backfill для existing rows).
+  paymentScheme  PaymentScheme?
+  /// PERCENTAGE|FIXED — как задан prepayment (PARTIAL/DEPOSIT); NULL для схем
+  /// без параметра (FULL/PAY_LATER/PAY_AT_SERVICE). Discriminated, не по значению.
+  prepaymentType PaymentPrepaymentType?
+  /// PERCENTAGE: 0 < p < 100; FIXED: 0 < v < total (валюта Checkout).
+  /// NULL для схем без параметра.
+  prepaymentValue Decimal? @db.Decimal(12, 2)
+  /// Server-derived: сколько покупатель платит сейчас (в валюте Checkout).
+  /// FULL → total; PARTIAL/DEPOSIT → вычислено (round_half_up);
+  /// PAY_LATER/PAY_AT_SERVICE → 0. Frontend НЕ передаёт.
+  initialAmount    Decimal? @db.Decimal(12, 2)
+  /// Server-derived: total - initialAmount (для всех схем, где prepayment —
+  /// часть total). Инвариант: initialAmount + remainingAmount == total.
+  remainingAmount  Decimal? @db.Decimal(12, 2)
 
   // ── Service context ──
   /// Дата услуги: date-only (YYYY-MM-DD → UTC midnight). Time/timezone — 2.8A.
