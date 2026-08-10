@@ -30,6 +30,7 @@ import {
   SaleStatus,
 } from "../../generated/prisma/enums";
 import {
+  SALE_COMPLETE_FORBIDDEN_KEYS,
   SALES_ASSIGN_FORBIDDEN_KEYS,
   SALES_CREATE_FORBIDDEN_KEYS,
   SALES_QUOTE_COMMERCIAL_FORBIDDEN_KEYS,
@@ -117,6 +118,19 @@ class CreateSaleDto {
   @IsString()
   @MaxLength(64)
   quoteId?: string;
+
+  /** Step 2.4: привязка Checkout контекста (обязателен для completion). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  checkoutIntentId?: string;
+}
+
+/** Step 2.4: completeSale — только expectedVersion (всё derived — server-side). */
+class CompleteSaleDto {
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
 }
 
 /** Transition-команды: только целевой status (lifecycle отдельной командой). */
@@ -626,9 +640,21 @@ export class SalesController {
   createSale(@Body() dto: CreateSaleDto, @CurrentUser() actor: AuthedRequest["user"], @Req() req: Request) {
     assertNoForbiddenKeys(req.body, SALES_CREATE_FORBIDDEN_KEYS);
     return this.sales.createSale(
-      { customerId: dto.customerId, opportunityId: dto.opportunityId, quoteId: dto.quoteId },
+      { customerId: dto.customerId, opportunityId: dto.opportunityId, quoteId: dto.quoteId, checkoutIntentId: dto.checkoutIntentId },
       { id: actor.id, username: actor.username },
     );
+  }
+
+  /**
+   * Step 2.4 — canonical Sale completion (единственная команда, НЕ generic PATCH):
+   * CAS + commercial snapshot + availability reservation (owner service) +
+   * OrderRequested (atomic, retryable outbox). sales.sale.complete permission.
+   */
+  @Post("sales/:code/complete")
+  @RequirePermissions("sales.sale.complete")
+  completeSale(@Param("code") code: string, @Body() dto: CompleteSaleDto, @CurrentUser() actor: AuthedRequest["user"], @Req() req: Request) {
+    assertNoForbiddenKeys(req.body, SALE_COMPLETE_FORBIDDEN_KEYS);
+    return this.sales.completeSale(code, dto.expectedVersion, { id: actor.id, username: actor.username });
   }
 
   @Get("sales")

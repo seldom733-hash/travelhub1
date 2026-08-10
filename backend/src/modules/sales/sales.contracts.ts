@@ -10,6 +10,7 @@ import type {
   OpportunityStatus,
   PaymentPrepaymentType,
   PaymentScheme,
+  QuoteDiscountType,
   QuoteStatus,
   SalesAcquisitionSource,
   SaleStatus,
@@ -91,8 +92,42 @@ export interface SaleDto extends SalesEntityDto {
   customerId: string | null;
   opportunityId: string | null;
   quoteId: string | null;
+  checkoutIntentId: string | null;
   createdById: string | null;
   status: SaleStatus;
+  /** Step 2.4: immutable commercial snapshot. NULL = OPEN/legacy (без backfill). */
+  commercialSnapshot: SaleCommercialSnapshot | null;
+  completedAt: string | null;
+  completedById: string | null;
+  reservationId: string | null;
+  orderRequestedEventId: string | null;
+}
+
+/** Step 2.4: immutable commercial snapshot (замораживается при completion). */
+export interface SaleCommercialSnapshot {
+  currency: string;
+  subtotal: string;
+  discountType: QuoteDiscountType;
+  discountValue: string | null;
+  discountAmount: string | null;
+  total: string;
+  paymentScheme: PaymentScheme | null;
+  prepaymentType: "PERCENTAGE" | "FIXED" | null;
+  prepaymentValue: string | null;
+  initialAmount: string | null;
+  remainingAmount: string | null;
+  acquisitionSource: SalesAcquisitionSource;
+}
+
+/** Step 2.4: результат команды completeSale. */
+export interface SaleDetailCompletionDto {
+  saleId: string;
+  saleCode: string;
+  status: SaleStatus;
+  version: number;
+  completedAt: string;
+  orderRequestedEventId: string;
+  reservations: string[];
 }
 
 export interface SalesListResult<T> {

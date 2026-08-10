@@ -441,11 +441,12 @@ describe("Phase 2 Step 2.2 — Sales Center Backend (e2e)", () => {
     await agent(sm.accessToken).put(`/api/v1/sales/quotes/${quote.code}/commercial`).send({ discountType: "NONE", validUntil: new Date(Date.now() + 30 * 86400000).toISOString() }).expect(200);
     await agent(sm.accessToken).post(`/api/v1/sales/quotes/${quote.code}/issue`).expect(201);
 
-    // Sale: только create/list/detail/history — close/complete route отсутствует (404).
+    // Sale: только create/list/detail/history — close отсутствует (404); complete
+    // введён в Step 2.4 (требует expectedVersion → пустое тело 400, см. 2.4 e2e).
     const sale = (await agent(sm.accessToken).post("/api/v1/sales/sales").send({}).expect(201)).body as { id: string; code: string };
     created.sales.push(sale.id);
     await agent(sm.accessToken).post(`/api/v1/sales/sales/${sale.code}/close`).expect(404);
-    await agent(sm.accessToken).post(`/api/v1/sales/sales/${sale.code}/complete`).expect(404);
+    await agent(sm.accessToken).post(`/api/v1/sales/sales/${sale.code}/complete`).send({}).expect(400);
     await agent(sm.accessToken).get(`/api/v1/sales/sales/${sale.code}/history`).expect(200);
   });
 

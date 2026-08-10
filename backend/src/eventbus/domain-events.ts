@@ -4,13 +4,15 @@
  * Издатели:
  *   Catalog: ProductCreated, ProductPublished, ProductArchived
  *   CRM:     CustomerCreated, CustomerUpdated, PartnerCreated
+ *   Sales:   OrderRequested (Step 2.4 — Sale completion → OrderRequested; command в Order domain)
  *   Order:   OrderCreated, OrderReadyForBooking, OrderFulfilled, OrderClosed,
  *            OrderCancelled, OrderStatusChanged (технические переходы),
  *            BookingRequested (command в Booking domain)
  *   Booking: BookingCreated, BookingConfirmed, BookingRejected, BookingCancelled
  *
  * Подписчики:
- *   Order   ← BookingConfirmed, BookingRejected (агрегированное состояние)
+ *   Order   ← OrderRequested (Step 2.5 consumer создаёт Order), BookingConfirmed,
+ *             BookingRejected (агрегированное состояние)
  *   Booking ← BookingRequested (создание Booking + Passenger)
  *
  * Order НИКОГДА не пишет в таблицы Booking и наоборот — только события + чтение.
@@ -37,6 +39,8 @@ export const DomainEvents = {
   CustomerCreated: "CustomerCreated",
   CustomerUpdated: "CustomerUpdated",
   PartnerCreated: "PartnerCreated",
+  // Sales → Order (Step 2.4: Sale completion → OrderRequested)
+  OrderRequested: "OrderRequested",
   // Order
   OrderCreated: "OrderCreated",
   OrderReadyForBooking: "OrderReadyForBooking",
@@ -158,6 +162,55 @@ export interface PartnerEventPayload {
   code: string;
   name: string;
   source: string; // "partner_onboarding" | "crm_center"
+}
+
+/**
+ * OrderRequested (Step 2.4) — canonical command Sales → Order domain.
+ *
+ * Содержит immutable commercial snapshot + refs (G3): Order consumer (Step 2.5)
+ * создаёт Order/OrderItems из ЭТИХ фактов, НЕ читая mutable Catalog price.
+ * БЕЗ PII: traveler details (имена/даты рождения) НЕ копируются в durable
+ * outbox payload — Order consumer получит их canonical-чтением Sales-owned
+ * CheckoutIntent при необходимости (Step 2.5). Только canonical refs.
+ */
+export interface OrderRequestedPayload {
+  /** Payload schema version (независим от event version). */
+  version: 1;
+  saleId: string;
+  saleCode: string;
+  checkoutId: string;
+  checkoutCode: string;
+  quoteId: string;
+  customerId: string | null;
+  /** Reserved inventory (catalog.AvailabilityReservation ref, без FK). */
+  reservationId: string | null;
+  /** Детерминированный состав (frozen QuoteItem snapshot). */
+  items: Array<{
+    productId: string;
+    productCode: string;
+    productTitle: string;
+    tariffId: string;
+    tariffCode: string;
+    quantity: number;
+    unitPrice: string;
+    amount: string;
+  }>;
+  /** Frozen commercial snapshot (без Catalog reprice). */
+  currency: string;
+  subtotal: string;
+  discountType: string;
+  discountValue: string | null;
+  discountAmount: string | null;
+  total: string;
+  /** Payment terms snapshot (Step 2.3B, без reinterpretation). */
+  paymentScheme: string | null;
+  prepaymentType: string | null;
+  prepaymentValue: string | null;
+  initialAmount: string | null;
+  remainingAmount: string | null;
+  /** Acquisition source (Step 2.5B) — не ре-вычисляется consumer-ом. */
+  acquisitionSource: string;
+  serviceDate: string | null;
 }
 
 export interface OrderEventPayload {

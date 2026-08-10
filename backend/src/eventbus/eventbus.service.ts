@@ -4,6 +4,27 @@ import { PrismaService } from "../prisma/prisma.service";
 import { createRequestId, getRequestContext, normalizeCorrelationId, runWithRequestContext } from "../shared/request-context";
 import { assertValidBusinessEventWrite, type BusinessEventActor, type BusinessEventEnvelope, type DomainEventType } from "./domain-events";
 
+/**
+ * Step 2.4 (G2): макс. попыток доставки для retryable-событий. После max
+ * попыток событие остаётся FAILED (poison — не выбирается retryFailed).
+ */
+export const OUTBOX_MAX_ATTEMPTS = 5;
+
+/**
+ * Step 2.4: экспоненциальный backoff (чистый helper, unit-testable):
+ * попытка n (1-based) → задержка до следующей: 2^(n-1) секунд, cap 60s.
+ */
+export function outboxBackoffMs(attempt: number): number {
+  if (attempt <= 0) return 0;
+  const seconds = Math.pow(2, attempt - 1);
+  return Math.min(seconds, 60) * 1000;
+}
+
+/** Следующая допустимая попытка (после attempt-ой попытки) — теперь + backoff. */
+export function outboxNextAttempt(attempt: number, now = new Date()): Date {
+  return new Date(now.getTime() + outboxBackoffMs(attempt));
+}
+
 export interface OutboxWrite {
   aggregateType: string;
   aggregateId: string;
@@ -16,6 +37,9 @@ export interface OutboxWrite {
    *  активного request context (HTTP: USER из JwtAuthGuard; consumer: SYSTEM).
    *  null = explicit UNKNOWN/legacy (не подменяется контекстом). */
   actor?: BusinessEventActor | null;
+  /** Step 2.4 (G2): критичное событие получает durable retry. Default false —
+   *  legacy-поведение (FAILED терминален, Step 1.18). */
+  retryable?: boolean;
 }
 
 /**
@@ -147,6 +171,11 @@ async emit(tx: Prisma.TransactionClient, write: OutboxWrite): Promise<string> {
         causationId,
         actor: (actor ?? Prisma.DbNull) as Prisma.InputJsonValue,
         status: "PENDING",
+        // Step 2.4 (G2): только явно помеченные события получают durable retry.
+        // nextAttemptAt=null при создании → первый retry немедленно; backoff
+        // применяется при последующих flip-ах (retryFailed).
+        retryable: write.retryable ?? false,
+        nextAttemptAt: null,
       },
       select: { id: true },
     });
@@ -222,11 +251,50 @@ async emit(tx: Prisma.TransactionClient, write: OutboxWrite): Promise<string> {
       } catch (err) {
         await this.prisma.outboxEvent.update({
           where: { id: ev.id },
-          data: { status: "FAILED", error: String((err as Error)?.message ?? err) },
+          data: {
+            status: "FAILED",
+            error: String((err as Error)?.message ?? err),
+            attempts: { increment: 1 },
+          },
         });
       }
     }
     return published;
+  }
+
+  /**
+   * Step 2.4 (G2) — минимальный durable retry для критичных событий.
+   *
+   * FAILED остаётся ТЕРМИНАЛЬНЫМ для legacy-событий (Step 1.18 конвенция: нет
+   * автоматического retry без явного контракта). События, emitted с
+   * `retryable: true` (OrderRequested), получают контролируемый retry:
+   * выбираются FAILED с attempts < maxAttempts и nextAttemptAt <= now,
+   * переводятся обратно в PENDING (тот же eventId/correlation/causation —
+   * Inbox dedup остаётся authoritative защитой от duplicate side effect).
+   *
+   * Возвращает число событий, переведённых в PENDING (не «доставленных» —
+   * доставку выполняет последующий publishPending).
+   */
+  async retryFailed(limit = 100, now = new Date()): Promise<number> {
+    const retryable = await this.prisma.outboxEvent.findMany({
+      where: {
+        status: "FAILED",
+        retryable: true,
+        attempts: { lt: OUTBOX_MAX_ATTEMPTS },
+        OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+      },
+      orderBy: { createdAt: "asc" },
+      take: limit,
+      select: { id: true, attempts: true },
+    });
+    if (retryable.length === 0) return 0;
+    for (const ev of retryable) {
+      await this.prisma.outboxEvent.update({
+        where: { id: ev.id },
+        data: { status: "PENDING", error: null, nextAttemptAt: outboxNextAttempt(ev.attempts + 1) },
+      });
+    }
+    return retryable.length;
   }
 
   /** Обработано ли событие данным consumer-ом (идемпотентность). */

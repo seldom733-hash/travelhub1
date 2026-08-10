@@ -237,9 +237,13 @@ Frontend не источник цены.
 `PAY_AT_SERVICE`. Partner выбирает только разрешённые платформой
 схемы/параметры; Sale/Order хранит immutable financial snapshot.
 
-· **Step 2.4 --- Sale Completion → OrderRequested**\
+· **Step 2.4 --- Sale Completion → OrderRequested** ✅ DONE\
 Sale публикует canonical `OrderRequested`; никаких прямых Sales writes в
-Order tables.
+Order tables. Реализовано: `POST /sales/sales/:code/complete` (RBAC
+`sales.sale.complete`), immutable commercial snapshot на Sale, atomic
+capacity hold через Catalog owner service (`AvailabilityReservation`, RSR-*),
+`OrderRequested` в outbox + durable retry (`retryFailed`, nextAttemptAt/backoff),
+CAS/CLOSED терминал + один OrderRequested (idempotency). Order consumer — Step 2.5.
 
 · **Step 2.5 --- Order Creation Consumer**\
 Order consumer создаёт `ORD-*`, пользовательский `TH-YYYY-######`,

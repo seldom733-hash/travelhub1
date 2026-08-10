@@ -37,6 +37,55 @@ export const SALES_CREATE_FORBIDDEN_KEYS = [
   "causationId",
 ] as const;
 
+/**
+ * Step 2.4: полный whitelist-инверсия для completeSale — клиент передаёт
+ * ТОЛЬКО expectedVersion. Все derived snapshot/reservation/event fields
+ * (статус, деньги, валюта, acquisition, reservationId, quantity, orderId,
+ * eventId, payment status, actor, correlation, timestamps) запрещены (§35).
+ */
+export const SALE_COMPLETE_FORBIDDEN_KEYS = [
+  "id",
+  "code",
+  "status",
+  "version",
+  "createdAt",
+  "updatedAt",
+  "createdById",
+  "completedAt",
+  "completedById",
+  "currency",
+  "subtotal",
+  "discountType",
+  "discountValue",
+  "discountAmount",
+  "total",
+  "paymentScheme",
+  "prepaymentType",
+  "prepaymentValue",
+  "initialAmount",
+  "remainingAmount",
+  "acquisitionSource",
+  "serviceDate",
+  "reservationId",
+  "quantity",
+  "orderId",
+  "orderCode",
+  "eventId",
+  "orderRequestedEventId",
+  "paymentStatus",
+  "paidAmount",
+  "customerId",
+  "quoteId",
+  "checkoutIntentId",
+  "actor",
+  "actorId",
+  "userId",
+  "username",
+  "correlationId",
+  "causationId",
+  "requestId",
+] as const;
+
 /** Step 2.3: поля, запрещённые в командах состава КП (client-owned override). */
 export const SALES_QUOTE_ITEM_FORBIDDEN_KEYS = [
   "id",

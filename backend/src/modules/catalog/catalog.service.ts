@@ -1345,6 +1345,79 @@ export class CatalogService implements OnModuleInit {
     });
   }
 
+  /**
+   * Step 2.4 — owner command: atomic availability reserve (DD-022 closure).
+   *
+   * Единственный canonical способ зарезервировать inventory capacity (ADR-0001:
+   * Sales вызывает ЭТОТ owner-сервис, а не пишет в catalog.Availability).
+   * Атомарный last-slot: conditional UPDATE slotsReserved += quantity WHERE
+   * slotsTotal - slotsBooked - slotsReserved >= quantity — два concurrent
+   * резервирования одного последнего слота → ровно один успех.
+   *
+   * Вызывается ВНУТРИ транзакции домена (tx передаётся извне — общая
+   * PostgreSQL-транзакция с Sale completion; rollback откатывает и hold).
+   * После committed Sale + FAILED outbox hold НЕ освобождается автоматически
+   * (OrderRequested может быть retried) — release принадлежит owner-step.
+   *
+   * Без строки Availability (productId/tariffId/date не настроены) → 422
+   * (NOT_CONFIGURED — честно, не «безлимит по умолчанию»).
+   */
+  async reserveAvailability(
+    tx: Prisma.TransactionClient,
+    input: { productId: string; tariffId?: string | null; date: Date; quantity: number; sourceSaleId: string; createdById?: string | null },
+  ): Promise<{ reservationId: string; code: string }> {
+    if (!Number.isInteger(input.quantity) || input.quantity < 1) {
+      throw new ValidationDomainError("reservation quantity must be a positive integer");
+    }
+    const date = new Date(input.date);
+    date.setUTCHours(0, 0, 0, 0);
+
+    // Атомарный last-slot guard — ОДИН conditional UPDATE (raw): инкремент только
+    // если доступно >= quantity. Один statement ⇒ два concurrent резервирования
+    // последнего слота: ровно один получает count=1, второй count=0 (нет TOCTOU).
+    const updated = await tx.$executeRaw`
+      UPDATE "catalog"."Availability"
+      SET "slotsReserved" = "slotsReserved" + ${input.quantity}
+      WHERE "productId" = ${input.productId}
+        AND "tariffId" IS NOT DISTINCT FROM ${input.tariffId ?? null}
+        AND "date" = ${date}
+        AND "slotsTotal" - "slotsBooked" - "slotsReserved" >= ${input.quantity}
+    `;
+
+    if (updated !== 1) {
+      // count=0: строка отсутствует ИЛИ capacity недостаточна. Различаем честно.
+      const row = await tx.availability.findFirst({
+        where: { productId: input.productId, tariffId: input.tariffId ?? null, date },
+        select: { id: true, slotsTotal: true, slotsBooked: true, slotsReserved: true },
+      });
+      if (!row) {
+        throw new ValidationDomainError(`Availability for product ${input.productId} on ${date.toISOString()} is not configured`);
+      }
+      const available = row.slotsTotal - row.slotsBooked - row.slotsReserved;
+      if (available < input.quantity) {
+        throw new ConflictError(`Not enough availability for product ${input.productId} on ${date.toISOString()}`);
+      }
+      // Недостижимо (условие guard совпало бы), defensive.
+      throw new ConflictError(`Availability reservation for product ${input.productId} failed`);
+    }
+
+    const code = await this.ids.nextCode(tx, "RSR");
+    const reservation = await tx.availabilityReservation.create({
+      data: {
+        code,
+        productId: input.productId,
+        tariffId: input.tariffId ?? null,
+        date,
+        quantity: input.quantity,
+        sourceSaleId: input.sourceSaleId,
+        createdById: input.createdById ?? null,
+        status: "HELD",
+      },
+      select: { id: true, code: true },
+    });
+    return { reservationId: reservation.id, code: reservation.code };
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────
 
   /** JSON-значение для nullable Json-поля: null/undefined → SQL NULL (Prisma.DbNull). */

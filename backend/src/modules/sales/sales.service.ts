@@ -4,6 +4,9 @@ import { IdsService } from "../../shared/ids.service";
 import { SecurityService } from "../../security/security.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { isoUtc } from "../../shared/temporal";
+import { EventBusService } from "../../eventbus/eventbus.service";
+import { DomainEvents, type OrderRequestedPayload } from "../../eventbus/domain-events";
+import { CatalogService } from "../catalog/catalog.service";
 import type { Prisma } from "../../generated/prisma/client";
 import {
   CheckoutStatus,
@@ -53,6 +56,8 @@ import type {
   CheckoutIntentDetailDto,
   CheckoutIntentDto,
   PaymentTermsDto,
+  SaleCommercialSnapshot,
+  SaleDetailCompletionDto,
   SaleDto,
   SalesHistoryItemDto,
   SalesKpiDto,
@@ -98,6 +103,9 @@ export class SalesService {
     private readonly prisma: PrismaService,
     private readonly ids: IdsService,
     private readonly security: SecurityService,
+    private readonly eventBus: EventBusService,
+    /** Step 2.4: availability reservation через OWNER service boundary (ADR-0001). */
+    private readonly catalog: CatalogService,
   ) {}
 
   /* ── Lead ───────────────────────────────────────────────────────────────── */
@@ -616,7 +624,7 @@ export class SalesService {
   /* ── Sale ───────────────────────────────────────────────────────────────── */
 
   async createSale(
-    input: { customerId?: string | null; opportunityId?: string | null; quoteId?: string | null },
+    input: { customerId?: string | null; opportunityId?: string | null; quoteId?: string | null; checkoutIntentId?: string | null },
     actor: Actor,
   ): Promise<SaleDto> {
     if (input.opportunityId) {
@@ -626,6 +634,18 @@ export class SalesService {
     if (input.quoteId) {
       const q = await this.prisma.quote.findUnique({ where: { id: input.quoteId }, select: { id: true } });
       if (!q) throw new ValidationDomainError(`Quote ${input.quoteId} does not exist`);
+    }
+    // Step 2.4: привязка Checkout контекста — Checkout обязан существовать и быть
+    // ACTIVE; quoteId должен совпадать (Sale завершает commercial intent Quote).
+    if (input.checkoutIntentId) {
+      const ck = await this.prisma.checkoutIntent.findUnique({ where: { id: input.checkoutIntentId }, select: { id: true, quoteId: true, status: true } });
+      if (!ck) throw new ValidationDomainError(`CheckoutIntent ${input.checkoutIntentId} does not exist`);
+      if (ck.status !== CheckoutStatus.ACTIVE) {
+        throw new ValidationDomainError(`CheckoutIntent ${input.checkoutIntentId} is ${ck.status}; cannot create Sale`);
+      }
+      if (input.quoteId && ck.quoteId !== input.quoteId) {
+        throw new ValidationDomainError(`CheckoutIntent ${input.checkoutIntentId} belongs to a different Quote`);
+      }
     }
     await this.assertOptionalCustomer(input.customerId);
 
@@ -637,6 +657,7 @@ export class SalesService {
           customerId: input.customerId ?? null,
           opportunityId: input.opportunityId ?? null,
           quoteId: input.quoteId ?? null,
+          checkoutIntentId: input.checkoutIntentId ?? null,
           status: SaleStatus.OPEN,
           createdById: actor.id,
         },
@@ -670,6 +691,205 @@ export class SalesService {
     const row = await this.prisma.sale.findUnique({ where: { code } });
     if (!row) throw new NotFoundError(`Sale ${code} not found`);
     return this.toSaleDto(row);
+  }
+
+  /**
+   * Step 2.4 — canonical Sale completion → OrderRequested.
+   *
+   * Единственная команда завершения продажи (НЕ generic PATCH). Атомарный
+   * workflow в ОДНОЙ PostgreSQL-транзакции (G4 + §27):
+   *   1. CAS Sale OPEN → CLOSED (expectedVersion);
+   *   2. проверки Checkout (ACTIVE, paymentTerms выбран, serviceDate, items);
+   *   3. immutable commercial snapshot фиксируется на Sale (G3);
+   *   4. availability резервируется через OWNER service (CatalogService.
+   *      reserveAvailability — atomic last-slot, DD-022 closure);
+   *   5. OrderRequested пишется в outbox (retryable) в той же транзакции.
+   * После коммита — publishPending (delivery failure НЕ откатывает commit).
+   *
+   * Инварианты: Sale НЕ пишет в Order (Step 2.5 consumer); НЕ создаёт
+   * Booking/Payment; reservation не освобождается при FAILED outbox (retry).
+   */
+  async completeSale(code: string, expectedVersion: number, actor: Actor): Promise<SaleDetailCompletionDto> {
+    const sale = await this.prisma.sale.findUnique({ where: { code } });
+    if (!sale) throw new NotFoundError(`Sale ${code} not found`);
+    if (sale.status !== SaleStatus.OPEN) {
+      // CLOSED = уже завершённая (повторный complete → controlled conflict).
+      throw new ConflictError(`Sale ${code} is already ${sale.status}`);
+    }
+
+    // Checkout контекст (prerequisite): Sale обязан быть привязан к CheckoutIntent.
+    if (!sale.checkoutIntentId) {
+      throw new ValidationDomainError(`Sale ${code} is not linked to a CheckoutIntent; completion requires checkout context`);
+    }
+    const checkout = await this.prisma.checkoutIntent.findUnique({
+      where: { id: sale.checkoutIntentId },
+    });
+    if (!checkout) throw new NotFoundError(`CheckoutIntent for Sale ${code} not found`);
+    this.assertCheckoutMutable(checkout);
+
+    // Payment terms обязательны (Step 2.3B prerequisite §9): без выбранной схемы
+    // completion блокируется. НИКАКОГО дефолтного FULL_PREPAYMENT fallback.
+    if (!checkout.paymentScheme || checkout.initialAmount === null || checkout.remainingAmount === null) {
+      throw new ValidationDomainError(`CheckoutIntent ${checkout.code} requires payment terms before Sale completion`);
+    }
+    if (!checkout.serviceDate) {
+      throw new ValidationDomainError(`CheckoutIntent ${checkout.code} requires a service date before Sale completion`);
+    }
+
+    // Детерминированный состав (frozen QuoteItem snapshot).
+    const quote = await this.prisma.quote.findUnique({
+      where: { id: checkout.quoteId },
+      include: { items: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+    });
+    if (!quote) throw new NotFoundError(`Quote for CheckoutIntent ${checkout.code} not found`);
+    if (quote.items.length === 0) {
+      throw new ValidationDomainError(`Quote ${quote.code} has no items; cannot complete Sale`);
+    }
+    for (const it of quote.items) {
+      if (it.productId.trim().length === 0 || it.tariffId.trim().length === 0 || it.quantity < 1) {
+        throw new ValidationDomainError(`Quote ${quote.code} has an invalid item`);
+      }
+    }
+
+    // Customer может отсутствовать (внутренний assisted flow) — честно nullable.
+    const customerId = checkout.customerId ?? sale.customerId ?? null;
+    const now = new Date();
+    const serviceDate = new Date(checkout.serviceDate);
+    serviceDate.setUTCHours(0, 0, 0, 0);
+
+    const completed = await this.prisma.$transaction(async (tx) => {
+      // CAS: OPEN → CLOSED (один победитель при concurrent double completion).
+      const res = await tx.sale.updateMany({
+        where: { id: sale.id, version: expectedVersion, status: SaleStatus.OPEN },
+        data: {
+          status: SaleStatus.CLOSED,
+          version: { increment: 1 },
+          completedAt: now,
+          completedById: actor.id,
+          currency: checkout.currency,
+          subtotal: checkout.subtotal,
+          discountType: checkout.discountType,
+          discountValue: checkout.discountValue,
+          discountAmount: checkout.discountAmount,
+          total: checkout.total,
+          paymentScheme: checkout.paymentScheme,
+          prepaymentType: checkout.prepaymentType,
+          prepaymentValue: checkout.prepaymentValue,
+          initialAmount: checkout.initialAmount,
+          remainingAmount: checkout.remainingAmount,
+          acquisitionSource: checkout.acquisitionSource,
+          serviceDate,
+        },
+      });
+      if (res.count === 0) throw new ConflictError(`Sale ${code} was modified concurrently; retry`);
+
+      // Immutable snapshot: дальше Checkout не влияет на завершённую Sale (§12).
+      const snapshot: SaleCommercialSnapshot = {
+        currency: checkout.currency,
+        subtotal: String(checkout.subtotal),
+        discountType: checkout.discountType,
+        discountValue: checkout.discountValue ? String(checkout.discountValue) : null,
+        discountAmount: checkout.discountAmount ? String(checkout.discountAmount) : null,
+        total: String(checkout.total),
+        paymentScheme: checkout.paymentScheme,
+        prepaymentType: checkout.prepaymentType,
+        prepaymentValue: checkout.prepaymentValue ? String(checkout.prepaymentValue) : null,
+        initialAmount: checkout.initialAmount ? String(checkout.initialAmount) : null,
+        remainingAmount: checkout.remainingAmount ? String(checkout.remainingAmount) : null,
+        acquisitionSource: checkout.acquisitionSource,
+      };
+
+      // Availability reservation через OWNER service (DD-022 closure).
+      const reservations: { reservationId: string; code: string }[] = [];
+      for (const it of quote.items) {
+        const r = await this.catalog.reserveAvailability(tx, {
+          productId: it.productId,
+          tariffId: it.tariffId,
+          date: serviceDate,
+          quantity: it.quantity,
+          sourceSaleId: sale.id,
+          createdById: actor.id,
+        });
+        reservations.push(r);
+      }
+      const firstReservation = reservations[0]?.reservationId ?? null;
+      await tx.sale.update({
+        where: { id: sale.id },
+        data: { reservationId: firstReservation },
+      });
+
+      // OrderRequested — атомарно с Sale + reservation (G2 retryable).
+      const eventId = await this.eventBus.emit(tx, {
+        aggregateType: "Sale",
+        aggregateId: sale.id,
+        eventType: DomainEvents.OrderRequested,
+        retryable: true,
+        payload: {
+          version: 1,
+          saleId: sale.id,
+          saleCode: sale.code,
+          checkoutId: checkout.id,
+          checkoutCode: checkout.code,
+          quoteId: quote.id,
+          customerId,
+          reservationId: firstReservation,
+          items: quote.items.map((it) => ({
+            productId: it.productId,
+            productCode: it.productCode,
+            productTitle: it.productTitle,
+            tariffId: it.tariffId,
+            tariffCode: it.tariffCode,
+            quantity: it.quantity,
+            unitPrice: String(it.unitPrice),
+            amount: String(it.amount),
+          })),
+          ...snapshot,
+          serviceDate: serviceDate.toISOString().slice(0, 10),
+        } as OrderRequestedPayload,
+      });
+      await tx.sale.update({
+        where: { id: sale.id },
+        data: { orderRequestedEventId: eventId },
+      });
+
+      await this.writeHistory(tx, "saleHistory", sale.id, "completed", SaleStatus.OPEN, SaleStatus.CLOSED, actor, {
+        completion: "sale_completed_order_requested",
+        reservationIds: reservations.map((r) => r.code),
+        eventId,
+        total: snapshot.total,
+        currency: snapshot.currency,
+      });
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "sales.sale.completed",
+        resource: "Sale",
+        resourceId: sale.id,
+        details: {
+          code: sale.code,
+          from: SaleStatus.OPEN,
+          to: SaleStatus.CLOSED,
+          reservationCodes: reservations.map((r) => r.code),
+          eventId,
+          total: snapshot.total,
+          currency: snapshot.currency,
+        },
+      });
+      return { saleId: sale.id, eventId, reservationCodes: reservations.map((r) => r.code) };
+    });
+
+    // Доставка — ПОСЛЕ коммита (failure → FAILED + retryable, НЕ rollback).
+    await this.eventBus.publishPending();
+
+    return {
+      saleId: completed.saleId,
+      saleCode: code,
+      status: SaleStatus.CLOSED,
+      version: expectedVersion + 1,
+      completedAt: isoUtc(now),
+      orderRequestedEventId: completed.eventId,
+      reservations: completed.reservationCodes,
+    };
   }
 
   /* ── Step 2.3A — Checkout / Commercial Intent (sales.*) ──────────────────── */
@@ -1769,23 +1989,63 @@ export class SalesService {
     customerId: string | null;
     opportunityId: string | null;
     quoteId: string | null;
+    checkoutIntentId: string | null;
     status: SaleStatus;
     version: number;
     createdById: string | null;
     createdAt: Date;
     updatedAt: Date;
+    currency: string | null;
+    subtotal: Prisma.Decimal | null;
+    discountType: QuoteDiscountType | null;
+    discountValue: Prisma.Decimal | null;
+    discountAmount: Prisma.Decimal | null;
+    total: Prisma.Decimal | null;
+    paymentScheme: PaymentScheme | null;
+    prepaymentType: "PERCENTAGE" | "FIXED" | null;
+    prepaymentValue: Prisma.Decimal | null;
+    initialAmount: Prisma.Decimal | null;
+    remainingAmount: Prisma.Decimal | null;
+    acquisitionSource: SalesAcquisitionSource | null;
+    completedAt: Date | null;
+    completedById: string | null;
+    reservationId: string | null;
+    orderRequestedEventId: string | null;
   }): SaleDto {
+    const snapshot: SaleCommercialSnapshot | null =
+      row.currency && row.subtotal !== null && row.total !== null && row.acquisitionSource
+        ? {
+            currency: row.currency,
+            subtotal: String(row.subtotal),
+            discountType: row.discountType ?? QuoteDiscountType.NONE,
+            discountValue: row.discountValue ? String(row.discountValue) : null,
+            discountAmount: row.discountAmount ? String(row.discountAmount) : null,
+            total: String(row.total),
+            paymentScheme: row.paymentScheme,
+            prepaymentType: row.prepaymentType,
+            prepaymentValue: row.prepaymentValue ? String(row.prepaymentValue) : null,
+            initialAmount: row.initialAmount ? String(row.initialAmount) : null,
+            remainingAmount: row.remainingAmount ? String(row.remainingAmount) : null,
+            acquisitionSource: row.acquisitionSource,
+          }
+        : null;
     return {
       id: row.id,
       code: row.code,
       customerId: row.customerId,
       opportunityId: row.opportunityId,
       quoteId: row.quoteId,
+      checkoutIntentId: row.checkoutIntentId,
       status: row.status,
       version: row.version,
       createdById: row.createdById,
       createdAt: isoUtc(row.createdAt),
       updatedAt: isoUtc(row.updatedAt),
+      commercialSnapshot: snapshot,
+      completedAt: row.completedAt ? isoUtc(row.completedAt) : null,
+      completedById: row.completedById,
+      reservationId: row.reservationId,
+      orderRequestedEventId: row.orderRequestedEventId,
     };
   }
 }

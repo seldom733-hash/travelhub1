@@ -56,10 +56,19 @@ model OutboxEvent {
   status        OutboxStatus @default(PENDING)
   attempts      Int          @default(0)
   error         String?
+  /// Step 2.4 (G2, outbox reliability): критичные события могут быть явно
+  /// retryable. FAILED остаётся терминальным для legacy-событий (Step 1.18
+  /// конвенция сохранена); retryable=true — только для событий, emitted с
+  /// флагом (OrderRequested). См. EventBusService.retryFailed.
+  retryable     Boolean      @default(false)
+  /// Step 2.4: минимальный durable retry — следующая допустимая попытка
+  /// (backoff). NULL = retry готов немедленно. Backoff helper — чистый.
+  nextAttemptAt DateTime?
   createdAt     DateTime     @default(now())
   publishedAt   DateTime?
 
   @@index([status, createdAt])
+  @@index([status, retryable, attempts])
   @@index([aggregateType, aggregateId])
   @@schema("events")
 }
@@ -337,6 +346,54 @@ model Availability {
   slotsReserved Int      @default(0)
 
   @@unique([productId, tariffId, date])
+  @@schema("catalog")
+}
+
+/// Lifecycle capacity-hold (Step 2.4, DD-022 closure).
+/// HELD — активный hold (считается в slotsReserved); RELEASED — освобождён
+/// (release-on-cancel принадлежит owner-step, здесь только состояние).
+enum AvailabilityReservationStatus {
+  HELD
+  RELEASED
+
+  @@schema("catalog")
+}
+
+/// Canonical durable capacity reservation/hold (Step 2.4). Owner — Catalog
+/// (catalog.*, ADR-0001): Sales НЕ пишет в catalog.Availability напрямую —
+/// атомарное резервирование выполняется через CatalogService.reserveAvailability
+/// (owner command) в той же PostgreSQL-транзакции, что и Sale completion.
+///
+/// Инварианты (DD-022 / Step 2.4 §13-17):
+///  - один Sale → один hold на (productId, tariffId, date) с quantity;
+///  - атомарный last-slot: conditional UPDATE slotsReserved += quantity
+///    WHERE slotsTotal - slotsBooked - slotsReserved >= quantity;
+///  - rollback транзакции откатывает и hold, и инкремент (reservation НЕ
+///    освобождается автоматически после committed Sale + FAILED outbox —
+///    OrderRequested может быть retried);
+///  - sourceSaleId — кросс-контекстная ссылка (без FK, ADR-0001).
+///
+/// НЕ Booking (supplier-level) и НЕ Order hold: inventory capacity hold,
+/// предшествующий OrderRequested. release/consume — owner-step (2.5+).
+model AvailabilityReservation {
+  id         String                        @id @default(uuid())
+  /// Канонический ID резервации: RSR-00000001 (IdsService, атомарный счётчик).
+  code       String                        @unique
+  productId  String
+  tariffId   String?
+  /// Дата услуги (date-only, UTC midnight — та же модель, что у Availability).
+  date       DateTime
+  quantity   Int                           @default(1)
+  /// Ссылка на Sales Sale (без FK). Один Sale → один hold на item.
+  sourceSaleId String
+  status     AvailabilityReservationStatus @default(HELD)
+  createdById String?
+  createdAt  DateTime                      @default(now())
+  /// Момент release (HELD → RELEASED), если owner-step введёт release.
+  releasedAt DateTime?
+
+  @@index([productId, tariffId, date])
+  @@index([sourceSaleId])
   @@schema("catalog")
 }
 
@@ -1903,26 +1960,58 @@ enum SaleStatus {
 /// не резервирует Availability, не меняет inventory. Sale completion →
 /// canonical OrderRequested — Step 2.4 (единственная граница).
 model Sale {
-  id            String     @id @default(uuid())
-  code          String     @unique // SAL-00000001
+  id            String       @id @default(uuid())
+  code          String       @unique // SAL-00000001
   customerId    String?
   opportunityId String?
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
-  quoteId       String?     @unique
-  quote         Quote?      @relation(fields: [quoteId], references: [id], onDelete: SetNull)
-  status        SaleStatus  @default(OPEN)
-  version       Int         @default(1)
+  quoteId       String?      @unique
+  quote         Quote?       @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  /// Step 2.4: CheckoutIntent, чей commercial контекст завершается этим Sale
+  /// (cross-schema ref без FK). Один Sale → один Checkout (unique).
+  checkoutIntentId String?   @unique
+  status        SaleStatus   @default(OPEN)
+  version       Int          @default(1)
   createdById   String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
-  history       SaleHistory[]
+  // ── Step 2.4 — Immutable commercial snapshot (замораживается при completion) ──
+  /// Заполняется ТОЛЬКО при completeSale (не backfill). NULL = Sale ещё не
+  /// завершён (OPEN) ИЛИ legacy (Step 2.1 CLOSED без snapshot — честно, без
+  /// угадывания). Order consumer читает эти факты — без повторного Catalog
+  /// reprice (G3).
+  currency        String?
+  subtotal        Decimal?          @db.Decimal(12, 2)
+  discountType    QuoteDiscountType?
+  discountValue   Decimal?          @db.Decimal(12, 2)
+  discountAmount  Decimal?          @db.Decimal(12, 2)
+  total           Decimal?          @db.Decimal(12, 2)
+  paymentScheme   PaymentScheme?
+  prepaymentType  PaymentPrepaymentType?
+  prepaymentValue Decimal?          @db.Decimal(12, 2)
+  initialAmount   Decimal?          @db.Decimal(12, 2)
+  remainingAmount Decimal?          @db.Decimal(12, 2)
+  acquisitionSource SalesAcquisitionSource?
+  serviceDate     DateTime?
+  /// Ссылка на catalog.AvailabilityReservation (без FK) — первая/каноническая
+  /// резервация Sale. Полный список резерваций — по sourceSaleId в catalog.*.
+  reservationId   String?
+  /// Идемпотентность/traceability: событие OrderRequested этого Sale.
+  orderRequestedEventId String?
+  /// Lifecycle milestone completion (Step 2.4): реальный переход OPEN → CLOSED.
+  /// updatedAt НЕ является milestone (§38).
+  completedAt     DateTime?
+  completedById   String?
+
+  history SaleHistory[]
 
   @@index([status])
   @@index([opportunityId])
   @@index([customerId])
   // Step 2.2: композитный индекс (status + createdAt).
   @@index([status, createdAt])
+  @@index([status, completedAt])
   @@schema("sales")
 }
 

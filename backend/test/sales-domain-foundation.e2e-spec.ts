@@ -381,6 +381,11 @@ describe("Phase 2 Step 2.1 — Sales Domain Foundation (e2e)", () => {
     const ordersBefore = await prisma.order.count();
     const bookingsBefore = await prisma.booking.count();
     const leadsBefore = await prisma.lead.count();
+    // Shared-DB isolation: Step 2.4 e2e законно публикует OrderRequested —
+    // сравниваем ДО/ПОСЛЕ создания Sale, а не абсолютный 0.
+    const orderEventsBefore = await prisma.outboxEvent.count({
+      where: { eventType: { in: ["OrderRequested", "OrderCreated"] } },
+    });
 
     const sale = (
       await agent(sm.accessToken)
@@ -393,10 +398,11 @@ describe("Phase 2 Step 2.1 — Sales Domain Foundation (e2e)", () => {
     // Sale (OPEN) не создаёт Order/Booking и не публикует OrderRequested.
     expect(await prisma.order.count()).toBe(ordersBefore);
     expect(await prisma.booking.count()).toBe(bookingsBefore);
-    const outbox = await prisma.outboxEvent.findMany({
-      where: { eventType: { in: ["OrderRequested", "OrderCreated"] } },
-    });
-    expect(outbox.length).toBe(0);
+    expect(
+      await prisma.outboxEvent.count({
+        where: { eventType: { in: ["OrderRequested", "OrderCreated"] } },
+      }),
+    ).toBe(orderEventsBefore);
 
     // Behavioral event (Marketplace view) → 202, но НЕ создаёт Lead.
     await request(app.getHttpServer())

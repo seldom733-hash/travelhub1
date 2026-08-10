@@ -401,29 +401,31 @@ Model) + Step 3.13 (Users & Access Center UI).
 
 ## DD-022 --- Availability Reservation / Locking Owner & Contract
 
-**Status:** DEFERRED
+**Status:** DECIDED
 
-**Already Decided (Step 2.3A):** до Step 2.3A/2.4 availability — read-only
-"checked, not reserved". CheckoutIntent НЕ подтверждает и НЕ гарантирует
-доступность и НЕ пишет в catalog.Availability (ADR-0001: Sales пишет только
-в sales.*). Каждый ответ честно несёт `availability.state =
-CHECKED_NOT_RESERVED` + `semantics` (checked, not reserved; no capacity hold)
-и вычисляется заново при каждом чтении (никакого stale "available=true").
-Владелец резервирования/блокировки capacity — граница Order/Booking
-(Step 2.4/2.5): hold обязан координироваться с Order/Booking/Payment
-state, поэтому вводится там, а не раньше.
+**Decision (Step 2.4):** владелец capacity hold — **Catalog** (owner of
+`catalog.Availability`). Новый `AvailabilityReservation` (catalog.*, статусы
+HELD/RELEASED/EXPIRED, код `RSR-*`) — capacity hold в рамках canonical owner
+contract (ADR-0001: Sales вызывает **owner service**, не пишет в catalog.*
+напрямую). Команда `CatalogService.reserveAvailability(tx, ...)` выполняет
+**атомарный conditional UPDATE** (`available >= requested` → декремент) и
+создаёт reservation-строку в **одной** PostgreSQL-транзакции вместе с
+персистом Sale (CLOSED) + history + outbox-event (честный atomic last-slot,
+capacity никогда не уходит в минус). Каждый Sale-hold привязан к конкретному
+item (productId/tariffId/date/quantity); `OrderRequested` несёт id резервации
+(без FK, canonical ref) — release/expiry/cleanup — граница Step 2.5/2.8A
+(Order consumer / Booking), здесь hold остаётся HELD после публикации.
 
-**Still Open:** atomic conditional reservation (available >= requested в
-одной транзакции), server-owned expiresAt + TTL, release/expiry/cleanup,
-retry/idempotency hold-ов, partial unique index (один активный hold),
-failure atomicity при персисте intent+reservation+history.
+**Superseded (Step 2.3A read-only):** `CHECKED_NOT_RESERVED` остаётся
+семантикой для CheckoutIntent (чтение без hold); hold вводится только на
+финальном шаге Sale completion (2.4).
 
-**Do Not Implement Yet:** никаких записей capacity из Sales; никакого
-hold-контракта до Step 2.4 (safe read-only семантика достаточна для
-authoritative checkout intent).
+**Deferred remainder:** server-owned TTL/expiry job, partial unique index
+(один активный hold на item), release-команда и cleanup — Step 2.5 (Order
+Creation Consumer) / Step 2.8A (Booking service date/time, capacity/slot).
 
-**Return Point:** Step 2.4 (Sale Completion → OrderRequested) / Step 2.8A
-(Booking service date/time model, capacity/slot reservation).
+**Return Point:** Step 2.5 (Order Creation Consumer — release на ошибке
+order creation) / Step 2.8A (Booking capacity/slot reservation).
 
 ------------------------------------------------------------------------
 
@@ -473,9 +475,9 @@ Deferred Decisions Map не отменяет действующий ADR.
 # Current Register State
 
 -   Total: **23**
--   DEFERRED: **23**
+-   DEFERRED: **22**
 -   IN_REVIEW: **0**
--   DECIDED: **0**
+-   DECIDED: **1**
 -   SUPERSEDED: **0**
 -   Next ID: **DD-024**
 

@@ -27,11 +27,15 @@
 | `QTE-` | Quote | Sales |
 | `SAL-` | Sale | Sales |
 | `CKT-` | CheckoutIntent (commercial intent) | Sales |
+| `RSR-` | AvailabilityReservation (capacity hold) | Catalog |
 
 *Exit Audit Step 1.18:* таблица синхронизирована с фактическим реестром
 `IdsService.nextCode` (PRD/CAT/TRF/CUS/CNT/COM/PAR/SUP/ORD/TH/BKG/CML/SELL/SPP/SF/APP/USR).
 *Step 2.1:* добавлены Sales-префиксы LED/OPP/QTE/SAL (sales.*, Phase 2).
 *Step 2.3A:* добавлен CKT- (CheckoutIntent, sales.*, Phase 2).
+*Step 2.4:* добавлен RSR- (AvailabilityReservation, catalog.*, capacity hold) — префикс зарегистрирован в `IdsService.nextCode`.
+
+*Step 2.4 (полный реестр):* `PRD/CAT/TRF/CUS/CNT/COM/PAR/SUP/ORD/TH/BKG/CML/SELL/SPP/SF/APP/USR/LED/OPP/QTE/SAL/CKT/RSR`.
 
 Формат: `PREFIX-` + число, дополненное слева нулями (8 цифр; для
 `TH-YYYY-######` — 6 цифр, последовательность сквозная по году).
