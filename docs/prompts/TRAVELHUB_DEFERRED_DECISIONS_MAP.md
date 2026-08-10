@@ -405,7 +405,7 @@ Model) + Step 3.13 (Users & Access Center UI).
 
 **Decision (Step 2.4):** владелец capacity hold — **Catalog** (owner of
 `catalog.Availability`). Новый `AvailabilityReservation` (catalog.*, статусы
-HELD/RELEASED/EXPIRED, код `RSR-*`) — capacity hold в рамках canonical owner
+HELD/RELEASED, код `RSR-*`) — capacity hold в рамках canonical owner
 contract (ADR-0001: Sales вызывает **owner service**, не пишет в catalog.*
 напрямую). Команда `CatalogService.reserveAvailability(tx, ...)` выполняет
 **атомарный conditional UPDATE** (`available >= requested` → декремент) и

@@ -576,5 +576,115 @@ describe("Phase 2 Step 2.4 — Sale Completion → OrderRequested + Availability
     (handler as unknown as { _done?: boolean })._done = true;
   });
 
+  // ── STRICT REVIEW §50: targeted tests ─────────────────────────────────────
+
+  it("§50.1. две Sale на один Checkout → 409 (controlled, не 500)", async () => {
+    const sm = await createStaff("s24_2sales", RoleCode.SALES_MANAGER);
+    const fx = await createProduct("s24_2sales", 100);
+    const ctx = await makeReadySale(sm.accessToken, fx);
+
+    // Вторая Sale с тем же checkoutIntentId — P2002 → управляемый 409.
+    await agent(sm.accessToken)
+      .post("/api/v1/sales/sales")
+      .send({ quoteId: ctx.quote.id, checkoutIntentId: ctx.intent.id })
+      .expect(409);
+    // Первая Sale не тронута.
+    expect((await prisma.sale.findUniqueOrThrow({ where: { id: ctx.sale.id } })).checkoutIntentId).toBe(ctx.intent.id);
+  });
+
+  it("§50.3. multi-item: первый item OK, второй unavailable → полный rollback (без следов)", async () => {
+    const sm = await createStaff("s24_multi", RoleCode.SALES_MANAGER);
+    const fx = await createProduct("s24_multi", 100);
+    const fx2 = await createProduct("s24_multi2", 50);
+    const date = FUTURE();
+
+    const quote = (await agent(sm.accessToken).post("/api/v1/sales/quotes").send({}).expect(201)).body as { id: string; code: string };
+    created.quotes.push(quote.id);
+    // item 1 — доступен; item 2 — capacity 0.
+    await agent(sm.accessToken).post(`/api/v1/sales/quotes/${quote.code}/items`).send({ productId: fx.productId, tariffId: fx.tariffId, quantity: 1 }).expect(201);
+    await agent(sm.accessToken).post(`/api/v1/sales/quotes/${quote.code}/items`).send({ productId: fx2.productId, tariffId: fx2.tariffId, quantity: 1 }).expect(201);
+    await agent(sm.accessToken)
+      .put(`/api/v1/sales/quotes/${quote.code}/commercial`)
+      .send({ discountType: "NONE", validUntil: new Date(Date.now() + 30 * 86400000).toISOString() })
+      .expect(200);
+    await agent(sm.accessToken).post(`/api/v1/sales/quotes/${quote.code}/issue`).expect(201);
+    const intent = (await agent(sm.accessToken).post("/api/v1/sales/checkouts").send({ quoteId: quote.id, serviceDate: date }).expect(201)).body as {
+      id: string;
+      code: string;
+      version: number;
+    };
+    created.checkouts.push(intent.id);
+    await agent(sm.accessToken).put(`/api/v1/sales/checkouts/${intent.code}/payment-terms`).send({ scheme: "FULL_PREPAYMENT", expectedVersion: intent.version }).expect(200);
+    await upsertAvailability(fx.productId, fx.tariffId, date, 10);
+    await upsertAvailability(fx2.productId, fx2.tariffId, date, 0);
+    const sale = (await agent(sm.accessToken).post("/api/v1/sales/sales").send({ quoteId: quote.id, checkoutIntentId: intent.id }).expect(201)).body as {
+      id: string;
+      code: string;
+      version: number;
+    };
+    created.sales.push(sale.id);
+
+    // item 1 зарезервировался бы, item 2 падает → ВСЯ транзакция откатывается.
+    await complete(sm.accessToken, sale.code, 1).expect(409);
+    expect(await prisma.availabilityReservation.count({ where: { sourceSaleId: sale.id } })).toBe(0);
+    const dateObj = new Date(`${date}T00:00:00.000Z`);
+    const row1 = await prisma.availability.findFirstOrThrow({ where: { productId: fx.productId, tariffId: fx.tariffId, date: dateObj } });
+    const row2 = await prisma.availability.findFirstOrThrow({ where: { productId: fx2.productId, tariffId: fx2.tariffId, date: dateObj } });
+    expect(row1.slotsReserved).toBe(0); // item 1 decrement откачен
+    expect(row2.slotsReserved).toBe(0);
+    expect((await prisma.sale.findUniqueOrThrow({ where: { id: sale.id } })).status).toBe("OPEN");
+    expect(await prisma.outboxEvent.count({ where: { aggregateId: sale.id, eventType: "OrderRequested" } })).toBe(0);
+    expect(await prisma.saleHistory.count({ where: { saleId: sale.id, action: "completed" } })).toBe(0);
+  });
+
+  it("§50.5/50.6/50.14. Checkout immutable после completion: payment-terms/service-date/travelers/cancel → 409", async () => {
+    const sm = await createStaff("s24_immut2", RoleCode.SALES_MANAGER);
+    const fx = await createProduct("s24_immut2", 100);
+    const ctx = await makeReadySale(sm.accessToken, fx);
+    await complete(sm.accessToken, ctx.sale.code, 1).expect(201);
+
+    const { version } = ctx.intent;
+    const vAfter = version + 1;
+    // payment-terms (после completion) → 409
+    await agent(sm.accessToken)
+      .put(`/api/v1/sales/checkouts/${ctx.intent.code}/payment-terms`)
+      .send({ scheme: "PAY_LATER", expectedVersion: vAfter })
+      .expect(409);
+    // service-date (после completion) → 409
+    await agent(sm.accessToken)
+      .put(`/api/v1/sales/checkouts/${ctx.intent.code}/service-date`)
+      .send({ serviceDate: FUTURE(60), expectedVersion: vAfter })
+      .expect(409);
+    // travelers (после completion) → 409
+    await agent(sm.accessToken)
+      .put(`/api/v1/sales/checkouts/${ctx.intent.code}/travelers`)
+      .send({ travelers: [{ firstName: "A", lastName: "B" }], expectedVersion: vAfter })
+      .expect(409);
+    // cancel (после completion) → 409
+    await agent(sm.accessToken).post(`/api/v1/sales/checkouts/${ctx.intent.code}/cancel`).send({ expectedVersion: vAfter }).expect(409);
+
+    // Checkout остался ACTIVE, но де-факто immutable; Sale snapshot не тронут.
+    const ck = await prisma.checkoutIntent.findUniqueOrThrow({ where: { id: ctx.intent.id } });
+    expect(ck.status).toBe("ACTIVE");
+    const sale = await prisma.sale.findUniqueOrThrow({ where: { id: ctx.sale.id } });
+    expect(sale.status).toBe("CLOSED");
+    expect(String(sale.total)).toBe(ctx.total);
+  });
+
+  it("§50.13. quote-expiry policy: expired Quote не блокирует completion (frozen Checkout = price authority, без reprice)", async () => {
+    const sm = await createStaff("s24_expiry", RoleCode.SALES_MANAGER);
+    const fx = await createProduct("s24_expiry", 100);
+    const ctx = await makeReadySale(sm.accessToken, fx);
+
+    // Quote протухает ПОСЛЕ создания Checkout (validUntil в прошлом).
+    await prisma.quote.update({ where: { id: ctx.quote.id }, data: { validUntil: new Date(Date.now() - 1000) } });
+    await complete(sm.accessToken, ctx.sale.code, 1).expect(201);
+
+    const sale = await prisma.sale.findUniqueOrThrow({ where: { id: ctx.sale.id } });
+    expect(sale.status).toBe("CLOSED");
+    expect(String(sale.total)).toBe(ctx.total); // frozen Checkout, не reprice
+    // Catalog price мутация после этого уже покрыта тестом 28.
+  });
+
   // handler guard после теста: _done=true больше не влияет (guard по saleId выше уже достаточен).
 });

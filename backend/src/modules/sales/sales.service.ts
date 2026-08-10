@@ -3,6 +3,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { IdsService } from "../../shared/ids.service";
 import { SecurityService } from "../../security/security.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
+import { uniqueConstraintNames } from "../../shared/prisma-errors";
 import { isoUtc } from "../../shared/temporal";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type OrderRequestedPayload } from "../../eventbus/domain-events";
@@ -651,17 +652,35 @@ export class SalesService {
 
     const created = await this.prisma.$transaction(async (tx) => {
       const code = await this.ids.nextCode(tx, "SAL");
-      const row = await tx.sale.create({
-        data: {
-          code,
-          customerId: input.customerId ?? null,
-          opportunityId: input.opportunityId ?? null,
-          quoteId: input.quoteId ?? null,
-          checkoutIntentId: input.checkoutIntentId ?? null,
-          status: SaleStatus.OPEN,
-          createdById: actor.id,
-        },
-      });
+      // REVIEW FIX (2.4 STRICT): one Checkout → одна Sale (Sale.checkoutIntentId
+      // unique). Конкурентное/повторное создание второй Sale на тот же Checkout
+      // → Prisma P2002 → управляемый 409, НЕ 500 (единый pattern REVIEW FIX 10).
+      let row: Awaited<ReturnType<typeof tx.sale.create>>;
+      try {
+        row = await tx.sale.create({
+          data: {
+            code,
+            customerId: input.customerId ?? null,
+            opportunityId: input.opportunityId ?? null,
+            quoteId: input.quoteId ?? null,
+            checkoutIntentId: input.checkoutIntentId ?? null,
+            status: SaleStatus.OPEN,
+            createdById: actor.id,
+          },
+        });
+      } catch (err) {
+        // Один Checkout → одна Sale; один Quote → одна Sale (оба unique на Sale).
+        // Вторая Sale на тот же checkoutIntentId ИЛИ quoteId → управляемый 409.
+        if (
+          uniqueConstraintNames(err).some((n) => {
+            const low = n.toLowerCase();
+            return low.includes("checkoutintentid") || low.includes("quoteid");
+          })
+        ) {
+          throw new ConflictError(`CheckoutIntent ${input.checkoutIntentId} is already linked to a Sale`);
+        }
+        throw err;
+      }
       await this.writeHistory(tx, "saleHistory", row.id, "created", null, row.status, actor, {});
       await this.security.audit(tx, {
         userId: actor.id,
@@ -1043,6 +1062,7 @@ export class SalesService {
     const row = await this.prisma.checkoutIntent.findUnique({ where: { code } });
     if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
     this.assertCheckoutMutable(row);
+    await this.assertCheckoutNotCompleted(row);
     this.assertTravelersValid(travelers);
 
     await this.prisma.$transaction(async (tx) => {
@@ -1082,6 +1102,7 @@ export class SalesService {
     const row = await this.prisma.checkoutIntent.findUnique({ where: { code } });
     if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
     this.assertCheckoutMutable(row);
+    await this.assertCheckoutNotCompleted(row);
     const parsed = parseServiceDate(serviceDate);
 
     await this.prisma.$transaction(async (tx) => {
@@ -1147,6 +1168,7 @@ export class SalesService {
     if (row.status !== CheckoutStatus.ACTIVE) {
       throw new ValidationDomainError(`CheckoutIntent ${code} is already ${row.status}`);
     }
+    await this.assertCheckoutNotCompleted(row);
     const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
@@ -1187,6 +1209,7 @@ export class SalesService {
     const row = await this.prisma.checkoutIntent.findUnique({ where: { code } });
     if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
     this.assertCheckoutMutable(row);
+    await this.assertCheckoutNotCompleted(row);
     // Money authority: frozen Checkout total (binding price). Payment terms НЕ
     // меняют total и НЕ читают текущую Catalog/Tariff цену (§12).
     const computed = computePaymentTerms(row.total, {
@@ -1767,6 +1790,22 @@ export class SalesService {
   private assertCheckoutMutable(row: { status: CheckoutStatus; code: string }): void {
     if (row.status !== CheckoutStatus.ACTIVE) {
       throw new ValidationDomainError(`CheckoutIntent ${row.code} is ${row.status}`);
+    }
+  }
+
+  /**
+   * REVIEW FIX (2.4 STRICT): Checkout, уже конвертированный в Sale (CLOSED),
+   * immutable — терминальный commercial intent. Мутации (terms/service-date/
+   * travelers/cancel) после completion отклоняются 409; completed Sale snapshot
+   * и OrderRequested payload остаются единственными фактами (§42/§50.14).
+   */
+  private async assertCheckoutNotCompleted(row: { id: string; code: string }): Promise<void> {
+    const completed = await this.prisma.sale.findFirst({
+      where: { checkoutIntentId: row.id, status: SaleStatus.CLOSED },
+      select: { id: true },
+    });
+    if (completed) {
+      throw new ConflictError(`CheckoutIntent ${row.code} is already completed by Sale; immutable after completion`);
     }
   }
 

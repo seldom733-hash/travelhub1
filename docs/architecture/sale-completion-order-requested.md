@@ -127,6 +127,20 @@ Legacy FAILED остаётся терминальным (конвенция Step
 - Booking/Passenger — не создаются (inventory hold ≠ supplier booking);
 - Order — создаётся consumer-ом Step 2.5 (никакого bootstrap).
 
+## 11.5 Checkout post-completion (STRICT REVIEW)
+
+- После Sale completion Checkout де-факто immutable: мутации (payment-terms /
+  service-date / travelers / cancel) → 409 через `assertCheckoutNotCompleted`
+  (STRICT REVIEW fix). Checkout остаётся `ACTIVE` (нет отдельного COMPLETED-
+  статуса) — «иммутабельность» выражена через связь с CLOSED Sale.
+- **Known narrow race (не блокирует):** guard — read-then-mutate (findFirst
+  CLOSED Sale → затем отдельная транзакция мутации). Конкурентный completeSale
+  в узком окне между проверкой и коммитом мутации может быть обойдён; CAS по
+  checkout.version не защищает (completion не инкрементирует его). Деньги
+  защищены инвариантом: Sale snapshot immutable — расхождение Checkout vs Sale
+  после такого окна не меняет завершённую экономику. Закрытие — flip Checkout
+  в терминал при completion (Step 2.5, Order consumer) либо CAS с row lock.
+
 ## 12. Deferred
 
 - Order consumer (2.5); release/expiry hold (2.5+); time-slot/timezone (2.8A);
