@@ -46,6 +46,13 @@ describe("Step 1.18 — Outbox FAILED failure-injection (e2e)", () => {
     prisma = app.get(PrismaService);
     eventBus = app.get(EventBusService);
 
+    // Shared-DB isolation (serial e2e): предыдущие спеки могли оставить PENDING-
+    // строки в общем events.OutboxEvent (их тесты уже завершены и повторно эти
+    // строки не нужны). publishPending() ниже выбирает ВСЕ PENDING-строки, а тест
+    // утверждает абсолютные счётчики — удаляем чужие строки, чтобы счётчики были
+    // детерминированы. FAILED-строки publishPending не выбирает, но чистим и их.
+    await prisma.outboxEvent.deleteMany({ where: { status: { in: ["PENDING", "FAILED"] } } });
+
     // flaky consumer (сначала падает), затем идемпотентный recovery consumer.
     eventBus.on(DomainEvents.ProductPublished, flakyConsumer);
     eventBus.on(DomainEvents.ProductPublished, async (envelope) => {

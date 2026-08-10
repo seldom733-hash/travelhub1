@@ -26,7 +26,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication"]
+  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales"]
 }
 
 // ─────────────────────────────── events.* ────────────────────────────────
@@ -1608,4 +1608,336 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@schema("security")
+}
+
+// ─────────────────────────────── sales.* ────────────────────────────────
+// Sales Domain Foundation (Phase 2 Step 2.1). Отдельный bounded context со своей
+// схемой БД. Владеет ТОЛЬКО Sales-сущностями (Lead/Opportunity/Quote/Sale +
+// history). НЕ владеет Order/Booking/Payment/Finance; НЕ пишет в Catalog/CRM/
+// Order/Booking/Security (ADR-0001). Cross-context ссылки (customerId/productId/
+// assignedToId) — по ID без FK, валидируются сервисом read-by-ID.
+//
+// Инварианты:
+//  - Sale ≠ Order: foundation-статусы НЕ означают OrderRequested/paid/fulfilled;
+//    граница Sale completion → OrderRequested — Step 2.4 (здесь НЕ публикуется);
+//  - behavioral события (Marketplace/Storefront) НЕ создают Lead автоматически;
+//  - money-поля ОСОЗНАННО отсутствуют: monetary contract — Step 2.3A/2.4;
+//  - temporal: createdAt/updatedAt (entity time); lifecycle milestones — только
+//    реальные transition-команды (НЕ updatedAt); новых legacy-строк нет.
+
+/// Lifecycle Lead (Step 2.1, минимальный): NEW → QUALIFIED (готовность к
+/// сделке) | DISQUALIFIED (терминал). Дальнейшая семантика — Sales Center (2.2).
+enum LeadStatus {
+  NEW
+  QUALIFIED
+  DISQUALIFIED
+
+  @@schema("sales")
+}
+
+/// Ранняя sales-сущность (интерес). НЕ behavioral event и НЕ автоматический
+/// consumer телеметрии (ContactClick — intent signal, не canonical Lead).
+/// Контакты/PII не копируются — предпочтителен canonical customerId
+/// (crm.Customer ref); ранний Lead может быть без Customer (только name).
+model Lead {
+  id          String     @id @default(uuid())
+  code        String     @unique // LED-00000001 (IdsService, атомарный счётчик)
+  name        String
+  /// Ссылка на crm.Customer (без FK). NULL для раннего Lead-интереса.
+  customerId  String?
+  /// Ссылка на security.User (ответственный, без FK). НЕ является security source.
+  assignedToId String?
+  status      LeadStatus @default(NEW)
+  version     Int        @default(1)
+  createdById String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  opportunities Opportunity[]
+  history       LeadHistory[]
+
+  @@index([status])
+  @@index([customerId])
+  @@index([assignedToId])
+  // Step 2.2 (Sales Center): композитные индексы под реальные filter/queue паттерны
+  // (status + createdAt период; assignedToId + status). Не speculative — соответствуют
+  // добавленным фильтрам list/KPI/queues.
+  @@index([status, createdAt])
+  @@index([assignedToId, status])
+  @@schema("sales")
+}
+
+/// Журнал Lead (audit by default) — история создания/правок/переходов.
+model LeadHistory {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  action    String
+  from      String?
+  to        String?
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@schema("sales")
+}
+
+/// Lifecycle Opportunity (Step 2.1, минимальный): NEW → OPEN → WON | LOST
+/// (терминалы). Полная Sales Center семантика — Step 2.2.
+enum OpportunityStatus {
+  NEW
+  OPEN
+  WON
+  LOST
+
+  @@schema("sales")
+}
+
+/// Sales opportunity внутри Sales domain. НЕ Order pre-state: lifecycle
+/// остаётся внутри Sales; никаких Order-related статусов.
+model Opportunity {
+  id           String            @id @default(uuid())
+  code         String            @unique // OPP-00000001
+  title        String
+  leadId       String?
+  lead         Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customerId   String?
+  assignedToId String?
+  status       OpportunityStatus @default(NEW)
+  version      Int               @default(1)
+  createdById  String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  quotes  Quote[]
+  sales   Sale[]
+  history OpportunityHistory[]
+
+  @@index([status])
+  @@index([leadId])
+  @@index([customerId])
+  // Step 2.2: композитные индексы (status + createdAt, assignedToId + status).
+  @@index([status, createdAt])
+  @@index([assignedToId, status])
+  @@schema("sales")
+}
+
+/// Журнал Opportunity (audit by default).
+model OpportunityHistory {
+  id            String   @id @default(uuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  action        String
+  from          String?
+  to            String?
+  fields        Json?
+  actorId       String?
+  actorName     String?
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  @@index([opportunityId])
+  @@schema("sales")
+}
+
+/// Lifecycle Quote (Step 2.1, integrity-минимум): DRAFT → ISSUED.
+/// Полный commercial offer flow (pricing/discounts/validity/acceptance/PDF) —
+/// Step 2.3; здесь никаких pricing/тарифов/snapshot и scheduler-ов.
+enum QuoteStatus {
+  DRAFT
+  ISSUED
+
+  @@schema("sales")
+}
+
+/// Step 2.3: тип скидки на КП (минимальная модель: NONE/PERCENTAGE/FIXED).
+/// PERCENTAGE — процент от subtotal (0..100); FIXED — фиксированная сумма в
+/// валюте КП (0..subtotal). Backend вычисляет discountAmount; клиент передаёт
+/// только value-параметр в разрешённых пределах. Никаких promo/coupon/campaign.
+enum QuoteDiscountType {
+  NONE
+  PERCENTAGE
+  FIXED
+
+  @@schema("sales")
+}
+
+/// Quote foundation. Money-поля отсутствуют осознанно (см. sales header).
+model Quote {
+  id            String      @id @default(uuid())
+  code          String      @unique // QTE-00000001
+  customerId    String?
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  /// Canonical Catalog Product ref (без FK), предмет КП.
+  /// Step 2.3: legacy/foundation single-ref колонка. Новый commercial flow
+  /// использует QuoteItem (состав) — колонка остаётся nullable с честной
+  /// семантикой (quote, созданные до 2.3, могут нести одиночный ref).
+  productId     String?
+  status        QuoteStatus @default(DRAFT)
+  version       Int         @default(1)
+  createdById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // ── Step 2.3 — Commercial Offer (money/validity/discount, backend-authoritative) ──
+  /// Единая валюта КП (ISO 4217 code). Источник — Catalog Tariff.currency
+  /// (все items одной валюты; свободный список не вводится — Finance Currency
+  /// master data — будущий домен). Для DRAFT — валюта первого item.
+  currency String @default("USD")
+  /// Срок действия коммерческого предложения (UTC instant). Обязателен при ISSUE;
+  /// server validates > now. Не заменяет issuedAt (temporal contract).
+  validUntil   DateTime?
+  /// Lifecycle time ISSUE (temporal contract; updatedAt не заменяет).
+  issuedAt     DateTime?
+  discountType QuoteDiscountType @default(NONE)
+  /// PERCENTAGE: 0..100; FIXED: >= 0 (в валюте КП). Игнорируется при NONE.
+  discountValue Decimal? @db.Decimal(12, 2)
+  /// Вычисленное backend-ом значение скидки (subtotal - total), замораживается при ISSUE.
+  discountAmount Decimal? @db.Decimal(12, 2)
+  /// Сумма строк (без скидки). Для DRAFT — вычисляется при чтении; персистится при ISSUE.
+  subtotal Decimal? @db.Decimal(12, 2)
+  /// Итог = subtotal - discountAmount (>= 0). Персистится при ISSUE (immutable).
+  total Decimal? @db.Decimal(12, 2)
+
+  sale      Sale?
+  history   QuoteHistory[]
+  items     QuoteItem[]
+  travelers QuoteTraveler[]
+
+  @@index([status])
+  @@index([opportunityId])
+  @@index([customerId])
+  // Step 2.2: композитный индекс (status + createdAt).
+  @@index([status, createdAt])
+  @@schema("sales")
+}
+
+/// Step 2.3: строка коммерческого предложения — Sales-owned immutable snapshot
+/// Catalog Product/Tariff (продукт и тариф остаются Catalog-owned; КП НЕ копирует
+/// Catalog ownership). Snapshot фиксируется при формировании DRAFT и замораживается
+/// при ISSUE: последующие изменения Catalog не меняют issued КП.
+model QuoteItem {
+  id      String @id @default(uuid())
+  quoteId String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  /// Canonical refs (без FK, ADR-0001).
+  productId String
+  /// Snapshot канонического кода (PRD-*) для исторического display.
+  productCode String
+  /// Snapshot названия Product.
+  productTitle String
+  tariffId String
+  /// Snapshot кода тарифа (TRF-*).
+  tariffCode String
+  /// Snapshot названия Tariff.
+  tariffName String
+
+  /// Количество/участники (>= 1).
+  quantity Int @default(1)
+  /// Snapshot unit price из Catalog Tariff (Decimal(12,2), backend-authoritative).
+  unitPrice Decimal @db.Decimal(12, 2)
+  /// Валюта тарифа (единая для КП).
+  currency String @default("USD")
+  /// Сумма строки = unitPrice * quantity (backend, Decimal, без JS float).
+  amount Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([quoteId])
+  @@schema("sales")
+}
+
+/// Step 2.3: Sales-owned pre-order traveler context (кто входит в предложение).
+/// МИНИМУМ для offer composition/pricing: имя + опциональная дата рождения
+/// (age-based pricing). НЕ копирует passport/document/payment data (OrderTraveler /
+/// Passenger — свои домены; паспортные данные — только при доказанной необходимости
+/// в их доменах, Step 2.5 создаст OrderTraveler из canonical snapshot).
+model QuoteTraveler {
+  id        String @id @default(uuid())
+  quoteId   String
+  quote     Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  firstName String
+  lastName  String
+  birthDate DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([quoteId])
+  @@schema("sales")
+}
+
+/// Журнал Quote (audit by default).
+model QuoteHistory {
+  id        String   @id @default(uuid())
+  quoteId   String
+  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  action    String
+  from      String?
+  to        String?
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([quoteId])
+  @@schema("sales")
+}
+
+/// Lifecycle Sale (Step 2.1, минимальный): OPEN → CLOSED (закрытие в
+/// sales-контексте). НЕ означает paid/fulfilled/OrderRequested.
+enum SaleStatus {
+  OPEN
+  CLOSED
+
+  @@schema("sales")
+}
+
+/// Sale — Sales-domain entity. НЕ Order: не создаёт Order/Booking/Payment,
+/// не резервирует Availability, не меняет inventory. Sale completion →
+/// canonical OrderRequested — Step 2.4 (единственная граница).
+model Sale {
+  id            String     @id @default(uuid())
+  code          String     @unique // SAL-00000001
+  customerId    String?
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  quoteId       String?     @unique
+  quote         Quote?      @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  status        SaleStatus  @default(OPEN)
+  version       Int         @default(1)
+  createdById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  history       SaleHistory[]
+
+  @@index([status])
+  @@index([opportunityId])
+  @@index([customerId])
+  // Step 2.2: композитный индекс (status + createdAt).
+  @@index([status, createdAt])
+  @@schema("sales")
+}
+
+/// Журнал Sale (audit by default).
+model SaleHistory {
+  id        String   @id @default(uuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  action    String
+  from      String?
+  to        String?
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([saleId])
+  @@schema("sales")
 }

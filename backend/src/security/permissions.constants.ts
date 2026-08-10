@@ -69,6 +69,10 @@ export const PERMISSIONS = {
   "sales.sale.read": "Чтение продаж",
   "sales.sale.write": "Управление продажами",
   "sales.sale.complete": "Завершение продажи",
+  // Step 2.2 (N2 review): агрегированный Sales read model (KPI). ТОЛЬКО
+  // count-based операционные метрики БЕЗ raw entity labels/IDs — для ролей,
+  // которым не нужны raw Lead/Opportunity/Quote/Sale details (ANALYST/MARKETER).
+  "sales.kpi.read": "Чтение агрегированного Sales read model (KPI, count-based)",
 
   // ── Finance (Phase 2, каталог прав зарезервирован) ───────────────────
   "finance.payment.read": "Чтение платежей",
@@ -166,6 +170,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "sales.opportunity.read",
     "sales.quote.read",
     "sales.sale.read",
+    "sales.kpi.read",
     "finance.payment.read",
     "finance.refund.read",
     "finance.invoice.read",
@@ -192,6 +197,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // customer-контекст вместе с Phase-2 finance endpoints по принципу grant-with-endpoint.
     "order.read",
     "booking.read",
+    // Step 2.2 (N2 review): FINANCE сохраняет ТОЛЬКО sales.sale.read (sale-level
+    // visibility, финансовая релевантность для будущей сверки); Lead/Opportunity/
+    // Quote raw details отозваны (Finance domain ещё отсутствует, business need
+    // не доказан). KPI не выдаётся (нет finance-контракта).
     "sales.sale.read",
     "finance.payment.read",
     "finance.payment.write",
@@ -217,9 +226,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // Step 1.17 review: crm.customer.read отозван — Phase 1 не имеет маркетинговых
     // endpoints (leads/opportunities — Phase 2); клиентские master-данные с PII
     // не выдаются без текущего контракта.
-    "sales.lead.read",
-    "sales.opportunity.read",
-    "sales.sale.read",
+    // Step 2.2 (N2 review): raw Sales entity reads ОТОЗВАНЫ (Lead name — display
+    // PII-adjacent, маркетингу raw-детали не нужны). Только агрегированный
+    // count-based KPI (sales.kpi.read) — без entity labels/IDs/queues.
+    "sales.kpi.read",
     "analytics.read",
     "reports.read",
     "settings.read",
@@ -234,10 +244,11 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // (контакты/PII) выдаются только вместе с Phase-2 analytics контрактом.
     "order.read",
     "booking.read",
-    "sales.lead.read",
-    "sales.opportunity.read",
-    "sales.quote.read",
-    "sales.sale.read",
+    // Step 2.2 (N2 review): raw Sales entity reads ОТОЗВАНЫ (Lead name — display
+    // PII-adjacent; аналитику нужны агрегаты, не raw-детали). Только count-based
+    // KPI (sales.kpi.read) без entity labels/IDs/queues; raw доступ вернётся
+    // вместе с Phase-3 analytics контрактом при доказанном business need.
+    "sales.kpi.read",
     "finance.payment.read",
     "finance.refund.read",
     "finance.invoice.read",
@@ -295,6 +306,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "sales.sale.read",
     "sales.sale.write",
     "sales.sale.complete",
+    "sales.kpi.read",
     "finance.payment.read",
     "finance.refund.read",
     "finance.invoice.read",

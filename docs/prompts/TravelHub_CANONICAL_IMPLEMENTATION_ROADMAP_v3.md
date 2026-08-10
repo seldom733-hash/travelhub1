@@ -535,6 +535,18 @@ approval ≠ payout-ready.
 · **Step 3.12D --- Notifications Foundation**\
 Email/SMS/in-app events, templates, preferences, retry/delivery.
 
+· **Step 3.12E --- Organization Capability & Navigation Access Model**\
+Зафиксировано в Step 2.2 (Sales Center review): роли = permission presets,
+не постоянные organizational job boundaries. Один internal user архитектурно
+может совмещать capabilities нескольких work centers (Customers/Sales/Suppliers/
+Orders/Bookings/Communications/Finance) — особенно для малых организаций.
+Backend authority — permission/capability-based (системные роли — пресеты),
+per-user capability assignment поддерживается архитектурно (permissions
+независимы от role names; DB-маппинг user→permission возможен без правки
+доменного кода; guards проверяют permissions). Sidebar/navigation —
+permission-driven (backend authoritative; скрытие меню ≠ security).
+Admin UI управления ролями/капабилити — в Step 3.13 Users & Access Center UI.
+
 · **Step 3.13 --- Users & Access Center UI**
 
 · **Step 3.14 --- Security Hardening**\

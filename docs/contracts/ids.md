@@ -22,9 +22,14 @@
 | `SF-` | PartnerStorefront | Catalog (storefront) |
 | `APP-` | PartnerApplication | Security (onboarding) |
 | `USR-` | User (staff/role accounts) | Security |
+| `LED-` | Lead | Sales |
+| `OPP-` | Opportunity | Sales |
+| `QTE-` | Quote | Sales |
+| `SAL-` | Sale | Sales |
 
 *Exit Audit Step 1.18:* таблица синхронизирована с фактическим реестром
 `IdsService.nextCode` (PRD/CAT/TRF/CUS/CNT/COM/PAR/SUP/ORD/TH/BKG/CML/SELL/SPP/SF/APP/USR).
+*Step 2.1:* добавлены Sales-префиксы LED/OPP/QTE/SAL (sales.*, Phase 2).
 
 Формат: `PREFIX-` + число, дополненное слева нулями (8 цифр; для
 `TH-YYYY-######` — 6 цифр, последовательность сквозная по году).

@@ -8,6 +8,7 @@ import { CrmModule } from "./modules/crm/crm.module";
 import { OrderModule } from "./modules/order/order.module";
 import { BookingModule } from "./modules/booking/booking.module";
 import { CommunicationModule } from "./modules/communication/communication.module";
+import { SalesModule } from "./modules/sales/sales.module";
 import { SecurityModule } from "./security/security.module";
 import { JwtAuthGuard } from "./security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "./security/auth/permissions.guard";
@@ -20,7 +21,7 @@ import { PermissionsGuard } from "./security/auth/permissions.guard";
  * открывает эндпоинты), PermissionsGuard глобально (проверка @RequirePermissions).
  */
 @Module({
-  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, OrderModule, BookingModule, CommunicationModule],
+  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, OrderModule, BookingModule, CommunicationModule, SalesModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

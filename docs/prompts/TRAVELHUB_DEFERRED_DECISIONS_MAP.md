@@ -374,6 +374,31 @@ domain, staff и другими SaaS-возможностями.
 
 ------------------------------------------------------------------------
 
+## DD-021 --- Per-User Capability Assignment & Admin Management UI
+
+**Status:** DEFERRED
+
+**Already Decided (Step 2.2 review):** backend authority —
+permission/capability-based; system roles = presets (не постоянные
+organizational job boundaries); один internal user может совмещать
+capabilities нескольких work centers (Customers/Sales/Suppliers/Orders/
+Bookings/Communications/Finance) — особенно для малых организаций.
+Permissions существуют независимо от role names; DB-маппинг user→permission
+архитектурно возможен без правки доменного кода; guards проверяют
+permissions; sidebar — permission-driven (backend authoritative).
+
+**Still Open:** admin UI назначения per-user capabilities (сверх роли),
+organization-defined access, UX совмещения work centers, дедупликация
+роль vs per-user grants.
+
+**Do Not Implement Yet:** без UI и без изменения существующей матрицы
+(роли остаются единственным активным механизмом назначения).
+
+**Return Point:** Step 3.12E (Organization Capability & Navigation Access
+Model) + Step 3.13 (Users & Access Center UI).
+
+------------------------------------------------------------------------
+
 # Правило пополнения
 
 1.  Новый отложенный вопрос → следующий `DD-XXX`.
@@ -394,12 +419,12 @@ Deferred Decisions Map не отменяет действующий ADR.
 
 # Current Register State
 
--   Total: **20**
--   DEFERRED: **20**
+-   Total: **21**
+-   DEFERRED: **21**
 -   IN_REVIEW: **0**
 -   DECIDED: **0**
 -   SUPERSEDED: **0**
--   Next ID: **DD-021**
+-   Next ID: **DD-022**
 
 ------------------------------------------------------------------------
 
