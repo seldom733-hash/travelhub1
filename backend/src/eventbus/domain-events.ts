@@ -172,6 +172,12 @@ export interface PartnerEventPayload {
  * БЕЗ PII: traveler details (имена/даты рождения) НЕ копируются в durable
  * outbox payload — Order consumer получит их canonical-чтением Sales-owned
  * CheckoutIntent при необходимости (Step 2.5). Только canonical refs.
+ *
+ * STRICT REVIEW 2.5 (fix):
+ *  - `reservationIds` — ВСЕ catalog.AvailabilityReservation holds (один на item,
+ *    детерминированный порядок); `reservationId` — первичный (первый) ref;
+ *  - item `productType` — frozen стабильная классификация Product (consumer
+ *    НЕ читает catalog.* для OrderItem.type — полная self-sufficiency).
  */
 export interface OrderRequestedPayload {
   /** Payload schema version (независим от event version). */
@@ -182,13 +188,17 @@ export interface OrderRequestedPayload {
   checkoutCode: string;
   quoteId: string;
   customerId: string | null;
-  /** Reserved inventory (catalog.AvailabilityReservation ref, без FK). */
+  /** Primary (первая) capacity hold (catalog.AvailabilityReservation ref, без FK). */
   reservationId: string | null;
+  /** ВСЕ capacity holds этого Sale (один на item, порядок = порядок items). */
+  reservationIds: string[];
   /** Детерминированный состав (frozen QuoteItem snapshot). */
   items: Array<{
     productId: string;
     productCode: string;
     productTitle: string;
+    /** Frozen стабильная классификация Product (для OrderItem.type). */
+    productType: string;
     tariffId: string;
     tariffCode: string;
     quantity: number;
@@ -217,17 +227,19 @@ export interface OrderEventPayload {
   orderId: string;
   code: string;
   number: string;
-  customerId: string;
+  /** NULL — internal assisted flow без CRM-клиента (Step 2.5 canonical Order). */
+  customerId: string | null;
   amount: string;
   currency: string;
 }
 
 /** Канонический Order ref (Step 1.14): минимальный payload для факт-событий
- *  (ReadyForBooking / Fulfilled / Closed / Cancelled). Без PII, без raw Prisma. */
+ *  (ReadyForBooking / Fulfilled / Closed / Cancelled). Без PII, без raw Prisma.
+ *  customerId может быть NULL (canonical Order без CRM-клиента, Step 2.5). */
 export interface OrderRefPayload {
   orderId: string;
   code: string;
-  customerId: string;
+  customerId: string | null;
 }
 
 /**
@@ -235,11 +247,12 @@ export interface OrderRefPayload {
  * (BookingSubscribers) читает order.items/order.travelers из БД по orderId
  * (READ-only, ADR-0001) — items/travelers в payload были РЕДУНДАНТНЫ и несли
  * паспортные данные туристов в durable Outbox. Остаются только canonical refs.
+ * customerId может быть NULL (canonical Order без CRM-клиента, Step 2.5).
  */
 export interface BookingRequestedPayload {
   orderId: string;
   orderCode: string;
-  customerId: string;
+  customerId: string | null;
 }
 
 export interface BookingEventPayload {

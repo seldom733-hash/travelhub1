@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import type { Prisma, OrderStatus } from "../../generated/prisma/client";
+import { Prisma } from "../../generated/prisma/client";
+import type { OrderStatus } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import {
@@ -7,10 +8,13 @@ import {
   type BookingRequestedPayload,
   type OrderEventPayload,
   type OrderRefPayload,
+  type OrderRequestedPayload,
 } from "../../eventbus/domain-events";
 import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
+import { isDateOnly } from "../../shared/date-only";
+import { PaymentPrepaymentType, PaymentScheme, QuoteDiscountType, SalesAcquisitionSource } from "../../generated/prisma/enums";
 
 export interface BootstrapOrderInput {
   customerId: string;
@@ -79,6 +83,129 @@ const ACTION_LABELS: Record<OrderAction, string> = {
 };
 
 /**
+ * Step 2.5 — строгая валидация OrderRequested payload (PURE).
+ *
+ * Consumer НЕ создаёт Order из malformed/unsupported события: невалидный
+ * payload → ValidationDomainError → транзакция откатывается (никакого
+ * partial Order graph), событие FAILED (retryable → poison после max попыток —
+ * честно: это дефект ленты).
+ */
+export function assertValidOrderRequestedPayload(p: unknown): asserts p is OrderRequestedPayload {
+  if (p === null || typeof p !== "object") {
+    throw new ValidationDomainError("OrderRequested payload is not an object");
+  }
+  const x = p as Partial<OrderRequestedPayload>;
+  if (x.version !== 1) {
+    throw new ValidationDomainError(`OrderRequested payload version ${String(x.version)} is not supported`);
+  }
+  for (const f of ["saleId", "saleCode", "checkoutId", "checkoutCode", "quoteId"] as const) {
+    if (typeof x[f] !== "string" || (x[f] as string).trim().length === 0) {
+      throw new ValidationDomainError(`OrderRequested payload is missing ${f}`);
+    }
+  }
+  if (x.customerId !== null && x.customerId !== undefined && (typeof x.customerId !== "string" || x.customerId.trim().length === 0)) {
+    throw new ValidationDomainError("OrderRequested payload customerId is invalid");
+  }
+  if (!Array.isArray(x.reservationIds)) {
+    throw new ValidationDomainError("OrderRequested payload reservationIds must be an array");
+  }
+  for (const rid of x.reservationIds) {
+    if (typeof rid !== "string" || rid.trim().length === 0) {
+      throw new ValidationDomainError("OrderRequested payload reservationIds contains an invalid ref");
+    }
+  }
+  if (!Array.isArray(x.items) || x.items.length === 0) {
+    throw new ValidationDomainError("OrderRequested payload items must be a non-empty array");
+  }
+  // Инвариант версии 1: ОДИН hold на item (Step 2.4 резервирует все items
+  // атомарно). Несоответствие = противоречивые durable-данные → отклоняются
+  // (не копятся в Order как потерянный ref).
+  if (x.reservationIds.length !== x.items.length) {
+    throw new ValidationDomainError("OrderRequested payload reservationIds count must match items count (one hold per item)");
+  }
+  for (const [i, it] of x.items.entries()) {
+    if (it === null || typeof it !== "object") {
+      throw new ValidationDomainError(`OrderRequested item[${i}] is invalid`);
+    }
+    const item = it as Record<string, unknown>;
+    for (const f of ["productId", "productCode", "productTitle", "productType", "tariffId", "tariffCode"] as const) {
+      if (typeof item[f] !== "string" || (item[f] as string).trim().length === 0) {
+        throw new ValidationDomainError(`OrderRequested item[${i}] is missing ${f}`);
+      }
+    }
+    if (typeof item.quantity !== "number" || !Number.isInteger(item.quantity) || item.quantity < 1) {
+      throw new ValidationDomainError(`OrderRequested item[${i}] quantity must be a positive integer`);
+    }
+    assertOrderMoney(item.unitPrice as string | null | undefined, `item[${i}].unitPrice`);
+    assertOrderMoney(item.amount as string | null | undefined, `item[${i}].amount`);
+  }
+  if (typeof x.currency !== "string" || x.currency.trim().length === 0) {
+    throw new ValidationDomainError("OrderRequested payload currency is missing");
+  }
+  // subtotal/total — обязательные поля контракта (OrderRequestedPayload):
+  // строго строки (assertOrderMoney допускает null для опциональных полей).
+  if (typeof x.subtotal !== "string" || x.subtotal.trim().length === 0) {
+    throw new ValidationDomainError("OrderRequested payload subtotal is missing");
+  }
+  assertOrderMoney(x.subtotal, "subtotal");
+  if (typeof x.total !== "string" || x.total.trim().length === 0) {
+    throw new ValidationDomainError("OrderRequested payload total is missing");
+  }
+  assertOrderMoney(x.total, "total");
+  // Known-value whitelists (STRICT REVIEW 2.5): snapshot-поля, на которые
+  // downstream полагается как на классификацию — unknown значения отклоняются
+  // (не копятся в Order как мусор). Значения берутся из канонических enum-ов
+  // (без drift-риска строковых дубликатов).
+  if (!(Object.values(QuoteDiscountType) as string[]).includes(x.discountType as string)) {
+    throw new ValidationDomainError(`OrderRequested payload discountType ${String(x.discountType)} is not supported`);
+  }
+  if (
+    x.paymentScheme !== null &&
+    x.paymentScheme !== undefined &&
+    !(Object.values(PaymentScheme) as string[]).includes(x.paymentScheme as string)
+  ) {
+    throw new ValidationDomainError(`OrderRequested payload paymentScheme ${String(x.paymentScheme)} is not supported`);
+  }
+  if (
+    x.prepaymentType !== null &&
+    x.prepaymentType !== undefined &&
+    !(Object.values(PaymentPrepaymentType) as string[]).includes(x.prepaymentType as string)
+  ) {
+    throw new ValidationDomainError(`OrderRequested payload prepaymentType ${String(x.prepaymentType)} is not supported`);
+  }
+  for (const f of ["discountValue", "discountAmount", "prepaymentValue", "initialAmount", "remainingAmount"] as const) {
+    assertOrderMoney(x[f] as string | null | undefined, f);
+  }
+  if (!(Object.values(SalesAcquisitionSource) as string[]).includes(x.acquisitionSource as string)) {
+    throw new ValidationDomainError(`OrderRequested payload acquisitionSource ${String(x.acquisitionSource)} is not supported`);
+  }
+  if (x.serviceDate !== null && x.serviceDate !== undefined) {
+    // Реальная календарная дата (YYYY-MM-DD) — канонический isDateOnly из
+    // src/shared (round-trip): 2026-02-29/2026-13-01/2026-04-31 НЕ проходят.
+    if (typeof x.serviceDate !== "string" || !isDateOnly(x.serviceDate as string)) {
+      throw new ValidationDomainError("OrderRequested payload serviceDate is invalid");
+    }
+  }
+}
+
+/** Money-проверка frozen snapshot: string, parseable Decimal, >= 0. NULL/undefined — ок. */
+function assertOrderMoney(v: string | null | undefined, label: string): void {
+  if (v === null || v === undefined) return;
+  if (typeof v !== "string" || v.trim().length === 0) {
+    throw new ValidationDomainError(`OrderRequested payload ${label} is invalid`);
+  }
+  let d: Prisma.Decimal;
+  try {
+    d = new Prisma.Decimal(v);
+  } catch {
+    throw new ValidationDomainError(`OrderRequested payload ${label} is not a valid amount`);
+  }
+  if (d.isNegative()) {
+    throw new ValidationDomainError(`OrderRequested payload ${label} must be >= 0`);
+  }
+}
+
+/**
  * Order Center — единственный владелец Order/OrderItem/OrderTraveler/Fulfillment.
  * Не владеет Customer/Product/Booking (только ID-ссылки).
  * Публикует (Step 1.14 canonical): OrderCreated, OrderReadyForBooking (confirm),
@@ -103,6 +230,9 @@ export class OrderService {
     const result = await this.prisma.$transaction(async (tx) => {
       const code = await this.ids.nextCode(tx, "ORD");
       const number = await this.ids.nextOrderNumber(tx);
+      // Step 2.5A: submission milestone = момент входа заказа в систему
+      // (server-owned, один timestamp на создание; НЕ заменяет createdAt).
+      const submittedAt = new Date();
 
       const order = await tx.order.create({
         data: {
@@ -116,6 +246,7 @@ export class OrderService {
           paidAmount: 0,
           serviceDate: input.serviceDate ? new Date(input.serviceDate) : null,
           version: 1,
+          submittedAt,
           createdBy: actor ?? null,
           updatedBy: actor ?? null,
         },
@@ -198,6 +329,153 @@ export class OrderService {
 
     await this.eventBus.publishPending();
     return result;
+  }
+
+  /**
+   * Step 2.5 — canonical Order creation из OrderRequested (domain-owned logic).
+   *
+   * Вызывается OrderRequestedConsumer ВНУТРИ транзакции consumer-а: весь граф
+   * Order (Order + OrderItems + OrderTraveler + Fulfillment + OrderHistory +
+   * OrderCreated result-event) атомарен. Владелец — Order (ADR-0001); Sales
+   * НЕ пишет в order.*; Order НЕ пишет в sales.* и catalog.* (только READ-only
+   * cross-context reads в consumer-е).
+   *
+   * Инварианты:
+   *  - frozen commercial snapshot переносится БЕЗ пересчёта (никакого reprice,
+   *    никакого чтения mutable Catalog/Sales price);
+   *  - money — Decimal (без JS float); amount = frozen total;
+   *  - канонические ID: ORD-* + TH-YYYY-###### (IdsService, атомарно);
+   *  - OrderTraveler — минимальный snapshot (firstName/lastName/birthDate,
+   *    dataCompleteness=INCOMPLETE — passport данные не входят в checkout
+   *    контекст, дополняются позже через PATCH /travelers);
+   *  - OrderCreated (PUBLISHED result-event) — атомарно с Order (emitResult).
+   */
+  async createOrderFromRequested(
+    tx: Prisma.TransactionClient,
+    input: {
+      payload: OrderRequestedPayload;
+      /** Canonical traveler контекст из Sales CheckoutIntent (READ-only,
+       *  immutable после Sale completion — Step 2.4 assertCheckoutNotCompleted). */
+      travelers: Array<{ firstName: string; lastName: string; birthDate: Date | null }>;
+      orderRequestedEventId: string;
+      correlationId: string | null;
+      causationId: string | null;
+    },
+  ): Promise<{ order: { id: string; code: string; number: string; customerId: string | null }; eventId: string }> {
+    const { payload, travelers } = input;
+    assertValidOrderRequestedPayload(payload);
+
+    const code = await this.ids.nextCode(tx, "ORD");
+    const number = await this.ids.nextOrderNumber(tx);
+    const customerId = payload.customerId ?? null;
+    const serviceDate = payload.serviceDate ? new Date(`${payload.serviceDate}T00:00:00.000Z`) : null;
+    const currency = payload.currency;
+    const amount = new Prisma.Decimal(payload.total);
+    // Step 2.5A: submission milestone — момент создания Order из OrderRequested
+    // (server-owned, один timestamp на создание).
+    const submittedAt = new Date();
+
+    const order = await tx.order.create({
+      data: {
+        code,
+        number,
+        customerId,
+        status: "NEW",
+        paymentStatus: "UNPAID",
+        currency,
+        amount,
+        paidAmount: new Prisma.Decimal(0),
+        serviceDate,
+        version: 1,
+        submittedAt,
+        // Step 2.5: upstream refs + frozen snapshot (из OrderRequested).
+        saleId: payload.saleId,
+        saleCode: payload.saleCode,
+        quoteId: payload.quoteId,
+        checkoutId: payload.checkoutId,
+        reservationId: payload.reservationId ?? null,
+        // Все holds (multi-item Sale без потери кардинальности, STRICT REVIEW 2.5).
+        reservationIds: payload.reservationIds.length > 0 ? payload.reservationIds : Prisma.JsonNull,
+        orderRequestedEventId: input.orderRequestedEventId,
+        subtotal: new Prisma.Decimal(payload.subtotal),
+        discountType: payload.discountType,
+        discountValue: payload.discountValue ? new Prisma.Decimal(payload.discountValue) : null,
+        discountAmount: payload.discountAmount ? new Prisma.Decimal(payload.discountAmount) : null,
+        paymentScheme: payload.paymentScheme ?? null,
+        prepaymentType: payload.prepaymentType ?? null,
+        prepaymentValue: payload.prepaymentValue ? new Prisma.Decimal(payload.prepaymentValue) : null,
+        initialAmount: payload.initialAmount ? new Prisma.Decimal(payload.initialAmount) : null,
+        remainingAmount: payload.remainingAmount ? new Prisma.Decimal(payload.remainingAmount) : null,
+        acquisitionSource: payload.acquisitionSource,
+      },
+      select: { id: true, code: true, number: true, customerId: true },
+    });
+
+    for (const it of payload.items) {
+      await tx.orderItem.create({
+        data: {
+          orderId: order.id,
+          productId: it.productId,
+          productCode: it.productCode,
+          title: it.productTitle,
+          type: it.productType, // frozen в payload (не mutable Catalog read)
+          quantity: it.quantity,
+          price: new Prisma.Decimal(it.unitPrice),
+          currency,
+          amount: new Prisma.Decimal(it.amount),
+          serviceDate,
+        },
+      });
+    }
+
+    for (const t of travelers) {
+      await tx.orderTraveler.create({
+        data: {
+          orderId: order.id,
+          customerId,
+          firstName: t.firstName,
+          lastName: t.lastName,
+          birthDate: t.birthDate,
+          dataCompleteness: "INCOMPLETE",
+          version: 1,
+        },
+      });
+    }
+
+    await tx.fulfillment.create({ data: { orderId: order.id, status: "NOT_STARTED", notes: null } });
+
+    await tx.orderHistory.create({
+      data: {
+        orderId: order.id,
+        action: "created",
+        to: "NEW",
+        actorId: null,
+        actorName: "Система",
+        comment: "Заказ создан из OrderRequested (Step 2.5)",
+        fields: { saleCode: payload.saleCode, orderRequestedEventId: input.orderRequestedEventId },
+      },
+    });
+
+    // OrderCreated — result-event: пишется сразу PUBLISHED в той же транзакции
+    // (факт в ленте атомарно с Order; НЕ виден без committed Order).
+    // correlation/causation — из родительского OrderRequested (Step 1.15).
+    const eventId = await this.eventBus.emitResult(tx, {
+      aggregateType: "Order",
+      aggregateId: order.id,
+      eventType: DomainEvents.OrderCreated,
+      payload: {
+        orderId: order.id,
+        code: order.code,
+        number: order.number,
+        customerId: order.customerId,
+        amount: String(amount),
+        currency,
+      } as OrderEventPayload,
+      correlationId: input.correlationId,
+      causationId: input.causationId,
+    });
+
+    return { order, eventId };
   }
 
   async listOrders(
@@ -321,9 +599,22 @@ export class OrderService {
       // статус/версия не изменились с момента чтения. Два concurrent/retry вызова
       // одного перехода → ровно ОДИН выигрывает, остальные получают ConflictError,
       // и canonical event не создаётся дважды как два business facts.
+      // Step 2.5A: business milestone timestamp фиксируется в ТОМ ЖЕ CAS-апдейте,
+      // что и статус (атомарно; один timestamp на переход; повторный переход
+      // невозможен lifecycle-ом → immutable milestone).
+      const data: Prisma.OrderUpdateManyMutationInput = {
+        status: transition.to,
+        version: { increment: 1 },
+        updatedBy: actor ?? null,
+      };
+      const milestoneNow = new Date();
+      if (action === "confirm") data.confirmedAt = milestoneNow;
+      else if (action === "complete") data.fulfilledAt = milestoneNow;
+      else if (action === "close") data.closedAt = milestoneNow;
+      else if (action === "cancel") data.cancelledAt = milestoneNow;
       const updatedRows = await tx.order.updateMany({
         where: { id: orderId, status: order.status, version: order.version },
-        data: { status: transition.to, version: { increment: 1 }, updatedBy: actor ?? null },
+        data,
       });
       if (updatedRows.count !== 1) {
         throw new ConflictError(`Order ${order.code} was concurrently modified; retry transition ${action}`);

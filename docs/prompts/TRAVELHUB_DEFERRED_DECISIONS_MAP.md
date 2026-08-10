@@ -454,6 +454,216 @@ canonical Catalog options модели.
 
 ------------------------------------------------------------------------
 
+## DD-024 --- Rate Plan vs Existing Tariff (Canonical Commercial Variant)
+
+**Status:** DEFERRED
+
+**Already Decided (existing model):** `catalog.Tariff` — name/price/
+currency/validFrom/validTo, привязан к Product; `Availability` — на
+(productId, tariffId, date); QuoteItem снэпшотит tariff
+(price/currency/name); OrderItem хранит productId/code (без tariff ref);
+Step 2.4 — AvailabilityReservation per (productId, tariffId, date,
+quantity), один hold на item.
+
+**Evidence (STRICT REVIEW):** матрица «Tariff vs RatePlan»:
+identity/code — Tariff имеет `id` + canonical `TRF-*` (code unique);
+Product relation — `productId` (Cascade); ownership — Catalog;
+name — да; price/currency — `Decimal(12,2)` + `currency`;
+validFrom/validTo — да (семантика: sales/booking price validity window,
+см. `SalesService.resolveEligibleTariff`: validFrom>now → не активен,
+validTo<now → expired; НЕ service/stay period); meal plan / refundability /
+cancellation policy / included services / restrictions / price basis /
+occupancy — **отсутствуют** (нужно расширение); availability relation —
+`Availability` unique (productId, tariffId, date) и
+`AvailabilityReservation` per (productId, tariffId, date, quantity) —
+Tariff уже ключ availability; lifecycle — версионность
+(`version`), без статусного lifecycle; history/audit — НЕ является
+владельцем отдельного history-журнала.
+
+**Verdict (STRICT REVIEW): вариант A** — Tariff уже является
+каноническим коммерческим вариантом (identity, price, currency,
+validity, availability-ключ): расширять (meal plan/refundability/
+cancellation ref/included services/restrictions/price basis/occupancy),
+НЕ вводить параллельную RatePlan-сущность с пересекающейся authority.
+Только если расширение Tariff окажется невозможным (нет evidence),
+вернуться к вопросу. Пересечение authorities Tariff+RatePlan запрещено
+(Roadmap must never permit overlapping authorities).
+
+**Still Open (Roadmap Amendment §28/§29 Q1):** финальная форма расширения
+Tariff (колонки vs child-таблица vs JSON-контракт), price basis модель,
+категорийные расширения.
+
+**Do Not Implement Yet:** Rate Plan сущность, периодная привязка,
+price basis enum.
+
+**Return Point:** Step 1.8B (Rate Plan / Commercial Variant Foundation).
+
+**Resolution trigger:** решение подтверждается при implementation-design
+Step 1.8B (зафиксировано в Roadmap §1.8B: «если Tariff — правильный
+owner, extend»).
+
+------------------------------------------------------------------------
+
+## DD-025 --- Seller Commercial Unit Identity & CategorySchema Nesting
+
+**Status:** DEFERRED
+
+**Evidence (STRICT REVIEW):** `CategorySchema` — это schema **атрибутов
+Product**: плоский `attributes` Json (`[{key,label,type,required,
+searchable,filterable,options?,min?,max?,pattern?}]`), валидируемый
+против конкретного Product (`validateAttributes`), + конфиг-блоки
+(availability/tariffRules/mediaRequirements/pdpSections), версии
+DRAFT→ACTIVE→DEPRECATED. **Nesting/repeatable Seller commercial units
+(Hotel → Rooms) НЕ моделируется**: нет unit-уровневого identity,
+lifecycle, собственных атрибутов единицы, запросов «все Rooms отеля».
+Повторяемый JSON внутри attributes — НЕ достаточен для стабильной
+identity/lifecycle/availability-relation.
+
+**Still Open (Roadmap Amendment §29 Q2-Q3):** нужен ли first-class
+Seller commercial unit (Room/service-unit) как отдельная Catalog-
+сущность с identity/code/lifecycle (не Product, не attributes-JSON);
+если да — расширение CategorySchema НЕдостаточно →
+`ARCHITECTURE DECISION REQUIRED` при Step 1.8A implementation-design
+(зафиксировано в Roadmap §1.8A). Нормализованные unit-атрибуты
+(view/maxAdults/area/...) без замены исходного Seller-названия
+(invariant: names preserved verbatim). Для импорта: unit-сущность
+обязана иметь **стабильный source/external ID** (source + externalKey),
+чтобы повторные импорты reconcile-ились, а не дублировали единицы
+(§26 review).
+
+**Do Not Implement Yet:** Room/unit entity, nesting в CategorySchema,
+unit-level attributes.
+
+**Return Point:** Step 1.8A (Service Template / Seller Commercial
+Structure Foundation).
+
+**Resolution trigger:** при implementation-design Step 1.8A; если
+CategorySchema-расширение признано недостаточным — оформляется ADR до
+реализации.
+
+------------------------------------------------------------------------
+
+## DD-026 --- Commercial Period Temporal Semantics, Price Basis & Occupancy
+
+**Status:** DEFERRED
+
+**Still Open (Roadmap Amendment §13-15/§29 Q4, Q6-Q9):** к чему крепятся
+commercial periods (Tariff? Product variant? другая Catalog-owned
+сущность); sales validity period vs service/stay period vs booking
+window — раздельные концепции (не конвейерить молча; evidence:
+`Tariff.validFrom/validTo` = price/booking validity window, НЕ
+service/stay period); price basis модель (per room/night, per person,
+per package, per vehicle, per service, per group — category-
+appropriate); **occupancy/PAX влияет на price identity, а не только на
+filtering** (single/double/triple/2A+1C/child age bands могут менять
+базовую цену, а не быть просто атрибутом); overlap-резолюция
+overlapping periods — детерминированная server-side (никаких двух
+равнозначно-authoritative активных цен с недетерминированным выбором);
+server precedence base period vs date override — явный детерминированный
+порядок.
+
+**Do Not Implement Yet:** period entity, price basis, occupancy matrix.
+
+**Return Point:** Steps 1.8B/1.8C (Rate Plan / Period Pricing &
+Availability Foundation).
+
+**Resolution trigger:** перед implementation-design Step 1.8C (period
+pricing/availability), чтобы schema не зафиксировала конвейерация
+концепций.
+
+------------------------------------------------------------------------
+
+## DD-027 --- Period Availability Granularity & Multi-Date Holds
+
+**Status:** DEFERRED
+
+**Still Open (Roadmap Amendment §17/§32):** category-dependent
+availability granularity (date / date range / departure / time slot /
+open date) — reconcile с существующими `DATE_ONLY`/`TIME_SLOT`/
+`DATE_RANGE`/`OPEN_DATE` концепциями; multi-date hotel stays —
+атомарная резервация ВСЕХ дат (last-slot invariant Step 2.4:
+conditional UPDATE, capacity никогда в минус; две конкурирующие
+покупки последней единицы не могут обе зарезервировать); base period vs
+date override precedence.
+
+**Contract impact (STRICT REVIEW, future-compat):** текущий Step 2.4/2.5
+контракт — `AvailabilityReservation` per (productId, tariffId, date),
+ОДИН hold на commercial item; `OrderRequested.reservationIds` =
+все holds, consumer валидирует `reservationIds.length === items.length`.
+Multi-date stay (1 коммерческий item → N ночей) создаст N holds →
+`reservationIds.length ≠ items.length` — контракт 2.4/2.5 должен быть
+ревизован при введении multi-date периодов (Step 1.8C): cardinality
+hold-ов = «все allocated units/dates», НЕ «число items»; детализация —
+Step 1.8C implementation. Это НЕ дефект текущего Step 2.5 (он APPROVED
+для one-hold-per-item), а документированная future compatibility
+migration.
+
+**Do Not Implement Yet:** period availability entity, multi-date hold
+логика.
+
+**Return Point:** Step 1.8C (Period Pricing & Period Availability
+Foundation) + Step 2.8A.
+
+**Resolution trigger:** перед implementation-design Step 1.8C; схема
+multi-date hold согласуется с 2.4/2.5 contract change.
+
+------------------------------------------------------------------------
+
+## DD-028 --- Normalized Taxonomy Ownership (Catalog dictionaries)
+
+**Status:** DEFERRED
+
+**Already Decided (existing model):** `CategorySchema` (catalog.*) уже
+владеет category-specific attribute definitions (options/enums/validation
+в schema). Step 2.2A (Reverse Marketplace) использует extensible service
+taxonomy (Accommodation/Tours/Transport/Activities) для matching — НО это
+потребление, не владение.
+
+**Still Open (Roadmap Amendment §23/§17):** кто владеет normalized
+dictionaries (meal plan, bed type, view, amenities, service class,
+vehicle class) и кто их модифицирует. Кандидат-owner — **Catalog**
+(категорийные schema-контракты уже там; ADR-0005: Catalog владеет
+public seller projection). Reverse Marketplace потребляет taxonomy для
+matching, но НЕ становится владельцем (не расширять права 2.2A на
+запись чужих словарей). Без controlled global enums для маркетинговых
+терминов; taxonomy extensible; source/original + normalized value.
+
+**Do Not Implement Yet:** словарные сущности/CRUD, taxonomy admin UI.
+
+**Return Point:** Step 1.8A (Service Template) / Step 2.2A
+(consumption contract).
+
+**Resolution trigger:** перед implementation-design Step 1.8A (чтобы
+schema не создала второй словарь в другом домене).
+
+------------------------------------------------------------------------
+
+## DD-029 --- Marketplace "from N" Multi-Currency Display Rule
+
+**Status:** DEFERRED
+
+**Still Open (Roadmap Amendment §19/§23):** period/date-aware «from N
+USD» на Card/search/PDP — server-derived из действующих authoritative
+commercial periods. Критично: **нельзя численно сравнивать `100 USD` и
+`90 EUR` без FX/display-price правила** (нет FX-домена). Либо
+same-currency выбор (минимум в валюте Buyer-а, если цена существует в
+этой валюте), либо явное deferred FX-нормализация — но правило обязано
+быть детерминированным и server-side.
+
+**Already Decided (Step 2.3):** один Quote/Checkout — одна валюта
+(mixed currency → 422); привязка цены — в валюте tariff.
+
+**Do Not Implement Yet:** FX engine, конвертация, «from»-логика в
+frontend.
+
+**Return Point:** Step 1.8C (period pricing) + Marketplace display
+step (period-aware price display).
+
+**Resolution trigger:** перед period-aware Marketplace display
+(после 1.8C backend); до FX-домена — same-currency правило.
+
+------------------------------------------------------------------------
+
 # Правило пополнения
 
 1.  Новый отложенный вопрос → следующий `DD-XXX`.
@@ -474,12 +684,12 @@ Deferred Decisions Map не отменяет действующий ADR.
 
 # Current Register State
 
--   Total: **23**
--   DEFERRED: **22**
+-   Total: **29**
+-   DEFERRED: **28**
 -   IN_REVIEW: **0**
 -   DECIDED: **1**
 -   SUPERSEDED: **0**
--   Next ID: **DD-024**
+-   Next ID: **DD-030**
 
 ------------------------------------------------------------------------
 

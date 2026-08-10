@@ -245,17 +245,26 @@ describe("Phase 1 Step 1.13A — Temporal readiness (e2e)", () => {
     await adminAgent.patch(`/api/v1/products/${product.id}`).send({ title: "Silent hack" }).expect(409);
   });
 
-  it("5. legacy Order/Booking: честные timestamps только (createdAt/serviceDate), без fake milestone (confirmedAt/cancelledAt/paidAt)", async () => {
-    // Контракт read-model Buyer Cabinet уже проверен в buyer-cabinet.e2e; здесь —
-    // DB-level инвариант: legacy Order/Booking не имеют milestone-колонок.
+  it("5. Order milestones — canonical Step 2.5A columns, NULL = не произошло; Booking без milestone-колонок; paidAt нигде не существует", async () => {
+    // Step 2.5A (Order Temporal Contract): Order имеет КАНОНИЧЕСКИЕ milestone-
+    // колонки (submittedAt/confirmedAt/fulfilledAt/closedAt/cancelledAt) — это
+    // замена старого инварианта «колонок нет». Честность legacy/не-наступивших
+    // фактов теперь гарантируется NULL (без fake backfill), а не отсутствием
+    // колонок (см. Step 2.5A e2e: legacy rows → NULL; transitions → реальные
+    // timestamps). createdAt/updatedAt остаются entity-time, не overloaded.
     const orderCols = await prisma.$queryRaw<Array<{ column_name: string }>>`
       SELECT column_name FROM information_schema.columns WHERE table_schema='order' AND table_name='Order'
     `;
     const orderNames = orderCols.map((r) => r.column_name);
     expect(orderNames).toContain("createdAt");
     expect(orderNames).toContain("updatedAt");
-    expect(orderNames).not.toContain("confirmedAt");
-    expect(orderNames).not.toContain("cancelledAt");
+    // Step 2.5A canonical milestone columns.
+    expect(orderNames).toContain("submittedAt");
+    expect(orderNames).toContain("confirmedAt");
+    expect(orderNames).toContain("cancelledAt");
+    expect(orderNames).toContain("fulfilledAt");
+    expect(orderNames).toContain("closedAt");
+    // Payment-домен ещё не существует — никакой paidAt/подобной колонки.
     expect(orderNames).not.toContain("paidAt");
 
     const bookingCols = await prisma.$queryRaw<Array<{ column_name: string }>>`
@@ -263,6 +272,7 @@ describe("Phase 1 Step 1.13A — Temporal readiness (e2e)", () => {
     `;
     const bookingNames = bookingCols.map((r) => r.column_name);
     expect(bookingNames).toContain("createdAt");
+    // Booking-милстоуны — будущий Step 2.9/2.9A (здесь НЕ вводились).
     expect(bookingNames).not.toContain("confirmedAt");
     expect(bookingNames).not.toContain("cancelledAt");
   });

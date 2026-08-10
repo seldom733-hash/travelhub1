@@ -838,6 +838,19 @@ export class SalesService {
       });
 
       // OrderRequested — атомарно с Sale + reservation (G2 retryable).
+      // STRICT REVIEW 2.5 (fix): payload self-sufficient для Order consumer —
+      //  - productType (стабильная классификация Product) замораживается в
+      //    каждый item (consumer НЕ читает catalog.* для OrderItem.type);
+      //  - reservationIds — ВСЕ holds (один на item; multi-item Sale без потери
+      //    кардинальности; reservationId остаётся первичным ref).
+      const productTypeById = new Map(
+        (
+          await this.prisma.product.findMany({
+            where: { id: { in: quote.items.map((it) => it.productId) } },
+            select: { id: true, type: true },
+          })
+        ).map((p) => [p.id, p.type]),
+      );
       const eventId = await this.eventBus.emit(tx, {
         aggregateType: "Sale",
         aggregateId: sale.id,
@@ -852,10 +865,12 @@ export class SalesService {
           quoteId: quote.id,
           customerId,
           reservationId: firstReservation,
+          reservationIds: reservations.map((r) => r.reservationId),
           items: quote.items.map((it) => ({
             productId: it.productId,
             productCode: it.productCode,
             productTitle: it.productTitle,
+            productType: productTypeById.get(it.productId) ?? "",
             tariffId: it.tariffId,
             tariffCode: it.tariffCode,
             quantity: it.quantity,

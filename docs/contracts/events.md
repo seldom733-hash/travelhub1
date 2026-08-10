@@ -80,7 +80,8 @@ Outbox event → consumer → child event → diagnostics/audit):
 | `CustomerCreated` | CRM | `{ customerId, code, name }` — data-minimized (нет consumer-ов; email остаётся в CRM master-data, STRICT REVIEW FIX) |
 | `CustomerUpdated` | CRM | `{ customerId, code, name, changedFields[] }` |
 | `PartnerCreated` | CRM | `{ partnerId, code, name, source }` — `source`: "partner_onboarding"\|"crm_center" (onboarding channel, НЕ acquisition); contactEmail/registrationNumber убраны (STRICT REVIEW FIX) |
-| `OrderCreated` | Order | `{ orderId, code, number, customerId, amount, currency }` |
+| `OrderRequested` | Sales | immutable commercial snapshot + refs (Step 2.4 §5; STRICT REVIEW 2.5: +`reservationIds` (все holds), +item `productType` frozen): `{ version, saleId, saleCode, checkoutId, checkoutCode, quoteId, customerId\|null, reservationId\|null, reservationIds[], items[{productId, productCode, productTitle, productType, tariffId, tariffCode, quantity, unitPrice, amount}], currency, subtotal, discountType, discountValue\|null, discountAmount\|null, total, paymentScheme\|null, prepaymentType\|null, prepaymentValue\|null, initialAmount\|null, remainingAmount\|null, acquisitionSource, serviceDate\|null }` — **command** в Order domain; retryable=true (durable retry); БЕЗ PII (travelers — READ-only из CheckoutIntent, immutable после completion) |
+| `OrderCreated` | Order | `{ orderId, code, number, customerId, amount, currency }` — `customerId` может быть NULL (canonical Order без CRM-клиента, internal assisted flow, Step 2.5) |
 | `OrderReadyForBooking` | Order | `{ orderId, code, customerId }` — факт: заказ готов к бронированию (transition `confirm`; бывш. `OrderApproved`, Step 1.14) |
 | `OrderFulfilled` | Order | `{ orderId, code, customerId }` — факт: заказ исполнен (`complete` или reconcile по терминальным броням, Step 1.14) |
 | `OrderClosed` | Order | `{ orderId, code, customerId }` — факт: заказ закрыт (`close`; CLOSED ≠ CANCELLED ≠ FULFILLED, Step 1.14) |
@@ -97,6 +98,7 @@ Outbox event → consumer → child event → diagnostics/audit):
 
 | Домен | Событие | Действие |
 |---|---|---|
+| **Order** | `OrderRequested` | создаёт canonical Order (ORD-* + TH-YYYY-######), OrderItems, OrderTraveler (snapshot из CheckoutIntent), Fulfillment, публикует OrderCreated (result-event); идемпотентно (InboxEvent + `Order.saleId @unique`, один Sale → один Order; P2002 — констрейнт-специфично) |
 | **Booking** | `BookingRequested` | создаёт Booking (BKG-*) на каждый OrderItem + Passenger из COMPLETE OrderTraveler; идемпотентно (InboxEvent + проверка существующих броней) |
 | **Order** | `BookingConfirmed` | реконсиляция агрегата: `SENT_TO_BOOKING → PARTIALLY_FULFILLED → FULFILLED` |
 | **Order** | `BookingStatusChanged` (→ CONFIRMED/IN_SERVICE/COMPLETED) | реконсиляция агрегата |

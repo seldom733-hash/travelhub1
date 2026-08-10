@@ -154,9 +154,13 @@ export class OrderSubscribers implements OnModuleInit {
       // explicit `complete` (или двух reconcile) → ровно ОДИН победитель
       // пишет state+history+canonical event; второй не создаёт duplicate
       // OrderFulfilled (как в orderAction.orderAction).
+      // Step 2.5A: fulfilledAt фиксируется атомарно с переходом в FULFILLED
+      // (включая reconcile-путь — тот же canonical milestone, один timestamp).
+      const data: Prisma.OrderUpdateManyMutationInput = { status: target, version: { increment: 1 } };
+      if (target === "FULFILLED") data.fulfilledAt = new Date();
       const updatedRows = await tx.order.updateMany({
         where: { id: orderId, status: order.status, version: order.version },
-        data: { status: target, version: { increment: 1 } },
+        data,
       });
       if (updatedRows.count !== 1) return; // другой transition уже победил — факт существует
 

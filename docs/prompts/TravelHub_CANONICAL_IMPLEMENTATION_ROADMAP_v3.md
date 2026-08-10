@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-09\
+**Дата актуализации:** 2026-08-10\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -68,6 +68,68 @@ Schema form, attributes, tariffs, availability, media, submit to
 moderation, moderation feedback; Partner-safe Active Category Schema
 contract.\
 **Статус: APPROVED.**
+
+· **Step 1.8A --- Service Template / Seller Commercial Structure Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
+Канонический service template foundation: extend/reconcile существующий
+`CategorySchema` как структуру service templates; Seller mapping/import
+собственной коммерческой единицы; исходные Seller-названия сохраняются
+verbatim; нормализованные сопоставимые атрибуты (accommodation type,
+room class, view, occupancy, bed configuration, area, balcony,
+accessibility, meal plan, amenities) — для filter/search/comparison/
+matching/analytics/validation, НЕ заменяют Seller-название;
+category-specific schemas (Hotel/Room, Tour, Transfer, Excursion, Car
+Rental — без hardcoded Hotel-допущений в generic model); физическая/
+service единица ≠ Rate Plan; БЕЗ pricing engine. Инварианты:
+«Template defines structure; Seller provides values», «Seller-defined
+commercial names preserved verbatim; TravelHub standardizes attributes,
+not names», «Room/service unit и Rate Plan — разные концепции». Если
+расширение `CategorySchema` безопасно невозможно —
+`ARCHITECTURE DECISION REQUIRED` до реализации.
+
+· **Step 1.8B --- Rate Plan / Commercial Variant Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
+Коммерческий вариант единицы (рабочее имя `RatePlan` / `CommercialVariant`;
+финальное имя НЕ заморожено): meal plan, refundable/non-refundable,
+cancellation policy ref, included services, commercial restrictions,
+price basis. Rate Plan принадлежит/ссылается на реальную коммерческую
+единицу Seller-а; НЕ равен Product/Room/Quote/Checkout/Sale. Перед
+реализацией решить (DD-024): является ли существующий `catalog.Tariff`
+уже каноническим Rate Plan (тогда extend, без duplicate concepts под
+новыми именами). Category-dependent extensibility; перечисление
+значений НЕ frozen.
+
+· **Step 1.8C --- Period Pricing & Period Availability Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
+Ограниченные commercial periods: authoritative period price
+(первичный source — эквивалент `MANUAL_PERIOD`; финальное имя/
+перечисление source — deferred до реализации, future extension points:
+`DATE_OVERRIDE`/`API_SUPPLIER`/`CHANNEL_MANAGER`/`DYNAMIC_RULE` —
+иллюстративные, НЕ frozen); period/date/departure/slot availability;
+reconcile с Catalog-owned `Availability`/`AvailabilityReservation`
+(Step 2.4); БЕЗ speculative future pricing, БЕЗ обязательного
+long-range forecast, БЕЗ требования, чтобы каждый Product был sellable
+на все будущие даты, БЕЗ второго hold engine. Инварианты: «Pricing
+answers how much; Availability answers how much can be sold;
+Reservation/Hold answers how much has been committed/held»; «price basis
+explicit & deterministic — Quote может рассчитать binding amount»;
+«sales validity period ≠ service/stay/departure period ≠ booking
+window — не конвейерить молча». Если существующая Availability-модель
+не может безопасно поддержать period/date inventory —
+`ARCHITECTURE DECISION REQUIRED`. **Future-compat (STRICT REVIEW):**
+multi-date stay (1 коммерческий item → N ночей) создаст N
+AvailabilityReservation hold-ов (одна строка на дату, модель Step 2.4) →
+контракт `OrderRequested.reservationIds.length === items.length`
+(Step 2.5, one hold per item) должен быть ревизован при введении
+multi-date периодов: cardinality = «все allocated units/dates», не
+«число items»; migration детализируется в 1.8C implementation (НЕ
+дефект текущего APPROVED Step 2.5; DD-027).
+
+· **Step 1.8D --- Commercial Restrictions / Overrides Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
+Минимальные stop-sell и override-модель; extension points для future
+stay/advance-booking/closed-to-arrival/closed-to-departure restrictions;
+НЕ revenue-management engine, НЕ channel-manager rules engine.
+Overlap-резолюция overlapping periods и server precedence base period vs
+date override — server-authoritative, детали deferred до реализации.
+Audit/history для изменений sellable terms (price/availability/stop-sell/
+commercial period/Rate Plan status) — по контракту Step-а.
 
 · **Step 1.9 --- Buyer Identity / Public-to-Authenticated Transition**\
 Регистрация/login BUYER, обязательный Buyer ↔ CRM Customer mapping, own
@@ -326,14 +388,28 @@ capacity hold через Catalog owner service (`AvailabilityReservation`, RSR-*
 `OrderRequested` в outbox + durable retry (`retryFailed`, nextAttemptAt/backoff),
 CAS/CLOSED терминал + один OrderRequested (idempotency). Order consumer — Step 2.5.
 
-· **Step 2.5 --- Order Creation Consumer**\
+· **Step 2.5 --- Order Creation Consumer** ✅ DONE\
 Order consumer создаёт `ORD-*`, пользовательский `TH-YYYY-######`,
-OrderItems/OrderTraveler, публикует `OrderCreated`.
+OrderItems/OrderTraveler, публикует `OrderCreated`.\
+Реализовано: consumer `OrderRequested` (`OrderRequestedConsumer`, InboxEvent\
+dedup + `Order.saleId @unique` — один Sale → один Order), domain-owned\
+`OrderService.createOrderFromRequested` (атомарный граф Order + items +\
+travelers + fulfillment + history + OrderCreated result-event), frozen\
+commercial snapshot на Order (subtotal/discount/payment terms/acquisition\
+source, без reprice), OrderTraveler-снапшот из CheckoutIntent (READ-only, без\
+PII), correlation/causation lineage из OrderRequested, bootstrap coexistence\
+(Step 2.6 удалит). 2.5B/2.6/2.7 НЕ реализованы. Миграция\
+`add_order_creation_consumer` (Order.customerId nullable + snapshot/refs).
 
-· **Step 2.5A --- Order Temporal Contract**\
+· **Step 2.5A --- Order Temporal Contract** ✅ DONE\
 `createdAt`, `submittedAt`, `confirmedAt`, `cancelledAt`, `fulfilledAt`,
 `closedAt` по фактическим переходам. History/events сохраняют
-`occurredAt`.
+`occurredAt`.\
+Реализовано: 5 milestone-колонок (additive, без backfill, миграция\
+`add_order_temporal_contract`), `submittedAt` на обоих create-путях (consumer\
++ bootstrap), `confirmedAt/fulfilledAt/closedAt/cancelledAt` на переходах\
++ reconcile через booking-события, e2e `order-temporal-contract` (10).\
+2.5B/2.6/2.7 НЕ реализованы.
 
 · **Step 2.5B --- Sales / Acquisition Channel Propagation**\
 Неизменяемый transaction context минимум: `MARKETPLACE`,
@@ -776,6 +852,14 @@ balances, net revenue.
 analytics и future marketing automation без смешения с Marketplace
 identity/disclosure.
 
+· **Step 3.29I --- Partner Commercial Calendar / Bulk Management UI** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
+Calendar/period view; bulk price editing; bulk availability editing;
+stop sell; create/copy periods; import/mapping UX; исходное Seller-
+название + нормализованные атрибуты; full period availability.
+Backend-зависимости — Steps 1.8A–1.8D (Service Templates / Rate Plan /
+Period Pricing & Availability); НЕ начинать до реализации
+соответствующих backend-шагов.
+
 · **Step 3.30 --- Buyer Cabinet Full**\
 Profile, Orders, Bookings, Payments, Documents, Support. (Roadmap
 Amendment: Reverse Marketplace) + **My Requests**; request
@@ -991,6 +1075,52 @@ Order, Booking, Payment, Refund, Settlement, Payout и других критич
 объектов должна восстанавливаться история:
 `что → когда → кто → объект → source/channel → trace`.
 
+## Catalog Commercial Modeling (Roadmap Amendment: Service Templates / Period Pricing & Availability)
+
+-   Seller-defined commercial names preserve verbatim; TravelHub
+    standardizes attributes, not names.
+-   Template defines structure; Seller provides values.
+-   Physical/service unit ≠ commercial Rate Plan (Room ≠ Rate Plan).
+-   Pricing answers «how much»; Availability answers «how much can be
+    sold»; Reservation/Hold answers «how much has been committed/held».
+-   Начальный price source — эквивалент `MANUAL_PERIOD` (НЕ
+algorithmic dynamic-pricing engine); финальное имя/перечисление
+    source — deferred до реализации.
+-   Seller публикует authoritative commercial terms для определённого
+    validity/service period; no fabricated future price, no mandatory
+    long-range forecast, не каждый Product обязан быть sellable на все
+    будущие даты.
+-   Sales validity period ≠ service/stay/departure period ≠ booking
+    window — не предполагаются одинаковыми без явного контракта.
+-   Price basis explicit & deterministic (per room/night, per person,
+    per package, per vehicle, per service, per group —
+    category-appropriate; НЕ frozen list), чтобы Quote мог рассчитать
+    binding amount.
+-   Occupancy/PAX composition — признаётся как измерение
+    (single/double/triple/2A+1C/child bands); минимальная каноническая
+    модель определяется при реализации категорий; НЕ кодировать
+    occupancy только в свободном Seller-названии.
+-   Availability granularity — category-dependent (date / date range /
+    departure / time slot / open date); reconcile с существующими
+    `DATE_ONLY`/`TIME_SLOT`/`DATE_RANGE`/`OPEN_DATE` концепциями, не
+    дублировать.
+-   Catalog owns availability AND availability reservation mechanics
+    (Step 2.4); никакого Sales/Order/Booking-owned inventory и второго
+    hold/reservation engine.
+-   Marketplace price display — date/period-aware: «from N USD» только
+    по server-side правилу из действующих authoritative commercial
+    periods; frontend-only price calculation запрещён.
+-   Quote binding authority сохраняется (Step 2.3/2.3A/2.4): после
+    binding — никакого reprice из текущего Catalog; later Seller price
+    /Product text changes не мутируют frozen commercial facts.
+-   Normalization не уничтожает Seller source values
+    (source/original value + normalized TravelHub value); никаких
+    uncontrolled global enums для маркетинговых терминов; taxonomy
+    extensible.
+-   Seller Commercial Capabilities (Reverse Marketplace) ≠
+    Product/RatePlan/Availability (capability ≠ inventory; Seller может
+    быть capable даже если конкретный product/period не опубликован).
+
 ## Security / Ownership
 
 -   Каждый домен пишет только в owned schema, кроме явно утверждённых
@@ -1179,3 +1309,77 @@ bounded context `reverse.*` (новое PostgreSQL-схема-домен по AD
 Reverse Marketplace сущностей — RECOMMENDED (не closed verdict). Это
 единственный блокирующий prerequisite для 2.2A–2.2F; Step 2.5 он НЕ
 затрагивает.
+
+## Dependency Analysis (Roadmap Amendment: Service Templates / Period Pricing & Availability)
+
+Логическое размещение Steps 1.8A–1.8D — рядом с Catalog foundation
+(документно после Step 1.8), НО это НЕ индикатор последовательности
+реализации: добавления аддитивны, не отменяют завершённую Phase 1, НЕ
+блокируют Step 2.5 (Order Creation Consumer) и не делают
+2.3/2.3A/2.3B/2.4/2.5 ретроспективно неполными.
+
+Рекомендуемый порядок реализации: `2.5 → 2.5A → 2.5B → Reverse
+Marketplace ADR → 2.2A–2.2F →` затем коммерческий template/rate-plan/
+period work в первой безопасной точке расширения Catalog/Partner —
+ДО того, как Marketplace/Partner UI начнёт зависеть от period-aware
+price/availability (в частности, до 3.29/3.29I Partner Cabinet UI-шагов
+и period-aware Marketplace display).
+
+**Dependency review (проведено):**
+
+-   `CategorySchema` — целевой кандидат расширения (template structure;
+    вложенность/repeatable Seller units — вопрос DD-025);
+-   `Product` — не дублируется; коммерческая единица/unit identity —
+    отдельный вопрос (DD-025);
+-   `Tariff` — кандидат на канонический Rate Plan (DD-024); никаких
+    duplicate concepts под новыми именами;
+-   `Availability`/`AvailabilityReservation` — period inventory
+    reconcile с Step 2.4 foundation; второй hold engine запрещён;
+-   Quote/CheckoutIntent/Sale snapshot — binding authority без reprice
+    (Step 2.3/2.3A/2.4) сохраняется;
+-   Order/Booking — только canonical pipeline (2.5/2.8);
+-   Step 2.8A — service-date semantics совместимы (date-only UTC);
+-   Partner Cabinet — workflow Seller-а (select template → create/import
+    own commercial entity → preserve original name → fill normalized
+    attributes → Rate Plans → periods → price → availability → publish
+    via existing moderation/lifecycle → update future periods);
+-   Marketplace search/PDP — period-aware display («from N USD» по
+    server-side правилу);
+-   Reverse Marketplace capabilities/matching — capability ≠ inventory;
+    matching использует normalized attributes/capabilities, НЕ live
+    period inventory.
+
+**Явное решение:** жёсткой зависимости, требующей переупорядочивания
+1.8A–1.8D перед 2.2A–2.2F, на текущий момент НЕ выявлено. Если при
+реализации 2.2A–2.2F потребуются normalized коммерческие атрибуты,
+отсутствующие в текущей модели, — зафиксировать как explicit
+prerequisite соответствующего шага (DD-025/DD-026 связка). 1.8A–1.8D
+НЕ блокируют 2.5/2.5A/2.5B.
+
+**Step 2.8A dependency (STRICT REVIEW):** date-based period
+pricing/availability (1.8C) НЕ блокируется Step 2.8A (date-only UTC,
+существующая семантика serviceDate совместима). Время-зависимая
+granularity (time slot для Transfer, точное время departure,
+timezone-семантика) ЗАВИСИТ от time-модели Step 2.8A (IANA timezone) —
+это не «первая безопасная точка», а явная зависимость: time-slot
+granularity 1.8C реализуется ПОСЛЕ/совместно с 2.8A.
+
+**Ownership map (Roadmap Amendment: Service Templates / Period
+Pricing & Availability):**
+
+| Концепт | Owner | Замечание |
+|---|---|---|
+| Category / CategorySchema | Catalog | существующий owner; расширение для service templates — 1.8A; nesting/repeatable Seller units — DD-025 |
+| Product | Catalog | существующий owner, не меняется |
+| Seller commercial unit (Room/service-unit) | Catalog (кандидат) | first-class identity/lifecycle — DD-025; НЕ Product, НЕ attributes-JSON; source/external ID для импорта |
+| Tariff / Rate Plan | Catalog | **Tariff = канонический коммерческий вариант (DD-024 verdict A), расширяется; никакой параллельной RatePlan-authority** |
+| Commercial period / price | Catalog | периодная привязка — DD-026; price authority до binding — Catalog |
+| Availability / AvailabilityReservation | Catalog | Step 2.4 foundation; multi-date hold future-compat — DD-027 |
+| Normalized taxonomy | Catalog | словари — DD-028; Reverse Marketplace — consumer, не owner |
+| Seller Commercial Capabilities | Reverse Marketplace (`reverse.*`) | существующий amendment; capability ≠ inventory |
+| BuyerRequest / Proposal | Reverse Marketplace (`reverse.*`) | существующий amendment |
+| Quote / Checkout / Sale | Sales | binding authority (2.3/2.3A/2.4); никакого reprice |
+| Order / Booking | Order / Booking | canonical pipeline (2.5/2.8) |
+| Finance | Finance | canonical pipeline |
+
+Никакие два bounded context не владеют одним mutable fact.

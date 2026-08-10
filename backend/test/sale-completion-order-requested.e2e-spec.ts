@@ -182,6 +182,24 @@ describe("Phase 2 Step 2.4 — Sale Completion → OrderRequested + Availability
         `DELETE FROM "events"."OutboxEvent" WHERE "eventType" = 'OrderRequested' AND "payload"->>'saleId' = ANY($1)`,
         created.sales,
       );
+      // Step 2.5: consumer создал Order из OrderRequested — чистим Order +
+      // OrderCreated-строки outbox + inbox-строки consumer-а (shared-DB isolation).
+      const createdOrders = await prisma.order.findMany({
+        where: { saleId: { in: created.sales } },
+        select: { id: true, orderRequestedEventId: true },
+      });
+      if (createdOrders.length > 0) {
+        const orderIds = createdOrders.map((o) => o.id);
+        const eventIds = createdOrders.map((o) => o.orderRequestedEventId).filter((e): e is string => !!e);
+        await prisma.$executeRawUnsafe(`DELETE FROM "events"."OutboxEvent" WHERE "eventType" = 'OrderCreated' AND "aggregateId" = ANY($1)`, orderIds);
+        if (eventIds.length > 0) {
+          await prisma.$executeRawUnsafe(
+            `DELETE FROM "events"."InboxEvent" WHERE "consumerId" = 'order-requested-consumer' AND "eventId" = ANY($1)`,
+            eventIds,
+          );
+        }
+        await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
+      }
     }
     for (const id of created.quotes) {
       await prisma.quoteItem.deleteMany({ where: { quoteId: id } });
@@ -376,17 +394,23 @@ describe("Phase 2 Step 2.4 — Sale Completion → OrderRequested + Availability
 
   // ── 14-16. Isolation ───────────────────────────────────────────────────────
 
-  it("14-16. нет Order/Booking/Payment side effects", async () => {
+  it("14-16. Order создаётся consumer-ом (Step 2.5, ровно один); нет Booking/Payment side effects", async () => {
     const sm = await createStaff("s24_iso", RoleCode.SALES_MANAGER);
     const fx = await createProduct("s24_iso", 100);
     const ctx = await makeReadySale(sm.accessToken, fx);
 
-    const ordersBefore = await prisma.order.count();
     const bookingsBefore = await prisma.booking.count();
 
     await complete(sm.accessToken, ctx.sale.code, 1).expect(201);
 
-    expect(await prisma.order.count()).toBe(ordersBefore); // Order consumer = Step 2.5
+    // Step 2.5: ровно один Order создан из OrderRequested (consumer, не bootstrap).
+    const orders = await prisma.order.findMany({ where: { saleId: ctx.sale.id } });
+    expect(orders).toHaveLength(1);
+    expect(orders[0].saleId).toBe(ctx.sale.id);
+    expect(String(orders[0].amount)).toBe(ctx.total);
+    expect(orders[0].status).toBe("NEW");
+    expect(orders[0].orderRequestedEventId).toBeTruthy();
+    // Booking НЕ создаётся (Step 2.5 создаёт только Order).
     expect(await prisma.booking.count()).toBe(bookingsBefore);
     // Никаких Payment-моделей нет в schema — проверим отсутствие event'ов payment.
     const ev = await prisma.outboxEvent.findFirstOrThrow({ where: { aggregateId: ctx.sale.id, eventType: "OrderRequested" } });

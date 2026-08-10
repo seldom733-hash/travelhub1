@@ -492,10 +492,17 @@ describe("Phase 2 Step 2.2 — Sales Center Backend (e2e)", () => {
 
   // ── 13. Isolation ─────────────────────────────────────────────────────────
 
-  it("12. изоляция: actions не создают Order/Booking; outbox без OrderRequested; response без PII", async () => {
+  it("12. изоляция: actions не создают Order/Booking; outbox без новых OrderRequested/OrderCreated; response без PII", async () => {
     const sm = await createStaff("sc_iso", RoleCode.SALES_MANAGER);
     const ordersBefore = await prisma.order.count();
     const bookingsBefore = await prisma.booking.count();
+    // STRICT REVIEW 2.5A: delta-based (не absolute-global) — shared-DB serial
+    // run может содержать OrderRequested/OrderCreated других спеков (напр.
+    // bootstrap/consumer-спеков); инвариант «Sales actions НЕ создают
+    // OrderRequested/OrderCreated» проверяется по ДЕЛЬТЕ до/после.
+    const outboxBefore = await prisma.outboxEvent.count({
+      where: { eventType: { in: ["OrderRequested", "OrderCreated"] } },
+    });
 
     const lead = await smCreateLead(sm.accessToken, "Isolation Lead");
     await agent(sm.accessToken).post(`/api/v1/sales/leads/${lead.code}/transition`).send({ status: "QUALIFIED" }).expect(201);
@@ -505,8 +512,8 @@ describe("Phase 2 Step 2.2 — Sales Center Backend (e2e)", () => {
 
     expect(await prisma.order.count()).toBe(ordersBefore);
     expect(await prisma.booking.count()).toBe(bookingsBefore);
-    const outbox = await prisma.outboxEvent.findMany({ where: { eventType: { in: ["OrderRequested", "OrderCreated"] } } });
-    expect(outbox.length).toBe(0);
+    const outbox = await prisma.outboxEvent.count({ where: { eventType: { in: ["OrderRequested", "OrderCreated"] } } });
+    expect(outbox).toBe(outboxBefore);
 
     // Privacy: entity response без PII/CRM/request-полей.
     const detail = (await agent(sm.accessToken).get(`/api/v1/sales/leads/${lead.code}`).expect(200)).body as Record<string, string>;

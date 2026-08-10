@@ -36,6 +36,8 @@
 *Step 2.4:* добавлен RSR- (AvailabilityReservation, catalog.*, capacity hold) — префикс зарегистрирован в `IdsService.nextCode`.
 
 *Step 2.4 (полный реестр):* `PRD/CAT/TRF/CUS/CNT/COM/PAR/SUP/ORD/TH/BKG/CML/SELL/SPP/SF/APP/USR/LED/OPP/QTE/SAL/CKT/RSR`.
+*Step 2.5:* ORD-*/TH-YYYY-###### создаются canonical OrderRequested consumer-ом
+(тот же `IdsService`); год TH-* — по UTC (canonical time-конвенция).
 
 Формат: `PREFIX-` + число, дополненное слева нулями (8 цифр; для
 `TH-YYYY-######` — 6 цифр, последовательность сквозная по году).

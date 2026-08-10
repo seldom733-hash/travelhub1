@@ -28,8 +28,9 @@ export class IdsService {
     return `${prefix}-${String(seq.value).padStart(digits, "0")}`;
   }
 
-  /** Пользовательский номер заказа TH-YYYY-###### (последовательность сквозная по году). */
-  async nextOrderNumber(tx: Prisma.TransactionClient, year = new Date().getFullYear()): Promise<string> {
+  /** Пользовательский номер заказа TH-YYYY-###### (последовательность сквозная по году).
+   *  Год — по UTC (canonical time convention проекта; Step 2.5 §7). */
+  async nextOrderNumber(tx: Prisma.TransactionClient, year = new Date().getUTCFullYear()): Promise<string> {
     return this.nextCode(tx, `TH-${year}`, 6);
   }
 

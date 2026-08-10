@@ -1136,11 +1136,22 @@ enum TravelerDataCompleteness {
 
 /// Order — единственный владелец: Order Center.
 /// customerId — ссылка на CRM (без FK), productId — ссылка на Catalog (без FK).
+///
+/// Step 2.5 — canonical event-driven creation (OrderRequested consumer):
+///  - customerId NULL допустим: internal-assisted flow без CRM-клиента
+///    (OrderRequested.customerId честно nullable, Step 2.4 §11);
+///  - saleId @unique — DB-level инвариант «один Sale → один Order»
+///    (идемпотентность НЕ зависит только от in-process inbox);
+///  - frozen commercial snapshot (subtotal/discount/payment terms/acquisition
+///    source) копируется ИЗ OrderRequested без пересчёта — downstream
+///    Booking/Finance/Documents не зависят от mutable Sales/Catalog state;
+///  - cross-schema refs (saleId/quoteId/checkoutId/reservationId) — по ID без
+///    FK (ADR-0001).
 model Order {
   id            String              @id @default(uuid())
   code          String              @unique // ORD-00000001
   number        String              @unique // TH-2026-000001
-  customerId    String // ссылка на CRM, без FK
+  customerId    String? // ссылка на CRM, без FK; NULL — internal assisted flow
   status        OrderStatus         @default(NEW)
   paymentStatus OrderPaymentStatus  @default(UNPAID)
   currency      String              @default("USD")
@@ -1152,6 +1163,54 @@ model Order {
   updatedAt     DateTime            @updatedAt
   createdBy     String?
   updatedBy     String?
+
+  // ── Step 2.5 — upstream refs (без FK) + frozen commercial snapshot ──
+  /// Один Sale completion → один Order (DB-level инвариант; NULL для
+  /// legacy/bootstrap Order).
+  saleId                String?    @unique
+  saleCode              String?
+  quoteId               String?
+  checkoutId            String?
+  /// Primary catalog.AvailabilityReservation ref (capacity hold, Step 2.4).
+  reservationId         String?
+  /// ВСЕ catalog.AvailabilityReservation refs этого Sale (один hold на item,
+  /// STRICT REVIEW 2.5: multi-item Sale не теряет кардинальность holds).
+  reservationIds        Json?
+  /// OrderRequested eventId, создавший Order (traceability/idempotency).
+  orderRequestedEventId String?
+  /// Сумма строк (без скидки) — frozen snapshot из OrderRequested.
+  subtotal              Decimal?   @db.Decimal(12, 2)
+  /// Snapshot QuoteDiscountType (cross-schema enum → String, честно).
+  discountType          String?
+  discountValue         Decimal?   @db.Decimal(12, 2)
+  discountAmount        Decimal?   @db.Decimal(12, 2)
+  /// Payment terms snapshot (Step 2.3B) — immutable commercial facts,
+  /// НЕ пересчитываются из текущей конфигурации.
+  paymentScheme         String?
+  prepaymentType        String?
+  prepaymentValue       Decimal?   @db.Decimal(12, 2)
+  initialAmount         Decimal?   @db.Decimal(12, 2)
+  remainingAmount       Decimal?   @db.Decimal(12, 2)
+  /// Acquisition source snapshot (Step 2.5B propagation boundary — не
+  /// ре-вычисляется consumer-ом).
+  acquisitionSource     String?
+
+  // ── Step 2.5A — Order Temporal Contract (business milestones) ──
+  /// Момент подачи/входа заказа в систему (OrderRequested consumer ИЛИ
+  /// bootstrap). Server-owned; immutable; NULL = legacy row (до миграции,
+  /// без backfill) — НЕ заменяет createdAt (persistence time).
+  submittedAt DateTime?
+  /// Момент перехода confirm → READY_FOR_BOOKING (OrderReadyForBooking).
+  /// Server-owned; immutable (однажды установлен — не перезаписывается).
+  confirmedAt DateTime?
+  /// Момент перехода cancel → CANCELLED (OrderCancelled). Server-owned;
+  /// immutable.
+  cancelledAt DateTime?
+  /// Момент перехода complete ИЛИ reconcile-реконсиляции → FULFILLED
+  /// (OrderFulfilled). Server-owned; immutable.
+  fulfilledAt DateTime?
+  /// Момент перехода close → CLOSED (OrderClosed). Server-owned; immutable.
+  closedAt DateTime?
 
   items      OrderItem[]
   travelers  OrderTraveler[]
