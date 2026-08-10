@@ -215,24 +215,105 @@ Documents.
 Проверка Phase 1, migrations, RBAC, events, legacy endpoints и
 готовности Sales/Order/Booking/Finance.
 
-· **Step 2.1 --- Sales Domain Foundation**\
+· **Step 2.1 --- Sales Domain Foundation** ✅ DONE\
 Lead `LED-*`, Opportunity `OPP-*`, Quote `QTE-*`, Sale `SAL-*`;
 ownership/lifecycle.
 
-· **Step 2.2 --- Sales Center Backend**\
+· **Step 2.2 --- Sales Center Backend** ✅ DONE\
 API, queues, filters, KPI/read models, actions, audit, RBAC. Sales не
 владеет Order/Booking logic.
 
-· **Step 2.3 --- Quote & Commercial Offer Flow**\
+· **Step 2.2A --- Seller Commercial Capabilities & Destination Coverage** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Reverse Marketplace, post-baseline addition)\
+Независимый capability-профиль Seller-а: сервисные категории/типы, которые Seller может продавать и на
+которые отвечать; покрываемые дестинации; приём Buyer Requests
+ON/OFF; active/lifecycle state; entitlement/capability eligibility;
+auditability; управление в own-scope Partner-а и internal-управление.
+Страна регистрации юридического лица НЕ определяет коммерческое
+покрытие (инвариант 1). Начальное покрытие — country-level +
+`WORLDWIDE`, но архитектура обязана допускать
+`Country → Region → City/Destination`. Capabilities НЕ выводятся только
+из опубликованных Catalog Products (инвариант 2). Сервисная таксономия
+extensible (Accommodation/Hotel/Apartment/Villa; Tours/Packages;
+Transport/Transfer/Car Rental; Activities/Excursion/Guide) — без
+hardcoded cross-category исключений; Seller явно декларирует, на какие
+Buyer Request сервисные типы он может отвечать. STRICT REVIEW:
+Capabilities описывают коммерческую способность/готовность отвечать на
+demand — НЕ shadow Catalog: они НЕ являются inventory authority,
+pricing authority или availability authority (не заменяют Product/
+Tariff/Availability; заказы через них не создают capacity-резервации вне
+canonical flows).
+
+· **Step 2.2B --- Buyer Request / Reverse Marketplace Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition)\
+Каноническая buyer-demand сущность, рабочее имя `BuyerRequest`, рабочий префикс `BRQ-*` (регистрация в ID-registry при
+реализации). Может содержать category-dependent: service type/category;
+destination; dates/range/flexibility; travelers; budget/currency;
+preferences/requirements; безопасный free-form requirements; lifecycle /
+timestamps; buyer own-scope; privacy; audit/history; source/acquisition
+context. Точный lifecycle enum в amendment НЕ замораживается. BuyerRequest
+НЕ является Lead/Opportunity/Quote/Sale/Order/Booking/Communication
+(инвариант 3) — это отдельная entity; НО связанные разговоры по нему
+ведутся в существующем Communication (`CML-*`, Step 2.2E), т.е. entity ≠
+communication context.
+
+· **Step 2.2C --- Buyer Request Matching & Distribution** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition)\
+Базовая концептуальная eligibility: `active/approved Seller` AND `eligible to receive Buyer Requests` AND
+`service capability matches` AND `destination coverage matches` AND
+`required entitlement/capability permits participation`. Локация Buyer-а
+и страна регистрации Seller-а НЕ authoritative destination-matching
+критерии (инвариант: пример — Buyer в Азербайджане запрашивает HOTEL /
+Antalya / Турция; eligible Seller может быть зарегистрирован в
+Азербайджане, Турции, ОАЭ, Грузии, Германии и т.д., если capability/coverage
+совпадают). Matching/distribution — server-authoritative (инвариант 10),
+auditable. Ranking/SLA/rating/AI — будущая работа. Distribution НЕ создаёт
+Leads автоматически: `1 BuyerRequest → 70 matched → 25 delivered →
+6 responses` НЕ создаёт 70/25 Leads (инвариант 4; conversion point —
+Step 2.2F, reconcile Lead vs Opportunity, не дублируя модель).
+MATCHED ≠ CONTACT DISCLOSED (инвариант 5).
+
+· **Step 2.2D --- Seller Proposal Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition)\
+Один BuyerRequest может получать `0..N` Seller-specific proposals. Proposal — competitive/pre-commercial ответ,
+НЕ автоматический канонический Quote (никакого второго Quote engine).
+Позже может содержать offered configuration, dates, description,
+amount/currency, inclusions/exclusions, validity, conditions, notes,
+structured service details. STRICT REVIEW: Proposal amount/currency —
+competitive/pre-commercial indication, НЕ binding-price контракт; binding
+price authority остаётся canonical Quote (Step 2.3) — никакого второго
+price contract (см. Ownership map). Строгая изоляция: Seller A не видит
+proposal/price/conversation Seller B; Buyer видит только proposal своего
+request; internal доступ — по permissions (инвариант 6).
+
+· **Step 2.2E --- Buyer Request / Proposal Communication** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition)\
+Переиспользование существующего `Communication = CML-*`; НЕ создаётся второй messaging domain. Context:
+`BuyerRequest + Buyer + Seller [+ Proposal]`. Один Buyer может иметь
+независимые разговоры с несколькими Sellers по одному request. Enforce:
+Buyer own-scope, Partner own-scope, participant/context consistency,
+нейтральный IDOR, anti-disintermediation, audit/history,
+cross-Seller isolation, совместимость с future attachments/notifications.
+Amend 3.37A (Chat Completion поддерживает BuyerRequest/Proposal, не
+только Order/Booking) и 3.37B (anti-disintermediation распространяется
+на pre-sale request chat).
+
+· **Step 2.2F --- Proposal → Canonical Sales Conversion** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition)\
+При выборе Buyer-ом proposal НЕ создаются
+BuyerRequestOrder/ProposalOrder/ReverseMarketplaceOrder/отдельные
+Checkout/Payment/Booking (инвариант 8). Target:
+`BuyerRequest → Matching → Proposal → Buyer selection → существующая
+Sales Opportunity/Quote → Checkout → Sale → OrderRequested → Order →
+Booking → Finance`. Реализация реконсилирует, с какого существующего
+Sales-stage начинается conversion (Lead vs Opportunity vs Quote).
+Каноническое правило: **Reverse Marketplace — ещё один commercial
+acquisition path, а не отдельная transaction system** (инвариант 7).
+
+· **Step 2.3 --- Quote & Commercial Offer Flow** ✅ DONE\
 Product/Tariff snapshot, price, discounts, currency, validity,
 customer/travelers context.
 
-· **Step 2.3A --- Checkout / Commercial Intent Foundation**\
+· **Step 2.3A --- Checkout / Commercial Intent Foundation** ✅ DONE\
 Authoritative checkout context: Product/Tariff, travelers, options,
 service date/time, payment terms, publication/acquisition context.
 Frontend не источник цены.
 
-· **Step 2.3B --- Payment Terms Foundation**\
+· **Step 2.3B --- Payment Terms Foundation** ✅ DONE\
 `FULL_PREPAYMENT`, `PARTIAL_PREPAYMENT`, `DEPOSIT`, `PAY_LATER`,
 `PAY_AT_SERVICE`. Partner выбирает только разрешённые платформой
 схемы/параметры; Sale/Order хранит immutable financial snapshot.
@@ -257,9 +338,12 @@ OrderItems/OrderTraveler, публикует `OrderCreated`.
 · **Step 2.5B --- Sales / Acquisition Channel Propagation**\
 Неизменяемый transaction context минимум: `MARKETPLACE`,
 `PARTNER_STOREFRONT`, позднее `PARTNER_CUSTOM_DOMAIN`, `API`,
-`MANUAL/DIRECT`. Entry → Quote/Sale → Order → Booking → Payment →
-Settlement → Analytics. Channel/source нельзя угадывать постфактум по
-Product/URL.
+`MANUAL/DIRECT` + **`BUYER_REQUEST`** (Roadmap Amendment, рабочее имя;
+финальное наименование реконсилируется с текущими конвенциями).
+`BUYER_REQUEST` распространяется immutably, где применимо:
+`BuyerRequest/Proposal → Quote/Sale → Order → Booking → Payment →
+Settlement → Analytics` (инвариант 9). Publication channel остаётся
+отличным от acquisition channel.
 
 · **Step 2.6 --- Remove Bootstrap Order Creation**\
 Удалить временный `/orders/bootstrap`; обычный Order только canonical
@@ -439,10 +523,20 @@ Refund Rate, Booking Confirmation Time, Payment Conversion, Partner SLA
 
 · **Step 3.3C --- Marketplace Conversion Funnel**\
 `ProductImpression → ProductViewed → CheckoutStarted → OrderCreated → PaymentSucceeded → BookingConfirmed → ServiceCompleted`.
+(Roadmap Amendment) Плюс reconstructable request-led funnel из
+canonical facts/events/timestamps:
+`BuyerRequestCreated → Matched → Delivered → SellerResponded →
+ProposalViewed → ProposalSelected → Quote → Checkout → Sale → Order`.
+Имена событий не финализируются в amendment (финализация — при
+реальных facts/consumers).
 
 · **Step 3.3D --- Attribution Analytics**\
 Marketplace / Partner Storefront / Custom Domain / API / Manual/Direct,
-campaign/source, Partner/Product/category.
+campaign/source, Partner/Product/category. (Roadmap Amendment) Сравнимость
+Product-led Marketplace, Storefront, Buyer Request, Direct/Manual, будущих
+Custom Domain/API. Future metrics: request count, matching/delivery rate,
+seller response rate, time-to-first-proposal, proposals/request, selection
+rate, Request→Quote/Sale/Order conversion.
 
 · **Step 3.4 --- Analytics Center UI**\
 Sales, Orders, Bookings, Finance, Products, Partners,
@@ -638,7 +732,18 @@ Organization/localization/business policies/references. Currency/Tax
 
 · **Step 3.29 --- Partner Cabinet Full**\
 Products/media/tariffs/availability/moderation + permitted
-sales/orders/bookings/finance views.
+sales/orders/bookings/finance views. (Roadmap Amendment: Reverse
+Marketplace) Полное управление: **Commercial Capabilities**, **Destination
+Coverage**, **Buyer Request Inbox**, **Seller Proposals**,
+request-related communications. Onboarding (Step 1.10) может
+первоначально захватывать: services sold; countries/destinations served;
+accepts Buyer Requests — остаются редактируемыми после регистрации;
+страна регистрации НИКОГДА не переиспользуется как coverage. STRICT
+REVIEW: это опциональный capture, НЕ делает завершённый Step 1.10
+ретроспективно неполным; canonical management живёт в Partner capability
+flow (2.2A); approval/Partner status НЕ автоматически выдаёт все Buyer
+Request entitlements. Access — capability/permission-driven, совместимый
+с small organizations (один сотрудник выполняет несколько функций).
 
 · **Step 3.29A --- Partner Storefront Advanced**\
 Themes, configurable sections, richer branding/navigation/settings.
@@ -672,7 +777,10 @@ analytics и future marketing automation без смешения с Marketplace
 identity/disclosure.
 
 · **Step 3.30 --- Buyer Cabinet Full**\
-Profile, Orders, Bookings, Payments, Documents, Support.
+Profile, Orders, Bookings, Payments, Documents, Support. (Roadmap
+Amendment: Reverse Marketplace) + **My Requests**; request
+lifecycle/status; **Received Proposals**; selected proposal;
+request-related conversations. Строгий BUYER own-scope.
 
 · **Step 3.30A --- Buyer Purchase History Full**\
 Order/Booking/Payment/Refund/Document/Support + chronological timeline.
@@ -709,10 +817,13 @@ Product text/media/reviews/future objects.
 
 · **Step 3.37A --- Communication / Chat Completion**\
 Buyer↔Partner messaging с Order/Booking context, attachments, audit.
+(Roadmap Amendment) Поддержка также BuyerRequest/Proposal context
+(`BuyerRequest + Buyer + Seller [+ Proposal]`) — pre-sale request chat.
 
 · **Step 3.37B --- Chat Anti-Disintermediation**\
 Detect/flag/block contact/external booking attempts до разрешённого
-disclosure stage.
+disclosure stage. (Roadmap Amendment) Распространяется на pre-sale
+BuyerRequest chat (BuyerRequest/Proposal context) — не только Order/Booking.
 
 · **Step 3.37C --- Post-Purchase Contact Disclosure Policy**\
 Когда BUYER получает operational/contact/legal Partner data по
@@ -777,6 +888,18 @@ chargeback/dispute ledger.
 · **Step 3.46D --- Storefront CRM Journey E2E --- NEW**\
 `Storefront visitor/direct lead → Partner CRM relationship → Quote/Sale → Order/Booking/Payment → repeat customer/analytics`
 с tenant isolation и сохранённым acquisition source.
+
+· **Step 3.46E --- Reverse Marketplace Journey E2E --- NEW (Roadmap Amendment)**\
+`BUYER → BuyerRequest → matching → несколько изолированных Seller
+proposals → контекстная коммуникация → selection → каноническая Sales
+→ Quote → Checkout → Sale → OrderRequested → Order → Booking →
+Payment/Documents → Fulfillment`. Доказательства: legal country НЕ
+определяет destination eligibility (capability/coverage — определяют);
+unmatched Seller не может получить доступ к request; Seller A не может
+получить доступ к proposal/conversation Seller B; Buyer PII не
+раскрывается одним фактом matching (MATCHED ≠ CONTACT DISCLOSED);
+никакого параллельного transaction pipeline (инвариант 8); acquisition
+source `BUYER_REQUEST` сохраняется end-to-end.
 
 · **Step 3.47 --- Final Architecture Audit**\
 Все центры/домены, IDs, RBAC, events, ownership, lifecycle, API/UI vs
@@ -930,6 +1053,79 @@ Order, Booking, Payment, Refund, Settlement, Payout и других критич
 -   Custom domain в будущем остаётся тем же Storefront tenant/channel, а
     не новым Product domain.
 
+## Reverse Marketplace / Commercial Capabilities (Roadmap Amendment)
+
+Не-negotiable инварианты request-led demand path (полный текст также в
+Step 2.2A–2.2F):
+
+1.  `Partner legal location ≠ Seller commercial destination coverage`.
+2.  `Published Products ≠ Seller Commercial Capabilities`.
+3.  BuyerRequest — demand, НЕ автоматический
+    Lead/Opportunity/Quote/Sale/Order/Booking.
+4.  Matching/delivery не создаёт Sales entities автоматически.
+5.  `MATCHED ≠ CONTACT DISCLOSED`.
+6.  Seller proposals/conversations изолированы per Seller.
+7.  Selected Proposal сходится в каноническую Sales.
+8.  Reverse Marketplace НЕ создаёт параллельные
+    Checkout/Order/Booking/Payment pipeline.
+9.  Acquisition source (`BUYER_REQUEST`) сохраняется end-to-end.
+10. Capability/destination matching — server-authoritative.
+
+-   Capabilities/destination coverage — editable и auditable; страна
+    регистрации НИКОГДА не переиспользуется как coverage.
+-   Matching/distribution auditable; ranking/SLA/rating/AI — future work.
+-   Distribution ≠ Lead creation; meaningful-engagement conversion point
+    реконсилируется с существующими Sales-стадиями (Lead vs Opportunity
+    vs Quote), без дублирования модели.
+-   Service taxonomy extensible (Accommodation/Hotel/Apartment/Villa;
+    Tours/Packages; Transport/Transfer/Car Rental;
+    Activities/Excursion/Guide), без hardcoded cross-category исключений.
+-   Communication reuse `CML-*`; никакого второго messaging domain.
+-   Никакого второго Quote engine; Proposal ≠ canonical Quote.
+-   Future platform management: service capability taxonomy,
+    destination/reference taxonomy, eligibility/moderation, entitlement
+    rules для Buyer Requests — без hardcoded commercial prices/plans и
+    без опоры только на фиксированные role names.
+-   STRICT REVIEW (small-org): никаких hardcoded role gates вроде «только
+    SALES_MANAGER получает Buyer Requests»; доступ — permissions/
+    capabilities/entitlements/admin-managed, с сохранением tenant/object
+    scope (Step 3.12E модель ролей как пресетов сохраняется).
+-   STRICT REVIEW (matching security): Seller НЕ может forge
+    destination/service capabilities через request payloads; distribution
+    state НЕ может self-promote Seller-ом; eligibility — server-authoritative.
+-   Buyer PII не раскрывается фактом matching; matched Seller получает
+    только коммерчески необходимые request facts; anti-disintermediation
+    остаётся authoritative.
+
+### Ownership map (Reverse Marketplace, Roadmap Amendment)
+
+| Концепт | Owner | Замечание |
+|---|---|---|
+| Partner identity | Security / CRM (Partner) | существующий owner, не меняется |
+| Seller Commercial Capabilities | **Reverse Marketplace** (рекомендуемый новый bounded context `reverse.*`, по прецеденту ADR-0011; формальный ADR — prerequisite до 2.2B) | edit — Partner own-scope + internal; НЕ в Catalog; страна регистрации ≠ coverage. Отличать от `PublicSellerProfile` (catalog.*, marketplace identity projection, ADR-0005) — разные сущности |
+| Catalog Product | Catalog | существующий owner, не меняется |
+| BuyerRequest | **Reverse Marketplace** (`reverse.*`, тот же новый bounded context) | lifecycle enum не заморожен; physical schema name — deferred |
+| matching/distribution | **Reverse Marketplace** (`reverse.*`); matching-результаты — домен-факт reverse-домена (не hidden cross-domain writer; ADR-0001 соблюдён) | auditable; ranking/AI — future |
+| Seller Proposal | **Reverse Marketplace** (`reverse.*`); per-Seller изоляция — object scope внутри reverse-домена | НЕ второй Quote engine; money authority — deferred (см. ниже) |
+| Communication | Communication (`CML-*`) | context `BuyerRequest+Buyer+Seller[+Proposal]`; без второго messaging domain |
+| Sales Quote/Sale | Sales | conversion target (2.2F) |
+| Order | Order | consumer Step 2.5; единственный pipeline |
+| Booking | Booking | единственный pipeline |
+| Finance | Finance | единственный pipeline |
+
+**Вывод владельца (STRICT REVIEW fix):** ни один существующий bounded
+context не может владеть BuyerRequest/Seller Capabilities/Proposal без
+владения чужим lifecycle (ADR-0001). По прецеденту ADR-0011 (Communication:
+cross-domain модель → новый домен `communication.*`) **рекомендуемый owner
+— новый bounded context `reverse.*` (Reverse Marketplace)**; Sales остаётся
+conversion target, Communication — context-only refs, Catalog —
+product/inventory. STRICT REVIEW: новый bounded context = новое
+PostgreSQL-схема-домен (ADR-0001), т.е. фундаментальное архитектурное
+добавление — **формальный ADR требуется ДО реализации 2.2B**
+(прецедент: ADR-0011 для `communication.*`; Master Plan rule #6). В
+Deferred Decisions это зафиксировано как explicit prerequisite (см. §26).
+До ADR владельческий статус — RECOMMENDED, не closed verdict.
+
 ------------------------------------------------------------------------
 
 # CANONICAL STATUS
@@ -945,6 +1141,41 @@ Order, Booking, Payment, Refund, Settlement, Payout и других критич
 4.  Каждый implementation prompt сверяется с этим Master Plan.
 5.  Каждый Exit Audit проверяет не только current-state, но
     timestamps/events/history, attribution, ownership, tenant isolation
-    и financial integrity.
+    и финансовую целостность.
 6.  После утверждения нового архитектурного решения этот файл должен
     обновляться, чтобы решение не оставалось только в переписке.
+
+## Dependency Analysis (Roadmap Amendment: Reverse Marketplace)
+
+Текущее состояние на момент amendment:
+
+-   2.1 completed; 2.2 completed; 2.3 completed; 2.3A completed;
+    2.3B completed; 2.4 completed; **2.5 НЕ начат**.
+
+Порядок реализации НЕ выводится из нумерации (§4 STRICT REVIEW):
+2.2A–2.2F — **логическая архитектурная позиция** (request-led upstream
+acquisition path), НЕ индикатор последовательности реализации; они
+вставлены после 2.2 документно, но не реализованы (NOT IMPLEMENTED) и
+НЕ делают завершённые 2.3/2.3A/2.3B/2.4 ретроспективно неполными — те
+остаются completed.
+
+-   2.2A–2.2F — логически upstream acquisition/Sales capabilities
+    (request-led demand path).
+-   Step 2.5 — downstream completion уже активного `OrderRequested`
+    flow (product-led path).
+
+**Явное решение:** если не обнаружится реальная жёсткая зависимость,
+сохраняется возможность выполнить Step 2.5 ПЕРЕД реализацией Reverse
+Marketplace. 2.2A–2.2F не блокируют Order consumer. Единственная точка
+соприкосновения на момент amendment — Step 2.5B (acquisition channel
+`BUYER_REQUEST`): он добавляется аддитивно в существующий список
+channel-значений и не требует изменения 2.5/2.5A. Жёсткие зависимости,
+требующие переупорядочивания, на текущий момент НЕ выявлены.
+
+**Prerequisite для 2.2A–2.2F (STRICT REVIEW):** перед началом реализации
+Reverse Marketplace требуется **формальный ADR** о введении нового
+bounded context `reverse.*` (новое PostgreSQL-схема-домен по ADR-0001;
+прецедент — ADR-0011 для `communication.*`). До этого ADR ownership
+Reverse Marketplace сущностей — RECOMMENDED (не closed verdict). Это
+единственный блокирующий prerequisite для 2.2A–2.2F; Step 2.5 он НЕ
+затрагивает.
