@@ -68,6 +68,19 @@ Entitlement gate — будущая работа; никаких entitlement-т�
 
 ## Destination coverage semantics (strict containment)
 
+Два явных документальных решения (STRICT REVIEW 2.2C, не произвольная
+заморозка):
+
+- **multi-destination request = OR (alternatives)**: Buyer перечисляет
+  альтернативные направления («или там, или там»); eligible при покрытии
+  ХОТЯ БЫ ОДНОГО. AND/itinerary-семантика не реализована (нет канонического
+  требования; при появлении — отдельное решение).
+- **request {worldwide} → только capability {worldwide}**: worldwide-запрос
+  означает «Buyer гибок к любой дестинации», и консервативно обслуживается
+  только Seller-ами, явно заявившими глобальное покрытие. Seller с
+  конкретным покрытием НЕ получает всемирные запросы (негативная
+  селекция — детерминированный безопасный default).
+
 Чистый helper `isRequestEligible` (src/modules/reverse/matching.validation.ts):
 
 - capability {worldwide} покрывает любой request destination;
@@ -131,7 +144,21 @@ Seller A не может прочитать distribution B (list строго с
   после commit cancel'а новые distributions невозможны; если matching первый —
   durable rows сохраняются, Seller projection показывает CANCELLED (e2e #11);
 - capability deactivate/accepts-off до commit — исключается fresh re-read
-  внутри tx (READ COMMITTED, statement-level snapshot) (e2e #12);
+  внутри tx (READ COMMITTED, statement-level snapshot) (e2e #12). Fresh
+  re-read перечитывает ТАКЖЕ destinations (они изменяемы через PATCH
+  2.2A) и полностью пересчитывает eligibility (включая coverage) по
+  свежему состоянию (e2e #12b — sequential regression: обновлённый
+  coverage применяется; настоящий concurrent interleaving НЕ доказуем
+  без hooks — контракт READ COMMITTED документирован, не переоценивается);
+- остаточное окно READ COMMITTED: изменение (deactivate/accepts/destinations),
+  закоммиченное ПОСЛЕ fresh re-read, но ДО commit matching-транзакции, может
+  не попасть в этот run — задокументированный контракт (см. §Concurrency);
+- Seller (crm.Partner) deactivation — кросс-контекстное чтение (ADR-0001),
+  row lock на чужую схему не применяется. Честный контракт: Partner,
+  деактивированный ПОСЛЕ чтения в run-транзакции, но ДО её commit, может
+  получить distribution этого конкретного run; последующий доступ к inbox
+  блокируется `assertSellerEligible` (partnerId + crm.Partner ACTIVE), т.е.
+  деактивированный Seller не может читать новые distributions.
 - batch = одна транзакция (все distributions одного request); partial failure
   невозможен; retry сходится; ноль Sales/Proposal/Communication side effects.
 
@@ -143,8 +170,10 @@ Seller A не может прочитать distribution B (list строго с
 ## Query paths / indexes
 
 - matching: `BuyerRequest [status, categoryId]` + `[status, createdAt]`
-  (существующие) + `SellerCapability [status, categoryId]` +
-  `[status, acceptsBuyerRequests]` (существующие);
+  (существующие) + `SellerCapability [status, categoryId]` (существующий;
+  candidate-запрос дополнительно фильтрует `acceptsBuyerRequests = true`
+  булевым предикатом на уже узком наборе — отдельный индекс
+  `[status, acceptsBuyerRequests]` НЕ создавался и не требуется);
 - inbox: `[sellerId]`, `[sellerId, distributedAt]`;
 - уникальность: `(buyerRequestId, sellerId)`.
 - JSONB destinations: evaluated чистой application-логикой после узкой
@@ -174,10 +203,13 @@ CANCELLED. Никаких Seller identities/counts/proposals в 2.2C.
 
 ## Audit
 
-Каждый matching run: `reverse.match.run` в AuditLog (actor, requestCode,
-categorySlug, candidates, matched, created, sellerIds) — внутри той же
-транзакции; failed run (404/422/stale) НЕ пишет успешный audit. Durable
-exclusion rows НЕ хранятся (только положительные distributions).
+Каждый успешный matching run (включая идемпотентный повторный с `created=0`)
+пишет `reverse.match.run` в AuditLog (actor, requestCode, categorySlug,
+candidates, matched, created, sellerIds) — внутри той же транзакции. Это
+НАМЕРЕННО: каждый run — отдельный операционный факт (кто/когда запустил),
+а не только первая персистенция. failed run (404/422/stale) НЕ пишет
+успешный audit. Durable exclusion rows НЕ хранятся (только положительные
+distributions).
 
 ## Migration
 

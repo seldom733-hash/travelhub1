@@ -225,15 +225,34 @@ export class MatchingService {
         );
       }
       // Fresh re-read capabilities внутри tx (READ COMMITTED: statement-level
-      // snapshot) — deactivated/disabled до этого момента не попадут.
+      // snapshot) — status/accepts/destinations, изменённые до этого момента,
+      // НЕ попадут. Полная eligibility пересчитывается по свежему состоянию
+      // (включая coverage — destinations capability изменяемы через PATCH
+      // 2.2A). Остаточное окно READ COMMITTED (изменение, закоммиченное ПОСЛЕ
+      // этого re-read, но ДО commit matching) — задокументированный контракт.
+      // requestDests/categoryId берутся из pre-tx чтения: это безопасно, т.к.
+      // SUBMITTED request заморожен (PATCH только для DRAFT; cancel меняет
+      // только status, что перечитывается через FOR UPDATE → locked.status).
       const freshCaps = await tx.sellerCapability.findMany({
         where: { id: { in: eligible.map((c) => c.id) } },
-        select: { id: true, status: true, acceptsBuyerRequests: true },
+        select: { id: true, categoryId: true, status: true, acceptsBuyerRequests: true, destinations: true },
       });
-      const stillEligibleIds = new Set(
-        freshCaps.filter((c) => c.status === "ACTIVE" && c.acceptsBuyerRequests === true).map((c) => c.id),
-      );
-      const finalRows = eligible.filter((c) => stillEligibleIds.has(c.id));
+      const freshById = new Map(freshCaps.map((c) => [c.id, c]));
+      const finalRows = eligible.filter((c) => {
+        const fresh = freshById.get(c.id);
+        if (!fresh) return false;
+        return isRequestEligible({
+          request: { status: locked.status, categoryId: request.categoryId, destinations: requestDests },
+          capability: {
+            status: fresh.status,
+            categoryId: fresh.categoryId,
+            destinations: fresh.destinations as CapabilityDestination[],
+            acceptsBuyerRequests: fresh.acceptsBuyerRequests,
+          },
+          sellerStatus: "ACTIVE", // seller gate уже применён выше (activeSellers);
+          // seller-status race — кросс-контекстное чтение, документированный контракт
+        }).eligible;
+      });
 
       // Детерминированный результат: matched = eligible seller set (стабилен
       // между retry при том же state); created = только вновь персистенные.
