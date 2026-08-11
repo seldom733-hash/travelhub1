@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-11 (Service Templates decision gates DD-024…DD-029 RESOLVED)\
+**Дата актуализации:** 2026-08-11 (Service Templates decision gates DD-024…DD-029 RESOLVED; Universal Pricing Model Amendment INTEGRATED — docs/architecture/universal-pricing-model.md)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -69,7 +69,7 @@ moderation, moderation feedback; Partner-safe Active Category Schema
 contract.\
 **Статус: APPROVED.**
 
-· **Step 1.8A --- Service Template / Seller Commercial Structure Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
+· **Step 1.8A --- Service Template / Seller Commercial Structure Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-11; Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition; реализовано: `ServiceUnit`/`SellerCommercialUnit` (catalog.*, префикс `UNI-*`, зарегистрирован в ID-registry), source+externalKey import identity, verbatim seller name + normalized attributes, schema snapshot, lifecycle create/list/get/update/publish/archive, own-scope PARTNER + internal; STRICT REVIEW FIXES: атомарные conditional updates по status (update/publish/archive — TOCTOU §34/§35), update-перевалидация по unit-снапшоту (не Product-снапшоту, §13), честная документация version/CAS и cascade-безопасности (§30/§31), e2e §49.30–32 (update-vs-publish race, product-state-vs-publish race, cascade/delete safety); регрессия 770/770 e2e + 395 unit + 135 frontend + build + migrate 37/37 drift 0; детали — `docs/architecture/service-unit-foundation.md`)\
 Канонический service template foundation: extend/reconcile существующий
 `CategorySchema` как структуру service templates; Seller mapping/import
 собственной коммерческой единицы; исходные Seller-названия сохраняются
@@ -92,7 +92,7 @@ unit-уровня); живёт в catalog.* (ADR не требуется); ident
 имя Seller-а verbatim; normalized unit-attributes из шаблона. См.
 `docs/architecture/service-templates-decision-gates.md` §1.
 
-· **Step 1.8B --- Rate Plan / Commercial Variant Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
+· **Step 1.8B --- Rate Plan / Commercial Variant Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition; **Universal Pricing Model Amendment INTEGRATED — 1.8B владеет Rate Plan foundation, см. `docs/architecture/universal-pricing-model.md`**)\
 Коммерческий вариант единицы (рабочее имя `RatePlan` / `CommercialVariant`;
 финальное имя НЕ заморожено): meal plan, refundable/non-refundable,
 cancellation policy ref, included services, commercial restrictions,
@@ -110,8 +110,26 @@ Price basis — на уровне Tariff; одна валюта на Rate Plan (
 IMPORT/API_SUPPLIER/CHANNEL_MANAGER) ≠ rule (FIXED/PERIOD/DATE_OVERRIDE/
 DAY_OF_WEEK/OCCUPANCY/PAX/…); PRICE_ON_REQUEST — типизированное состояние,
 не ноль/маркетинг. См. `docs/architecture/service-templates-decision-gates.md` §2/§3/§6.
+**UNIVERSAL PRICING (amendment, 2026-08-11) — 1.8B реализует:** привязку
+`Tariff.serviceUnitId` (Rate Plan attach к ServiceUnit); Seller-defined
+Rate Plan name verbatim; commercial currency (одна на план); price basis
+(Rate Plan-level, enum-имена финализируются здесь); refundability;
+cancellation-policy ref; inclusions/meal plan где категория поддерживает;
+commercial restrictions; PRICE_ON_REQUEST как типизированное состояние
+(inquiry-based, отличное от missing-price); совместимость с future
+CommercialPeriod (1.8C). НЕ реализует periods/availability (1.8C) и
+restrictions-engine (1.8D).
+**UNIVERSAL PRICING STRICT REVIEW (2026-08-11) — legacy `Tariff.price` transition:**
+существующие `Tariff.price/currency/validFrom/validTo` сохраняются как
+**legacy/base price** (совместимость legacy Product/Tariff; Quote продолжает
+снапшотить с Tariff). 1.8B расширяет Tariff **аддитивно** (НЕ удаляет, НЕ
+переосмысляет legacy price); после ввода CommercialPeriod (1.8C): при наличии
+релевантных period-фактов authoritative — period price; при отсутствии — legacy
+`Tariff.price` = base/FIXED fallback. Никакой destructive migration;
+legacy-safe реализация 1.8B не блокируется. Детали —
+`docs/architecture/universal-pricing-model.md` §17.
 
-· **Step 1.8C --- Period Pricing & Period Availability Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
+· **Step 1.8C --- Period Pricing & Period Availability Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition; **Universal Pricing Model Amendment INTEGRATED — 1.8C владеет CommercialPeriod/date pricing, см. `docs/architecture/universal-pricing-model.md`**)\
 Ограниченные commercial periods: authoritative period price
 (первичный source — эквивалент `MANUAL_PERIOD`; финальное имя/
 перечисление source — deferred до реализации, future extension points:
@@ -138,14 +156,25 @@ multi-date периодов: cardinality = «все allocated units/dates», н�
 **GATE RESOLVED (2026-08-11, DD-026/DD-027):** `CommercialPeriod` (catalog.*,
 tariffId + [validFrom,validTo] date-only inclusive, price/currency/basis);
 precedence детерминирована: DATE_OVERRIDE > явный PERIOD (уже диапазон
-выигрывает) > DAY_OF_WEEK > сезон/base PERIOD > FIXED; overlapping
-same-priority → 422 на write; missing price не фабрикуется (unavailable /
+выигрывает) > DAY_OF_WEEK* > сезон/base PERIOD > FIXED; overlapping
+same-priority → 422 на write; (*DAY_OF_WEEK — условие внутри периода, см.
+Universal Pricing STRICT REVIEW ниже); missing price не фабрикуется (unavailable /
 PRICE_ON_REQUEST). Multi-date: N ночей → N reservation-строк в одной tx
 (существующий conditional-UPDATE механизм Step 2.4; второй hold engine НЕ
 вводится); контракт `OrderRequested.reservationIds` ревизуется (cardinality =
 все allocated units/dates); DATE_ONLY — безопасна для 1.8C, time-slot/
 departure — гейт 2.8A; inventory unit category-dependent; price ≠
 availability (stop-sell ≠ удаление цены). См. `docs/architecture/service-templates-decision-gates.md` §3/§4.
+**Universal Pricing STRICT REVIEW (2026-08-11) — DAY_OF_WEEK semantics уточнена:**
+DAY_OF_WEEK реализуется как **условие ВНУТРИ периода** (не отдельный глобальный
+слой иерархии): период с day-of-week-условием специфичнее «голого» сезонного
+периода того же диапазона; итоговый порядок ЭКВИВАЛЕНТЕН иерархии выше
+(weekend-правило специфичнее base-сезона), но разрешается единым механизмом
+специфичности, без двух интерпретаций. Overlap: одинаковый уровень
+специфичности → 422; разный (narrower range / exact condition) → разрешён
+(«Summer+occupancy ANY» и «Summer+occupancy 2» НЕ конфликтуют — второй
+специфичнее). Детали — `docs/architecture/universal-pricing-model.md` §7.
+**UNIVERSAL PRICING (amendment, 2026-08-11) — 1.8C реализует:** `CommercialPeriod`/date pricing; fixed/base price compatibility (FIXED как base); **annual/seasonal calendar как first-class workflow (commercial periods, НЕ 365 дат вручную; applicable всем категориям)**; date overrides (holidays/events, без правки base-сезона); deterministic precedence по amendment §7 (exact override > специфичное условное > PERIOD > DAY_OF_WEEK-условие > FIXED; same-priority overlap → 422); category-supported conditions (day-of-week/occupancy/PAX/duration/tier где категория позволяет, через CategorySchema); availability relationship (price ≠ availability; stop-sell ≠ удаление цены); multi-date atomic hold compat (N ночей → N holds, DD-027, единый Step 2.4 engine); date-only boundary до 2.8A. НЕ реализует restrictions-engine (1.8D), supplier/API/динамику, FX.
 
 · **Step 1.8D --- Commercial Restrictions / Overrides Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
 Минимальные stop-sell и override-модель; extension points для future
@@ -160,6 +189,12 @@ commercial period/Rate Plan status) — по контракту Step-а.
 как в §1.8C; gap/conflict — детерминированные (422, отсутствие цены →
 unavailable/PRICE_ON_REQUEST); normalized словари — Catalog-owned (Reverse
 2.2A только читает). См. `docs/architecture/service-templates-decision-gates.md` §3/§5.
+**UNIVERSAL PRICING (amendment, 2026-08-11) — 1.8D совместим с:** resolved
+server pricing (resolver §8 universal-pricing-model.md), Marketplace display
+(«from N» server-side), Partner publication/consumption contract; stop-sell
+≠ удаление цены; restrictions (min-stay/advance-booking/closed-to-arrival-
+departure) — коммерческие ограничения Rate Plan, НЕ merged в Availability
+counts и НЕ в price rows; не расширяется сверх необходимо о.
 
 · **Step 1.9 --- Buyer Identity / Public-to-Authenticated Transition**\
 Регистрация/login BUYER, обязательный Buyer ↔ CRM Customer mapping, own
@@ -922,10 +957,20 @@ balances, net revenue.
 analytics и future marketing automation без смешения с Marketplace
 identity/disclosure.
 
-· **Step 3.29I --- Partner Commercial Calendar / Bulk Management UI** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
+· **Step 3.29I --- Partner Commercial Calendar / Bulk Management UI** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition; **Universal Pricing Model Amendment INTEGRATED — UX-контракт annual calendar, см. `docs/architecture/universal-pricing-model.md` §14**)\
 Calendar/period view; bulk price editing; bulk availability editing;
-stop sell; create/copy periods; import/mapping UX; исходное Seller-
+stop sell; create/copy periods (copy season/year где безопасно);
+import/mapping UX; исходное Seller-
 название + нормализованные атрибуты; full period availability.
+**Universal Pricing UX-контракт:** Seller workflow Product → ServiceUnit →
+Rate Plan → pricing method → basis/currency → base/period → seasonal →
+holiday/date overrides → day-of-week/PAX/duration/tier conditions →
+overlap-validation → calendar preview resolved price → availability отдельно
+→ publish; annual calendar (year/month), bulk price entry, copy period/season,
+weekday/weekend rules, occupancy/PAX matrix где категория позволяет,
+preview resolved price, validation errors до publish; import (CSV/XLS/supplier/
+API/channel manager) → тот же canonical Rate Plan + CommercialPeriod model
+(никакого «Excel pricing engine»).
 Backend-зависимости — Steps 1.8A–1.8D (Service Templates / Rate Plan /
 Period Pricing & Availability); НЕ начинать до реализации
 соответствующих backend-шагов.
@@ -1183,6 +1228,24 @@ algorithmic dynamic-pricing engine); финальное имя/перечисл�
 -   Quote binding authority сохраняется (Step 2.3/2.3A/2.4): после
     binding — никакого reprice из текущего Catalog; later Seller price
     /Product text changes не мутируют frozen commercial facts.
+
+## Universal Pricing Model (Roadmap Amendment — integrated 2026-08-11; детали — `docs/architecture/universal-pricing-model.md`)
+
+-   **Commercial graph:** `Product → ServiceUnit → Tariff/Rate Plan → CommercialPeriod/Pricing Rule → resolved authoritative price`. Product НЕ финальный universal price authority при наличии ServiceUnits; ServiceUnit НЕ price row; Rate Plan — commercial offer/rules; period/rule — date/condition-sensitive price facts.
+-   **Universal, НЕ Hotel-specific:** room/night/adult-child/vehicle — category rules через CategorySchema, не глобальные mandatory поля core.
+-   **Pricing modes — first-class Seller workflows:** FIXED; **annual/seasonal calendar (REQUIRED first-class mode — commercial periods, не 365 дат вручную; applicable всем категориям)**; DATE_OVERRIDE (holidays/events, не требует правки base-сезона); DAY_OF_WEEK; OCCUPANCY/PAX; DURATION; TIER/VOLUME; package/inclusion (каждый Rate Plan — свои periods); advance-purchase/last-minute — extension point.
+-   **Source ≠ method:** price source (MANUAL/IMPORT/API_SUPPLIER/CHANNEL_MANAGER/future) — ОТКУДА факт; pricing method/rule (FIXED/PERIOD/DATE_OVERRIDE/DAY_OF_WEEK/OCCUPANCY/DURATION_TIER/future LEAD_TIME/DYNAMIC) — КАК устроена цена. Не концентрировать. CSV/XLS — input method, НЕ pricing authority.
+-   **Price basis** — Rate Plan-level commercial semantic (PER_UNIT/PER_ROOM/PER_PERSON/PER_NIGHT/PER_DAY/PER_HOUR/PER_TRIP/PER_SERVICE/PACKAGE_TOTAL; enum-имена финализируются 1.8B); quantity/basis arithmetic — explicit (unit amount, quantity, duration, total; без implicit arithmetic).
+-   **Temporal:** `validFrom`/`validTo` — date-only inclusive (1.8C; UTC date-only midnight — модель `Availability.date`); **timezone authority НЕ существует до Step 2.8A** (у Product/ServiceUnit нет канонического commercial timezone; поле не выдумывается; 1.8C — UTC date-only); гейт Step 2.8A сохраняется (date-based может идти до 2.8A; time-slot/exact departure/timezone-aware — после 2.8A).
+-   **Deterministic precedence (HARD):** 1) exact/specific DATE_OVERRIDE; 2) более специфичное условное override; 3) применимый seasonal/PERIOD; 4) DAY_OF_WEEK (как условие внутри периода, не глобальный ранг); 5) base/FIXED. Same-priority overlap, матчащий один context → 422 на write (никаких row-order/createdAt/frontend-order). Specificity — механическая, server-testable.
+-   **Server resolver:** единый authoritative `resolvePrice(serviceUnit, ratePlan, serviceDate/range, occupancy/PAX, quantity, duration, currency)`; explainable (matched rule/period, basis, currency, unit price, quantity/duration, total, provenance, rule/period identity). Frontend не authoritative.
+-   **No fabricated future price (HARD GATE):** нет авторитетной цены на даты → нет экстраполяции/stale-fallback/fake zero/авто-текущей цены; not instant-bindable. PRICE_ON_REQUEST — только intentional inquiry-based offer (не каждая missing price).
+-   **Currency:** одна canonical валюта на Rate Plan (DD-029); смена валюты внутри периодов одного плана — не casually; multi-currency — отдельные Rate Plans. Display-конверсия ≠ binding price.
+-   **Pricing ≠ Availability:** price row не несёт inventory counters; stop-sell ≠ удаление цены; multi-date stay — price per night + атомарные holds каждой ночи (DD-027, единый Step 2.4 engine).
+-   **Quote/Checkout/Sale freeze:** Catalog pricing — authoritative до binding; после freeze — никакого reprice из правок календаря; Order не реконструирует историческую сумму. Future Quote snapshot: serviceUnit ref, Rate Plan ref, rule/period ref, basis, currency, unit price, quantity/duration, total, service date/range.
+-   **Marketplace «from N»:** только server-side из authoritative eligible periods по документированной политике; после выбора дат — серверная резолюция + отдельная оценка availability (никакого frontend-пересчёта из скачанного календаря).
+-   **Partner Cabinet workflow (3.29I):** Product → ServiceUnit → Rate Plan → method → basis/currency → base/period → seasonal → overrides → conditions → валидация overlap → preview → availability отдельно → publish; annual calendar UX (bulk/copy/override/stop-sell/preview); import UX → тот же canonical model (никакого «Excel pricing engine»).
+-   **Future automation:** supplier/API pricing — trusted source → canonical future prices (provenance, idempotent reconcile, no spoofing, conflict policy, frozen snapshots); dynamic/RM — обязана резолвить authoritative Catalog price под тем же binding contract (никакого второго price authority); manual override supersedes automated в scope с provenance/audit.
 -   Normalization не уничтожает Seller source values
     (source/original value + normalized TravelHub value); никаких
     uncontrolled global enums для маркетинговых терминов; taxonomy
@@ -1464,9 +1527,11 @@ strict containment coverage).
 14. **Step 2.2F — Proposal → Canonical Sales Conversion** ✅ DONE (2026-08-11; target = **Opportunity (OPP-*)**, затем Quote → Checkout → Sale → OrderRequested → Order → Booking; регрессия 744/744 e2e + 380 unit + 135 frontend + build + migrate drift 0)
 15. **Step 2.2F — STRICT REVIEW** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-11; FIX 1–5 — см. Step 2.2F)
 16. **Service Templates return point (conditional)** ✅ DECISION GATES RESOLVED (2026-08-11; DD-024…DD-029 → DECIDED; решения — `docs/architecture/service-templates-decision-gates.md`; DDM и Roadmap 1.8A–1.8D синхронизированы; ADR НЕ требуется; Universal Pricing Model Amendment — отдельный pre-prepared prompt, исполняется как самостоятельный pass в рамках этого return point перед 1.8B/1.8C)
-17. **Step 1.8A — Service Template / Seller Commercial Structure Foundation** ▶ NEXT (active item)
-18. **Step 1.8A — STRICT REVIEW**
-19. **Step 1.8B — Tariff / Commercial Variant Foundation**
+17. **Step 1.8A — Service Template / Seller Commercial Structure Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-11; ServiceUnit `UNI-*`, catalog.*; 26 e2e + 15 unit green; регрессия 770/770 e2e + 395 unit + 135 frontend)
+18. **Step 1.8A — STRICT REVIEW** ✅ DONE (APPROVED WITH REVIEW FIXES)
+18A. **Universal Pricing Model Amendment** ✅ IMPLEMENTATION/DOCUMENTATION COMPLETED — WAITING FOR STRICT REVIEW (2026-08-11; documentation-only: `docs/architecture/universal-pricing-model.md` интегрирован в Roadmap — invariants, pricing modes, annual/seasonal calendar first-class, source≠method, price basis, deterministic precedence, missing-price, currency, pricing≠availability, Quote freeze, Marketplace «from N», Partner Cabinet annual-calendar UX, import/API/dynamic extension points, cross-category applicability; контракты 1.8B/1.8C/1.8D/3.29I обновлены; код НЕ менялся)
+18B. **Universal Pricing Model Amendment — STRICT REVIEW** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-11; FIXES: §28 timezone authority явно deferred до 2.8A (UTC date-only для 1.8C, поле НЕ выдумывается); §17/§31 DAY_OF_WEEK согласован как условие внутри периода с DD-026 §3.6 (единый механизм специфичности, без двух интерпретаций); §30 overlap — различены invalid ambiguous (422) vs valid specificity-resolved («Summer+ANY» vs «Summer+occupancy2»); §22 basis — одиночный тег + quantity/duration dimensions (без compound-строки); §35 PRICE_ON_REQUEST — Rate Plan-level (1.8B) vs period-level (1.8C) vs gap=missing-price; §41 multi-date — N-rows подтверждены решением DD-027 (не надморозка); §50 legacy `Tariff.price` transition заморожен (аддитивный 1.8B, base/FIXED fallback до 1.8C, без destructive migration); документация-only, код НЕ менялся)
+19. **Step 1.8B — Tariff / Commercial Variant (Rate Plan) Foundation** ▶ NEXT (active item; UNBLOCKED — amendment approved)
 20. **Step 1.8B — STRICT REVIEW**
 21. **Step 1.8C — Period Pricing & Period Availability Foundation**
 22. **Step 1.8C — STRICT REVIEW**

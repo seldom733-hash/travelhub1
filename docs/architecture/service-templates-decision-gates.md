@@ -123,6 +123,14 @@ exact DATE_OVERRIDE (single date / explicit date-range) > explicit PERIOD (narro
 DAY_OF_WEEK rule > broader seasonal/base PERIOD > FIXED/BASE
 ```
 
+> **Universal Pricing Amendment STRICT REVIEW (2026-08-11) — refinement, не переоткрытие:**
+> DAY_OF_WEEK реализуется как **условие ВНУТРИ периода** (не отдельный глобальный слой);
+> итоговый порядок ЭКВИВАЛЕНТЕН приведённому (период с day-of-week-условием специфичнее
+> «голого» сезонного периода того же диапазона), но разрешается единым механизмом
+> специфичности (narrower range / exact condition), без двух интерпретаций. Overlap:
+> одинаковый уровень специфичности → 422; разный → разрешён. Детали —
+> `docs/architecture/universal-pricing-model.md` §7.
+
 - overlapping periods of the same priority: **FORBIDDEN** — write-time validation (422, no "first row wins");
 - tie impossible by construction; source priority (manual vs supplier/imported) resolved as documented
   extension point (see §9);
