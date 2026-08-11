@@ -1,6 +1,6 @@
 # Step 2.2E — Buyer Request / Proposal Communication (pre-sale conversations)
 
-**Status:** IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW
+**Status:** STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES
 **Owner:** Communication (`communication.*`, ADR-0011) + Reverse Marketplace context refs (ADR-0012)
 **IDs:** `CML-*` (потоки и сообщения — тот же canonical ID-домен, §18)
 **Migration:** `20260811101502_add_pre_sale_conversations` (additive, только `communication.*`)
