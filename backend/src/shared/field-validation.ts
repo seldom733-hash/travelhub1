@@ -204,6 +204,68 @@ export const MATCH_RUN_FORBIDDEN_KEYS = [
 ] as const;
 
 /**
+ * Поля SellerProposal, которые клиент НИКОГДА не может передать (Step 2.2D):
+ * ownership (sellerId/partnerId/ownerId/buyerId), identity (id/code/
+ * distributionId — server-derived: distribution резолвится сервисом по
+ * (buyerRequestId, sellerId)), lifecycle/status, version (кроме
+ * expectedVersion — отдельное поле), timestamps, acquisition/sales-
+ * conversion поля (quoteId/saleId/selected/contactDisclosed), actor/correlation.
+ *
+ * ПРИМЕЧАНИЕ: buyerRequestId НЕ запрещён на create — это легитимный client-
+ * вход (для какого распределённого request создаётся Proposal; сервер
+ * проверяет существование distribution к этому Seller-у). На update/lifecycle
+ * он запрещён (immutable после создания).
+ */
+export const PROPOSAL_CREATE_FORBIDDEN_KEYS = [
+  "id",
+  "code",
+  "sellerId",
+  "partnerId",
+  "ownerId",
+  "buyerId",
+  "distributionId",
+  "status",
+  "version",
+  "acquisitionSource",
+  "source",
+  "createdBy",
+  "createdAt",
+  "updatedAt",
+  "submittedAt",
+  "withdrawnAt",
+  "convertedAt",
+  "quoteId",
+  "saleId",
+  "contactDisclosed",
+  "selected",
+  "accepted",
+  "correlationId",
+  "causationId",
+] as const;
+/**
+ * PATCH: те же server-owned поля ПЛЮС buyerRequestId (immutable после
+ * создания — смена request = отзыв + создание нового Proposal).
+ */
+export const PROPOSAL_UPDATE_FORBIDDEN_KEYS = [...PROPOSAL_CREATE_FORBIDDEN_KEYS, "buyerRequestId"] as const;
+
+/**
+ * Lifecycle-команды (submit/withdraw) принимают ТОЛЬКО expectedVersion.
+ * Все content/ownership/lifecycle/source/temporal ключи запрещены → 422 (loud).
+ */
+export const PROPOSAL_LIFECYCLE_FORBIDDEN_KEYS = [
+  ...PROPOSAL_CREATE_FORBIDDEN_KEYS,
+  "buyerRequestId", // immutable после создания (как в update)
+  "amount",
+  "currency",
+  "description",
+  "includedServices",
+  "exclusions",
+  "conditions",
+  "notes",
+  "validUntil",
+] as const;
+
+/**
  * Отклоняет запрос, содержащий запрещённые ключи (масс-assignment / role injection /
  * forged customerId/partnerId). Возвращает список задетых ключей (пусто — ок).
  * Чистая функция: не бросает сама (бросают сервисы), чтобы тестировать без Nest.

@@ -30,6 +30,7 @@
 | `RSR-` | AvailabilityReservation (capacity hold) | Catalog |
 | `CAP-` | SellerCapability (commercial capability) | Reverse Marketplace (reverse.*) |
 | `BRQ-` | BuyerRequest (demand entry) | Reverse Marketplace (reverse.*) |
+| `PRP-` | SellerProposal (pre-commercial response) | Reverse Marketplace (reverse.*) |
 
 *Exit Audit Step 1.18:* таблица синхронизирована с фактическим реестром
 `IdsService.nextCode` (PRD/CAT/TRF/CUS/CNT/COM/PAR/SUP/ORD/TH/BKG/CML/SELL/SPP/SF/APP/USR).
@@ -44,7 +45,8 @@
 capability declarations.
 *Step 2.2B:* зарегистрирован BRQ- (BuyerRequest, reverse.*) — канонический
 buyer-demand префикс (финальная регистрация в точке реализации 2.2B).
-Proposal prefix НЕ регистрируется (Step 2.2D).
+*Step 2.2D:* зарегистрирован PRP- (SellerProposal, reverse.*) — pre-commercial
+ответ Seller-а на распределённый BuyerRequest (промпт 2.2D §37).
 
 Формат: `PREFIX-` + число, дополненное слева нулями (8 цифр; для
 `TH-YYYY-######` — 6 цифр, последовательность сквозная по году).

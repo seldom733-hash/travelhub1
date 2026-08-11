@@ -1908,6 +1908,7 @@ model BuyerRequest {
 
   history        BuyerRequestHistory[]
   distributions  BuyerRequestDistribution[]
+  proposals      SellerProposal[]
 
   @@index([buyerId])
   @@index([buyerId, status])
@@ -1942,6 +1943,8 @@ model BuyerRequestDistribution {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
+  proposals SellerProposal[]
+
   @@unique([buyerRequestId, sellerId])
   @@index([sellerId])
   @@index([sellerId, distributedAt])
@@ -1963,6 +1966,119 @@ model BuyerRequestHistory {
   createdAt DateTime     @default(now())
 
   @@index([requestId])
+  @@schema("reverse")
+}
+
+/// Lifecycle Seller Proposal (Step 2.2D, reverse.*): DRAFT — редактируемый
+/// черновик; SUBMITTED — направлен Buyer-у (виден в Buyer projection);
+/// WITHDRAWN — отозван Seller-ом (терминал). ACCEPTED/SELECTED/CONVERTED/
+/// QUOTED/WON/LOST НЕ здесь — Buyer selection и конверсия принадлежат
+/// Step 2.2F (DD-030 gate).
+enum ProposalStatus {
+  DRAFT
+  SUBMITTED
+  WITHDRAWN
+
+  @@schema("reverse")
+}
+
+/// Seller Proposal (Step 2.2D, reverse.*, ADR-0012) — pre-commercial
+/// competitive ответ Seller-а на распределённый ему BuyerRequest.
+///
+/// Инварианты:
+///  - 0..N Proposals на BuyerRequest; ОДИН Proposal на (Seller, BuyerRequest)
+///    (unique, deterministic duplicate rule, idempotent retry);
+///  - Proposal ≠ Sales Quote: НЕ reuse sales.Quote, НЕ второй binding Quote
+///    engine; amount/currency — НЕ-binding индикация (authority — canonical
+///    Quote Step 2.3); NULL amount = PRICE_ON_REQUEST (честное отсутствие,
+///    НЕ фабрикуется ноль);
+///  - sellerId — crm.Partner ref (без FK), ВСЕГДА из actor.partnerId;
+///  - distributionId — reverse.BuyerRequestDistribution ref (FK внутри
+///    reverse.*): создание ТРЕБУЕТ реальной канонической distribution к этому
+///    Seller-у (клиент не может forged distribution/self-match);
+///  - request gate: Proposal создаётся/сабмитится только для SUBMITTED
+///    request; CANCELLED — новые Proposal запрещены; существующие сохраняются
+///    (история durable); withdraw допустим всегда (решение Seller-а);
+///  - PROPOSAL EXISTS ≠ CONTACT DISCLOSED: контент — plain text без
+///    контактов/URL (анти-disintermediation, консервативная валидация);
+///  - создание НЕ создаёт Lead/Opportunity/Quote/Sale/Order/Booking/Product;
+///  - acquisitionSource остаётся BUYER_REQUEST (2.2F сохранит при конверсии);
+///  - CAS (version); history/audit; события НЕ эмитятся (consumer — 2.2E/F
+///    читают напрямую; explicit command — наблюдаемый trigger);
+///  - DD-030 compatibility: schema поддерживает будущую конверсию без выбора
+///    target сейчас (нет salesQuoteId/leadId/opportunityId полей).
+model SellerProposal {
+  id   String @id @default(uuid())
+  code String @unique // PRP-00000001 (IdsService, атомарный счётчик)
+
+  /// Владелец — crm.Partner ref (без FK). ВСЕГДА из actor.partnerId (сервер),
+  /// никогда из body/query.
+  sellerId String
+
+  /// Demand ref — reverse.BuyerRequest (FK внутри reverse.*).
+  buyerRequestId String
+  buyerRequest   BuyerRequest @relation(fields: [buyerRequestId], references: [id], onDelete: Cascade)
+
+  /// Доказательство канонической distribution (reverse.BuyerRequestDistribution,
+  /// FK внутри reverse.*): Proposal может существовать ТОЛЬКО на реально
+  /// распределённый Seller-у request. distributionId — server-derived
+  /// (резолвится сервисом по (buyerRequestId, sellerId), клиент не передаёт).
+  distributionId String
+  distribution   BuyerRequestDistribution @relation(fields: [distributionId], references: [id])
+
+  /// Индикативная коммерческая информация (НЕ-binding): amount — Decimal,
+  /// non-negative, без silent currency conversion; NULL = PRICE_ON_REQUEST
+  /// (честное отсутствие); currency — ISO 4217 (обязателен при amount).
+  amount   Decimal? @db.Decimal(12, 2)
+  currency String?
+
+  /// Контент Proposal (free-text, size-limited, plain text, анти-injection,
+  /// анти-disintermediation — без контактов/URL; НЕ DLP-safe store).
+  description      String?
+  includedServices String?
+  exclusions       String?
+  conditions       String?
+  notes            String?
+  /// Validity hint (date-only, UTC midnight) — НЕ Sales Quote expiry semantics;
+  /// это Reverse Marketplace fact.
+  validUntil DateTime?
+
+  status  ProposalStatus @default(DRAFT)
+  /// Optimistic concurrency (CAS): stale expectedVersion → 409.
+  version Int @default(1)
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  /// Lifecycle milestones (реальные переходы, НЕ updatedAt).
+  submittedAt DateTime?
+  withdrawnAt DateTime?
+
+  history SellerProposalHistory[]
+
+  // Один Proposal на (Seller, BuyerRequest) — deterministic duplicate rule.
+  @@unique([buyerRequestId, sellerId])
+  @@index([sellerId])
+  @@index([sellerId, status])
+  @@index([buyerRequestId, status])
+  @@schema("reverse")
+}
+
+/// Журнал SellerProposal (audit by default, без контактного PII/raw body).
+model SellerProposalHistory {
+  id         String         @id @default(uuid())
+  proposalId String
+  proposal   SellerProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  action     String
+  from       String?
+  to         String?
+  fields     Json?
+  actorId    String?
+  actorName  String?
+  comment    String?
+  createdAt  DateTime       @default(now())
+
+  @@index([proposalId])
   @@schema("reverse")
 }
 

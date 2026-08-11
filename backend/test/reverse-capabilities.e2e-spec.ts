@@ -14,7 +14,7 @@
  *  - acceptsBuyerRequests: безопасный default false; enable/disable НЕ создаёт
  *    BuyerRequest/Lead/Opportunity/Quote/Sale и НЕ даёт entitlement;
  *  - capability ≠ inventory: НИКАКИХ side effects на Product/Tariff/Availability/
- *    Reservation; reverse.* содержит ТОЛЬКО SellerCapability + History;
+ *    Reservation; reverse.* содержит approved 2.2A-2.2D сущности;
  *  - audit history по каждому meaningful mutation; события НЕ эмитятся.
  *
  * Test DB: изолированная (e2e.env.ts) — dev-БД не используется.
@@ -402,7 +402,15 @@ describe("Phase 2 Step 2.2A — Seller Commercial Capabilities (e2e)", () => {
     expect(after).toEqual(before);
     const tables = await reverseTables();
     // Step 2.2C добавил BuyerRequestDistribution (легитимная эволюция).
-    expect(tables).toEqual(["BuyerRequest", "BuyerRequestDistribution", "BuyerRequestHistory", "SellerCapability", "SellerCapabilityHistory"]);
+    expect(tables).toEqual([
+      "BuyerRequest",
+      "BuyerRequestDistribution",
+      "BuyerRequestHistory",
+      "SellerCapability",
+      "SellerCapabilityHistory",
+      "SellerProposal",
+      "SellerProposalHistory",
+    ]);
   });
 
   it("18. worldwide coverage — эксклюзивная запись (валидация); не создаётся как fake country", async () => {

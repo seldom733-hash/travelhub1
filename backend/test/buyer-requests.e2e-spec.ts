@@ -13,7 +13,7 @@
  *  - PII-minimal: никаких контактов в request/history/audit; preferences
  *    reject contact-ключи;
  *  - Seller/PARTNER доступа НЕ имеет (2.2C distribution — позже);
- *  - reverse.* содержит только 2.2A+2.2B сущности.
+ *  - reverse.* содержит approved 2.2A-2.2D сущности.
  *
  * Test DB: изолированная (e2e.env.ts) — dev-БД не используется.
  */
@@ -447,10 +447,18 @@ describe("Phase 2 Step 2.2B — Buyer Request Foundation (e2e)", () => {
     await partnerAgent.get(`/api/v1/buyer/requests/${own.items[0].id}`).expect(403);
   });
 
-  it("22/23. reverse.* содержит только 2.2A+2.2B сущности (нет matching/Proposal)", async () => {
+  it("22/23. reverse.* содержит approved 2.2A-2.2D сущности (включая Proposal, добавленный Step 2.2D)", async () => {
     const tables = await reverseTables();
     // Step 2.2C добавил BuyerRequestDistribution (легитимная эволюция).
-    expect(tables).toEqual(["BuyerRequest", "BuyerRequestDistribution", "BuyerRequestHistory", "SellerCapability", "SellerCapabilityHistory"]);
+    expect(tables).toEqual([
+      "BuyerRequest",
+      "BuyerRequestDistribution",
+      "BuyerRequestHistory",
+      "SellerCapability",
+      "SellerCapabilityHistory",
+      "SellerProposal",
+      "SellerProposalHistory",
+    ]);
   });
 
   it("24/25/26. создание request НЕ создаёт Sales/Order/Booking/Product entities", async () => {

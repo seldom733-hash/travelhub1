@@ -13,7 +13,7 @@
  *  - idempotent: unique (buyerRequestId, sellerId), retry/concurrent safe;
  *  - cancel-vs-matching: serialized (FOR UPDATE); durable rows не удаляются;
  *  - Seller inbox: только СВОИ distributions; unmatched Seller → пусто/404;
- *  - reverse.* содержит только 2.2A+2.2B+2.2C сущности (нет Proposal).
+ *  - reverse.* содержит 2.2A-2.2D сущности (2.2D добавила SellerProposal + History).
  */
 import "reflect-metadata";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
@@ -243,6 +243,10 @@ describe("Phase 2 Step 2.2C — Matching & Distribution (e2e)", () => {
     await sellerA.agent.post("/api/v1/system/reverse/matching/run").send({ buyerRequestId: "x" }).expect(403);
   });
 
+  it("1b. BUYER matching run → 403 (нет reverse.match.run)", async () => {
+    await runMatch(buyerAgent, "00000000-0000-0000-0000-000000000000").expect(403);
+  });
+
   it("2. forged sellerIds/status/timestamps/rank/contactDisclosed в matching run → 422", async () => {
     const id = "00000000-0000-0000-0000-000000000000";
     await runMatch(adminAgent, id).send({ sellerIds: ["x"] }).expect(422);
@@ -263,6 +267,16 @@ describe("Phase 2 Step 2.2C — Matching & Distribution (e2e)", () => {
     const r = (await buyerAgent.post("/api/v1/buyer/requests").send({ categoryId: catHotelId, destinations: [{ countryCode: "TR" }] }).expect(201)).body as { id: string; version: number };
     await buyerAgent.post(`/api/v1/buyer/requests/${r.id}/cancel`).send({ expectedVersion: r.version }).expect(201);
     await runMatch(adminAgent, r.id).expect(422);
+  });
+
+  it("4b. inactive category → 422 (distribution impossible)", async () => {
+    const cat = (await adminAgent.post("/api/v1/categories").send({ title: `Match inactive ${stamp}`, slug: `mch-inactive-${stamp}` }).expect(201)).body as { id: string };
+    created.categories.push(cat.id);
+    const r = (await buyerAgent.post("/api/v1/buyer/requests").send({ categoryId: cat.id, destinations: [{ countryCode: "TR" }] }).expect(201)).body as { id: string; version: number };
+    await buyerAgent.post(`/api/v1/buyer/requests/${r.id}/submit`).send({ expectedVersion: r.version }).expect(201);
+    await prisma.category.update({ where: { id: cat.id }, data: { status: "INACTIVE" } });
+    await runMatch(adminAgent, r.id).expect(422);
+    expect(await prisma.buyerRequestDistribution.count({ where: { buyerRequestId: r.id } })).toBe(0);
   });
 
   // ── Core matching proofs ──────────────────────────────────────────────
@@ -314,8 +328,11 @@ describe("Phase 2 Step 2.2C — Matching & Distribution (e2e)", () => {
 
   // ── 9/10. Capability/Seller state gates ───────────────────────────────
 
+  it("9b. duplicate capability (same Seller + category) → 409 (одна capability на (Seller, категорию); перекрытия невозможны структурно)", async () => {
+    await sellerA.agent.post("/api/v1/partner/reverse/capabilities").send({ categoryId: catHotelId, destinations: [{ countryCode: "GE" }] }).expect(409);
+  });
+
   it("9. acceptsBuyerRequests=false исключает; capability deactivate исключает; inactive Seller исключает", async () => {
-    // Seller A: создаём второй capability (car-rental) БЕЗ accept и без activate.
     const draft = (await sellerA.agent.post("/api/v1/partner/reverse/capabilities").send({ categoryId: catCarRentalId, destinations: [{ countryCode: "TR" }] }).expect(201)).body as { id: string; version: number };
     // Deactivate: отключаем accepts у A hotel capability через новый draft-capability?
     // Вместо этого: DRAFT capability (car-rental) с accept=false не матчится:
@@ -392,6 +409,18 @@ describe("Phase 2 Step 2.2C — Matching & Distribution (e2e)", () => {
     expect(run.sellerIds).not.toContain(sellerE.partnerId);
   });
 
+  it("12b. destinations update (PATCH 2.2A) уважается matching-ом: изменённый coverage исключает seller (sequential regression; настоящий interleaving — READ COMMITTED контракт, документирован)", async () => {
+    const sellerF = await createApprovedSeller("f");
+    await createActiveCapability(sellerF, catHotelId, [{ countryCode: "TR" }]);
+    const caps = (await sellerF.agent.get("/api/v1/partner/reverse/capabilities").expect(200)).body as { items: Array<{ id: string; version: number; status: string }> };
+    const cap = caps.items.find((c) => c.status === "ACTIVE")!;
+    // Меняем coverage с TR на GE (destinations изменяемы через PATCH 2.2A).
+    await sellerF.agent.patch(`/api/v1/partner/reverse/capabilities/${cap.id}`).send({ destinations: [{ countryCode: "GE" }], expectedVersion: cap.version }).expect(200);
+    const reqId = await submitHotelRequest([{ countryCode: "TR" }]);
+    const run = (await runMatch(adminAgent, reqId).expect(201)).body as MatchRunResult;
+    expect(run.sellerIds).not.toContain(sellerF.partnerId);
+  });
+
   // ── 14/15. Seller inbox / isolation / projection ──────────────────────
 
   it("13. Seller inbox: own list/detail только распределённые; unmatched Seller → пусто/404; pagination", async () => {
@@ -446,9 +475,17 @@ describe("Phase 2 Step 2.2C — Matching & Distribution (e2e)", () => {
 
   // ── 16-18. No fan-out / audit / failure atomicity ─────────────────────
 
-  it("16. reverse.* содержит только 2.2A+2.2B+2.2C сущности (нет Proposal/matching-inbox)", async () => {
+  it("16. reverse.* содержит 2.2A-2.2D сущности (включая SellerProposal + History, добавленные Step 2.2D)", async () => {
     const tables = await reverseTables();
-    expect(tables).toEqual(["BuyerRequest", "BuyerRequestDistribution", "BuyerRequestHistory", "SellerCapability", "SellerCapabilityHistory"]);
+    expect(tables).toEqual([
+      "BuyerRequest",
+      "BuyerRequestDistribution",
+      "BuyerRequestHistory",
+      "SellerCapability",
+      "SellerCapabilityHistory",
+      "SellerProposal",
+      "SellerProposalHistory",
+    ]);
   });
 
   it("17. audit: reverse.match.run с actor/candidates/matched; unknown request → 404 без сайд-эффектов", async () => {
