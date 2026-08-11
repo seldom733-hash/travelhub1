@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-10\
+**Дата актуализации:** 2026-08-11 (Service Templates decision gates DD-024…DD-029 RESOLVED)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -85,6 +85,12 @@ commercial names preserved verbatim; TravelHub standardizes attributes,
 not names», «Room/service unit и Rate Plan — разные концепции». Если
 расширение `CategorySchema` безопасно невозможно —
 `ARCHITECTURE DECISION REQUIRED` до реализации.
+**GATE RESOLVED (2026-08-11, DD-025):** требуется НОВАЯ Catalog-owned сущность
+`ServiceUnit`/`SellerCommercialUnit` (CategorySchema — плоский JSON, без
+unit-уровня); живёт в catalog.* (ADR не требуется); identity + code-prefix
+регистрируются при реализации; `source+externalKey` для import-reconcile;
+имя Seller-а verbatim; normalized unit-attributes из шаблона. См.
+`docs/architecture/service-templates-decision-gates.md` §1.
 
 · **Step 1.8B --- Rate Plan / Commercial Variant Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
 Коммерческий вариант единицы (рабочее имя `RatePlan` / `CommercialVariant`;
@@ -96,6 +102,14 @@ price basis. Rate Plan принадлежит/ссылается на реаль
 уже каноническим Rate Plan (тогда extend, без duplicate concepts под
 новыми именами). Category-dependent extensibility; перечисление
 значений НЕ frozen.
+**GATE RESOLVED (2026-08-11, DD-024/DD-026/DD-029):** Tariff = канонический
+Rate Plan (расширять: meal plan/refundability/cancellationPolicyId ref/
+restrictions/priceBasis/occupancy; параллельная RatePlan-сущность запрещена).
+Price basis — на уровне Tariff; одна валюта на Rate Plan (binding без
+конверсии; display — same-currency «from N», FX deferred). source (MANUAL/
+IMPORT/API_SUPPLIER/CHANNEL_MANAGER) ≠ rule (FIXED/PERIOD/DATE_OVERRIDE/
+DAY_OF_WEEK/OCCUPANCY/PAX/…); PRICE_ON_REQUEST — типизированное состояние,
+не ноль/маркетинг. См. `docs/architecture/service-templates-decision-gates.md` §2/§3/§6.
 
 · **Step 1.8C --- Period Pricing & Period Availability Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
 Ограниченные commercial periods: authoritative period price
@@ -121,6 +135,17 @@ AvailabilityReservation hold-ов (одна строка на дату, моде
 multi-date периодов: cardinality = «все allocated units/dates», не
 «число items»; migration детализируется в 1.8C implementation (НЕ
 дефект текущего APPROVED Step 2.5; DD-027).
+**GATE RESOLVED (2026-08-11, DD-026/DD-027):** `CommercialPeriod` (catalog.*,
+tariffId + [validFrom,validTo] date-only inclusive, price/currency/basis);
+precedence детерминирована: DATE_OVERRIDE > явный PERIOD (уже диапазон
+выигрывает) > DAY_OF_WEEK > сезон/base PERIOD > FIXED; overlapping
+same-priority → 422 на write; missing price не фабрикуется (unavailable /
+PRICE_ON_REQUEST). Multi-date: N ночей → N reservation-строк в одной tx
+(существующий conditional-UPDATE механизм Step 2.4; второй hold engine НЕ
+вводится); контракт `OrderRequested.reservationIds` ревизуется (cardinality =
+все allocated units/dates); DATE_ONLY — безопасна для 1.8C, time-slot/
+departure — гейт 2.8A; inventory unit category-dependent; price ≠
+availability (stop-sell ≠ удаление цены). См. `docs/architecture/service-templates-decision-gates.md` §3/§4.
 
 · **Step 1.8D --- Commercial Restrictions / Overrides Foundation** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition)\
 Минимальные stop-sell и override-модель; extension points для future
@@ -130,6 +155,11 @@ Overlap-резолюция overlapping periods и server precedence base period 
 date override — server-authoritative, детали deferred до реализации.
 Audit/history для изменений sellable terms (price/availability/stop-sell/
 commercial period/Rate Plan status) — по контракту Step-а.
+**GATE RESOLVED (2026-08-11, DD-026/DD-028):** server-side resolver —
+единственный authoritative (frontend НЕ считает binding price); precedence
+как в §1.8C; gap/conflict — детерминированные (422, отсутствие цены →
+unavailable/PRICE_ON_REQUEST); normalized словари — Catalog-owned (Reverse
+2.2A только читает). См. `docs/architecture/service-templates-decision-gates.md` §3/§5.
 
 · **Step 1.9 --- Buyer Identity / Public-to-Authenticated Transition**\
 Регистрация/login BUYER, обязательный Buyer ↔ CRM Customer mapping, own
@@ -1433,11 +1463,8 @@ strict containment coverage).
 13. **DD-030 — Proposal → Canonical Sales Conversion Point (Architecture Decision)** ✅ RESOLVED (2026-08-11): target = **Opportunity (OPP-*)** — Lead отклонён (дубликат BuyerRequest-demand; шаг назад в воронке), Quote отклонён как первая точка (требует Product/Tariff → shadow product; Proposal non-binding), Opportunity подтверждён (leadId nullable, без Product, first qualified deal). Решение: `docs/prompts/DD-030_PROPOSAL_TO_CANONICAL_SALES_CONVERSION_POINT_ARCHITECTURE_DECISION.md`
 14. **Step 2.2F — Proposal → Canonical Sales Conversion** ✅ DONE (2026-08-11; target = **Opportunity (OPP-*)**, затем Quote → Checkout → Sale → OrderRequested → Order → Booking; регрессия 744/744 e2e + 380 unit + 135 frontend + build + migrate drift 0)
 15. **Step 2.2F — STRICT REVIEW** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-11; FIX 1–5 — см. Step 2.2F)
-16. **Service Templates return point (conditional):** ▶ NEXT (active item) — разрешить
-    implementation-time gates DD-025/Step 1.8A, DD-024/Step 1.8B,
-    DD-026/Step 1.8C, DD-027/Step 1.8C (multi-date holds → 2.4/2.5
-    contract), DD-028 taxonomy ownership, DD-029 multi-currency display.
-17. **Step 1.8A — Service Template / Seller Commercial Structure Foundation**
+16. **Service Templates return point (conditional)** ✅ DECISION GATES RESOLVED (2026-08-11; DD-024…DD-029 → DECIDED; решения — `docs/architecture/service-templates-decision-gates.md`; DDM и Roadmap 1.8A–1.8D синхронизированы; ADR НЕ требуется; Universal Pricing Model Amendment — отдельный pre-prepared prompt, исполняется как самостоятельный pass в рамках этого return point перед 1.8B/1.8C)
+17. **Step 1.8A — Service Template / Seller Commercial Structure Foundation** ▶ NEXT (active item)
 18. **Step 1.8A — STRICT REVIEW**
 19. **Step 1.8B — Tariff / Commercial Variant Foundation**
 20. **Step 1.8B — STRICT REVIEW**

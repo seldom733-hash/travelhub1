@@ -456,7 +456,7 @@ canonical Catalog options модели.
 
 ## DD-024 --- Rate Plan vs Existing Tariff (Canonical Commercial Variant)
 
-**Status:** DEFERRED
+**Status:** DECIDED (2026-08-11, Service Templates decision gates)
 
 **Already Decided (existing model):** `catalog.Tariff` — name/price/
 currency/validFrom/validTo, привязан к Product; `Availability` — на
@@ -502,11 +502,20 @@ price basis enum.
 Step 1.8B (зафиксировано в Roadmap §1.8B: «если Tariff — правильный
 owner, extend»).
 
+**Final Decision (2026-08-11):** **A — Tariff IS канонический Rate Plan, расширять**
+(подтверждено). Параллельная RatePlan-сущность ЗАПРЕЩЕНА (пересекающиеся
+authorities). 1.8B расширяет `catalog.Tariff`: meal plan, refundability,
+`cancellationPolicyId` ref (политика — отдельный owner), included services,
+restrictions, `priceBasis`, occupancy/PAX applicability; сохраняются
+identity/`TRF-*`, price/currency, validity window (price/booking window, НЕ
+stay period), роль ключа Availability, version/CAS. Полное обоснование —
+`docs/architecture/service-templates-decision-gates.md` §2.
+
 ------------------------------------------------------------------------
 
 ## DD-025 --- Seller Commercial Unit Identity & CategorySchema Nesting
 
-**Status:** DEFERRED
+**Status:** DECIDED (2026-08-11, Service Templates decision gates)
 
 **Evidence (STRICT REVIEW):** `CategorySchema` — это schema **атрибутов
 Product**: плоский `attributes` Json (`[{key,label,type,required,
@@ -541,11 +550,21 @@ Structure Foundation).
 CategorySchema-расширение признано недостаточным — оформляется ADR до
 реализации.
 
+**Final Decision (2026-08-11):** **B — требуется НОВАЯ Catalog-owned сущность
+`ServiceUnit`/`SellerCommercialUnit`** (categorySchema-шаблон НЕ может дать
+unit-уровневую identity/lifecycle/availability-relation: `attributes` — плоский
+JSON, конфиг-блоки — одиночные JSON). Единица живёт в catalog.* (тот же
+bounded context, что Product/Tariff) → **ADR НЕ требуется** (ADR-0001 покрывает;
+ADR лишь если 1.8A докажет невозможность проживания в catalog.*). Identity +
+канонический code-prefix регистрируется при 1.8A; `source + externalKey` для
+import-reconcile; имя Seller-а verbatim; normalized unit-attributes из шаблона.
+Полное обоснование — `docs/architecture/service-templates-decision-gates.md` §1.
+
 ------------------------------------------------------------------------
 
 ## DD-026 --- Commercial Period Temporal Semantics, Price Basis & Occupancy
 
-**Status:** DEFERRED
+**Status:** DECIDED (2026-08-11, Service Templates decision gates)
 
 **Still Open (Roadmap Amendment §13-15/§29 Q4, Q6-Q9):** к чему крепятся
 commercial periods (Tariff? Product variant? другая Catalog-owned
@@ -571,11 +590,26 @@ Availability Foundation).
 pricing/availability), чтобы schema не зафиксировала конвейерация
 концепций.
 
+**Final Decision (2026-08-11):** периодная сущность `CommercialPeriod`
+(catalog.*, ключ tariffId + [validFrom,validTo] date-only inclusive, price,
+currency, basis); разделение source (MANUAL/IMPORT/API_SUPPLIER/
+CHANNEL_MANAGER/future DYNAMIC_RULE) vs rule (FIXED/PERIOD/DATE_OVERRIDE/
+DAY_OF_WEEK/OCCUPANCY/PAX/AGE_BAND/DURATION/ROUTE/PACKAGE/PRICE_ON_REQUEST);
+price basis на уровне Tariff (PER_UNIT/PER_ROOM/PER_PERSON/PER_NIGHT/PER_DAY/
+PER_HOUR/PER_TRIP/PACKAGE_TOTAL); occupancy/PAX/age/duration/route —
+price-identity-измерения (category-configurable, не frozen глобально);
+детерминированная precedence: DATE_OVERRIDE > явный PERIOD (уже диапазон
+выигрывает) > DAY_OF_WEEK > сезон/base PERIOD > FIXED; overlapping
+same-priority PERIOD-ы — запрещены на write (422); missing price — не
+фабрикуется (unavailable для binding или PRICE_ON_REQUEST); 1.8C — date-only
+(Step 2.8A gate сохраняется). Полное обоснование —
+`docs/architecture/service-templates-decision-gates.md` §3.
+
 ------------------------------------------------------------------------
 
 ## DD-027 --- Period Availability Granularity & Multi-Date Holds
 
-**Status:** DEFERRED
+**Status:** DECIDED (2026-08-11, Service Templates decision gates)
 
 **Still Open (Roadmap Amendment §17/§32):** category-dependent
 availability granularity (date / date range / departure / time slot /
@@ -607,11 +641,25 @@ Foundation) + Step 2.8A.
 **Resolution trigger:** перед implementation-design Step 1.8C; схема
 multi-date hold согласуется с 2.4/2.5 contract change.
 
+**Final Decision (2026-08-11):** **A — существующие Availability +
+AvailabilityReservation расширяются/переиспользуются** для атомарных
+multi-date hold-ов: N ночей → N reservation-строк (по дате) в ОДНОЙ
+PostgreSQL-транзакции через существующий conditional-UPDATE механизм
+(CatalogService.reserveAvailability; любой failure → полный rollback, без
+partial holds). Второй hold engine не вводится. Контракт
+`OrderRequested.reservationIds.length === items.length` (Step 2.5, один hold на
+item) ревизуется при 1.8C: cardinality = «все allocated units/dates» (НЕ
+дефект APPROVED Step 2.5; `Order.reservationIds` Json уже хранит все holds).
+Granularity: DATE_ONLY безопасна для 1.8C; TIME_SLOT/DEPARTURE — гейт 2.8A.
+Inventory unit — category-dependent (rooms/seats/vehicles/units), НЕ всегда
+«people». Price ≠ Availability (независимые состояния; stop-sell ≠ удаление
+цены). Полное обоснование — `docs/architecture/service-templates-decision-gates.md` §4.
+
 ------------------------------------------------------------------------
 
 ## DD-028 --- Normalized Taxonomy Ownership (Catalog dictionaries)
 
-**Status:** DEFERRED
+**Status:** DECIDED (2026-08-11, Service Templates decision gates)
 
 **Already Decided (existing model):** `CategorySchema` (catalog.*) уже
 владеет category-specific attribute definitions (options/enums/validation
@@ -636,11 +684,20 @@ matching, но НЕ становится владельцем (не расшир
 **Resolution trigger:** перед implementation-design Step 1.8A (чтобы
 schema не создала второй словарь в другом домене).
 
+**Final Decision (2026-08-11):** owner нормализованных коммерческих словарей
+(meal plan, bed type, view, amenities, service class, vehicle class) —
+**Catalog** (CategorySchema/template — платформенные определения). Reverse
+Marketplace (2.2A) ЧИТАЕТ normalized attributes/capabilities для matching,
+НЕ владеет (без прав записи чужих словарей). Без duplicated taxonomy per UI;
+без controlled global enums для маркетинговых терминов;
+source/original + normalized value сохраняется; taxonomy extensible. Полное
+обоснование — `docs/architecture/service-templates-decision-gates.md` §5.
+
 ------------------------------------------------------------------------
 
 ## DD-029 --- Marketplace "from N" Multi-Currency Display Rule
 
-**Status:** DEFERRED
+**Status:** DECIDED (2026-08-11, Service Templates decision gates)
 
 **Still Open (Roadmap Amendment §19/§23):** period/date-aware «from N
 USD» на Card/search/PDP — server-derived из действующих authoritative
@@ -661,6 +718,17 @@ step (period-aware price display).
 
 **Resolution trigger:** перед period-aware Marketplace display
 (после 1.8C backend); до FX-домена — same-currency правило.
+
+**Final Decision (2026-08-11):** каждая period price row несёт явную валюту;
+**одна валюта на Rate Plan/Tariff**; binding authority неизменен (Quote/
+Checkout/Sale биндят в валюте tariff/period). Marketplace display —
+**same-currency «from N» правило** (минимум в display/buyer-валюте только если
+цена существует в этой валюте); cross-currency сравнение запрещено до
+канонического FX-домена. FX engine НЕ реализуется (deferred); display-
+конверсия (когда появится) — display-only, НЕ мутирует binding price
+(`display conversion ≠ binding commercial price mutation`). 1.8B/1.8C
+продолжают с single-currency-per-RatePlan. Полное обоснование —
+`docs/architecture/service-templates-decision-gates.md` §6.
 
 ------------------------------------------------------------------------
 
@@ -782,9 +850,9 @@ Deferred Decisions Map не отменяет действующий ADR.
 # Current Register State
 
 -   Total: **30**
--   DEFERRED: **29**
+-   DEFERRED: **22**
 -   IN_REVIEW: **0**
--   DECIDED: **1**
+-   DECIDED: **8** (DD-022, DD-024, DD-025, DD-026, DD-027, DD-028, DD-029, DD-030)
 -   SUPERSEDED: **0**
 -   Next ID: **DD-031**
 
