@@ -22,6 +22,7 @@ import {
   PROPOSAL_CREATE_FORBIDDEN_KEYS,
   PROPOSAL_UPDATE_FORBIDDEN_KEYS,
   PROPOSAL_LIFECYCLE_FORBIDDEN_KEYS,
+  PROPOSAL_SELECT_FORBIDDEN_KEYS,
 } from "../../shared/field-validation";
 
 class CreateProposalDto {
@@ -104,6 +105,14 @@ class UpdateProposalDto {
 }
 
 class LifecycleDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  expectedVersion!: number;
+}
+
+/** Step 2.2F: selection-команда принимает ТОЛЬКО expectedVersion (request CAS). */
+class SelectProposalDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -207,5 +216,27 @@ export class ProposalsController {
     @Param("proposalId") proposalId: string,
   ) {
     return this.proposals.getForRequest(actor, requestId, proposalId);
+  }
+
+  // ── Step 2.2F — Buyer selection / conversion (DD-030) ────────────────
+
+  /**
+   * POST /buyer/requests/:requestId/proposals/:proposalId/select
+   * Buyer (own request) выбирает Proposal → атомарная конверсия в canonical
+   * Opportunity. Server derives всё (buyerId/customerId, sellerId, acquisition-
+   * Source=BUYER_REQUEST, provenance, opportunityId); client передаёт ТОЛЬКО
+   * expectedVersion (CAS). Forged поля → 422 (loud, §29).
+   */
+  @Post("buyer/requests/:requestId/proposals/:proposalId/select")
+  @RequirePermissions("reverse.proposal.select_own")
+  selectProposal(
+    @Body() dto: SelectProposalDto,
+    @Req() req: Request,
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Param("requestId") requestId: string,
+    @Param("proposalId") proposalId: string,
+  ) {
+    assertNoForbiddenKeys(req.body, PROPOSAL_SELECT_FORBIDDEN_KEYS);
+    return this.proposals.selectProposal(actor, requestId, proposalId, dto.expectedVersion);
   }
 }

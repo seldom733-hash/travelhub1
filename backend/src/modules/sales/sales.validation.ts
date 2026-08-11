@@ -35,6 +35,20 @@ export const SALES_CREATE_FORBIDDEN_KEYS = [
   "requestId",
   "correlationId",
   "causationId",
+  // STRICT REVIEW 2.2F (§22/§33): server-owned acquisition/provenance/selection
+  // поля — loud 422 в generic Sales create (Lead/Opportunity/Quote/Sale), а НЕ
+  // silent DTO-strip. Данные защищены сервисами (source всегда server-derived),
+  // но конвенция проекта — явный отказ на forged ключи (§22 «generic payload
+  // spreading»; соответствует CHECKOUT_*/SALE_COMPLETE спискам).
+  "acquisitionSource",
+  "buyerRequestId",
+  "proposalId",
+  "sellerId",
+  "partnerId",
+  "selected",
+  "converted",
+  "convertedOpportunityId",
+  "selectedProposalId",
 ] as const;
 
 /**

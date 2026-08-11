@@ -368,10 +368,24 @@ ON DELETE SET NULL оставлял 10 осиротевших строк → ф�
 ДЕЛЬТОЙ (count до/после init), а не абсолютным 0; FIX 3-4 — аналогичная
 хрупкость count==0 закрыта в sales-domain-foundation (дельта) и sales-center
 (wipe sales-таблиц в beforeAll); полная регрессия 728/728 e2e + 380 unit +
-135 frontend vitest + build green).
-
-· **Step 2.2F --- Proposal → Canonical Sales Conversion** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition; gate DD-030: Proposal→Sales conversion target resolved ДО начала 2.2F — **DD-030 RESOLVED 2026-08-11: target = `Opportunity` (`OPP-*`)**; см. `docs/prompts/DD-030_PROPOSAL_TO_CANONICAL_SALES_CONVERSION_POINT_ARCHITECTURE_DECISION.md`)\
-При выборе Buyer-ом proposal НЕ создаются
+135 frontend vitest + build green).· **Step 2.2F --- Proposal → Canonical Sales Conversion** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-11; Roadmap Amendment, post-baseline addition; gate DD-030 RESOLVED: target = `Opportunity` (`OPP-*`); см. `docs/prompts/DD-030_PROPOSAL_TO_CANONICAL_SALES_CONVERSION_POINT_ARCHITECTURE_DECISION.md`; контракт ниже; детали — `docs/architecture/reverse-proposal-to-sales-conversion.md`)\
+  Реализовано (2.2F): `POST /buyer/requests/:requestId/proposals/:proposalId/select` (BUYER own-scope, `reverse.proposal.select_own`);
+  атомарная owner-service конверсия в ОДНОЙ tx: selection-факт (reverse.BuyerRequest.selectedProposalId @unique,
+  reverse.SellerProposal.selectedAt/convertedOpportunityId @unique/convertedAt) + `sales.Opportunity` через
+  SalesService.createOpportunityFromBuyerRequestSelection (leadId=NULL, status=NEW, acquisitionSource=BUYER_REQUEST,
+  provenance buyerRequestId/proposalId/sellerId). Проверен Checkout DIRECT-hardcode-gap: Checkout выводит source
+  server-side из Quote (`quote.acquisitionSource ?? DIRECT`), Quote наследует из Opportunity — request-led путь
+  BUYER_REQUEST, direct путь DIRECT (legacy сохранён). Регрессия: 744/744 e2e (вкл. reverse-conversion 16), 380 unit,
+  135 frontend vitest, build green, migrate 36/36 drift 0.
+  STRICT REVIEW APPROVED WITH REVIEW FIXES: FIX 1 (§22/§33) SALES_CREATE_FORBIDDEN_KEYS
+  усилен (acquisitionSource/buyerRequestId/proposalId/sellerId/partnerId/selected/converted/
+  convertedOpportunityId/selectedProposalId → loud 422 — generic Sales create НЕ silent-strip
+  forged source/provenance); FIX 2 (§51) select-эндпоинт задокументирован в docs/contracts/api.md
+  (endpoint/permission/own-scope/request/response/idempotency/errors/privacy-boundary);
+  FIX 3 (§37) e2e: idempotent retry со СТАРОЙ expectedVersion (response-loss) → тот же результат,
+  без дублирования history/audit; FIX 4 (§10) e2e: проигравший concurrent A/B — без success
+  history/audit; FIX 5 (§25/§47/§50) e2e: полная цепочка select → Sale → OrderRequested →
+  Order → Booking сохраняет BUYER_REQUEST (frozen; DIRECT-пути не задеты). При выборе Buyer-ом proposal НЕ создаются
 BuyerRequestOrder/ProposalOrder/ReverseMarketplaceOrder/отдельные
 Checkout/Payment/Booking (инвариант 8). Канонический путь:
 `BuyerRequest → Matching → Proposal → Buyer selection → Opportunity (OPP-*) → Quote (QTE-*) → Checkout → Sale → OrderRequested → Order → Booking → Finance`.
@@ -1417,9 +1431,9 @@ strict containment coverage).
 11. **Step 2.2E — Buyer Request / Proposal Communication** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES
 12. **Step 2.2E — STRICT REVIEW** ✅ DONE (APPROVED WITH REVIEW FIXES)
 13. **DD-030 — Proposal → Canonical Sales Conversion Point (Architecture Decision)** ✅ RESOLVED (2026-08-11): target = **Opportunity (OPP-*)** — Lead отклонён (дубликат BuyerRequest-demand; шаг назад в воронке), Quote отклонён как первая точка (требует Product/Tariff → shadow product; Proposal non-binding), Opportunity подтверждён (leadId nullable, без Product, first qualified deal). Решение: `docs/prompts/DD-030_PROPOSAL_TO_CANONICAL_SALES_CONVERSION_POINT_ARCHITECTURE_DECISION.md`
-14. **Step 2.2F — Proposal → Canonical Sales Conversion** ▶ NEXT (gate DD-030 resolved; conversion target = **Opportunity (OPP-*)**, затем Quote → Checkout → Sale → OrderRequested → Order → Booking)
-15. **Step 2.2F — STRICT REVIEW**
-16. **Service Templates return point (conditional):** разрешить
+14. **Step 2.2F — Proposal → Canonical Sales Conversion** ✅ DONE (2026-08-11; target = **Opportunity (OPP-*)**, затем Quote → Checkout → Sale → OrderRequested → Order → Booking; регрессия 744/744 e2e + 380 unit + 135 frontend + build + migrate drift 0)
+15. **Step 2.2F — STRICT REVIEW** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-11; FIX 1–5 — см. Step 2.2F)
+16. **Service Templates return point (conditional):** ▶ NEXT (active item) — разрешить
     implementation-time gates DD-025/Step 1.8A, DD-024/Step 1.8B,
     DD-026/Step 1.8C, DD-027/Step 1.8C (multi-date holds → 2.4/2.5
     contract), DD-028 taxonomy ownership, DD-029 multi-currency display.

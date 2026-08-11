@@ -50,6 +50,12 @@ buyer-demand префикс (финальная регистрация в точ
 *Step 2.2E:* pre-sale conversations (communication.CommunicationThread + её
 сообщения) используют существующий префикс CML-* (тот же атомарный счётчик —
 никакого нового ID-домена; 2.2E §18).
+*Step 2.2F (DD-030, target = Opportunity):* конверсия выбранного SellerProposal
+создаёт canonical `OPP-*` (существующий Sales-префикс; никакого нового ID-домена).
+Provenance refs — trusted refs БЕЗ FK: `Opportunity.buyerRequestId` (BRQ-*),
+`Opportunity.proposalId` (PRP-*, @unique — один Proposal → одна Opportunity),
+`Opportunity.sellerId` (crm.Partner). `BuyerRequest.selectedProposalId` @unique —
+one-winner invariant (2.2F §11/§12).
 
 Формат: `PREFIX-` + число, дополненное слева нулями (8 цифр; для
 `TH-YYYY-######` — 6 цифр, последовательность сквозная по году).

@@ -18,5 +18,8 @@ import { CatalogModule } from "../catalog/catalog.module";
   imports: [CatalogModule],
   controllers: [SalesController, SalesCenterController, CheckoutController],
   providers: [SalesService],
+  /** Step 2.2F: SalesService экспортируется для Reverse owner orchestration
+   *  (createOpportunityFromBuyerRequestSelection вызывается в единой tx). */
+  exports: [SalesService],
 })
 export class SalesModule {}

@@ -88,6 +88,8 @@ export class RequestsService {
     updatedAt: Date;
     submittedAt: Date | null;
     cancelledAt: Date | null;
+    // Step 2.2F: канонический выбранный Proposal (server-owned; own-request view).
+    selectedProposalId: string | null;
   }) {
     return {
       id: row.id,
@@ -110,6 +112,7 @@ export class RequestsService {
       updatedAt: row.updatedAt,
       submittedAt: row.submittedAt,
       cancelledAt: row.cancelledAt,
+      selectedProposalId: row.selectedProposalId,
     };
   }
 

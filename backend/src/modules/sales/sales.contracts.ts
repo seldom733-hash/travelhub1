@@ -40,6 +40,11 @@ export interface OpportunityDto extends SalesEntityDto {
   assignedToId: string | null;
   createdById: string | null;
   status: OpportunityStatus;
+  // Step 2.2F (DD-030): Reverse Marketplace provenance + server-derived source.
+  buyerRequestId: string | null;
+  proposalId: string | null;
+  sellerId: string | null;
+  acquisitionSource: SalesAcquisitionSource | null;
 }
 
 export interface QuoteDto extends SalesEntityDto {
@@ -57,6 +62,9 @@ export interface QuoteDto extends SalesEntityDto {
   discountAmount: string | null;
   subtotal: string | null;
   total: string | null;
+  // Step 2.2F: acquisition source (server-derived из Opportunity; NULL для
+  // direct/staff Quote — Checkout резолвит DIRECT fallback).
+  acquisitionSource: SalesAcquisitionSource | null;
 }
 
 /** Step 2.3: строка КП (Sales-owned snapshot Catalog Product/Tariff). */

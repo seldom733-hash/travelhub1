@@ -8,6 +8,7 @@ import type { AuthUser } from "../../security/auth/auth.service";
 import { RoleCode } from "../../generated/prisma/enums";
 import { Prisma } from "../../generated/prisma/client";
 import { normalizeProposalContent, normalizeProposalMoney, normalizeProposalValidUntil } from "./proposal.validation";
+import { SalesService } from "../sales/sales.service";
 
 const toJson = (v: unknown): Prisma.InputJsonValue => v as unknown as Prisma.InputJsonValue;
 
@@ -42,6 +43,9 @@ export class ProposalsService {
     private readonly prisma: PrismaService,
     private readonly ids: IdsService,
     private readonly security: SecurityService,
+    /** Step 2.2F: Sales owner service boundary (ADR-0001) — конверсия выбранного
+     *  Proposal в canonical Opportunity выполняется Sales в ЕДИНОЙ транзакции. */
+    private readonly sales: SalesService,
   ) {}
 
   // ── Gates ─────────────────────────────────────────────────────────────
@@ -122,6 +126,10 @@ export class ProposalsService {
     updatedAt: Date;
     submittedAt: Date | null;
     withdrawnAt: Date | null;
+    // Step 2.2F: selection/conversion state (server-owned).
+    selectedAt: Date | null;
+    convertedOpportunityId: string | null;
+    convertedAt: Date | null;
   }) {
     return {
       id: row.id,
@@ -144,6 +152,9 @@ export class ProposalsService {
       updatedAt: row.updatedAt,
       submittedAt: row.submittedAt,
       withdrawnAt: row.withdrawnAt,
+      selectedAt: row.selectedAt,
+      convertedOpportunityId: row.convertedOpportunityId,
+      convertedAt: row.convertedAt,
     };
   }
 
@@ -214,6 +225,8 @@ export class ProposalsService {
       validUntil: Date | null;
       status: string;
       submittedAt: Date | null;
+      // Step 2.2F: selection state (server-owned; без internal sales refs).
+      selectedAt: Date | null;
     },
     seller: ReturnType<ProposalsService["toPublicSeller"]> | null,
   ) {
@@ -233,6 +246,7 @@ export class ProposalsService {
       validUntil: row.validUntil,
       status: row.status,
       submittedAt: row.submittedAt,
+      selectedAt: row.selectedAt,
     };
   }
 
@@ -551,6 +565,14 @@ export class ProposalsService {
   async withdrawOwn(actor: AuthUser, id: string, expectedVersion: number) {
     const sellerId = await this.assertSellerEligible(actor);
     const current = await this.findOwn(id, sellerId);
+    // Step 2.2F §33: выбранный/сконвертированный Proposal отозвать НЕЛЬЗЯ —
+    // withdrawal не должен молча инвалидировать уже созданную canonical
+    // Opportunity. Guard до CAS (race покрыт CAS + FOR UPDATE в selection).
+    if (current.convertedOpportunityId) {
+      throw new ValidationDomainError(
+        "Proposal has already been selected/converted by the Buyer; withdrawal is not available",
+      );
+    }
     if (current.status === "WITHDRAWN") {
       return this.toSellerView(current); // deterministic no-op
     }
@@ -626,5 +648,230 @@ export class ProposalsService {
     if (!row) throw new NotFoundError("Seller proposal not found");
     const sellers = await this.sellerIdentityMap([row.sellerId]);
     return this.toBuyerView(row, sellers.get(row.sellerId) ?? null);
+  }
+
+  // ── Step 2.2F — Buyer selection / conversion (DD-030, target = Opportunity) ──
+
+  /**
+   * Buyer selects один eligible SellerProposal СВОЕГО request → атомарная
+   * конверсия в canonical sales.Opportunity (Sales owner method, та же tx).
+   *
+   * Одна PostgreSQL-транзакция (G4/§7):
+   *   1. FOR UPDATE на BuyerRequest — сериализация cancel/selection race (§31/§32);
+   *   2. повторная проверка status == SUBMITTED (CANCELLED → 422, §10);
+   *   3. one-winner: другой выбранный Proposal → 409 (§11, DB @unique + lock);
+   *   4. FOR UPDATE на SellerProposal — сериализация withdraw/selection race (§33);
+   *   5. повторная проверка proposal.status == SUBMITTED (WITHDRAWN → 422, §9);
+   *   6. CAS по version (expectedVersion) на request и proposal (stale → 409);
+   *   7. SalesService.createOpportunityFromBuyerRequestSelection(tx, ...) —
+   *      тот же tx (owner-service orchestration, никакого cross-domain Prisma);
+   *   8. selection state на request/proposal + history + audit (без PII/контента).
+   *
+   * Инварианты: один Proposal → максимум одна Opportunity (Opportunity.proposalId
+   * и SellerProposal.convertedOpportunityId @unique); retry идемпотентен (тот же
+   * Proposal → существующий результат, §34); никакого partial state (§37); НЕ
+   * создаёт Quote/Checkout/Sale/Order/Booking (§19/§39); НЕ меняет disclosure
+   * (§25) и Communication (§26/§41).
+   */
+  async selectProposal(actor: AuthUser, requestId: string, proposalId: string, expectedVersion: number) {
+    const buyerId = await this.assertBuyerEligible(actor);
+
+    // Own-scope + принадлежность Proposal к request (neutral 404, анти-enumeration).
+    const request = await this.prisma.buyerRequest.findFirst({ where: { id: requestId, buyerId } });
+    if (!request) throw new NotFoundError("Buyer request not found");
+    const proposal = await this.prisma.sellerProposal.findFirst({
+      where: { id: proposalId, buyerRequestId: requestId },
+    });
+    if (!proposal) throw new NotFoundError("Seller proposal not found");
+
+    // Быстрые детерминированные gates (до транзакции).
+    if (request.status === "DRAFT") {
+      throw new ValidationDomainError("BuyerRequest is DRAFT; only SUBMITTED requests can be selected");
+    }
+    if (request.status === "CANCELLED") {
+      throw new ValidationDomainError("BuyerRequest is CANCELLED; selection is not allowed");
+    }
+    if (proposal.status !== "SUBMITTED") {
+      throw new ValidationDomainError(
+        `Proposal is ${proposal.status}; only SUBMITTED Proposals can be selected`,
+      );
+    }
+
+    // Idempotent retry (fast path): selection уже закоммичен → тот же результат.
+    if (request.selectedProposalId === proposalId) {
+      if (proposal.convertedOpportunityId) {
+        return this.toSelectionResult(requestId, proposal, proposal.convertedOpportunityId, true);
+      }
+      // Атомарная tx гарантирует отсутствие selectedProposalId без Opportunity;
+      // defensive (недостижимо при корректной конверсии).
+      throw new ConflictError("Proposal is already selected; conversion state is inconsistent");
+    }
+
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      // 1) Row lock на request: cancel/selection race. READ COMMITTED + FOR UPDATE
+      //    дают детерминированный порядок (та же техника, что 2.2C/2.2D §14).
+      const lockedReq = (
+        await tx.$queryRawUnsafe<Array<{ status: string; selectedProposalId: string | null }>>(
+          `SELECT status, "selectedProposalId" FROM reverse."BuyerRequest" WHERE id = $1 FOR UPDATE`,
+          requestId,
+        )
+      )[0];
+      if (!lockedReq) throw new NotFoundError("Buyer request not found");
+      if (lockedReq.status !== "SUBMITTED") {
+        throw new ValidationDomainError(
+          `BuyerRequest is no longer open for selection (${lockedReq.status})`,
+        );
+      }
+      // One-winner: повторная проверка ПОСЛЕ lock (race-proof, §11).
+      if (lockedReq.selectedProposalId && lockedReq.selectedProposalId !== proposalId) {
+        throw new ConflictError(
+          "BuyerRequest already has a selected proposal; one commercial path per request",
+        );
+      }
+      // Concurrent idempotent retry (после lock виден коммит первого): тот же
+      // Proposal → возвращаем существующий результат, НЕ создаём второй.
+      if (lockedReq.selectedProposalId === proposalId) {
+        const already = await tx.sellerProposal.findUniqueOrThrow({ where: { id: proposalId } });
+        if (!already.convertedOpportunityId) {
+          // Недостижимо при атомарной конверсии (selection + Opportunity — один tx);
+          // защита от inconsistent state вместо незамапленного P2002 → 500.
+          throw new ConflictError("Proposal is already selected; conversion state is inconsistent");
+        }
+        return { idempotent: true as const, opportunityId: already.convertedOpportunityId };
+      }
+
+      // 2) Row lock на proposal: withdraw/selection race (§33).
+      const lockedProposal = (
+        await tx.$queryRawUnsafe<Array<{ status: string; version: number }>>(
+          `SELECT status, version FROM reverse."SellerProposal" WHERE id = $1 FOR UPDATE`,
+          proposalId,
+        )
+      )[0];
+      if (!lockedProposal) throw new NotFoundError("Seller proposal not found");
+      if (lockedProposal.status !== "SUBMITTED") {
+        throw new ValidationDomainError(
+          `Proposal is ${lockedProposal.status}; only SUBMITTED Proposals can be selected`,
+        );
+      }
+
+      // 3) CAS: request.selectedProposalId (expectedVersion). Stale → 409.
+      const reqRes = await tx.buyerRequest.updateMany({
+        where: { id: requestId, buyerId, version: expectedVersion },
+        data: { selectedProposalId: proposalId, version: { increment: 1 } },
+      });
+      if (reqRes.count === 0) {
+        throw new ConflictError("Buyer request was modified concurrently (stale version)");
+      }
+
+      // 4) Canonical Opportunity через Sales OWNER method — та же tx (атомарность).
+      const opportunity = await this.sales.createOpportunityFromBuyerRequestSelection(
+        tx,
+        {
+          // Server-owned title seed (BuyerRequest факты; Proposal text НЕ источник).
+          title: `BuyerRequest ${request.code} — ${request.categorySlug}`,
+          customerId: buyerId,
+          buyerRequestId: requestId,
+          proposalId,
+          sellerId: proposal.sellerId,
+        },
+        { id: actor.id, username: actor.username },
+      );
+
+      // 5) Selection state на Proposal (CAS по его version).
+      const propRes = await tx.sellerProposal.updateMany({
+        where: { id: proposalId, version: lockedProposal.version },
+        data: {
+          selectedAt: new Date(),
+          convertedOpportunityId: opportunity.id,
+          convertedAt: new Date(),
+          version: { increment: 1 },
+        },
+      });
+      if (propRes.count === 0) {
+        throw new ConflictError("Seller proposal was modified concurrently; retry");
+      }
+
+      // 6) History + audit (без PII/контента Proposal, §35).
+      await tx.buyerRequestHistory.create({
+        data: {
+          requestId,
+          action: "proposal_selected",
+          from: "SUBMITTED",
+          to: "SUBMITTED",
+          actorId: actor.id,
+          actorName: actor.username,
+          fields: toJson({
+            proposalId,
+            proposalCode: proposal.code,
+            convertedOpportunityId: opportunity.id,
+            opportunityCode: opportunity.code,
+          }),
+        },
+      });
+      await tx.sellerProposalHistory.create({
+        data: {
+          proposalId,
+          action: "selected",
+          from: "SUBMITTED",
+          to: "SUBMITTED",
+          actorId: actor.id,
+          actorName: actor.username,
+          fields: toJson({
+            buyerRequestId: requestId,
+            convertedOpportunityId: opportunity.id,
+            opportunityCode: opportunity.code,
+          }),
+        },
+      });
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "proposal.selected",
+        resource: "SellerProposal",
+        resourceId: proposalId,
+        details: {
+          buyerRequestId: requestId,
+          proposalCode: proposal.code,
+          convertedOpportunityId: opportunity.id,
+          opportunityCode: opportunity.code,
+        },
+      });
+
+      this.logger.log(
+        `SellerProposal ${proposal.code} selected → Opportunity ${opportunity.code} (BUYER_REQUEST) by ${actor.username}`,
+      );
+      return { idempotent: false as const, opportunityId: opportunity.id, opportunityCode: opportunity.code };
+    });
+
+    if (outcome.idempotent) {
+      return this.toSelectionResult(requestId, proposal, outcome.opportunityId, true);
+    }
+    return this.toSelectionResult(requestId, proposal, outcome.opportunityId, false, outcome.opportunityCode);
+  }
+
+  /** Единый ответ selection (включая idempotent retry): selected + Opportunity ref. */
+  private async toSelectionResult(
+    requestId: string,
+    proposal: { id: string; code: string },
+    opportunityId: string,
+    idempotent: boolean,
+    opportunityCode?: string,
+  ) {
+    // Первичный путь уже имеет code из tx; idempotent-путь — только id (1 read).
+    const opp = opportunityCode
+      ? { id: opportunityId, code: opportunityCode }
+      : await this.prisma.opportunity.findUnique({ where: { id: opportunityId }, select: { id: true, code: true } });
+    if (!opp) {
+      // Недостижимо при атомарной конверсии; защита от inconsistent state.
+      throw new ConflictError("Conversion state is inconsistent; contact support");
+    }
+    return {
+      requestId,
+      proposalId: proposal.id,
+      proposalCode: proposal.code,
+      selected: true,
+      idempotent,
+      opportunity: { id: opp.id, code: opp.code },
+    };
   }
 }

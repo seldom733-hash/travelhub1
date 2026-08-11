@@ -237,6 +237,75 @@ export class SalesService {
     return this.toOpportunityDto(created);
   }
 
+  /**
+   * Step 2.2F (DD-030): canonical conversion выбранного Reverse SellerProposal.
+   * Owner-метод Sales (ADR-0001): вызывается Reverse owner command в ЕДИНОЙ
+   * транзакции (тот же tx, что selection) — никакого cross-domain прямого
+   * Prisma-доступа из reverse.* к sales-таблицам.
+   *
+   * Инварианты:
+   *  - leadId = null (Lead отклонён DD-030: конверсия НЕ создаёт Lead, §14/§38);
+   *  - status = NEW (никакого авто-OPEN/WON; lifecycle управляет Sales, §42);
+   *  - acquisitionSource = BUYER_REQUEST (server-derived, клиент не передаёт, §21);
+   *  - provenance refs buyerRequestId/proposalId/sellerId — trusted refs без FK
+   *    (ADR-0001); proposalId @unique — DB-invariant один Proposal → одна Opportunity;
+   *  - Proposal amount НЕ копируется (non-binding, §18 — никакого shadow pricing);
+   *  - НЕ создаёт Quote/Checkout/Sale/Order/Booking (2.2F scope = Opportunity, §19);
+   *  - history + audit без PII и без контента Proposal (§35).
+   */
+  async createOpportunityFromBuyerRequestSelection(
+    tx: Prisma.TransactionClient,
+    input: { title: string; customerId: string; buyerRequestId: string; proposalId: string; sellerId: string },
+    actor: Actor,
+  ): Promise<{ id: string; code: string }> {
+    const title = input.title.trim();
+    if (title.length === 0) throw new ValidationDomainError("Opportunity title is required");
+    if (title.length > 200) throw new ValidationDomainError("Opportunity title is too long (max 200)");
+    // Customer existence check в ТОЙ ЖЕ tx (консистентность «одна транзакция»).
+    const customerExists = await tx.customer.findUnique({ where: { id: input.customerId }, select: { id: true } });
+    if (!customerExists) throw new ValidationDomainError(`Customer ${input.customerId} does not exist`);
+
+    const code = await this.ids.nextCode(tx, "OPP");
+    const row = await tx.opportunity.create({
+      data: {
+        code,
+        title,
+        leadId: null, // DD-030: Lead rejected для Reverse-конверсии
+        customerId: input.customerId,
+        status: OpportunityStatus.NEW,
+        acquisitionSource: SalesAcquisitionSource.BUYER_REQUEST,
+        buyerRequestId: input.buyerRequestId,
+        proposalId: input.proposalId,
+        sellerId: input.sellerId,
+        createdById: actor.id,
+      },
+    });
+    await this.writeHistory(tx, "opportunityHistory", row.id, "created", null, row.status, actor, {
+      title,
+      source: "buyer_request_proposal_selection",
+      buyerRequestId: input.buyerRequestId,
+      proposalId: input.proposalId,
+      acquisitionSource: SalesAcquisitionSource.BUYER_REQUEST,
+    });
+    await this.security.audit(tx, {
+      userId: actor.id,
+      username: actor.username,
+      action: "sales.opportunity.created_from_buyer_request",
+      resource: "Opportunity",
+      resourceId: row.id,
+      details: {
+        code: row.code,
+        status: row.status,
+        acquisitionSource: SalesAcquisitionSource.BUYER_REQUEST,
+        buyerRequestId: input.buyerRequestId,
+        proposalId: input.proposalId,
+        sellerId: input.sellerId,
+      },
+    });
+    this.logger.log(`Opportunity ${row.code} created from BuyerRequest proposal selection (BUYER_REQUEST)`);
+    return { id: row.id, code: row.code };
+  }
+
   async listOpportunities(query: OpportunityListQueryInput): Promise<SalesListResult<OpportunityDto>> {
     const { p, ps } = this.pagination(query.page, query.pageSize);
     const where = buildOpportunityListWhere(query);
@@ -286,9 +355,17 @@ export class SalesService {
     input: { customerId?: string | null; opportunityId?: string | null; productId?: string | null },
     actor: Actor,
   ): Promise<QuoteDto> {
+    // Step 2.2F §23: acquisition source наследуется из Opportunity (server-derived;
+    // клиент не передаёт). Reverse-конверсия → BUYER_REQUEST; staff/direct
+    // Opportunity (source NULL) → Quote.acquisitionSource = NULL честно.
+    let opportunityAcquisitionSource: SalesAcquisitionSource | null = null;
     if (input.opportunityId) {
-      const opp = await this.prisma.opportunity.findUnique({ where: { id: input.opportunityId }, select: { id: true } });
+      const opp = await this.prisma.opportunity.findUnique({
+        where: { id: input.opportunityId },
+        select: { id: true, acquisitionSource: true },
+      });
       if (!opp) throw new ValidationDomainError(`Opportunity ${input.opportunityId} does not exist`);
+      opportunityAcquisitionSource = opp.acquisitionSource ?? null;
     }
     await this.assertOptionalCustomer(input.customerId);
     await this.assertOptionalProduct(input.productId);
@@ -302,6 +379,7 @@ export class SalesService {
           opportunityId: input.opportunityId ?? null,
           productId: input.productId ?? null,
           status: QuoteStatus.DRAFT,
+          acquisitionSource: opportunityAcquisitionSource,
           createdById: actor.id,
         },
       });
@@ -996,9 +1074,12 @@ export class SalesService {
           discountAmount: quote.discountAmount,
           total: quote.total as Prisma.Decimal,
           serviceDate,
-          // Server-derived acquisition source: internal-assisted entry (2.5B
-          // propagation); client hint не принимается (§24/§26).
-          acquisitionSource: SalesAcquisitionSource.DIRECT,
+          // Server-derived acquisition source (Step 2.2F §22/§23, DD-030 gap fix):
+          // наследуется из Quote.acquisitionSource (который наследует из
+          // Opportunity.acquisitionSource). Request-led конверсия → BUYER_REQUEST;
+          // direct/staff flow (Quote без source) → DIRECT (legacy поведение
+          // сохраняется). Client hint не принимается (§24/§26).
+          acquisitionSource: quote.acquisitionSource ?? SalesAcquisitionSource.DIRECT,
           createdById: actor.id,
         },
       });
@@ -1577,6 +1658,11 @@ export class SalesService {
     createdById: string | null;
     createdAt: Date;
     updatedAt: Date;
+    // Step 2.2F: Reverse Marketplace provenance + acquisition source.
+    buyerRequestId: string | null;
+    proposalId: string | null;
+    sellerId: string | null;
+    acquisitionSource: SalesAcquisitionSource | null;
   }): OpportunityDto {
     return {
       id: row.id,
@@ -1590,6 +1676,10 @@ export class SalesService {
       createdById: row.createdById,
       createdAt: isoUtc(row.createdAt),
       updatedAt: isoUtc(row.updatedAt),
+      buyerRequestId: row.buyerRequestId,
+      proposalId: row.proposalId,
+      sellerId: row.sellerId,
+      acquisitionSource: row.acquisitionSource,
     };
   }
 
@@ -1612,6 +1702,8 @@ export class SalesService {
     discountAmount: Prisma.Decimal | null;
     subtotal: Prisma.Decimal | null;
     total: Prisma.Decimal | null;
+    // Step 2.2F: acquisition source (наследуется из Opportunity при создании).
+    acquisitionSource: SalesAcquisitionSource | null;
   }): QuoteDto {
     return {
       id: row.id,
@@ -1632,6 +1724,7 @@ export class SalesService {
       discountAmount: row.discountAmount ? String(row.discountAmount) : null,
       subtotal: row.subtotal ? String(row.subtotal) : null,
       total: row.total ? String(row.total) : null,
+      acquisitionSource: row.acquisitionSource,
     };
   }
 
@@ -1659,6 +1752,7 @@ export class SalesService {
     discountAmount: Prisma.Decimal | null;
     subtotal: Prisma.Decimal | null;
     total: Prisma.Decimal | null;
+    acquisitionSource: SalesAcquisitionSource | null;
     items: Array<{
       id: string;
       productId: string;

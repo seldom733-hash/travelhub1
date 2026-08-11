@@ -266,6 +266,35 @@ export const PROPOSAL_LIFECYCLE_FORBIDDEN_KEYS = [
 ] as const;
 
 /**
+ * Selection-команда (Step 2.2F) принимает ТОЛЬКО expectedVersion (CAS request).
+ * Все forged server-owned поля → 422 (loud), а не silent-strip: ownership
+ * (buyerId/customerId/sellerId/partnerId/ownerId), identity (id/code/
+ * opportunityId/leadId/quoteId), lifecycle/version/timestamps, acquisitionSource,
+ * amount/currency (Proposal money НЕ-binding и НЕ client-authoritative), 
+ * selected/converted/contactDisclosed/salesOwner, correlation.
+ */
+export const PROPOSAL_SELECT_FORBIDDEN_KEYS = [
+  // LIFECYCLE наследует PROPOSAL_CREATE (id/code/sellerId/partnerId/ownerId/
+  // buyerId/status/version/acquisitionSource/quoteId/saleId/selected/accepted/
+  // convertedAt/...) + контент/money/validUntil. Ниже — только genuinely новые.
+  ...PROPOSAL_LIFECYCLE_FORBIDDEN_KEYS,
+  "customerId",
+  "opportunityId",
+  "leadId",
+  "salesOwner",
+  "assignedTo",
+  "assignedToId",
+  // Conversion-специфичные server-owned ключи (без них select-команда видела бы
+  // forged conversion state): lifecycle-маркеры, refs, timestamps.
+  "converted",
+  "convertedOpportunityId",
+  "selectedAt",
+  "selectedProposalId",
+  "proposalCode",
+  "opportunityCode",
+] as const;
+
+/**
  * Поля pre-sale conversation open-команды (Step 2.2E), которые клиент НЕ может
  * передать: ownership (buyerId/customerId/ownerId/sellerId/partnerId/memberIds),
  * identity (id/code/threadId), lifecycle/status, version, timestamps, context

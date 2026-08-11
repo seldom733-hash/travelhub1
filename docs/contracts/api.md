@@ -156,6 +156,72 @@ Send-contract: `{ "body": 1..4000 plain text, "subject": "?" ≤200 }` — ТО�
   occurredAt asc (хронология); права: `communication.read_own`/`write_own`
   (BUYER/PARTNER). Staff peer-записи не имеют (write_own отсутствует → 403).
 
+## Reverse Marketplace — Buyer selection → canonical Opportunity (Step 2.2F, DD-030)
+
+Единственная публичная конверсионная команда Reverse Marketplace: Buyer выбирает
+Seller Proposal СВОЕГО запроса → атомарное создание canonical Sales Opportunity
+(`OPP-*`, acquisition source `BUYER_REQUEST`). Документация архитектуры:
+`docs/architecture/reverse-proposal-to-sales-conversion.md`.
+
+```text
+POST   /api/v1/buyer/requests/:requestId/proposals/:proposalId/select   — reverse.proposal.select_own (BUYER)
+GET    /api/v1/buyer/requests/:requestId/proposals                      — reverse.proposal.read_own (BUYER, own request)
+GET    /api/v1/buyer/requests/:requestId/proposals/:proposalId          — reverse.proposal.read_own (BUYER, own request)
+```
+
+Select-contract (request body — ТОЛЬКО concurrency input):
+
+```jsonc
+{ "expectedVersion": 3 }   // CAS по версии BuyerRequest (int ≥ 1)
+```
+
+Правила (Step 2.2F):
+
+- **own-scope**: только Buyer, владеющий BuyerRequest (`actor.customerId` ==
+  `buyerId`); чужой request / Proposal чужого request → neutral 404
+  (анти-enumeration); PARTNER → 403; anonymous → 401;
+- **eligibility**: request `SUBMITTED` (DRAFT/CANCELLED → 422); Proposal
+  `SUBMITTED` (DRAFT/WITHDRAWN → 422) и принадлежит этому request;
+- **server-derived**: buyerId/customerId/sellerId, `acquisitionSource =
+  BUYER_REQUEST`, `opportunityId`, provenance refs (`buyerRequestId`/
+  `proposalId`/`sellerId`), timestamps — клиент передаёт ТОЛЬКО
+  `expectedVersion`; любые forged поля (`buyerId`, `customerId`, `sellerId`,
+  `opportunityId`, `leadId`, `quoteId`, `amount`, `currency`, `acquisitionSource`,
+  `selected`/`converted`, `selectedAt`/`convertedAt`, `convertedOpportunityId`,
+  `salesOwner`, `assignedToId`, `contactDisclosed`, actor/correlation) → 422 (loud);
+- **one winner per request**: один выбранный Proposal → одна canonical
+  Opportunity (DB `selectedProposalId @unique` + row-lock); другой Proposal
+  после выбора → 409; concurrent A/B → ровно один победитель (201 + 409);
+- **idempotency**: повторный select того же Proposal (в т.ч. со СТАРОЙ
+  `expectedVersion` после response-loss) → 201 с `idempotent: true` и тем же
+  `opportunity` (никакого дублирования Opportunity/history/audit);
+- **error semantics**: 401/403/404 (neutral)/409 (one-winner, stale CAS)/422
+  (eligibility, forged поля); неудача → полный rollback (никакого partial state);
+- **response** (BUYER-safe, без контактов):
+
+```jsonc
+{
+  "requestId": "...",
+  "proposalId": "...",
+  "proposalCode": "PRP-*",
+  "selected": true,
+  "idempotent": false,
+  "opportunity": { "id": "...", "code": "OPP-*" }
+}
+```
+
+- **privacy boundary**: конверсия НЕ раскрывает контакты (MATCHED ≠ CONTACT
+  DISCLOSED; CONVERTED ≠ CONTACT DISCLOSED); не создаёт Lead (DD-030), Quote,
+  Checkout, Sale, Order, Booking, Payment, Communication, Catalog entities;
+  Proposal money остаётся non-binding (Opportunity без money); история/audit
+  без PII и без контента Proposal;
+- **acquisition chain**: Opportunity `BUYER_REQUEST` → Quote (наследует) →
+  CheckoutIntent (server-derived) → Sale → OrderRequested → Order → Booking
+  (frozen snapshot; DIRECT-пути остаются DIRECT, см. acquisition-source-
+  propagation);
+- права: `reverse.proposal.select_own`/`read_own` — только BUYER (staff -
+  без этих прав → 403; сама конверсия запускается строго Buyer-ом).
+
 ## Catalog Center (владелец Product/Tariff/Availability/Category)
 
 ```text

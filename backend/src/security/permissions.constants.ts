@@ -127,6 +127,11 @@ export const PERMISSIONS = {
   // read_own — и для BUYER (proposals своего BuyerRequest, own-request scope).
   "reverse.proposal.read_own": "Чтение СВОИХ Seller Proposals (Seller own-scope; BUYER — proposals своего BuyerRequest)",
   "reverse.proposal.write_own": "Создание/изменение/сабмит/отзыв СВОИХ Seller Proposals (Seller own-scope)",
+  // Step 2.2F: выбор/конверсия Proposal в canonical Opportunity. ТОЛЬКО BUYER
+  // (владелец BuyerRequest); PARTNER НЕ выбирает свой Proposal (сервис-гейт 403
+  // + отсутствие права). Сервер выводит всё (seller/opportunity/source); клиент
+  // передаёт только expectedVersion.
+  "reverse.proposal.select_own": "Выбор Seller Proposal своего BuyerRequest → конверсия в Opportunity (BUYER own-scope)",
 
   // ── Account / own profile (Step 1.9, granular own-scope) ──────────────
   "account.profile.read": "Чтение собственного профиля/аккаунта (own-scope)",
@@ -463,6 +468,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "reverse.request.write_own",
     // Step 2.2D: BUYER читает proposals СВОИХ Buyer Requests (own-request scope).
     "reverse.proposal.read_own",
+    // Step 2.2F: BUYER выбирает Proposal СВОЕГО request (→ canonical Opportunity).
+    "reverse.proposal.select_own",
     "account.order.read_own",
     "account.booking.read_own",
     "account.payment.read_own",

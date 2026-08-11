@@ -25,9 +25,9 @@ Acquisition source = коммерческий канал/происхожден�
 - `MARKETPLACE`
 - `PARTNER_STOREFRONT`
 - `DIRECT` (MANUAL/DIRECT — internal-assisted entry)
-- `BUYER_REQUEST` (Step 2.5B, Roadmap Amendment — аддитивно; рабочее имя,
-  финальное наименование реконсилируется с конвенциями; Reverse Marketplace
-  НЕ реализован)
+- `BUYER_REQUEST` (Step 2.5B, Roadmap Amendment — аддитивно; Step 2.2F
+  реализует request-led коммерческий путь через Reverse Marketplace
+  конверсию → canonical Sales pipeline)
 
 `PARTNER_CUSTOM_DOMAIN` / `API` — «позднее» по Roadmap 2.5B, НЕ добавляются.
 Никаких duplicate synonyms. Отдельная behavioral-analytics константа
@@ -40,7 +40,14 @@ transaction lineage).
 
 - Source — server-authoritative. Клиент не может forge: поля нет ни в одном DTO
   (bootstrap/checkout/sale), whitelist-стрип подтверждён e2e.
-- Checkout foundation: server-derived `DIRECT` (internal-assisted entry).
+- Checkout (Step 2.2F, DD-030 gap fix): source выводится server-side из Quote —
+  `quote.acquisitionSource ?? DIRECT`. Request-led путь (Quote из конвертированной
+  Opportunity) → `BUYER_REQUEST`; direct/staff flow (Quote без source) → `DIRECT`
+  (legacy поведение сохранено, e2e reverse-conversion #14/#15).
+- Opportunity.acquisitionSource (Step 2.2F): server-derived; Reverse-конверсия →
+  `BUYER_REQUEST`; staff-созданные Opportunity → NULL (честно, без угадывания).
+- Quote.acquisitionSource (Step 2.2F): наследуется из Opportunity при создании
+  Quote по opportunityId; без opportunityId → NULL (Checkout резолвит DIRECT).
 - Bootstrap Order: server-derived `DIRECT` (та же internal-assisted семантика;
   Step 2.5B) — НЕ fabricated: staff-создание заказа = MANUAL/DIRECT канал.
 - После freeze (Checkout → Sale) source immutable: completion не пересчитывает,
@@ -50,7 +57,9 @@ transaction lineage).
 
 | Слой | Механизм |
 |---|---|
-| CheckoutIntent.acquisitionSource | server-derived при создании (DIRECT) |
+| Opportunity.acquisitionSource | server-derived (конверсия → BUYER_REQUEST; staff → NULL) |
+| Quote.acquisitionSource | наследуется из Opportunity (без opportunityId → NULL) |
+| CheckoutIntent.acquisitionSource | server-derived из Quote (`quote.acquisitionSource ?? DIRECT`) |
 | Sale.acquisitionSource | копия из checkout при создании Sale (frozen) |
 | OrderRequestedPayload.acquisitionSource | frozen snapshot Sale при complete |
 | Order.acquisitionSource (String?) | consumer персистит payload source точно; валидатор whitelist Object.values(SalesAcquisitionSource) — BUYER_REQUEST принят автоматически |
@@ -79,10 +88,13 @@ Booking — row-level ref). BookingCreated/OrderCreated payload — минима
 
 ## 9. Booking boundary (Roadmap lineage)
 
-Roadmap 2.5B: `BuyerRequest/Proposal → Quote/Sale → Order → Booking → Payment →
-Settlement → Analytics`. На 2.5B реализован минимальный immutable snapshot на
-Booking (frozen ref из Order). Payment/Settlement/Analytics — будущие owner-steps,
-НЕ реализованы (никаких Payment-сущностей/financial events/analytics).
+Roadmap 2.5B/2.2F: `BuyerRequest → Proposal → Opportunity → Quote → Checkout →
+Sale → OrderRequested → Order → Booking → Payment → Settlement → Analytics`.
+Step 2.2F реализовал request-led начало цепочки (Opportunity/Quote/Checkout
+carry BUYER_REQUEST server-side, e2e reverse-conversion #14); 2.5B реализовал
+минимальный immutable snapshot на Booking (frozen ref из Order).
+Payment/Settlement/Analytics — будущие owner-steps, НЕ реализованы (никаких
+Payment-сущностей/financial events/analytics).
 
 ## 10. Migration
 
@@ -96,3 +108,17 @@ backfill). Чистый replay, drift 0.
 forge rejection; bootstrap DIRECT; lifecycle/temporal preserve; duplicate delivery;
 unknown → FAILED; BUYER_REQUEST contract propagation (без Reverse Marketplace —
 reverse-схемы нет); Booking propagation; legacy NULL; no side effects/PII.
+`test/reverse-conversion.e2e-spec.ts` (15, Step 2.2F): request-led цепочка
+Opportunity → Quote → Checkout = BUYER_REQUEST (#14); direct flow Quote без
+Opportunity → Checkout = DIRECT (#15); source не forgeable (#2); конверсия
+создаёт ровно одну Opportunity с BUYER_REQUEST (#5).
+
+## 12. Migration (Step 2.2F)
+
+`20260811120000_add_proposal_to_opportunity_conversion` — аддитивно: reverse.
+`BuyerRequest.selectedProposalId` (TEXT, @unique), reverse.`SellerProposal`.
+`selectedAt`/`convertedOpportunityId` (@unique)/`convertedAt`, sales.`Opportunity`.
+`buyerRequestId`/`proposalId` (@unique)/`sellerId`/`acquisitionSource`,
+sales.`Quote`.`acquisitionSource` (enum `SalesAcquisitionSource`). Без backfill,
+без cross-schema FK (ADR-0001), nullable legacy-safe; чистое replay (globalSetup
+e2e пересоздаёт тестовую БД), drift 0.

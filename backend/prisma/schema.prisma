@@ -1976,6 +1976,14 @@ model BuyerRequest {
   submittedAt DateTime?
   cancelledAt DateTime?
 
+  /// Step 2.2F: канонический выбранный SellerProposal (trusted ref БЕЗ FK,
+  /// конвенция ADR-0001/ADR-0012). Server-derived ТОЛЬКО командой selection
+  /// (reverse.proposal.select_own); клиент не передаёт. @unique = DB-invariant
+  /// «один выбранный Proposal на BuyerRequest» И «один request на выбранный
+  /// Proposal» (one-winner при concurrent A/B selection). Selection/конверсия
+  /// атомарны с созданием Opportunity (Sales owner service, единая tx).
+  selectedProposalId String? @unique
+
   history        BuyerRequestHistory[]
   distributions  BuyerRequestDistribution[]
   proposals      SellerProposal[]
@@ -2124,6 +2132,17 @@ model SellerProposal {
   submittedAt DateTime?
   withdrawnAt DateTime?
 
+  /// ── Step 2.2F — Selection/Conversion state (reverse.*, server-owned) ──
+  /// Заполняются ТОЛЬКО командой Buyer selection (единая атомарная tx
+  /// с созданием canonical Opportunity в sales.*). Статус Proposal НЕ меняется
+  /// (SELECTED/CONVERTED НЕ вводятся — lifecycle остаётся DRAFT/SUBMITTED/
+  /// WITHDRAWN); selection — отдельный факт. `convertedOpportunityId` — trusted
+  /// ref на sales.Opportunity (без FK); @unique = DB-invariant «один Proposal →
+  /// максимум одна Opportunity» (защита duplicate conversion, §12/§34).
+  selectedAt          DateTime?
+  convertedOpportunityId String? @unique
+  convertedAt         DateTime?
+
   history SellerProposalHistory[]
 
   // Один Proposal на (Seller, BuyerRequest) — deterministic duplicate rule.
@@ -2254,6 +2273,22 @@ model Opportunity {
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
+  // ── Step 2.2F — Reverse Marketplace provenance (DD-030, server-owned) ──
+  /// Trusted ref на reverse.BuyerRequest (без FK; ADR-0001/ADR-0012).
+  /// Заполняется ТОЛЬКО конверсией выбранного Proposal (Sales owner method).
+  buyerRequestId String?
+  /// Trusted ref на reverse.SellerProposal (без FK). @unique = DB-invariant
+  /// «selected Proposal → максимум одна Opportunity» (защита duplicate
+  /// conversion при retry/конкурентности, DD-030 §12).
+  proposalId     String?  @unique
+  /// Выбранный Seller — crm.Partner ref (без FK). Коммерческий контур: Seller
+  /// продавца, НЕ internal staff owner (assignedToId остаётся staff-owner).
+  sellerId       String?
+  /// Server-derived acquisition source (клиент не передаёт). Конверсия из
+  /// BuyerRequest → BUYER_REQUEST; staff-созданные Opportunity → NULL (честно,
+  /// без угадывания). Пропагируется далее: Quote → Checkout → Sale → Order.
+  acquisitionSource SalesAcquisitionSource?
+
   quotes  Quote[]
   sales   Sale[]
   history OpportunityHistory[]
@@ -2264,6 +2299,9 @@ model Opportunity {
   // Step 2.2: композитные индексы (status + createdAt, assignedToId + status).
   @@index([status, createdAt])
   @@index([assignedToId, status])
+  // Step 2.2F: provenance queries (поиск конверсий по request/seller).
+  @@index([buyerRequestId])
+  @@index([sellerId])
   @@schema("sales")
 }
 
@@ -2324,6 +2362,13 @@ model Quote {
   createdById   String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+
+  /// Step 2.2F: server-derived acquisition source, унаследованный из
+  /// Opportunity.acquisitionSource при создании Quote по opportunityId
+  /// (Reverse-конверсия → BUYER_REQUEST; direct/staff → NULL честно).
+  /// Checkout затем выводит свой source из Quote (quote.acquisitionSource ??
+  /// DIRECT) — без client authority и без нового Acquision-домена.
+  acquisitionSource SalesAcquisitionSource?
 
   // ── Step 2.3 — Commercial Offer (money/validity/discount, backend-authoritative) ──
   /// Единая валюта КП (ISO 4217 code). Источник — Catalog Tariff.currency
