@@ -370,16 +370,22 @@ ON DELETE SET NULL оставлял 10 осиротевших строк → ф�
 (wipe sales-таблиц в beforeAll); полная регрессия 728/728 e2e + 380 unit +
 135 frontend vitest + build green).
 
-· **Step 2.2F --- Proposal → Canonical Sales Conversion** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition; gate DD-030: Proposal→Sales conversion target resolved ДО начала 2.2F)\
+· **Step 2.2F --- Proposal → Canonical Sales Conversion** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition; gate DD-030: Proposal→Sales conversion target resolved ДО начала 2.2F — **DD-030 RESOLVED 2026-08-11: target = `Opportunity` (`OPP-*`)**; см. `docs/prompts/DD-030_PROPOSAL_TO_CANONICAL_SALES_CONVERSION_POINT_ARCHITECTURE_DECISION.md`)\
 При выборе Buyer-ом proposal НЕ создаются
 BuyerRequestOrder/ProposalOrder/ReverseMarketplaceOrder/отдельные
-Checkout/Payment/Booking (инвариант 8). Target:
-`BuyerRequest → Matching → Proposal → Buyer selection → существующая
-Sales Opportunity/Quote → Checkout → Sale → OrderRequested → Order →
-Booking → Finance`. Реализация реконсилирует, с какого существующего
-Sales-stage начинается conversion (Lead vs Opportunity vs Quote).
-Каноническое правило: **Reverse Marketplace — ещё один commercial
-acquisition path, а не отдельная transaction system** (инвариант 7).
+Checkout/Payment/Booking (инвариант 8). Канонический путь:
+`BuyerRequest → Matching → Proposal → Buyer selection → Opportunity (OPP-*) → Quote (QTE-*) → Checkout → Sale → OrderRequested → Order → Booking → Finance`.
+Конверсия начинается с **Opportunity** (первый Sales-owned qualified deal после
+выбора одного Seller-а; `Opportunity.leadId` nullable — Lead не обязателен;
+Opportunity не требует Product/Tariff — совместимо с Proposal без
+опубликованного Product). Каноническое правило: **Reverse Marketplace — ещё
+один commercial acquisition path, а не отдельная transaction system**
+(инвариант 7). Sales создаёт новый canonical Quote из trusted/revalidated
+фактов (Proposal никогда не переклассифицируется в Quote; Proposal money
+не-binding); CheckoutIntent получает server-derived `BUYER_REQUEST`;
+provenance refs (buyerRequestId/proposalId/sellerId) — аддитивные
+implementation implications; один selected Proposal → один Sales-path
+(idempotent); события без реального consumer-а не добавляются.
 
 · **Step 2.3 --- Quote & Commercial Offer Flow** ✅ DONE\
 Product/Tariff snapshot, price, discounts, currency, validity,
@@ -1410,22 +1416,21 @@ strict containment coverage).
 10. **Step 2.2D — STRICT REVIEW** ✅ DONE (APPROVED WITH REVIEW FIXES)
 11. **Step 2.2E — Buyer Request / Proposal Communication** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES
 12. **Step 2.2E — STRICT REVIEW** ✅ DONE (APPROVED WITH REVIEW FIXES)
-13. **Step 2.2F — Proposal → Canonical Sales Conversion** ▶ NEXT (gate DD-030:
-    Proposal→Sales conversion target — Lead vs Opportunity vs Quote —
-    resolved ДО начала 2.2F)
-14. **Step 2.2F — STRICT REVIEW**
-15. **Service Templates return point (conditional):** разрешить
+13. **DD-030 — Proposal → Canonical Sales Conversion Point (Architecture Decision)** ✅ RESOLVED (2026-08-11): target = **Opportunity (OPP-*)** — Lead отклонён (дубликат BuyerRequest-demand; шаг назад в воронке), Quote отклонён как первая точка (требует Product/Tariff → shadow product; Proposal non-binding), Opportunity подтверждён (leadId nullable, без Product, first qualified deal). Решение: `docs/prompts/DD-030_PROPOSAL_TO_CANONICAL_SALES_CONVERSION_POINT_ARCHITECTURE_DECISION.md`
+14. **Step 2.2F — Proposal → Canonical Sales Conversion** ▶ NEXT (gate DD-030 resolved; conversion target = **Opportunity (OPP-*)**, затем Quote → Checkout → Sale → OrderRequested → Order → Booking)
+15. **Step 2.2F — STRICT REVIEW**
+16. **Service Templates return point (conditional):** разрешить
     implementation-time gates DD-025/Step 1.8A, DD-024/Step 1.8B,
     DD-026/Step 1.8C, DD-027/Step 1.8C (multi-date holds → 2.4/2.5
     contract), DD-028 taxonomy ownership, DD-029 multi-currency display.
-16. **Step 1.8A — Service Template / Seller Commercial Structure Foundation**
-17. **Step 1.8A — STRICT REVIEW**
-18. **Step 1.8B — Tariff / Commercial Variant Foundation**
-19. **Step 1.8B — STRICT REVIEW**
-20. **Step 1.8C — Period Pricing & Period Availability Foundation**
-21. **Step 1.8C — STRICT REVIEW**
-22. **Step 1.8D — Commercial Restrictions / Overrides Foundation**
-23. **Step 1.8D — STRICT REVIEW**
+17. **Step 1.8A — Service Template / Seller Commercial Structure Foundation**
+18. **Step 1.8A — STRICT REVIEW**
+19. **Step 1.8B — Tariff / Commercial Variant Foundation**
+20. **Step 1.8B — STRICT REVIEW**
+21. **Step 1.8C — Period Pricing & Period Availability Foundation**
+22. **Step 1.8C — STRICT REVIEW**
+23. **Step 1.8D — Commercial Restrictions / Overrides Foundation**
+24. **Step 1.8D — STRICT REVIEW**
 
 **Step 2.8A conditional dependency (детерминированный дефолт):** date-based
 period pricing/availability НЕ требует Step 2.8A; time-slot / exact

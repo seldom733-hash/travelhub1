@@ -666,15 +666,81 @@ step (period-aware price display).
 
 ## DD-030 --- Reverse Marketplace: Proposal → Sales conversion point
 
-**Status:** DEFERRED (ADR-0012 §5/§14)
+**Status:** DECIDED (2026-08-11) — `Opportunity` (OPP-*) — `docs/prompts/DD-030_PROPOSAL_TO_CANONICAL_SALES_CONVERSION_POINT_ARCHITECTURE_DECISION.md`
 
-**Still Open (ADR-0012):** в какой canonical Sales stage конвертируется
-принятый Seller Proposal — Lead vs Opportunity vs Quote (или иной
-существующий stage). ADR-0012 фиксирует границы reverse.* и инвариант
-«Distribution ≠ Lead creation» (6 meaningful-engagement ответов НЕ
-создают 70/25 Leads), но сам conversion point сознательно НЕ
-резолвится в ADR: он должен быть решён отдельным Proposal→Sales
-architecture decision ДО Step 2.2F (gate DD-030).
+**Decision (2026-08-11, репозиторная истина sales.*):**
+
+Выбранная каноническая точка конвертации принятого Seller Proposal —
+**`Opportunity` (`OPP-*`, sales.*)**. Канонический путь:
+
+`BuyerRequest (SUBMITTED) → selected SellerProposal (SUBMITTED) →
+Opportunity (NEW) → Quote (DRAFT → ISSUED) → CheckoutIntent → Sale →
+OrderRequested → Order → Booking → Finance`
+
+**Почему Opportunity (repository-backed):**
+
+- `Opportunity.leadId` nullable — Opportunity может существовать БЕЗ
+  Lead (`createOpportunity` принимает title без leadId);
+- Opportunity НЕ требует Product/Tariff (поля: title, customerId,
+  assignedToId; статус NEW→OPEN→WON/LOST) — совместимо с Proposal,
+  который может существовать без опубликованного Product
+  (capability ≠ inventory);
+- Opportunity — первый Sales-owned «qualified deal» после выбора
+  Buyer-ом одного Seller-а; формальный binding Quote создаётся Sales-ом
+  позже из trusted/revalidated фактов (Proposal остаётся non-binding);
+- Acquisition source `BUYER_REQUEST` уже зарегистрирован в
+  `SalesAcquisitionSource` (Step 2.5B) и валидатор Order consumer-а
+  принимает его; CheckoutIntent в 2.2F будет получать server-derived
+  `BUYER_REQUEST` (gap текущей реализации: сейчас hardcoded DIRECT).
+
+**Почему Lead отклонён:** BuyerRequest уже является acquired demand
+record (инвариант 3: BuyerRequest ≠ Lead). Lead — необработанный
+интерес до квалификации; создание Lead после выбора Proposal
+дублирует demand-сущность и откатывает уже Seller-specific qualified
+journey назад в воронку (Lead duplication test FAIL).
+
+**Почему Quote отклонён как первая точка:** Quote.ISSUE невозможен без
+QuoteItem, а QuoteItem требует productId+tariffId+unitPrice из Catalog
+Tariff (`resolveEligibleTariff`). Proposal может существовать без
+Product → прямой Proposal→Quote создал бы shadow Product/pricing
+authority; кроме того, Proposal money — non-binding индикация, и
+прямая конвертация неправомерно возвела бы её в binding authority
+(инвариант Proposal ≠ canonical Quote). Quote остаётся ВТОРЫМ шагом
+после Opportunity (Direct Quote skip test PASS — не выбран).
+
+**Proposal selection ownership:** selection — факт reverse.*
+(BuyerRequest/Proposal — reverse-owned); conversion-команда пересекает
+boundary в Sales через OWNER service (Sales создаёт Opportunity;
+Reverse не пишет sales.*; Sales не пишет reverse.*; Prisma не hidden
+cross-domain writer).
+
+**Binding commercial authority:** начинается в canonical Quote
+(ISSUE — frozen totals) и CheckoutIntent (server-copied, immutable);
+Proposal amount — не-binding, никогда не становится молчаливой ценой
+Quote/Sale.
+
+**Idempotency/cardinality invariant (для 2.2F):** один selected
+Proposal → максимум один канонический Sales-path; только selected
+Proposal может инициировать конверсию; non-selected Proposals остаются
+историей; matching/submission не fan-out-ят Sales entities; reselection
+и retry — idempotent на уровне DB/domain (Opportunity с уникальным ref
+на Proposal).
+
+**Provenance (требование к 2.2F):** canonical Sales обязан сохранять
+buyerRequestId, proposalId, sellerId (partner), acquisitionSource
+(BUYER_REQUEST), correlation/causation. Текущая схема Opportunity НЕ
+содержит этих refs → аддитивные поля/refs документируются как
+implementation implications Step 2.2F (runtime schema НЕ изменяется
+этим решением).
+
+**Contact disclosure:** конверсия НЕ меняет disclosure policy
+(MATCHED ≠ CONTACT DISCLOSED; CHAT EXISTS ≠ CONTACT DISCLOSED —
+остаются true). PublicSellerProfile — presentation, не commercial
+authority.
+
+**Eventing:** отдельные события (ProposalSelected/Converted/Opportunity-
+Created/QuoteCreated) НЕ добавляются без реального consumer-а;
+прямая owner-service orchestration (модульный монолит) достаточна.
 
 **Already Decided (ADR-0012):** reverse.* — отдельный bounded context
 без параллельного pipeline; Seller Proposal переходит в canonical Sales
@@ -683,14 +749,15 @@ premature conversion-решения; никакой дублирующей мо�
 reverse.*.
 
 **Do Not Implement Yet:** Proposal→Sales конверсия, Lead/Opportunity/
-Quote автосоздание из BuyerRequest/Proposal, конверсионные метрики.
+Quote автосоздание из BuyerRequest/Proposal, конверсионные метрики,
+contact disclosure.
 
 **Return Point:** Step 2.2F (Seller Proposal → Canonical Sales
-Conversion).
+Conversion) — конверсия в Opportunity (gate DD-030 разрешён).
 
-**Resolution trigger:** отдельный архитектурный decision ДО начала
-2.2F; реконсиляция с существующими Sales-стадиями (Lead/Opportunity/
-Quote), а не изобретение дублирующей модели.
+**Resolution trigger:** РАЗРЕШЁН 2026-08-11 отдельным архитектурным
+решением (см. документ выше); реконсиляция с существующими
+Sales-стадиями (Opportunity), без дублирующей модели.
 
 ------------------------------------------------------------------------
 
