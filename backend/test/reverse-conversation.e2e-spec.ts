@@ -279,7 +279,14 @@ describe("Phase 2 Step 2.2E — Buyer Request / Proposal Communication (e2e)", (
   });
 
   afterAll(async () => {
-    await prisma.communication.deleteMany({ where: { id: { in: created.messages } } });
+    // Shared-DB isolation: удаляем ВСЕ сообщения этого контекста спеки (не только
+    // отслеженные в created.messages — тесты 13/24/25/30/31 создают сообщения без
+    // записи id; FK Communication.threadId = ON DELETE SET NULL оставил бы их
+    // осиротевшими строками и сломал бы абсолютный счётчик communication.e2e-spec
+    // (count==0 после boot) при нестабильном порядке запуска спеков).
+    await prisma.communication.deleteMany({
+      where: { OR: [{ id: { in: created.messages } }, { contextType: "BUYER_REQUEST" }] },
+    });
     await prisma.communicationThread.deleteMany({ where: { id: { in: created.threads } } });
     await prisma.sellerProposalHistory.deleteMany();
     await prisma.sellerProposal.deleteMany();

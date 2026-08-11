@@ -49,6 +49,7 @@ describe("Phase 1 Step 1.16 — Communication Foundation (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let adminAgent: ReturnType<typeof request.agent>;
+  let commBeforeBoot: number;
 
   const stamp = Date.now();
   const created: {
@@ -136,8 +137,15 @@ describe("Phase 1 Step 1.16 — Communication Foundation (e2e)", () => {
     app.setGlobalPrefix("api/v1");
     app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
     app.useGlobalFilters(new AppExceptionFilter());
+    // §25/§59 invariant: boot не создаёт Communication (нет startup backfill).
+    // Проверяем ДЕЛЬТОЙ (count до boot vs после), а не абсолютным нулём:
+    // e2e-БД общая, другие спеки могут легально оставить Communication-строки,
+    // а порядок запуска спеков на Windows нестабилен — абсолютный 0 был бы
+    // транзиентным флейком (727/728) при запуске communication.e2e ПОСЛЕ
+    // reverse-conversation.e2e (10 BUYER_REQUEST-строк от его сообщений).
+    prisma = moduleRef.get(PrismaService);
+    commBeforeBoot = await prisma.communication.count();
     await app.init();
-    prisma = app.get(PrismaService);
 
     const admin = await login("admin", "admin123");
     adminAgent = agent(admin.accessToken);
@@ -171,13 +179,16 @@ describe("Phase 1 Step 1.16 — Communication Foundation (e2e)", () => {
 
   // ── 1. Auth gate + legacy isolation ────────────────────────────────────────
 
-  it("1. anonymous /communications* → 401; нет startup backfill (count==0 после boot)", async () => {
+  it("1. anonymous /communications* → 401; нет startup backfill (count не растёт при boot)", async () => {
     for (const path of ["", "/own", "/CML-00000001"]) {
       await request(app.getHttpServer()).get(`/api/v1/communications${path}`).expect(401);
     }
     await request(app.getHttpServer()).post("/api/v1/communications").send({}).expect(401);
-    // §25/§59: boot не создаёт Communication автоматически (нет backfill).
-    expect(await prisma.communication.count()).toBe(0);
+    // §25/§59: boot не создаёт Communication автоматически (нет backfill) —
+    // проверяем ДЕЛЬТОЙ (count до boot vs после), а не абсолютным нулём:
+    // общая e2e-БД, другие спеки легально создают Communication, порядок
+    // запуска нестабилен → абсолютный 0 был бы флейком (727/728).
+    expect(await prisma.communication.count()).toBe(commBeforeBoot);
   });
 
   // ── 2-6. Create + semantics + content ──────────────────────────────────────
