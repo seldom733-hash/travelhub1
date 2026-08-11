@@ -30,6 +30,13 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Stray root artifacts (не проект — только корень, не backend/frontend src)
+/src/
+/public/
+skills-lock.json
+~$*.docx
+~$*.xlsx
+
 # Freebuff local artifacts
 .freebuff/
 .freebuff-preview.log
