@@ -401,7 +401,8 @@ describe("Phase 2 Step 2.2A — Seller Commercial Capabilities (e2e)", () => {
     const after = await dbCounts();
     expect(after).toEqual(before);
     const tables = await reverseTables();
-    expect(tables).toEqual(["BuyerRequest", "BuyerRequestHistory", "SellerCapability", "SellerCapabilityHistory"]);
+    // Step 2.2C добавил BuyerRequestDistribution (легитимная эволюция).
+    expect(tables).toEqual(["BuyerRequest", "BuyerRequestDistribution", "BuyerRequestHistory", "SellerCapability", "SellerCapabilityHistory"]);
   });
 
   it("18. worldwide coverage — эксклюзивная запись (валидация); не создаётся как fake country", async () => {

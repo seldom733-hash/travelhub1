@@ -1906,12 +1906,45 @@ model BuyerRequest {
   submittedAt DateTime?
   cancelledAt DateTime?
 
-  history BuyerRequestHistory[]
+  history        BuyerRequestHistory[]
+  distributions  BuyerRequestDistribution[]
 
   @@index([buyerId])
   @@index([buyerId, status])
   @@index([status, categoryId])
   @@index([status, createdAt])
+  @@schema("reverse")
+}
+
+/// Детерминированная per-Seller distribution-факт (Step 2.2C, reverse.*).
+/// Server-authoritative: создаётся ТОЛЬКО системной matching-командой
+/// (reverse.match.run); Seller НЕ может self-match; Buyer НЕ мутирует.
+///
+/// Инварианты:
+///  - MATCHED/DISTRIBUTED ≠ CONTACT DISCLOSED (никаких контактов/PII);
+///  - matching НЕ создаёт Lead/Opportunity/Quote/Sale/Order/Booking;
+///  - sellerId — crm.Partner ref (без FK), из server-owned state;
+///  - eligibility evaluated на момент run (request SUBMITTED + category match +
+///    destination coverage + capability ACTIVE + acceptsBuyerRequests + Seller
+///    ACTIVE); capability ≠ entitlement (entitlement authority для reverse
+///    marketplace отсутствует — participation gate = capability-level);
+///  - уникальность (buyerRequestId, sellerId) — idempotent retry;
+///  - durable: при CANCELLED request row сохраняется (история не удаляется),
+///    Seller projection показывает актуальный request.status;
+///  - UUID-only (без business-префикса: internal fact, §34 prompt).
+model BuyerRequestDistribution {
+  id             String        @id @default(uuid())
+  buyerRequestId String
+  buyerRequest   BuyerRequest  @relation(fields: [buyerRequestId], references: [id], onDelete: Cascade)
+  /// crm.Partner ref (без FK). Всегда из server-owned eligibility state.
+  sellerId       String
+  distributedAt  DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([buyerRequestId, sellerId])
+  @@index([sellerId])
+  @@index([sellerId, distributedAt])
   @@schema("reverse")
 }
 

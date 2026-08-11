@@ -386,13 +386,14 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
     created.orders.push(order.id);
     expect(order.acquisitionSource).toBe("BUYER_REQUEST");
     // Reverse Marketplace runtime ограничен approved steps (ADR-0012): schema
-    // существует; BuyerRequest (2.2B) + SellerCapability (2.2A) есть, но
-    // matching/distribution/Proposal сущностей НЕТ. Будущие — Step 2.2C+.
+    // существует; BuyerRequest (2.2B) + SellerCapability (2.2A) есть;
+    // BuyerRequestDistribution (2.2C) добавлена легитимно; Proposal (2.2D) НЕТ.
     const reverseTables = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = 'reverse' ORDER BY table_name`,
     );
     expect(reverseTables.map((r) => r.table_name)).toEqual([
       "BuyerRequest",
+      "BuyerRequestDistribution",
       "BuyerRequestHistory",
       "SellerCapability",
       "SellerCapabilityHistory",

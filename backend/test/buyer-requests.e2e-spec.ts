@@ -449,7 +449,8 @@ describe("Phase 2 Step 2.2B — Buyer Request Foundation (e2e)", () => {
 
   it("22/23. reverse.* содержит только 2.2A+2.2B сущности (нет matching/Proposal)", async () => {
     const tables = await reverseTables();
-    expect(tables).toEqual(["BuyerRequest", "BuyerRequestHistory", "SellerCapability", "SellerCapabilityHistory"]);
+    // Step 2.2C добавил BuyerRequestDistribution (легитимная эволюция).
+    expect(tables).toEqual(["BuyerRequest", "BuyerRequestDistribution", "BuyerRequestHistory", "SellerCapability", "SellerCapabilityHistory"]);
   });
 
   it("24/25/26. создание request НЕ создаёт Sales/Order/Booking/Product entities", async () => {

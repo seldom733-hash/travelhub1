@@ -114,6 +114,10 @@ export const PERMISSIONS = {
   // (доступ к запросам — только после server-authoritative distribution 2.2C).
   "reverse.request.read_own": "Чтение собственных Buyer Requests (BUYER own-scope)",
   "reverse.request.write_own": "Создание/изменение/сабмит/отмена собственных Buyer Requests (BUYER own-scope)",
+  // Step 2.2C: Matching & Distribution — reverse.*. Системная команда
+  // matching run (только ADMIN/система; Seller НЕ может self-match).
+  "reverse.match.run": "Запуск server-authoritative matching/distribution для BuyerRequest (system command)",
+  "reverse.distribution.read_own": "Чтение СВОИХ distributed Buyer Requests (Seller own-scope inbox)",
 
   // ── Account / own profile (Step 1.9, granular own-scope) ──────────────
   "account.profile.read": "Чтение собственного профиля/аккаунта (own-scope)",
@@ -421,6 +425,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // (own-scope). Узкие права — без internal Catalog/Sales/CRM прав.
     "reverse.capability.read_own",
     "reverse.capability.write_own",
+    // Step 2.2C: PARTNER читает ТОЛЬКО СВОИ распределённые Buyer Requests
+    // (server-authoritative distribution; нет global list, нет self-match).
+    "reverse.distribution.read_own",
   ],
 
   // Step 1.3 review fix: BUYER БЕЗ unrestricted internal catalog.product.read —

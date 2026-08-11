@@ -317,7 +317,7 @@ context. Точный lifecycle enum в amendment НЕ замораживает�
 ведутся в существующем Communication (`CML-*`, Step 2.2E), т.е. entity ≠
 communication context.
 
-· **Step 2.2C --- Buyer Request Matching & Distribution** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition)\
+· **Step 2.2C --- Buyer Request Matching & Distribution** 🛠 IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW (Roadmap Amendment, post-baseline addition; reverse.*, ADR-0012; server-authoritative run + Seller inbox)\
 Базовая концептуальная eligibility: `active/approved Seller` AND `eligible to receive Buyer Requests` AND
 `service capability matches` AND `destination coverage matches` AND
 `required entitlement/capability permits participation`. Локация Buyer-а
@@ -1363,11 +1363,13 @@ PII-скан; FIX 2: lifecycle-команды loud-422 на forged keys; FIX 3�
 race final-state/category-snapshot/nested-PII e2e; doc: PAX
 category-neutrality + destination source).
 
-**Currently active item:** Step 2.2C — NOT IMPLEMENTED (blocked до
-отдельного implementation-промпта).
+**Currently active item:** Step 2.2C — STRICT REVIEW (Matching &
+Distribution; реализация завершена: reverse.BuyerRequestDistribution,
+system matching command, Seller inbox, strict containment coverage).
 
-**Exact NEXT item:** `PHASE 2 — STEP 2.2C — MATCHING & DISTRIBUTION`
-(единственный NEXT; 2.2B STRICT REVIEW завершён, approval дан).
+**Exact NEXT item:** `Step 2.2C — STRICT REVIEW` (review reverse.*
+matching/distribution implementation; 2.2D остаётся заблокированной до
+approval).
 
 ### Полная авторитетная последовательность после 2.5B
 
@@ -1386,8 +1388,8 @@ category-neutrality + destination source).
 4.  **Step 2.2A — STRICT REVIEW** — ✅ DONE (APPROVED WITH REVIEW FIXES)
 5.  **Step 2.2B — Buyer Request / Reverse Marketplace Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES
 6.  **Step 2.2B — STRICT REVIEW** ✅ DONE (APPROVED WITH REVIEW FIXES)
-7.  **Step 2.2C — Buyer Request Matching & Distribution** ▶ NEXT
-8.  **Step 2.2C — STRICT REVIEW**
+7.  **Step 2.2C — Buyer Request Matching & Distribution** 🛠 IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW
+8.  **Step 2.2C — STRICT REVIEW** ▶ NEXT
 9.  **Step 2.2D — Seller Proposal Foundation**
 10. **Step 2.2D — STRICT REVIEW**
 11. **Step 2.2E — Buyer Request / Proposal Communication**

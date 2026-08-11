@@ -176,6 +176,34 @@ export const REQUEST_LIFECYCLE_FORBIDDEN_KEYS = [
 ] as const;
 
 /**
+ * Matching-команда (Step 2.2C) принимает ТОЛЬКО buyerRequestId. Все forged
+ * server-owned поля (sellerIds/self-match/status/timestamps/rank/score/
+ * contactDisclosed/proposalId/actor) → 422 (loud), а не silent-strip.
+ */
+export const MATCH_RUN_FORBIDDEN_KEYS = [
+  "sellerIds",
+  "sellers",
+  "sellerId",
+  "status",
+  "matchedAt",
+  "distributedAt",
+  "createdAt",
+  "updatedAt",
+  "eligibilityReason",
+  "eligibility",
+  "rank",
+  "score",
+  "contactDisclosed",
+  "proposalId",
+  "version",
+  "actorId",
+  "actorName",
+  "createdBy",
+  "correlationId",
+  "causationId",
+] as const;
+
+/**
  * Отклоняет запрос, содержащий запрещённые ключи (масс-assignment / role injection /
  * forged customerId/partnerId). Возвращает список задетых ключей (пусто — ок).
  * Чистая функция: не бросает сама (бросают сервисы), чтобы тестировать без Nest.
