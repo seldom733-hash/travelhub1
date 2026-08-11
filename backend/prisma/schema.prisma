@@ -1458,11 +1458,14 @@ enum CommunicationStatus {
 /// Canonical typed context reference (§10): один primary context на
 /// Communication. SUPPORT отложен — Support domain ещё не реализован (§30),
 /// extension-ready без симуляции Ticket/SLA.
+/// BUYER_REQUEST — Step 2.2E pre-sale conversation context (сообщения
+/// CommunicationThread, владелец reverse.BuyerRequest, НЕ переобъявляет его).
 enum CommunicationContextType {
   CUSTOMER
   PARTNER
   ORDER
   BOOKING
+  BUYER_REQUEST
 
   @@schema("communication")
 }
@@ -1479,6 +1482,8 @@ enum CommunicationParticipantType {
   @@schema("communication")
 }
 
+/// Каноническая Communication (CML-*): единый факт коммуникации, способный
+/// связывать cross-domain business contexts без владения ими.
 /// Каноническая Communication (CML-*): единый факт коммуникации, способный
 /// связывать cross-domain business contexts без владения ими.
 model Communication {
@@ -1499,6 +1504,13 @@ model Communication {
   /// не определён — по факту create всегда передаёт контекст (§10).
   contextType CommunicationContextType?
   contextId   String?
+
+  /// Step 2.2E: ссылка на pre-sale conversation (communication.CommunicationThread).
+  /// NULL — НЕ-пресейл Communication (CUSTOMER/PARTNER/ORDER/BOOKING контексты).
+  /// Сообщения потока имеют contextType=BUYER_REQUEST + contextId=buyerRequestId
+  /// (тот же business context, что у потока) + threadId (изоляция per-seller).
+  threadId String?
+  thread   CommunicationThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
 
   /// Actor = кто совершил system action (§13) — canonical security.User id.
   /// НЕ путать с sender/recipient (иногда совпадают, но это не правило).
@@ -1527,6 +1539,64 @@ model Communication {
   @@index([contextType, contextId])
   @@index([occurredAt])
   @@index([direction, status])
+  @@index([threadId])
+  @@schema("communication")
+}
+
+/// Pre-sale conversation (Step 2.2E, communication.*, ADR-0011) — изолированная
+/// переписка Buyer↔Seller по каноническому reverse-контексту
+/// `BuyerRequest + Buyer + Seller [+ Proposal]`. Владелец — communication.*
+/// (room lifecycle, membership, messages); reverse.* остаётся владельцем
+/// BuyerRequest/Distribution/SellerProposal (ADR-0012).
+///
+/// Инварианты:
+///  - РОВНО один активный канонический пресейл-разговор на
+///    (buyerRequestId, sellerPartnerId) — DB unique (get-or-create, retry-safe);
+///  - membership НЕ таблица: ровно 2 участника — server-derived колонки
+///    buyerCustomerId (из BuyerRequest.buyerId) и sellerPartnerId (из
+///    BuyerRequestDistribution.sellerId). Клиент НЕ передаёт членов/владельцев;
+///    generic add/remove-member API отсутствует (нет группы, §22/§23);
+///  - proposalId — опциональный trusted ref на reverse.SellerProposal
+///    (валидирован: тот же request + тот же seller; auto-attach при open,
+///    если Proposal уже существует); Proposal НЕ становится владельцем
+///    контекста и НЕ мутируется через чат;
+///  - сообщения — строки communication.Communication (CML-*) с threadId;
+///  - liveness определяется ЖИВЫМ reverse.BuyerRequest.status (re-read при
+///    open/send, §31): CANCELLED блокирует новые сообщения, история durable;
+///  - cross-Seller изоляция: отдельный thread на каждого Seller; Seller A
+///    не видит/не пишет в thread Seller B; Buyer общается с каждым отдельно;
+///  - создание потока/отправка НЕ создаёт Lead/Opportunity/Quote/Sale/Order/
+///    Booking/Product/Payment (zero Sales fan-out, §38); события НЕ эмитятся
+///    (конвенция ADR-0011 §19); аудит — security.AuditLog без body.
+model CommunicationThread {
+  id   String @id @default(uuid())
+  /// Канонический код потока: CML-* (тот же префикс/счётчик, что сообщения,
+  /// 2.2E §18 — никакого нового ID-домена). immutable, server-generated.
+  code String @unique
+
+  /// reverse.BuyerRequest ref (БЕЗ FK, ADR-0001). Server-derived из client
+  /// входного buyerRequestId (open-команда), НИКОГДА не подменяется клиентом.
+  buyerRequestId String
+  /// crm.Customer ref — server-derived из BuyerRequest.buyerId (member 1).
+  buyerCustomerId String
+  /// crm.Partner ref — server-derived из BuyerRequestDistribution.sellerId
+  /// (member 2; Buyer-у — через publicId SELL-*, сервер резолвит partnerId).
+  sellerPartnerId String
+  /// reverse.SellerProposal ref (trusted, optional; тот же request+seller).
+  proposalId String?
+
+  /// Row-level version (зарезервирован; мутации потоков в 2.2E отсутствуют).
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Communication[]
+
+  /// ЕДИНЫЙ канонический разговор на (request, seller) — DB-level idempotency
+  /// (retry/concurrent open → один поток, §19/§21/§32).
+  @@unique([buyerRequestId, sellerPartnerId])
+  @@index([buyerCustomerId])
+  @@index([sellerPartnerId])
   @@schema("communication")
 }
 

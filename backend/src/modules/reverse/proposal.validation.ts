@@ -13,6 +13,10 @@
  *   semantics; hint, не обязательный.
  */
 import { ValidationDomainError } from "../../shared/errors";
+// ЕДИНАЯ каноническая анти-disintermediation (Step 2.2D + Step 2.2E) —
+// shared/anti-disintermediation.ts; здесь только re-export для обратной
+// совместимости спека (никакой второй реализации).
+import { hasForbiddenText, assertNoContactText } from "../../shared/anti-disintermediation";
 
 export const MAX_PROPOSAL_TEXT_LENGTH = 4000;
 /// Decimal(12,2) ёмкость: 10 цифр до запятой + 2 после = макс 9_999_999_999.99.
@@ -20,37 +24,6 @@ export const MAX_PROPOSAL_TEXT_LENGTH = 4000;
 export const MAX_AMOUNT = 9_999_999_999.99;
 const CURRENCY_RE = /^[A-Z]{3}$/;
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * Паттерны контактов/URL для анти-disintermediation (консервативная проверка).
- * Обнаружение → 422 (loud), НЕ silent-strip: Proposal не должен содержать
- * каналы обхода платформы (email, телефон, мессенджеры, URL, соцсети).
- * Ограничение документировано: это базовая regex-защита, НЕ DLP.
- */
-export const CONTACT_PATTERNS: ReadonlyArray<{ label: string; re: RegExp }> = [
-  { label: "email", re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/ },
-  { label: "phone", re: /(?<![A-Za-z0-9])(\+?\d[\d\s().-]{7,}\d)(?![A-Za-z0-9])/ },
-  { label: "url", re: /(https?:\/\/|www\.)[A-Za-z0-9.-]+/i },
-  { label: "social/telegram/whatsapp", re: /(t\.me\/|wa\.me\/|@[A-Za-z0-9_]{4,}|instagram\.com|facebook\.com|vk\.com|youtube\.com)/i },
-];
-
-/** ISO date-only (YYYY-MM-DD) — НЕ контакт. Учитывается в phone-проверке. */
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function hasForbiddenText(value: string): string | null {
-  for (const p of CONTACT_PATTERNS) {
-    if (!p.re.test(value)) continue;
-    // Phone-паттерн ложно ловит ISO-даты (YYYY-MM-DD) в свободном тексте
-    // (например «даты: 2026-09-01»). Даты НЕ контакт — пропускаем такое совпадение.
-    if (p.label === "phone") {
-      const matches = value.match(new RegExp(p.re.source, "g")) ?? [];
-      const nonDate = matches.some((m) => !ISO_DATE_RE.test(m.trim()));
-      if (!nonDate) continue;
-    }
-    return p.label;
-  }
-  return null;
-}
 
 /** Проверка одного текстового поля: тип, длина, plain-text, анти-disintermediation. */
 function normalizeTextField(raw: unknown, label: string, max = MAX_PROPOSAL_TEXT_LENGTH): string {
@@ -73,10 +46,7 @@ function normalizeTextField(raw: unknown, label: string, max = MAX_PROPOSAL_TEXT
     throw new ValidationDomainError(`${label} must be plain text (no HTML/script markup)`);
   }
   // Анти-disintermediation: контакты/URL запрещены (PROPOSAL EXISTS ≠ CONTACT DISCLOSED).
-  const hit = hasForbiddenText(value);
-  if (hit) {
-    throw new ValidationDomainError(`${label} must not contain contact information or links (${hit})`);
-  }
+  assertNoContactText(label, value);
   return value;
 }
 

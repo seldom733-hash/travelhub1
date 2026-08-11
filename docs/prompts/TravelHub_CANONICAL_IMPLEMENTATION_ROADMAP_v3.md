@@ -344,7 +344,7 @@ price contract (см. Ownership map). Строгая изоляция: Seller A 
 proposal/price/conversation Seller B; Buyer видит только proposal своего
 request; internal доступ — по permissions (инвариант 6).
 
-· **Step 2.2E --- Buyer Request / Proposal Communication** ⏳ BLOCKED (Roadmap Amendment, post-baseline addition) — NEXT after 2.2D approval\
+· **Step 2.2E --- Buyer Request / Proposal Communication** ✅ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW (Roadmap Amendment, post-baseline addition)\
 Переиспользование существующего `Communication = CML-*`; НЕ создаётся второй messaging domain. Context:
 `BuyerRequest + Buyer + Seller [+ Proposal]`. Один Buyer может иметь
 независимые разговоры с несколькими Sellers по одному request. Enforce:
@@ -353,7 +353,14 @@ Buyer own-scope, Partner own-scope, participant/context consistency,
 cross-Seller isolation, совместимость с future attachments/notifications.
 Amend 3.37A (Chat Completion поддерживает BuyerRequest/Proposal, не
 только Order/Booking) и 3.37B (anti-disintermediation распространяется
-на pre-sale request chat).
+на pre-sale request chat). IMPLEMENTATION: `communication.CommunicationThread`
+(room, CML-*, unique (buyerRequestId, sellerPartnerId)) + сообщения = строки
+communication.Communication (contextType=BUYER_REQUEST, threadId); membership =
+2 server-derived колонки; distribution prerequisite + SUBMITTED gate (FOR UPDATE);
+cancel блокирует send, история durable; WITHDRAWN proposal не блокирует чат;
+CHAT EXISTS ≠ CONTACT DISCLOSED (единый anti-disintermediation helper);
+PublicSellerProfile проекция (ADR-0005), без raw partnerId; buyer-view без
+customer PII; zero Sales/Catalog fan-out; e2e 36/36 (все пункты §45).
 
 · **Step 2.2F --- Proposal → Canonical Sales Conversion** ⏳ NOT IMPLEMENTED (Roadmap Amendment, post-baseline addition; gate DD-030: Proposal→Sales conversion target resolved ДО начала 2.2F)\
 При выборе Buyer-ом proposal НЕ создаются
@@ -1391,10 +1398,10 @@ strict containment coverage).
 6.  **Step 2.2B — STRICT REVIEW** ✅ DONE (APPROVED WITH REVIEW FIXES)
 7.  **Step 2.2C — Buyer Request Matching & Distribution** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES
 8.  **Step 2.2C — STRICT REVIEW** ✅ DONE (APPROVED WITH REVIEW FIXES)
-9.  **Step 2.2D — Seller Proposal Foundation** ▶ NEXT (по отдельному prompt)
-10. **Step 2.2D — STRICT REVIEW**
-11. **Step 2.2E — Buyer Request / Proposal Communication**
-12. **Step 2.2E — STRICT REVIEW**
+9.  **Step 2.2D — Seller Proposal Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES
+10. **Step 2.2D — STRICT REVIEW** ✅ DONE (APPROVED WITH REVIEW FIXES)
+11. **Step 2.2E — Buyer Request / Proposal Communication** ✅ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW
+12. **Step 2.2E — STRICT REVIEW** ▶ NEXT (активный пункт; по отдельному prompt)
 13. **Step 2.2F — Proposal → Canonical Sales Conversion** (gate DD-030:
     Proposal→Sales conversion target — Lead vs Opportunity vs Quote —
     resolved ДО начала 2.2F)

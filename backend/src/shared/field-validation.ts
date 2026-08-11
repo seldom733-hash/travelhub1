@@ -266,6 +266,93 @@ export const PROPOSAL_LIFECYCLE_FORBIDDEN_KEYS = [
 ] as const;
 
 /**
+ * Поля pre-sale conversation open-команды (Step 2.2E), которые клиент НЕ может
+ * передать: ownership (buyerId/customerId/ownerId/sellerId/partnerId/memberIds),
+ * identity (id/code/threadId), lifecycle/status, version, timestamps, context
+ * refs (proposalId/distributionId — server-derived, auto-attach), sales-
+ * conversion/contact поля, actor/correlation. Клиент передаёт ТОЛЬКО
+ * buyerRequestId (+ sellerPublicId для BUYER).
+ */
+export const CONVERSATION_OPEN_FORBIDDEN_KEYS = [
+  "id",
+  "code",
+  "threadId",
+  "conversationId",
+  "buyerId",
+  "customerId",
+  "ownerId",
+  "sellerId",
+  "partnerId",
+  "memberIds",
+  "members",
+  "buyerCustomerId",
+  "sellerPartnerId",
+  "proposalId",
+  "distributionId",
+  "status",
+  "version",
+  "createdAt",
+  "updatedAt",
+  "createdBy",
+  "actorId",
+  "actorName",
+  "acquisitionSource",
+  "source",
+  "contactDisclosed",
+  "converted",
+  "selected",
+  "accepted",
+  "quoteId",
+  "saleId",
+  "correlationId",
+  "causationId",
+] as const;
+
+/**
+ * Поля send-команды (Step 2.2E): ТОЛЬКО body (+ subject). Всё остальное
+ * (sender/recipient/ownership/direction/status/timestamps/context refs) —
+ * server-derived из actor и thread → 422 (loud), а не silent-strip.
+ */
+export const CONVERSATION_SEND_FORBIDDEN_KEYS = [
+  "id",
+  "code",
+  "threadId",
+  "conversationId",
+  "buyerRequestId",
+  "buyerId",
+  "customerId",
+  "ownerId",
+  "sellerId",
+  "partnerId",
+  "memberIds",
+  "members",
+  "sender",
+  "senderId",
+  "senderType",
+  "senderName",
+  "recipient",
+  "recipientId",
+  "recipientType",
+  "direction",
+  "status",
+  "version",
+  "occurredAt",
+  "createdAt",
+  "updatedAt",
+  "createdBy",
+  "actorId",
+  "actorName",
+  "contactDisclosed",
+  "converted",
+  "selected",
+  "accepted",
+  "quoteId",
+  "saleId",
+  "correlationId",
+  "causationId",
+] as const;
+
+/**
  * Отклоняет запрос, содержащий запрещённые ключи (масс-assignment / role injection /
  * forged customerId/partnerId). Возвращает список задетых ключей (пусто — ок).
  * Чистая функция: не бросает сама (бросают сервисы), чтобы тестировать без Nest.

@@ -5,6 +5,7 @@ import {
   CommunicationType,
 } from "../../generated/prisma/enums";
 import { ValidationDomainError } from "../../shared/errors";
+import { assertNoContactText } from "../../shared/anti-disintermediation";
 
 /**
  * PHASE 1 STEP 1.16 — чистые валидаторы Communication (unit-testable, без Nest).
@@ -180,6 +181,36 @@ export function assertNoSystemParticipantFromHttp(participants: Array<{ type: Co
       throw new ValidationDomainError("SYSTEM participant cannot be set via API (reserved for system-originated facts)");
     }
   }
+}
+
+/**
+ * Step 2.2E — pre-sale chat: направление сообщения по стороне автора.
+ * Для BUYER_REQUEST thread-сообщений direction отражает платформенный поток
+ * от requester-стороны (НЕ staff-семантику create-эндпоинта):
+ *  - автор BUYER (CUSTOMER) → INBOUND;
+ *  - автор SELLER (PARTNER) → OUTBOUND.
+ * Детерминированное server-side правило; клиент не передаёт direction.
+ */
+export function preSaleMessageDirection(senderSide: "BUYER" | "SELLER"): CommunicationDirection {
+  return senderSide === "BUYER" ? CommunicationDirection.INBOUND : CommunicationDirection.OUTBOUND;
+}
+
+/**
+ * Step 2.2E — pre-sale chat body: reuse base-валидатора (1..4000, plain text,
+ * без HTML/control chars) ПЛЮС анти-disintermediation — CHAT EXISTS ≠ CONTACT
+ * DISCLOSED (Roadmap Amend 3.37B). Обнаружение контакта/URL → 422 (loud).
+ * НЕ DLP: базовая regex-защита, ограничение документировано.
+ */
+export function assertValidPreSaleBody(body: string): void {
+  assertValidCommunicationBody(body);
+  assertNoContactText("message body", body);
+}
+
+/** Step 2.2E — pre-sale chat subject (optional): ≤200, plain text, анти-disintermediation. */
+export function assertValidPreSaleSubject(subject: string | undefined): void {
+  if (subject === undefined) return;
+  assertValidCommunicationSubject(subject);
+  assertNoContactText("message subject", subject);
 }
 
 /** Context: обязателен на foundation (каждая Communication привязана к business context). */

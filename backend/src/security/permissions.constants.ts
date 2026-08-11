@@ -101,6 +101,10 @@ export const PERMISSIONS = {
   "communication.read": "Чтение communications (internal staff, cross-domain context)",
   "communication.create": "Создание communication по business context (internal staff)",
   "communication.read_own": "Чтение собственных communications (BUYER/PARTNER own-scope)",
+  // Step 2.2E: peer-запись в СВОИ pre-sale conversations (open + send).
+  // Message ownership остаётся Communication; permission защищает context
+  // creation/access, не создавая параллельных reverse-message прав (§24).
+  "communication.write_own": "Открытие/отправка в собственные pre-sale conversations (BUYER/PARTNER own-scope)",
 
   // ── Reverse Marketplace capabilities (Step 2.2A, reverse.*) ────────────
   // Узкие own-scope права PARTNER: управление СВОИМИ Seller Commercial
@@ -426,6 +430,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // Step 1.16: PARTNER читает communications своего Partner-контекста
     // (own-scope, не-NOTE/не-INTERNAL). Никаких широких internal прав.
     "communication.read_own",
+    // Step 2.2E: PARTNER открывает/пишет в СВОИ pre-sale conversations
+    // (по канонически распределённым Buyer Requests).
+    "communication.write_own",
     // Step 2.2A: PARTNER управляет СВОИМИ Reverse Marketplace capabilities
     // (own-scope). Узкие права — без internal Catalog/Sales/CRM прав.
     "reverse.capability.read_own",
@@ -464,5 +471,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // Step 1.16: BUYER читает communications своего Customer-контекста
     // (own-scope, не-NOTE/не-INTERNAL).
     "communication.read_own",
+    // Step 2.2E: BUYER открывает/пишет в pre-sale conversations СВОИХ
+    // Buyer Requests (по распределённым Seller-ам).
+    "communication.write_own",
   ],
 };

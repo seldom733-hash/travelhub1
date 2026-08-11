@@ -47,6 +47,9 @@ capability declarations.
 buyer-demand префикс (финальная регистрация в точке реализации 2.2B).
 *Step 2.2D:* зарегистрирован PRP- (SellerProposal, reverse.*) — pre-commercial
 ответ Seller-а на распределённый BuyerRequest (промпт 2.2D §37).
+*Step 2.2E:* pre-sale conversations (communication.CommunicationThread + её
+сообщения) используют существующий префикс CML-* (тот же атомарный счётчик —
+никакого нового ID-домена; 2.2E §18).
 
 Формат: `PREFIX-` + число, дополненное слева нулями (8 цифр; для
 `TH-YYYY-######` — 6 цифр, последовательность сквозная по году).

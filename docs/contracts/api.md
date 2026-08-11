@@ -108,6 +108,54 @@ Create-contract (whitelist DTO + raw-body forbidden keys → 422):
   `communication.create` (OPERATOR/SALES_MANAGER/ADMIN),
   `communication.read_own` (BUYER/PARTNER). MODERATOR/FINANCE и др. — без прав.
 
+### Pre-sale conversations (Step 2.2E — владелец communication.*, CML-*, ADR-0011)
+
+Изолированная переписка Buyer↔Seller по Reverse Marketplace контексту
+`BuyerRequest + Buyer + Seller [+ Proposal]`. Тот же Communication bounded context
+(никакого второго chat-домена): комната — `communication.CommunicationThread`,
+сообщения — строки `communication.Communication` (contextType=BUYER_REQUEST,
+threadId). Reverse.* остаётся владельцем BuyerRequest/Distribution/SellerProposal.
+
+```text
+POST   /api/v1/communications/reverse/conversations                    open/get (get-or-create) — communication.write_own
+GET    /api/v1/communications/reverse/conversations                    list own — communication.read_own
+GET    /api/v1/communications/reverse/conversations/:id                detail — communication.read_own
+GET    /api/v1/communications/reverse/conversations/:id/messages       сообщения (?page=&pageSize=) — communication.read_own
+POST   /api/v1/communications/reverse/conversations/:id/messages       send — communication.write_own
+```
+
+Open-contract: `{ "buyerRequestId": "...", "sellerPublicId": "SELL-*" }` —
+`sellerPublicId` ТОЛЬКО для BUYER (сервер резолвит crm.Partner id через
+PublicSellerProfile, ADR-0005); для PARTNER identity = actor.partnerId.
+Send-contract: `{ "body": 1..4000 plain text, "subject": "?" ≤200 }` — ТОЛЬКО
+эти поля (авторство/direction/ownership server-derived).
+
+Правила (Step 2.2E):
+
+- ровно один поток на `(buyerRequestId, sellerPartnerId)` — DB unique + get-or-create
+  (повторный/конкурентный open → один CML, §19/§21);
+- eligibility: Buyer владеет request (иначе 404); Seller имеет каноническую
+  Distribution (иначе neutral 422); open ТОЛЬКО для SUBMITTED request;
+- membership = ровно 2 server-derived участника (колонки потока); generic
+  add/remove-member API отсутствует; forged sellerId/buyerId/memberIds/proposalId/
+  status/version/timestamps/contactDisclosed → 422 (loud);
+- cross-Seller изоляция: отдельный поток на Seller; Seller A не видит/не пишет
+  в поток B (neutral 404); Buyer общается с каждым Seller отдельно;
+- send re-read живой `reverse.BuyerRequest.status` (FOR UPDATE): CANCELLED → 422,
+  история durable; Proposal WITHDRAWN НЕ блокирует переписку; Proposal не
+  мутируется чатом;
+- CHAT EXISTS ≠ CONTACT DISCLOSED: body/subject проходят единую анти-
+  disintermediation (email/phone/URL/мессенджеры/social → 422; ISO-даты — ок);
+- сообщения: только `side` (BUYER/SELLER) — без внутренних UUID сторон;
+  buyer-view потока: `seller` = PublicSellerProfile (SELL-*, без raw partnerId);
+  seller-view: только requestCode (BRQ-*) — без Buyer контактного PII;
+- direction для thread-сообщений: автор BUYER → INBOUND, автор SELLER → OUTBOUND;
+- аудит: `conversation.opened` / `conversation.message.sent` (без body); события
+  НЕ эмитятся; zero Sales/Order/Booking/Payment/Catalog fan-out;
+- пагинация: page/pageSize (cap 50), threads — createdAt desc, сообщения —
+  occurredAt asc (хронология); права: `communication.read_own`/`write_own`
+  (BUYER/PARTNER). Staff peer-записи не имеют (write_own отсутствует → 403).
+
 ## Catalog Center (владелец Product/Tariff/Availability/Category)
 
 ```text

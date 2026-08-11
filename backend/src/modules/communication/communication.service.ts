@@ -249,6 +249,9 @@ export class CommunicationService {
   }
 
   private async assertContextExists(contextType: CommunicationContextType, contextId: string): Promise<void> {
+    // Step 2.2E: BUYER_REQUEST — pre-sale conversation context (reverse.BuyerRequest,
+    // read-only по ADR-0001). Сообщения потоков создаются peer-endpoint'ами;
+    // staff-факт по request-контексту (например, запись звонка) тоже валиден.
     const exists =
       contextType === CommunicationContextType.CUSTOMER
         ? await this.prisma.customer.findUnique({ where: { id: contextId }, select: { id: true } })
@@ -256,7 +259,9 @@ export class CommunicationService {
           ? await this.prisma.partner.findUnique({ where: { id: contextId }, select: { id: true } })
           : contextType === CommunicationContextType.ORDER
             ? await this.prisma.order.findUnique({ where: { id: contextId }, select: { id: true } })
-            : await this.prisma.booking.findUnique({ where: { id: contextId }, select: { id: true } });
+            : contextType === CommunicationContextType.BUYER_REQUEST
+              ? await this.prisma.buyerRequest.findUnique({ where: { id: contextId }, select: { id: true } })
+              : await this.prisma.booking.findUnique({ where: { id: contextId }, select: { id: true } });
     if (!exists) {
       throw new ValidationDomainError(`Context ${contextType} ${contextId} does not exist`);
     }
@@ -309,6 +314,12 @@ export class CommunicationService {
         } else if (contextType === CommunicationContextType.ORDER) {
           const order = await this.prisma.order.findUnique({ where: { id: contextId }, select: { customerId: true } });
           if (order && p.id !== order.customerId) throw new ValidationDomainError("CUSTOMER participant must be the owner of the ORDER context");
+        } else if (contextType === CommunicationContextType.BUYER_REQUEST) {
+          // Step 2.2E: CUSTOMER на request-контексте — только владелец request.
+          const request = await this.prisma.buyerRequest.findUnique({ where: { id: contextId }, select: { buyerId: true } });
+          if (request && p.id !== request.buyerId) {
+            throw new ValidationDomainError("CUSTOMER participant must be the owner of the BUYER_REQUEST context");
+          }
         } else {
           const booking = await this.prisma.booking.findUnique({ where: { id: contextId }, select: { orderId: true } });
           if (booking) {
@@ -327,6 +338,16 @@ export class CommunicationService {
           const partnerIds = await this.orderPartnerIds(contextId);
           if (partnerIds.length > 0 && !partnerIds.includes(p.id!)) {
             throw new ValidationDomainError("PARTNER participant is not associated with the ORDER context");
+          }
+        } else if (contextType === CommunicationContextType.BUYER_REQUEST) {
+          // Step 2.2E: PARTNER на request-контексте — только канонически
+          // распределённый Seller (BuyerRequestDistribution, read-only).
+          const dist = await this.prisma.buyerRequestDistribution.findFirst({
+            where: { buyerRequestId: contextId, sellerId: p.id! },
+            select: { id: true },
+          });
+          if (!dist) {
+            throw new ValidationDomainError("PARTNER participant is not a distributed Seller of the BUYER_REQUEST context");
           }
         } else {
           const booking = await this.prisma.booking.findUnique({ where: { id: contextId }, select: { productId: true } });
