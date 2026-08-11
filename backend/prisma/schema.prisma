@@ -107,6 +107,17 @@ enum ProductStatus {
   @@schema("catalog")
 }
 
+/// Жизненный цикл Seller Commercial / Service Unit (Step 1.8A, DD-025 B).
+/// DRAFT → PUBLISHED → ARCHIVED (публикация — Catalog publication authority,
+/// гейт: родительский Product PUBLISHED; без второго moderation engine).
+enum ServiceUnitStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
+  @@schema("catalog")
+}
+
 enum ProductType {
   TOUR
   HOTEL
@@ -206,6 +217,7 @@ model Product {
 
   tariffs      Tariff[]
   availability Availability[]
+  serviceUnits ServiceUnit[]
   history      ProductHistory[]
   media        ProductMedia[]
   moderation   ModerationSubmission[]
@@ -394,6 +406,106 @@ model AvailabilityReservation {
 
   @@index([productId, tariffId, date])
   @@index([sourceSaleId])
+  @@schema("catalog")
+}
+
+/// Seller Commercial / Service Unit (Phase 1 Step 1.8A, DD-025 B).
+///
+/// Категория → CategorySchema(template) → Product → Service Unit → Tariff (Rate
+/// Plan, Step 1.8B). Персистентная Seller-определённая коммерческая/сервисная
+/// единица ВНУТРИ Product: НЕ Product, НЕ attributes-JSON, НЕ CategorySchema.
+///
+/// Инварианты (Step 1.8A §8-§17, DD-025):
+///  - Owner: catalog.* (только Catalog пишет; ADR-0001 — сервис-владелец);
+///  - Seller-определённое коммерческое имя сохраняется verbatim (TravelHub
+///    стандартизирует атрибуты, не названия);
+///  - normalized attributes валидируются по CategorySchema-снапшоту
+///    (categorySchemaId), наследуемому из Product (не client-forgeable);
+///  - ownership partnerId наследуется из Product (server-derived, trusted ref
+///    без FK — ADR-0001), immutable;
+///  - lifecycle DRAFT → PUBLISHED → ARCHIVED; публикация — staff/ADMIN команда
+///    (catalog.service_unit.publish), гейт: родительский Product PUBLISHED
+///    (юнит не может сделать неопубликованный Product публично bookable);
+///  - import identity foundation: (source, externalKey) — server/trusted
+///    контекст (staff/ADMIN), уникальность в реальном ownership scope
+///    (partnerId+productId+source+externalKey) — repeated imports reconcile,
+///    никогда не дублируют; manual units (source=NULL, externalKey=NULL)
+///    законно не имеют external key (NULL не конфликтует в unique index);
+///  - никаких price/availability полей в юните (1.8A — structure only);
+///  - business code UNI-* генерирует ТОЛЬКО IdsService (атомарный счётчик).
+model ServiceUnit {
+  id        String   @id @default(uuid())
+  /// Канонический бизнес-код: UNI-00000001 (IdsService, атомарный счётчик).
+  code      String   @unique
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Seller-определённое коммерческое название — verbatim (только trim;
+  /// case/порядок слов НЕ нормализуются, НЕ переводятся).
+  name String
+
+  /// Category/schema-контекст наследуется из Product (snapshot refs):
+  ///  - categoryId — категория, в которой создан Product;
+  ///  - categorySchemaId — снапшот версии CategorySchema, по которой
+  ///    валидированы attributes (изменение schema НЕ переинтерпретирует
+  ///    исторические unit-данные).
+  categoryId       String?
+  categorySchemaId String?
+  /// Normalized structured attributes (валидированный JSON, whitelist-ключи
+  /// CategorySchema; источник/original value НЕ перезаписывается таксономией).
+  attributes Json?
+
+  /// Import identity foundation (DD-025 §17/§18): source — trusted интеграционный
+  /// контекст (не произвольный клиентский authority), externalKey — seller-
+  /// scoped внешний ключ. NULL для manual units (без fabricated key).
+  source      String?
+  externalKey String?
+
+  /// Ownership: partnerId из Product (server-derived, без FK — ADR-0001),
+  /// immutable после создания.
+  partnerId String?
+
+  status      ServiceUnitStatus @default(DRAFT)
+  /// Версия строки (informational/аудит, конвенция Product.version): инкремент
+  /// на каждое изменение. НЕ является expectedVersion/CAS-механизмом (конвенция
+  /// Catalog — как у Product; stale-state защита — через атомарные conditional
+  /// updates по status в ServiceUnitService, STRICT REVIEW 1.8A §34/§35).
+  version     Int               @default(1)
+  publishedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  createdBy   String?
+  updatedBy   String?
+
+  history ServiceUnitHistory[]
+
+  // Import reconcile: внешний ключ уникален в реальном ownership scope
+  // (два Seller не коллидят; в пределах Seller+Product+source ключ уникален).
+  // NULL source/externalKey (manual) в unique index НЕ конфликтуют (Postgres).
+  @@unique([partnerId, productId, source, externalKey])
+  @@index([productId])
+  @@index([status])
+  @@index([partnerId])
+  @@schema("catalog")
+}
+
+/// Журнал аудита Service Unit (audit by default; без PII — атрибуты не
+/// dump'ятся в security audit, только refs и lifecycle-переходы).
+model ServiceUnitHistory {
+  id        String       @id @default(uuid())
+  unitId    String
+  unit      ServiceUnit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  version   Int
+  action    String
+  from      String?
+  to        String?
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime     @default(now())
+
+  @@index([unitId])
   @@schema("catalog")
 }
 

@@ -41,7 +41,7 @@ PATCH  /api/v1/users/:id/status блокировка/активация (ауд�
 
 | Домен | Чтение | Запись | Особое |
 |---|---|---|---|
-| Catalog | `catalog.product.read` | `catalog.product.write` | publish: `catalog.product.publish`; категории: `catalog.category.write`; availability: `catalog.availability.write` |
+| Catalog | `catalog.product.read` | `catalog.product.write` | publish: `catalog.product.publish`; категории: `catalog.category.write`; availability: `catalog.availability.write`; Service Unit publish/archive: `catalog.service_unit.publish` (Step 1.8A) |
 | CRM | `crm.customer.read` | `crm.customer.write`, `crm.contact.write`, `crm.company.write`, `crm.partner.write`, `crm.supplier.write` | — |
 | Order | `order.read` | по action: `order.accept`, `order.edit_noncritical`, `order.request_booking`, `order.suspend`, `order.cancel`, `order.close` | `POST /orders/bootstrap` — только `order.import` (ADMIN exception) |
 | Booking | `booking.read` | по action: `booking.send_supplier`, `booking.confirm`, `booking.cancel` | создание только через событие `BookingRequested` |
@@ -236,6 +236,67 @@ POST   /api/v1/products/:id/availability upsert слотов — catalog.availab
 GET    /api/v1/categories                — catalog.product.read
 POST   /api/v1/categories                — catalog.category.write
 ```
+
+## Service Unit (Step 1.8A — владелец catalog.*, UNI-*, DD-025 B)
+
+Seller Commercial / Service Unit — персистентная коммерческая/сервисная единица
+ВНУТРИ Product (комната отеля, вариант трансфера, пакет тура и т.п.). Структура
+и идентичность (structure-only): никаких price/availability полей в юните.
+Документация архитектуры: `docs/architecture/service-unit-foundation.md`.
+
+```text
+POST   /api/v1/products/:productId/service-units   создание (UNI-*, DRAFT) — PARTNER: catalog.product.create_own; staff/ADMIN: catalog.product.write
+GET    /api/v1/products/:productId/service-units   список (детерминированный order, limit/offset) — PARTNER: catalog.product.read_own; staff: catalog.product.read
+GET    /api/v1/service-units/:id                   карточка — PARTNER: catalog.product.read_own; staff: catalog.product.read
+GET    /api/v1/service-units/:id/history           audit-история — PARTNER: catalog.product.read_own; staff: catalog.product.read
+PATCH  /api/v1/service-units/:id                   правка name/attributes — PARTNER: catalog.product.update_own_draft (только СВОЙ DRAFT); staff/ADMIN: catalog.product.write
+POST   /api/v1/service-units/:id/publish           публикация (гейт: Product PUBLISHED) — catalog.service_unit.publish (staff/ADMIN)
+POST   /api/v1/service-units/:id/archive           архивация (soft) — catalog.service_unit.publish (staff/ADMIN)
+```
+
+Create-contract:
+
+```jsonc
+{
+  "name": "Deluxe Room Sea View",   // обязательное, verbatim, ≤200 (только trim)
+  "attributes": { "occupancy": 2, "bedType": "double" },  // optional, валидируется по CategorySchema Product
+  "source": "CHANNEL_MANAGER",     // optional — ТОЛЬКО staff/ADMIN (trusted import identity); PARTNER → 422
+  "externalKey": "RM-101"          // optional — требует source; server/trusted
+}
+```
+
+Правила (Step 1.8A):
+
+- **ownership**: юнит принадлежит Product; `partnerId`/`categoryId`/
+  `categorySchemaId` наследуются из Product (server-derived, без FK — ADR-0001);
+  PARTNER — только СВОИ Product; чужой Product/unit → 403 (managed deny, как
+  Product);
+- **verbatim name**: Seller-название сохраняется как есть (case/порядок слов не
+  нормализуются, не переводятся); TravelHub стандартизирует атрибуты, не имена;
+- **schema snapshot**: attributes валидируются по CategorySchema-снапшоту Product
+  (`categorySchemaId`) — изменение CategorySchema не переинтерпретирует
+  исторические юниты; forged attributes → 422;
+- **forbidden keys** (create/update, 422 loud): id/code/productId/categoryId/
+  categorySchemaId/partnerId/ownerId/status/version/publishedAt/timestamps/actor;
+  update дополнительно: source/externalKey (immutable — смена = delete + create);
+- **import identity** (DD-025): `(source, externalKey)` — server/trusted;
+  PARTNER не может задавать (422); externalKey без source → 422; уникальность
+  в ownership scope `(partnerId, productId, source, externalKey)` — повторный
+  import → 409 (reconcile), concurrency → ровно один юнит; manual units без
+  externalKey валидны;
+- **lifecycle**: DRAFT → PUBLISHED → ARCHIVED; PUBLISHED разрешён ТОЛЬКО если
+  родительский Product PUBLISHED (иначе 409) — юнит не может сделать
+  неопубликованный Product публично bookable; PARTNER не имеет publish (403);
+  idempotent re-publish/archive (no-op при том же состоянии);
+- **mutability**: PARTNER правит СВОЙ DRAFT; staff/ADMIN — любые не-ARCHIVED;
+  ARCHIVED immutable (409);
+- **no side effects**: create не создаёт Tariff/Availability/Reservation/
+  Quote/Checkout/Sale/Order/Booking; Reverse Marketplace данные не мутируются;
+  событий нет (нет consumer-а — §37);
+- **audit**: `ServiceUnitHistory` + AuditLog (`service_unit.created/updated/
+  published/archived`) без PII/атрибутов;
+- MODERATOR/BUYER — без прав (403); public read юнитов отсутствует (1.8A —
+  structure-only, frontend не затронут).
 
 ## CRM mini (владелец Customer/Contact/Company/Partner/Supplier)
 

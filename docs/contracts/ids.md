@@ -8,6 +8,7 @@
 | `PRD-` | Product | Catalog |
 | `CAT-` | Category | Catalog |
 | `TRF-` | Tariff | Catalog |
+| `UNI-` | ServiceUnit (Seller Commercial/Service Unit, Step 1.8A) | Catalog |
 | `CUS-` | Customer | CRM |
 | `CNT-` | Contact | CRM |
 | `COM-` | Company | CRM |
@@ -56,6 +57,11 @@ Provenance refs — trusted refs БЕЗ FK: `Opportunity.buyerRequestId` (BRQ-*)
 `Opportunity.proposalId` (PRP-*, @unique — один Proposal → одна Opportunity),
 `Opportunity.sellerId` (crm.Partner). `BuyerRequest.selectedProposalId` @unique —
 one-winner invariant (2.2F §11/§12).
+*Step 1.8A (DD-025 B):* добавлен `UNI-` (ServiceUnit, catalog.*) — персистентная
+Seller-определённая коммерческая/сервисная единица ВНУТРИ Product (комната
+отеля, вариант трансфера, пакет тура и т.п.). Префикс зарегистрирован в
+`IdsService.nextCode` (атомарный счётчик). НЕ конфликтует с существующими
+(PRD/CAT/TRF/.../CAP/BRQ/PRP — проверено по реестру).
 
 Формат: `PREFIX-` + число, дополненное слева нулями (8 цифр; для
 `TH-YYYY-######` — 6 цифр, последовательность сквозная по году).

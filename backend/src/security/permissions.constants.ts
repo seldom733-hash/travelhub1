@@ -16,6 +16,13 @@ export const PERMISSIONS = {
   "catalog.product.update_own_draft": "Редактирование собственного draft Product (PARTNER)",
   "catalog.product.read_own": "Чтение собственных продуктов (PARTNER)",
   "catalog.product.channels_own": "Управление каналами публикации собственного Product (own-scope)",
+  // Step 1.8A: Service Unit publication — ОТДЕЛЬНАЯ publication authority.
+  // Юнит — child-entity Product (create/update/read переиспользуют catalog.product.*
+  // own-scope, §22), но publish/archive — отдельное право: PARTNER НЕ имеет
+  // (как и catalog.product.publish), только staff/ADMIN; гейт — родительский
+  // Product PUBLISHED (§15). Смешивать с catalog.product.publish нельзя — юнит
+  // имеет собственный lifecycle DRAFT → PUBLISHED → ARCHIVED.
+  "catalog.service_unit.publish": "Публикация/архивация Service Unit (Catalog publication authority, гейт: Product PUBLISHED)",
   "catalog.category.write": "Управление категориями",
   "catalog.category_schema.read": "Чтение Category Schema (конфигурации категорий)",
   "catalog.category_schema.write": "Управление Category Schema (только ADMIN)",

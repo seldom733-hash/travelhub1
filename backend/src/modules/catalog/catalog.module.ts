@@ -16,6 +16,8 @@ import { PublicSellerProfileService } from "./seller/seller-profile.service";
 import { SellerProfileRepairService } from "./seller/seller-profile-repair.service";
 import { StorefrontAdminController, StorefrontController } from "./storefront/storefront.controller";
 import { StorefrontService } from "./storefront/storefront.service";
+import { ServiceUnitsController } from "./service-units.controller";
+import { ServiceUnitService } from "./service-unit.service";
 import { StorefrontBehavioralController } from "./behavioral/storefront-behavioral.controller";
 import { StorefrontBehavioralService } from "./behavioral/storefront-behavioral.service";
 import { MarketplaceBehavioralController } from "./behavioral/marketplace-behavioral.controller";
@@ -42,9 +44,13 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
  *
  * Step 1.12.1: StorefrontController/StorefrontService — Partner Storefront
  * domain foundation (own-scope management + public read через PublicCatalogService).
+ *
+ * Step 1.8A: ServiceUnitsController/ServiceUnitService — Seller Commercial /
+ * Service Unit foundation (DD-025): own-scope управление юнитами внутри Product,
+ * Catalog publication authority (catalog.service_unit.publish), import identity.
  */
 @Module({
-  controllers: [CatalogController, ModerationController, PublicCatalogController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController],
+  controllers: [CatalogController, ModerationController, PublicCatalogController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController],
   providers: [
     CatalogService,
     CatalogAccessPolicy,
@@ -58,8 +64,9 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
     StorefrontService,
     StorefrontBehavioralService,
     MarketplaceBehavioralService,
+    ServiceUnitService,
     { provide: "ObjectStorageService", useClass: S3ObjectStorageService },
   ],
-  exports: [CatalogService, CatalogAccessPolicy, ProductMediaService, PublicSellerProfileService, "ObjectStorageService"],
+  exports: [CatalogService, CatalogAccessPolicy, ProductMediaService, PublicSellerProfileService, ServiceUnitService, "ObjectStorageService"],
 })
 export class CatalogModule {}

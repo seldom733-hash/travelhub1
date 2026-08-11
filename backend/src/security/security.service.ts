@@ -406,6 +406,7 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "catalog.product.update_own_draft": "Редактирование собственного draft Product (PARTNER)",
   "catalog.product.read_own": "Чтение собственных продуктов (PARTNER)",
   "catalog.product.channels_own": "Управление каналами публикации собственного Product (own-scope)",
+  "catalog.service_unit.publish": "Публикация/архивация Service Unit (Catalog publication authority, гейт: Product PUBLISHED)",
   "catalog.category.write": "Управление категориями",
   "catalog.category_schema.read": "Чтение Category Schema (конфигурации категорий)",
   "catalog.category_schema.write": "Управление Category Schema (только ADMIN)",
