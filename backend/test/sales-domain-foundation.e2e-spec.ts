@@ -44,6 +44,7 @@ describe("Phase 2 Step 2.1 — Sales Domain Foundation (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let adminAgent: ReturnType<typeof request.agent>;
+  let salesBeforeBoot: { leads: number; opportunities: number; quotes: number; sales: number };
 
   const stamp = Date.now();
   const created: {
@@ -96,8 +97,19 @@ describe("Phase 2 Step 2.1 — Sales Domain Foundation (e2e)", () => {
     app.setGlobalPrefix("api/v1");
     app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
     app.useGlobalFilters(new AppExceptionFilter());
+    // §invariant: boot не создаёт Sales-сущности (нет startup backfill).
+    // Проверяем ДЕЛЬТОЙ (count до boot vs после), а не абсолютным нулём:
+    // e2e-БД общая, другие спеки могут легально оставить Sales-строки, а порядок
+    // запуска спеков на Windows нестабилен — абсолютный 0 был бы транзиентным
+    // флейком того же класса, что communication.e2e (727/728).
+    prisma = moduleRef.get(PrismaService);
+    salesBeforeBoot = {
+      leads: await prisma.lead.count(),
+      opportunities: await prisma.opportunity.count(),
+      quotes: await prisma.quote.count(),
+      sales: await prisma.sale.count(),
+    };
     await app.init();
-    prisma = app.get(PrismaService);
 
     const admin = await login("admin", "admin123");
     adminAgent = agent(admin.accessToken);
@@ -124,15 +136,16 @@ describe("Phase 2 Step 2.1 — Sales Domain Foundation (e2e)", () => {
 
   // ── 1. Auth gate + no startup backfill ─────────────────────────────────────
 
-  it("1. anonymous /api/v1/sales/* → 401; нет startup backfill (count==0 после boot)", async () => {
+  it("1. anonymous /api/v1/sales/* → 401; нет startup backfill (count не растёт при boot)", async () => {
     for (const p of ["leads", "opportunities", "quotes", "sales"]) {
       await request(app.getHttpServer()).get(`/api/v1/sales/${p}`).expect(401);
       await request(app.getHttpServer()).post(`/api/v1/sales/${p}`).send({}).expect(401);
     }
-    expect(await prisma.lead.count()).toBe(0);
-    expect(await prisma.opportunity.count()).toBe(0);
-    expect(await prisma.quote.count()).toBe(0);
-    expect(await prisma.sale.count()).toBe(0);
+    // ДЕЛЬТА (до boot vs сейчас), а не абсолютный 0 — см. beforeAll.
+    expect(await prisma.lead.count()).toBe(salesBeforeBoot.leads);
+    expect(await prisma.opportunity.count()).toBe(salesBeforeBoot.opportunities);
+    expect(await prisma.quote.count()).toBe(salesBeforeBoot.quotes);
+    expect(await prisma.sale.count()).toBe(salesBeforeBoot.sales);
   });
 
   // ── 2-5. Create + canonical prefixes + DTO whitelist + relations ───────────

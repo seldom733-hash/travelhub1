@@ -108,6 +108,15 @@ describe("Phase 2 Step 2.2 — Sales Center Backend (e2e)", () => {
     await app.init();
     prisma = app.get(PrismaService);
 
+    // KPI zero-state (тест 1) требует пустых Sales-таблиц независимо от порядка
+    // запуска спеков на Windows. Гарантируем чистоту сами (каскады удалят
+    // history/items/travelers), а не полагаемся на «предыдущие спеки чистят за
+    // собой» — это устраняет транзиентный флейк класса communication.e2e (727/728).
+    await prisma.sale.deleteMany();
+    await prisma.quote.deleteMany();
+    await prisma.opportunity.deleteMany();
+    await prisma.lead.deleteMany();
+
     const admin = await login("admin", "admin123");
     adminAgent = agent(admin.accessToken);
   });
@@ -137,7 +146,7 @@ describe("Phase 2 Step 2.2 — Sales Center Backend (e2e)", () => {
     }
     await request(app.getHttpServer()).post("/api/v1/sales/leads/LED-00000001/assign").send({ assignedToId: "x" }).expect(401);
 
-    // Sales-таблицы пусты (предыдущие спеки чистят за собой) → KPI-нули.
+    // Sales-таблицы очищены в beforeAll → KPI-нули (детерминированно).
     expect(await prisma.lead.count()).toBe(0);
     const sm = await createStaff("sc_zero", RoleCode.SALES_MANAGER);
     const kpi = (await agent(sm.accessToken).get("/api/v1/sales/center/kpi").expect(200)).body as {
