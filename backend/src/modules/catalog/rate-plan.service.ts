@@ -7,6 +7,7 @@ import { ConflictError, NotFoundError, ValidationDomainError } from "../../share
 import { CatalogAccessPolicy } from "./catalog-access.policy";
 import { RoleCode } from "../../generated/prisma/enums";
 import type { AuthUser } from "../../security/auth/auth.service";
+import { baseRestrictionKeysToTypes } from "./restriction.validation";
 import {
   validateCurrency,
   validateInclusions,
@@ -195,6 +196,46 @@ export class RatePlanService {
     }
   }
 
+  /** Категорийный гейт base restriction-метаданных (1.8D §13): объявленный
+   * allowlist → только member-типы; unsupported key → 422 fail loudly. */
+  private async assertRestrictionsCategoryAllowed(
+    tx: Prisma.TransactionClient,
+    categoryId: string | null,
+    restrictions: Record<string, unknown>,
+    productCode: string,
+  ): Promise<void> {
+    const allowed = await this.allowedRestrictionTypes(tx, categoryId);
+    if (!allowed) return;
+    const types = baseRestrictionKeysToTypes(Object.keys(restrictions));
+    for (const t of types) {
+      if (!allowed.includes(t)) {
+        throw new ValidationDomainError(
+          `Restriction dimension ${t} is not supported by category ${productCode}; supported: ${allowed.join(", ")}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Категорийный allowlist restriction-типов (Step 1.8D §13, DD-028):
+   * CategorySchema.tariffRules.allowedRestrictions (ACTIVE схема категории).
+   * Legacy-safe: необъявленный/пустой allowlist = все типы разрешены (существующие
+   * данные и категории без схемы НЕ ломаются); объявленный непустой список —
+   * только member-типы (unsupported dimension → 422 fail loudly).
+   */
+  async allowedRestrictionTypes(tx: Prisma.TransactionClient, categoryId: string | null): Promise<string[] | null> {
+    if (!categoryId) return null;
+    const schema = await tx.categorySchema.findFirst({
+      where: { categoryId, status: "ACTIVE" },
+      orderBy: { version: "desc" },
+      select: { tariffRules: true },
+    });
+    const rules = (schema?.tariffRules ?? null) as { allowedRestrictions?: unknown } | null;
+    if (!rules || !Array.isArray(rules.allowedRestrictions)) return null;
+    const types = rules.allowedRestrictions.filter((t): t is string => typeof t === "string");
+    return types.length > 0 ? types : null;
+  }
+
   private toView(row: {
     id: string;
     code: string;
@@ -282,6 +323,9 @@ export class RatePlanService {
         });
       }
       await this.assertBasisAllowed(tx, product.categoryId, priceBasis);
+      if (restrictions) {
+        await this.assertRestrictionsCategoryAllowed(tx, product.categoryId, restrictions, product.code);
+      }
 
       const code = await this.ids.nextCode(tx, "TRF");
       const created = await tx.tariff.create({
@@ -420,6 +464,9 @@ export class RatePlanService {
       }
       if (input.restrictions !== undefined) {
         const restrictions = validateRestrictions(input.restrictions);
+        if (restrictions) {
+          await this.assertRestrictionsCategoryAllowed(tx, tariff.product.categoryId, restrictions, tariff.product.code);
+        }
         next.restrictions = restrictions ? toJson(restrictions) : Prisma.DbNull;
       }
       if (input.validFrom !== undefined || input.validTo !== undefined) {

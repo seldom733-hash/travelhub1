@@ -1,5 +1,6 @@
 import { ValidationDomainError } from "../../shared/errors";
 import { PRICE_BASIS_VALUES } from "./rate-plan.validation";
+import { RESTRICTION_TYPE_VALUES } from "./restriction.validation";
 
 /**
  * Category Schema foundation (Step 1.1) — чистые функции валидации.
@@ -180,6 +181,23 @@ export function validateSchemaConfig(input: unknown): CategorySchemaConfig {
       );
     }
     tariff.allowedBases = [...new Set(tariff.allowedBases)] as unknown as Record<string, unknown>;
+  }
+
+  // Step 1.8D §13 (DD-028): category-driven commercial restriction allowlist.
+  // tariffRules.allowedRestrictions — валидные CommercialRestrictionType для
+  // Rate Plans этой категории (не все категории поддерживают все dimensions).
+  // Legacy-safe: необъявленный/пустой allowlist = все типы разрешены.
+  if (tariff && tariff.allowedRestrictions !== undefined) {
+    if (
+      !Array.isArray(tariff.allowedRestrictions) ||
+      tariff.allowedRestrictions.length === 0 ||
+      tariff.allowedRestrictions.some((t) => typeof t !== "string" || !(RESTRICTION_TYPE_VALUES as readonly string[]).includes(t))
+    ) {
+      throw new ValidationDomainError(
+        `tariffRules.allowedRestrictions must be a non-empty array of valid restriction types: ${RESTRICTION_TYPE_VALUES.join(", ")}`,
+      );
+    }
+    tariff.allowedRestrictions = [...new Set(tariff.allowedRestrictions)] as unknown as Record<string, unknown>;
   }
 
   return {

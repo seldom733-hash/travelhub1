@@ -186,6 +186,47 @@ enum CommercialPeriodKind {
   @@schema("catalog")
 }
 
+/// Scope коммерческого ограничения (Step 1.8D §6):
+///  - PERIOD — привязано к конкретному CommercialPeriod (restriction «едет» на
+///    resolved period: специфичность наследуется от периода 1.8C, НЕ своя);
+///  - DATE — точная сервисная дата (startDate == endDate, date-only UTC).
+/// Tariff-base факты живут в Tariff.restrictions (1.8B) — отдельного TARIFF-
+/// scope в этом entity НЕТ (единый authority на каждом уровне).
+enum CommercialRestrictionScope {
+  PERIOD
+  DATE
+
+  @@schema("catalog")
+}
+
+/// Тип коммерческого ограничения (Step 1.8D §5, минимальный типизированный
+/// набор; расширяется аддитивно):
+///  - STOP_SELL — даты не продаются (price/availability НЕ трогаются); DATE-only;
+///  - MIN_STAY — минимальная длительность услуги (service-days; категория
+///    проецирует как ночи для accommodation);
+///  - ADVANCE_BOOKING — минимальный lead time (date-only дни, UTC);
+///  - CLOSED_TO_ARRIVAL — запрет заезда/начала в даты;
+///  - CLOSED_TO_DEPARTURE — запрет выезда/окончания в даты.
+enum CommercialRestrictionType {
+  STOP_SELL
+  MIN_STAY
+  ADVANCE_BOOKING
+  CLOSED_TO_ARRIVAL
+  CLOSED_TO_DEPARTURE
+
+  @@schema("catalog")
+}
+
+/// Soft lifecycle коммерческого ограничения (как Tariff/Period): ACTIVE —
+/// действует; ARCHIVED — снято (resolver игнорирует; delete-safety — history
+/// Restrict; физическое удаление запрещено).
+enum CommercialRestrictionStatus {
+  ACTIVE
+  ARCHIVED
+
+  @@schema("catalog")
+}
+
 enum ProductType {
   TOUR
   HOTEL
@@ -451,6 +492,7 @@ model Tariff {
 
   history TariffHistory[]
   periods CommercialPeriod[]
+  commercialRestrictions CommercialRestriction[]
 
   @@index([productId])
   @@index([serviceUnitId])
@@ -504,6 +546,7 @@ model CommercialPeriod {
   updatedAt DateTime @updatedAt
 
   history CommercialPeriodHistory[]
+  restrictions CommercialRestriction[]
 
   @@index([tariffId, status])
   @@schema("catalog")
@@ -527,6 +570,85 @@ model CommercialPeriodHistory {
   createdAt DateTime @default(now())
 
   @@index([periodId])
+  @@schema("catalog")
+}
+
+/// PHASE 1 STEP 1.8D — CommercialRestriction (CRS-*): типизированное
+/// коммерческое ограничение/override Rate Plan (Catalog owner, DD-026/DD-028).
+///
+/// Канонический граф: Product → ServiceUnit → Tariff → CommercialPeriod →
+/// CommercialRestriction. Три роли (НЕ три authority):
+///  - base факты — Tariff.restrictions (1.8B, whitelist-валидированный);
+///  - period-scoped override — restriction на CommercialPeriod (scope PERIOD);
+///  - date-scoped override — restriction на точную дату (scope DATE).
+///
+/// Precedence (детерминированный, §7): DATE (1) > PERIOD-attached к resolved
+/// period (2) > base Tariff.restrictions (3). createdAt/порядок строк НЕ
+/// precedence; same-priority contradiction на write → 422 (как 1.8C overlap).
+///
+/// - STOP_SELL — DATE-scope only (period stop-sell = CommercialPeriod.sellable,
+///   1.8C authority — не дублируется);
+/// - MIN_STAY/ADVANCE_BOOKING — value = положительное число;
+/// - CLOSED_TO_ARRIVAL/DEPARTURE — presence = блок (value NULL);
+/// - ownership: tariffId server-derived; partnerId наследуется через Product
+///   (CatalogAccessPolicy); PARTNER — own-scope, коммерческие правки под DRAFT;
+/// - lifecycle soft ACTIVE/ARCHIVED; version-CAS; advisory lock на Tariff;
+/// - history Restrict — delete-safety, физическое удаление запрещено;
+/// - НЕ inventory-счётчик, НЕ price-строка, НЕ второй pricing/availability
+///   engine; time-slot/timezone — гейт 2.8A.
+model CommercialRestriction {
+  id   String @id @default(uuid())
+  code String @unique // CRS-00000001
+
+  tariffId String
+  tariff   Tariff @relation(fields: [tariffId], references: [id], onDelete: Cascade)
+
+  scope CommercialRestrictionScope
+  /// PERIOD-scope: обязательная ссылка на CommercialPeriod (ownership
+  /// наследуется через Tariff; сервер валидирует принадлежность + ACTIVE).
+  commercialPeriodId String?
+  commercialPeriod   CommercialPeriod? @relation(fields: [commercialPeriodId], references: [id], onDelete: Cascade)
+  /// DATE-scope: точная дата (startDate == endDate, date-only UTC).
+  startDate DateTime?
+  endDate   DateTime?
+
+  type  CommercialRestrictionType
+  /// MIN_STAY/ADVANCE_BOOKING — значение; STOP_SELL/CTA/CTD — NULL (presence).
+  value Int?
+
+  status    CommercialRestrictionStatus @default(ACTIVE)
+  version   Int                         @default(1)
+  createdById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+  archivedAt DateTime?
+
+  history CommercialRestrictionHistory[]
+
+  @@index([tariffId, status])
+  @@index([commercialPeriodId])
+  @@index([type, status])
+  @@schema("catalog")
+}
+
+/// Журнал аудита CommercialRestriction (audit by default; onDelete Restrict —
+/// физическое удаление restriction с историей запрещено; lifecycle = soft
+/// archive, как TariffHistory/CommercialPeriodHistory).
+model CommercialRestrictionHistory {
+  id   String @id @default(uuid())
+  restrictionId String
+  restriction   CommercialRestriction @relation(fields: [restrictionId], references: [id], onDelete: Restrict)
+  version Int
+  action  String
+  from    String?
+  to      String?
+  fields  Json?
+  actorId String?
+  actorName String?
+  comment String?
+  createdAt DateTime @default(now())
+
+  @@index([restrictionId])
   @@schema("catalog")
 }
 
@@ -2761,6 +2883,11 @@ model QuoteItem {
   currency String @default("USD")
   /// Сумма строки = unitPrice * quantity (backend, Decimal, без JS float).
   amount Decimal @db.Decimal(12, 2)
+  /// Step 1.8D: провенанс применённых коммерческих ограничений на момент
+  /// binding (Quote ISSUE) — [{type, value, source, code}]. Frozen documentary
+  /// snapshot, НЕ re-validated после ISSUE (canonical freeze, 1.8C §44).
+  /// NULL — legacy/base snapshot без даты (ограничения не оценивались).
+  restrictionSnapshot Json?
 
   createdAt DateTime @default(now())
 

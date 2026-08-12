@@ -22,6 +22,8 @@ import { RatePlansController } from "./rate-plans.controller";
 import { RatePlanService } from "./rate-plan.service";
 import { CommercialPeriodsController } from "./commercial-periods.controller";
 import { CommercialPeriodService } from "./commercial-period.service";
+import { CommercialRestrictionsController } from "./commercial-restrictions.controller";
+import { CommercialRestrictionService } from "./commercial-restriction.service";
 import { StorefrontBehavioralController } from "./behavioral/storefront-behavioral.controller";
 import { StorefrontBehavioralService } from "./behavioral/storefront-behavioral.service";
 import { MarketplaceBehavioralController } from "./behavioral/marketplace-behavioral.controller";
@@ -66,7 +68,7 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
  * soft lifecycle; валюта наследуется из Tariff; POR без числовых периодов.
  */
 @Module({
-  controllers: [CatalogController, ModerationController, PublicCatalogController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController],
+  controllers: [CatalogController, ModerationController, PublicCatalogController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController, CommercialRestrictionsController],
   providers: [
     CatalogService,
     CatalogAccessPolicy,
@@ -83,6 +85,7 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
     ServiceUnitService,
     RatePlanService,
     CommercialPeriodService,
+    CommercialRestrictionService,
     { provide: "ObjectStorageService", useClass: S3ObjectStorageService },
   ],
   exports: [CatalogService, CatalogAccessPolicy, ProductMediaService, PublicSellerProfileService, ServiceUnitService, RatePlanService, "ObjectStorageService"],

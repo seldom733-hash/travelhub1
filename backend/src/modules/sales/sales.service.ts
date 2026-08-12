@@ -9,6 +9,7 @@ import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type OrderRequestedPayload } from "../../eventbus/domain-events";
 import { CatalogService } from "../catalog/catalog.service";
 import { resolveApplicablePeriod, type PeriodRow } from "../catalog/period-resolution";
+import { evaluateRestrictions, type AppliedRestriction, type RestrictionRow } from "../catalog/restriction-evaluation";
 import { Prisma } from "../../generated/prisma/client";
 import {
   CheckoutStatus,
@@ -68,6 +69,7 @@ import type {
   OpportunityDto,
   QuoteDetailDto,
   QuoteDto,
+  QuoteItemDto,
 } from "./sales.contracts";
 
 const PAGE_SIZE_MAX = 50;
@@ -496,7 +498,7 @@ export class SalesService {
 
   async addQuoteItem(
     code: string,
-    input: { productId: string; tariffId: string; quantity: number; serviceDate?: string },
+    input: { productId: string; tariffId: string; quantity: number; serviceDate?: string; durationDays?: number },
     actor: Actor,
   ): Promise<QuoteDetailDto> {
     const row = await this.prisma.quote.findUnique({ where: { code } });
@@ -504,8 +506,11 @@ export class SalesService {
     assertQuoteComposable(row.status);
     // Step 1.8C: опциональная сервисная дата (date-only) → периодная цена
     // резолвится server-side на дату; без даты — base fallback (legacy).
+    // Step 1.8D: опциональный durationDays (1..365) — вход restriction-оценки
+    // (min/max-stay, CTD); server-валидирован, НЕ используется для пересчёта цены.
     const serviceDate = input.serviceDate ? parseServiceDate(input.serviceDate) : null;
-    const snap = await this.resolveEligibleTariff(input.productId, input.tariffId, serviceDate);
+    const durationDays = input.durationDays ?? null;
+    const snap = await this.resolveEligibleTariff(input.productId, input.tariffId, serviceDate, durationDays);
     const amount = lineAmount(snap.price, input.quantity);
 
     await this.prisma.$transaction(async (tx) => {
@@ -531,6 +536,9 @@ export class SalesService {
           unitPrice: snap.price,
           currency: snap.currency,
           amount,
+          // Step 1.8D: провенанс применённых restriction-фактов на момент binding
+          // (frozen documentary snapshot; НЕ re-validated после ISSUE).
+          restrictionSnapshot: snap.restrictions.length > 0 ? (snap.restrictions as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
         },
       });
       // Первый item фиксирует валюту КП.
@@ -1787,6 +1795,7 @@ export class SalesService {
       unitPrice: Prisma.Decimal;
       currency: string;
       amount: Prisma.Decimal;
+      restrictionSnapshot: Prisma.JsonValue | null;
     }>;
     travelers: Array<{ id: string; firstName: string; lastName: string; birthDate: Date | null }>;
   }): QuoteDetailDto {
@@ -1818,6 +1827,8 @@ export class SalesService {
         unitPrice: String(i.unitPrice),
         currency: i.currency,
         amount: String(i.amount),
+        // Step 1.8D: провенанс restriction-фактов (frozen на binding); null — legacy.
+        restrictionSnapshot: (i.restrictionSnapshot ?? null) as unknown as QuoteItemDto["restrictionSnapshot"],
       })),
       travelers: row.travelers.map((t) => ({
         id: t.id,
@@ -1874,11 +1885,15 @@ export class SalesService {
    * Step 2.3 eligibility (server-side, read-only): Product существует и не
    * ARCHIVED; Tariff существует и принадлежит Product; tariff validity window
    * (если задан) покрывает текущий момент. Без capacity reservation/locking.
+   * Step 1.8C: периодная цена на сервисную дату (DD-026). Step 1.8D: единый
+   * restriction evaluator (BASE/PERIOD/DATE) — non-sellable контекст → 422;
+   * без даты — base (legacy Quote flow без изменений, ограничения не оцениваются).
    */
   private async resolveEligibleTariff(
     productId: string,
     tariffId: string,
     serviceDate?: Date | null,
+    durationDays?: number | null,
   ): Promise<{
     productCode: string;
     productTitle: string;
@@ -1887,6 +1902,7 @@ export class SalesService {
     price: Prisma.Decimal;
     currency: string;
     periodSource: "PERIOD" | "DATE_OVERRIDE" | "BASE" | null;
+    restrictions: AppliedRestriction[];
   }> {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
@@ -1898,7 +1914,7 @@ export class SalesService {
     }
     const tariff = await this.prisma.tariff.findUnique({
       where: { id: tariffId },
-      select: { id: true, code: true, name: true, price: true, currency: true, productId: true, validFrom: true, validTo: true, status: true, pricingMode: true },
+      select: { id: true, code: true, name: true, price: true, currency: true, productId: true, validFrom: true, validTo: true, status: true, pricingMode: true, restrictions: true },
     });
     if (!tariff) throw new ValidationDomainError(`Tariff ${tariffId} does not exist`);
     if (tariff.productId !== productId) {
@@ -1924,39 +1940,42 @@ export class SalesService {
       throw new ValidationDomainError(`Tariff ${tariff.code} has expired`);
     }
 
-    // Step 1.8C: детерминированная периодная цена на сервисную дату (DD-026).
-    // Период price authoritative → base FIXED fallback; stop-sell период → 422;
-    // без даты — base (legacy Quote flow без изменений).
+    // Step 1.8C/1.8D: date-aware path (периодная цена + restriction evaluation).
     if (serviceDate) {
       const periods = (await this.prisma.commercialPeriod.findMany({
         where: { tariffId, status: "ACTIVE" },
         orderBy: { createdAt: "asc" },
       })) as unknown as PeriodRow[];
       const winner = resolveApplicablePeriod(periods, serviceDate);
-      if (winner) {
-        if (!winner.sellable) {
-          throw new ValidationDomainError(
-            `Tariff ${tariff.code} is not sellable for ${serviceDate.toISOString().slice(0, 10)} (period stop-sell)`,
-          );
-        }
-        return {
-          productCode: product.code,
-          productTitle: product.title,
-          tariffCode: tariff.code,
-          tariffName: tariff.name,
-          price: new Prisma.Decimal(winner.price.toString()),
-          currency: tariff.currency ?? "USD",
-          periodSource: winner.kind,
-        };
+      const rows = (await this.prisma.commercialRestriction.findMany({
+        where: { tariffId, status: "ACTIVE" },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, code: true, scope: true, commercialPeriodId: true, startDate: true, endDate: true, type: true, value: true },
+      })) as unknown as RestrictionRow[];
+      const base = this.baseRestrictionFacts(tariff.restrictions);
+      const evaluation = evaluateRestrictions({
+        serviceDate,
+        durationDays: durationDays ?? null,
+        base,
+        resolvedPeriod: winner
+          ? { id: winner.id, code: winner.code, kind: winner.kind, startDate: winner.startDate, endDate: winner.endDate, sellable: winner.sellable }
+          : null,
+        rows,
+      });
+      if (!evaluation.sellable) {
+        throw new ValidationDomainError(
+          `Tariff ${tariff.code} is not sellable for ${serviceDate.toISOString().slice(0, 10)} (${evaluation.blockedReason})`,
+        );
       }
       return {
         productCode: product.code,
         productTitle: product.title,
         tariffCode: tariff.code,
         tariffName: tariff.name,
-        price: tariff.price,
+        price: winner ? new Prisma.Decimal(winner.price.toString()) : tariff.price,
         currency: tariff.currency ?? "USD",
-        periodSource: "BASE",
+        periodSource: winner ? winner.kind : "BASE",
+        restrictions: evaluation.applied,
       };
     }
 
@@ -1968,6 +1987,28 @@ export class SalesService {
       price: tariff.price,
       currency: tariff.currency ?? "USD",
       periodSource: null,
+      restrictions: [],
+    };
+  }
+
+  /** Base факты из Tariff.restrictions (1.8B whitelist; defensive coercion). */
+  private baseRestrictionFacts(restrictions: Prisma.JsonValue | null): {
+    minStay?: number | null;
+    maxStay?: number | null;
+    advanceBookingDays?: number | null;
+    closedToArrival?: boolean | null;
+    closedToDeparture?: boolean | null;
+  } {
+    const r = (restrictions ?? null) as Record<string, unknown> | null;
+    if (!r) return {};
+    const int = (v: unknown): number | null => (typeof v === "number" && Number.isInteger(v) ? v : null);
+    const bool = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null);
+    return {
+      minStay: int(r.minStay),
+      maxStay: int(r.maxStay),
+      advanceBookingDays: int(r.advanceBookingDays),
+      closedToArrival: bool(r.closedToArrival),
+      closedToDeparture: bool(r.closedToDeparture),
     };
   }
 

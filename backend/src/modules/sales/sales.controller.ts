@@ -284,7 +284,9 @@ class HistoryQueryDto {
 
 /** Step 2.3: добавление строки КП — только refs + quantity (snapshot server-side).
  * Step 1.8C: опциональный serviceDate (date-only) — периодная цена резолвится
- * server-side на дату (иначе base fallback); client НЕ передаёт сумму. */
+ * server-side на дату (иначе base fallback); client НЕ передаёт сумму.
+ * Step 1.8D: опциональный durationDays (1..365) — вход restriction-оценки
+ * (min/max-stay, CTD); сервер-валидирован, цену не пересчитывает. */
 class AddQuoteItemDto {
   @IsString()
   @MaxLength(64)
@@ -302,6 +304,13 @@ class AddQuoteItemDto {
   @IsOptional()
   @IsString()
   serviceDate?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  durationDays?: number;
 }
 
 /** Step 2.3: обновление строки — только quantity. */

@@ -377,6 +377,44 @@ Create/Update-contract:
   без PII/inclusions/restrictions;
 - MODERATOR/BUYER — без прав (403).
 
+## Commercial Period (Step 1.8C — владелец catalog.*, CPR-*, DD-026/DD-027)
+
+```text
+POST   /api/v1/tariffs/:tariffId/commercial-periods           создание (CPR-*, ACTIVE) — PARTNER: catalog.product.update_own_draft (СВОЙ DRAFT); staff/ADMIN: catalog.product.write
+POST   /api/v1/tariffs/:tariffId/commercial-periods/bulk      годовой календарь (all-or-nothing, advisory lock) — те же permissions
+GET    /api/v1/tariffs/:tariffId/commercial-periods           список (?status=ACTIVE|ARCHIVED|ALL, limit/offset) — PARTNER: catalog.product.read_own; staff: catalog.product.read
+GET    /api/v1/commercial-periods/:id                         карточка — PARTNER: catalog.product.read_own; staff: catalog.product.read
+GET    /api/v1/commercial-periods/:id/history                 audit-история — те же permissions
+PATCH  /api/v1/commercial-periods/:id                         правка (version-CAS, 409 на stale) — PARTNER: update_own_draft (DRAFT); staff: catalog.product.write
+POST   /api/v1/commercial-periods/:id/archive                 soft-снятие — catalog.rate_plan.publish (staff/ADMIN)
+POST   /api/v1/commercial-periods/:id/activate                восстановление — catalog.rate_plan.publish (staff/ADMIN)
+```
+
+- kind `PERIOD`/`DATE_OVERRIDE`; date-only inclusive `[startDate, endDate]` (UTC midnight);
+- price Decimal(12,2) в валюте Tariff (наследуется, не передаётся); `sellable=false` = stop-sell периода;
+- precedence: DATE_OVERRIDE > narrower PERIOD > DAY_OF_WEEK > base (same-priority overlap → 422);
+- MODERATOR/BUYER — 403.
+
+## Commercial Restriction (Step 1.8D — владелец catalog.*, CRS-*, DD-026/DD-028)
+
+```text
+POST   /api/v1/tariffs/:tariffId/commercial-restrictions      создание (CRS-*, ACTIVE) — PARTNER: catalog.product.update_own_draft (СВОЙ DRAFT); staff/ADMIN: catalog.product.write
+GET    /api/v1/tariffs/:tariffId/commercial-restrictions      список (?status=ACTIVE|ARCHIVED|ALL, limit/offset) — PARTNER: catalog.product.read_own; staff: catalog.product.read
+GET    /api/v1/commercial-restrictions/:id                    карточка — PARTNER: catalog.product.read_own; staff: catalog.product.read
+GET    /api/v1/commercial-restrictions/:id/history            audit-история — те же permissions
+PATCH  /api/v1/commercial-restrictions/:id                    правка (version-CAS, 409 на stale) — PARTNER: update_own_draft (DRAFT); staff: catalog.product.write
+POST   /api/v1/commercial-restrictions/:id/archive            soft-снятие — catalog.rate_plan.publish (staff/ADMIN)
+POST   /api/v1/commercial-restrictions/:id/activate           восстановление — catalog.rate_plan.publish (staff/ADMIN)
+```
+
+- body: `scope` PERIOD|DATE, `type` STOP_SELL|MIN_STAY|ADVANCE_BOOKING|CLOSED_TO_ARRIVAL|CLOSED_TO_DEPARTURE, `value` (MIN_STAY 1..365, ADVANCE_BOOKING 0..365), `commercialPeriodId` (PERIOD-scope), `startDate==endDate` (DATE-scope);
+- base-факты живут в `Tariff.restrictions` (1.8B) — единый authority на уровне; TARIFF-scope в entity запрещён;
+- precedence: DATE > PERIOD-attached (resolved period 1.8C) > BASE; same-tier duplicate → 422;
+- STOP_SELL — DATE-scope only (периодный stop-sell = `CommercialPeriod.sellable`);
+- CategorySchema `tariffRules.allowedRestrictions` (DD-028) — unsupported dimension → 422;
+- Quote path: серверный evaluator (pre-binding 422), `QuoteItem.restrictionSnapshot` — frozen provenance;
+- MODERATOR/BUYER — 403.
+
 ## CRM mini (владелец Customer/Contact/Company/Partner/Supplier)
 
 ```text

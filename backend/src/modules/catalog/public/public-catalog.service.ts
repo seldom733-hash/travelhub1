@@ -72,8 +72,13 @@ interface PublicTariffRow {
   validTo: Date | null;
   /** Step 1.8B: FIXED — bindable цена; PRICE_ON_REQUEST — inquiry-only (цена не выводится). */
   pricingMode: string;
-  /** Step 1.8C: ACTIVE + sellable периоды с endDate >= сегодня (priceFrom policy). */
-  periods?: Array<{ price: Prisma.Decimal }>;
+  /** Base restriction-факты Tariff.restrictions (internal — НЕ сериализуются). */
+  restrictions: Prisma.JsonValue | null;
+  /** ACTIVE CommercialRestriction rows (internal — НЕ сериализуются). */
+  commercialRestrictions?: Array<{ scope: string; type: string; commercialPeriodId: string | null; startDate: Date | null; endDate: Date | null; value: number | null }>;
+  /** Step 1.8C/1.8D: ACTIVE + sellable периоды с endDate >= сегодня (priceFrom
+   * policy): исключаются полностью stop-sold и полностью advance-window-периоды. */
+  periods?: Array<{ id: string; startDate: Date; endDate: Date; sellable: boolean; price: Prisma.Decimal }>;
 }
 
 /** Начало сегодняшнего дня (UTC) для period priceFrom policy (не исторические цены). */
@@ -173,11 +178,18 @@ export class PublicCatalogService {
           validFrom: true,
           validTo: true,
           pricingMode: true,
+          restrictions: true,
+          // Step 1.8D: ACTIVE restriction rows (internal — priceFrom eligible-set
+          // policy; НЕ сериализуются в публичный DTO).
+          commercialRestrictions: {
+            where: { status: "ACTIVE" },
+            select: { scope: true, type: true, commercialPeriodId: true, startDate: true, endDate: true, value: true },
+          },
           // Step 1.8C: периодные цены для priceFrom (только ACTIVE + sellable +
           // future/current — «НЕ минимальная историческая цена», Universal §35).
           periods: {
             where: { status: "ACTIVE", sellable: true, endDate: { gte: todayStartUtc() } },
-            select: { price: true },
+            select: { id: true, startDate: true, endDate: true, sellable: true, price: true },
           },
         },
       },
@@ -221,9 +233,14 @@ export class PublicCatalogService {
           validFrom: true,
           validTo: true,
           pricingMode: true,
+          restrictions: true,
+          commercialRestrictions: {
+            where: { status: "ACTIVE" },
+            select: { scope: true, type: true, commercialPeriodId: true, startDate: true, endDate: true, value: true },
+          },
           periods: {
             where: { status: "ACTIVE", sellable: true, endDate: { gte: todayStartUtc() } },
-            select: { price: true },
+            select: { id: true, startDate: true, endDate: true, sellable: true, price: true },
           },
         },
       },
@@ -697,6 +714,27 @@ export class PublicCatalogService {
               AND (t2."serviceUnitId" IS NULL OR EXISTS (
                 SELECT 1 FROM catalog."ServiceUnit" su2
                 WHERE su2."id" = t2."serviceUnitId" AND su2."status" = 'PUBLISHED'))
+              -- Step 1.8D §9.1: период НЕ полностью stop-sold (есть хотя бы
+              -- одна дата без ACTIVE DATE-scope STOP_SELL row).
+              AND NOT EXISTS (
+                SELECT 1 FROM generate_series(cp."startDate"::date, cp."endDate"::date, interval '1 day') d
+                WHERE NOT EXISTS (
+                  SELECT 1 FROM catalog."CommercialRestriction" r
+                  WHERE r."tariffId" = t2."id" AND r."status" = 'ACTIVE' AND r."type" = 'STOP_SELL'
+                    AND r."scope" = 'DATE' AND r."startDate" = d::date AND r."endDate" = d::date
+                )
+              )
+              -- Step 1.8D §9.1: хотя бы одна bindable-сегодня дата (период НЕ
+              -- целиком внутри advance-window; effective = PERIOD-attached
+              -- ADVANCE_BOOKING иначе base advanceBookingDays).
+              AND cp."endDate" >= date_trunc('day', now() AT TIME ZONE 'UTC') + (
+                COALESCE(
+                  (SELECT r2."value" FROM catalog."CommercialRestriction" r2
+                    WHERE r2."tariffId" = t2."id" AND r2."status" = 'ACTIVE'
+                      AND r2."type" = 'ADVANCE_BOOKING' AND r2."scope" = 'PERIOD'
+                      AND r2."commercialPeriodId" = cp."id"),
+                  COALESCE((t2."restrictions"->>'advanceBookingDays')::int, 0)
+                ) * interval '1 day')
         ) AS prices) AS "minPrice"
       FROM catalog."Product" p
       LEFT JOIN catalog."Category" c ON c."id" = p."categoryId"
@@ -854,17 +892,53 @@ export class PublicCatalogService {
   }
 
   /**
-   * Минимальный публичный тариф (priceFrom §11/§43 + Step 1.8C §42 policy):
-   * min по {base FIXED price} ∪ {ACTIVE + sellable периодные цены с endDate >=
-   * сегодня}. Нет bindable цен → null (не 0, не fallback на POR/stop-sell).
-   * Period price policy (Universal §35): «НЕ минимальная историческая цена» —
-   * прошлые периоды не снижают priceFrom; search-horizon — Marketplace (позже).
+   * Минимальный публичный тариф (priceFrom §11/§43 + 1.8C §42 + 1.8D §9.1):
+   * min по bindable-today eligible-set:
+   *  1. base FIXED price — всегда candidate (bindable на будущих датах за
+   *     пределами конечного advance-window);
+   *  2. period price π — candidate iff π.sellable И π.endDate >= сегодня И
+   *     НЕ полностью stop-sold (каждая дата диапазона покрыта ACTIVE
+   *     DATE-scope STOP_SELL row) И имеет хотя бы одну bindable-сегодня дату
+   *     (π.endDate >= сегодня + effectiveAdvance, где effectiveAdvance =
+   *     PERIOD-attached ADVANCE_BOOKING иначе base advanceBookingDays).
+   * Нет bindable цен → null (не 0, не fallback на POR/stop-sell).
+   * Прошлые периоды не снижают priceFrom (Universal §35); search-horizon —
+   * Marketplace (позже). DATE-scope ADVANCE_BOOKING granularity — вне priceFrom
+   * policy (documented: per-date granularity ниже «from N»).
    */
   private minTariff(tariffs: PublicTariffRow[]): { amount: string; currency: string } | null {
     const candidates: Array<{ price: Prisma.Decimal; currency: string }> = [];
+    const today = todayStartUtc().getTime();
+    const DAY_MS = 86_400_000;
     for (const t of tariffs) {
       if (t.pricingMode === "FIXED") candidates.push({ price: t.price, currency: t.currency });
-      for (const p of t.periods ?? []) candidates.push({ price: p.price, currency: t.currency });
+      const base = (t.restrictions ?? null) as { advanceBookingDays?: unknown } | null;
+      const baseAdv = typeof base?.advanceBookingDays === "number" && Number.isInteger(base.advanceBookingDays) ? base.advanceBookingDays : 0;
+      const dateStopSet = new Set<number>(
+        (t.commercialRestrictions ?? [])
+          .filter((r) => r.scope === "DATE" && r.type === "STOP_SELL" && r.startDate)
+          .map((r) => r.startDate!.getTime()),
+      );
+      for (const p of t.periods ?? []) {
+        const attachedAdv =
+          (t.commercialRestrictions ?? []).find(
+            (r) => r.scope === "PERIOD" && r.type === "ADVANCE_BOOKING" && r.commercialPeriodId === p.id,
+          )?.value ?? null;
+        const adv = attachedAdv !== null && attachedAdv !== undefined ? attachedAdv : baseAdv;
+        if (!p.sellable) continue; // (1.8C: уже отфильтровано в include, defensive)
+        if (p.endDate.getTime() < today) continue; // прошлое — не candidate (§35)
+        if (adv > 0 && p.endDate.getTime() < today + adv * DAY_MS) continue; // весь период в advance-window
+        // Полностью stop-sold диапазон → не candidate (рекламировать нечего).
+        let fullyStopped = true;
+        for (let d = p.startDate.getTime(); d <= p.endDate.getTime(); d += DAY_MS) {
+          if (!dateStopSet.has(d)) {
+            fullyStopped = false;
+            break;
+          }
+        }
+        if (fullyStopped) continue;
+        candidates.push({ price: p.price, currency: t.currency });
+      }
     }
     if (candidates.length === 0) return null;
     let best = candidates[0];

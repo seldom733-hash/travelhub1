@@ -82,6 +82,9 @@ export interface QuoteItemDto {
   unitPrice: string;
   currency: string;
   amount: string;
+  /// Step 1.8D: провенанс применённых commercial restrictions на момент binding
+  /// (frozen snapshot; null — legacy/base без даты). Whitelist-форма, без PII.
+  restrictionSnapshot: Array<{ type: string; value: number | null; source: string; code: string | null }> | null;
 }
 
 /** Step 2.3: traveler context (без passport/document/PII-расширения). */

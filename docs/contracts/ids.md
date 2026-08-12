@@ -10,6 +10,7 @@
 | `TRF-` | Tariff / Rate Plan (canonical commercial variant, Step 1.8B) | Catalog |
 | `UNI-` | ServiceUnit (Seller Commercial/Service Unit, Step 1.8A) | Catalog |
 | `CPR-` | CommercialPeriod (date-based period price/availability факт, Step 1.8C) | Catalog |
+| `CRS-` | CommercialRestriction (scoped commercial restriction/override, Step 1.8D) | Catalog |
 | `CUS-` | Customer | CRM |
 | `CNT-` | Contact | CRM |
 | `COM-` | Company | CRM |
