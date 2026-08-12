@@ -218,6 +218,7 @@ Forbidden keys (create/update, 422 loud — raw-body check, не срезанн�
 ## 22. Quote / Checkout / Sale / Reverse compatibility (§35-37)
 
 - **Quote**: legacy flow зелёный (e2e #26) — Quote снапшотит tariff price как раньше; новые поля не ломают snapshot; Quote НЕ зависит от CommercialPeriod; binding semantics не менялись;
+- **STRICT REVIEW §46 — Quote gate (fix)**: `resolveEligibleTariff` (Sales path) теперь проверяет коммерческое состояние Rate Plan — ARCHIVED и PRICE_ON_REQUEST НЕ могут связать числовой Quote (контролируемый 422). ARCHIVED = soft commercial discontinuation (нельзя продолжать продавать); POR = inquiry-only (цена не bindable без явного inquiry→quote flow). Legacy тарифы — ACTIVE/FIXED по default (без регрессии; e2e #26B доказывает POR/ARCHIVED → 422 и новый FIXED план → 201).
 - **Checkout/Sale/OrderRequested**: не затронуты (никакого репрайса; freeze 2.3/2.3A/2.4);
 - **Reverse**: SellerProposal остаётся non-binding; никаких Reverse writes в Rate Plans; capability ≠ Product/Unit/Tariff.
 
@@ -257,7 +258,7 @@ Forbidden keys (create/update, 422 loud — raw-body check, не срезанн�
 ## 27. Tests
 
 - unit: `rate-plan.validation.spec.ts` (name/currency/basis/refundability/pricingMode/Decimal/inclusions/restrictions/validity/forbidden keys) + `category-schema.validation.spec.ts` (allowedBases);
-- e2e: `rate-plan.e2e-spec.ts` — 35 тестов, покрывающие §43 сценарии 1-34 (включая: verbatim name, server identity, foreign Product/ServiceUnit, legacy compat, fixed price без CommercialPeriod, POR явный, zero price, currency immutable, basis allowlist, refundability, inclusions, restrictions, no CommercialPeriod/calendar/availability/reservation/reverse/sales side effects, legacy Quote green, cross-category Hotel/Tour/Transfer/Car Rental, публичность ACTIVE + POR-видимость (§22), unit-eligibility (§42), legacy delete-safety (§52), lost-update CAS (§39), update-vs-archive concurrency + activate, детерминированная пагинация, additive миграция legacy-строк, RBAC);
+- e2e: `rate-plan.e2e-spec.ts` — 36 тестов, покрывающие §43 сценарии 1-34 (включая: verbatim name, server identity, foreign Product/ServiceUnit, legacy compat, fixed price без CommercialPeriod, POR явный, zero price, currency immutable, basis allowlist, refundability, inclusions, restrictions, no CommercialPeriod/calendar/availability/reservation/reverse/sales side effects, legacy Quote green, Quote POR/ARCHIVED gate (§46), cross-category Hotel/Tour/Transfer/Car Rental, публичность ACTIVE + POR-видимость (§22), unit-eligibility (§42), legacy delete-safety (§52), lost-update CAS (§39), update-vs-archive concurrency + activate, детерминированная пагинация, additive миграция legacy-строк, RBAC);
 - полная регрессия: 415 unit + 806 e2e + 135 frontend (vitest) + frontend tsc + build + migrate drift 0.
 
 ---

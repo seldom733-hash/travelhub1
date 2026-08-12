@@ -1870,11 +1870,23 @@ export class SalesService {
     }
     const tariff = await this.prisma.tariff.findUnique({
       where: { id: tariffId },
-      select: { id: true, code: true, name: true, price: true, currency: true, productId: true, validFrom: true, validTo: true },
+      select: { id: true, code: true, name: true, price: true, currency: true, productId: true, validFrom: true, validTo: true, status: true, pricingMode: true },
     });
     if (!tariff) throw new ValidationDomainError(`Tariff ${tariffId} does not exist`);
     if (tariff.productId !== productId) {
       throw new ValidationDomainError(`Tariff ${tariff.code} does not belong to Product ${product.code}`);
+    }
+    // Step 1.8B STRICT REVIEW §46: коммерческое состояние план (Rate Plan)
+    // соблюдается в Quote path — ARCHIVED (soft commercial discontinuation) и
+    // PRICE_ON_REQUEST (inquiry-only, цена не bindable) НЕ могут связать
+    // числовой Quote. Legacy тарифы — ACTIVE/FIXED по default, без регрессии.
+    if (tariff.status === "ARCHIVED") {
+      throw new ValidationDomainError(`Tariff ${tariff.code} is archived and cannot be quoted`);
+    }
+    if (tariff.pricingMode === "PRICE_ON_REQUEST") {
+      throw new ValidationDomainError(
+        `Tariff ${tariff.code} is PRICE_ON_REQUEST (inquiry-only); bind a numeric quote is not allowed without an explicit quote flow`,
+      );
     }
     const now = new Date();
     if (tariff.validFrom && tariff.validFrom > now) {

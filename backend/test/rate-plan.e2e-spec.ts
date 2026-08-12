@@ -549,6 +549,35 @@ describe("Phase 1 Step 1.8B — Tariff → Rate Plan foundation (e2e)", () => {
     expect(detail.items[0].unitPrice).toBe("100");
   });
 
+  it("26B. STRICT REVIEW §46: ARCHIVED и PRICE_ON_REQUEST не связывают числовой Quote; новый FIXED план — bindable", async () => {
+    const product = await createProduct(seller1Agent, `RP26B Hotel ${stamp}`, hotelCatId, { roomType: "standard" });
+    const fixed = await createRatePlan(seller1Agent, product.id, { name: "Bindable FIXED", price: 95, priceBasis: "PER_NIGHT" });
+    const por = await createRatePlan(seller1Agent, product.id, {
+      name: "Inquiry Only",
+      price: 40,
+      pricingMode: "PRICE_ON_REQUEST",
+      priceBasis: "PER_NIGHT",
+    });
+    const toArchive = await createRatePlan(seller1Agent, product.id, { name: "Archived", price: 50, priceBasis: "PER_NIGHT" });
+    await adminAgent.post(`/api/v1/tariffs/${toArchive.id}/archive`).expect(201);
+
+    const quote = (await smAgent.post("/api/v1/sales/quotes").send({}).expect(201)).body as { id: string; code: string };
+    created.quotes.push(quote.id);
+    // POR — inquiry-only: bindable quote запрещён (422, controlled).
+    await smAgent.post(`/api/v1/sales/quotes/${quote.code}/items`).send({ productId: product.id, tariffId: por.id, quantity: 1 }).expect(422);
+    // ARCHIVED — soft commercial discontinuation: bindable quote запрещён (422).
+    await smAgent.post(`/api/v1/sales/quotes/${quote.code}/items`).send({ productId: product.id, tariffId: toArchive.id, quantity: 1 }).expect(422);
+    // Новый FIXED Rate Plan — bindable (base/FIXED price, без resolver).
+    await smAgent.post(`/api/v1/sales/quotes/${quote.code}/items`).send({ productId: product.id, tariffId: fixed.id, quantity: 1 }).expect(201);
+    const detail = (await smAgent.get(`/api/v1/sales/quotes/${quote.code}`).expect(200)).body as { items: Array<{ tariffCode: string; unitPrice: string }> };
+    const fixedItem = detail.items.find((i) => i.tariffCode === fixed.code);
+    expect(fixedItem?.unitPrice).toBe("95");
+    // Чужие (foreign) тарифы по-прежнему запрещены в Quote path.
+    const p2 = await createProduct(seller2Agent, `RP26B2 Hotel ${stamp}`, hotelCatId, { roomType: "standard" });
+    const foreign = await createRatePlan(seller2Agent, p2.id, { name: "Foreign", price: 10, priceBasis: "PER_NIGHT" });
+    await smAgent.post(`/api/v1/sales/quotes/${quote.code}/items`).send({ productId: product.id, tariffId: foreign.id, quantity: 1 }).expect(422);
+  });
+
   // ── 27-30: cross-category ─────────────────────────────────────────────────
 
   it("27-30. cross-category: Hotel + Tour + Transfer + Car Rental Rate Plans", async () => {
