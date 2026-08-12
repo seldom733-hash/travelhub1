@@ -166,6 +166,26 @@ enum RatePlanStatus {
   @@schema("catalog")
 }
 
+/// Soft коммерческое состояние периода (Step 1.8C §45): ACTIVE — действует;
+/// ARCHIVED — коммерчески снят (soft, как RatePlanStatus; resolver игнорирует;
+/// delete-safety — history Restrict, физическое удаление запрещено).
+enum CommercialPeriodStatus {
+  ACTIVE
+  ARCHIVED
+
+  @@schema("catalog")
+}
+
+/// Коммерческий вид периода (Step 1.8C §12/§13, DD-026 §3.6):
+///  - PERIOD — сезонный/явный диапазон (narrower выигрывает у более широкого);
+///  - DATE_OVERRIDE — точная дата (startDate == endDate), самый высокий приоритет.
+enum CommercialPeriodKind {
+  PERIOD
+  DATE_OVERRIDE
+
+  @@schema("catalog")
+}
+
 enum ProductType {
   TOUR
   HOTEL
@@ -430,12 +450,86 @@ model Tariff {
   updatedAt DateTime @updatedAt @default(now())
 
   history TariffHistory[]
+  periods CommercialPeriod[]
 
   @@index([productId])
   @@index([serviceUnitId])
   @@index([status])
   @@schema("catalog")
 }
+
+/// PHASE 1 STEP 1.8C — CommercialPeriod (period pricing & period availability
+/// foundation; DD-026/DD-027, Universal Pricing §1/§5/§30).
+///
+/// Bounded service-date commercial rule под canonical Rate Plan (Tariff):
+///  - kind: PERIOD (сезонный/явный диапазон) | DATE_OVERRIDE (точная дата);
+///  - date-only inclusive range: startDate <= serviceDate <= endDate
+///    (midnight-UTC, date-only семантика; time-slot/departure — гейт 2.8A);
+///  - dayOfWeek — условие ВНУТРИ периода (DD-026 §3.6): период с условием
+///    специфичнее «голого» периода того же диапазона; НЕ отдельный слой;
+///  - price: периодная цена (bindable при FIXED; POR-планы НЕ могут иметь
+///    числовые period price — §35); валюта наследуется из Tariff (одна
+///    canonical валюта на Rate Plan, §10 — НЕ дублируется здесь);
+///  - sellable: period availability факт (price ≠ availability; stop-sell ≠
+///    удаление цены; канонический inventory — Availability/Reservation, §19);
+///  - precedence (DD-026): DATE_OVERRIDE > PERIOD (уже диапазон выигрывает) >
+///    DAY_OF_WEEK-условие > сезон/base PERIOD > FIXED base; overlapping
+///    same-priority → 422 на write;
+///  - lifecycle: soft ACTIVE/ARCHIVED (как Tariff); физическое удаление
+///    заблокировано (history Restrict — delete-safety §45);
+///  - version-CAS (lost-update §47); audit: CommercialPeriodHistory + Security.
+model CommercialPeriod {
+  id   String @id @default(uuid())
+  code String @unique // CPR-00000001
+
+  tariffId String
+  tariff   Tariff @relation(fields: [tariffId], references: [id], onDelete: Cascade)
+
+  kind      CommercialPeriodKind @default(PERIOD)
+  startDate DateTime
+  endDate   DateTime
+  /// Условие внутри периода: 0=Sunday..6=Saturday (JS getUTCDay-совместимо).
+  /// Пустой массив = bare период (без условия).
+  dayOfWeek Int[]
+  /// Периодная цена (Decimal(12,2), наследует валюту Tariff).
+  price Decimal @db.Decimal(12, 2)
+  /// Периодная sellability (stop-sell): false = даты периода не продаются.
+  sellable Boolean @default(true)
+  /// Soft commercial lifecycle (как Tariff): ACTIVE — действует, ARCHIVED —
+  /// коммерчески снят (resolver игнорирует; данные/история сохраняются).
+  status CommercialPeriodStatus @default(ACTIVE)
+
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  history CommercialPeriodHistory[]
+
+  @@index([tariffId, status])
+  @@schema("catalog")
+}
+
+/// Журнал аудита CommercialPeriod (audit by default). onDelete Restrict —
+/// физическое удаление периода с аудит-историей запрещено (lifecycle = soft
+/// archive; delete-safety, как TariffHistory §52).
+model CommercialPeriodHistory {
+  id       String @id @default(uuid())
+  periodId String
+  period   CommercialPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  version  Int
+  action   String
+  from     String?
+  to       String?
+  fields   Json?
+  actorId  String?
+  actorName String?
+  comment  String?
+  createdAt DateTime @default(now())
+
+  @@index([periodId])
+  @@schema("catalog")
+}
+
 
 /// Журнал аудита Rate Plan (audit by default; без dump inclusions/restrictions в
 /// security audit — только refs и lifecycle/коммерческие transition-факты).
@@ -2656,6 +2750,11 @@ model QuoteItem {
 
   /// Количество/участники (>= 1).
   quantity Int @default(1)
+  /// Step 1.8C: сервисная дата, на которую резолвлена unitPrice (date-only UTC
+  /// midnight). NULL — legacy/base snapshot без даты. Snapshot для provenance
+  /// (STRICT REVIEW §41: amount/currency/serviceDate/tariff ref); НЕ изменяется
+  /// при reprice — frozen commercial fact.
+  serviceDate DateTime?
   /// Snapshot unit price из Catalog Tariff (Decimal(12,2), backend-authoritative).
   unitPrice Decimal @db.Decimal(12, 2)
   /// Валюта тарифа (единая для КП).

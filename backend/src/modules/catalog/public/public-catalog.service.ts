@@ -72,6 +72,14 @@ interface PublicTariffRow {
   validTo: Date | null;
   /** Step 1.8B: FIXED — bindable цена; PRICE_ON_REQUEST — inquiry-only (цена не выводится). */
   pricingMode: string;
+  /** Step 1.8C: ACTIVE + sellable периоды с endDate >= сегодня (priceFrom policy). */
+  periods?: Array<{ price: Prisma.Decimal }>;
+}
+
+/** Начало сегодняшнего дня (UTC) для period priceFrom policy (не исторические цены). */
+function todayStartUtc(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
 interface PublicProductRow {
@@ -157,7 +165,21 @@ export class PublicCatalogService {
           status: "ACTIVE",
           OR: [{ serviceUnitId: null }, { serviceUnit: { status: "PUBLISHED" } }],
         },
-        select: { id: true, name: true, price: true, currency: true, validFrom: true, validTo: true, pricingMode: true },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          currency: true,
+          validFrom: true,
+          validTo: true,
+          pricingMode: true,
+          // Step 1.8C: периодные цены для priceFrom (только ACTIVE + sellable +
+          // future/current — «НЕ минимальная историческая цена», Universal §35).
+          periods: {
+            where: { status: "ACTIVE", sellable: true, endDate: { gte: todayStartUtc() } },
+            select: { price: true },
+          },
+        },
       },
       media: {
         where: { status: "PUBLISHED" },
@@ -191,7 +213,19 @@ export class PublicCatalogService {
           status: "ACTIVE",
           OR: [{ serviceUnitId: null }, { serviceUnit: { status: "PUBLISHED" } }],
         },
-        select: { id: true, name: true, price: true, currency: true, validFrom: true, validTo: true, pricingMode: true },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          currency: true,
+          validFrom: true,
+          validTo: true,
+          pricingMode: true,
+          periods: {
+            where: { status: "ACTIVE", sellable: true, endDate: { gte: todayStartUtc() } },
+            select: { price: true },
+          },
+        },
       },
       availability: { orderBy: { date: "asc" }, take: 60, select: { date: true, slotsTotal: true, slotsBooked: true, slotsReserved: true } },
     } satisfies Prisma.ProductInclude;
@@ -648,11 +682,22 @@ export class PublicCatalogService {
     // и исключает POR (inquiry-only, не bindable).
     const base = Prisma.sql`
       SELECT p."id", p."publishedAt", p."createdAt",
-        (SELECT min(t."price") FROM catalog."Tariff" t
-          WHERE t."productId" = p."id" AND t."status" = 'ACTIVE' AND t."pricingMode" = 'FIXED'
-            AND (t."serviceUnitId" IS NULL OR EXISTS (
-              SELECT 1 FROM catalog."ServiceUnit" su
-              WHERE su."id" = t."serviceUnitId" AND su."status" = 'PUBLISHED'))) AS "minPrice"
+        (SELECT min(x) FROM (
+          SELECT t."price" AS x FROM catalog."Tariff" t
+            WHERE t."productId" = p."id" AND t."status" = 'ACTIVE' AND t."pricingMode" = 'FIXED'
+              AND (t."serviceUnitId" IS NULL OR EXISTS (
+                SELECT 1 FROM catalog."ServiceUnit" su
+                WHERE su."id" = t."serviceUnitId" AND su."status" = 'PUBLISHED'))
+          UNION ALL
+          SELECT cp."price" FROM catalog."CommercialPeriod" cp
+            JOIN catalog."Tariff" t2 ON t2."id" = cp."tariffId"
+            WHERE t2."productId" = p."id" AND cp."status" = 'ACTIVE' AND cp."sellable" = true
+              AND cp."endDate" >= date_trunc('day', now() AT TIME ZONE 'UTC')
+              AND t2."status" = 'ACTIVE' AND t2."pricingMode" = 'FIXED'
+              AND (t2."serviceUnitId" IS NULL OR EXISTS (
+                SELECT 1 FROM catalog."ServiceUnit" su2
+                WHERE su2."id" = t2."serviceUnitId" AND su2."status" = 'PUBLISHED'))
+        ) AS prices) AS "minPrice"
       FROM catalog."Product" p
       LEFT JOIN catalog."Category" c ON c."id" = p."categoryId"
       WHERE ${where}
@@ -809,15 +854,22 @@ export class PublicCatalogService {
   }
 
   /**
-   * Минимальный публичный тариф (priceFrom §11/§43). Нет FIXED тарифов → null
-   * (не 0, не fallback на POR-цену — POR inquiry-only, цена не bindable).
+   * Минимальный публичный тариф (priceFrom §11/§43 + Step 1.8C §42 policy):
+   * min по {base FIXED price} ∪ {ACTIVE + sellable периодные цены с endDate >=
+   * сегодня}. Нет bindable цен → null (не 0, не fallback на POR/stop-sell).
+   * Period price policy (Universal §35): «НЕ минимальная историческая цена» —
+   * прошлые периоды не снижают priceFrom; search-horizon — Marketplace (позже).
    */
   private minTariff(tariffs: PublicTariffRow[]): { amount: string; currency: string } | null {
-    const bindable = tariffs.filter((t) => t.pricingMode === "FIXED");
-    if (bindable.length === 0) return null;
-    let best = bindable[0];
-    for (const t of bindable) {
-      if (t.price.lessThan(best.price)) best = t;
+    const candidates: Array<{ price: Prisma.Decimal; currency: string }> = [];
+    for (const t of tariffs) {
+      if (t.pricingMode === "FIXED") candidates.push({ price: t.price, currency: t.currency });
+      for (const p of t.periods ?? []) candidates.push({ price: p.price, currency: t.currency });
+    }
+    if (candidates.length === 0) return null;
+    let best = candidates[0];
+    for (const c of candidates) {
+      if (c.price.lessThan(best.price)) best = c;
     }
     return { amount: this.money(best.price), currency: best.currency };
   }

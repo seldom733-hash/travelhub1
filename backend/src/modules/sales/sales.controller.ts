@@ -282,7 +282,9 @@ class HistoryQueryDto {
   pageSize?: number;
 }
 
-/** Step 2.3: добавление строки КП — только refs + quantity (snapshot server-side). */
+/** Step 2.3: добавление строки КП — только refs + quantity (snapshot server-side).
+ * Step 1.8C: опциональный serviceDate (date-only) — периодная цена резолвится
+ * server-side на дату (иначе base fallback); client НЕ передаёт сумму. */
 class AddQuoteItemDto {
   @IsString()
   @MaxLength(64)
@@ -296,6 +298,10 @@ class AddQuoteItemDto {
   @Min(1)
   @Max(999)
   quantity!: number;
+
+  @IsOptional()
+  @IsString()
+  serviceDate?: string;
 }
 
 /** Step 2.3: обновление строки — только quantity. */

@@ -347,8 +347,10 @@ describe("Phase 1 Step 1.8B — Tariff → Rate Plan foundation (e2e)", () => {
     for (const bad of ["commercialPeriod", "calendar", "periods", "overrides", "weekday"]) {
       expect(raw.toLowerCase()).not.toContain(bad.toLowerCase());
     }
-    const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`SELECT tablename FROM pg_tables WHERE schemaname = 'catalog' AND tablename ILIKE '%CommercialPeriod%'`;
-    expect(tables).toHaveLength(0);
+    // Step 1.8C: модель CommercialPeriod существует (легитимно), но rate-plan
+    // CRUD НЕ создаёт period-строк (no side effect; период — отдельный объект).
+    const periodRows = await prisma.commercialPeriod.count({ where: { tariffId: plan.id } });
+    expect(periodRows).toBe(0);
   });
 
   // ── 10-11: PRICE_ON_REQUEST / zero ────────────────────────────────────────
@@ -482,10 +484,12 @@ describe("Phase 1 Step 1.8B — Tariff → Rate Plan foundation (e2e)", () => {
   it("20-21. нет CommercialPeriod модели и annual/seasonal pricing", async () => {
     const product = await createProduct(seller1Agent, `RP20 Hotel ${stamp}`, hotelCatId, { roomType: "standard" });
     await createRatePlan(seller1Agent, product.id, { name: "Plain", price: 60, priceBasis: "PER_NIGHT" });
-    // Модель CommercialPeriod отсутствует в призме.
-    const hasPeriodModel = Object.keys(prisma).some((k) => /commercialperiod/i.test(k));
-    expect(hasPeriodModel).toBe(false);
-    const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`SELECT tablename FROM pg_tables WHERE schemaname = 'catalog' AND (tablename ILIKE '%CommercialPeriod%' OR tablename ILIKE '%Calendar%' OR tablename ILIKE '%PricingRule%')`;
+    // Step 1.8C: CommercialPeriod — каноническая модель (1.8B её НЕ создавал;
+    // здесь доказываем отсутствие side effects: rate-plan CRUD не создаёт
+    // период-строк и НЕ существует ни Calendar/PricingRule сущностей).
+    const periodRows = await prisma.commercialPeriod.count({ where: { tariffId: product.id } });
+    expect(periodRows).toBe(0);
+    const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`SELECT tablename FROM pg_tables WHERE schemaname = 'catalog' AND (tablename ILIKE '%Calendar%' OR tablename ILIKE '%PricingRule%' OR tablename ILIKE '%TimeSlot%')`;
     expect(tables).toHaveLength(0);
   });
 

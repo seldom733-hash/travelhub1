@@ -8,7 +8,8 @@ import { isoUtc } from "../../shared/temporal";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type OrderRequestedPayload } from "../../eventbus/domain-events";
 import { CatalogService } from "../catalog/catalog.service";
-import type { Prisma } from "../../generated/prisma/client";
+import { resolveApplicablePeriod, type PeriodRow } from "../catalog/period-resolution";
+import { Prisma } from "../../generated/prisma/client";
 import {
   CheckoutStatus,
   LeadStatus,
@@ -495,13 +496,16 @@ export class SalesService {
 
   async addQuoteItem(
     code: string,
-    input: { productId: string; tariffId: string; quantity: number },
+    input: { productId: string; tariffId: string; quantity: number; serviceDate?: string },
     actor: Actor,
   ): Promise<QuoteDetailDto> {
     const row = await this.prisma.quote.findUnique({ where: { code } });
     if (!row) throw new NotFoundError(`Quote ${code} not found`);
     assertQuoteComposable(row.status);
-    const snap = await this.resolveEligibleTariff(input.productId, input.tariffId);
+    // Step 1.8C: опциональная сервисная дата (date-only) → периодная цена
+    // резолвится server-side на дату; без даты — base fallback (legacy).
+    const serviceDate = input.serviceDate ? parseServiceDate(input.serviceDate) : null;
+    const snap = await this.resolveEligibleTariff(input.productId, input.tariffId, serviceDate);
     const amount = lineAmount(snap.price, input.quantity);
 
     await this.prisma.$transaction(async (tx) => {
@@ -521,6 +525,9 @@ export class SalesService {
           tariffCode: snap.tariffCode,
           tariffName: snap.tariffName,
           quantity: input.quantity,
+          // Step 1.8C: date-only UTC midnight snapshot — provenance сервисной даты,
+          // на которую резолвлена цена (STRICT REVIEW §41); НЕ reprice-источник.
+          serviceDate,
           unitPrice: snap.price,
           currency: snap.currency,
           amount,
@@ -853,6 +860,14 @@ export class SalesService {
     const now = new Date();
     const serviceDate = new Date(checkout.serviceDate);
     serviceDate.setUTCHours(0, 0, 0, 0);
+
+    // Step 1.8C freeze contract (Roadmap 1226-1227, Universal §12, 1.8C §39):
+    // binding price = frozen QuoteItem snapshot (amount/currency/serviceDate/tariff
+    // ref). ПОСЛЕ binding (Quote ISSUE) никакого reprice из текущего Catalog;
+    // later Seller price/calendar правки НЕ мутируют frozen commercial facts.
+    // Здесь НЕ пере-резолвится периодная цена против текущего календаря — это
+    // позволило бы Seller-edit инвалидировать выпущенную КП (STRICT REVIEW §44
+    // FIX 1). Availability гейтится отдельно: checked-not-reserved + reserve.
 
     const completed = await this.prisma.$transaction(async (tx) => {
       // CAS: OPEN → CLOSED (один победитель при concurrent double completion).
@@ -1200,6 +1215,12 @@ export class SalesService {
     this.assertCheckoutMutable(row);
     await this.assertCheckoutNotCompleted(row);
     const parsed = parseServiceDate(serviceDate);
+
+    // Step 1.8C freeze contract (STRICT REVIEW §42/§44 FIX 1): сервисная дата —
+    // availability/execution факт; binding price уже заморожен в QuoteItem при
+    // addQuoteItem (freeze point = Quote ISSUE). Смена даты НЕ пере-резолвит
+    // цену и НЕ репрайсит (никакого reprice из текущего Catalog; frozen Quote
+    // immutable). Availability пересчитывается отдельным read-гейтом.
 
     await this.prisma.$transaction(async (tx) => {
       const res = await tx.checkoutIntent.updateMany({
@@ -1762,6 +1783,7 @@ export class SalesService {
       tariffCode: string;
       tariffName: string;
       quantity: number;
+      serviceDate: Date | null;
       unitPrice: Prisma.Decimal;
       currency: string;
       amount: Prisma.Decimal;
@@ -1792,6 +1814,7 @@ export class SalesService {
         tariffCode: i.tariffCode,
         tariffName: i.tariffName,
         quantity: i.quantity,
+        serviceDate: i.serviceDate ? i.serviceDate.toISOString().slice(0, 10) : null,
         unitPrice: String(i.unitPrice),
         currency: i.currency,
         amount: String(i.amount),
@@ -1852,13 +1875,18 @@ export class SalesService {
    * ARCHIVED; Tariff существует и принадлежит Product; tariff validity window
    * (если задан) покрывает текущий момент. Без capacity reservation/locking.
    */
-  private async resolveEligibleTariff(productId: string, tariffId: string): Promise<{
+  private async resolveEligibleTariff(
+    productId: string,
+    tariffId: string,
+    serviceDate?: Date | null,
+  ): Promise<{
     productCode: string;
     productTitle: string;
     tariffCode: string;
     tariffName: string;
     price: Prisma.Decimal;
     currency: string;
+    periodSource: "PERIOD" | "DATE_OVERRIDE" | "BASE" | null;
   }> {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
@@ -1895,6 +1923,43 @@ export class SalesService {
     if (tariff.validTo && tariff.validTo < now) {
       throw new ValidationDomainError(`Tariff ${tariff.code} has expired`);
     }
+
+    // Step 1.8C: детерминированная периодная цена на сервисную дату (DD-026).
+    // Период price authoritative → base FIXED fallback; stop-sell период → 422;
+    // без даты — base (legacy Quote flow без изменений).
+    if (serviceDate) {
+      const periods = (await this.prisma.commercialPeriod.findMany({
+        where: { tariffId, status: "ACTIVE" },
+        orderBy: { createdAt: "asc" },
+      })) as unknown as PeriodRow[];
+      const winner = resolveApplicablePeriod(periods, serviceDate);
+      if (winner) {
+        if (!winner.sellable) {
+          throw new ValidationDomainError(
+            `Tariff ${tariff.code} is not sellable for ${serviceDate.toISOString().slice(0, 10)} (period stop-sell)`,
+          );
+        }
+        return {
+          productCode: product.code,
+          productTitle: product.title,
+          tariffCode: tariff.code,
+          tariffName: tariff.name,
+          price: new Prisma.Decimal(winner.price.toString()),
+          currency: tariff.currency ?? "USD",
+          periodSource: winner.kind,
+        };
+      }
+      return {
+        productCode: product.code,
+        productTitle: product.title,
+        tariffCode: tariff.code,
+        tariffName: tariff.name,
+        price: tariff.price,
+        currency: tariff.currency ?? "USD",
+        periodSource: "BASE",
+      };
+    }
+
     return {
       productCode: product.code,
       productTitle: product.title,
@@ -1902,6 +1967,7 @@ export class SalesService {
       tariffName: tariff.name,
       price: tariff.price,
       currency: tariff.currency ?? "USD",
+      periodSource: null,
     };
   }
 

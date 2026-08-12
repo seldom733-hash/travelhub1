@@ -77,6 +77,8 @@ export interface QuoteItemDto {
   tariffCode: string;
   tariffName: string;
   quantity: number;
+  /// Step 1.8C: сервисная дата snapshot (YYYY-MM-DD) или null (base/legacy).
+  serviceDate: string | null;
   unitPrice: string;
   currency: string;
   amount: string;

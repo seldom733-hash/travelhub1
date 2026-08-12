@@ -20,6 +20,8 @@ import { ServiceUnitsController } from "./service-units.controller";
 import { ServiceUnitService } from "./service-unit.service";
 import { RatePlansController } from "./rate-plans.controller";
 import { RatePlanService } from "./rate-plan.service";
+import { CommercialPeriodsController } from "./commercial-periods.controller";
+import { CommercialPeriodService } from "./commercial-period.service";
 import { StorefrontBehavioralController } from "./behavioral/storefront-behavioral.controller";
 import { StorefrontBehavioralService } from "./behavioral/storefront-behavioral.service";
 import { MarketplaceBehavioralController } from "./behavioral/marketplace-behavioral.controller";
@@ -55,9 +57,16 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
  * foundation (DD-024/Universal Pricing): own-scope управление Rate Plans внутри
  * Product (с привязкой к ServiceUnit), category-driven basis allowlist,
  * PRICE_ON_REQUEST, soft commercial state (catalog.rate_plan.publish).
+ *
+ * Step 1.8C: CommercialPeriodsController/CommercialPeriodService — Period
+ * Pricing & Period Availability foundation (DD-026/DD-027): annual/seasonal
+ * calendar как first-class workflow (bulk), date-only inclusive ranges,
+ * deterministic precedence (DATE_OVERRIDE > PERIOD > DAY_OF_WEEK > base),
+ * period sellability (price ≠ availability), version-CAS + advisory lock,
+ * soft lifecycle; валюта наследуется из Tariff; POR без числовых периодов.
  */
 @Module({
-  controllers: [CatalogController, ModerationController, PublicCatalogController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController],
+  controllers: [CatalogController, ModerationController, PublicCatalogController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController],
   providers: [
     CatalogService,
     CatalogAccessPolicy,
@@ -73,6 +82,7 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
     MarketplaceBehavioralService,
     ServiceUnitService,
     RatePlanService,
+    CommercialPeriodService,
     { provide: "ObjectStorageService", useClass: S3ObjectStorageService },
   ],
   exports: [CatalogService, CatalogAccessPolicy, ProductMediaService, PublicSellerProfileService, ServiceUnitService, RatePlanService, "ObjectStorageService"],

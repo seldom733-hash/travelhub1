@@ -9,6 +9,7 @@
 | `CAT-` | Category | Catalog |
 | `TRF-` | Tariff / Rate Plan (canonical commercial variant, Step 1.8B) | Catalog |
 | `UNI-` | ServiceUnit (Seller Commercial/Service Unit, Step 1.8A) | Catalog |
+| `CPR-` | CommercialPeriod (date-based period price/availability факт, Step 1.8C) | Catalog |
 | `CUS-` | Customer | CRM |
 | `CNT-` | Contact | CRM |
 | `COM-` | Company | CRM |
