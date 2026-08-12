@@ -1,4 +1,5 @@
 import { ValidationDomainError } from "../../shared/errors";
+import { PRICE_BASIS_VALUES } from "./rate-plan.validation";
 
 /**
  * Category Schema foundation (Step 1.1) — чистые функции валидации.
@@ -163,10 +164,28 @@ export function validateSchemaConfig(input: unknown): CategorySchemaConfig {
     sections = pdpSections as string[];
   }
 
+  // Step 1.8B §12: category-driven price basis allowlist. CategorySchema владеет
+  // коммерческими правилами категории: tariffRules.allowedBases — валидные
+  // PriceBasis теги для Rate Plans этой категории (не все категории позволяют
+  // все basis). Хранится в существующем tariffRules JSON (конфигурация).
+  let tariff: Record<string, unknown> | null = isPlainObject(tariffRules) ? { ...tariffRules } : null;
+  if (tariff && tariff.allowedBases !== undefined) {
+    if (
+      !Array.isArray(tariff.allowedBases) ||
+      tariff.allowedBases.length === 0 ||
+      tariff.allowedBases.some((b) => typeof b !== "string" || !(PRICE_BASIS_VALUES as readonly string[]).includes(b))
+    ) {
+      throw new ValidationDomainError(
+        `tariffRules.allowedBases must be a non-empty array of valid price basis values: ${PRICE_BASIS_VALUES.join(", ")}`,
+      );
+    }
+    tariff.allowedBases = [...new Set(tariff.allowedBases)] as unknown as Record<string, unknown>;
+  }
+
   return {
     attributes: defs,
     availability: isPlainObject(availability) ? availability : null,
-    tariffRules: isPlainObject(tariffRules) ? tariffRules : null,
+    tariffRules: tariff,
     mediaRequirements: media,
     pdpSections: sections,
   };

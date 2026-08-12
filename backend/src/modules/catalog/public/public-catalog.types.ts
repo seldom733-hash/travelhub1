@@ -115,10 +115,14 @@ export interface PublicProductCard {
 export interface PublicTariff {
   id: string;
   name: string;
-  price: string;
-  currency: string;
+  /** Цена только у FIXED планов; PRICE_ON_REQUEST — null (inquiry-only, §22). */
+  price: string | null;
+  /** Валюта вместе с ценой; null для POR (нет bindable цены). */
+  currency: string | null;
   validFrom: string | null;
   validTo: string | null;
+  /** FIXED — bindable цена; PRICE_ON_REQUEST — inquiry-only (по запросу). */
+  pricingMode: "FIXED" | "PRICE_ON_REQUEST";
 }
 
 /**

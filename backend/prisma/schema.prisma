@@ -118,6 +118,54 @@ enum ServiceUnitStatus {
   @@schema("catalog")
 }
 
+/// Price basis (Step 1.8B, Universal Pricing §5) — одиночный семантический тег
+/// Rate Plan-уровня; quantity/duration — отдельные dimensions (STRICT REVIEW §22,
+/// без compound-строк вида PER_ROOM_PER_NIGHT). NULL = legacy-тариф без basis.
+enum PriceBasis {
+  PER_UNIT
+  PER_ROOM
+  PER_PERSON
+  PER_NIGHT
+  PER_DAY
+  PER_HOUR
+  PER_TRIP
+  PER_SERVICE
+  PACKAGE_TOTAL
+
+  @@schema("catalog")
+}
+
+/// Refundability foundation (Step 1.8B §13) — минимальная явная семантика,
+/// согласованная с существующей cancellation-архитектурой; engine — 1.8D.
+/// NULL = не заявлено (legacy).
+enum Refundability {
+  REFUNDABLE
+  NON_REFUNDABLE
+
+  @@schema("catalog")
+}
+
+/// Pricing mode Rate Plan (Step 1.8B §17, Universal Pricing §9):
+///  - FIXED — нормальная цена (base/fixed);
+///  - PRICE_ON_REQUEST — явное inquiry-only состояние плана (НЕ inferred from null).
+enum RatePlanPricingMode {
+  FIXED
+  PRICE_ON_REQUEST
+
+  @@schema("catalog")
+}
+
+/// Коммерческое состояние Rate Plan (Step 1.8B §24): ACTIVE — действующий;
+/// ARCHIVED — коммерчески снят (soft; данные сохраняются, история не обрывается).
+/// Публикация Rate Plan НЕ отдельный lifecycle: eligibility наследуется из
+/// родительской цепочки (Product PUBLISHED + ServiceUnit PUBLISHED если attached).
+enum RatePlanStatus {
+  ACTIVE
+  ARCHIVED
+
+  @@schema("catalog")
+}
+
 enum ProductType {
   TOUR
   HOTEL
@@ -330,20 +378,85 @@ model CategorySchema {
   @@schema("catalog")
 }
 
+/// Tariff — canonical Rate Plan foundation (Step 1.8B, DD-024; Universal Pricing §1/§17).
+///
+/// Канонический коммерческий граф: Product → ServiceUnit → Tariff/Rate Plan →
+/// CommercialPeriod (1.8C, НЕ реализован). НЕ создаётся второй RatePlan-концепт.
+///
+///  - name — Seller-определённое название verbatim (только trim);
+///  - price/currency/validFrom/validTo — LEGACY base/fixed price (ДО 1.8C);
+///    после 1.8C при наличии применимых CommercialPeriod фактов authoritative —
+///    period price; иначе legacy price = base/FIXED fallback (STRICT REVIEW §50);
+///  - validFrom/validTo — коммерческая/booking validity window, НЕ stay-период
+///    (не переинтерпретировать как CommercialPeriod);
+///  - serviceUnitId — каноническая привязка к ServiceUnit (additive, nullable,
+///    legacy Product-only тарифы остаются валидными; сервер валидирует
+///    unit.productId == tariff.productId и ownership);
+///  - priceBasis — одиночный семантический тег; category-allowlist через
+///    CategorySchema.tariffRules.allowedBases;
+///  - pricingMode FIXED/PRICE_ON_REQUEST — явное inquiry-only состояние
+///    (missing price ≠ PRICE_ON_REQUEST);
+///  - inclusions/restrictions — структурированные metadata foundations
+///    (enforcement/engine — 1.8D);
+///  - status ACTIVE/ARCHIVED — коммерческое состояние (не moderation).
+///
+/// Никаких CommercialPeriod/calendar/resolver/availability-полей (1.8C/1.8D).
 model Tariff {
   id        String   @id @default(uuid())
   code      String   @unique // TRF-00000001
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// Канонический ServiceUnit-аттач (Step 1.8B §6). NULL — legacy Product-only.
+  serviceUnitId String?
+  serviceUnit   ServiceUnit? @relation(fields: [serviceUnitId], references: [id], onDelete: SetNull)
   name      String
   price     Decimal  @db.Decimal(12, 2)
   currency  String   @default("USD")
+  /// LEGACY booking/commercial validity window — НЕ stay-period (см. выше).
   validFrom DateTime?
   validTo   DateTime?
+  priceBasis PriceBasis?
+  refundability Refundability?
+  pricingMode   RatePlanPricingMode @default(FIXED)
+  status        RatePlanStatus      @default(ACTIVE)
+  /// Category-driven inclusions foundation (напр. mealPlan/includedServices).
+  inclusions Json?
+  /// Restrictions metadata foundation (minStay/advanceBooking/...); engine — 1.8D.
+  restrictions Json?
   version   Int      @default(1)
   createdAt DateTime @default(now())
+  /// @default(now()) — только для additive-миграции существующих legacy-строк;
+  /// фактическое значение поддерживает @updatedAt (как остальные Catalog-модели).
+  updatedAt DateTime @updatedAt @default(now())
+
+  history TariffHistory[]
 
   @@index([productId])
+  @@index([serviceUnitId])
+  @@index([status])
+  @@schema("catalog")
+}
+
+/// Журнал аудита Rate Plan (audit by default; без dump inclusions/restrictions в
+/// security audit — только refs и lifecycle/коммерческие transition-факты).
+/// STRICT REVIEW §52: onDelete Restrict — физическое удаление Rate Plan с
+/// аудит-историей запрещено (history не стирается); legacy Product PATCH
+/// tariffs-replacement перехватывает → 409 (см. CatalogService).
+model TariffHistory {
+  id        String   @id @default(uuid())
+  tariffId  String
+  tariff    Tariff   @relation(fields: [tariffId], references: [id], onDelete: Restrict)
+  version   Int
+  action    String
+  from      String?
+  to        String?
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([tariffId])
   @@schema("catalog")
 }
 
@@ -478,6 +591,9 @@ model ServiceUnit {
   updatedBy   String?
 
   history ServiceUnitHistory[]
+  /// Rate Plans (Step 1.8B): привязка Tariff.serviceUnitId — каноническая,
+  /// сервер валидирует unit.productId == tariff.productId + ownership.
+  tariffs Tariff[]
 
   // Import reconcile: внешний ключ уникален в реальном ownership scope
   // (два Seller не коллидят; в пределах Seller+Product+source ключ уникален).

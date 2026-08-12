@@ -70,6 +70,8 @@ interface PublicTariffRow {
   currency: string;
   validFrom: Date | null;
   validTo: Date | null;
+  /** Step 1.8B: FIXED — bindable цена; PRICE_ON_REQUEST — inquiry-only (цена не выводится). */
+  pricingMode: string;
 }
 
 interface PublicProductRow {
@@ -142,7 +144,21 @@ export class PublicCatalogService {
   private productInclude() {
     return {
       category: { select: { id: true, slug: true, title: true } },
-      tariffs: { select: { id: true, name: true, price: true, currency: true, validFrom: true, validTo: true } },
+      // Step 1.8B: публично ACTIVE Rate Plans (ARCHIVED скрыт — soft commercial
+      // discontinuation §25) под eligible родительской цепочкой (§30/§42):
+      //  - legacy product-only план (без unit) — публичен;
+      //  - план на ServiceUnit — публичен только если unit PUBLISHED
+      //    (DRAFT/ARCHIVED unit → план не публикуется; единый publication engine
+      //    1.8A §15 — без второго lifecycle);
+      //  - PRICE_ON_REQUEST виден как inquiry-only offer (price:null в маппере),
+      //    но НЕ вносит цену в priceFrom/sort (Universal §9/§13 — §22 fix).
+      tariffs: {
+        where: {
+          status: "ACTIVE",
+          OR: [{ serviceUnitId: null }, { serviceUnit: { status: "PUBLISHED" } }],
+        },
+        select: { id: true, name: true, price: true, currency: true, validFrom: true, validTo: true, pricingMode: true },
+      },
       media: {
         where: { status: "PUBLISHED" },
         orderBy: { sortOrder: "asc" },
@@ -167,7 +183,16 @@ export class PublicCatalogService {
   private productDetailInclude() {
     return {
       ...this.productInclude(),
-      tariffs: { orderBy: { createdAt: "asc" }, select: { id: true, name: true, price: true, currency: true, validFrom: true, validTo: true } },
+      // Step 1.8B: публично ACTIVE Rate Plans под eligible unit (см. productInclude);
+      // POR остаётся видим как inquiry-only (price:null), FIXED — с ценой.
+      tariffs: {
+        orderBy: { createdAt: "asc" },
+        where: {
+          status: "ACTIVE",
+          OR: [{ serviceUnitId: null }, { serviceUnit: { status: "PUBLISHED" } }],
+        },
+        select: { id: true, name: true, price: true, currency: true, validFrom: true, validTo: true, pricingMode: true },
+      },
       availability: { orderBy: { date: "asc" }, take: 60, select: { date: true, slotsTotal: true, slotsBooked: true, slotsReserved: true } },
     } satisfies Prisma.ProductInclude;
   }
@@ -618,9 +643,16 @@ export class PublicCatalogService {
     const where = Prisma.join(conds, " AND ");
 
     // Базовый подзапрос: published + фильтры + min-тариф для price sort.
+    // Step 1.8B §42/§43: min учитывает только ACTIVE + FIXED Rate Plans под
+    // eligible unit (unit-less legacy — ок; DRAFT/ARCHIVED unit — план не публичен)
+    // и исключает POR (inquiry-only, не bindable).
     const base = Prisma.sql`
       SELECT p."id", p."publishedAt", p."createdAt",
-        (SELECT min(t."price") FROM catalog."Tariff" t WHERE t."productId" = p."id") AS "minPrice"
+        (SELECT min(t."price") FROM catalog."Tariff" t
+          WHERE t."productId" = p."id" AND t."status" = 'ACTIVE' AND t."pricingMode" = 'FIXED'
+            AND (t."serviceUnitId" IS NULL OR EXISTS (
+              SELECT 1 FROM catalog."ServiceUnit" su
+              WHERE su."id" = t."serviceUnitId" AND su."status" = 'PUBLISHED'))) AS "minPrice"
       FROM catalog."Product" p
       LEFT JOIN catalog."Category" c ON c."id" = p."categoryId"
       WHERE ${where}
@@ -729,10 +761,13 @@ export class PublicCatalogService {
         tariffs: row.tariffs.map((t) => ({
           id: t.id,
           name: t.name,
-          price: this.money(t.price),
-          currency: t.currency,
+          // §22: POR — inquiry-only offer; bindable цена не выводится (null),
+          // но план видим (visibility отделён от цены/bindability).
+          price: t.pricingMode === "PRICE_ON_REQUEST" ? null : this.money(t.price),
+          currency: t.pricingMode === "PRICE_ON_REQUEST" ? null : t.currency,
           validFrom: t.validFrom ? t.validFrom.toISOString() : null,
           validTo: t.validTo ? t.validTo.toISOString() : null,
+          pricingMode: t.pricingMode as "FIXED" | "PRICE_ON_REQUEST",
         })),
         priceFrom: price?.amount ?? null,
         currency: price?.currency ?? null,
@@ -773,11 +808,15 @@ export class PublicCatalogService {
     };
   }
 
-  /** Минимальный публичный тариф (priceFrom §11). Нет тарифов → null (не 0). */
+  /**
+   * Минимальный публичный тариф (priceFrom §11/§43). Нет FIXED тарифов → null
+   * (не 0, не fallback на POR-цену — POR inquiry-only, цена не bindable).
+   */
   private minTariff(tariffs: PublicTariffRow[]): { amount: string; currency: string } | null {
-    if (tariffs.length === 0) return null;
-    let best = tariffs[0];
-    for (const t of tariffs) {
+    const bindable = tariffs.filter((t) => t.pricingMode === "FIXED");
+    if (bindable.length === 0) return null;
+    let best = bindable[0];
+    for (const t of bindable) {
       if (t.price.lessThan(best.price)) best = t;
     }
     return { amount: this.money(best.price), currency: best.currency };

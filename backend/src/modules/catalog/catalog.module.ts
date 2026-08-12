@@ -18,6 +18,8 @@ import { StorefrontAdminController, StorefrontController } from "./storefront/st
 import { StorefrontService } from "./storefront/storefront.service";
 import { ServiceUnitsController } from "./service-units.controller";
 import { ServiceUnitService } from "./service-unit.service";
+import { RatePlansController } from "./rate-plans.controller";
+import { RatePlanService } from "./rate-plan.service";
 import { StorefrontBehavioralController } from "./behavioral/storefront-behavioral.controller";
 import { StorefrontBehavioralService } from "./behavioral/storefront-behavioral.service";
 import { MarketplaceBehavioralController } from "./behavioral/marketplace-behavioral.controller";
@@ -48,9 +50,14 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
  * Step 1.8A: ServiceUnitsController/ServiceUnitService — Seller Commercial /
  * Service Unit foundation (DD-025): own-scope управление юнитами внутри Product,
  * Catalog publication authority (catalog.service_unit.publish), import identity.
+ *
+ * Step 1.8B: RatePlansController/RatePlanService — Tariff → canonical Rate Plan
+ * foundation (DD-024/Universal Pricing): own-scope управление Rate Plans внутри
+ * Product (с привязкой к ServiceUnit), category-driven basis allowlist,
+ * PRICE_ON_REQUEST, soft commercial state (catalog.rate_plan.publish).
  */
 @Module({
-  controllers: [CatalogController, ModerationController, PublicCatalogController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController],
+  controllers: [CatalogController, ModerationController, PublicCatalogController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController],
   providers: [
     CatalogService,
     CatalogAccessPolicy,
@@ -65,8 +72,9 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
     StorefrontBehavioralService,
     MarketplaceBehavioralService,
     ServiceUnitService,
+    RatePlanService,
     { provide: "ObjectStorageService", useClass: S3ObjectStorageService },
   ],
-  exports: [CatalogService, CatalogAccessPolicy, ProductMediaService, PublicSellerProfileService, ServiceUnitService, "ObjectStorageService"],
+  exports: [CatalogService, CatalogAccessPolicy, ProductMediaService, PublicSellerProfileService, ServiceUnitService, RatePlanService, "ObjectStorageService"],
 })
 export class CatalogModule {}

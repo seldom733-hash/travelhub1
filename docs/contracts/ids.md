@@ -7,7 +7,7 @@
 |---|---|---|
 | `PRD-` | Product | Catalog |
 | `CAT-` | Category | Catalog |
-| `TRF-` | Tariff | Catalog |
+| `TRF-` | Tariff / Rate Plan (canonical commercial variant, Step 1.8B) | Catalog |
 | `UNI-` | ServiceUnit (Seller Commercial/Service Unit, Step 1.8A) | Catalog |
 | `CUS-` | Customer | CRM |
 | `CNT-` | Contact | CRM |

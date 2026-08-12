@@ -322,7 +322,10 @@ export class CatalogService implements OnModuleInit {
         take: pageSize,
         include: {
           category: { select: { id: true, slug: true, title: true } },
-          tariffs: { select: { id: true, code: true, name: true, price: true, currency: true } },
+          // Step 1.8B: priceFrom из ACTIVE Rate Plans (ARCHIVED не участвует);
+          // PRICE_ON_REQUEST (inquiry-only, НЕ bindable) исключается из priceFrom
+          // (Universal §9/§13) — см. reduce ниже; в списке план остаётся видим.
+          tariffs: { where: { status: "ACTIVE" }, select: { id: true, code: true, name: true, price: true, currency: true, pricingMode: true } },
         },
       }),
       this.prisma.product.count({ where }),
@@ -358,7 +361,9 @@ export class CatalogService implements OnModuleInit {
     const rows = items.map((p) => {
       const thumb = thumbByProduct.get(p.id);
       const sub = lastSub.get(p.id);
-      const minTariff = p.tariffs.length > 0 ? p.tariffs.reduce((m, t) => (Number(t.price) < Number(m.price) ? t : m)) : null;
+      // priceFrom: только FIXED планы (POR — inquiry-only, цена не bindable).
+      const bindable = p.tariffs.filter((t) => t.pricingMode === "FIXED");
+      const minTariff = bindable.length > 0 ? bindable.reduce((m, t) => (Number(t.price) < Number(m.price) ? t : m)) : null;
       return {
         ...p,
         thumbnail: thumb ? { id: thumb.id, mimeType: thumb.mimeType, width: thumb.width, height: thumb.height } : null,
@@ -537,6 +542,9 @@ export class CatalogService implements OnModuleInit {
       });
 
       if (input.tariffs) {
+        // STRICT REVIEW §52: legacy tariffs-replacement не может физически стереть
+        // Rate Plans с аудит-историей (TariffHistory.onDelete Restrict + явный гейт).
+        await this.assertNoAuditedRatePlans(tx, id, "legacy tariffs replacement");
         await tx.tariff.deleteMany({ where: { productId: id } });
         await this.createTariffs(tx, id, input.tariffs);
       }
@@ -869,6 +877,9 @@ export class CatalogService implements OnModuleInit {
     const draft = existing.draft;
     if (draft) {
       if (draft.tariffs) {
+        // STRICT REVIEW §52: publish change-proposal не может физически стереть
+        // Rate Plans с аудит-историей (TariffHistory.onDelete Restrict + гейт).
+        await this.assertNoAuditedRatePlans(tx, productId, "change-proposal publish tariffs replacement");
         await tx.tariff.deleteMany({ where: { productId } });
         await this.createTariffs(tx, productId, draft.tariffs as unknown as CreateTariffDto[]);
       }
@@ -1513,6 +1524,28 @@ export class CatalogService implements OnModuleInit {
       await tx.tariff.create({
         data: { code, productId, name: t.name, price: t.price, currency: t.currency ?? "USD" },
       });
+    }
+  }
+
+  /**
+   * STRICT REVIEW §52: legacy delete-пути (Product PATCH tariffs / change-proposal
+   * publish) НЕ могут физически удалить Rate Plans, у которых есть аудит-история
+   * (TariffHistory) — история коммерческих фактов не стирается. Канонический путь
+   * управления такими планами — Rate Plan API (archive/activate/update), а не
+   * legacy tariffs-replacement. Гейт дублирует DB-level Restrict и даёт 409 (loud).
+   */
+  private async assertNoAuditedRatePlans(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    operation: string,
+  ): Promise<void> {
+    const audited = await tx.tariffHistory.count({
+      where: { tariff: { productId } },
+    });
+    if (audited > 0) {
+      throw new ConflictError(
+        `Cannot ${operation}: ${audited} rate plan(s) have audit history and cannot be physically deleted; use the Rate Plan API (archive/activate/update) instead`,
+      );
     }
   }
 

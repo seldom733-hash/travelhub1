@@ -23,6 +23,12 @@ export const PERMISSIONS = {
   // Product PUBLISHED (§15). Смешивать с catalog.product.publish нельзя — юнит
   // имеет собственный lifecycle DRAFT → PUBLISHED → ARCHIVED.
   "catalog.service_unit.publish": "Публикация/архивация Service Unit (Catalog publication authority, гейт: Product PUBLISHED)",
+  // Step 1.8B: Rate Plan commercial-state authority (archive/activate). Rate Plan —
+  // child-entity Product (create/update/read переиспользуют catalog.product.* own-scope),
+  // публикация наследуется из родительской цепочки (Product/ServiceUnit), поэтому здесь
+  // только soft commercial state (ACTIVE → ARCHIVED / обратно). PARTNER НЕ имеет
+  // (как service_unit.publish) — staff/ADMIN команды.
+  "catalog.rate_plan.publish": "Архивация/активация Rate Plan (soft commercial state, staff/ADMIN)",
   "catalog.category.write": "Управление категориями",
   "catalog.category_schema.read": "Чтение Category Schema (конфигурации категорий)",
   "catalog.category_schema.write": "Управление Category Schema (только ADMIN)",

@@ -298,6 +298,85 @@ Create-contract:
 - MODERATOR/BUYER — без прав (403); public read юнитов отсутствует (1.8A —
   structure-only, frontend не затронут).
 
+## Rate Plan (Step 1.8B — владелец catalog.*, Tariff IS Rate Plan, TRF-*, DD-024)
+
+Tariff → canonical Rate Plan foundation: коммерческий план ВНУТРИ Product, опционально
+привязан к ServiceUnit. Канонический граф: `Product → ServiceUnit → Tariff/Rate Plan →
+CommercialPeriod (1.8C, НЕ реализован)`. Документация архитектуры:
+`docs/architecture/rate-plan-foundation.md`, `docs/architecture/universal-pricing-model.md`.
+
+```text
+POST   /api/v1/products/:productId/tariffs   создание (TRF-*, ACTIVE) — PARTNER: catalog.product.create_own (только СВОЙ DRAFT Product); staff/ADMIN: catalog.product.write
+GET    /api/v1/products/:productId/tariffs   список (детерминированный order, limit/offset) — PARTNER: catalog.product.read_own; staff: catalog.product.read
+GET    /api/v1/tariffs/:id                   карточка — PARTNER: catalog.product.read_own; staff: catalog.product.read
+GET    /api/v1/tariffs/:id/history           audit-история — PARTNER: catalog.product.read_own; staff: catalog.product.read
+PATCH  /api/v1/tariffs/:id                   правка — PARTNER: catalog.product.update_own_draft (только под DRAFT Product); staff/ADMIN: catalog.product.write
+POST   /api/v1/tariffs/:id/archive           soft-снятие (ACTIVE → ARCHIVED) — catalog.rate_plan.publish (staff/ADMIN)
+POST   /api/v1/tariffs/:id/activate          восстановление (ARCHIVED → ACTIVE) — catalog.rate_plan.publish (staff/ADMIN)
+```
+
+Create/Update-contract:
+
+```jsonc
+{
+  "name": "Breakfast Included — Non-refundable",  // обязательное, verbatim, ≤200 (только trim)
+  "price": 150,                                    // Decimal(12,2), неотрицательный; 0 — бесплатная услуга
+  "currency": "AZN",                              // optional, ISO 4217 (default USD); immutable после создания
+  "serviceUnitId": "<UNI-*>",                     // optional — юнит того же Product + того же Seller (иначе 422); null — отвязка
+  "priceBasis": "PER_NIGHT",                      // optional — одиночный тег; category allowlist (CategorySchema.tariffRules.allowedBases)
+  "refundability": "REFUNDABLE",                  // optional: REFUNDABLE | NON_REFUNDABLE
+  "pricingMode": "FIXED",                         // optional: FIXED (default) | PRICE_ON_REQUEST (явное inquiry-only состояние)
+  "inclusions": { "mealPlan": "Half Board", "includedServices": ["Transfer"] },  // optional, whitelist-ключи
+  "restrictions": { "minStay": 1, "maxStay": 7, "advanceBookingDays": 3 },        // optional, metadata (engine — 1.8D)
+  "validFrom": "2026-06-01", "validTo": "2026-08-31"   // optional legacy booking/commercial validity window (НЕ stay-period)
+}
+```
+
+Правила (Step 1.8B):
+
+- **ownership**: Rate Plan принадлежит Product; PARTNER — только СВОИ Product;
+  чужой Product → 403; ServiceUnit-привязка сервер-валидируется (unit.productId ==
+  tariff.productId, unit.partnerId == product.partnerId, unit НЕ ARCHIVED) — forged/
+  foreign/cross-Product unit → 422;
+- **verbatim name**: Seller-название как есть (только trim); не нормализуется/не переводится;
+- **basis**: одиночный семантический тег (PER_UNIT/PER_ROOM/PER_PERSON/PER_NIGHT/
+  PER_DAY/PER_HOUR/PER_TRIP/PER_SERVICE/PACKAGE_TOTAL); НЕ compound-строки; если
+  CategorySchema.tariffRules.allowedBases задан — basis обязан быть member (иначе 422),
+  но basis НЕ обязателен (legacy Product-only планы валидны);
+- **PRICE_ON_REQUEST**: явное состояние плана «inquiry-only»; НЕ выводится из null/нуля
+  цены (missing ≠ POR); legacy price остаётся base/FIXED fallback (до 1.8C);
+  публично POR-план ВИДИМ как inquiry-only offer (price:null, pricingMode в DTO), но
+  НЕ вносит цену в priceFrom/price-sort и не bindable (STRICT REVIEW §22 — visibility
+  отделена от цены/bindability);
+- **currency**: одна canonical валюта на план (DD-029); ISO 4217; immutable после
+  создания (смена = новый Rate Plan);
+- **legacy validFrom/validTo**: booking/commercial validity window — НЕ stay-период,
+  не переинтерпретируется как CommercialPeriod (1.8C);
+- **forbidden keys** (create/update, 422 loud): id/code/productId/partnerId/ownerId/
+  status/version/timestamps/actor/commercialPeriods/calendar/overrides/availability/
+  reservation/sales-refs; update дополнительно: currency (immutable);
+- **lifecycle**: status ACTIVE/ARCHIVED (soft commercial state); публикация НЕ отдельный
+  lifecycle — eligibility наследуется из родительской цепочки (Product PUBLISHED +
+  ServiceUnit PUBLISHED если attached; план на DRAFT/ARCHIVED unit публично скрыт —
+  STRICT REVIEW §42); публично ACTIVE планы под eligible unit (ARCHIVED скрыт;
+  unit-less legacy план публичен); archive/activate — catalog.rate_plan.publish
+  (staff/ADMIN; PARTNER → 403); idempotent no-op при том же состоянии;
+- **mutability**: PARTNER правит Rate Plans только под СВОИ DRAFT Product (коммерческие
+  правки опубликованного контента — через change proposal/модерацию); staff/ADMIN —
+  любые не-ARCHIVED; ARCHIVED immutable (409); атомарный conditional update по status
+  + version-CAS (STRICT REVIEW §39): два параллельных PATCH с разными полями —
+  второй получает 409 (никакого last-write-wins/lost update);
+- **delete-safety (STRICT REVIEW §52)**: Rate Plan с аудит-историей (TariffHistory)
+  НЕ может быть удалён физически (FK ON DELETE RESTRICT + явный гейт в legacy
+  tariffs-replacement → 409); управление такими планами — через Rate Plan API
+  (archive/activate/update);
+- **no side effects**: create/update не создаёт CommercialPeriod/calendar/overrides/
+  Availability/Reservation/Quote/Checkout/Sale/Order/Booking; Reverse данные не
+  мутируются; событий нет (нет consumer-а — §34);
+- **audit**: `TariffHistory` + AuditLog (`rate_plan.created/updated/archived/activated`)
+  без PII/inclusions/restrictions;
+- MODERATOR/BUYER — без прав (403).
+
 ## CRM mini (владелец Customer/Contact/Company/Partner/Supplier)
 
 ```text

@@ -18,8 +18,9 @@ const PUBLISHED_PRODUCT = {
   attributes: { days: 7, language: "en" },
   category: { id: "cat-1", slug: "tours", title: "Tours" },
   tariffs: [
-    { id: "t1", name: "S", price: new Prisma.Decimal("150.00"), currency: "USD", validFrom: null, validTo: null },
-    { id: "t2", name: "M", price: new Prisma.Decimal("100.00"), currency: "USD", validFrom: null, validTo: null },
+    // Step 1.8B: legacy tariffs (как создаёт createProduct) — pricingMode FIXED.
+    { id: "t1", name: "S", price: new Prisma.Decimal("150.00"), currency: "USD", validFrom: null, validTo: null, pricingMode: "FIXED" },
+    { id: "t2", name: "M", price: new Prisma.Decimal("100.00"), currency: "USD", validFrom: null, validTo: null, pricingMode: "FIXED" },
   ],
   media: [
     {
@@ -419,6 +420,48 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       expect(raw).not.toContain("draft");
       expect(raw).not.toContain("moderation");
       expect(raw).not.toContain("https://");
+    });
+
+    it("Step 1.8B §22: POR-план видим как inquiry-only (price null, pricingMode POR), не входит в priceFrom; FIXED участвует", async () => {
+      const prisma = makePrismaStub();
+      prisma.product.findFirst.mockResolvedValue({
+        ...PUBLISHED_PRODUCT,
+        tariffs: [
+          { id: "t-fixed", name: "FIXED Plan", price: new Prisma.Decimal("100.00"), currency: "USD", validFrom: null, validTo: null, pricingMode: "FIXED" },
+          { id: "t-por", name: "Inquiry Only", price: new Prisma.Decimal("40.00"), currency: "USD", validFrom: null, validTo: null, pricingMode: "PRICE_ON_REQUEST" },
+        ],
+      });
+      const service = makeService(prisma);
+
+      const detail = await service.getProductDetail("tour-1");
+
+      const tariffs = detail.product.tariffs;
+      expect(tariffs).toHaveLength(2); // POR ВИДИМ (visibility ≠ bindability) — §22 fix
+      const por = tariffs.find((t) => t.id === "t-por")!;
+      expect(por.price).toBeNull(); // inquiry-only: bindable цена не выводится
+      expect(por.currency).toBeNull();
+      expect(por.pricingMode).toBe("PRICE_ON_REQUEST");
+      const fixed = tariffs.find((t) => t.id === "t-fixed")!;
+      expect(fixed.price).toBe("100.00");
+      // priceFrom — только FIXED: 40.00 POR не участвует (нет null→0 и нет POR-leakage).
+      expect(detail.product.priceFrom).toBe("100.00");
+      expect(detail.product.currency).toBe("USD");
+    });
+
+    it("Step 1.8B §43: только POR-планы → priceFrom null (не 0, не fallback на POR-цену)", async () => {
+      const prisma = makePrismaStub();
+      prisma.product.findFirst.mockResolvedValue({
+        ...PUBLISHED_PRODUCT,
+        tariffs: [
+          { id: "t-por", name: "Inquiry Only", price: new Prisma.Decimal("40.00"), currency: "USD", validFrom: null, validTo: null, pricingMode: "PRICE_ON_REQUEST" },
+        ],
+      });
+      const service = makeService(prisma);
+
+      const detail = await service.getProductDetail("tour-1");
+      expect(detail.product.tariffs).toHaveLength(1); // видим
+      expect(detail.product.priceFrom).toBeNull();
+      expect(detail.product.currency).toBeNull();
     });
   });
 
