@@ -557,7 +557,7 @@ change/cancellation, fulfillment, обратные события Order.
 `createdAt`, `requestedAt`, `confirmedAt`, `rejectedAt`, `cancelledAt`,
 `completedAt`, history/SLA timestamps.
 
-· **Step 2.10 --- Finance Domain Foundation**\
+· **Step 2.10 --- Finance Domain Foundation** ✅ APPROVED (STRICT REVIEW, 2026-08-13; FIX 1: createCurrency race P2002 → controlled 409 вместо raw 500 (e2e 6A [201,409]); country-контракт alpha-2 доказан e2e (locale `az` → 422, alpha-3/locale-tag → 400); PaymentTerms boundary задокументирован в arch doc (SAFE PLACEHOLDER: источник — frozen 2.3B снапшот; материализация в 2.12 ТОЛЬКО как проекция, никогда пересчёт); остальное по implementation: модуль finance.*, 10 foundation-моделей (Currency/ExchangeRate/Tax/TaxRule + Payment/PaymentTerms/Refund/Invoice/Commission/CommissionAccrual schema-only), master-data CRUD (CUR-/FXR-/TAX-/TXR-), деньги = Decimal-строки, forged server-owned поля → 422 (raw-body), duplicate isoCode → 409, RBAC `finance.*.manage` (FINANCE/ADMIN; DIRECTOR read-only), write-пути Payment/Refund/Invoice/Settlement/Payout/LedgerTransaction → 404, события НЕ эмитятся, migration `add_finance_domain_foundation` (аддитивная, replay-proof), e2e finance-domain-foundation 12/12 + unit 15/15, полный serial e2e 1024/1024, unit 490, frontend 135, миграции 47/47 diff clean; детали — `docs/architecture/finance-domain-foundation.md`; NEXT = STEP 2.10A)\
 Finance владеет Payment `PAY-*`, PaymentTerms `PMT-*`, ProviderFee
 `PFE-*`, Refund `RFD-*`, Invoice `INV-*`, Commission `CMS-*`,
 CommissionAccrual `CAA-*`, Settlement `STL-*`, Payout `POT-*`,

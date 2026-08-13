@@ -26,7 +26,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse"]
+  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance"]
 }
 
 // ─────────────────────────────── events.* ────────────────────────────────
@@ -3278,4 +3278,302 @@ model CheckoutIntentHistory {
 
   @@index([checkoutIntentId])
   @@schema("sales")
+}
+
+
+// ============================================================================
+// finance.* — Finance Center (Phase 2, Step 2.10 — Finance Domain Foundation)
+// ============================================================================
+// Owner: Finance Center. Finance владеет (Roadmap Step 2.10):
+//   Payment PAY-*, PaymentTerms PMT-*, ProviderFee PFE-*, Refund RFD-*,
+//   Invoice INV-*, Commission CMS-*, CommissionAccrual CAA-*, Settlement STL-*,
+//   Payout POT-*, LedgerTransaction LTX-*, Currency CUR-*, ExchangeRate FXR-*,
+//   Tax TAX-*, TaxRule TXR-*.
+//
+// Step 2.10 = Finance Domain FOUNDATION: модуль + схемные модели-агрегаты +
+// master data + идентификаторы + money-контракт + RBAC + документация.
+// Осознанно НЕ реализуется в Step 2.10 (Roadmap sub-steps):
+//   - LedgerTransaction (append-only финансовые факты)            → Step 2.10A;
+//   - ProviderFee / Settlement / Payout механика                  → Step 2.10B;
+//   - temporal milestones (authorizedAt/capturedAt/... columns)   → Step 2.10C;
+//   - payment initiation / PSP / webhooks / refund execution      → 2.12–2.14;
+//   - settlement engine / invoice generation / FX / tax engine    → 2.14+.
+//
+// Инварианты foundation:
+//   - money: DECIMAL(12,2), half-up 2dp — платформенный контракт (sales.money);
+//   - Finance НЕ пишет в Order/Booking/Catalog/Availability/Acquisition
+//     (только reads по ID, ADR-0001; никаких cross-domain writes);
+//   - providerRef — ОПАКОВАННАЯ ссылка внешнего провайдера (без секретов);
+//   - идентификаторы — server-owned через events.BusinessSequence;
+//   - temporal: createdAt/updatedAt (entity time); business milestones — 2.10C.
+// ============================================================================
+
+/// Бизнес-статус Payment (TravelHub vocabulary, НЕ provider-статус; provider
+/// states живут в адаптере, 2.12A). Vocabulary выведен из канонических
+/// milestone-имён Roadmap 2.10C (authorized/captured/failed/cancelled) +
+/// OrderPaymentStatus прецедента (PAID/REFUNDED). Терминалы: CAPTURED/FAILED/
+/// CANCELLED/REFUNDED. Переходы/механика — 2.12+ (здесь только vocabulary).
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  CANCELLED
+  REFUNDED
+
+  @@schema("finance")
+}
+
+/// Payment — canonical Finance aggregate (PAY-*). Step 2.10: foundation-модель.
+/// Создание Payment (initiation) НЕ реализуется в 2.10 (§15/§52); provider
+/// orchestration — 2.12/2.12A; temporal milestones (authorizedAt/capturedAt/
+/// failedAt/cancelledAt) — 2.10C.
+model Payment {
+  id            String        @id @default(uuid())
+  code          String        @unique // PAY-00000001
+  /// ref order.Order, без FK (ADR-0001).
+  orderId       String
+  /// ref crm.Customer, без FK. NULL — internal assisted flow.
+  customerId    String?
+  /// ref crm.Partner, без FK. NULL — платформенный (platform) платеж.
+  partnerId     String?
+  amount        Decimal       @db.Decimal(12, 2)
+  currency      String        @default("USD")
+  status        PaymentStatus @default(PENDING)
+  paymentMethod String?
+  /// Опакованная ссылка внешнего провайдера (без секретов/PII; НЕ authority).
+  providerRef   String?
+  version       Int           @default(1)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([customerId])
+  @@index([partnerId])
+  @@index([status])
+  @@schema("finance")
+}
+
+/// PaymentTerms (PMT-*) — Finance-owned projection графика/условий оплаты.
+/// Шаблон-источник: frozen коммерческие факты Sales/Order (Step 2.3B
+/// computePaymentTerms snapshot, без пересчёта). Создание PMT-* в рамках
+/// будущего payment schedule/installment — 2.12F; здесь foundation-модель.
+model PaymentTerms {
+  id              String   @id @default(uuid())
+  code            String   @unique // PMT-00000001
+  /// ref order.Order, без FK.
+  orderId         String
+  /// PaymentScheme snapshot (cross-schema enum → String, честно; как Order).
+  scheme          String
+  prepaymentType  String?
+  prepaymentValue Decimal? @db.Decimal(12, 2)
+  initialAmount   Decimal  @db.Decimal(12, 2)
+  remainingAmount Decimal  @db.Decimal(12, 2)
+  currency        String   @default("USD")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([orderId])
+  @@schema("finance")
+}
+
+/// Бизнес-статус Refund (TravelHub vocabulary из Roadmap 2.10C milestone-имён:
+/// requestedAt/approvedAt/processedAt/failedAt). Исполнение refund — 2.13.
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  PROCESSED
+  FAILED
+
+  @@schema("finance")
+}
+
+/// Refund (RFD-*) — canonical Finance aggregate foundation. НЕ provider-refund;
+/// исполнение/возврат Availability-емкости — 2.13 (здесь не реализуется).
+model Refund {
+  id         String       @id @default(uuid())
+  code       String       @unique // RFD-00000001
+  /// ref finance.Payment (без FK).
+  paymentId  String
+  /// ref order.Order, без FK.
+  orderId    String
+  amount     Decimal      @db.Decimal(12, 2)
+  currency   String       @default("USD")
+  status     RefundStatus @default(REQUESTED)
+  reason     String?
+  version    Int          @default(1)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([paymentId])
+  @@index([orderId])
+  @@index([status])
+  @@schema("finance")
+}
+
+/// Бизнес-статус Invoice (canonical event InvoiceIssued). Vocabulary foundation;
+/// генерация/жизненный цикл Invoice — 2.14.
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
+
+  @@schema("finance")
+}
+
+/// Invoice (INV-*) — canonical Finance aggregate foundation. Генерация — 2.14.
+model Invoice {
+  id         String        @id @default(uuid())
+  code       String        @unique // INV-00000001
+  /// ref order.Order, без FK.
+  orderId    String
+  /// ref crm.Customer, без FK.
+  customerId String?
+  amount     Decimal       @db.Decimal(12, 2)
+  currency   String        @default("USD")
+  status     InvoiceStatus @default(DRAFT)
+  version    Int           @default(1)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([customerId])
+  @@index([status])
+  @@schema("finance")
+}
+
+/// Бизнес-статус Commission (TravelHub Commission отдельно от ProviderFee,
+/// 2.10B). Vocabulary foundation; расчёт/факты — 2.12C/2.14.
+enum CommissionStatus {
+  ACCRUED
+  INVOICED
+  PAID
+
+  @@schema("finance")
+}
+
+/// Commission (CMS-*) — TravelHub платформенная комиссия. НЕ ProviderFee
+/// (2.10B). Foundation-модель; расчёт — 2.12C/2.14.
+model Commission {
+  id         String           @id @default(uuid())
+  code       String           @unique // CMS-00000001
+  /// ref order.Order, без FK.
+  orderId    String
+  /// ref crm.Partner, без FK.
+  partnerId  String
+  amount     Decimal          @db.Decimal(12, 2)
+  currency   String           @default("USD")
+  status     CommissionStatus @default(ACCRUED)
+  version    Int              @default(1)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([orderId])
+  @@index([partnerId])
+  @@index([status])
+  @@schema("finance")
+}
+
+/// Бизнес-статус CommissionAccrual (PARTNER_COLLECT задолженность Partner перед
+/// TravelHub, 2.12E). Vocabulary foundation; accrual-механика — 2.12E/2.14.
+enum CommissionAccrualStatus {
+  ACCRUED
+  INVOICED
+  COLLECTED
+
+  @@schema("finance")
+}
+
+/// CommissionAccrual (CAA-*) — задолженность Partner (PARTNER_COLLECT mode).
+/// Foundation-модель; агрегация/списание — 2.12E/2.14.
+model CommissionAccrual {
+  id          String                   @id @default(uuid())
+  code        String                   @unique // CAA-00000001
+  /// ref crm.Partner, без FK.
+  partnerId   String
+  amount      Decimal                  @db.Decimal(12, 2)
+  currency    String                   @default("USD")
+  status      CommissionAccrualStatus  @default(ACCRUED)
+  periodStart DateTime?
+  periodEnd   DateTime?
+  version     Int                      @default(1)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  @@index([partnerId])
+  @@index([status])
+  @@schema("finance")
+}
+
+
+/// Валюта (CUR-*) — Finance master data (единственный владелец, Screen Design
+/// §7 / Architecture §8; Settings НЕ дублирует). isoCode — canonical ключ.
+model Currency {
+  id        String   @id @default(uuid())
+  code      String   @unique // CUR-00000001
+  isoCode   String   @unique // ISO 4217 (USD, AZN, EUR, ...)
+  name      String
+  symbol    String
+  decimals  Int      @default(2)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("finance")
+}
+
+/// Курс валюты (FXR-*) — Finance master data. НЕ выполняет FX-конверсию
+/// (cross-currency settlement — вне 2.10; конверсия — 2.12A/2.14D).
+model ExchangeRate {
+  id               String   @id @default(uuid())
+  code             String   @unique // FXR-00000001
+  baseCurrencyIso  String
+  quoteCurrencyIso String
+  /// Курс «1 base = rate quote» (Decimal, НЕ float). Точность rate — 6 знаков
+  /// (rate ≠ amount; amount-контракт DECIMAL(12,2) не применяется к rate).
+  rate             Decimal  @db.Decimal(18, 6)
+  validFrom        DateTime
+  validTo          DateTime?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([baseCurrencyIso, quoteCurrencyIso])
+  @@schema("finance")
+}
+
+/// Налог (TAX-*) — Finance master data (Tax/VAT engine НЕ реализуется в 2.10;
+/// правила применения — TaxRule, расчёт — 2.11/2.14A).
+model Tax {
+  id         String   @id @default(uuid())
+  code       String   @unique // TAX-00000001
+  name       String
+  rate       Decimal  @db.Decimal(12, 2)
+  countryIso String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  rules     TaxRule[]
+  @@schema("finance")
+}
+
+/// Правило налога (TXR-*) — Finance master data: где/как применяется Tax.
+model TaxRule {
+  id            String    @id @default(uuid())
+  code          String    @unique // TXR-00000001
+  taxId         String
+  tax           Tax       @relation(fields: [taxId], references: [id], onDelete: Restrict)
+  /// ref catalog.Product type / category scope (без FK; свободная привязка).
+  productType   String?
+  countryIso    String?
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([taxId])
+  @@schema("finance")
 }

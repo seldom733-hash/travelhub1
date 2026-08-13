@@ -34,6 +34,16 @@
 | `CAP-` | SellerCapability (commercial capability) | Reverse Marketplace (reverse.*) |
 | `BRQ-` | BuyerRequest (demand entry) | Reverse Marketplace (reverse.*) |
 | `PRP-` | SellerProposal (pre-commercial response) | Reverse Marketplace (reverse.*) |
+| `PAY-` | Payment | Finance (finance.*) |
+| `PMT-` | PaymentTerms | Finance (finance.*) |
+| `RFD-` | Refund | Finance (finance.*) |
+| `INV-` | Invoice | Finance (finance.*) |
+| `CMS-` | Commission | Finance (finance.*) |
+| `CAA-` | CommissionAccrual | Finance (finance.*) |
+| `CUR-` | Currency | Finance (finance.*) |
+| `FXR-` | ExchangeRate | Finance (finance.*) |
+| `TAX-` | Tax | Finance (finance.*) |
+| `TXR-` | TaxRule | Finance (finance.*) |
 
 *Exit Audit Step 1.18:* таблица синхронизирована с фактическим реестром
 `IdsService.nextCode` (PRD/CAT/TRF/CUS/CNT/COM/PAR/SUP/ORD/TH/BKG/CML/SELL/SPP/SF/APP/USR).
@@ -71,3 +81,11 @@ Seller-определённая коммерческая/сервисная ед
 Реализация: `backend/src/shared/ids.service.ts` (`IdsService.nextCode`).
 Инкремент выполняется `upsert`-ом в рамках транзакции домена — атомарно и
 без дубликатов при параллельной работе.
+
+*Step 2.10 (Finance Domain Foundation):* добавлены Finance-префиксы (finance.*):
+`PAY-` Payment, `PMT-` PaymentTerms, `RFD-` Refund, `INV-` Invoice,
+`CMS-` Commission, `CAA-` CommissionAccrual, `CUR-` Currency,
+`FXR-` ExchangeRate, `TAX-` Tax, `TXR-` TaxRule. Зарегистрированы в
+`IdsService.nextCode` (атомарный счётчик events.BusinessSequence).
+Префиксы `PFE-` (ProviderFee), `STL-` (Settlement), `POT-` (Payout),
+`LTX-` (LedgerTransaction) — reserved, регистрируются с 2.10A/2.10B.

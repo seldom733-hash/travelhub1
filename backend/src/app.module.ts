@@ -10,6 +10,7 @@ import { BookingModule } from "./modules/booking/booking.module";
 import { CommunicationModule } from "./modules/communication/communication.module";
 import { SalesModule } from "./modules/sales/sales.module";
 import { ReverseModule } from "./modules/reverse/reverse.module";
+import { FinanceModule } from "./modules/finance/finance.module";
 import { SecurityModule } from "./security/security.module";
 import { JwtAuthGuard } from "./security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "./security/auth/permissions.guard";
@@ -22,7 +23,7 @@ import { PermissionsGuard } from "./security/auth/permissions.guard";
  * открывает эндпоинты), PermissionsGuard глобально (проверка @RequirePermissions).
  */
 @Module({
-  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, OrderModule, BookingModule, CommunicationModule, SalesModule, ReverseModule],
+  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, OrderModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

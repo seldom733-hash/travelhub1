@@ -154,3 +154,13 @@ durable fact в `communication.Communication` (CML-*, ADR-0011), аудируе�
 AuditLog без body. Если появится реальный consumer — событие добавляется в
 canonical registry по envelope ADR-0010 с payload из references/minimal
 metadata (БЕЗ body/PII, §21/§54).
+
+## Finance (Step 2.10 — foundation)
+
+Finance master-data CRUD **НЕ эмитит доменных событий** (нет consumer-ов):
+Currency/ExchangeRate/Tax/TaxRule — справочные факты, аудируются в AuditLog
+(`finance.*.created/updated`, без PII). Payment/Refund/Invoice/Settlement/
+Payout события не существуют — write-пути и их события появятся вместе с
+реализацией 2.12–2.14 (foundation их не фабрикует: event taxonomy «на будущее»
+запрещена). Каждый будущий Finance event — canonical registry по envelope
+ADR-0010 (references/minimal metadata, outbox + inbox, correlation/causation).

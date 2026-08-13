@@ -584,3 +584,36 @@ cancelledAt/completedAt) → **422** (`assertNoForbiddenKeys`). Сериализ
 ISO-8601 instants; lifecycle-порядок enforcement: `confirmedAt` может
 существовать только при CONFIRMED (исторически — до `cancelledAt`, если бронь
 была подтверждена до компенсации); терминальный milestone ровно один.
+
+## Finance Center (Step 2.10 — владелец Finance master data; CUR-/FXR-/TAX-/TXR-)
+
+Finance domain FOUNDATION: master-data CRUD. Payment/Refund/Invoice/Settlement/
+Payout/LedgerTransaction **write-пути отсутствуют** в Step 2.10 (foundation) —
+агрегатные модели в схеме, клиентские write-endpoints → 404 (реализуются
+2.12–2.14). Finance — единственный владелец master data; Settings/иные модули
+не дублируют.
+
+RBAC: `finance.currency.manage`, `finance.exchange_rate.manage`,
+`finance.tax.manage` — только FINANCE/ADMIN; DIRECTOR — read-only Finance
+(read-права finance.payment/refund/invoice/commission без manage); BUYER/
+PARTNER/OPERATOR/SALES_MANAGER/MODERATOR/MARKETER/ANALYST → 403.
+
+- `GET /api/v1/finance/currencies` / `GET /api/v1/finance/currencies/:code`
+- `POST /api/v1/finance/currencies` — `{ isoCode (ISO 4217, 3 буквы), name, symbol, decimals? }`
+- `PATCH /api/v1/finance/currencies/:code` — `{ name?, symbol?, decimals?, isActive? }`; isoCode неизменяем
+- `GET /api/v1/finance/exchange-rates` / `GET /api/v1/finance/exchange-rates/:code`
+- `POST /api/v1/finance/exchange-rates` — `{ baseCurrencyIso, quoteCurrencyIso, rate (Decimal string), validFrom, validTo? }`; base≠quote
+- `PATCH /api/v1/finance/exchange-rates/:code` — `{ rate?, validFrom?, validTo?, isActive? }`
+- `GET /api/v1/finance/taxes` / `GET /api/v1/finance/taxes/:code`
+- `POST /api/v1/finance/taxes` — `{ name, rate (Decimal 12,2), countryIso? (ISO 3166-1 alpha-2) }`
+- `PATCH /api/v1/finance/taxes/:code` — `{ name?, rate?, countryIso?, isActive? }`
+- `GET /api/v1/finance/tax-rules` / `GET /api/v1/finance/tax-rules/:code`
+- `POST /api/v1/finance/tax-rules` — `{ taxId (UUID), productType?, countryIso?, effectiveFrom, effectiveTo? }`; unknown taxId → 422
+- `PATCH /api/v1/finance/tax-rules/:code` — `{ productType?, countryIso?, effectiveFrom?, effectiveTo?, isActive? }`
+
+Деньги: Decimal строки (никогда float); rate ≤ 6 знаков, tax rate ≤ 2 знака.
+`countryIso` — 2-буквенный ISO 3166-1 alpha-2 (AZ/RU/…); locale-строки и
+3-буквенные коды отклоняются. Forged server-owned поля
+(`id/code/createdAt/updatedAt/version`) → **422** (`assertNoForbiddenKeys` по
+raw body). Дубликат isoCode → 409; неизвестный код → 404. Audit: каждая
+master-data запись пишет `finance.*.created/updated` в AuditLog (без PII).
