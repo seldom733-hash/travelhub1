@@ -104,6 +104,9 @@ export const PERMISSIONS = {
   "finance.currency.manage": "Управление валютами",
   "finance.exchange_rate.manage": "Управление курсами",
   "finance.tax.manage": "Управление налогами",
+  // Step 2.10A: LedgerTransaction read (Finance Center ledger view). Write —
+  // только внутренний LedgerService (нет публичного write-эндпоинта).
+  "finance.ledger.read": "Чтение LedgerTransaction (Finance Center)",
 
   // ── Communication (Step 1.16, canonical CML-*) ─────────────────────────
   // Узкие права: internal staff — read/create (заметки и зафиксированные
@@ -227,6 +230,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.refund.read",
     "finance.invoice.read",
     "finance.commission.read",
+    "finance.ledger.read",
     "support.read",
     "documents.read",
     "settings.read",
@@ -265,6 +269,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.currency.manage",
     "finance.exchange_rate.manage",
     "finance.tax.manage",
+    "finance.ledger.read",
     "support.read",
     "documents.read",
     "settings.read",
@@ -305,6 +310,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.refund.read",
     "finance.invoice.read",
     "finance.commission.read",
+    "finance.ledger.read",
     "support.read",
     "documents.read",
     "settings.read",

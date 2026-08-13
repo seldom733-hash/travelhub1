@@ -564,7 +564,7 @@ CommissionAccrual `CAA-*`, Settlement `STL-*`, Payout `POT-*`,
 LedgerTransaction `LTX-*`, Currency `CUR-*`, ExchangeRate `FXR-*`, Tax
 `TAX-*`, TaxRule `TXR-*`.
 
-· **Step 2.10A --- Financial Ledger Foundation**\
+· **Step 2.10A --- Financial Ledger Foundation** ✅ APPROVED (STRICT REVIEW, 2026-08-13; FIX 1: duplicate key с РАЗНЫМ payload (amount/currency/sourceEventId/businessRef) → controlled 409 вместо молчаливого возврата существующего — first-write-wins + payload-верификация, e2e 9A; immutable append-only `finance.LedgerTransaction` `LTX-*`: amount>0 DECIMAL(12,2), currency-снапшот валидируется против finance.Currency, type/sourceType/sourceId/sourceEventId/businessRef/correlation/causation/actor, createdAt UTC; НЕТ updatedAt (append-only); единственный production writer — внутренний `LedgerService.create` (публичного POST нет; update/delete → 404); idempotency invariant @@unique(sourceType, sourceId, type) — replay/concurrent duplicate → существующий факт (no-op), неизвестный P2002 → controlled 409; read `finance.ledger.read` (FINANCE/DIRECTOR/ANALYST/ADMIN) — list (whitelist+пагинация) + detail; 0 доменных событий (нет consumer-ов); zero cross-domain writes (Order/Booking/Payment/Refund/Commission/availability не тронуты); migration `add_ledger_transaction_foundation` (аддитивная, replay-proof); e2e ledger-transaction-foundation 17/17 (RBAC/immutability/idempotency/concurrency/provenance/isolation/temporal/legacy); unit 492, serial e2e 1041/1041, frontend 135 + build; детали — `docs/architecture/ledger-transaction-foundation.md`; NEXT = STEP 2.10B)\
 Append-only LedgerTransaction. Финансовая история не восстанавливается
 из текущего Payment status.
 

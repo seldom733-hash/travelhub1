@@ -9,7 +9,8 @@
  * Mass-assignment: server-owned поля (id/code/createdAt/updatedAt/version)
  * запрещены громко (422, project convention loud-forbidden-key) — не silent strip.
  */
-import { IsBoolean, IsISO8601, IsInt, IsOptional, IsString, Length, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
+import { IsBoolean, IsISO8601, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
+import { Type } from "class-transformer";
 import { ValidationDomainError } from "../../shared/errors";
 
 /** Запрещённые server-owned поля для всех Finance master-data write DTO. */
@@ -244,6 +245,23 @@ export function validateRate(rate: string): string {
   return rate;
 }
 
+/**
+ * Step 2.10A — Ledger: валидация immutable amount (> 0, до 2 знаков,
+ * DECIMAL(12,2) платформенный money-контракт). Строковый Decimal, без float.
+ * Экономический смысл несёт type (не знак суммы).
+ */
+export function validateLedgerAmount(amount: string): string {
+  const d = Number(amount);
+  if (!Number.isFinite(d) || d <= 0) {
+    throw new ValidationDomainError("ledger amount must be a positive decimal number");
+  }
+  const parts = amount.split(".");
+  if (parts.length === 2 && parts[1].length > 2) {
+    throw new ValidationDomainError("ledger amount supports at most 2 decimal places (DECIMAL(12,2) contract)");
+  }
+  return amount;
+}
+
 /** Валидация налоговой ставки: >= 0, до 2 знаков (DECIMAL(12,2) контракт). */
 export function validateTaxRate(rate: string): string {
   const d = Number(rate);
@@ -255,6 +273,37 @@ export function validateTaxRate(rate: string): string {
     throw new ValidationDomainError("tax rate supports at most 2 decimal places");
   }
   return rate;
+}
+
+/** Whitelist-query для чтения Ledger (Finance Center ledger view). */
+export class LedgerListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  sourceType?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  type?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  currency?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
 }
 
 /** Дата «до» должна быть позже даты «с». */

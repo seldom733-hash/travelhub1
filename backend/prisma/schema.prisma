@@ -3577,3 +3577,43 @@ model TaxRule {
   @@index([taxId])
   @@schema("finance")
 }
+
+/// IMMUTABLE ledger fact (Step 2.10A). Append-only финансовый факт.
+/// НЕ mutable operational объект: amount/currency/type/source/provenance
+/// неизменяемы после create; нет updatedAt (намеренно — append-only);
+/// исправление — только будущий compensating/reversal факт (одобренный шаг).
+/// Double-entry/account chart/balances — НЕ входят в 2.10A (Roadmap определяет
+/// только append-only; debit/credit/balance — без канонического контракта).
+model LedgerTransaction {
+  id            String   @id @default(uuid())
+  code          String   @unique // LTX-########
+  /// Immutable amount > 0 (DECIMAL(12,2) платформенный money-контракт).
+  /// Экономический смысл несёт type (vocabulary приходит с producer-шагом 2.12+).
+  amount        Decimal  @db.Decimal(12, 2)
+  /// ISO 4217 code-снапшот, валидируется против finance.Currency (без FK).
+  currency      String
+  /// Классификация факта (String; словарь значений — с producer-шагом).
+  type          String
+  /// Домен-производитель факта (ORDER/BOOKING/PAYMENT/...).
+  sourceType    String
+  /// Каноническая ссылка на source aggregate/entity (UUID/code).
+  sourceId      String
+  /// Провенанс: event id, если факт порождён event-ом (provenance-only,
+  /// НЕ idempotency key — инвариант: (sourceType, sourceId, type)).
+  sourceEventId String?
+  /// Опциональный human-readable business ref (не заменяет sourceId).
+  businessRef   String?
+  correlationId String?
+  causationId   String?
+  /// Провенанс actor-а (USER/SYSTEM/UNKNOWN).
+  actorType     String?
+  actorId       String?
+  /// Время финансового факта (сервер-owned, UTC).
+  createdAt     DateTime @default(now())
+
+  /// Idempotency invariant: один ledger fact данного типа на source-факт.
+  @@unique([sourceType, sourceId, type])
+  @@index([sourceType, sourceId])
+  @@index([createdAt])
+  @@schema("finance")
+}

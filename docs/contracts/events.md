@@ -164,3 +164,13 @@ Payout события не существуют — write-пути и их со�
 реализацией 2.12–2.14 (foundation их не фабрикует: event taxonomy «на будущее»
 запрещена). Каждый будущий Finance event — canonical registry по envelope
 ADR-0010 (references/minimal metadata, outbox + inbox, correlation/causation).
+
+## Finance — LedgerTransaction (Step 2.10A)
+
+Ledger-факты (immutable append-only) **НЕ эмитят событий**: у
+`LedgerTransaction` нет consumer-ов и канонического event-контракта в 2.10A
+(foundation). Запись факта аудируется в AuditLog
+(`finance.ledger_transaction.created`, minimal metadata `{ code }`, без PII).
+Когда 2.12+ определит producer-шаг и реальных потребителей — событие
+добавляется в canonical registry по envelope ADR-0010 (references/minimal
+metadata, outbox + inbox, correlation/causation из контекста).

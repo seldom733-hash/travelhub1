@@ -13,9 +13,10 @@
  * Payment/Refund/Invoice/Commission write-endpoints НЕ существуют в Step 2.10
  * (foundation, §15/§52) — агрегатные модели в схеме, создание — 2.12–2.14.
  */
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import { FinanceService } from "./finance.service";
+import { LedgerService } from "./ledger.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { RequirePermissions } from "../../security/auth/decorators";
@@ -26,6 +27,7 @@ import {
   CreateTaxDto,
   CreateTaxRuleDto,
   FINANCE_MASTER_FORBIDDEN_KEYS,
+  LedgerListQueryDto,
   UpdateCurrencyDto,
   UpdateExchangeRateDto,
   UpdateTaxDto,
@@ -35,7 +37,10 @@ import {
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("finance")
 export class FinanceController {
-  constructor(private readonly finance: FinanceService) {}
+  constructor(
+    private readonly finance: FinanceService,
+    private readonly ledger: LedgerService,
+  ) {}
 
   // ── Currency (finance.currency.manage) ──────────────────────────────────────
 
@@ -149,5 +154,22 @@ export class FinanceController {
   async updateTaxRule(@Param("code") code: string, @Req() req: Request, @Body() dto: UpdateTaxRuleDto) {
     assertNoForbiddenKeys(req.body, FINANCE_MASTER_FORBIDDEN_KEYS);
     return this.finance.updateTaxRule(code, dto);
+  }
+
+  // ── LedgerTransaction (Step 2.10A) — read-only (Finance Center ledger view).
+  // Публичного write-API НЕТ: создание — только внутренний LedgerService
+  // (canonical Finance creation path, §13 option A). Immutability: update/delete
+  // эндпоинты не существуют.
+
+  @Get("ledger-transactions")
+  @RequirePermissions("finance.ledger.read")
+  async listLedger(@Query() query: LedgerListQueryDto) {
+    return this.ledger.list(query);
+  }
+
+  @Get("ledger-transactions/:code")
+  @RequirePermissions("finance.ledger.read")
+  async getLedger(@Param("code") code: string) {
+    return this.ledger.getByCode(code);
   }
 }

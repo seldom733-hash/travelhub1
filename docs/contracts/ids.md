@@ -87,5 +87,9 @@ Seller-определённая коммерческая/сервисная ед
 `CMS-` Commission, `CAA-` CommissionAccrual, `CUR-` Currency,
 `FXR-` ExchangeRate, `TAX-` Tax, `TXR-` TaxRule. Зарегистрированы в
 `IdsService.nextCode` (атомарный счётчик events.BusinessSequence).
-Префиксы `PFE-` (ProviderFee), `STL-` (Settlement), `POT-` (Payout),
-`LTX-` (LedgerTransaction) — reserved, регистрируются с 2.10A/2.10B.
+Префиксы `PFE-` (ProviderFee), `STL-` (Settlement), `POT-` (Payout) —
+reserved, регистрируются с 2.10B.
+
+*Step 2.10A (Ledger Transaction Foundation):* `LTX-` LedgerTransaction —
+зарегистрирован в `IdsService.nextCode` (атомарный счётчик
+events.BusinessSequence), immutable append-only финансовый факт.

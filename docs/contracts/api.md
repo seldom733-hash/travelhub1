@@ -617,3 +617,30 @@ PARTNER/OPERATOR/SALES_MANAGER/MODERATOR/MARKETER/ANALYST → 403.
 (`id/code/createdAt/updatedAt/version`) → **422** (`assertNoForbiddenKeys` по
 raw body). Дубликат isoCode → 409; неизвестный код → 404. Audit: каждая
 master-data запись пишет `finance.*.created/updated` в AuditLog (без PII).
+
+## Finance — LedgerTransaction (Step 2.10A — immutable ledger foundation)
+
+Append-only immutable финансовый факт (`LTX-########`). Публичного write-API
+**НЕТ** (создание — только внутренний `LedgerService`, canonical Finance
+creation path; update/delete эндпоинты не существуют → 404; модель не имеет
+`updatedAt`). Read — Finance Center ledger view.
+
+RBAC: `finance.ledger.read` — FINANCE/DIRECTOR/ANALYST/ADMIN; BUYER/PARTNER/
+OPERATOR/SALES_MANAGER/MODERATOR/MARKETER → 403; anonymous → 401.
+
+- `GET /api/v1/finance/ledger-transactions` — whitelist-фильтры
+  `{ sourceType?, type?, currency? }` + `{ page?, pageSize? (≤100) }` →
+  `{ items, total, page, pageSize, hasMore }`, детерминированная сортировка
+  (createdAt desc, code asc).
+- `GET /api/v1/finance/ledger-transactions/:code` — деталь; неизвестный → 404.
+
+Факт: `{ id, code, amount (Decimal string > 0, ≤2dp), currency (ISO 4217,
+валидируется против finance.Currency), type, sourceType, sourceId,
+sourceEventId?, businessRef?, correlationId?, causationId?, actorType?,
+actorId?, createdAt (UTC) }`. `amount/currency/type/source/provenance`
+неизменяемы после create; исправление — только будущий compensating факт
+(одобренный шаг). Idempotency invariant: один факт данного `type` на
+`(sourceType, sourceId)` — replay/конкурентный duplicate возвращает
+существующий факт (no-op), никогда не дубликат и не raw 500. НЕ эмитит
+событий; НЕ трогает Order.paymentStatus/paidAmount/Payment/Refund/
+Commission/Booking/Availability.

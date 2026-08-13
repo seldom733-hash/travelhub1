@@ -1,11 +1,13 @@
 /**
  * PHASE 2 STEP 2.10 — finance.validation unit tests (pure validators).
  */
+import "reflect-metadata";
 import {
   assertValidRange,
   FINANCE_MASTER_FORBIDDEN_KEYS,
   validateCountryIso,
   validateIsoCode,
+  validateLedgerAmount,
   validateRate,
   validateTaxRate,
 } from "./finance.validation";
@@ -69,6 +71,21 @@ describe("finance.validation — tax rate", () => {
   it("rejects negative / more than 2 decimals", () => {
     expect(() => validateTaxRate("-1")).toThrow(ValidationDomainError);
     expect(() => validateTaxRate("1.234")).toThrow(ValidationDomainError);
+  });
+});
+
+describe("finance.validation — ledger amount (Step 2.10A)", () => {
+  it("accepts positive decimal up to 2 places", () => {
+    expect(validateLedgerAmount("100")).toBe("100");
+    expect(validateLedgerAmount("1.5")).toBe("1.5");
+    expect(validateLedgerAmount("0.01")).toBe("0.01");
+  });
+
+  it("rejects zero/negative/non-numeric/excess precision", () => {
+    expect(() => validateLedgerAmount("0")).toThrow(ValidationDomainError);
+    expect(() => validateLedgerAmount("-5")).toThrow(ValidationDomainError);
+    expect(() => validateLedgerAmount("abc")).toThrow(ValidationDomainError);
+    expect(() => validateLedgerAmount("1.234")).toThrow(ValidationDomainError);
   });
 });
 

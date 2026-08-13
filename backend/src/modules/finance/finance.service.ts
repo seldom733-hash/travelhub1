@@ -9,8 +9,9 @@
  *  - refund execution (2.13);
  *  - invoice generation / commission flow (2.14);
  *  - settlement engine (2.14A) / payout (2.14B);
- *  - ledger (2.10A) / provider-fee, settlement, payout (2.10B);
- *  - temporal milestones (2.10C).
+ *  - provider-fee, settlement, payout (2.10B);
+ *  - temporal milestones (2.10C). LedgerTransaction (2.10A) реализован
+ *    в отдельном LedgerService (immutable append-only, read-only API).
  *
  * Инварианты:
  *  - Finance НЕ пишет в Order/Booking/Catalog/Availability/Acquisition
