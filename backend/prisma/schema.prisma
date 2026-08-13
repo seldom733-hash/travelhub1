@@ -3617,3 +3617,99 @@ model LedgerTransaction {
   @@index([createdAt])
   @@schema("finance")
 }
+
+/// Step 2.10B — ProviderFee: immutable факт комиссии внешнего финансового/
+/// платёжного провайдера (PSP/bank; Screen Design: «Provider Fees — фактические
+/// комиссии PSP/bank»). ОТДЕЛЬНО от TravelHub Commission (2.12C/E) и от Fee
+/// engine (не вычисляется «по проценту» без canonical source fact).
+/// НЕ PSP-интеграция: providerRef — внешняя ссылка (провенанс), не вызов.
+/// Append-only: нет updatedAt; исправление — будущий компенсирующий факт.
+model ProviderFee {
+  id            String   @id @default(uuid())
+  code          String   @unique // PFE-########
+  /// Идентификатор провайдера (String; словарь — с producer-шагом 2.12A+).
+  provider      String
+  /// Immutable amount > 0 (DECIMAL(12,2) платформенный money-контракт).
+  amount        Decimal  @db.Decimal(12, 2)
+  /// ISO 4217 снапшот, валидируется против finance.Currency (без FK).
+  currency      String
+  /// Внешняя ссылка провайдера (провенанс; не secrets).
+  providerRef   String?
+  /// Домен-производитель факта (PAYMENT/... future).
+  sourceType    String
+  /// Каноническая ссылка на source факт (напр. будущий Payment).
+  sourceId      String
+  correlationId String?
+  causationId   String?
+  actorType     String?
+  actorId       String?
+  createdAt     DateTime @default(now())
+
+  /// Idempotency: один provider fee на (source-факт, провайдер).
+  @@unique([sourceType, sourceId, provider])
+  @@index([sourceType, sourceId])
+  @@schema("finance")
+}
+
+/// Step 2.10B — Settlement: durable факт/контейнер сведения денежных
+/// обязательств (Screen Design: «Settlements — распределение
+/// gross/refunds/commission/provider fees/tax/partner payable»).
+/// ОТДЕЛЬНО от Payment (Buyer rail) и Payout (Partner rail). БЕЗ fabricated
+/// accounting state: нет balance/net-payable/periods/status (lifecycle и
+/// settlement engine — будущие шаги; статус-словарь не изобретается).
+/// Append-only факт: createdAt; без updatedAt/status.
+model Settlement {
+  id            String   @id @default(uuid())
+  code          String   @unique // STL-########
+  /// Immutable amount > 0 (settled сумма, DECIMAL(12,2)).
+  amount        Decimal  @db.Decimal(12, 2)
+  /// ISO 4217 снапшот, валидируется против finance.Currency.
+  currency      String
+  /// Домен-производитель (ORDER/SALE/...).
+  sourceType    String
+  /// Каноническая ссылка на source коммерческий факт.
+  sourceId      String
+  correlationId String?
+  causationId   String?
+  actorType     String?
+  actorId       String?
+  createdAt     DateTime @default(now())
+
+  /// Idempotency: один settlement на source-факт.
+  @@unique([sourceType, sourceId])
+  @@index([sourceType, sourceId])
+  @@schema("finance")
+}
+
+/// Step 2.10B — Payout: Finance-owned операционная запись выплаты Partner
+/// (Screen Design: «Payouts — выплаты Partner, преимущественно bank transfer
+/// rail»). НЕ обещание реального банковского/PSP перевода: никаких PSP calls,
+/// банковских credentials/PII, Stripe Connect assumptions.
+/// Payee — через provenance (sourceType/sourceId; партнёр контекст несёт
+/// source-факт); отдельная payee-колонка не вводится (ownership не определён
+/// канонически). Lifecycle/status — будущий шаг (словарь не изобретается).
+/// Append-only факт: createdAt; без updatedAt/status.
+model Payout {
+  id            String   @id @default(uuid())
+  code          String   @unique // POT-########
+  /// Immutable amount > 0 (DECIMAL(12,2)).
+  amount        Decimal  @db.Decimal(12, 2)
+  /// ISO 4217 снапшот, валидируется против finance.Currency.
+  currency      String
+  /// Внешняя ссылка провайдера/банка (провенанс; не secrets).
+  providerRef   String?
+  /// Домен-производитель (SETTLEMENT/COMMISSION_ACCRUAL/...).
+  sourceType    String
+  /// Каноническая ссылка на source обязательства (напр. Settlement).
+  sourceId      String
+  correlationId String?
+  causationId   String?
+  actorType     String?
+  actorId       String?
+  createdAt     DateTime @default(now())
+
+  /// Idempotency: один payout на source-факт.
+  @@unique([sourceType, sourceId])
+  @@index([sourceType, sourceId])
+  @@schema("finance")
+}

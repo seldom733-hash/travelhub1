@@ -275,6 +275,32 @@ export function validateTaxRate(rate: string): string {
   return rate;
 }
 
+/** Whitelist-query для чтения фактов 2.10B (ProviderFee/Settlement/Payout). */
+export class FactListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  sourceType?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  currency?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+}
+
 /** Whitelist-query для чтения Ledger (Finance Center ledger view). */
 export class LedgerListQueryDto {
   @IsOptional()

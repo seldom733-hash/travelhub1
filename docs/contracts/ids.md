@@ -88,8 +88,14 @@ Seller-определённая коммерческая/сервисная ед
 `FXR-` ExchangeRate, `TAX-` Tax, `TXR-` TaxRule. Зарегистрированы в
 `IdsService.nextCode` (атомарный счётчик events.BusinessSequence).
 Префиксы `PFE-` (ProviderFee), `STL-` (Settlement), `POT-` (Payout) —
-reserved, регистрируются с 2.10B.
+были reserved при 2.10, зарегистрированы в 2.10B.
 
 *Step 2.10A (Ledger Transaction Foundation):* `LTX-` LedgerTransaction —
 зарегистрирован в `IdsService.nextCode` (атомарный счётчик
 events.BusinessSequence), immutable append-only финансовый факт.
+
+*Step 2.10B (Provider Fee / Settlement / Payout Foundation):* зарегистрированы
+`PFE-` ProviderFee, `STL-` Settlement, `POT-` Payout — финансовые
+операционные факты (Finance-owned), создаются только внутренним
+`SettlementService` (публичного POST нет), idempotency на DB-unique
+(sourceType+sourceId[+provider]), `IdsService.nextCode` в той же transaction.

@@ -140,15 +140,16 @@ describe("Phase 2 Step 2.0 — Phase 2 entry audit (e2e)", () => {
 
   it("2. Payment: нет Payment entity; paymentStatus/paidAmount — НЕ payment history; Buyer payments available:false", async () => {
     // Step 2.10 (Finance foundation) легитимно ввёл schema-only модели
-    // Payment/PaymentTerms/Refund/Invoice/Commission/CommissionAccrual —
-    // делегаты существуют, но write-пути отсутствуют (404, доказано
-    // finance-domain-foundation e2e #7). Settlement/Payout/subscription/
-    // billing по-прежнему не существуют.
+    // Payment/PaymentTerms/Refund/Invoice/Commission/CommissionAccrual,
+    // Step 2.10A — LedgerTransaction, Step 2.10B — ProviderFee/Settlement/
+    // Payout: делегаты существуют, но write-пути отсутствуют (404/0 writers,
+    // доказано finance/ledger/provider-fee e2e). Subscription/plan/billing
+    // по-прежнему не существуют.
     const client = prisma as unknown as Record<string, unknown>;
-    for (const m of ["payment", "refund", "invoice"]) {
+    for (const m of ["payment", "refund", "invoice", "settlement", "payout"]) {
       expect(client[m]).toBeDefined();
     }
-    for (const m of ["settlement", "payout", "subscription", "plan", "billing"]) {
+    for (const m of ["subscription", "plan", "billing"]) {
       expect(client[m]).toBeUndefined();
     }
     // Representation — только поля на Order

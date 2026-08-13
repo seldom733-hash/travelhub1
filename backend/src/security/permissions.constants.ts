@@ -107,6 +107,11 @@ export const PERMISSIONS = {
   // Step 2.10A: LedgerTransaction read (Finance Center ledger view). Write —
   // только внутренний LedgerService (нет публичного write-эндпоинта).
   "finance.ledger.read": "Чтение LedgerTransaction (Finance Center)",
+  // Step 2.10B: ProviderFee/Settlement/Payout read (Finance Center views).
+  // Write — только внутренний SettlementService (нет публичного write-эндпоинта).
+  "finance.provider_fee.read": "Чтение ProviderFee (Finance Center)",
+  "finance.settlement.read": "Чтение Settlement (Finance Center)",
+  "finance.payout.read": "Чтение Payout (Finance Center)",
 
   // ── Communication (Step 1.16, canonical CML-*) ─────────────────────────
   // Узкие права: internal staff — read/create (заметки и зафиксированные
@@ -231,6 +236,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.invoice.read",
     "finance.commission.read",
     "finance.ledger.read",
+    "finance.provider_fee.read",
+    "finance.settlement.read",
+    "finance.payout.read",
     "support.read",
     "documents.read",
     "settings.read",
@@ -270,6 +278,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.exchange_rate.manage",
     "finance.tax.manage",
     "finance.ledger.read",
+    "finance.provider_fee.read",
+    "finance.settlement.read",
+    "finance.payout.read",
     "support.read",
     "documents.read",
     "settings.read",
@@ -311,6 +322,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.invoice.read",
     "finance.commission.read",
     "finance.ledger.read",
+    "finance.provider_fee.read",
+    "finance.settlement.read",
+    "finance.payout.read",
     "support.read",
     "documents.read",
     "settings.read",

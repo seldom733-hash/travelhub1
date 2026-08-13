@@ -17,6 +17,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from
 import type { Request } from "express";
 import { FinanceService } from "./finance.service";
 import { LedgerService } from "./ledger.service";
+import { SettlementService } from "./settlement.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { RequirePermissions } from "../../security/auth/decorators";
@@ -26,6 +27,7 @@ import {
   CreateExchangeRateDto,
   CreateTaxDto,
   CreateTaxRuleDto,
+  FactListQueryDto,
   FINANCE_MASTER_FORBIDDEN_KEYS,
   LedgerListQueryDto,
   UpdateCurrencyDto,
@@ -40,6 +42,7 @@ export class FinanceController {
   constructor(
     private readonly finance: FinanceService,
     private readonly ledger: LedgerService,
+    private readonly settlement: SettlementService,
   ) {}
 
   // ── Currency (finance.currency.manage) ──────────────────────────────────────
@@ -171,5 +174,46 @@ export class FinanceController {
   @RequirePermissions("finance.ledger.read")
   async getLedger(@Param("code") code: string) {
     return this.ledger.getByCode(code);
+  }
+
+  // ── ProviderFee / Settlement / Payout (Step 2.10B) — read-only (Finance
+  // Center views). Публичного write-API НЕТ: создание — только внутренний
+  // SettlementService (canonical Finance creation path). Append-only факты
+  // без lifecycle: update/delete не существуют.
+
+  @Get("provider-fees")
+  @RequirePermissions("finance.provider_fee.read")
+  async listProviderFees(@Query() query: FactListQueryDto) {
+    return this.settlement.listProviderFees(query);
+  }
+
+  @Get("provider-fees/:code")
+  @RequirePermissions("finance.provider_fee.read")
+  async getProviderFee(@Param("code") code: string) {
+    return this.settlement.getProviderFeeByCode(code);
+  }
+
+  @Get("settlements")
+  @RequirePermissions("finance.settlement.read")
+  async listSettlements(@Query() query: FactListQueryDto) {
+    return this.settlement.listSettlements(query);
+  }
+
+  @Get("settlements/:code")
+  @RequirePermissions("finance.settlement.read")
+  async getSettlement(@Param("code") code: string) {
+    return this.settlement.getSettlementByCode(code);
+  }
+
+  @Get("payouts")
+  @RequirePermissions("finance.payout.read")
+  async listPayouts(@Query() query: FactListQueryDto) {
+    return this.settlement.listPayouts(query);
+  }
+
+  @Get("payouts/:code")
+  @RequirePermissions("finance.payout.read")
+  async getPayout(@Param("code") code: string) {
+    return this.settlement.getPayoutByCode(code);
   }
 }

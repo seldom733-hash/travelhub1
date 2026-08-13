@@ -644,3 +644,23 @@ actorId?, createdAt (UTC) }`. `amount/currency/type/source/provenance`
 существующий факт (no-op), никогда не дубликат и не raw 500. НЕ эмитит
 событий; НЕ трогает Order.paymentStatus/paidAmount/Payment/Refund/
 Commission/Booking/Availability.
+
+## Step 2.10B — Provider Fee / Settlement / Payout foundation
+
+Внутренний Finance API (read-only для staff; публичного POST нет):
+
+- `GET /api/v1/finance/provider-fees` — list ProviderFee (`finance.provider_fee.read`);
+  фильтры `sourceType`, `currency`; пагинация `page`/`pageSize` (≤100), total, hasMore.
+- `GET /api/v1/finance/provider-fees/:code` — detail.
+- `GET /api/v1/finance/settlements` — list Settlement (`finance.settlement.read`).
+- `GET /api/v1/finance/settlements/:code` — detail.
+- `GET /api/v1/finance/payouts` — list Payout (`finance.payout.read`).
+- `GET /api/v1/finance/payouts/:code` — detail.
+
+Write-surface отсутствует: POST/PATCH/DELETE → 404. Create — только
+внутренний `SettlementService` (canonical creation path). Деньги — Decimal-
+строки DECIMAL(12,2); currency — ISO 4217 снапшот против `finance.Currency`.
+Idempotency: DB-unique (ProviderFee: sourceType+sourceId+provider;
+Settlement/Payout: sourceType+sourceId) — identical replay → no-op,
+divergent payload → 409, unknown P2002 → controlled conflict. События НЕ
+эмитятся; LedgerTransaction НЕ пишется (нет canonical engine).

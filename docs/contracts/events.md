@@ -174,3 +174,13 @@ Ledger-факты (immutable append-only) **НЕ эмитят событий**: 
 Когда 2.12+ определит producer-шаг и реальных потребителей — событие
 добавляется в canonical registry по envelope ADR-0010 (references/minimal
 metadata, outbox + inbox, correlation/causation из контекста).
+
+## Step 2.10B — ProviderFee / Settlement / Payout
+
+`ProviderFeeCreated` / `SettlementCreated` / `PayoutCreated` — НЕ эмитятся:
+нет consumer-ов и canonical event-контракта в foundation. Запись факта
+аудируется в AuditLog (`finance.provider_fee.created` / `finance.settlement
+.created` / `finance.payout.created`, minimal metadata `{ code }`, без PII).
+Когда 2.12+ определит producer-шаги и реальных потребителей — события
+добавляются в canonical registry по envelope ADR-0010 (outbox + inbox,
+correlation/causation из контекста).
