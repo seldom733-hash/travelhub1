@@ -431,7 +431,6 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "order.suspend": "Приостановка заказа",
   "order.cancel": "Отмена заказа",
   "order.close": "Закрытие заказа",
-  "order.import": "Импорт/создание заказа (ADMIN exception)",
   "booking.read": "Чтение бронирований",
   "booking.send_supplier": "Отправка запроса поставщику",
   "booking.confirm": "Подтверждение/отклонение бронирования",

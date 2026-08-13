@@ -323,6 +323,14 @@ model Product {
   categorySchemaId  String?
   categorySchema    CategorySchema? @relation(fields: [categorySchemaId], references: [id], onDelete: SetNull)
   attributes        Json?
+  /// Step 2.8A: канонический commercial timezone услуги (IANA ID, напр.
+  /// "Asia/Baku") — AUTHORITY времени услуги для TIME_SLOT-бронирований.
+  /// Seller-декларация локации, где оказывается услуга (Catalog owns calendar/
+  /// commercial definitions). НЕ выводится из browser/buyer locale/server/IP
+  /// (гейт 2.8A §8). NULL = date-only услуга / zone unknown (честно, без
+  /// угадывания). Замораживается в CheckoutIntent при binding — Booking никогда
+  /// не пере-резолвит текущий Catalog.
+  serviceTimeZone String?
 
   tariffs      Tariff[]
   availability Availability[]
@@ -897,6 +905,9 @@ model ProductDraft {
   categoryId        String?
   categorySchemaId  String?
   attributes        Json?
+  /// Step 2.8A: change-proposal N+1 commercial timezone (поле Draft, как
+  /// title/description — применяется на approve; frozen Booking НЕ пере-резолвит).
+  serviceTimeZone   String?
   /// Тарифы N+1 (JSON payload; применяются на approve — заменяют live tariffs).
   tariffs     Json?
   /// Ревизия черновика: 1,2,3… на каждую правку PARTNER-а.
@@ -1602,6 +1613,15 @@ model Order {
   amount        Decimal             @default(0) @db.Decimal(12, 2)
   paidAmount    Decimal             @default(0) @db.Decimal(12, 2)
   serviceDate   DateTime?
+  /// Step 2.8A: frozen local temporal facts услуги (verbatim из OrderRequested,
+  /// произошли из CheckoutIntent; НЕ пере-вычисляются). serviceTime — local
+  /// wall-clock "HH:mm" (TIME_SLOT); serviceEndTime — опциональный local end;
+  /// serviceTimeZone — IANA (frozen authority из Catalog на момент binding).
+  /// Date-only услуга: все три NULL. UTC instant НЕ дублируется здесь —
+  /// единственная точка деривации — Booking (инвариант local↔UTC, §13).
+  serviceTime     String?
+  serviceEndTime  String?
+  serviceTimeZone String?
   version       Int                 @default(1)
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
@@ -1734,6 +1754,26 @@ model OrderHistory {
 
 // ─────────────────────────────── booking.* ───────────────────────────────
 
+/// Step 2.8A: тип service occurrence Booking (Roadmap 2.8A).
+///  - DATE_ONLY — известная календарная дата, точное время неизвестно/не
+///    применимо (serviceDate только; UTC instant НЕ фабрикуется как 00:00, §7);
+///  - TIME_SLOT — известная дата + точное local время (serviceTime +
+///    serviceTimeZone → serviceStartsAt; опционально serviceEndTime →
+///    serviceEndsAt). Слот — описание occurrence, НЕ отдельная capacity-entity
+///    (второй hold engine запрещён §18);
+///  - DATE_RANGE — дата-диапазон (start + end). Зарезервирован: производство
+///    требует canonical duration/end-авторитета (не создаётся второй authority
+///    §14) — не продуцируется текущим flow;
+///  - OPEN_DATE — дата неизвестна (legacy/null serviceDate путь).
+enum BookingServiceTimeType {
+  DATE_ONLY
+  TIME_SLOT
+  DATE_RANGE
+  OPEN_DATE
+
+  @@schema("booking")
+}
+
 enum BookingStatus {
   NEW
   PREPARING_REQUEST
@@ -1767,6 +1807,10 @@ model Booking {
   code        String        @unique // BKG-00000001
   orderId     String // ссылка на Order, без FK
   productId   String // ссылка на Catalog, без FK
+  /// Step 2.8: canonical linkage OrderItem ↔ Booking (1 OrderItem → ≤1 Booking,
+  /// DB-level unique; consumer BookingRequested заполняет из order.items).
+  /// NULL — legacy Booking, созданные до Step 2.8 (без backfill).
+  orderItemId String?       @unique
   status      BookingStatus @default(NEW)
   amount      Decimal       @default(0) @db.Decimal(12, 2)
   serviceDate DateTime?
@@ -1774,6 +1818,39 @@ model Booking {
   /// (READ-only, ADR-0001) в момент создания Booking. Cross-schema ref — String
   /// (Prisma multiSchema); NULL — legacy Booking до 2.5B (без backfill).
   acquisitionSource String?
+  /// ── Step 2.8A: frozen service occurrence (verbatim из Order/OrderItem) ────
+  /// Тип occurrence: DATE_ONLY (default — точная классификация legacy: у них
+  /// только serviceDate) | TIME_SLOT | OPEN_DATE (serviceDate null) |
+  /// DATE_RANGE (зарезервирован, не продуцируется — нет duration-авторитета).
+  serviceTimeType BookingServiceTimeType @default(DATE_ONLY)
+  /// Local wall-clock start "HH:mm" (TIME_SLOT only; date-only → NULL).
+  serviceTime     String?
+  /// Local wall-clock end "HH:mm" (опционально, только с serviceTime).
+  serviceEndTime  String?
+  /// IANA zone (TIME_SLOT only; frozen authority из Catalog через Order).
+  serviceTimeZone String?
+  /// Derived UTC instant: serviceDate + serviceTime в serviceTimeZone (§13).
+  /// NULL для date-only/OPEN_DATE (не фабрикуется как UTC-midnight, §7).
+  /// Деривация — ОДИН раз при создании consumer-ом (frozen; не пере-резолвится).
+  serviceStartsAt DateTime?
+  /// Derived UTC end instant: serviceEndTime на дате старта (или следующей,
+  /// если end <= start); NULL без endTime/для date-only.
+  serviceEndsAt   DateTime?
+  /// ── Step 2.9A: Booking temporal contract (lifecycle milestones) ────────
+  /// Сервер-owned UTC instants, immutable после установки (первый переход),
+  /// атомарны с CAS-переходом (status+version+milestone+history+outbox).
+  /// НЕ связаны с service occurrence (2.8A) — lifecycle время ≠ время услуги.
+  /// nullable: legacy Booking (до 2.9A) — без backfill/fabrication.
+  /// requestAt: запрос отправлен поставщику (transition `send` → SENT_TO_SUPPLIER).
+  requestedAt DateTime?
+  /// Подтверждено (transition `confirm` → CONFIRMED).
+  confirmedAt  DateTime?
+  /// Отклонено поставщиком (transition `reject` → SUPPLIER_REJECTED).
+  rejectedAt   DateTime?
+  /// Отменено (explicit `cancel`, компенсация OrderCancelled, born-CANCELLED).
+  cancelledAt  DateTime?
+  /// Исполнено (transition `complete` → COMPLETED).
+  completedAt  DateTime?
   version     Int           @default(1)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -2978,6 +3055,11 @@ model Sale {
   remainingAmount Decimal?          @db.Decimal(12, 2)
   acquisitionSource SalesAcquisitionSource?
   serviceDate     DateTime?
+  /// Step 2.8A: frozen local temporal факты (verbatim из CheckoutIntent при
+  /// completion; UTC instant НЕ дублируется — деривация только на Booking).
+  serviceTime     String?
+  serviceEndTime  String?
+  serviceTimeZone String?
   /// Ссылка на catalog.AvailabilityReservation (без FK) — первая/каноническая
   /// резервация Sale. Полный список резерваций — по sourceSaleId в catalog.*.
   reservationId   String?
@@ -3135,8 +3217,17 @@ model CheckoutIntent {
   remainingAmount  Decimal? @db.Decimal(12, 2)
 
   // ── Service context ──
-  /// Дата услуги: date-only (YYYY-MM-DD → UTC midnight). Time/timezone — 2.8A.
+  /// Дата услуги: date-only (YYYY-MM-DD → UTC midnight).
   serviceDate  DateTime?
+  /// Step 2.8A: local wall-clock start "HH:mm" (TIME_SLOT; settable через
+  /// service-date команду). NULL = date-only.
+  serviceTime     String?
+  /// Local wall-clock end "HH:mm" (опционально, только с serviceTime).
+  serviceEndTime  String?
+  /// IANA zone — ЗАМОРОЖЕН server-side при создании CheckoutIntent из Quote
+  /// items' products (Catalog authority; client НЕ передаёт — forbidden key).
+  /// NULL = date-only или mixed/missing zones. serviceTime без zone → 422.
+  serviceTimeZone String?
   /// Server-derived acquisition source (internal-assisted = DIRECT), immutable.
   acquisitionSource SalesAcquisitionSource @default(DIRECT)
 

@@ -30,6 +30,7 @@ import {
   assertQuoteTransition,
 } from "./sales.validation";
 import { classifyAvailability, isDateOnly, parseServiceDate, quoteExpiry } from "./sales.checkout";
+import { isLocalTime } from "../../shared/service-time";
 import { computePaymentTerms } from "./sales.payment-terms";
 import {
   discountAmountOf,
@@ -868,6 +869,15 @@ export class SalesService {
     const now = new Date();
     const serviceDate = new Date(checkout.serviceDate);
     serviceDate.setUTCHours(0, 0, 0, 0);
+    // Step 2.8A: frozen local temporal факты (verbatim из CheckoutIntent; UTC
+    // instant НЕ дублируется здесь — единственная деривация на Booking §13).
+    // Defensive: time без zone не может пройти Checkout гейт — mismatch = дефект.
+    if (checkout.serviceTime && !checkout.serviceTimeZone) {
+      throw new ValidationDomainError(`CheckoutIntent ${checkout.code} has serviceTime without a service timezone (canonical violation)`);
+    }
+    const serviceTime = checkout.serviceTime ?? null;
+    const serviceEndTime = checkout.serviceEndTime ?? null;
+    const serviceTimeZone = checkout.serviceTimeZone ?? null;
 
     // Step 1.8C freeze contract (Roadmap 1226-1227, Universal §12, 1.8C §39):
     // binding price = frozen QuoteItem snapshot (amount/currency/serviceDate/tariff
@@ -899,6 +909,9 @@ export class SalesService {
           remainingAmount: checkout.remainingAmount,
           acquisitionSource: checkout.acquisitionSource,
           serviceDate,
+          serviceTime,
+          serviceEndTime,
+          serviceTimeZone,
         },
       });
       if (res.count === 0) throw new ConflictError(`Sale ${code} was modified concurrently; retry`);
@@ -917,6 +930,9 @@ export class SalesService {
         initialAmount: checkout.initialAmount ? String(checkout.initialAmount) : null,
         remainingAmount: checkout.remainingAmount ? String(checkout.remainingAmount) : null,
         acquisitionSource: checkout.acquisitionSource,
+        serviceTime,
+        serviceEndTime,
+        serviceTimeZone,
       };
 
       // Availability reservation через OWNER service (DD-022 closure).
@@ -980,6 +996,9 @@ export class SalesService {
           })),
           ...snapshot,
           serviceDate: serviceDate.toISOString().slice(0, 10),
+          serviceTime,
+          serviceEndTime,
+          serviceTimeZone,
         } as OrderRequestedPayload,
       });
       await tx.sale.update({
@@ -1072,6 +1091,19 @@ export class SalesService {
     // Service date — опциональна на create (без даты availability = NOT_SPECIFIED).
     const serviceDate = input.serviceDate ? parseServiceDate(input.serviceDate) : null;
 
+    // Step 2.8A: timezone authority (IANA) — ЗАМОРАЖИВАЕТСЯ server-side из Catalog
+    // products Quote items (единственный источник; client НЕ передаёт — forbidden
+    // key). Единый non-null zone у ВСЕХ items → freeze; иначе (mixed/missing) →
+    // NULL — точный time-based выбор невозможен (serviceTime → 422 на команде).
+    // Booking НИКОГДА не пере-резолвит текущий Catalog (frozen occurrence §10).
+    const zoneRows = await this.prisma.product.findMany({
+      where: { id: { in: quote.items.map((i) => i.productId) } },
+      select: { serviceTimeZone: true },
+    });
+    const zones = new Set<string>();
+    for (const z of zoneRows) if (z.serviceTimeZone) zones.add(z.serviceTimeZone);
+    const serviceTimeZone = zones.size === 1 ? [...zones][0] : null;
+
     // Travelers: если не переданы — наследуются из Quote (editing allowed, §20).
     const travelers =
       input.travelers ??
@@ -1097,6 +1129,8 @@ export class SalesService {
           discountAmount: quote.discountAmount,
           total: quote.total as Prisma.Decimal,
           serviceDate,
+          // Step 2.8A: frozen IANA zone (Catalog authority; см. выше).
+          serviceTimeZone,
           // Server-derived acquisition source (Step 2.2F §22/§23, DD-030 gap fix):
           // наследуется из Quote.acquisitionSource (который наследует из
           // Opportunity.acquisitionSource). Request-led конверсия → BUYER_REQUEST;
@@ -1121,6 +1155,7 @@ export class SalesService {
         currency: quote.currency,
         total: String(quote.total),
         serviceDate: serviceDate ? serviceDate.toISOString().slice(0, 10) : null,
+        serviceTimeZone,
         acquisitionSource: row.acquisitionSource,
       });
       await this.security.audit(tx, {
@@ -1216,28 +1251,60 @@ export class SalesService {
     return this.getCheckoutIntentDetail(code);
   }
 
-  /** Service date: date-only (UTC midnight), НЕ в прошлом; availability пересчитывается. */
-  async setCheckoutServiceDate(code: string, serviceDate: string, expectedVersion: number, actor: Actor): Promise<CheckoutIntentDetailDto> {
+  /**
+   * Service occurrence (Step 2.8A): serviceDate (date-only, НЕ в прошлом) +
+   * опциональное точное local время (serviceTime/serviceEndTime — HH:mm).
+   * Timezone — frozen server-side (из Catalog, см. createCheckoutIntent); client
+   * НЕ передаёт zone/instants (forbidden keys → 422). undefined = не менять;
+   * null = очистить (вернуться к date-only). Time без frozen zone → 422 (честный
+   * гейт: нет authoritative IANA source — точное время недоступно, §8).
+   * Step 1.8C freeze contract (STRICT REVIEW §42/§44 FIX 1): сервисная дата —
+   * availability/execution факт; binding price уже заморожен в QuoteItem при
+   * addQuoteItem (freeze point = Quote ISSUE). Смена даты НЕ пере-резолвит цену
+   * и НЕ репрайсит (никакого reprice из текущего Catalog; frozen Quote immutable).
+   */
+  async setCheckoutServiceDate(
+    code: string,
+    input: { serviceDate: string; serviceTime?: string | null; serviceEndTime?: string | null },
+    expectedVersion: number,
+    actor: Actor,
+  ): Promise<CheckoutIntentDetailDto> {
     const row = await this.prisma.checkoutIntent.findUnique({ where: { code } });
     if (!row) throw new NotFoundError(`CheckoutIntent ${code} not found`);
     this.assertCheckoutMutable(row);
     await this.assertCheckoutNotCompleted(row);
-    const parsed = parseServiceDate(serviceDate);
+    const parsed = parseServiceDate(input.serviceDate);
 
-    // Step 1.8C freeze contract (STRICT REVIEW §42/§44 FIX 1): сервисная дата —
-    // availability/execution факт; binding price уже заморожен в QuoteItem при
-    // addQuoteItem (freeze point = Quote ISSUE). Смена даты НЕ пере-резолвит
-    // цену и НЕ репрайсит (никакого reprice из текущего Catalog; frozen Quote
-    // immutable). Availability пересчитывается отдельным read-гейтом.
+    // Step 2.8A: local time semantics (undefined = не менять; null = очистить).
+    const nextTime = input.serviceTime === undefined ? (row.serviceTime ?? null) : input.serviceTime;
+    const nextEndTime = input.serviceEndTime === undefined ? (row.serviceEndTime ?? null) : input.serviceEndTime;
+    if (nextTime !== null && nextTime !== undefined) {
+      if (!isLocalTime(nextTime)) throw new ValidationDomainError("serviceTime must be local wall-clock HH:mm");
+      // Authority gate (§8): точное время требует frozen IANA zone (Catalog).
+      if (!row.serviceTimeZone) {
+        throw new ValidationDomainError(
+          `CheckoutIntent ${row.code} has no service timezone (products declare no IANA timezone); exact-time selection is not available`,
+        );
+      }
+      if (nextEndTime !== null && nextEndTime !== undefined && !isLocalTime(nextEndTime)) {
+        throw new ValidationDomainError("serviceEndTime must be local wall-clock HH:mm");
+      }
+    } else if (nextEndTime !== null && nextEndTime !== undefined) {
+      // end без start — противоречивый temporal факт → 422 (не silent-clear).
+      throw new ValidationDomainError("serviceEndTime requires serviceTime");
+    }
 
     await this.prisma.$transaction(async (tx) => {
       const res = await tx.checkoutIntent.updateMany({
         where: { id: row.id, version: expectedVersion },
-        data: { serviceDate: parsed, version: { increment: 1 } },
+        data: { serviceDate: parsed, serviceTime: nextTime ?? null, serviceEndTime: nextEndTime ?? null, version: { increment: 1 } },
       });
       if (res.count === 0) throw new ConflictError(`CheckoutIntent ${code} was modified concurrently; retry`);
       await this.writeHistory(tx, "checkoutIntentHistory", row.id, "service_date_changed", null, null, actor, {
         serviceDate: parsed.toISOString().slice(0, 10),
+        serviceTime: nextTime ?? null,
+        serviceEndTime: nextEndTime ?? null,
+        serviceTimeZone: row.serviceTimeZone ?? null,
       });
       await this.security.audit(tx, {
         userId: actor.id,
@@ -1245,7 +1312,12 @@ export class SalesService {
         action: "sales.checkout.service_date_changed",
         resource: "CheckoutIntent",
         resourceId: row.id,
-        details: { code: row.code, serviceDate: parsed.toISOString().slice(0, 10) },
+        details: {
+          code: row.code,
+          serviceDate: parsed.toISOString().slice(0, 10),
+          serviceTime: nextTime ?? null,
+          serviceEndTime: nextEndTime ?? null,
+        },
       });
     });
     return this.getCheckoutIntentDetail(code);
@@ -2152,6 +2224,9 @@ export class SalesService {
       discountAmount: Prisma.Decimal | null;
       total: Prisma.Decimal;
       serviceDate: Date | null;
+      serviceTime: string | null;
+      serviceEndTime: string | null;
+      serviceTimeZone: string | null;
       acquisitionSource: SalesAcquisitionSource;
       paymentScheme: PaymentScheme | null;
       prepaymentType: "PERCENTAGE" | "FIXED" | null;
@@ -2179,6 +2254,10 @@ export class SalesService {
       discountAmount: row.discountAmount ? String(row.discountAmount) : null,
       total: String(row.total),
       serviceDate: row.serviceDate ? row.serviceDate.toISOString().slice(0, 10) : null,
+      // Step 2.8A: local wall-clock (HH:mm) + frozen IANA zone (verbatim).
+      serviceTime: row.serviceTime ?? null,
+      serviceEndTime: row.serviceEndTime ?? null,
+      serviceTimeZone: row.serviceTimeZone ?? null,
       acquisitionSource: row.acquisitionSource,
       cancelledAt: row.cancelledAt ? isoUtc(row.cancelledAt) : null,
       createdById: row.createdById,
@@ -2223,6 +2302,9 @@ export class SalesService {
       discountAmount: Prisma.Decimal | null;
       total: Prisma.Decimal;
       serviceDate: Date | null;
+      serviceTime: string | null;
+      serviceEndTime: string | null;
+      serviceTimeZone: string | null;
       acquisitionSource: SalesAcquisitionSource;
       paymentScheme: PaymentScheme | null;
       prepaymentType: "PERCENTAGE" | "FIXED" | null;
@@ -2274,6 +2356,9 @@ export class SalesService {
     initialAmount: Prisma.Decimal | null;
     remainingAmount: Prisma.Decimal | null;
     acquisitionSource: SalesAcquisitionSource | null;
+    serviceTime: string | null;
+    serviceEndTime: string | null;
+    serviceTimeZone: string | null;
     completedAt: Date | null;
     completedById: string | null;
     reservationId: string | null;
@@ -2294,6 +2379,9 @@ export class SalesService {
             initialAmount: row.initialAmount ? String(row.initialAmount) : null,
             remainingAmount: row.remainingAmount ? String(row.remainingAmount) : null,
             acquisitionSource: row.acquisitionSource,
+            serviceTime: row.serviceTime ?? null,
+            serviceEndTime: row.serviceEndTime ?? null,
+            serviceTimeZone: row.serviceTimeZone ?? null,
           }
         : null;
     return {

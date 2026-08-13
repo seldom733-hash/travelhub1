@@ -585,25 +585,20 @@ describe("Phase 2 Step 2.5 — Order Creation Consumer (e2e)", () => {
     expect((await prisma.outboxEvent.findUniqueOrThrow({ where: { id: eventId } })).status).toBe("FAILED");
   });
 
-  // ── Bootstrap isolation (§22) ─────────────────────────────────────────────
+  // ── Bootstrap isolation (§22) — Step 2.6: маршрут удалён ────────────────
 
-  it("9. bootstrap flow остаётся изолированным (без saleId); canonical Order — только через OrderRequested", async () => {
+  it("9. Step 2.6: POST /orders/bootstrap → 404; canonical Order — только через OrderRequested", async () => {
     const buyer = await registerBuyer("s25_buyer");
     const customerId = buyer.user.customerId!;
     const fx = await createProduct("s25_boot", 50);
-    const res = await adminAgent
+    await adminAgent
       .post("/api/v1/orders/bootstrap")
       .send({ customerId, items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }] })
-      .expect(201);
-    const bootOrder = res.body.order as { id: string };
-    created.orders.push(bootOrder.id);
+      .expect(404);
+    // Никакого Order по удалённому пути.
+    expect(await prisma.order.count({ where: { customerId } })).toBe(0);
 
-    const row = await prisma.order.findUniqueOrThrow({ where: { id: bootOrder.id } });
-    expect(row.saleId).toBeNull(); // bootstrap ≠ canonical flow
-    expect(row.orderRequestedEventId).toBeNull();
-
-    // Canonical chain создаёт свой Order (проверено тестом 1); bootstrap не
-    // «перехватывает» OrderRequested — consumer создаёт через доменную логику.
+    // Canonical chain создаёт Order ТОЛЬКО через OrderRequested consumer.
     const sm = await createStaff("s25_boot2", RoleCode.SALES_MANAGER);
     const fx2 = await createProduct("s25_boot2", 60);
     const ctx = await makeReadySale(sm.accessToken, fx2);

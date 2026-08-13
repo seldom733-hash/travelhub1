@@ -24,6 +24,9 @@ import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
+import { IdsService } from "../src/shared/ids.service";
+import { EventBusService } from "../src/eventbus/eventbus.service";
+import { createFixtureOrder } from "./fixtures/create-order.fixture";
 
 interface Session {
   accessToken: string;
@@ -33,6 +36,8 @@ interface Session {
 describe("Step 1.17 — PII redaction: traveler/passenger в order/booking read (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let ids: IdsService;
+  let eventBus: EventBusService;
 
   const stamp = Date.now();
   const created = {
@@ -69,11 +74,13 @@ describe("Step 1.17 — PII redaction: traveler/passenger в order/booking read 
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+    ids = app.get(IdsService);
+    eventBus = app.get(EventBusService);
 
     const admin = await login("admin", "admin123");
     const adminAgent = agent(admin.accessToken);
 
-    // Customer + Order с traveler (полные PII) через bootstrap.
+    // Customer + Order с traveler (полные PII) через test-fixture (Step 2.6).
     const customer = (
       await adminAgent
         .post("/api/v1/customers")
@@ -83,25 +90,22 @@ describe("Step 1.17 — PII redaction: traveler/passenger в order/booking read 
     created.customers.push(customer.id);
 
     const order = (
-      await adminAgent
-        .post("/api/v1/orders/bootstrap")
-        .send({
-          customerId: customer.id,
-          currency: "USD",
-          items: [{ productId: "00000000-0000-0000-0000-000000000001", title: "PII Tour", type: "TOUR", price: 100 }],
-          travelers: [
-            {
-              firstName: "Иван",
-              lastName: "Петров",
-              birthDate: "1990-05-01",
-              citizenship: "AZ",
-              gender: "male",
-              passportNumber: "AB1234567",
-            },
-          ],
-        })
-        .expect(201)
-    ).body.order;
+      await createFixtureOrder(prisma, ids, eventBus, {
+        customerId: customer.id,
+        currency: "USD",
+        items: [{ productId: "00000000-0000-0000-0000-000000000001", title: "PII Tour", type: "TOUR", price: 100 }],
+        travelers: [
+          {
+            firstName: "Иван",
+            lastName: "Петров",
+            birthDate: "1990-05-01",
+            citizenship: "AZ",
+            gender: "male",
+            passportNumber: "AB1234567",
+          },
+        ],
+      })
+    ).order;
     created.orders.push(order.id);
 
     // Booking + Passenger (полные PII) — фикстура напрямую (детерминированно).

@@ -272,9 +272,15 @@ describe("Phase 1 Step 1.13A — Temporal readiness (e2e)", () => {
     `;
     const bookingNames = bookingCols.map((r) => r.column_name);
     expect(bookingNames).toContain("createdAt");
-    // Booking-милстоуны — будущий Step 2.9/2.9A (здесь НЕ вводились).
-    expect(bookingNames).not.toContain("confirmedAt");
-    expect(bookingNames).not.toContain("cancelledAt");
+    // Step 2.9A canonical Booking milestone columns (5 аддитивных сервер-owned
+    // фактов; NULL = переход не произошёл).
+    expect(bookingNames).toContain("requestedAt");
+    expect(bookingNames).toContain("confirmedAt");
+    expect(bookingNames).toContain("rejectedAt");
+    expect(bookingNames).toContain("cancelledAt");
+    expect(bookingNames).toContain("completedAt");
+    // Payment-домен ещё не существует — никакой paidAt/подобной колонки и на Booking.
+    expect(bookingNames).not.toContain("paidAt");
   });
 
   it("6. no-fake-backfill: legacy-подобные строки (raw SQL, без temporal timestamps) остаются NULL после seed/reconciliation (§29)", async () => {

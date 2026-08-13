@@ -11,7 +11,8 @@ const CONSUMER_ID = "order-requested-consumer";
  *
  * Владелец Order — Order Center (ADR-0001): consumer создаёт Order/OrderItems/
  * OrderTraveler/Fulfillment + OrderCreated строго через OrderService (доменную
- * логику), а НЕ симулируя HTTP bootstrap.
+ * логику). Step 2.6: это ЕДИНСТВЕННЫЙ путь создания нормального Order —
+ * HTTP bootstrap-путь удалён.
  *
  * Идемпотентность — тройная защита:
  *  1. events.InboxEvent (unique consumerId+eventId) — стандартный dedup;

@@ -130,6 +130,12 @@ export interface SaleCommercialSnapshot {
   initialAmount: string | null;
   remainingAmount: string | null;
   acquisitionSource: SalesAcquisitionSource;
+  /** Step 2.8A: frozen local temporal факты (verbatim из CheckoutIntent; IANA
+   *  zone authority; NULL = date-only). UTC instant НЕ дублируется — деривация
+   *  только на Booking (§13). */
+  serviceTime: string | null;
+  serviceEndTime: string | null;
+  serviceTimeZone: string | null;
 }
 
 /** Step 2.4: результат команды completeSale. */
@@ -206,6 +212,10 @@ export interface CheckoutIntentDto extends SalesEntityDto {
   discountAmount: string | null;
   total: string;
   serviceDate: string | null;
+  // Step 2.8A: local wall-clock (HH:mm) + frozen IANA zone (server-derived).
+  serviceTime: string | null;
+  serviceEndTime: string | null;
+  serviceTimeZone: string | null;
   cancelledAt: string | null;
   createdById: string | null;
   // Step 2.3B: коммерческие условия оплаты (server-derived). NULL = not selected

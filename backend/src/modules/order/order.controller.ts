@@ -1,44 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { Type } from "class-transformer";
-import {
-  IsArray,
-  IsEnum,
-  IsNumber,
-  IsObject,
-  IsOptional,
-  IsString,
-  Min,
-  ValidateNested,
-} from "class-validator";
+import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from "class-validator";
+import { Request } from "express";
 import { OrderService, type OrderAction } from "./order.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
+import { assertNoForbiddenKeys } from "../../shared/field-validation";
+import { ORDER_ACTION_FORBIDDEN_KEYS, ORDER_TRAVELERS_FORBIDDEN_KEYS } from "./order.validation";
 
-class BootstrapItemDto {
-  @IsString()
-  productId!: string;
-
-  @IsString()
-  title!: string;
-
-  @IsString()
-  type!: string;
-
-  @IsOptional()
-  @IsNumber()
-  quantity?: number;
-
-  @IsNumber()
-  price!: number;
-
-  @IsOptional()
-  @IsString()
-  serviceDate?: string;
-}
-
-class BootstrapTravelerDto {
+class TravelerDto {
   @IsString()
   firstName!: string;
 
@@ -62,30 +34,6 @@ class BootstrapTravelerDto {
   passportNumber?: string;
 }
 
-class BootstrapOrderDto {
-  @IsString()
-  customerId!: string;
-
-  @IsOptional()
-  @IsString()
-  currency?: string;
-
-  @IsOptional()
-  @IsString()
-  serviceDate?: string;
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => BootstrapItemDto)
-  items!: BootstrapItemDto[];
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => BootstrapTravelerDto)
-  travelers?: BootstrapTravelerDto[];
-}
-
 class OrderActionDto {
   @IsEnum(["process", "markWaitingData", "resumeProcessing", "confirm", "send", "complete", "close", "cancel", "problem", "suspend"] as const)
   action!: OrderAction;
@@ -94,8 +42,8 @@ class OrderActionDto {
 class UpdateTravelersDto {
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => BootstrapTravelerDto)
-  travelers!: BootstrapTravelerDto[];
+  @Type(() => TravelerDto)
+  travelers!: TravelerDto[];
 }
 
 class ListOrdersQuery {
@@ -140,19 +88,15 @@ const ACTION_PERMISSIONS: Record<OrderAction, string> = {
 
 /**
  * REST API: /api/v1/orders → Order Center.
- * POST /orders/bootstrap — ADMIN-only exception (Phase 1 bootstrap, Phase 2 §4:
- * «убрать из обычного UI; оставить только как ADMIN/import exception»).
+ *
+ * Step 2.6: POST /orders/bootstrap удалён. Единственный путь создания нормального
+ * Order — canonical flow: Quote → CheckoutIntent → Sale → OrderRequested →
+ * Outbox/EventBus → Order-owned consumer → Order (OrderCreated).
  */
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller()
 export class OrderController {
   constructor(private readonly orders: OrderService) {}
-
-  @Post("orders/bootstrap")
-  @RequirePermissions("order.import")
-  bootstrapOrder(@Body() dto: BootstrapOrderDto, @CurrentUser() actor: AuthedRequest["user"]) {
-    return this.orders.bootstrapOrder(dto, actor.username);
-  }
 
   @Get("orders")
   @RequirePermissions("order.read")
@@ -168,15 +112,34 @@ export class OrderController {
 
   @Patch("orders/:id")
   @RequirePermissions((req) => [ACTION_PERMISSIONS[req.body?.action as OrderAction] ?? "order.edit_noncritical"])
-  orderAction(@Param("id") id: string, @Body() dto: OrderActionDto, @CurrentUser() actor: AuthedRequest["user"]) {
+  orderAction(
+    @Param("id") id: string,
+    @Body() dto: OrderActionDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Req() req: Request,
+  ) {
+    // STRICT REVIEW §28: forged server-owned поля → ЯВНЫЙ 422 (конвенция
+    // assertNoForbiddenKeys, как в Sales/Reverse/Catalog), а не silent-strip
+    // через whitelist. Команда принимает ТОЛЬКО `action`.
+    assertNoForbiddenKeys(req.body, ORDER_ACTION_FORBIDDEN_KEYS);
     return this.orders.orderAction(id, dto.action, actor.username);
   }
 
   @Patch("orders/:id/travelers")
   @RequirePermissions("order.edit_noncritical")
-  updateTravelers(@Param("id") id: string, @Body() dto: UpdateTravelersDto, @CurrentUser() actor: AuthedRequest["user"]) {
+  updateTravelers(
+    @Param("id") id: string,
+    @Body() dto: UpdateTravelersDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Req() req: Request,
+  ) {
+    // STRICT REVIEW §28: server-owned OrderTraveler ключи (id/orderId/version/
+    // dataCompleteness/…) → 422, а не молчаливая обрезка (как в checkout-конвенции).
+    assertNoForbiddenKeys(req.body, ORDER_TRAVELERS_FORBIDDEN_KEYS);
+    const raw = (req.body as { travelers?: unknown[] } | undefined)?.travelers;
+    if (raw) {
+      for (const t of raw) assertNoForbiddenKeys(t, ORDER_TRAVELERS_FORBIDDEN_KEYS);
+    }
     return this.orders.updateTravelers(id, dto.travelers, actor.username);
   }
 }
-
-export { IsObject };

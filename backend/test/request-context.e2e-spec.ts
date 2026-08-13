@@ -33,11 +33,14 @@ import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { EventBusService } from "../src/eventbus/eventbus.service";
 import { createRequestId, isValidRequestId } from "../src/shared/request-context";
+import { IdsService } from "../src/shared/ids.service";
+import { createFixtureOrder, type FixtureOrderInput } from "./fixtures/create-order.fixture";
 
 describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let eventBus: EventBusService;
+  let ids: IdsService;
   let http: request.Agent;
   let anon: request.Agent;
 
@@ -50,8 +53,9 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   let productId: string;
   let customerId: string;
 
-  const bootstrap = () =>
-    http.post("/api/v1/orders/bootstrap").send({
+  // Step 2.6: test-only fixture вместо удалённого POST /orders/bootstrap.
+  const fixtureOrder = () =>
+    createFixtureOrder(prisma, ids, eventBus, {
       customerId,
       currency: "USD",
       items: [{ productId, title: "Tour", type: "TOUR", quantity: 1, price: 100 }],
@@ -69,6 +73,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
     await app.init();
     prisma = app.get(PrismaService);
     eventBus = app.get(EventBusService);
+    ids = app.get(IdsService);
 
     const login = await request(app.getHttpServer()).post("/api/v1/auth/login").send({ username: "admin", password: "admin123" }).expect(200);
     http = request.agent(app.getHttpServer());
@@ -146,7 +151,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
     const res = await anon.get("/api/v1/public/products?pageSize=1").set("x-request-id", clientId).expect(200);
     expect(res.headers["x-request-id"]).toBe(clientId); // requestId echo
     // correlation в outbox для этого запроса НЕ равен client UUID.
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").set("x-request-id", clientId).expect(200);
     const ev = await prisma.outboxEvent.findFirst({ where: { aggregateId: order.id, eventType: "OrderStatusChanged" } });
@@ -157,7 +162,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   it("4c. client X-Correlation-Id НЕ становится authoritative correlation (server assigns)", async () => {
     // Произвольный client correlation не формирует цепочку: сервер сам назначает
     // correlation = requestId. Проверяем на HTTP-команде с outbox-событием.
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     const res = await action(order.id, "process").set("x-correlation-id", "client-forged-chain").expect(200);
     const requestId = res.headers["x-request-id"] as string;
@@ -174,7 +179,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   // ── 5-6. Async propagation: outbox видит тот же context ──────────────────
 
   it("5-6. HTTP-triggered Outbox event наследует correlation = requestId", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     const res = await action(order.id, "process").expect(200);
     const requestId = res.headers["x-request-id"] as string;
@@ -189,7 +194,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   // ── 7-9. Causal chain: Order command → BookingRequested → Booking consumer ─
 
   it("7-8. child event (BookingCreated) наследует correlation и получает causation → parent", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -221,9 +226,9 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
     // Два независимых запроса с ОДНИМ client UUID получают одинаковый requestId
     // (echo), но РАЗНЫЕ correlationId — никакого случайного слияния в одну chain.
     const sharedClientId = createRequestId();
-    const o1 = (await bootstrap().expect(201)).body.order;
+    const o1 = (await fixtureOrder()).order;
     orderIds.push(o1.id);
-    const o2 = (await bootstrap().expect(201)).body.order;
+    const o2 = (await fixtureOrder()).order;
     orderIds.push(o2.id);
     const r1 = await action(o1.id, "process").set("x-request-id", sharedClientId).expect(200);
     const r2 = await action(o2.id, "process").set("x-request-id", sharedClientId).expect(200);
@@ -238,9 +243,9 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   });
 
   it("9. independent chains имеют разные correlation (разные requestId)", async () => {
-    const o1 = (await bootstrap().expect(201)).body.order;
+    const o1 = (await fixtureOrder()).order;
     orderIds.push(o1.id);
-    const o2 = (await bootstrap().expect(201)).body.order;
+    const o2 = (await fixtureOrder()).order;
     orderIds.push(o2.id);
     const r1 = await action(o1.id, "process").expect(200);
     const r2 = await action(o2.id, "process").expect(200);
@@ -253,7 +258,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   // ── 10-12. Consumer retry / duplicate delivery / legacy NULL ─────────────
 
   it("10. consumer retry (повторная доставка того же события) сохраняет correlation и не создаёт новый effect", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -288,7 +293,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   it("11. duplicate delivery (тот же eventId) не создаёт новую logical chain", async () => {
     // Фактически покрыто тестом 10 (inbox dedup). Дополнительно: повторный send
     // команды отклоняется from-guard'ом, второй BookingRequested не публикуется.
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -299,7 +304,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   });
 
   it("12. legacy NULL correlation event обрабатывается consumer-ом", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -374,8 +379,8 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
     expect(raw).not.toContain("secret");
   });
 
-  it("16b. 4xx (validation) несёт requestId и не раскрывает детали", async () => {
-    const res = await http.post("/api/v1/orders/bootstrap").send({}).expect(400);
+  it("16b. Step 2.6: удалённый bootstrap-маршрут → 404 с requestId (никакого валидационного create-пути)", async () => {
+    const res = await http.post("/api/v1/orders/bootstrap").send({}).expect(404);
     expect(isValidRequestId(res.headers["x-request-id"] as string)).toBe(true);
     expect(res.body.requestId).toBe(res.headers["x-request-id"]);
   });
@@ -396,7 +401,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   // ── 17-20. Ключевые регрессии (полные — в отдельных e2e-файлах) ─────────
 
   it("17. Order canonical events 1.14 не сломаны (confirm → одно OrderReadyForBooking)", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -406,7 +411,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   });
 
   it("18. BookingRequested flow не сломан (Booking + Passenger созданы)", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);

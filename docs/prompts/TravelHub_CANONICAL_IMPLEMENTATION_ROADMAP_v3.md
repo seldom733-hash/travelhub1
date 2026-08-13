@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-11 (Service Templates decision gates DD-024…DD-029 RESOLVED; Universal Pricing Model Amendment INTEGRATED — docs/architecture/universal-pricing-model.md)\
+**Дата актуализации:** 2026-08-13 (Service Templates decision gates DD-024…DD-029 RESOLVED; Universal Pricing Model Amendment INTEGRATED — docs/architecture/universal-pricing-model.md; Canonical Roadmap Gap & Status Reconciliation Audit COMPLETED 2026-08-12 — статусы 1.12.3/1.18/1.18A/2.0/2.6 синхронизированы; Step 2.7 ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES; Step 2.8 ✅ STRICT REVIEW COMPLETED — APPROVED; Step 2.8A ✅ STRICT REVIEW COMPLETED — APPROVED; Step 2.9 ◀ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW (2026-08-13))\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -271,6 +271,7 @@ behavioral events, anonymous/authenticated session context,
 `occurredAt`, storefrontId/productId, source/channel, trace context.
 Подготовить неизменяемую передачу будущего acquisition context, но не
 создавать Order/Sale преждевременно.
+**Статус: APPROVED (ADR-0008; реализовано: StorefrontBehavioralEvent + MarketplaceBehavioralEvent, migrations `add_storefront_behavioral_events`/`add_marketplace_behavioral_events`; e2e storefront-behavioral/marketplace-behavioral; подтверждено Phase 1 Exit Audit (1.18) + Phase 2 Entry Audit (2.0); маркер отсутствовал — ROADMAP STATUS STALE, COMPLETION VERIFIED 2026-08-12).**
 
 · **Step 1.13 --- Buyer Cabinet Foundation**\
 Свои будущие Orders/Bookings/Documents/Payments/Support read models;
@@ -322,12 +323,13 @@ performance/security; Partner/Seller/Storefront включены.\
 · **Step 1.18 --- Phase 1 Exit Audit**\
 GAP-анализ против актуального Master/Baseline, Phase 1 DoD,
 ADR/migration/security debt, готовность к Phase 2.\
-**Статус: не начат.**
+**Статус: APPROVED (2026-08-09; артефакт — docs/architecture/phase1-exit-audit.md; Verdict: READY FOR 1.18A; DoD-матрица, RBAC exit gate, fresh install proof, регрессия 28 suites/438 e2e + 230 unit; маркер «не начат» устарел — ROADMAP STATUS STALE, COMPLETION VERIFIED 2026-08-12).**
 
 · **Step 1.18A --- Phase 1 Analytics Readiness Gate**\
 Доказать, что Product/Moderation/Partner/Buyer/Seller/Storefront имеют
 достаточные timestamps/events/history. Не переходить в Phase 2 с
 невосстановимой историей lifecycle transitions.
+**Статус: APPROVED (2026-08-10; артефакт — docs/architecture/analytics-readiness.md; Verdict: PASS; READY-матрица Product/Moderation/Partner/Buyer/Seller/Storefront/behavioral; legacy NULL сегментирован без фабрикаций; маркер отсутствовал — ROADMAP STATUS STALE, COMPLETION VERIFIED 2026-08-12).**
 
 ------------------------------------------------------------------------
 
@@ -339,6 +341,7 @@ Documents.
 · **Step 2.0 --- Phase 2 Entry Audit**\
 Проверка Phase 1, migrations, RBAC, events, legacy endpoints и
 готовности Sales/Order/Booking/Finance.
+**Статус: APPROVED (2026-08-10; артефакт — docs/architecture/phase2-entry-audit.md; Verdict: PHASE 2 STEP 2.0 ENTRY AUDIT PASSED WITH STEP-LOCAL PREREQUISITES — READY FOR FIRST PHASE 2 IMPLEMENTATION STEP; e2e phase2-entry-audit; маркер отсутствовал — ROADMAP STATUS STALE, COMPLETION VERIFIED 2026-08-12).**
 
 · **Step 2.1 --- Sales Domain Foundation** ✅ DONE\
 Lead `LED-*`, Opportunity `OPP-*`, Quote `QTE-*`, Sale `SAL-*`;
@@ -527,26 +530,30 @@ propagation — будущие owner-steps; 2.6/2.7/2.8 НЕ реализова�
 · **Step 2.6 --- Remove Bootstrap Order Creation**\
 Удалить временный `/orders/bootstrap`; обычный Order только canonical
 flow.
+**Статус: ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-12; отчёт — PHASE_2_STEP_2.6_REMOVE_BOOTSTRAP_ORDER_CREATION_STRICT_REVIEW.md; единственный production writer — canonical OrderRequested consumer; `order.import` удалён; регрессия 863/863 e2e + 459 unit + 135 frontend + build + migrate 42/42; см. «Полная авторитетная последовательность после 2.5B» ниже).**
 
 · **Step 2.7 --- Order Lifecycle Completion**\
 Backend lifecycle, stable codes, guards, history, SLA,
 `OrderReadyForBooking`, `BookingRequested`, `OrderFulfilled`,
 `OrderClosed`.
+**Статус: ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-12; независимый adversarial-аудит — отчёт PHASE_2_STEP_2.7_ORDER_LIFECYCLE_COMPLETION_STRICT_REVIEW.md; REVIEW FIXES: §28 forged server-owned поля → 422 (assertNoForbiddenKeys, order.validation.ts), §40/§29/§33/§37 добавлены e2e concurrent confirm / send-vs-cancel / fulfill race / BUYER_REQUEST / legacy null-acquisition / MODERATOR; §13 boundary подтверждён — pre-existing Phase 1 BookingRequested consumer канонизируется в 2.8; регрессия 895/895 e2e + 459 unit + 135 frontend + build + migrate 42/42 drift 0; детали — `docs/architecture/order-lifecycle-completion.md`).**
 
 · **Step 2.8 --- BookingRequested → Booking Creation**\
 Booking создаётся только по `BookingRequested`; связь OrderItem ↔
 Booking без нарушения ownership.
+**Статус: ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-12; независимый adversarial-аудит — отчёт PHASE_2_STEP_2.8_BOOKINGREQUESTED_TO_BOOKING_CREATION_STRICT_REVIEW.md; канонизация pre-existing Phase 1 consumer `booking.subscribers.ts` — ЕДИНСТВЕННЫЙ create-механизм (write-path audit: один `booking.create`, категория 5 = 0; POST /bookings не существует); кардинальность 1 OrderItem → 1 Booking (DB unique `Booking.orderItemId`, миграция 20260812140000_add_booking_order_item_link, аддитивная, nullable для legacy); frozen факты verbatim (acquisitionSource DIRECT/BUYER_REQUEST/null без fabrication, amount = item.amount Decimal без reprice); Passenger из COMPLETE OrderTraveler (non-traveler — без placeholder); идемпотентность Inbox + count-check + DB unique (P2002 no-op ТОЛЬКО для `Booking_orderItemId_key`/`InboxEvent_consumerId_eventId_key` через shared `uniqueConstraintNames` — оба Prisma shape; прочие unique-дефекты → FAILED); failure atomicity — весь OrderRequest в одной consumer-транзакции; BookingCreated ровно одно на обработку (без PII, correlation наследуется, causation = BookingRequested.eventId, actor SYSTEM); §28 forbidden-key 422 на PATCH /bookings (booking.validation.ts) + Order-команды (order.validation.ts); event authority — durable BookingRequested без live-state gate (race cancel после send → Booking остаётся, компенсация 2.9); legacy-совместимость (orderItemId NULL, null acquisition); 2.8A-boundary соблюдён (serviceStartsAt/EndsAt/Timezone — только forbidden keys); регрессия 909/909 e2e + 459 unit + 135 frontend + build + migrate 43/43 drift 0; детали — `docs/architecture/booking-requested-to-booking-creation.md`; e2e `booking-requested-consumer` (14 тестов); Step 2.8A НЕ начат).**
 
 · **Step 2.8A --- Booking Service Date / Time Model**\
 Отдельно entity creation time и время услуги: `serviceStartsAt`,
 `serviceEndsAt`, `serviceTimezone`; `DATE_ONLY`, `TIME_SLOT`,
-`DATE_RANGE`, `OPEN_DATE`; capacity/slot reservation. IANA timezone.
+`DATE_RANGE`, `OPEN_DATE`; capacity/slot reservation. IANA timezone.\
+**Статус: ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-13; имплементация: frozen service occurrence пропагируется цепочкой Catalog → Quote → CheckoutIntent → Sale → OrderRequested → Order → BookingRequested → Booking; authority timezone = `Product.serviceTimeZone` (IANA, Intl.supportedValuesOf) → frozen в CheckoutIntent при binding → verbatim дальше (никакого browser/locale/IP/offset authority; forged zone/instant → 422); temporal vocabulary `serviceDate` (date-only) + `serviceTime`/`serviceEndTime` (local HH:mm) + `serviceTimeZone` (IANA) + `serviceStartsAt`/`serviceEndsAt` (derived UTC instants, Intl-оффсеты БЕЗ ручной арифметики; DST ambiguous → ранний instant, nonexistent → сразу после разрыва; date-only → NULL, 00:00 НЕ фабрикуется §7); `serviceTimeType` DATE_ONLY (default, корректно классифицирует legacy)|TIME_SLOT|OPEN_DATE|DATE_RANGE (зарезервирован); деривация — ОДИН раз в consumer-е BookingRequested из frozen фактов (инвариант local↔UTC §13); миграции 20260812212139_add_booking_service_time_model + add_product_draft_service_time_zone (аддитивные, nullable; 45/45 drift 0); продакшн PATCH /orders|/bookings и checkout service-date — forbidden temporal keys → 422; OrderRequested +serviceTime/serviceEndTime/serviceTimeZone (валидация consumer-а: time требует zone + serviceDate, endTime требует time; дефект ленты → FAILED); BookingCreated НЕ расширен; TimeSlot/slot-capacity/reschedule — вне 2.8A (гейты); регрессия 949/949 e2e (54 suite, вкл. booking-service-time-model 40 тестов) + 475 unit + 135 frontend + build + drift 0; STRICT REVIEW 2026-08-13 — независимый adversarial-аудит: 0 дефектов (3 документационные уточнения: mixed/no-zone quote → order-level zone freeze; clear-time требует явный serviceEndTime:null; ±12h window — теоретический лимит); отчёт `docs/prompts/PHASE_2_STEP_2.8A_BOOKING_SERVICE_DATE_TIME_MODEL_STRICT_REVIEW.md`; детали — `docs/architecture/booking-service-time-model.md`; NEXT = Step 2.9).**
 
 · **Step 2.9 --- Booking Lifecycle Completion**\
 Supplier processing, confirmation, clarification, rejection,
 change/cancellation, fulfillment, обратные события Order.
 
-· **Step 2.9A --- Booking Temporal Contract**\
+· **Step 2.9A --- Booking Temporal Contract** ✅ APPROVED (STRICT REVIEW, 2026-08-13; 5 сервер-owned milestones `requestedAt/confirmedAt/rejectedAt/cancelledAt/completedAt` на Booking; first-only внутри той же CAS-transaction, что и переход статуса; born-CANCELLED `cancelledAt=createdAt`; компенсация Order-cancel пишет `cancelledAt` CAS; forged milestone PATCH → 422 (forbidden keys уже покрывали); UTC instants; `updatedAt` ≠ бизнес-дата; migration 46_booking_temporal_milestones (5 аддитивных DateTime?, backfill N/A); e2e booking-temporal-contract 18/18 (negative §41 + positive §42 + concurrency §38 + lifecycle matrix §40; гонки confirm/confirm, confirm/reject, confirm/cancel, complete/cancel, компенсация/confirm — один победитель, ровно один milestone, без raw 500; duplicate compensation replay идемпотентен; acquisition frozen; детали — `docs/architecture/booking-temporal-contract.md`; NEXT = STEP 2.10)\
 `createdAt`, `requestedAt`, `confirmedAt`, `rejectedAt`, `cancelledAt`,
 `completedAt`, history/SLA timestamps.
 
@@ -1489,12 +1496,12 @@ PII-скан; FIX 2: lifecycle-команды loud-422 на forged keys; FIX 3�
 race final-state/category-snapshot/nested-PII e2e; doc: PAX
 category-neutrality + destination source).
 
-**Currently active item:** Step 2.2C — STRICT REVIEW COMPLETED
+**Currently active item (исторический снапшот на 2026-08-10; актуальная последовательность — раздел «Полная авторитетная последовательность после 2.5B» ниже):** Step 2.2C — STRICT REVIEW COMPLETED
 (APPROVED WITH REVIEW FIXES; Matching & Distribution: reverse.
 BuyerRequestDistribution, system matching command, Seller inbox,
 strict containment coverage).
 
-**Exact NEXT item:** `PHASE 2 — STEP 2.2D — SELLER PROPOSAL FOUNDATION`
+**Exact NEXT item (исторический снапшот на 2026-08-10):** `PHASE 2 — STEP 2.2D — SELLER PROPOSAL FOUNDATION`
 (читает reverse.BuyerRequestDistribution напрямую; 2.2C одобрена;
 2.2D запускается отдельным implementation prompt).
 
@@ -1534,8 +1541,14 @@ strict containment coverage).
 21. **Step 1.8C — Period Pricing & Period Availability Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-12; `catalog.CommercialPeriod` CPR-* — tariffId, kind PERIOD/DATE_OVERRIDE, date-only UTC inclusive, dayOfWeek условие, price Decimal(12,2) наследует валюту Tariff, sellable stop-sell, ACTIVE/ARCHIVED, version-CAS, CommercialPeriodHistory RESTRICT; deterministic resolver DD-026 precedence DATE_OVERRIDE > narrower PERIOD > DAY_OF_WEEK > base (same-priority overlap → 422); bulk annual calendar atomic + advisory lock; Quote item `serviceDate` → period price резолвится pre-binding и замораживается; POR/ARCHIVED/stop-sell → 422; public priceFrom = min(base FIXED ∪ future sellable periods), UTC-consistent; регрессия 838/838 e2e + 430 unit + 135 frontend + build + migrate 40/40 drift 0; time-slot deferred до 2.8A; STRICT REVIEW FIXES: §44 freeze semantics — completeSale/setCheckoutServiceDate НЕ пере-резолвят текущий календарь (frozen Quote binding после ISSUE; Seller-edit не инвалидирует КП), §50 priceFrom SQL CURRENT_DATE→UTC (sort=display), §41 QuoteItem.serviceDate provenance snapshot, §23/§24 occupancy/PAX/duration/tier = 1.8D (не 1.8C); детали — `docs/architecture/period-pricing-foundation.md`)
 22. **Step 1.8C — STRICT REVIEW** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-12; независимая проверка кода/миграции/runtime; FIX 1 §44 freeze — verifyCheckoutPeriodPrices удалён (binding = Quote ISSUE), FIX 2 §50 priceFrom SQL timezone UTC, FIX 3 §41 QuoteItem.serviceDate, FIX 4 docs minNights/productId/currency/Decimal overclaims исправлены; e2e #20-22 переписан (200 вместо 422); 1.8B test-evolution — легитимная (модель появилась в 1.8C), НЕ ослабление)
 23. **Step 1.8D — Commercial Restrictions / Overrides Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-12; STRICT REVIEW FIXES: §42 range stop-sell, §44/§51 activate parent guard, §21 override-семантика, §18 default-all, priceFrom boundary; 859/859 e2e + 459 unit + 135 frontend + build + migrate 42/42 drift 0; детали — `docs/architecture/commercial-restrictions-overrides-foundation.md`)
-23. **Step 1.8D — Commercial Restrictions / Overrides Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES
-24. **STEP 2.6 — REMOVE BOOTSTRAP ORDER CREATION** ▶ NEXT (active item; UNBLOCKED — 1.8D STRICT REVIEW APPROVED; RETURN TO ORIGINAL SEQUENCE)
+24. **STEP 2.6 — REMOVE BOOTSTRAP ORDER CREATION** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-12; независимая проверка: единственный production writer `createOrderFromRequested` (аудит writes — категория 4 = 0), consumer diff vs HEAD = только комментарий, fixture test-only (не в src/модулях/build), `order.import` удалён + seed-реконсиляция role-scoped, mass-assignment закрыт (PATCH только action/travelers), Step 2.7/Booking/Payment/availability не тронуты (git scope), legacy Order читаем/управляем; REVIEW FIX: canonical journey усилен нетривиальной Decimal-суммой 123.45 (§15/§33.13) — frozen money от Quote до OrderCreated без float-drift; регрессия воспроизведена независимо: 863/863 serial e2e + 459 unit + 135 frontend + build + migrate 42/42; детали — отчёт STRICT REVIEW)
+25. **STEP 2.7 — ORDER LIFECYCLE COMPLETION** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-12; STRICT REVIEW FIXES: §28 forbidden-key 422 (order.validation.ts), §40/§29/§33/§37 новые e2e (concurrent confirm, send-vs-cancel, fulfill race, BUYER_REQUEST, legacy null-acquisition, MODERATOR); регрессия 895/895 e2e + 459 unit + 135 frontend; единственная авторитетная машина состояний (12 кодов, Screen Design), `OrderReadyForBooking`/`BookingRequested`/`OrderFulfilled`/`OrderClosed` атомарно с state+history, `confirm` guard (travelers COMPLETE), explicit send→`BookingRequested` (только из READY_FOR_BOOKING), CAS/идемпотентность, milestone-времена 2.5A immutable, SLA = детерминизм из milestones/history, READY_TO_CLOSE = резервный код без producer-а, Step 2.8 boundary сохранён (Booking создаёт ТОЛЬКО consumer BookingRequested); детали — `docs/architecture/order-lifecycle-completion.md`; e2e order-lifecycle-completion)
+26. **STEP 2.7 — STRICT REVIEW** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-12; отчёт — PHASE_2_STEP_2.7_ORDER_LIFECYCLE_COMPLETION_STRICT_REVIEW.md)
+27. **STEP 2.8 — BOOKINGREQUESTED → BOOKING CREATION** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-12; канонизация pre-existing Phase 1 consumer; кардинальность 1:1 `orderItemId` @unique; §28 booking PATCH 422; регрессия 909/909 e2e + 459 unit + 135 frontend + migrate 43/43; e2e booking-requested-consumer 14 тестов)
+28. **STEP 2.8 — STRICT REVIEW** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-12; отчёт — PHASE_2_STEP_2.8_BOOKINGREQUESTED_TO_BOOKING_CREATION_STRICT_REVIEW.md)
+29. **STEP 2.8A — BOOKING SERVICE DATE / TIME MODEL** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-13; см. секцию Step 2.8A выше; регрессия 949/949 e2e + 475 unit + 135 frontend + build + migrate 45/45 drift 0)
+29A. **PHASE 2 — STEP 2.8A — STRICT REVIEW** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-13; отчёт PHASE_2_STEP_2.8A_BOOKING_SERVICE_DATE_TIME_MODEL_STRICT_REVIEW.md; 0 дефектов)
+29B. **PHASE 2 — STEP 2.9 — BOOKING LIFECYCLE COMPLETION** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-13; независимый adversarial-аудит: write-path (ровно 3 Booking-owned writer-а, категория 4 = 0), единая state-machine authority, compensation OrderCancelled (CAS + history + BookingCancelled, терминальные не трогаются), born-CANCELLED (§15 — создание сразу в CANCELLED при OrderCancelled-раньше-BookingRequested, `created_cancelled`, без BookingCancelled — перехода не было), BookingCompleted vs BookingStatusChanged (canonical факт + технический reconcile-контракт 2.5A, не конкурируют — BookingCompleted без consumer-а), AWAITING_CONFIRMATION — резервный код без producer-а (как READY_TO_CLOSE), §46 Order reconciliation matrix M1–M8 (все 8 комбинаций e2e; cancelled-only/rejected-only НЕ → FULFILLED; PROBLEM не перезаписывается reconcile), Availability release ownership — schema явно фиксирует owner-step, release нигде не реализован (системно), 2.9 не освобождает — OK; REVIEW FIXES: (1) order-status guard в bookingAction — lifecycle-команды (кроме cancel) на брони заказа CANCELLED/CLOSED → 409 (инвариант §15 детерминирован; компенсация-vs-command race закрыта для последовательного сценария), (2) `problem` self-transition исключён (alignment с Order), (3) race-тесты compensation-vs-confirm/complete; регрессия воспроизведена независимо: 994/994 serial e2e (55 suite) + 475 unit + 135 frontend + build + migrate 45/45; детали — `docs/architecture/booking-lifecycle-completion.md` (§16/§16A); отчёт — PHASE_2_STEP_2.9_BOOKING_LIFECYCLE_COMPLETION_STRICT_REVIEW.md; NEXT = Step 2.9A) полный канонический Booking lifecycle: единственный authority `BookingService.bookingAction` + CAS (`updateMany id+status+version`, как Order 1.14 §19); producer-ы для Screen Design статусов (prepare→PREPARING_REQUEST, requestClarification/resume→NEEDS_CLARIFICATION, requestChange/resolveChange→CHANGE_REQUESTED, requestCancellation→CANCELLATION_REQUESTED; AWAITING_CONFIRMATION — резервный без producer-а); canonical `BookingCompleted` (ровно одно на реальный complete; BookingStatusChanged остаётся техническим для approved reconcile-контракта 2.5A); **компенсация Step 2.8-race §15** — `OrderCancelled` → booking-order-cancelled-consumer отменяет активные брони (CAS + history `cancelled_order` + result BookingCancelled), гонка Order-cancel vs Booking-create в обоих порядках детерминирована (создание сразу в CANCELLED при уже отменённом заказе, `created_cancelled`); терминальные не перезаписываются; Order-cancel после Booking exists — компенсируется (никакого delete/refund/Finance/availability-release — ownership не определён); frozen факты immutable (money/acquisition/service occurrence 2.8A), никакого второго hold; Order feedback без изменений (Order-owned reconcile); RBAC/IDOR/mass-assignment (новые actions → существующие permissions booking.send_supplier/confirm/request_change/cancel); e2e booking-lifecycle-completion 34 теста (negative §41 + positive/race §42) + rbac-actions расширен; регрессия: см. отчёт; Migration N/A (все статусы уже в enum); детали — `docs/architecture/booking-lifecycle-completion.md`; NEXT = STEP 2.9 STRICT REVIEW)
 
 **Step 2.8A conditional dependency (детерминированный дефолт):** date-based
 period pricing/availability НЕ требует Step 2.8A; time-slot / exact

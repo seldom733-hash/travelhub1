@@ -30,6 +30,9 @@ import { AppModule } from "../src/app.module";
 import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { IdsService } from "../src/shared/ids.service";
+import { EventBusService } from "../src/eventbus/eventbus.service";
+import { createFixtureOrder } from "./fixtures/create-order.fixture";
 
 interface Session {
   accessToken: string;
@@ -39,6 +42,8 @@ interface Session {
 describe("Phase 2 Step 2.0 — Phase 2 entry audit (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let ids: IdsService;
+  let eventBus: EventBusService;
 
   const stamp = Date.now();
   const created = { users: [] as string[], customers: [] as string[], orders: [] as string[], storefronts: [] as string[] };
@@ -77,6 +82,8 @@ describe("Phase 2 Step 2.0 — Phase 2 entry audit (e2e)", () => {
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+    ids = app.get(IdsService);
+    eventBus = app.get(EventBusService);
 
     adminAgent = await agent((await login("admin", "admin123")).accessToken);
 
@@ -85,7 +92,7 @@ describe("Phase 2 Step 2.0 — Phase 2 entry audit (e2e)", () => {
   });
 
   afterAll(async () => {
-    // Shared-DB isolation (STRICT REVIEW 2.5B): bootstrap-заказы эмитят
+    // Shared-DB isolation (STRICT REVIEW 2.5B): fixture-заказы эмитят
     // OrderCreated (causation=null) — чистим outbox + inbox своих заказов.
     if (created.orders.length > 0) {
       const orderEvents = await prisma.outboxEvent.findMany({
@@ -109,16 +116,11 @@ describe("Phase 2 Step 2.0 — Phase 2 entry audit (e2e)", () => {
   // ── 1. Money representation ───────────────────────────────────────────────
 
   it("1. Money: Decimal(12,2) без float-drift (amount/paidAmount/price), currency companion", async () => {
-    const order = (
-      await adminAgent
-        .post("/api/v1/orders/bootstrap")
-        .send({
-          customerId: buyerASession.user.customerId,
-          currency: "USD",
-          items: [{ productId: "00000000-0000-0000-0000-000000000000", title: "Audit Tour", type: "TOUR", quantity: 1, price: 123.45 }],
-        })
-        .expect(201)
-    ).body as { order: { id: string; amount: string; currency: string } };
+    const order = await createFixtureOrder(prisma, ids, eventBus, {
+      customerId: buyerASession.user.customerId,
+      currency: "USD",
+      items: [{ productId: "00000000-0000-0000-0000-000000000000", title: "Audit Tour", type: "TOUR", quantity: 1, price: 123.45 }],
+    });
     created.orders.push(order.order.id);
     orderAId = order.order.id;
     // Decimal сериализуется строкой — точность сохранена, никакого float-drift
@@ -131,7 +133,7 @@ describe("Phase 2 Step 2.0 — Phase 2 entry audit (e2e)", () => {
     // schema: все money-поля Decimal @db.Decimal(12,2) (Tariff.price/currency,
     // OrderItem.price/amount, Booking.amount) — float нигде не используется
     // (подтверждено инвентаризацией schema.prisma: строки 318, 1090-1091,
-    // 1118-1120, 1211); здесь доказано на Order через реальный bootstrap-флоу.
+    // 1118-1120, 1211); здесь доказано на Order через test-fixture (Step 2.6).
   });
 
   // ── 2. Legacy Payment absence ─────────────────────────────────────────────

@@ -32,6 +32,8 @@ import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { EventBusService, type OutboxEnvelope } from "../src/eventbus/eventbus.service";
 import type { BusinessEventActor } from "../src/eventbus/domain-events";
+import { IdsService } from "../src/shared/ids.service";
+import { createFixtureOrder } from "./fixtures/create-order.fixture";
 
 const UTC_ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
@@ -39,6 +41,7 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let eventBus: EventBusService;
+  let ids: IdsService;
   let http: request.Agent;
   let adminId: string;
 
@@ -53,8 +56,9 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
   let productId: string;
   let customerId: string;
 
-  const bootstrap = (overrides: Record<string, unknown> = {}) =>
-    http.post("/api/v1/orders/bootstrap").send({
+  // Step 2.6: test-only fixture вместо удалённого POST /orders/bootstrap.
+  const fixtureOrder = (overrides: Partial<import("./fixtures/create-order.fixture").FixtureOrderInput> = {}) =>
+    createFixtureOrder(prisma, ids, eventBus, {
       customerId,
       currency: "USD",
       items: [{ productId, title: "Tour", type: "TOUR", quantity: 1, price: 100 }],
@@ -90,6 +94,7 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
     await app.init();
     prisma = app.get(PrismaService);
     eventBus = app.get(EventBusService);
+    ids = app.get(IdsService);
 
     const login = await request(app.getHttpServer()).post("/api/v1/auth/login").send({ username: "admin", password: "admin123" }).expect(200);
     http = request.agent(app.getHttpServer());
@@ -127,7 +132,7 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
   });
 
   it("1. OrderReadyForBooking: canonical envelope (USER actor, entityId, occurredAt UTC, correlation=requestId)", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     const confirmRes = await action(order.id, "confirm").expect(200);
@@ -155,7 +160,7 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
   });
 
   it("2. OrderFulfilled (SYSTEM при reconcile) и OrderClosed (USER при close): envelope + counts как в 1.14 (§37.2-4)", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -199,7 +204,7 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
   });
 
   it("3. child BookingCreated: наследует correlation/causation, SYSTEM actor, entityId=bookingId (§37.5/§37.7/§37.8)", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -237,7 +242,7 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
   });
 
   it("4. occurredAt/eventId стабильны; повторная доставка не мутирует envelope (§37.9-11)", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     const before = (await eventsFor(order.id)).find((e) => e.eventType === "OrderStatusChanged")!;
@@ -256,7 +261,7 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
   });
 
   it("5. нет PII в Order payload (§37.13)", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     const events = await eventsFor(order.id);
     const created = events.find((e) => e.eventType === "OrderCreated")!;
@@ -421,8 +426,10 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
   });
 
   it("10. независимые request chains остаются различными (§37.18)", async () => {
-    const o1 = (await bootstrap().expect(201)).body.order;
-    const o2 = (await bootstrap().expect(201)).body.order;
+    // Явные correlationId + actor (вне HTTP-контекста fixture не имеет
+    // requestId/actor) — цепочки остаются различными и не-null, actor = USER.
+    const o1 = (await fixtureOrder({ correlationId: `fixture-env-${stamp}-1`, eventActor: { type: "USER", id: adminId } })).order;
+    const o2 = (await fixtureOrder({ correlationId: `fixture-env-${stamp}-2`, eventActor: { type: "USER", id: adminId } })).order;
     orderIds.push(o1.id, o2.id);
     const e1 = (await eventsFor(o1.id)).find((e) => e.eventType === "OrderCreated")!;
     const e2 = (await eventsFor(o2.id)).find((e) => e.eventType === "OrderCreated")!;

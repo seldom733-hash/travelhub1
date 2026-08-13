@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FilesInterceptor } from "@nestjs/platform-express";
 import { Type } from "class-transformer";
-import { IsArray, IsEnum, IsNumber, IsObject, IsOptional, IsString, Min, ValidateNested } from "class-validator";
+import { IsArray, IsEnum, IsNumber, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested } from "class-validator";
 import { ProductStatus, ProductType, PublicationChannel, RoleCode } from "../../generated/prisma/enums";
 import { CatalogService } from "./catalog.service";
 import { ProductMediaService } from "./media/product-media.service";
@@ -53,6 +53,12 @@ class CreateProductDto {
   @IsObject()
   attributes?: Record<string, unknown>;
 
+  // Step 2.8A: commercial service timezone (IANA ID, server-валидируется в сервисе).
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  serviceTimeZone?: string;
+
   // Step 1.3: explicit ownership override — ТОЛЬКО для staff/ADMIN (catalog.product.write),
   // аудируется. PARTNER: значение ИГНОРИРУЕТСЯ (scope берётся из actor context).
   @IsOptional()
@@ -93,6 +99,11 @@ class UpdateProductDto {
   @IsOptional()
   @IsObject()
   attributes?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  serviceTimeZone?: string;
 }
 
 class ListProductsQuery {

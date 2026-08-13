@@ -6,7 +6,8 @@
  *  - granular permissions: ADMIN полный доступ, BUYER только чтение Catalog,
  *    ANALYST — read-only, OPERATOR — команды Order/Booking;
  *  - смена роли (ADMIN) применяется сразу (права читаются из БД);
- *  - bootstrap Order — ADMIN-only exception (order.import);
+ *  - Step 2.6: POST /orders/bootstrap удалён — нормальный Order создаётся только
+ *    каноническим flow (OrderRequested → consumer); никакой роли не нужен create;
  *  - аудит auth.login / user.role_changed.
  *
  * Test DB: jest `setupFiles` (test/e2e.env.ts) подставляет изолированную
@@ -22,10 +23,15 @@ import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
+import { IdsService } from "../src/shared/ids.service";
+import { EventBusService } from "../src/eventbus/eventbus.service";
+import { createFixtureOrder, type FixtureOrderInput } from "./fixtures/create-order.fixture";
 
 describe("Phase 2 — Auth + RBAC (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let ids: IdsService;
+  let eventBus: EventBusService;
 
   const created: { users: string[]; products: string[]; orders: string[]; customers: string[] } = {
     users: [],
@@ -54,10 +60,14 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+    ids = app.get(IdsService);
+    eventBus = app.get(EventBusService);
   });
 
+  const fixtureOrder = (body: FixtureOrderInput) => createFixtureOrder(prisma, ids, eventBus, body);
+
   afterAll(async () => {
-    // Shared-DB isolation (STRICT REVIEW 2.5B): bootstrap-заказы эмитят
+    // Shared-DB isolation (STRICT REVIEW 2.5B): fixture-заказы эмитят
     // OrderCreated (causation=null) — чистим outbox + inbox своих заказов,
     // иначе строки утекают в общий events.OutboxEvent.
     if (created.orders.length > 0) {
@@ -117,7 +127,8 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     expect(adminPerms).toContain("catalog.product.write");
     expect(adminPerms).toContain("catalog.product.publish");
     expect(adminPerms).toContain("moderation.approve");
-    expect(adminPerms).toContain("order.import");
+    // Step 2.6: order.import удалён — никакой create-permission не существует.
+    expect(adminPerms).not.toContain("order.import");
     expect(adminPerms).toContain("catalog.media.upload_own");
 
     // 3) login работает и возвращает полный набор прав.
@@ -139,7 +150,8 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
   it("логин администратора выдаёт JWT и полный набор прав", async () => {
     const session = await login("admin", "admin123");
     expect(session.user.role).toBe("ADMIN");
-    expect(session.user.permissions).toContain("order.import");
+    // Step 2.6: order.import удалён из каталога прав (нет скрытого create).
+    expect(session.user.permissions).not.toContain("order.import");
     expect(session.user.permissions).toContain("settings.write");
 
     const me = await request(app.getHttpServer())
@@ -177,7 +189,7 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     await buyerAgent.post("/api/v1/products").send({ type: "TOUR", title: "Forbidden Tour" }).expect(403);
   });
 
-  it("bootstrap Order — только ADMIN (order.import)", async () => {
+  it("Step 2.6: POST /orders/bootstrap удалён — 404 для BUYER и ADMIN; никакой роли не нужен create-permission", async () => {
     const reg = await request(app.getHttpServer())
       .post("/api/v1/auth/register")
       .send({ username: `buyer2${stamp}`, email: `buyer2${stamp}@test.local`, password: "buyerpass123" })
@@ -188,7 +200,16 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     await buyerAgent
       .post("/api/v1/orders/bootstrap")
       .send({ customerId: "none", items: [{ productId: "none", title: "x", type: "TOUR", price: 1 }] })
-      .expect(403);
+      .expect(404);
+    // ADMIN тоже не имеет скрытого bootstrap-пути.
+    const admin = await login("admin", "admin123");
+    const adminAgent = await agent(admin.accessToken);
+    await adminAgent
+      .post("/api/v1/orders/bootstrap")
+      .send({ customerId: "none", items: [{ productId: "none", title: "x", type: "TOUR", price: 1 }] })
+      .expect(404);
+    // Никакой hidden create-permission не осталось.
+    expect(admin.user.permissions).not.toContain("order.import");
   });
 
   it("ANALYST: read-only — читает, но команды запрещены", async () => {
@@ -233,12 +254,13 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     ).body.customer;
     created.customers.push(customer.id);
     const order = (
-      await adminAgent.post("/api/v1/orders/bootstrap").send({
+      await fixtureOrder({
         customerId: customer.id,
         items: [{ productId: product.id, title: product.title, type: "TOUR", price: 100 }],
         travelers: [{ firstName: "RBAC", lastName: "Customer", passportNumber: "P8888888" }],
+        actor: "admin",
       })
-    ).body.order;
+    ).order;
     created.orders.push(order.id);
 
     const operator = await login(`analyst1${stamp}`, "analystpass123");

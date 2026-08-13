@@ -23,10 +23,15 @@ import { AppModule } from "../src/app.module";
 import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { IdsService } from "../src/shared/ids.service";
+import { EventBusService } from "../src/eventbus/eventbus.service";
+import { createFixtureOrder, type FixtureOrderInput } from "./fixtures/create-order.fixture";
 
 describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let ids: IdsService;
+  let eventBus: EventBusService;
   let http: request.Agent;
 
   const stamp = Date.now();
@@ -37,8 +42,9 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   let productId: string;
   let customerId: string;
 
-  const bootstrap = (overrides: Record<string, unknown> = {}) =>
-    http.post("/api/v1/orders/bootstrap").send({
+  // Step 2.6: test-only fixture вместо удалённого POST /orders/bootstrap.
+  const fixtureOrder = (overrides: Partial<FixtureOrderInput> = {}) =>
+    createFixtureOrder(prisma, ids, eventBus, {
       customerId,
       currency: "USD",
       items: [{ productId, title: "Tour", type: "TOUR", quantity: 1, price: 100 }],
@@ -70,6 +76,8 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+    ids = app.get(IdsService);
+    eventBus = app.get(EventBusService);
 
     const login = await request(app.getHttpServer()).post("/api/v1/auth/login").send({ username: "admin", password: "admin123" }).expect(200);
     http = request.agent(app.getHttpServer());
@@ -104,7 +112,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   });
 
   it("1. OrderReadyForBooking: не публикуется до confirm, ровно один раз при confirm; payload минимальный", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
 
     // До confirm — только OrderCreated + технический OrderStatusChanged на process.
@@ -141,7 +149,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   });
 
   it("2. retry/duplicate confirm → 409 и НЕ создаёт второй OrderReadyForBooking", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -151,7 +159,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   });
 
   it("3. concurrent confirm: ровно один выигрывает, одно OrderReadyForBooking (optimistic concurrency)", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     const results = await Promise.allSettled([action(order.id, "confirm"), action(order.id, "confirm")]);
@@ -164,14 +172,16 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   });
 
   it("4. OrderFulfilled (прямой complete): только при реальном fulfillment; unrelated update не публикует", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
 
     // Unrelated update (travelers без смены статуса) → нет OrderFulfilled.
+    // Контракт PATCH /travelers (STRICT REVIEW 2.7 §28): server-owned ключи
+    // (id/version/dataCompleteness/…) — forbidden → 422; отправляем только
+    // traveler-поля (сервис сопоставляет по позиции, id не передаётся).
     const detail = await http.get(`/api/v1/orders/${order.id}`).expect(200);
-    const travelers = detail.body.travelers.map((t: { id: string; firstName: string; lastName: string; birthDate: string | null; citizenship: string | null; gender: string | null; passportNumber: string | null }) => ({
-      id: t.id,
+    const travelers = detail.body.travelers.map((t: { firstName: string; lastName: string; birthDate: string | null; citizenship: string | null; gender: string | null; passportNumber: string | null }) => ({
       firstName: t.firstName,
       lastName: t.lastName,
       birthDate: t.birthDate ?? undefined,
@@ -180,6 +190,11 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
       passportNumber: t.passportNumber ?? undefined,
     }));
     await http.patch(`/api/v1/orders/${order.id}/travelers`).send({ travelers }).expect(200);
+    // Forged `id` в traveler-item → 422 (loud, конвенция assertNoForbiddenKeys).
+    await http
+      .patch(`/api/v1/orders/${order.id}/travelers`)
+      .send({ travelers: [{ ...travelers[0], id: "00000000-0000-4000-8000-000000000001" }] })
+      .expect(422);
     expect(typeCount(await eventsFor(order.id), "OrderFulfilled")).toBe(0);
 
     // Прямой complete из SENT_TO_BOOKING (штатный переход, без ожидания броней).
@@ -196,7 +211,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   });
 
   it("5. OrderFulfilled через reconcile (терминальные брони) — ровно одно; retry не дублирует", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -216,7 +231,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
 
   it("6. OrderClosed: только при close; fulfilled ≠ closed; cancelled ≠ closed", async () => {
     // A: fulfilled, но не закрыт → НЕТ OrderClosed.
-    const a = (await bootstrap().expect(201)).body.order;
+    const a = (await fixtureOrder()).order;
     orderIds.push(a.id);
     await action(a.id, "process").expect(200);
     await action(a.id, "confirm").expect(200);
@@ -227,7 +242,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
     expect(typeCount(events, "OrderClosed")).toBe(0);
 
     // B: cancelled → OrderCancelled, НЕ OrderClosed.
-    const b = (await bootstrap().expect(201)).body.order;
+    const b = (await fixtureOrder()).order;
     orderIds.push(b.id);
     await action(b.id, "cancel").expect(200);
     events = await eventsFor(b.id);
@@ -249,7 +264,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   });
 
   it("11. explicit complete раньше reconcile: reconcile не создаёт второй OrderFulfilled (race-защита CAS)", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -272,7 +287,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
     expect((await prisma.order.findUnique({ where: { id: order.id } }))!.status).toBe("FULFILLED");
   });
 
-  it("9. partial fulfillment (reconcile → PARTIALLY_FULFILLED) НЕ создаёт OrderFulfilled", async () => {    const order = (await bootstrap().expect(201)).body.order;
+  it("9. partial fulfillment (reconcile → PARTIALLY_FULFILLED) НЕ создаёт OrderFulfilled", async () => {    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
@@ -300,7 +315,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   });
 
   it("10. rollback/atomicity: неуспешный transition не оставляет orphan state/history/event", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
 
     // complete из NEW — невалидный from-state → 409 до каких-либо записей.
@@ -315,7 +330,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
 
     // process → confirm с неполными данными туристов → 400 ДО записи события.
     await action(order.id, "process").expect(200);
-    const incomplete = (await bootstrap({ travelers: [{ firstName: "А", lastName: "Б" }] }).expect(201)).body.order;
+    const incomplete = (await fixtureOrder({ travelers: [{ firstName: "А", lastName: "Б" }] })).order;
     orderIds.push(incomplete.id);
     await action(incomplete.id, "process").expect(200);
     await action(incomplete.id, "confirm").expect(422); // данные туристов неполные (ValidationDomainError → 422)
@@ -328,7 +343,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   });
 
   it("7. generic OrderStatusChanged остаётся только для технических переходов", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200); // technical
     await action(order.id, "markWaitingData").expect(200); // technical
@@ -349,7 +364,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   });
 
   it("8. consumer dedup: повторная доставка BookingRequested не дублирует Booking", async () => {
-    const order = (await bootstrap().expect(201)).body.order;
+    const order = (await fixtureOrder()).order;
     orderIds.push(order.id);
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);

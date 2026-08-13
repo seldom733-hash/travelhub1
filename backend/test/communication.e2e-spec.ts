@@ -32,6 +32,9 @@ import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
+import { IdsService } from "../src/shared/ids.service";
+import { EventBusService } from "../src/eventbus/eventbus.service";
+import { createFixtureOrder } from "./fixtures/create-order.fixture";
 
 interface Session {
   accessToken: string;
@@ -48,6 +51,8 @@ interface Session {
 describe("Phase 1 Step 1.16 — Communication Foundation (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let ids: IdsService;
+  let eventBus: EventBusService;
   let adminAgent: ReturnType<typeof request.agent>;
   let commBeforeBoot: number;
 
@@ -114,11 +119,11 @@ describe("Phase 1 Step 1.16 — Communication Foundation (e2e)", () => {
     await adminAgent.post(`/api/v1/products/${product.id}/publish`).expect(201);
 
     const order = (
-      await adminAgent
-        .post("/api/v1/orders/bootstrap")
-        .send({ customerId, items: [{ productId: product.id, title: product.title, type: "TOUR", price: 90 }] })
-        .expect(201)
-    ).body.order;
+      await createFixtureOrder(prisma, ids, eventBus, {
+        customerId,
+        items: [{ productId: product.id, title: product.title, type: "TOUR", price: 90 }],
+      })
+    ).order;
     created.orders.push(order.id);
 
     await adminAgent.patch(`/api/v1/orders/${order.id}`).send({ action: "process" }).expect(200);
@@ -144,6 +149,8 @@ describe("Phase 1 Step 1.16 — Communication Foundation (e2e)", () => {
     // транзиентным флейком (727/728) при запуске communication.e2e ПОСЛЕ
     // reverse-conversation.e2e (10 BUYER_REQUEST-строк от его сообщений).
     prisma = moduleRef.get(PrismaService);
+    ids = moduleRef.get(IdsService);
+    eventBus = moduleRef.get(EventBusService);
     commBeforeBoot = await prisma.communication.count();
     await app.init();
 

@@ -2,8 +2,9 @@
  * E2E PHASE 2 STEP 2.5A — Order Temporal Contract.
  *
  * Покрывает (§18 implementation prompt + Roadmap 2.5A):
- *  - submittedAt на canonical OrderRequested-пути и bootstrap (server-owned);
- *  - forged milestone-поля из body отклоняются (whitelist DTO / server authority);
+ *  - submittedAt на canonical OrderRequested-пути и test-fixture (server-owned);
+ *  - Step 2.6: production create-route отсутствует (POST /orders/bootstrap → 404) —
+ *    forged milestone-поля невозможны (никакого HTTP-create DTO);
  *  - confirmedAt/fulfilledAt/closedAt/cancelledAt — по фактическим переходам
  *    (confirm/complete/close/cancel), атомарно с CAS-переходом статуса;
  *  - createdAt остаётся persistence time (не overloaded lifecycle field);
@@ -25,6 +26,8 @@ import { Prisma, RoleCode } from "../src/generated/prisma/client";
 import { BookingStatus } from "../src/generated/prisma/enums";
 import { EventBusService } from "../src/eventbus/eventbus.service";
 import { DomainEvents } from "../src/eventbus/domain-events";
+import { IdsService } from "../src/shared/ids.service";
+import { createFixtureOrder, type FixtureOrderInput } from "./fixtures/create-order.fixture";
 
 interface Session {
   accessToken: string;
@@ -44,6 +47,7 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
   let prisma: PrismaService;
   let adminAgent: ReturnType<typeof request.agent>;
   let eventBus: EventBusService;
+  let ids: IdsService;
 
   const stamp = Date.now();
   const created: {
@@ -101,6 +105,8 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
   const upsertAvailability = async (productId: string, tariffId: string, date: string, slotsTotal: number) => {
     await adminAgent.post(`/api/v1/products/${productId}/availability`).send({ tariffId, date: `${date}T00:00:00.000Z`, slotsTotal }).expect(201);
   };
+  const fixtureOrder = (body: FixtureOrderInput) => createFixtureOrder(prisma, ids, eventBus, body);
+  // Step 2.6 negative: удалённый production-маршрут должен отвечать 404.
   const bootstrapOrder = (body: Record<string, unknown>) => adminAgent.post("/api/v1/orders/bootstrap").send(body);
   const action = (orderId: string, act: string, token?: string) => {
     const a = token ? agent(token) : adminAgent;
@@ -157,6 +163,7 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
     await app.init();
     prisma = app.get(PrismaService);
     eventBus = app.get(EventBusService);
+    ids = app.get(IdsService);
     const admin = await login("admin", "admin123");
     adminAgent = agent(admin.accessToken);
   });
@@ -247,33 +254,38 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
 
   // ── 2. Bootstrap: submittedAt server-owned; forged milestone отклоняется ──
 
-  it("2. bootstrap Order: submittedAt установлен сервером; forged submittedAt/confirmedAt из body не проходят", async () => {
+  it("2. Step 2.6: производственный create-маршрут удалён (404); milestone-поля серверные, forge невозможен", async () => {
     const buyer = await registerBuyer("s25a_boot");
     const customerId = buyer.user.customerId!;
     const fx = await createProduct("s25a_boot");
 
-    const res = await bootstrapOrder({
+    // Production bootstrap-путь удалён — классический forged payload → 404.
+    await bootstrapOrder({
       customerId,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
-      // Forged server-owned milestone fields — ValidationPipe whitelist срезает.
       submittedAt: "2020-01-01T00:00:00.000Z",
       confirmedAt: "2020-01-01T00:00:00.000Z",
       fulfilledAt: "2020-01-01T00:00:00.000Z",
       closedAt: "2020-01-01T00:00:00.000Z",
       cancelledAt: "2020-01-01T00:00:00.000Z",
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
-    created.orders.push(orderId);
-    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    }).expect(404);
+    expect(await prisma.order.count({ where: { customerId } })).toBe(0);
 
-    // Server authority: submittedAt — реальное время создания, НЕ forged 2020.
+    // Test-only fixture (server-owned, НЕ HTTP): submittedAt — реальное время,
+    // никакой клиентский DTO не может подставить forged milestone.
+    const res = await fixtureOrder({
+      customerId,
+      items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
+    });
+    created.orders.push(res.order.id);
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: res.order.id } });
     expect(order.submittedAt).not.toBeNull();
     expect(order.submittedAt!.getUTCFullYear()).toBeGreaterThanOrEqual(2026);
     expect(order.confirmedAt).toBeNull();
     expect(order.fulfilledAt).toBeNull();
     expect(order.closedAt).toBeNull();
     expect(order.cancelledAt).toBeNull();
-    expect(order.saleId).toBeNull(); // bootstrap ≠ canonical
+    expect(order.saleId).toBeNull(); // fixture ≠ canonical (нет Sales-цепочки)
   });
 
   // ── 3. Lifecycle: milestones по фактическим переходам ──
@@ -281,12 +293,12 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
   it("3. lifecycle: confirm→confirmedAt, complete→fulfilledAt, close→closedAt (атомарно с CAS)", async () => {
     const buyer = await registerBuyer("s25a_lc");
     const fx = await createProduct("s25a_lc");
-    const res = await bootstrapOrder({
+    const res = await fixtureOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
       travelers: [{ firstName: "Анна", lastName: "Петрова", birthDate: "1991-02-02", passportNumber: "P1234567" }],
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
+    });
+    const orderId = res.order.id;
     created.orders.push(orderId);
 
     const get = () => prisma.order.findUniqueOrThrow({ where: { id: orderId } });
@@ -327,11 +339,11 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
   it("4. cancel → cancelledAt; повторный cancel → 409 (immutable milestone)", async () => {
     const buyer = await registerBuyer("s25a_cx");
     const fx = await createProduct("s25a_cx");
-    const res = await bootstrapOrder({
+    const res = await fixtureOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
+    });
+    const orderId = res.order.id;
     created.orders.push(orderId);
 
     await action(orderId, "cancel").expect(200);
@@ -535,12 +547,12 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
   it("11. duplicate confirm → 409; confirmedAt не перезаписывается", async () => {
     const buyer = await registerBuyer("s25a_cf2");
     const fx = await createProduct("s25a_cf2");
-    const res = await bootstrapOrder({
+    const res = await fixtureOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
       travelers: [{ firstName: "Игорь", lastName: "Соколов", birthDate: "1988-03-03", passportNumber: "P7654321" }],
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
+    });
+    const orderId = res.order.id;
     created.orders.push(orderId);
 
     await action(orderId, "process").expect(200);
@@ -563,12 +575,12 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
   it("12. concurrent cancel vs close (FULFILLED) → ровно один терминальный факт, никаких обоих", async () => {
     const buyer = await registerBuyer("s25a_race");
     const fx = await createProduct("s25a_race");
-    const res = await bootstrapOrder({
+    const res = await fixtureOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
       travelers: [{ firstName: "Мария", lastName: "Ким", birthDate: "1992-04-04", passportNumber: "P1112223" }],
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
+    });
+    const orderId = res.order.id;
     created.orders.push(orderId);
     await action(orderId, "process").expect(200);
     await action(orderId, "confirm").expect(200);
@@ -608,12 +620,12 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
   it("13. reconcile: PARTIALLY_FULFILLED → fulfilledAt NULL; FULFILLED (все брони terminal) → set; replay не меняет", async () => {
     const buyer = await registerBuyer("s25a_rec");
     const fx = await createProduct("s25a_rec");
-    const res = await bootstrapOrder({
+    const res = await fixtureOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
       travelers: [{ firstName: "Олег", lastName: "Гусейнов", birthDate: "1990-07-07", passportNumber: "P3334445" }],
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
+    });
+    const orderId = res.order.id;
     created.orders.push(orderId);
     await action(orderId, "process").expect(200);
     await action(orderId, "confirm").expect(200);

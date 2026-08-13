@@ -5,7 +5,8 @@
  *    (разные BusinessSequence-ключи TH-2026 / TH-2027 — нет пересечений и
  *    гонок на границе года);
  *  - год по UTC (canonical time-конвенция, НЕ локальный OS-год);
- *  - bootstrap и canonical consumer делят ОДИН генератор (нет второй схемы).
+ *  - canonical consumer и test-only fixture делят ОДИН генератор (нет второй
+ *    схемы; Step 2.6: HTTP bootstrap-путь удалён).
  */
 import { IdsService } from "./ids.service";
 
@@ -52,12 +53,13 @@ describe("IdsService — canonical ID policy (STRICT REVIEW 2.5)", () => {
     expect(prefix).toBe(`TH-${new Date().getUTCFullYear()}`);
   });
 
-  it("bootstrap и canonical consumer делят ОДИН генератор (тот же ключ ORD/TH)", async () => {
+  it("canonical consumer и test-only fixture делят ОДИН генератор (тот же ключ ORD/TH)", async () => {
     const tx = makeTx();
     const ids = new IdsService({} as never);
-    // bootstrap Order (order.service.bootstrapOrder) и canonical Order
-    // (createOrderFromRequested) вызывают те же nextCode(tx,"ORD") /
-    // nextOrderNumber(tx) — один атомарный счётчик, без коллизий.
+    // Canonical Order (createOrderFromRequested) и test-only fixture
+    // (backend/test/fixtures/create-order.fixture.ts, Step 2.6) вызывают те же
+    // nextCode(tx,"ORD") / nextOrderNumber(tx) — один атомарный счётчик,
+    // без коллизий.
     const ord1 = await ids.nextCode(tx as never, "ORD");
     const th1 = await ids.nextOrderNumber(tx as never, 2026);
     const ord2 = await ids.nextCode(tx as never, "ORD");

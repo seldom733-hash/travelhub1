@@ -1,14 +1,15 @@
 /**
  * E2E PHASE 2 STEP 2.5B — Acquisition Source Propagation.
  *
- * Покрывает (§21 implementation prompt):
+ * Покрывает (§21 implementation prompt + Step 2.6):
  *  1. canonical DIRECT flow: Checkout → Sale → OrderRequested → Order (source frozen);
- *  2. client cannot forge acquisitionSource (bootstrap DTO — whitelist strip);
+ *  2. Step 2.6: production create-route отсутствует (POST /orders/bootstrap → 404) —
+ *     клиент не может forge acquisitionSource/timestamps через HTTP;
  *  3. Sale completion does NOT recompute source;
  *  4. Order consumer persists payload source exactly;
  *  5. duplicate delivery preserves source;
  *  6. lifecycle actions (confirm/complete/close + 2.5A temporal) preserve source;
- *  7. bootstrap source semantics truthful (server-assisted DIRECT);
+ *  7. test-fixture Order: acquisitionSource = DIRECT (server-assisted entry), saleId null;
  *  8. unknown acquisition value rejected at event/contract boundary (FAILED, no Order);
  *  9. BUYER_REQUEST (Roadmap Amendment) propagates at contract level — без Reverse
  *     Marketplace сущностей;
@@ -28,6 +29,8 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { Prisma, RoleCode } from "../src/generated/prisma/client";
 import { EventBusService } from "../src/eventbus/eventbus.service";
 import { DomainEvents } from "../src/eventbus/domain-events";
+import { IdsService } from "../src/shared/ids.service";
+import { createFixtureOrder, type FixtureOrderInput } from "./fixtures/create-order.fixture";
 
 interface Session {
   accessToken: string;
@@ -47,6 +50,7 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
   let prisma: PrismaService;
   let adminAgent: ReturnType<typeof request.agent>;
   let eventBus: EventBusService;
+  let ids: IdsService;
 
   const stamp = Date.now();
   const created: {
@@ -101,6 +105,8 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
   const upsertAvailability = async (productId: string, tariffId: string, date: string, slotsTotal: number) => {
     await adminAgent.post(`/api/v1/products/${productId}/availability`).send({ tariffId, date: `${date}T00:00:00.000Z`, slotsTotal }).expect(201);
   };
+  const fixtureOrder = (body: FixtureOrderInput) => createFixtureOrder(prisma, ids, eventBus, body);
+  // Step 2.6 negative: удалённый production-маршрут должен отвечать 404.
   const bootstrapOrder = (body: Record<string, unknown>) => adminAgent.post("/api/v1/orders/bootstrap").send(body);
   const action = (orderId: string, act: string) => adminAgent.patch(`/api/v1/orders/${orderId}`).send({ action: act });
 
@@ -208,6 +214,7 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
     await app.init();
     prisma = app.get(PrismaService);
     eventBus = app.get(EventBusService);
+    ids = app.get(IdsService);
     const admin = await login("admin", "admin123");
     adminAgent = agent(admin.accessToken);
   });
@@ -287,34 +294,31 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
 
   // ── 2. Client cannot forge acquisitionSource ──
 
-  it("2. forged acquisitionSource в bootstrap body отклоняется (server-derived DIRECT)", async () => {
+  it("2. Step 2.6: production create-route отсутствует — POST /orders/bootstrap → 404 (forge невозможен)", async () => {
     const buyer = await registerBuyer("s25b_forge");
     const fx = await createProduct("s25b_forge");
-    const res = await bootstrapOrder({
+    // Классический bootstrap payload с forged server-owned полями — маршрут удалён.
+    await bootstrapOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
-      acquisitionSource: "MARKETPLACE", // forged — whitelist DTO срезает
+      acquisitionSource: "MARKETPLACE", // forged — маршрута больше нет
       submittedAt: "2020-01-01T00:00:00.000Z",
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
-    created.orders.push(orderId);
-    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.acquisitionSource).toBe("DIRECT"); // server-derived, не forged
-    expect(order.submittedAt!.getUTCFullYear()).toBeGreaterThanOrEqual(2026);
+    }).expect(404);
+    // Никакого Order по этому пути.
+    expect(await prisma.order.count({ where: { customerId: buyer.user.customerId } })).toBe(0);
   });
 
-  // ── 3. Bootstrap semantics: server-assisted DIRECT, не fabricated ──
+  // ── 3. Fixture semantics: server-assisted DIRECT, не fabricated ──
 
-  it("3. bootstrap Order: acquisitionSource = DIRECT (internal-assisted entry, сервер), not null", async () => {
+  it("3. test-fixture Order: acquisitionSource = DIRECT (server-assisted entry), saleId null", async () => {
     const buyer = await registerBuyer("s25b_boot");
     const fx = await createProduct("s25b_boot");
-    const res = await bootstrapOrder({
+    const res = await fixtureOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
-    created.orders.push(orderId);
-    const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    });
+    created.orders.push(res.order.id);
+    const order = await prisma.order.findUniqueOrThrow({ where: { id: res.order.id } });
     expect(order.acquisitionSource).toBe("DIRECT");
     expect(order.saleId).toBeNull();
   });
@@ -324,12 +328,12 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
   it("4. lifecycle (confirm/complete/close) и temporal milestones не меняют acquisitionSource", async () => {
     const buyer = await registerBuyer("s25b_lc");
     const fx = await createProduct("s25b_lc");
-    const res = await bootstrapOrder({
+    const res = await fixtureOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
       travelers: [{ firstName: "Анна", lastName: "Петрова", birthDate: "1991-02-02", passportNumber: "P1234567" }],
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
+    });
+    const orderId = res.order.id;
     created.orders.push(orderId);
 
     const get = () => prisma.order.findUniqueOrThrow({ where: { id: orderId } });
@@ -407,12 +411,12 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
   it("8. send → Booking.acquisitionSource = Order.acquisitionSource (READ-only, ADR-0001)", async () => {
     const buyer = await registerBuyer("s25b_bkg");
     const fx = await createProduct("s25b_bkg");
-    const res = await bootstrapOrder({
+    const res = await fixtureOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
       travelers: [{ firstName: "Олег", lastName: "Гусейнов", birthDate: "1990-07-07", passportNumber: "P3334445" }],
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
+    });
+    const orderId = res.order.id;
     created.orders.push(orderId);
     await action(orderId, "process").expect(200);
     await action(orderId, "confirm").expect(200);
@@ -499,12 +503,12 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
   it("12. duplicate BookingRequested → одна Booking, acquisitionSource стабилен", async () => {
     const buyer = await registerBuyer("s25b_dbkg");
     const fx = await createProduct("s25b_dbkg");
-    const res = await bootstrapOrder({
+    const res = await fixtureOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
       travelers: [{ firstName: "Дина", lastName: "Алиева", birthDate: "1989-09-09", passportNumber: "P9998877" }],
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
+    });
+    const orderId = res.order.id;
     created.orders.push(orderId);
     await action(orderId, "process").expect(200);
     await action(orderId, "confirm").expect(200);
@@ -530,12 +534,12 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
   it("13. Booking status-переход не перезаписывает acquisitionSource", async () => {
     const buyer = await registerBuyer("s25b_bimm");
     const fx = await createProduct("s25b_bimm");
-    const res = await bootstrapOrder({
+    const res = await fixtureOrder({
       customerId: buyer.user.customerId!,
       items: [{ productId: fx.productId, title: "Boot", type: "TOUR", quantity: 1, price: 50 }],
       travelers: [{ firstName: "Камран", lastName: "Мамедов", birthDate: "1985-11-11", passportNumber: "P5554433" }],
-    }).expect(201);
-    const orderId = (res.body.order as { id: string }).id;
+    });
+    const orderId = res.order.id;
     created.orders.push(orderId);
     await action(orderId, "process").expect(200);
     await action(orderId, "confirm").expect(200);

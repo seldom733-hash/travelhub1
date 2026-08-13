@@ -25,10 +25,29 @@ import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
+import { IdsService } from "../src/shared/ids.service";
+import { EventBusService } from "../src/eventbus/eventbus.service";
+import { createFixtureOrder, type FixtureOrderInput } from "./fixtures/create-order.fixture";
 
 /** Все команды, которые фронтенд показывает в панелях (и их права из ACTION_PERMISSIONS). */
 const ORDER_ACTIONS = ["process", "confirm", "send", "complete", "close", "cancel"] as const;
-const BOOKING_ACTIONS = ["send", "confirm", "reject", "service", "complete", "cancel"] as const;
+// Step 2.9: полный набор lifecycle-команд (включая supplier-processing,
+// clarification, change/cancellation markers) — все закрыты для BUYER/SALES_MANAGER.
+const BOOKING_ACTIONS = [
+  "prepare",
+  "send",
+  "requestClarification",
+  "resume",
+  "confirm",
+  "reject",
+  "service",
+  "requestChange",
+  "resolveChange",
+  "requestCancellation",
+  "complete",
+  "cancel",
+  "problem",
+] as const;
 /** Права, которых не должно быть у BUYER/SALES_MANAGER. */
 const ACTION_PERMS = [
   "order.accept",
@@ -44,6 +63,8 @@ const ACTION_PERMS = [
 describe("Phase 2 — RBAC: действия Order/Booking закрыты по правам (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let ids: IdsService;
+  let eventBus: EventBusService;
 
   const created: { users: string[]; products: string[]; orders: string[]; customers: string[] } = {
     users: [],
@@ -80,6 +101,8 @@ describe("Phase 2 — RBAC: действия Order/Booking закрыты по �
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+    ids = app.get(IdsService);
+    eventBus = app.get(EventBusService);
 
     // Роли: ADMIN (setup), BUYER (регистрация), SALES_MANAGER и OPERATOR (персонал)
     adminAgent = await agent((await login("admin", "admin123")).accessToken);
@@ -171,11 +194,11 @@ describe("Phase 2 — RBAC: действия Order/Booking закрыты по �
     created.customers.push(customer.id);
 
     const order = (
-      await adminAgent.post("/api/v1/orders/bootstrap").send({
+      await createFixtureOrder(prisma, ids, eventBus, {
         customerId: customer.id,
         items: [{ productId: product.id, title: product.title, type: "TOUR", price: 100 }],
       })
-    ).body.order;
+    ).order;
     created.orders.push(order.id);
 
     // Отрицательный контроль: ни одного действия не должно пройти без прав
@@ -205,12 +228,12 @@ describe("Phase 2 — RBAC: действия Order/Booking закрыты по �
     created.customers.push(customer.id);
 
     const order = (
-      await adminAgent.post("/api/v1/orders/bootstrap").send({
+      await createFixtureOrder(prisma, ids, eventBus, {
         customerId: customer.id,
         items: [{ productId: product.id, title: product.title, type: "HOTEL", price: 200 }],
         travelers: [{ firstName: "403", lastName: "Booking", passportNumber: "P8888899" }],
       })
-    ).body.order;
+    ).order;
     created.orders.push(order.id);
 
     // Доводим заказ до Booking силами OPERATOR

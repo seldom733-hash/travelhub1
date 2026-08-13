@@ -89,11 +89,23 @@ class UpdateCheckoutTravelersDto {
   expectedVersion!: number;
 }
 
-/** Service date (date-only) + expectedVersion. */
+/** Service occurrence (Step 2.8A): serviceDate (date-only) + опциональные
+ *  serviceTime/serviceEndTime (local HH:mm) + expectedVersion. Zone/instants —
+ *  server-owned (forbidden keys). null = очистить time (вернуться к date-only). */
 class SetCheckoutServiceDateDto {
   @IsString()
   @MaxLength(16)
   serviceDate!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  serviceTime?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  serviceEndTime?: string | null;
 
   @IsInt()
   @Min(1)
@@ -259,8 +271,15 @@ export class CheckoutController {
     @CurrentUser() actor: AuthedRequest["user"],
     @Req() req: Request,
   ) {
+    // Step 2.8A: zone/instants — server-owned (не forge-ятся); только serviceDate
+    // + serviceTime/serviceEndTime (local HH:mm, optional).
     assertNoForbiddenKeys(req.body, CHECKOUT_SERVICE_DATE_FORBIDDEN_KEYS);
-    return this.sales.setCheckoutServiceDate(code, dto.serviceDate, dto.expectedVersion, { id: actor.id, username: actor.username });
+    return this.sales.setCheckoutServiceDate(
+      code,
+      { serviceDate: dto.serviceDate, serviceTime: dto.serviceTime ?? null, serviceEndTime: dto.serviceEndTime ?? null },
+      dto.expectedVersion,
+      { id: actor.id, username: actor.username },
+    );
   }
 
   @Post(":code/revalidate")

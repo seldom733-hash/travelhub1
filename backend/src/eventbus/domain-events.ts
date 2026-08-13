@@ -8,12 +8,14 @@
  *   Order:   OrderCreated, OrderReadyForBooking, OrderFulfilled, OrderClosed,
  *            OrderCancelled, OrderStatusChanged (технические переходы),
  *            BookingRequested (command в Booking domain)
- *   Booking: BookingCreated, BookingConfirmed, BookingRejected, BookingCancelled
+ *   Booking: BookingCreated, BookingConfirmed, BookingRejected, BookingCancelled,
+ *             BookingCompleted (Step 2.9 — canonical fulfillment факт)
  *
  * Подписчики:
  *   Order   ← OrderRequested (Step 2.5 consumer создаёт Order), BookingConfirmed,
- *             BookingRejected (агрегированное состояние)
- *   Booking ← BookingRequested (создание Booking + Passenger)
+ *             BookingRejected, BookingStatusChanged (агрегированное состояние)
+ *   Booking ← BookingRequested (создание Booking + Passenger),
+ *             OrderCancelled (Step 2.9 compensation: отмена активных броней заказа)
  *
  * Order НИКОГДА не пишет в таблицы Booking и наоборот — только события + чтение.
  *
@@ -55,6 +57,11 @@ export const DomainEvents = {
   BookingRejected: "BookingRejected",
   BookingCancelled: "BookingCancelled",
   BookingStatusChanged: "BookingStatusChanged",
+  // Step 2.9: canonical fulfillment факт (ровно одно на реальный complete).
+  // BookingStatusChanged остаётся техническим (существующий consumer-контракт
+  // Order reconcile, approved 2.5A); BookingCompleted — canonical факт без
+  // consumer-а (лента/аналитика), не заменяет BookingStatusChanged.
+  BookingCompleted: "BookingCompleted",
 } as const;
 
 export type DomainEventType = (typeof DomainEvents)[keyof typeof DomainEvents];
@@ -221,6 +228,14 @@ export interface OrderRequestedPayload {
   /** Acquisition source (Step 2.5B) — не ре-вычисляется consumer-ом. */
   acquisitionSource: string;
   serviceDate: string | null;
+  /** Step 2.8A: frozen local temporal факты (verbatim из CheckoutIntent через
+   *  Sale snapshot). serviceTime/serviceEndTime — local wall-clock "HH:mm";
+   *  serviceTimeZone — IANA (Catalog authority, frozen при binding). Date-only
+   *  услуга: все null. UTC instant НЕ передаётся — единственная деривация на
+   *  Booking (§13). Additive, v1-совместимы (null/undefined = date-only). */
+  serviceTime: string | null;
+  serviceEndTime: string | null;
+  serviceTimeZone: string | null;
 }
 
 export interface OrderEventPayload {

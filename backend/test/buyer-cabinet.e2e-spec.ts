@@ -30,6 +30,9 @@ import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
+import { IdsService } from "../src/shared/ids.service";
+import { EventBusService } from "../src/eventbus/eventbus.service";
+import { createFixtureOrder, type FixtureOrderInput } from "./fixtures/create-order.fixture";
 
 interface BuyerSession {
   accessToken: string;
@@ -46,6 +49,8 @@ interface BuyerSession {
 describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let ids: IdsService;
+  let eventBus: EventBusService;
   let adminAgent: ReturnType<typeof request.agent>;
 
   const stamp = Date.now();
@@ -105,10 +110,15 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+    ids = app.get(IdsService);
+    eventBus = app.get(EventBusService);
 
     const admin = await login("admin", "admin123");
     adminAgent = agent(admin.accessToken);
   });
+
+  // Step 2.6: test-only fixture вместо удалённого POST /orders/bootstrap.
+  const fixtureOrder = (body: FixtureOrderInput) => createFixtureOrder(prisma, ids, eventBus, body);
 
   afterAll(async () => {
     // Очистка в обратном порядке зависимостей.
@@ -167,7 +177,7 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
     const buyerB = await registerBuyer("cab_idor_b");
     const aAgent = agent(buyerA.accessToken);
 
-    // Product + Order для покупателя B (bootstrap через ADMIN).
+    // Product + Order для покупателя B (test-fixture, Step 2.6).
     const product = (
       await adminAgent
         .post("/api/v1/products")
@@ -178,11 +188,11 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
     await adminAgent.post(`/api/v1/products/${product.id}/publish`).expect(201);
 
     const orderB = (
-      await adminAgent.post("/api/v1/orders/bootstrap").send({
+      await fixtureOrder({
         customerId: buyerB.user.customerId,
         items: [{ productId: product.id, title: product.title, type: "TOUR", price: 120 }],
       })
-    ).body.order;
+    ).order;
     created.orders.push(orderB.id);
 
     // A не видит заказ B, даже подставив его customerId в query.
@@ -241,13 +251,13 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
     await adminAgent.post(`/api/v1/products/${product.id}/publish`).expect(201);
 
     const order = (
-      await adminAgent.post("/api/v1/orders/bootstrap").send({
+      await fixtureOrder({
         customerId: buyer.user.customerId,
         serviceDate: "2026-10-01T00:00:00.000Z",
         items: [{ productId: product.id, title: product.title, type: "TOUR", price: 250 }],
         travelers: [{ firstName: "Покупатель", lastName: "CAB", passportNumber: "P1234567" }],
       })
-    ).body.order;
+    ).order;
     created.orders.push(order.id);
     expect(order.code).toMatch(/^ORD-\d{8}$/);
 
@@ -265,7 +275,11 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
     const own = ordersRes.items[0];
     expect(own.code).toBe(order.code);
     // Точная projection (§7, §19): только whitelist, БЕЗ internal/CRM/audit полей.
-    expect(Object.keys(own).sort()).toEqual(["amount", "code", "createdAt", "currency", "id", "items", "number", "paymentStatus", "serviceDate", "status"].sort());
+    // Step 2.8A: +serviceTime/serviceTimeZone (authorized frozen temporal facts,
+    // order-level; OrderItem наследует — item projection без дублей).
+    expect(Object.keys(own).sort()).toEqual(
+      ["amount", "code", "createdAt", "currency", "id", "items", "number", "paymentStatus", "serviceDate", "serviceTime", "serviceTimeZone", "status"].sort(),
+    );
     expect(own).not.toHaveProperty("customerId");
     expect(own).not.toHaveProperty("updatedAt");
     expect(own).not.toHaveProperty("version");
@@ -320,11 +334,11 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
     // Два заказа одного покупателя.
     for (let i = 0; i < 2; i++) {
       const o = (
-        await adminAgent.post("/api/v1/orders/bootstrap").send({
+        await fixtureOrder({
           customerId: buyer.user.customerId,
           items: [{ productId: product.id, title: `${product.title} #${i}`, type: "TOUR", price: 100 }],
         })
-      ).body.order;
+      ).order;
       created.orders.push(o.id);
     }
 

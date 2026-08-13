@@ -49,6 +49,14 @@ export const SALES_CREATE_FORBIDDEN_KEYS = [
   "converted",
   "convertedOpportunityId",
   "selectedProposalId",
+  // Step 2.8A: temporal server-owned факты (zone authority + derived instants) —
+  // не forge-ятся через generic create (только checkout service-date команда).
+  "serviceTime",
+  "serviceEndTime",
+  "serviceTimeZone",
+  "serviceStartsAt",
+  "serviceEndsAt",
+  "serviceTimeType",
 ] as const;
 
 /**
@@ -80,6 +88,12 @@ export const SALE_COMPLETE_FORBIDDEN_KEYS = [
   "remainingAmount",
   "acquisitionSource",
   "serviceDate",
+  "serviceTime",
+  "serviceEndTime",
+  "serviceTimeZone",
+  "serviceStartsAt",
+  "serviceEndsAt",
+  "serviceTimeType",
   "reservationId",
   "quantity",
   "orderId",
@@ -305,6 +319,12 @@ export const CHECKOUT_CREATE_FORBIDDEN_KEYS = [
   "expiresAt",
   "acquisitionSource",
   "options",
+  "serviceTime",
+  "serviceEndTime",
+  "serviceTimeZone",
+  "serviceStartsAt",
+  "serviceEndsAt",
+  "serviceTimeType",
   "cancelledAt",
   "createdAt",
   "updatedAt",
@@ -335,6 +355,12 @@ export const CHECKOUT_TRAVELERS_FORBIDDEN_KEYS = [
   "discountAmount",
   "total",
   "serviceDate",
+  "serviceTime",
+  "serviceEndTime",
+  "serviceTimeZone",
+  "serviceStartsAt",
+  "serviceEndsAt",
+  "serviceTimeType",
   "acquisitionSource",
   "options",
   "cancelledAt",
@@ -351,7 +377,9 @@ export const CHECKOUT_TRAVELERS_FORBIDDEN_KEYS = [
   "causationId",
 ] as const;
 
-/** Step 2.3A: service-date команда — только serviceDate + expectedVersion. */
+/** Step 2.3A: service-date команда — только serviceDate + expectedVersion
+ *  (Step 2.8A: + опциональные serviceTime/serviceEndTime). Zone/instants —
+ *  server-owned → 422 (client НЕ может forge zone или derived UTC instant). */
 export const CHECKOUT_SERVICE_DATE_FORBIDDEN_KEYS = [
   "id",
   "code",
@@ -369,6 +397,10 @@ export const CHECKOUT_SERVICE_DATE_FORBIDDEN_KEYS = [
   "travelers",
   "acquisitionSource",
   "options",
+  "serviceTimeZone",
+  "serviceStartsAt",
+  "serviceEndsAt",
+  "serviceTimeType",
   "cancelledAt",
   "createdAt",
   "updatedAt",
@@ -402,6 +434,12 @@ export const CHECKOUT_REVALIDATE_FORBIDDEN_KEYS = [
   "travelers",
   "acquisitionSource",
   "options",
+  "serviceTime",
+  "serviceEndTime",
+  "serviceTimeZone",
+  "serviceStartsAt",
+  "serviceEndsAt",
+  "serviceTimeType",
   "cancelledAt",
   "createdAt",
   "updatedAt",
@@ -499,6 +537,12 @@ export const PAYMENT_TERMS_FORBIDDEN_KEYS = [
   "availability",
   "capacity",
   "serviceDate",
+  "serviceTime",
+  "serviceEndTime",
+  "serviceTimeZone",
+  "serviceStartsAt",
+  "serviceEndsAt",
+  "serviceTimeType",
   "travelers",
   "acquisitionSource",
   "options",

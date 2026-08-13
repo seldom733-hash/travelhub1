@@ -62,7 +62,6 @@ export const PERMISSIONS = {
   "order.suspend": "Приостановка заказа",
   "order.cancel": "Отмена заказа",
   "order.close": "Закрытие заказа",
-  "order.import": "Импорт/создание заказа (ADMIN exception, Phase 1 bootstrap)",
 
   // ── Booking ───────────────────────────────────────────────────────────
   "booking.read": "Чтение бронирований",

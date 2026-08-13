@@ -80,29 +80,31 @@ Outbox event → consumer → child event → diagnostics/audit):
 | `CustomerCreated` | CRM | `{ customerId, code, name }` — data-minimized (нет consumer-ов; email остаётся в CRM master-data, STRICT REVIEW FIX) |
 | `CustomerUpdated` | CRM | `{ customerId, code, name, changedFields[] }` |
 | `PartnerCreated` | CRM | `{ partnerId, code, name, source }` — `source`: "partner_onboarding"\|"crm_center" (onboarding channel, НЕ acquisition); contactEmail/registrationNumber убраны (STRICT REVIEW FIX) |
-| `OrderRequested` | Sales | immutable commercial snapshot + refs (Step 2.4 §5; STRICT REVIEW 2.5: +`reservationIds` (все holds), +item `productType` frozen): `{ version, saleId, saleCode, checkoutId, checkoutCode, quoteId, customerId\|null, reservationId\|null, reservationIds[], items[{productId, productCode, productTitle, productType, tariffId, tariffCode, quantity, unitPrice, amount}], currency, subtotal, discountType, discountValue\|null, discountAmount\|null, total, paymentScheme\|null, prepaymentType\|null, prepaymentValue\|null, initialAmount\|null, remainingAmount\|null, acquisitionSource, serviceDate\|null }` — **command** в Order domain; retryable=true (durable retry); БЕЗ PII (travelers — READ-only из CheckoutIntent, immutable после completion) |
+| `OrderRequested` | Sales | immutable commercial snapshot + refs (Step 2.4 §5; STRICT REVIEW 2.5: +`reservationIds` (все holds), +item `productType` frozen; Step 2.8A: +frozen local temporal факты): `{ version, saleId, saleCode, checkoutId, checkoutCode, quoteId, customerId\|null, reservationId\|null, reservationIds[], items[{productId, productCode, productTitle, productType, tariffId, tariffCode, quantity, unitPrice, amount}], currency, subtotal, discountType, discountValue\|null, discountAmount\|null, total, paymentScheme\|null, prepaymentType\|null, prepaymentValue\|null, initialAmount\|null, remainingAmount\|null, acquisitionSource, serviceDate\|null, serviceTime\|null (local HH:mm), serviceEndTime\|null (local HH:mm), serviceTimeZone\|null (IANA) }` — **command** в Order domain; retryable=true (durable retry); БЕЗ PII (travelers — READ-only из CheckoutIntent, immutable после completion). Step 2.8A: time/zone — frozen verbatim из CheckoutIntent (zone — authority Catalog через binding); валидация на входе consumer-а (time без zone / не-IANA / не-HH:mm → событие FAILED, никакого Order) |
 | `OrderCreated` | Order | `{ orderId, code, number, customerId, amount, currency }` — `customerId` может быть NULL (canonical Order без CRM-клиента, internal assisted flow, Step 2.5) |
 | `OrderReadyForBooking` | Order | `{ orderId, code, customerId }` — факт: заказ готов к бронированию (transition `confirm`; бывш. `OrderApproved`, Step 1.14) |
 | `OrderFulfilled` | Order | `{ orderId, code, customerId }` — факт: заказ исполнен (`complete` или reconcile по терминальным броням, Step 1.14) |
 | `OrderClosed` | Order | `{ orderId, code, customerId }` — факт: заказ закрыт (`close`; CLOSED ≠ CANCELLED ≠ FULFILLED, Step 1.14) |
 | `OrderCancelled` | Order | `{ orderId, code, customerId }` |
 | `OrderStatusChanged` | Order | `{ from, to, reason?, actor? }` — **только технические переходы** (process/markWaitingData/resumeProcessing/problem/suspend/PARTIALLY_FULFILLED/PROBLEM); canonical факты на него не мапятся |
-| `BookingRequested` | Order | `{ orderId, orderCode, customerId }` — command в Booking domain (transition `send`; НЕ заменяет `OrderReadyForBooking`). STRICT REVIEW FIX (PII): items/travelers (паспортные данные) убраны из durable payload — consumer читает order.items/order.travelers из БД по orderId (READ-only) |
-| `BookingCreated` | Booking | `{ count, bookings[{id,code}], orderId }` |
+| `BookingRequested` | Order | `{ orderId, orderCode, customerId }` — command в Booking domain (transition `send`; НЕ заменяет `OrderReadyForBooking`). STRICT REVIEW FIX (PII): items/travelers (паспортные данные) убраны из durable payload — consumer читает order.items/order.travelers из БД по orderId (READ-only). Step 2.8: кардинальность `1 OrderItem → 1 Booking` (DB unique `Booking.orderItemId`). Step 2.8A: temporal payload НЕ расширяется (minimal §11) — frozen local факты (serviceDate/serviceTime/serviceEndTime/serviceTimeZone) читаются consumer-ом из Order (READ-only, verbatim), UTC instants деривируются ОДИН раз при создании |
+| `BookingCreated` | Booking | `{ count, bookings[{id,code}], orderId }` — result-event, ровно ОДНО на обработку BookingRequested (без PII; correlation наследуется, causation = `BookingRequested.eventId`; actor SYSTEM; не эмитится на duplicate/no-op; consumer-ов нет) |
 | `BookingConfirmed` | Booking | `{ bookingId, code, orderId, productId }` |
 | `BookingRejected` | Booking | `{ bookingId, code, orderId, productId, reason }` |
-| `BookingCancelled` | Booking | `{ bookingId, code, orderId, productId }` |
-| `BookingStatusChanged` | Booking | `{ from, to, bookingId, orderId, code }` |
+| `BookingCancelled` | Booking | `{ bookingId, code, orderId, productId }` — HTTP-команда `cancel`, а также result-event компенсации от OrderCancelled-консьюмера (добавляется `reason: "Заказ отменён"`; Step 2.9 §15) |
+| `BookingStatusChanged` | Booking | `{ from, to, bookingId, orderId, code }` — технический переход (prepare/send/requestClarification/resume/service/requestChange/resolveChange/requestCancellation/problem/complete) |
+| `BookingCompleted` | Booking | `{ bookingId, code, orderId, productId }` — **canonical fulfillment факт (Step 2.9 §17)**: ровно одно на реальный `complete` (CAS); эмитится атомарно с техническим `BookingStatusChanged` (существующий Order-reconcile-контракт 2.5A); consumer-ов нет (лента/аналитика) |
 
 ## Подписчики
 
 | Домен | Событие | Действие |
 |---|---|---|
 | **Order** | `OrderRequested` | создаёт canonical Order (ORD-* + TH-YYYY-######), OrderItems, OrderTraveler (snapshot из CheckoutIntent), Fulfillment, публикует OrderCreated (result-event); идемпотентно (InboxEvent + `Order.saleId @unique`, один Sale → один Order; P2002 — констрейнт-специфично) |
-| **Booking** | `BookingRequested` | создаёт Booking (BKG-*) на каждый OrderItem + Passenger из COMPLETE OrderTraveler; идемпотентно (InboxEvent + проверка существующих броней) |
+| **Booking** | `BookingRequested` | создаёт Booking (BKG-*) на каждый OrderItem (linkage `orderItemId`, DB unique) + Passenger из COMPLETE OrderTraveler; идемпотентно (InboxEvent + проверка существующих броней + DB unique orderItemId); frozen acquisitionSource verbatim; availability не трогает. Step 2.8A: `serviceTimeType` (DATE_ONLY|TIME_SLOT|OPEN_DATE; DATE_RANGE зарезервирован) из presence-фактов; local время/zone verbatim из Order; `serviceStartsAt/EndsAt` — деривированные UTC instants (Intl, детерминированно), date-only → NULL (00:00 НЕ фабрикуется) |
 | **Order** | `BookingConfirmed` | реконсиляция агрегата: `SENT_TO_BOOKING → PARTIALLY_FULFILLED → FULFILLED` |
 | **Order** | `BookingStatusChanged` (→ CONFIRMED/IN_SERVICE/COMPLETED) | реконсиляция агрегата |
 | **Order** | `BookingRejected` | заказ → `PROBLEM` |
+| **Booking** | `OrderCancelled` | компенсация (Step 2.9 §15): активные Booking заказа → `CANCELLED` (CAS + BookingHistory `cancelled_order` + result-event `BookingCancelled`); терминальные не трогаются; no hard delete; Order НЕ пишется; availability release/refund — вне owner-контракта (не реализуется) |
 
 **Canonical Order events (Step 1.14):** факт-события публикуются **атомарно**
 с переходом (state + OrderHistory + OutboxEvent в одной транзакции), ровно один

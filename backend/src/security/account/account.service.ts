@@ -36,6 +36,9 @@ export interface OwnOrder {
   amount: string;
   /** Canonical service date (если есть), иначе null. НЕ updatedAt (§13). */
   serviceDate: string | null;
+  /** Step 2.8A: local wall-clock (HH:mm) + frozen IANA zone (authorized facts). */
+  serviceTime: string | null;
+  serviceTimeZone: string | null;
   /** Canonical Order.createdAt — момент создания, НЕ «дата заказа» (§13). */
   createdAt: string;
   items: OwnOrderItem[];
@@ -60,6 +63,11 @@ export interface OwnBooking {
   status: string;
   amount: string;
   serviceDate: string | null;
+  /** Step 2.8A: local wall-clock + zone (authorized; PII-free). */
+  serviceTime: string | null;
+  serviceTimeZone: string | null;
+  /** Derived UTC start instant (TIME_SLOT) — authorized serialization §26. */
+  serviceStartsAt: string | null;
   createdAt: string;
 }
 
@@ -194,6 +202,8 @@ export class AccountService {
         currency: o.currency,
         amount: o.amount.toString(),
         serviceDate: isoOrNull(o.serviceDate),
+        serviceTime: o.serviceTime ?? null,
+        serviceTimeZone: o.serviceTimeZone ?? null,
         createdAt: isoUtc(o.createdAt),
         items: o.items.map((i) => ({
           id: i.id,
@@ -202,6 +212,8 @@ export class AccountService {
           quantity: i.quantity,
           price: i.price.toString(),
           amount: i.amount.toString(),
+          // OrderItem не имеет собственных temporal-колонок — order-level
+          // факты (serviceTime/serviceTimeZone) отдаются на уровне Order.
           serviceDate: isoOrNull(i.serviceDate),
         })),
       })),
@@ -244,6 +256,9 @@ export class AccountService {
         status: b.status,
         amount: b.amount.toString(),
         serviceDate: isoOrNull(b.serviceDate),
+        serviceTime: b.serviceTime ?? null,
+        serviceTimeZone: b.serviceTimeZone ?? null,
+        serviceStartsAt: isoOrNull(b.serviceStartsAt),
         createdAt: isoUtc(b.createdAt),
       })),
       total,

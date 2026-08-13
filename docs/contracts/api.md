@@ -43,7 +43,7 @@ PATCH  /api/v1/users/:id/status блокировка/активация (ауд�
 |---|---|---|---|
 | Catalog | `catalog.product.read` | `catalog.product.write` | publish: `catalog.product.publish`; категории: `catalog.category.write`; availability: `catalog.availability.write`; Service Unit publish/archive: `catalog.service_unit.publish` (Step 1.8A) |
 | CRM | `crm.customer.read` | `crm.customer.write`, `crm.contact.write`, `crm.company.write`, `crm.partner.write`, `crm.supplier.write` | — |
-| Order | `order.read` | по action: `order.accept`, `order.edit_noncritical`, `order.request_booking`, `order.suspend`, `order.cancel`, `order.close` | `POST /orders/bootstrap` — только `order.import` (ADMIN exception) |
+| Order | `order.read` | по action: `order.accept`, `order.edit_noncritical`, `order.request_booking`, `order.suspend`, `order.cancel`, `order.close` | создание только канонически: `OrderRequested` → consumer (Step 2.6; bootstrap-путь удалён) |
 | Booking | `booking.read` | по action: `booking.send_supplier`, `booking.confirm`, `booking.cancel` | создание только через событие `BookingRequested` |
 
 ## Communication (Step 1.16 — владелец communication.*, CML-*, ADR-0011)
@@ -236,6 +236,17 @@ POST   /api/v1/products/:id/availability upsert слотов — catalog.availab
 GET    /api/v1/categories                — catalog.product.read
 POST   /api/v1/categories                — catalog.category.write
 ```
+
+**Product `serviceTimeZone` (Step 2.8A — canonical timezone authority):**
+Product create/update принимает опциональный `serviceTimeZone` — IANA ID
+(`Asia/Baku`, `Europe/Berlin`; ≤64; формат/валюта не влияют). Является
+**авторитетным источником timezone** для exact-time услуг: zone замораживается
+в CheckoutIntent при binding и далее verbatim в Sale → OrderRequested → Order →
+Booking (§8: никакого browser/locale/IP/offset authority). Не-IANA значение
+(`UTC+4`, `UTC+5:30`, несуществующий ID) → **422** при create/update (в т.ч.
+через change-proposal/draft для PUBLISHED). NULL = date-only услуга (exact
+время недоступно: выбор `serviceTime` в checkout без zone → 422). Изменение
+zone НЕ мутирует уже созданные Booking (frozen при создании Booking).
 
 ## Service Unit (Step 1.8A — владелец catalog.*, UNI-*, DD-025 B)
 
@@ -433,8 +444,11 @@ POST   /api/v1/suppliers        — crm.supplier.write
 
 ## Order Center (владелец Order/OrderItem/OrderTraveler/Fulfillment)
 
+> Создание Order — ТОЛЬКО канонический путь (Step 2.6): `Quote → CheckoutIntent →
+> Sale → OrderRequested → Outbox/EventBus → Order-owned consumer → Order → OrderCreated`.
+> Никакого HTTP direct-create эндпоинта не существует.
+
 ```text
-POST   /api/v1/orders/bootstrap   служебное создание (ADMIN exception): ORD-* + TH-* — order.import
 GET    /api/v1/orders             список: ?status=&customerId=&search=&page=&pageSize= — order.read
 GET    /api/v1/orders/:id         карточка + items + travelers + fulfillment + история — order.read
 PATCH  /api/v1/orders/:id         action: process | markWaitingData | resumeProcessing |
@@ -442,7 +456,7 @@ PATCH  /api/v1/orders/:id         action: process | markWaitingData | resumeProc
 PATCH  /api/v1/orders/:id/travelers  обновление паспортных данных — order.edit_noncritical
 ```
 
-Действия и события (Step 1.14 — canonical Order events):
+Действия и события (Step 1.14/2.7 — canonical Order events):
 `confirm` → `OrderReadyForBooking` (факт); `send` («Передать в Booking Center») →
 `BookingRequested` (command); `complete` → `OrderFulfilled` (факт);
 `close` → `OrderClosed` (факт); `cancel` → `OrderCancelled` (факт);
@@ -450,15 +464,123 @@ PATCH  /api/v1/orders/:id/travelers  обновление паспортных �
 `OrderStatusChanged` (технический). События пишутся атомарно с переходом
 (state + OrderHistory + outbox в одной транзакции).
 
+Статусы (Step 2.7, stable backend codes — Screen Design Baseline):
+`NEW` → `IN_PROCESSING` ⇄ `WAITING_FOR_DATA` → `READY_FOR_BOOKING` →
+`SENT_TO_BOOKING` → `PARTIALLY_FULFILLED` → `FULFILLED` → `CLOSED`;
+`CANCELLED`/`PROBLEM`/`SUSPENDED` — marker-состояния. `READY_TO_CLOSE` —
+зарезервированный код без producer-а (close каноничен из `FULFILLED`).
+Невалидные переходы → 409 (from-guard, CAS); неполные данные туристов на
+`confirm` → 422; forged server-owned поля (status/amount/version/milestones/
+customerId/saleId/acquisitionSource/… на PATCH /orders/:id; id/orderId/version/
+dataCompleteness/… на PATCH /orders/:id/travelers) → **422** (`assertNoForbiddenKeys`,
+STRICT REVIEW 2.7 §28 — конвенция Sales/Reverse/Catalog, не silent-strip).
+
+**Order temporal факты (Step 2.8A):** Order/OrderItem несут frozen local
+service occurrence — `serviceDate` (date-only) + опциональные `serviceTime`/
+`serviceEndTime` (local HH:mm) + `serviceTimeZone` (IANA), verbatim из
+OrderRequested (Sales freezes; Order не пере-резолвит Catalog). PATCH
+`/orders/:id` с forged temporal полями (serviceTime/serviceTimeZone/
+serviceStartsAt/…) → **422** (server-owned, конвенция §28).
+`READY_FOR_BOOKING` требует `OrderTraveler.dataCompleteness =
+COMPLETE`; `send` — только из `READY_FOR_BOOKING`; Booking создаёт ТОЛЬКО
+consumer `BookingRequested` (Order-модуль не пишет в booking.*, Step 2.8 boundary).
+
+Milestone-времена (2.5A): `confirmedAt`/`fulfilledAt`/`closedAt`/`cancelledAt` +
+`submittedAt` — server-owned, immutable, ставятся атомарно с переходом. SLA
+(Step 2.7): детерминированно вычислимо из milestone-времён и OrderHistory
+(persisted SLA-политика/дедлайны не введены — нет канонического источника;
+см. `docs/architecture/order-lifecycle-completion.md`).
+
 ## Booking Center (владелец Booking/Reservation/SupplierConfirmation/Passenger)
 
 ```text
 GET    /api/v1/bookings          список: ?status=&orderId=&search=&page=&pageSize= — booking.read
 GET    /api/v1/bookings/:id      карточка + passengers + confirmations + история — booking.read
-PATCH  /api/v1/bookings/:id      action: send | confirm | reject | service | complete | cancel | problem
+PATCH  /api/v1/bookings/:id      action: prepare | send | requestClarification | resume |
+                                 confirm | reject | service | requestChange | resolveChange |
+                                 requestCancellation | complete | cancel | problem
 ```
 
+**Lifecycle (Step 2.9 — единственный authority `BookingService.bookingAction`,
+Screen Design codes verbatim):**
+
+| Действие | From → To | Право | Событие |
+|---|---|---|---|
+| `prepare` | NEW → PREPARING_REQUEST | booking.send_supplier | BookingStatusChanged (техн.) |
+| `send` | NEW/PREPARING_REQUEST → SENT_TO_SUPPLIER | booking.send_supplier | BookingStatusChanged (техн.) |
+| `requestClarification` | SENT_TO_SUPPLIER/AWAITING_CONFIRMATION → NEEDS_CLARIFICATION | booking.confirm | BookingStatusChanged (техн.) |
+| `resume` | NEEDS_CLARIFICATION → SENT_TO_SUPPLIER | booking.confirm | BookingStatusChanged (техн.) |
+| `confirm` | SENT_TO_SUPPLIER/AWAITING_CONFIRMATION → CONFIRMED | booking.confirm | **BookingConfirmed** |
+| `reject` | SENT_TO_SUPPLIER/AWAITING_CONFIRMATION → SUPPLIER_REJECTED (терм.) | booking.confirm | **BookingRejected** |
+| `service` | CONFIRMED → IN_SERVICE | booking.confirm | BookingStatusChanged (техн.) |
+| `requestChange` | CONFIRMED/IN_SERVICE → CHANGE_REQUESTED | booking.request_change | BookingStatusChanged (техн.) |
+| `resolveChange` | CHANGE_REQUESTED → CONFIRMED | booking.request_change | BookingStatusChanged (техн.) |
+| `requestCancellation` | CONFIRMED/IN_SERVICE/CHANGE_REQUESTED/NEEDS_CLARIFICATION → CANCELLATION_REQUESTED | booking.cancel | BookingStatusChanged (техн.) |
+| `complete` | IN_SERVICE → COMPLETED (терм.) | booking.confirm | **BookingCompleted** + BookingStatusChanged (техн.) |
+| `cancel` | любой активный → CANCELLED (терм.) | booking.cancel | **BookingCancelled** |
+| `problem` | любой активный → PROBLEM | booking.confirm | BookingStatusChanged (техн.) |
+
+- Терминальные: `SUPPLIER_REJECTED`, `COMPLETED`, `CANCELLED` — не reopen-аются (409).
+- `AWAITING_CONFIRMATION` — резервный код без producer-а (legacy-источник для
+  `confirm`/`reject`; как `READY_TO_CLOSE` в Order).
+- `NEEDS_CLARIFICATION`/`CHANGE_REQUESTED`/`CANCELLATION_REQUESTED` —
+  operational marker-состояния (screen queues); НЕ меняют frozen money,
+  acquisitionSource, service occurrence (2.8A), availability, Finance.
+- Невалидный переход → 409 (from-guard + CAS `updateMany where id+status+version`;
+  concurrent/retry — ровно один победитель, остальные 409, без duplicate
+  history/event). Malformed/forged → 400/422. Unknown Booking → нейтральный 404.
+- **Order-status guard (STRICT REVIEW 2.9):** lifecycle-команды (кроме `cancel`)
+  на брони заказа `CANCELLED`/`CLOSED` → 409 (READ-only Order check; инвариант
+  «нет активной Booking под отменённым заказом»); `problem` из PROBLEM — 409
+  (нет self-transition).
+- RBAC: только staff-роли с каталоговыми правами (OPERATOR/ADMIN и др.);
+  BUYER/PARTNER/MODERATOR/SALES_MANAGER — 403 (матрица §4).
+- События: state + BookingHistory + outbox — атомарно в одной транзакции;
+  HTTP-команды — correlation = server UUID, causation = null.
+- **Компенсация (Step 2.9 §15):** `OrderCancelled` → Booking-консьюмер
+  (`booking-order-cancelled-consumer`) отменяет активные Booking заказа
+  (CANCELLED + history `cancelled_order` + result-event `BookingCancelled`);
+  терминальные не трогаются; гонка Order-cancel vs Booking-create в обоих
+  порядках детерминирована (создание сразу в CANCELLED при уже отменённом
+  заказе); никакого hard delete / refund / Finance / availability-release.
+
 **Создания через POST нет** — Booking создаётся только consumer-ом
-`BookingRequested`. `confirm` → `BookingConfirmed`; `reject` →
-`BookingRejected`; `cancel` → `BookingCancelled`; прочие →
-`BookingStatusChanged` (Order слушает их для реконсиляции агрегата).
+`BookingRequested` (Step 2.8 canonical: `Order → BookingRequested →
+Booking-owned consumer → Booking`; POST /bookings → 404). Кардинальность:
+`1 OrderItem → ровно 1 Booking` (DB-level unique `Booking.orderItemId`;
+legacy NULL). Initial status `NEW`, коды `BKG-*`; Passenger — из COMPLETE
+OrderTraveler (non-traveler заказ — Booking без Passenger); frozen
+acquisitionSource verbatim (DIRECT/BUYER_REQUEST/null); amount = item.amount
+(без reprice); availability hold не дублируется. `PATCH /bookings/:id` —
+только `action`; forged server-owned поля (id/code/orderId/orderItemId/
+productId/status/amount/acquisitionSource/version/…) → **422**
+(`assertNoForbiddenKeys`, STRICT REVIEW 2.8 §28).
+
+**Booking temporal модель (Step 2.8A):** Booking хранит frozen service
+occurrence, verbatim из Order: `serviceTimeType` (`DATE_ONLY` default — точная
+классификация legacy | `TIME_SLOT` | `OPEN_DATE` | `DATE_RANGE` зарезервирован),
+`serviceTime`/`serviceEndTime` (local HH:mm), `serviceTimeZone` (IANA),
+`serviceStartsAt`/`serviceEndsAt` — деривированные UTC instants (одна деривация
+при создании consumer-ом; дата-only → NULL, 00:00 НЕ фабрикуется; инвариант
+local↔UTC enforced). Неизменяемы на lifecycle (reschedule не входит в 2.8A);
+forged temporal PATCH (`serviceTime/serviceStartsAt/…`) → **422**. Сериализация:
+`serviceDate` — date-only/ISO по конвенции проекции; `serviceTime` — `HH:mm`;
+zone — IANA ID; `serviceStartsAt` — ISO-8601 instant. `confirm` →
+`BookingConfirmed`; `reject` → `BookingRejected`; `cancel` →
+`BookingCancelled`; прочие → `BookingStatusChanged` (Order слушает их для
+реконсиляции агрегата; сам факт создания Booking НЕ меняет статус Order).
+
+**Booking milestone-времена (Step 2.9A):** Booking несёт сервер-owned
+milestones: `requestedAt` (момент отправки запроса поставщику — transition
+`send`), `confirmedAt`, `rejectedAt`, `cancelledAt`, `completedAt`.
+Каждый milestone устанавливается **ровно один раз** внутри того же
+CAS-transaction, что и переход статуса (first-only); повторный переход не
+перезаписывает. born-CANCELLED (компенсация при отменённом Order до создания)
+несёт `cancelledAt` = момент создания. Компенсация Order-cancel пишет
+`cancelledAt` в CAS-обновлении существующей активной брони. Все значения —
+UTC instants, сервер-generated; `updatedAt` НЕ используется как бизнес-дата.
+forged PATCH любого milestone (requestedAt/confirmedAt/rejectedAt/
+cancelledAt/completedAt) → **422** (`assertNoForbiddenKeys`). Сериализация:
+ISO-8601 instants; lifecycle-порядок enforcement: `confirmedAt` может
+существовать только при CONFIRMED (исторически — до `cancelledAt`, если бронь
+была подтверждена до компенсации); терминальный milestone ровно один.

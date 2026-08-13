@@ -14,15 +14,8 @@ import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
 import { isDateOnly } from "../../shared/date-only";
+import { isIanaTimeZone, isLocalTime } from "../../shared/service-time";
 import { PaymentPrepaymentType, PaymentScheme, QuoteDiscountType, SalesAcquisitionSource } from "../../generated/prisma/enums";
-
-export interface BootstrapOrderInput {
-  customerId: string;
-  currency?: string;
-  serviceDate?: string;
-  items: { productId: string; title: string; type: string; quantity?: number; price: number; serviceDate?: string }[];
-  travelers?: { firstName: string; lastName: string; birthDate?: string; citizenship?: string; gender?: string; passportNumber?: string }[];
-}
 
 export interface TravelerUpdateInput {
   firstName?: string;
@@ -186,6 +179,36 @@ export function assertValidOrderRequestedPayload(p: unknown): asserts p is Order
       throw new ValidationDomainError("OrderRequested payload serviceDate is invalid");
     }
   }
+  // Step 2.8A: local temporal факты (additive; null/undefined = date-only).
+  // Инварианты: time требует valid IANA zone (authority §8); endTime требует
+  // time; zone без time — легально (продукт с zone, покупатель не выбрал время).
+  const st = x.serviceTime as string | null | undefined;
+  const et = x.serviceEndTime as string | null | undefined;
+  const tz = x.serviceTimeZone as string | null | undefined;
+  if (st !== null && st !== undefined) {
+    if (typeof st !== "string" || !isLocalTime(st)) {
+      throw new ValidationDomainError("OrderRequested payload serviceTime is invalid (HH:mm)");
+    }
+    if (tz === null || tz === undefined || typeof tz !== "string" || !isIanaTimeZone(tz)) {
+      throw new ValidationDomainError("OrderRequested payload serviceTime requires a valid IANA serviceTimeZone");
+    }
+    // STRICT REVIEW 2.8A fix: локальное время без календарной даты — противоречивый
+    // occurrence-факт (Booking НЕ может вывести instant; OPEN_DATE+time бессмыслен).
+    if (x.serviceDate === null || x.serviceDate === undefined) {
+      throw new ValidationDomainError("OrderRequested payload serviceTime requires serviceDate");
+    }
+  }
+  if (et !== null && et !== undefined) {
+    if (typeof et !== "string" || !isLocalTime(et)) {
+      throw new ValidationDomainError("OrderRequested payload serviceEndTime is invalid (HH:mm)");
+    }
+    if (st === null || st === undefined) {
+      throw new ValidationDomainError("OrderRequested payload serviceEndTime requires serviceTime");
+    }
+  }
+  if (tz !== null && tz !== undefined && (typeof tz !== "string" || !isIanaTimeZone(tz))) {
+    throw new ValidationDomainError("OrderRequested payload serviceTimeZone is not a valid IANA timezone");
+  }
 }
 
 /** Money-проверка frozen snapshot: string, parseable Decimal, >= 0. NULL/undefined — ок. */
@@ -220,120 +243,6 @@ export class OrderService {
     private readonly ids: IdsService,
     private readonly eventBus: EventBusService,
   ) {}
-
-  /** Bootstrap creation (Phase 1, временный служебный сценарий до Phase 2 OrderRequested). */
-  async bootstrapOrder(input: BootstrapOrderInput, actor?: string) {
-    if (!input.items.length) throw new ValidationDomainError("Order must contain at least one item");
-    const currency = input.currency ?? "USD";
-    const amount = input.items.reduce((sum, i) => sum + i.price * (i.quantity ?? 1), 0);
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const code = await this.ids.nextCode(tx, "ORD");
-      const number = await this.ids.nextOrderNumber(tx);
-      // Step 2.5A: submission milestone = момент входа заказа в систему
-      // (server-owned, один timestamp на создание; НЕ заменяет createdAt).
-      const submittedAt = new Date();
-
-      const order = await tx.order.create({
-        data: {
-          code,
-          number,
-          customerId: input.customerId,
-          status: "NEW",
-          paymentStatus: "UNPAID",
-          currency,
-          amount,
-          paidAmount: 0,
-          serviceDate: input.serviceDate ? new Date(input.serviceDate) : null,
-          version: 1,
-          submittedAt,
-          // Step 2.5B: bootstrap = server-assisted internal entry → canonical
-          // MANUAL/DIRECT (server-derived, та же семантика, что у Checkout
-          // foundation; клиент не может forge — поля в DTO нет).
-          acquisitionSource: SalesAcquisitionSource.DIRECT,
-          createdBy: actor ?? null,
-          updatedBy: actor ?? null,
-        },
-        select: { id: true, code: true, number: true, customerId: true, status: true, amount: true, currency: true },
-      });
-
-      // Чтение канонических кодов продуктов из Catalog (READ-only, без записи).
-      const productCodes = await tx.product.findMany({
-        where: { id: { in: input.items.map((i) => i.productId) } },
-        select: { id: true, code: true },
-      });
-      const codeById = new Map(productCodes.map((p) => [p.id, p.code]));
-
-      for (const item of input.items) {
-        await tx.orderItem.create({
-          data: {
-            orderId: order.id,
-            productId: item.productId,
-            productCode: codeById.get(item.productId) ?? "",
-            title: item.title,
-            type: item.type,
-            quantity: item.quantity ?? 1,
-            price: item.price,
-            currency,
-            amount: item.price * (item.quantity ?? 1),
-            serviceDate: item.serviceDate ? new Date(item.serviceDate) : input.serviceDate ? new Date(input.serviceDate) : null,
-          },
-        });
-      }
-
-      for (const t of input.travelers ?? []) {
-        await tx.orderTraveler.create({
-          data: {
-            orderId: order.id,
-            customerId: input.customerId,
-            firstName: t.firstName,
-            lastName: t.lastName,
-            birthDate: t.birthDate ? new Date(t.birthDate) : null,
-            citizenship: t.citizenship ?? null,
-            gender: t.gender ?? null,
-            passportNumber: t.passportNumber ?? null,
-            dataCompleteness: t.passportNumber ? "COMPLETE" : "INCOMPLETE",
-            version: 1,
-          },
-        });
-      }
-
-      // Fulfillment создаётся владельцем Order (статус исполнения заказа).
-      await tx.fulfillment.create({ data: { orderId: order.id, status: "NOT_STARTED", notes: null } });
-
-      await tx.orderHistory.create({
-        data: {
-          orderId: order.id,
-          action: "created",
-          to: "NEW",
-          actorId: actor ?? null,
-          actorName: actor ?? null,
-          comment: "Заказ создан (bootstrap, Phase 1)",
-        },
-      });
-
-      // Step 1.15: correlationId НЕ является business entity ID (order.code) —
-      // он наследуется из request context (HTTP flow: correlation = requestId).
-      const eventId = await this.eventBus.emit(tx, {
-        aggregateType: "Order",
-        aggregateId: order.id,
-        eventType: DomainEvents.OrderCreated,
-        payload: {
-          orderId: order.id,
-          code: order.code,
-          number: order.number,
-          customerId: order.customerId,
-          amount: order.amount.toString(),
-          currency,
-        } as OrderEventPayload,
-      });
-
-      return { order, eventId };
-    });
-
-    await this.eventBus.publishPending();
-    return result;
-  }
 
   /**
    * Step 2.5 — canonical Order creation из OrderRequested (domain-owned logic).
@@ -373,6 +282,11 @@ export class OrderService {
     const number = await this.ids.nextOrderNumber(tx);
     const customerId = payload.customerId ?? null;
     const serviceDate = payload.serviceDate ? new Date(`${payload.serviceDate}T00:00:00.000Z`) : null;
+    // Step 2.8A: frozen local temporal факты (verbatim; UTC instant НЕ
+    // дублируется — единственная деривация на Booking, §13).
+    const serviceTime = payload.serviceTime ?? null;
+    const serviceEndTime = payload.serviceEndTime ?? null;
+    const serviceTimeZone = payload.serviceTimeZone ?? null;
     const currency = payload.currency;
     const amount = new Prisma.Decimal(payload.total);
     // Step 2.5A: submission milestone — момент создания Order из OrderRequested
@@ -390,6 +304,9 @@ export class OrderService {
         amount,
         paidAmount: new Prisma.Decimal(0),
         serviceDate,
+        serviceTime,
+        serviceEndTime,
+        serviceTimeZone,
         version: 1,
         submittedAt,
         // Step 2.5: upstream refs + frozen snapshot (из OrderRequested).

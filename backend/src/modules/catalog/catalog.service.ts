@@ -7,6 +7,7 @@ import { IdsService } from "../../shared/ids.service";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { uniqueConstraintNames } from "../../shared/prisma-errors";
 import { validateAttributes, validateCategorySlug, validateSchemaConfig, toCategoryEditorContract, type AttributeDef, type CategoryEditorSchemaContract } from "./category-schema.validation";
+import { isIanaTimeZone } from "../../shared/service-time";
 import { CANONICAL_CATEGORIES, DEFAULT_SCHEMA_CONFIG } from "./canonical-categories";
 import { CatalogAccessPolicy } from "./catalog-access.policy";
 import { PublicSellerProfileService } from "./seller/seller-profile.service";
@@ -76,6 +77,9 @@ export interface CreateProductInput {
   /** Step 1.1: категория + category-specific attributes (валидируются по ACTIVE Category Schema). */
   categoryId?: string;
   attributes?: Record<string, unknown>;
+  /** Step 2.8A: commercial service timezone (IANA ID) услуги — authoritative source
+   *  времени для TIME_SLOT-бронирований. Валидируется server-side; NULL = date-only. */
+  serviceTimeZone?: string | null;
   /** Step 1.2/1.3: владелец-партнёр (object scope). Для PARTNER заполняется СЕРВЕРОМ
    *  из актора — body-значение игнорируется. Для staff/ADMIN — explicit ownership
    *  override (аудируется) при наличии catalog.product.write. */
@@ -90,6 +94,8 @@ export interface UpdateProductInput {
   tariffs?: CreateTariffDto[];
   categoryId?: string;
   attributes?: Record<string, unknown>;
+  /** Step 2.8A: commercial service timezone (IANA); undefined = не менять. */
+  serviceTimeZone?: string | null;
 }
 
 export interface ProductListQuery {
@@ -215,6 +221,8 @@ export class CatalogService implements OnModuleInit {
           title: input.title,
           slug,
           description: input.description ?? null,
+          // Step 2.8A: server-validated IANA authority (NULL = date-only).
+          serviceTimeZone: this.normalizeServiceTimeZone(input.serviceTimeZone),
           status: "DRAFT",
           version: 1,
           createdBy: actor?.username ?? null,
@@ -534,6 +542,12 @@ export class CatalogService implements OnModuleInit {
         data: {
           title: input.title ?? existing.title,
           description: input.description !== undefined ? input.description : existing.description,
+          // Step 2.8A: явное изменение (undefined = не трогать). Seller-edit НЕ
+          // мутирует существующие Booking (zone frozen при binding — §21/§17).
+          serviceTimeZone:
+            input.serviceTimeZone !== undefined
+              ? this.normalizeServiceTimeZone(input.serviceTimeZone)
+              : (existing.serviceTimeZone ?? null),
           version: { increment: 1 },
           updatedBy: actor.username,
           ...categoryData,
@@ -578,7 +592,7 @@ export class CatalogService implements OnModuleInit {
    */
   private async updatePublishedDraft(
     tx: Prisma.TransactionClient,
-    existing: { id: string; code: string; status: string; title: string; description: string | null; categoryId: string | null; categorySchemaId: string | null; attributes: Prisma.JsonValue | null; partnerId: string | null; version: number },
+    existing: { id: string; code: string; status: string; title: string; description: string | null; categoryId: string | null; categorySchemaId: string | null; attributes: Prisma.JsonValue | null; partnerId: string | null; version: number; serviceTimeZone: string | null },
     input: UpdateProductInput,
     actor: AuthUser,
   ) {
@@ -613,6 +627,10 @@ export class CatalogService implements OnModuleInit {
 
     const nextTitle = input.title ?? draft?.title ?? existing.title;
     const nextDescription = input.description !== undefined ? input.description : (draft?.description ?? existing.description ?? null);
+    // Step 2.8A: change proposal N+1 — zone валидируется и уходит в Draft (на
+    // approve применится к live; существующие Booking frozen и не пере-резолвят).
+    const nextServiceTimeZone =
+      input.serviceTimeZone !== undefined ? this.normalizeServiceTimeZone(input.serviceTimeZone) : (draft?.serviceTimeZone ?? existing.serviceTimeZone ?? null);
 
     if (draft) {
       await tx.productDraft.update({
@@ -620,6 +638,7 @@ export class CatalogService implements OnModuleInit {
         data: {
           title: nextTitle,
           description: nextDescription,
+          serviceTimeZone: nextServiceTimeZone,
           version: { increment: 1 },
           updatedById: actor.id,
           ...categoryData,
@@ -632,6 +651,7 @@ export class CatalogService implements OnModuleInit {
           productId: existing.id,
           title: nextTitle,
           description: nextDescription,
+          serviceTimeZone: nextServiceTimeZone,
           version: 1,
           createdById: actor.id,
           updatedById: actor.id,
@@ -912,6 +932,8 @@ export class CatalogService implements OnModuleInit {
       ? {
           title: draft.title,
           description: draft.description,
+          // Step 2.8A: approved change proposal применяет zone к live Product.
+          serviceTimeZone: draft.serviceTimeZone ?? null,
           categoryId: draft.categoryId ?? null,
           categorySchemaId: draft.categorySchemaId ?? null,
           attributes: (draft.attributes ?? Prisma.DbNull) as Prisma.InputJsonValue,
@@ -968,6 +990,7 @@ export class CatalogService implements OnModuleInit {
       categoryId?: string | null;
       categorySchemaId?: string | null;
       attributes?: Prisma.JsonValue | null;
+      serviceTimeZone?: string | null;
       tariffs?: Prisma.JsonValue | null;
     } | null;
     title?: string;
@@ -975,12 +998,14 @@ export class CatalogService implements OnModuleInit {
     categoryId?: string | null;
     categorySchemaId?: string | null;
     attributes?: Prisma.JsonValue | null;
+    serviceTimeZone?: string | null;
   }): {
     title?: string;
     description?: string | null;
     categoryId?: string | null;
     categorySchemaId?: string | null;
     attributes?: Prisma.JsonValue | null;
+    serviceTimeZone?: string | null;
     tariffs?: Prisma.JsonValue | null;
   } {
     if (!product.draft) return {};
@@ -990,6 +1015,7 @@ export class CatalogService implements OnModuleInit {
       categoryId: product.draft.categoryId !== undefined ? product.draft.categoryId : product.categoryId,
       categorySchemaId: product.draft.categorySchemaId !== undefined ? product.draft.categorySchemaId : product.categorySchemaId,
       attributes: product.draft.attributes !== undefined ? product.draft.attributes : product.attributes,
+      serviceTimeZone: product.draft.serviceTimeZone !== undefined ? product.draft.serviceTimeZone : (product.serviceTimeZone ?? null),
       tariffs: product.draft.tariffs ?? null,
     };
   }
@@ -1181,6 +1207,18 @@ export class CatalogService implements OnModuleInit {
       });
       return { id, channels: unique };
     });
+  }
+
+  /** Step 2.8A: server-side IANA normalization (trim; пустая строка → null).
+   *  Невалидный IANA ID → ValidationDomainError (raw offset/выдумка → 422). */
+  private normalizeServiceTimeZone(value: string | null | undefined): string | null {
+    if (value === undefined || value === null) return null;
+    const tz = value.trim();
+    if (tz.length === 0) return null;
+    if (!isIanaTimeZone(tz)) {
+      throw new ValidationDomainError(`serviceTimeZone "${tz}" is not a valid IANA timezone`);
+    }
+    return tz;
   }
 
   /** Изменение title категории — slug остаётся прежним (title не источник identity). */

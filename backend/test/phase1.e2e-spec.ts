@@ -1,7 +1,7 @@
 /**
  * E2E Phase 1 (Jest + Supertest): полный сквозной сценарий DoD.
  *
- *   Product → Customer → bootstrap Order → OrderTraveler validation →
+ *   Product → Customer → Order (test-fixture, Step 2.6) → OrderTraveler validation →
  *   Ready for Booking → BookingRequested → Booking (+Passenger) → BookingConfirmed →
  *   Order aggregate updated (через событие, не напрямую).
  *
@@ -20,10 +20,15 @@ import { AppModule } from "../src/app.module";
 import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { IdsService } from "../src/shared/ids.service";
+import { EventBusService } from "../src/eventbus/eventbus.service";
+import { createFixtureOrder } from "./fixtures/create-order.fixture";
 
 describe("Phase 1 — Product → Order → Booking (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let ids: IdsService;
+  let eventBus: EventBusService;
   let http: request.Agent;
 
   // Created ids for cleanup
@@ -39,6 +44,8 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+    ids = app.get(IdsService);
+    eventBus = app.get(EventBusService);
 
     // Phase 2: вход администратором (seed выполняется при старте AppModule);
     // авторизованный agent подставляет Bearer во все последующие запросы.
@@ -91,18 +98,15 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     customerIds.push(customer.id);
     expect(customer.code).toMatch(/^CUS-\d{8}$/);
 
-    // ── 3. bootstrap Order: ORD-* + TH-*, items + travelers ───────────────────
-    const orderRes = await http
-      .post("/api/v1/orders/bootstrap")
-      .send({
-        customerId: customer.id,
-        currency: "USD",
-        serviceDate: "2026-10-01T00:00:00.000Z",
-        items: [{ productId: product.id, title: product.title, type: "TOUR", quantity: 1, price: 250 }],
-        travelers: [{ firstName: "Айгюн", lastName: "Тестова", birthDate: "1990-05-01", passportNumber: "P1234567" }],
-      })
-      .expect(201);
-    const order = orderRes.body.order;
+    // ── 3. Order (test-fixture, Step 2.6): ORD-* + TH-*, items + travelers ──
+    const orderRes = await createFixtureOrder(prisma, ids, eventBus, {
+      customerId: customer.id,
+      currency: "USD",
+      serviceDate: "2026-10-01T00:00:00.000Z",
+      items: [{ productId: product.id, title: product.title, type: "TOUR", quantity: 1, price: 250 }],
+      travelers: [{ firstName: "Айгюн", lastName: "Тестова", birthDate: "1990-05-01", passportNumber: "P1234567" }],
+    });
+    const order = orderRes.order;
     orderIds.push(order.id);
     expect(order.code).toMatch(/^ORD-\d{8}$/);
     expect(order.number).toMatch(/^TH-\d{4}-\d{6}$/);
@@ -117,24 +121,16 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     expect(orderDetail.body.items[0].productCode).toBe(product.code);
 
     // ── 5. Нельзя перейти в READY_FOR_BOOKING без паспортных данных ──────────
-    await http
-      .post("/api/v1/orders/bootstrap")
-      .send({
-        customerId: customer.id,
-        items: [{ productId: product.id, title: product.title, type: "TOUR", price: 100 }],
-        travelers: [{ firstName: "Без", lastName: "Паспорта" }],
-      })
-      .expect(201)
-      .then(async (r) => {
-        const badOrder = r.body.order;
-        orderIds.push(badOrder.id);
-        // Принять в работу можно; переход в READY_FOR_BOOKING без паспорта запрещён.
-        await http.patch(`/api/v1/orders/${badOrder.id}`).send({ action: "process" }).expect(200);
-        await http
-          .patch(`/api/v1/orders/${badOrder.id}`)
-          .send({ action: "confirm" })
-          .expect(422);
-      });
+    const badOrderRes = await createFixtureOrder(prisma, ids, eventBus, {
+      customerId: customer.id,
+      items: [{ productId: product.id, title: product.title, type: "TOUR", price: 100 }],
+      travelers: [{ firstName: "Без", lastName: "Паспорта" }],
+    });
+    const badOrder = badOrderRes.order;
+    orderIds.push(badOrder.id);
+    // Принять в работу можно; переход в READY_FOR_BOOKING без паспорта запрещён.
+    await http.patch(`/api/v1/orders/${badOrder.id}`).send({ action: "process" }).expect(200);
+    await http.patch(`/api/v1/orders/${badOrder.id}`).send({ action: "confirm" }).expect(422);
 
     // ── 6. Lifecycle: process → confirm → send (BookingRequested) ─────────────
     await http.patch(`/api/v1/orders/${order.id}`).send({ action: "process" }).expect(200);
