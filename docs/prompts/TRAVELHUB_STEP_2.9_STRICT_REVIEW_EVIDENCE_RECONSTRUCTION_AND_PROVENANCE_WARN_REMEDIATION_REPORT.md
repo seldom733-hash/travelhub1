@@ -195,14 +195,14 @@ Unrelated untracked prompts NOT staged.
 
 ## 22. Commit evidence
 
-- Commit: `<populated after commit>` — scoped message
+- Commit: `54fdb03` — scoped message
   `docs: reconstruct step 2.9 review evidence and close provenance warning`.
 - Persistence SHA of reviewed artifacts: `1bc19b7`.
 
 ## 23. Push evidence
 
-- `git push`; then `git rev-parse HEAD` == `git rev-parse @{u}` verification.
-- `<populated after commit>`.
+- `git push origin master`; then `git rev-parse HEAD` == `git rev-parse @{u}`
+  verification: `54fdb03` == `54fdb03` — **PUSHED** (`cd33f0b..54fdb03`).
 
 ## 24. Repository Evidence
 
@@ -210,8 +210,8 @@ Unrelated untracked prompts NOT staged.
 REPOSITORY EVIDENCE
 repository: D:\travelhub_v1 (origin seldom733-hash/travelhub1)
 branch: master
-head: <populated after commit>
-origin: <populated after commit>
+head: 54fdb03
+origin: 54fdb03
 worktree_clean: false (unrelated untracked prompt files remain)
 migration_count: 56
 reviewed_state: COMMIT
@@ -219,7 +219,7 @@ reviewed_diff_base: 53b2042
 reviewed_diff_head: 1bc19b7
 persistence_status: PERSISTED
 persistence_sha: 1bc19b76a2c6bdff2544448e2631cc7d43c45c27
-push_status: <populated after commit>
+push_status: PUSHED
 ```
 
 ## 25. Release status
