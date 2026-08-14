@@ -1612,6 +1612,11 @@ model Order {
   currency      String              @default("USD")
   amount        Decimal             @default(0) @db.Decimal(12, 2)
   paidAmount    Decimal             @default(0) @db.Decimal(12, 2)
+  /// Step 2.13: сумма возвратов (Order-owned projection на RefundProcessed;
+  /// Server-owned. paidAmount — исторический факт «деньги получены» НЕ
+  /// переписывается; refundedAmount — возвраты поверх него. Полный refund
+  /// (refundedAmount >= paidAmount) → paymentStatus REFUNDED; partial → PAID.
+  refundedAmount Decimal            @default(0) @db.Decimal(12, 2)
   serviceDate   DateTime?
   /// Step 2.8A: frozen local temporal facts услуги (verbatim из OrderRequested,
   /// произошли из CheckoutIntent; НЕ пере-вычисляются). serviceTime — local
@@ -3443,26 +3448,151 @@ enum RefundStatus {
   @@schema("finance")
 }
 
-/// Refund (RFD-*) — canonical Finance aggregate foundation. НЕ provider-refund;
-/// исполнение/возврат Availability-емкости — 2.13 (здесь не реализуется).
+/// Refund (RFD-*) — canonical Finance aggregate (Step 2.13 runtime).
+/// Provider-neutral Refund flow: immutable/operational финансовый факт,
+/// производный от УЖЕ CAPTURED Payment; НЕ переписывает Payment.amount / frozen
+/// Order snapshot (никакого reprice); НЕ становится Settlement/Payout/Commission/
+/// double-entry логикой (boundaries 2.12D/2.12C/2.14/2.14A).
 model Refund {
   id         String       @id @default(uuid())
   code       String       @unique // RFD-00000001
-  /// ref finance.Payment (без FK).
+  /// ref finance.Payment (без FK). Source authority — ТОЛЬКО CAPTURED.
   paymentId  String
-  /// ref order.Order, без FK.
+  /// ref order.Order, без FK (server-derived из Payment.orderId — не клиентский).
   orderId    String
   amount     Decimal      @db.Decimal(12, 2)
+  /// Server-copied verbatim из Payment.currency (forged → 422).
   currency   String       @default("USD")
   status     RefundStatus @default(REQUESTED)
+  /// Опциональный business reason (descriptive, без PII).
   reason     String?
   version    Int          @default(1)
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
+  /// ── Step 2.13 milestones (2.10C DEFER → 2.13) ──
+  /// Server-owned UTC, first-only, атомарны с CAS-переходом
+  /// (status+version+milestone+history+outbox). request = creation milestone
+  /// (как Order.submittedAt). NULL — milestone ещё не произошёл; без backfill.
+  requestedAt DateTime?
+  approvedAt  DateTime?
+  processedAt DateTime?
+  failedAt    DateTime?
+  /// Step 2.13 idempotency slot: «один Refund на (paymentId, amount) пока НЕ
+  /// FAILED». true для REQUESTED/APPROVED/PROCESSED (identical retry → no-op
+  /// существующий факт — защита от двойного refund при network retry; второй
+  /// идентичный частичный refund блокируется — conservative); false ТОЛЬКО для
+  /// FAILED (attempt 2 легален — как Payment FAILED → reinitiation). Различные
+  /// суммы — независимые partial refunds (key = paymentId+amount). Server-owned,
+  /// атомарно с CAS. Паттерн: ModerationSubmission.isActiveSubmission /
+  /// Payment.isActivePayment (managed boolean + partial unique).
+  isActiveRefund Boolean @default(true)
+
+  history RefundHistory[]
+
   @@index([paymentId])
   @@index([orderId])
   @@index([status])
+  @@unique([paymentId, amount], where: { isActiveRefund: true }, map: "Refund_one_active_per_payment_amount")
+  @@schema("finance")
+}
+
+/// Журнал Refund (audit by default; как PaymentHistory/QuoteHistory).
+/// Без PII/provider-payload dump — только переход и минимальный comment.
+model RefundHistory {
+  id        String   @id @default(uuid())
+  refundId  String
+  refund    Refund   @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  action    String
+  from      String?
+  to        String?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([refundId])
+  @@schema("finance")
+}
+
+/// Бизнес-статус Dispute (Step 2.13A Chargeback/Dispute Foundation).
+/// Минимальный честный provider-neutral lifecycle: OPENED (creation) →
+/// RESOLVED | CANCELLED (терминальные). won/lost liability-исход,
+/// PSP-статусы, adjustments — deferred (2.12A/2.12B, 2.12D/2.12C/2.14A).
+enum DisputeStatus {
+  OPENED
+  RESOLVED
+  CANCELLED
+
+  @@schema("finance")
+}
+
+/// Dispute (DSP-*) — canonical Finance aggregate (Step 2.13A Chargeback/Dispute
+/// Foundation, provider-neutral). Спор/chargeback фиксируется как отдельный
+/// финансовый факт против CAPTURED Payment; Payment остаётся историческим
+/// captured fact (НЕ мутируется, никакого Payment.status = DISPUTED).
+/// Provider-neutral: 0 PSP-адаптеров/webhooks/вызовов (2.12A/2.12B); 0 Ledger/
+/// Commission/Settlement/Payout side-effects (2.12D/2.12C/2.14A deferred);
+/// 0 cross-domain writes. chargeback — vocabulary-категория причины, НЕ отдельная
+/// сущность (Roadmap не различает Dispute/Chargeback как две модели).
+model Dispute {
+  id         String        @id @default(uuid())
+  code       String        @unique // DSP-00000001
+  /// ref finance.Payment (без FK). Source authority — ТОЛЬКО CAPTURED.
+  paymentId  String
+  /// ref order.Order, без FK (server-derived из Payment.orderId — не клиентский).
+  orderId    String
+  /// Оспариваемая сумма (server-validated 0 < amount ≤ payment.amount;
+  /// DECIMAL(12,2); НЕ netting с Refund — monetary netting deferred, документировано).
+  amount     Decimal       @db.Decimal(12, 2)
+  /// Server-copied verbatim из Payment.currency (forged → 422).
+  currency   String        @default("USD")
+  status     DisputeStatus @default(OPENED)
+  /// Опциональный business reason (descriptive, без PII/evidence-body).
+  reason     String?
+  version    Int           @default(1)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  /// ── Step 2.13A milestones (server-owned UTC, first-only, атомарны с CAS) ──
+  /// openedAt = creation (как Refund.requestedAt). NULL — milestone ещё не
+  /// произошёл; без backfill. resolvedAt/cancelledAt — терминальные переходы.
+  openedAt    DateTime?
+  resolvedAt  DateTime?
+  cancelledAt DateTime?
+  /// Step 2.13A idempotency slot: «один активный Dispute на Payment» (паттерн
+  /// Payment.isActivePayment / Refund.isActiveRefund). true для OPENED; false
+  /// ТОЛЬКО для терминальных (RESOLVED/CANCELLED — повторное открытие после
+  /// терминального состояния легально, attempt-2). НЕ (paymentId, amount): спор
+  /// один на платёж, а не на сумму-срез (в отличие от Refund partial-срезов);
+  /// future partial dispute slices — аддитивная переработка ключа (2.13A+/2.14+,
+  /// документировано). Server-owned, атомарно с CAS.
+  isActiveDispute Boolean @default(true)
+
+  history DisputeHistory[]
+
+  @@index([paymentId])
+  @@index([orderId])
+  @@index([status])
+  @@unique([paymentId], where: { isActiveDispute: true }, map: "Dispute_one_active_per_payment")
+  @@schema("finance")
+}
+
+/// Журнал Dispute (audit by default; как PaymentHistory/RefundHistory).
+/// Без PII/provider-payload dump — только переход и минимальный comment.
+model DisputeHistory {
+  id        String   @id @default(uuid())
+  disputeId String
+  dispute   Dispute  @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  action    String
+  from      String?
+  to        String?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([disputeId])
   @@schema("finance")
 }
 

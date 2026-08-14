@@ -618,15 +618,51 @@ Deposit, 30/70 и другие разрешённые схемы; каждый �
 ProviderFee ≠ TravelHub Commission. Processing/FX/cross-border/payout
 fees --- отдельные факты и политика распределения расходов.
 
-· **Step 2.13 --- Refund Flow**\
-Полный/частичный refund, reason, permission, audit/events; reverse
-allocations вместо переписывания истории.
+· **Step 2.13 --- Refund Flow** ✅ STRICT REVIEW COMPLETED — APPROVED (NO REVIEW FIXES REQUIRED) (2026-08-14; реализация — `docs/prompts/PHASE_2_STEP_2.13_REFUND_FLOW_IMPLEMENTATION_REPORT.md`; provider-neutral Refund runtime: Refund — Finance-owned (RFD-*, finance.refund.write; PSP/chargeback — 2.13A+, webhook-путей 0); source authority — ТОЛЬКО CAPTURED Payment (currency/orderId server-derived verbatim; Payment НЕ мутируется — остаётся CAPTURED, REFUNDED reserved unreachable: partial refund делает одиночный Payment.REFUNDED семантически неверным); partial refund'ы в scope (разные суммы — независимые факты); refundable = payment.amount − Σ(non-FAILED), over-refund — serialized pg_advisory_xact_lock на paymentId (concurrent 70+70 на 100 → один факт, total ≤ amount, без raw 500); idempotency — managed isActiveRefund + partial unique `Refund_one_active_per_payment_amount` (identical retry → no-op; attempt 2 после FAILED); единственный state-machine authority `RefundService.transition` (CAS from-guard): REQUESTED → APPROVED → PROCESSED | FAILED (REQUESTED\|APPROVED → FAILED); милстоуны requestedAt/approvedAt/processedAt/failedAt (2.10C DEFER → 2.13, canonical Roadmap-визион; архивное refundedAt НЕ используется — канон processedAt); Order projection — Order-owned subscriber на RefundProcessed (refundedAmount += amount; полный возврат → paymentStatus REFUNDED, partial → PAID; paidAmount исторический НЕ переписывается; Finance НЕ пишет order.*); события RefundCreated/Approved/Processed/Failed (outbox, correlation=server UUID, causation=null; payload refs+frozen money, без PII); RBAC finance.refund.read (FINANCE/DIRECTOR/ANALYST/SALES_MANAGER) + finance.refund.write (FINANCE/ADMIN, добавлено) + finance.refund.approve (FINANCE/ADMIN); mass assignment: forged currency/status/orderId/version/milestones → 422; миграция `20260814150000_add_refund_runtime` аддитивная (milestones + isActiveRefund + RefundHistory + Order.refundedAmount); 0 Ledger/ProviderFee/Settlement/Payout/Invoice/Commission/CommissionAccrual auto-post, Booking/availability не тронуты; unit 534/534 (+14), serial e2e 1093/1093 (62 suites, +13 refund-flow T1–T13), frontend 135/135 + build, migrate 53/53 drift 0; арх-док `docs/architecture/refund-flow.md` (32 секции); REVIEW NOTE: api.md RBAC-claim OPERATOR исправлен (пропуск 2.12-review-fixa); NEXT = STRICT REVIEW (не выполняется в этом проходе))\
 
-· **Step 2.13A --- Chargeback / Dispute Foundation**\
+· **Step 2.13A --- Chargeback / Dispute Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-14; независимый adversarial-аудит — `docs/prompts/PHASE_2_STEP_2.13A_CHARGEBACK_DISPUTE_FOUNDATION_STRICT_REVIEW_REPORT.md`\
 Dispute/chargeback, evidence, liability, ledger/commission/settlement
 adjustments.
+PREREQUISITES (Roadmap Reconciliation 2026-08-14): provider-neutral foundation
+(dispute/evidence/liability факты) допустим после 2.13; real-PSP chargeback →
+2.12A/2.12B; adjustments (ledger/commission/settlement) → 2.12D/2.12C/2.14A.
+реализация — `docs/prompts/PHASE_2_STEP_2.13A_CHARGEBACK_DISPUTE_FOUNDATION_IMPLEMENTATION_REPORT.md`;
+provider-neutral Dispute runtime: Dispute — Finance-owned (DSP-*, finance.dispute.write; chargeback —
+vocabulary-категория reason, НЕ отдельная сущность — Roadmap не различает; real-PSP chargeback — 2.12A/2.12B,
+webhook-путей 0); source authority — ТОЛЬКО CAPTURED Payment (currency/orderId server-derived verbatim;
+Payment НЕ мутируется — остаётся CAPTURED, никакого Payment.status=DISPUTED); amount server-validated
+0 < amount ≤ payment.amount (frozen captured; НЕ netting с Refund — monetary netting deferred до
+2.12D/2.14A, explicit restriction e2e T10); cardinality — один активный Dispute на Payment (managed
+isActiveDispute + partial unique `Dispute_one_active_per_payment`; identical retry → no-op; RESOLVED/
+CANCELLED освобождают слот — attempt 2 легален; concurrent duplicate → controlled 409, один факт);
+единственный state-machine authority `DisputeService.transition` (CAS from-guard OPENED): OPENED →
+RESOLVED | CANCELLED; милстоуны openedAt/resolvedAt/cancelledAt (server-owned UTC, first-only); события
+DisputeOpened/Resolved/Cancelled (outbox, correlation=server UUID, causation=null; payload refs+frozen
+money, без PII; consumer-ов НЕТ — 0 cross-domain projections, Roadmap 2.13A их не требует); RBAC
+finance.dispute.read (FINANCE/DIRECTOR/ANALYST/SALES_MANAGER) + finance.dispute.write (FINANCE/ADMIN,
+добавлено); mass assignment: forged currency/status/orderId/version/milestones → 422; миграция
+`20260814170000_add_chargeback_dispute_foundation` аддитивная (enum + Dispute + DisputeHistory +
+isActiveDispute partial unique); 0 PSP/webhook/Ledger/ProviderFee/Settlement/Payout/Invoice/Commission/
+CommissionAccrual auto-post (e2e T9), Payment/Refund/Booking/availability не тронуты; won/lost
+liability-исход — deferred; unit 547/547 (+13), serial e2e 1105/1105 (63 suites, +12 chargeback-dispute
+T1–T12), frontend 135/135 + build, migrate 54/54 drift 0; арх-док
+`docs/architecture/chargeback-dispute-foundation.md` (27 секций); NEXT = STRICT REVIEW (не выполняется
+в этом проходе))
+STRICT REVIEW: все hard gates PASS — единственный writer DisputeService (repo-wide 0 других
+dispute create/update/upsert/delete; 0 raw SQL; 0 cross-domain writes), source authority — ТОЛЬКО
+CAPTURED Payment (currency/orderId verbatim, 0 reprice), frozen money amount ≤ captured (без netting
+с Refund — explicit restriction e2e T10), cardinality один активный Dispute на Payment (partial unique
+DB-level; attempt 2 после RESOLVED/CANCELLED), state machine OPENED → RESOLVED|CANCELLED (CAS
+from-guard, milestones first-only), 3 события PII-free (0 consumer-ов — 0 cross-domain projections),
+RBAC finance.dispute.read/write (OPERATOR не имеет — проверено ROLE_PERMISSIONS), mass assignment →
+422, 0 PSP/webhook/Ledger/Commission/Settlement/Payout/Invoice (e2e T9), Payment/Refund/Booking/
+availability не тронуты, миграция аддитивная (54/54, drift 0, fresh replay); REVIEW FIX (HIGH,
+class «silent divergent idempotency success», Ledger 2.10A FIX 1 прецедент): divergent amount при
+активном Dispute возвращал существующий факт (no-op 200 с чужой суммой) — теперь controlled 409
+(identical retry — тот же amount — no-op; e2e T5 + unit); регрессия unit 548/548 + serial e2e
+1105/1105 (63 suites) + frontend 135/135 + build + migrate 54/54 drift 0))
 
-· **Step 2.14 --- Invoice / Commission Flow**\
+· **Step 2.14 --- Invoice / Commission Flow** ⛔ BLOCKED — ARCHITECTURE DECISION REQUIRED (2026-08-14; stop-condition §58 #4 — Commission formula/rate/base/source authority НЕ определена: 0 rate/policy-моделей в схеме (только TaxRule/ExchangeRate), 0 ставок в legacy-коде, 0 commission-данных в frozen Order snapshot (2.11 — «commission части deferred до появления canonical producer-ов»); семантика комиссии канонически принадлежит 2.12C (SPLIT_AT_PAYMENT — native PSP split), 2.12E (PARTNER_COLLECT → CommissionAccrual) и 2.14E (Channel-Based Commission Rules, «Никаких hardcoded ставок») — все ⏳ NOT STARTED; промпт §9 «if commission trigger or base is undefined: STOP», §10 «не изобретать процент/базу», §58 #4 → BLOCKED; 0 production-кода 2.14 внесено, НЕ маркируется IMPLEMENTATION COMPLETED; Invoice-часть доказуемо независима от Commission (frozen Order snapshot — источник), НО НЕ реализована (решение: весь Step 2.14 незавершён); итог — `docs/prompts/PHASE_2_STEP_2.14_BLOCKED_ARCHITECTURE_DECISION_REQUIRED.md`; NEXT = COMMISSION DEPENDENCY RECONCILIATION (2.12C/2.12E/2.14E) — отдельный prompt, НЕ начинается в этом проходе; 2.14A и самостоятельная реализация 2.12C/2.12E запрещены)\
 Invoice lifecycle, platform/partner commission facts.
 
 · **Step 2.14A --- Settlement Engine**\
@@ -1572,6 +1608,41 @@ Service Templates analysis: 1.8A–D требуются до 3.29/3.29I UI, чт
 удовлетворяется независимо от позиции). Далее основная последовательность
 продолжается: 2.6 → 2.7 → 2.8 → 2.8A (time model) → 2.9 → 2.9A → … →
 3.29 серия (Partner Cabinet Full).
+
+**Finance-блок (2.10–2.13) — выполнено по body NEXT markers (Roadmap Reconciliation 2026-08-14):**
+2.10 → 2.10A → 2.10B → 2.10C → 2.11 → 2.12 → 2.13 (все ✅ STRICT REVIEW APPROVED;
+отчёт — `docs/prompts/PHASE_2_ROADMAP_RECONCILIATION_2.12A_TO_2.13A_REPORT.md`).
+Принцип (как 2.2A–2.2F / 1.8A–1.8D): Steps 2.12A–2.12G — **логические расширения
+2.12 core, НЕ обязательные prerequisites**; порядок реализации НЕ выводится из
+документной нумерации (Dependency Analysis прецедент выше). Доказано 2.12/2.13
+strict reviews: 2.13 provider-neutral (source = CAPTURED Payment, 0 PSP/webhook/
+AUTHORIZED/Commission/Ledger/partial/feeType side-effects). 2.13A (Chargeback/
+Dispute Foundation) — **MIXED DEPENDENCY**: foundation (dispute/evidence/liability
+факты, provider-neutral) может идти после 2.13; real-PSP chargeback требует
+2.12A/2.12B; ledger/commission/settlement adjustments требуют 2.12D/2.12C/2.14A.
+2.13A ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (см. запись body выше).
+NEXT (актуальный): Step 2.14 — Invoice / Commission Flow — ⛔ BLOCKED — ARCHITECTURE
+DECISION REQUIRED (stop-condition §58 #4: Commission formula/rate/base/source authority
+не определена; 2.12C/2.12E/2.14E NOT STARTED — итог:
+`docs/prompts/PHASE_2_STEP_2.14_BLOCKED_ARCHITECTURE_DECISION_REQUIRED.md`).
+Следующий проход — Commission Dependency Reconciliation (2.12C/2.12E/2.14E) отдельным
+prompt-ом; НЕ начинать 2.14A и НЕ реализовывать 2.12C/2.12E самостоятельно.
+**Commission Dependency Reconciliation (2026-08-14) — итог:
+`PHASE 2 COMMISSION DEPENDENCY RECONCILIATION COMPLETED — ARCHITECTURE DECISION REQUIRED`
+(отчёт — `docs/prompts/PHASE_2_COMMISSION_DEPENDENCY_RECONCILIATION_2.12C_2.12E_2.14E_REPORT.md`).**
+Выводы из фактического репозитория: (1) Commission policy authority НЕ существует
+(ADR-0006: «Никаких fee %, plan prices, ... commission engine»; 0 rate/policy-моделей —
+только TaxRule/ExchangeRate; 0 ставок в legacy; 0 commission в frozen snapshot);
+(2) PREREQUISITE EDGES: 2.12C (SPLIT_AT_PAYMENT, native PSP split) → HARD requires
+2.12A/2.12B (PSP/adapters/webhooks) + требует frozen commission policy/base до split;
+2.14E (Channel-Based Commission Rules) → policy-фундамент ДОЛЖЕН предшествовать 2.12C/2.12E
+(«Никаких hardcoded ставок» — ставки = master data, не константы), несмотря на более поздний
+номер; 2.12E (PARTNER_COLLECT → CommissionAccrual) — provider-neutral, НО trigger/base
+не определены; 2.14 остаётся BLOCKED; 2.14A/2.14B — NOT STARTED, commission — input для
+Settlement Engine; (3) Invoice (buyer, customerId) доказуемо независима — frozen Order
+snapshot; (4) ARCHITECTURE DECISIONS REQUIRED до любого commission-кода: policy dimensions,
+base (gross/net/tax/discount), rate type, freeze boundary, collection model per channel,
+adjustment strategy (Refund/Dispute).
 
 ## Dependency Analysis (Roadmap Amendment: Reverse Marketplace)
 

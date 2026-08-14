@@ -1,8 +1,10 @@
 import { Module } from "@nestjs/common";
+import { DisputeService } from "./dispute.service";
 import { FinanceController } from "./finance.controller";
 import { FinanceService } from "./finance.service";
 import { LedgerService } from "./ledger.service";
 import { PaymentService } from "./payment.service";
+import { RefundService } from "./refund.service";
 import { SettlementService } from "./settlement.service";
 
 /**
@@ -21,6 +23,6 @@ import { SettlementService } from "./settlement.service";
  */
 @Module({
   controllers: [FinanceController],
-  providers: [FinanceService, LedgerService, PaymentService, SettlementService],
+  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService],
 })
 export class FinanceModule {}

@@ -292,13 +292,20 @@ describe("Phase 2 Step 2.10 — Finance Domain Foundation (e2e)", () => {
 
   // ── 6. no payment initiation / no refund / no invoice write paths ───────────
 
-  it("7. НЕ реализовано: refund/invoice/settlement/payout/ledger write-пути → 404 (Payment runtime активирован в Step 2.12)", async () => {
+  it("7. НЕ реализовано: invoice/settlement/payout/ledger write-пути → 404 (Payment 2.12 и Refund 2.13 runtime активированы)", async () => {
     const fin = await createStaff("f_fin6", RoleCode.FINANCE);
     const a = agent(fin.accessToken);
 
-    // Step 2.12 (Payment Flow) легитимно активировал finance.payments write-path
-    // (см. payment-flow.e2e-spec.ts). Остальные агрегаты остаются schema-only:
-    await a.post("/api/v1/finance/refunds").send({ paymentId: "x", amount: "5" }).expect(404);
+    // Step 2.12 (Payment Flow) активировал finance.payments, Step 2.13 (Refund
+    // Flow) — finance.refunds write-path (см. payment-flow/refund-flow e2e).
+    // Refund-route СУЩЕСТВУЕТ: unknown payment → 404 «Payment not found»
+    // (доменная семантика), НЕ route-missing 404.
+    await a
+      .post("/api/v1/finance/refunds")
+      .send({ paymentId: "x", amount: "5" })
+      .expect(404)
+      .then((r) => expect(JSON.stringify(r.body)).toContain("Payment"));
+    // Остальные агрегаты остаются schema-only (route-missing 404):
     await a.post("/api/v1/finance/invoices").send({ orderId: "x", amount: "10" }).expect(404);
     await a.post("/api/v1/finance/settlements").send({ orderId: "x" }).expect(404);
     await a.post("/api/v1/finance/payouts").send({ partnerId: "x", amount: "10" }).expect(404);
@@ -362,22 +369,49 @@ describe("Phase 2 Step 2.10 — Finance Domain Foundation (e2e)", () => {
   // ── 9. temporal: 2.10C ввёл ОДНО легитимное поле (Ledger occurredAt),
   //    lifecycle-милстоуны Payment/Refund/Settlement/Payout остаются deferred ──
 
-  it("11. temporal: occurredAt только на LedgerTransaction; Payment имеет 2.12-милстоуны (paidAt/failedAt/cancelledAt), PSP/lifecycle-колонки чужих агрегатов запрещены", async () => {
+  it("11. temporal: occurredAt только на LedgerTransaction; Payment имеет 2.12-милстоуны; Refund имеет 2.13-милстоуны; PSP/lifecycle-колонки чужих агрегатов запрещены", async () => {
     // Roadmap evolution (§28): Step 2.10C добавил LedgerTransaction.occurredAt;
-    // Step 2.12 (Payment Flow) легитимно добавил Payment paidAt/failedAt/
-    // cancelledAt (defer 2.10C → 2.12). Всё ещё ЗАПРЕЩЕНЫ: authorizedAt /
-    // capturedAt (PSP authorize/capture — 2.12B), settledAt (2.14A),
-    // refundedAt (2.13) — их producer-ы/семантика не существуют.
+    // Step 2.12 (Payment Flow) — Payment paidAt/failedAt/cancelledAt; Step 2.13
+    // (Refund Flow) — Refund requestedAt/approvedAt/processedAt/failedAt
+    // (canonical Roadmap-визион 2.10C: «Refund: requestedAt/approvedAt/
+    // processedAt/failedAt»). Всё ещё ЗАПРЕЩЕНЫ: authorizedAt/capturedAt
+    // (PSP authorize/capture — 2.12B), settledAt (2.14A), refundedAt (архивное
+    // имя 2.10C-арх-дока; канон — processedAt) — producer-ы/семантика отсутствуют.
     const forbidden = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
       "SELECT column_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name IN ('authorizedAt','capturedAt','settledAt','refundedAt')",
     );
     expect(forbidden.length).toBe(0);
 
-    // 2.12-милстоуны Payment существуют и живут ТОЛЬКО на Payment.
+    // 2.12-милстоуны Payment: paidAt уникален для Payment; cancelledAt — общий
+    // с Dispute (2.13A, терминальный переход), failedAt — общий с Refund
+    // (проверен ниже).
     const pay = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
-      "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name IN ('paidAt','failedAt','cancelledAt')",
+      "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name = 'paidAt'",
     );
     expect(new Set(pay.map((r) => r.table_name))).toEqual(new Set(["Payment"]));
+    const cancelled = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
+      "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name = 'cancelledAt'",
+    );
+    expect(new Set(cancelled.map((r) => r.table_name))).toEqual(new Set(["Payment", "Dispute"]));
+
+    // Step 2.13-милстоуны Refund: requestedAt/approvedAt/processedAt уникальны
+    // для Refund (failedAt — общий с Payment 2.12, проверен ниже отдельно).
+    const ref = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
+      "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name IN ('requestedAt','approvedAt','processedAt')",
+    );
+    expect(new Set(ref.map((r) => r.table_name))).toEqual(new Set(["Refund"]));
+    // failedAt живёт на Payment (2.12) И Refund (2.13) — оба легитимны.
+    const fail = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
+      "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name = 'failedAt'",
+    );
+    expect(new Set(fail.map((r) => r.table_name))).toEqual(new Set(["Payment", "Refund"]));
+
+    // Step 2.13A-милстоуны Dispute: openedAt/resolvedAt уникальны для Dispute
+    // (cancelledAt — общий с Payment, проверен выше).
+    const dsp = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
+      "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name IN ('openedAt','resolvedAt')",
+    );
+    expect(new Set(dsp.map((r) => r.table_name))).toEqual(new Set(["Dispute"]));
 
     // occurredAt — 2.10C-поле и живёт ТОЛЬКО на LedgerTransaction.
     const occ = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(

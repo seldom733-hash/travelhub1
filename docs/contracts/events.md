@@ -197,3 +197,32 @@ correlation/causation из контекста).
 HTTP-команды: correlation = server UUID, causation = null (ADR-0009/0010,
 как orderAction). Consumer-события: causation = родительский eventId.
 Payload PII-free (refs + frozen money); никаких card/PAN/CVV/provider-секретов.
+
+## Step 2.13 — Refund (provider-neutral Refund runtime)
+
+| Событие | Producer | Payload | Потребители |
+|---|---|---|---|
+| `RefundCreated` | Finance (RefundService.createRefund, HTTP-команда) | `{ refundId, code, paymentId, orderId, amount (Decimal string), currency, reason\|null }` — запрос (REQUESTED, requestedAt); без PII | лента/аналитика |
+| `RefundApproved` | Finance (RefundService.approveRefund) | тот же payload — REQUESTED → APPROVED (approvedAt) | лента/аналитика |
+| `RefundProcessed` | Finance (RefundService.processRefund) | тот же payload — APPROVED → PROCESSED (processedAt, деньги возвращены); **consumer: Order-owned projection** (Order.refundedAmount += amount; полный возврат → paymentStatus REFUNDED, partial → PAID; Order НЕ пишет finance.*) | Order (`order-refund-consumer`, inbox) |
+| `RefundFailed` | Finance (RefundService.failRefund) | тот же payload — REQUESTED\|APPROVED → FAILED (failedAt; слот освобождён — attempt 2 легален) | лента/аналитика (Order projection НЕ реагирует — деньги не возвращены) |
+
+HTTP-команды: correlation = server UUID, causation = null (ADR-0009/0010).
+Consumer-события: causation = родительский eventId. Payload PII-free (refs +
+frozen money из CAPTURED Payment + reason); никаких card/PAN/CVV/provider-
+секретов. RefundCreated/Approved/Failed consumer-ов нет (canonical факты для
+ленты/аналитики — прецедент OrderReadyForBooking/BookingCompleted).
+
+## Step 2.13A — Dispute (provider-neutral Chargeback/Dispute Foundation)
+
+| Событие | Producer | Payload | Потребители |
+|---|---|---|---|
+| `DisputeOpened` | Finance (DisputeService.createDispute, HTTP-команда) | `{ disputeId, code, paymentId, orderId, amount (Decimal string), currency, reason\|null }` — открыт спор (OPENED, openedAt); без PII | лента/аналитика |
+| `DisputeResolved` | Finance (DisputeService.resolveDispute) | тот же payload — OPENED → RESOLVED (resolvedAt, спор закрыт) | лента/аналитика |
+| `DisputeCancelled` | Finance (DisputeService.cancelDispute) | тот же payload — OPENED → CANCELLED (cancelledAt; слот освобождён — attempt 2 легален) | лента/аналитика |
+
+HTTP-команды: correlation = server UUID, causation = null. Payload PII-free
+(refs + frozen money из CAPTURED Payment + reason); никаких card/PAN/CVV/
+provider-секретов/evidence-body. Consumer-ов НЕТ (0 cross-domain projections —
+Roadmap 2.13A их не требует). События НЕ обещают PSP completion / ledger
+posting / commission reversal (deferred 2.12A–G/2.14+).

@@ -453,6 +453,8 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "finance.payment.write": "Управление платежами",
   "finance.refund.read": "Чтение возвратов",
   "finance.refund.approve": "Согласование возвратов",
+  "finance.dispute.read": "Чтение споров",
+  "finance.dispute.write": "Управление спорами (открытие/закрытие)",
   "finance.invoice.read": "Чтение счетов",
   "finance.invoice.write": "Выставление счетов",
   "finance.commission.read": "Чтение комиссий",

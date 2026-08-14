@@ -3,12 +3,14 @@ import { Prisma } from "../../generated/prisma/client";
 import type { OrderStatus } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService, type OutboxEnvelope } from "../../eventbus/eventbus.service";
-import { DomainEvents, type BookingEventPayload, type PaymentEventPayload } from "../../eventbus/domain-events";
+import { DomainEvents, type BookingEventPayload, type PaymentEventPayload, type RefundEventPayload } from "../../eventbus/domain-events";
 import { BookingQueryService } from "../booking/booking-query.service";
 
 const CONSUMER_ID = "order-booking-consumer";
 /** Step 2.12: Order-owned projection paymentStatus/paidAmount ← PaymentCaptured. */
 const ORDER_PAYMENT_CONSUMER_ID = "order-payment-consumer";
+/** Step 2.13: Order-owned projection refundedAmount/paymentStatus ← RefundProcessed. */
+const ORDER_REFUND_CONSUMER_ID = "order-refund-consumer";
 const TERMINAL_BOOKING = ["COMPLETED", "CANCELLED"];
 const CONFIRMED_BOOKING = ["CONFIRMED", "IN_SERVICE", "COMPLETED"];
 
@@ -37,6 +39,9 @@ export class OrderSubscribers implements OnModuleInit {
     // Step 2.12: canonical факт оплаты → Order-owned projection (Order.paymentStatus
     // / paidAmount — Order-owned поля; Finance НЕ пишет order.* напрямую, §20).
     this.eventBus.on(DomainEvents.PaymentCaptured, (ev) => this.onPaymentCaptured(ev));
+    // Step 2.13: canonical факт возврата → Order-owned projection (Order.refundedAmount
+    // / paymentStatus — Order-owned поля; Finance НЕ пишет order.* напрямую).
+    this.eventBus.on(DomainEvents.RefundProcessed, (ev) => this.onRefundProcessed(ev));
   }
 
   private async onBookingConfirmed(ev: OutboxEnvelope): Promise<void> {
@@ -272,6 +277,86 @@ export class OrderSubscribers implements OnModuleInit {
         }
 
         await tx.inboxEvent.create({ data: { consumerId: ORDER_PAYMENT_CONSUMER_ID, eventId: ev.id } });
+      });
+    } catch (err) {
+      if (this.isUniqueViolation(err)) return; // concurrent — уже обработано
+      throw err;
+    }
+  }
+
+  /**
+   * Step 2.13 — Order refund projection (RefundProcessed consumer).
+   *
+   * Refund — Finance-owned; Order НЕ пишет finance.*. Order-owned subscriber
+   * проецирует факт возврата на СВОИ поля: refundedAmount += frozen amount,
+   * paymentStatus → REFUNDED при полном возврате (refundedAmount >= paidAmount),
+   * иначе остаётся PAID (частичный возврат; over-refund невозможен — guard на
+   * Refund-уровне, refundable = payment.amount − refunded). paidAmount —
+   * исторический факт «деньги получены» НЕ переписывается. Идемпотентность:
+   * InboxEvent; повторная доставка → no-op. CAS по version: конкурентные
+   * обновления Order не перезаписываются молча. Без result-event (проекция
+   * Order-owned; потребителей нет). RefundCreated/Approved/Failed НЕ
+   * проецируются (деньги ещё не возвращены / возврат не состоялся).
+   */
+  private async onRefundProcessed(ev: OutboxEnvelope): Promise<void> {
+    const p = ev.payload as unknown as RefundEventPayload;
+    if (!p?.orderId || !p?.refundId) return;
+    if (await this.eventBus.isProcessed(ORDER_REFUND_CONSUMER_ID, ev.id)) return;
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: ORDER_REFUND_CONSUMER_ID, eventId: ev.id } } })) return;
+
+        const order = await tx.order.findUnique({ where: { id: p.orderId } });
+        if (!order) {
+          // Order отсутствует — проекция невозможна; отметить обработанным,
+          // чтобы повторная доставка не создавала вечный retry.
+          await tx.inboxEvent.create({ data: { consumerId: ORDER_REFUND_CONSUMER_ID, eventId: ev.id } });
+          return;
+        }
+
+        // Frozen money из payload (Decimal string, ≥ 0) — defensive валидация.
+        let amount: Prisma.Decimal;
+        try {
+          amount = new Prisma.Decimal(p.amount);
+        } catch {
+          throw new Error(`[order-refund] invalid amount in RefundProcessed for ${p.refundId}`);
+        }
+        if (amount.isNegative()) {
+          throw new Error(`[order-refund] negative amount in RefundProcessed for ${p.refundId}`);
+        }
+
+        const nextRefunded = order.refundedAmount.add(amount);
+        // Over-refund невозможен (Refund-guard: refundable = payment.amount −
+        // refunded; payment.amount == Order.paidAmount) — defensively: не даём
+        // проекции уйти в отрицательную truth.
+        const refunded = nextRefunded.greaterThan(order.paidAmount) ? order.paidAmount : nextRefunded;
+        const targetStatus = refunded.greaterThanOrEqualTo(order.paidAmount) ? "REFUNDED" : "PAID";
+        const fromStatus = order.paymentStatus;
+
+        const updatedRows = await tx.order.updateMany({
+          where: { id: order.id, version: order.version },
+          data: {
+            refundedAmount: refunded,
+            paymentStatus: targetStatus,
+            version: { increment: 1 },
+          },
+        });
+        if (updatedRows.count === 1) {
+          await tx.orderHistory.create({
+            data: {
+              orderId: order.id,
+              action: "refund_processed",
+              from: fromStatus,
+              to: targetStatus,
+              actorId: null,
+              actorName: "Система",
+              comment: `Возврат получен (${p.code}): ${p.amount} ${p.currency}`,
+            },
+          });
+        }
+
+        await tx.inboxEvent.create({ data: { consumerId: ORDER_REFUND_CONSUMER_ID, eventId: ev.id } });
       });
     } catch (err) {
       if (this.isUniqueViolation(err)) return; // concurrent — уже обработано

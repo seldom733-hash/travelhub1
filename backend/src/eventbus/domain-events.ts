@@ -71,6 +71,24 @@ export const DomainEvents = {
   PaymentCaptured: "PaymentCaptured",
   PaymentFailed: "PaymentFailed",
   PaymentCancelled: "PaymentCancelled",
+  // Finance — Refund (Step 2.13, provider-neutral Refund runtime).
+  // RefundCreated — запрос (REQUESTED); RefundApproved — согласован (APPROVED);
+  // RefundProcessed — деньги возвращены (PROCESSED; consumer — Order-owned
+  // projection refundedAmount/paymentStatus); RefundFailed — терминальное
+  // отклонение (FAILED; capacity-слот и idempotency-слот освобождены —
+  // attempt 2 легален; Order projection НЕ реагирует).
+  RefundCreated: "RefundCreated",
+  RefundApproved: "RefundApproved",
+  RefundProcessed: "RefundProcessed",
+  RefundFailed: "RefundFailed",
+  // Finance — Dispute (Step 2.13A, provider-neutral Chargeback/Dispute
+  // Foundation). DisputeOpened — создание (OPENED, openedAt); DisputeResolved /
+  // DisputeCancelled — терминальные переходы (лента/аналитика; consumer-ов нет:
+  // 0 cross-domain projections — Roadmap 2.13A их не требует). События НЕ
+  // обещают PSP completion / ledger posting / commission reversal (deferred).
+  DisputeOpened: "DisputeOpened",
+  DisputeResolved: "DisputeResolved",
+  DisputeCancelled: "DisputeCancelled",
 } as const;
 
 export type DomainEventType = (typeof DomainEvents)[keyof typeof DomainEvents];
@@ -312,4 +330,41 @@ export interface PaymentEventPayload {
   currency: string;
   /** Опциональный descriptive метод (manual/provider-neutral; без PII). */
   method?: string | null;
+}
+
+/**
+ * Refund event payload (Step 2.13). Минимальный, PII-free: canonical refs +
+ * frozen money fact (amount/currency verbatim из CAPTURED Payment).
+ * RefundProcessed несёт orderId+amount — Order-owned projection subscriber
+ * self-sufficient (refundedAmount/paymentStatus; без чтения finance.*).
+ * НЕ содержит provider payload/card/PAN/CVV/секретов (только opaque refs).
+ */
+export interface RefundEventPayload {
+  refundId: string;
+  code: string;
+  paymentId: string;
+  orderId: string;
+  /** Frozen money fact (Decimal string, DECIMAL(12,2)) — verbatim из Payment. */
+  amount: string;
+  currency: string;
+  /** Опциональный business reason (descriptive; без PII). */
+  reason?: string | null;
+}
+
+/**
+ * Dispute event payload (Step 2.13A). Минимальный, PII-free: canonical refs +
+ * frozen money fact (amount/currency verbatim из CAPTURED Payment).
+ * Consumer-ов нет (Roadmap 2.13A не требует cross-domain projections);
+ * НЕ содержит provider payload/evidence-body/card/PAN/CVV/секретов.
+ */
+export interface DisputeEventPayload {
+  disputeId: string;
+  code: string;
+  paymentId: string;
+  orderId: string;
+  /** Frozen money fact (Decimal string, DECIMAL(12,2)) — verbatim из Payment. */
+  amount: string;
+  currency: string;
+  /** Опциональный business reason (descriptive; без PII). */
+  reason?: string | null;
 }

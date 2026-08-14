@@ -15,9 +15,11 @@
  */
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
+import { DisputeService } from "./dispute.service";
 import { FinanceService } from "./finance.service";
 import { LedgerService } from "./ledger.service";
 import { PaymentService } from "./payment.service";
+import { RefundService } from "./refund.service";
 import { SettlementService } from "./settlement.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
@@ -26,15 +28,21 @@ import { CurrentUser, RequirePermissions } from "../../security/auth/decorators"
 import { assertNoForbiddenKeys } from "../../shared/field-validation";
 import {
   CreateCurrencyDto,
+  CreateDisputeDto,
   CreateExchangeRateDto,
   CreatePaymentDto,
+  CreateRefundDto,
   CreateTaxDto,
   CreateTaxRuleDto,
+  DISPUTE_CREATE_FORBIDDEN_KEYS,
+  DisputeListQueryDto,
   FactListQueryDto,
   FINANCE_MASTER_FORBIDDEN_KEYS,
   LedgerListQueryDto,
   PAYMENT_CREATE_FORBIDDEN_KEYS,
   PaymentListQueryDto,
+  REFUND_CREATE_FORBIDDEN_KEYS,
+  RefundListQueryDto,
   UpdateCurrencyDto,
   UpdateExchangeRateDto,
   UpdateTaxDto,
@@ -49,6 +57,8 @@ export class FinanceController {
     private readonly ledger: LedgerService,
     private readonly settlement: SettlementService,
     private readonly payments: PaymentService,
+    private readonly refunds: RefundService,
+    private readonly disputes: DisputeService,
   ) {}
 
   // ── Currency (finance.currency.manage) ──────────────────────────────────────
@@ -268,5 +278,94 @@ export class FinanceController {
   @RequirePermissions("finance.payment.write")
   async cancelPayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.payments.cancelPayment(code, { id: actor.id, username: actor.username });
+  }
+
+  // ── Refund (Step 2.13 — provider-neutral Refund runtime) ───────────────────
+  // Refund — Finance-owned aggregate (RFD-*). Source authority — CAPTURED
+  // Payment (currency/orderId server-derived verbatim); amount server-validated
+  // ≤ refundable (serialized over-refund protection). Клиент передаёт ТОЛЬКО
+  // paymentId + amount + reason. PSP refund — future (2.13A+; здесь нет).
+
+  @Get("refunds")
+  @RequirePermissions("finance.refund.read")
+  async listRefunds(@Query() query: RefundListQueryDto) {
+    return this.refunds.list(query);
+  }
+
+  @Get("refunds/:code")
+  @RequirePermissions("finance.refund.read")
+  async getRefund(@Param("code") code: string) {
+    return this.refunds.getByCode(code);
+  }
+
+  @Post("refunds")
+  @RequirePermissions("finance.refund.write")
+  async createRefund(@Req() req: Request, @CurrentUser() actor: AuthedRequest["user"], @Body() dto: CreateRefundDto) {
+    // raw req.body — forged server-owned поля (money/status/milestones/...) → 422.
+    assertNoForbiddenKeys(req.body, REFUND_CREATE_FORBIDDEN_KEYS);
+    return this.refunds.createRefund(
+      { paymentId: dto.paymentId, amount: dto.amount, reason: dto.reason ?? null },
+      { id: actor.id, username: actor.username },
+    );
+  }
+
+  @Post("refunds/:code/approve")
+  @RequirePermissions("finance.refund.approve")
+  async approveRefund(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.refunds.approveRefund(code, { id: actor.id, username: actor.username });
+  }
+
+  @Post("refunds/:code/process")
+  @RequirePermissions("finance.refund.write")
+  async processRefund(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.refunds.processRefund(code, { id: actor.id, username: actor.username });
+  }
+
+  @Post("refunds/:code/fail")
+  @RequirePermissions("finance.refund.write")
+  async failRefund(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.refunds.failRefund(code, { id: actor.id, username: actor.username });
+  }
+
+  // ── Dispute (Step 2.13A — provider-neutral Chargeback/Dispute Foundation) ──
+  // Dispute — Finance-owned aggregate (DSP-*). Source authority — CAPTURED
+  // Payment (currency/orderId server-derived verbatim; amount server-validated
+  // ≤ payment.amount). Клиент передаёт ТОЛЬКО paymentId + amount + reason.
+  // PSP/chargeback-from-provider — 2.12A/2.12B (здесь нет); won/lost
+  // liability-исход и ledger/commission/settlement adjustments — deferred.
+
+  @Get("disputes")
+  @RequirePermissions("finance.dispute.read")
+  async listDisputes(@Query() query: DisputeListQueryDto) {
+    return this.disputes.list(query);
+  }
+
+  @Get("disputes/:code")
+  @RequirePermissions("finance.dispute.read")
+  async getDispute(@Param("code") code: string) {
+    return this.disputes.getByCode(code);
+  }
+
+  @Post("disputes")
+  @RequirePermissions("finance.dispute.write")
+  async createDispute(@Req() req: Request, @CurrentUser() actor: AuthedRequest["user"], @Body() dto: CreateDisputeDto) {
+    // raw req.body — forged server-owned поля (money/status/milestones/...) → 422.
+    assertNoForbiddenKeys(req.body, DISPUTE_CREATE_FORBIDDEN_KEYS);
+    return this.disputes.createDispute(
+      { paymentId: dto.paymentId, amount: dto.amount, reason: dto.reason ?? null },
+      { id: actor.id, username: actor.username },
+    );
+  }
+
+  @Post("disputes/:code/resolve")
+  @RequirePermissions("finance.dispute.write")
+  async resolveDispute(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.disputes.resolveDispute(code, { id: actor.id, username: actor.username });
+  }
+
+  @Post("disputes/:code/cancel")
+  @RequirePermissions("finance.dispute.write")
+  async cancelDispute(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.disputes.cancelDispute(code, { id: actor.id, username: actor.username });
   }
 }

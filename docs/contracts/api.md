@@ -713,8 +713,9 @@ server-owned: amount/currency копируются verbatim из frozen Order sn
 2.12A/2.12B (в 2.12 нет — подтверждение получения manual/provider-neutral).
 
 RBAC: write — `finance.payment.write` (FINANCE/ADMIN); read —
-`finance.payment.read` (FINANCE/ADMIN/DIRECTOR/ANALYST/OPERATOR/...);
-BUYER/PARTNER — 403 (Buyer-оплата — 2.12B, не экспонирована).
+`finance.payment.read` (FINANCE/ADMIN/DIRECTOR/ANALYST/SALES_MANAGER;
+OPERATOR НЕ имеет finance.payment.*); BUYER/PARTNER — 403 (Buyer-оплата —
+2.12B, не экспонирована).
 
 - `POST /api/v1/finance/payments` — `{ orderId, paymentMethod? (≤64, descriptive) }`
   → 201 `{ id, code (PAY-*), orderId, customerId|null, amount (Decimal string),
@@ -748,3 +749,94 @@ Order projection (Order-owned subscriber на `PaymentCaptured`):
 payload — refs + frozen amount/currency, без PII). Boundaries: 0
 LedgerTransaction/ProviderFee/Settlement/Payout/Refund/Invoice/Commission/
 CommissionAccrual auto-post; Booking/availability не затрагиваются.
+
+## Step 2.13 — Refund Flow (provider-neutral Refund runtime)
+
+Refund — Finance-owned aggregate (RFD-*). Новый финансовый факт, производный
+от УЖЕ **CAPTURED Payment** (source authority): currency/orderId копируются
+verbatim из Payment (orderId server-derived из Payment.orderId); Payment НЕ
+мутируется (остаётся CAPTURED; `REFUNDED` reserved/unreachable — частичный
+refund делает одиночный Payment.REFUNDED семантически неверным). Partial
+refund'ы — в scope (разные суммы — независимые Refund). PSP-refund — future
+(2.13A+; здесь нет).
+
+RBAC: write/create/process/fail — `finance.refund.write` (FINANCE/ADMIN,
+добавлено в 2.13); approve — `finance.refund.approve` (FINANCE/ADMIN); read —
+`finance.refund.read` (FINANCE/ADMIN/DIRECTOR/ANALYST/SALES_MANAGER);
+BUYER/PARTNER — 403 (Buyer refund-request — Customer Support flow, future).
+
+- `POST /api/v1/finance/refunds` — `{ paymentId, amount (Decimal string, > 0,
+  ≤ 2 знаков), reason? (≤255, descriptive) }` → 201 `{ id, code (RFD-*),
+  paymentId, orderId, amount, currency, status: REQUESTED, reason|null,
+  requestedAt (set), approvedAt|null, processedAt|null, failedAt|null,
+  version, createdAt }`. Unknown Payment → 404; НЕ-CAPTURED Payment
+  (PENDING/FAILED/CANCELLED) → 422. Over-refund: refundable =
+  payment.amount − Σ(non-FAILED refunds); refund > refundable → 409
+  (serialized pg_advisory_xact_lock на paymentId — concurrent partial refund'ы
+  не могут превысить amount). Idempotent: повторный create (paymentId+amount,
+  НЕ-FAILED) → существующий факт (no-op); attempt 2 после FAILED легален;
+  concurrent duplicate → 409 (partial unique `Refund_one_active_per_payment_amount`).
+- `POST /api/v1/finance/refunds/:code/approve` — REQUESTED → **APPROVED**,
+  `approvedAt` set (`finance.refund.approve`). Повторный → 409; из APPROVED →
+  409 (from-guard).
+- `POST /api/v1/finance/refunds/:code/process` — APPROVED → **PROCESSED**
+  (деньги возвращены, manual/provider-neutral), `processedAt` set. До approve
+  → 409 (from-guard).
+- `POST /api/v1/finance/refunds/:code/fail` — REQUESTED|APPROVED → **FAILED**,
+  `failedAt` set; слот освобождён — attempt 2 (тот же amount) легален.
+- `GET /api/v1/finance/refunds` — list (`finance.refund.read`); фильтры
+  `paymentId`, `orderId`, `status`; пагинация `page`/`pageSize` (≤100).
+- `GET /api/v1/finance/refunds/:code` — detail; неизвестный → 404.
+
+**Order projection (Step 2.13):** Order-owned subscriber на `RefundProcessed`
+→ `Order.refundedAmount += amount`; полный возврат (`refundedAmount >=`
+`paidAmount`) → `Order.paymentStatus = REFUNDED`; частичный → остаётся PAID.
+`paidAmount` — исторический факт «деньги получены» НЕ переписывается; Finance
+НЕ пишет order.* напрямую. Милстоуны `requestedAt/approvedAt/processedAt/
+failedAt` (2.10C DEFER → 2.13; canonical Roadmap-визион), server-owned UTC,
+первый переход wins, атомарны с CAS.
+
+События: `RefundCreated`/`RefundApproved`/`RefundProcessed`/`RefundFailed`
+(outbox; correlation = server UUID, causation = null для HTTP-команд; payload
+— refs + frozen amount/currency + reason, без PII). Boundaries: 0
+LedgerTransaction/ProviderFee/Settlement/Payout/Invoice/Commission/
+CommissionAccrual auto-post; Booking/availability не затрагиваются;
+Settlement/Payout/Commission reversal — 2.12D/2.12C/2.14.
+
+## Step 2.13A — Chargeback / Dispute Foundation (provider-neutral)
+
+Dispute — Finance-owned aggregate (DSP-*). Provider-neutral спор/chargeback:
+source authority — ТОЛЬКО CAPTURED Payment (currency/orderId server-derived
+verbatim); amount server-validated 0 < amount ≤ payment.amount (frozen
+captured; НЕ netting с Refund — monetary netting deferred, документировано).
+Payment НЕ мутируется (остаётся CAPTURED; никакого Payment.status = DISPUTED).
+Real-PSP chargeback — 2.12A/2.12B; ledger/commission/settlement adjustments —
+2.12D/2.12C/2.14A (Roadmap Reconciliation 2026-08-14).
+
+RBAC: create/resolve/cancel — `finance.dispute.write` (FINANCE/ADMIN, добавлено
+в 2.13A); read — `finance.dispute.read` (FINANCE/ADMIN/DIRECTOR/ANALYST/
+SALES_MANAGER); OPERATOR/PARTNER/BUYER — 403.
+
+- `POST /api/v1/finance/disputes` — `{ paymentId, amount (Decimal string, > 0,
+  ≤ 2 знаков), reason? (≤255, descriptive) }` → 201 `{ id, code (DSP-*),
+  paymentId, orderId, amount, currency, status: OPENED, reason|null,
+  openedAt (set), resolvedAt|null, cancelledAt|null, version, createdAt }`.
+  Unknown Payment → 404; НЕ-CAPTURED Payment (PENDING/FAILED/CANCELLED) → 422;
+  amount > captured → 409. Idempotent: активный Dispute на payment → no-op;
+  concurrent duplicate → 409 (partial unique `Dispute_one_active_per_payment`).
+- `POST /api/v1/finance/disputes/:code/resolve` — OPENED → **RESOLVED**
+  (resolvedAt). Повторный → 409; терминальные не перезаписываются.
+- `POST /api/v1/finance/disputes/:code/cancel` — OPENED → **CANCELLED**
+  (cancelledAt); слот освобождён — повторное открытие (attempt 2) легально.
+- `GET /api/v1/finance/disputes` — list (`finance.dispute.read`); фильтры
+  `paymentId`, `orderId`, `status`; пагинация `page`/`pageSize` (≤100).
+- `GET /api/v1/finance/disputes/:code` — detail; неизвестный → 404.
+- PATCH/DELETE НЕ существуют (immutable source fields + action-only lifecycle).
+
+События: `DisputeOpened`/`DisputeResolved`/`DisputeCancelled` (outbox;
+correlation = server UUID, causation = null; payload — refs + frozen
+amount/currency + reason, без PII; consumer-ов НЕТ — 0 cross-domain
+projections). Boundaries: 0 PSP/webhook (2.12A/2.12B); 0
+LedgerTransaction/Commission/CommissionAccrual/Settlement/Payout/Invoice;
+Payment/Refund/Booking/availability не затрагиваются; won/lost
+liability-исход — deferred (2.12D/2.14A).

@@ -321,6 +321,47 @@ export function validateOccurredAt(value: string | null | undefined): Date | nul
   return d;
 }
 
+/**
+ * Step 2.13 — Refund amount: > 0, до 2 знаков (DECIMAL(12,2) контракт),
+ * строковый Decimal без float. Server-validated (клиент запрашивает сумму,
+ * сервер валидирует ≤ refundable отдельно — capacity guard в RefundService).
+ */
+export function validateRefundAmount(amount: string): string {
+  if (typeof amount !== "string" || amount.trim().length === 0) {
+    throw new ValidationDomainError("refund amount must be a positive decimal number");
+  }
+  const d = Number(amount);
+  if (!Number.isFinite(d) || d <= 0) {
+    throw new ValidationDomainError("refund amount must be a positive decimal number");
+  }
+  const parts = amount.split(".");
+  if (parts.length === 2 && parts[1].length > 2) {
+    throw new ValidationDomainError("refund amount supports at most 2 decimal places (DECIMAL(12,2) contract)");
+  }
+  return amount;
+}
+
+/**
+ * Step 2.13A — Dispute amount: > 0, до 2 знаков (DECIMAL(12,2) контракт),
+ * строковый Decimal без float. Server-validated (клиент запрашивает сумму,
+ * сервер валидирует ≤ payment.amount отдельно — capacity guard в
+ * DisputeService; НЕ netting с Refund — monetary netting deferred).
+ */
+export function validateDisputeAmount(amount: string): string {
+  if (typeof amount !== "string" || amount.trim().length === 0) {
+    throw new ValidationDomainError("dispute amount must be a positive decimal number");
+  }
+  const d = Number(amount);
+  if (!Number.isFinite(d) || d <= 0) {
+    throw new ValidationDomainError("dispute amount must be a positive decimal number");
+  }
+  const parts = amount.split(".");
+  if (parts.length === 2 && parts[1].length > 2) {
+    throw new ValidationDomainError("dispute amount supports at most 2 decimal places (DECIMAL(12,2) contract)");
+  }
+  return amount;
+}
+
 /** Валидация налоговой ставки: >= 0, до 2 знаков (DECIMAL(12,2) контракт). */
 export function validateTaxRate(rate: string): string {
   const d = Number(rate);
@@ -443,6 +484,169 @@ export class CreatePaymentDto {
 
 /** Whitelist-query для чтения Payment (Finance Center). */
 export class PaymentListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  orderId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  status?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2.13 — Refund Flow (provider-neutral Refund runtime)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Server-owned Refund поля — громкий 422 при forged-вводе (mass assignment
+ * HARD GATE §35): id/code/status/currency/orderId/version/milestones/
+ * timestamps/isActiveRefund. Клиент передаёт ТОЛЬКО paymentId + amount
+ * (server-validated ≤ refundable) + опциональный reason. orderId server-derived
+ * из Payment; currency server-copied verbatim из Payment.
+ */
+export const REFUND_CREATE_FORBIDDEN_KEYS = [
+  "id",
+  "code",
+  "status",
+  "currency",
+  "orderId",
+  "customerId",
+  "version",
+  "createdAt",
+  "updatedAt",
+  "requestedAt",
+  "approvedAt",
+  "processedAt",
+  "failedAt",
+  "isActiveRefund",
+  "providerRef",
+] as const;
+
+/** Create Refund: paymentId (CAPTURED Payment — source authority) + amount
+ *  (Decimal string, > 0, ≤ 2 знаков, server-validated ≤ refundable) + reason
+ *  (descriptive, без PII). */
+export class CreateRefundDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  paymentId!: string;
+
+  /** Decimal string (как validateLedgerAmount контракт): > 0, ≤ 2 знаков. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  amount!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  reason?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2.13A — Chargeback / Dispute Foundation (provider-neutral)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Server-owned Dispute поля — громкий 422 при forged-вводе (mass assignment
+ * HARD GATE §20): id/code/status/currency/orderId/version/milestones/
+ * timestamps/isActiveDispute. Клиент передаёт ТОЛЬКО paymentId + amount
+ * (server-validated ≤ payment.amount) + опциональный reason. orderId
+ * server-derived из Payment; currency server-copied verbatim из Payment.
+ */
+export const DISPUTE_CREATE_FORBIDDEN_KEYS = [
+  "id",
+  "code",
+  "status",
+  "currency",
+  "orderId",
+  "customerId",
+  "version",
+  "createdAt",
+  "updatedAt",
+  "openedAt",
+  "resolvedAt",
+  "cancelledAt",
+  "isActiveDispute",
+  "providerRef",
+] as const;
+
+/** Create Dispute: paymentId (CAPTURED Payment — source authority) + amount
+ *  (Decimal string, > 0, ≤ 2 знаков, server-validated ≤ payment.amount) +
+ *  reason (descriptive, без PII). */
+export class CreateDisputeDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  paymentId!: string;
+
+  /** Decimal string (как validateRefundAmount контракт): > 0, ≤ 2 знаков. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  amount!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  reason?: string;
+}
+
+/** Whitelist-query для чтения Dispute (Finance Center). */
+export class DisputeListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  paymentId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  orderId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  status?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+}
+
+/** Whitelist-query для чтения Refund (Finance Center). */
+export class RefundListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  paymentId?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(64)

@@ -37,6 +37,7 @@
 | `PAY-` | Payment | Finance (finance.*) |
 | `PMT-` | PaymentTerms | Finance (finance.*) |
 | `RFD-` | Refund | Finance (finance.*) |
+| `DSP-` | Dispute | Finance (finance.*) |
 | `INV-` | Invoice | Finance (finance.*) |
 | `CMS-` | Commission | Finance (finance.*) |
 | `CAA-` | CommissionAccrual | Finance (finance.*) |
@@ -83,7 +84,7 @@ Seller-определённая коммерческая/сервисная ед
 без дубликатов при параллельной работе.
 
 *Step 2.10 (Finance Domain Foundation):* добавлены Finance-префиксы (finance.*):
-`PAY-` Payment, `PMT-` PaymentTerms, `RFD-` Refund, `INV-` Invoice,
+`PAY-` Payment, `PMT-` PaymentTerms, `RFD-` Refund, `DSP-` Dispute, `INV-` Invoice,
 `CMS-` Commission, `CAA-` CommissionAccrual, `CUR-` Currency,
 `FXR-` ExchangeRate, `TAX-` Tax, `TXR-` TaxRule. Зарегистрированы в
 `IdsService.nextCode` (атомарный счётчик events.BusinessSequence).
