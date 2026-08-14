@@ -201,11 +201,11 @@ is a separate approved documentation-only pass.
 ```text
 REPOSITORY EVIDENCE
 branch: master
-head: <populated after commit per §27>
-origin/upstream: <populated after commit>
-worktree_clean: false (unrelated untracked prompt files remain)
+head: 24ca50a
+origin/upstream: 24ca50a (pushed, 3b10e8e..24ca50a)
+worktree_clean: false (unrelated untracked prompt files remain: 2.12A, 2.17, duplicate "(1).md")
 reviewed_state: COMMIT
 persistence_status: PERSISTED
-persistence_sha: <populated after commit>
-push_status: <populated after commit>
+persistence_sha: 24ca50a
+push_status: pushed to origin/master
 ```
