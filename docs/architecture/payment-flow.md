@@ -199,10 +199,11 @@ E2E T11: commission/accrual counts без изменений.
 ## 21. RBAC
 
 `finance.payment.write` — FINANCE, ADMIN (ALL_PERMISSIONS); `finance.payment.
-read` — FINANCE/ADMIN/DIRECTOR/ANALYST/OPERATOR/... (существующий каталог
-прав 2.10). BUYER/PARTNER — 403 (Buyer surface — 2.12B). Разделение
-read/initiate/manage: write-команды только write-право; read-эндпоинты —
-read-право. E2E T9: 401/403/404.
+read` — FINANCE/ADMIN/DIRECTOR/ANALYST/SALES_MANAGER (существующий каталог
+прав 2.10; STRICT REVIEW 2.12 FIX: OPERATOR НЕ имеет finance.payment.* —
+проверено `ROLE_PERMISSIONS`, RBAC Matrix Baseline 1.3 §2). BUYER/PARTNER —
+403 (Buyer surface — 2.12B). Разделение read/initiate/manage: write-команды
+только write-право; read-эндпоинты — read-право. E2E T9: 401/403/404.
 
 ## 22. Mass assignment — HARD GATE
 

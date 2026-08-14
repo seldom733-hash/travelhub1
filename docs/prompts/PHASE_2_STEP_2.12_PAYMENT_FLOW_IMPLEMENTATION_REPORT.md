@@ -241,8 +241,9 @@ AuditLog userId/username). Клиентские значения не прини
 
 ## 32. RBAC
 
-`finance.payment.read` (FINANCE/ADMIN/DIRECTOR/ANALYST/OPERATOR/...) —
-read-эндпоинты; `finance.payment.write` (FINANCE/ADMIN) — create/confirm/
+`finance.payment.read` (FINANCE/ADMIN/DIRECTOR/ANALYST/SALES_MANAGER; STRICT
+REVIEW FIX: OPERATOR НЕ имеет finance.payment.* — проверено `ROLE_PERMISSIONS`)
+— read-эндпоинты; `finance.payment.write` (FINANCE/ADMIN) — create/confirm/
 fail/cancel. 0 универсальных write. e2e T9: 401 аноним, 403 SALES_MANAGER/
 DIRECTOR на write (read — 200), FINANCE write OK, 404 unknown.
 
