@@ -40,6 +40,7 @@
 | `DSP-` | Dispute | Finance (finance.*) |
 | `INV-` | Invoice | Finance (finance.*) |
 | `CMS-` | Commission | Finance (finance.*) |
+| `CMP-` | CommissionPolicy (master data, Step 2.14E) | Finance (finance.*) |
 | `CAA-` | CommissionAccrual | Finance (finance.*) |
 | `CUR-` | Currency | Finance (finance.*) |
 | `FXR-` | ExchangeRate | Finance (finance.*) |

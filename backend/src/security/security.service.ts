@@ -459,6 +459,7 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "finance.invoice.write": "Выставление счетов",
   "finance.commission.read": "Чтение комиссий",
   "finance.commission.write": "Управление комиссиями",
+  "finance.commission.manage": "Управление Commission Policy (master data, Step 2.14E)",
   "finance.currency.manage": "Управление валютами",
   "finance.exchange_rate.manage": "Управление курсами",
   "finance.tax.manage": "Управление налогами",

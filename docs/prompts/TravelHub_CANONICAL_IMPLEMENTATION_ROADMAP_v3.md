@@ -680,7 +680,7 @@ Payout lifecycle; bank transfer/local rail/SEPA/SWIFT по рынку.
 PSP transaction → Payment → Ledger → Commission → Settlement → Payout →
 bank result.
 
-· **Step 2.14E --- Channel-Based Commission Rules**\
+· **Step 2.14E --- Channel-Based Commission Rules** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-14; ADR-0013 материализован: Finance-owned `finance.CommissionPolicy` (CMP-*) — ЕДИНСТВЕННЫЙ policy authority; V1 channel-only (MARKETPLACE — create-гейт; PARTNER_STOREFRONT/DIRECT/BUYER_REQUEST no-commission → 422); rateType PERCENTAGE; rate = десятичная доля 0<r<1 ≤6 знаков (DECIMAL(18,6)); lifecycle DRAFT → ACTIVE → ARCHIVED (CAS, update только в DRAFT, ACTIVE immutable); overlap-инвариант pg_advisory_xact_lock(hashtext('commission-policy:'||channel)) + activate-проверка → 409 (concurrent → один 201 + 409, 0 raw 500); resolver `resolveCommissionPolicy(channel, instant)` fail-closed (NO_COMMISSION_CHANNEL/NO_POLICY/AMBIGUOUS), half-open [effectiveFrom, effectiveTo); CommissionPolicyHistory (полный state на версию — future frozen snapshot репродукция); RBAC `finance.commission.manage` (FINANCE/ADMIN) + read finance.commission.read (FINANCE/DIRECTOR/ANALYST — фактический ROLE_PERMISSIONS; SALES_MANAGER НЕ имеет); mass assignment → 422; AuditLog snake_case; 0 доменных событий; 0 Commission/CommissionAccrual/ledger/settlement/payout/invoice фактов (e2e T12), 0 cross-domain (T13); миграция `20260814180000_add_commission_policy_foundation` аддитивная (55/55, drift 0); unit 567/567 (+19), serial e2e 1120/1120 (64 suites, +15 commission-policy-foundation T1–T15), frontend 135/135 + build; арх-док `docs/architecture/commission-policy-foundation.md`; отчёт `docs/prompts/PHASE_2_STEP_2.14E_CHANNEL_BASED_COMMISSION_RULES_FOUNDATION_IMPLEMENTATION_REPORT.md`; ADR-0013 D18 read-set уточнён по факту (SALES_MANAGER без commission.read); seller-атрибуция (Order.sellerPartnerId) — следующий freeze-шаг, НЕ 2.14E; STRICT REVIEW: найден и исправлен HIGH-дефект валидации rate — научная нотация («1e-7» = 0.0000001 → Postgres DECIMAL(18,6) округлял до 0.000000, молчаливая 0%-policy) и whitespace (« 0.15 » → Prisma.Decimal DecimalError → raw 500); фикс: каноническая форма /^0\.(?!0+$)\d{1,6}$/ (regex-authority, без JS float arithmetic); unit 583/583 (+16 adversarial), e2e T5 расширен + T5b (границы 0.000001/0.999999), serial e2e 1121/1121 (64 suites); stale-комментарий контроллера (SALES_MANAGER read) исправлен по факту ROLE_PERMISSIONS; api.md/арх-док фиксируют каноническую форму; live DB drift 0 (55/55); отчёт `docs/prompts/PHASE_2_STEP_2.14E_COMMISSION_POLICY_FOUNDATION_STRICT_REVIEW_REPORT.md`; NEXT = STEP 2.12E — PARTNER_COLLECT / COMMISSION ACCRUAL FOUNDATION (по dependency graph 2.14E→2.12E→2.12C; не начинается в этом проходе; Step 2.14 остаётся BLOCKED до закрытия prerequisites))\
 Разные commission policies для Marketplace, Storefront, Custom Domain,
 API/Manual. Никаких hardcoded ставок. Storefront SaaS subscription и
 Marketplace commission --- разные механизмы.
@@ -1643,6 +1643,24 @@ Settlement Engine; (3) Invoice (buyer, customerId) доказуемо незав
 snapshot; (4) ARCHITECTURE DECISIONS REQUIRED до любого commission-кода: policy dimensions,
 base (gross/net/tax/discount), rate type, freeze boundary, collection model per channel,
 adjustment strategy (Refund/Dispute).
+**Commission Policy Contract ADR-0013 (2026-08-14) — DECIDED (архитектурное решение,
+0 кода; ADR — `docs/adr/ADR-0013-commission-policy-contract.md`, отчёт —
+`docs/prompts/PHASE_2_COMMISSION_POLICY_CONTRACT_ARCHITECTURE_DECISION_REPORT.md`):**
+Finance-owned `finance.CommissionPolicy` (master data, НЕ проценты в коде);
+V1-дименсия = channel (MARKETPLACE; PARTNER_STOREFRONT — SaaS no-commission;
+DIRECT/BUYER_REQUEST — none; CUSTOM_DOMAIN/API — deferred 2.5B); rateType PERCENTAGE
+(fixed/tiered — deferred); base = frozen discounted Order.total (tax-exclusive by
+construction, order-level); rounding ROUND_HALF_UP scale 2; selection+freeze = Quote
+ISSUE (frozen commissionSnapshot verbatim Checkout→Sale→Order); collection: SPLIT_AT_PAYMENT
+(Payment CAPTURED trigger; PSP получает предвычисленный amount, НЕ владеет policy) /
+PARTNER_COLLECT (Order creation trigger; CommissionAccrual receivable); Commission =
+earned fact, CommissionAccrual = receivable-представление; refund adjustment = immutable
++ компенсирующий факт (пропорциональный, deferred); dispute adjustment = DEFER до
+liability-исхода; invoice: buyer + partner-commission (два концепта); seller атрибуция —
+`Order.sellerPartnerId` frozen (one-seller invariant, multi-seller fail-closed);
+RBAC `finance.commission.manage` (FINANCE/ADMIN) — добавить в 2.14E; событие
+CommissionAccrued (consumer-ы 2.12D/2.14A/2.14); 14 инвариантов. NEXT = STEP 2.14E —
+CHANNEL-BASED COMMISSION RULES FOUNDATION (не начинается в этом проходе).
 
 ## Dependency Analysis (Roadmap Amendment: Reverse Marketplace)
 

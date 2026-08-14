@@ -15,6 +15,7 @@
  */
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
+import { CommissionPolicyService } from "./commission-policy.service";
 import { DisputeService } from "./dispute.service";
 import { FinanceService } from "./finance.service";
 import { LedgerService } from "./ledger.service";
@@ -27,6 +28,9 @@ import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import { assertNoForbiddenKeys } from "../../shared/field-validation";
 import {
+  COMMISSION_POLICY_FORBIDDEN_KEYS,
+  CommissionPolicyListQueryDto,
+  CreateCommissionPolicyDto,
   CreateCurrencyDto,
   CreateDisputeDto,
   CreateExchangeRateDto,
@@ -43,6 +47,8 @@ import {
   PaymentListQueryDto,
   REFUND_CREATE_FORBIDDEN_KEYS,
   RefundListQueryDto,
+  ResolveCommissionPolicyQueryDto,
+  UpdateCommissionPolicyDto,
   UpdateCurrencyDto,
   UpdateExchangeRateDto,
   UpdateTaxDto,
@@ -59,6 +65,7 @@ export class FinanceController {
     private readonly payments: PaymentService,
     private readonly refunds: RefundService,
     private readonly disputes: DisputeService,
+    private readonly commissionPolicies: CommissionPolicyService,
   ) {}
 
   // ── Currency (finance.currency.manage) ──────────────────────────────────────
@@ -367,5 +374,65 @@ export class FinanceController {
   @RequirePermissions("finance.dispute.write")
   async cancelDispute(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.disputes.cancelDispute(code, { id: actor.id, username: actor.username });
+  }
+
+  // ── CommissionPolicy (Step 2.14E — ADR-0013 Channel-Based Commission Rules) ─
+  // Finance-owned mutable master data (CMP-*, единственный authority). Read —
+  // finance.commission.read (ФАКТИЧЕСКИЙ ROLE_PERMISSIONS: FINANCE/DIRECTOR/
+  // ANALYST; SALES_MANAGER commission.read НЕ имеет — строгий review fix);
+  // manage — finance.commission.manage (FINANCE/ADMIN). V1: channel MARKETPLACE
+  // only; rateType PERCENTAGE; lifecycle DRAFT → ACTIVE → ARCHIVED. 0 фактов.
+
+  @Get("commission-policies")
+  @RequirePermissions("finance.commission.read")
+  async listCommissionPolicies(@Query() query: CommissionPolicyListQueryDto) {
+    return this.commissionPolicies.list(query);
+  }
+
+  // NOTE: resolve MUST be declared before ":code" route (Nest order).
+  @Get("commission-policies/resolve")
+  @RequirePermissions("finance.commission.read")
+  async resolveCommissionPolicy(@Query() query: ResolveCommissionPolicyQueryDto) {
+    return this.commissionPolicies.resolve(query.channel, query.at);
+  }
+
+  @Get("commission-policies/:code")
+  @RequirePermissions("finance.commission.read")
+  async getCommissionPolicy(@Param("code") code: string) {
+    return this.commissionPolicies.getByCode(code);
+  }
+
+  @Post("commission-policies")
+  @RequirePermissions("finance.commission.manage")
+  async createCommissionPolicy(@Req() req: Request, @CurrentUser() actor: AuthedRequest["user"], @Body() dto: CreateCommissionPolicyDto) {
+    // raw req.body — forged server-owned поля (code/version/status/rateType/...) → 422.
+    assertNoForbiddenKeys(req.body, COMMISSION_POLICY_FORBIDDEN_KEYS);
+    return this.commissionPolicies.create(
+      { channel: dto.channel, rate: dto.rate, effectiveFrom: dto.effectiveFrom, effectiveTo: dto.effectiveTo },
+      { id: actor.id, username: actor.username },
+    );
+  }
+
+  @Patch("commission-policies/:code")
+  @RequirePermissions("finance.commission.manage")
+  async updateCommissionPolicy(@Param("code") code: string, @Req() req: Request, @CurrentUser() actor: AuthedRequest["user"], @Body() dto: UpdateCommissionPolicyDto) {
+    assertNoForbiddenKeys(req.body, COMMISSION_POLICY_FORBIDDEN_KEYS);
+    return this.commissionPolicies.update(
+      code,
+      { rate: dto.rate, effectiveFrom: dto.effectiveFrom, effectiveTo: dto.effectiveTo },
+      { id: actor.id, username: actor.username },
+    );
+  }
+
+  @Post("commission-policies/:code/activate")
+  @RequirePermissions("finance.commission.manage")
+  async activateCommissionPolicy(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.commissionPolicies.activate(code, { id: actor.id, username: actor.username });
+  }
+
+  @Post("commission-policies/:code/archive")
+  @RequirePermissions("finance.commission.manage")
+  async archiveCommissionPolicy(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.commissionPolicies.archive(code, { id: actor.id, username: actor.username });
   }
 }

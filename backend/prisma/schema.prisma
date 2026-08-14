@@ -3691,6 +3691,100 @@ model CommissionAccrual {
   @@schema("finance")
 }
 
+/// Business-статус CommissionPolicy (ADR-0013 D16). Lifecycle:
+/// DRAFT → ACTIVE → ARCHIVED (CAS; update ТОЛЬКО в DRAFT — ACTIVE immutable;
+/// overlap-инвариант проверяется при activate). ACTIVE = селектируема в
+/// effective-окне; ARCHIVED = терминальный (не селектируема); DRAFT =
+/// редактируемая, НЕ селектируема.
+enum CommissionPolicyStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+
+  @@schema("finance")
+}
+
+/// Канал комиссии (ADR-0013 D15). ОТДЕЛЬНЫЙ vocabulary от AcquisitionSource
+/// (acquisition = происхождение lead; commission channel = коммерческий контекст
+/// комиссии). V1 commission-capable: MARKETPLACE. PARTNER_STOREFRONT — SaaS
+/// (ADR-0006, no commission); DIRECT/BUYER_REQUEST — no commission.
+/// CUSTOM_DOMAIN/API — deferred (Roadmap 2.5B, НЕ добавляются).
+enum CommissionChannel {
+  MARKETPLACE
+  PARTNER_STOREFRONT
+  DIRECT
+  BUYER_REQUEST
+
+  @@schema("finance")
+}
+
+/// Форма commission rule (ADR-0013 D3). V1: PERCENTAGE only (0 < rate < 1,
+/// DECIMAL(18,6) — rate ≠ amount, прецедент ExchangeRate). FIXED/hybrid/tiered
+/// — deferred (аддитивное расширение enum).
+enum CommissionRateType {
+  PERCENTAGE
+
+  @@schema("finance")
+}
+
+/// CommissionPolicy (CMP-*) — канонический mutable Commission policy master data
+/// (ADR-0013 D1: Finance-owned, ЕДИНСТВЕННЫЙ authority; Settings/Catalog/Sales/
+/// PSP НЕ дублируют). V1 matching key — channel only (D2). Ставки — master data,
+/// НЕ константы (invariant 1). Историческая воспроизводимость: future frozen
+/// snapshot ссылается на (code, version); ACTIVE-политики immutable после
+/// activate (update только в DRAFT) → текущая строка = замороженная версия;
+/// CommissionPolicyHistory хранит ПОЛНОЕ состояние каждой версии.
+model CommissionPolicy {
+  id            String                 @id @default(uuid())
+  code          String                 @unique // CMP-00000001
+  /// Канал — matching key V1 (D2); НЕ меняется после создания (identity).
+  channel       CommissionChannel
+  /// V1: PERCENTAGE only (D3).
+  rateType      CommissionRateType     @default(PERCENTAGE)
+  /// Процент-доля: 0 < rate < 1 (0.15 = 15%), DECIMAL(18,6). Representation:
+  /// десятичная доля (прецедент ExchangeRate), НЕ «проценты-числом» —
+  /// документировано: 0.10 = 10%, 10 НЕ валиден (10 ≥ 1).
+  rate          Decimal                @db.Decimal(18, 6)
+  status        CommissionPolicyStatus @default(DRAFT)
+  /// Server-owned; инкремент на каждое изменение (draft-итерации). Клиент не
+  /// передаёт (mass assignment → 422). createdAt НЕ является precedence (D16).
+  version       Int                    @default(1)
+  /// Селекция: effectiveFrom <= businessInstant < effectiveTo (включ. начало,
+  /// исключ. конец). effectiveTo NULL = open-ended.
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  history CommissionPolicyHistory[]
+
+  @@index([channel, status])
+  @@index([effectiveFrom])
+  @@schema("finance")
+}
+
+/// Журнал CommissionPolicy (audit by default + version-репродукция). Каждая
+/// мутация (created/updated/activated/archived) — строка с ПОЛНЫМ состоянием
+/// политики на этой версии (fields Json) — future frozen snapshot воспроизводит
+/// (code, version) без текущего lookup.
+model CommissionPolicyHistory {
+  id        String   @id @default(uuid())
+  policyId  String
+  policy    CommissionPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  action    String
+  /// Версия, к которой относится этот снапшот состояния.
+  version   Int
+  /// Полное состояние политики на этой версии.
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([policyId])
+  @@schema("finance")
+}
+
 
 /// Валюта (CUR-*) — Finance master data (единственный владелец, Screen Design
 /// §7 / Architecture §8; Settings НЕ дублирует). isoCode — canonical ключ.

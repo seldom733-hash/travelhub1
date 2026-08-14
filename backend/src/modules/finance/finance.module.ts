@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { CommissionPolicyService } from "./commission-policy.service";
 import { DisputeService } from "./dispute.service";
 import { FinanceController } from "./finance.controller";
 import { FinanceService } from "./finance.service";
@@ -23,6 +24,6 @@ import { SettlementService } from "./settlement.service";
  */
 @Module({
   controllers: [FinanceController],
-  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService],
+  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService],
 })
 export class FinanceModule {}

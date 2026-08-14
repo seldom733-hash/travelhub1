@@ -12,6 +12,7 @@
 import { IsBoolean, IsISO8601, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
 import { Type } from "class-transformer";
 import { ValidationDomainError } from "../../shared/errors";
+import { CommissionChannel } from "../../generated/prisma/enums";
 
 /** Запрещённые server-owned поля для всех Finance master-data write DTO. */
 export const FINANCE_MASTER_FORBIDDEN_KEYS = [
@@ -669,4 +670,150 @@ export class RefundListQueryDto {
   @Min(1)
   @Max(100)
   pageSize?: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2.14E — Channel-Based Commission Rules Foundation (ADR-0013)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Server-owned CommissionPolicy поля — громкий 422 при forged-вводе (mass
+ * assignment HARD GATE §15): id/code/version/createdAt/updatedAt/status/
+ * rateType (server-derived, V1 = PERCENTAGE)/audit-поля. Клиент передаёт ТОЛЬКО
+ * channel + rate + effectiveFrom/effectiveTo.
+ */
+export const COMMISSION_POLICY_FORBIDDEN_KEYS = [
+  "id",
+  "code",
+  "version",
+  "createdAt",
+  "updatedAt",
+  "status",
+  "rateType",
+  "actorId",
+  "actorName",
+  "correlationId",
+  "causationId",
+];
+
+/**
+ * Валидация commission rate (ADR-0013 D3/D5, §8): десятичная ДОЛЯ, 0 < rate < 1
+ * (0.15 = 15%). Representation документирован: «10» НЕ валиден (10 ≥ 1) —
+ * только 0.10. Точность ≤ 6 знаков (DECIMAL(18,6), прецедент ExchangeRate —
+ * rate ≠ amount). Строковый Decimal, без JS float authority.
+ */
+export function validateCommissionRate(rate: string): string {
+  // Каноническая форма — десятичная ДОЛЯ «0.dddddd», 1–6 знаков, не все нули:
+  //   /^0\.(?!0+$)\d{1,6}$/
+  // Regex-authority без JS float arithmetic. Исключает:
+  //  - научную нотацию («1e-7» = 0.0000001 → Postgres DECIMAL(18,6) округляет
+  //    до 0.000000 — молчаливая 0%-policy; строгий review fix 2.14E),
+  //  - whitespace (« 0.15 » → Prisma.Decimal бросает DecimalError → raw 500),
+  //  - «10»/«15»/«1» (≥ 1 — percent-ambiguitiy), «0»/«0.0»/«0.000000» (= 0),
+  //  - «-0.05», «+0.15», «.15», «0,15», NaN/Infinity/malformed.
+  if (typeof rate !== "string" || !/^0\.(?!0+$)\d{1,6}$/.test(rate)) {
+    throw new ValidationDomainError("commission rate must be a positive decimal fraction in (0, 1) with at most 6 decimal places — canonical form 0.15 = 15% (scientific notation, percent-as-number and whitespace are rejected)");
+  }
+  return rate;
+}
+
+/**
+ * Проверка channel-значения: член vocabulary CommissionChannel (D15).
+ * Неизвестные значения → ValidationDomainError (400).
+ */
+export function validateCommissionChannel(channel: string): string {
+  const values = Object.values(CommissionChannel);
+  if (!values.includes(channel as CommissionChannel)) {
+    throw new ValidationDomainError(`commission channel must be one of: ${values.join(", ")}`);
+  }
+  return channel;
+}
+
+/**
+ * V1 create-гейт (ADR-0013 D15/D2): commission policy можно создать ТОЛЬКО для
+ * MARKETPLACE. PARTNER_STOREFRONT (SaaS, ADR-0006) / DIRECT / BUYER_REQUEST —
+ * no-commission каналы: generic CRUD НЕ должен случайно дать им policy (T6).
+ */
+export function assertCommissionPolicyCreateChannel(channel: string): void {
+  if (channel !== CommissionChannel.MARKETPLACE) {
+    throw new ValidationDomainError("V1 commission policy creation is allowed only for channel MARKETPLACE (no-commission channels: PARTNER_STOREFRONT/DIRECT/BUYER_REQUEST)");
+  }
+}
+
+/** Create CommissionPolicy: channel + rate (доля) + effectiveFrom/effectiveTo. */
+export class CreateCommissionPolicyDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  channel!: string;
+
+  /** Decimal-строка (validateCommissionRate): доля 0 < rate < 1, ≤ 6 знаков. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  rate!: string;
+
+  @IsISO8601()
+  effectiveFrom!: string;
+
+  @IsOptional()
+  @IsISO8601()
+  effectiveTo?: string;
+}
+
+/** Update CommissionPolicy (ТОЛЬКО в DRAFT; version инкремент server-side). */
+export class UpdateCommissionPolicyDto {
+  /** Decimal-строка (validateCommissionRate). */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  rate?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  effectiveFrom?: string;
+
+  /** null = open-ended (убрать effectiveTo). */
+  @IsOptional()
+  @ValidateIf((o) => o.effectiveTo !== null)
+  @IsISO8601()
+  effectiveTo?: string | null;
+}
+
+/** Whitelist-list-query для CommissionPolicy (канал/статус/пагинация). */
+export class CommissionPolicyListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  channel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  status?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+}
+
+/** Resolution-query: channel + business instant (UTC ISO 8601). */
+export class ResolveCommissionPolicyQueryDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  channel!: string;
+
+  @IsISO8601()
+  at!: string;
 }

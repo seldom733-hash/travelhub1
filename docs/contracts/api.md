@@ -840,3 +840,46 @@ projections). Boundaries: 0 PSP/webhook (2.12A/2.12B); 0
 LedgerTransaction/Commission/CommissionAccrual/Settlement/Payout/Invoice;
 Payment/Refund/Booking/availability не затрагиваются; won/lost
 liability-исход — deferred (2.12D/2.14A).
+
+---
+
+## Step 2.14E — Commission Policy (Channel-Based Commission Rules Foundation, ADR-0013)
+
+Finance-owned mutable master data `finance.CommissionPolicy` (CMP-*) — ЕДИНСТВЕННЫЙ
+commission policy authority (Settings/Catalog/Sales/PSP НЕ дублируют). V1 matching
+key — channel only; rateType PERCENTAGE; ставки — master data (0 hardcoded констант).
+Lifecycle: DRAFT → ACTIVE → ARCHIVED (update только в DRAFT; ACTIVE immutable —
+изменение = новая policy). Overlap-инвариант (≤1 ACTIVE policy на channel в точке
+времени): сериализация pg_advisory_xact_lock + проверка при activate → 409;
+resolver fail-closed (AMBIGUOUS → no policy).
+
+- `GET /api/v1/finance/commission-policies` — list (whitelist-фильтры channel/status,
+  пагинация page/pageSize ≤ 100; invalid → 400; invalid channel/status → 422).
+- `GET /api/v1/finance/commission-policies/:code` — detail.
+- `GET /api/v1/finance/commission-policies/resolve?channel=&at=` — детерминированный
+  resolver: `{found:true, reason:"POLICY_FOUND", policy}` | `{found:false,
+  reason:"NO_COMMISSION_CHANNEL"|"NO_POLICY"|"AMBIGUOUS"}` (half-open [effectiveFrom,
+  effectiveTo)). НЕ считает amount; НЕ читает Catalog; НЕ пишет.
+- `POST /api/v1/finance/commission-policies` — create (DRAFT): body ТОЛЬКО
+  `{channel: "MARKETPLACE", rate: "0.15", effectiveFrom, effectiveTo?}`; no-commission
+  каналы (PARTNER_STOREFRONT/DIRECT/BUYER_REQUEST) → 422; forged server-owned поля
+  (code/version/status/rateType/timestamps) → 422; rate = десятичная доля 0<r<1, ≤6
+  знаков, КАНОНИЧЕСКАЯ форма «0.dddddd» (0.15 = 15%); scientific notation
+  («1e-7» → округление DECIMAL(18,6) до 0), whitespace, «+0.15», «.15», «0,15»,
+  «10»/«15»/«0» → 422 (строгий review fix 2.14E).
+- `PATCH /api/v1/finance/commission-policies/:code` — update (DRAFT only; version +1).
+- `POST /api/v1/finance/commission-policies/:code/activate` — DRAFT → ACTIVE
+  (overlap → 409).
+- `POST /api/v1/finance/commission-policies/:code/archive` — → ARCHIVED (terminal).
+
+RBAC: `finance.commission.manage` (FINANCE/ADMIN) — create/update/activate/archive;
+read — `finance.commission.read` (фактические держатели FINANCE/DIRECTOR/ANALYST;
+SALES_MANAGER/OPERATOR/BUYER/PARTNER → 403); anonymous → 401.
+
+0 фактов: policy CRUD создаёт 0 Commission/CommissionAccrual/LedgerTransaction/
+ProviderFee/Settlement/Payout/Invoice/Payment/Refund/Dispute (e2e T12); 0 Order/
+Booking/Availability (T13); 0 доменных событий (master data + AuditLog); 0 PSP/
+webhook/tax/FX/ledger. Аудит: `finance.commission_policy.created/updated/activated/
+archived` + CommissionPolicyHistory (полный state на версию). Seller-атрибуция
+(Order.sellerPartnerId) — следующий зависимый шаг (freeze), не 2.14E. Детали —
+`docs/architecture/commission-policy-foundation.md`; ADR — `docs/adr/ADR-0013-commission-policy-contract.md`.
