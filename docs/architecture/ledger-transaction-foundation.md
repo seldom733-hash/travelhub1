@@ -141,9 +141,21 @@ clearing (2.10B deferred).
 
 ## 21. Temporal boundary
 
-Нет `authorizedAt/capturedAt/paidAt/refundedAt/settledAt/payoutRequestedAt`
-(2.10C deferred). `createdAt` — время факта ledger-записи, не payment
-milestone (доказано e2e #15: колонки отсутствуют).
+**Эволюция (Step 2.10C, Finance Temporal Contract):** `LedgerTransaction`
+легитимно получил `occurredAt` — бизнес-occurrence время факта (UTC),
+ОТДЕЛЬНО от `createdAt` (персистенция). NULL = время наступления неизвестно
+(legacy / producer не передал; без fabricated backfill). Authority:
+server-валидированный ISO 8601 (для event-порождённых фактов 2.12+ —
+`occurredAt` канонического события); malformed/impossible → ValidationDomainError
+(никогда не становится authority). НЕ входит в replay payload-сравнение
+(first-write-wins — идентичный логический replay не расходится из-за более
+позднего retry, §16 2.10C). Детали —
+`docs/architecture/finance-temporal-contract.md`.
+
+По-прежнему НЕТ `authorizedAt/capturedAt/paidAt/refundedAt/settledAt/
+payoutRequestedAt` — payment/lifecycle milestone-колонки не вводятся
+(deferred 2.12–2.14; доказано e2e #15: колонки отсутствуют). `createdAt` —
+время факта ledger-записи (персистенция), не payment milestone.
 
 ## 22. Legacy compatibility
 

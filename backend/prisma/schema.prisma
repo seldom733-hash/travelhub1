@@ -3608,6 +3608,15 @@ model LedgerTransaction {
   /// Провенанс actor-а (USER/SYSTEM/UNKNOWN).
   actorType     String?
   actorId       String?
+  /// Время наступления финансового факта (business occurrence, UTC) — Roadmap
+  /// 2.10C: «Ledger: occurredAt». ОТДЕЛЬНО от createdAt (время персистенции):
+  /// никогда не выводится из createdAt/updatedAt/AuditLog. NULL — неизвестное
+  /// время наступления (legacy / producer не передал; без fabricated backfill).
+  /// Authority: server-валидированный ISO 8601 (для event-порождённых фактов
+  /// 2.12+ — occurredAt канонического события); пишется только LedgerService
+  /// (immutable факт — update нет; identical replay → существующий факт, не
+  /// перезаписывает первое вхождение).
+  occurredAt    DateTime?
   /// Время финансового факта (сервер-owned, UTC).
   createdAt     DateTime @default(now())
 

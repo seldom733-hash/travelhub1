@@ -27,6 +27,7 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { LedgerService } from "../src/modules/finance/ledger.service";
+import { ConflictError } from "../src/shared/errors";
 import { runWithRequestContext } from "../src/shared/request-context";
 import { RoleCode } from "../src/generated/prisma/enums";
 import type { BusinessEventActor } from "../src/eventbus/domain-events";
@@ -162,6 +163,96 @@ describe("Phase 2 Step 2.10A — Ledger Transaction Foundation (e2e)", () => {
     expect(row.amount.toString()).toBe("100"); // Decimal.js нормализация trailing zeros
     // immutability: модель не имеет updatedAt — тип сам это гарантирует
     // (компилируется только без поля); колоночный proof — тест 15.
+  });
+
+  it("3B. Step 2.10C occurredAt: бизнес-occurrence (UTC) отдельно от createdAt; NULL когда неизвестно; malformed → controlled error", async () => {
+    // Метка в ПРОШЛОМ относительно времени прогона: бизнес-факт наступил ДО
+    // персистенции (occurredAt <= createdAt), что и проверяется ниже. Фиксированная
+    // дата в будущем сломала бы инвариант на машинах с ранними часами.
+    const t0 = "2026-08-01T10:00:00.000Z";
+    const fact = await createLedgerFact({ sourceId: `order-${stamp}-occ`, occurredAt: t0 });
+    created.ledgerIds.push(fact.id as string);
+    // UTC instant в DTO (ISO-строка с Z), НЕ локальная timezone.
+    expect(fact.occurredAt).toBe(t0);
+    const row = await prisma.ledgerTransaction.findUniqueOrThrow({ where: { code: fact.code as string } });
+    expect(row.occurredAt!.toISOString()).toBe(t0);
+    // occurredAt ≠ createdAt (персистенция) — разные факты времени.
+    expect(row.occurredAt!.getTime()).toBeLessThanOrEqual(row.createdAt.getTime());
+
+    // NULL = неизвестное время наступления (без fabricated backfill).
+    const noOcc = await createLedgerFact({ sourceId: `order-${stamp}-noocc` });
+    created.ledgerIds.push(noOcc.id as string);
+    expect(noOcc.occurredAt).toBeNull();
+    const noOccRow = await prisma.ledgerTransaction.findUniqueOrThrow({ where: { code: noOcc.code as string } });
+    expect(noOccRow.occurredAt).toBeNull();
+
+    // Malformed/impossible timestamp никогда не становится authority.
+    await expect(createLedgerFact({ sourceId: `order-${stamp}-occbad`, occurredAt: "not-a-date" })).rejects.toThrow();
+    await expect(createLedgerFact({ sourceId: `order-${stamp}-occbad2`, occurredAt: "2026-13-01T00:00:00Z" })).rejects.toThrow();
+    // STRICT REVIEW: TZ-зависимые/date-only форматы и невозможные календарные даты
+    // (Date.parse молча нормализует Feb 30 → Mar 2) отклоняются строгим валидатором.
+    await expect(createLedgerFact({ sourceId: `order-${stamp}-occbad3`, occurredAt: "2026-08-01" })).rejects.toThrow();
+    await expect(createLedgerFact({ sourceId: `order-${stamp}-occbad4`, occurredAt: "08/01/2026" })).rejects.toThrow();
+    await expect(createLedgerFact({ sourceId: `order-${stamp}-occbad5`, occurredAt: "2026-02-30T00:00:00Z" })).rejects.toThrow();
+    const occBadCount = await prisma.ledgerTransaction.count({ where: { sourceId: { in: [`order-${stamp}-occbad`, `order-${stamp}-occbad2`, `order-${stamp}-occbad3`, `order-${stamp}-occbad4`, `order-${stamp}-occbad5`] } } });
+    expect(occBadCount).toBe(0);
+
+    // STRICT REVIEW (§11): эквивалентные инстанты с разными offset-ами после
+    // персистенции представляют ОДИН и тот же абсолютный instant (Z == +02:00).
+    const offFact = await createLedgerFact({ sourceId: `order-${stamp}-occoff`, occurredAt: "2026-08-01T12:00:00+02:00" });
+    created.ledgerIds.push(offFact.id as string);
+    expect(offFact.occurredAt).toBe("2026-08-01T10:00:00.000Z");
+    const offRow = await prisma.ledgerTransaction.findUniqueOrThrow({ where: { code: offFact.code as string } });
+    expect(offRow.occurredAt!.toISOString()).toBe("2026-08-01T10:00:00.000Z");
+  });
+
+  it("3C. replay НЕ перезаписывает первое occurrence (first-write-wins; occurredAt вне replay-сравнения)", async () => {
+    const first = await createLedgerFact({ sourceId: `order-${stamp}-occidem`, amount: "100", occurredAt: "2026-08-14T08:00:00.000Z" });
+    created.ledgerIds.push(first.id as string);
+    // Identical business replay, но retry случился позже (другой occurredAt):
+    // milestone не заставляет идентичный логический replay расходиться (§16).
+    const replay = await createLedgerFact({ sourceId: `order-${stamp}-occidem`, amount: "100", occurredAt: "2026-08-14T09:00:00.000Z" });
+    expect(replay.id).toBe(first.id);
+    expect(replay.occurredAt).toBe("2026-08-14T08:00:00.000Z"); // первое вхождение сохранено
+    const count = await prisma.ledgerTransaction.count({ where: { sourceId: `order-${stamp}-occidem`, type: "TEST_FACT" } });
+    expect(count).toBe(1);
+  });
+
+  it("3D. STRICT REVIEW §14/§38.2: concurrent temporal disagreement (same payload, разные occurredAt) → один факт, first-write-wins, без raw 500", async () => {
+    const src = `order-${stamp}-occrace`;
+    const [a, b] = await Promise.all([
+      createLedgerFact({ sourceId: src, amount: "100", occurredAt: "2026-08-01T08:00:00.000Z" }),
+      createLedgerFact({ sourceId: src, amount: "100", occurredAt: "2026-08-01T09:00:00.000Z" }),
+    ]);
+    created.ledgerIds.push(a.id as string);
+    // Оба пути возвращают один факт (победитель + P2002-replay no-op):
+    // никакой второй строки, никакой мутации первого occurrence.
+    expect(a.id).toBe(b.id);
+    const row = await prisma.ledgerTransaction.findUniqueOrThrow({ where: { id: a.id as string } });
+    expect(["2026-08-01T08:00:00.000Z", "2026-08-01T09:00:00.000Z"]).toContain(row.occurredAt!.toISOString());
+    const count = await prisma.ledgerTransaction.count({ where: { sourceId: src, type: "TEST_FACT" } });
+    expect(count).toBe(1);
+  });
+
+  it("3E. STRICT REVIEW §14/§38.3: concurrent divergent amount → один факт + controlled ConflictError, без raw 500", async () => {
+    const src = `order-${stamp}-finrace`;
+    const results = await Promise.allSettled([
+      createLedgerFact({ sourceId: src, amount: "100", currency: "USD" }),
+      createLedgerFact({ sourceId: src, amount: "200", currency: "USD" }),
+    ]);
+    const fulfilled = results.filter((r) => r.status === "fulfilled");
+    const rejected = results.filter((r) => r.status === "rejected");
+    // Ровно один факт создан; конкурент с ДРУГИМ payload получает громкий
+    // controlled conflict (2.10A FIX 1), НЕ молчаливый no-op и НЕ raw 500.
+    expect(fulfilled.length).toBe(1);
+    expect(rejected.length).toBe(1);
+    const reason = (rejected[0] as PromiseRejectedResult).reason;
+    expect(reason).toBeInstanceOf(ConflictError);
+    if (fulfilled[0].status === "fulfilled") {
+      created.ledgerIds.push((fulfilled[0].value as { id: string }).id);
+    }
+    const count = await prisma.ledgerTransaction.count({ where: { sourceId: src, type: "TEST_FACT" } });
+    expect(count).toBe(1);
   });
 
   it("4. read API: list + detail by code; unknown → 404", async () => {
@@ -338,15 +429,20 @@ describe("Phase 2 Step 2.10A — Ledger Transaction Foundation (e2e)", () => {
     expect(await prisma.booking.count()).toBe(before.bookings);
   });
 
-  it("15. temporal 2.10C boundary: LedgerTransaction не имеет payment milestone-колонок", async () => {
+  it("15. temporal boundary: LedgerTransaction имеет 2.10C occurredAt (business occurrence), НО не имеет payment/lifecycle milestone-колонок", async () => {
     const cols = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
       "SELECT column_name FROM information_schema.columns WHERE table_schema = 'finance' AND table_name = 'LedgerTransaction'",
     );
     const names = cols.map((c) => c.column_name);
+    // Payment/Refund/Settlement/Payout milestones НЕ существуют на Ledger:
+    // lifecycle-семантики чужих агрегатов не выдумываются (2.12/2.13/2.14).
     for (const forbidden of ["paidAt", "authorizedAt", "capturedAt", "refundedAt", "settledAt", "payoutRequestedAt"]) {
       expect(names).not.toContain(forbidden);
     }
-    // createdAt — сервер-owned время факта, не payment milestone.
+    // Step 2.10C (Finance Temporal Contract) легитимно ввёл occurredAt —
+    // бизнес-occurrence времени факта, отдельно от createdAt (персистенция).
+    expect(names).toContain("occurredAt");
+    // createdAt — сервер-owned время персистенции, не payment milestone.
     expect(names).toContain("createdAt");
     expect(names).not.toContain("updatedAt"); // append-only
   });

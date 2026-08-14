@@ -8,6 +8,7 @@ import {
   validateCountryIso,
   validateIsoCode,
   validateLedgerAmount,
+  validateOccurredAt,
   validateRate,
   validateTaxRate,
 } from "./finance.validation";
@@ -98,6 +99,48 @@ describe("finance.validation — period range", () => {
   it("rejects validTo <= validFrom", () => {
     expect(() => assertValidRange("2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z")).toThrow(ValidationDomainError);
     expect(() => assertValidRange("2026-02-01T00:00:00Z", "2026-01-01T00:00:00Z")).toThrow(ValidationDomainError);
+  });
+});
+
+describe("finance.validation — ledger occurredAt (Step 2.10C)", () => {
+  it("accepts valid ISO 8601 UTC instants; null/undefined → null (unknown, no fabrication)", () => {
+    expect(validateOccurredAt("2026-08-14T10:00:00.000Z")).toEqual(new Date("2026-08-14T10:00:00.000Z"));
+    expect(validateOccurredAt("2026-08-14T10:00:00Z")).toEqual(new Date("2026-08-14T10:00:00Z"));
+    expect(validateOccurredAt("2026-08-14T10:00:00.123Z")).toEqual(new Date("2026-08-14T10:00:00.123Z"));
+    expect(validateOccurredAt(null)).toBeNull();
+    expect(validateOccurredAt(undefined)).toBeNull();
+  });
+
+  it("STRICT REVIEW: offsets нормализуются в один абсолютный instant (Z/+02:00/-04:30/+0200)", () => {
+    const utc = new Date("2026-08-14T10:00:00.000Z");
+    expect(validateOccurredAt("2026-08-14T10:00:00.000Z")).toEqual(utc);
+    expect(validateOccurredAt("2026-08-14T12:00:00+02:00")).toEqual(utc); // +02:00 → 10:00Z
+    expect(validateOccurredAt("2026-08-14T05:30:00-04:30")).toEqual(utc); // -04:30 → 10:00Z
+    expect(validateOccurredAt("2026-08-14T12:00:00+0200")).toEqual(utc); // ISO ±HHMM (без colon)
+    expect(validateOccurredAt("2026-08-14T00:00:00-10:00")).toEqual(new Date("2026-08-14T10:00:00.000Z"));
+  });
+
+  it("rejects malformed / non-ISO / TZ-зависимые форматы — никогда не становятся authority", () => {
+    // Голый Date.parse принял бы всё это, интерпретируя в ЛОКАЛЬНОМ TZ сервера
+    // или выдумывая полночь: строгий контракт — полный UTC ISO 8601 datetime.
+    expect(() => validateOccurredAt("abc")).toThrow(ValidationDomainError);
+    expect(() => validateOccurredAt("")).toThrow(ValidationDomainError);
+    expect(() => validateOccurredAt(42 as unknown as string)).toThrow(ValidationDomainError);
+    expect(() => validateOccurredAt("2026-08-14")).toThrow(ValidationDomainError); // date-only → выдуманная полночь
+    expect(() => validateOccurredAt("2026-08")).toThrow(ValidationDomainError); // month-only
+    expect(() => validateOccurredAt("08/14/2026")).toThrow(ValidationDomainError); // US locale, TZ-зависим
+    expect(() => validateOccurredAt("August 14, 2026")).toThrow(ValidationDomainError); // human string
+    expect(() => validateOccurredAt("2026-08-14 10:00:00")).toThrow(ValidationDomainError); // space, без offset
+    expect(() => validateOccurredAt("2026-08-14T10:00:00")).toThrow(ValidationDomainError); // без Z/offset
+    expect(() => validateOccurredAt("2026-13-01T00:00:00Z")).toThrow(ValidationDomainError); // month 13
+    expect(() => validateOccurredAt("2026-01-01T25:00:00Z")).toThrow(ValidationDomainError); // hour 25
+    expect(() => validateOccurredAt("2026-01-01T00:60:00Z")).toThrow(ValidationDomainError); // minute 60
+    expect(() => validateOccurredAt("2026-01-01T00:00:00+25:00")).toThrow(ValidationDomainError); // offset +25:00
+    // Date.parse молча НОРМАЛИЗУЕТ невозможные календарные даты (2026-02-30 → 03-02):
+    // round-trip проверка отклоняет их — иначе другой instant стал бы authority.
+    expect(() => validateOccurredAt("2026-02-30T00:00:00Z")).toThrow(ValidationDomainError);
+    expect(() => validateOccurredAt("2026-04-31T00:00:00Z")).toThrow(ValidationDomainError);
+    expect(() => validateOccurredAt("2026-06-31T12:00:00+02:00")).toThrow(ValidationDomainError);
   });
 });
 

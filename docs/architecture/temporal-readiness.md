@@ -83,7 +83,8 @@ lifecycle'ов здесь НЕ вводится.
 | `Category.status` transitions | runtime-переходов status у Category нет (только create/rename) — `createdAt/updatedAt` покрывают. |
 | `Order.confirmedAt/cancelledAt/fulfilledAt/closedAt` | canonical события реализованы (Step 1.14, факт-хронология из outbox); milestone-КОЛОНКИ — Step 2.5A/2.7, fake не вводим. |
 | `Booking` request/confirm/cancel timestamps | будущая temporal-модель — Step 2.8A/2.9A. |
-| `Payment.*` timestamps | Finance-модель не существует — GAP для 2.10C/2.12. |
+| `Payment.*` timestamps | Finance-модель не существует — GAP для 2.10C/2.12 (остаётся; producer/семантика — 2.12–2.14). |
+| `LedgerTransaction.occurredAt` | РЕАЛИЗОВАН (Step 2.10C, 2026-08-14): бизнес-occurrence время факта (UTC), отдельно от `createdAt` (персистенция); NULL = неизвестно (без backfill); authority — server-валидированный ISO 8601; first-write-wins при replay. Детали — `finance-temporal-contract.md`. |
 | `crm.Partner.createdAt/updatedAt` | создание/link доказуемо из `PartnerCreated` + `PartnerApplication.reviewedAt` + Catalog projection. |
 | `User.activatedAt/deactivatedAt` | статус-переходы фиксируются AuditLog `user.status_changed`. |
 | IANA timezone / `serviceStartsAt` | legacy `serviceDate` — service-local time; IANA-модель — future (2.8A/2.9A), отдельно от UTC instants. |

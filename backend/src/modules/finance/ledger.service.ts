@@ -11,6 +11,9 @@
  *  - amount > 0 DECIMAL(12,2) (платформенный money-контракт), экономический
  *    смысл несёт type; currency — ISO 4217 снапшот, валидируется против
  *    finance.Currency (без FK);
+ *  - Step 2.10C: `occurredAt` — бизнес-occurrence времени факта (UTC), ОТДЕЛЬНО
+ *    от createdAt (персистенция); NULL = неизвестно (без fabrication); НЕ входит
+ *    в replay payload-сравнение (first-write-wins);
  *  - idempotency invariant: @@unique([sourceType, sourceId, type]) — replay
  *    одного canonical source fact возвращает существующий факт (no-op);
  *    неизвестный P2002 (например LTX code collision) — controlled 409, НЕ raw 500;
@@ -29,7 +32,7 @@ import { SecurityService } from "../../security/security.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { uniqueConstraintNames } from "../../shared/prisma-errors";
 import { getRequestContext } from "../../shared/request-context";
-import { validateIsoCode, validateLedgerAmount } from "./finance.validation";
+import { validateIsoCode, validateLedgerAmount, validateOccurredAt } from "./finance.validation";
 
 /** Idempotency unique constraint: ровно один факт данного типа на source. */
 const LEDGER_IDEMPOTENCY_CONSTRAINT = "LedgerTransaction_sourceType_sourceId_type_key";
@@ -49,6 +52,14 @@ export interface LedgerCreateInput {
   sourceEventId?: string | null;
   /** Опциональный human-readable business ref. */
   businessRef?: string | null;
+  /**
+   * Step 2.10C — бизнес-occurrence времени факта (UTC ISO 8601), ОТДЕЛЬНО от
+   * createdAt (персистенция). NULL/undefined → NULL (неизвестно; без fabrication).
+   * Authority: server-валидированный ISO 8601 (для event-порождённых фактов —
+   * occurredAt канонического события). НЕ входит в replay payload-сравнение
+   * (первое вхождение wins; retry с более поздним occurredAt не расходится).
+   */
+  occurredAt?: string | null;
 }
 
 export interface LedgerListQuery {
@@ -77,6 +88,7 @@ export class LedgerService {
     const sourceType = this.assertNonEmpty(input.sourceType, "sourceType");
     const sourceId = this.assertNonEmpty(input.sourceId, "sourceId");
     const type = this.assertNonEmpty(input.type, "type");
+    const occurredAt = validateOccurredAt(input.occurredAt);
 
     // Currency authority: ISO 4217 снапшот должен существовать в finance.Currency
     // (inactive допустим — исторические факты сохраняются; без FK, read-by-code).
@@ -101,6 +113,7 @@ export class LedgerService {
             sourceId,
             sourceEventId: input.sourceEventId ?? null,
             businessRef: input.businessRef ?? null,
+            occurredAt,
             correlationId: ctx?.correlationId ?? null,
             causationId: ctx?.causationId ?? null,
             actorType,
@@ -127,6 +140,9 @@ export class LedgerService {
           // Immutable факт-поля обязаны совпадать (amount/currency/sourceEventId/
           // businessRef). Расхождение = producer-баг/другое событие — громкий 409,
           // НЕ молчаливый возврат существующего (STRICT REVIEW 2.10A FIX 1).
+          // occurredAt НЕ сравнивается: first-write-wins (Step 2.10C §16) —
+          // milestone не заставляет идентичный логический replay расходиться
+          // только потому, что retry произошёл позже.
           const samePayload =
             existing.amount.toString() === new Prisma.Decimal(amount).toString() &&
             existing.currency === currency &&
@@ -188,6 +204,7 @@ export class LedgerService {
     sourceId: string;
     sourceEventId: string | null;
     businessRef: string | null;
+    occurredAt: Date | null;
     correlationId: string | null;
     causationId: string | null;
     actorType: string | null;
@@ -204,6 +221,7 @@ export class LedgerService {
       sourceId: r.sourceId,
       sourceEventId: r.sourceEventId,
       businessRef: r.businessRef,
+      occurredAt: r.occurredAt ? r.occurredAt.toISOString() : null,
       correlationId: r.correlationId,
       causationId: r.causationId,
       actorType: r.actorType,

@@ -358,12 +358,24 @@ describe("Phase 2 Step 2.10 — Finance Domain Foundation (e2e)", () => {
     }
   });
 
-  // ── 9. temporal: никаких fake milestone-колонок (2.10C deferred) ───────────
+  // ── 9. temporal: 2.10C ввёл ОДНО легитимное поле (Ledger occurredAt),
+  //    lifecycle-милстоуны Payment/Refund/Settlement/Payout остаются deferred ──
 
-  it("11. temporal: finance.* модели НЕ имеют milestone-колонок paidAt/authorizedAt/capturedAt (2.10C deferred)", async () => {
-    const cols = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
+  it("11. temporal: 2.10C ввёл occurredAt ТОЛЬКО на LedgerTransaction; payment/lifecycle milestone-колонки остаются ЗАПРЕЩЕНЫ (deferred 2.12–2.14)", async () => {
+    // Roadmap evolution (§28): Step 2.10C (Finance Temporal Contract) легитимно
+    // добавил LedgerTransaction.occurredAt (бизнес-occurrence, отдельно от
+    // createdAt). Lifecycle-милстоуны (paidAt/authorizedAt/capturedAt/failedAt/
+    // cancelledAt/settledAt) НЕ существуют: их producer-ы/семантика — 2.12–2.14.
+    const lifecycle = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
       "SELECT column_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name IN ('paidAt','authorizedAt','capturedAt','failedAt','cancelledAt','settledAt')",
     );
-    expect(cols.length).toBe(0);
+    expect(lifecycle.length).toBe(0);
+
+    // occurredAt — единственное 2.10C-поле и живёт ТОЛЬКО на LedgerTransaction
+    // (не на Payment/Refund/Settlement/Payout — чужие семантики не выдумываются).
+    const occ = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
+      "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name = 'occurredAt'",
+    );
+    expect(occ.map((r) => r.table_name)).toEqual(["LedgerTransaction"]);
   });
 });

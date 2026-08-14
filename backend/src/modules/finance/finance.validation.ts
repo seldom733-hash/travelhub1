@@ -262,6 +262,65 @@ export function validateLedgerAmount(amount: string): string {
   return amount;
 }
 
+/**
+ * Step 2.10C — Ledger occurredAt: business occurrence time (UTC instant).
+ * NULL/undefined → NULL (неизвестное время наступления; без fabrication).
+ *
+ * STRICT REVIEW FIX (2.10C): голый Date.parse принимает locale/TZ-зависимые
+ * форматы ("08/14/2026", "August 14, 2026", "2026-08-14 10:00:00"), которые
+ * интерпретируются в ЛОКАЛЬНОМ TZ сервера (разные инстанты на разных машинах),
+ * date-only ("2026-08-14" → выдуманная полночь UTC) и даже молча НОРМАЛИЗУЕТ
+ * невозможные даты ("2026-02-30" → 2026-03-02). Для authoritative бизнес-
+ * времени это недопустимо: контракт — UTC ISO 8601 instant. Поэтому:
+ *  1) строгий структурный regex (только полный datetime + Z/±HH:MM(±HHMM));
+ *  2) Date.parse отклоняет range-невозможное (month 13, hour 25, minute 60,
+ *     offset +25:00);
+ *  3) round-trip проверка: локальные компоненты (offset применён обратно)
+ *     обязаны совпадать с написанными — невозможные календарные даты
+ *     (Feb 30, Apr 31) никогда не становятся authority.
+ * Malformed/impossible → ValidationDomainError. Отдельно от createdAt.
+ */
+const ISO_8601_DATETIME_RE =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d{1,9})?(Z|[+-]\d{2}:?\d{2})$/;
+
+function parseOffsetMinutes(offset: string): number {
+  if (offset === "Z") return 0;
+  const sign = offset[0] === "-" ? -1 : 1;
+  const h = Number(offset.slice(1, 3));
+  const m = Number(offset.slice(4, 6)); // "+0200" и "+02:00" → минуты с индекса 4
+  return sign * (h * 60 + m);
+}
+
+export function validateOccurredAt(value: string | null | undefined): Date | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") {
+    throw new ValidationDomainError("occurredAt must be a valid ISO 8601 datetime (UTC)");
+  }
+  const m = ISO_8601_DATETIME_RE.exec(value);
+  if (!m) {
+    throw new ValidationDomainError("occurredAt must be a valid ISO 8601 datetime (UTC)");
+  }
+  const ts = Date.parse(value);
+  if (!Number.isFinite(ts)) {
+    throw new ValidationDomainError("occurredAt must be a valid ISO 8601 datetime (UTC)");
+  }
+  // Round-trip: UTC instant + записанный offset → локальные компоненты ввода.
+  // Расхождение = невозможная календарная дата, молча нормализованная Date.parse.
+  const d = new Date(ts);
+  const local = new Date(ts + parseOffsetMinutes(m[8]) * 60000);
+  const ok =
+    local.getUTCFullYear() === Number(m[1]) &&
+    local.getUTCMonth() + 1 === Number(m[2]) &&
+    local.getUTCDate() === Number(m[3]) &&
+    local.getUTCHours() === Number(m[4]) &&
+    local.getUTCMinutes() === Number(m[5]) &&
+    local.getUTCSeconds() === Number(m[6]);
+  if (!ok) {
+    throw new ValidationDomainError("occurredAt must be a valid ISO 8601 datetime (UTC)");
+  }
+  return d;
+}
+
 /** Валидация налоговой ставки: >= 0, до 2 знаков (DECIMAL(12,2) контракт). */
 export function validateTaxRate(rate: string): string {
   const d = Number(rate);

@@ -637,13 +637,41 @@ OPERATOR/SALES_MANAGER/MODERATOR/MARKETER → 403; anonymous → 401.
 Факт: `{ id, code, amount (Decimal string > 0, ≤2dp), currency (ISO 4217,
 валидируется против finance.Currency), type, sourceType, sourceId,
 sourceEventId?, businessRef?, correlationId?, causationId?, actorType?,
-actorId?, createdAt (UTC) }`. `amount/currency/type/source/provenance`
-неизменяемы после create; исправление — только будущий compensating факт
-(одобренный шаг). Idempotency invariant: один факт данного `type` на
-`(sourceType, sourceId)` — replay/конкурентный duplicate возвращает
-существующий факт (no-op), никогда не дубликат и не raw 500. НЕ эмитит
-событий; НЕ трогает Order.paymentStatus/paidAmount/Payment/Refund/
-Commission/Booking/Availability.
+actorId?, occurredAt?, createdAt (UTC) }`.
+
+`occurredAt` (Step 2.10C — Finance Temporal Contract):
+- **тип:** `string | null` — UTC ISO 8601 instant (`YYYY-MM-DDTHH:mm:ss.sssZ`);
+- **nullable:** да. `NULL` = время наступления бизнес-факта неизвестно
+  (legacy / producer не передал) — честный NULL, БЕЗ fabricated backfill;
+- **server-owned:** устанавливает ТОЛЬКО внутренний `LedgerService` из
+  server-валидированного ISO 8601 (для event-порождённых фактов 2.12+ —
+  `occurredAt` канонического события); клиентских write-путей нет (404),
+  forged через публичный API невозможен;
+- **смысл:** время НАСТУПЛЕНИЯ финансового факта — ОТДЕЛЬНО от `createdAt`
+  (время персистенции). Никогда не выводится из `createdAt/updatedAt`/
+  AuditLog/Outbox; `createdAt` НЕ является payment-милстоуном;
+- **immutable:** update отсутствует (append-only); при identical replay
+  (idempotency key) первое вхождение wins — `occurredAt` НЕ входит в
+  replay payload-сравнение (§16 2.10C);
+- **malformed/impossible:** → controlled 422/ValidationDomainError, никогда
+  не становится authority. Строго ISO 8601: полный datetime + `Z`/`±HH:MM`
+  (`±HHMM` допустим); date-only/locale/space-separated формы (`"2026-08-14"`,
+  `"08/14/2026"`, `"August 14, 2026"`, `"2026-08-14 10:00:00"`) отклоняются —
+  иначе интерпретация в локальном TZ сервера дала бы разные инстанты на разных
+  машинах; невозможные календарные даты (Feb 30 → Mar 2 у `Date.parse`)
+  отклоняются round-trip проверкой;
+- **future-time policy:** контракт НЕ запрещает `occurredAt` в будущем
+  относительно `createdAt` (producer clock-skew легитимен); инвариант
+  `occurredAt <= createdAt` НЕ enforced в коде — семантическое ожидание для
+  исторических фактов (проверяется тестом на исторической метке), НЕ DB-
+  констрейнт;
+
+`amount/currency/type/source/provenance` неизменяемы после create;
+исправление — только будущий compensating факт (одобренный шаг). Idempotency
+invariant: один факт данного `type` на `(sourceType, sourceId)` —
+replay/конкурентный duplicate возвращает существующий факт (no-op), никогда
+не дубликат и не raw 500. НЕ эмитит событий; НЕ трогает
+Order.paymentStatus/paidAmount/Payment/Refund/Commission/Booking/Availability.
 
 ## Step 2.10B — Provider Fee / Settlement / Payout foundation
 
