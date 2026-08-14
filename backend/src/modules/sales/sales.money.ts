@@ -127,3 +127,96 @@ export function totalOf(subtotal: MoneyInput, discountAmount: MoneyInput): Prism
   if (t.isNegative()) throw new ValidationDomainError("total must not be negative");
   return t;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2.11 — CANONICAL PRICING / FINANCIAL SNAPSHOT CONTRACT
+//
+// Единый кросс-доменный контракт frozen money facts (Quote → CheckoutIntent →
+// Sale → Order → Booking): DECIMAL(12,2), half-up 2dp, decimal.js, overflow
+// guard — та же authority, что и выше (finance.money переиспользует этот
+// модуль как single source of truth, Step 2.10 §7). НЕ пересчитывает цену из
+// mutable Catalog/Tax/FX — только проверяет, что frozen snapshot внутренне
+// консистентен (невалидный snapshot → controlled 422, никогда не bind-ится
+// молча). Требует НЕ только итоговые суммы, но и их происхождение (lines).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** ISO 4217 (валюта): ровно 3 заглавные латинские буквы (та же семантика, что
+ *  finance.validateIsoCode; локально, чтобы sales не зависел от finance). */
+const ISO_CODE_RE = /^[A-Z]{3}$/;
+
+/** Строка frozen snapshot (canonical money component vocabulary, §9 2.11). */
+export interface FrozenSnapshotLine {
+  unitPrice: MoneyInput;
+  quantity: number;
+  amount: MoneyInput;
+}
+
+export interface FrozenSnapshotInput {
+  currency: string;
+  lines: FrozenSnapshotLine[];
+  subtotal: MoneyInput;
+  discountType: QuoteDiscountType;
+  discountValue?: MoneyInput | null;
+  discountAmount?: MoneyInput | null;
+  total: MoneyInput;
+}
+
+/**
+ * Единичный frozen money fact (напр. Booking.amount + Booking.currency):
+ * сумма — валидный Decimal (>= 0, ≤2dp, overflow guard), валюта — ISO 4217.
+ * Деньги БЕЗ валюты не имеют однозначной семантики — оба обязательны.
+ */
+export function validateFrozenMoneyFact(amount: MoneyInput, currency: string, label = "frozen money fact"): void {
+  toMoney2(amount, `${label} amount`);
+  if (typeof currency !== "string" || !ISO_CODE_RE.test(currency)) {
+    throw new ValidationDomainError(`${label} currency must be a 3-letter ISO 4217 code`);
+  }
+}
+
+function snapshotDiscountValue(value: MoneyInput | null | undefined): Prisma.Decimal | null {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  return toMoney2(value, "discountValue");
+}
+
+/**
+ * Consistency gate для canonical frozen snapshot (binding boundary, §25 2.11):
+ *  - line amount == round_half_up(unitPrice × quantity);
+ *  - subtotal == Σ line amounts;
+ *  - discountAmount == NONE→0 | PERCENTAGE→round_half_up(subtotal×pct/100) |
+ *    FIXED→value (≤ subtotal); discountType ≠ NONE без value → 422;
+ *  - total == subtotal − discountAmount >= 0;
+ *  - currency — ISO 4217; все суммы — Decimal ≤2dp с overflow guard.
+ * Тот же математический контракт, что в quoteTotals/ISSUE (2.3) — расхождение
+ * = producer-дефект/дрейф, громкий 422, НЕ молчаливый bind.
+ */
+export function validateFrozenSnapshot(input: FrozenSnapshotInput): void {
+  validateFrozenMoneyFact(input.subtotal, input.currency, "snapshot");
+  if (input.lines.length === 0) {
+    throw new ValidationDomainError("snapshot must contain at least one line");
+  }
+  const expectedLines = input.lines.map((l) => lineAmount(l.unitPrice, l.quantity));
+  input.lines.forEach((l, i) => {
+    if (!toMoney2(l.amount, `line ${i} amount`).equals(expectedLines[i]!)) {
+      throw new ValidationDomainError(`snapshot line ${i} amount is inconsistent with unitPrice × quantity`);
+    }
+  });
+  const subtotal = toMoney2(input.subtotal, "snapshot subtotal");
+  if (!subtotal.equals(subtotalOf(expectedLines))) {
+    throw new ValidationDomainError("snapshot subtotal is inconsistent with line amounts");
+  }
+  if (input.discountType === QuoteDiscountType.NONE) {
+    if (snapshotDiscountValue(input.discountValue) !== null) {
+      throw new ValidationDomainError("snapshot discountValue must be absent when discountType is NONE");
+    }
+  } else if (snapshotDiscountValue(input.discountValue) === null) {
+    throw new ValidationDomainError("snapshot discountValue is required for the selected discount type");
+  }
+  const expectedDiscount = discountAmountOf(subtotal, input.discountType, snapshotDiscountValue(input.discountValue));
+  const discountAmount = snapshotDiscountValue(input.discountAmount) ?? new Prisma.Decimal(0);
+  if (!discountAmount.equals(expectedDiscount)) {
+    throw new ValidationDomainError("snapshot discountAmount is inconsistent with discount type/value");
+  }
+  if (!toMoney2(input.total, "snapshot total").equals(totalOf(subtotal, discountAmount))) {
+    throw new ValidationDomainError("snapshot total is inconsistent with subtotal − discountAmount");
+  }
+}

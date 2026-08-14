@@ -17,19 +17,24 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from
 import type { Request } from "express";
 import { FinanceService } from "./finance.service";
 import { LedgerService } from "./ledger.service";
+import { PaymentService } from "./payment.service";
 import { SettlementService } from "./settlement.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
+import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
-import { RequirePermissions } from "../../security/auth/decorators";
+import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import { assertNoForbiddenKeys } from "../../shared/field-validation";
 import {
   CreateCurrencyDto,
   CreateExchangeRateDto,
+  CreatePaymentDto,
   CreateTaxDto,
   CreateTaxRuleDto,
   FactListQueryDto,
   FINANCE_MASTER_FORBIDDEN_KEYS,
   LedgerListQueryDto,
+  PAYMENT_CREATE_FORBIDDEN_KEYS,
+  PaymentListQueryDto,
   UpdateCurrencyDto,
   UpdateExchangeRateDto,
   UpdateTaxDto,
@@ -43,6 +48,7 @@ export class FinanceController {
     private readonly finance: FinanceService,
     private readonly ledger: LedgerService,
     private readonly settlement: SettlementService,
+    private readonly payments: PaymentService,
   ) {}
 
   // ── Currency (finance.currency.manage) ──────────────────────────────────────
@@ -215,5 +221,52 @@ export class FinanceController {
   @RequirePermissions("finance.payout.read")
   async getPayout(@Param("code") code: string) {
     return this.settlement.getPayoutByCode(code);
+  }
+
+  // ── Payment (Step 2.12 — provider-neutral Payment runtime) ─────────────────
+  // Payment — Finance-owned aggregate (PAY-*). Деньги/статус/милстоуны —
+  // server-owned (frozen Order snapshot verbatim); клиент передаёт ТОЛЬКО
+  // orderId + опциональный paymentMethod (descriptive, без PII).
+  // PSP/authorize/capture/webhook — Step 2.12A/2.12B (здесь нет).
+
+  @Get("payments")
+  @RequirePermissions("finance.payment.read")
+  async listPayments(@Query() query: PaymentListQueryDto) {
+    return this.payments.list(query);
+  }
+
+  @Get("payments/:code")
+  @RequirePermissions("finance.payment.read")
+  async getPayment(@Param("code") code: string) {
+    return this.payments.getByCode(code);
+  }
+
+  @Post("payments")
+  @RequirePermissions("finance.payment.write")
+  async createPayment(@Req() req: Request, @CurrentUser() actor: AuthedRequest["user"], @Body() dto: CreatePaymentDto) {
+    // raw req.body — forged server-owned поля (money/status/milestones/...) → 422.
+    assertNoForbiddenKeys(req.body, PAYMENT_CREATE_FORBIDDEN_KEYS);
+    return this.payments.createPayment(
+      { orderId: dto.orderId, paymentMethod: dto.paymentMethod ?? null },
+      { id: actor.id, username: actor.username },
+    );
+  }
+
+  @Post("payments/:code/confirm")
+  @RequirePermissions("finance.payment.write")
+  async confirmPayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.payments.confirmPayment(code, { id: actor.id, username: actor.username });
+  }
+
+  @Post("payments/:code/fail")
+  @RequirePermissions("finance.payment.write")
+  async failPayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.payments.failPayment(code, { id: actor.id, username: actor.username });
+  }
+
+  @Post("payments/:code/cancel")
+  @RequirePermissions("finance.payment.write")
+  async cancelPayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.payments.cancelPayment(code, { id: actor.id, username: actor.username });
   }
 }

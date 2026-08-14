@@ -397,3 +397,72 @@ export function assertValidRange(validFrom: string, validTo: string | undefined,
     throw new ValidationDomainError(`${label}: validTo must be after validFrom`);
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2.12 — Payment Flow (provider-neutral Payment runtime)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Server-owned Payment поля — громкий 422 при forged-вводе (mass assignment
+ * HARD GATE §32): id/code/status/amount/currency/customerId/partnerId/
+ * milestones/version/timestamps/providerRef/isActivePayment. Клиент передаёт
+ * ТОЛЬКО orderId (+ опциональный paymentMethod) — деньги и статус серверные.
+ */
+export const PAYMENT_CREATE_FORBIDDEN_KEYS = [
+  "id",
+  "code",
+  "status",
+  "amount",
+  "currency",
+  "customerId",
+  "partnerId",
+  "providerRef",
+  "version",
+  "createdAt",
+  "updatedAt",
+  "paidAt",
+  "failedAt",
+  "cancelledAt",
+  "isActivePayment",
+] as const;
+
+/** Create Payment: orderId обязателен; paymentMethod — опциональный descriptive
+ *  label (manual/provider-neutral, ≤64, без PII/секретов; НЕ authority). */
+export class CreatePaymentDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  orderId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  paymentMethod?: string;
+}
+
+/** Whitelist-query для чтения Payment (Finance Center). */
+export class PaymentListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  orderId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  status?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+}

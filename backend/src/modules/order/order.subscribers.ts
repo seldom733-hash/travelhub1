@@ -1,11 +1,14 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
-import type { OrderStatus, Prisma } from "../../generated/prisma/client";
+import { Prisma } from "../../generated/prisma/client";
+import type { OrderStatus } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService, type OutboxEnvelope } from "../../eventbus/eventbus.service";
-import { DomainEvents, type BookingEventPayload } from "../../eventbus/domain-events";
+import { DomainEvents, type BookingEventPayload, type PaymentEventPayload } from "../../eventbus/domain-events";
 import { BookingQueryService } from "../booking/booking-query.service";
 
 const CONSUMER_ID = "order-booking-consumer";
+/** Step 2.12: Order-owned projection paymentStatus/paidAmount ← PaymentCaptured. */
+const ORDER_PAYMENT_CONSUMER_ID = "order-payment-consumer";
 const TERMINAL_BOOKING = ["COMPLETED", "CANCELLED"];
 const CONFIRMED_BOOKING = ["CONFIRMED", "IN_SERVICE", "COMPLETED"];
 
@@ -31,6 +34,9 @@ export class OrderSubscribers implements OnModuleInit {
     this.eventBus.on(DomainEvents.BookingConfirmed, (ev) => this.onBookingConfirmed(ev));
     this.eventBus.on(DomainEvents.BookingRejected, (ev) => this.onBookingRejected(ev));
     this.eventBus.on(DomainEvents.BookingStatusChanged, (ev) => this.onBookingStatusChanged(ev));
+    // Step 2.12: canonical факт оплаты → Order-owned projection (Order.paymentStatus
+    // / paidAmount — Order-owned поля; Finance НЕ пишет order.* напрямую, §20).
+    this.eventBus.on(DomainEvents.PaymentCaptured, (ev) => this.onPaymentCaptured(ev));
   }
 
   private async onBookingConfirmed(ev: OutboxEnvelope): Promise<void> {
@@ -193,6 +199,83 @@ export class OrderSubscribers implements OnModuleInit {
         correlationId,
         causationId: eventId,
       });
+    }
+  }
+
+  /**
+   * Step 2.12 — Order payment projection (PaymentCaptured consumer).
+   *
+   * Payment — Finance-owned; Order НЕ пишет finance.*. Здесь Order-owned
+   * subscriber проецирует факт оплаты на СВОИ поля: paymentStatus = PAID,
+   * paidAmount = frozen amount (из payload, Decimal string — self-sufficient,
+   * без чтения finance.*). Идемпотентность: InboxEvent; повторная доставка
+   * (или второй PaymentCaptured для того же заказа — невозможен: 1 активный
+   * Payment на Order) → no-op. CAS по version: конкурентные обновления Order
+   * не перезаписываются молча. Financial факт фиксируется независимо от
+   * lifecycle Order (деньги получены); refund — 2.13. Без result-event
+   * (проекция Order-owned; потребителей нет).
+   */
+  private async onPaymentCaptured(ev: OutboxEnvelope): Promise<void> {
+    const p = ev.payload as unknown as PaymentEventPayload;
+    if (!p?.orderId || !p?.paymentId) return;
+    if (await this.eventBus.isProcessed(ORDER_PAYMENT_CONSUMER_ID, ev.id)) return;
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: ORDER_PAYMENT_CONSUMER_ID, eventId: ev.id } } })) return;
+
+        const order = await tx.order.findUnique({ where: { id: p.orderId } });
+        if (!order) {
+          // Order отсутствует — проекция невозможна; отметить обработанным,
+          // чтобы повторная доставка не создавала вечный retry.
+          await tx.inboxEvent.create({ data: { consumerId: ORDER_PAYMENT_CONSUMER_ID, eventId: ev.id } });
+          return;
+        }
+
+        // Уже PAID (идентичный replay / другой captured payment) → no-op.
+        if (order.paymentStatus === "PAID") {
+          await tx.inboxEvent.create({ data: { consumerId: ORDER_PAYMENT_CONSUMER_ID, eventId: ev.id } });
+          return;
+        }
+
+        // Frozen money из payload (Decimal string, ≥ 0) — defensive валидация.
+        let amount: Prisma.Decimal;
+        try {
+          amount = new Prisma.Decimal(p.amount);
+        } catch {
+          throw new Error(`[order-payment] invalid amount in PaymentCaptured for ${p.paymentId}`);
+        }
+        if (amount.isNegative()) {
+          throw new Error(`[order-payment] negative amount in PaymentCaptured for ${p.paymentId}`);
+        }
+
+        const updatedRows = await tx.order.updateMany({
+          where: { id: order.id, version: order.version },
+          data: {
+            paymentStatus: "PAID",
+            paidAmount: amount,
+            version: { increment: 1 },
+          },
+        });
+        if (updatedRows.count === 1) {
+          await tx.orderHistory.create({
+            data: {
+              orderId: order.id,
+              action: "payment_captured",
+              from: "UNPAID",
+              to: "PAID",
+              actorId: null,
+              actorName: "Система",
+              comment: `Оплата получена (${p.code}): ${p.amount} ${p.currency}`,
+            },
+          });
+        }
+
+        await tx.inboxEvent.create({ data: { consumerId: ORDER_PAYMENT_CONSUMER_ID, eventId: ev.id } });
+      });
+    } catch (err) {
+      if (this.isUniqueViolation(err)) return; // concurrent — уже обработано
+      throw err;
     }
   }
 

@@ -292,11 +292,12 @@ describe("Phase 2 Step 2.10 — Finance Domain Foundation (e2e)", () => {
 
   // ── 6. no payment initiation / no refund / no invoice write paths ───────────
 
-  it("7. НЕ реализовано (foundation): payment/refund/invoice/settlement/payout write-пути отсутствуют → 404", async () => {
+  it("7. НЕ реализовано: refund/invoice/settlement/payout/ledger write-пути → 404 (Payment runtime активирован в Step 2.12)", async () => {
     const fin = await createStaff("f_fin6", RoleCode.FINANCE);
     const a = agent(fin.accessToken);
 
-    await a.post("/api/v1/finance/payments").send({ orderId: "x", amount: "10", currency: "USD" }).expect(404);
+    // Step 2.12 (Payment Flow) легитимно активировал finance.payments write-path
+    // (см. payment-flow.e2e-spec.ts). Остальные агрегаты остаются schema-only:
     await a.post("/api/v1/finance/refunds").send({ paymentId: "x", amount: "5" }).expect(404);
     await a.post("/api/v1/finance/invoices").send({ orderId: "x", amount: "10" }).expect(404);
     await a.post("/api/v1/finance/settlements").send({ orderId: "x" }).expect(404);
@@ -361,18 +362,24 @@ describe("Phase 2 Step 2.10 — Finance Domain Foundation (e2e)", () => {
   // ── 9. temporal: 2.10C ввёл ОДНО легитимное поле (Ledger occurredAt),
   //    lifecycle-милстоуны Payment/Refund/Settlement/Payout остаются deferred ──
 
-  it("11. temporal: 2.10C ввёл occurredAt ТОЛЬКО на LedgerTransaction; payment/lifecycle milestone-колонки остаются ЗАПРЕЩЕНЫ (deferred 2.12–2.14)", async () => {
-    // Roadmap evolution (§28): Step 2.10C (Finance Temporal Contract) легитимно
-    // добавил LedgerTransaction.occurredAt (бизнес-occurrence, отдельно от
-    // createdAt). Lifecycle-милстоуны (paidAt/authorizedAt/capturedAt/failedAt/
-    // cancelledAt/settledAt) НЕ существуют: их producer-ы/семантика — 2.12–2.14.
-    const lifecycle = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
-      "SELECT column_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name IN ('paidAt','authorizedAt','capturedAt','failedAt','cancelledAt','settledAt')",
+  it("11. temporal: occurredAt только на LedgerTransaction; Payment имеет 2.12-милстоуны (paidAt/failedAt/cancelledAt), PSP/lifecycle-колонки чужих агрегатов запрещены", async () => {
+    // Roadmap evolution (§28): Step 2.10C добавил LedgerTransaction.occurredAt;
+    // Step 2.12 (Payment Flow) легитимно добавил Payment paidAt/failedAt/
+    // cancelledAt (defer 2.10C → 2.12). Всё ещё ЗАПРЕЩЕНЫ: authorizedAt /
+    // capturedAt (PSP authorize/capture — 2.12B), settledAt (2.14A),
+    // refundedAt (2.13) — их producer-ы/семантика не существуют.
+    const forbidden = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name IN ('authorizedAt','capturedAt','settledAt','refundedAt')",
     );
-    expect(lifecycle.length).toBe(0);
+    expect(forbidden.length).toBe(0);
 
-    // occurredAt — единственное 2.10C-поле и живёт ТОЛЬКО на LedgerTransaction
-    // (не на Payment/Refund/Settlement/Payout — чужие семантики не выдумываются).
+    // 2.12-милстоуны Payment существуют и живут ТОЛЬКО на Payment.
+    const pay = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
+      "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name IN ('paidAt','failedAt','cancelledAt')",
+    );
+    expect(new Set(pay.map((r) => r.table_name))).toEqual(new Set(["Payment"]));
+
+    // occurredAt — 2.10C-поле и живёт ТОЛЬКО на LedgerTransaction.
     const occ = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
       "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name = 'occurredAt'",
     );

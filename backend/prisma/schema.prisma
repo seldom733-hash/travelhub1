@@ -1813,6 +1813,13 @@ model Booking {
   orderItemId String?       @unique
   status      BookingStatus @default(NEW)
   amount      Decimal       @default(0) @db.Decimal(12, 2)
+  /// Step 2.11 (Pricing & Financial Snapshot): frozen money fact — валюта,
+  /// скопированная consumer-ом verbatim из OrderItem.currency при создании
+  /// Booking (READ-only, ADR-0001; НЕ пересчитывается из mutable Catalog/
+  /// Finance master-data). Без валюты сумма amount не имеет однозначной
+  /// денежной семантики. NULL — legacy Booking (до 2.11, валюта не
+  /// фиксировалась; без fabricated backfill).
+  currency    String?
   serviceDate DateTime?
   /// Step 2.5B: frozen acquisition source, скопированный consumer-ом из Order
   /// (READ-only, ADR-0001) в момент создания Booking. Cross-schema ref — String
@@ -3347,10 +3354,58 @@ model Payment {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
+  /// ── Step 2.12 (Payment Flow): lifecycle milestones (2.10C DEFER → 2.12) ──
+  /// Сервер-owned UTC instants, immutable после установки (первый переход),
+  /// атомарны с CAS-переходом (status+version+milestone+history+outbox).
+  /// НЕ связаны с createdAt (персистенция).
+  /// paidAt — момент успеха (PENDING → CAPTURED, manual/provider-neutral
+  /// подтверждение получения в 2.12; PSP capture milestone capturedAt — 2.12B).
+  /// failedAt — PENDING → FAILED. cancelledAt — PENDING → CANCELLED.
+  /// authorizedAt/capturedAt — DEFER (2.12B, PSP authorize/capture).
+  /// NULL — milestone ещё не произошёл; legacy/без backfill.
+  paidAt      DateTime?
+  failedAt    DateTime?
+  cancelledAt DateTime?
+  /// Step 2.12 cardinality (CRITICAL §6): managed projection «Payment блокирует
+  /// второй Payment того же Order». true для PENDING/AUTHORIZED/CAPTURED/
+  /// REFUNDED (overpayment protection — после успеха/возврата повторная оплата
+  /// запрещена); false для FAILED/CANCELLED (повторная инициация — attempt 2 —
+  /// легальна). Server-owned, устанавливается атомарно с CAS-переходом статуса
+  /// (PaymentService — единственный writer; инвариант: isActivePayment ==
+  /// status NOT IN (FAILED, CANCELLED); никогда не дрейфует от status).
+  /// Паттерн: ModerationSubmission.isActiveSubmission (managed boolean +
+  /// partial unique index). DB-level инвариант: ≤1 активный Payment на Order —
+  /// overpayment protection + детерминизм concurrent duplicate create
+  /// (P2002 → controlled 409, один факт). 2.12F (partial/installments)
+  /// переработает этот индекс в своей аддитивной миграции (документировано) —
+  /// будущие approved semantics не блокируются (Prompt §6).
+  isActivePayment Boolean @default(true)
+
+  history PaymentHistory[]
+
   @@index([orderId])
   @@index([customerId])
   @@index([partnerId])
   @@index([status])
+  @@unique([orderId], where: { isActivePayment: true }, map: "Payment_one_active_per_order")
+  @@schema("finance")
+}
+
+/// Журнал Payment (audit by default; как QuoteHistory/SaleHistory/BookingHistory).
+/// Без PII/provider-payload dump — только переход и минимальный comment.
+model PaymentHistory {
+  id        String   @id @default(uuid())
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  action    String
+  from      String?
+  to        String?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([paymentId])
   @@schema("finance")
 }
 

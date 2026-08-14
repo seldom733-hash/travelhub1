@@ -6,6 +6,9 @@ import { DomainEvents, type BookingEventPayload, type BookingRequestedPayload, t
 import { IdsService } from "../../shared/ids.service";
 import { uniqueConstraintNames } from "../../shared/prisma-errors";
 import { deriveServiceEndsAt, deriveServiceStartsAt, deriveServiceTimeType } from "../../shared/service-time";
+// Step 2.11: canonical frozen money fact validation (платформенный денежный
+// контракт DECIMAL(12,2)/half-up — single source of truth, как finance.money).
+import { validateFrozenMoneyFact } from "../sales/sales.money";
 
 const CONSUMER_ID = "booking-requested-consumer";
 const ORDER_CANCELLED_CONSUMER_ID = "booking-order-cancelled-consumer";
@@ -86,6 +89,12 @@ export class BookingSubscribers implements OnModuleInit {
         const readyTravelers = order.travelers.filter((t) => t.dataCompleteness === "COMPLETE");
         const created: { id: string; code: string }[] = [];
 
+        // Step 2.11: defensive consistency — каждый копируемый money fact
+        // (amount + currency) валиден до записи (Decimal ≥ 0, ≤2dp, ISO 4217).
+        for (const item of order.items) {
+          validateFrozenMoneyFact(item.amount, item.currency, "booking money fact");
+        }
+
         // Step 2.8A: frozen local temporal факты (order-level, verbatim из
         // OrderRequested → Order). Деривация UTC instant — ОДИН раз здесь, из
         // frozen local фактов (чистая функция, БЕЗ чтения mutable Catalog §10).
@@ -130,6 +139,11 @@ export class BookingSubscribers implements OnModuleInit {
               createdAt: bornCancelledAt ?? undefined,
               cancelledAt: bornCancelledAt,
               amount: item.amount,
+              // Step 2.11: frozen money fact verbatim — amount + currency из ОДНОГО
+              // OrderItem (frozen 2.5); НЕ пересчитывается, НЕ резолвится из
+              // mutable Catalog/Finance master-data. Defensive: невалидный
+              // money fact → событие FAILED (честно), никогда не молчаливый save.
+              currency: item.currency,
               serviceDate: itemServiceDate,
               // ── Step 2.8A: frozen service occurrence (Roadmap 2.8A) ──
               // Тип из presence-фактов (OPEN_DATE — serviceDate null; TIME_SLOT —

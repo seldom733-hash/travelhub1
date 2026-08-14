@@ -184,3 +184,16 @@ metadata, outbox + inbox, correlation/causation из контекста).
 Когда 2.12+ определит producer-шаги и реальных потребителей — события
 добавляются в canonical registry по envelope ADR-0010 (outbox + inbox,
 correlation/causation из контекста).
+
+## Step 2.12 — Payment (provider-neutral Payment runtime)
+
+| Событие | Producer | Payload | Потребители |
+|---|---|---|---|
+| `PaymentCreated` | Finance (PaymentService.createPayment, HTTP-команда) | `{ paymentId, code, orderId, customerId\|null, amount (Decimal string), currency, method\|null }` — инициация (PENDING); без PII | лента/аналитика |
+| `PaymentCaptured` | Finance (PaymentService.confirmPayment, HTTP-команда) | тот же payload — успех (PENDING → CAPTURED, money received); **consumer: Order-owned projection** (Order.paymentStatus = PAID, Order.paidAmount = frozen amount; Order НЕ пишет finance.*) | Order (`order-payment-consumer`, inbox) |
+| `PaymentFailed` | Finance (PaymentService.failPayment) | тот же payload — PENDING → FAILED | лента/аналитика (Order projection НЕ реагирует — обязательство остаётся UNPAID) |
+| `PaymentCancelled` | Finance (PaymentService.cancelPayment) | тот же payload — PENDING → CANCELLED | лента/аналитика |
+
+HTTP-команды: correlation = server UUID, causation = null (ADR-0009/0010,
+как orderAction). Consumer-события: causation = родительский eventId.
+Payload PII-free (refs + frozen money); никаких card/PAN/CVV/provider-секретов.

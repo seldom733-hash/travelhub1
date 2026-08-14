@@ -9,6 +9,9 @@ import {
   totalOf,
   MONEY_SCALE,
   MONEY_MAX,
+  validateFrozenMoneyFact,
+  validateFrozenSnapshot,
+  type FrozenSnapshotInput,
 } from "./sales.money";
 import { ValidationDomainError } from "../../shared/errors";
 
@@ -113,6 +116,88 @@ describe("sales.money (Step 2.3 quote monetary contract)", () => {
     });
     it("scale is 2", () => {
       expect(MONEY_SCALE).toBe(2);
+    });
+  });
+
+  // ── Step 2.11 — canonical pricing / financial snapshot contract ────────────
+
+  describe("validateFrozenMoneyFact (Step 2.11)", () => {
+    it("accepts valid amount + ISO currency", () => {
+      expect(() => validateFrozenMoneyFact("100.00", "USD")).not.toThrow();
+      expect(() => validateFrozenMoneyFact("0", "AZN")).not.toThrow();
+    });
+    it("rejects invalid amount (negative / non-decimal / overflow)", () => {
+      expect(() => validateFrozenMoneyFact("-1", "USD")).toThrow(ValidationDomainError);
+      expect(() => validateFrozenMoneyFact("abc", "USD")).toThrow(ValidationDomainError);
+      expect(() => validateFrozenMoneyFact("10000000000", "USD")).toThrow(ValidationDomainError);
+    });
+    it("rejects missing / non-ISO currency — деньги без валюты не имеют семантики", () => {
+      expect(() => validateFrozenMoneyFact("100", "")).toThrow(ValidationDomainError);
+      expect(() => validateFrozenMoneyFact("100", "usd")).toThrow(ValidationDomainError);
+      expect(() => validateFrozenMoneyFact("100", "USD2")).toThrow(ValidationDomainError);
+    });
+  });
+
+  describe("validateFrozenSnapshot (Step 2.11 consistency gate)", () => {
+    const snapshot = (over: Partial<FrozenSnapshotInput> = {}): FrozenSnapshotInput => ({
+      currency: "USD",
+      lines: [
+        { unitPrice: "99.99", quantity: 2, amount: "199.98" }, // 99.99 × 2
+        { unitPrice: "10", quantity: 1, amount: "10" },
+      ],
+      subtotal: "209.98",
+      discountType: QuoteDiscountType.PERCENTAGE,
+      discountValue: "10",
+      discountAmount: "21", // round_half_up(209.98 × 10% = 20.998) = 21
+      total: "188.98",
+      ...over,
+    });
+
+    it("accepts a consistent frozen snapshot (line/subtotal/discount/total)", () => {
+      expect(() => validateFrozenSnapshot(snapshot())).not.toThrow();
+    });
+    it("accepts NONE discount (discountAmount 0, total = subtotal)", () => {
+      expect(() =>
+        validateFrozenSnapshot(
+          snapshot({ discountType: QuoteDiscountType.NONE, discountValue: null, discountAmount: "0", total: "209.98" }),
+        ),
+      ).not.toThrow();
+    });
+    it("rejects line amount inconsistent with unitPrice × quantity", () => {
+      expect(() => validateFrozenSnapshot(snapshot({ lines: [{ unitPrice: "99.99", quantity: 2, amount: "200.00" }] }))).toThrow(
+        ValidationDomainError,
+      );
+    });
+    it("rejects subtotal inconsistent with line amounts", () => {
+      expect(() => validateFrozenSnapshot(snapshot({ subtotal: "200.00" }))).toThrow(ValidationDomainError);
+    });
+    it("rejects discountAmount inconsistent with discount type/value", () => {
+      expect(() => validateFrozenSnapshot(snapshot({ discountAmount: "20" }))).toThrow(ValidationDomainError);
+      // PERCENTAGE без value — невалидный snapshot
+      expect(() => validateFrozenSnapshot(snapshot({ discountValue: null }))).toThrow(ValidationDomainError);
+      // NONE с value — невалидный snapshot
+      expect(() =>
+        validateFrozenSnapshot(snapshot({ discountType: QuoteDiscountType.NONE, discountValue: "5", discountAmount: "0" })),
+      ).toThrow(ValidationDomainError);
+    });
+    it("rejects total inconsistent with subtotal − discountAmount", () => {
+      expect(() => validateFrozenSnapshot(snapshot({ total: "188.00" }))).toThrow(ValidationDomainError);
+      expect(() => validateFrozenSnapshot(snapshot({ total: "-1" }))).toThrow(ValidationDomainError);
+    });
+    it("rejects overflow / bad currency / empty lines", () => {
+      // Сумма строк превышает DECIMAL(12,2) → 422, не Prisma numeric overflow.
+      expect(() =>
+        validateFrozenSnapshot(
+          snapshot({
+            lines: [
+              { unitPrice: "9999999999.99", quantity: 1, amount: "9999999999.99" },
+              { unitPrice: "9999999999.99", quantity: 1, amount: "9999999999.99" },
+            ],
+          }),
+        ),
+      ).toThrow(ValidationDomainError);
+      expect(() => validateFrozenSnapshot(snapshot({ currency: "usd" }))).toThrow(ValidationDomainError);
+      expect(() => validateFrozenSnapshot(snapshot({ lines: [] }))).toThrow(ValidationDomainError);
     });
   });
 });

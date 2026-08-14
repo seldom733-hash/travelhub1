@@ -62,6 +62,15 @@ export const DomainEvents = {
   // Order reconcile, approved 2.5A); BookingCompleted — canonical факт без
   // consumer-а (лента/аналитика), не заменяет BookingStatusChanged.
   BookingCompleted: "BookingCompleted",
+  // Finance — Payment (Step 2.12, provider-neutral Payment runtime).
+  // PaymentCreated — инициация (PENDING); PaymentCaptured — успех (money
+  // received, PENDING → CAPTURED; consumer — Order projection paymentStatus/paidAmount);
+  // PaymentFailed / PaymentCancelled — терминальные отклонения (лента/аналитика;
+  // Order projection НЕ реагирует — обязательство остаётся UNPAID).
+  PaymentCreated: "PaymentCreated",
+  PaymentCaptured: "PaymentCaptured",
+  PaymentFailed: "PaymentFailed",
+  PaymentCancelled: "PaymentCancelled",
 } as const;
 
 export type DomainEventType = (typeof DomainEvents)[keyof typeof DomainEvents];
@@ -283,4 +292,24 @@ export interface StatusChangedPayload {
   to: string;
   reason?: string;
   actor?: string;
+}
+
+/**
+ * Payment event payload (Step 2.12). Минимальный, PII-free: canonical refs +
+ * frozen money facts (amount/currency verbatim из Order snapshot).
+ * PaymentCaptured несёт amount/currency — Order-owned projection subscriber
+ * self-sufficient (без чтения finance.*); НЕ содержит provider payload/
+ * card/PAN/CVV/секретов (только opaque refs).
+ */
+export interface PaymentEventPayload {
+  paymentId: string;
+  code: string;
+  orderId: string;
+  /** NULL — internal assisted flow (как Order.customerId). */
+  customerId: string | null;
+  /** Frozen money fact (Decimal string, DECIMAL(12,2)) — verbatim из Order. */
+  amount: string;
+  currency: string;
+  /** Опциональный descriptive метод (manual/provider-neutral; без PII). */
+  method?: string | null;
 }

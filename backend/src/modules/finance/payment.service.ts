@@ -1,0 +1,332 @@
+/**
+ * PHASE 2 STEP 2.12 — PaymentService (provider-neutral Payment runtime).
+ *
+ * Finance-owned canonical Payment aggregate (PAY-*). Активация runtime,
+ * заявленного в Step 2.10 foundation (§15/§52): создание + lifecycle Payment
+ * с НЕПСП-механикой — PSP/adapters/webhooks — Step 2.12A/2.12B.
+ *
+ * Принцип (Prompt §2): Payment погашает УЖЕ замороженное финансовое
+ * обязательство; Payment НЕ является pricing authority.
+ *
+ * Hard gates:
+ *  - Payment создаётся ТОЛЬКО Finance (finance.payment.write); Order/Booking/
+ *    Sales НЕ пишут finance.Payment (никаких cross-domain writes);
+ *  - payable source — frozen Order snapshot (Order.amount/currency verbatim,
+ *    immutable; НИКАКОГО reprice из mutable Catalog/Tax/FX — §12/§43);
+ *  - cardinality: один Payment на Order (isActivePayment partial unique,
+ *    DB-level); FAILED/CANCELLED — повторная инициация (attempt 2) легальна;
+ *    CAPTURED/REFUNDED блокируют (overpayment protection); 2.12F снимет
+ *    индекс в своей миграции (документировано);
+ *  - status machine (единственный authority): PENDING → CAPTURED (paidAt) |
+ *    FAILED (failedAt) | CANCELLED (cancelledAt). AUTHORIZED/REFUNDED —
+ *    reserved vocabulary (producer: 2.12B PSP authorize / 2.13 refund);
+ *    capturedAt/authorizedAt milestones — DEFER (2.12B);
+ *  - idempotency: identical create retry → существующий активный Payment
+ *    (no-op); concurrent duplicate → P2002 (Payment_one_active_per_order) →
+ *    controlled 409, один факт; неизвестный P2002 не глотается;
+ *  - 0 side effects: без LedgerTransaction/ProviderFee/Settlement/Payout/
+ *    Refund/Invoice/CommissionAccrual auto-post (boundaries §22–§25);
+ *  - события: PaymentCreated/PaymentCaptured/PaymentFailed/PaymentCancelled
+ *    (outbox, correlation/causation/actor server-authoritative);
+ *  - milestones server-owned UTC, первый переход wins, атомарны с CAS.
+ */
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "../../generated/prisma/client";
+import { PaymentStatus } from "../../generated/prisma/enums";
+import { PrismaService } from "../../prisma/prisma.service";
+import { IdsService } from "../../shared/ids.service";
+import { SecurityService } from "../../security/security.service";
+import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
+import { uniqueConstraintNames } from "../../shared/prisma-errors";
+import { getRequestContext } from "../../shared/request-context";
+import { EventBusService } from "../../eventbus/eventbus.service";
+import { DomainEvents, type PaymentEventPayload } from "../../eventbus/domain-events";
+import { validateFrozenMoneyFact } from "../sales/sales.money";
+
+/** Cardinality partial unique index (schema): ≤1 активный Payment на Order. */
+const PAYMENT_ONE_ACTIVE_PER_ORDER = "Payment_one_active_per_order";
+
+/** Статусы, НЕ блокирующие новую инициацию (attempt 2). */
+const REINITIABLE: PaymentStatus[] = ["FAILED", "CANCELLED"];
+
+interface Actor {
+  id: string;
+  username: string;
+}
+
+/** Статусы Order, при которых оплата невозможна (обязательство не подлежит оплате). */
+const ORDER_NOT_PAYABLE = ["CANCELLED", "CLOSED"];
+
+@Injectable()
+export class PaymentService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ids: IdsService,
+    private readonly security: SecurityService,
+    private readonly eventBus: EventBusService,
+  ) {}
+
+  // ── Payment creation ────────────────────────────────────────────────────────
+
+  /**
+   * Инициация Payment для Order (Finance command, finance.payment.write).
+   * Деньги — frozen Order snapshot verbatim (amount/currency); frontend НЕ
+   * источник цены (forged money → 422 forbidden keys). Idempotent: повторный
+   * create с активным Payment → существующий факт (no-op, identical retry =
+   * same effect); concurrent duplicate → P2002 → controlled 409.
+   */
+  async createPayment(input: { orderId: string; paymentMethod?: string | null }, actor: Actor): Promise<Record<string, unknown>> {
+    const orderId = input.orderId.trim();
+    if (!orderId) throw new ValidationDomainError("orderId is required");
+    const paymentMethod = input.paymentMethod ? input.paymentMethod.trim() : null;
+    if (paymentMethod && paymentMethod.length > 64) {
+      throw new ValidationDomainError("paymentMethod must not exceed 64 characters");
+    }
+
+    // READ-only cross-context read (ADR-0001): Order — owner обязательства.
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+    if (ORDER_NOT_PAYABLE.includes(order.status)) {
+      throw new ValidationDomainError(`Order ${order.code} is ${order.status}; payment cannot be initiated`);
+    }
+
+    // Frozen money fact (Step 2.11 authority): amount+currency из ОДНОГО frozen
+    // источника (Order snapshot). Валидация — платформенный контракт sales.money.
+    validateFrozenMoneyFact(order.amount, order.currency, "payment money fact");
+
+    const emitPayload = (paymentId: string, code: string): PaymentEventPayload => ({
+      paymentId,
+      code,
+      orderId: order.id,
+      customerId: order.customerId,
+      amount: order.amount.toString(),
+      currency: order.currency,
+      method: paymentMethod,
+    });
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Idempotent retry: активный Payment уже существует → no-op.
+        const existing = await tx.payment.findFirst({
+          where: { orderId: order.id, isActivePayment: true },
+        });
+        if (existing) return this.paymentDto(existing);
+
+        const code = await this.ids.nextCode(tx, "PAY");
+        const created = await tx.payment.create({
+          data: {
+            code,
+            orderId: order.id,
+            customerId: order.customerId ?? null,
+            amount: order.amount,
+            currency: order.currency,
+            status: PaymentStatus.PENDING,
+            paymentMethod,
+            isActivePayment: true,
+            version: 1,
+          },
+        });
+        await tx.paymentHistory.create({
+          data: {
+            paymentId: created.id,
+            action: "created",
+            to: PaymentStatus.PENDING,
+            actorId: actor.id,
+            actorName: actor.username,
+            comment: `Платёж инициирован по заказу ${order.code}`,
+          },
+        });
+        await this.security.audit(tx, {
+          userId: actor.id,
+          username: actor.username,
+          action: "finance.payment.created",
+          resource: "Payment",
+          resourceId: created.id,
+          details: { code: created.code, orderId: order.id, amount: order.amount.toString(), currency: order.currency },
+        });
+        await this.eventBus.emit(tx, {
+          aggregateType: "Payment",
+          aggregateId: created.id,
+          eventType: DomainEvents.PaymentCreated,
+          payload: emitPayload(created.id, created.code),
+        });
+        return this.paymentDto(created);
+      });
+    } catch (err) {
+      // Concurrent duplicate create: оба прошли проверку isActivePayment,
+      // один проиграл partial unique → controlled 409 (один факт, без raw 500).
+      if (uniqueConstraintNames(err).includes(PAYMENT_ONE_ACTIVE_PER_ORDER)) {
+        throw new ConflictError(`A payment is already active for order ${order.code}`);
+      }
+      throw err;
+    } finally {
+      await this.eventBus.publishPending();
+    }
+  }
+
+  // ── Lifecycle transitions (единственный state-machine authority) ──────────
+
+  /** PENDING → CAPTURED (успех; money received, manual/provider-neutral
+   *  подтверждение). Milestone paidAt (Step 2.10C DEFER → 2.12). */
+  async confirmPayment(code: string, actor: Actor): Promise<Record<string, unknown>> {
+    return this.transition(code, PaymentStatus.CAPTURED, "paidAt", "captured", "finance.payment.captured", DomainEvents.PaymentCaptured, actor);
+  }
+
+  /** PENDING → FAILED (терминальное отклонение; повторная инициация легальна). */
+  async failPayment(code: string, actor: Actor): Promise<Record<string, unknown>> {
+    return this.transition(code, PaymentStatus.FAILED, "failedAt", "failed", "finance.payment.failed", DomainEvents.PaymentFailed, actor);
+  }
+
+  /** PENDING → CANCELLED (терминальное отклонение; повторная инициация легальна). */
+  async cancelPayment(code: string, actor: Actor): Promise<Record<string, unknown>> {
+    return this.transition(code, PaymentStatus.CANCELLED, "cancelledAt", "cancelled", "finance.payment.cancelled", DomainEvents.PaymentCancelled, actor);
+  }
+
+  /**
+   * Единый CAS-переход (паттерн Order/Booking): from-guard PENDING +
+   * updateMany where id+status+version → ровно один победитель; повторный
+   * переход → controlled 409 (terminal protection, конвенция completeSale).
+   * Milestone + history + outbox атомарно с переходом. isActivePayment
+   * обновляется атомарно (false для FAILED/CANCELLED — attempt 2 легален;
+   * true для CAPTURED — overpayment protection).
+   */
+  private async transition(
+    code: string,
+    to: PaymentStatus,
+    milestone: "paidAt" | "failedAt" | "cancelledAt",
+    historyAction: string,
+    auditAction: string,
+    eventType: string,
+    actor: Actor,
+  ): Promise<Record<string, unknown>> {
+    const payment = await this.prisma.payment.findUnique({ where: { code } });
+    if (!payment) throw new NotFoundError(`Payment ${code} not found`);
+
+    if (payment.status === to) {
+      throw new ConflictError(`Payment ${code} is already ${to}`);
+    }
+    if (payment.status !== PaymentStatus.PENDING) {
+      throw new ConflictError(`Payment ${code} cannot transition from ${payment.status} to ${to}`);
+    }
+
+    const now = new Date();
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updatedRows = await tx.payment.updateMany({
+        where: { id: payment.id, status: PaymentStatus.PENDING, version: payment.version },
+        data: {
+          status: to,
+          version: { increment: 1 },
+          [milestone]: now,
+          isActivePayment: !REINITIABLE.includes(to),
+        },
+      });
+      if (updatedRows.count !== 1) {
+        throw new ConflictError(`Payment ${code} was modified concurrently; retry`);
+      }
+      const fresh = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
+
+      await tx.paymentHistory.create({
+        data: {
+          paymentId: payment.id,
+          action: historyAction,
+          from: PaymentStatus.PENDING,
+          to,
+          actorId: actor.id,
+          actorName: actor.username,
+          comment: historyAction === "captured" ? "Оплата получена (подтверждение Finance)" : undefined,
+        },
+      });
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: auditAction,
+        resource: "Payment",
+        resourceId: payment.id,
+        details: { code: payment.code, from: PaymentStatus.PENDING, to },
+      });
+      await this.eventBus.emit(tx, {
+        aggregateType: "Payment",
+        aggregateId: payment.id,
+        eventType,
+        payload: {
+          paymentId: payment.id,
+          code: payment.code,
+          orderId: payment.orderId,
+          customerId: payment.customerId,
+          amount: payment.amount.toString(),
+          currency: payment.currency,
+          method: payment.paymentMethod,
+        } as PaymentEventPayload,
+      });
+      return fresh;
+    });
+
+    await this.eventBus.publishPending();
+    return this.paymentDto(result);
+  }
+
+  // ── Read (Finance Center) ───────────────────────────────────────────────────
+
+  async list(query: { orderId?: string; status?: string; page?: number; pageSize?: number }) {
+    const page = query.page ?? 1;
+    const pageSize = Math.min(query.pageSize ?? 50, 100);
+    const where: Prisma.PaymentWhereInput = {
+      ...(query.orderId ? { orderId: query.orderId } : {}),
+      ...(query.status ? { status: query.status as PaymentStatus } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        orderBy: [{ createdAt: "desc" }, { code: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+    return { items: items.map((r) => this.paymentDto(r)), total, page, pageSize, hasMore: page * pageSize < total };
+  }
+
+  async getByCode(code: string): Promise<Record<string, unknown>> {
+    const row = await this.prisma.payment.findUnique({ where: { code } });
+    if (!row) throw new NotFoundError(`Payment ${code} not found`);
+    return this.paymentDto(row);
+  }
+
+  // ── Whitelist DTO (без PII/secrets; money — Decimal strings) ───────────────
+
+  private paymentDto(r: {
+    id: string;
+    code: string;
+    orderId: string;
+    customerId: string | null;
+    partnerId: string | null;
+    amount: Prisma.Decimal;
+    currency: string;
+    status: PaymentStatus;
+    paymentMethod: string | null;
+    providerRef: string | null;
+    version: number;
+    createdAt: Date;
+    paidAt: Date | null;
+    failedAt: Date | null;
+    cancelledAt: Date | null;
+  }): Record<string, unknown> {
+    return {
+      id: r.id,
+      code: r.code,
+      orderId: r.orderId,
+      customerId: r.customerId,
+      partnerId: r.partnerId,
+      amount: r.amount.toString(),
+      currency: r.currency,
+      status: r.status,
+      paymentMethod: r.paymentMethod,
+      providerRef: r.providerRef,
+      paidAt: r.paidAt ? r.paidAt.toISOString() : null,
+      failedAt: r.failedAt ? r.failedAt.toISOString() : null,
+      cancelledAt: r.cancelledAt ? r.cancelledAt.toISOString() : null,
+      version: r.version,
+      createdAt: r.createdAt.toISOString(),
+    };
+  }
+}

@@ -533,6 +533,17 @@ Screen Design codes verbatim):**
   на брони заказа `CANCELLED`/`CLOSED` → 409 (READ-only Order check; инвариант
   «нет активной Booking под отменённым заказом»); `problem` из PROBLEM — 409
   (нет self-transition).
+- **Frozen money fact (Step 2.11 — Pricing & Financial Snapshot):** Booking
+  несёт `amount` (Decimal string, DECIMAL(12,2), verbatim из `OrderItem.amount`)
+  + `currency` (`string | null`, ISO 4217, verbatim из `OrderItem.currency`,
+  копируется consumer-ом при создании из Order — READ-only, ADR-0001).
+  `NULL` = legacy Booking (до 2.11, валюта не фиксировалась; честный NULL,
+  без backfill). Деньги без валюты не имеют однозначной семантики — новые
+  Booking всегда получают currency. Snapshot НЕ пересчитывается из mutable
+  Catalog/Tax/FX master-data: изменение Product price / Currency / ExchangeRate /
+  Tax после freeze не меняет уже зафиксированную стоимость (см.
+  `docs/architecture/pricing-financial-snapshot.md`). Lifecycle-переходы
+  Booking не трогают money/currency (2.9A).
 - RBAC: только staff-роли с каталоговыми правами (OPERATOR/ADMIN и др.);
   BUYER/PARTNER/MODERATOR/SALES_MANAGER — 403 (матрица §4).
 - События: state + BookingHistory + outbox — атомарно в одной транзакции;
@@ -692,3 +703,48 @@ Idempotency: DB-unique (ProviderFee: sourceType+sourceId+provider;
 Settlement/Payout: sourceType+sourceId) — identical replay → no-op,
 divergent payload → 409, unknown P2002 → controlled conflict. События НЕ
 эмитятся; LedgerTransaction НЕ пишется (нет canonical engine).
+
+## Step 2.12 — Payment Flow (provider-neutral Payment runtime)
+
+Payment — Finance-owned aggregate (PAY-*). Деньги/статус/милстоуны —
+server-owned: amount/currency копируются verbatim из frozen Order snapshot
+(Order.amount/Order.currency); клиент НЕ передаёт деньги/статус (forged →
+422, raw-body forbidden keys). PSP/authorize/capture/webhook — Step
+2.12A/2.12B (в 2.12 нет — подтверждение получения manual/provider-neutral).
+
+RBAC: write — `finance.payment.write` (FINANCE/ADMIN); read —
+`finance.payment.read` (FINANCE/ADMIN/DIRECTOR/ANALYST/OPERATOR/...);
+BUYER/PARTNER — 403 (Buyer-оплата — 2.12B, не экспонирована).
+
+- `POST /api/v1/finance/payments` — `{ orderId, paymentMethod? (≤64, descriptive) }`
+  → 201 `{ id, code (PAY-*), orderId, customerId|null, amount (Decimal string),
+  currency, status: PENDING, paymentMethod|null, providerRef|null, paidAt|null,
+  failedAt|null, cancelledAt|null, version, createdAt }`. Unknown Order → 404;
+  Order CANCELLED/CLOSED → 422. Idempotent: повторный create с активным
+  Payment → существующий факт (no-op); после CAPTURED — no-op (overpayment
+  protection: второй Payment не создаётся); concurrent duplicate → 409
+  (partial unique `Payment_one_active_per_order`).
+- `POST /api/v1/finance/payments/:code/confirm` — PENDING → **CAPTURED**
+  (успех, money received), `paidAt` set. Повторный confirm / из FAILED /
+  CANCELLED → 409 (from-guard PENDING, CAS).
+- `POST /api/v1/finance/payments/:code/fail` — PENDING → **FAILED**, `failedAt`
+  set; повторная инициация (attempt 2) легальна.
+- `POST /api/v1/finance/payments/:code/cancel` — PENDING → **CANCELLED**,
+  `cancelledAt` set; повторная инициация легальна.
+- `GET /api/v1/finance/payments` — list (`finance.payment.read`); фильтры
+  `orderId`, `status`; пагинация `page`/`pageSize` (≤100), total, hasMore.
+- `GET /api/v1/finance/payments/:code` — detail; неизвестный → 404.
+
+**PAID semantics:** Payment CAPTURED ⟺ деньги получены (подтверждено Finance).
+Order projection (Order-owned subscriber на `PaymentCaptured`):
+`Order.paymentStatus = PAID`, `Order.paidAmount = frozen amount` — Finance НЕ
+пишет order.* напрямую. AUTHORIZED/REFUNDED — reserved vocabulary (producer:
+2.12B PSP authorize / 2.13 refund); PARTIALLY_PAID — 2.12F. Милстоуны:
+`paidAt/failedAt/cancelledAt` (2.10C DEFER → 2.12), server-owned UTC,
+первый переход wins; `authorizedAt/capturedAt` — 2.12B.
+
+События: `PaymentCreated`/`PaymentCaptured`/`PaymentFailed`/`PaymentCancelled`
+(outbox; correlation = server UUID, causation = null для HTTP-команд;
+payload — refs + frozen amount/currency, без PII). Boundaries: 0
+LedgerTransaction/ProviderFee/Settlement/Payout/Refund/Invoice/Commission/
+CommissionAccrual auto-post; Booking/availability не затрагиваются.

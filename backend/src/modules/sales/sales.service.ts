@@ -38,6 +38,7 @@ import {
   subtotalOf,
   totalOf,
   validateDiscountValue,
+  validateFrozenSnapshot,
 } from "./sales.money";
 import {
   buildCheckoutListWhere,
@@ -1082,6 +1083,22 @@ export class SalesService {
     if (quote.subtotal === null || quote.total === null) {
       throw new ValidationDomainError(`Quote ${quote.code} has no frozen totals`);
     }
+
+    // Step 2.11 — canonical snapshot consistency gate на binding boundary
+    // (покупатель принимает цену): frozen Quote snapshot (currency/lines/
+    // subtotal/discount/total) обязан быть внутренне консистентным (Decimal,
+    // half-up, overflow, ISO currency). Невалидный snapshot → controlled 422,
+    // НИКОГДА не bind-ится молча (§25 2.11). Это defense-in-depth: Quote
+    // уже валидировался при ISSUE — расхождение = producer-дефект/дрейф.
+    validateFrozenSnapshot({
+      currency: quote.currency,
+      lines: quote.items.map((i) => ({ unitPrice: i.unitPrice, quantity: i.quantity, amount: i.amount })),
+      subtotal: quote.subtotal,
+      discountType: quote.discountType,
+      discountValue: quote.discountValue,
+      discountAmount: quote.discountAmount,
+      total: quote.total,
+    });
 
     // Customer scope: default = Quote customer; override — business reference
     // (staff-assisted, server validates existence; не расширяет права, §29/§62).
