@@ -471,3 +471,71 @@ Checkout обязан ясно показывать PaymentTerms: сумма с�
 ### Settlement mode visualization
 
 Finance/Partner UI явно показывает `SPLIT_AT_PAYMENT`, `PLATFORM_COLLECT` или `PARTNER_COLLECT` для соответствующего settlement context. Для PARTIAL_PREPAYMENT checkout/Buyer view показывает «к оплате сейчас», остаток и due date/event; Partner view показывает распределение каждой фактической оплаты и итоговую сверку.
+
+## Commission Policies — Finance Center (Step 2.14F, UI-реконсиляция 2026-08-14)
+
+Экран управления canonical **Commission Policy master data** (`finance.CommissionPolicy`,
+CMP-*, ADR-0013 / Step 2.14E backend approved). НЕ экран Commission-фактов.
+
+### Навигация
+
+`Finance Center / Commissions / Commission Policies` (breadcrumbs).
+Табы секции Commissions: `Policies | Commission Facts | Accruals`.
+Policies активна (backend 2.14E); Commission Facts и Accruals — disabled/
+placeholder, включаются ТОЛЬКО когда их canonical backend runtime реализован
+(2.12C/2.14 и 2.12E соответственно). Не показывать их как реализованные.
+
+### Список
+
+- колонки: business ID (`CMP-*`), channel, rate type, rate (отображение `15%`),
+  status (badge DRAFT/ACTIVE/ARCHIVED), effectiveFrom, effectiveTo (open-ended —
+  «без срока»), version, createdAt, current/effective indicator (если безопасно
+  выводим из [effectiveFrom, effectiveTo) и status=ACTIVE);
+- фильтры — из фактического backend vocabulary: status, channel (whitelist
+  enum); пагинация по фактическому backend (page/pageSize ≤ 100);
+- row actions (по RBAC и status): Edit (DRAFT only), Activate (DRAFT),
+  Archive (DRAFT|ACTIVE), View history.
+
+### Create / Edit
+
+- create → DRAFT: channel (только MARKETPLACE в V1), rate-ввод `15` →
+  API `0.15` (display-конверсия ТОЛЬКО; «10»/«1500%»/«0.15 »/«1e-7» НЕ
+  принимаются — backend regex-authority `/^0\.(?!0+$)\d{1,6}$/`), effectiveFrom,
+  effectiveTo (опционально, open-ended);
+- edit: только DRAFT (backend 422 для ACTIVE/ARCHIVED — UI не показывает Edit);
+- конфликтные состояния: overlap при activate → контролируемое сообщение 409
+  («заархивируйте пересекающуюся ACTIVE policy или выберите другой период»);
+  validation errors (rate/период) — с сообщениями backend.
+
+### Detail / Version history
+
+- detail page/drawer: текущие поля + version, status, эффективный период;
+- version history — read-only, из backend-owned `CommissionPolicyHistory`
+  (НЕ реконструкция на клиенте): version, action (created/updated/activated/
+  archived), изменившиеся поля (fields snapshot), actor, timestamp;
+- редактирование исторических версий запрещено.
+
+### Rate representation (контракт)
+
+- authoritative: десятичная дробь-строка API `"0.15"` (0 < rate < 1, ≤ 6 знаков);
+- UI: `15%`; пользователь вводит `15`;
+- frontend конвертирует presentation ↔ canonical representation;
+- frontend НЕ является вторым policy/расчётным authority; никакой JS float
+  арифметики как финансового/политического authority.
+
+### RBAC
+
+- read: FINANCE/DIRECTOR/ANALYST (`finance.commission.read`);
+- manage (create/edit/activate/archive): FINANCE/ADMIN (`finance.commission.manage`);
+- SALES_MANAGER/OPERATOR/PARTNER: доступ отсутствует (скрытие меню ≠ security,
+  backend остаётся авторитетным — 403).
+
+### Границы
+
+- ручное управление = master data policy; НЕ ручное редактирование
+  исторических Commission фактов/снапшотов/Refund/Dispute сумм;
+- изменение policy 15% → 18% НЕ переписывает исторические Orders/Payments/
+  Commission/Accruals;
+- Settings/Catalog/PSP не дублируют authority.
+
+

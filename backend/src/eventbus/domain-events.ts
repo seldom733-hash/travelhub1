@@ -89,6 +89,13 @@ export const DomainEvents = {
   DisputeOpened: "DisputeOpened",
   DisputeResolved: "DisputeResolved",
   DisputeCancelled: "DisputeCancelled",
+  // Finance — CommissionAccrual (Step 2.12E, PARTNER_COLLECT, ADR-0013 D19).
+  // CommissionAccrued — признание receivable Partner → TravelHub на Order
+  // creation из frozen commissionSnapshot (producer — Finance). Future
+  // consumer-ы: Ledger (2.12D), Settlement (2.14A), Invoice (2.14) — НЕ
+  // создаются в 2.12E (0 consumer-ов). Policy-событий НЕТ (master data +
+  // AuditLog/History).
+  CommissionAccrued: "CommissionAccrued",
 } as const;
 
 export type DomainEventType = (typeof DomainEvents)[keyof typeof DomainEvents];
@@ -263,6 +270,13 @@ export interface OrderRequestedPayload {
   serviceTime: string | null;
   serviceEndTime: string | null;
   serviceTimeZone: string | null;
+  /** Step 2.12E (ADR-0013 D7): frozen commission snapshot Json (verbatim из
+   *  CheckoutIntent через Sale). NULL = нет commission-контекста (no-commission
+   *  канал / NO_POLICY fail-closed / legacy). Additive, v1-совместим. */
+  commissionSnapshot: unknown;
+  /** Step 2.12E (ADR-0013 D14): frozen seller attribution (snapshot-at-event,
+   *  НЕ live lookup). NULL = multi-seller/нет seller → 0 commission-фактов. */
+  sellerPartnerId: string | null;
 }
 
 export interface OrderEventPayload {
@@ -367,4 +381,40 @@ export interface DisputeEventPayload {
   currency: string;
   /** Опциональный business reason (descriptive; без PII). */
   reason?: string | null;
+}
+
+/**
+ * Step 2.12E — CommissionAccrued (PARTNER_COLLECT, ADR-0013 D19).
+ * Producer: Finance (признание на Order creation из frozen commissionSnapshot).
+ * Поля — durable refs + frozen money/policy факты (без PII, без raw Prisma).
+ * correlation/causation наследуются из OrderCreated (canonical chain).
+ * Future consumer-ы (Ledger 2.12D / Settlement 2.14A / Invoice 2.14) читают
+ * frozen provenance (policyCode/version, baseAmount) — без live policy lookup.
+ */
+export interface CommissionAccruedPayload {
+  /** Commission (CMS-*, canonical earned-факт). */
+  commissionId: string;
+  commissionCode: string;
+  /** CommissionAccrual (CAA-*, receivable). */
+  accrualId: string;
+  accrualCode: string;
+  orderId: string;
+  orderCode: string;
+  /** Frozen sellerPartnerId (ref crm.Partner, без FK; бизнес-идентификатор). */
+  partnerId: string;
+  /** Frozen CommissionChannel (MARKETPLACE V1). */
+  channel: string;
+  /** Frozen collection model (PARTNER_COLLECT V1). */
+  collectionModel: string;
+  /** Frozen earned amount (Decimal string, DECIMAL(12,2)). */
+  amount: string;
+  currency: string;
+  /** Frozen policy provenance (из commissionSnapshot — без live lookup). */
+  policyCode: string;
+  policyVersion: number;
+  /** Frozen calculation base (Order.total, Decimal string). */
+  baseAmount: string;
+  baseCurrency: string;
+  /** Frozen business instant селекции policy (Quote ISSUE, ISO 8601). */
+  selectedAt: string;
 }

@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
+import { CommissionAccrualConsumer } from "./commission-accrual.consumer";
 import { CommissionPolicyService } from "./commission-policy.service";
+import { CommissionService } from "./commission.service";
 import { DisputeService } from "./dispute.service";
 import { FinanceController } from "./finance.controller";
 import { FinanceService } from "./finance.service";
@@ -24,6 +26,10 @@ import { SettlementService } from "./settlement.service";
  */
 @Module({
   controllers: [FinanceController],
-  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService],
+  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer],
+  /** Step 2.12E: CommissionPolicyService экспортируется для Sales/Order
+   *  freeze-time read (ADR-0013 D1: read by Sales/Order at freeze boundary,
+   *  READ-only cross-domain). CommissionService/Consumer — Finance-internal. */
+  exports: [CommissionPolicyService, CommissionService],
 })
 export class FinanceModule {}

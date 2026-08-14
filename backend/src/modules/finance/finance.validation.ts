@@ -9,10 +9,11 @@
  * Mass-assignment: server-owned поля (id/code/createdAt/updatedAt/version)
  * запрещены громко (422, project convention loud-forbidden-key) — не silent strip.
  */
-import { IsBoolean, IsISO8601, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
+import { IsBoolean, IsEnum, IsISO8601, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
 import { Type } from "class-transformer";
 import { ValidationDomainError } from "../../shared/errors";
-import { CommissionChannel } from "../../generated/prisma/enums";
+import { Prisma } from "../../generated/prisma/client";
+import { CommissionAccrualStatus, CommissionChannel, CommissionStatus } from "../../generated/prisma/enums";
 
 /** Запрещённые server-owned поля для всех Finance master-data write DTO. */
 export const FINANCE_MASTER_FORBIDDEN_KEYS = [
@@ -816,4 +817,141 @@ export class ResolveCommissionPolicyQueryDto {
 
   @IsISO8601()
   at!: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2.12E — PARTNER_COLLECT / CommissionAccrual Foundation (ADR-0013 D7/D9)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Каноническая форма frozen commission snapshot (ADR-0013 D7). */
+export interface CommissionSnapshotShape {
+  policyCode: string;
+  policyVersion: number;
+  rateType: string;
+  rate: string;
+  baseAmount: string;
+  baseCurrency: string;
+  channel: string;
+  sellerPartnerId: string | null;
+  selectedAt: string;
+  roundingContractVersion: string;
+}
+
+/**
+ * Валидация frozen commission snapshot (производится Finance producer-ом при
+ * признании accrual — единый authority; snapshot заморожен на Quote ISSUE и
+ * перенесён verbatim, НЕ пере-резолвится). Fail-closed: любая несостыковка
+ * формы/rate/base → ValidationDomainError (событие FAILED, а не молчаливый
+ * 0-факт). rate — каноническая форма validateCommissionRate (0<r<1, ≤6 знаков).
+ */
+export function validateCommissionSnapshot(snapshot: unknown): CommissionSnapshotShape {
+  if (snapshot === null || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    throw new ValidationDomainError("commissionSnapshot must be an object");
+  }
+  const s = snapshot as Record<string, unknown>;
+  const needString = ["policyCode", "rateType", "rate", "baseAmount", "baseCurrency", "channel", "selectedAt", "roundingContractVersion"] as const;
+  for (const f of needString) {
+    if (typeof s[f] !== "string" || (s[f] as string).trim().length === 0) {
+      throw new ValidationDomainError(`commissionSnapshot is missing ${f}`);
+    }
+  }
+  // selectedAt = freeze instant (ISO 8601). Malformed → fail-loud (коррупция
+  // authoritative snapshot; НЕ молчаливый факт с битым provenance, STRICT REVIEW).
+  if (typeof s.selectedAt !== "string" || !Number.isFinite(Date.parse(s.selectedAt))) {
+    throw new ValidationDomainError("commissionSnapshot selectedAt must be a valid ISO 8601 instant");
+  }
+  if (typeof s.policyVersion !== "number" || !Number.isInteger(s.policyVersion) || (s.policyVersion as number) < 1) {
+    throw new ValidationDomainError("commissionSnapshot policyVersion must be a positive integer");
+  }
+  if (s.sellerPartnerId !== null && s.sellerPartnerId !== undefined && (typeof s.sellerPartnerId !== "string" || (s.sellerPartnerId as string).trim().length === 0)) {
+    throw new ValidationDomainError("commissionSnapshot sellerPartnerId is invalid");
+  }
+  if (typeof s.rate !== "string") {
+    throw new ValidationDomainError("commissionSnapshot rate is invalid");
+  }
+  validateCommissionRate(s.rate); // 0 < rate < 1, ≤ 6 знаков, каноническая форма
+  if (typeof s.baseAmount !== "string") {
+    throw new ValidationDomainError("commissionSnapshot baseAmount is invalid");
+  }
+  let base: Prisma.Decimal;
+  try {
+    base = new Prisma.Decimal(s.baseAmount);
+  } catch {
+    throw new ValidationDomainError("commissionSnapshot baseAmount is not a valid amount");
+  }
+  if (base.isNegative()) {
+    throw new ValidationDomainError("commissionSnapshot baseAmount must be >= 0");
+  }
+  if (s.channel !== CommissionChannel.MARKETPLACE) {
+    throw new ValidationDomainError(`commissionSnapshot channel ${String(s.channel)} is not commission-bearing in V1`);
+  }
+  return {
+    policyCode: s.policyCode as string,
+    policyVersion: s.policyVersion as number,
+    rateType: s.rateType as string,
+    rate: s.rate as string,
+    baseAmount: s.baseAmount as string,
+    baseCurrency: s.baseCurrency as string,
+    channel: s.channel as string,
+    sellerPartnerId: (s.sellerPartnerId as string | null) ?? null,
+    selectedAt: s.selectedAt as string,
+    roundingContractVersion: s.roundingContractVersion as string,
+  };
+}
+
+/** Whitelist list-query для Commission фактов (status/orderId/partnerId/пагинация).
+ *  status — строго валидный CommissionStatus (invalid → 400, НЕ raw 500). */
+export class CommissionListQueryDto {
+  @IsOptional()
+  @IsEnum(CommissionStatus)
+  status?: CommissionStatus;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  orderId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  partnerId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+}
+
+/** Whitelist list-query для CommissionAccrual (status/partnerId/пагинация).
+ *  status — строго валидный CommissionAccrualStatus (invalid → 400). */
+export class CommissionAccrualListQueryDto {
+  @IsOptional()
+  @IsEnum(CommissionAccrualStatus)
+  status?: CommissionAccrualStatus;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  partnerId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
 }

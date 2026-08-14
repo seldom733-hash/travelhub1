@@ -1663,6 +1663,20 @@ model Order {
   /// Acquisition source snapshot (Step 2.5B propagation boundary — не
   /// ре-вычисляется consumer-ом).
   acquisitionSource     String?
+  /// ── Step 2.12E (ADR-0013 D14) — frozen seller attribution ──
+  /// Единственный selling partner заказа (order-level), server-frozen при
+  /// Order creation из frozen commissionSnapshot (происхождение — Quote ISSUE
+  /// freeze: Product.partnerId items на момент ISSUE, snapshot-at-event, НЕ live
+  /// lookup позже). NULL = multi-seller / отсутствие seller / legacy —
+  /// fail-closed: 0 commission-фактов (D14). НЕ изменяется после создания.
+  sellerPartnerId       String?
+  /// ── Step 2.12E (ADR-0013 D7) — frozen commission snapshot (verbatim из
+  /// OrderRequested → Sale → CheckoutIntent → Quote ISSUE) ──
+  /// {policyCode, policyVersion, rateType, rate, baseAmount, baseCurrency,
+  ///  channel, sellerPartnerId, selectedAt, roundingContractVersion}. NULL = нет
+  /// commission-контекста (no-commission канал / NO_POLICY / legacy) — честно,
+  /// без backfill и без live policy lookup. Immutable после создания.
+  commissionSnapshot    Json?
 
   // ── Step 2.5A — Order Temporal Contract (business milestones) ──
   /// Момент подачи/входа заказа в систему (OrderRequested consumer ИЛИ
@@ -1688,6 +1702,9 @@ model Order {
 
   @@index([status])
   @@index([customerId])
+  // Step 2.12E: frozen seller attribution (D14) — фильтр/агрегация по seller
+  // (Finance/аналитика; соответствует Order_sellerPartnerId_idx в миграции).
+  @@index([sellerPartnerId])
   @@schema("order")
 }
 
@@ -2922,6 +2939,13 @@ model Quote {
   subtotal Decimal? @db.Decimal(12, 2)
   /// Итог = subtotal - discountAmount (>= 0). Персистится при ISSUE (immutable).
   total Decimal? @db.Decimal(12, 2)
+  /// Step 2.12E (ADR-0013 D6/D7) — frozen commission snapshot, ЗАМОРОЖЕН
+  /// server-side при ISSUE (selection/freeze boundary): policyCode/policyVersion/
+  /// rateType/rate/baseAmount/baseCurrency/channel/sellerPartnerId/selectedAt/
+  /// roundingContractVersion. NULL = нет commission-контекста (no-commission
+  /// канал / NO_POLICY fail-closed / legacy) — честно, без backfill и без live
+  /// policy lookup при признании. Копируется verbatim Checkout → Sale → Order.
+  commissionSnapshot Json?
 
   sale            Sale?
   history         QuoteHistory[]
@@ -3060,6 +3084,10 @@ model Sale {
   discountValue   Decimal?          @db.Decimal(12, 2)
   discountAmount  Decimal?          @db.Decimal(12, 2)
   total           Decimal?          @db.Decimal(12, 2)
+  /// Step 2.12E (ADR-0013 D7) — frozen commission snapshot из CheckoutIntent,
+  /// verbatim при completion. NULL = нет commission-контекста. Копируется в
+  /// OrderRequested payload → Order (Order.sellerPartnerId/commissionSnapshot).
+  commissionSnapshot Json?
   paymentScheme   PaymentScheme?
   prepaymentType  PaymentPrepaymentType?
   prepaymentValue Decimal?          @db.Decimal(12, 2)
@@ -3209,6 +3237,10 @@ model CheckoutIntent {
   discountAmount Decimal? @db.Decimal(12, 2)
   /// Итог = subtotal - discountAmount (frozen; НЕ paid amount — §49).
   total        Decimal  @db.Decimal(12, 2)
+  /// Step 2.12E (ADR-0013 D7) — frozen commission snapshot из ISSUED Quote,
+  /// verbatim (как currency/subtotal/total). NULL = нет commission-контекста.
+  /// Immutable после создания; копируется в Sale completion → OrderRequested.
+  commissionSnapshot Json?
 
   // ── Step 2.3B — Payment Terms (коммерческие условия, server-derived) ──
   /// Выбранная схема оплаты. NULL = payment terms not selected (честно, НЕ
@@ -3638,22 +3670,43 @@ enum CommissionStatus {
   @@schema("finance")
 }
 
-/// Commission (CMS-*) — TravelHub платформенная комиссия. НЕ ProviderFee
-/// (2.10B). Foundation-модель; расчёт — 2.12C/2.14.
-model Commission {
-  id         String           @id @default(uuid())
-  code       String           @unique // CMS-00000001
-  /// ref order.Order, без FK.
-  orderId    String
-  /// ref crm.Partner, без FK.
-  partnerId  String
-  amount     Decimal          @db.Decimal(12, 2)
-  currency   String           @default("USD")
-  status     CommissionStatus @default(ACCRUED)
-  version    Int              @default(1)
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+/// Collection-модель комиссии (ADR-0013 D8): ОДНА и та же policy/rate/base для
+/// обеих моделей; отличается только механизм сбора. V1 (2.12E): PARTNER_COLLECT
+/// (Partner собирает деньги покупателя → CommissionAccrual receivable).
+/// SPLIT_AT_PAYMENT — 2.12C (native PSP split), аддитивное расширение enum.
+/// PSP НЕ владеет business policy (invariant 12).
+enum CommissionCollectionModel {
+  PARTNER_COLLECT
 
+  @@schema("finance")
+}
+
+/// Commission (CMS-*) — TravelHub платформенная комиссия. НЕ ProviderFee
+/// (2.10B). Step 2.12E: canonical earned-факт (ADR-0013 D9) — одна строка =
+/// один TravelHub earned commission факт сделки (frozen policy-результат),
+/// создаётся producer-ом из frozen commissionSnapshot (0 live policy lookup).
+/// Immutable финансовые поля (orderId/partnerId/amount/currency/collectionModel)
+/// не переписываются; status эволюционирует в будущих шагах (INVOICED/PAID —
+/// 2.12E+/2.14). collectionModel — PARTNER_COLLECT (V1); SPLIT_AT_PAYMENT —
+/// 2.12C (аддитивное расширение enum).
+model Commission {
+  id         String                   @id @default(uuid())
+  code       String                   @unique // CMS-00000001
+  /// ref order.Order, без FK. Идемпотентность: ОДИН Commission на Order
+  /// (источник-факт) — @@unique([orderId]) DB backstop.
+  orderId    String
+  /// ref crm.Partner, без FK (frozen sellerPartnerId из Order).
+  partnerId  String
+  amount     Decimal                  @db.Decimal(12, 2)
+  currency   String                   @default("USD")
+  /// Collection-модель (ADR-0013 D8/D9). V1: PARTNER_COLLECT (2.12E producer).
+  collectionModel CommissionCollectionModel @default(PARTNER_COLLECT)
+  status     CommissionStatus         @default(ACCRUED)
+  version    Int                      @default(1)
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+
+  @@unique([orderId])
   @@index([orderId])
   @@index([partnerId])
   @@index([status])
@@ -3670,22 +3723,35 @@ enum CommissionAccrualStatus {
   @@schema("finance")
 }
 
-/// CommissionAccrual (CAA-*) — задолженность Partner (PARTNER_COLLECT mode).
-/// Foundation-модель; агрегация/списание — 2.12E/2.14.
+/// CommissionAccrual (CAA-*) — receivable: долг Partner перед TravelHub
+/// (PARTNER_COLLECT mode, ADR-0013 D9). Step 2.12E: создаётся producer-ом на
+/// Order creation из frozen commissionSnapshot (0 live lookup), ОДНА строка =
+/// один receivable на Commission-факт (sourceCommissionId unique). Immutable
+/// финансовые поля; status эволюционирует в будущих шагах (INVOICED/COLLECTED —
+/// 2.12E+/2.14). periodStart/periodEnd — NULL (порядок-уровневое accrual;
+/// периодизация — deferred). accruedAt — сервер-owned время признания
+/// (Order creation, 2.10C DEFER → 2.12E; первый-wins, без backfill).
 model CommissionAccrual {
   id          String                   @id @default(uuid())
   code        String                   @unique // CAA-00000001
-  /// ref crm.Partner, без FK.
+  /// ref crm.Partner, без FK (frozen sellerPartnerId).
   partnerId   String
   amount      Decimal                  @db.Decimal(12, 2)
   currency    String                   @default("USD")
   status      CommissionAccrualStatus  @default(ACCRUED)
   periodStart DateTime?
   periodEnd   DateTime?
+  /// ref finance.Commission (canonical earned-факт), без FK. ОДИН accrual на
+  /// Commission — @@unique backstop.
+  sourceCommissionId String?
+  /// 2.10C DEFER → 2.12E: время признания receivable (Order creation, UTC).
+  /// Server-owned, first-only; NULL = legacy/не известно (без backfill).
+  accruedAt   DateTime?
   version     Int                      @default(1)
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
 
+  @@unique([sourceCommissionId])
   @@index([partnerId])
   @@index([status])
   @@schema("finance")

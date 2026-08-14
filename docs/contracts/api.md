@@ -843,6 +843,31 @@ liability-исход — deferred (2.12D/2.14A).
 
 ---
 
+## Step 2.12E — Commission Accrual (PARTNER_COLLECT, ADR-0013 D9/D10/D14/D19)
+
+Finance-owned признание TravelHub Commission (CMS-*) + receivable CommissionAccrual
+(CAA-*) на **Order creation** из **frozen commissionSnapshot** (Quote ISSUE freeze).
+Recognition: Order creation (НЕ Payment CAPTURED/PSP); 0 live policy lookup; base =
+frozen Order.total; amount = round_half_up(base × rate) (Decimal, без JS float).
+
+- `GET /api/v1/finance/commissions?status=&orderId=&partnerId=&page=&pageSize=`
+  — list immutable earned-фактов (фильтры whitelist; пагинация ≤ 100; `status` — строго
+  валидный CommissionStatus (ACCRUED/INVOICED/PAID), invalid → 400, НЕ raw 500 — strict
+  review fix 2.12E; page/pageSize 1..100, invalid → 400).
+- `GET /api/v1/finance/commissions/:code` — detail (404 unknown).
+- `GET /api/v1/finance/commission-accruals?status=&partnerId=&page=&pageSize=`
+  — list receivable-фактов (`status` — строго валидный CommissionAccrualStatus,
+  invalid → 400).
+- `GET /api/v1/finance/commission-accruals/:code` — detail (404 unknown).
+
+Write-эндпоинтов НЕТ: факты создаются ТОЛЬКО CommissionAccrualConsumer (OrderCreated),
+immutable (update/delete путей нет). RBAC: read — `finance.commission.read`
+(фактические держатели FINANCE/DIRECTOR/ANALYST; SALES_MANAGER/OPERATOR/BUYER →
+403); anonymous → 401. DTO без PII (refs + frozen money + status + accruedAt).
+
+0 side-effects: факты НЕ создают Ledger (2.12D), Settlement/Payout (2.14A/B),
+Invoice (2.14), PSP split (2.12C), Refund/Dispute adjustments (D11/D12 deferred).
+
 ## Step 2.14E — Commission Policy (Channel-Based Commission Rules Foundation, ADR-0013)
 
 Finance-owned mutable master data `finance.CommissionPolicy` (CMP-*) — ЕДИНСТВЕННЫЙ

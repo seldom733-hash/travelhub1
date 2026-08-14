@@ -3,6 +3,7 @@ import { SalesController, SalesCenterController } from "./sales.controller";
 import { CheckoutController } from "./checkout.controller";
 import { SalesService } from "./sales.service";
 import { CatalogModule } from "../catalog/catalog.module";
+import { FinanceModule } from "../finance/finance.module";
 
 /**
  * PHASE 2 STEP 2.1 — Sales Domain Foundation (новый bounded context, sales.*).
@@ -15,7 +16,9 @@ import { CatalogModule } from "../catalog/catalog.module";
  * (ADR-0001), а вызывает канонический owner command в общей транзакции.
  */
 @Module({
-  imports: [CatalogModule],
+  // Step 2.12E: FinanceModule — для CommissionPolicyService (freeze-time read
+  // при Quote ISSUE, ADR-0013 D1; READ-only cross-domain, как PaymentTerms 2.3B).
+  imports: [CatalogModule, FinanceModule],
   controllers: [SalesController, SalesCenterController, CheckoutController],
   providers: [SalesService],
   /** Step 2.2F: SalesService экспортируется для Reverse owner orchestration

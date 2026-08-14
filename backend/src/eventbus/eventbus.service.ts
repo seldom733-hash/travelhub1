@@ -116,8 +116,11 @@ export type EventHandler = (event: OutboxEnvelope) => void | Promise<void>;
  * Паттерн: доменное событие записывается в events.OutboxEvent В ТОЙ ЖЕ транзакции,
  * что и изменение сущности (метод emit), а после коммита вызывается publishPending(),
  * который рассылает события подписчикам и помечает их PUBLISHED/FAILED.
- * События-результаты (BookingCreated, OrderCreated из consumer-ов) пишутся сразу
+ * События-результаты без потребителей (BookingCreated и др.) пишутся сразу
  * PUBLISHED — они фиксируют факт в ленте и не рассылаются повторно.
+ * События с потребителями (BookingConfirmed, OrderCreated — Step 2.12E
+ * CommissionAccrualConsumer) пишутся PENDING (emit) и доставляются после
+ * коммита через publishPending() вызывающим сервисом/consumer-ом.
  *
  * Идемпотентность consumer-ов — через events.InboxEvent (unique consumerId+eventId).
  * Шина in-process; интерфейс (on/emit/publishPending) позволяет заменить её на

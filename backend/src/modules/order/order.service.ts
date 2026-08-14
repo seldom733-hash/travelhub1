@@ -209,6 +209,20 @@ export function assertValidOrderRequestedPayload(p: unknown): asserts p is Order
   if (tz !== null && tz !== undefined && (typeof tz !== "string" || !isIanaTimeZone(tz))) {
     throw new ValidationDomainError("OrderRequested payload serviceTimeZone is not a valid IANA timezone");
   }
+  // Step 2.12E (ADR-0013 D7/D14): frozen commission контекст — additive,
+  // v1-совместим. Снапшот переносится verbatim (глубокая валидация формы —
+  // Finance producer при признании accrual, единый authority). Здесь — только
+  // базовый shape-guard против мусора в durable payload.
+  if (x.commissionSnapshot !== null && x.commissionSnapshot !== undefined && typeof x.commissionSnapshot !== "object") {
+    throw new ValidationDomainError("OrderRequested payload commissionSnapshot must be an object or null");
+  }
+  if (
+    x.sellerPartnerId !== null &&
+    x.sellerPartnerId !== undefined &&
+    (typeof x.sellerPartnerId !== "string" || x.sellerPartnerId.trim().length === 0)
+  ) {
+    throw new ValidationDomainError("OrderRequested payload sellerPartnerId is invalid");
+  }
 }
 
 /** Money-проверка frozen snapshot: string, parseable Decimal, >= 0. NULL/undefined — ок. */
@@ -261,7 +275,10 @@ export class OrderService {
    *  - OrderTraveler — минимальный snapshot (firstName/lastName/birthDate,
    *    dataCompleteness=INCOMPLETE — passport данные не входят в checkout
    *    контекст, дополняются позже через PATCH /travelers);
-   *  - OrderCreated (PUBLISHED result-event) — атомарно с Order (emitResult).
+   *  - OrderCreated — атомарно с Order, эмитится PENDING (emit) и доставляется
+   *    подписчикам после коммита (order-requested consumer вызывает
+   *    publishPending): Step 2.12E CommissionAccrualConsumer — единственный
+   *    потребитель (canonical Order-created факт, ADR-0013 D10).
    */
   async createOrderFromRequested(
     tx: Prisma.TransactionClient,
@@ -328,6 +345,11 @@ export class OrderService {
         initialAmount: payload.initialAmount ? new Prisma.Decimal(payload.initialAmount) : null,
         remainingAmount: payload.remainingAmount ? new Prisma.Decimal(payload.remainingAmount) : null,
         acquisitionSource: payload.acquisitionSource,
+        // Step 2.12E (ADR-0013 D7/D14): frozen commission контекст verbatim
+        // (NULL = нет commission-контекста — legacy/без-commission канал;
+        // без backfill). Immutable после создания.
+        sellerPartnerId: payload.sellerPartnerId ?? null,
+        commissionSnapshot: payload.commissionSnapshot ? (payload.commissionSnapshot as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
       select: { id: true, code: true, number: true, customerId: true },
     });
@@ -377,10 +399,13 @@ export class OrderService {
       },
     });
 
-    // OrderCreated — result-event: пишется сразу PUBLISHED в той же транзакции
-    // (факт в ленте атомарно с Order; НЕ виден без committed Order).
+    // OrderCreated — пишется PENDING (emit) в той же транзакции (факт атомарен
+    // с Order; НЕ виден без committed Order); доставку подписчикам выполняет
+    // order-requested consumer через publishPending() ПОСЛЕ коммита (паттерн
+    // booking.service/BookingConfirmed). Потребитель — CommissionAccrualConsumer
+    // (Step 2.12E, canonical Order-created факт, ADR-0013 D10).
     // correlation/causation — из родительского OrderRequested (Step 1.15).
-    const eventId = await this.eventBus.emitResult(tx, {
+    const eventId = await this.eventBus.emit(tx, {
       aggregateType: "Order",
       aggregateId: order.id,
       eventType: DomainEvents.OrderCreated,

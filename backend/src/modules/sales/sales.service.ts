@@ -8,11 +8,13 @@ import { isoUtc } from "../../shared/temporal";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type OrderRequestedPayload } from "../../eventbus/domain-events";
 import { CatalogService } from "../catalog/catalog.service";
+import { CommissionPolicyService } from "../finance/commission-policy.service";
 import { resolveApplicablePeriod, type PeriodRow } from "../catalog/period-resolution";
 import { evaluateRestrictions, type AppliedRestriction, type RestrictionRow } from "../catalog/restriction-evaluation";
 import { Prisma } from "../../generated/prisma/client";
 import {
   CheckoutStatus,
+  CommissionChannel,
   LeadStatus,
   OpportunityStatus,
   PaymentScheme,
@@ -101,6 +103,16 @@ interface Actor {
  *  - money-поля отсутствуют (monetary contract — Step 2.3A/2.4);
  *  - PII не копируется (только canonical customerId reference).
  */
+/**
+ * Step 2.12E (ADR-0013 D15) — acquisition source → CommissionChannel mapping
+ * (freeze-time, server-side). Только MARKETPLACE несёт commission-механизм;
+ * PARTNER_STOREFRONT (SaaS, ADR-0006) / DIRECT / BUYER_REQUEST — no commission
+ * (NULL). NULL acquisition (legacy Quote без source) → no commission. PURE.
+ */
+export function mapCommissionChannelFromAcquisition(source: SalesAcquisitionSource | null | undefined): CommissionChannel | null {
+  return source === SalesAcquisitionSource.MARKETPLACE ? CommissionChannel.MARKETPLACE : null;
+}
+
 @Injectable()
 export class SalesService {
   private readonly logger = new Logger(SalesService.name);
@@ -112,6 +124,9 @@ export class SalesService {
     private readonly eventBus: EventBusService,
     /** Step 2.4: availability reservation через OWNER service boundary (ADR-0001). */
     private readonly catalog: CatalogService,
+    /** Step 2.12E: CommissionPolicy read при Quote ISSUE freeze (ADR-0013 D1,
+     *  READ-only cross-domain; Sales НЕ пишет finance.*). */
+    private readonly commissionPolicies: CommissionPolicyService,
   ) {}
 
   /* ── Lead ───────────────────────────────────────────────────────────────── */
@@ -453,6 +468,45 @@ export class SalesService {
       const now = new Date();
       if (fresh.validUntil <= now) throw new ValidationDomainError(`Quote ${code} validUntil must be in the future`);
 
+      // ── Step 2.12E — commission freeze (ADR-0013 D6/D7/D14/D15) ──
+      // Selection/freeze boundary = Quote ISSUE: policy подбирается
+      // детерминированно по channel и ЗАМОРАЖИВАЕТСЯ здесь (0 live lookup при
+      // признании). Channel mapping (D15): только MARKETPLACE несёт
+      // commission-контекст.
+      const commissionChannel = mapCommissionChannelFromAcquisition(fresh.acquisitionSource);
+      // Seller attribution (D14): один уникальный non-null Product.partnerId по
+      // items на МОМЕНТ ISSUE (snapshot-at-event, НЕ live lookup позже);
+      // multi-seller/отсутствие seller → NULL → 0 commission-фактов (fail-closed).
+      const partnerRows = await tx.product.findMany({
+        where: { id: { in: fresh.items.map((it) => it.productId) } },
+        select: { partnerId: true },
+      });
+      const partnerIds = new Set<string>();
+      for (const p of partnerRows) if (p.partnerId) partnerIds.add(p.partnerId);
+      const sellerPartnerId = partnerIds.size === 1 ? [...partnerIds][0] : null;
+      // Policy selection (D6/D17): детерминированный fail-closed resolver.
+      // NO_POLICY / AMBIGUOUS → NULL snapshot (не «0%» молча, а отсутствие
+      // commission-контекста → позже 0 accrual); NO_COMMISSION_CHANNEL — уже
+      // исключён mapping-ом.
+      let commissionSnapshot: Record<string, unknown> | null = null;
+      if (commissionChannel) {
+        const resolution = await this.commissionPolicies.resolve(commissionChannel, now.toISOString());
+        if (resolution.found) {
+          commissionSnapshot = {
+            policyCode: resolution.policy.code,
+            policyVersion: resolution.policy.version,
+            rateType: resolution.policy.rateType,
+            rate: resolution.policy.rate,
+            baseAmount: String(total),
+            baseCurrency: fresh.currency,
+            channel: commissionChannel,
+            sellerPartnerId,
+            selectedAt: now.toISOString(),
+            roundingContractVersion: "v1",
+          };
+        }
+      }
+
       const res = await tx.quote.updateMany({
         where: { id: row.id, version: fresh.version },
         data: {
@@ -462,6 +516,7 @@ export class SalesService {
           subtotal,
           discountAmount,
           total,
+          commissionSnapshot: commissionSnapshot ? (commissionSnapshot as Prisma.InputJsonValue) : Prisma.JsonNull,
         },
       });
       if (res.count === 0) throw new ConflictError(`Quote ${code} was modified concurrently; retry`);
@@ -909,6 +964,9 @@ export class SalesService {
           initialAmount: checkout.initialAmount,
           remainingAmount: checkout.remainingAmount,
           acquisitionSource: checkout.acquisitionSource,
+          // Step 2.12E (ADR-0013 D7): frozen commission snapshot verbatim из
+          // CheckoutIntent (NULL = нет commission-контекста).
+          commissionSnapshot: checkout.commissionSnapshot ?? Prisma.JsonNull,
           serviceDate,
           serviceTime,
           serviceEndTime,
@@ -934,6 +992,8 @@ export class SalesService {
         serviceTime,
         serviceEndTime,
         serviceTimeZone,
+        // Step 2.12E (ADR-0013 D7): frozen commission snapshot verbatim.
+        commissionSnapshot: checkout.commissionSnapshot ?? null,
       };
 
       // Availability reservation через OWNER service (DD-022 closure).
@@ -1000,6 +1060,10 @@ export class SalesService {
           serviceTime,
           serviceEndTime,
           serviceTimeZone,
+          // Step 2.12E: frozen seller attribution (D14) — из snapshot verbatim.
+          sellerPartnerId: (checkout.commissionSnapshot as Record<string, unknown> | null)?.sellerPartnerId
+            ? String((checkout.commissionSnapshot as Record<string, unknown>).sellerPartnerId)
+            : null,
         } as OrderRequestedPayload,
       });
       await tx.sale.update({
@@ -1145,6 +1209,10 @@ export class SalesService {
           discountValue: quote.discountValue,
           discountAmount: quote.discountAmount,
           total: quote.total as Prisma.Decimal,
+          // Step 2.12E (ADR-0013 D7): frozen commission snapshot verbatim из
+          // ISSUED Quote (как остальной commercial snapshot). NULL = нет
+          // commission-контекста — честно, без пере-резолва.
+          commissionSnapshot: quote.commissionSnapshot ?? Prisma.JsonNull,
           serviceDate,
           // Step 2.8A: frozen IANA zone (Catalog authority; см. выше).
           serviceTimeZone,
@@ -2376,6 +2444,7 @@ export class SalesService {
     serviceTime: string | null;
     serviceEndTime: string | null;
     serviceTimeZone: string | null;
+    commissionSnapshot: Prisma.JsonValue | null;
     completedAt: Date | null;
     completedById: string | null;
     reservationId: string | null;
@@ -2399,6 +2468,7 @@ export class SalesService {
             serviceTime: row.serviceTime ?? null,
             serviceEndTime: row.serviceEndTime ?? null,
             serviceTimeZone: row.serviceTimeZone ?? null,
+            commissionSnapshot: row.commissionSnapshot ?? null,
           }
         : null;
     return {

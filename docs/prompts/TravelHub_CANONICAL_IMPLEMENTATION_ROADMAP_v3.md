@@ -606,7 +606,7 @@ authorize/capture/fail/cancel, webhook signature, idempotency.
 Buyer платит platform-controlled rail → Ledger/Settlement → Payout
 Partner.
 
-· **Step 2.12E --- PARTNER_COLLECT / Post-Factum Commission**\
+· **Step 2.12E --- PARTNER_COLLECT / Post-Factum Commission** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-15; ADR-0013 D9/D10/D14/D19 материализован: признание Commission (CMS-*) + CommissionAccrual (CAA-*) на Order creation из frozen commissionSnapshot — Quote ISSUE freeze (policy selection через детерминированный resolver + Order.sellerPartnerId snapshot-at-event, verbatim Checkout→Sale→Order); recognition = Order creation (НЕ Payment CAPTURED/PSP); 0 live policy lookup; base = frozen Order.total; amount = round_half_up(base × rate) (Decimal, без JS float); fail-closed: NO_POLICY/AMBIGUOUS/multi-seller/без seller → 0 фактов (не «0%»); idempotency: inbox + Commission_orderId_key + CommissionAccrual_sourceCommissionId_key; divergent replay → ConflictError; CommissionAccrued (PUBLISHED, PII-free, causation chain OrderRequested→OrderCreated→CommissionAccrued); read API (list/detail, RBAC finance.commission.read — FINANCE/DIRECTOR/ANALYST; 403 SALES_MANAGER/OPERATOR/BUYER; 404 unknown); OrderCreated доставляется подписчикам (emit PENDING; order-requested consumer после коммита помечает OrderRequested PUBLISHED + publishPending — паттерн payment/booking; downstream failure → OrderCreated FAILED, не молчаливый 0-факт); миграция 20260814190000_add_partner_collect_commission_accrual аддитивная (56/56, drift 0); unit 596/596, serial e2e 1129/1129 (65 suites, +8 partner-collect T1–T8); арх-док docs/architecture/partner-collect-commission-accrual.md; отчёт docs/prompts/PHASE_2_STEP_2.12E_PARTNER_COLLECT_COMMISSION_ACCRUAL_FOUNDATION_IMPLEMENTATION_REPORT.md; NEXT = STRICT REVIEW (отдельный промпт; 2.12C SPLIT_AT_PAYMENT остаётся ⏳ NOT STARTED; Step 2.14 остаётся ⛔ BLOCKED) STRICT REVIEW (2026-08-15; независимый adversarial-аудит: имплементационный отчёт не принимался на веру; hard gates PASS — scope, policy authority (единственный finance.CommissionPolicy, 0 hardcoded ставок), freeze verbatim (T9: policy A заморожена → archive/activate B → Commission использует frozen A 0.15, не B 0.30), seller snapshot frozen (T10: product.partnerId мутирован после freeze → Commission остаётся у frozen seller), one-seller/multi-seller fail-closed (T4/T11), NO_POLICY/AMBIGUOUS fail-closed (T5 + resolver unit), money Decimal ROUND_HALF_UP (T2 + half-cent unit 1.00×0.015=0.02), corrupted snapshot fail-loud (T8 + unit matrix), single write-authority (repo-wide grep), atomicity (одна tx: Commission+Accrual+CommissionAccrued+inbox), idempotency тройная + divergent → ConflictError (unit), concurrency (T12: concurrent OrderCreated → ровно 1 факт, 0 raw 500), EventBus OrderCreated delivery (emit PENDING + consumer publish после коммита; rollback no-publish; attempts=1 regression sale-completion 29-30; narrow fix, НЕ redesign EventBus), RBAC по факту ROLE_PERMISSIONS (FINANCE/DIRECTOR/ANALYST read; ADMIN=ALL_PERMISSIONS; 403 SALES_MANAGER/OPERATOR/MODERATOR/MARKETER/PARTNER/BUYER), boundaries (T7: delta 0 по Ledger/ProviderFee/Settlement/Payout/Invoice/Payment/Refund/Dispute/Booking/Availability); НАЙДЕНО И ИСПРАВЛЕНО: 1) MEDIUM validation — malformed selectedAt проходил snapshot-валидацию (битый provenance) → ISO 8601 проверка (fail-loud); 2) MEDIUM raw 500 — invalid status-фильтр read API → Prisma enum error → @IsEnum на DTO → контролируемый 400 (латентный тот же паттерн у Payment/Refund list — задокументирован, вне scope 2.12E); 3) HIGH e2e-infra — fixture Order number выводился из ORD-счётчика вместо TH-2026 sequence → коллизия уникальности Order (OrderRequested FAILED) → канонический IdsService в fixture-ах; 4) LOW drift — Order.sellerPartnerId @@index отсутствовал в schema при наличии индекса в миграции → добавлен (live→schema diff 0); +5 review e2e (T9–T13: policy-after-freeze, catalog-after-freeze, multi-seller, concurrent duplicate, pagination/enum validation) + T3 RBAC matrix расширен + T7 Booking/Availability delta + unit +3 (half-cent, zero-amount, snapshot-матрица); РЕГРЕССИЯ (факт): unit 598/598, targeted EventBus e2e 122/122 (10 suites), serial e2e 1134/1134 (65 suites), frontend tsc + vitest 135/135 + build, backend build, migrate 56/56 up-to-date, live→schema drift 0 (после фикса); отчёт docs/prompts/PHASE_2_STEP_2.12E_PARTNER_COLLECT_COMMISSION_ACCRUAL_FOUNDATION_STRICT_REVIEW_REPORT.md; NEXT по dependency graph = STEP 2.12A — PAYMENT PROVIDER ABSTRACTION (2.12C SPLIT_AT_PAYMENT hard-depends на 2.12A+2.12B+2.14E policy — зафиксировано; 2.14 ⛔ BLOCKED остаётся; 2.14F UI ⏳ PLANNED))
 Buyer платит Partner → `CommissionAccrual` фиксирует долг Partner перед
 TravelHub → settlement/invoice/collection.
 
@@ -684,6 +684,43 @@ bank result.
 Разные commission policies для Marketplace, Storefront, Custom Domain,
 API/Manual. Никаких hardcoded ставок. Storefront SaaS subscription и
 Marketplace commission --- разные механизмы.
+
+· **Step 2.14F --- Commission Policy Management UI** 🚧 PLANNED — НЕ реализован
+(2026-08-14; UI/roadmap-реконсиляция — `docs/prompts/PHASE_2_FINANCE_COMMISSION_POLICY_UI_ROADMAP_RECONCILIATION_REPORT.md`;
+ранее UI-шаг отсутствовал: Phase 3 имеет Analytics/CRM/Marketing/Support/Users/
+Documents/Calendar/Reports/Integrations/AI Center UI, но НЕ Finance Center UI;
+Screen Design §7 перечисляет «Commissions» в навигации Finance Center, но без
+контракта экрана Commission Policies).
+Цель: `Finance Center → Commissions → Commission Policies` — управление
+canonical `finance.CommissionPolicy` (master data 2.14E, НЕ Commission-факты).
+Минимальный scope (§17 реконсиляции): list (CMP-*/channel/rateType/rate
+отображение 15%/status/effectiveFrom/effectiveTo/version/createdAt,
+current/effective indicator если безопасно выводим), whitelist-фильтры
+(status/channel), detail + version history (read-only, backend-owned
+CommissionPolicyHistory; НЕ реконструкция на клиенте), create DRAFT / edit
+DRAFT / activate / archive (только по факт. status backend), effective period
+[from,to) + open-ended, overlap/validation conflict — контролируемые состояния,
+rate-ввод «15» ↔ API «0.15» (display-конверсия ТОЛЬКО; frontend НЕ второй
+policy/расчётный authority, 0 float-арифметики как authority), RBAC-aware
+(read — FINANCE/DIRECTOR/ANALYST; manage — FINANCE/ADMIN; SALES_MANAGER/
+OPERATOR/PARTNER → 403 + скрытие меню ≠ security), permission-denied/empty/
+loading/error states, responsive как internal centers.
+Табы `Policies | Commission Facts | Accruals`: Policies активна (backend 2.14E
+approved); Commission Facts — gated на future backend runtime (2.12C/2.14),
+Accruals — gated на 2.12E backend runtime; НЕ маркировать их UI реализованным.
+НЕ редактирует исторические Commission/снапшоты/Refund/Dispute-суммы (ручное
+управление = master data policy, НЕ финансовый override; корректировка истории —
+append-only компенсирующие факты в будущих approved шагах). Settings/Catalog/
+PSP НЕ дублируют authority (Settings → Commission Rate запрещён; Catalog —
+read-only reference при необходимости).
+**API-гэп (prerequisite, задокументирован в реконсиляции):** read endpoint
+версионной истории `GET /api/v1/finance/commission-policies/:code/history`
+отсутствует в 2.14E (CommissionPolicyHistory пишется, но не читается через API;
+прецедент: `/service-units/:id/history`, `/tariffs/:id/history`). Реализовать
+как backend-подготовку 2.14F.
+Зависимости: 2.14E API (approved, 2026-08-14) → 2.14F (UI); 2.14F НЕ требует
+2.12C/2.12E. Step 2.14 (backend Invoice/Commission runtime) остаётся
+⛔ BLOCKED — 2.14F его не разблокирует и не маркирует реализованным.
 
 · **Step 2.15 --- Documents Commercial Flow**\
 Contract, invoice/receipt/voucher, immutable snapshots,

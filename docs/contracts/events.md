@@ -81,7 +81,7 @@ Outbox event → consumer → child event → diagnostics/audit):
 | `CustomerUpdated` | CRM | `{ customerId, code, name, changedFields[] }` |
 | `PartnerCreated` | CRM | `{ partnerId, code, name, source }` — `source`: "partner_onboarding"\|"crm_center" (onboarding channel, НЕ acquisition); contactEmail/registrationNumber убраны (STRICT REVIEW FIX) |
 | `OrderRequested` | Sales | immutable commercial snapshot + refs (Step 2.4 §5; STRICT REVIEW 2.5: +`reservationIds` (все holds), +item `productType` frozen; Step 2.8A: +frozen local temporal факты): `{ version, saleId, saleCode, checkoutId, checkoutCode, quoteId, customerId\|null, reservationId\|null, reservationIds[], items[{productId, productCode, productTitle, productType, tariffId, tariffCode, quantity, unitPrice, amount}], currency, subtotal, discountType, discountValue\|null, discountAmount\|null, total, paymentScheme\|null, prepaymentType\|null, prepaymentValue\|null, initialAmount\|null, remainingAmount\|null, acquisitionSource, serviceDate\|null, serviceTime\|null (local HH:mm), serviceEndTime\|null (local HH:mm), serviceTimeZone\|null (IANA) }` — **command** в Order domain; retryable=true (durable retry); БЕЗ PII (travelers — READ-only из CheckoutIntent, immutable после completion). Step 2.8A: time/zone — frozen verbatim из CheckoutIntent (zone — authority Catalog через binding); валидация на входе consumer-а (time без zone / не-IANA / не-HH:mm → событие FAILED, никакого Order) |
-| `OrderCreated` | Order | `{ orderId, code, number, customerId, amount, currency }` — `customerId` может быть NULL (canonical Order без CRM-клиента, internal assisted flow, Step 2.5) |
+| `OrderCreated` | Order | `{ orderId, code, number, customerId, amount, currency }` — `customerId` может быть NULL (canonical Order без CRM-клиента, internal assisted flow, Step 2.5). Step 2.12E: эмитится PENDING (emit) атомарно с Order и ДОСТАВЛЯЕТСЯ подписчикам (order-requested consumer после коммита помечает OrderRequested PUBLISHED и вызывает publishPending) — потребитель CommissionAccrualConsumer (признание Commission/CommissionAccrual, ADR-0013 D10). Downstream failure → OrderCreated FAILED (не молчаливый 0-факт) |
 | `OrderReadyForBooking` | Order | `{ orderId, code, customerId }` — факт: заказ готов к бронированию (transition `confirm`; бывш. `OrderApproved`, Step 1.14) |
 | `OrderFulfilled` | Order | `{ orderId, code, customerId }` — факт: заказ исполнен (`complete` или reconcile по терминальным броням, Step 1.14) |
 | `OrderClosed` | Order | `{ orderId, code, customerId }` — факт: заказ закрыт (`close`; CLOSED ≠ CANCELLED ≠ FULFILLED, Step 1.14) |
@@ -139,8 +139,10 @@ reconcile — OrderFulfilled пишется атомарно с переходо
    PENDING-события подписчикам и помечает их PUBLISHED (при ошибке — FAILED,
    событие сохраняется для диагностики; автоматический publisher retry
    FAILED-событий — за пределами Step 1.14, фиксируется как debt).
-3. События-результаты (`BookingCreated`, `OrderCreated` из consumer-ов)
-   пишутся сразу PUBLISHED (фиксация факта в ленте, без повторной рассылки).
+3. События-результаты БЕЗ потребителей (напр. `BookingCreated`) пишутся сразу
+   PUBLISHED (фиксация факта в ленте, без повторной рассылки). События с
+   потребителями (напр. `OrderCreated` — CommissionAccrualConsumer, Step 2.12E)
+   пишутся PENDING (emit) и доставляются после коммита через publishPending().
 4. Идемпотентность consumer-ов: `events.InboxEvent` (unique consumerId+eventId).
 
 Реализация: `backend/src/eventbus/eventbus.service.ts`,
@@ -226,3 +228,16 @@ HTTP-команды: correlation = server UUID, causation = null. Payload PII-fr
 provider-секретов/evidence-body. Consumer-ов НЕТ (0 cross-domain projections —
 Roadmap 2.13A их не требует). События НЕ обещают PSP completion / ledger
 posting / commission reversal (deferred 2.12A–G/2.14+).
+
+## Step 2.12E — Commission Accrual (PARTNER_COLLECT, ADR-0013 D9/D10/D19)
+
+| Событие | Producer | Payload | Потребители |
+|---|---|---|---|
+| `CommissionAccrued` | Finance (CommissionAccrualConsumer, на OrderCreated) | `{ commissionId, commissionCode, accrualId, accrualCode, orderId, orderCode, partnerId, channel, collectionModel: "PARTNER_COLLECT", amount (Decimal string), currency, policyCode, policyVersion, baseAmount, baseCurrency, selectedAt }` — признан earned-факт + receivable на Order creation из frozen snapshot; без PII (email/phone/passport/card отсутствуют) | лента/аналитика (потребителей 0) |
+
+Producer — Finance-owned consumer на `OrderCreated` (READ-only cross-context чтение
+Order, ADR-0001; НЕ пишет order.*). correlation/causation наследуются из
+OrderCreated (chain: OrderRequested → OrderCreated → CommissionAccrued). Payload
+PII-free: refs + frozen money/policy provenance. 0 side-effects: событие НЕ
+создаёт Ledger/Settlement/Payout/Invoice/PSP split (deferred 2.12D/2.14A/B/2.14/
+2.12C).

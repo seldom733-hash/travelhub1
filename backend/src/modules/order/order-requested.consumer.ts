@@ -82,6 +82,22 @@ export class OrderRequestedConsumer implements OnModuleInit {
 
         await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
       });
+
+      // Step 2.12E: OrderCreated эмитится PENDING (emit) атомарно с Order;
+      // доставка подписчикам (CommissionAccrualConsumer) — сразу после
+      // успешного коммита. ПЕРЕД вложенным publishPending помечаем исходное
+      // OrderRequested PUBLISHED: иначе вложенный publishPending заново
+      // доставил бы его всем обработчикам (внешний цикл ещё держит его
+      // PENDING) → задвоение deliveries/attempts. Порядок handler-ов: этот
+      // consumer — первый, поэтому OrderCreated уже в ленте к моменту
+      // вложенного publishPending. Downstream failure (коррупция snapshot)
+      // помечает OrderCreated FAILED внутри publishPending без rethrow —
+      // OrderRequested остаётся PUBLISHED.
+      await this.prisma.outboxEvent.updateMany({
+        where: { id: ev.id, status: "PENDING" },
+        data: { status: "PUBLISHED", publishedAt: new Date() },
+      });
+      await this.eventBus.publishPending();
     } catch (err) {
       // STRICT REVIEW 2.5: P2002 = no-op ТОЛЬКО для idempotency-unique
       // (inbox consumerId+eventId, Order.saleId). Любой другой unique-коллизии

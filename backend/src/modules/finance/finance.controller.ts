@@ -16,6 +16,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
 import { CommissionPolicyService } from "./commission-policy.service";
+import { CommissionService } from "./commission.service";
 import { DisputeService } from "./dispute.service";
 import { FinanceService } from "./finance.service";
 import { LedgerService } from "./ledger.service";
@@ -29,6 +30,8 @@ import { CurrentUser, RequirePermissions } from "../../security/auth/decorators"
 import { assertNoForbiddenKeys } from "../../shared/field-validation";
 import {
   COMMISSION_POLICY_FORBIDDEN_KEYS,
+  CommissionAccrualListQueryDto,
+  CommissionListQueryDto,
   CommissionPolicyListQueryDto,
   CreateCommissionPolicyDto,
   CreateCurrencyDto,
@@ -66,6 +69,7 @@ export class FinanceController {
     private readonly refunds: RefundService,
     private readonly disputes: DisputeService,
     private readonly commissionPolicies: CommissionPolicyService,
+    private readonly commissions: CommissionService,
   ) {}
 
   // ── Currency (finance.currency.manage) ──────────────────────────────────────
@@ -434,5 +438,34 @@ export class FinanceController {
   @RequirePermissions("finance.commission.manage")
   async archiveCommissionPolicy(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.commissionPolicies.archive(code, { id: actor.id, username: actor.username });
+  }
+
+  // ── Commission facts / CommissionAccrual read (Step 2.12E, PARTNER_COLLECT) ─
+  // Immutable финансовые факты (producer — CommissionAccrualConsumer на
+  // OrderCreated). Read: finance.commission.read (FINANCE/DIRECTOR/ANALYST);
+  // mutation API отсутствует (immutable; status-переходы — future шаги).
+
+  @Get("commissions")
+  @RequirePermissions("finance.commission.read")
+  async listCommissions(@Query() query: CommissionListQueryDto) {
+    return this.commissions.listCommissions(query);
+  }
+
+  @Get("commissions/:code")
+  @RequirePermissions("finance.commission.read")
+  async getCommission(@Param("code") code: string) {
+    return this.commissions.getCommissionByCode(code);
+  }
+
+  @Get("commission-accruals")
+  @RequirePermissions("finance.commission.read")
+  async listCommissionAccruals(@Query() query: CommissionAccrualListQueryDto) {
+    return this.commissions.listAccruals(query);
+  }
+
+  @Get("commission-accruals/:code")
+  @RequirePermissions("finance.commission.read")
+  async getCommissionAccrual(@Param("code") code: string) {
+    return this.commissions.getAccrualByCode(code);
   }
 }

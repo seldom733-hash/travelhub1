@@ -136,6 +136,10 @@ export interface SaleCommercialSnapshot {
   serviceTime: string | null;
   serviceEndTime: string | null;
   serviceTimeZone: string | null;
+  /** Step 2.12E (ADR-0013 D7): frozen commission snapshot (verbatim из
+   *  CheckoutIntent). NULL = нет commission-контекста. Копируется в
+   *  OrderRequested payload → Order. */
+  commissionSnapshot: unknown;
 }
 
 /** Step 2.4: результат команды completeSale. */
