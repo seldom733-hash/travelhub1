@@ -331,7 +331,7 @@ Frontend unchanged (0 files touched). `tsc --noEmit` clean; vitest **135/135**;
 - Checker regression: 13/13.
 - Roadmap artifact-integrity checker (post-update run): **PASS=95 WARN=0 FAIL=0**
   (59 steps, 463 references). Footer initially NOT_PERSISTED (pre-commit
-  truthfulness); flipped to PERSISTED with real SHA in the second
+  truthfulness); flipped to PERSISTED with real SHA (`b3307cc`) in the second
   footer/provenance commit (established convention).
 
 ## 52. Exact files changed
@@ -380,16 +380,16 @@ Explicit staging of exact files only (§52); commit; push; upstream verification
 REPOSITORY EVIDENCE
 repository: D:\travelhub_v1 (origin seldom733-hash/travelhub1)
 branch: master
-head: <populated after commit>
-origin: <populated after commit>
+head: b3307cc
+origin: b3307cc
 worktree_clean: false (unrelated untracked prompt files remain)
 migration_count: 56
 reviewed_state: COMMIT
-reviewed_diff_base: <populated after commit>
-reviewed_diff_head: <populated after commit>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
-push_status: <populated after commit>
+reviewed_diff_base: c132acc
+reviewed_diff_head: b3307cc
+persistence_status: PERSISTED
+persistence_sha: b3307cc2a9c8077382d20607a7072c9889f3b7d6
+push_status: PUSHED
 ```
 
 ## 58. Release status
