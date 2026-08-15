@@ -7,6 +7,7 @@ import { FinanceController } from "./finance.controller";
 import { FinanceService } from "./finance.service";
 import { LedgerService } from "./ledger.service";
 import { PaymentService } from "./payment.service";
+import { PaymentProviderModule } from "./provider/payment-provider.module";
 import { RefundService } from "./refund.service";
 import { SettlementService } from "./settlement.service";
 
@@ -25,11 +26,12 @@ import { SettlementService } from "./settlement.service";
  *  НЕ пишет в Order/Booking/Catalog/Availability (ADR-0001).
  */
 @Module({
+  imports: [PaymentProviderModule],
   controllers: [FinanceController],
   providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer],
   /** Step 2.12E: CommissionPolicyService экспортируется для Sales/Order
    *  freeze-time read (ADR-0013 D1: read by Sales/Order at freeze boundary,
    *  READ-only cross-domain). CommissionService/Consumer — Finance-internal. */
-  exports: [CommissionPolicyService, CommissionService],
+  exports: [CommissionPolicyService, CommissionService, PaymentProviderModule],
 })
 export class FinanceModule {}
