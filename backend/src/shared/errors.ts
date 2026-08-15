@@ -36,3 +36,10 @@ export class ForbiddenError extends DomainError {
     this.name = "ForbiddenError";
   }
 }
+
+export class TooManyRequestsError extends DomainError {
+  constructor(message: string) {
+    super(message, 429);
+    this.name = "TooManyRequestsError";
+  }
+}

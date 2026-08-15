@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, auth } from "@/lib/api";
+import { api, auth, fetchSessionUser } from "@/lib/api";
 import { postLoginTarget, safeNextPath } from "@/lib/routes";
 import { t, useLocale } from "@/lib/i18n";
 import LocaleSelector from "@/components/public/LocaleSelector";
@@ -32,13 +32,14 @@ function LoginPageInner() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Уже залогиненный пользователь: переводим по роли (внешние — на витрину/next).
+  // Уже залогиненный пользователь (Step 2.17: сессия в HttpOnly cookie):
+  // проба /auth/session → переводим по роли (внешние — на витрину/next).
   useEffect(() => {
-    if (!auth.token) return;
-    api
-      .get<{ role: string }>("/auth/me")
-      .then((u) => router.replace(postLoginTarget(u.role, rawNext)))
-      .catch(() => router.replace("/"));
+    fetchSessionUser()
+      .then((u) => {
+        if (u) router.replace(postLoginTarget(u.role, rawNext));
+      })
+      .catch(() => undefined);
   }, [router, next]);
 
   const submit = async (e: React.FormEvent) => {

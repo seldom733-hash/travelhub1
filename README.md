@@ -8,7 +8,9 @@ event-driven интеграция с transactional outbox.
 
 ## Обзор
 
-- **Backend** — NestJS модульный монолит, REST `http://localhost:4000/api/v1/...`.
+- **Backend** — NestJS модульный монолит, REST `http://localhost:4000/api/v1/...`;
+  durable event delivery — фоновый outbox-воркер (advisory-lock serialized,
+  Step 2.17): PENDING публикуются, retryable FAILED ретраятся автоматически.
 - **Frontend** — Next.js (App Router), RU/AZ/EN: каталог, search, витрины
   `/store/:slug`, Partner Cabinet, Buyer Cabinet `/account/*`, internal staff UI
   `/app/*`.
@@ -17,7 +19,9 @@ event-driven интеграция с transactional outbox.
 - **Интеграция** — только через события (transactional outbox + inbox
   deduplication), correlation/causation сквозь цепочку (ADR-0009/0010).
 - **Безопасность** — JWT auth + granular RBAC (10 канонических ролей), права
-  перечитываются из БД на каждый запрос, аудит в `security.AuditLog`.
+  перечитываются из БД на каждый запрос, аудит в `security.AuditLog`. Сессия —
+  серверная HttpOnly cookie (`travelhub.auth`, Secure в prod, SameSite=Lax);
+  logout реально инвалидирует токены через `User.tokenVersion` (Step 2.17).
 
 ## Архитектура в двух словах
 
@@ -150,12 +154,14 @@ npm run build        # next build
 
 ## CI/CD
 
-Workflow `.github/workflows/ci.yml` определён (typecheck/lint/build на push/PR),
-но **на текущий момент он нерабочий**: выполняет `npm ci` и `npm run build` в
-корне репозитория (где нет `package.json`) и задаёт `DATABASE_URL=file:./dev.db`
-(SQLite), в то время как бэкенд — PostgreSQL multiSchema. Контроль качества
-держится на локальном/ручном прогоне. Ремонт CI закреплён за
-`PHASE 2 — STEP 2.17 — PLATFORM HARDENING GATE`.
+Workflow `.github/workflows/ci.yml` (Step 2.17):
+
+- работает из **корней пакетов** (`backend/`, `frontend/`), а не из корня репо;
+- backend: `npm ci` → `tsc --noEmit` → unit → `prisma migrate deploy` на
+  PostgreSQL service (multiSchema, реальные миграции) → полный serial e2e;
+- frontend: `npm ci` → `tsc --noEmit` → vitest → production build;
+- `legacy/` в CI не участвует (отдельный исторический проект, см. ниже);
+- SQLite-конфигурация legacy-версии в CI не используется.
 
 ## Документация
 
@@ -190,10 +196,9 @@ SQLite со своим `package.json`, `prisma/schema.prisma`, `dev.db`). Это
 - **PSP-интеграция не реализована**: Finance — фундамент (master data +
   immutable факты); Payment/Refund/Invoice/Commission runtime, settlement engine,
   partner payout rail — deferred (шаги 2.12–2.14).
-- **Фоновый outbox-воркер отсутствует**: доставка PENDING-событий и retry
-  FAILED (`retryFailed`) на текущий момент выполняются вручную/на запросах;
-  durable background delivery — шаг 2.17 (platform hardening).
 - **Финансовый UI** минимален (нет полноценного Finance Center во frontend).
-- **CI** нерабочий — см. раздел «CI/CD».
+- **Login rate limiter** — in-memory per-instance (single-instance deployment;
+  при горизонтальном масштабировании требуется external store — известно и
+  документировано в Step 2.17).
 - Часть бухгалтерских/коммерческих процессов (commission collection,
   settlement lifecycle, reconciliation) — deferred.

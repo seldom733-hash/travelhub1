@@ -11,6 +11,13 @@ import { assertValidBusinessEventWrite, type BusinessEventActor, type BusinessEv
 export const OUTBOX_MAX_ATTEMPTS = 5;
 
 /**
+ * Step 2.17: envelope schemaVersion (additive default v1). Consumer-ы могут
+ * проверять version и отклонять неизвестные будущие версии; v1-контракты
+ * толерантны к >= 1. См. BusinessEventEnvelope.version.
+ */
+export const OUTBOX_ENVELOPE_VERSION = 1;
+
+/**
  * Step 2.4: экспоненциальный backoff (чистый helper, unit-testable):
  * попытка n (1-based) → задержка до следующей: 2^(n-1) секунд, cap 60s.
  */
@@ -84,6 +91,8 @@ export function toOutboxEnvelope(row: {
     actor: toActor(row.actor),
     entityId: row.aggregateId,
     entityType: row.aggregateType,
+    // Step 2.17: additive envelope schemaVersion=1.
+    version: OUTBOX_ENVELOPE_VERSION,
     payload: row.payload,
     // legacy aliases
     id: row.id,
@@ -209,9 +218,15 @@ async emit(tx: Prisma.TransactionClient, write: OutboxWrite): Promise<string> {
     return created.id;
   }
 
-  /** Публикация накопившихся PENDING-событий подписчикам. Возвращает число опубликованных. */
-  async publishPending(limit = 100): Promise<number> {
-    const pending = await this.prisma.outboxEvent.findMany({
+  /**
+   * Публикация накопившихся PENDING-событий подписчикам. Возвращает число
+   * опубликованных. `tx` — опциональный TransactionClient: worker (Step 2.17)
+   * прогоняет цикл внутри advisory-lock-транзакции, HTTP-пути вызывают без tx
+   * (оптимизация латентности; единственный eventual-delivery механизм — worker).
+   */
+  async publishPending(limit = 100, tx?: Prisma.TransactionClient): Promise<number> {
+    const db = tx ?? this.prisma;
+    const pending = await db.outboxEvent.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "asc" },
       take: limit,
@@ -246,13 +261,13 @@ async emit(tx: Prisma.TransactionClient, write: OutboxWrite): Promise<string> {
             }
           },
         );
-        await this.prisma.outboxEvent.update({
+        await db.outboxEvent.update({
           where: { id: ev.id },
           data: { status: "PUBLISHED", publishedAt: new Date() },
         });
         published++;
       } catch (err) {
-        await this.prisma.outboxEvent.update({
+        await db.outboxEvent.update({
           where: { id: ev.id },
           data: {
             status: "FAILED",
@@ -278,8 +293,9 @@ async emit(tx: Prisma.TransactionClient, write: OutboxWrite): Promise<string> {
    * Возвращает число событий, переведённых в PENDING (не «доставленных» —
    * доставку выполняет последующий publishPending).
    */
-  async retryFailed(limit = 100, now = new Date()): Promise<number> {
-    const retryable = await this.prisma.outboxEvent.findMany({
+  async retryFailed(limit = 100, now = new Date(), tx?: Prisma.TransactionClient): Promise<number> {
+    const db = tx ?? this.prisma;
+    const retryable = await db.outboxEvent.findMany({
       where: {
         status: "FAILED",
         retryable: true,
@@ -292,7 +308,7 @@ async emit(tx: Prisma.TransactionClient, write: OutboxWrite): Promise<string> {
     });
     if (retryable.length === 0) return 0;
     for (const ev of retryable) {
-      await this.prisma.outboxEvent.update({
+      await db.outboxEvent.update({
         where: { id: ev.id },
         data: { status: "PENDING", error: null, nextAttemptAt: outboxNextAttempt(ev.attempts + 1) },
       });

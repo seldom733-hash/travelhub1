@@ -29,16 +29,18 @@ export class JwtAuthGuard implements CanActivate {
     const token = this.extractToken(request);
     if (!token) throw new UnauthorizedException("Missing access token");
 
-    let payload: { sub?: string };
+    let payload: { sub?: string; tv?: number };
     try {
-      payload = await this.jwt.verifyAsync<{ sub?: string }>(token);
+      payload = await this.jwt.verifyAsync<{ sub?: string; tv?: number }>(token);
     } catch {
       throw new UnauthorizedException("Invalid or expired token");
     }
     if (!payload.sub) throw new UnauthorizedException("Invalid token payload");
 
     // Права загружаются из БД на каждый запрос — смена роли применяется сразу.
-    request.user = await this.auth.me(payload.sub);
+    // Step 2.17: payload.tv против user.tokenVersion — logout/revoke отклоняет
+    // ранее выданные токены (даже не истёкшие).
+    request.user = await this.auth.me(payload.sub, payload.tv);
     // Step 1.15A §10: authenticated actor в request context (внутри ALS-scope
     // middleware-а) — envelope.actor = {type:"USER", id} для бизнес-событий
     // этого запроса. Только canonical userId, без username/email/permissions.
@@ -46,8 +48,19 @@ export class JwtAuthGuard implements CanActivate {
     return true;
   }
 
+  /**
+   * Step 2.17: токен из Authorization: Bearer (API-клиенты/e2e, legacy контракт)
+   * ИЛИ из HttpOnly cookie `travelhub.auth` (браузерная сессия, установлена
+   * сервером при login — JS не может её прочитать). Приоритет: header.
+   */
   private extractToken(request: Request): string | undefined {
     const [type, token] = request.headers.authorization?.split(" ") ?? [];
-    return type === "Bearer" ? token : undefined;
+    if (type === "Bearer" && token) return token;
+    const cookie = (request.headers.cookie ?? "")
+      .split(";")
+      .map((c) => c.trim())
+      .find((c) => c.startsWith("travelhub.auth="))
+      ?.slice("travelhub.auth=".length);
+    return cookie ? decodeURIComponent(cookie) : undefined;
   }
 }

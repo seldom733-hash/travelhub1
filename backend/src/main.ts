@@ -2,6 +2,8 @@ import "reflect-metadata";
 import "dotenv/config";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import cookieParser from "cookie-parser";
+import { parseCorsOrigins } from "./shared/cors";
 import { AppModule } from "./app.module";
 import { AppExceptionFilter } from "./shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "./shared/validation-pipe";
@@ -11,7 +13,12 @@ async function bootstrap(): Promise<void> {
 
   // REST, версионирование: /api/v1/{domain}/...
   app.setGlobalPrefix("api/v1");
-  app.enableCors({ origin: true });
+  // Step 2.17: HttpOnly session cookie (travelhub.auth) — читается guard-ом.
+  app.use(cookieParser());
+  // Step 2.17: CORS allowlist вместо origin:true (cookie-сессии: credentials
+  // только для явно разрешённых origins; НЕ wildcard).
+  const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGINS);
+  app.enableCors({ origin: corsOrigins, credentials: true });
   // Step 1.5: qs (extended) query parser — вложенные category-specific фильтры
   // public catalog: ?f[days]=7&f[language]=en → { f: { days: '7', language: 'en' } }.
   (app.getHttpAdapter().getInstance() as { set: (k: string, v: string) => void }).set("query parser", "extended");

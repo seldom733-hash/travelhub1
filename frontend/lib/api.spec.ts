@@ -1,36 +1,36 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { auth } from "./api";
+import { auth, fetchSessionUser } from "./api";
 
 /**
- * Step 1.6 §10: server-side auth boundary (middleware.ts) не может читать
- * localStorage — токен зеркалируется в httpOnly-less cookie `travelhub.auth`.
- * Эти тесты фиксируют cookie-контракт auth-стора.
+ * Step 2.17 — Auth hardening: сессионный credential НЕ хранится в JS-readable
+ * сторадже. Токен — в серверной HttpOnly cookie (JS не читает); этот стор —
+ * только in-memory «флаг сессии» для реактивного UI. localStorage и
+ * document.cookie больше НЕ используются как credential-хранилище.
  */
-describe("api auth store (Step 1.6 §10 — cookie mirror for middleware boundary)", () => {
-  it("setToken пишет токен в localStorage И в cookie travelhub.auth (path=/ SameSite=Lax)", () => {
-    const setter = vi.spyOn(document, "cookie", "set");
+describe("api auth store (Step 2.17 — in-memory session flag, no JS-readable credential)", () => {
+  it("setToken хранит токен ТОЛЬКО в памяти — НЕ пишет в localStorage и НЕ в document.cookie", () => {
     auth.setToken("jwt-abc");
-    expect(window.localStorage.getItem("travelhub.token")).toBe("jwt-abc");
-    expect(document.cookie).toContain("travelhub.auth=jwt-abc");
-    // Атрибуты cookie задаются в строке setter'а (jsdom-джар их не отдаёт через getter).
-    const setCalls = setter.mock.calls.map((c) => String(c[0])).join("|");
-    expect(setCalls).toContain("travelhub.auth=jwt-abc; path=/; SameSite=Lax");
-    setter.mockRestore();
-  });
-
-  it("clear удаляет токен из localStorage и убивает cookie (max-age=0)", () => {
-    auth.setToken("jwt-abc");
-    auth.clear();
+    expect(auth.token).toBe("jwt-abc");
     expect(window.localStorage.getItem("travelhub.token")).toBeNull();
     expect(document.cookie).not.toContain("travelhub.auth");
+    expect(document.cookie).toBe("");
   });
 
-  it("getter токена читает только localStorage (server-side middleware не используется)", () => {
+  it("clear снимает флаг сессии (in-memory) — ничего не пишет в localStorage/cookie", () => {
+    auth.setToken("jwt-abc");
+    auth.clear();
+    expect(auth.token).toBeNull();
+    expect(window.localStorage.getItem("travelhub.token")).toBeNull();
+    expect(document.cookie).toBe("");
+  });
+
+  it("getter токена читает in-memory флаг", () => {
     auth.clear();
     expect(auth.token).toBeNull();
     auth.setToken("jwt-xyz");
     expect(auth.token).toBe("jwt-xyz");
+    auth.clear();
   });
 
   it("subscribe уведомляет подписчиков при set/clear (reactive useCurrentUser)", () => {
@@ -43,10 +43,29 @@ describe("api auth store (Step 1.6 §10 — cookie mirror for middleware boundar
     unsubscribe();
     auth.setToken("t2");
     expect(listener).toHaveBeenCalledTimes(2);
+    auth.clear();
   });
 
-  it("encodeURIComponent: токен с спецсимволами безопасно пишется в cookie", () => {
-    auth.setToken("a b+c/d");
-    expect(document.cookie).toContain(`travelhub.auth=${encodeURIComponent("a b+c/d")}`);
+  it("fetchSessionUser: 200 {user} → пользователь; 200 {user:null} → null; сетевая ошибка → null", async () => {
+    const ok = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ user: { id: "u1", role: "BUYER" } }),
+    });
+    vi.stubGlobal("fetch", ok);
+    expect(await fetchSessionUser()).toEqual({ id: "u1", role: "BUYER" });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ user: null }) }),
+    );
+    expect(await fetchSessionUser()).toBeNull();
+
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+    expect(await fetchSessionUser()).toBeNull();
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401 }));
+    expect(await fetchSessionUser()).toBeNull();
+
+    vi.unstubAllGlobals();
   });
 });

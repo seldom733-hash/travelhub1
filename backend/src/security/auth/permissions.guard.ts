@@ -23,7 +23,14 @@ export class PermissionsGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<AuthedRequest>();
     const user = request.user;
-    if (!user) return true; // public-эндпоинт без auth — не блокируем
+    // Step 2.17: FAIL-CLOSED. Раньше public-эндпоинт с ошибочно навешанным
+    // @RequirePermissions тихо пропускался (no-op) — маскировал misconfiguration.
+    // Теперь: если endpoint требует прав, а authenticated user отсутствует —
+    // отказ (JwtAuthGuard уже выполнился ДО PermissionsGuard в APP_GUARD-цепочке;
+    // отсутствие user здесь = public/неверная конфигурация, а не легитимный вход).
+    if (!user) {
+      throw new ForbiddenException("Authentication required");
+    }
 
     const required = typeof metadata === "function" ? metadata(request) : metadata;
     if (required.length === 0) return true;

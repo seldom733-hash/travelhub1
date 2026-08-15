@@ -51,11 +51,11 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
     setMounted(true);
   }, []);
 
-  // Auth boundary: anonymous /partner/* перехватывается middleware (server-side).
-  // Клиентский !auth.token-guard здесь НЕ используется: во время гидратации чтение
-  // localStorage может разойтись с загрузкой user (race), что давало ложный logout
-  // валидного пользователя. Отсутствие сессии на защищённом пути обрабатывает
-  // useCurrentUser (path-guarded fallback на /login).
+  // Auth boundary: anonymous /partner/* перехватывается proxy.ts (server-side,
+  // по отсутствию HttpOnly cookie). Клиентский !auth.token-guard здесь НЕ
+  // используется (Step 2.17: сессия в HttpOnly cookie, JS не читает токен):
+  // истина — useCurrentUser через /auth/session; отсутствие сессии на защищённом
+  // пути обрабатывает useCurrentUser (path-guarded fallback на /login).
 
   // Role gate: только PARTNER имеет право на /partner/*. Решение — по ЗАГРУЖЕННОМУ
   // user из /auth/me (единственный источник истины), никогда не logout.
@@ -76,7 +76,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
     }
   }, [mounted, pathname, user, router]);
 
-  if (!mounted || !auth.token || !user || user.role !== "PARTNER") {
+  if (!mounted || !user || user.role !== "PARTNER") {
     return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">…</div>;
   }
 

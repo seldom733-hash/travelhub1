@@ -1,37 +1,35 @@
 const BASE = "/api/v1";
 
-const TOKEN_KEY = "travelhub.token";
-/** Cookie-зеркало токена для server-side auth boundary (middleware.ts, Step 1.6 §10). */
-const AUTH_COOKIE = "travelhub.auth";
+/**
+ * Step 2.17 — Auth hardening: сессионный credential НЕ хранится в JS-readable
+ * сторадже (localStorage/document.cookie). Токен живёт в серверной HttpOnly
+ * cookie `travelhub.auth` (Secure в prod, SameSite=Lax), которую JS не может
+ * прочитать. Здесь — ТОЛЬКО in-memory «флаг сессии» для реактивного UI:
+ * ставится при login/register-ответе, снимается при logout/401. Настоящая
+ * аутентификация — cookie (credentials: "include"), истина — GET /auth/session.
+ *
+ * In-memory токен (если он есть, напр. в тестах/SSR-прокси) отправляется как
+ * Authorization: Bearer — backend guard читает И header, И cookie (Step 2.17).
+ */
 
-/** Подписка на изменение токена (login/logout) — для реактивных хуков. */
+/** Подписка на изменение сессии (login/logout) — для реактивных хуков. */
 type TokenListener = () => void;
 const tokenListeners = new Set<TokenListener>();
 const notifyToken = () => tokenListeners.forEach((l) => l());
 
-const setAuthCookie = (token: string) => {
-  if (typeof document === "undefined") return;
-  document.cookie = `${AUTH_COOKIE}=${encodeURIComponent(token)}; path=/; SameSite=Lax`;
-};
+let memoryToken: string | null = null;
 
-const clearAuthCookie = () => {
-  if (typeof document === "undefined") return;
-  document.cookie = `${AUTH_COOKIE}=; path=/; max-age=0`;
-};
-
-/** Реактивный стор токена: setToken/clear уведомляют подписчиков (useCurrentUser). */
+/** Реактивный стор сессии: setToken/clear уведомляют подписчиков (useCurrentUser). */
 export const auth = {
   get token() {
-    return typeof window !== "undefined" ? window.localStorage.getItem(TOKEN_KEY) : null;
+    return memoryToken;
   },
   setToken(token: string) {
-    window.localStorage.setItem(TOKEN_KEY, token);
-    setAuthCookie(token);
+    memoryToken = token;
     notifyToken();
   },
   clear() {
-    window.localStorage.removeItem(TOKEN_KEY);
-    clearAuthCookie();
+    memoryToken = null;
     notifyToken();
   },
   subscribe(listener: TokenListener): () => void {
@@ -77,34 +75,51 @@ async function handle<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
-const headers = (extra?: Record<string, string>): Record<string, string> => {
+/**
+ * Step 2.17: credentials "include" — HttpOnly cookie летит с каждым запросом.
+ * Authorization добавляется ТОЛЬКО если есть in-memory токен (тесты/прокси).
+ */
+const fetchOptions = (extra?: Record<string, string>): RequestInit => {
   const h: Record<string, string> = { ...(extra ?? {}) };
   if (auth.token) h.Authorization = `Bearer ${auth.token}`;
-  return h;
+  return { headers: h, credentials: "include" };
 };
 
 export const api = {
-  get: <T>(path: string): Promise<T> => fetch(`${BASE}${path}`, { headers: headers() }).then((r) => handle<T>(r)),
+  get: <T>(path: string): Promise<T> => fetch(`${BASE}${path}`, fetchOptions()).then((r) => handle<T>(r)),
   post: <T>(path: string, body?: unknown): Promise<T> =>
     fetch(`${BASE}${path}`, {
+      ...fetchOptions({ "Content-Type": "application/json" }),
       method: "POST",
-      headers: headers({ "Content-Type": "application/json" }),
       body: body ? JSON.stringify(body) : undefined,
     }).then((r) => handle<T>(r)),
   patch: <T>(path: string, body: unknown): Promise<T> =>
     fetch(`${BASE}${path}`, {
+      ...fetchOptions({ "Content-Type": "application/json" }),
       method: "PATCH",
-      headers: headers({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
     }).then((r) => handle<T>(r)),
   put: <T>(path: string, body: unknown): Promise<T> =>
     fetch(`${BASE}${path}`, {
+      ...fetchOptions({ "Content-Type": "application/json" }),
       method: "PUT",
-      headers: headers({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
     }).then((r) => handle<T>(r)),
-  del: <T>(path: string): Promise<T> => fetch(`${BASE}${path}`, { method: "DELETE", headers: headers() }).then((r) => handle<T>(r)),
+  del: <T>(path: string): Promise<T> =>
+    fetch(`${BASE}${path}`, { ...fetchOptions(), method: "DELETE" }).then((r) => handle<T>(r)),
 };
+
+/** Публичная сессионная проба (GET /auth/session) — cookie-аутентификация. */
+export async function fetchSessionUser(): Promise<AuthUser | null> {
+  try {
+    const res = await fetch(`${BASE}/auth/session`, fetchOptions());
+    if (!res.ok) return null;
+    const body = (await res.json()) as { user: AuthUser | null };
+    return body.user ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export interface PlatformUser {
   id: string;

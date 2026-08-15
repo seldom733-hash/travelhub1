@@ -10,6 +10,7 @@ import { ApplicantType, RoleCode, UserStatus } from "../../generated/prisma/enum
 import { ConflictError, ValidationDomainError } from "../../shared/errors";
 import { normalizeEmail } from "../../shared/field-validation";
 import type { Prisma } from "../../generated/prisma/client";
+import type { Request } from "express";
 
 export interface AuthUser {
   id: string;
@@ -256,12 +257,52 @@ export class AuthService {
   }
 
   /**
+   * Step 2.17 — реальная revocation: инкремент tokenVersion инвалидирует ВСЕ
+   * ранее выданные JWT (payload.tv !== tokenVersion → 401 в me()). Вызывается
+   * при logout. Идемпотентна: повторный вызов — ещё один инкремент, безопасен.
+   */
+  async revokeSession(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
+  }
+
+  /**
    * Текущий пользователь + его актуальные права.
    * Step 1.9 §12: НЕ-ACTIVE пользователь (INACTIVE/LOCKED) не сохраняет
    * действующий доступ — любой защищённый запрос с его токеном отклоняется
    * (guard вызывает me() на каждый запрос).
    */
-  async me(userId: string): Promise<AuthUser> {
+  /**
+   * Step 2.17 — сессионная проба для cookie-аутентификации (GET /auth/session).
+   * Токен из Authorization: Bearer ИЛИ HttpOnly cookie travelhub.auth; проверка
+   * tv (revocation) и ACTIVE. Любая ошибка → null (public, без исключений).
+   */
+  async sessionUser(req: Request): Promise<AuthUser | null> {
+    let token: string | undefined;
+    const [type, headerToken] = req.headers.authorization?.split(" ") ?? [];
+    if (type === "Bearer" && headerToken) {
+      token = headerToken;
+    } else {
+      const cookie = (req.headers.cookie ?? "")
+        .split(";")
+        .map((c) => c.trim())
+        .find((c) => c.startsWith("travelhub.auth="))
+        ?.slice("travelhub.auth=".length);
+      token = cookie ? decodeURIComponent(cookie) : undefined;
+    }
+    if (!token) return null;
+    try {
+      const payload = await this.jwt.verifyAsync<{ sub?: string; tv?: number }>(token);
+      if (!payload.sub) return null;
+      return await this.me(payload.sub, payload.tv);
+    } catch {
+      return null; // невалидный/истёкший/revoked/INACTIVE → null, не 401
+    }
+  }
+
+  async me(userId: string, tokenVersion?: number): Promise<AuthUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { role: true },
@@ -269,6 +310,11 @@ export class AuthService {
     if (!user) throw new UnauthorizedException("User not found");
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException("Account is not active");
+    }
+    // Step 2.17: tokenVersion revocation. Токен, выданный до logout/revoke,
+    // имеет старое tv — отклоняется, даже если JWT ещё не истёк.
+    if (tokenVersion !== undefined && user.tokenVersion !== tokenVersion) {
+      throw new UnauthorizedException("Session has been revoked");
     }
     return this.toAuthUser(user);
   }
@@ -284,8 +330,10 @@ export class AuthService {
     role: { code: RoleCode; title: string };
     partnerId: string | null;
     customerId: string | null;
+    tokenVersion: number;
   }): Promise<LoginResult> {
-    const payload = { sub: user.id, username: user.username, role: user.role.code };
+    // Step 2.17: tv (tokenVersion) в JWT — logout/revoke инвалидирует сессии.
+    const payload = { sub: user.id, username: user.username, role: user.role.code, tv: user.tokenVersion };
     const accessToken = await this.jwt.signAsync(payload);
     const authUser = await this.toAuthUser(user);
     return { accessToken, user: authUser };

@@ -52,10 +52,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Auth boundary: anonymous /app/* перехватывается middleware (server-side).
-  // Клиентский !auth.token-guard убран: во время гидратации чтение localStorage
-  // может разойтись с загрузкой user (race) → ложный logout. Отсутствие сессии
-  // на защищённом пути обрабатывает useCurrentUser (path-guarded fallback).
+  // Auth boundary: anonymous /app/* перехватывается proxy.ts (server-side,
+  // по отсутствию HttpOnly cookie). Клиентский !auth.token-guard убран (Step 2.17:
+  // сессия в HttpOnly cookie, JS не читает токен): истина — useCurrentUser
+  // через /auth/session. Отсутствие сессии на защищённом пути обрабатывает
+  // useCurrentUser (path-guarded fallback).
 
   // Step 1.6 §11 + Step 1.8 + Step 1.13: внешние роли НЕ получают employee Work
   // Centers. PARTNER → /partner (Partner Cabinet), BUYER → /account (Buyer Cabinet).
@@ -87,7 +88,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   // (b) внешние роли (PARTNER/BUYER) никогда не получают внутренние Work Centers —
   // рендер детей блокирован до редиректа (review: исключает вспышку внутреннего UI
   // и лишние internal API-запросы от внешней роли). BUYER → /account (Step 1.13).
-  if (!mounted || !auth.token || !user || isExternalRole(user.role)) {
+  if (!mounted || !user || isExternalRole(user.role)) {
     return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">Загрузка…</div>;
   }
 

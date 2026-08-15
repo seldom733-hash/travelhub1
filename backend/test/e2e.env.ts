@@ -18,5 +18,10 @@ process.env.S3_ENDPOINT = `http://127.0.0.1:${MINIO_TEST_PORT}`;
 process.env.S3_BUCKET = MINIO_TEST_BUCKET;
 process.env.S3_REGION = "us-east-1";
 process.env.S3_ACCESS_KEY = MINIO_TEST_ACCESS_KEY;
+
+// Step 2.17: durable outbox worker выключен в e2e — тесты детерминированно
+// управляют публикацией сами (publishPending() в явных точках). Worker
+// тестируется отдельным spec-ом (outbox-worker.e2e-spec.ts) со своим app-инстансом.
+process.env.OUTBOX_WORKER_ENABLED = "false";
 process.env.S3_SECRET_KEY = MINIO_TEST_SECRET_KEY;
 process.env.S3_FORCE_PATH_STYLE = "true";

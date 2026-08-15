@@ -50,7 +50,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
     router.replace("/login");
   };
 
-  if (!mounted || !auth.token || !user || user.role !== "BUYER") {
+  if (!mounted || !user || user.role !== "BUYER") {
     return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-400">…</div>;
   }
 

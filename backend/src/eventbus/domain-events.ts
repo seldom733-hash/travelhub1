@@ -110,8 +110,9 @@ export type DomainEventType = (typeof DomainEvents)[keyof typeof DomainEvents];
 //    проектция выполняется при чтении (OutboxEnvelope.occurredAt);
 //  - actor — typed actor (USER/SYSTEM/UNKNOWN), НЕ raw User/username;
 //  - entityId/entityType — canonical aggregate (из Outbox aggregateId/aggregateType);
-//  - source/version/metadata — ОТСУТСТВУЮТ в v1: нет authoritative значения
-//    (source/channel не угадывается), нет реальной entity/event version,
+//  - source — ОТСУТСТВУЕТ в v1: нет authoritative значения (source/channel
+//    не угадывается). version: Step 2.17 — аддитивный envelope schemaVersion=1
+//    (см. BusinessEventEnvelope.version); entity/event версии — вне v1.
 //    metadata не нужна. Добавляются только при реальной необходимости (§12-14).
 
 export type BusinessEventActor =
@@ -129,6 +130,10 @@ export interface BusinessEventEnvelope<TPayload = unknown> {
   actor: BusinessEventActor | null;
   entityId: string;
   entityType: string;
+  /** Step 2.17: envelope schemaVersion (additive default v1). Consumers MAY check
+   *  this to reject unknown future versions; v1 consumers must tolerate >= 1.
+   *  ADR-0010 envelope v1 ранее не имел version — добавление аддитивно. */
+  version: number;
   payload: TPayload;
 }
 

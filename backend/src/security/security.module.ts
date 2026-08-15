@@ -8,6 +8,7 @@ import { AccountService } from "./account/account.service";
 import { AccountController } from "./account/account.controller";
 import { PartnerOnboardingService } from "./partner/partner-onboarding.service";
 import { PartnerOnboardingController } from "./partner/partner-onboarding.controller";
+import { LoginThrottleService } from "../shared/login-throttle.service";
 import { CrmModule } from "../modules/crm/crm.module";
 import { JwtAuthGuard } from "./auth/jwt-auth.guard";
 import { PermissionsGuard } from "./auth/permissions.guard";
@@ -35,7 +36,7 @@ import { PermissionsGuard } from "./auth/permissions.guard";
     CrmModule,
   ],
   controllers: [AuthController, UsersController, AccountController, PartnerOnboardingController],
-  providers: [SecurityService, AuthService, AccountService, PartnerOnboardingService, JwtAuthGuard, PermissionsGuard],
-  exports: [SecurityService, AuthService, JwtAuthGuard, PermissionsGuard],
+  providers: [SecurityService, AuthService, AccountService, PartnerOnboardingService, JwtAuthGuard, PermissionsGuard, LoginThrottleService],
+  exports: [SecurityService, AuthService, JwtAuthGuard, PermissionsGuard, LoginThrottleService],
 })
 export class SecurityModule {}

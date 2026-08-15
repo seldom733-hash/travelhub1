@@ -13,13 +13,40 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # Canonical backend DB for CI: PostgreSQL with Prisma multiSchema.
+  # E2E uses TEST_DATABASE_URL (name must end with "test" — enforced by
+  # test/e2e-db-config.ts), never DATABASE_URL.
+  DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/travelhub1"
+  TEST_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/travelhub1_test"
+  JWT_SECRET: "ci-jwt-secret-not-for-production"
+  ADMIN_USERNAME: admin
+  ADMIN_PASSWORD: admin123
+
 jobs:
-  check:
-    name: Typecheck · Lint · Build
+  backend:
+    name: Backend · Typecheck · Build · Unit · E2E
     runs-on: ubuntu-latest
-    env:
-      # SQLite локально в CI; prisma.config.ts и src/lib/prisma.ts читают эту переменную
-      DATABASE_URL: "file:./dev.db"
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: travelhub1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    defaults:
+      run:
+        working-directory: backend
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,24 +56,65 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install dependencies
+      - name: Install backend dependencies
         run: npm ci
 
-      # src/generated/prisma не хранится в git — генерируем клиент
       - name: Generate Prisma Client
         run: npx prisma generate
 
-      # Главная страница prerender'ится на этапе build и обращается к БД,
-      # поэтому перед сборкой применяем миграции
+      # Real migrations against the CI PostgreSQL service — no db push.
       - name: Apply migrations
         run: npx prisma migrate deploy
 
       - name: Typecheck
         run: npx tsc --noEmit
 
-      - name: Lint
-        run: npm run lint
-
       - name: Build
         run: npm run build
+
+      - name: Unit tests
+        run: npx jest --runInBand
+
+      # E2E run sequentially (one e2e run per test DB is supported).
+      # MinIO binary for media tests is self-bootstrapped by test/e2e.minio.ts
+      # (version-pinned download + SHA-256 check, cached in .tools/minio).
+      - name: E2E tests (serial, isolated test DB)
+        run: npx jest --config test/jest-e2e.json --runInBand
+        env:
+          TEST_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/travelhub1_test"
+          S3_ENDPOINT: "http://127.0.0.1:19000"
+
+  frontend:
+    name: Frontend · Typecheck · Tests · Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npx vitest run
+
+      - name: Production build
+        run: npm run build
+        env:
+          BACKEND_URL: "http://localhost:4000"
