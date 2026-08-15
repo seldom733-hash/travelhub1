@@ -592,10 +592,15 @@ contracts/events.
 Provider-agnostic adapters;
 Stripe/Adyen/Mangopay/Checkout.com/Rapyd/банки не являются domain model.
 Capability matrix по country/currency/rail.
+**RECONCILIATION 2026-08-15 (Critical Platform Risks):** MAY PROCEED as NEXT with embedded hard gates; границы зафиксированы: внешний клиентский `Idempotency-Key` — ВНЕ scope 2.12A (owner = Step 2.12H, HARD prerequisite of 2.12B); PSP-local multi-instance race-дизайн обязателен в 2.12A (stable TravelHub-side request identity — §14 уже требует; strategy для webhook dedup key / create-payment race / callback reorder фиксируется здесь, реализация — 2.12B); новые outbound event-типы не вводить до решения schemaVersion (owner = Step 2.17); RLS — НЕ блокер (ADR-0014: application isolation canonical); NO REAL NETWORK hard gate сохранён.
+
+· **Step 2.12H --- External API Idempotency Contract Foundation** 🚧 PLANNED — НЕ реализован
+Внешний клиентский `Idempotency-Key` header-контракт для money-changing POST (checkout, future payment create, refund, dispute): key format/length, principal/route scope, request fingerprint, storage authority, response snapshot/replay semantics, identical vs divergent replay, concurrent same-key, failed/in-progress, retention/TTL, provider idempotency-key mapping, PII/security. **HARD PREREQUISITE of Step 2.12B** (реальные деньги). Создан reconciliation-ом 2026-08-15 (доказательство отсутствия: 0 `Idempotency-Key` в backend/src; money-changing POST полагаются на business codes).
 
 · **Step 2.12B --- Buyer Card / Wallet Payment**\
 Card, Apple Pay, Google Pay где поддерживается;
 authorize/capture/fail/cancel, webhook signature, idempotency.
+**RECONCILIATION 2026-08-15:** HARD prerequisites = Step 2.12A (provider abstraction) + Step 2.12H (external Idempotency-Key). PSP-local multi-instance гарантии проектируются в 2.12A и реализуются здесь: webhook dedup через DB unique на provider-event key, create-payment race, webhook-до-API-response, callback reorder, duplicate webhook storm. Webhook burst-robustness e2e обязателен (subset Load gate Step 2.17B).
 
 · **Step 2.12C --- SPLIT_AT_PAYMENT / Marketplace Commission**\
 Предпочтительный режим при поддержке PSP:
@@ -745,9 +750,17 @@ settlement, payout, net revenue, debt to TravelHub. Sales ≠ cash.
 · **Step 2.17 --- Phase 2 Hardening**\
 Idempotency, Outbox, retries, duplicate events, concurrency,
 compensation, security, audit, performance.
+**RECONCILIATION 2026-08-15 (Critical Platform Risks):** scope уточнён, системно-широкие items получают явных владельцев: event schema versioning decision + envelope `version` (additive default v1; evidence: ADR-0010 envelope v1 БЕЗ version, только OrderRequestedPayload.version=1, consumers без version-check) → ЗДЕСЬ; outbox publisher atomic claim / single-delivery worker (publishPending = findMany PENDING без SKIP LOCKED/claim; duplicate-safe consumers ЕСТЬ, single-delivery publisher НЕТ) → ЗДЕСЬ; durable retry scheduler (retryFailed БЕЗ production caller) → ЗДЕСЬ CRITICAL HARD GATE; CI repair / legacy isolation / auth hardening / ADMIN SoD / operational visibility → ЗДЕСЬ (per prepared 2.17 prompt). **Backup/DR и Load/Performance НЕ входят в 2.17** — независимые pre-exit gates Step 2.17A / Step 2.17B.
+
+· **Step 2.17A --- Backup & Disaster Recovery Readiness** 🚧 PLANNED — НЕ реализован
+Независимый pre-Phase-2-Exit operational gate (НЕ часть scope Step 2.17): PostgreSQL logical backup + restore runbook + **tested restore drill**, object/media (MinIO/S3) versioning/replication, secrets/config recovery, migration-state recovery, outbox/inbox/audit/finance recovery. RPO/RTO — без фабрикации, требуют authority. Рекомендовано завершить ДО 2.12B real-money go-live. Owner: reconciliation 2026-08-15 (доказательство отсутствия: 0 backup/restore скриптов, 0 pg_dump/PITR упоминаний, compose содержит только MinIO).
+
+· **Step 2.17B --- Load & Performance Qualification** 🚧 PLANNED — НЕ реализован
+Независимый pre-Phase-2-Exit gate (НЕ часть scope Step 2.17): load/стресс сценарии (auth/API baseline, catalog/search, checkout, payment initiation, PSP webhook burst + duplicate storm, refund concurrency, outbox backlog drain, inbox contention, advisory-lock hot keys, DB pool saturation, Finance reads). SLO/SLI числа требуют authority (не выдумывать; сейчас SLO нет). PSP webhook burst subset — обязателен в 2.12B. Owner: reconciliation 2026-08-15 (доказательство отсутствия: 0 load-тулинг в package.json, 0 perf-docs).
 
 · **Step 2.18 --- Phase 2 Exit Audit**\
 Сверка с Master/Baseline и DoD.
+**RECONCILIATION 2026-08-15:** включает verification application-isolation / RLS-deferral решения (ADR-0014) и завершённость независимых gates Step 2.17A / Step 2.17B.
 
 · **Step 2.18A --- Financial Integrity Exit Gate**\
 Monetary precision, webhook replay, duplicate capture/refund, ledger
