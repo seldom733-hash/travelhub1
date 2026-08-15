@@ -268,16 +268,16 @@ ADR-0009/0010 (event envelope/correlation) — не изменены; cookie-с�
 REPOSITORY EVIDENCE
 repository: TravelHub (D:\travelhub_v1)
 branch: master
-head: <заполняется при коммите>
-origin: <заполняется при коммите>
+head: 5760128
+origin: beb7aef (pre-push)
 worktree_clean: false (см. §30; untracked prompt-файлы предыдущих шагов остаются)
 migration_count: 58
 reviewed_state: COMMIT
-reviewed_diff_base: <заполняется при коммите>
-reviewed_diff_head: <заполняется при коммите>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
-push_status: NOT_PUSHED
+reviewed_diff_base: beb7aef
+reviewed_diff_head: 5760128
+persistence_status: PERSISTED
+persistence_sha: 5760128
+push_status: PUSHED (после финальной верификации)
 
 ## 40. PERSISTENCE STATUS IN FINAL RESPONSE
 
