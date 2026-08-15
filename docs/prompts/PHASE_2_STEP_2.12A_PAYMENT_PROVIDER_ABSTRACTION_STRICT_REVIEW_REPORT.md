@@ -443,7 +443,7 @@ runtime 0; RLS 0; global schemaVersion retrofit 0; Backup/DR 0; load framework
 
 ## 57. Persistence
 
-- branch: master; review commit `<populated after commit>`; footer commit `<populated after commit>`; final HEAD `<populated after commit>`; upstream `<populated after commit>`; push_status `<populated after commit>`. Footer initially NOT_PERSISTED (pre-commit truthfulness); flipped to PERSISTED with real SHA in the second footer/provenance commit (established convention).
+- branch: master; review commit `74abbfb`; footer commit `<populated after commit>`; final HEAD `<populated after commit>`; upstream `<populated after commit>`; push_status PUSHED (review commit verified `bb98fba..74abbfb`). Footer initially NOT_PERSISTED (pre-commit truthfulness); flipped to PERSISTED with real SHA in the second footer/provenance commit (established convention).
 
 ## 58. Repository Evidence
 
@@ -451,16 +451,16 @@ runtime 0; RLS 0; global schemaVersion retrofit 0; Backup/DR 0; load framework
 REPOSITORY EVIDENCE
 repository: D:\travelhub_v1 (origin seldom733-hash/travelhub1)
 branch: master
-head: <populated after commit>
-origin: <populated after commit>
+head: 74abbfb
+origin: 74abbfb
 worktree_clean: false (unrelated untracked prompt files remain)
 migration_count: 56
 reviewed_state: COMMIT
 reviewed_diff_base: b3307cc (implementation commit)
-reviewed_diff_head: <populated after commit>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
-push_status: <populated after commit>
+reviewed_diff_head: 74abbfb
+persistence_status: PERSISTED
+persistence_sha: 74abbfb8c7dbd3e754041ee96a17ca0ef90c72b5
+push_status: PUSHED
 ```
 
 ## 59. Release
