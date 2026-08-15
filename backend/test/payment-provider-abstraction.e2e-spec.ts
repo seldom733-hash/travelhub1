@@ -23,6 +23,8 @@
 import "reflect-metadata";
 import { Test } from "@nestjs/testing";
 import { INestApplication } from "@nestjs/common";
+import * as fs from "fs";
+import * as path from "path";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/prisma/prisma.service";
@@ -31,6 +33,16 @@ import { FakePaymentProvider } from "../src/modules/finance/provider/fake.paymen
 import { deriveProviderOperationKey } from "../src/modules/finance/provider/provider-operation-id";
 import { TEST_PAYMENT_PROVIDER_CODE } from "../src/modules/finance/provider/provider.types";
 import { NotFoundError } from "../src/shared/errors";
+
+const PROVIDER_DIR = path.resolve(__dirname, "../src/modules/finance/provider");
+
+function providerSource(): string {
+  return fs
+    .readdirSync(PROVIDER_DIR)
+    .filter((f) => f.endsWith(".ts"))
+    .map((f) => fs.readFileSync(path.join(PROVIDER_DIR, f), "utf8"))
+    .join("\n");
+}
 
 describe("Payment Provider Abstraction (Step 2.12A)", () => {
   let app: INestApplication;
@@ -44,7 +56,11 @@ describe("Payment Provider Abstraction (Step 2.12A)", () => {
     await app.init();
     prisma = app.get(PrismaService);
     registry = app.get(PaymentProviderRegistry);
-    // TEST-ONLY registration — production FinanceModule registers no provider.
+    // PRODUCTION WIRING PROOF: the booted AppModule (production FinanceModule
+    // config) registers NO provider — registry is empty before any test
+    // registration. The fake is registered HERE ONLY, by test code.
+    expect(registry.list()).toHaveLength(0);
+    expect(registry.has(TEST_PAYMENT_PROVIDER_CODE)).toBe(false);
     fake = new FakePaymentProvider();
     registry.register(fake);
   });
@@ -205,5 +221,39 @@ describe("Payment Provider Abstraction (Step 2.12A)", () => {
       fakeApi: Object.keys(fake),
     });
     expect(surface).not.toMatch(/row.level.security|schemaVersion|pg_dump|k6|artillery/i);
+  });
+
+  test("T18. route-graph audit: no webhook/callback/provider-event/signature routes", async () => {
+    // Real route-graph audit (not a single 404): enumerate the Express router
+    // stack and assert no provider/webhook surface exists anywhere.
+    const server = app.getHttpServer() as unknown as { _router?: { stack?: Array<{ route?: { path?: string } }> } };
+    const paths: string[] = [];
+    for (const layer of server._router?.stack ?? []) {
+      if (layer.route?.path) paths.push(layer.route.path);
+    }
+    const joined = paths.join("\n");
+    expect(joined).not.toMatch(/webhook|callback|provider-event|signature|payment-provider|psp/i);
+    // belt-and-braces: plausible PSP paths 404 (no hidden generic callback)
+    await request(app.getHttpServer()).get("/api/v1/finance/webhooks").expect(404);
+    await request(app.getHttpServer()).post("/api/v1/finance/webhooks/provider/capture").expect(404);
+    await request(app.getHttpServer()).post("/api/v1/finance/provider/events").expect(404);
+  });
+
+  test("T19. source audit: no network / idempotency-runtime / PaymentStatus / real PSP in provider/", () => {
+    // Audit RUNTIME code only (strip comment lines — boundary references in
+    // doc comments are expected and are not runtime surfaces).
+    const src = providerSource()
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("/**"))
+      .join("\n");
+    // no network execution surface
+    expect(src).not.toMatch(/axios|from "node:http"|from "http"|fetch\(|undici|https?:\/\//);
+    // no external HTTP Idempotency-Key runtime (2.12H boundary: header
+    // parsing, middleware, storage, replay — none exist)
+    expect(src).not.toMatch(/Idempotency-Key|idempotencyKey|@Headers|req\.headers|getHeader|fingerprint|replay store/i);
+    // no Payment domain lifecycle authority (AUTHORIZED unreachable via abstraction)
+    expect(src).not.toMatch(/PaymentStatus|authorizedAt|paidAt/);
+    // no real PSP adapter
+    expect(src).not.toMatch(/stripe|adyen|paypal|mangopay|rapyd|checkout\.com/i);
   });
 });

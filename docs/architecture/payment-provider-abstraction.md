@@ -66,6 +66,13 @@ Future adapters map it to provider idempotency header/key.
 `assertProviderOperationParamsConsistent` detects divergent replay at contract
 level → controlled ConflictError. NO persistence in 2.12A.
 
+**Canonical representation (STRICT REVIEW 2026-08-15, OBSERVATION):**
+divergence comparison is strict string equality — `"150.00"` ≠ `"150"` ≠
+`"150.0"`, and `"usd"` ≠ `"USD"`. This is deliberately conservative
+(fail-loud: a changed amount is never silently accepted). The 2.12B adapter
+MUST canonicalize provider-side representations (Decimal string with fixed
+scale, uppercase ISO-4217 currency) before comparing or persisting.
+
 ## PSP-local concurrency / race model (design for 2.12B)
 
 Reconciliation requires the design before 2.12B. Contract per race:

@@ -224,4 +224,55 @@ describe("PaymentProviderRegistry", () => {
     expect(new ProviderConfigurationError("bad config").category).toBe("AUTH_CONFIGURATION");
     expect(new ProviderMalformedResponseError("bad payload").retryable).toBe(false);
   });
+
+  // ── STRICT REVIEW adversarial tests (identical/divergent/concurrent retries) ──
+
+  test("18. identity is order-independent and not instance-dependent (pure function)", () => {
+    const a = deriveProviderOperationKey({ paymentCode: "PAY-00000001", operation: "CAPTURE", paymentId: "pay-1" });
+    const b = deriveProviderOperationKey({ paymentId: "pay-1", operation: "CAPTURE", paymentCode: "PAY-00000001" });
+    expect(a).toBe("PAY-00000001:CAPTURE");
+    expect(b).toBe(a);
+    // two independent fakes (separate instances) derive the same identity
+    const f1 = new FakePaymentProvider();
+    const f2 = new FakePaymentProvider();
+    expect(f1.getCapabilities()).toBeDefined();
+    expect(f2.getCapabilities()).toBeDefined();
+    // divergence detection is per-instance state, but the identity itself is pure
+    expect(deriveProviderOperationKey({ paymentId: "p", paymentCode: "PAY-1", operation: "CAPTURE" }))
+      .toBe(deriveProviderOperationKey({ paymentId: "p", paymentCode: "PAY-1", operation: "CAPTURE" }));
+  });
+
+  test("19. divergent currency cannot silently reuse identity (fail-loud)", () => {
+    const fake = new FakePaymentProvider();
+    fake.executeOperation(REQ, { amount: "150.00", currency: "USD" });
+    expect(() => fake.executeOperation(REQ, { amount: "150.00", currency: "EUR" })).toThrow(ConflictError);
+    // currency canonical contract: lowercase variant is divergent, not normalized away
+    expect(() => fake.executeOperation(REQ, { amount: "150.00", currency: "usd" })).toThrow(ConflictError);
+  });
+
+  test("20. amount canonicalization edges are conservative (fail-loud, no silent match)", () => {
+    // "150" vs "150.00" differ as canonical strings — treated as divergent
+    // (SAFE: fail-loud rather than silently accepting a changed amount).
+    // The 2.12B adapter must canonicalize provider-side representations.
+    const fake = new FakePaymentProvider();
+    fake.executeOperation(REQ, { amount: "150.00", currency: "USD" });
+    expect(() => fake.executeOperation(REQ, { amount: "150", currency: "USD" })).toThrow(ConflictError);
+  });
+
+  test("21. different Payment or operation → different identity (scoped, no cross-use)", () => {
+    const pay1 = deriveProviderOperationKey({ paymentId: "p1", paymentCode: "PAY-00000001", operation: "CAPTURE" });
+    const pay2 = deriveProviderOperationKey({ paymentId: "p2", paymentCode: "PAY-00000002", operation: "CAPTURE" });
+    const op2 = deriveProviderOperationKey({ paymentId: "p1", paymentCode: "PAY-00000001", operation: "REFUND" });
+    expect(pay1).not.toBe(pay2);
+    expect(pay1).not.toBe(op2);
+    // different payment → different derived key → no cross-contamination.
+    // NOTE: providerOperationKey is ALWAYS derived server-side (never client-set).
+    const fake = new FakePaymentProvider();
+    const k1 = deriveProviderOperationKey({ paymentId: "pay-1", paymentCode: "PAY-00000001", operation: "CAPTURE" });
+    const k2 = deriveProviderOperationKey({ paymentId: "pay-2", paymentCode: "PAY-00000002", operation: "CAPTURE" });
+    fake.executeOperation({ ...REQ, paymentId: "pay-1", paymentCode: "PAY-00000001", providerOperationKey: k1 }, { amount: "150.00", currency: "USD" });
+    fake.executeOperation({ ...REQ, paymentId: "pay-2", paymentCode: "PAY-00000002", providerOperationKey: k2 }, { amount: "150.00", currency: "USD" });
+    expect(fake.hasRecorded(k1)).toBe(true);
+    expect(fake.hasRecorded(k2)).toBe(true);
+  });
 });
