@@ -166,15 +166,15 @@ See §30.
 REPOSITORY EVIDENCE
 repository: travelhub_v1 (local canonical identity)
 branch: master
-head: WORKTREE
-origin: 452054d
+head: 2816af5
+origin: 2816af5
 worktree_clean: false (unrelated untracked prompts)
 migration_count: 57
-reviewed_state: COMMIT (decision made on clean baseline 452054d)
+reviewed_state: COMMIT
 reviewed_diff_base: 452054d
-reviewed_diff_head: WORKTREE
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: 2816af5
+persistence_status: PERSISTED
+persistence_sha: 2816af5
 
 ## 31. Release
 
