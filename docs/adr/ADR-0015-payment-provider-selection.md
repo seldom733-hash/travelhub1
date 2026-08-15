@@ -156,7 +156,7 @@ Verified from current official provider documentation (2026-08-15):
 
 ## 25. Follow-up implementation ownership
 
-1. **Business/product authority**: select local AZ candidate(s) and obtain commercial confirmation (onboarding eligibility, commercial quote, technical capability proofs, sandbox access).
+1. **Business/product authority**: select local AZ candidate(s) and obtain commercial confirmation (onboarding eligibility, commercial quote, technical capability proofs, sandbox access). The RFI vehicle is ready: sendable questionnaire `docs/commercial/az-payment-provider-rfi.md` + internal scoring workbook `docs/commercial/az-payment-provider-rfi-internal-workbook.md` (verdict template, hard-gate matrix, 2.12C guardrail). Responses must be scored per workbook §8 and reconciled against this ADR before any ACCEPTED flip.
 2. Record the confirmed provider decision in this ADR (flip to ACCEPTED) + Roadmap 2.12B entry.
 3. Implement Step 2.12B against the existing contract (2.12A adapter boundary + 2.12H idempotency + PaymentService authority + webhook dedup/reorder/multi-instance + PCI tokenized-only).
 4. If 2.12C native split is unavailable on the selected rail — record the accepted secondary-rail (ledger-orchestrated payout) tradeoff before 2.12C starts.
