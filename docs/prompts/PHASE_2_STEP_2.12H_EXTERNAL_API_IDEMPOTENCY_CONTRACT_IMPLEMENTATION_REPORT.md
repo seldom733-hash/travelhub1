@@ -252,15 +252,15 @@ Two-commit convention: implementation commit, then provenance/footer commit.
 REPOSITORY EVIDENCE
 repository: travelhub_v1 (local canonical identity)
 branch: master
-head: <after first commit>
-origin: <after push>
+head: cd8ed56
+origin: cd8ed56
 worktree_clean: false (unrelated untracked prompts)
 migration_count: 57
 reviewed_state: COMMIT
 reviewed_diff_base: 68c28bc
-reviewed_diff_head: <implementation commit>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: cd8ed56
+persistence_status: PERSISTED
+persistence_sha: cd8ed56
 
 ## 30. Release
 
