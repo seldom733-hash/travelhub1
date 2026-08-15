@@ -154,6 +154,32 @@ Verified from current official provider documentation (2026-08-15):
 - No credentials, merchant IDs, or account secrets in this ADR or any repository artifact.
 - TravelHub-side protections remain: digest slotKeys (2.12H), server-derived provider-operation identity (2.12A), single Payment lifecycle authority.
 
+## 24A. Step 2.12I boundaries (2026-08-15 reconciliation amendment)
+
+Provider selection does not itself decide the final marketplace money flow. The
+following boundaries are recorded now and are independent of which candidate is
+ultimately selected:
+
+- Card-data boundary: PSP-hosted / PSP-tokenized collection is the target;
+  raw PAN/CVV/CVC must never reach the TravelHub backend.
+- **ProviderFee ≠ TravelHub Commission** (hard invariant). ProviderFee is an
+external cost/fact charged by PSP/aggregator/acquiring/scheme/payout/FX rail.
+TravelHub Commission is TravelHub-owned revenue governed by `finance.CommissionPolicy`;
+the selected PSP must NOT become the authority for TravelHub commission rates or
+commercial policy.
+- A provider commercial tariff is NOT automatically accounting truth. Where the
+provider supplies an actual finalized fee via settlement/reconciliation/API
+evidence, that provider-reported monetary fact is the preferred accounting source;
+a hardcoded-rate fallback requires an explicit later architecture decision.
+- The economic bearer of ProviderFee (TravelHub absorbs / partner payable
+reduction / split / buyer surcharge / native allocation) is a later explicit
+business/accounting decision — never inferred from API behavior alone.
+- Native split is not assumed; payout is not native split; Step 2.12C
+`SPLIT_AT_PAYMENT` must not be silently replaced by payout orchestration.
+- **Step 2.12I** is the mandatory post-selection reconciliation gate
+(PSP Contract, Provider Fees & Money-Flow Architecture Reconciliation) before any
+downstream production money-flow implementation.
+
 ## 25. Follow-up implementation ownership
 
 1. **Business/product authority**: select local AZ candidate(s) and obtain commercial confirmation (onboarding eligibility, commercial quote, technical capability proofs, sandbox access). The RFI vehicle is ready: sendable questionnaire `docs/commercial/az-payment-provider-rfi.md` + internal scoring workbook `docs/commercial/az-payment-provider-rfi-internal-workbook.md` (verdict template, hard-gate matrix, 2.12C guardrail). Responses must be scored per workbook §8 and reconciled against this ADR before any ACCEPTED flip.

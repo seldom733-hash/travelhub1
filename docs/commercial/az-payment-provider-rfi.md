@@ -247,11 +247,13 @@ TravelHub treats provider cost separately from TravelHub commission.
 Confirm availability of actual transaction-level:
 - gross amount;
 - provider/acquirer fee;
+- fixed and percentage fee components, where applicable;
 - scheme/interchange components where exposed;
 - tax/VAT on fee;
 - net settlement;
 - refund/chargeback fees;
-- timing/finality of fee data.
+- timing/finality of fee data;
+- who is contractually charged for each fee (TravelHub, partner, or buyer).
 
 ---
 
