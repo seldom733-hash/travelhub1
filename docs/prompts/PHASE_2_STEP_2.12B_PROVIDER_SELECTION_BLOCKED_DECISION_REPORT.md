@@ -72,12 +72,12 @@ report. Регрессия не требуется (документация-onl
 REPOSITORY EVIDENCE
 repository: travelhub_v1 (local canonical identity)
 branch: master
-head: <после первого коммита>
-origin: <после push>
+head: 553f470
+origin: 553f470
 worktree_clean: false (unrelated untracked prompts)
 migration_count: 57
 reviewed_state: COMMIT
 reviewed_diff_base: 94a2d0e
-reviewed_diff_head: <decision-коммит>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: 553f470
+persistence_status: PERSISTED
+persistence_sha: 553f470
