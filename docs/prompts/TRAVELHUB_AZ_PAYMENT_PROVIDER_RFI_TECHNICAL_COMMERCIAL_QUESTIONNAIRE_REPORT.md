@@ -75,12 +75,12 @@ checker regression suite green. See the provenance footer below.
 REPOSITORY EVIDENCE
 repository: travelhub_v1 (local canonical identity)
 branch: master
-head: WORKTREE
-origin: 0cf8b5f
+head: 18f410d
+origin: 18f410d
 worktree_clean: false (unrelated untracked prompts)
 migration_count: 57
-reviewed_state: WORKTREE
+reviewed_state: COMMIT
 reviewed_diff_base: 0cf8b5f
-reviewed_diff_head: WORKTREE
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: 18f410d
+persistence_status: PERSISTED
+persistence_sha: 18f410d
