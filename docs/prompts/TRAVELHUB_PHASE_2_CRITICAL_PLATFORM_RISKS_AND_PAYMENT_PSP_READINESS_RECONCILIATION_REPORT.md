@@ -183,16 +183,16 @@ All start PLANNED, none started, all have explicit owners/rationale/evidence in 
 REPOSITORY EVIDENCE
 repository: D:\travelhub_v1 (origin seldom733-hash/travelhub1)
 branch: master
-head: <populated after commit>
-origin: <populated after commit>
+head: d0b59f3
+origin: d0b59f3
 worktree_clean: false (unrelated untracked prompt files remain)
 migration_count: 56
 reviewed_state: COMMIT
-reviewed_diff_base: <populated after commit>
-reviewed_diff_head: <populated after commit>
+reviewed_diff_base: 5ba650e
+reviewed_diff_head: d0b59f3
 persistence_status: PERSISTED
-persistence_sha: <populated after commit>
-push_status: <populated after commit>
+persistence_sha: d0b59f32e153109ff6ac8df07fc90f7846dc70b1
+push_status: PUSHED
 ```
 
 ## 25. Exact NEXT
