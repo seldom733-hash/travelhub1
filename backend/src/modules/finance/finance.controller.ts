@@ -28,6 +28,7 @@ import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import { assertNoForbiddenKeys } from "../../shared/field-validation";
+import { Idempotent } from "../../shared/idempotency/idempotency.decorator";
 import {
   COMMISSION_POLICY_FORBIDDEN_KEYS,
   CommissionAccrualListQueryDto,
@@ -264,6 +265,9 @@ export class FinanceController {
 
   @Post("payments")
   @RequirePermissions("finance.payment.write")
+  // Step 2.12H: payment-initiation boundary — защищённая операция (external
+  // Idempotency-Key обязателен; retry/replay/divergent — контракт 2.12H).
+  @Idempotent("payment.create")
   async createPayment(@Req() req: Request, @CurrentUser() actor: AuthedRequest["user"], @Body() dto: CreatePaymentDto) {
     // raw req.body — forged server-owned поля (money/status/milestones/...) → 422.
     assertNoForbiddenKeys(req.body, PAYMENT_CREATE_FORBIDDEN_KEYS);

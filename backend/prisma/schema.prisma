@@ -94,6 +94,55 @@ model BusinessSequence {
   @@schema("events")
 }
 
+enum ExternalIdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+
+  @@schema("events")
+}
+
+/// PHASE 2 STEP 2.12H — External API Idempotency Contract.
+///
+/// Durable HTTP-уровневый idempotency slot для защищённых mutating операций
+/// (клиентский `Idempotency-Key`). PostgreSQL = correctness authority
+/// (multi-instance, restart-safe) — НЕ in-memory map. Отличается от:
+///  - InboxEvent (consumer-level dedup по eventId);
+///  - outbox publication;
+///  - 2.12A provider-operation identity (server-derived, без HTTP-ключа);
+///  - future PSP webhook dedup (2.12B).
+///
+/// slotKey — sha256(scope + operation + client key): digest-хранение, raw key
+/// никогда не сохраняется (opaque, no PII/secrets; digest детерминирован для
+/// replay-поиска). scope — серверный authenticated principal (scopeType+scopeId),
+/// поэтому одинаковый literal key разных principals НЕ пересекается.
+/// fingerprint — sha256(canonical validated server-side request) для divergence
+/// detection (same slot + divergent fingerprint → controlled 409).
+/// lifecycle IN_PROGRESS → COMPLETED; бизнес-ошибка/rollback → claim удаляется
+/// (ключ переиспользуем, не poisoning). Stale IN_PROGRESS (crash) — CAS
+/// takeover по claimedAt (bound), повторное выполнение безопасно благодаря
+/// business-idempotency защищённых операций.
+model ExternalIdempotencyRecord {
+  id             String                     @id @default(uuid())
+  /// sha256 digest слота (scope+operation+clientKey) — unique DB backstop.
+  slotKey        String                     @unique
+  scopeType      String
+  scopeId        String
+  operation      String
+  fingerprint    String
+  status         ExternalIdempotencyStatus @default(IN_PROGRESS)
+  claimedAt      DateTime                   @default(now())
+  /// Safe client-visible replay (HTTP status + whitelisted business body).
+  responseStatus Int?
+  responseBody   Json?
+  completedAt    DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@index([scopeType, scopeId, operation])
+  @@index([status, claimedAt])
+  @@schema("events")
+}
+
 // ─────────────────────────────── catalog.* ───────────────────────────────
 
 enum ProductStatus {

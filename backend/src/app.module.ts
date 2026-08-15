@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { RequestContextMiddleware } from "./shared/request-context.middleware";
 import { PrismaModule } from "./prisma/prisma.module";
 import { EventBusModule } from "./eventbus/eventbus.module";
@@ -11,6 +11,8 @@ import { CommunicationModule } from "./modules/communication/communication.modul
 import { SalesModule } from "./modules/sales/sales.module";
 import { ReverseModule } from "./modules/reverse/reverse.module";
 import { FinanceModule } from "./modules/finance/finance.module";
+import { IdempotencyModule } from "./shared/idempotency/idempotency.module";
+import { IdempotencyInterceptor } from "./shared/idempotency/idempotency.interceptor";
 import { SecurityModule } from "./security/security.module";
 import { JwtAuthGuard } from "./security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "./security/auth/permissions.guard";
@@ -23,10 +25,13 @@ import { PermissionsGuard } from "./security/auth/permissions.guard";
  * открывает эндпоинты), PermissionsGuard глобально (проверка @RequirePermissions).
  */
 @Module({
-  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, OrderModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule],
+  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, OrderModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, IdempotencyModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    // Step 2.12H: external API idempotency — passthrough для незащищённых
+    // эндпоинтов; контракт активен только на @Idempotent("...") операциях.
+    { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],
 })
 export class AppModule implements NestModule {

@@ -112,7 +112,8 @@ describe("Phase 2 Step 2.13 — Refund Flow (e2e)", () => {
   /** buildOrder + Payment create + confirm → CAPTURED (source authority для Refund). */
   const buildCapturedPayment = async (sm: Session, fin: Session, tag: string, price: number, opts: { buyerRequest?: boolean } = {}): Promise<{ orderId: string; paymentId: string; paymentCode: string; amount: string; currency: string }> => {
     const { orderId, amount, currency } = await buildOrder(sm, tag, price, opts);
-    const pay = (await agent(fin.accessToken).post("/api/v1/finance/payments").send({ orderId }).expect(201)).body as { id: string; code: string };
+    // Step 2.12H: payment.create требует Idempotency-Key (защищённая операция).
+    const pay = (await agent(fin.accessToken).post("/api/v1/finance/payments").set("Idempotency-Key", `e2e-rf-${Date.now()}-1`).send({ orderId }).expect(201)).body as { id: string; code: string };
     created.payments.push(pay.id);
     await agent(fin.accessToken).post(`/api/v1/finance/payments/${pay.code}/confirm`).expect(201);
     await eventBus.publishPending();
@@ -204,7 +205,7 @@ describe("Phase 2 Step 2.13 — Refund Flow (e2e)", () => {
     const fin = await createStaff("s13_fin2", RoleCode.FINANCE);
     // Order + PENDING payment (НЕ подтверждён) — refund невозможен.
     const { orderId } = await buildOrder(sm, "rfd_t2", 60);
-    const pending = (await agent(fin.accessToken).post("/api/v1/finance/payments").send({ orderId }).expect(201)).body as { id: string };
+    const pending = (await agent(fin.accessToken).post("/api/v1/finance/payments").set("Idempotency-Key", `e2e-rf-${Date.now()}-2`).send({ orderId }).expect(201)).body as { id: string };
     created.payments.push(pending.id);
     await createRefund(fin, pending.id, { amount: "10" }).expect(422);
     await createRefund(fin, "no-such-payment", { amount: "10" }).expect(404);

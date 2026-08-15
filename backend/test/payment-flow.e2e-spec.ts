@@ -124,9 +124,14 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
     return { orderId: order.id, orderCode: order.code, amount: issued.total, currency: issued.currency };
   };
 
+  // Step 2.12H: payment.create — защищённая операция; Idempotency-Key обязателен.
+  // Каждый вызов — НОВЫЙ ключ (новый запрос); intentional retry-тесты (T6/T8)
+  // полагаются на business idempotency (один активный Payment на Order).
+  let payKeySeq = 0;
+  const nextPayKey = () => `e2e-payflow-${Date.now()}-${++payKeySeq}`;
   const createPayment = (fin: Session, orderId: string, body: Record<string, unknown> = {}) => {
     const a = agent(fin.accessToken);
-    return a.post("/api/v1/finance/payments").send({ orderId, ...body });
+    return a.post("/api/v1/finance/payments").set("Idempotency-Key", nextPayKey()).send({ orderId, ...body });
   };
 
   beforeAll(async () => {
@@ -324,8 +329,8 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
     const { orderId } = await buildOrder(sm, "pay_t7", 55);
     const a = agent(fin.accessToken);
     const [r1, r2] = await Promise.all([
-      a.post("/api/v1/finance/payments").send({ orderId }),
-      a.post("/api/v1/finance/payments").send({ orderId }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", nextPayKey()).send({ orderId }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", nextPayKey()).send({ orderId }),
     ]);
     const statuses = [r1.status, r2.status].sort();
     // 201 + 409 (или 201+201 в случае последовательного no-op — но параллельно
