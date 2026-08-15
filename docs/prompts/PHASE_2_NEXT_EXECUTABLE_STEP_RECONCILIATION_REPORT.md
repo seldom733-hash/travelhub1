@@ -253,23 +253,23 @@ See the provenance footer below (populated post-commit).
 REPOSITORY EVIDENCE
 repository: travelhub_v1 (local canonical identity)
 branch: master
-head: WORKTREE
-origin: 8ddc589
+head: d1dd6f6
+origin: d1dd6f6
 worktree_clean: false (unrelated untracked prompts)
 migration_count: 57
-reviewed_state: WORKTREE
+reviewed_state: COMMIT
 reviewed_diff_base: 8ddc589
-reviewed_diff_head: WORKTREE
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: d1dd6f6
+persistence_status: PERSISTED
+persistence_sha: d1dd6f6
 reviewed_base_sha: 8ddc589
-roadmap_sha_or_state: WORKTREE (8ddc589 + clarification note)
-report_commit_sha: N/A
-provenance_footer_commit_sha: N/A
-final_head_sha: N/A
-upstream_sha: 8ddc589
-push_status: NOT_PUSHED
-artifact_integrity: PASS=109 (pre-change baseline) WARN=0 FAIL=0
+roadmap_sha_or_state: d1dd6f6
+report_commit_sha: d1dd6f6
+provenance_footer_commit_sha: d1dd6f6
+final_head_sha: d1dd6f6
+upstream_sha: d1dd6f6
+push_status: PUSHED
+artifact_integrity: PASS=111 WARN=0 FAIL=0
 release_status: NOT APPLICABLE
 
 RELEASE: NOT APPLICABLE — DOCUMENTATION / SEQUENCING RECONCILIATION
