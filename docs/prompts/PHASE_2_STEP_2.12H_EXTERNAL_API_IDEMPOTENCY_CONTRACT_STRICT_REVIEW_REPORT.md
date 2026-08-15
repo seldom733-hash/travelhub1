@@ -490,15 +490,15 @@ Dependency chain: `2.12A APPROVED → 2.12H APPROVED → 2.12B`. 2.12B НЕ
 REPOSITORY EVIDENCE
 repository: travelhub_v1 (local canonical identity)
 branch: master
-head: <после review-коммита>
-origin: <после push>
+head: 085d6fa
+origin: 085d6fa
 worktree_clean: false (unrelated untracked prompts)
 migration_count: 57
 reviewed_state: COMMIT
 reviewed_diff_base: 68c28bc
-reviewed_diff_head: <review-коммит>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: 085d6fa
+persistence_status: PERSISTED
+persistence_sha: 085d6fa
 
 ## 55. Release
 
