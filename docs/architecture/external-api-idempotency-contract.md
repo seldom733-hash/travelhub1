@@ -127,6 +127,13 @@ business operation (not exactly-once), but the business fact is not duplicated
 (guaranteed by business idempotency of the protected set). This is documented,
 not hidden.
 
+STRICT REVIEW FIX (2.12H §18/§37): complete-step P2025 race — if the slot is
+removed concurrently by another instance's rollback path between business
+commit and the COMPLETED update (pathological >30s in-flight + takeover +
+business P2002-loser), the committed business result is returned instead of a
+raw 500; the slot is gone, so a future same-key retry re-executes safely
+(business idempotent). Verified: unit #10 + e2e T20/T22 (0 raw 500).
+
 ## Concurrency (in-progress duplicates)
 
 Bounded deterministic behavior: DB serialization via unique slotKey; on a

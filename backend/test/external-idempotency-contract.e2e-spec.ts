@@ -31,7 +31,7 @@ import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { EventBusService } from "../src/eventbus/eventbus.service";
 import { ExternalIdempotencyStatus } from "../src/generated/prisma/enums";
-import { RoleCode } from "../src/generated/prisma/client";
+import { Prisma, RoleCode } from "../src/generated/prisma/client";
 import { deriveSlotKey } from "../src/shared/idempotency/idempotency.slot-key";
 
 interface Session {
@@ -469,5 +469,139 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
     });
     expect(rec.status).toBe(ExternalIdempotencyStatus.COMPLETED);
     expect(rec.responseStatus).toBe(201);
+  });
+
+  // ── STRICT REVIEW §18/§36 — CRASH WINDOW C FAULT INJECTION ─────────────────
+  // Payment COMMIT succeeded, но completion idempotency-записи не произошёл
+  // (crash/пропуск) → после stale recovery retry НЕ создаёт второй Payment.
+  // Симуляция crash-остатка на уровне DB: слот → IN_PROGRESS + stale claimedAt,
+  // response поля → NULL (как если бы complete() не выполнялся).
+
+  const simulateCrashWindowC = async (scopeId: string, key: string) => {
+    const slotKey = deriveSlotKey({ type: "USER", id: scopeId }, "payment.create", key);
+    await prisma.externalIdempotencyRecord.update({
+      where: { slotKey },
+      data: {
+        status: ExternalIdempotencyStatus.IN_PROGRESS,
+        claimedAt: new Date(Date.now() - 120_000), // stale (>30s bound)
+        responseStatus: null,
+        responseBody: Prisma.DbNull,
+        completedAt: null,
+      },
+    });
+  };
+
+  it("T20. CRASH WINDOW C: Payment закоммичен, complete пропущен (stale IN_PROGRESS) → retry даёт ТОТ ЖЕ Payment, 0 дубликатов, 0 raw 500", async () => {
+    const fin = await createStaff("h_fin20", RoleCode.FINANCE);
+    const sm = await createStaff("h_sm20", RoleCode.SALES_MANAGER);
+    const { orderId } = await buildOrder(sm, "idem_t20", 22);
+    const key = `e2e-t20-${stamp}`;
+    const first = (await createPayment(fin, orderId, key).expect(201)).body as { id: string };
+    created.payments.push(first.id);
+    expect(await paymentCount(orderId)).toBe(1);
+
+    // Fault injection: crash между бизнес-commit и idempotency-complete.
+    await simulateCrashWindowC(fin.user.id, key);
+
+    // Retry после stale recovery → ре-execute; business idempotency возвращает
+    // СУЩЕСТВУЮЩИЙ Payment — второй Payment НЕ создаётся.
+    const retry = (await createPayment(fin, orderId, key).expect(201)).body as { id: string };
+    expect(retry.id).toBe(first.id);
+    expect(await paymentCount(orderId)).toBe(1); // НЕТ второго Payment
+    // НЕТ дубликата PaymentCreated / PaymentHistory.
+    expect(await prisma.outboxEvent.count({ where: { eventType: "PaymentCreated", aggregateId: first.id } })).toBe(1);
+    expect(await prisma.paymentHistory.count({ where: { paymentId: first.id } })).toBe(1);
+    // Слот восстановлен в COMPLETED с корректным replay-результатом.
+    const rec = await prisma.externalIdempotencyRecord.findUniqueOrThrow({
+      where: { slotKey: deriveSlotKey({ type: "USER", id: fin.user.id }, "payment.create", key) },
+    });
+    expect(rec.status).toBe(ExternalIdempotencyStatus.COMPLETED);
+    expect(rec.responseStatus).toBe(201);
+    expect((rec.responseBody as { id: string }).id).toBe(first.id);
+  });
+
+  it("T21. divergent retry НЕ может захватить crash-восстановление (stale IN_PROGRESS + другой body → 409, 0 фактов)", async () => {
+    const fin = await createStaff("h_fin21", RoleCode.FINANCE);
+    const sm = await createStaff("h_sm21", RoleCode.SALES_MANAGER);
+    const { orderId: orderA } = await buildOrder(sm, "idem_t21a", 20);
+    const { orderId: orderB } = await buildOrder(sm, "idem_t21b", 18);
+    const key = `e2e-t21-${stamp}`;
+    const first = (await createPayment(fin, orderA, key).expect(201)).body as { id: string };
+    created.payments.push(first.id);
+    await simulateCrashWindowC(fin.user.id, key);
+
+    // Тот же key + другой orderId → fingerprint mismatch ДО stale-логики → 409.
+    const res = await createPayment(fin, orderB, key);
+    expect(res.status).toBe(409);
+    expect(await paymentCount(orderB)).toBe(0); // 0 фактов для orderB
+    expect(await paymentCount(orderA)).toBe(1); // исходный факт не тронут
+    // Слот остался stale IN_PROGRESS — корректный retry всё ещё может восстановить.
+    const rec = await prisma.externalIdempotencyRecord.findUniqueOrThrow({
+      where: { slotKey: deriveSlotKey({ type: "USER", id: fin.user.id }, "payment.create", key) },
+    });
+    expect(rec.status).toBe(ExternalIdempotencyStatus.IN_PROGRESS);
+    // Честное восстановление правильным retry (идентичный body).
+    const healed = (await createPayment(fin, orderA, key).expect(201)).body as { id: string };
+    expect(healed.id).toBe(first.id);
+  });
+
+  it("T22. concurrent stale reclaim: два same-key retry после crash-остатка → ни одного raw 500, ровно один факт", async () => {
+    const fin = await createStaff("h_fin22", RoleCode.FINANCE);
+    const sm = await createStaff("h_sm22", RoleCode.SALES_MANAGER);
+    const { orderId } = await buildOrder(sm, "idem_t22", 16);
+    const key = `e2e-t22-${stamp}`;
+    const first = (await createPayment(fin, orderId, key).expect(201)).body as { id: string };
+    created.payments.push(first.id);
+    await simulateCrashWindowC(fin.user.id, key);
+
+    const a = agent(fin.accessToken);
+    const [r1, r2] = await Promise.all([
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }),
+    ]);
+    for (const r of [r1, r2]) {
+      expect(r.status).toBeLessThan(500); // никогда raw 500
+      expect([201, 409]).toContain(r.status);
+    }
+    expect([r1.status, r2.status]).toContain(201); // CAS победитель восстановил
+    expect(await paymentCount(orderId)).toBe(1);
+    const rec = await prisma.externalIdempotencyRecord.findUniqueOrThrow({
+      where: { slotKey: deriveSlotKey({ type: "USER", id: fin.user.id }, "payment.create", key) },
+    });
+    expect(rec.status).toBe(ExternalIdempotencyStatus.COMPLETED);
+  });
+
+  it("T23. raw Idempotency-Key НЕ персистится (только digest slotKey, 0 raw key в записи)", async () => {
+    const fin = await createStaff("h_fin23", RoleCode.FINANCE);
+    const sm = await createStaff("h_sm23", RoleCode.SALES_MANAGER);
+    const { orderId } = await buildOrder(sm, "idem_t23", 14);
+    const key = `raw-key-must-not-persist-${stamp}-secret`;
+    const first = (await createPayment(fin, orderId, key).expect(201)).body as { id: string };
+    created.payments.push(first.id);
+    const rec = await prisma.externalIdempotencyRecord.findUniqueOrThrow({
+      where: { slotKey: deriveSlotKey({ type: "USER", id: fin.user.id }, "payment.create", key) },
+    });
+    const serialized = JSON.stringify(rec);
+    expect(serialized).not.toContain(key); // raw key нигде не сохранён
+    expect(rec.slotKey).toMatch(/^[0-9a-f]{64}$/); // digest
+    expect(rec.slotKey).not.toBe(key);
+  });
+
+  it("T24. replay НЕ дублирует PaymentCreated/PaymentHistory (identical retry — только replay)", async () => {
+    const fin = await createStaff("h_fin24", RoleCode.FINANCE);
+    const sm = await createStaff("h_sm24", RoleCode.SALES_MANAGER);
+    const { orderId } = await buildOrder(sm, "idem_t24", 12);
+    const key = `e2e-t24-${stamp}`;
+    const first = (await createPayment(fin, orderId, key).expect(201)).body as { id: string };
+    created.payments.push(first.id);
+    expect(await prisma.outboxEvent.count({ where: { eventType: "PaymentCreated", aggregateId: first.id } })).toBe(1);
+    expect(await prisma.paymentHistory.count({ where: { paymentId: first.id } })).toBe(1);
+
+    // Identical retry → replay из слота (бизнес НЕ вызывается).
+    const second = (await createPayment(fin, orderId, key).expect(201)).body as { id: string };
+    expect(second.id).toBe(first.id);
+    expect(await prisma.outboxEvent.count({ where: { eventType: "PaymentCreated", aggregateId: first.id } })).toBe(1);
+    expect(await prisma.paymentHistory.count({ where: { paymentId: first.id } })).toBe(1);
+    expect(await prisma.auditLog.count({ where: { resourceId: first.id, action: "finance.payment.created" } })).toBe(1);
   });
 });

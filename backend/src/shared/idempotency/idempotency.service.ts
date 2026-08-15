@@ -63,6 +63,7 @@ export interface IdempotencyExecuteOptions {
 }
 
 const P2002 = "P2002";
+const P2025 = "P2025";
 
 @Injectable()
 export class IdempotencyService {
@@ -139,15 +140,30 @@ export class IdempotencyService {
   ): Promise<IdempotencyExecutionResult> {
     try {
       const result = await options.execute();
-      await this.prisma.externalIdempotencyRecord.update({
-        where: { slotKey },
-        data: {
-          status: ExternalIdempotencyStatus.COMPLETED,
-          responseStatus: result.status,
-          responseBody: result.body === undefined ? Prisma.DbNull : (result.body as Prisma.InputJsonValue),
-          completedAt: new Date(),
-        },
-      });
+      try {
+        await this.prisma.externalIdempotencyRecord.update({
+          where: { slotKey },
+          data: {
+            status: ExternalIdempotencyStatus.COMPLETED,
+            responseStatus: result.status,
+            responseBody: result.body === undefined ? Prisma.DbNull : (result.body as Prisma.InputJsonValue),
+            completedAt: new Date(),
+          },
+        });
+      } catch (completeErr) {
+        // STRICT REVIEW FIX (2.12H §18/§37): P2025 на complete — слот удалён
+        // конкурентным rollback-ом ДРУГОГО instance-а, пока бизнес-факт уже
+        // закоммичен (pathological >30s-window + takeover + бизнес-P2002-loser).
+        // Бизнес-результат дурален и business-idempotent → возвращаем его
+        // (НЕ raw 500). Следующий same-key retry перевыполнит безопасно.
+        if (completeErr instanceof Prisma.PrismaClientKnownRequestError && completeErr.code === P2025) {
+          this.logger.warn(
+            `[idempotency] slot ${slotKey} was removed concurrently after business commit; returning committed result`,
+          );
+          return { replay: false, status: result.status, body: result.body };
+        }
+        throw completeErr;
+      }
       return { replay: false, status: result.status, body: result.body };
     } catch (err) {
       // Rollback/бизнес-ошибка → claim удаляем: ключ переиспользуем (не poison).
