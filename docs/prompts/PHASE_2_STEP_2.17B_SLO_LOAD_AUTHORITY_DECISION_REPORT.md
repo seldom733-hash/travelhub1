@@ -340,11 +340,11 @@ worktree_clean: true (of my changes)
 migration_count: 58
 reviewed_state: AUTHORITY DECISION
 reviewed_diff_base: 2282521
-reviewed_diff_head: 2282521
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: c51f080
+persistence_status: PERSISTED
+persistence_sha: c51f080
 authority_base_sha: 2282521
-authority_decision_commit_sha: N/A
+authority_decision_commit_sha: c51f080
 provenance_footer_commit_sha: N/A
 final_head_sha: N/A
 upstream_sha: N/A
