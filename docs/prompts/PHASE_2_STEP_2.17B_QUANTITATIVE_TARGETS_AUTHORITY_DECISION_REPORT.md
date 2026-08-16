@@ -467,10 +467,10 @@ authority_base_sha: 63bd376
 previous_authority_decision_sha: c51f080
 harness_implementation_sha: 5baa743
 quantitative_authority_commit_sha: 60ead9a
-provenance_footer_commit_sha: N/A
-final_head_sha: N/A
-upstream_sha: N/A
-push_status: NOT_PUSHED
+provenance_footer_commit_sha: 4d2c3c6
+final_head_sha: 4d2c3c6
+upstream_sha: 4d2c3c6
+push_status: PUSHED
 step_2_17_state: APPROVED
 step_2_17a_state: APPROVED WITH REVIEW FIXES
 step_2_17b_state: HARNESS IMPLEMENTED — QUANTITATIVE AUTHORITY APPROVED — NOT APPROVED
