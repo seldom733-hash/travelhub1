@@ -9,7 +9,7 @@
 
 import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
-import { RoleCode } from "../../generated/prisma/client";
+import { Prisma, RoleCode } from "../../generated/prisma/client";
 
 export interface ApiResult<T = unknown> {
   status: number;
@@ -59,16 +59,29 @@ export async function api<T = unknown>(
 export interface Tracked {
   users: string[];
   products: string[];
+  customers: string[];
   quotes: string[];
   checkouts: string[];
   sales: string[];
   orders: string[];
   payments: string[];
+  ledger: string[];
   outbox: string[];
 }
 
 export function newRegistry(): Tracked {
-  return { users: [], products: [], quotes: [], checkouts: [], sales: [], orders: [], payments: [], outbox: [] };
+  return {
+    users: [],
+    products: [],
+    customers: [],
+    quotes: [],
+    checkouts: [],
+    sales: [],
+    orders: [],
+    payments: [],
+    ledger: [],
+    outbox: [],
+  };
 }
 
 export async function adminLogin(baseUrl: string): Promise<AuthSession> {
@@ -218,6 +231,203 @@ export async function buildOrderChain(
   return { quoteId: quote.body.id, checkoutId: intent.body.id, saleId: sale.body.id, saleCode: sale.body.code };
 }
 
+/** Create a synthetic CRM customer via the canonical API. */
+export async function createCustomer(
+  baseUrl: string,
+  adminToken: string,
+  registry: Tracked,
+  tag: string,
+  index: number,
+): Promise<{ id: string; code: string }> {
+  const created = await api<{ customer: { id: string; code: string } }>(baseUrl, "POST", "/api/v1/customers", {
+    token: adminToken,
+    body: {
+      type: "PERSON",
+      firstName: `Perf${tag}`,
+      lastName: `Seed${index}`,
+      email: `perf.${tag}.${index}@example.test`,
+    },
+  });
+  if (created.status !== 201) {
+    throw new Error(`create customer '${tag}${index}' failed (${created.status}): ${JSON.stringify(created.body)}`);
+  }
+  registry.customers.push(created.body.customer.id);
+  return created.body.customer;
+}
+
+/** Seed N synthetic LedgerTransaction facts directly (canonical finance model, tracked). */
+export async function seedLedgerRows(prisma: PrismaService, registry: Tracked, count: number, tag: string): Promise<string[]> {
+  const ids: string[] = [];
+  const BATCH = 200;
+  for (let base = 0; base < count; base += BATCH) {
+    const rows = Array.from({ length: Math.min(BATCH, count - base) }, (_, k) => {
+      const i = base + k;
+      return {
+        code: `LTX-${String(10_000_000 + i).padStart(8, "0")}`,
+        amount: new Prisma.Decimal("100.00"),
+        currency: "USD",
+        type: "PERF_DATASET",
+        sourceType: "PERF",
+        sourceId: `${tag}-${i}`,
+        businessRef: `perf-dataset-${tag}-${i}`,
+        actorType: "SYSTEM",
+      };
+    });
+    // LedgerTransaction rows are created via LedgerService in production; direct
+    // inserts here are synthetic dataset preparation only (deterministic, tracked).
+    await prisma.ledgerTransaction.createMany({ data: rows as never, skipDuplicates: true });
+    const found = await prisma.ledgerTransaction.findMany({
+      where: { businessRef: { startsWith: `perf-dataset-${tag}-` } },
+      select: { id: true },
+    });
+    ids.push(...found.map((r) => r.id));
+  }
+  registry.ledger.push(...ids);
+  return ids;
+}
+
+/** Seed N EventBus probe events (BookingCreated, synthetic) — seed-capacity proof. */
+export async function seedEventBusProbes(
+  eventBus: EventBusService,
+  prisma: PrismaService,
+  registry: Tracked,
+  count: number,
+  prefix: string,
+): Promise<string[]> {
+  // Chunked: one transaction per 500 emits (5s interactive tx timeout safety).
+  const ids: string[] = [];
+  for (let base = 0; base < count; base += 500) {
+    const chunk = Math.min(500, count - base);
+    await prisma.$transaction(async (tx) => {
+      for (let k = 0; k < chunk; k++) {
+        const i = base + k;
+        ids.push(
+          await eventBus.emit(tx, {
+            aggregateType: "Booking",
+            aggregateId: `${prefix}-${i}`,
+            eventType: "BookingCreated",
+            payload: { bookingId: `${prefix}-${i}`, note: "perf-dataset" },
+            actor: { type: "SYSTEM" },
+          }),
+        );
+      }
+    });
+  }
+  registry.outbox.push(...ids);
+  return ids;
+}
+
+/**
+ * Deterministic synthetic dataset preparation (H3).
+ *
+ * Creates users/products/customers/quotes/order-chains/ledger rows through the
+ * canonical APIs (plus tracked direct ledger inserts) at the requested dataset
+ * profile scale. Everything is run-prefixed and tracked for dependency-aware
+ * cleanup. Order chains are drained so orders (payment-capable) materialize.
+ */
+export interface DatasetPrep {
+  counts: Record<string, number>;
+  usernames: string[];
+  orderIds: string[];
+  sm: SeedUser;
+  fin: SeedUser;
+}
+
+export async function prepareDataset(opts: {
+  baseUrl: string;
+  adminToken: string;
+  prisma: PrismaService;
+  eventBus: EventBusService;
+  registry: Tracked;
+  runId: string;
+  counts: { users: number; products: number; customers: number; quotes: number; orderChains: number; paymentCapableOrders: number; ledger: number; eventBusSeed: number };
+}): Promise<DatasetPrep> {
+  const { baseUrl, adminToken, prisma, eventBus, registry, runId, counts } = opts;
+  const tag = runId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 20);
+  const sm = await createStaffUser(baseUrl, adminToken, registry, `perf${tag}_sm`, RoleCode.SALES_MANAGER);
+  const fin = await createStaffUser(baseUrl, adminToken, registry, `perf${tag}_fin`, RoleCode.FINANCE);
+  const serviceDate = futureDate(45);
+  const usernames: string[] = [];
+  const orderIds: string[] = [];
+
+  // Users (dataset principals for login scenarios).
+  for (let i = 0; i < counts.users; i++) {
+    const u = await createStaffUser(baseUrl, adminToken, registry, `perf${tag}_u${i}`, RoleCode.OPERATOR);
+    usernames.push(u.username);
+  }
+  // Products + availability.
+  for (let i = 0; i < counts.products; i++) {
+    await createProductWithAvailability(baseUrl, adminToken, prisma, registry, `Perf ${tag} p${i}`, 100 + (i % 900), serviceDate);
+  }
+  // CRM customers.
+  for (let i = 0; i < counts.customers; i++) {
+    await createCustomer(baseUrl, adminToken, registry, tag, i);
+  }
+  // Quotes (issued).
+  for (let i = 0; i < counts.quotes; i++) {
+    const prod = await prisma.product.findFirst({
+      where: { title: { startsWith: `Perf ${tag}` } },
+      select: { id: true },
+      skip: i % Math.max(1, counts.products),
+    });
+    const tariff = prod ? await prisma.tariff.findFirstOrThrow({ where: { productId: prod.id } }) : null;
+    const quote = await api<{ id: string; code: string }>(baseUrl, "POST", "/api/v1/sales/quotes", { token: sm.token, body: {} });
+    if (quote.status !== 201) throw new Error(`dataset quote failed (${quote.status})`);
+    registry.quotes.push(quote.body.id);
+    if (prod && tariff) {
+      const item = await api(baseUrl, "POST", `/api/v1/sales/quotes/${quote.body.code}/items`, {
+        token: sm.token,
+        body: { productId: prod.id, tariffId: tariff.id, quantity: 1 },
+      });
+      if (item.status !== 201) throw new Error(`dataset quote item failed (${item.status})`);
+      const commercial = await api(baseUrl, "PUT", `/api/v1/sales/quotes/${quote.body.code}/commercial`, {
+        token: sm.token,
+        body: { discountType: "NONE", validUntil: new Date(Date.now() + 60 * 86400000).toISOString() },
+      });
+      if (commercial.status !== 200) throw new Error(`dataset commercial failed (${commercial.status})`);
+      const issue = await api(baseUrl, "POST", `/api/v1/sales/quotes/${quote.body.code}/issue`, { token: sm.token });
+      if (issue.status !== 201) throw new Error(`dataset quote issue failed (${issue.status})`);
+    }
+  }
+  // Order chains (Booking/Order dataset) — drained so Orders materialize.
+  const chainSaleIds: string[] = [];
+  for (let i = 0; i < counts.orderChains; i++) {
+    const chain = await buildOrderChain(baseUrl, adminToken, prisma, sm, registry, 100 + (i % 900), serviceDate, `${tag}oc${i}`);
+    chainSaleIds.push(chain.saleId);
+  }
+  await drainOutbox(eventBus, prisma);
+  const orders = await prisma.order.findMany({
+    where: { saleId: { in: chainSaleIds } },
+    select: { id: true },
+  });
+  const chainOrders = orders;
+  registry.orders.push(...chainOrders.map((o) => o.id));
+  orderIds.push(...chainOrders.map((o) => o.id));
+  // Ledger facts.
+  await seedLedgerRows(prisma, registry, counts.ledger, tag);
+  // EventBus seed-capacity proof (probe events, drained so the DB state is clean).
+  const probePrefix = `perf-ds-${runId}`;
+  await seedEventBusProbes(eventBus, prisma, registry, counts.eventBusSeed, probePrefix);
+  await drainOutbox(eventBus, prisma);
+
+  return {
+    counts: {
+      users: usernames.length,
+      products: counts.products,
+      customers: counts.customers,
+      quotes: counts.quotes,
+      orderChains: chainOrders.length,
+      paymentCapableOrders: chainOrders.length,
+      ledger: counts.ledger,
+      eventBusSeed: counts.eventBusSeed,
+    },
+    usernames,
+    orderIds,
+    sm,
+    fin,
+  };
+}
+
 /** Drive the outbox until no PENDING remains (bounded) — materializes consumers. */
 export async function drainOutbox(eventBus: EventBusService, prisma: PrismaService, maxRounds = 20): Promise<void> {
   for (let round = 0; round < maxRounds; round++) {
@@ -260,11 +470,33 @@ export async function cleanup(prisma: PrismaService, registry: Tracked): Promise
     await del("order outbox", () => prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: registry.orders } } }));
     await del("orders", () => prisma.order.deleteMany({ where: { id: { in: registry.orders } } }));
   }
+  // OBS-2 fix: Quote/Checkout/Sale aggregate events also carry outbox+inbox rows
+  // (QuoteIssued, CheckoutCreated, SaleCompleted…) — previously left as residue.
+  const aggGroups: Array<{ label: string; ids: string[] }> = [
+    { label: "sale", ids: registry.sales },
+    { label: "checkout", ids: registry.checkouts },
+    { label: "quote", ids: registry.quotes },
+  ];
+  for (const g of aggGroups) {
+    if (g.ids.length === 0) continue;
+    const eventIds = (await prisma.outboxEvent.findMany({ where: { aggregateId: { in: g.ids } }, select: { id: true } })).map((e) => e.id);
+    await del(`${g.label} inbox`, () => prisma.inboxEvent.deleteMany({ where: { eventId: { in: eventIds } } }));
+    await del(`${g.label} outbox`, () => prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: g.ids } } }));
+  }
   if (registry.sales.length > 0) {
     await del("availability reservations", () =>
       prisma.availabilityReservation.deleteMany({ where: { sourceSaleId: { in: registry.sales } } }),
     );
     await del("sales", () => prisma.sale.deleteMany({ where: { id: { in: registry.sales } } }));
+  }
+  if (registry.ledger.length > 0) {
+    await del("ledger transactions", () => prisma.ledgerTransaction.deleteMany({ where: { id: { in: registry.ledger } } }));
+  }
+  if (registry.customers.length > 0) {
+    const custEventIds = (await prisma.outboxEvent.findMany({ where: { aggregateId: { in: registry.customers } }, select: { id: true } })).map((e) => e.id);
+    await del("customer inbox", () => prisma.inboxEvent.deleteMany({ where: { eventId: { in: custEventIds } } }));
+    await del("customer outbox", () => prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: registry.customers } } }));
+    await del("customers", () => prisma.customer.deleteMany({ where: { id: { in: registry.customers } } }));
   }
   if (registry.products.length > 0) {
     await del("availability", () => prisma.availability.deleteMany({ where: { productId: { in: registry.products } } }));

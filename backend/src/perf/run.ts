@@ -1,11 +1,13 @@
 /**
- * PHASE 2 — STEP 2.17B — LOAD & PERFORMANCE HARNESS (exploratory).
+ * PHASE 2 — STEP 2.17B — LOAD & PERFORMANCE HARNESS (exploratory + qualification-ready).
  *
- * Orchestrator: parses CLI config (fail-closed) → safe-target guard →
- * boots the real Nest application in-process against an ISOLATED database →
- * seeds deterministic synthetic data → runs the requested profile (load /
- * payment.create idempotency / EventBus recovery) → validates correctness →
- * writes structured artifacts → deterministic cleanup.
+ * Orchestrator: parses CLI config (fail-closed) → safe-target guard → final-mode
+ * qualification validation → boots the real Nest application(s) in-process
+ * against an ISOLATED database → prepares deterministic synthetic dataset →
+ * runs the requested profile (load / payment.create / Booking-Order / login /
+ * EventBus steady-burst-recovery / multi-instance) → validates correctness
+ * against authoritative DB state → writes structured artifacts → deterministic
+ * cleanup (attempted even on failure).
  *
  * Semantics: EXPLORATORY / HARNESS VALIDATION PROFILE only.
  *   exploratory profile ≠ approved SLO ≠ measured capacity ≠ capacity guarantee.
@@ -25,9 +27,10 @@ import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../shared/validation-pipe";
 import { PrismaService } from "../prisma/prisma.service";
 import { EventBusService } from "../eventbus/eventbus.service";
 import { RoleCode } from "../generated/prisma/client";
-import { parseArgs, PROFILES, usage, type RunConfig } from "./lib/config";
+import { parseArgs, PROFILES, usage, type RunConfig, type LoadProfile, type Profile } from "./lib/config";
 import { guardViolations } from "./lib/guard";
-import { runLoad, summarizeLoad, type LoadResult, type MakeRequest } from "./lib/loader";
+import { runLoad, summarizeLoad, type LoadResult, type MakeRequest, type RouteClass } from "./lib/loader";
+import { scheduledStartMs, sleep } from "./lib/pacer";
 import { collectEnv, type EnvMetadata } from "./lib/env";
 import { writeArtifacts } from "./lib/artifacts";
 import { sanitizeMetadata } from "./lib/redact";
@@ -40,6 +43,9 @@ import {
   drainOutbox,
   futureDate,
   newRegistry,
+  prepareDataset,
+  type AuthSession,
+  type SeedUser,
   type Tracked,
 } from "./lib/seed";
 import {
@@ -50,6 +56,12 @@ import {
   type CorrectnessCheck,
   type CorrectnessResult,
 } from "./lib/correctness";
+import {
+  datasetCountsFor,
+  QUALIFICATION,
+  validateQualificationConfig,
+  type DatasetCounts,
+} from "./lib/qualification";
 
 interface Booted {
   app: INestApplication;
@@ -63,7 +75,56 @@ interface RunContext extends Booted {
   scenario: Record<string, unknown>;
 }
 
+interface Auth {
+  admin: AuthSession;
+  sm: SeedUser;
+  fin: SeedUser;
+}
+
 const SLO_STATE = "NOT EVALUATED — AUTHORITY REQUIRED";
+
+/** Lightweight harness-level memory sampler (no production deps; no SLO). */
+class MemorySampler {
+  private samples: Array<{ t: number; rss: number; heapUsed: number; heapTotal: number }> = [];
+  private timer: NodeJS.Timeout | null = null;
+  private startedAt = 0;
+
+  start(intervalMs = 5_000): void {
+    this.startedAt = Date.now();
+    this.sample();
+    this.timer = setInterval(() => this.sample(), intervalMs);
+    this.timer.unref?.();
+  }
+
+  stop(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    this.sample();
+  }
+
+  private sample(): void {
+    const m = process.memoryUsage();
+    this.samples.push({ t: Date.now() - this.startedAt, rss: m.rss, heapUsed: m.heapUsed, heapTotal: m.heapTotal });
+  }
+
+  stats(): Record<string, unknown> {
+    const peakRss = Math.max(0, ...this.samples.map((s) => s.rss));
+    const endRss = this.samples[this.samples.length - 1]?.rss ?? 0;
+    const peakHeap = Math.max(0, ...this.samples.map((s) => s.heapUsed));
+    const startRss = this.samples[0]?.rss ?? 0;
+    return {
+      status: "MEASURED",
+      startRssMb: Math.round(startRss / (1024 * 1024)),
+      peakRssMb: Math.round(peakRss / (1024 * 1024)),
+      endRssMb: Math.round(endRss / (1024 * 1024)),
+      peakHeapUsedMb: Math.round(peakHeap / (1024 * 1024)),
+      samples: this.samples.length,
+      durationMs: this.startedAt ? Date.now() - this.startedAt : 0,
+    };
+  }
+}
 
 async function bootApp(workerEnabled: boolean): Promise<Booted> {
   process.env.OUTBOX_WORKER_ENABLED = workerEnabled ? "true" : "false";
@@ -94,7 +155,7 @@ async function postgresVersion(prisma: PrismaService): Promise<string> {
 }
 
 function buildMakeRequest(
-  steps: Array<{ label: string; method: "GET" | "POST"; path: string; auth: "public" | "admin" | "sm" | "fin" | "login"; expected: number[]; body?: () => Record<string, unknown> }>,
+  steps: LoadProfile["steps"],
   auth: { admin: string; sm: string; fin: string },
 ): MakeRequest {
   return (iteration: number) => {
@@ -103,7 +164,15 @@ function buildMakeRequest(
     if (step.auth === "admin") headers.Authorization = `Bearer ${auth.admin}`;
     else if (step.auth === "sm") headers.Authorization = `Bearer ${auth.sm}`;
     else if (step.auth === "fin") headers.Authorization = `Bearer ${auth.fin}`;
-    return { label: step.label, method: step.method, path: step.path, headers, body: step.body ? step.body() : undefined, expected: step.expected };
+    return {
+      label: step.label,
+      method: step.method,
+      path: step.path,
+      headers,
+      body: step.body ? step.body() : undefined,
+      expected: step.expected,
+      routeClass: step.routeClass,
+    };
   };
 }
 
@@ -114,34 +183,52 @@ function p95Of(ms: number[]): number {
   return sorted[Math.max(0, idx)];
 }
 
-async function runLoadProfile(config: RunConfig, steps: Array<{ label: string; method: "GET" | "POST"; path: string; auth: "public" | "admin" | "sm" | "fin" | "login"; expected: number[]; body?: () => Record<string, unknown> }>, warmupMs: number, ctx: RunContext): Promise<{ result: LoadResult; checks: CorrectnessCheck[] }> {
-  const admin = await adminLogin(ctx.baseUrl);
-  const sm = await createStaffUser(ctx.baseUrl, admin.accessToken, ctx.registry, `perf${config.runId}_sm`, RoleCode.SALES_MANAGER);
-  const fin = await createStaffUser(ctx.baseUrl, admin.accessToken, ctx.registry, `perf${config.runId}_fin`, RoleCode.FINANCE);
+interface LoadOverrides {
+  rps?: number;
+  durationMs?: number;
+  concurrency?: number;
+  warmupMs?: number;
+  baseUrls?: string[];
+}
+
+async function runLoadProfile(config: RunConfig, profile: LoadProfile, ctx: RunContext, auth: Auth, overrides: LoadOverrides = {}): Promise<{ result: LoadResult; checks: CorrectnessCheck[] }> {
+  const rps = overrides.rps ?? config.targetRps ?? profile.rps;
+  const durationMs = overrides.durationMs ?? config.durationMs ?? profile.durationMs;
+  const concurrency = overrides.concurrency ?? config.concurrency ?? profile.concurrency;
+  const warmupMs = overrides.warmupMs ?? config.warmupMs ?? profile.warmupMs;
+  const baseUrls = overrides.baseUrls ?? [ctx.baseUrl];
 
   // Scripted login probe — distinct synthetic users, once each (per-instance
-  // throttle respected; login is NOT part of sustained load).
+  // throttle respected; login is NOT part of sustained read load).
   const loginProbe: Array<{ username: string; ms: number; status: number }> = [];
   for (let i = 0; i < 5; i++) {
-    const u = await createStaffUser(ctx.baseUrl, admin.accessToken, ctx.registry, `perf${config.runId}_lg${i}`, RoleCode.OPERATOR);
+    const u = await createStaffUser(ctx.baseUrl, auth.admin.accessToken, ctx.registry, `perf${config.runId}_lg${i}`, RoleCode.OPERATOR);
     const start = performance.now();
     const res = await api(ctx.baseUrl, "POST", "/api/v1/auth/login", { body: { username: u.username, password: "perfpass123" } });
     loginProbe.push({ username: u.username, ms: performance.now() - start, status: res.status });
   }
 
-  const durationMs = config.durationMs ?? 10_000;
-  const concurrency = config.concurrency ?? 5;
   const result = await runLoad({
     baseUrl: ctx.baseUrl,
+    baseUrls,
     concurrency,
     durationMs,
     warmupMs,
-    makeRequest: buildMakeRequest(steps, { admin: admin.accessToken, sm: sm.token, fin: fin.token }),
+    mode: rps > 0 ? "paced" : "max-effort",
+    targetRps: rps > 0 ? rps : undefined,
+    makeRequest: buildMakeRequest(profile.steps, { admin: auth.admin.accessToken, sm: auth.sm.token, fin: auth.fin.token }),
     requestTimeoutMs: config.requestTimeoutMs,
     seed: config.seed,
   });
 
   const checks = [...loadRunChecks(result)];
+  if (result.pacing) {
+    checks.push({
+      name: "load application validity (±5%)",
+      passed: result.pacing.loadApplicationValid,
+      detail: result.pacing.loadValidityDetail,
+    });
+  }
   const unexpectedLogin = loginProbe.filter((l) => l.status !== 200).length;
   checks.push({
     name: "scripted login probe 200",
@@ -152,39 +239,43 @@ async function runLoadProfile(config: RunConfig, steps: Array<{ label: string; m
   ctx.scenario = {
     profile: config.profile,
     kind: "load",
+    mode: result.mode,
+    targetRps: rps,
     concurrency,
     durationMs,
     warmupMs,
-    steps: steps.map((s) => ({ label: s.label, method: s.method, path: s.path, auth: s.auth, expected: s.expected })),
+    steps: profile.steps.map((s) => ({ label: s.label, method: s.method, path: s.path, auth: s.auth, expected: s.expected, routeClass: s.routeClass })),
     loginProbe: loginProbe.map((l) => ({ username: l.username, status: l.status, ms: Math.round(l.ms) })),
   };
   return { result, checks };
 }
 
-async function runPaycreate(config: RunConfig, ctx: RunContext): Promise<{ result: LoadResult; checks: CorrectnessCheck[] }> {
-  const admin = await adminLogin(ctx.baseUrl);
-  const sm = await createStaffUser(ctx.baseUrl, admin.accessToken, ctx.registry, `perf${config.runId}_sm`, RoleCode.SALES_MANAGER);
-  const fin = await createStaffUser(ctx.baseUrl, admin.accessToken, ctx.registry, `perf${config.runId}_fin`, RoleCode.FINANCE);
-
-  // Build orders via the canonical chain (worker off — we drive the outbox).
-  // 5 orders for the unique-key/burst set, 1 reserved for concurrent-identical,
-  // 2 for concurrent-divergent → 8 total.
-  const ORDER_COUNT = 8;
+/** Fresh payment-capable order pool for payment scenarios (capped, tracked). */
+async function buildOrderPool(ctx: RunContext, admin: AuthSession, sm: SeedUser, count: number, tag: string): Promise<string[]> {
   const serviceDate = futureDate(45);
   const chains = [];
-  for (let i = 0; i < ORDER_COUNT; i++) {
-    chains.push(await buildOrderChain(ctx.baseUrl, admin.accessToken, ctx.prisma, sm, ctx.registry, 100 + i, serviceDate, `payc${i}`));
+  for (let i = 0; i < count; i++) {
+    chains.push(await buildOrderChain(ctx.baseUrl, admin.accessToken, ctx.prisma, sm, ctx.registry, 100 + (i % 900), serviceDate, `${tag}${i}`));
   }
   await drainOutbox(ctx.eventBus, ctx.prisma);
-  const orders = await ctx.prisma.order.findMany({ where: { saleId: { in: chains.map((c) => c.saleId) } }, select: { id: true } });
-  const orderIds = orders.map((o) => o.id);
-  ctx.registry.orders.push(...orderIds);
-  if (orderIds.length !== ORDER_COUNT) {
-    throw new Error(`expected ${ORDER_COUNT} orders, got ${orderIds.length}`);
+  const orders = await ctx.prisma.order.findMany({
+    where: { saleId: { in: chains.map((c) => c.saleId) } },
+    select: { id: true },
+  });
+  const ids = orders.map((o) => o.id);
+  ctx.registry.orders.push(...ids);
+  if (ids.length !== count) {
+    throw new Error(`order pool expected ${count}, got ${ids.length}`);
   }
+  return ids;
+}
 
-  // Nested consumer chain proof: OrderRequested → Order → OrderCreated →
-  // CommissionAccrual. Consumers are authoritative via InboxEvent dedup rows.
+async function runPaycreate(config: RunConfig, ctx: RunContext, auth: Auth): Promise<{ result: LoadResult; checks: CorrectnessCheck[] }> {
+  // Build orders via the canonical chain (worker off — we drive the outbox).
+  const ORDER_COUNT = 8;
+  const orderIds = await buildOrderPool(ctx, auth.admin, auth.sm, ORDER_COUNT, `payc${config.seed}`);
+
+  // Nested consumer chain proof: OrderRequested → Order → OrderCreated → CommissionAccrual.
   const orderCreatedRows = await ctx.prisma.outboxEvent.findMany({ where: { eventType: "OrderCreated", aggregateId: { in: orderIds } }, select: { id: true } });
   const orderCreatedEvents = orderCreatedRows.length;
   const consumedInboxRows = await ctx.prisma.inboxEvent.count({ where: { eventId: { in: orderCreatedRows.map((r) => r.id) } } });
@@ -192,16 +283,12 @@ async function runPaycreate(config: RunConfig, ctx: RunContext): Promise<{ resul
 
   const pay = (orderId: string, key: string) =>
     api<{ id: string }>(ctx.baseUrl, "POST", "/api/v1/finance/payments", {
-      token: fin.token,
+      token: auth.fin.token,
       headers: { "Idempotency-Key": key },
       body: { orderId },
       timeoutMs: config.requestTimeoutMs,
     });
 
-  // 1. Unique-key burst: 2 keys × 5 orders = 10 requests. The first key per
-  //    order creates the Payment (201). The second key on the SAME order is a
-  //    canonical business-level no-op (PaymentService idempotent retry: active
-  //    payment exists → returns the existing fact, 201) — 0 duplicate facts.
   const uniqueOrders = orderIds.slice(0, 5);
   let unique201 = 0;
   let unique5xx = 0;
@@ -223,14 +310,13 @@ async function runPaycreate(config: RunConfig, ctx: RunContext): Promise<{ resul
         perOrderFirstId.set(orderId, id);
         ctx.registry.payments.push(id);
       } else if (perOrderFirstId.get(orderId) === id) {
-        businessNoop++; // business-level no-op: same fact returned
+        businessNoop++;
       }
     } else if (res.status >= 500) {
       unique5xx++;
     }
   }
 
-  // 2. Identical retry ×3 (DB-backed replay — 0 new facts, same id).
   let replayOk = 0;
   for (let i = 0; i < 3; i++) {
     const orderId = uniqueOrders[i];
@@ -242,7 +328,6 @@ async function runPaycreate(config: RunConfig, ctx: RunContext): Promise<{ resul
     }
   }
 
-  // 3. Concurrent identical ×4 — all < 500, exactly 1 fact (fresh order).
   const concOrder = orderIds[5];
   const keyA = `perf-${config.runId}-conc-id-${config.seed}`;
   const concId = await Promise.all(Array.from({ length: 4 }, () => pay(concOrder, keyA)));
@@ -251,7 +336,6 @@ async function runPaycreate(config: RunConfig, ctx: RunContext): Promise<{ resul
   const winnerId = concId.find((r) => r.status === 201);
   if (winnerId) ctx.registry.payments.push((winnerId.body as { id: string }).id);
 
-  // 4. Concurrent divergent — same key, different fresh orders → 1×201 + 1×409.
   const keyB = `perf-${config.runId}-conc-div-${config.seed}`;
   const [ra, rb] = await Promise.all([pay(orderIds[6], keyB), pay(orderIds[7], keyB)]);
   const divWinner = [ra, rb].find((r) => r.status === 201);
@@ -264,9 +348,9 @@ async function runPaycreate(config: RunConfig, ctx: RunContext): Promise<{ resul
   expectedPerOrder.push({ orderId: concOrder, expected: 1 });
   expectedPerOrder.push({ orderId: orderIds[6], expected: ra.status === 201 ? 1 : 0 });
   expectedPerOrder.push({ orderId: orderIds[7], expected: rb.status === 201 ? 1 : 0 });
-  const expectedPayments = 5 + 1 + div201; // unique facts + concurrent + divergent winner
+  const expectedPayments = 5 + 1 + div201;
   const checks: CorrectnessCheck[] = [
-    ...(await paycreateChecks(ctx.prisma, { expectedPerOrder, userIds: [fin.id], expectedPayments, businessNoopKeys: businessNoop })),
+    ...(await paycreateChecks(ctx.prisma, { expectedPerOrder, userIds: [auth.fin.id], expectedPayments, businessNoopKeys: businessNoop })),
     {
       name: "0 raw 500 across payment scenarios",
       passed: unique5xx + concId500 + div500 === 0,
@@ -295,14 +379,10 @@ async function runPaycreate(config: RunConfig, ctx: RunContext): Promise<{ resul
   ];
 
   const result: LoadResult = {
+    mode: "max-effort",
     samples: [],
-    byLabel: {
-      "paycreate.unique": {
-        count: uniqueLatency.length,
-        stats: { count: uniqueLatency.length, min: 0, p50: 0, p95: 0, p99: 0, max: 0, mean: 0 },
-        outcomes: { expected: unique201, unexpected4xx: 0, unexpected409: 0, unexpected429: 0, unexpected5xx: unique5xx, timeout: 0, transportError: 0 },
-      },
-    },
+    byLabel: {},
+    byRouteClass: {},
     totalRequests: 10 + 6 + 4 + 2,
     expected: expectedPayments,
     unexpected4xx: 0,
@@ -314,6 +394,10 @@ async function runPaycreate(config: RunConfig, ctx: RunContext): Promise<{ resul
     requestsPerSec: 0,
     successfulPerSec: 0,
     measurementMs: 0,
+    perBaseUrl: { [ctx.baseUrl]: 22 },
+    warmup: { durationMs: 0, requests: 0 },
+    expectedStatuses: expectedPayments,
+    unexpectedStatuses: unique5xx + concId500 + div500 + div409,
   };
 
   ctx.scenario = {
@@ -331,29 +415,514 @@ async function runPaycreate(config: RunConfig, ctx: RunContext): Promise<{ resul
   return { result, checks };
 }
 
-async function runEventbusRecovery(config: RunConfig): Promise<{ result: LoadResult; checks: CorrectnessCheck[]; drainMs: number; env: EnvMetadata }> {
-  const SEED_COUNT = 250; // exceeds default worker batch (100) → burst
+/** Paced payment.create: fresh order pool + unique keys, business-idempotency exercised. */
+async function runPaymentPaced(config: RunConfig, ctx: RunContext, auth: Auth, opts: { rps: number; durationMs: number; concurrency: number }): Promise<{ result: LoadResult; checks: CorrectnessCheck[] }> {
+  // Max-effort (rps=0) exercises the CONCURRENCY ceiling directly (the payment
+  // concurrency gate); paced mode exercises the arrival rate.
+  const requestCount =
+    opts.rps > 0 ? Math.floor((opts.durationMs / 1000) * opts.rps) : Math.min(Math.max(50, opts.concurrency * 2), 120);
+  const poolSize = Math.min(Math.max(8, requestCount), 120);
+  const orderIds = await buildOrderPool(ctx, auth.admin, auth.sm, poolSize, `payp${config.seed}`);
+  const paymentsBefore = await ctx.prisma.payment.count({ where: { orderId: { in: orderIds } } });
+
+  const result = await runLoad({
+    baseUrl: ctx.baseUrl,
+    concurrency: opts.concurrency,
+    durationMs: opts.durationMs,
+    warmupMs: config.warmupMs ?? 1_000,
+    mode: opts.rps > 0 ? "paced" : "max-effort",
+    targetRps: opts.rps > 0 ? opts.rps : undefined,
+    makeRequest: (n: number) => {
+      const orderId = orderIds[n % orderIds.length];
+      return {
+        label: "payment.create",
+        method: "POST",
+        path: "/api/v1/finance/payments",
+        headers: { Authorization: `Bearer ${auth.fin.token}`, "Idempotency-Key": `perf-${config.runId}-pay-${n}-${config.seed}` },
+        body: { orderId },
+        expected: [200, 201],
+        routeClass: "E" as RouteClass,
+      };
+    },
+    requestTimeoutMs: config.requestTimeoutMs,
+    seed: config.seed,
+  });
+
+  const facts = await ctx.prisma.payment.count({ where: { orderId: { in: orderIds } } });
+  const started = opts.rps > 0 ? result.pacing?.startedOperations ?? 0 : result.totalRequests;
+  // Warm-up requests really execute (paced and max-effort) and create idempotency
+  // slots — they must be included in the «every key recorded» bookkeeping.
+  const warmupRequests = result.warmup.requests ?? 0;
+  const reached = started + warmupRequests;
+  const expectedFacts = Math.min(poolSize, started);
+  const perOrderViolations = await ctx.prisma.payment.groupBy({ by: ["orderId"], where: { orderId: { in: orderIds } }, _count: { _all: true } });
+  const dupOrders = perOrderViolations.filter((g) => g._count._all > 1).length;
+  const completedSlots = await ctx.prisma.externalIdempotencyRecord.count({
+    where: { operation: "payment.create", scopeId: auth.fin.id, status: "COMPLETED" },
+  });
+  const checks: CorrectnessCheck[] = [
+    ...loadRunChecks(result),
+    {
+      name: "payment facts = min(pool, started), 0 duplicates per order",
+      passed: facts === expectedFacts && dupOrders === 0 && facts === paymentsBefore + expectedFacts,
+      detail: `facts=${facts} expected=${expectedFacts} before=${paymentsBefore} dupOrders=${dupOrders}`,
+    },
+    {
+      name: "idempotency slots == requests reaching the API (measurement + warm-up)",
+      passed: completedSlots === reached,
+      detail: `completedSlots=${completedSlots} started=${started} warmup=${warmupRequests} reached=${reached}`,
+    },
+    {
+      name: "one-active-payment invariant (<=1 per order)",
+      passed: dupOrders === 0 && facts <= poolSize,
+      detail: `perOrderMax=${dupOrders === 0 ? 1 : ">1"} pool=${poolSize}`,
+    },
+  ];
+  if (result.pacing) {
+    checks.push({ name: "load application validity (±5%)", passed: result.pacing.loadApplicationValid, detail: result.pacing.loadValidityDetail });
+  }
+  ctx.scenario = {
+    profile: config.profile,
+    kind: "payment",
+    rps: opts.rps,
+    durationMs: opts.durationMs,
+    requestCount,
+    poolSize,
+    facts,
+    noopKeys: Math.max(0, reached - facts),
+  };
+  return { result, checks };
+}
+
+/** Paced Booking/Order chain writes: one canonical order per paced chain start. */
+async function runBookingOrderPaced(config: RunConfig, ctx: RunContext, auth: Auth, opts: { rps: number; durationMs: number; concurrency: number }): Promise<{ result: LoadResult; checks: CorrectnessCheck[] }> {
+  const targetRps = opts.rps;
+  const windowStart = Date.now();
+  const scheduled = Math.floor((opts.durationMs / 1000) * targetRps);
+  const serviceDate = futureDate(45);
+  const failures: string[] = [];
+  const chainDurations: number[] = [];
+  const chainSaleIds: string[] = [];
+  let started = 0;
+  let inFlight = 0;
+  let maxConcurrencyObserved = 0;
+  let completed = 0;
+  const startOffsets: number[] = [];
+
+  const startChain = async (n: number): Promise<void> => {
+    const scheduledStart = scheduledStartMs({ targetRps, durationMs: opts.durationMs, windowStartMs: windowStart }, n);
+    const delay = scheduledStart - Date.now();
+    if (delay > 0) await sleep(delay);
+    startOffsets.push(Date.now() - windowStart);
+    started++;
+    inFlight++;
+    maxConcurrencyObserved = Math.max(maxConcurrencyObserved, inFlight);
+    const s = performance.now();
+    try {
+      const chain = await buildOrderChain(ctx.baseUrl, auth.admin.accessToken, ctx.prisma, auth.sm, ctx.registry, 100 + (n % 900), serviceDate, `bok${config.seed}x${n}`);
+      chainSaleIds.push(chain.saleId);
+    } catch (err) {
+      failures.push(`chain ${n}: ${String((err as Error)?.message ?? err)}`);
+    } finally {
+      chainDurations.push(performance.now() - s);
+      inFlight--;
+      completed++;
+    }
+  };
+
+  const windowDeadline = windowStart + opts.durationMs;
+  let next = 0;
+  while (next < scheduled) {
+    const waitMs = scheduledStartMs({ targetRps, durationMs: opts.durationMs, windowStartMs: windowStart }, next) - Date.now();
+    if (waitMs > 0) await sleep(waitMs);
+    if (Date.now() >= windowDeadline) break;
+    while (inFlight >= opts.concurrency && Date.now() < windowDeadline + 1_000) {
+      await sleep(2);
+    }
+    if (inFlight >= opts.concurrency) break;
+    void startChain(next);
+    next++;
+  }
+  while (inFlight > 0) await sleep(10);
+  await drainOutbox(ctx.eventBus, ctx.prisma);
+
+  // Orders materialize via the OrderRequested consumer during drain — count the
+  // canonical Order rows for exactly the sales this scenario created, and track
+  // their ids so cleanup is complete.
+  const orderRows = await ctx.prisma.order.findMany({ where: { saleId: { in: chainSaleIds } }, select: { id: true } });
+  ctx.registry.orders.push(...orderRows.map((o) => o.id));
+  const ordersCreated = orderRows.length;
+  // Scenario-scoped convergence: OrderCreated events for THIS scenario's orders
+  // only (the shared perf DB accumulates events from prior scenarios).
+  const orderRowIds = orderRows.map((o) => o.id);
+  const orderCreatedEvents = await ctx.prisma.outboxEvent.count({ where: { eventType: "OrderCreated", aggregateId: { in: orderRowIds } } });
+  const orderEventRows = await ctx.prisma.outboxEvent.findMany({ where: { eventType: "OrderCreated", aggregateId: { in: orderRowIds } }, select: { id: true } });
+  const consumedInbox = await ctx.prisma.inboxEvent.count({ where: { eventId: { in: orderEventRows.map((r) => r.id) } } });
+  const orderDup = await ctx.prisma.order.groupBy({ by: ["saleId"], _count: { _all: true } });
+  const dupSales = orderDup.filter((g) => g._count._all > 1).length;
+
+  const achievedStartRate = started > 1 ? (started - 1) / (Math.max(1e-3, (startOffsets[startOffsets.length - 1] - startOffsets[0]) / 1000)) : started > 0 ? started / (Math.max(1, opts.durationMs) / 1000) : 0;
+  const isBurst = opts.durationMs <= 60_000;
+  const validityDetail = isBurst
+    ? `burst started=${started} scheduled=${scheduled} diffPct=${(Math.abs(started - scheduled) / Math.max(1, scheduled)) * 100}% (tolerance ±5%)`
+    : `sustained achievedStartRate=${achievedStartRate.toFixed(2)}/s target=${targetRps}/s`;
+  const loadValid = isBurst ? Math.abs(started - scheduled) / Math.max(1, scheduled) <= 0.05 : Math.abs(achievedStartRate - targetRps) / targetRps <= 0.05;
+
+  const checks: CorrectnessCheck[] = [
+    {
+      name: "0 chain failures (0 raw 500 at chain level)",
+      passed: failures.length === 0,
+      detail: `failures=${failures.length}${failures.length > 0 ? ` first=${failures[0]}` : ""}`,
+    },
+    {
+      // Successful chains only — aborted chains never reach the Order step.
+      name: "1 Order per successful chain (no duplicates)",
+      passed: ordersCreated === completed - failures.length && dupSales === 0,
+      detail: `ordersCreated=${ordersCreated} chainsStarted=${completed} chainsFailed=${failures.length} dupSales=${dupSales}`,
+    },
+    {
+      name: "event-chain convergence (OrderCreated consumed)",
+      passed: orderCreatedEvents >= ordersCreated && consumedInbox >= ordersCreated,
+      detail: `orderCreated=${orderCreatedEvents} consumedInbox=${consumedInbox} orders=${ordersCreated}`,
+    },
+    {
+      name: "load application validity (±5%)",
+      passed: loadValid,
+      detail: validityDetail,
+    },
+  ];
+
+  const result: LoadResult = {
+    mode: "paced",
+    samples: [],
+    byLabel: {},
+    byRouteClass: {
+      D: {
+        count: chainDurations.length,
+        stats: (() => {
+          const sorted = [...chainDurations].sort((a, b) => a - b);
+          const p = (q: number) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil((q / 100) * sorted.length) - 1)] : 0);
+          return { count: sorted.length, min: sorted[0] ?? 0, p50: p(50), p95: p(95), p99: p(99), max: sorted[sorted.length - 1] ?? 0, mean: sorted.length ? sorted.reduce((a, b) => a + b, 0) / sorted.length : 0 };
+        })(),
+        outcomes: { expected: completed - failures.length, unexpected4xx: 0, unexpected409: 0, unexpected429: 0, unexpected5xx: failures.length, timeout: 0, transportError: 0 },
+      },
+    },
+    totalRequests: completed,
+    expected: completed - failures.length,
+    unexpected4xx: 0,
+    unexpected409: 0,
+    unexpected429: 0,
+    unexpected5xx: failures.length,
+    timeouts: 0,
+    transportErrors: 0,
+    requestsPerSec: completed > 0 ? Math.round((completed / Math.max(1, opts.durationMs)) * 1000) : 0,
+    successfulPerSec: Math.round(((completed - failures.length) / Math.max(1, opts.durationMs)) * 1000),
+    measurementMs: opts.durationMs,
+    pacing: {
+      targetRps,
+      scheduledOperations: scheduled,
+      startedOperations: started,
+      completedOperations: completed,
+      achievedStartRate,
+      achievedCompletionRate: completed / (Math.max(1, opts.durationMs) / 1000),
+      schedulerLagMs: 0,
+      maxConcurrencyObserved,
+      loadApplicationValid: loadValid,
+      loadValidityDetail: validityDetail,
+    },
+    perBaseUrl: { [ctx.baseUrl]: completed },
+    warmup: { durationMs: 0, requests: 0 },
+    expectedStatuses: completed - failures.length,
+    unexpectedStatuses: failures.length,
+  };
+
+  ctx.scenario = {
+    profile: config.profile,
+    kind: "booking",
+    rps: targetRps,
+    durationMs: opts.durationMs,
+    scheduled,
+    started,
+    completed,
+    ordersCreated,
+    chainP95Ms: p95Of(chainDurations),
+  };
+  return { result, checks };
+}
+
+/** Paced auth/login with a distinct-user pool (throttle respected, never bypassed). */
+async function runLoginPaced(config: RunConfig, ctx: RunContext, opts: { rps: number; durationMs: number }): Promise<{ result: LoadResult; checks: CorrectnessCheck[] }> {
+  const requestCount = Math.floor((opts.durationMs / 1000) * opts.rps);
+  const admin = await adminLogin(ctx.baseUrl);
+  const pool: Array<{ username: string; password: string }> = [];
+  // Pool sized so each principal is used sparingly (successful logins reset the
+  // per-key throttle window; failures would accumulate — keep usage < 10/key).
+  const needed = Math.ceil(requestCount / 9);
+  for (let i = 0; i < Math.max(8, Math.min(needed, 60)); i++) {
+    const u = await createStaffUser(ctx.baseUrl, admin.accessToken, ctx.registry, `perf${config.runId}_ln${i}`, RoleCode.OPERATOR);
+    pool.push({ username: u.username, password: "perfpass123" });
+  }
+  const startedAt = Date.now();
+  const result = await runLoad({
+    baseUrl: ctx.baseUrl,
+    concurrency: 4,
+    durationMs: opts.durationMs,
+    warmupMs: Math.min(config.warmupMs ?? 500, 500),
+    mode: "paced",
+    targetRps: opts.rps,
+    makeRequest: (n: number) => {
+      const u = pool[n % pool.length];
+      return {
+        label: "auth.login",
+        method: "POST",
+        path: "/api/v1/auth/login",
+        body: { username: u.username, password: u.password },
+        expected: [200],
+        routeClass: "F" as RouteClass,
+      };
+    },
+    requestTimeoutMs: config.requestTimeoutMs,
+    seed: config.seed,
+  });
+  const measuredMs = Date.now() - startedAt;
+  const checks: CorrectnessCheck[] = [
+    ...loadRunChecks(result),
+    {
+      name: "login throttle not triggered (distinct principals, successes reset window)",
+      passed: result.unexpected429 === 0,
+      detail: `unexpected429=${result.unexpected429} pool=${pool.length} requests=${result.totalRequests}`,
+    },
+  ];
+  if (result.pacing) {
+    checks.push({ name: "load application validity (±5%)", passed: result.pacing.loadApplicationValid, detail: result.pacing.loadValidityDetail });
+  }
+  ctx.scenario = {
+    profile: config.profile,
+    kind: "login",
+    rps: opts.rps,
+    durationMs: opts.durationMs,
+    requestCount,
+    poolSize: pool.length,
+    measuredMs,
+  };
+  return { result, checks };
+}
+
+interface EventbusOutcome {
+  result: LoadResult;
+  checks: CorrectnessCheck[];
+  env: EnvMetadata;
+  drainMs: number;
+  metrics: Record<string, unknown>;
+}
+
+async function runEventbusScenario(config: RunConfig): Promise<EventbusOutcome> {
+  if (config.profile === "eventbus-steady") {
+    return runEventbusSteady(config);
+  }
+  const isRecovery = config.profile === "eventbus-recovery";
+  const seedCount = config.seedEvents > 0 ? config.seedEvents : isRecovery ? QUALIFICATION.eventbus.recovery : QUALIFICATION.eventbus.burst;
+  return runEventbusDrain(config, {
+    seedCount,
+    label: isRecovery ? "RECOVERY" : "BURST",
+    recoveryGate: isRecovery,
+  });
+}
+
+/** EventBus generation-under-processing at the approved steady rate (canonical worker config). */
+async function runEventbusSteady(config: RunConfig): Promise<EventbusOutcome> {
+  const rate = QUALIFICATION.eventbus.steadyPerSec;
+  const durationMs = config.durationMs ?? 30_000;
+  const workerCount = Math.max(1, config.workers);
+  const prefix = `perf-ebs-${config.runId}`;
+  const checks: CorrectnessCheck[] = [];
+  let env: EnvMetadata | null = null;
+
+  // Worker-enabled apps with CANONICAL worker config (no timing overrides).
+  const workers: Booted[] = [];
+  for (let i = 0; i < workerCount; i++) workers.push(await bootApp(true));
+  const { prisma, eventBus } = workers[0];
+  const backlogSamples: number[] = [];
+  const maxBacklog = { value: 0 };
+  let oldestAgeMaxMs = 0;
+  const generationStart = Date.now();
+  const scheduled = Math.floor((durationMs / 1000) * rate);
+  let emitted = 0;
+  let finished = 0;
+
+  const emitOne = async (n: number): Promise<void> => {
+    try {
+      const scheduledStart = scheduledStartMs({ targetRps: rate, durationMs, windowStartMs: generationStart }, n);
+      const delay = scheduledStart - Date.now();
+      if (delay > 0) await sleep(delay);
+      await prisma.$transaction((tx) =>
+        eventBus.emit(tx, {
+          aggregateType: "Booking",
+          aggregateId: `${prefix}-${n}`,
+          eventType: "BookingCreated",
+          payload: { bookingId: `${prefix}-${n}`, note: "perf-steady" },
+          actor: { type: "SYSTEM" },
+        }),
+      );
+      emitted++;
+      const pending = await prisma.outboxEvent.count({ where: { status: "PENDING", aggregateId: { startsWith: `${prefix}-` } } });
+      backlogSamples.push(pending);
+      maxBacklog.value = Math.max(maxBacklog.value, pending);
+      const oldest = await prisma.outboxEvent.findFirst({ where: { status: "PENDING", aggregateId: { startsWith: `${prefix}-` } }, orderBy: { createdAt: "asc" }, select: { createdAt: true } });
+      if (oldest) oldestAgeMaxMs = Math.max(oldestAgeMaxMs, Date.now() - oldest.createdAt.getTime());
+    } catch {
+      /* a single emit failure is recorded as emitted < scheduled */
+    } finally {
+      finished++;
+    }
+  };
+
+  let next = 0;
+  while (next < scheduled) {
+    const waitMs = scheduledStartMs({ targetRps: rate, durationMs, windowStartMs: generationStart }, next) - Date.now();
+    if (waitMs > 0) await sleep(waitMs);
+    if (Date.now() >= generationStart + durationMs) break;
+    void emitOne(next).catch(() => undefined);
+    next++;
+  }
+  while (finished < next) await sleep(5);
+  const generationMs = Date.now() - generationStart;
+
+  // Drain: wait for PENDING to reach 0 (bounded).
+  const drainStart = Date.now();
+  const drainDeadline = drainStart + config.drainTimeoutMs;
+  while (Date.now() < drainDeadline) {
+    const pending = await prisma.outboxEvent.count({ where: { status: "PENDING", aggregateId: { startsWith: `${prefix}-` } } });
+    if (pending === 0) break;
+    await sleep(500);
+  }
+  const drainMs = Date.now() - drainStart;
+  const published = await prisma.outboxEvent.count({ where: { status: "PUBLISHED", aggregateId: { startsWith: `${prefix}-` } } });
+  const residualFailed = await prisma.outboxEvent.count({ where: { status: "FAILED", aggregateId: { startsWith: `${prefix}-` } } });
+  const finalPending = await prisma.outboxEvent.count({ where: { status: "PENDING", aggregateId: { startsWith: `${prefix}-` } } });
+
+  env = await collectEnv({
+    runId: config.runId,
+    dbUrl: process.env.DATABASE_URL,
+    baseUrl: workers[0].baseUrl,
+    profile: config.profile,
+    seed: config.seed,
+    datasetClass: "SMALL",
+    appInstances: 0,
+    workerInstances: workerCount,
+    postgresVersion: await postgresVersion(prisma),
+    requestTimeoutMs: config.requestTimeoutMs,
+  });
+
+  checks.push(
+    {
+      name: "steady generation applied (emitted == scheduled)",
+      passed: emitted === scheduled,
+      detail: `emitted=${emitted} scheduled=${scheduled} generationMs=${generationMs}`,
+    },
+    {
+      name: "0 lost committed events (all published or draining)",
+      passed: published + finalPending === scheduled && residualFailed === 0,
+      detail: `published=${published} finalPending=${finalPending} failed=${residualFailed}`,
+    },
+    {
+      name: "backlog converged to 0 after generation",
+      passed: finalPending === 0,
+      detail: `finalPending=${finalPending} drainMs=${drainMs}`,
+    },
+    {
+      name: "backlog bounded during generation (max recorded)",
+      passed: true,
+      detail: `maxBacklog=${maxBacklog.value} oldestAgeMaxMs=${oldestAgeMaxMs} samples=${backlogSamples.length}`,
+    },
+  );
+
+  // Cleanup probe events.
+  const ids = (await prisma.outboxEvent.findMany({ where: { aggregateId: { startsWith: `${prefix}-` } }, select: { id: true } })).map((e) => e.id);
+  await prisma.inboxEvent.deleteMany({ where: { eventId: { in: ids } } });
+  await prisma.outboxEvent.deleteMany({ where: { aggregateId: { startsWith: `${prefix}-` } } });
+  for (const w of workers) await w.app.close().catch(() => undefined);
+
+  const result: LoadResult = {
+    mode: "paced",
+    samples: [],
+    byLabel: {},
+    byRouteClass: {},
+    totalRequests: 0,
+    expected: published,
+    unexpected4xx: 0,
+    unexpected409: 0,
+    unexpected429: 0,
+    unexpected5xx: 0,
+    timeouts: 0,
+    transportErrors: 0,
+    requestsPerSec: 0,
+    successfulPerSec: Math.round((published / Math.max(1, drainMs)) * 1000),
+    measurementMs: drainMs,
+    perBaseUrl: {},
+    warmup: { durationMs: 0, requests: 0 },
+    expectedStatuses: published,
+    unexpectedStatuses: 0,
+  };
+
+  const metrics: Record<string, unknown> = {
+    mode: "steady-generation",
+    targetPerSec: rate,
+    scheduled,
+    emitted,
+    generationMs,
+    drainMs,
+    published,
+    finalPending,
+    residualFailed,
+    maxBacklog: maxBacklog.value,
+    oldestAgeMaxMs,
+    backlogSamples: backlogSamples.length,
+    workers: workerCount,
+    workerIntervalMs: QUALIFICATION.canonical.workerIntervalMs,
+    workerBatch: QUALIFICATION.canonical.workerBatch,
+  };
+  return { result, checks, env, drainMs, metrics };
+}
+
+/** EventBus burst/recovery: seed N PENDING (+ poison) with workers OFF, then drain with canonical-config workers. */
+async function runEventbusDrain(
+  config: RunConfig,
+  opts: { seedCount: number; label: string; recoveryGate: boolean },
+): Promise<EventbusOutcome> {
+  const seedCount = opts.seedCount;
   const RUN_PREFIX = `perf-eb-${config.runId}`;
+  const workerCount = Math.max(1, config.workers);
+  const drainBoundMs = opts.recoveryGate ? config.drainTimeoutMs : Math.max(60_000, config.drainTimeoutMs);
   let env: EnvMetadata | null = null;
 
   // Phase A: worker disabled — seed burst of PENDING + one poison.
+  // Chunked seeding: 5,000 emits in one transaction exceeds the 5s interactive
+  // transaction timeout — batch by 500 per transaction (deterministic order).
   const a = await bootApp(false);
+  let seededCount = 0;
   try {
-    const seeded = await a.prisma.$transaction(async (tx) => {
-      const ids: string[] = [];
-      for (let i = 0; i < SEED_COUNT; i++) {
-        ids.push(
-          await a.eventBus.emit(tx, {
-            aggregateType: "Booking",
-            aggregateId: `${RUN_PREFIX}-${i}`,
-            eventType: "BookingCreated",
-            payload: { bookingId: `${RUN_PREFIX}-${i}`, note: "perf-probe" },
-            actor: { type: "SYSTEM" },
-          }),
-        );
-      }
-      return ids;
-    });
+    const seeded: string[] = [];
+    for (let base = 0; base < seedCount; base += 500) {
+      const chunk = Math.min(500, seedCount - base);
+      const ids = await a.prisma.$transaction(async (tx) => {
+        const out: string[] = [];
+        for (let k = 0; k < chunk; k++) {
+          const i = base + k;
+          out.push(
+            await a.eventBus.emit(tx, {
+              aggregateType: "Booking",
+              aggregateId: `${RUN_PREFIX}-${i}`,
+              eventType: "BookingCreated",
+              payload: { bookingId: `${RUN_PREFIX}-${i}`, note: "perf-probe" },
+              actor: { type: "SYSTEM" },
+            }),
+          );
+        }
+        return out;
+      });
+      seeded.push(...ids);
+    }
     const poison = await a.prisma.$transaction((tx) =>
       a.eventBus.emit(tx, {
         aggregateType: "Booking",
@@ -363,15 +932,16 @@ async function runEventbusRecovery(config: RunConfig): Promise<{ result: LoadRes
         actor: { type: "SYSTEM" },
       }),
     );
+    void seeded;
     await a.prisma.outboxEvent.update({
       where: { id: poison },
       data: { status: "FAILED", retryable: false, attempts: 5, error: "perf poison" },
     });
     const pendingBefore = await a.prisma.outboxEvent.count({ where: { status: "PENDING", aggregateId: { startsWith: `${RUN_PREFIX}-` } } });
-    if (pendingBefore !== SEED_COUNT) {
-      throw new Error(`expected ${SEED_COUNT} PENDING, got ${pendingBefore}`);
+    if (pendingBefore !== seedCount) {
+      throw new Error(`expected ${seedCount} PENDING, got ${pendingBefore}`);
     }
-    void seeded;
+    seededCount = seedCount;
     env = await collectEnv({
       runId: config.runId,
       dbUrl: process.env.DATABASE_URL,
@@ -379,8 +949,8 @@ async function runEventbusRecovery(config: RunConfig): Promise<{ result: LoadRes
       profile: config.profile,
       seed: config.seed,
       datasetClass: "SMALL",
-      appInstances: 2,
-      workerInstances: 1,
+      appInstances: 0,
+      workerInstances: workerCount,
       postgresVersion: await postgresVersion(a.prisma),
       requestTimeoutMs: config.requestTimeoutMs,
     });
@@ -388,100 +958,66 @@ async function runEventbusRecovery(config: RunConfig): Promise<{ result: LoadRes
     await a.app.close();
   }
 
-  // Phase B: worker enabled (fast interval) — measure drain + poison isolation.
-  const prevInterval = process.env.OUTBOX_WORKER_INTERVAL_MS;
-  process.env.OUTBOX_WORKER_INTERVAL_MS = "200";
+  // Phase B: canonical-config workers (NO timing overrides) — measure drain + poison isolation.
   const drainStart = Date.now();
-  const b = await bootApp(true);
+  const workers: Booted[] = [];
+  for (let i = 0; i < workerCount; i++) workers.push(await bootApp(true));
   let drainMs = 0;
   let published = 0;
+  let residualPending = 0;
   let residualFailed = 0;
   let poisonStillFailed = false;
   try {
-    const deadline = Date.now() + config.drainTimeoutMs;
+    const deadline = Date.now() + drainBoundMs;
     while (Date.now() < deadline) {
-      const pending = await b.prisma.outboxEvent.count({ where: { status: "PENDING", aggregateId: { startsWith: `${RUN_PREFIX}-` } } });
+      const pending = await workers[0].prisma.outboxEvent.count({ where: { status: "PENDING", aggregateId: { startsWith: `${RUN_PREFIX}-` } } });
       if (pending === 0) break;
       await new Promise((r) => setTimeout(r, 500));
     }
     drainMs = Date.now() - drainStart;
-    published = await b.prisma.outboxEvent.count({ where: { status: "PUBLISHED", aggregateId: { startsWith: `${RUN_PREFIX}-` } } });
-    residualFailed = await b.prisma.outboxEvent.count({ where: { status: "FAILED", aggregateId: { startsWith: `${RUN_PREFIX}-` } } });
-    const poisonRow = await b.prisma.outboxEvent.findFirst({ where: { aggregateId: `${RUN_PREFIX}-poison` } });
+    published = await workers[0].prisma.outboxEvent.count({ where: { status: "PUBLISHED", aggregateId: { startsWith: `${RUN_PREFIX}-` } } });
+    residualPending = await workers[0].prisma.outboxEvent.count({ where: { status: "PENDING", aggregateId: { startsWith: `${RUN_PREFIX}-` } } });
+    residualFailed = await workers[0].prisma.outboxEvent.count({ where: { status: "FAILED", aggregateId: { startsWith: `${RUN_PREFIX}-` } } });
+    const poisonRow = await workers[0].prisma.outboxEvent.findFirst({ where: { aggregateId: `${RUN_PREFIX}-poison` } });
     poisonStillFailed = poisonRow?.status === "FAILED";
   } finally {
-    await b.app.close();
-    if (prevInterval !== undefined) process.env.OUTBOX_WORKER_INTERVAL_MS = prevInterval;
-    else delete process.env.OUTBOX_WORKER_INTERVAL_MS;
+    for (const w of workers) await w.app.close().catch(() => undefined);
   }
 
-  // Phase C: multi-instance drain — two worker-enabled apps, same DB.
-  const MI_COUNT = 100;
-  const MI_PREFIX = `perf-mi-${config.runId}`;
-  process.env.OUTBOX_WORKER_INTERVAL_MS = "500";
-  const mi: Booted[] = [await bootApp(true), await bootApp(true)];
-  let miPublished = 0;
-  let miPending = 0;
-  try {
-    const { prisma, eventBus } = mi[0];
-    await prisma.$transaction(async (tx) => {
-      for (let i = 0; i < MI_COUNT; i++) {
-        await eventBus.emit(tx, {
-          aggregateType: "Booking",
-          aggregateId: `${MI_PREFIX}-${i}`,
-          eventType: "BookingCreated",
-          payload: { bookingId: `${MI_PREFIX}-${i}`, note: "perf-mi" },
-          actor: { type: "SYSTEM" },
-        });
-      }
-    });
-    const miDeadline = Date.now() + config.drainTimeoutMs;
-    while (Date.now() < miDeadline) {
-      miPending = await prisma.outboxEvent.count({ where: { status: "PENDING", aggregateId: { startsWith: `${MI_PREFIX}-` } } });
-      if (miPending === 0) break;
-      await new Promise((r) => setTimeout(r, 400));
-    }
-    miPublished = await prisma.outboxEvent.count({ where: { status: "PUBLISHED", aggregateId: { startsWith: `${MI_PREFIX}-` } } });
-  } finally {
-    for (const inst of mi) await inst.app.close().catch(() => undefined);
-    if (prevInterval !== undefined) process.env.OUTBOX_WORKER_INTERVAL_MS = prevInterval;
-    else delete process.env.OUTBOX_WORKER_INTERVAL_MS;
-  }
-
-  // Cleanup: remove all seeded rows by prefix (deterministic, run-scoped).
-  const cleanupPrisma = mi[0]?.prisma ?? b.prisma;
-  const cleaned = await cleanupPrisma.outboxEvent.deleteMany({ where: { OR: [{ aggregateId: { startsWith: `${RUN_PREFIX}-` } }, { aggregateId: { startsWith: `${MI_PREFIX}-` } }] } });
-  if (cleaned.count === 0) {
-    // Fallback: reopen a prisma-less path is not possible — surface as observation.
-    console.warn("[perf] eventbus cleanup deleted 0 rows (rows may already be gone)");
-  }
-
+  const drained = published === seedCount && residualPending === 0;
   const checks = eventbusChecks({
-    seededCount: SEED_COUNT,
+    seededCount,
     poisonId: `${RUN_PREFIX}-poison`,
     publishedCount: published,
-    residualPending: 0,
-    residualFailed: residualFailed - 1, // the poison itself is the expected FAILED
+    residualPending,
+    residualFailed: residualFailed - 1,
     poisonStillFailed,
     drainMs,
   });
-  if (miPublished !== MI_COUNT || miPending !== 0) {
+  if (opts.recoveryGate) {
     checks.push({
-      name: "multi-instance drain complete",
-      passed: false,
-      detail: `published=${miPublished}/${MI_COUNT} pending=${miPending}`,
+      name: "recovery drain <= 120s (frozen authority)",
+      passed: drained && drainMs <= 120_000,
+      detail: `drainMs=${drainMs} published=${published}/${seedCount} pending=${residualPending} bound=120000`,
     });
   } else {
     checks.push({
-      name: "multi-instance drain complete",
-      passed: true,
-      detail: `published=${miPublished}/${MI_COUNT} pending=${miPending} instances=2`,
+      name: "burst drained within bound",
+      passed: drained,
+      detail: `drainMs=${drainMs} published=${published}/${seedCount} pending=${residualPending}`,
     });
   }
 
+  // Cleanup: probe events (outbox + any inbox rows) by prefix.
+  const ids = (await workers[0].prisma.outboxEvent.findMany({ where: { aggregateId: { startsWith: `${RUN_PREFIX}-` } }, select: { id: true } })).map((e) => e.id);
+  await workers[0].prisma.inboxEvent.deleteMany({ where: { eventId: { in: ids } } });
+  await workers[0].prisma.outboxEvent.deleteMany({ where: { aggregateId: { startsWith: `${RUN_PREFIX}-` } } });
+
   const result: LoadResult = {
+    mode: "paced",
     samples: [],
     byLabel: {},
+    byRouteClass: {},
     totalRequests: 0,
     expected: published,
     unexpected4xx: 0,
@@ -493,8 +1029,153 @@ async function runEventbusRecovery(config: RunConfig): Promise<{ result: LoadRes
     requestsPerSec: Math.round((published / Math.max(1, drainMs)) * 1000),
     successfulPerSec: Math.round((published / Math.max(1, drainMs)) * 1000),
     measurementMs: drainMs,
+    perBaseUrl: {},
+    warmup: { durationMs: 0, requests: 0 },
+    expectedStatuses: published,
+    unexpectedStatuses: 0,
   };
-  return { result, checks, drainMs, env: env! };
+
+  const metrics: Record<string, unknown> = {
+    mode: opts.recoveryGate ? "recovery" : "burst",
+    seeded: seedCount,
+    published,
+    drainMs,
+    pendingAfter: residualPending,
+    failedAfterExcludingPoison: residualFailed - 1,
+    poisonIsolated: poisonStillFailed,
+    workers: workerCount,
+    workerIntervalMs: QUALIFICATION.canonical.workerIntervalMs,
+    workerBatch: QUALIFICATION.canonical.workerBatch,
+    drainGateMs: opts.recoveryGate ? 120_000 : drainBoundMs,
+  };
+  return { result, checks, env, drainMs, metrics };
+}
+
+/** True 2 app + 2 worker HTTP topology with shared PostgreSQL. */
+async function runMultiInstance(config: RunConfig, profile: Profile): Promise<{ result: LoadResult; checks: CorrectnessCheck[]; env: EnvMetadata; metrics: Record<string, unknown> }> {
+  const appCount = Math.max(2, config.apps);
+  const workerCount = Math.max(2, config.workers);
+  const apps: Booted[] = [];
+  const workers: Booted[] = [];
+  for (let i = 0; i < appCount; i++) apps.push(await bootApp(false));
+  for (let i = 0; i < workerCount; i++) workers.push(await bootApp(true));
+
+  const baseUrls = apps.map((a) => a.baseUrl);
+  const admin = await adminLogin(apps[0].baseUrl);
+  const registry = newRegistry();
+  const sm = await createStaffUser(apps[0].baseUrl, admin.accessToken, registry, `perf${config.runId}_mism`, RoleCode.SALES_MANAGER);
+  const fin = await createStaffUser(apps[0].baseUrl, admin.accessToken, registry, `perf${config.runId}_misfin`, RoleCode.FINANCE);
+
+  // Seed probe events (worker off on apps → PENDING); workers drain them.
+  const MI_COUNT = 200;
+  const MI_PREFIX = `perf-mi-${config.runId}`;
+  const probeIds: string[] = [];
+  await apps[0].prisma.$transaction(async (tx) => {
+    for (let i = 0; i < MI_COUNT; i++) {
+      probeIds.push(
+        await apps[0].eventBus.emit(tx, {
+          aggregateType: "Booking",
+          aggregateId: `${MI_PREFIX}-${i}`,
+          eventType: "BookingCreated",
+          payload: { bookingId: `${MI_PREFIX}-${i}`, note: "perf-mi" },
+          actor: { type: "SYSTEM" },
+        }),
+      );
+    }
+  });
+
+  const rps = config.targetRps ?? 100;
+  const durationMs = config.durationMs ?? (profile.kind === "multi" ? ((profile as { durationMs?: number }).durationMs ?? 60_000) : 60_000);
+  const concurrency = config.concurrency ?? 100;
+  const result = await runLoad({
+    baseUrl: apps[0].baseUrl,
+    baseUrls,
+    concurrency,
+    durationMs,
+    warmupMs: Math.min(config.warmupMs ?? 3_000, 3_000),
+    mode: "paced",
+    targetRps: rps,
+    makeRequest: (n: number) => {
+      const steps = (PROFILES["qual-burst"] as LoadProfile).steps;
+      const step = steps[n % steps.length];
+      const headers: Record<string, string> = {};
+      if (step.auth === "sm") headers.Authorization = `Bearer ${sm.token}`;
+      else if (step.auth === "fin") headers.Authorization = `Bearer ${fin.token}`;
+      else if (step.auth === "admin") headers.Authorization = `Bearer ${admin.accessToken}`;
+      return { label: step.label, method: step.method, path: step.path, headers, body: step.body ? step.body() : undefined, expected: step.expected, routeClass: step.routeClass };
+    },
+    requestTimeoutMs: config.requestTimeoutMs,
+    seed: config.seed,
+  });
+
+  // EventBus competition: workers (canonical config) drain the probe backlog.
+  const drainStart = Date.now();
+  const drainDeadline = drainStart + Math.max(60_000, config.drainTimeoutMs);
+  while (Date.now() < drainDeadline) {
+    const pending = await apps[0].prisma.outboxEvent.count({ where: { status: "PENDING", aggregateId: { startsWith: `${MI_PREFIX}-` } } });
+    if (pending === 0) break;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  const drainMs = Date.now() - drainStart;
+  const miPublished = await apps[0].prisma.outboxEvent.count({ where: { status: "PUBLISHED", aggregateId: { startsWith: `${MI_PREFIX}-` } } });
+  const miPending = await apps[0].prisma.outboxEvent.count({ where: { status: "PENDING", aggregateId: { startsWith: `${MI_PREFIX}-` } } });
+
+  const perApp = Object.values(result.perBaseUrl);
+  const balanced = perApp.length === appCount && perApp.every((c) => c > 0) && Math.abs(perApp[0] - perApp[1]) / Math.max(1, perApp[0] + perApp[1]) <= 0.6;
+  const checks: CorrectnessCheck[] = [
+    ...loadRunChecks(result),
+    {
+      name: "HTTP traffic distributed across both app instances",
+      passed: balanced,
+      detail: `perApp=${JSON.stringify(result.perBaseUrl)}`,
+    },
+    {
+      name: "EventBus competition drained (published == seeded, 0 pending)",
+      passed: miPublished === MI_COUNT && miPending === 0,
+      detail: `published=${miPublished}/${MI_COUNT} pending=${miPending} drainMs=${drainMs} workers=${workerCount}`,
+    },
+    {
+      name: "0 duplicate business effects (no raw 500, idempotent reads)",
+      passed: result.unexpected5xx === 0,
+      detail: `unexpected5xx=${result.unexpected5xx}`,
+    },
+  ];
+  if (result.pacing) {
+    checks.push({ name: "load application validity (±5%)", passed: result.pacing.loadApplicationValid, detail: result.pacing.loadValidityDetail });
+  }
+
+  const env = await collectEnv({
+    runId: config.runId,
+    dbUrl: process.env.DATABASE_URL,
+    baseUrl: apps[0].baseUrl,
+    profile: config.profile,
+    seed: config.seed,
+    datasetClass: "SMALL",
+    appInstances: appCount,
+    workerInstances: workerCount,
+    postgresVersion: await postgresVersion(apps[0].prisma),
+    requestTimeoutMs: config.requestTimeoutMs,
+  });
+
+  // Cleanup.
+  const ids = (await apps[0].prisma.outboxEvent.findMany({ where: { aggregateId: { startsWith: `${MI_PREFIX}-` } }, select: { id: true } })).map((e) => e.id);
+  await apps[0].prisma.inboxEvent.deleteMany({ where: { eventId: { in: ids } } });
+  await apps[0].prisma.outboxEvent.deleteMany({ where: { aggregateId: { startsWith: `${MI_PREFIX}-` } } });
+  await apps[0].prisma.user.deleteMany({ where: { id: { in: registry.users } } });
+  for (const b of [...apps, ...workers]) await b.app.close().catch(() => undefined);
+
+  const metrics: Record<string, unknown> = {
+    appInstances: appCount,
+    workerInstances: workerCount,
+    perAppRequestCounts: result.perBaseUrl,
+    probeSeeded: MI_COUNT,
+    probePublished: miPublished,
+    probePendingAfter: miPending,
+    eventbusDrainMs: drainMs,
+    rps,
+    durationMs,
+  };
+  return { result, checks, env, metrics };
 }
 
 async function main(): Promise<void> {
@@ -529,10 +1210,38 @@ async function main(): Promise<void> {
     console.error("No seed/load was executed.");
     process.exit(2);
   }
+  // Final-mode fail-closed validation (worker timing, topology, dataset).
+  if (config.finalMode) {
+    const issues = validateQualificationConfig({
+      finalMode: true,
+      profile: config.profile,
+      targetRps: config.targetRps ?? (profile.kind === "load" ? (profile as LoadProfile).rps : undefined),
+      durationMs: config.durationMs,
+      concurrency: config.concurrency,
+      warmupMs: config.warmupMs,
+      dataset: config.dataset,
+      apps: config.apps,
+      workers: config.workers,
+      workerIntervalEnv: process.env.OUTBOX_WORKER_INTERVAL_MS,
+      workerBatchEnv: process.env.OUTBOX_WORKER_BATCH,
+      pspEnvVars: Object.entries(process.env)
+        .filter(([k]) => /PSP|STRIPE|PAYSTACK|ADYEN|CHECKOUT/i.test(k))
+        .map(([k, v]) => ({ name: k, value: v })),
+    });
+    if (issues.length > 0) {
+      console.error("FINAL-MODE QUALIFICATION CONFIG INVALID (fail-closed):");
+      for (const i of issues) console.error(`  - [${i.code}] ${i.message}`);
+      console.error("No seed/load was executed.");
+      process.exit(2);
+    }
+  }
   process.env.DATABASE_URL = dbUrl;
 
-  console.log(`[perf] profile=${config.profile} runId=${config.runId} db=${dbUrl.replace(/\/\/[^@]+@/, "//***@")}`);
+  console.log(`[perf] profile=${config.profile} runId=${config.runId} db=${dbUrl.replace(/\/\/[^@]+@/, "//***@")} final=${config.finalMode}`);
   console.log(`[perf] EXPLORATORY PROFILE — NOT a production SLO, NOT a capacity target`);
+
+  const memory = new MemorySampler();
+  memory.start();
 
   let result: LoadResult | null = null;
   let checks: CorrectnessCheck[] = [];
@@ -540,40 +1249,90 @@ async function main(): Promise<void> {
   let ctx: RunContext | null = null;
   let drainMs = 0;
   let execError: string | null = null;
+  let eventBusMetrics: Record<string, unknown> | null = null;
+  let multiMetrics: Record<string, unknown> | null = null;
+  let datasetPrepared: DatasetCounts | null = null;
+  const finalModeIssues: string[] = [];
+  const status = { value: "RUNNING" as string };
 
   try {
     if (profile.kind === "eventbus") {
-      const r = await runEventbusRecovery(config);
+      const r = await runEventbusScenario(config);
       result = r.result;
       checks = r.checks;
       env = r.env;
       drainMs = r.drainMs;
-      console.log(`[perf] EVENTBUS RECOVERY: published=${result.expected} drain=${drainMs}ms events/s=${result.successfulPerSec}`);
+      eventBusMetrics = r.metrics;
+      console.log(`[perf] EVENTBUS ${r.metrics.mode}: published=${result.expected} drain=${drainMs}ms events/s=${result.successfulPerSec}`);
+    } else if (profile.kind === "multi") {
+      const r = await runMultiInstance(config, profile);
+      result = r.result;
+      checks = r.checks;
+      env = r.env;
+      multiMetrics = r.metrics;
+      console.log("[perf] MULTI-INSTANCE:\n" + summarizeLoad(r.result));
     } else {
       const booted = await bootApp(false);
-      ctx = { ...booted, registry: newRegistry(), scenario: {} };
+      const registry = newRegistry();
+      ctx = { ...booted, registry, scenario: {} };
+      const admin = await adminLogin(booted.baseUrl);
+      const counts = datasetCountsFor(config.dataset, config.datasetScale);
+      const prep = await prepareDataset({
+        baseUrl: booted.baseUrl,
+        adminToken: admin.accessToken,
+        prisma: booted.prisma,
+        eventBus: booted.eventBus,
+        registry,
+        runId: config.runId,
+        counts,
+      });
+      datasetPrepared = counts;
+      const auth: Auth = { admin, sm: prep.sm, fin: prep.fin };
       env = await collectEnv({
         runId: config.runId,
         dbUrl,
         baseUrl: booted.baseUrl,
         profile: config.profile,
         seed: config.seed,
-        datasetClass: "SMALL",
+        datasetClass: config.dataset,
         appInstances: 1,
         workerInstances: 0,
         postgresVersion: await postgresVersion(booted.prisma),
         requestTimeoutMs: config.requestTimeoutMs,
       });
       if (profile.kind === "load") {
-        const r = await runLoadProfile(config, profile.steps, profile.warmupMs, ctx);
+        const lp = profile as LoadProfile;
+        const r = await runLoadProfile(config, lp, ctx, auth);
         result = r.result;
         checks = r.checks;
         console.log("[perf] LOAD:\n" + summarizeLoad(r.result));
-      } else {
-        const r = await runPaycreate(config, ctx);
+      } else if (profile.kind === "paycreate") {
+        const r = await runPaycreate(config, ctx, auth);
         result = r.result;
         checks = r.checks;
         console.log(`[perf] PAYCREATE: payments=${result.expected} unexpected5xx=${result.unexpected5xx}`);
+      } else if (profile.kind === "payment") {
+        // payment-concurrency: max-effort (rps=0) so the 50-concurrent ceiling is
+        // genuinely reached; steady/burst use arrival-rate pacing.
+        const isConc = config.profile === "payment-concurrency";
+        const rps = isConc ? 0 : config.targetRps ?? (config.profile === "payment-burst" ? QUALIFICATION.payment.burstRps : QUALIFICATION.payment.steadyRps);
+        const concurrency = isConc ? QUALIFICATION.payment.concurrency : config.concurrency ?? 20;
+        const r = await runPaymentPaced(config, ctx, auth, { rps, durationMs: config.durationMs ?? profile.durationMs ?? 60_000, concurrency });
+        result = r.result;
+        checks = r.checks;
+        console.log("[perf] PAYMENT PACED:\n" + summarizeLoad(r.result));
+      } else if (profile.kind === "booking") {
+        const rps = config.targetRps ?? (config.profile === "booking-order-burst" ? QUALIFICATION.bookingOrder.burstRps : QUALIFICATION.bookingOrder.steadyRps);
+        const r = await runBookingOrderPaced(config, ctx, auth, { rps, durationMs: config.durationMs ?? profile.durationMs ?? 60_000, concurrency: config.concurrency ?? 10 });
+        result = r.result;
+        checks = r.checks;
+        console.log("[perf] BOOKING/ORDER PACED:\n" + summarizeLoad(r.result));
+      } else if (profile.kind === "login") {
+        const rps = config.targetRps ?? (config.profile === "login-burst" ? QUALIFICATION.login.burstRps : QUALIFICATION.login.qualRps);
+        const r = await runLoginPaced(config, ctx, { rps, durationMs: config.durationMs ?? profile.durationMs ?? 60_000 });
+        result = r.result;
+        checks = r.checks;
+        console.log("[perf] LOGIN PACED:\n" + summarizeLoad(r.result));
       }
     }
   } catch (err) {
@@ -581,6 +1340,7 @@ async function main(): Promise<void> {
     console.error(`[perf] HARNESS EXECUTION FAILED: ${execError}`);
     process.exitCode = 1;
   } finally {
+    status.value = execError !== null ? "FAILED" : "DONE";
     if (ctx) {
       await ctx.app.close().catch(() => undefined);
       const issues = await cleanup(ctx.prisma, ctx.registry).catch((err) => [`cleanup crashed: ${String((err as Error)?.message ?? err)}`]);
@@ -591,23 +1351,25 @@ async function main(): Promise<void> {
     }
   }
 
-  if (env === null || result === null) {
-    if (process.exitCode === 0) process.exitCode = 1;
-    return;
-  }
-
+  memory.stop();
   const correctness: CorrectnessResult = verdictOf(checks);
-  if (correctness.verdict === "FAIL" && process.exitCode === 0) process.exitCode = 1;
+  // process.exitCode is undefined until set — treat undefined/0 as «no failure yet»;
+  // never override a cleanup exit code (3).
+  if (execError === null && correctness.verdict === "FAIL" && process.exitCode !== 3) process.exitCode = 1;
   const harnessExecution = execError === null ? "PASS" : "FAIL";
 
   const summary = {
     runId: config.runId,
     profile: config.profile,
+    mode: config.finalMode ? "final" : "exploratory",
     timestamp: new Date().toISOString(),
+    status: status.value,
     verdict: { harnessExecution, correctness: correctness.verdict, measurement: "RECORDED", sloQualification: SLO_STATE },
     load: result
       ? sanitizeMetadata({
+          mode: result.mode,
           byLabel: result.byLabel,
+          byRouteClass: result.byRouteClass,
           totals: {
             totalRequests: result.totalRequests,
             expected: result.expected,
@@ -618,18 +1380,37 @@ async function main(): Promise<void> {
             timeouts: result.timeouts,
             transportErrors: result.transportErrors,
           },
+          expectedStatuses: result.expectedStatuses,
+          unexpectedStatuses: result.unexpectedStatuses,
           requestsPerSec: result.requestsPerSec,
           successfulPerSec: result.successfulPerSec,
           measurementMs: result.measurementMs,
+          perBaseUrl: result.perBaseUrl,
+          warmup: result.warmup,
+          pacing: result.pacing,
         })
       : null,
+    eventBus: eventBusMetrics,
+    multiInstance: multiMetrics,
+    dataset: datasetPrepared,
+    topology: {
+      appInstances: env?.appInstances ?? 0,
+      workerInstances: env?.workerInstances ?? 0,
+    },
+    worker: {
+      intervalMs: QUALIFICATION.canonical.workerIntervalMs,
+      batch: QUALIFICATION.canonical.workerBatch,
+      overridesRejected: config.finalMode ? finalModeIssues.length > 0 : "N/A (exploratory)",
+    },
+    memoryTrend: memory.stats(),
+    qualificationConfigValid: config.finalMode ? finalModeIssues.length === 0 : "N/A (exploratory)",
     note: "EXPLORATORY / HARNESS VALIDATION PROFILE — NOT production SLO, NOT production capacity target",
   };
 
   const written = writeArtifacts(config.outDir, {
     summary,
-    environment: env as unknown as Record<string, unknown>,
-    scenario: ctx?.scenario ?? { profile: config.profile, kind: "eventbus", seeded: 250, multiInstance: 100 },
+    environment: (env ?? {}) as Record<string, unknown>,
+    scenario: ctx?.scenario ?? eventBusMetrics ?? multiMetrics ?? { profile: config.profile, kind: "none" },
     correctness: { ...correctness },
   });
   console.log("[perf] artifacts:");

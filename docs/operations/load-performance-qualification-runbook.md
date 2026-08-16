@@ -106,17 +106,44 @@ npx prisma migrate status   # must be up to date
 npx ts-node src/perf/run.ts --profile=smoke  --run-id=<id>
 npx ts-node src/perf/run.ts --profile=baseline --run-id=<id>
 npx ts-node src/perf/run.ts --profile=paycreate --run-id=<id>          # idempotency concurrency
-npx ts-node src/perf/run.ts --profile=eventbus-recovery --run-id=<id>   # burst drain + multi-instance
+# Arrival-rate paced qualification profiles (frozen manifest values as defaults):
+npx ts-node src/perf/run.ts --profile=qual-steady --run-id=<id> --rps=50 --duration=900000 --warmup=300000
+npx ts-node src/perf/run.ts --profile=qual-peak   --run-id=<id> --rps=100 --duration=900000
+npx ts-node src/perf/run.ts --profile=qual-burst  --run-id=<id> --rps=200 --duration=60000
+npx ts-node src/perf/run.ts --profile=qual-soak   --run-id=<id> --rps=50 --duration=1800000 --concurrency=250
+# Scenario profiles (frozen domain rates as defaults):
+npx ts-node src/perf/run.ts --profile=payment-steady        --run-id=<id> --rps=2
+npx ts-node src/perf/run.ts --profile=payment-burst         --run-id=<id> --rps=10
+npx ts-node src/perf/run.ts --profile=payment-concurrency   --run-id=<id> --concurrency=50
+npx ts-node src/perf/run.ts --profile=booking-order-steady  --run-id=<id> --rps=6
+npx ts-node src/perf/run.ts --profile=booking-order-burst   --run-id=<id> --rps=20
+npx ts-node src/perf/run.ts --profile=login-qualification   --run-id=<id> --rps=2
+npx ts-node src/perf/run.ts --profile=login-burst           --run-id=<id> --rps=5
+# EventBus (canonical worker config — timing overrides forbidden in final mode):
+npx ts-node src/perf/run.ts --profile=eventbus-steady  --run-id=<id> --workers=2
+npx ts-node src/perf/run.ts --profile=eventbus-burst   --run-id=<id> --seed-events=1000 --workers=2
+npx ts-node src/perf/run.ts --profile=eventbus-recovery --run-id=<id> --seed-events=5000 --workers=2
+# Multi-instance 2 app + 2 worker HTTP topology:
+npx ts-node src/perf/run.ts --profile=multi-instance --run-id=<id> --rps=100 --apps=2 --workers=2
+# Exploratory / characterization:
 npx ts-node src/perf/run.ts --profile=burst --run-id=<id>
-npx ts-node src/perf/run.ts --profile=soak --run-id=<id> --duration=30000
 npx ts-node src/perf/run.ts --profile=stress --stress --run-id=<id>     # explicit opt-in
 ```
 
-Order: SMOKE → BASELINE → STEADY → PEAK → BURST → SOAK → STRESS/BREAKPOINT → RECOVERY.
-The harness boots the app in-process against the isolated DB, seeds deterministic synthetic
+Dataset: `--dataset=SMALL|REPRESENTATIVE|STRESS` (default SMALL; REPRESENTATIVE = approved
+authority counts: ≥1,000 users, ≥500 products, ≥1,000 customers, ≥1,000 quotes, ≥1,000 order
+chains, ≥500 payment-capable orders, ≥5,000 ledger, ≥5,000 EventBus seed; `--dataset-scale=0..1`
+is a validation aid). Final mode: `--final` fails closed unless apps=2, workers=2, dataset
+valid, and worker interval/batch are canonical (2000 ms / 100). The ±5% arrival-rate validity
+is a harness tolerance, not an SLO.
+
+Order: SMOKE → paced STEADY/PEAK/BURST → SOAK → payment/booking/login scenarios → EventBus
+steady/burst/recovery → multi-instance → STRESS (characterization only).
+The harness boots the app(s) in-process against the isolated DB, seeds deterministic synthetic
 data, runs the profile, validates correctness against authoritative DB state and cleans up.
 Each scenario records: purpose, duration, concurrency, dataset, metrics, correctness
-assertions, pass/fail semantics (§23 of the design doc).
+assertions, pass/fail semantics (§23 of the design doc). Exit codes: 2 = config/guard/final
+validation, 1 = execution/correctness failure, 3 = cleanup issues, 0 = PASS.
 
 ## 6. Capture metrics
 
@@ -150,9 +177,11 @@ After each scenario (and at soak milestones):
 
 Artifacts are written automatically by the harness to `backend/artifacts/performance/<run-id>/`
 (gitignored): `summary.json` (verdict: harnessExecution/correctness/measurement/
-sloQualification), `environment.json` (env metadata, secrets scrubbed), `scenario.json`
-(steps/params), `correctness.json` (checks + verdict). Summary measurements may be copied
-into the implementation report; bulky raw artifacts are never committed.
+sloQualification; load totals, per-route-class A–F metrics, pacing evidence, warm-up,
+per-instance counts, dataset, topology, worker config, memory trend), `environment.json`
+(env metadata, secrets scrubbed), `scenario.json` (steps/params), `correctness.json`
+(checks + verdict). Summary measurements may be copied into the implementation report;
+bulky raw artifacts are never committed.
 
 ## 11. Abort criteria
 

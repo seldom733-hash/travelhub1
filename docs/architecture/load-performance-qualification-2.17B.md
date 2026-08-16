@@ -628,3 +628,38 @@ runs invalidated by orchestration/session boundaries (recorded, not hidden).
 
 Step 2.17B remains NOT APPROVED. NEXT = QUALIFICATION HARNESS/ENVIRONMENT REMEDIATION
 (separate prompt), then re-execution against the unchanged frozen targets.
+
+## 37. Harness/environment remediation (2026-08-16)
+
+Pass: `docs/prompts/PHASE_2_STEP_2.17B_QUALIFICATION_HARNESS_ENVIRONMENT_REMEDIATION_REPORT.md`.
+
+All 11 proven blockers (H1–H11) were reproduced from code and remediated — harness/environment
+ONLY, frozen authority unchanged, zero production tuning:
+
+| ID | Blocker | Remediation | Evidence |
+|---|---|---|---|
+| H1 | no arrival-rate pacing | `lib/pacer.ts` monotonic wall-clock scheduler (`scheduled_start(n)=phase+n/rate`); `lib/loader.ts` paced mode; ±5% load-validity classification | 50/100/200 RPS validation: 1500/1500, 3000/3000, 2999/3000 started; achieved 50.0/100.0/200.0 rps; valid=true; 0 unexpected |
+| H2 | `--warmup` parsed, never applied | CLI wired; warm-up paced at target rate, separately timed/reported | warmup.durationMs/requests emitted; 5-min (300 s) manifest value expressible |
+| H3 | dataset SMALL-only | `lib/qualification.ts` dataset profiles SMALL/REPRESENTATIVE/STRESS + scale; `lib/seed.ts` users/products/customers/quotes/chains/ledger/EventBus seeding, deterministic + tracked cleanup | unit tests (counts/scale/cleanup); SMALL live |
+| H4 | no payment 2/10 RPS profiles | `payment-steady`/`payment-burst`/`payment-concurrency` (max-effort 50-ceiling) with business-idempotency correctness | 30/30, 80/80, PASS; 0 duplicate, 0 raw 500; Class E p95 82–110 ms |
+| H5 | no Booking/Order 6/20 RPS | `booking-order-steady`/`-burst` paced full-chain writes, order-fact correctness | 48/48 @ 6 rps PASS (Class D p95 576 ms); 20 rps burst exercised — achieved ~11–12 chains/s (system limit recorded, NOT a harness defect) |
+| H6 | no login 2/5 RPS | `login-qualification`/`login-burst` with distinct-principal pool, throttle respected | 24/24 @ 2 rps, 40/40 @ 5 rps, 0×429, Class F p95 107–113 ms |
+| H7 | no EventBus steady 100 ev/s | `eventbus-steady` generation-under-processing (canonical worker config) | 100 ev/s generated, backlog sampled, drain verified |
+| H8 | burst hardcoded 250 | `--seed-events` configurable (250/1000/5000) | burst 1,000 drained with canonical workers |
+| H9 | recovery 250 + interval override | `eventbus-recovery` 5,000 / 2 workers / CANONICAL config; final mode fails closed on worker-timing overrides | 5,000 seeded, canonical 2000 ms/100 batch, drain ≤ 120 s gate |
+| H10 | no 2 app + 2 worker HTTP | `multi-instance` topology: 2 apps (worker off) + 2 workers (worker on), round-robin HTTP, per-instance counts | per-instance request counts > 0, EventBus competition drained, 0 duplicates |
+| H11 | soak 50 RPS not drivable | paced soak capability + canonical manifest (`lib/qualification.ts`) + fail-closed final-mode validation | `qual-soak` = 30 min @ 50 RPS / 250 expressible; soak config short-run validated |
+
+Load-control contract: `targetRps`, `scheduledOperations`, `startedOperations`, `achievedStartRate`,
+`achievedCompletionRate`, `schedulerLagMs`, `maxConcurrencyObserved`, `loadApplicationValid`;
+±5% is a harness validity tolerance, NOT a business SLO. Route-class metrics A–F per approved
+latency classes. Structured result contract emitted per run (`summary/environment/scenario/
+correctness.json`). OBS-2 resolved (registry scope extended to sale/checkout/quote/customer
+aggregate events); OBS-3 resolved (worker timing overrides removed, canonical-config fail-closed);
+OBS-4 resolved (artifacts finalized on failure, cleanup in finally, exit codes 2/1/3). OBS-1
+preserved untouched — sales.list Class B root cause still NOT YET PROVEN, judgment deferred to
+final re-qualification. Memory: harness-level RSS/heap sampler added (no production deps; no SLO).
+
+Step 2.17B: HARNESS REMEDIATION COMPLETED — READY FOR FINAL RE-QUALIFICATION — NOT APPROVED.
+Quantitative authority unchanged (frozen matrix §33). Next: final re-qualification against the
+unchanged approved targets.

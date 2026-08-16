@@ -16,6 +16,8 @@ import { redact, REDACTED, scrubUrlCredentials, sanitizeMetadata } from "./lib/r
 import { parseArgs, PROFILE_NAMES } from "./lib/config";
 import { runLoad } from "./lib/loader";
 import { loadRunChecks, verdictOf } from "./lib/correctness";
+import { scheduledStartMs, scheduledOperationsFor, classifyPacingValidity } from "./lib/pacer";
+import { datasetCountsFor, validateQualificationConfig, QUALIFICATION } from "./lib/qualification";
 
 describe("perf guard — safe-target (fail-closed)", () => {
   it("refuses NODE_ENV=production unconditionally", () => {
@@ -270,5 +272,290 @@ describe("perf loader — end-to-end against a local HTTP server", () => {
     fail500 = false;
     expect(result.unexpected5xx).toBe(result.totalRequests);
     expect(loadRunChecks(result).some((c) => !c.passed)).toBe(true);
+  });
+});
+
+describe("perf pacing — arrival-rate scheduler (H1)", () => {
+  it("schedules monotonic start times: start(n) = phaseStart + n/rate", () => {
+    const spec = { targetRps: 50, durationMs: 10_000, windowStartMs: 1_000_000 };
+    expect(scheduledStartMs(spec, 0)).toBe(1_000_000);
+    expect(scheduledStartMs(spec, 1)).toBe(1_000_020); // 20ms apart at 50 rps
+    expect(scheduledStartMs(spec, 10)).toBe(1_000_200);
+  });
+
+  it("computes scheduled operations from duration and rate", () => {
+    expect(scheduledOperationsFor({ targetRps: 50, durationMs: 10_000, windowStartMs: 0 })).toBe(500);
+    expect(scheduledOperationsFor({ targetRps: 2, durationMs: 60_000, windowStartMs: 0 })).toBe(120);
+    expect(scheduledOperationsFor({ targetRps: 200, durationMs: 60_000, windowStartMs: 0 })).toBe(12_000);
+  });
+
+  it("classifies sustained start-rate within ±5% as valid", () => {
+    const spec = { targetRps: 50, durationMs: 10_000, windowStartMs: 0 };
+    const offsets = Array.from({ length: 501 }, (_, i) => (i / 50) * 1000); // exactly 50/s
+    const v = classifyPacingValidity(spec, { burst: false, startOffsetsMs: offsets, startedOperations: 501, completedOperations: 500, maxConcurrencyObserved: 1 });
+    expect(v.valid).toBe(true);
+  });
+
+  it("classifies slow start-rate beyond ±5% as invalid", () => {
+    const spec = { targetRps: 50, durationMs: 10_000, windowStartMs: 0 };
+    // 40/s instead of 50/s → 20% off
+    const offsets = Array.from({ length: 401 }, (_, i) => (i / 40) * 1000);
+    const v = classifyPacingValidity(spec, { burst: false, startOffsetsMs: offsets, startedOperations: 401, completedOperations: 400, maxConcurrencyObserved: 1 });
+    expect(v.valid).toBe(false);
+  });
+
+  it("classifies burst started-vs-scheduled within ±5% as valid", () => {
+    const spec = { targetRps: 200, durationMs: 60_000, windowStartMs: 0 };
+    const offsets = Array.from({ length: 12_000 }, (_, i) => (i / 200) * 1000);
+    expect(classifyPacingValidity(spec, { burst: true, startOffsetsMs: offsets, startedOperations: 12_000, completedOperations: 12_000, maxConcurrencyObserved: 1 }).valid).toBe(true);
+    expect(classifyPacingValidity(spec, { burst: true, startOffsetsMs: offsets.slice(0, 10_000), startedOperations: 10_000, completedOperations: 10_000, maxConcurrencyObserved: 1 }).valid).toBe(false);
+  });
+
+  it("zero-started runs always FAIL load validity", () => {
+    const spec = { targetRps: 50, durationMs: 10_000, windowStartMs: 0 };
+    expect(classifyPacingValidity(spec, { burst: false, startOffsetsMs: [], startedOperations: 0, completedOperations: 0, maxConcurrencyObserved: 0 }).valid).toBe(false);
+  });
+});
+
+describe("perf paced loader — wall-clock scheduling, not completion-rate", () => {
+  let server: Server;
+  let port: number;
+  let slow: boolean;
+
+  beforeAll(async () => {
+    server = createServer((req, res) => {
+      if (slow) {
+        setTimeout(() => {
+          res.writeHead(200);
+          res.end("ok");
+        }, 60);
+        return;
+      }
+      res.writeHead(200);
+      res.end("ok");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    port = (server.address() as AddressInfo).port;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  it("starts requests at the target rate even when the server is slow (no completion-rate pacing)", async () => {
+    slow = true; // 60ms latency — a completion-driven schedule would start ~16/s
+    const result = await runLoad({
+      baseUrl: `http://127.0.0.1:${port}`,
+      concurrency: 200,
+      durationMs: 1_000,
+      warmupMs: 0,
+      mode: "paced",
+      targetRps: 100,
+      makeRequest: () => ({ label: "ping", method: "GET", path: "/", expected: [200], routeClass: "A" }),
+      seed: 1,
+    });
+    slow = false;
+    expect(result.pacing).toBeDefined();
+    // ~100 scheduled starts in 1s with a 60ms-latency server — only possible with
+    // wall-clock scheduling (completion-rate pacing would produce ~16/s ≫ ±5%).
+    expect(Math.abs(result.pacing!.startedOperations - result.pacing!.scheduledOperations) / result.pacing!.scheduledOperations).toBeLessThanOrEqual(0.05);
+    expect(result.pacing!.loadApplicationValid).toBe(true);
+    // Drain completes every started request.
+    expect(result.pacing!.completedOperations).toBe(result.pacing!.startedOperations);
+    expect(result.mode).toBe("paced");
+  });
+
+  it("enforces the concurrency ceiling in paced mode", async () => {
+    slow = true;
+    const result = await runLoad({
+      baseUrl: `http://127.0.0.1:${port}`,
+      concurrency: 8,
+      durationMs: 1_000,
+      warmupMs: 0,
+      mode: "paced",
+      targetRps: 200,
+      makeRequest: () => ({ label: "ping", method: "GET", path: "/", expected: [200] }),
+      seed: 2,
+    });
+    slow = false;
+    expect(result.pacing!.maxConcurrencyObserved).toBeLessThanOrEqual(8);
+    expect(result.pacing!.maxConcurrencyObserved).toBeGreaterThan(0);
+  });
+
+  it("distributes requests across baseUrls (multi-instance) and emits per-instance counts", async () => {
+    const server2 = createServer((req, res) => {
+      res.writeHead(200);
+      res.end("ok");
+    });
+    await new Promise<void>((resolve) => server2.listen(0, "127.0.0.1", () => resolve()));
+    const port2 = (server2.address() as AddressInfo).port;
+    const result = await runLoad({
+      baseUrl: `http://127.0.0.1:${port}`,
+      baseUrls: [`http://127.0.0.1:${port}`, `http://127.0.0.1:${port2}`],
+      concurrency: 4,
+      durationMs: 600,
+      warmupMs: 0,
+      mode: "paced",
+      targetRps: 50,
+      makeRequest: () => ({ label: "ping", method: "GET", path: "/", expected: [200] }),
+      seed: 3,
+    });
+    await new Promise<void>((resolve) => server2.close(() => resolve()));
+    const counts = Object.values(result.perBaseUrl);
+    expect(counts.length).toBe(2);
+    expect(counts[0]).toBeGreaterThan(0);
+    expect(counts[1]).toBeGreaterThan(0);
+    const diff = Math.abs(counts[0] - counts[1]) / Math.max(1, counts[0] + counts[1]);
+    expect(diff).toBeLessThan(0.2); // round-robin → near-balanced
+  });
+
+  it("separates paced warm-up from measurement and attributes route classes", async () => {
+    const result = await runLoad({
+      baseUrl: `http://127.0.0.1:${port}`,
+      concurrency: 4,
+      durationMs: 500,
+      warmupMs: 300,
+      mode: "paced",
+      targetRps: 50,
+      makeRequest: (n: number) => ({ label: n % 2 === 0 ? "ping" : "pong", method: "GET", path: "/", expected: [200], routeClass: (n % 2 === 0 ? "A" : "B") as "A" | "B" }),
+      seed: 4,
+    });
+    expect(result.warmup.requests).toBeGreaterThan(0);
+    expect(result.warmup.durationMs).toBe(300);
+    expect(result.byRouteClass["A"].count).toBeGreaterThan(0);
+    expect(result.byRouteClass["B"].count).toBeGreaterThan(0);
+    // Measurement window ≈ 500ms @ 50 rps = 25 requests.
+    expect(result.totalRequests).toBeGreaterThanOrEqual(20);
+  });
+});
+
+describe("perf final-mode validation — fail-closed (H9/H10/§17)", () => {
+  const base = {
+    finalMode: true,
+    profile: "qual-steady",
+    targetRps: 50,
+    durationMs: 900_000,
+    concurrency: 500,
+    warmupMs: 300_000,
+    dataset: "REPRESENTATIVE",
+    apps: 2,
+    workers: 2,
+    pspEnvVars: [] as Array<{ name: string; value?: string }>,
+  };
+
+  it("accepts the canonical qualification configuration", () => {
+    expect(validateQualificationConfig({ ...base })).toEqual([]);
+  });
+
+  it("rejects non-canonical worker interval override", () => {
+    const issues = validateQualificationConfig({ ...base, workerIntervalEnv: "200" });
+    expect(issues.some((i) => i.code === "WORKER_INTERVAL")).toBe(true);
+  });
+
+  it("rejects non-canonical worker batch override", () => {
+    const issues = validateQualificationConfig({ ...base, workerBatchEnv: "50" });
+    expect(issues.some((i) => i.code === "WORKER_BATCH")).toBe(true);
+  });
+
+  it("accepts canonical (unset) worker env", () => {
+    expect(validateQualificationConfig({ ...base, workerIntervalEnv: undefined, workerBatchEnv: undefined })).toEqual([]);
+  });
+
+  it("rejects wrong instance topology (apps/workers != 2)", () => {
+    expect(validateQualificationConfig({ ...base, apps: 1 }).some((i) => i.code === "APPS")).toBe(true);
+    expect(validateQualificationConfig({ ...base, workers: 1 }).some((i) => i.code === "WORKERS")).toBe(true);
+  });
+
+  it("rejects invalid dataset and zero rps", () => {
+    expect(validateQualificationConfig({ ...base, dataset: "HUGE" }).some((i) => i.code === "DATASET")).toBe(true);
+    expect(validateQualificationConfig({ ...base, targetRps: 0 }).some((i) => i.code === "RPS")).toBe(true);
+  });
+
+  it("rejects PSP connectivity env in final mode", () => {
+    expect(validateQualificationConfig({ ...base, pspEnvVars: [{ name: "STRIPE_SECRET_KEY", value: "sk_test_x" }] }).some((i) => i.code === "PSP")).toBe(true);
+  });
+
+  it("exploratory mode returns no issues", () => {
+    expect(validateQualificationConfig({ ...base, finalMode: false, apps: 1, workers: 0, workerIntervalEnv: "200" })).toEqual([]);
+  });
+});
+
+describe("perf dataset profiles (H3)", () => {
+  it("SMALL is a tiny deterministic slice", () => {
+    const c = datasetCountsFor("SMALL");
+    expect(c.users).toBe(8);
+    expect(c.orderChains).toBe(8);
+  });
+
+  it("REPRESENTATIVE meets the approved authority counts", () => {
+    const c = datasetCountsFor("REPRESENTATIVE");
+    expect(c.users).toBeGreaterThanOrEqual(1_000);
+    expect(c.products).toBeGreaterThanOrEqual(500);
+    expect(c.customers).toBeGreaterThanOrEqual(1_000);
+    expect(c.quotes).toBeGreaterThanOrEqual(1_000);
+    expect(c.orderChains).toBeGreaterThanOrEqual(1_000);
+    expect(c.paymentCapableOrders).toBeGreaterThanOrEqual(500);
+    expect(c.ledger).toBeGreaterThanOrEqual(5_000);
+    expect(c.eventBusSeed).toBeGreaterThanOrEqual(5_000);
+  });
+
+  it("scale factor scales REPRESENTATIVE deterministically", () => {
+    const c = datasetCountsFor("REPRESENTATIVE", 0.1);
+    expect(c.users).toBe(100);
+    expect(c.products).toBe(50);
+  });
+
+  it("STRESS scales the envelope up", () => {
+    const c = datasetCountsFor("STRESS", 0.5);
+    expect(c.users).toBeGreaterThan(datasetCountsFor("REPRESENTATIVE").users);
+  });
+
+  it("frozen manifest is intact", () => {
+    expect(QUALIFICATION.steady).toEqual({ rps: 50, durationMs: 900_000, concurrency: 500 });
+    expect(QUALIFICATION.peak).toEqual({ rps: 100, durationMs: 900_000, concurrency: 500 });
+    expect(QUALIFICATION.burst).toEqual({ rps: 200, durationMs: 60_000, concurrency: 1_000 });
+    expect(QUALIFICATION.soak).toEqual({ rps: 50, durationMs: 1_800_000, concurrency: 250 });
+    expect(QUALIFICATION.canonical).toEqual({ workerIntervalMs: 2000, workerBatch: 100 });
+  });
+});
+
+describe("perf config — new flags (H2/H4–H6/H8/H11)", () => {
+  it("parses --rps/--warmup/--dataset/--apps/--workers/--seed-events/--final", () => {
+    const r = parseArgs([
+      "--profile=payment-steady",
+      "--rps=2",
+      "--duration=20000",
+      "--warmup=5000",
+      "--dataset=REPRESENTATIVE",
+      "--dataset-scale=0.5",
+      "--apps=2",
+      "--workers=2",
+      "--seed-events=5000",
+      "--final",
+    ]);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.config.targetRps).toBe(2);
+      expect(r.config.durationMs).toBe(20_000);
+      expect(r.config.warmupMs).toBe(5_000);
+      expect(r.config.dataset).toBe("REPRESENTATIVE");
+      expect(r.config.datasetScale).toBe(0.5);
+      expect(r.config.apps).toBe(2);
+      expect(r.config.workers).toBe(2);
+      expect(r.config.seedEvents).toBe(5_000);
+      expect(r.config.finalMode).toBe(true);
+    }
+  });
+
+  it("rejects invalid dataset class and out-of-range scale", () => {
+    expect(parseArgs(["--profile=smoke", "--dataset=BIG"]).ok).toBe(false);
+    expect(parseArgs(["--profile=smoke", "--dataset-scale=2"]).ok).toBe(false);
+    expect(parseArgs(["--profile=smoke", "--dataset-scale=0"]).ok).toBe(false);
+  });
+
+  it("new qualification/scenario profiles are registered", () => {
+    for (const p of ["qual-steady", "qual-peak", "qual-burst", "qual-soak", "payment-steady", "payment-burst", "payment-concurrency", "booking-order-steady", "booking-order-burst", "login-qualification", "login-burst", "eventbus-steady", "eventbus-burst", "multi-instance"]) {
+      expect(PROFILE_NAMES).toContain(p);
+    }
   });
 });
