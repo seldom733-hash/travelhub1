@@ -45,3 +45,8 @@ skills-lock.json
 .tools/
 backend/uploads/
 uploads/
+
+# DR backup artifacts (Step 2.17A) — never commit dumps/checksums/evidence
+backend/.backups/
+*.dump
+*.dump.sha256
