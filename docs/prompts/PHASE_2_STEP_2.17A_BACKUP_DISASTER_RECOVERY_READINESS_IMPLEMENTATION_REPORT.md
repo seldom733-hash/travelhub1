@@ -278,13 +278,13 @@ then `PHASE 2 — STEP 2.17A — STRICT REVIEW`.
 
 repository: TravelHub (D:\travelhub_v1)
 branch: master
-head: WORKTREE
+head: 00b38fe
 origin: f06178f
 worktree_clean: false (untracked prompt-файлы предыдущих шагов остаются — не мои)
 migration_count: 58 (canonical folders; dev DB has 3 legacy rows — documented)
 reviewed_state: COMMIT
 reviewed_diff_base: f06178f
-reviewed_diff_head: WORKTREE
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
-push_status: PENDING (после финальной верификации)
+reviewed_diff_head: 00b38fe
+persistence_status: PERSISTED
+persistence_sha: 00b38fe
+push_status: PUSHED (после финальной верификации)
