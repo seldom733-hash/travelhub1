@@ -18,6 +18,7 @@ import { runLoad } from "./lib/loader";
 import { loadRunChecks, verdictOf } from "./lib/correctness";
 import { scheduledStartMs, scheduledOperationsFor, classifyPacingValidity } from "./lib/pacer";
 import { datasetCountsFor, validateQualificationConfig, QUALIFICATION } from "./lib/qualification";
+import { drainOutbox, newRegistry, cleanup } from "./lib/seed";
 
 describe("perf guard — safe-target (fail-closed)", () => {
   it("refuses NODE_ENV=production unconditionally", () => {
@@ -557,5 +558,223 @@ describe("perf config — new flags (H2/H4–H6/H8/H11)", () => {
     for (const p of ["qual-steady", "qual-peak", "qual-burst", "qual-soak", "payment-steady", "payment-burst", "payment-concurrency", "booking-order-steady", "booking-order-burst", "login-qualification", "login-burst", "eventbus-steady", "eventbus-burst", "multi-instance"]) {
       expect(PROFILE_NAMES).toContain(p);
     }
+  });
+});
+
+describe("perf outbox drain — bounded state-driven (round 2, F-1)", () => {
+  interface DrainState {
+    pending: number;
+    retryable: number; // FAILED retryable=true attempts<max (retryFailed flips these)
+    poison: number; // FAILED retryable=false OR exhausted — terminal, isolated
+    publishedTotal: number;
+    retriedTotal: number;
+    publishCalls: number;
+    retryCalls: number;
+  }
+
+  interface DrainConfig {
+    /** Each processed event spawns one nested PENDING while budget > 0 (consumer chains). */
+    spawnBudget: number;
+    /** Simulate a retryable event that always fails on publish (flips back to retryable). */
+    alwaysFailRetryable: boolean;
+  }
+
+  function makeMocks(initial: { pending?: number; retryable?: number; poison?: number }, cfg: Partial<DrainConfig> = {}) {
+    const state: DrainState = {
+      pending: initial.pending ?? 0,
+      retryable: initial.retryable ?? 0,
+      poison: initial.poison ?? 0,
+      publishedTotal: 0,
+      retriedTotal: 0,
+      publishCalls: 0,
+      retryCalls: 0,
+    };
+    const config: DrainConfig = { spawnBudget: cfg.spawnBudget ?? 0, alwaysFailRetryable: cfg.alwaysFailRetryable ?? false };
+    const eventBus = {
+      publishPending: jest.fn(async (limit: number) => {
+        state.publishCalls++;
+        const n = Math.min(state.pending, limit);
+        state.pending -= n;
+        if (config.alwaysFailRetryable) {
+          // every processed event fails again → back to retryable (attempts<max forever in this mock)
+          state.retryable += n;
+          return 0; // nothing durably published
+        }
+        state.publishedTotal += n;
+        const spawned = Math.min(n, config.spawnBudget);
+        config.spawnBudget -= spawned;
+        state.pending += spawned;
+        return n;
+      }),
+      retryFailed: jest.fn(async (limit: number) => {
+        state.retryCalls++;
+        const n = Math.min(state.retryable, limit);
+        state.retryable -= n;
+        state.pending += n;
+        state.retriedTotal += n;
+        return n;
+      }),
+    };
+    const prisma = {
+      outboxEvent: {
+        count: jest.fn(async ({ where }: { where: Record<string, unknown> }) => {
+          if (where.status === "PENDING") return state.pending;
+          if (where.status === "FAILED") {
+            if (where.retryable === true && (where.attempts as { lt?: number })?.lt !== undefined) return state.retryable;
+            return state.poison;
+          }
+          return 0;
+        }),
+      },
+    };
+    return { state, config, eventBus, prisma };
+  }
+
+  it("1. drains less than one batch (<200) and converges", async () => {
+    const { state, eventBus, prisma } = makeMocks({ pending: 50 });
+    const r = await drainOutbox(eventBus as never, prisma as never, { batchSize: 200 });
+    expect(r.completed).toBe(true);
+    expect(r.published).toBe(50);
+    expect(r.iterations).toBe(1);
+    expect(state.pending).toBe(0);
+  });
+
+  it("2. drains exactly one batch (200)", async () => {
+    const { state, eventBus, prisma } = makeMocks({ pending: 200 });
+    const r = await drainOutbox(eventBus as never, prisma as never, { batchSize: 200 });
+    expect(r.completed).toBe(true);
+    expect(r.published).toBe(200);
+    expect(r.iterations).toBe(1);
+    expect(state.pending).toBe(0);
+  });
+
+  it("3. drains >20×batch volume (4,200) — old 20-round bound no longer caps", async () => {
+    const { state, eventBus, prisma } = makeMocks({ pending: 200 * 21 });
+    const r = await drainOutbox(eventBus as never, prisma as never, { batchSize: 200 });
+    expect(r.completed).toBe(true);
+    expect(r.published).toBe(4_200);
+    expect(r.iterations).toBe(21);
+    expect(state.pending).toBe(0);
+  });
+
+  it("4. drains 5,000+ events (REPRESENTATIVE EventBus seed contract)", async () => {
+    const { state, eventBus, prisma } = makeMocks({ pending: 5_000 });
+    const r = await drainOutbox(eventBus as never, prisma as never, { batchSize: 200 });
+    expect(r.completed).toBe(true);
+    expect(r.published).toBe(5_000);
+    expect(r.iterations).toBe(25);
+    expect(state.pending).toBe(0);
+  });
+
+  it("5. continues when consumers emit nested PENDING events", async () => {
+    // 1,000 initial events each spawn one nested event (OrderRequested→OrderCreated→…)
+    const { state, eventBus, prisma } = makeMocks({ pending: 1_000 }, { spawnBudget: 1_000 });
+    const r = await drainOutbox(eventBus as never, prisma as never, { batchSize: 200 });
+    expect(r.completed).toBe(true);
+    expect(r.published).toBe(2_000);
+    expect(state.pending).toBe(0);
+  });
+
+  it("6. does not stop on a partial final batch (350 = 200 + 150)", async () => {
+    const { state, eventBus, prisma } = makeMocks({ pending: 350 });
+    const r = await drainOutbox(eventBus as never, prisma as never, { batchSize: 200 });
+    expect(r.completed).toBe(true);
+    expect(r.published).toBe(350);
+    expect(r.iterations).toBe(2);
+    expect(state.pending).toBe(0);
+  });
+
+  it("7. exits when healthy work is empty (poison retained, not blocking)", async () => {
+    const { state, eventBus, prisma } = makeMocks({ pending: 0, retryable: 0, poison: 5 });
+    const r = await drainOutbox(eventBus as never, prisma as never, { batchSize: 200 });
+    expect(r.completed).toBe(true);
+    expect(r.remainingPending).toBe(0);
+    expect(r.remainingRetryableFailed).toBe(0);
+    expect(state.poison).toBe(5); // poison untouched
+  });
+
+  it("8. poison/exhausted retained but never treated as healthy pending", async () => {
+    const { state, eventBus, prisma } = makeMocks({ pending: 100, retryable: 0, poison: 3 });
+    const r = await drainOutbox(eventBus as never, prisma as never, { batchSize: 200 });
+    expect(r.completed).toBe(true);
+    expect(r.published).toBe(100);
+    expect(state.pending).toBe(0);
+    expect(state.poison).toBe(3);
+    expect(state.retryable).toBe(0);
+  });
+
+  it("9. non-converging retryable work hits the safety bound (fail-closed)", async () => {
+    const { state, eventBus, prisma } = makeMocks({ pending: 1 }, { alwaysFailRetryable: true });
+    await expect(drainOutbox(eventBus as never, prisma as never, { batchSize: 200, maxIterations: 5 })).rejects.toThrow("outbox did not drain within bound");
+    expect(eventBus.publishPending).toHaveBeenCalledTimes(5);
+    expect(state.pending).toBe(0);
+    expect(state.retryable).toBe(1); // still retryable — never converged
+  });
+
+  it("10. diagnostics include remaining counts, iterations, elapsed and batch", async () => {
+    const failing = makeMocks({ pending: 1 }, { alwaysFailRetryable: true });
+    // maxIterations=3 → 3 work rounds, then the bound fires on the next iteration (reports 4).
+    await expect(drainOutbox(failing.eventBus as never, failing.prisma as never, { batchSize: 50, maxIterations: 3 })).rejects.toThrow(/pending=\d+ retryableFailed=\d+ iterations=4 elapsedMs=\d+ batchSize=50/);
+    const ok = makeMocks({ pending: 100 });
+    const r = await drainOutbox(ok.eventBus as never, ok.prisma as never, { batchSize: 200 });
+    expect(r.completed).toBe(true);
+    expect(r.remainingPending).toBe(0);
+    expect(r.remainingRetryableFailed).toBe(0);
+    expect(r.batchSize).toBe(200);
+    expect(r.published).toBe(100);
+    expect(r.iterations).toBeGreaterThan(0);
+    expect(r.elapsedMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("11. no unbounded loop — maxIterations terminates a never-converging drain", async () => {
+    const { eventBus, prisma } = makeMocks({ pending: 3 }, { alwaysFailRetryable: true });
+    const started = Date.now();
+    await expect(drainOutbox(eventBus as never, prisma as never, { batchSize: 200, maxIterations: 7 })).rejects.toThrow("outbox did not drain within bound");
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(eventBus.publishPending).toHaveBeenCalledTimes(7);
+  });
+
+  it("12. cleanup after seed failure deletes tracked rows (no orphan residue)", async () => {
+    const registry = newRegistry();
+    registry.users.push("u1");
+    registry.products.push("p1");
+    registry.customers.push("c1");
+    const deletes: string[] = [];
+    const prisma = {
+      externalIdempotencyRecord: { deleteMany: jest.fn(async () => { deletes.push("idem"); return { count: 0 }; }) },
+      outboxEvent: {
+        findMany: jest.fn(async () => []),
+        deleteMany: jest.fn(async () => { deletes.push("outbox"); return { count: 0 }; }),
+      },
+      inboxEvent: { deleteMany: jest.fn(async () => { deletes.push("inbox"); return { count: 0 }; }) },
+      paymentHistory: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      payment: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      order: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      availabilityReservation: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      sale: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      ledgerTransaction: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      customer: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      availability: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      checkoutIntent: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      quote: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      product: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+      user: { deleteMany: jest.fn(async () => { deletes.push("user"); return { count: 0 }; }) },
+    };
+    const issues = await cleanup(prisma as never, registry);
+    expect(issues).toEqual([]);
+    expect(deletes).toContain("idem");
+    expect(deletes).toContain("user");
+  });
+
+  it("contract: REPRESENTATIVE EventBus seed ≥5,000 is drainable in one drain call", async () => {
+    expect(datasetCountsFor("REPRESENTATIVE").eventBusSeed).toBeGreaterThanOrEqual(5_000);
+    // The F-1 defect failed here: 5,000 probes + nested chain events exceeded the
+    // old 20×200=4,000 cap. The state-driven drain must converge with headroom.
+    const { state, eventBus, prisma } = makeMocks({ pending: 5_000 }, { spawnBudget: 2_000 });
+    const r = await drainOutbox(eventBus as never, prisma as never, { batchSize: 200 });
+    expect(r.completed).toBe(true);
+    expect(r.published).toBe(7_000);
+    expect(r.iterations).toBeLessThan(100);
+    expect(state.pending).toBe(0);
   });
 });

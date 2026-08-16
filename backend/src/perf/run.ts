@@ -45,6 +45,7 @@ import {
   newRegistry,
   prepareDataset,
   type AuthSession,
+  type DrainOutboxResult,
   type SeedUser,
   type Tracked,
 } from "./lib/seed";
@@ -60,7 +61,6 @@ import {
   datasetCountsFor,
   QUALIFICATION,
   validateQualificationConfig,
-  type DatasetCounts,
 } from "./lib/qualification";
 
 interface Booted {
@@ -1251,7 +1251,8 @@ async function main(): Promise<void> {
   let execError: string | null = null;
   let eventBusMetrics: Record<string, unknown> | null = null;
   let multiMetrics: Record<string, unknown> | null = null;
-  let datasetPrepared: DatasetCounts | null = null;
+  let datasetPrepared: Record<string, number> | null = null;
+  let datasetDrain: { afterChains: DrainOutboxResult; afterProbes: DrainOutboxResult } | null = null;
   const finalModeIssues: string[] = [];
   const status = { value: "RUNNING" as string };
 
@@ -1286,7 +1287,8 @@ async function main(): Promise<void> {
         runId: config.runId,
         counts,
       });
-      datasetPrepared = counts;
+      datasetPrepared = prep.counts;
+      datasetDrain = prep.drain;
       const auth: Auth = { admin, sm: prep.sm, fin: prep.fin };
       env = await collectEnv({
         runId: config.runId,
@@ -1393,6 +1395,7 @@ async function main(): Promise<void> {
     eventBus: eventBusMetrics,
     multiInstance: multiMetrics,
     dataset: datasetPrepared,
+    datasetDrain,
     topology: {
       appInstances: env?.appInstances ?? 0,
       workerInstances: env?.workerInstances ?? 0,

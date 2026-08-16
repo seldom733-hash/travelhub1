@@ -8,8 +8,9 @@
  */
 
 import { PrismaService } from "../../prisma/prisma.service";
-import { EventBusService } from "../../eventbus/eventbus.service";
+import { EventBusService, OUTBOX_MAX_ATTEMPTS } from "../../eventbus/eventbus.service";
 import { Prisma, RoleCode } from "../../generated/prisma/client";
+import { sleep } from "./pacer";
 
 export interface ApiResult<T = unknown> {
   status: number;
@@ -327,6 +328,8 @@ export async function seedEventBusProbes(
  */
 export interface DatasetPrep {
   counts: Record<string, number>;
+  /** Round-2 (F-1) drain diagnostics: iterations/duration/remaining per drain call. */
+  drain: { afterChains: DrainOutboxResult; afterProbes: DrainOutboxResult };
   usernames: string[];
   orderIds: string[];
   sm: SeedUser;
@@ -395,7 +398,7 @@ export async function prepareDataset(opts: {
     const chain = await buildOrderChain(baseUrl, adminToken, prisma, sm, registry, 100 + (i % 900), serviceDate, `${tag}oc${i}`);
     chainSaleIds.push(chain.saleId);
   }
-  await drainOutbox(eventBus, prisma);
+  const drainAfterChains = await drainOutbox(eventBus, prisma);
   const orders = await prisma.order.findMany({
     where: { saleId: { in: chainSaleIds } },
     select: { id: true },
@@ -408,7 +411,7 @@ export async function prepareDataset(opts: {
   // EventBus seed-capacity proof (probe events, drained so the DB state is clean).
   const probePrefix = `perf-ds-${runId}`;
   await seedEventBusProbes(eventBus, prisma, registry, counts.eventBusSeed, probePrefix);
-  await drainOutbox(eventBus, prisma);
+  const drainAfterProbes = await drainOutbox(eventBus, prisma);
 
   return {
     counts: {
@@ -421,6 +424,7 @@ export async function prepareDataset(opts: {
       ledger: counts.ledger,
       eventBusSeed: counts.eventBusSeed,
     },
+    drain: { afterChains: drainAfterChains, afterProbes: drainAfterProbes },
     usernames,
     orderIds,
     sm,
@@ -428,14 +432,114 @@ export async function prepareDataset(opts: {
   };
 }
 
-/** Drive the outbox until no PENDING remains (bounded) — materializes consumers. */
-export async function drainOutbox(eventBus: EventBusService, prisma: PrismaService, maxRounds = 20): Promise<void> {
-  for (let round = 0; round < maxRounds; round++) {
-    await eventBus.publishPending(200);
-    const pending = await prisma.outboxEvent.count({ where: { status: "PENDING" } });
-    if (pending === 0) return;
+/**
+ * Round-2 remediation (F-1): bounded, STATE-DRIVEN outbox drain for dataset
+ * preparation. Completion is based on actual EventBus state, not loop count:
+ *
+ *   - healthy PENDING → published via the same production `publishPending` the
+ *     worker uses; consumers may emit NESTED PENDING events (OrderRequested →
+ *     Order → OrderCreated → CommissionAccrual), so the loop keeps going while
+ *     PENDING remains (a single `publishPending` returning less than the batch
+ *     is NOT a stop condition — §7).
+ *   - retryable FAILED (attempts < OUTBOX_MAX_ATTEMPTS) → flipped back via the
+ *     production `retryFailed` and re-published (durable-retry worker contract);
+ *     events waiting on backoff (`nextAttemptAt`) are polled briefly.
+ *   - poison / exhausted FAILED (retryable=false OR attempts >= max) → retained
+ *     and isolated; NEVER counted as drainable work (§6).
+ *
+ * Convergence = PENDING === 0 AND retryable FAILED === 0. If the explicit
+ * safety bound (maxIterations / maxDurationMs) is reached first, the seed FAILS
+ * closed and the dataset MUST NOT be marked ready (§8). No unbounded loop; no
+ * outbox/inbox history is deleted to force completion.
+ */
+export interface DrainOutboxOptions {
+  /** publishPending/retryFailed batch (default 200). */
+  batchSize?: number;
+  /** Safety cap on drain iterations (default 2,000 — derived from the
+   * REPRESENTATIVE contract: >=5,000 seed events + ~3 nested events/chain over
+   * 1,000 chains ⇒ min rounds ≈ 8,000/200 = 40; 2,000 = 50x headroom). */
+  maxIterations?: number;
+  /** Safety cap on elapsed wall-clock time (default 10 min). */
+  maxDurationMs?: number;
+}
+
+export interface DrainOutboxResult {
+  completed: boolean;
+  iterations: number;
+  published: number;
+  retried: number;
+  elapsedMs: number;
+  remainingPending: number;
+  remainingRetryableFailed: number;
+  batchSize: number;
+}
+
+const DRAIN_DEFAULT_BATCH_SIZE = 200;
+const DRAIN_DEFAULT_MAX_ITERATIONS = 2_000;
+const DRAIN_DEFAULT_MAX_DURATION_MS = 10 * 60_000;
+/** Poll interval when only backoff-delayed retryable work remains. */
+const DRAIN_BACKOFF_POLL_MS = 500;
+
+interface DrainEventStore {
+  outboxEvent: { count(args: { where: Record<string, unknown> }): Promise<number> };
+}
+
+export async function drainOutbox(
+  eventBus: Pick<EventBusService, "publishPending" | "retryFailed">,
+  prisma: DrainEventStore,
+  options: DrainOutboxOptions = {},
+): Promise<DrainOutboxResult> {
+  const batchSize = options.batchSize ?? DRAIN_DEFAULT_BATCH_SIZE;
+  const maxIterations = options.maxIterations ?? DRAIN_DEFAULT_MAX_ITERATIONS;
+  const maxDurationMs = options.maxDurationMs ?? DRAIN_DEFAULT_MAX_DURATION_MS;
+  const startedAt = Date.now();
+  let iterations = 0;
+  let published = 0;
+  let retried = 0;
+
+  const readState = async (): Promise<{ pending: number; retryable: number }> => {
+    const [pending, retryable] = await Promise.all([
+      prisma.outboxEvent.count({ where: { status: "PENDING" } }),
+      prisma.outboxEvent.count({
+        where: { status: "FAILED", retryable: true, attempts: { lt: OUTBOX_MAX_ATTEMPTS } },
+      }),
+    ]);
+    return { pending, retryable };
+  };
+
+  for (;;) {
+    iterations++;
+    const elapsedMs = Date.now() - startedAt;
+    if (iterations > maxIterations || elapsedMs > maxDurationMs) {
+      const { pending, retryable } = await readState();
+      throw new Error(
+        `outbox did not drain within bound: pending=${pending} retryableFailed=${retryable} iterations=${iterations} elapsedMs=${elapsedMs} batchSize=${batchSize}`,
+      );
+    }
+    const flipped = await eventBus.retryFailed(batchSize);
+    const done = await eventBus.publishPending(batchSize);
+    retried += flipped;
+    published += done;
+    const { pending, retryable } = await readState();
+    if (pending === 0 && retryable === 0) {
+      return {
+        completed: true,
+        iterations,
+        published,
+        retried,
+        elapsedMs: Date.now() - startedAt,
+        remainingPending: 0,
+        remainingRetryableFailed: 0,
+        batchSize,
+      };
+    }
+    // No healthy progress this round (only backoff-delayed retryable work left,
+    // e.g. a transiently failed OrderRequested waiting on nextAttemptAt): poll
+    // briefly so the backoff can elapse — still bounded by the safety cap.
+    if (done === 0 && flipped === 0 && pending === 0) {
+      await sleep(DRAIN_BACKOFF_POLL_MS);
+    }
   }
-  throw new Error("outbox did not drain within bound");
 }
 
 /** Cleanup: delete all tracked synthetic rows in dependency order. */
@@ -499,6 +603,13 @@ export async function cleanup(prisma: PrismaService, registry: Tracked): Promise
     await del("customers", () => prisma.customer.deleteMany({ where: { id: { in: registry.customers } } }));
   }
   if (registry.products.length > 0) {
+    // Round-2 (F-1 scope): ProductCreated outbox/inbox rows carry the product
+    // aggregateId — previously left as PUBLISHED residue (1,500 rows after a
+    // REPRESENTATIVE seed). Harness-owned synthetic rows; canonical history
+    // semantics preserved (only tracked perf rows are deleted).
+    const prodEventIds = (await prisma.outboxEvent.findMany({ where: { aggregateId: { in: registry.products } }, select: { id: true } })).map((e) => e.id);
+    await del("product inbox", () => prisma.inboxEvent.deleteMany({ where: { eventId: { in: prodEventIds } } }));
+    await del("product outbox", () => prisma.outboxEvent.deleteMany({ where: { aggregateId: { in: registry.products } } }));
     await del("availability", () => prisma.availability.deleteMany({ where: { productId: { in: registry.products } } }));
   }
   if (registry.checkouts.length > 0) {
