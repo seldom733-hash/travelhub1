@@ -244,8 +244,8 @@ push_status: PUSHED
 decision_base_sha: dacdd85
 authority_decision_commit_sha: 8fc0f36
 provenance_footer_commit_sha: da4a4b7
-final_head_sha: 7bfa9cb
-upstream_sha: 7bfa9cb
+final_head_sha: 3af93a6
+upstream_sha: 3af93a6
 postgres_rpo_target: <=1h
 postgres_rto_target: <=4h
 media_rpo_target: <=24h
