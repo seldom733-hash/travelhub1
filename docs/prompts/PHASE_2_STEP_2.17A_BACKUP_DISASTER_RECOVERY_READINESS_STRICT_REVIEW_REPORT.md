@@ -504,19 +504,19 @@ and proven. No CRITICAL/HIGH findings. No false production-compliance claim.
 
 repository: TravelHub (D:\travelhub_v1)
 branch: master
-head: <pending>
+head: 39d3134
 origin: d873a44
 worktree_clean: false (untracked prompt-файлы предыдущих шагов остаются — не мои)
 migration_count: 58 (canonical folders; dev DB has 3 legacy rows — documented)
 reviewed_state: COMMIT
 reviewed_diff_base: d873a44
-reviewed_diff_head: <pending>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
-push_status: NOT_PUSHED
+reviewed_diff_head: 39d3134
+persistence_status: PERSISTED
+persistence_sha: 39d3134
+push_status: <pending>
 reviewed_head_before_review_fixes: d873a44
-review_fix_commit_sha: <pending>
-strict_review_commit_sha: <pending>
+review_fix_commit_sha: 39d3134
+strict_review_commit_sha: 39d3134
 provenance_footer_commit_sha: <pending>
 final_head_sha: <pending>
 upstream_sha: <pending>
