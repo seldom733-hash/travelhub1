@@ -5,6 +5,28 @@
 > validated live against an isolated `travelhub_perf_*` database. Do not execute against
 > production.
 
+## 0. SLO / load authority state (2026-08-16) — VERDICT B (PARTIAL)
+
+Decision pass: `docs/prompts/PHASE_2_STEP_2.17B_SLO_LOAD_AUTHORITY_DECISION_REPORT.md`.
+
+- **Approved (repository contracts, not business demand):** correctness-under-load hard
+  gates (0 duplicate Payment/Order/Commission/Accrual, 0 wrong/divergent replay, 0 lost
+  committed PENDING event, 0 poison-blocking, 0 raw 500 from controlled races, Decimal
+  exact, 0 invalid terminal transition) and HTTP reliability posture (unexpected
+  5xx/timeout/transport = 0). Fast-but-wrong FAILS.
+- **TBD — BUSINESS/PRODUCT/OPERATIONS AUTHORITY REQUIRED:** every quantitative target
+  (expected V1 peak RPS, concurrency, read/write mix, booking/order/payment/login rates,
+  p95/p99 latency per route class, EventBus steady/peak/burst/backlog-age/drain-time,
+  soak duration, release regression tolerance, qualification environment/instance counts).
+  0 approved numbers exist in the repository; engineering does NOT invent them.
+- **Hard semantic rule:** `approved SLO ≠ measured capacity ≠ production capacity ≠ V1
+  launch requirement ≠ future scaling target`. All numbers in this runbook's example
+  profiles are EXPLORATORY harness validation only.
+- **Final qualification is BLOCKED** where material targets are TBD. Step 2.17B remains
+  NOT APPROVED.
+- **PSP subset deferred:** `STEP 2.17B-PSP` until ADR-0015 ACCEPTED + 2.12B runtime +
+  provider sandbox/contract evidence.
+
 ## 1. Prerequisites
 
 - PostgreSQL 18.x (matching dev), isolated qualification DB (NEVER canonical dev/prod DB).

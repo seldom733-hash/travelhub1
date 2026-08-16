@@ -293,7 +293,26 @@ logged; auth tokens never logged; PSP secrets never present.
 | soak duration | NO | 0 SLO anywhere | YES | Operations |
 | release regression tolerance | NO | 0 SLO anywhere | YES | Engineering/Operations |
 
-All values: `TBD — BUSINESS/PRODUCT/OPERATIONS AUTHORITY REQUIRED`. Not chosen here.
+**Authority decision (2026-08-16) — VERDICT B (PARTIAL):** see §33. Quantitative rows
+remain `TBD — BUSINESS/PRODUCT/OPERATIONS AUTHORITY REQUIRED` (0 approved values in the
+repository — verified repo-wide; engineering does NOT invent business demand). The
+correctness/reliability gates below ARE approved because they are repository contract
+invariants, not business demand:
+
+| Approved (contract-level) | Value | Evidence |
+|---|---|---|
+| duplicate committed Payment | 0 | 2.12H digest slots + PaymentService idempotent retry + e2e |
+| wrong / silent divergent idempotent replay | 0 | 2.12H slotKey = sha256(scope, op, key) |
+| duplicate Order / business fact from race or retry | 0 | Order consumer + Inbox dedup authoritative |
+| duplicate Commission / CommissionAccrual fact | 0 | 2.10B idempotency + unique constraints |
+| lost committed PENDING event | 0 | durable outbox + worker (2.17) |
+| poison blocking unrelated progress | 0 | exhausted poison isolation (2.17) |
+| raw 500 from controlled race | 0 | every e2e asserts 0 unexpected 5xx |
+| Decimal corruption | 0 | decimal.js + DECIMAL(12,2) guards |
+| invalid terminal lifecycle transition | 0 | CAS + status gates |
+| unexpected 5xx / timeout / transport (HTTP reliability) | 0 | established repo-wide gate |
+
+Fast-but-wrong FAILS: correctness is absolute and never weakened by load results.
 
 ## 27. Observability gaps
 
@@ -379,3 +398,54 @@ capacity targets. Artifacts: `backend/artifacts/performance/<run-id>/*.json` (gi
   subset (`STEP 2.17B-PSP` deferred until ADR-0015 ACCEPTED + 2.12B runtime + provider sandbox).
 - ADR-0015 — PROPOSED/BLOCKED; PSP selection prerequisite.
 - Step 2.18 — Phase Exit; consumes 2.17B evidence per §24.
+
+## 33. SLO / load authority decision (2026-08-16) — VERDICT B (PARTIAL)
+
+Decision pass: `docs/prompts/PHASE_2_STEP_2.17B_SLO_LOAD_AUTHORITY_DECISION_REPORT.md`.
+
+**Verdict B — PARTIAL AUTHORITY.** Quantitative V1 platform performance targets are NOT
+approved because no Business/Product/Operations authority exists in the repository (verified
+repo-wide: 0 SLO numbers, 0 demand documents, 0 traffic model). Engineering must not invent
+business demand. Approved = correctness-under-load and reliability gates (repository
+contracts, §26 table above). TBD = every quantitative load/latency/duration target.
+
+Canonical semantic preserved:
+
+```text
+approved SLO ≠ measured capacity ≠ production capacity ≠ V1 launch requirement ≠ future scaling target
+V1 LAUNCH TARGET = TBD — BUSINESS AUTHORITY REQUIRED
+QUALIFICATION TARGET = TBD — BUSINESS/PRODUCT AUTHORITY REQUIRED (includes headroom)
+FUTURE SCALING TARGET = planning section only, non-blocking (§34)
+OBSERVED MEASUREMENT = harness evidence only (~367/235/1544/320 req/s, ~187 ev/s — localhost)
+```
+
+Explicitly NOT approved (TBD — named owner):
+
+| Target | Owner | Decision |
+|---|---|---|
+| expected V1 peak RPS / concurrency | Business/Product | TBD |
+| qualification peak RPS + headroom factor | Business/Product + Operations | TBD |
+| read/write mix; booking/order/payment/login rates | Business/Product | TBD |
+| p95/p99 latency per route class (public/read, auth-read, write, pay.create, login) | Business/Product | TBD |
+| unexpected 5xx / timeout / transport rate | Business/Product + Operations | 0 (contract gate) |
+| EventBus steady/peak/burst rate; backlog age; max drain time | Operations/Engineering | TBD |
+| soak duration | Operations | TBD (30 s harness validation ≠ endurance) |
+| release regression tolerance | Engineering/Operations | TBD |
+| app/worker instance count for final qualification | Operations | TBD |
+
+Final qualification against approved targets is BLOCKED where material (all of the above).
+Step 2.17B remains NOT APPROVED.
+
+## 34. Future scaling — non-blocking planning
+
+12-month traffic growth, horizontal app/worker scaling, DB read replicas, caching,
+distributed rate limiting, observability/APM, PSP/webhook scaling — planning-only section.
+None of these are Phase 2 gates unless separately approved.
+
+## 35. Step 2.17B current state (2026-08-16)
+
+- harness: IMPLEMENTED (dependency-free `backend/src/perf/`, 31 unit/integration tests);
+- exploratory baseline: MEASURED (localhost, isolated DB — NOT authority);
+- SLO/load authority: VERDICT B — quantitative targets TBD (named owners above);
+- correctness-under-load: HARD GATE PASS on all live scenarios;
+- final qualification: BLOCKED on authority; PSP subset: DEFERRED (ADR-0015 + 2.12B).
