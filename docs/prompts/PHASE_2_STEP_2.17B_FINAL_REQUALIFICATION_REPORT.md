@@ -529,7 +529,7 @@ base_sha: 93102534e70c49be732e1c5cd1e834a129aa788b
 upstream_before: 93102534e70c49be732e1c5cd1e834a129aa788b
 harness_remediation_sha: e2c8231
 qualification_commit_sha: fadc9a8
-provenance_footer_commit_sha: <filled after footer commit>
+provenance_footer_commit_sha: 4e4f519
 final_head_sha: <filled after push>
 upstream_sha: <filled after push>
 push_status: <filled after push>
