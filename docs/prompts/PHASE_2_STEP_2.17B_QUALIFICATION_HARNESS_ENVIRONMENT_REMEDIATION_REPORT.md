@@ -418,10 +418,10 @@ quantitative_authority_sha: 60ead9a
 quantitative_authority_footer_sha: 4d2c3c6
 harness_implementation_sha: 5baa743
 remediation_commit_sha: e2c8231
-provenance_footer_commit_sha: <footer commit sha>
-final_head_sha: <filled after push>
-upstream_sha: <filled after push>
-push_status: <filled after push>
+provenance_footer_commit_sha: 8262468
+final_head_sha: 8262468
+upstream_sha: 8262468
+push_status: PUSHED
 database_drift: 0
 artifact_integrity: PASS=142 WARN=0 FAIL=0
 checker_regression: 13/13
