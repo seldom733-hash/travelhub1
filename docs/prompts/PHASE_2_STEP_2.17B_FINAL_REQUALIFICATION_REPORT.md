@@ -522,14 +522,14 @@ worktree_clean: true (of my changes)
 migration_count: 58
 reviewed_state: REQUALIFICATION_INVALID
 reviewed_diff_base: 93102534e70c49be732e1c5cd1e834a129aa788b
-reviewed_diff_head: <filled after commit>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: fadc9a8
+persistence_status: PERSISTED
+persistence_sha: fadc9a8
 base_sha: 93102534e70c49be732e1c5cd1e834a129aa788b
 upstream_before: 93102534e70c49be732e1c5cd1e834a129aa788b
 harness_remediation_sha: e2c8231
-qualification_commit_sha: <filled after commit>
-provenance_footer_commit_sha: <filled after commit>
+qualification_commit_sha: fadc9a8
+provenance_footer_commit_sha: <filled after footer commit>
 final_head_sha: <filled after push>
 upstream_sha: <filled after push>
 push_status: <filled after push>
