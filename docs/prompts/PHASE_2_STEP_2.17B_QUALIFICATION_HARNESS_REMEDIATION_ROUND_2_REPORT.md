@@ -365,9 +365,9 @@ base_sha: 0c28a8d23d857e893b73281aaed7cb1adea9aba7
 previous_qualification_sha: fadc9a8 (→ 4e4f519 → 5fd9d63 → 0c28a8d)
 remediation_round2_commit_sha: fc8c7ef
 provenance_footer_commit_sha: e6c2afc
-final_head_sha: <filled after push>
-upstream_sha: <filled after push>
-push_status: <filled after push>
+final_head_sha: fb2dd6a
+upstream_sha: fb2dd6a
+push_status: PUSHED
 database_drift: 0
 artifact_integrity: PASS=145 WARN=0 FAIL=0
 checker_regression: 13/13
