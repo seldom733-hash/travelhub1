@@ -293,11 +293,12 @@ logged; auth tokens never logged; PSP secrets never present.
 | soak duration | NO | 0 SLO anywhere | YES | Operations |
 | release regression tolerance | NO | 0 SLO anywhere | YES | Engineering/Operations |
 
-**Authority decision (2026-08-16) — VERDICT B (PARTIAL):** see §33. Quantitative rows
-remain `TBD — BUSINESS/PRODUCT/OPERATIONS AUTHORITY REQUIRED` (0 approved values in the
-repository — verified repo-wide; engineering does NOT invent business demand). The
-correctness/reliability gates below ARE approved because they are repository contract
-invariants, not business demand:
+**Authority decision (2026-08-16) — QUANTITATIVE AUTHORITY SUPPLIED — VERDICT A (see §33):**
+the Business/Product/Operations quantitative authority previously missing was supplied by a
+dedicated authority pass (report:
+`docs/prompts/PHASE_2_STEP_2.17B_QUANTITATIVE_TARGETS_AUTHORITY_DECISION_REPORT.md`).
+The canonical authority matrix with APPROVED values is in §33. The correctness/reliability
+gates below remain approved repository contract invariants:
 
 | Approved (contract-level) | Value | Evidence |
 |---|---|---|
@@ -399,42 +400,173 @@ capacity targets. Artifacts: `backend/artifacts/performance/<run-id>/*.json` (gi
 - ADR-0015 — PROPOSED/BLOCKED; PSP selection prerequisite.
 - Step 2.18 — Phase Exit; consumes 2.17B evidence per §24.
 
-## 33. SLO / load authority decision (2026-08-16) — VERDICT B (PARTIAL)
+## 33. Quantitative SLO/load authority (2026-08-16) — VERDICT A (APPROVED)
 
-Decision pass: `docs/prompts/PHASE_2_STEP_2.17B_SLO_LOAD_AUTHORITY_DECISION_REPORT.md`.
+Authority pass:
+`docs/prompts/PHASE_2_STEP_2.17B_QUANTITATIVE_TARGETS_AUTHORITY_DECISION_REPORT.md`.
+Preceding Verdict B (partial) recorded in
+`docs/prompts/PHASE_2_STEP_2.17B_SLO_LOAD_AUTHORITY_DECISION_REPORT.md`.
 
-**Verdict B — PARTIAL AUTHORITY.** Quantitative V1 platform performance targets are NOT
-approved because no Business/Product/Operations authority exists in the repository (verified
-repo-wide: 0 SLO numbers, 0 demand documents, 0 traffic model). Engineering must not invent
-business demand. Approved = correctness-under-load and reliability gates (repository
-contracts, §26 table above). TBD = every quantitative load/latency/duration target.
+**Verdict A — QUANTITATIVE AUTHORITY APPROVED.** Business/Product/Operations supplied the
+V1 planning/qualification envelope below as explicit owner-approved targets. They are NOT
+derived from localhost measurements and NOT production capacity claims.
 
 Canonical semantic preserved:
 
 ```text
-approved SLO ≠ measured capacity ≠ production capacity ≠ V1 launch requirement ≠ future scaling target
-V1 LAUNCH TARGET = TBD — BUSINESS AUTHORITY REQUIRED
-QUALIFICATION TARGET = TBD — BUSINESS/PRODUCT AUTHORITY REQUIRED (includes headroom)
-FUTURE SCALING TARGET = planning section only, non-blocking (§34)
-OBSERVED MEASUREMENT = harness evidence only (~367/235/1544/320 req/s, ~187 ev/s — localhost)
+APPROVED BUSINESS TARGET ≠ OBSERVED HARNESS MEASUREMENT ≠ VERIFIED CAPABILITY
+≠ PRODUCTION CAPACITY CLAIM ≠ FUTURE SCALING TARGET
 ```
 
-Explicitly NOT approved (TBD — named owner):
+### 33.1 V1 user / load planning envelope (Business/Product)
 
-| Target | Owner | Decision |
+| Metric | Value |
+|---|---|
+| Registered users planning envelope | 100,000 |
+| MAU planning envelope | 25,000 |
+| DAU planning envelope | 5,000 |
+| Normal concurrent active users | 100 |
+| Expected V1 peak concurrent users | 250 |
+| Qualification peak concurrent users | 500 |
+| Short burst concurrency | 1,000 |
+
+### 33.2 Traffic mix (Business/Product)
+
+| Class | Share |
+|---|---|
+| Reads | 80% |
+| Writes | 20% |
+| — of total: auth/login | <= 5% |
+| — booking/order writes | <= 5% |
+| — payment initiation | <= 2% |
+| — other domain writes | <= 8% |
+| — reads (public/authenticated) | balance |
+
+Workload-design authority, not a requirement that every run matches this exact distribution.
+
+### 33.3 Request-rate authority
+
+| Metric | Value | Kind |
 |---|---|---|
-| expected V1 peak RPS / concurrency | Business/Product | TBD |
-| qualification peak RPS + headroom factor | Business/Product + Operations | TBD |
-| read/write mix; booking/order/payment/login rates | Business/Product | TBD |
-| p95/p99 latency per route class (public/read, auth-read, write, pay.create, login) | Business/Product | TBD |
-| unexpected 5xx / timeout / transport rate | Business/Product + Operations | 0 (contract gate) |
-| EventBus steady/peak/burst rate; backlog age; max drain time | Operations/Engineering | TBD |
-| soak duration | Operations | TBD (30 s harness validation ≠ endurance) |
-| release regression tolerance | Engineering/Operations | TBD |
-| app/worker instance count for final qualification | Operations | TBD |
+| Expected normal application load | 25 RPS | V1 planning |
+| Expected V1 peak application load | 50 RPS | V1 planning |
+| Qualification sustained target | 100 RPS | Phase 2 qualification |
+| Qualification short-burst target | 200 RPS | Phase 2 qualification |
+| Future scaling planning target | 1,000 RPS | planning only — NOT a Phase 2 gate |
+| Qualification headroom over expected V1 peak | 2.0x | Business/Product + Operations |
 
-Final qualification against approved targets is BLOCKED where material (all of the above).
-Step 2.17B remains NOT APPROVED.
+### 33.4 Latency SLO per route class (TravelHub-controlled only; PSP latency excluded)
+
+| Class | p95 | p99 |
+|---|---|---|
+| A — public/light reads | <= 300 ms | <= 750 ms |
+| B — authenticated reads | <= 500 ms | <= 1000 ms |
+| C — ordinary domain writes | <= 750 ms | <= 1500 ms |
+| D — concurrency-sensitive writes | <= 1000 ms | <= 2000 ms |
+| E — payment.create (internal processing) | <= 1000 ms | <= 2000 ms |
+| F — auth/login | <= 750 ms | <= 1500 ms |
+
+p50 informational; max diagnostic. Correctness more important than latency (Class E).
+
+### 33.5 Reliability / correctness gates (unchanged, absolute)
+
+Unexpected HTTP 5xx = 0; unexpected transport failures = 0; unexpected timeouts = 0
+(qualification-run gates, NOT a production availability SLA). Expected scenario-specific
+400/401/403/404/409/429 are not failures when the contract requires them. Correctness-under-
+load gates (§26 table) remain absolute; fast-but-wrong FAILS.
+
+### 33.6 Domain-rate authority
+
+- **payment.create** (TravelHub-owned only, ADR-0015/2.12B blocked): expected peak 1 RPS,
+  qualification 2 RPS, burst 10 RPS, concurrent 50; latency per Class E; correctness:
+  duplicate committed Payment = 0, wrong replay = 0, raw 500 from controlled race = 0;
+  no real PSP call in qualification.
+- **Booking/Order**: expected combined V1 peak 3 RPS, qualification 6 RPS, burst 20 RPS;
+  lifecycle correctness, terminal-state protection, 0 duplicate facts, event-chain
+  convergence, 0 lost committed events, controlled conflicts; latency per Class C/D.
+- **Login**: expected V1 peak 1 RPS, qualification 2 RPS, burst 5 RPS; harness respects the
+  in-memory per-instance throttle (10/15 min, Step 2.17 contract) — distinct synthetic
+  users, throttle NOT bypassed/disabled; tokenVersion/logout semantics preserved.
+
+### 33.7 EventBus authority (at-least-once + Inbox/consumer idempotency preserved)
+
+| Metric | Value |
+|---|---|
+| Expected steady event generation | 25 ev/s |
+| Expected V1 peak event generation | 50 ev/s |
+| Qualification steady target | 100 ev/s |
+| Qualification burst | 1,000 events |
+| Normal steady-state PENDING backlog | <= 100 |
+| Normal oldest PENDING age | <= 10 s |
+| Recovery backlog | 5,000 events |
+| Recovery worker instances | 2 |
+| Max full backlog drain / convergence | <= 120 s |
+
+Post-convergence: lost committed events = 0, duplicate business effects = 0, poison blocks
+unrelated events = 0, unexpected retryable residue = 0 (deliberately poisoned/exhausted
+records allowed only when the scenario expects them, isolated/auditable). exactly-once is
+NEVER claimed.
+
+### 33.8 Qualification topology / sequence / durations
+
+Topology: **2 app instances + 2 worker instances + shared PostgreSQL** (dedicated isolated
+performance environment). No linear-scaling claim.
+
+Sequence: safe-target/env validation → dataset preparation → SMOKE → warm-up 5 min →
+steady 15 min @ 50 RPS → qualification peak 15 min @ 100 RPS → burst 60 s @ 200 RPS →
+payment.create concurrency/idempotency → booking/order write profile → EventBus
+steady/peak/burst → EventBus recovery (5,000 / 2 workers) → multi-instance profile →
+soak 30 min @ 50 RPS / concurrency 250 → post-run correctness validation → cleanup
+validation. Stress characterization may run separately and must not replace qualification.
+
+Burst ceilings: Class A/B burst p99 <= 2000 ms; Class C–F burst p99 <= 3000 ms; correctness
+absolute during burst; backlog/latency converge after burst without manual cleanup.
+
+Soak (30 min @ 50 RPS / concurrency 250): 0 unexpected 5xx/timeout/transport, 0 correctness
+violations, no continuously growing EventBus backlog, no unrecovered retryable FAILED
+accumulation, no obvious unbounded memory-growth pattern, no DB corruption, cleanup
+succeeds. Process memory start/peak/end reported if the harness can obtain it without new
+runtime deps; otherwise `NOT MEASURED — OBSERVABILITY LIMITATION` (no production-code change
+for this pass).
+
+Stress: characterization only, NOT a Phase 2 approval gate; permitted exploratory ceiling
+up to 500 RPS and/or 2,000 concurrent requests (isolated environment safe); abort on
+correctness violation / DB safety concern / uncontrolled failure cascade / inability to
+clean up / guard failure; no requirement to reach 500 RPS; no production-capacity claim.
+
+### 33.9 Release regression tolerance (Engineering/Operations)
+
+p95 regression > 20%, p99 regression > 25%, throughput regression > 20% on materially
+comparable environments → investigate / qualification warning (NOT automatic SLO failure
+if absolute approved SLOs still pass). Any correctness regression = immediate FAIL.
+
+### 33.10 Future scaling — planning only, non-blocking
+
+Future planning: 1,000 RPS / 5,000 concurrency / 20 payment-initiation RPS /
+500 EventBus ev/s. NOT Phase 2 blockers, NOT capacity claims, harness NOT required to pass
+them; prevents V1-load-as-permanent-ceiling assumptions. (Also §34.)
+
+### 33.11 Dataset authority
+
+Deterministic synthetic representative dataset: Users >= 1,000; Products/service units
+>= 500; Customers/CRM >= 1,000; Sales/quotes >= 1,000; Booking/Order chains >= 1,000;
+Payment-capable orders >= 500; Finance/ledger >= 5,000; EventBus seed capability >= 5,000.
+Nearest canonical domain entity mapping documented per run; no fake schema concepts.
+
+### 33.12 Environment authority
+
+Dedicated isolated performance environment (local/perf host or dedicated CI/perf runner),
+isolated PostgreSQL, canonical migrations, production Nest path, deterministic synthetic
+data only, never canonical/prod DB, full environment metadata (OS, CPU, RAM, Node, PG,
+DB class, app/worker counts, worker interval/batch, dataset size, profile, commit SHA).
+Sufficient for Phase 2 platform qualification; NOT production capacity certification;
+future pre-launch staging/prod-like qualification may be required separately.
+
+### 33.13 PSP / step separation (unchanged)
+
+PSP performance subset DEFERRED until ADR-0015 ACCEPTED + 2.12B runtime + provider
+sandbox/contract evidence. Step 2.17A RPO/RTO (1h/4h/24h/8h) are DR targets, NOT latency
+SLOs. 2.17C Sales debt, 2.18, RLS (ADR-0014) — NOT started. This pass changes no code.
 
 ## 34. Future scaling — non-blocking planning
 
@@ -446,6 +578,7 @@ None of these are Phase 2 gates unless separately approved.
 
 - harness: IMPLEMENTED (dependency-free `backend/src/perf/`, 31 unit/integration tests);
 - exploratory baseline: MEASURED (localhost, isolated DB — NOT authority);
-- SLO/load authority: VERDICT B — quantitative targets TBD (named owners above);
+- quantitative SLO/load authority: VERDICT A — APPROVED (2026-08-16, §33);
 - correctness-under-load: HARD GATE PASS on all live scenarios;
-- final qualification: BLOCKED on authority; PSP subset: DEFERRED (ADR-0015 + 2.12B).
+- final qualification: NOT STARTED — UNBLOCKED (next gate);
+- Step 2.17B: NOT APPROVED; strict review: NOT STARTED; PSP subset: DEFERRED (ADR-0015 + 2.12B).

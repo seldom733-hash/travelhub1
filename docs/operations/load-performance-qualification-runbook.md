@@ -5,24 +5,48 @@
 > validated live against an isolated `travelhub_perf_*` database. Do not execute against
 > production.
 
-## 0. SLO / load authority state (2026-08-16) — VERDICT B (PARTIAL)
+## 0. Quantitative SLO/load authority state (2026-08-16) — VERDICT A (APPROVED)
 
-Decision pass: `docs/prompts/PHASE_2_STEP_2.17B_SLO_LOAD_AUTHORITY_DECISION_REPORT.md`.
+Decision passes: `docs/prompts/PHASE_2_STEP_2.17B_SLO_LOAD_AUTHORITY_DECISION_REPORT.md`
+(Verdict B — blocker recorded) and
+`docs/prompts/PHASE_2_STEP_2.17B_QUANTITATIVE_TARGETS_AUTHORITY_DECISION_REPORT.md`
+(Verdict A — authority supplied). Canonical matrix: design doc §33.
 
-- **Approved (repository contracts, not business demand):** correctness-under-load hard
-  gates (0 duplicate Payment/Order/Commission/Accrual, 0 wrong/divergent replay, 0 lost
-  committed PENDING event, 0 poison-blocking, 0 raw 500 from controlled races, Decimal
-  exact, 0 invalid terminal transition) and HTTP reliability posture (unexpected
-  5xx/timeout/transport = 0). Fast-but-wrong FAILS.
-- **TBD — BUSINESS/PRODUCT/OPERATIONS AUTHORITY REQUIRED:** every quantitative target
-  (expected V1 peak RPS, concurrency, read/write mix, booking/order/payment/login rates,
-  p95/p99 latency per route class, EventBus steady/peak/burst/backlog-age/drain-time,
-  soak duration, release regression tolerance, qualification environment/instance counts).
-  0 approved numbers exist in the repository; engineering does NOT invent them.
-- **Hard semantic rule:** `approved SLO ≠ measured capacity ≠ production capacity ≠ V1
-  launch requirement ≠ future scaling target`. All numbers in this runbook's example
-  profiles are EXPLORATORY harness validation only.
-- **Final qualification is BLOCKED** where material targets are TBD. Step 2.17B remains
+**Approved quantitative targets (Business/Product/Operations authority — explicit
+owner-approved planning/qualification values, NOT derived from localhost benchmarks, NOT
+production capacity claims):**
+
+- V1 envelope: 100,000 registered / 25,000 MAU / 5,000 DAU; concurrency normal 100 /
+  expected V1 peak 250 / qualification 500 / burst 1,000; read/write mix 80/20
+  (login <= 5%, booking/order <= 5%, payment <= 2%, other writes <= 8%).
+- Load: normal 25 RPS, V1 peak 50 RPS, qualification sustained 100 RPS, burst 200 RPS,
+  headroom 2.0x; future planning 1,000 RPS (NOT a Phase 2 gate).
+- Latency p95/p99: public reads 300/750 ms; authenticated reads 500/1000 ms; ordinary
+  writes 750/1500 ms; concurrency-sensitive writes 1000/2000 ms; payment.create
+  1000/2000 ms (internal only); login 750/1500 ms.
+- Reliability: unexpected 5xx / timeout / transport = 0 (qualification gates, not a
+  production SLA); expected 400/401/403/404/409/429 per scenario are not failures.
+- Domain rates: payment.create 1/2/10 RPS (peak/qual/burst), concurrency 50; Booking/Order
+  3/6/20 RPS; login 1/2/5 RPS (harness respects per-instance throttle — distinct synthetic
+  users, throttle NOT bypassed).
+- EventBus: steady 25, peak 50, qual steady 100 ev/s, burst 1,000 events; normal backlog
+  <= 100, oldest PENDING <= 10 s; recovery 5,000 events / 2 workers / max drain <= 120 s;
+  semantics at-least-once + Inbox/consumer idempotency (exactly-once NEVER claimed).
+- Qualification: 2 app + 2 worker instances, shared PostgreSQL, dedicated isolated
+  environment; warm-up 5 min → steady 15 min @ 50 RPS → peak 15 min @ 100 RPS → burst
+  60 s @ 200 RPS → soak 30 min @ 50 RPS / concurrency 250; burst p99 ceilings A/B
+  2000 ms, C–F 3000 ms; regression tolerance p95 > 20% / p99 > 25% / throughput > 20%
+  (investigate/warning; correctness regression = immediate FAIL).
+- Stress: characterization only, exploratory ceiling 500 RPS / 2,000 concurrent (isolated,
+  abort-safe); NOT a Phase 2 gate. Dataset: synthetic deterministic (users >= 1,000,
+  products >= 500, CRM >= 1,000, sales >= 1,000, booking/order >= 1,000, payment-capable
+  orders >= 500, finance/ledger >= 5,000, EventBus seed >= 5,000).
+
+**Hard semantic rule:** `approved SLO ≠ measured capacity ≠ production capacity ≠ V1
+launch requirement ≠ future scaling target`. Exploratory localhost results
+(~367/235/1544/320 req/s, ~187 ev/s) remain harness validation evidence only.
+
+- **Final qualification: UNBLOCKED** (next gate), NOT STARTED. Step 2.17B remains
   NOT APPROVED.
 - **PSP subset deferred:** `STEP 2.17B-PSP` until ADR-0015 ACCEPTED + 2.12B runtime +
   provider sandbox/contract evidence.
