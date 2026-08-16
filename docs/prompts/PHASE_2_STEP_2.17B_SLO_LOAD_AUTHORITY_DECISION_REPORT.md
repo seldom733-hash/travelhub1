@@ -345,10 +345,10 @@ persistence_status: PERSISTED
 persistence_sha: c51f080
 authority_base_sha: 2282521
 authority_decision_commit_sha: c51f080
-provenance_footer_commit_sha: N/A
-final_head_sha: N/A
-upstream_sha: N/A
-push_status: NOT_PUSHED
+provenance_footer_commit_sha: 1aafcda
+final_head_sha: 1aafcda
+upstream_sha: 1aafcda
+push_status: PUSHED
 harness_state: IMPLEMENTED (backend/src/perf/, 31 unit tests)
 harness_implementation_sha: 5baa743
 slo_authority_verdict: B — PARTIAL AUTHORITY
