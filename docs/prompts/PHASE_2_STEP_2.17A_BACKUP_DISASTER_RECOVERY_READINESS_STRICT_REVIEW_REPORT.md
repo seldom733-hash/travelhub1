@@ -518,8 +518,8 @@ reviewed_head_before_review_fixes: d873a44
 review_fix_commit_sha: 39d3134
 strict_review_commit_sha: 39d3134
 provenance_footer_commit_sha: 9eca2aa
-final_head_sha: 9eca2aa
-upstream_sha: 9eca2aa
+final_head_sha: 29c5b2d
+upstream_sha: 29c5b2d
 artifact_integrity: PASS=130 WARN=0 FAIL=0
 postgres_rpo_target: <=1h (APPROVED TARGET; capability NOT VERIFIED)
 postgres_rto_target: <=4h (APPROVED TARGET; capability NOT VERIFIED)
