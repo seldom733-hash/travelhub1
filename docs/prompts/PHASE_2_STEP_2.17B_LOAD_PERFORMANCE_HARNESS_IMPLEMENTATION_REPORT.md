@@ -374,17 +374,17 @@ REPOSITORY EVIDENCE
 
 repository: travelhub_v1
 branch: master
-head: WORKTREE
+head: 5baa743
 origin: 2861326
 worktree_clean: true (of my changes)
 migration_count: 58
 reviewed_state: IMPLEMENTATION
 reviewed_diff_base: 2861326
-reviewed_diff_head: <pending>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: 5baa743
+persistence_status: PERSISTED
+persistence_sha: 5baa743
 implementation_base_sha: 2861326
-implementation_commit_sha: <pending>
+implementation_commit_sha: 5baa743
 provenance_footer_commit_sha: <pending>
 final_head_sha: <pending>
 upstream_sha: <pending>
