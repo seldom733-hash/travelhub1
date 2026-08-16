@@ -385,10 +385,10 @@ persistence_status: PERSISTED
 persistence_sha: 5baa743
 implementation_base_sha: 2861326
 implementation_commit_sha: 5baa743
-provenance_footer_commit_sha: <pending>
-final_head_sha: <pending>
-upstream_sha: <pending>
-push_status: <pending>
+provenance_footer_commit_sha: acdfab1
+final_head_sha: acdfab1
+upstream_sha: acdfab1
+push_status: PUSHED
 load_tool: dependency-free Node harness (backend/src/perf/run.ts, global fetch)
 load_tool_version: 1.0.0
 harness_profiles: smoke/baseline/steady/peak/burst/soak/stress/paycreate/eventbus-recovery
