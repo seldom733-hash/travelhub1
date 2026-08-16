@@ -306,17 +306,17 @@ REPOSITORY EVIDENCE
 
 repository: travelhub_v1
 branch: master
-head: WORKTREE
+head: 25ea448
 origin: 20df68c
 worktree_clean: true (of my changes)
 migration_count: 58
 reviewed_state: AUTHORITY/DESIGN RECONCILIATION
 reviewed_diff_base: 20df68c
-reviewed_diff_head: <pending>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: 25ea448
+persistence_status: PERSISTED
+persistence_sha: 25ea448
 decision_base_sha: 20df68c
-reconciliation_commit_sha: <pending>
+reconciliation_commit_sha: 25ea448
 provenance_footer_commit_sha: <pending>
 final_head_sha: <pending>
 upstream_sha: <pending>
