@@ -460,13 +460,13 @@ worktree_clean: true (of my changes)
 migration_count: 58
 reviewed_state: AUTHORITY DECISION
 reviewed_diff_base: 63bd376
-reviewed_diff_head: 63bd376
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: 60ead9a
+persistence_status: PERSISTED
+persistence_sha: 60ead9a
 authority_base_sha: 63bd376
 previous_authority_decision_sha: c51f080
 harness_implementation_sha: 5baa743
-quantitative_authority_commit_sha: N/A
+quantitative_authority_commit_sha: 60ead9a
 provenance_footer_commit_sha: N/A
 final_head_sha: N/A
 upstream_sha: N/A
