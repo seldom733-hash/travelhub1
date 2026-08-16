@@ -231,18 +231,18 @@ provenance is complete. Review is NOT performed in this pass.
 
 repository: TravelHub (D:\travelhub_v1)
 branch: master
-head: <pending>
-origin: <pending>
+head: 8fc0f36
+origin: dacdd85
 worktree_clean: false (untracked prompt-файлы предыдущих шагов остаются — не мои)
 migration_count: 58 (canonical folders; dev DB has 3 legacy rows — documented)
 reviewed_state: COMMIT
 reviewed_diff_base: dacdd85
-reviewed_diff_head: <pending>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
-push_status: NOT_PUSHED
+reviewed_diff_head: 8fc0f36
+persistence_status: PERSISTED
+persistence_sha: 8fc0f36
+push_status: <pending>
 decision_base_sha: dacdd85
-authority_decision_commit_sha: <pending>
+authority_decision_commit_sha: 8fc0f36
 provenance_footer_commit_sha: <pending>
 final_head_sha: <pending>
 upstream_sha: <pending>
