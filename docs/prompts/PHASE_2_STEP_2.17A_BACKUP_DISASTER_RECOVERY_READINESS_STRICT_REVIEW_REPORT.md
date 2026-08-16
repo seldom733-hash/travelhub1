@@ -513,13 +513,13 @@ reviewed_diff_base: d873a44
 reviewed_diff_head: 39d3134
 persistence_status: PERSISTED
 persistence_sha: 39d3134
-push_status: <pending>
+push_status: PUSHED
 reviewed_head_before_review_fixes: d873a44
 review_fix_commit_sha: 39d3134
 strict_review_commit_sha: 39d3134
-provenance_footer_commit_sha: <pending>
-final_head_sha: <pending>
-upstream_sha: <pending>
+provenance_footer_commit_sha: 9eca2aa
+final_head_sha: 9eca2aa
+upstream_sha: 9eca2aa
 artifact_integrity: PASS=130 WARN=0 FAIL=0
 postgres_rpo_target: <=1h (APPROVED TARGET; capability NOT VERIFIED)
 postgres_rto_target: <=4h (APPROVED TARGET; capability NOT VERIFIED)
