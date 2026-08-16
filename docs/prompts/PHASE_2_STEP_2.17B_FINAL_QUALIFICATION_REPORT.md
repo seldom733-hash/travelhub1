@@ -472,13 +472,13 @@ worktree_clean: true (of my changes)
 migration_count: 58
 reviewed_state: QUALIFICATION
 reviewed_diff_base: 69515bd
-reviewed_diff_head: 69515bd
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: 6ced13a
+persistence_status: PERSISTED
+persistence_sha: 6ced13a
 qualification_base_sha: 69515bd
 quantitative_authority_sha: 60ead9a
 harness_implementation_sha: 5baa743
-qualification_evidence_commit_sha: N/A
+qualification_evidence_commit_sha: 6ced13a
 provenance_footer_commit_sha: N/A
 final_head_sha: N/A
 upstream_sha: N/A
