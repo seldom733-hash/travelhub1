@@ -24,6 +24,12 @@ export class LoginThrottleService {
     const now = Date.now();
     const cutoff = now - LoginThrottleService.WINDOW_MS;
     const list = (this.attempts.get(key) ?? []).filter((t) => t > cutoff);
+    // STRICT REVIEW FIX: bounded cleanup — ключ, чьё окно полностью истекло,
+    // удаляется (иначе Map растёт неограниченно при множестве различных
+    // username|ip-ключей на долгоживущем инстансе).
+    if (list.length === 0) {
+      this.attempts.delete(key);
+    }
     if (list.length >= LoginThrottleService.MAX_ATTEMPTS) {
       this.attempts.set(key, list);
       throw new TooManyRequestsError("Too many login attempts. Try again later.");

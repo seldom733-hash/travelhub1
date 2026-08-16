@@ -8,10 +8,13 @@ import { NextResponse, type NextRequest } from "next/server";
  * блокирует anonymous access на сервере: без cookie `travelhub.auth` → редирект
  * на /login?next=<path> (глубокие ссылки переживают refresh).
  *
- * Cookie зеркалит token из localStorage (lib/api.ts): ставится при login,
- * снимается при logout/401. Ролевая принадлежность (PARTNER vs internal)
- * проверяется клиентски в PartnerLayout/Shell; backend остаётся авторитетным.
- * Эта граница — первый барьер, не единственный.
+ * Step 2.17 (auth hardening): cookie `travelhub.auth` — серверная HttpOnly
+ * сессия (ставится при login/register, снимается при logout), JS её не читает.
+ * Здесь проверяется только НАЛИЧИЕ cookie (первый барьер, не security):
+ * валидность/revocation/роль проверяет backend на каждом API-запросе, а
+ * клиентский useCurrentUser через /auth/session уводит невалидную сессию на
+ * /login. Ролевая принадлежность (PARTNER vs internal) проверяется клиентски
+ * в PartnerLayout/Shell; backend остаётся авторитетным.
  *
  * Next.js 16: file convention `middleware.ts` deprecated → `proxy.ts` (тот же
  * API: NextRequest/NextResponse/cookies/matcher, named export `proxy`).

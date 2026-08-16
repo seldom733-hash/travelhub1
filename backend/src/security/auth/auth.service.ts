@@ -313,7 +313,14 @@ export class AuthService {
     }
     // Step 2.17: tokenVersion revocation. Токен, выданный до logout/revoke,
     // имеет старое tv — отклоняется, даже если JWT ещё не истёк.
-    if (tokenVersion !== undefined && user.tokenVersion !== tokenVersion) {
+    // STRICT REVIEW FIX: missing/legacy tv-claim трактуется как tv=0 (fail-safe).
+    // Раньше `tokenVersion !== undefined` пропускал токены БЕЗ tv-claim — после
+    // logout (tokenVersion=1) legacy-токен (без tv) оставался валидным, нарушая
+    // контракт «все ранее выданные JWT мгновенно 401». Теперь: legacy-токен
+    // работает только пока tokenVersion=0 (до первого logout); после ЛЮБОГО
+    // logout все токены без tv-claim отклоняются. Обратная совместимость
+    // сохранена (все токены, issued после 2.17, содержат tv).
+    if (user.tokenVersion !== (tokenVersion ?? 0)) {
       throw new UnauthorizedException("Session has been revoked");
     }
     return this.toAuthUser(user);

@@ -220,9 +220,17 @@ async emit(tx: Prisma.TransactionClient, write: OutboxWrite): Promise<string> {
 
   /**
    * Публикация накопившихся PENDING-событий подписчикам. Возвращает число
-   * опубликованных. `tx` — опциональный TransactionClient: worker (Step 2.17)
-   * прогоняет цикл внутри advisory-lock-транзакции, HTTP-пути вызывают без tx
-   * (оптимизация латентности; единственный eventual-delivery механизм — worker).
+   * опубликованных. `tx` — опциональный TransactionClient (для будущих
+   * вызывающих; сейчас НЕ используется — см. ниже).
+   *
+   * STRICT REVIEW FIX (док-синхронизация со стабилизацией worker-а): доставка
+   * НЕ выполняется внутри advisory-lock-транзакции worker-а — publishPending
+   * синхронно исполняет consumer-ов (длинные цепочки OrderRequested→Order→
+   * CommissionAccrual превышали 5s interactive-transaction timeout). Worker
+   * (OutboxWorkerService.runCycle) вызывает этот метод БЕЗ tx, вне lock-транзакции;
+   * HTTP-пути вызывают без tx (оптимизация латентности; единственный
+   * eventual-delivery механизм — worker). Идемпотентность повторной доставки —
+   * InboxEvent dedup (authoritative), не полагаемся на exactly-once.
    */
   async publishPending(limit = 100, tx?: Prisma.TransactionClient): Promise<number> {
     const db = tx ?? this.prisma;

@@ -3,9 +3,16 @@ import { isCorsOriginAllowed, parseCorsOrigins } from "./cors";
 
 describe("Step 2.17 — CORS allowlist (вместо origin:true)", () => {
   it("default (dev): http://localhost:3000; пустая строка → пустой allowlist (fail-closed)", () => {
-    expect(parseCorsOrigins(undefined)).toEqual(["http://localhost:3000"]);
+    expect(parseCorsOrigins(undefined, "development")).toEqual(["http://localhost:3000"]);
     // Явная пустая строка — НЕ default: пустой allowlist → все origins отклонены.
-    expect(parseCorsOrigins("")).toEqual([]);
+    expect(parseCorsOrigins("", "development")).toEqual([]);
+  });
+
+  it("production без CORS_ORIGINS → fail-closed (пустой allowlist), dev-default не утекает", () => {
+    expect(parseCorsOrigins(undefined, "production")).toEqual([]);
+    expect(parseCorsOrigins("", "production")).toEqual([]);
+    // Явный prod-список работает.
+    expect(parseCorsOrigins("https://app.example.com", "production")).toEqual(["https://app.example.com"]);
   });
 
   it("CSV-список парсится, пробелы обрезаются, пустые отбрасываются", () => {

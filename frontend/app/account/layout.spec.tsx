@@ -52,8 +52,8 @@ function renderLayout() {
 }
 
 beforeEach(() => {
-  window.localStorage.clear();
-  window.localStorage.setItem("travelhub.token", "jwt");
+  // Step 2.17 (auth hardening): сессия в HttpOnly cookie, а НЕ в localStorage —
+  // useCurrentUser замочен, localStorage-токен не существует и не используется.
   routerReplaceMock.mockClear();
 });
 
@@ -98,8 +98,7 @@ describe("BuyerAccountLayout (Step 1.13 §4)", () => {
     expect(routerReplaceMock).toHaveBeenCalledWith("/app/dashboard");
   });
 
-  it("anonymous (нет токена): нейтральный loading, никакой навигации кабинета (§28.3)", async () => {
-    window.localStorage.removeItem("travelhub.token");
+  it("anonymous (нет сессии): нейтральный loading, никакой навигации кабинета (§28.3)", async () => {
     useCurrentUserMock.mockReturnValue(null);
     await act(async () => {
       renderLayout();

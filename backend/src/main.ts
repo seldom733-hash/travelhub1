@@ -17,7 +17,12 @@ async function bootstrap(): Promise<void> {
   app.use(cookieParser());
   // Step 2.17: CORS allowlist вместо origin:true (cookie-сессии: credentials
   // только для явно разрешённых origins; НЕ wildcard).
-  const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGINS);
+  // STRICT REVIEW FIX: в production отсутствующий/пустой CORS_ORIGINS →
+  // fail-closed (пустой allowlist), dev-default не утекает в prod.
+  const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGINS, process.env.NODE_ENV);
+  if (process.env.NODE_ENV === "production" && corsOrigins.length === 0) {
+    console.warn("[cors] CORS_ORIGINS is not set — CORS fail-closed: all browser origins rejected");
+  }
   app.enableCors({ origin: corsOrigins, credentials: true });
   // Step 1.5: qs (extended) query parser — вложенные category-specific фильтры
   // public catalog: ?f[days]=7&f[language]=en → { f: { days: '7', language: 'en' } }.

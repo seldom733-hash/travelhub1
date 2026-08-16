@@ -20,6 +20,7 @@
 import "reflect-metadata";
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { JwtService } from "@nestjs/jwt";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { AppExceptionFilter } from "../src/shared/exception.filter";
@@ -125,6 +126,63 @@ describe("Step 2.17 — Auth hardening (e2e)", () => {
       .set("Authorization", `Bearer ${relogin.body.accessToken}`)
       .expect(200);
     expect(me.body.username).toBe(u.username);
+  });
+
+  it("токен БЕЗ tv-claim (legacy/missing): работает до logout (tv=0), инвалидируется ПОСЛЕ logout (fail-safe)", async () => {
+    const u = await registerBuyer("legacytv");
+    const userRow = await prisma.user.findUniqueOrThrow({ where: { username: u.username } });
+    expect(userRow.tokenVersion).toBe(0);
+    const jwt = app.get(JwtService);
+    // Legacy-токен: подписан БЕЗ tv-claim (как до Step 2.17).
+    const legacy = await jwt.signAsync({ sub: userRow.id, username: u.username, role: "BUYER" });
+
+    // До logout (tokenVersion=0): legacy-токен валиден (обратная совместимость).
+    await request(app.getHttpServer()).get("/api/v1/auth/me").set("Authorization", `Bearer ${legacy}`).expect(200);
+
+    // logout → tokenVersion=1.
+    await request(app.getHttpServer()).post("/api/v1/auth/logout").set("Authorization", `Bearer ${u.token}`).expect(200);
+
+    // После logout legacy-токен (missing tv → 0 ≠ 1) отклоняется — fail-safe.
+    await request(app.getHttpServer()).get("/api/v1/auth/me").set("Authorization", `Bearer ${legacy}`).expect(401);
+    // И public-проба /auth/session по legacy-токену → user:null (не раскрывает данные).
+    const session = await request(app.getHttpServer()).get("/api/v1/auth/session").set("Authorization", `Bearer ${legacy}`).expect(200);
+    expect(session.body.user).toBeNull();
+  });
+
+  it("concurrent logout: два параллельных logout-а не могут понизить tokenVersion (монотонный инкремент)", async () => {
+    const u = await registerBuyer("conc");
+    const tv0 = (await prisma.user.findUniqueOrThrow({ where: { username: u.username } })).tokenVersion;
+    // Два независимых authenticated logout-а (два токена одной сессии-эпохи невозможны
+    // после первого logout — используем свежий логин для второго вызова).
+    const relogin = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ username: u.username, password })
+      .expect(200);
+    const tok1 = relogin.body.accessToken as string;
+    const relogin2 = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ username: u.username, password })
+      .expect(200);
+    const tok2 = relogin2.body.accessToken as string;
+
+    // Параллельные logout-ы одной эпохи (одинаковый tv в обоих токенах):
+    // легитимная гонка — первый коммит инвалидирует второй mid-flight, поэтому
+    // второй может получить 401 (тоже отказ, не raw-500). Ни один запрос не
+    // должен упасть 500.
+    const [r1, r2] = await Promise.all([
+      request(app.getHttpServer()).post("/api/v1/auth/logout").set("Authorization", `Bearer ${tok1}`),
+      request(app.getHttpServer()).post("/api/v1/auth/logout").set("Authorization", `Bearer ${tok2}`),
+    ]);
+    expect([200, 401]).toContain(r1.status);
+    expect([200, 401]).toContain(r2.status);
+    expect(r1.status).not.toBe(500);
+    expect(r2.status).not.toBe(500);
+    const tvFinal = (await prisma.user.findUniqueOrThrow({ where: { username: u.username } })).tokenVersion;
+    expect(tvFinal).toBeGreaterThan(tv0); // монотонный инкремент, без понижения
+
+    // Оба старых токена теперь недействительны.
+    await request(app.getHttpServer()).get("/api/v1/auth/me").set("Authorization", `Bearer ${tok1}`).expect(401);
+    await request(app.getHttpServer()).get("/api/v1/auth/me").set("Authorization", `Bearer ${tok2}`).expect(401);
   });
 
   it("logout идемпотентен: повторная revoke-сессия безопасна, cookie очищается", async () => {

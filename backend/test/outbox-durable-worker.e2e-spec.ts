@@ -23,7 +23,7 @@ import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/prisma/prisma.service";
-import { EventBusService, OUTBOX_MAX_ATTEMPTS } from "../src/eventbus/eventbus.service";
+import { EventBusService, OUTBOX_MAX_ATTEMPTS, type OutboxEnvelope } from "../src/eventbus/eventbus.service";
 import { OutboxWorkerService } from "../src/eventbus/outbox-worker.service";
 import { DomainEvents } from "../src/eventbus/domain-events";
 import { createRequestId, runWithRequestContext } from "../src/shared/request-context";
@@ -40,6 +40,32 @@ describe("Step 2.17 — Outbox durable worker (e2e)", () => {
   const flakyConsumer = () => {
     if (failNext) throw new Error("injected worker consumer failure");
   };
+  // Идемпотентный dedup-consumer (Inbox authoritative), production-паттерн:
+  // P2002 по inbox unique (consumerId+eventId) — легитимная гонка двух
+  // одновременных доставок → no-op (не raw-ошибка). Регистрируется на ОБОИХ
+  // шинах (T-A): кто бы ни опубликовал событие, side effect считается ровно
+  // один раз.
+  const dedupConsumer = async (envelope: OutboxEnvelope) => {
+    try {
+      await prisma.$transaction(async (tx) => {
+        if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: CONSUMER, eventId: envelope.eventId } } })) return;
+        sideEffects++;
+        await tx.inboxEvent.create({ data: { consumerId: CONSUMER, eventId: envelope.eventId } });
+      });
+    } catch (err) {
+      if (typeof err === "object" && err !== null) {
+        const e = err as { code?: string; meta?: { target?: unknown } };
+        if (e.code === "P2002" && Array.isArray(e.meta?.target) && (e.meta.target as string[]).includes("consumerId") && (e.meta.target as string[]).includes("eventId")) return;
+      }
+      throw err;
+    }
+  };
+
+  // T-A: второй worker-«инстанс» — отдельный Prisma-клиент (отдельное
+  // соединение), отдельный EventBusService и OutboxWorkerService на той же БД.
+  let prisma2: PrismaService;
+  let eventBus2: EventBusService;
+  let worker2: OutboxWorkerService;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -54,20 +80,21 @@ describe("Step 2.17 — Outbox durable worker (e2e)", () => {
     await prisma.inboxEvent.deleteMany({ where: { consumerId: CONSUMER } });
 
     eventBus.on(DomainEvents.OrderRequested, flakyConsumer);
-    eventBus.on(DomainEvents.OrderRequested, async (envelope) => {
-      if (await eventBus.isProcessed(CONSUMER, envelope.eventId)) return;
-      await prisma.$transaction(async (tx) => {
-        if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: CONSUMER, eventId: envelope.eventId } } })) return;
-        sideEffects++;
-        await tx.inboxEvent.create({ data: { consumerId: CONSUMER, eventId: envelope.eventId } });
-      });
-    });
+    eventBus.on(DomainEvents.OrderRequested, dedupConsumer);
+
+    // Второй инстанс (отдельные соединения, та же БД) — конкуренция за pg
+    // advisory xact lock между двумя worker-ами.
+    prisma2 = new PrismaService();
+    eventBus2 = new EventBusService(prisma2);
+    eventBus2.on(DomainEvents.OrderRequested, flakyConsumer);
+    eventBus2.on(DomainEvents.OrderRequested, dedupConsumer);
+    worker2 = new OutboxWorkerService(prisma2, eventBus2);
   });
 
   afterAll(async () => {
     // Реальный OrderRequestedConsumer (AppModule) обрабатывает наши события и
     // создаёт Order в общей БД — чистим их (shared-DB isolation для serial e2e).
-    const saleRefs = ["sale-pending-1", "sale-retry-1", "sale-poison-1"];
+    const saleRefs = ["sale-pending-1", "sale-retry-1", "sale-poison-1", "sale-race-1", "sale-crash-1", "sale-chain-1"];
     const orders = await prisma.order.findMany({ where: { saleId: { in: saleRefs } }, select: { id: true } });
     if (orders.length > 0) {
       const ids = orders.map((o) => o.id);
@@ -88,6 +115,7 @@ describe("Step 2.17 — Outbox durable worker (e2e)", () => {
       WHERE "consumerId" IN ('order-requested-consumer', 'commission-accrual-consumer')
         AND "eventId" NOT IN (SELECT id FROM "events"."OutboxEvent")
     `);
+    await prisma2.$disconnect();
     await app.close();
   });
 
@@ -217,5 +245,78 @@ describe("Step 2.17 — Outbox durable worker (e2e)", () => {
     expect(first.lockAcquired).toBe(true);
     // Оба вызова завершились корректно; ни один не «упал» из-за конкуренции за lock.
     expect(typeof second.lockAcquired).toBe("boolean");
+  });
+
+  it("T-A: два worker-инстанса (раздельные соединения, одна БД) — race за advisory lock без raw-ошибки и без дубликата side effect", async () => {
+    failNext = true;
+    const eventId = await emitOrder("race-1");
+    const before = sideEffects;
+    // Оба цикла стартуют одновременно — конкурентная гонка за pg advisory xact lock.
+    const [r1, r2] = await Promise.all([worker.runCycle(), worker2.runCycle()]);
+    // Ожидаемая гонка — НЕ raw-ошибка: оба вернули результат.
+    expect(typeof r1.lockAcquired).toBe("boolean");
+    expect(typeof r2.lockAcquired).toBe("boolean");
+    // Хотя бы один инстанс владел lock (flip + попытка публикации).
+    expect(r1.lockAcquired || r2.lockAcquired).toBe(true);
+    const row = await prisma.outboxEvent.findUniqueOrThrow({ where: { id: eventId } });
+    expect(row.status).toBe("FAILED"); // инжектированная consumer-ошибка
+    expect(row.error).toContain("injected worker consumer failure");
+    expect(row.attempts).toBeGreaterThanOrEqual(1);
+    expect(sideEffects).toBe(before); // во время FAILED side effect не выполнен
+
+    // Детерминированный recovery: flip с now за пределами backoff-окна (если событие
+    // уже PENDING — flip no-op), затем race двух инстансов НА ДОСТАВКЕ одного
+    // PENDING-события — ровно один side effect (Inbox dedup authoritative),
+    // без raw-ошибки. Backoff-математика покрыта unit (eventbus.retry.spec).
+    failNext = false;
+    await eventBus.retryFailed(100, new Date(Date.now() + 5000));
+    const mid = await prisma.outboxEvent.findUniqueOrThrow({ where: { id: eventId } });
+    expect(mid.status).toBe("PENDING"); // flip закоммичен, доставка ещё не началась
+
+    const [f1, f2] = await Promise.all([worker.runCycle(), worker2.runCycle()]);
+    expect(typeof f1.lockAcquired).toBe("boolean");
+    expect(typeof f2.lockAcquired).toBe("boolean");
+    const final = await prisma.outboxEvent.findUniqueOrThrow({ where: { id: eventId } });
+    expect(final.status).toBe("PUBLISHED");
+    expect(sideEffects).toBe(before + 1); // ровно одна доставка side effect
+  });
+
+  it("T-B: crash-окно FAILED→PENDING (только flip) до доставки — событие восстанавливается следующим циклом", async () => {
+    failNext = true;
+    const eventId = await emitOrder("crash-1");
+    await worker.runCycle(); // FAILED (инжектированная ошибка)
+    failNext = false;
+    const before = sideEffects;
+
+    // Имитация crash-окна: только flip (retryFailed), доставка ещё не произошла
+    // (worker упал между flip и publishPending).
+    const flipped = await eventBus.retryFailed(100, new Date());
+    expect(flipped).toBeGreaterThanOrEqual(1);
+    const mid = await prisma.outboxEvent.findUniqueOrThrow({ where: { id: eventId } });
+    expect(mid.status).toBe("PENDING"); // flip закоммичен, доставки не было
+
+    // Следующий цикл worker-а доставляет (recovery без потери и без дубликата).
+    const r = await worker.runCycle();
+    expect(r.published).toBeGreaterThanOrEqual(1);
+    const final = await prisma.outboxEvent.findUniqueOrThrow({ where: { id: eventId } });
+    expect(final.status).toBe("PUBLISHED");
+    expect(sideEffects).toBe(before + 1); // ровно одна доставка side effect
+  });
+
+  it("T-G/T-H: nested цепочка OrderRequested→Order→OrderCreated (реальный consumer) через worker-цикл", async () => {
+    const eventId = await emitOrder("chain-1");
+    await worker.runCycle();
+
+    // Реальный OrderRequestedConsumer создал Order из frozen snapshot payload.
+    const order = await prisma.order.findUnique({ where: { saleId: "sale-chain-1" } });
+    expect(order).toBeTruthy();
+    // OrderCreated эмитится PENDING атомарно с Order; вложенный publishPending
+    // (вне lock-транзакции после стабилизации) доставил его → PUBLISHED.
+    const oc = await prisma.outboxEvent.findFirst({ where: { eventType: "OrderCreated", aggregateId: order!.id } });
+    expect(oc).toBeTruthy();
+    expect(oc!.status).toBe("PUBLISHED");
+    // Исходное OrderRequested — PUBLISHED (не зависло в FAILED/PENDING).
+    const orig = await prisma.outboxEvent.findUniqueOrThrow({ where: { id: eventId } });
+    expect(orig.status).toBe("PUBLISHED");
   });
 });
