@@ -1,9 +1,17 @@
 # Load & Performance Qualification — Runbook (Step 2.17B)
 
-> STATUS: HARNESS IMPLEMENTED (2026-08-16). Tool = dependency-free Node harness
-> (`backend/src/perf/run.ts`, run via `npx ts-node`). Commands below are real and were
-> validated live against an isolated `travelhub_perf_*` database. Do not execute against
-> production.
+> STATUS: HARNESS IMPLEMENTED (2026-08-16); **FINAL QUALIFICATION = VERDICT C
+> (INVALID/INCOMPLETE)** — valid verdict against the approved matrix not available due to
+> harness capability gaps (no arrival-rate pacing; warm-up flag not wired; SMALL-only
+> dataset; no sustained payment/booking/login/EventBus-steady profiles; recovery seed
+> hardcoded 250 + worker-interval override; no 2-app HTTP multi-instance). Executed subset
+> (steady/peak/burst/soak max-effort, paycreate, eventbus-recovery) PASSED with 0
+> unexpected statuses. Report:
+> `docs/prompts/PHASE_2_STEP_2.17B_FINAL_QUALIFICATION_REPORT.md`; NEXT = harness
+> remediation, then re-qualification against unchanged frozen targets. Tool = dependency-free
+> Node harness (`backend/src/perf/run.ts`, run via `npx ts-node`). Commands below are real
+> and were validated live against an isolated `travelhub_perf_*` database. Do not execute
+> against production.
 
 ## 0. Quantitative SLO/load authority state (2026-08-16) — VERDICT A (APPROVED)
 

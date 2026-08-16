@@ -579,6 +579,52 @@ None of these are Phase 2 gates unless separately approved.
 - harness: IMPLEMENTED (dependency-free `backend/src/perf/`, 31 unit/integration tests);
 - exploratory baseline: MEASURED (localhost, isolated DB — NOT authority);
 - quantitative SLO/load authority: VERDICT A — APPROVED (2026-08-16, §33);
-- correctness-under-load: HARD GATE PASS on all live scenarios;
-- final qualification: NOT STARTED — UNBLOCKED (next gate);
+- correctness-under-load: HARD GATE PASS on all executed scenarios;
+- final qualification: EXECUTED → **VERDICT C — INVALID/INCOMPLETE** (see §36);
 - Step 2.17B: NOT APPROVED; strict review: NOT STARTED; PSP subset: DEFERRED (ADR-0015 + 2.12B).
+
+## 36. Final qualification result (2026-08-16) — VERDICT C (INVALID/INCOMPLETE)
+
+Qualification pass: `docs/prompts/PHASE_2_STEP_2.17B_FINAL_QUALIFICATION_REPORT.md`.
+
+Executed honestly against the frozen authority matrix on a dedicated isolated perf DB
+(localhost, PG 18.4, Node v24.18.0, 12 vCPU):
+
+| Executed subset | Result |
+|---|---|
+| Steady 15 min (max-effort) | 225,270 req, 250 req/s, 0 unexpected, correctness PASS |
+| Peak 15 min (max-effort) | 330,656 req, 367 req/s, 0 unexpected, correctness PASS |
+| Burst 60 s (max-effort) | 51,766 req, 863 req/s, 0 unexpected, correctness PASS |
+| Soak 30 min (max-effort, conc 250) | 558,609 req, 310 req/s, 0 unexpected, correctness PASS |
+| payment.create (one-shot) | 7 facts + 5 business no-ops, 0 duplicate, 0 raw 500, nested chain inbox 8/8 |
+| EventBus recovery (as harness supports) | 250→250, drain 1.3 s, poison isolated, 2-instance 100/100 |
+
+**Verdict C — INVALID/INCOMPLETE.** A valid verdict against the approved matrix is NOT
+available because the current harness cannot execute required gates (proven gaps, NOT
+system failures; harness NOT modified per qualification rules):
+
+1. no arrival-rate pacing — the loader is a max-effort concurrency pool (gates "@ 50/100/200
+   RPS" cannot be driven);
+2. `--warmup` flag parsed but never applied; warm-up profile-fixed ≤ 2 s (5-min warm-up
+   not requestable);
+3. dataset generator only SMALL per-run scale (authority dataset >= 1,000 users etc. not
+   supported);
+4. payment.create sustained 2/10 RPS — one-shot scenario only;
+5. Booking/Order sustained 6/20 RPS — no write profile;
+6. login sustained 2/5 RPS — 5 one-shot probes only;
+7. EventBus steady 100 ev/s — no generation scenario;
+8. EventBus burst 1,000 — `SEED_COUNT = 250` hardcoded;
+9. EventBus recovery 5,000 / 2 workers / canonical config — 250 seed + hardcoded
+   `OUTBOX_WORKER_INTERVAL_MS=200/500` override (violates canonical-config rule);
+10. multi-instance 2 app + 2 worker with HTTP — only 2 worker instances in eventbus phase;
+11. soak 30 min @ 50 RPS — duration/concurrency executed, 50 RPS pacing not emitted.
+
+Observations (no fix in this pass): **OBS-1** Class B (sales.list) p95 degrades with load
+(428 ms @ 250 req/s → 1,533 ms @ 367 req/s → 2,427 ms @ 310 req/s / conc 250) —
+classification `DATABASE QUERY / CONNECTION POOL CONTENTION`, root cause NOT yet proven,
+routed to remediation; **OBS-2** paycreate cleanup leaves 24 PUBLISHED event rows (registry
+scope); **OBS-3** worker-interval override must be made canonical-config; **OBS-4** two
+runs invalidated by orchestration/session boundaries (recorded, not hidden).
+
+Step 2.17B remains NOT APPROVED. NEXT = QUALIFICATION HARNESS/ENVIRONMENT REMEDIATION
+(separate prompt), then re-execution against the unchanged frozen targets.
