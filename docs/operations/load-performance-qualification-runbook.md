@@ -1,9 +1,9 @@
 # Load & Performance Qualification — Runbook (Step 2.17B)
 
-> STATUS: AUTHORITY/DESIGN RECONCILIATION (2026-08-16). This runbook is a DESIGN — the load
-> tool is NOT selected yet (§11 criteria), the harness is NOT implemented, and no commands
-> below assume a specific tool. `<TOOL>`/`<SCENARIO>` placeholders are resolved at
-> implementation time. Do not execute against production.
+> STATUS: HARNESS IMPLEMENTED (2026-08-16). Tool = dependency-free Node harness
+> (`backend/src/perf/run.ts`, run via `npx ts-node`). Commands below are real and were
+> validated live against an isolated `travelhub_perf_*` database. Do not execute against
+> production.
 
 ## 1. Prerequisites
 
@@ -12,20 +12,25 @@
 - Backend env: `DATABASE_URL` → isolated DB; `OUTBOX_WORKER_INTERVAL_MS`/`OUTBOX_WORKER_BATCH`
   defaults (2000 ms / 100) unless a scenario explicitly varies them and records it.
 - MinIO/S3 up if media-bearing scenarios run (public media, storefront assets).
-- Load tool selected per `docs/architecture/load-performance-qualification-2.17B.md` §11
-  and installed as dev-dependency in `backend/` (NOT installed in this pass).
-- Synthetic credentials/users dataset generator (no PII, no PAN/CVV, no production JWTs).
+- Harness: `backend/src/perf/run.ts` (dependency-free; `npm run perf:run`). No third-party
+  load tool is installed.
+- Synthetic credentials/users dataset generator built into the harness (no PII, no PAN/CVV,
+  no production JWTs).
 
 ## 2. Isolated environment
 
 ```bash
-# create isolated DB (names: travelhub_perf_<run-id>)
-# apply migrations: npx prisma migrate deploy
-# confirm migrate status + drift 0 before any load
+# from backend/
+PERF_DB="travelhub_perf_$(date +%H%M%S)"
+PGPASSWORD=postgres psql -h localhost -U postgres -c "DROP DATABASE IF EXISTS \"$PERF_DB\" WITH (FORCE)" -c "CREATE DATABASE \"$PERF_DB\""
+export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/$PERF_DB"
+npx prisma migrate deploy   # 58 canonical migrations
+npx prisma migrate status   # must be up to date
 ```
 
 - Shared dirty test state is FORBIDDEN as capacity evidence — fresh DB per qualification run.
-- Record machine characteristics (CPU/RAM/OS/Node/PostgreSQL versions) in run metadata.
+- Record machine characteristics (CPU/RAM/OS/Node/PostgreSQL versions) — the harness emits
+  them automatically into `environment.json` (secrets scrubbed).
 
 ## 3. Seed / reset
 
@@ -43,12 +48,21 @@
 
 ## 5. Scenario execution order
 
-```text
-SMOKE → BASELINE → STEADY → PEAK → BURST → SOAK → STRESS/BREAKPOINT → RECOVERY
+```bash
+npx ts-node src/perf/run.ts --profile=smoke  --run-id=<id>
+npx ts-node src/perf/run.ts --profile=baseline --run-id=<id>
+npx ts-node src/perf/run.ts --profile=paycreate --run-id=<id>          # idempotency concurrency
+npx ts-node src/perf/run.ts --profile=eventbus-recovery --run-id=<id>   # burst drain + multi-instance
+npx ts-node src/perf/run.ts --profile=burst --run-id=<id>
+npx ts-node src/perf/run.ts --profile=soak --run-id=<id> --duration=30000
+npx ts-node src/perf/run.ts --profile=stress --stress --run-id=<id>     # explicit opt-in
 ```
 
-Each scenario records: purpose, duration, concurrency/arrival model, dataset, metrics,
-correctness assertions, pass/fail semantics (`docs/architecture/load-performance-qualification-2.17B.md` §23).
+Order: SMOKE → BASELINE → STEADY → PEAK → BURST → SOAK → STRESS/BREAKPOINT → RECOVERY.
+The harness boots the app in-process against the isolated DB, seeds deterministic synthetic
+data, runs the profile, validates correctness against authoritative DB state and cleans up.
+Each scenario records: purpose, duration, concurrency, dataset, metrics, correctness
+assertions, pass/fail semantics (§23 of the design doc).
 
 ## 6. Capture metrics
 
@@ -80,9 +94,11 @@ After each scenario (and at soak milestones):
 
 ## 10. Archive result metadata
 
-Per-run results directory under `docs/performance/results/` (run-id per run): `summary.json`
-(env metadata, scenario, thresholds, pass/fail, commit SHA, timestamps) and optional CSV
-files (not committed by default).
+Artifacts are written automatically by the harness to `backend/artifacts/performance/<run-id>/`
+(gitignored): `summary.json` (verdict: harnessExecution/correctness/measurement/
+sloQualification), `environment.json` (env metadata, secrets scrubbed), `scenario.json`
+(steps/params), `correctness.json` (checks + verdict). Summary measurements may be copied
+into the implementation report; bulky raw artifacts are never committed.
 
 ## 11. Abort criteria
 

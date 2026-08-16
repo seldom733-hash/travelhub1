@@ -1,8 +1,8 @@
 # Load & Performance Qualification — Step 2.17B (Authority / Design Reconciliation)
 
-> STATUS: AUTHORITY/DESIGN RECONCILIATION (2026-08-16) — harness implementation NOT started.
-> Verdict A: harness/design MAY PROCEED with non-authoritative exploratory profiles; FINAL
-> qualification against approved SLO/load targets requires authority.
+> STATUS: HARNESS IMPLEMENTATION COMPLETED (2026-08-16) — EXPLORATORY BASELINE MEASURED.
+> Final qualification against approved SLO/load targets still requires authority;
+> Step 2.17B remains NOT APPROVED.
 
 ## 1. Purpose
 
@@ -42,9 +42,11 @@ improvising them. This document is the repository-backed contract for that imple
 
 ## 3. Repository inventory (verified 2026-08-16)
 
-- **Load tooling:** 0 — no k6/artillery/autocannon/wrk/vegeta/jmeter/locust/gatling in
-  `backend/package.json` or `frontend/package.json`; no `benchmark`/`load-test` scripts; no
-  perf docs prior to this file. Evidence: repo-wide search + `TRAVELHUB_PHASE_2_CRITICAL_PLATFORM_RISKS_AND_PAYMENT_PSP_READINESS_RECONCILIATION_REPORT.md` §10.
+- **Load tooling:** 0 third-party — no k6/artillery/autocannon/wrk/vegeta/jmeter/locust/gatling
+  in `backend/package.json` or `frontend/package.json`; no third-party load dependency was
+  added. The Step 2.17B harness (`backend/src/perf/`) is a **dependency-free Node harness**
+  (global fetch, deterministic seeded PRNG, pure percentile math) — no lockfile change.
+  Evidence: repo-wide search + `TRAVELHUB_PHASE_2_CRITICAL_PLATFORM_RISKS_AND_PAYMENT_PSP_READINESS_RECONCILIATION_REPORT.md` §10.
 - **Metrics/observability:** 0 — no prom-client/OpenTelemetry/Grafana/Prometheus; no
   `/metrics` endpoint; no event-loop-lag or query-duration instrumentation.
 - **SLO/SLI numbers:** 0 — no approved quantitative SLO anywhere (see §26 authority table).
@@ -148,15 +150,24 @@ count, worker instance count, DB isolation (dedicated DB, not shared dirty state
 relevance, test machine characteristics, env vars, debug/logging mode (log level recorded —
 see §34), seed state, MinIO/object dependencies if exercised, git commit SHA, timestamps.
 
-## 11. Tooling decision criteria
+## 11. Tooling decision (DECIDED 2026-08-16)
 
-Candidate families (k6 / autocannon / Artillery / Node-native harness). Selection at
-implementation time, NOT in this pass, by criteria:
-- scriptable, deterministic, concurrency + arrival-rate modelling;
-- latency percentiles + thresholds + JSON/structured output;
-- CI-friendly for smoke gates; can send auth cookies/headers and `Idempotency-Key`;
-- scenario modelling (ramp/burst/soak);
-- no new dependency installed in this pass.
+**Dependency-free Node harness** (`backend/src/perf/`, Node global `fetch`) was selected over
+k6 / autocannon / Artillery.
+
+Why: (1) zero new dependency — no lockfile change, no binary download, deterministic and
+Windows-native; (2) full control over auth bootstrap, `Idempotency-Key` handling, outcome
+classification and post-run correctness validation in one process; (3) the repository already
+favours dependency-free operational scripts (`dr-backup.mjs` / `dr-restore-drill.mjs`);
+(4) scenario modelling (warm-up, concurrency, duration, per-request closures) is native code.
+
+Rejected: k6 (Go binary dependency, richer but heavier than needed for exploratory
+platform baseline), autocannon (needs an orchestrator anyway for auth/idempotency scenarios),
+Artillery (dependency + scenario DSL; same orchestrator need).
+
+Selection criteria (from the authority/design pass) are all met: scriptable, deterministic
+(seeded PRNG), concurrency control, p50/p95/p99/max, structured JSON artifacts, auth
+headers/cookies + `Idempotency-Key`, CI-safe smoke, Windows-compatible.
 
 ## 12. EventBus scenarios (measurable, semantic preserved)
 
@@ -322,7 +333,43 @@ but does NOT block harness construction; prior reconciliation classifies 2.17B a
 harness implementation; final qualification against approved targets requires the authority
 decision. Final Step 2.17B APPROVED status is forbidden before authority + measurement.
 
-## 31. Related steps
+## 31. Harness implementation status (2026-08-16)
+
+Implemented in `backend/src/perf/` (dependency-free, Node 24 global fetch):
+
+- `run.ts` — CLI orchestrator: config parse (fail-closed) → safe-target guard → boots the
+  real Nest application in-process against an isolated DB → deterministic synthetic seed →
+  profile execution → post-run correctness validator → structured artifacts → cleanup.
+- `lib/guard.ts` — safe-target guard (fail-closed): NODE_ENV=production refuse; canonical/
+  production-like DB names refuse (`travelhub1`, `*_prod*`, `postgres`, `template*`);
+  non-local DB/base URL require `--allow-non-local`; `stress` requires `--stress`.
+- `lib/loader.ts` — concurrent fetch pool: warm-up excluded from measurement, per-label
+  p50/p95/p99/max, outcome classification, throughput.
+- `lib/classify.ts` — expected vs unexpected 4xx/409/429/5xx/timeout/transport.
+- `lib/seed.ts` + `lib/correctness.ts` — deterministic synthetic datasets (run-prefixed,
+  tracked, deleted in dependency order) + authoritative DB-state validator.
+- `lib/config.ts` — profiles SMOKE/BASELINE/STEADY/PEAK/BURST/SOAK/STRESS (exploratory
+  numbers, visibly non-authoritative) + special profiles `paycreate` (external idempotency
+  concurrency) and `eventbus-recovery` (burst PENDING → drain, poison isolation,
+  multi-instance).
+- `perf-harness.spec.ts` — 31 unit/integration tests (guard, classification, percentiles,
+  redaction, config fail-closed, loader end-to-end against a local HTTP server).
+
+Live exploratory validation (isolated `travelhub_perf_*` DB, localhost, 2026-08-16):
+
+| Profile | Result | Notes |
+|---|---|---|
+| SMOKE | 3669 req, 367 req/s, 0 unexpected | 4 route classes |
+| BASELINE | 2351 req, 235 req/s, 0 unexpected | 6 route classes incl. crm/customers |
+| PAYCREATE | 7 facts / 8 orders, 0 raw 500 | 10 unique keys → 5 facts + 5 business no-ops; concurrent identical 4×201 → 1 fact; divergent 1×201+1×409; slots=12=7+5 |
+| EVENTBUS | 250 seeded → 250 published, drain 1335 ms, 187 ev/s | poison isolated; multi-instance 100/100 |
+| BURST | 7720 req (~1544 req/s), 0 unexpected | concurrency 40 |
+| SOAK (30 s) | 9591 req (~320 req/s), 0 unexpected | short exploratory |
+
+All measurements are EXPLORATORY / HARNESS VALIDATION — NOT production SLOs, NOT
+capacity targets. Artifacts: `backend/artifacts/performance/<run-id>/*.json` (gitignored).
+
+## 32. Related steps
 
 - Step 2.17 (hardening) — APPROVED; worker/CI/auth foundations this step builds on.
 - Step 2.17A (Backup/DR) — APPROVED WITH REVIEW FIXES; independent gate.

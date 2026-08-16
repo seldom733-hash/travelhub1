@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:e2e": "jest --config test/jest-e2e.json --runInBand",
+    "perf:run": "ts-node src/perf/run.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",

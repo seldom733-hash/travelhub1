@@ -50,3 +50,6 @@ uploads/
 backend/.backups/
 *.dump
 *.dump.sha256
+
+# Step 2.17B perf harness run artifacts (generated, bulk) — never commit by default
+backend/artifacts/performance/
