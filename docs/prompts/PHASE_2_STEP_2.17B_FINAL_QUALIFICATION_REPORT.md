@@ -479,10 +479,10 @@ qualification_base_sha: 69515bd
 quantitative_authority_sha: 60ead9a
 harness_implementation_sha: 5baa743
 qualification_evidence_commit_sha: 6ced13a
-provenance_footer_commit_sha: N/A
-final_head_sha: N/A
-upstream_sha: N/A
-push_status: NOT_PUSHED
+provenance_footer_commit_sha: f135d94
+final_head_sha: f135d94
+upstream_sha: f135d94
+push_status: PUSHED
 checker_regression: 13/13
 backend_regression: tsc 0, build PASS, unit 714/714, serial e2e 1194/1194 (69 suites)
 frontend_regression: tsc 0, vitest 135/135, build PASS
