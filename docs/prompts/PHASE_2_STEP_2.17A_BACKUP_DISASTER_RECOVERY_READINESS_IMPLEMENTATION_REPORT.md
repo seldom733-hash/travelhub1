@@ -2,11 +2,13 @@
 
 ## 1. Verdict
 
-**`PHASE 2 STEP 2.17A TECHNICAL IMPLEMENTATION COMPLETED — RPO/RTO DECISION REQUIRED BEFORE APPROVAL`**
+**`PHASE 2 STEP 2.17A IMPLEMENTATION COMPLETED — RPO/RTO/RETENTION AUTHORITY APPROVED — WAITING FOR STRICT REVIEW`**
 
 Technical readiness is complete and executable (backup + isolated restore drill proven end-to-end).
-Approval is gated on a business/operations RPO/RTO authority decision, which does not exist in the
-repository (classification B per prompt §4).
+The RPO/RTO/retention authority gap has since been closed by a separate authority-decision pass
+(`docs/prompts/PHASE_2_STEP_2.17A_RPO_RTO_RETENTION_AUTHORITY_DECISION_REPORT.md`): PostgreSQL
+RPO≤1h / RTO≤4h, Media RPO≤24h / RTO≤8h, retention daily=30d / monthly=12mo — approved as targets,
+not capability evidence. Strict Review is NOT STARTED; Step 2.17A is not marked APPROVED.
 
 ## 2. Baseline
 
@@ -41,19 +43,20 @@ Full matrix in runbook §2. Key facts:
 
 ## 5. Authority classification
 
-**RPO/RTO/retention/PITR — classification B (no approved authority).**
-Repository-wide search for `RPO`, `RTO`, recovery point/time, retention, PITR found no approved
-business-continuity targets — only references to retention as future debt (ADR-0010, analytics docs).
+At implementation time: **classification B (no approved authority existed)** — repository-wide
+search found no approved business-continuity targets. That gap is now closed by the authority
+decision pass (2026-08-16):
 
 ```text
-RPO: TBD — BUSINESS/OPERATIONS AUTHORITY REQUIRED
-RTO: TBD — BUSINESS/OPERATIONS AUTHORITY REQUIRED
-retention: TBD — OPERATIONS/LEGAL/BUSINESS AUTHORITY REQUIRED
-PITR: NOT CURRENTLY VERIFIED / PROVIDER-DEPENDENT
+PostgreSQL: RPO ≤ 1 hour / RTO ≤ 4 hours — APPROVED TARGETS
+Media/Object Storage: RPO ≤ 24 hours / RTO ≤ 8 hours — APPROVED TARGETS
+retention: daily = 30 days / monthly = 12 months — APPROVED TARGETS
+PITR: NOT VERIFIED / provider-dependent; production requires verified mechanism capable of RPO≤1h
 ```
 
-Options prepared (none approved): daily full dump (~24h window), hourly+WAL/PITR (minutes window,
-infra implication), continuous replication (provider-dependent).
+Options prepared (none selected): daily full dump (~24h window), hourly+WAL/PITR (minutes window,
+infra implication), continuous replication (provider-dependent). Approved target ≠ implemented
+capability ≠ verified capability.
 
 ## 6. PostgreSQL backup contract — CRITICAL HARD GATE: PASS
 
@@ -148,13 +151,35 @@ documented (no secret manager selected); not invented. PSP secrets deferred (ADR
 Git remote is source-recovery authority only when history is pushed (HEAD == upstream verified).
 Migrations/config versioned where safe; secrets not. Unpushed worktree ≠ DR-safe — documented.
 
-## 17. RPO — TBD (authority)
+## 17. RPO — APPROVED TARGET ≤ 1 hour (PostgreSQL) / ≤ 24 hours (Media)
 
-## 18. RTO — TBD (authority)
+Authority decision (2026-08-16) records these as approved Business/Operations targets, not
+implemented capability. A full dump interval capable of losing >1h is insufficient by itself
+for production RPO≤1h. Historical measurements preserved above (§8): local backup ~0.9s,
+restore ~2–4s — test evidence only.
 
-## 19. Retention — TBD (authority)
+## 18. RTO — APPROVED TARGET ≤ 4 hours (PostgreSQL) / ≤ 8 hours (Media)
 
-## 20. PITR — NOT CURRENTLY VERIFIED / PROVIDER-DEPENDENT
+Authority decision (2026-08-16). Measured local isolated restore (~4–6s) proves procedure
+viability only, not production RTO. Future verification must include realistic DB size, backup
+location/network, restore infrastructure, migrations, integrity verification, app startup,
+EventBus recovery and operational overhead.
+
+## 19. Retention — APPROVED TARGET daily = 30 days / monthly = 12 months
+
+Authority decision (2026-08-16). Backup retention only — not automatically application/legal/
+accounting/audit/PSP/immutable retention. Exact monthly day/storage tier/provider mechanism may
+be chosen later while meeting the target.
+
+## 20. PITR — NOT VERIFIED / PROVIDER-DEPENDENT
+
+```text
+PITR implementation: NOT VERIFIED
+provider: NOT SELECTED / provider-dependent
+production requirement: verified mechanism capable of PostgreSQL RPO≤1h
+```
+
+Not rewritten as "PITR implemented".
 
 ## 21. Backup security / immutability
 
@@ -255,9 +280,13 @@ ADR-0015 preserved; RLS deferral preserved.
 
 ## 33. Unresolved decisions
 
-- RPO/RTO/retention/PITR authority — **BLOCKING approval** (business/operations decision required).
+- RPO/RTO/retention authority — **RESOLVED** (approved targets; decision report
+  `docs/prompts/PHASE_2_STEP_2.17A_RPO_RTO_RETENTION_AUTHORITY_DECISION_REPORT.md`).
+- PITR/equivalent mechanism — NOT VERIFIED / provider-dependent; selection + verification pending
+  (required for production RPO≤1h).
 - Secret manager selection — gap documented.
 - Object-storage backup provider/contract — provider authority required before production dependence.
+- Strict Review for Step 2.17A — NOT STARTED.
 
 ## 34. Persistence
 
@@ -265,12 +294,11 @@ ADR-0015 preserved; RLS deferral preserved.
 
 ## 35. Release
 
-`RELEASE: NOT PERFORMED — STRICT REVIEW / AUTHORITY DECISION REQUIRED`
+`RELEASE: NOT APPLICABLE — DOCUMENTATION / AUTHORITY DECISION (implementation pass)`
 
 ## 36. NEXT
 
-`STEP 2.17A — RPO/RTO AUTHORITY DECISION` (authority gate precedes strict review),
-then `PHASE 2 — STEP 2.17A — STRICT REVIEW`.
+`PHASE 2 — STEP 2.17A — STRICT REVIEW` (authority gate resolved; strict review NOT STARTED).
 
 ---
 

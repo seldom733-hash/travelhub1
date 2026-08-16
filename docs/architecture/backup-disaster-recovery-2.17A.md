@@ -24,21 +24,39 @@ See runbook §2 (`docs/operations/backup-disaster-recovery-runbook.md`). All can
 AUTHORITATIVE; media objects AUTHORITATIVE non-reconstructable; secrets EXTERNAL AUTHORITY
 (gap documented); Git source RECONSTRUCTABLE when pushed.
 
-## 4. RPO/RTO authority
+## 4. RPO/RTO authority — APPROVED TARGETS
 
-**Classification B — no approved authority exists.**
+Business/Operations recovery objectives approved by this project pass (2026-08-16; decision
+report `docs/prompts/PHASE_2_STEP_2.17A_RPO_RTO_RETENTION_AUTHORITY_DECISION_REPORT.md`):
 
-- `RPO: TBD — BUSINESS/OPERATIONS AUTHORITY REQUIRED`
-- `RTO: TBD — BUSINESS/OPERATIONS AUTHORITY REQUIRED`
-- `retention: TBD — OPERATIONS/LEGAL/BUSINESS AUTHORITY REQUIRED`
-- `PITR: NOT CURRENTLY VERIFIED / PROVIDER-DEPENDENT`
+| State | RPO | RTO |
+|---|---:|---:|
+| Canonical PostgreSQL transactional state | **≤ 1 hour** | **≤ 4 hours** |
+| Authoritative Media / Object Storage | **≤ 24 hours** | **≤ 8 hours** |
 
-Measured restore time ≠ RTO; test backup interval ≠ RPO. Options prepared (none approved):
-- daily full `pg_dump` — ~24h window, simplest;
-- hourly + WAL/PITR — minutes window, requires provider/ops authority and infra;
-- continuous replication — provider-dependent.
+Backup retention:
+- daily recoverable backups: **30 days**;
+- designated monthly recoverable backups: **12 months**.
 
-Decision required from business/operations **before Step 2.17A approval**.
+**Hard semantic rule:** `APPROVED TARGET ≠ IMPLEMENTED CAPABILITY ≠ VERIFIED CAPABILITY`.
+- PostgreSQL RPO≤1h is an APPROVED TARGET, not current capability evidence.
+- PITR = NOT YET VERIFIED / provider-dependent.
+- Local isolated restore ~4–6 s = TEST EVIDENCE, not production RTO proof.
+
+Capability implication:
+```text
+Production PostgreSQL MUST use a selected and verified recovery mechanism capable of RPO≤1h.
+Candidate classes: WAL/PITR, managed PostgreSQL PITR, or technically equivalent verified mechanism.
+A full dump interval capable of losing >1h is insufficient by itself for production RPO≤1h.
+```
+
+RTO≤4h verification must eventually include realistic DB size, backup location/network, restore
+infrastructure, migrations, integrity verification, app startup, EventBus recovery and operational
+overhead. Retention is backup retention, not automatically application/legal/accounting/audit/PSP/
+immutable retention; exact monthly day/storage tier/provider mechanism may be chosen later while
+meeting the target. Secrets are NOT placed into ordinary backups; one compromised application
+credential must not be able to destroy both live state and all recoverable backups (implementation
+provider/infrastructure-dependent). Capability-gap matrix: runbook §16b.
 
 ## 5. PostgreSQL backup contract
 
@@ -97,6 +115,8 @@ Equal → no-op; older backup → `prisma migrate deploy`; newer DB than code �
 
 ## 14. Verdict
 
-Technical readiness complete; approval gated on RPO/RTO authority decision.
+Technical readiness complete and executable (backup + isolated restore drill proven end-to-end);
+RPO/RTO/retention authority now APPROVED as targets (not capability evidence). Strict Review is
+**NOT STARTED** — Step 2.17A is not marked APPROVED.
 
-`PHASE 2 STEP 2.17A TECHNICAL IMPLEMENTATION COMPLETED — RPO/RTO DECISION REQUIRED BEFORE APPROVAL`
+`PHASE 2 STEP 2.17A IMPLEMENTATION COMPLETED — RPO/RTO/RETENTION AUTHORITY APPROVED — WAITING FOR STRICT REVIEW`

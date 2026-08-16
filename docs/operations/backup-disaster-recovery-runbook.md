@@ -1,6 +1,6 @@
 # TravelHub — Backup & Disaster Recovery Runbook (Step 2.17A)
 
-Status: **TECHNICAL IMPLEMENTATION COMPLETED — RPO/RTO DECISION REQUIRED BEFORE APPROVAL**
+Status: **IMPLEMENTATION COMPLETED — RPO/RTO/RETENTION AUTHORITY APPROVED — WAITING FOR STRICT REVIEW**
 
 ## 1. Purpose & scope
 
@@ -9,8 +9,9 @@ This runbook defines the canonical Backup & Disaster Recovery (DR) readiness for
 recovery, EventBus/outbox/inbox recovery, financial-state recovery, secrets/config recovery,
 restore safety and integrity checks.
 
-It does **not** define business continuity targets — those require business/operations
-authority (see §16).
+Business continuity targets are defined by the approved Business/Operations authority
+(§3, §16) — PostgreSQL RPO≤1h / RTO≤4h, Media RPO≤24h / RTO≤8h, retention daily=30d /
+monthly=12mo — as targets, not implemented-capability evidence.
 
 ## 2. State inventory
 
@@ -28,17 +29,24 @@ authority (see §16).
 | secrets/config (backend/.env) | EXTERNAL AUTHORITY (no secret manager selected) | local/gitignored | recovery source = secure env management (§14) | — |
 | Git source | RECONSTRUCTABLE (pushed history) | remote | only if history pushed | clone |
 
-## 3. RPO/RTO — authority
+## 3. RPO/RTO — authority (APPROVED TARGETS)
 
-**No approved RPO/RTO/retention authority exists in the repository** (searched docs/, README, ADRs).
+Approved Business/Operations recovery objectives (2026-08-16; decision report
+`docs/prompts/PHASE_2_STEP_2.17A_RPO_RTO_RETENTION_AUTHORITY_DECISION_REPORT.md`):
 
-- `RPO: TBD — BUSINESS/OPERATIONS AUTHORITY REQUIRED`
-- `RTO: TBD — BUSINESS/OPERATIONS AUTHORITY REQUIRED`
-- `retention: TBD — OPERATIONS/LEGAL/BUSINESS AUTHORITY REQUIRED`
-- `PITR: NOT CURRENTLY VERIFIED / PROVIDER-DEPENDENT`
+| State | RPO | RTO |
+|---|---:|---:|
+| Canonical PostgreSQL transactional state | **≤ 1 hour** | **≤ 4 hours** |
+| Authoritative Media / Object Storage | **≤ 24 hours** | **≤ 8 hours** |
 
-Measured restore time is **not** an approved RTO. Test backup interval is **not** an approved RPO.
-Decision record: `docs/architecture/backup-disaster-recovery-2.17A.md` §16.
+Retention: daily recoverable backups **30 days**; designated monthly recoverable backups **12 months**.
+
+**Hard semantic rule:** `APPROVED TARGET ≠ IMPLEMENTED CAPABILITY ≠ VERIFIED CAPABILITY`.
+- PostgreSQL RPO≤1h = APPROVED TARGET; PITR = NOT YET VERIFIED / provider-dependent;
+  production PostgreSQL MUST use a verified mechanism capable of RPO≤1h (dump-only insufficient).
+- RTO≤4h = APPROVED TARGET; measured local restore time is **not** production RTO proof.
+- Retention = backup retention, not legal/accounting/audit/PSP/immutable retention.
+- Decision record: `docs/architecture/backup-disaster-recovery-2.17A.md` §4.
 
 ## 4. PostgreSQL backup contract
 
@@ -151,11 +159,28 @@ No monitoring platform selected — contract/ownership defined only; no new plat
 
 ## 16. RPO/RTO authority decision record
 
-- No approved RPO/RTO/retention authority exists.
-- **Decision required from business/operations before Step 2.17A approval.**
-- Options prepared (none approved): daily full backup (~24h data-loss window, simple),
-  hourly+WAL/PITR (minutes window, infra implication), continuous replication (provider-dependent).
-- Until a decision: `RPO: TBD`, `RTO: TBD`, `retention: TBD`, `PITR: NOT VERIFIED`.
+- **APPROVED (2026-08-16):** PostgreSQL RPO≤1h / RTO≤4h; Media/Object Storage RPO≤24h / RTO≤8h;
+  retention daily=30d / monthly=12mo. All are approved **targets**, not capability evidence.
+- PITR: NOT VERIFIED / provider-dependent. Production PostgreSQL requires a verified mechanism
+  capable of RPO≤1h (candidate classes: WAL/PITR, managed PostgreSQL PITR, or equivalent).
+- Daily full `pg_dump` alone is insufficient for production RPO≤1h.
+- RTO verification remains future work: realistic DB size, backup location/network, restore
+  infrastructure, migrations, integrity verification, app startup, EventBus recovery, operational overhead.
+
+## 16b. Capability gap matrix
+
+| objective | approved target | current evidence | production capability verified? | remaining owner | verification step |
+|---|---|---|---|---|---|
+| PostgreSQL RPO | ≤ 1h | local backup ~1s; drill restore works | NO (dump-only insufficient alone) | Ops + provider authority | select & verify PITR-equivalent mechanism capable of RPO≤1h |
+| PostgreSQL RTO | ≤ 4h | isolated restore ~4–6 s (TEST EVIDENCE) | NO (not RTO proof) | Ops | full-scale restore drill (size/network/infra/migrations/app/EventBus) |
+| Media/Object storage RPO | ≤ 24h | contract defined (provider-neutral) | NO | Ops + provider authority | provider backup/replication contract verified |
+| Media/Object storage RTO | ≤ 8h | contract defined | NO | Ops + provider authority | provider restore procedure verified |
+| daily retention | 30d | target approved | NO | Ops | scheduled-job + recovery verification |
+| monthly retention | 12mo | target approved | NO | Ops | designated monthly backups + recovery verification |
+| PITR / equivalent | verified mechanism capable of RPO≤1h | NOT VERIFIED | NO | Ops + provider authority | mechanism selection + verification |
+| backup immutability | one compromised credential must not destroy live + all backups | MISSING (gap documented) | NO | Ops + provider authority | immutable/off-account storage implementation |
+| secret/key recovery | secure env management | `backend/.env` only (no secret manager) | NO | Ops | secret manager selection + rotation drill |
+| monitoring/alerting | backup failure visibility | evidence contract only | NO | Ops | monitoring platform + alert path |
 
 ## 17. PSP / card-data boundary
 
