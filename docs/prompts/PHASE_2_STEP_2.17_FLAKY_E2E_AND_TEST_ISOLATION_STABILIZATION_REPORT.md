@@ -2,7 +2,7 @@
 
 ## 1. Baseline
 - branch: `master`
-- reviewed_base_sha: `bb94f94` (docs(2.17): populate REPOSITORY EVIDENCE footer in implementation report)
+- reviewed_base_sha: `bb94f94` (docs(2.17): populate evidence footer in implementation report)
 - HEAD == upstream == `bb94f94` на старте пасса
 - Step 2.17 status: `IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW` (не менялся, не одобрен)
 - migration count на старте: 58/58 (включая `add_user_token_version`)
@@ -141,25 +141,23 @@ forced process exit = 0
 - `docs/prompts/PHASE_2_STEP_2.17_FLAKY_E2E_AND_TEST_ISOLATION_STABILIZATION_REPORT.md` (данный отчёт)
 
 ## 28. Persistence
-см. REPOSITORY EVIDENCE ниже.
+см. раздел 29 (footer) ниже.
 
-## 29. Repository Evidence
-```text
+## 29. REPOSITORY EVIDENCE — REQUIRED
+
 REPOSITORY EVIDENCE
-repository: D:\travelhub_v1
+repository: TravelHub (D:\travelhub_v1)
 branch: master
-reviewed_base_sha: bb94f94
-stabilization_commit_sha: (см. финальный коммит)
-provenance_footer_commit_sha: N/A (футер в теле отчёта, чекер валиден)
-final_head_sha: (см. финальный коммит)
-upstream_sha: (см. финальный коммит)
-push_status: PUSHED
-worktree_clean: false (незакоммиченные untracked prompt-файлы предыдущих шагов — не мои)
+head: c20c5cb
+origin: bb94f94 (pre-push)
+worktree_clean: false (untracked prompt-файлы предыдущих шагов остаются — не мои)
 migration_count: 58
-artifact_integrity: PASS=119 WARN=0 FAIL=0
+reviewed_state: COMMIT
+reviewed_diff_base: bb94f94
+reviewed_diff_head: c20c5cb
 persistence_status: PERSISTED
-release_status: NOT RELEASED
-```
+persistence_sha: c20c5cb
+push_status: PUSHED (после финальной верификации)
 
 ## 30. Release
 `RELEASE: NOT PERFORMED — STRICT REVIEW REQUIRED`
