@@ -67,19 +67,36 @@ export class OutboxWorkerService implements OnApplicationBootstrap, OnApplicatio
   /**
    * Один bounded-цикл: retry FAILED → publish PENDING.
    * Возвращает { retried, published, lockAcquired } для тестов/наблюдаемости.
+   *
+   * FIX (Step 2.17 e2e stabilization, root-cause B): доставка НЕ выполняется
+   * внутри advisory-lock-транзакции. publishPending() синхронно исполняет
+   * consumer-ов (OrderRequested → Order создание → вложенный publishPending →
+   * CommissionAccrual и т.д.) — это превышает 5s interactive-transaction
+   * timeout („expired transaction“), событие остаётся FAILED/PENDING и
+   * последующие суиты видят лишний retryable-FAILED. Поэтому:
+   *  - ТОЛЬКО flip retryable-FAILED→PENDING атомарен под lock (короткая tx,
+   *    retryFailed — findMany+update, без consumer-исполнения);
+   *  - publishPending() вызывается ВНЕ lock-транзакции (тот же путь, что в
+   *    HTTP-командах; InboxEvent dedup — authoritative защита от duplicate
+   *    side effect; повторная доставка идемпотентна).
+   *  - lockAcquired=true в цикле с flip; при конкуренции за lock — false.
    */
   async runCycle(): Promise<{ retried: number; published: number; lockAcquired: boolean }> {
-    return this.prisma.$transaction(async (tx) => {
+    // Шаг 1: сериализация цикла — короткая tx: try-lock + flip retryable FAILED.
+    const flip = await this.prisma.$transaction(async (tx) => {
       const [{ locked }] = await tx.$queryRaw<{ locked: boolean }[]>`
         SELECT pg_try_advisory_xact_lock(hashtext(${OutboxWorkerService.WORKER_LOCK_KEY})) AS locked
       `;
-      if (!locked) return { retried: 0, published: 0, lockAcquired: false };
-
+      if (!locked) return { locked: false as const, retried: 0 };
       const retried = await this.eventBus.retryFailed(this.batchSize, new Date(), tx);
-      const published = await this.eventBus.publishPending(this.batchSize, tx);
-      this.logger.log(`outbox cycle: retried=${retried} published=${published}`);
-      return { retried, published, lockAcquired: true };
+      return { locked: true as const, retried };
     });
+    if (!flip.locked) return { retried: 0, published: 0, lockAcquired: false };
+
+    // Шаг 2: доставка вне lock-транзакции (безопасно по длительности; dedup — Inbox).
+    const published = await this.eventBus.publishPending(this.batchSize);
+    this.logger.log(`outbox cycle: retried=${flip.retried} published=${published}`);
+    return { retried: flip.retried, published, lockAcquired: true };
   }
 
   /** Текущая наблюдаемость бэклогов (PENDING/FAILED/retryable-exhausted). */

@@ -34,6 +34,16 @@
 - **Multi-instance safety**: каждый цикл берёт pg advisory xact lock
   (`pg_try_advisory_xact_lock(hashtext('travelhub:outbox-worker'))`) внутри
   транзакции — только один инстанс исполняет цикл за раз, конкуренты скипают.
+- **Lock-tx scope (Step 2.17 e2e stabilization, root-cause B):** под
+  advisory-lock-транзакцией выполняется ТОЛЬКО атомарный flip retryable
+  FAILED→PENDING (короткая tx, без исполнения consumer-ов). Доставка
+  (`publishPending`) выполняется ВНЕ lock-транзакции: publishPending синхронно
+  исполняет consumer-ов (OrderRequested → Order создание → вложенный
+  publishPending → CommissionAccrual и т.д.), что превышает 5s
+  interactive-transaction timeout → „expired transaction“ → событие оставалось
+  FAILED/PENDING. Вынос доставки за пределы lock-tx устраняет это
+  (InboxEvent dedup остаётся authoritative защитой от duplicate side effect;
+  повторная доставка идемпотентна).
 - **Controlled errors**: исключения цикла логируются, worker не падает.
 - **No tight loop**: интервал, не занятой цикл; `timer.unref()` — процесс не
   держится таймером.

@@ -78,6 +78,16 @@ describe("Step 2.17 — Outbox durable worker (e2e)", () => {
     }
     await prisma.outboxEvent.deleteMany({ where: { eventType: { in: [DomainEvents.ProductPublished, DomainEvents.OrderRequested] } } });
     await prisma.inboxEvent.deleteMany({ where: { consumerId: CONSUMER } });
+    // Harness hygiene: наши OrderRequested обрабатываются ТАКЖЕ реальными
+    // consumer-ами AppModule (order-requested-consumer → Order/OrderCreated →
+    // commission-accrual-consumer). Их Inbox-записи для наших (уже удалённых)
+    // событий — сироты в общей БД: удаляем (не влияет на другие суиты, т.к.
+    // их события на месте).
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM "events"."InboxEvent"
+      WHERE "consumerId" IN ('order-requested-consumer', 'commission-accrual-consumer')
+        AND "eventId" NOT IN (SELECT id FROM "events"."OutboxEvent")
+    `);
     await app.close();
   });
 
