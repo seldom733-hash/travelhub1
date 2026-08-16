@@ -358,13 +358,13 @@ worktree_clean: true (of my changes)
 migration_count: 58
 reviewed_state: HARNESS_REMEDIATION_ROUND_2
 reviewed_diff_base: 0c28a8d23d857e893b73281aaed7cb1adea9aba7
-reviewed_diff_head: <filled after commit>
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
+reviewed_diff_head: fc8c7ef
+persistence_status: PERSISTED
+persistence_sha: fc8c7ef
 base_sha: 0c28a8d23d857e893b73281aaed7cb1adea9aba7
 previous_qualification_sha: fadc9a8 (→ 4e4f519 → 5fd9d63 → 0c28a8d)
-remediation_round2_commit_sha: <filled after commit>
-provenance_footer_commit_sha: <filled after commit>
+remediation_round2_commit_sha: fc8c7ef
+provenance_footer_commit_sha: <filled after footer commit>
 final_head_sha: <filled after push>
 upstream_sha: <filled after push>
 push_status: <filled after push>
