@@ -305,13 +305,13 @@ Per canonical Roadmap after approval: Step 2.17A (Backup/DR) / Step 2.17B (Load/
 
 repository: TravelHub (D:\travelhub_v1)
 branch: master
-head: WORKTREE
+head: 84fea62
 origin: d0e8a09
 worktree_clean: false (untracked prompt-файлы предыдущих шагов остаются — не мои)
 migration_count: 58
 reviewed_state: COMMIT
 reviewed_diff_base: beb7aef
 reviewed_diff_head: d0e8a09
-persistence_status: NOT_PERSISTED
-persistence_sha: N/A
-push_status: PENDING (после финальной верификации)
+persistence_status: PERSISTED
+persistence_sha: 84fea62
+push_status: PUSHED (после финальной верификации)
