@@ -74,7 +74,7 @@ function flag(name, def) {
   const i = args.indexOf(name);
   return i >= 0 && args[i + 1] ? args[i + 1] : def;
 }
-const backupFile = resolve(flag("--backup", ""));
+const backupFile = flag("--backup", "") ? resolve(flag("--backup", "")) : "";
 const targetOverride = flag("--target", "");
 const keep = args.includes("--keep");
 const yes = args.includes("--yes");
@@ -91,8 +91,11 @@ function isProtected(name) {
 
 // SAFETY-FIRST: target safety guards run BEFORE any backup-file handling.
 const target = targetOverride || `travelhub_dr_drill_${Date.now()}`;
-if (isProtected(target)) {
+// Refuse if the target equals the canonical DB from DATABASE_URL — derived from
+// actual config, not only a static list (protects against renamed canonical DBs).
+if (isProtected(target) || target.toLowerCase() === canonicalDb.toLowerCase()) {
   console.error(`[dr-restore-drill] REFUSED: target "${target}" is a protected/canonical name — aborting`);
+  console.error(`  canonical DB: ${canonicalDb}`);
   process.exit(3);
 }
 if (!yes) {
@@ -105,16 +108,48 @@ if (!/^[a-z_][a-z0-9_]*$/i.test(target)) {
   process.exit(3);
 }
 
-if (!backupFile || !existsSync(backupFile)) {
-  console.error("[dr-restore-drill] missing or invalid --backup file");
+if (!backupFile || !existsSync(backupFile) || !backupFile.endsWith(".dump")) {
+  console.error("[dr-restore-drill] missing or invalid --backup file (expected a .dump artifact)");
   process.exit(2);
 }
 
 // Split DATABASE_URL into connection parts (no secret printing).
-const u = new URL(url);
-const pgUrl = url; // pg tools accept the full URL via -d
 const t0 = Date.now();
 let timings = {};
+let targetCreated = false;
+
+/** Best-effort DROP of the isolated target after a failure. Safe: the target
+ * already passed all fail-closed guards (protected-name/bare-name/--yes).
+ * Never touches the canonical DB. */
+function cleanupIsolatedTarget() {
+  if (!targetCreated) return;
+  const r2 = spawnSync(psql, ["-d", adminUrl, "-c", `DROP DATABASE IF EXISTS "${target}" WITH (FORCE)`], { encoding: "utf8" });
+  if (r2.status === 0) {
+    console.log(`  cleanup: dropped ${target} (after failure)`);
+  } else {
+    console.warn(`  cleanup WARN: could not drop ${target} after failure: ${r2.stderr?.slice(0, 400)}`);
+  }
+}
+
+/** Persist drill evidence (no secrets) — also on failure paths. */
+function writeEvidence(result, note) {
+  try {
+    const evidenceFile = join(BACKEND_ROOT, ".backups", `drill-evidence-${Date.now()}.json`);
+    writeFileSync(evidenceFile, JSON.stringify({
+      backup: backupFile,
+      target,
+      checksum: typeof actual !== "undefined" ? actual : null,
+      checksum_algorithm: "sha256",
+      timings_ms: timings,
+      result,
+      note: note ?? undefined,
+      ts: new Date().toISOString(),
+    }, null, 2));
+    console.log(`  evidence: ${evidenceFile}`);
+  } catch (err) {
+    console.warn(`  evidence WARN: could not write evidence: ${err.message}`);
+  }
+}
 
 console.log(`[dr-restore-drill] backup: ${backupFile}`);
 console.log(`[dr-restore-drill] target (isolated): ${target}  (canonical: ${canonicalDb})`);
@@ -142,8 +177,10 @@ let r = spawnSync(psql, ["-d", adminUrl, "-v", "ON_ERROR_STOP=1", "-c", `CREATE 
 if (r.status !== 0) {
   console.error("[dr-restore-drill] FAILED: could not create isolated target DB");
   console.error(r.stderr?.slice(0, 1200));
+  writeEvidence("FAILED", "target DB create failed");
   process.exit(5);
 }
+targetCreated = true;
 timings.create = Date.now() - t0;
 
 // 3. Restore (custom format; --no-owner/--no-privileges for isolated drill).
@@ -154,6 +191,8 @@ timings.restore = Date.now() - tRestore;
 if (r.status !== 0) {
   console.error("[dr-restore-drill] FAILED: pg_restore exited non-zero");
   console.error(r.stderr?.slice(0, 2000));
+  cleanupIsolatedTarget();
+  writeEvidence("FAILED", "pg_restore failed");
   process.exit(6);
 }
 
@@ -203,6 +242,8 @@ try {
   console.log(`  migrations_folder_expected: ${folderMigs.length}`);
 } catch (err) {
   console.error("[dr-restore-drill] FAILED: integrity verification: " + err.message);
+  cleanupIsolatedTarget();
+  writeEvidence("FAILED", "integrity verification failed");
   process.exit(7);
 }
 timings.verify = Date.now() - tVerify;
@@ -216,6 +257,8 @@ try {
   console.log(`  smoke: active users=${smokeUser}, tokenVersion set=${smokeToken}, outbox PENDING=${smokeOutboxPending}`);
 } catch (err) {
   console.error("[dr-restore-drill] FAILED: smoke check: " + err.message);
+  cleanupIsolatedTarget();
+  writeEvidence("FAILED", "smoke check failed");
   process.exit(8);
 }
 timings.smoke = Date.now() - tSmoke;
@@ -239,15 +282,4 @@ if (!keep) {
   console.log(`  cleanup: --keep set, target left as ${target}`);
 }
 
-// Persist drill evidence (no secrets).
-const evidenceFile = join(BACKEND_ROOT, ".backups", `drill-evidence-${Date.now()}.json`);
-writeFileSync(evidenceFile, JSON.stringify({
-  backup: backupFile,
-  target,
-  checksum: actual,
-  checksum_algorithm: "sha256",
-  timings_ms: timings,
-  result: "PASSED",
-  ts: new Date().toISOString(),
-}, null, 2));
-console.log(`  evidence: ${evidenceFile}`);
+writeEvidence("PASSED", null);

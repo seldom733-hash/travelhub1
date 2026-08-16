@@ -15,7 +15,7 @@
  */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync, readdirSync, rmSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -92,6 +92,15 @@ const r = spawnSync(pgDump, argsDump, { encoding: "utf8", env: { ...process.env,
 if (r.status !== 0) {
   console.error("[dr-backup] FAILED: pg_dump exited non-zero");
   if (r.stderr) console.error(r.stderr.slice(0, 2000));
+  // Remove any partial artifact pg_dump may have left (no sidecar was written).
+  if (existsSync(artifact)) {
+    try {
+      rmSync(artifact, { force: true });
+      console.error(`  removed partial artifact: ${artifact}`);
+    } catch (e) {
+      console.error(`  WARN: could not remove partial artifact: ${e.message}`);
+    }
+  }
   process.exit(r.status ?? 1);
 }
 

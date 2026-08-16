@@ -73,7 +73,13 @@ provider/infrastructure-dependent). Capability-gap matrix: runbook §16b.
 2. verify backup checksum sidecar (missing/mismatch → refuse);
 3. create isolated DB; 4. restore; 5. verify schemas/migrations/data; 6. smoke; 7. timings; 8. cleanup.
 
-Proven by unit tests `src/ops/dr-scripts.spec.ts` (4 fail-closed guards) and live drill evidence.
+Failure paths are safe and observable: if restore/verify/smoke fails after the isolated target was
+created, the drill best-effort DROPs that target (guards already passed — production/canonical DBs
+are never touched), persists `FAILED` evidence, and exits non-zero. `dr-backup.mjs` removes any
+partial artifact on pg_dump failure (no sidecar for partial output).
+
+Proven by unit tests `src/ops/dr-scripts.spec.ts` (10 fail-closed/adversarial guards) and live
+drill evidence (success + failure paths).
 
 ## 7. Integrity checks (derived from actual schema)
 

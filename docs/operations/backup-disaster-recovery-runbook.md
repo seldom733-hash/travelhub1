@@ -79,6 +79,11 @@ Fail-closed guards (all proven by unit tests `src/ops/dr-scripts.spec.ts`):
 Drill steps: validate target → create isolated DB → restore → verify schemas/migrations/data →
 read-only smoke → record timings → cleanup (DROP) unless `--keep`.
 
+Failure paths are also cleaned up: if restore/verify/smoke fails after the isolated target DB was
+created, the drill best-effort DROPs that target (guards already passed — canonical/production DBs
+are never touched) and persists FAILED evidence before exiting non-zero. A failed `pg_dump` removes
+any partial artifact (no sidecar is written for partial output).
+
 ## 6. Restore integrity checks
 
 Verified by the drill against the actual schema:
@@ -154,6 +159,10 @@ Cache-only rebuild/flush on recovery. No authoritative Redis state exists today.
 
 Evidence contract (per backup/drill):
 `exit status · timestamp · artifact id/path · size · checksum (sha256) · duration · restore-test status · owner/alert path`.
+
+The restore drill persists evidence on **both success and failure** (`result: PASSED|FAILED` +
+note) into `backend/.backups/drill-evidence-*.json`. A failed drill cleans up its isolated target
+and exits non-zero, so failure is observable via exit code + evidence + absence of orphan target.
 
 No monitoring platform selected — contract/ownership defined only; no new platform built.
 
