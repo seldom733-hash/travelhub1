@@ -158,3 +158,26 @@ The burst gate **remains FAIL on load application only**: 134 of 300 scheduled c
 - Workstream C: **FIXED + VERIFIED** (p95 553–601ms vs 4,337ms; correctness 9/9; payment 2/10 RPS no regression).
 - Workstream B: all app-side root causes **proven and fixed** (BusinessSequence convoy eliminated — 50-way nextCode 5ms; pool 20; per-event delivery; in-tx reads; complete 8.9s → 1.4s; aborts → 0; steady 6 chains/s PASS 120/120; burst 134/300, p95 6.9s, 0 failures, 0 dup, 1:1 convergence) — but the burst gate's **load application remains FAIL (134/300)** due to a **proven environment/machine-level residual** (pool-insensitive, handler/guards fast, trivial route fast, worsens with connections). The remaining blocker is environmental, not an application defect.
 - Step 2.17B is **NOT declared APPROVED**. Handoff: Final Re-Qualification Round 3 requires the environment precondition (§J.1) or an authority decision, then a full re-run of the frozen matrix on the final code.
+
+---
+
+## 47. REPOSITORY EVIDENCE
+
+```text
+repository: travelhub_v1 (local canonical identity)
+branch: master
+head: 1913d7f
+origin: 1913d7f
+worktree_clean: true (of my changes; untracked diagnostic/run artifacts remain on disk)
+migration_count: 58
+reviewed_state: REMEDIATION
+reviewed_diff_base: ef90335
+reviewed_diff_head: 1913d7f
+persistence_status: PERSISTED
+persistence_sha: 1913d7f
+remediation_verdict: REMEDIATION PARTIAL — NOT READY FOR ROUND 3 (booking burst gate FAIL on load application; environment/machine-level residual, §J.1)
+workstream_a: FIXED + VERIFIED (backlog 16 ≤ 100; oldest ~150ms ≤ 10s)
+workstream_c: FIXED + VERIFIED (p95 553–601ms ≤ 1,000ms; correctness 9/9)
+workstream_b: SYSTEM FIXES PROVEN (Hi/Lo 5ms; pool 20; publishEvent; in-tx read; steady 120/120); burst 134/300 — gate remains FAIL
+push_status: PUSHED (HEAD == upstream)
+```
