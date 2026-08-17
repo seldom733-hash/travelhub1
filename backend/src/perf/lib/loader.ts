@@ -272,7 +272,14 @@ async function runPacedWindow(opts: {
     maxConcurrencyObserved = Math.max(maxConcurrencyObserved, inFlight);
     const baseUrl = baseUrls[n % baseUrls.length];
     try {
-      const req = await makeRequest(n);
+      // Warm-up and measurement windows MUST share one monotonically increasing
+      // identity stream: the previous code passed the window-relative `n` (which
+      // restarts at 0 for every window), so paced warm-up and measurement issued
+      // IDENTICAL idempotency keys (e.g. `pay-0`, `pay-1` …) — warm-up slots were
+      // counted as reached but reused in measurement, making the idempotency-slot
+      // correctness check formally fail even when the system is fully correct.
+      // `iteration.n` is the per-run global counter (also used by max-effort mode).
+      const req = await makeRequest(iteration.n++);
       const sample = await executeOnce({ baseUrl, req, requestTimeoutMs });
       recordSample({ ...sample, routeClass: req.routeClass }, baseUrl);
     } finally {

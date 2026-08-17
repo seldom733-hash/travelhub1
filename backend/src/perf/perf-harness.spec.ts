@@ -428,6 +428,62 @@ describe("perf paced loader — wall-clock scheduling, not completion-rate", () 
     // Measurement window ≈ 500ms @ 50 rps = 25 requests.
     expect(result.totalRequests).toBeGreaterThanOrEqual(20);
   });
+
+  it("warm-up and measurement use DISJOINT identity streams (namespace disjointness)", async () => {
+    // §13 harness-defect fix: warm-up keys must never collide with measurement
+    // keys (paced windows previously restarted `n` at 0 → identical idempotency
+    // keys → warm-up slots formally invalidated the payment gate).
+    const seen: number[] = [];
+    await runLoad({
+      baseUrl: `http://127.0.0.1:${port}`,
+      concurrency: 8,
+      durationMs: 400,
+      warmupMs: 250,
+      mode: "paced",
+      targetRps: 40,
+      makeRequest: (n: number) => {
+        seen.push(n);
+        return { label: "ping", method: "GET", path: "/", expected: [200] };
+      },
+      seed: 7,
+    });
+    // warmup ∪ measurement = one monotonic, non-repeating stream: no identity is
+    // ever reused across the two windows, so idempotency keys are disjoint by
+    // construction (warmupSlotSet ∩ measurementSlotSet = ∅).
+    expect(new Set(seen).size).toBe(seen.length);
+    for (let i = 1; i < seen.length; i++) expect(seen[i]).toBeGreaterThan(seen[i - 1]);
+    expect(seen[0]).toBe(0);
+    // Both windows really executed: identities span warm-up AND measurement.
+    expect(seen.length).toBeGreaterThan(10);
+  });
+
+  it("deterministic run-scoped namespaces: same seed, same identity sequence", async () => {
+    const ids = async (seed: number): Promise<number[]> => {
+      const seen: number[] = [];
+      await runLoad({
+        baseUrl: `http://127.0.0.1:${port}`,
+        concurrency: 4,
+        durationMs: 300,
+        warmupMs: 200,
+        mode: "paced",
+        targetRps: 30,
+        makeRequest: (n: number) => {
+          seen.push(n);
+          return { label: "ping", method: "GET", path: "/", expected: [200] };
+        },
+        seed,
+      });
+      return seen;
+    };
+    const a = await ids(42);
+    const b = await ids(42);
+    expect(a).toEqual(b);
+    // Run-scoped: each run starts its own monotonic stream at 0 (actual idempotency
+    // keys additionally embed the runId, so cross-run identity reuse is harmless).
+    expect(Math.min(...a)).toBe(0);
+    const c = await ids(43);
+    expect(Math.min(...c)).toBe(0);
+  });
 });
 
 describe("perf final-mode validation — fail-closed (H9/H10/§17)", () => {

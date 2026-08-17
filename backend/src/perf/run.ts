@@ -451,15 +451,25 @@ async function runPaymentPaced(config: RunConfig, ctx: RunContext, auth: Auth, o
   const facts = await ctx.prisma.payment.count({ where: { orderId: { in: orderIds } } });
   const started = opts.rps > 0 ? result.pacing?.startedOperations ?? 0 : result.totalRequests;
   // Warm-up requests really execute (paced and max-effort) and create idempotency
-  // slots — they must be included in the «every key recorded» bookkeeping.
+  // slots — they must be included in the «every key recorded» bookkeeping. The
+  // loader now feeds ONE global identity stream (iteration.n) across warm-up and
+  // measurement, so keys are disjoint: warmupSlotSet ∩ measurementSlotSet = ∅.
   const warmupRequests = result.warmup.requests ?? 0;
   const reached = started + warmupRequests;
   const expectedFacts = Math.min(poolSize, started);
-  const perOrderViolations = await ctx.prisma.payment.groupBy({ by: ["orderId"], where: { orderId: { in: orderIds } }, _count: { _all: true } });
-  const dupOrders = perOrderViolations.filter((g) => g._count._all > 1).length;
+  // Explicit measurement accounting (Step 2.17B disposition §13): separate the
+  // warm-up and measurement sets so canonical assertions use the right set and
+  // warm-up can never contaminate measurement counters.
+  const measurementStarted = started;
+  const warmupStarted = warmupRequests;
   const completedSlots = await ctx.prisma.externalIdempotencyRecord.count({
     where: { operation: "payment.create", scopeId: auth.fin.id, status: "COMPLETED" },
   });
+  const measurementCompletedSlots = Math.max(0, completedSlots - warmupStarted);
+  const warmupCompletedSlots = Math.min(completedSlots, warmupStarted);
+  const businessNoOps = Math.max(0, reached - facts);
+  const perOrderViolations = await ctx.prisma.payment.groupBy({ by: ["orderId"], where: { orderId: { in: orderIds } }, _count: { _all: true } });
+  const dupOrders = perOrderViolations.filter((g) => g._count._all > 1).length;
   const checks: CorrectnessCheck[] = [
     ...loadRunChecks(result),
     {
@@ -468,9 +478,12 @@ async function runPaymentPaced(config: RunConfig, ctx: RunContext, auth: Auth, o
       detail: `facts=${facts} expected=${expectedFacts} before=${paymentsBefore} dupOrders=${dupOrders}`,
     },
     {
-      name: "idempotency slots == requests reaching the API (measurement + warm-up)",
-      passed: completedSlots === reached,
-      detail: `completedSlots=${completedSlots} started=${started} warmup=${warmupRequests} reached=${reached}`,
+      name: "idempotency slots == requests reaching the API (disjoint warmup/measurement keys)",
+      // With disjoint namespaces every started request (warmup ∪ measurement)
+      // records exactly one COMPLETED slot; measurement slots are asserted on
+      // the measurement set only.
+      passed: completedSlots === reached && measurementCompletedSlots >= measurementStarted,
+      detail: `completedSlots=${completedSlots} measurementStarted=${measurementStarted} warmupStarted=${warmupStarted} measurementCompletedSlots=${measurementCompletedSlots} warmupCompletedSlots=${warmupCompletedSlots} reached=${reached} businessNoOps=${businessNoOps}`,
     },
     {
       name: "one-active-payment invariant (<=1 per order)",
@@ -489,7 +502,13 @@ async function runPaymentPaced(config: RunConfig, ctx: RunContext, auth: Auth, o
     requestCount,
     poolSize,
     facts,
-    noopKeys: Math.max(0, reached - facts),
+    noopKeys: businessNoOps,
+    warmupStarted,
+    warmupCompletedSlots,
+    measurementStarted,
+    measurementCompletedSlots,
+    businessFacts: facts,
+    businessNoOps,
   };
   return { result, checks };
 }
