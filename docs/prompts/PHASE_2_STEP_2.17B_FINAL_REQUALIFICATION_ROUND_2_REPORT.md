@@ -573,9 +573,9 @@ qualification_runs_sha: d9f25bb9 (all 18 runs)
 qualification_db: travelhub_perf_r2fq_095905 (isolated, dropped)
 qualification_commit_sha: a9dbbd3
 persistence_status: PERSISTED
-persistence_sha: a9dbbd3
-final_head_sha: a9dbbd3
-upstream_sha: a9dbbd3
+persistence_sha: efa6e9f
+final_head_sha: efa6e9f
+upstream_sha: efa6e9f
 push_status: PUSHED
 ```
 
