@@ -567,6 +567,16 @@ strict_review_state: NOT STARTED
 step_2_17c_state: NOT STARTED
 step_2_18_state: NOT STARTED
 release_status: NOT PERFORMED
+base_sha: fc8c7ef
+provenance_footer_chain: e6c2afc → fb2dd6a → d9f25bb
+qualification_runs_sha: d9f25bb9 (all 18 runs)
+qualification_db: travelhub_perf_r2fq_095905 (isolated, dropped)
+qualification_commit_sha: a9dbbd3
+persistence_status: PERSISTED
+persistence_sha: a9dbbd3
+final_head_sha: a9dbbd3
+upstream_sha: a9dbbd3
+push_status: PUSHED
 ```
 
 ## 48. RELEASE
