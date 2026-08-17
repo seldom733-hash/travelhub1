@@ -305,7 +305,10 @@ NEXT: execute the unchanged Booking burst gate on a suitable clean/dedicated qua
 
 ## 34. Commits / push
 
-(to be completed after push — see REPOSITORY EVIDENCE)
+```text
+fe5c586 perf: resolve Step 2.17B booking qualification disposition + fix payment warmup slots
+(provenance/footer commit follows; HEAD == upstream after push)
+```
 
 ## 35. REPOSITORY EVIDENCE
 
@@ -316,6 +319,7 @@ base_sha: d34875a
 upstream_before: d34875a
 remediation_commit_sha: 1913d7f (prior pass)
 provenance_footer_commit_sha: d34875a (prior pass)
+disposition_commit_sha: fe5c586
 final_head_sha: <recorded after push>
 upstream_sha: <recorded after push>
 push_status: <PUSHED after push>
