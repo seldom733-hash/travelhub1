@@ -56,10 +56,10 @@ export class OrderRequestedConsumer implements OnModuleInit {
     if (await this.eventBus.isProcessed(CONSUMER_ID, ev.id)) return;
 
     try {
-      await this.prisma.$transaction(async (tx) => {
+      const orderCreatedEventId = await this.prisma.$transaction(async (tx) => {
         // Повторная проверка внутри tx: гонка двух доставок — ровно один winner.
         if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: CONSUMER_ID, eventId: ev.id } } })) {
-          return;
+          return null;
         }
 
         // READ-only cross-context read (ADR-0001): traveler контекст из
@@ -72,7 +72,10 @@ export class OrderRequestedConsumer implements OnModuleInit {
         });
 
         // Доменная логика создания (OrderService — owner) в той же транзакции.
-        await this.orders.createOrderFromRequested(tx, {
+        // Step 2.17B remediation (Workstream B): OrderCreated эмитится атомарно
+        // с Order — сохраняем его id для точечной доставки ниже (publishEvent
+        // вместо полного publishPending: не дреним чужой backlog в цепочке).
+        const { eventId: orderCreatedEventId } = await this.orders.createOrderFromRequested(tx, {
           payload,
           travelers,
           orderRequestedEventId: ev.id,
@@ -81,6 +84,7 @@ export class OrderRequestedConsumer implements OnModuleInit {
         });
 
         await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
+        return orderCreatedEventId;
       });
 
       // Step 2.12E: OrderCreated эмитится PENDING (emit) атомарно с Order;
@@ -97,7 +101,14 @@ export class OrderRequestedConsumer implements OnModuleInit {
         where: { id: ev.id, status: "PENDING" },
         data: { status: "PUBLISHED", publishedAt: new Date() },
       });
-      await this.eventBus.publishPending();
+      // Step 2.17B remediation (Workstream B): точечная доставка OrderCreated
+      // (CommissionAccrualConsumer) вместо полного publishPending — вложенная
+      // доставка НЕ дренит чужой backlog (гонки/дубликаты при conc 50).
+      // null = idempotent no-op (уже обработано другим winner-ом) — публиковать
+      // нечего.
+      if (orderCreatedEventId) {
+        await this.eventBus.publishEvent(orderCreatedEventId);
+      }
     } catch (err) {
       // STRICT REVIEW 2.5: P2002 = no-op ТОЛЬКО для idempotency-unique
       // (inbox consumerId+eventId, Order.saleId). Любой другой unique-коллизии

@@ -89,7 +89,9 @@ export function collectEnv(opts: EnvOptions): EnvMetadata {
     toolName: "travelhub-perf-harness",
     toolVersion: "1.0.0",
     loggingMode: String(process.env.LOG_LEVEL ?? "info"),
-    workerIntervalMs: Number(process.env.OUTBOX_WORKER_INTERVAL_MS ?? 2000),
+    // Step 2.17B remediation (Workstream A): default 2000 → 500ms, в синхроне
+    // с OutboxWorkerService (OUTBOX_WORKER_INTERVAL_MS ?? 500).
+    workerIntervalMs: Number(process.env.OUTBOX_WORKER_INTERVAL_MS ?? 500),
     workerBatch: Number(process.env.OUTBOX_WORKER_BATCH ?? 100),
     requestTimeoutMs: opts.requestTimeoutMs,
   };

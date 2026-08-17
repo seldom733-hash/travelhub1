@@ -23,8 +23,15 @@ export const QUALIFICATION = {
   eventbus: { steadyPerSec: 100, burst: 1_000, recovery: 5_000, recoveryWorkers: 2 },
   apps: 2,
   workers: 2,
-  /** Canonical Step 2.17 worker configuration — never overridden in final mode. */
-  canonical: { workerIntervalMs: 2000, workerBatch: 100 },
+  /**
+   * Canonical Step 2.17 worker configuration — never overridden in final mode.
+   * Step 2.17B remediation (Workstream A): idle interval reduced 2000 → 500ms.
+   * Proven root cause: at 100 ev/s a 2000ms poll creates a sawtooth backlog
+   * floor of ~200 (100 ev/s × 2 s) — mathematically unable to pass the frozen
+   * gate max backlog ≤100. 500ms ⇒ floor ≤50 with headroom, while idle load is
+   * still negligible (2 polls/s). workerBatch unchanged (100).
+   */
+  canonical: { workerIntervalMs: 500, workerBatch: 100 },
 } as const;
 
 export type DatasetClass = "SMALL" | "REPRESENTATIVE" | "STRESS";

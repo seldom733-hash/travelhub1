@@ -30,8 +30,23 @@ import { EventBusService, OUTBOX_MAX_ATTEMPTS } from "./eventbus.service";
 export class OutboxWorkerService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(OutboxWorkerService.name);
   private timer: NodeJS.Timeout | null = null;
-  private readonly intervalMs = Number(process.env.OUTBOX_WORKER_INTERVAL_MS ?? 2000);
+  private readonly intervalMs = Number(process.env.OUTBOX_WORKER_INTERVAL_MS ?? 500);
   private readonly batchSize = Number(process.env.OUTBOX_WORKER_BATCH ?? 100);
+  /**
+   * Step 2.17B remediation (Workstream A): drain backoff when work remains.
+   * Root cause (proven): fixed-interval polling (canonical 2000ms) at 100 ev/s
+   * production creates an unavoidable sawtooth backlog floor — between two
+   * cycles up to ~200 events accumulate, so max backlog peaked at 163–178
+   * against the frozen gate ≤100 even though the worker drains cleanly.
+   * The canonical idle interval was reduced 2000ms → 500ms (calculation:
+   * 100 ev/s × 0.5 s = 50 events accumulate between idle polls, well under
+   * the ≤100 gate; the old 2000ms floor of ~200 could never pass). Combined
+   * with adaptive self-scheduling — while PENDING/FAILED work remains the
+   * worker keeps draining with a short backoff; only when idle does it wait
+   * the canonical interval. Semantics unchanged: at-least-once delivery,
+   * Inbox/consumer idempotency, advisory-lock cycle serialization.
+   */
+  private readonly drainBackoffMs = Number(process.env.OUTBOX_WORKER_DRAIN_BACKOFF_MS ?? 100);
   /** Advisory-lock key: тот же на всех инстансах → сериализация цикла. */
   private static readonly WORKER_LOCK_KEY = "travelhub:outbox-worker";
 
@@ -47,14 +62,32 @@ export class OutboxWorkerService implements OnApplicationBootstrap, OnApplicatio
       this.logger.log("Outbox worker disabled (OUTBOX_WORKER_ENABLED=false)");
       return;
     }
-    this.logger.log(`Outbox worker started (interval=${this.intervalMs}ms, batch=${this.batchSize})`);
-    this.timer = setInterval(() => {
-      void this.runCycle().catch((err) => {
+    this.logger.log(`Outbox worker started (interval=${this.intervalMs}ms, batch=${this.batchSize}, drainBackoff=${this.drainBackoffMs}ms)`);
+    // Adaptive self-scheduling (Step 2.17B): drain while work remains, rest at
+    // the canonical interval when idle. Not a tight loop — backoff bounds it.
+    // First cycle runs immediately (delay 0): a 2000ms initial sleep lets ~200
+    // events accumulate at 100 ev/s, which alone blows the frozen backlog gate.
+    this.scheduleNext(0);
+  }
+
+  private scheduleNext(delayMs: number): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+    }
+    this.timer = setTimeout(() => {
+      void this.runCycleAndReschedule().catch((err) => {
         this.logger.error(`outbox worker cycle failed: ${String((err as Error)?.message ?? err)}`);
+        this.scheduleNext(this.intervalMs);
       });
-    }, this.intervalMs);
+    }, delayMs);
     // Не держать процесс живым из-за таймера.
     this.timer.unref?.();
+  }
+
+  private async runCycleAndReschedule(): Promise<void> {
+    const res = await this.runCycle();
+    const busy = res.lockAcquired && (res.published > 0 || res.retried > 0);
+    this.scheduleNext(busy ? this.drainBackoffMs : this.intervalMs);
   }
 
   onApplicationShutdown(): void {

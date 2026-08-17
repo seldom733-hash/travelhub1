@@ -557,6 +557,17 @@ push: performed; HEAD == upstream verified
 ## 47. REPOSITORY EVIDENCE
 
 ```text
+repository: travelhub_v1 (local canonical identity)
+branch: master
+head: efa6e9f
+origin: efa6e9f
+worktree_clean: true
+migration_count: 58
+reviewed_state: COMMIT
+reviewed_diff_base: fc8c7ef
+reviewed_diff_head: efa6e9f
+persistence_status: PERSISTED
+persistence_sha: efa6e9f
 qualification_verdict: B — VALID SYSTEM FAIL (2 valid failures: EventBus backlog 171>100; Booking burst 20 chains/s not sustained)
 f2_verdict: FAIL (fresh max backlog 171 > 100; oldest PENDING 1.7 s; canonical config; no tuning)
 booking_burst_verdict: FAIL (103/300 @ 20 chains/s, conc 50; chain p95 14.2 s; root cause NOT YET PROVEN)
@@ -572,8 +583,6 @@ provenance_footer_chain: e6c2afc → fb2dd6a → d9f25bb
 qualification_runs_sha: d9f25bb9 (all 18 runs)
 qualification_db: travelhub_perf_r2fq_095905 (isolated, dropped)
 qualification_commit_sha: a9dbbd3
-persistence_status: PERSISTED
-persistence_sha: efa6e9f
 final_head_sha: efa6e9f
 upstream_sha: efa6e9f
 push_status: PUSHED

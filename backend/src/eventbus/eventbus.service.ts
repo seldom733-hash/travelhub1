@@ -242,50 +242,84 @@ async emit(tx: Prisma.TransactionClient, write: OutboxWrite): Promise<string> {
 
     let published = 0;
     for (const ev of pending) {
-      // Step 1.15A: canonical projection для consumer-ов (§19) — единый
-      // toOutboxEnvelope: occurredAt = createdAt (опция A), entityId/entityType
-      // из aggregate-полей, actor из колонки. Legacy-строки без actor → null.
-      const envelope = toOutboxEnvelope(ev);
-      try {
-        // Step 1.15 §8: consumer обрабатывает событие в НОВОМ processing context:
-        //  - requestId — новый invocation ID;
-        //  - correlationId — inherited из события (вся causal chain);
-        //  - causationId — parent eventId (для child events, создаваемых consumer-ом);
-        //  - actor — SYSTEM (Step 1.15A §10: обработка события — системный актор;
-        //    события-результаты consumer-а наследуют его как envelope.actor).
-        // Повторная доставка того же события (inbox dedup) не создаёт новую
-        // логическую цепочку/эффект.
-        await runWithRequestContext(
-          {
-            requestId: createRequestId(),
-            correlationId: ev.correlationId,
-            causationId: ev.id,
-            actor: { type: "SYSTEM" },
-          },
-          async () => {
-            const list = [...(this.handlers.get(ev.eventType) ?? []), ...this.anyHandlers];
-            for (const handler of list) {
-              await handler(envelope);
-            }
-          },
-        );
-        await db.outboxEvent.update({
-          where: { id: ev.id },
-          data: { status: "PUBLISHED", publishedAt: new Date() },
-        });
-        published++;
-      } catch (err) {
-        await db.outboxEvent.update({
-          where: { id: ev.id },
-          data: {
-            status: "FAILED",
-            error: String((err as Error)?.message ?? err),
-            attempts: { increment: 1 },
-          },
-        });
-      }
+      published += await this.deliver(ev, db);
     }
     return published;
+  }
+
+  /**
+   * Step 2.17B remediation (Workstream B): доставка РОВНО ОДНОГО события по id
+   * (синхронно, в вызывающем request path).
+   *
+   * Root cause (proven, chain-diag на REPRESENTATIVE/conc 50): каждый
+   * HTTP-command-путь awaited publishPending(), который дренил ВЕСЬ PENDING
+   * backlog последовательно (OrderRequested → Order → CommissionAccrual ≈
+   * 300-500мс/событие) и конкурирующие вызовы гонялись за одними и теми же
+   * событиями (дублирующая работа + LOCK:transactionid на Order INSERT,
+   * 88/300 сэмплов) — complete p50 8-9s при conc 50 (tx коммита ~1s).
+   *
+   * publishEvent(id) доставляет ТОЛЬКО событие текущего запроса: детерминированно
+   * (limit=1, без гонок на общем backlog), синхронно (e2e-контракт: после
+   * complete Sale → Order существует), и не превращает HTTP-путь в дренаж всего
+   * лога. Фоновая доставка остального backlog — outbox worker (production,
+   * Step 2.17) / drainOutbox (harness). Семантика без изменений: at-least-once,
+   * InboxEvent dedup — authoritative; повторная доставка идемпотентна.
+   */
+  async publishEvent(eventId: string): Promise<number> {
+    const ev = await this.prisma.outboxEvent.findUnique({ where: { id: eventId } });
+    if (!ev || ev.status !== "PENDING") return 0;
+    return this.deliver(ev, this.prisma);
+  }
+
+  /**
+   * Доставка одного события подписчикам + атомарный статусный переход.
+   * Возвращает 1 при успешной публикации, 0 при сбое (событие → FAILED).
+   * Общий путь publishPending / publishEvent.
+   */
+  private async deliver(ev: { id: string; eventType: string; correlationId: string | null }, db: PrismaService | Prisma.TransactionClient): Promise<number> {
+    // Step 1.15A: canonical projection для consumer-ов (§19) — единый
+    // toOutboxEnvelope: occurredAt = createdAt (опция A), entityId/entityType
+    // из aggregate-полей, actor из колонки. Legacy-строки без actor → null.
+    const envelope = toOutboxEnvelope(ev as Parameters<typeof toOutboxEnvelope>[0]);
+    try {
+      // Step 1.15 §8: consumer обрабатывает событие в НОВОМ processing context:
+      //  - requestId — новый invocation ID;
+      //  - correlationId — inherited из события (вся causal chain);
+      //  - causationId — parent eventId (для child events, создаваемых consumer-ом);
+      //  - actor — SYSTEM (Step 1.15A §10: обработка события — системный актор;
+      //    события-результаты consumer-а наследуют его как envelope.actor).
+      // Повторная доставка того же события (inbox dedup) не создаёт новую
+      // логическую цепочку/эффект.
+      await runWithRequestContext(
+        {
+          requestId: createRequestId(),
+          correlationId: ev.correlationId,
+          causationId: ev.id,
+          actor: { type: "SYSTEM" },
+        },
+        async () => {
+          const list = [...(this.handlers.get(ev.eventType) ?? []), ...this.anyHandlers];
+          for (const handler of list) {
+            await handler(envelope);
+          }
+        },
+      );
+      await db.outboxEvent.update({
+        where: { id: ev.id },
+        data: { status: "PUBLISHED", publishedAt: new Date() },
+      });
+      return 1;
+    } catch (err) {
+      await db.outboxEvent.update({
+        where: { id: ev.id },
+        data: {
+          status: "FAILED",
+          error: String((err as Error)?.message ?? err),
+          attempts: { increment: 1 },
+        },
+      });
+      return 0;
+    }
   }
 
   /**

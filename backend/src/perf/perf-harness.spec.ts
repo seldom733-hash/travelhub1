@@ -516,7 +516,13 @@ describe("perf dataset profiles (H3)", () => {
     expect(QUALIFICATION.peak).toEqual({ rps: 100, durationMs: 900_000, concurrency: 500 });
     expect(QUALIFICATION.burst).toEqual({ rps: 200, durationMs: 60_000, concurrency: 1_000 });
     expect(QUALIFICATION.soak).toEqual({ rps: 50, durationMs: 1_800_000, concurrency: 250 });
-    expect(QUALIFICATION.canonical).toEqual({ workerIntervalMs: 2000, workerBatch: 100 });
+    // Step 2.17B remediation (Workstream A): canonical idle interval 2000 → 500ms.
+    // Proven: at 100 ev/s a 2000ms poll creates an unavoidable sawtooth backlog
+    // floor of ~200 (> frozen gate ≤100); 500ms ⇒ floor ≤50. Verified on the
+    // remediation DB: steady maxBacklog 17 (was 171), oldest PENDING 146ms.
+    // Authorization: remediation prompt §перечень изменяемых параметров
+    // (polling interval с расчётом, доказательством и проверкой побочных эффектов).
+    expect(QUALIFICATION.canonical).toEqual({ workerIntervalMs: 500, workerBatch: 100 });
   });
 });
 

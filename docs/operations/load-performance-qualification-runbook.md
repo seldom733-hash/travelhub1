@@ -64,7 +64,16 @@ launch requirement ≠ future scaling target`. Exploratory localhost results
 - PostgreSQL 18.x (matching dev), isolated qualification DB (NEVER canonical dev/prod DB).
 - Node version as recorded in `backend/.env`/CI; backend buildable (`npm run build`).
 - Backend env: `DATABASE_URL` → isolated DB; `OUTBOX_WORKER_INTERVAL_MS`/`OUTBOX_WORKER_BATCH`
-  defaults (2000 ms / 100) unless a scenario explicitly varies them and records it.
+  defaults (**500 ms / 100** — Step 2.17B remediation: канонический idle-интервал снижен
+  с 2000ms; при 100 ev/s старый 2000ms поллинг давал неизбежный sawtooth-floor ~200
+  событий между циклами → гейт backlog ≤100 был математически невыполним; 500ms даёт
+  50 событий между idle-циклами. Адаптивный self-scheduling drain: busy → 100ms backoff,
+  первый цикл сразу после boot) unless a scenario explicitly varies them and records it.
+- Backend pool: `DATABASE_POOL_SIZE` (default 20; pg.Pool default max=10 сериализовал
+  50-way конкуренцию — Step 2.17B remediation) + выделенный `seqClient` (3, конфиг
+  `DATABASE_SEQ_POOL_SIZE`); `BUSINESS_SEQUENCE_BLOCK_SIZE` (default 100) — Hi/Lo блочная
+  аллокация BusinessSequence (row-lock конвой на общем prefix-row устранён).
+  Бюджет 2 app + 2 worker: 4 × (20 + 3) = 92 < PG max_connections=100.
 - MinIO/S3 up if media-bearing scenarios run (public media, storefront assets).
 - Harness: `backend/src/perf/run.ts` (dependency-free; `npm run perf:run`). No third-party
   load tool is installed.
@@ -134,7 +143,7 @@ Dataset: `--dataset=SMALL|REPRESENTATIVE|STRESS` (default SMALL; REPRESENTATIVE 
 authority counts: ≥1,000 users, ≥500 products, ≥1,000 customers, ≥1,000 quotes, ≥1,000 order
 chains, ≥500 payment-capable orders, ≥5,000 ledger, ≥5,000 EventBus seed; `--dataset-scale=0..1`
 is a validation aid). Final mode: `--final` fails closed unless apps=2, workers=2, dataset
-valid, and worker interval/batch are canonical (2000 ms / 100). The ±5% arrival-rate validity
+valid, and worker interval/batch are canonical (500 ms / 100 — Step 2.17B remediation, см. выше). The ±5% arrival-rate validity
 is a harness tolerance, not an SLO.
 
 Order: SMOKE → paced STEADY/PEAK/BURST → SOAK → payment/booking/login scenarios → EventBus

@@ -1023,7 +1023,7 @@ export class SalesService {
       //    кардинальности; reservationId остаётся первичным ref).
       const productTypeById = new Map(
         (
-          await this.prisma.product.findMany({
+          await tx.product.findMany({
             where: { id: { in: quote.items.map((it) => it.productId) } },
             select: { id: true, type: true },
           })
@@ -1098,7 +1098,12 @@ export class SalesService {
     });
 
     // Доставка — ПОСЛЕ коммита (failure → FAILED + retryable, НЕ rollback).
-    await this.eventBus.publishPending();
+    // Step 2.17B remediation (Workstream B): доставляем ТОЛЬКО событие этого
+    // запроса (publishEvent) — НЕ дреним весь PENDING backlog в request path
+    // (root cause complete p50 8-9s при conc 50: каждый complete ждал
+    // последовательную обработку всех накопленных событий + гонки конкурентных
+    // дренажей). Остальной backlog доставляет worker / drainOutbox.
+    await this.eventBus.publishEvent(completed.eventId);
 
     return {
       saleId: completed.saleId,
