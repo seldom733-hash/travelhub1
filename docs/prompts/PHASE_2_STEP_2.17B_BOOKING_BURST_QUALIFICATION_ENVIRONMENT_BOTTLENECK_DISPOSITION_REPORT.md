@@ -320,9 +320,9 @@ upstream_before: d34875a
 remediation_commit_sha: 1913d7f (prior pass)
 provenance_footer_commit_sha: d34875a (prior pass)
 disposition_commit_sha: fe5c586
-final_head_sha: <recorded after push>
-upstream_sha: <recorded after push>
-push_status: <PUSHED after push>
+final_head_sha: 51d6875
+upstream_sha: 51d6875
+push_status: PUSHED (HEAD == upstream)
 worktree_clean: true (of my changes; untracked diagnostics in backend/.freebuff-dbg/)
 
 step_2_17b_state_before: REMEDIATION PARTIAL — NOT READY FOR ROUND 3
