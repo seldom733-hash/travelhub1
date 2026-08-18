@@ -473,10 +473,10 @@ Must not:
 repository: travelhub_v1
 branch: master
 start_sha: c0a9abb
-reconciliation_commit_sha: <pending>
-provenance_footer_commit_sha: <pending>
-final_head_sha: <pending>
-upstream_sha: <pending>
+reconciliation_commit_sha: 1ac36c6
+provenance_footer_commit_sha: b9cc411
+final_head_sha: b9cc411
+upstream_sha: b9cc411
 push_status: PENDING
 worktree_clean: YES (excluding untracked)
 
