@@ -200,10 +200,10 @@ checker regression: 13/13 PASS
 | Item | Value |
 |---|---|
 | branch | master |
-| design commit | (pending) |
-| provenance/footer | (pending) |
-| final HEAD/upstream | (after push) |
-| push_status | (after push) |
+| design commit | 023bf00 |
+| provenance/footer | 023bf00 |
+| final HEAD/upstream | 023bf00 |
+| push_status | PUSHED |
 
 ---
 
@@ -229,10 +229,10 @@ Phase 2 exit: BLOCKED (2.17B unresolved)
 repository: travelhub_v1
 branch: master
 design_base_sha: f1d4a59
-design_commit_sha: <after commit>
-provenance_footer_commit_sha: <after footer>
-final_head_sha: <after push>
-upstream_sha: <after push>
+design_commit_sha: 023bf00
+provenance_footer_commit_sha: 023bf00
+final_head_sha: 023bf00
+upstream_sha: 023bf00
 push_status: PUSHED
 
 step_2_17: APPROVED
