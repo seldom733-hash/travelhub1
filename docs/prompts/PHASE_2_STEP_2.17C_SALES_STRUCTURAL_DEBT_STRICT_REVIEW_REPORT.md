@@ -615,9 +615,9 @@ next: repository-first next executable Phase 2 step
 implementation_commit: 036f91f
 docs_commit: cda3dfb
 strict_review_commit: fdbd90f
-provenance_footer_commit: fdbd90f
-final_head_sha: fdbd90f
-upstream_sha: fdbd90f
+provenance_footer_commit: 047540a
+final_head_sha: 047540a
+upstream_sha: 047540a
 push_status: PUSHED
 ```
 
