@@ -2,6 +2,11 @@ import { Module } from "@nestjs/common";
 import { SalesController, SalesCenterController } from "./sales.controller";
 import { CheckoutController } from "./checkout.controller";
 import { SalesService } from "./sales.service";
+import { SalesQueryService } from "./sales-query.service";
+import { SalesLifecycleService } from "./sales-lifecycle.service";
+import { SalesQuoteService } from "./sales-quote.service";
+import { SalesCheckoutService } from "./sales-checkout.service";
+import { SalesCompletionService } from "./sales-completion.service";
 import { CatalogModule } from "../catalog/catalog.module";
 import { FinanceModule } from "../finance/finance.module";
 
@@ -20,9 +25,9 @@ import { FinanceModule } from "../finance/finance.module";
   // при Quote ISSUE, ADR-0013 D1; READ-only cross-domain, как PaymentTerms 2.3B).
   imports: [CatalogModule, FinanceModule],
   controllers: [SalesController, SalesCenterController, CheckoutController],
-  providers: [SalesService],
+  providers: [SalesService, SalesQueryService, SalesLifecycleService, SalesQuoteService, SalesCheckoutService, SalesCompletionService],
   /** Step 2.2F: SalesService экспортируется для Reverse owner orchestration
    *  (createOpportunityFromBuyerRequestSelection вызывается в единой tx). */
-  exports: [SalesService],
+  exports: [SalesService, SalesQueryService, SalesLifecycleService, SalesQuoteService, SalesCheckoutService, SalesCompletionService],
 })
 export class SalesModule {}

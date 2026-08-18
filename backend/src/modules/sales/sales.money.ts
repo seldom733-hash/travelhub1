@@ -220,3 +220,20 @@ export function validateFrozenSnapshot(input: FrozenSnapshotInput): void {
     throw new ValidationDomainError("snapshot total is inconsistent with subtotal − discountAmount");
   }
 }
+
+/**
+ * Step 2.17C Wave 1 — backend-authoritative totals (Decimal, half-up 2dp).
+ * Pure function extracted from SalesService.quoteTotals private method.
+ * Used by SalesService, toQuoteDetailDto (sales.projection), and future
+ * SalesQuoteService.
+ */
+export function quoteTotals(
+  items: Array<{ unitPrice: Prisma.Decimal; quantity: number }>,
+  discountType: QuoteDiscountType,
+  discountValue: Prisma.Decimal | null,
+): { subtotal: Prisma.Decimal; discountAmount: Prisma.Decimal; total: Prisma.Decimal } {
+  const subtotal = subtotalOf(items.map((i) => lineAmount(i.unitPrice, i.quantity)));
+  const discountAmount = discountAmountOf(subtotal, discountType, discountValue);
+  const total = totalOf(subtotal, discountAmount);
+  return { subtotal, discountAmount, total };
+}

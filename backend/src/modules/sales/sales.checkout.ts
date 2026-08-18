@@ -71,3 +71,7 @@ export function quoteExpiry(validUntil: Date | null, now = new Date()): {
   const expired = validUntil !== null && validUntil.getTime() <= now.getTime();
   return { quoteExpired: expired, priceAuthoritative: !expired };
 }
+
+/** Semantics label for checkout availability (defense-in-depth, §44). */
+export const CHECKOUT_AVAILABILITY_SEMANTICS =
+  "checked, not reserved — read-only capacity snapshot; no capacity hold (reservation/locking owner is the Order/Booking boundary, Step 2.4)";
