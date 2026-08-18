@@ -529,10 +529,10 @@ Step 2.17B BLOCKED preserved. Phase 2 exit BLOCKED preserved.
 | branch | master |
 | review base SHA | cda3dfb |
 | implementation SHA | 036f91f |
-| strict review commit | (pending) |
-| provenance/footer commit | (pending) |
-| final HEAD/upstream | (after push) |
-| push_status | (after push) |
+| strict review commit | fdbd90f |
+| provenance/footer commit | fdbd90f |
+| final HEAD/upstream | fdbd90f |
+| push_status | PUSHED |
 | worktree_clean | true (tracked only) |
 
 ---
@@ -611,6 +611,14 @@ payment_branch_state: unchanged
 rls_state: unchanged
 release_status: NOT PERFORMED
 next: repository-first next executable Phase 2 step
+
+implementation_commit: 036f91f
+docs_commit: cda3dfb
+strict_review_commit: fdbd90f
+provenance_footer_commit: fdbd90f
+final_head_sha: fdbd90f
+upstream_sha: fdbd90f
+push_status: PUSHED
 ```
 
 ---
