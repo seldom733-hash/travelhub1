@@ -473,9 +473,9 @@ repository: travelhub_v1
 branch: master
 start_sha: c0a9abb
 reconciliation_commit_sha: 1ac36c6
-provenance_footer_commit_sha: 04094e8
-final_head_sha: 04094e8
-upstream_sha: 04094e8
+provenance_footer_commit_sha: 6dbd56c
+final_head_sha: 6dbd56c
+upstream_sha: 6dbd56c
 push_status: PENDING
 worktree_clean: YES (excluding untracked)
 
