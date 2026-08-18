@@ -353,10 +353,10 @@ Step 2.17B BLOCKED preserved. Phase 2 exit BLOCKED preserved.
 |---|---|
 | branch | master |
 | review base SHA | 21439df |
-| strict review commit | (pending) |
-| provenance/footer | (pending) |
-| final HEAD/upstream | (after push) |
-| push_status | (after push) |
+| strict review commit | e59f12b |
+| provenance/footer | e59f12b |
+| final HEAD/upstream | e59f12b |
+| push_status | PUSHED |
 
 ---
 
@@ -368,10 +368,10 @@ branch: master
 base_sha: feac6ca
 review_start_sha: 21439df
 review_fix_commit_sha: N/A (verdict A)
-strict_review_commit_sha: <after commit>
-provenance_footer_commit_sha: <after footer>
-final_head_sha: <after push>
-upstream_sha: <after push>
+strict_review_commit_sha: e59f12b
+provenance_footer_commit_sha: e59f12b
+final_head_sha: e59f12b
+upstream_sha: e59f12b
 push_status: PUSHED
 
 step_2_18a_contract: Financial Integrity Exit Gate
