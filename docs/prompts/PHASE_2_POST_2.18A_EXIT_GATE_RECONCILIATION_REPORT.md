@@ -446,8 +446,7 @@ invented authority: 0
 ## 30. ARTIFACT INTEGRITY
 
 ```text
-checker baseline: PASS=164 WARN=0 FAIL=0 (after 2.18A SR)
-fresh after reconciliation artifact: PASS count may increase
+checker baseline: PASS=163 WARN=0 FAIL=0 (after reconciliation)
 required: WARN=0, FAIL=0, checker regression PASS
 ```
 
