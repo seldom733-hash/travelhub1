@@ -261,10 +261,10 @@ checker regression: 13/13 PASS
 | Item | Value |
 |---|---|
 | branch | master |
-| reconciliation commit | (pending) |
-| provenance/footer | (pending) |
-| final HEAD/upstream | (after push) |
-| push_status | (after push) |
+| reconciliation commit | 074c288 |
+| provenance/footer | 074c288 |
+| final HEAD/upstream | 074c288 |
+| push_status | PUSHED |
 
 ---
 
@@ -309,10 +309,10 @@ repository: travelhub_v1
 branch: master
 review_base_sha: 9ec953b
 step_2_17c_strict_review_sha: fdbd90f
-reconciliation_commit_sha: <after commit>
-provenance_footer_commit_sha: <after footer>
-final_head_sha: <after push>
-upstream_sha: <after push>
+reconciliation_commit_sha: 074c288
+provenance_footer_commit_sha: 074c288
+final_head_sha: 074c288
+upstream_sha: 074c288
 push_status: PUSHED
 
 step_2_17: APPROVED
