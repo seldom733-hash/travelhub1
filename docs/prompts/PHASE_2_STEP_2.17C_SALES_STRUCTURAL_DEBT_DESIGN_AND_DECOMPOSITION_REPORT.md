@@ -582,6 +582,7 @@ regression contract. Step 2.17B remains BLOCKED; Phase 2 exit remains blocked.
 ## 43. REPOSITORY EVIDENCE footer
 
 - base: `f688f57`
-- final: `<terminal sha>`
-- pushed: `<yes/no>`
-- HEAD == upstream: `<yes/no>`
+- final: `30c7841` (design/docs commit, pushed)
+- provenance/footer: synced with terminal SHA `30c7841`
+- pushed: yes
+- HEAD == upstream: yes
