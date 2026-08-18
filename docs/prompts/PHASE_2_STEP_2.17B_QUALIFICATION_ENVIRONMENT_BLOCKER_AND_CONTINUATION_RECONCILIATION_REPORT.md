@@ -254,9 +254,9 @@ git diff --check: clean
 ```text
 branch: master
 staged: report + Roadmap only (no git add . / -A)
-commit: <this pass>
+commit: 50bb3b7
 provenance/footer: appended per repository convention
-final HEAD/upstream: <verified after push>
+final HEAD/upstream: 50bb3b7 (verified after push)
 push_status: PUSHED (HEAD == upstream)
 worktree_clean: true of tracked changes; unrelated untracked files left untouched
 ```
@@ -291,9 +291,9 @@ repository: travelhub_v1 (local canonical identity)
 branch: master
 base_sha: b193584
 upstream_before: b193584
-reconciliation_commit_sha: <post-push>
-final_head_sha: <post-push>
-upstream_sha: <post-push>
+reconciliation_commit_sha: 50bb3b7
+final_head_sha: 50bb3b7
+upstream_sha: 50bb3b7
 push_status: PUSHED (HEAD == upstream)
 worktree_clean: true (tracked); unrelated untracked files untouched
 
