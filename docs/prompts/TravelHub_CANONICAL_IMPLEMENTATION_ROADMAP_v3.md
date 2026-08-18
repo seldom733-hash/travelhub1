@@ -767,7 +767,7 @@ settlement, payout, net revenue, debt to TravelHub. Sales ≠ cash.
 Сверка с Master/Baseline и DoD.
 **RECONCILIATION 2026-08-15:** включает verification application-isolation / RLS-deferral решения (ADR-0014) и завершённость независимых gates Step 2.17A / Step 2.17B.
 
-· **Step 2.18A --- Financial Integrity Exit Gate**\
+· **Step 2.18A --- Financial Integrity Exit Gate** ✅ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW (2026-08-18; implementation — `docs/prompts/PHASE_2_STEP_2.18A_FINANCIAL_INTEGRITY_EXIT_GATE_IMPLEMENTATION_REPORT.md`; architecture — `docs/architecture/financial-integrity-exit-gate-2.18A.md`; VERDICT A — IMPLEMENTATION COMPLETED; FinancialIntegrityChecker (8 checks: duplicate Payment/Commission/Accrual, orphan Ledger, amount/currency consistency, Ledger idempotency) + 36 unit tests; Payment authority PASS, Commission authority PASS, Ledger authority PASS, Money/Decimal exactness PASS, frozen facts PASS, idempotency PASS, concurrency PASS, DB constraints PASS; 0 production semantic changes, 0 schema/migration changes; regression: backend tsc 0 / build PASS / unit 816/816 (+36) / finance e2e 79/79, frontend tsc 0 / vitest 135/135 / build PASS, migrate 58/58 drift 0, artifact integrity PASS=159 WARN=0 FAIL=0; STRICT REVIEW REQUIRED; Step 2.17B BLOCKED unchanged, Phase 2 exit BLOCKED).\
 Monetary precision, webhook replay, duplicate capture/refund, ledger
 balance, settlement reconciliation, temporal integrity.
 
