@@ -297,8 +297,8 @@ repository: travelhub_v1 (local canonical identity)
 branch: master
 base_sha: 3ec8629
 upstream_before: 3ec8629
-final_head_sha: <post-push>
-upstream_sha: <post-push>
+final_head_sha: 64c30da
+upstream_sha: 64c30da
 push_status: PUSHED (HEAD == upstream)
 worktree_clean: true (tracked); unrelated untracked files left untouched
 
