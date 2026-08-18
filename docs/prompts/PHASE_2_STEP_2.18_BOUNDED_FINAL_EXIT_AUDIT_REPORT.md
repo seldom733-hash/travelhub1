@@ -551,8 +551,8 @@ checker regression: PASS
 repository: travelhub_v1
 branch: master
 audit_start_sha: 28832cf
-audit_report_commit_sha: <pending>
-roadmap_commit_sha: <pending>
+audit_report_commit_sha: f9ebfc9
+roadmap_commit_sha: f9ebfc9
 provenance_footer_commit_sha: <pending>
 final_head_sha: <pending>
 upstream_sha: <pending>
