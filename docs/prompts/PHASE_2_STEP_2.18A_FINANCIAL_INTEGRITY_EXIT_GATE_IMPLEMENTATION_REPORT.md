@@ -254,10 +254,10 @@ transaction boundary changes: 0
 | Item | Value |
 |---|---|
 | branch | master |
-| implementation commit | (pending) |
-| provenance/footer | (pending) |
-| final HEAD/upstream | (after push) |
-| push_status | (after push) |
+| implementation commit | cbb0b89 |
+| provenance/footer | cbb0b89 |
+| final HEAD/upstream | cbb0b89 |
+| push_status | PUSHED |
 
 ---
 
@@ -316,9 +316,9 @@ Regression:
 
 Persistence:
 - branch: master
-- implementation commit: <sha>
-- provenance/footer: <sha>
-- final HEAD/upstream: <sha>
+- implementation commit: cbb0b89
+- provenance/footer: cbb0b89
+- final HEAD/upstream: cbb0b89
 - push_status: PUSHED
 
 RELEASE: NOT PERFORMED
