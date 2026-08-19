@@ -2259,8 +2259,9 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  auditLogs           AuditLog[]
-  partnerApplications PartnerApplication[]
+  auditLogs              AuditLog[]
+  partnerApplications    PartnerApplication[]
+  workspaceLayouts       UserWorkspaceLayout[]
 
   @@index([roleId])
   @@index([status])
@@ -4118,4 +4119,26 @@ model Payout {
   @@unique([sourceType, sourceId])
   @@index([sourceType, sourceId])
   @@schema("finance")
+}
+
+// ─── WORKSPACE CONSTRUCTOR ────────────────────────────────────────────
+// Global Page / Workspace Constructor Foundation (Phase 3 Architecture Addendum)
+// Persists per-user layout overrides for customizable pages.
+// Layout = JSON with widget positions, sizes, visibility, config.
+// Hierarchy: System Default → Role Default → User Layout.
+model UserWorkspaceLayout {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pageId        String   // e.g. "command-center", "analytics"
+  layoutVersion Int      @default(1)
+  widgets       Json     // JSON array of widget positions/sizes/visibility/config
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  /// One active layout per (user, page).
+  @@unique([userId, pageId])
+  @@index([userId])
+  @@index([pageId])
+  @@schema("security")
 }
