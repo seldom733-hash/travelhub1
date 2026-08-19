@@ -61,12 +61,15 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
   async function createUserWithRole(
     role: RoleCode,
     suffix: string,
-  ): Promise<{ token: string; userId: string }> {
-    const username = `ws_test_${suffix}_${Date.now()}`;
+  ): Promise<{ token: string; userId: string; username: string }> {
+    const ts = Date.now().toString(36);
+    const rnd = Math.random().toString(36).slice(2, 6);
+    const username = `ws_${suffix.slice(0, 12)}_${ts}_${rnd}`.slice(0, 50);
     const res = await request(app.getHttpServer())
       .post("/api/v1/auth/register")
       .send({
         username,
+        email: `${username}@test.example.com`,
         password: "TestPassword123!",
         fullName: `WS Test ${suffix}`,
       })
@@ -82,7 +85,7 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
       .expect(200);
 
     const userLogin = await login(username, "TestPassword123!");
-    return { token: userLogin.accessToken, userId };
+    return { token: userLogin.accessToken, userId, username };
   }
 
   // ─── 1. Unauthenticated → 401 ──────────────────────────────────────
@@ -408,6 +411,17 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
         .expect(403);
     });
 
+    it("ADMIN with analytics.read gets 200 on GET command-center/widgets", async () => {
+      const adminLogin = await login("admin", "admin123");
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/workspaces/command-center/widgets")
+        .set("Authorization", `Bearer ${adminLogin.accessToken}`)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(1);
+    });
+
     it("MARKETER with analytics.read gets 200 on GET command-center", async () => {
       const { token: marketerToken } = await createUserWithRole(
         RoleCode.MARKETER,
@@ -423,14 +437,52 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
       expect(res.body.constructorEnabled).toBe(true);
     });
 
-    it("FINANCE with persisted analytics.read grant gets 200 on GET", async () => {
-      const { token: financeToken, userId } = await createUserWithRole(
+    it("MARKETER with analytics.read gets 200 on GET command-center/widgets", async () => {
+      const { token: marketerToken } = await createUserWithRole(
+        RoleCode.MARKETER,
+        "ws_rbac_marketer_w",
+      );
+
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/workspaces/command-center/widgets")
+        .set("Authorization", `Bearer ${marketerToken}`)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("FINANCE without analytics.read gets 403 on GET command-center/widgets", async () => {
+      const { token: financeToken } = await createUserWithRole(
         RoleCode.FINANCE,
-        "ws_rbac_finance_grant",
+        "ws_rbac_finance_w",
+      );
+
+      await request(app.getHttpServer())
+        .get("/api/v1/workspaces/command-center/widgets")
+        .set("Authorization", `Bearer ${financeToken}`)
+        .expect(403);
+    });
+
+    it("PARTNER without analytics.read gets 403 on GET command-center/widgets", async () => {
+      const { token: partnerToken } = await createUserWithRole(
+        RoleCode.PARTNER,
+        "ws_rbac_partner_w",
+      );
+
+      await request(app.getHttpServer())
+        .get("/api/v1/workspaces/command-center/widgets")
+        .set("Authorization", `Bearer ${partnerToken}`)
+        .expect(403);
+    });
+
+    it("FINANCE with persisted analytics.read grant gets 200 on GET", async () => {
+      const { username } = await createUserWithRole(
+        RoleCode.FINANCE,
+        "ws_fin_grant",
       );
 
       // Create persisted grant: FINANCE → analytics.read
-      const adminLogin = await login("admin", "admin123");
       const financeRole = await prisma.role.findUnique({ where: { code: RoleCode.FINANCE } });
       const analyticsPerm = await prisma.permission.findUnique({ where: { code: "analytics.read" } });
       let grantCreated = false;
@@ -441,7 +493,7 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
         grantCreated = true;
 
         // Re-login to get updated permissions
-        const newLogin = await login(`ws_test_ws_rbac_finance_grant_${userId}`, "TestPassword123!");
+        const newLogin = await login(username, "TestPassword123!");
         const res = await request(app.getHttpServer())
           .get("/api/v1/workspaces/command-center")
           .set("Authorization", `Bearer ${newLogin.accessToken}`)
@@ -459,12 +511,11 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
     });
 
     it("after removing persisted grant, GET returns 403 again", async () => {
-      const { token: financeToken, userId } = await createUserWithRole(
+      const { userId, username } = await createUserWithRole(
         RoleCode.FINANCE,
-        "ws_rbac_finance_revoke",
+        "ws_fin_revoke",
       );
 
-      const adminLogin = await login("admin", "admin123");
       const financeRole = await prisma.role.findUnique({ where: { code: RoleCode.FINANCE } });
       const analyticsPerm = await prisma.permission.findUnique({ where: { code: "analytics.read" } });
       let grantCreated = false;
@@ -475,7 +526,7 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
         grantCreated = true;
 
         // Re-login — should now have analytics.read
-        const newLogin = await login(`ws_test_ws_rbac_finance_revoke_${userId}`, "TestPassword123!");
+        const newLogin = await login(username, "TestPassword123!");
         await request(app.getHttpServer())
           .get("/api/v1/workspaces/command-center")
           .set("Authorization", `Bearer ${newLogin.accessToken}`)
@@ -488,7 +539,7 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
         grantCreated = false;
 
         // Re-login — should lose access
-        const revokedLogin = await login(`ws_test_ws_rbac_finance_revoke_${userId}`, "TestPassword123!");
+        const revokedLogin = await login(username, "TestPassword123!");
         await request(app.getHttpServer())
           .get("/api/v1/workspaces/command-center")
           .set("Authorization", `Bearer ${revokedLogin.accessToken}`)
@@ -503,13 +554,9 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
     });
 
     it("user with analytics.read but no dashboard.customize gets 403 on PUT/DELETE", async () => {
-      // ANALYST has analytics.read + dashboard.customize by default
-      // We need a role with analytics.read but NOT dashboard.customize
-      // MARKETER has analytics.read + dashboard.customize
-      // FINANCE has neither — we use persisted grant for analytics.read only
-      const { token: financeToken, userId } = await createUserWithRole(
+      const { username } = await createUserWithRole(
         RoleCode.FINANCE,
-        "ws_rbac_customize",
+        "ws_nocustom",
       );
 
       const financeRole = await prisma.role.findUnique({ where: { code: RoleCode.FINANCE } });
@@ -521,7 +568,7 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
         });
         grantCreated = true;
 
-        const newLogin = await login(`ws_test_ws_rbac_customize_${userId}`, "TestPassword123!");
+        const newLogin = await login(username, "TestPassword123!");
 
         // GET should work (has analytics.read)
         await request(app.getHttpServer())

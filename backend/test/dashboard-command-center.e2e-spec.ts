@@ -14,6 +14,7 @@ import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
+import { AnalyticsService } from "../src/modules/analytics/analytics.service";
 
 describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
   let app: INestApplication;
@@ -55,11 +56,14 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
     role: RoleCode,
     suffix: string,
   ): Promise<{ token: string; userId: string }> {
-    const username = `dashboard_test_${suffix}_${Date.now()}`;
+    const ts = Date.now().toString(36);
+    const rnd = Math.random().toString(36).slice(2, 6);
+    const username = `dt_${suffix.slice(0, 12)}_${ts}_${rnd}`.slice(0, 50);
     const res = await request(app.getHttpServer())
       .post("/api/v1/auth/register")
       .send({
         username,
+        email: `${username}@test.example.com`,
         password: "TestPassword123!",
         fullName: `Dashboard Test ${suffix}`,
       })
@@ -370,33 +374,80 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
     it("financial read model not called without Financial permission", async () => {
       const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_financial_skip");
 
-      await request(app.getHttpServer())
-        .get("/api/v1/dashboard/command-center")
-        .set("Authorization", `Bearer ${marketerToken}`)
-        .query({ preset: "MONTH" })
-        .expect(200);
+      // Spy on AnalyticsService.getFinancialReconciliation
+      const analyticsService = app.get(AnalyticsService);
+      const spy = jest.spyOn(analyticsService, "getFinancialReconciliation").mockResolvedValue({
+        period: { start: "", endExclusive: "", timezone: "UTC", preset: "MONTH" },
+        currency: "USD",
+        totalPayments: "0.00",
+        totalRefunds: "0.00",
+        netPayments: "0.00",
+        totalCommission: "0.00",
+        totalLedgerEntries: 0,
+        currencies: [],
+      } as any);
 
-      // Financial section should be absent — reconciliation not called
+      try {
+        await request(app.getHttpServer())
+          .get("/api/v1/dashboard/command-center")
+          .set("Authorization", `Bearer ${marketerToken}`)
+          .query({ preset: "MONTH" })
+          .expect(200);
+
+        // Financial section should be absent — reconciliation NOT called
+        expect(spy).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it("unknown trend metric returns 404", async () => {
       const adminLogin = await login("admin", "admin123");
-      await request(app.getHttpServer())
-        .get("/api/v1/dashboard/command-center/trends")
-        .set("Authorization", `Bearer ${adminLogin.accessToken}`)
-        .query({ preset: "MONTH", metric: "nonexistent" })
-        .expect(404);
+
+      const analyticsService2 = app.get(AnalyticsService);
+      const spy2 = jest.spyOn(analyticsService2, "getTimeSeries").mockResolvedValue({
+        period: { start: "", endExclusive: "", timezone: "UTC", preset: "MONTH" },
+        granularity: "DAY",
+        buckets: [],
+      } as any);
+
+      try {
+        await request(app.getHttpServer())
+          .get("/api/v1/dashboard/command-center/trends")
+          .set("Authorization", `Bearer ${adminLogin.accessToken}`)
+          .query({ preset: "MONTH", metric: "nonexistent" })
+          .expect(404);
+
+        // Analytics provider NOT called for unknown metric
+        expect(spy2).not.toHaveBeenCalled();
+      } finally {
+        spy2.mockRestore();
+      }
     });
 
     it("unauthorized trend metric returns 403", async () => {
       const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_trend_403");
 
-      // MARKETER has no dashboard.financial.read → payments should be 403
-      await request(app.getHttpServer())
-        .get("/api/v1/dashboard/command-center/trends")
-        .set("Authorization", `Bearer ${marketerToken}`)
-        .query({ preset: "MONTH", metric: "payments" })
-        .expect(403);
+      const analyticsService3 = app.get(AnalyticsService);
+      const spy3 = jest.spyOn(analyticsService3, "getTimeSeries").mockResolvedValue({
+        period: { start: "", endExclusive: "", timezone: "UTC", preset: "MONTH" },
+        granularity: "DAY",
+        buckets: [],
+      } as any);
+
+      try {
+        // MARKETER has no dashboard.financial.read → payments should be 403
+        await request(app.getHttpServer())
+          .get("/api/v1/dashboard/command-center/trends")
+          .set("Authorization", `Bearer ${marketerToken}`)
+          .query({ preset: "MONTH", metric: "payments" })
+          .expect(403);
+
+        // Analytics provider NOT called for unauthorized metric
+        expect(spy3).not.toHaveBeenCalled();
+      } finally {
+        spy3.mockRestore();
+      }
     });
 
     it("FINANCE without analytics.read gets 403 on command center", async () => {

@@ -29,7 +29,7 @@ import type { AuthUser } from "../../security/auth/auth.service";
 import { WorkspaceService } from "./workspace.service";
 import type { WidgetPosition } from "./workspace.types";
 
-@Controller("api/v1/workspaces")
+@Controller("workspaces")
 export class WorkspaceController {
   constructor(private readonly workspaceService: WorkspaceService) {}
 
