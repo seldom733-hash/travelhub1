@@ -1,16 +1,11 @@
 /**
- * Step 3.2 — DB-Backed Restart Persistence Tests (Round 2)
+ * Step 3.2 — DB-Backed Restart Persistence Tests (Round 3)
  *
- * Tests that validate persisted RolePermission state survives application
- * restart lifecycle against a REAL PostgreSQL database.
+ * Each test is SELF-CONTAINED with its own try/finally cleanup.
+ * Tests do NOT depend on execution order.
+ * afterAll only closes the app — no fixture restoration there.
  *
- * These tests do NOT use mocks — they use the real PrismaService connected
- * to the isolated test database (travelhub1_test).
- *
- * Test contract (§5 of Round 2 remediation prompt):
- * Test A: revoked MARKETER default link stays revoked after restart
- * Test B: FINANCE extra grant survives after restart
- * Test C: repeated startup is idempotent
+ * Uses real PrismaService against isolated test database (travelhub1_test).
  */
 
 import "reflect-metadata";
@@ -20,18 +15,11 @@ import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { SecurityService } from "../src/security/security.service";
 import { RoleCode } from "../src/generated/prisma/enums";
-import { ALL_PERMISSIONS } from "../src/security/permissions.constants";
 
-describe("Step 3.2 — DB-Backed Restart Persistence (Round 2)", () => {
+describe("Step 3.2 — DB-Backed Restart Persistence (Round 3)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let securityService: SecurityService;
-
-  // Track fixtures for cleanup
-  const fixtures: {
-    revokedLink?: { roleId: string; permissionId: string };
-    extraGrant?: { roleId: string; permissionId: string };
-  } = {};
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -46,22 +34,10 @@ describe("Step 3.2 — DB-Backed Restart Persistence (Round 2)", () => {
   });
 
   afterAll(async () => {
-    // Restore any revoked fixtures
-    if (fixtures.revokedLink) {
-      await prisma.rolePermission
-        .create({ data: fixtures.revokedLink })
-        .catch(() => {});
-    }
-    // Remove any extra grants
-    if (fixtures.extraGrant) {
-      await prisma.rolePermission
-        .delete({ where: { roleId_permissionId: fixtures.extraGrant } })
-        .catch(() => {});
-    }
     await app.close();
   });
 
-  // ─── Helper: find RolePermission link ─────────────────────────────
+  // ─── Helpers ──────────────────────────────────────────────────────
 
   async function findRolePermission(
     roleCode: RoleCode,
@@ -72,7 +48,6 @@ describe("Step 3.2 — DB-Backed Restart Persistence (Round 2)", () => {
       where: { code: permissionCode },
     });
     if (!role || !perm) return false;
-
     const link = await prisma.rolePermission.findUnique({
       where: {
         roleId_permissionId: { roleId: role.id, permissionId: perm.id },
@@ -81,134 +56,156 @@ describe("Step 3.2 — DB-Backed Restart Persistence (Round 2)", () => {
     return link !== null;
   }
 
-  // ─── Helper: count RolePermission for a role ──────────────────────
-
-  async function countRolePermissions(roleCode: RoleCode): Promise<number> {
-    const role = await prisma.role.findUnique({ where: { code: roleCode } });
-    if (!role) return 0;
-    return prisma.rolePermission.count({ where: { roleId: role.id } });
+  async function getRolePermissionIds(
+    roleCode: RoleCode,
+  ): Promise<{ roleId: string; permissionIds: Set<string> }> {
+    const role = await prisma.role.findUnique({
+      where: { code: roleCode },
+      include: { permissions: { select: { permissionId: true } } },
+    });
+    return {
+      roleId: role!.id,
+      permissionIds: new Set(role!.permissions.map((p) => p.permissionId)),
+    };
   }
 
-  // ─── Test A: revoked MARKETER default link stays revoked ──────────
+  // ─── Test A: revoke MARKETER default → stays revoked ──────────────
 
   it("Test A: revoked MARKETER → dashboard.marketplace.read stays revoked after onModuleInit()", async () => {
-    // 1. Verify default link exists before revocation
-    const existsBefore = await findRolePermission(
-      RoleCode.MARKETER,
-      "dashboard.marketplace.read",
-    );
-    expect(existsBefore).toBe(true);
-
-    // 2. Record fixture for cleanup
-    const marketerRole = await prisma.role.findUnique({
+    const role = await prisma.role.findUnique({
       where: { code: RoleCode.MARKETER },
     });
-    const marketplacePerm = await prisma.permission.findUnique({
+    const perm = await prisma.permission.findUnique({
       where: { code: "dashboard.marketplace.read" },
     });
-    fixtures.revokedLink = {
-      roleId: marketerRole!.id,
-      permissionId: marketplacePerm!.id,
-    };
+    const compositeKey = { roleId: role!.id, permissionId: perm!.id };
 
-    // 3. Delete the default link (simulating admin revocation)
-    await prisma.rolePermission.delete({
-      where: {
-        roleId_permissionId: {
-          roleId: marketerRole!.id,
-          permissionId: marketplacePerm!.id,
-        },
-      },
-    });
-
-    // 4. Verify link is deleted
-    const existsAfterRevoke = await findRolePermission(
+    // Ensure baseline: link exists
+    const existedBefore = await findRolePermission(
       RoleCode.MARKETER,
       "dashboard.marketplace.read",
     );
-    expect(existsAfterRevoke).toBe(false);
+    expect(existedBefore).toBe(true);
 
-    // 5. Run real onModuleInit (startup seed)
-    await securityService.onModuleInit();
+    try {
+      // Delete the link
+      await prisma.rolePermission.delete({
+        where: { roleId_permissionId: compositeKey },
+      });
 
-    // 6. Verify link is STILL deleted (not restored by seed)
-    const existsAfterRestart = await findRolePermission(
-      RoleCode.MARKETER,
-      "dashboard.marketplace.read",
-    );
-    expect(existsAfterRestart).toBe(false);
+      // Verify deleted
+      expect(
+        await findRolePermission(RoleCode.MARKETER, "dashboard.marketplace.read"),
+      ).toBe(false);
 
-    // 7. Restore fixture in test's own finally (via afterAll)
+      // Run startup seed
+      await securityService.onModuleInit();
+
+      // Verify still deleted — seed must NOT restore it
+      expect(
+        await findRolePermission(RoleCode.MARKETER, "dashboard.marketplace.read"),
+      ).toBe(false);
+    } finally {
+      // Restore baseline — re-create the link if it was missing
+      const stillMissing = !(await findRolePermission(
+        RoleCode.MARKETER,
+        "dashboard.marketplace.read",
+      ));
+      if (stillMissing) {
+        await prisma.rolePermission
+          .create({ data: compositeKey })
+          .catch(() => {});
+      }
+    }
+
+    // Assert baseline restored after finally
+    expect(
+      await findRolePermission(RoleCode.MARKETER, "dashboard.marketplace.read"),
+    ).toBe(true);
   });
 
-  // ─── Test B: FINANCE extra grant survives restart ─────────────────
+  // ─── Test B: extra grant FINANCE → analytics.read survives ────────
 
   it("Test B: FINANCE → analytics.read extra grant survives onModuleInit()", async () => {
-    // 1. Verify default link does NOT exist
-    const existsBefore = await findRolePermission(
-      RoleCode.FINANCE,
-      "analytics.read",
-    );
-    expect(existsBefore).toBe(false);
-
-    // 2. Record fixture for cleanup
-    const financeRole = await prisma.role.findUnique({
+    const role = await prisma.role.findUnique({
       where: { code: RoleCode.FINANCE },
     });
-    const analyticsPerm = await prisma.permission.findUnique({
+    const perm = await prisma.permission.findUnique({
       where: { code: "analytics.read" },
     });
-    fixtures.extraGrant = {
-      roleId: financeRole!.id,
-      permissionId: analyticsPerm!.id,
-    };
+    const compositeKey = { roleId: role!.id, permissionId: perm!.id };
 
-    // 3. Create the extra grant
-    await prisma.rolePermission.create({
-      data: { roleId: financeRole!.id, permissionId: analyticsPerm!.id },
-    });
-
-    // 4. Verify link exists
-    const existsAfterCreate = await findRolePermission(
+    // Ensure baseline: link does NOT exist
+    const existedBefore = await findRolePermission(
       RoleCode.FINANCE,
       "analytics.read",
     );
-    expect(existsAfterCreate).toBe(true);
+    expect(existedBefore).toBe(false);
 
-    // 5. Run real onModuleInit (startup seed)
-    await securityService.onModuleInit();
+    try {
+      // Create the extra grant
+      await prisma.rolePermission.create({ data: compositeKey });
 
-    // 6. Verify link STILL exists (not deleted by seed)
-    const existsAfterRestart = await findRolePermission(
-      RoleCode.FINANCE,
-      "analytics.read",
-    );
-    expect(existsAfterRestart).toBe(true);
+      // Verify created
+      expect(
+        await findRolePermission(RoleCode.FINANCE, "analytics.read"),
+      ).toBe(true);
+
+      // Run startup seed
+      await securityService.onModuleInit();
+
+      // Verify still present — seed must NOT delete it
+      expect(
+        await findRolePermission(RoleCode.FINANCE, "analytics.read"),
+      ).toBe(true);
+    } finally {
+      // Cleanup: remove the extra grant if it still exists
+      const stillPresent = await findRolePermission(
+        RoleCode.FINANCE,
+        "analytics.read",
+      );
+      if (stillPresent) {
+        await prisma.rolePermission
+          .delete({ where: { roleId_permissionId: compositeKey } })
+          .catch(() => {});
+      }
+    }
+
+    // Assert baseline restored after finally
+    expect(
+      await findRolePermission(RoleCode.FINANCE, "analytics.read"),
+    ).toBe(false);
   });
 
   // ─── Test C: repeated startup is idempotent ───────────────────────
 
-  it("Test C: repeated onModuleInit() does not create duplicate RolePermission rows", async () => {
-    // Record initial counts
-    const adminCountBefore = await countRolePermissions(RoleCode.ADMIN);
-    const financeCountBefore = await countRolePermissions(RoleCode.FINANCE);
+  it("Test C: repeated onModuleInit() does not change RolePermission state", async () => {
+    // Snapshot exact baseline for ALL roles
+    const baseline = new Map<string, Set<string>>();
+    for (const code of Object.values(RoleCode)) {
+      const { permissionIds } = await getRolePermissionIds(code);
+      baseline.set(code, permissionIds);
+    }
 
     // Run onModuleInit 3 times
     await securityService.onModuleInit();
     await securityService.onModuleInit();
     await securityService.onModuleInit();
 
-    // Verify counts unchanged (no duplicate RolePermission rows created)
-    const adminCountAfter = await countRolePermissions(RoleCode.ADMIN);
-    const financeCountAfter = await countRolePermissions(RoleCode.FINANCE);
-
-    expect(adminCountAfter).toBe(adminCountBefore);
-    expect(financeCountAfter).toBe(financeCountBefore);
+    // Verify exact equality for every role
+    for (const code of Object.values(RoleCode)) {
+      const { permissionIds } = await getRolePermissionIds(code);
+      const before = baseline.get(code)!;
+      expect(permissionIds.size).toBe(before.size);
+      for (const pid of before) {
+        expect(permissionIds.has(pid)).toBe(true);
+      }
+    }
   });
 
-  // ─── Test D: verify all 65 dashboard permission codes exist ────────
+  // ─── Test D: all dashboard permissions exist ──────────────────────
 
-  it("Test D: all dashboard permission codes exist in Permission catalog", async () => {
+  it("Test D: all 5 dashboard permission codes exist in Permission catalog", async () => {
     const dashboardPerms = [
       "dashboard.executive.read",
       "dashboard.operational.read",
@@ -224,27 +221,24 @@ describe("Step 3.2 — DB-Backed Restart Persistence (Round 2)", () => {
     }
   });
 
-  // ─── Test E: safe role defaults match ROLE_PERMISSIONS ─────────────
+  // ─── Test E: MARKETER dashboard defaults (order-independent) ──────
 
-  it("Test E: MARKETER has expected non-revoked dashboard defaults", async () => {
-    const marketerRole = await prisma.role.findUnique({
-      where: { code: RoleCode.MARKETER },
-      include: {
-        permissions: {
-          include: { permission: true },
-        },
-      },
-    });
+  it("Test E: MARKETER has full expected dashboard default set", async () => {
+    const marketerPerms = await getRolePermissionIds(RoleCode.MARKETER);
+    const allPerms = await prisma.permission.findMany();
+    const permCodeMap = new Map(allPerms.map((p) => [p.id, p.code]));
 
-    const permCodes = marketerRole!.permissions.map(
-      (rp) => rp.permission.code,
+    const marketerCodes = new Set(
+      Array.from(marketerPerms.permissionIds).map((id) => permCodeMap.get(id)),
     );
 
-    // MARKETER should have executive and customize (non-revoked defaults)
-    expect(permCodes).toContain("dashboard.executive.read");
-    expect(permCodes).toContain("dashboard.customize");
+    // Expected MARKETER dashboard defaults
+    expect(marketerCodes).toContain("dashboard.executive.read");
+    expect(marketerCodes).toContain("dashboard.marketplace.read");
+    expect(marketerCodes).toContain("dashboard.customize");
 
-    // Note: Test A revoked marketplace.read — it will be restored in afterAll
-    // So we don't assert it here. The test validates that core defaults exist.
+    // Should NOT have these
+    expect(marketerCodes).not.toContain("dashboard.operational.read");
+    expect(marketerCodes).not.toContain("dashboard.financial.read");
   });
 });

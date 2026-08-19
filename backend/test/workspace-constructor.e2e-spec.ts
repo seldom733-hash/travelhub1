@@ -109,6 +109,12 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
         .delete("/api/v1/workspaces/command-center/layout")
         .expect(401);
     });
+
+    it("returns 401 without access token (Widgets GET)", async () => {
+      await request(app.getHttpServer())
+        .get("/api/v1/workspaces/command-center/widgets")
+        .expect(401);
+    });
   });
 
   // ─── 2. Unknown page → 404 ─────────────────────────────────────────
@@ -500,6 +506,14 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
           .expect(200);
 
         expect(res.body.pageId).toBe("command-center");
+
+        // Also verify Widgets GET returns 200
+        const wRes = await request(app.getHttpServer())
+          .get("/api/v1/workspaces/command-center/widgets")
+          .set("Authorization", `Bearer ${newLogin.accessToken}`)
+          .expect(200);
+
+        expect(Array.isArray(wRes.body)).toBe(true);
       } finally {
         // Cleanup: remove persisted grant
         if (grantCreated) {
@@ -531,6 +545,10 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
           .get("/api/v1/workspaces/command-center")
           .set("Authorization", `Bearer ${newLogin.accessToken}`)
           .expect(200);
+        await request(app.getHttpServer())
+          .get("/api/v1/workspaces/command-center/widgets")
+          .set("Authorization", `Bearer ${newLogin.accessToken}`)
+          .expect(200);
 
         // Remove the grant
         await prisma.rolePermission.delete({
@@ -538,10 +556,14 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
         });
         grantCreated = false;
 
-        // Re-login — should lose access
+        // Re-login — should lose access on BOTH endpoints
         const revokedLogin = await login(username, "TestPassword123!");
         await request(app.getHttpServer())
           .get("/api/v1/workspaces/command-center")
+          .set("Authorization", `Bearer ${revokedLogin.accessToken}`)
+          .expect(403);
+        await request(app.getHttpServer())
+          .get("/api/v1/workspaces/command-center/widgets")
           .set("Authorization", `Bearer ${revokedLogin.accessToken}`)
           .expect(403);
       } finally {
