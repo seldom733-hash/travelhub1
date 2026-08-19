@@ -17,6 +17,7 @@
 import {
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Put,
@@ -68,7 +69,7 @@ export class WorkspaceController {
   /**
    * PUT /api/v1/workspaces/:pageId/layout
    * Save user layout. Idempotent upsert for (userId, pageId).
-   * Rejects if constructor is disabled for the page.
+   * Step 3.2: Requires analytics.read + dashboard.customize for Command Center.
    */
   @Put(":pageId/layout")
   async saveLayout(
@@ -76,6 +77,15 @@ export class WorkspaceController {
     @Body() body: { widgets: WidgetPosition[] },
     @CurrentUser() user: AuthUser,
   ) {
+    // Step 3.2: dashboard.customize enforcement for Command Center
+    if (pageId === "command-center") {
+      if (!user.permissions.includes("analytics.read")) {
+        throw new ForbiddenException("analytics.read required for Command Center");
+      }
+      if (!user.permissions.includes("dashboard.customize")) {
+        throw new ForbiddenException("dashboard.customize required to save layout");
+      }
+    }
     return this.workspaceService.saveLayout(
       user.id,
       pageId,
@@ -87,6 +97,7 @@ export class WorkspaceController {
   /**
    * DELETE /api/v1/workspaces/:pageId/layout
    * Reset user layout to system/role default. Idempotent.
+   * Step 3.2: Requires analytics.read + dashboard.customize for Command Center.
    */
   @Delete(":pageId/layout")
   @HttpCode(200)
@@ -94,6 +105,15 @@ export class WorkspaceController {
     @Param("pageId") pageId: string,
     @CurrentUser() user: AuthUser,
   ) {
+    // Step 3.2: dashboard.customize enforcement for Command Center
+    if (pageId === "command-center") {
+      if (!user.permissions.includes("analytics.read")) {
+        throw new ForbiddenException("analytics.read required for Command Center");
+      }
+      if (!user.permissions.includes("dashboard.customize")) {
+        throw new ForbiddenException("dashboard.customize required to reset layout");
+      }
+    }
     return this.workspaceService.resetLayout(
       user.id,
       pageId,

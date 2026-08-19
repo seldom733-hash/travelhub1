@@ -209,6 +209,15 @@ export const PERMISSIONS = {
   "moderation.approve": "Одобрение модерации",
   "moderation.reject": "Отклонение модерации",
   "moderation.request_changes": "Запрос изменений в модерации",
+
+  // ── Dashboard / Command Center (Step 3.2, server-side section authority) ──
+  // Section-level permissions: page gate = analytics.read;
+  // section data authorized via these permissions.
+  "dashboard.executive.read": "Чтение Executive KPIs (GMV, Revenue, Orders, Bookings, AOV, Conversion)",
+  "dashboard.operational.read": "Чтение Operational KPIs (Orders Fulfilled, Bookings Confirmed, Funnel)",
+  "dashboard.financial.read": "Чтение Financial KPIs (Commission, Reconciliation, Payments)",
+  "dashboard.marketplace.read": "Чтение Marketplace KPIs (Sessions, Partners, Customers)",
+  "dashboard.customize": "Настройка layout Command Center (save/reset) — не расширяет доступ к данным",
 } as const;
 
 export type PermissionCode = keyof typeof PERMISSIONS;
@@ -257,6 +266,12 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "partner.onboarding.review",
     // Step 1.16: DIRECTOR читает communications (cross-domain контекст).
     "communication.read",
+    // Step 3.2: Command Center section authority — DIRECTOR получает все секции.
+    "dashboard.executive.read",
+    "dashboard.operational.read",
+    "dashboard.financial.read",
+    "dashboard.marketplace.read",
+    "dashboard.customize",
   ],
 
   FINANCE: [
@@ -313,6 +328,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "analytics.read",
     "reports.read",
     "settings.read",
+    // Step 3.2: Command Center section authority — MARKETER получает Executive + Marketplace.
+    "dashboard.executive.read",
+    "dashboard.marketplace.read",
+    "dashboard.customize",
   ],
 
   ANALYST: [
@@ -344,6 +363,12 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "audit.read",
     "analytics.read",
     "reports.read",
+    // Step 3.2: Command Center section authority — ANALYST получает все секции.
+    "dashboard.executive.read",
+    "dashboard.operational.read",
+    "dashboard.financial.read",
+    "dashboard.marketplace.read",
+    "dashboard.customize",
   ],
 
   // Step 1.3 review fix: MODERATOR имеет ТОЛЬКО moderation-права — review/approve/

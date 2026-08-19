@@ -9,7 +9,7 @@
  * Invariant: COMMAND CENTER = ORCHESTRATION, NOT A SECOND ANALYTICS ENGINE
  */
 
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import {
   AnalyticsService,
   type AnalyticsQueryDto,
@@ -35,6 +35,32 @@ export interface TrendQueryDto extends DashboardQueryDto {
   granularity?: string;
 }
 
+// ─── Section Authority (Step 3.2) ──────────────────────────────────────────
+
+export type DashboardSection = "executive" | "operational" | "financial" | "marketplace";
+
+/** Canonical section → permission mapping. Single source of truth. */
+export const SECTION_PERMISSION_MAP: Record<DashboardSection, string> = {
+  executive: "dashboard.executive.read",
+  operational: "dashboard.operational.read",
+  financial: "dashboard.financial.read",
+  marketplace: "dashboard.marketplace.read",
+};
+
+const ALL_SECTIONS: DashboardSection[] = ["executive", "operational", "financial", "marketplace"];
+
+/** Metric → section mapping for trends authorization. Only supported metrics. */
+export const METRIC_SECTION_MAP: Record<string, DashboardSection> = {
+  orders: "executive",
+  bookings: "executive",
+  payments: "financial",
+  customers: "marketplace",
+  commissions: "financial",
+};
+
+export type TrendMetric = keyof typeof METRIC_SECTION_MAP;
+const SUPPORTED_METRICS = Object.keys(METRIC_SECTION_MAP) as TrendMetric[];
+
 // ─── Response Types ─────────────────────────────────────────────────────────
 
 export interface KpiValue {
@@ -57,8 +83,10 @@ export interface CommandCenterResponse {
     start: string;
     endExclusive: string;
   };
+  availableSections: DashboardSection[];
+  availableMetrics: string[];
   sections: {
-    executive: {
+    executive?: {
       gmv: KpiValue;
       revenue: KpiValue;
       netRevenue: KpiValue;
@@ -67,7 +95,7 @@ export interface CommandCenterResponse {
       averageOrderValue: KpiValue;
       conversionRate: KpiValue;
     };
-    operational: {
+    operational?: {
       ordersFulfilled: KpiValue;
       bookingsConfirmed: KpiValue;
       bookingsCompleted: KpiValue;
@@ -75,13 +103,13 @@ export interface CommandCenterResponse {
       refundsProcessed: KpiValue;
       funnelConversion: KpiValue;
     };
-    financial: {
+    financial?: {
       commissionAccrued: KpiValue;
       reconciliationStatus: KpiValue;
       totalPayments: KpiValue;
       netPayments: KpiValue;
     };
-    marketplace: {
+    marketplace?: {
       marketplaceSessions: KpiValue;
       storefrontSessions: KpiValue;
       activePartners: KpiValue;
@@ -123,6 +151,7 @@ export class DashboardService {
    *
    * Orchestrates Step 3.3 read models into a single Command Center response.
    * All period/currency/comparison logic delegated to Step 3.3.
+   * Step 3.2: Server-side section filtering by user permissions.
    */
   async getCommandCenter(
     dto: DashboardQueryDto,
@@ -136,19 +165,45 @@ export class DashboardService {
       comparison: dto.comparison !== false,
     };
 
-    // Parallel calls to Step 3.3 read models
+    // Step 3.2: Compute authorized sections and metrics
+    const availableSections = this.computeAvailableSections(user.permissions);
+    const availableMetrics = this.computeAvailableMetrics(user.permissions);
+    const sectionSet = new Set(availableSections);
+
+    // Parallel calls to Step 3.3 read models — only call authorized sources
+    const needsFinancial = sectionSet.has("financial");
+    const needsOperational = sectionSet.has("operational");
+
     const [kpi, funnel, reconciliation] = await Promise.all([
       this.analyticsService.getCompanyKpi(analyticsDto, user as any),
-      this.analyticsService.getConversionFunnel(analyticsDto, user as any),
-      this.analyticsService.getFinancialReconciliation(analyticsDto, user as any),
+      needsOperational
+        ? this.analyticsService.getConversionFunnel(analyticsDto, user as any)
+        : null,
+      needsFinancial
+        ? this.analyticsService.getFinancialReconciliation(analyticsDto, user as any)
+        : null,
     ]);
 
-    // Build response sections from Step 3.3 data
-    const sections = this.buildSections(kpi, funnel, reconciliation);
+    // Build only authorized sections
+    const sections: CommandCenterResponse["sections"] = {};
+    if (sectionSet.has("executive")) {
+      sections.executive = this.buildExecutiveSection(kpi);
+    }
+    if (sectionSet.has("operational") && funnel) {
+      sections.operational = this.buildOperationalSection(kpi, funnel);
+    }
+    if (sectionSet.has("financial") && reconciliation) {
+      sections.financial = this.buildFinancialSection(kpi, reconciliation);
+    }
+    if (sectionSet.has("marketplace")) {
+      sections.marketplace = this.buildMarketplaceSection(kpi);
+    }
 
     return {
       period: kpi.period,
       comparison: kpi.comparison,
+      availableSections,
+      availableMetrics,
       sections,
       attribution: kpi.attribution,
     };
@@ -158,11 +213,26 @@ export class DashboardService {
    * GET /api/v1/dashboard/command-center/trends
    *
    * Lazy-loaded time series. Forwards to Step 3.3 Time Series.
+   * Step 3.2: Metric → section authorization. Unknown metric = 404, unauthorized = 403.
    */
   async getTrends(
     dto: TrendQueryDto,
     user: { id: string; role: string; partnerId?: string | null; permissions: string[] },
   ): Promise<TrendResponse> {
+    const metric = (dto.metric || "orders") as string;
+
+    // Step 3.2: Validate metric exists
+    if (!(metric in METRIC_SECTION_MAP)) {
+      throw new NotFoundException(`Metric "${metric}" is not supported`);
+    }
+
+    // Step 3.2: Authorize metric against section permission
+    const requiredSection = METRIC_SECTION_MAP[metric as TrendMetric];
+    const requiredPermission = SECTION_PERMISSION_MAP[requiredSection];
+    if (!user.permissions.includes(requiredPermission)) {
+      throw new ForbiddenException(`Metric "${metric}" requires ${requiredPermission}`);
+    }
+
     const analyticsDto: AnalyticsQueryDto = {
       preset: dto.preset as any,
       startDate: dto.startDate,
@@ -171,7 +241,6 @@ export class DashboardService {
       comparison: false,
     };
 
-    const metric = dto.metric || "orders";
     const granularity = dto.granularity as AnalyticsGranularity | undefined;
 
     const timeSeries = await this.analyticsService.getTimeSeries(
@@ -203,20 +272,22 @@ export class DashboardService {
     };
   }
 
-  // ─── Section Builders ─────────────────────────────────────────────────────
+  // ─── Section Authority Helpers (Step 3.2) ────────────────────────────────
 
-  private buildSections(
-    kpi: CompanyKpiResponse,
-    funnel: ConversionFunnelResponse,
-    reconciliation: FinancialReconciliationResponse,
-  ): CommandCenterResponse["sections"] {
-    return {
-      executive: this.buildExecutiveSection(kpi),
-      operational: this.buildOperationalSection(kpi, funnel),
-      financial: this.buildFinancialSection(kpi, reconciliation),
-      marketplace: this.buildMarketplaceSection(kpi),
-    };
+  /** Compute which sections the user can access. Deterministic canonical order. */
+  computeAvailableSections(permissions: string[]): DashboardSection[] {
+    return ALL_SECTIONS.filter((s) => permissions.includes(SECTION_PERMISSION_MAP[s]));
   }
+
+  /** Compute which trend metrics the user can access. */
+  computeAvailableMetrics(permissions: string[]): string[] {
+    return SUPPORTED_METRICS.filter((m) => {
+      const section = METRIC_SECTION_MAP[m];
+      return permissions.includes(SECTION_PERMISSION_MAP[section]);
+    });
+  }
+
+
 
   private buildExecutiveSection(kpi: CompanyKpiResponse) {
     const m = kpi.metrics;

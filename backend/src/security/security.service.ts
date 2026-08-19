@@ -65,35 +65,10 @@ export class SecurityService implements OnModuleInit {
       });
     }
 
-    // Роль → права (матрица §2). Матрица АВТОРИТЕТНА: ссылки, которых больше нет
-    // в матрице (Step 1.3: MODERATOR −catalog.product.write, PARTNER −catalog.product.read),
-    // отзываются — иначе dev-БД не сойдётся с новой матрицей при повторном seed.
-    for (const [role, perms] of Object.entries(ROLE_PERMISSIONS) as [RoleCode, PermissionCode[]][]) {
-      const roleRow = await this.prisma.role.findUniqueOrThrow({ where: { code: role }, select: { id: true } });
-      const permRows = await this.prisma.permission.findMany({
-        where: { code: { in: perms } },
-        select: { id: true, code: true },
-      });
-      const existingLinks = await this.prisma.rolePermission.findMany({
-        where: { roleId: roleRow.id },
-        select: { permissionId: true },
-      });
-      const existingSet = new Set(existingLinks.map((l) => l.permissionId));
-      const toAdd = permRows.filter((p) => !existingSet.has(p.id));
-      if (toAdd.length > 0) {
-        await this.prisma.rolePermission.createMany({
-          data: toAdd.map((p) => ({ roleId: roleRow.id, permissionId: p.id })),
-        });
-      }
-      const matrixSet = new Set(permRows.map((p) => p.id));
-      const toRevoke = existingLinks.filter((l) => !matrixSet.has(l.permissionId));
-      if (toRevoke.length > 0) {
-        await this.prisma.rolePermission.deleteMany({
-          where: { roleId: roleRow.id, permissionId: { in: toRevoke.map((l) => l.permissionId) } },
-        });
-        this.logger.log(`Revoked ${toRevoke.length} stale permission(s) from role ${role}`);
-      }
-    }
+    // Step 3.2: RolePermission rows = persisted effective state.
+    // Startup seed НЕ выполняет toAdd/toRevoke для RolePermission.
+    // Default assignments создаются one-time Prisma migration.
+    // Admin grant/revoke (Stage C) сохраняется между restarts.
     this.logger.log("RBAC roles/permissions seeded");
   }
 
@@ -476,4 +451,9 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "moderation.approve": "Одобрение модерации",
   "moderation.reject": "Отклонение модерации",
   "moderation.request_changes": "Запрос изменений в модерации",
+  "dashboard.executive.read": "Чтение Executive KPIs (GMV, Revenue, Orders, Bookings, AOV, Conversion)",
+  "dashboard.operational.read": "Чтение Operational KPIs (Orders Fulfilled, Bookings Confirmed, Funnel)",
+  "dashboard.financial.read": "Чтение Financial KPIs (Commission, Reconciliation, Payments)",
+  "dashboard.marketplace.read": "Чтение Marketplace KPIs (Sessions, Partners, Customers)",
+  "dashboard.customize": "Настройка layout Command Center (save/reset)",
 };

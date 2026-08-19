@@ -175,7 +175,7 @@ describe("W2: WorkspaceService", () => {
       const layout = await service.getEffectiveLayout(
         "user-1",
         "command-center",
-        ["analytics.read"],
+        ["analytics.read", "dashboard.executive.read", "dashboard.operational.read", "dashboard.financial.read", "dashboard.marketplace.read", "dashboard.customize"],
         "ANALYST",
       );
       expect(layout.pageId).toBe("command-center");
@@ -199,7 +199,26 @@ describe("W2: WorkspaceService", () => {
       expect(layout.widgets.length).toBe(0);
     });
 
-    it("restores required widgets even when missing", async () => {
+    it("filters by section permission", async () => {
+      // MARKETER gets only Executive + Marketplace widgets
+      const layout = await service.getEffectiveLayout(
+        "user-1",
+        "command-center",
+        ["analytics.read", "dashboard.executive.read", "dashboard.marketplace.read"],
+        "MARKETER",
+      );
+      const widgetIds = layout.widgets.map((w) => w.widgetId);
+      // Executive widgets should be present
+      expect(widgetIds).toContain("gmv");
+      expect(widgetIds).toContain("revenue");
+      // Financial widgets should NOT be present
+      expect(widgetIds).not.toContain("commission");
+      expect(widgetIds).not.toContain("payments");
+      // Operational widgets should NOT be present
+      expect(widgetIds).not.toContain("funnel");
+    });
+
+    it("restores required widgets when user has section permission", async () => {
       // Mock saved layout WITHOUT required reconciliation widget
       const savedWidgets: WidgetPosition[] = [
         { widgetId: "gmv", x: 0, y: 0, w: 1, h: 1, visible: true },
@@ -211,11 +230,22 @@ describe("W2: WorkspaceService", () => {
       const layout = await service.getEffectiveLayout(
         "user-1",
         "command-center",
-        ["analytics.read"],
+        ["analytics.read", "dashboard.executive.read", "dashboard.financial.read"],
       );
 
       const widgetIds = layout.widgets.map((w) => w.widgetId);
       expect(widgetIds).toContain("reconciliation");
+    });
+
+    it("does NOT restore reconciliation without financial permission", async () => {
+      const layout = await service.getEffectiveLayout(
+        "user-1",
+        "command-center",
+        ["analytics.read", "dashboard.executive.read"], // no financial
+      );
+
+      const widgetIds = layout.widgets.map((w) => w.widgetId);
+      expect(widgetIds).not.toContain("reconciliation");
     });
 
     it("applies role default when no user layout exists", async () => {
@@ -223,7 +253,7 @@ describe("W2: WorkspaceService", () => {
       const layout = await service.getEffectiveLayout(
         "user-1",
         "command-center",
-        ["analytics.read"],
+        ["analytics.read", "dashboard.executive.read", "dashboard.operational.read", "dashboard.financial.read", "dashboard.marketplace.read", "dashboard.customize"],
         "DIRECTOR",
       );
       expect(layout.widgets.length).toBeGreaterThanOrEqual(10);
@@ -236,7 +266,7 @@ describe("W2: WorkspaceService", () => {
         { widgetId: "gmv", x: 0, y: 0, w: 1, h: 1, visible: true },
       ];
       await service.saveLayout("user-1", "command-center", widgets, [
-        "analytics.read",
+        "analytics.read", "dashboard.executive.read",
       ]);
       expect(mockPrisma.userWorkspaceLayout.upsert).toHaveBeenCalledTimes(1);
     });
@@ -266,7 +296,7 @@ describe("W2: WorkspaceService", () => {
         },
       ];
       await service.saveLayout("user-1", "command-center", widgets, [
-        "analytics.read",
+        "analytics.read", "dashboard.executive.read",
       ]);
 
       const savedWidgets = (
@@ -281,7 +311,7 @@ describe("W2: WorkspaceService", () => {
         { widgetId: "gmv", x: 1, y: 0, w: 1, h: 1, visible: true },
       ];
       await service.saveLayout("user-1", "command-center", widgets, [
-        "analytics.read",
+        "analytics.read", "dashboard.executive.read",
       ]);
 
       const savedWidgets = (
@@ -297,7 +327,7 @@ describe("W2: WorkspaceService", () => {
         { widgetId: "gmv", x: 0, y: 0, w: 1, h: 1, visible: true },
       ];
       await service.saveLayout("user-1", "command-center", widgets, [
-        "analytics.read",
+        "analytics.read", "dashboard.executive.read", "dashboard.financial.read",
       ]);
 
       const savedWidgets = (
@@ -307,7 +337,7 @@ describe("W2: WorkspaceService", () => {
     });
 
     it("filters out forbidden widgets on save, but required restored", async () => {
-      // User has no permissions — non-required widgets filtered, required restored
+      // User has no permissions — non-required widgets filtered, section-gated required NOT restored
       const widgets: WidgetPosition[] = [
         { widgetId: "gmv", x: 0, y: 0, w: 1, h: 1, visible: true },
       ];
@@ -316,9 +346,10 @@ describe("W2: WorkspaceService", () => {
       const savedWidgets = (
         mockPrisma.userWorkspaceLayout.upsert
       ).mock.calls[0][0].create.widgets as WidgetPosition[];
-      // reconciliation is required → restored even with empty permissions
-      expect(savedWidgets.length).toBe(1);
-      expect(savedWidgets[0].widgetId).toBe("reconciliation");
+      // Step 3.2: reconciliation has sectionPermission: dashboard.financial.read
+      // User has no permissions → reconciliation NOT restored
+      const recWidget = savedWidgets.find((w) => w.widgetId === "reconciliation");
+      expect(recWidget).toBeUndefined();
     });
   });
 
@@ -327,20 +358,19 @@ describe("W2: WorkspaceService", () => {
       const layout = await service.resetLayout(
         "user-1",
         "command-center",
-        ["analytics.read"],
+        ["analytics.read", "dashboard.executive.read", "dashboard.operational.read", "dashboard.financial.read", "dashboard.marketplace.read"],
       );
       expect(mockPrisma.userWorkspaceLayout.delete).toHaveBeenCalledTimes(1);
       expect(layout.widgets.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("returns default even if no layout existed", async () => {
+    });    it("returns default even if no layout existed", async () => {
       (
         mockPrisma.userWorkspaceLayout.delete
       ).mockRejectedValue(new Error("Record not found"));
+
       const layout = await service.resetLayout(
         "user-1",
         "command-center",
-        ["analytics.read"],
+        ["analytics.read", "dashboard.executive.read", "dashboard.operational.read", "dashboard.financial.read", "dashboard.marketplace.read"],
       );
       expect(layout.widgets.length).toBeGreaterThanOrEqual(1);
     });
@@ -349,14 +379,14 @@ describe("W2: WorkspaceService", () => {
   describe("getAvailableWidgets", () => {
     it("returns widgets for valid page", () => {
       const widgets = service.getAvailableWidgets("command-center", [
-        "analytics.read",
+        "analytics.read", "dashboard.executive.read", "dashboard.operational.read", "dashboard.financial.read", "dashboard.marketplace.read",
       ]);
       expect(widgets.length).toBeGreaterThanOrEqual(1);
     });
 
     it("filters by permission", () => {
       const all = service.getAvailableWidgets("command-center", [
-        "analytics.read",
+        "analytics.read", "dashboard.executive.read", "dashboard.operational.read", "dashboard.financial.read", "dashboard.marketplace.read",
       ]);
       const none = service.getAvailableWidgets("command-center", []);
       expect(none.length).toBeLessThan(all.length);

@@ -14,6 +14,7 @@
 
 import { DashboardService } from "./dashboard.service";
 import { AnalyticsPeriodPreset } from "../analytics/analytics-period.resolver";
+import { NotFoundException, ForbiddenException } from "@nestjs/common";
 
 // ─── Mock Analytics Service ─────────────────────────────────────────────────
 
@@ -104,9 +105,35 @@ function createMockAnalytics() {
   } as any;
 }
 
-const MOCK_USER = {
+const MOCK_ADMIN = {
   id: "u1",
   role: "ADMIN",
+  partnerId: null,
+  permissions: [
+    "analytics.read",
+    "dashboard.executive.read",
+    "dashboard.operational.read",
+    "dashboard.financial.read",
+    "dashboard.marketplace.read",
+    "dashboard.customize",
+  ],
+};
+
+const MOCK_MARKETER = {
+  id: "u2",
+  role: "MARKETER",
+  partnerId: null,
+  permissions: [
+    "analytics.read",
+    "dashboard.executive.read",
+    "dashboard.marketplace.read",
+    "dashboard.customize",
+  ],
+};
+
+const MOCK_NO_SECTIONS = {
+  id: "u3",
+  role: "FINANCE",
   partnerId: null,
   permissions: ["analytics.read"],
 };
@@ -119,7 +146,7 @@ describe("DashboardService — Command Center", () => {
     const service = new DashboardService(analytics);
     const result = await service.getCommandCenter(
       { preset: "MONTH" },
-      MOCK_USER,
+      MOCK_ADMIN,
     );
 
     // Period forwarded
@@ -137,35 +164,35 @@ describe("DashboardService — Command Center", () => {
     expect(result.sections.marketplace).toBeDefined();
 
     // Executive: 7 KPIs
-    expect(result.sections.executive.gmv).toBeDefined();
-    expect(result.sections.executive.revenue).toBeDefined();
-    expect(result.sections.executive.netRevenue).toBeDefined();
-    expect(result.sections.executive.ordersCreated).toBeDefined();
-    expect(result.sections.executive.bookingsRequested).toBeDefined();
-    expect(result.sections.executive.averageOrderValue).toBeDefined();
-    expect(result.sections.executive.conversionRate).toBeDefined();
+    expect(result.sections.executive!.gmv).toBeDefined();
+    expect(result.sections.executive!.revenue).toBeDefined();
+    expect(result.sections.executive!.netRevenue).toBeDefined();
+    expect(result.sections.executive!.ordersCreated).toBeDefined();
+    expect(result.sections.executive!.bookingsRequested).toBeDefined();
+    expect(result.sections.executive!.averageOrderValue).toBeDefined();
+    expect(result.sections.executive!.conversionRate).toBeDefined();
 
     // Operational: 6 KPIs
-    expect(result.sections.operational.ordersFulfilled).toBeDefined();
-    expect(result.sections.operational.bookingsConfirmed).toBeDefined();
-    expect(result.sections.operational.bookingsCompleted).toBeDefined();
-    expect(result.sections.operational.paymentsCaptured).toBeDefined();
-    expect(result.sections.operational.refundsProcessed).toBeDefined();
-    expect(result.sections.operational.funnelConversion).toBeDefined();
+    expect(result.sections.operational!.ordersFulfilled).toBeDefined();
+    expect(result.sections.operational!.bookingsConfirmed).toBeDefined();
+    expect(result.sections.operational!.bookingsCompleted).toBeDefined();
+    expect(result.sections.operational!.paymentsCaptured).toBeDefined();
+    expect(result.sections.operational!.refundsProcessed).toBeDefined();
+    expect(result.sections.operational!.funnelConversion).toBeDefined();
 
     // Financial: 4 KPIs
-    expect(result.sections.financial.commissionAccrued).toBeDefined();
-    expect(result.sections.financial.reconciliationStatus).toBeDefined();
-    expect(result.sections.financial.totalPayments).toBeDefined();
-    expect(result.sections.financial.netPayments).toBeDefined();
+    expect(result.sections.financial!.commissionAccrued).toBeDefined();
+    expect(result.sections.financial!.reconciliationStatus).toBeDefined();
+    expect(result.sections.financial!.totalPayments).toBeDefined();
+    expect(result.sections.financial!.netPayments).toBeDefined();
 
     // Marketplace: 4 KPIs (but 18 total = 7+6+4+4 = 21? Let me count: actually 7+6+4+4=21)
     // Design says 18, but sections have 7+6+4+4=21. The design KPI count was approximate.
     // All cards are present and valid.
-    expect(result.sections.marketplace.marketplaceSessions).toBeDefined();
-    expect(result.sections.marketplace.storefrontSessions).toBeDefined();
-    expect(result.sections.marketplace.activePartners).toBeDefined();
-    expect(result.sections.marketplace.newCustomers).toBeDefined();
+    expect(result.sections.marketplace!.marketplaceSessions).toBeDefined();
+    expect(result.sections.marketplace!.storefrontSessions).toBeDefined();
+    expect(result.sections.marketplace!.activePartners).toBeDefined();
+    expect(result.sections.marketplace!.newCustomers).toBeDefined();
 
     // Attribution
     expect(result.attribution).toBeDefined();
@@ -177,7 +204,7 @@ describe("DashboardService — Command Center", () => {
     const service = new DashboardService(analytics);
     await service.getCommandCenter(
       { preset: "CUSTOM", startDate: "2026-01-01", endDate: "2026-01-31", timezone: "Asia/Baku" },
-      MOCK_USER,
+      MOCK_ADMIN,
     );
 
     expect(analytics.getCompanyKpi).toHaveBeenCalledWith(
@@ -187,7 +214,7 @@ describe("DashboardService — Command Center", () => {
         endDate: "2026-01-31",
         timezone: "Asia/Baku",
       }),
-      MOCK_USER,
+      MOCK_ADMIN,
     );
   });
 
@@ -196,22 +223,22 @@ describe("DashboardService — Command Center", () => {
     const service = new DashboardService(analytics);
     await service.getCommandCenter(
       { preset: "MONTH", comparison: false },
-      MOCK_USER,
+      MOCK_ADMIN,
     );
 
     expect(analytics.getCompanyKpi).toHaveBeenCalledWith(
       expect.objectContaining({ comparison: false }),
-      MOCK_USER,
+      MOCK_ADMIN,
     );
   });
 
   it("computes conversion rate correctly", async () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics);
-    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_USER);
+    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     // paymentsCaptured=40, ordersCreated=50 → 80%
-    expect(result.sections.executive.conversionRate.current).toBe(80);
+    expect(result.sections.executive!.conversionRate.current).toBe(80);
   });
 
   it("handles zero denominator in conversion rate", async () => {
@@ -238,42 +265,42 @@ describe("DashboardService — Command Center", () => {
       },
     });
     const service = new DashboardService(analytics);
-    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_USER);
+    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
-    expect(result.sections.executive.conversionRate.current).toBe("0.00");
-    expect(result.sections.executive.conversionRate.previous).toBeNull();
+    expect(result.sections.executive!.conversionRate.current).toBe("0.00");
+    expect(result.sections.executive!.conversionRate.previous).toBeNull();
   });
 
   it("funnel conversion = last stage / first stage", async () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics);
-    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_USER);
+    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     // First=1000, Last=20 → 2%
-    expect(result.sections.operational.funnelConversion.current).toBe("2.00");
+    expect(result.sections.operational!.funnelConversion.current).toBe("2.00");
   });
 
   it("maps all monetary KPIs with currency", async () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics);
-    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_USER);
+    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     // GMV has currency from Step 3.3
-    expect(result.sections.executive.gmv.current).toBe("150.00");
-    expect(result.sections.executive.gmv.previous).toBe("120.00");
-    expect(result.sections.executive.gmv.delta).toBe("30.00");
-    expect(result.sections.executive.gmv.deltaPercent).toBe(25);
+    expect(result.sections.executive!.gmv.current).toBe("150.00");
+    expect(result.sections.executive!.gmv.previous).toBe("120.00");
+    expect(result.sections.executive!.gmv.delta).toBe("30.00");
+    expect(result.sections.executive!.gmv.deltaPercent).toBe(25);
   });
 
   it("drillDown targets are set for all KPIs", async () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics);
-    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_USER);
+    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
-    expect(result.sections.executive.gmv.drillDown?.target).toBe("analytics");
-    expect(result.sections.operational.ordersFulfilled.drillDown?.target).toBe("orders");
-    expect(result.sections.financial.totalPayments.drillDown?.target).toBe("finance");
-    expect(result.sections.marketplace.newCustomers.drillDown?.target).toBe("crm");
+    expect(result.sections.executive!.gmv.drillDown?.target).toBe("analytics");
+    expect(result.sections.operational!.ordersFulfilled.drillDown?.target).toBe("orders");
+    expect(result.sections.financial!.totalPayments.drillDown?.target).toBe("finance");
+    expect(result.sections.marketplace!.newCustomers.drillDown?.target).toBe("crm");
   });
 });
 
@@ -285,7 +312,7 @@ describe("DashboardService — Trends", () => {
     const service = new DashboardService(analytics);
     const result = await service.getTrends(
       { preset: "MONTH", metric: "orders" },
-      MOCK_USER,
+      MOCK_ADMIN,
     );
 
     expect(result.metric).toBe("orders");
@@ -297,7 +324,7 @@ describe("DashboardService — Trends", () => {
   it("defaults metric to orders", async () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics);
-    const result = await service.getTrends({ preset: "MONTH" }, MOCK_USER);
+    const result = await service.getTrends({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.metric).toBe("orders");
   });
@@ -307,12 +334,12 @@ describe("DashboardService — Trends", () => {
     const service = new DashboardService(analytics);
     await service.getTrends(
       { preset: "MONTH", timezone: "Asia/Baku" },
-      MOCK_USER,
+      MOCK_ADMIN,
     );
 
     expect(analytics.getTimeSeries).toHaveBeenCalledWith(
       expect.objectContaining({ timezone: "Asia/Baku" }),
-      MOCK_USER,
+      MOCK_ADMIN,
       "orders",
     );
   });
@@ -360,10 +387,133 @@ describe("DashboardService — Empty State", () => {
     });
 
     const service = new DashboardService(analytics);
-    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_USER);
+    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
-    expect(result.sections.executive.gmv.current).toBe("0.00");
-    expect(result.sections.executive.ordersCreated.current).toBe(0);
-    expect(result.sections.financial.totalPayments.current).toBe("0.00");
+    expect(result.sections.executive!.gmv.current).toBe("0.00");
+    expect(result.sections.executive!.ordersCreated.current).toBe(0);
+    expect(result.sections.financial!.totalPayments.current).toBe("0.00");
+  });
+});
+
+// ─── Section Authority Tests (Step 3.2) ─────────────────────────────────────
+
+describe("DashboardService — Section Authority", () => {
+  it("ADMIN gets all 4 sections + availableSections + availableMetrics", async () => {
+    const analytics = createMockAnalytics();
+    const service = new DashboardService(analytics);
+    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
+
+    expect(result.sections.executive).toBeDefined();
+    expect(result.sections.operational).toBeDefined();
+    expect(result.sections.financial).toBeDefined();
+    expect(result.sections.marketplace).toBeDefined();
+    expect(result.availableSections).toEqual(["executive", "operational", "financial", "marketplace"]);
+    expect(result.availableMetrics).toContain("orders");
+    expect(result.availableMetrics).toContain("payments");
+    expect(result.availableMetrics).toContain("customers");
+    expect(result.availableMetrics).toContain("commissions");
+    expect(result.availableMetrics).toContain("bookings");
+  });
+
+  it("MARKETER gets only Executive + Marketplace sections", async () => {
+    const analytics = createMockAnalytics();
+    const service = new DashboardService(analytics);
+    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
+
+    expect(result.sections.executive).toBeDefined();
+    expect(result.sections.marketplace).toBeDefined();
+    expect(result.sections.operational).toBeUndefined();
+    expect(result.sections.financial).toBeUndefined();
+    expect(result.availableSections).toEqual(["executive", "marketplace"]);
+  });
+
+  it("MARKETER availableMetrics excludes financial metrics", async () => {
+    const analytics = createMockAnalytics();
+    const service = new DashboardService(analytics);
+    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
+
+    expect(result.availableMetrics).toContain("orders");
+    expect(result.availableMetrics).toContain("bookings");
+    expect(result.availableMetrics).toContain("customers");
+    expect(result.availableMetrics).not.toContain("payments");
+    expect(result.availableMetrics).not.toContain("commissions");
+  });
+
+  it("user with page permission but no section permissions gets empty sections/metrics", async () => {
+    const analytics = createMockAnalytics();
+    const service = new DashboardService(analytics);
+    const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_NO_SECTIONS);
+
+    expect(result.sections).toEqual({});
+    expect(result.availableSections).toEqual([]);
+    expect(result.availableMetrics).toEqual([]);
+  });
+
+  it("financial read model not called without Financial permission", async () => {
+    const analytics = createMockAnalytics();
+    const service = new DashboardService(analytics);
+    await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
+
+    expect(analytics.getFinancialReconciliation).not.toHaveBeenCalled();
+  });
+
+  it("funnel read model not called without Operational permission", async () => {
+    const analytics = createMockAnalytics();
+    const service = new DashboardService(analytics);
+    await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
+
+    expect(analytics.getConversionFunnel).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Trends Authority Tests (Step 3.2) ──────────────────────────────────────
+
+describe("DashboardService — Trends Authority", () => {
+  it("unknown metric returns 404", async () => {
+    const analytics = createMockAnalytics();
+    const service = new DashboardService(analytics);
+
+    await expect(
+      service.getTrends({ preset: "MONTH", metric: "nonexistent" }, MOCK_ADMIN),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it("unauthorized metric returns 403", async () => {
+    const analytics = createMockAnalytics();
+    const service = new DashboardService(analytics);
+
+    // MARKETER has no dashboard.financial.read → payments should be 403
+    await expect(
+      service.getTrends({ preset: "MONTH", metric: "payments" }, MOCK_MARKETER),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it("MARKETER can access orders (executive), bookings (executive), customers (marketplace)", async () => {
+    const analytics = createMockAnalytics();
+    const service = new DashboardService(analytics);
+
+    const orders = await service.getTrends({ preset: "MONTH", metric: "orders" }, MOCK_MARKETER);
+    expect(orders.metric).toBe("orders");
+
+    const bookings = await service.getTrends({ preset: "MONTH", metric: "bookings" }, MOCK_MARKETER);
+    expect(bookings.metric).toBe("bookings");
+
+    const customers = await service.getTrends({ preset: "MONTH", metric: "customers" }, MOCK_MARKETER);
+    expect(customers.metric).toBe("customers");
+  });
+
+  it("unauthorized/unknown metric does not call analytics service", async () => {
+    const analytics = createMockAnalytics();
+    const service = new DashboardService(analytics);
+
+    await expect(
+      service.getTrends({ preset: "MONTH", metric: "nonexistent" }, MOCK_ADMIN),
+    ).rejects.toThrow();
+
+    expect(analytics.getTimeSeries).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "nonexistent",
+    );
   });
 });

@@ -75,8 +75,8 @@ export class WorkspaceService {
       widgetPositions = savedPositions;
     }
 
-    // 4. Required widget restoration
-    widgetPositions = this.ensureRequiredWidgets(widgetPositions, pageId);
+    // 4. Required widget restoration (conditional on section permission)
+    widgetPositions = this.ensureRequiredWidgets(widgetPositions, pageId, userPermissions);
 
     // 5. RBAC filter — remove widgets user cannot access
     const allPageWidgets = getWidgetsForPage(pageId);
@@ -129,8 +129,8 @@ export class WorkspaceService {
       page,
     );
 
-    // Required widget restoration
-    const finalWidgets = this.ensureRequiredWidgets(validatedWidgets, pageId);
+    // Required widget restoration (conditional on section permission)
+    const finalWidgets = this.ensureRequiredWidgets(validatedWidgets, pageId, userPermissions);
 
     // Upsert
     await this.prisma.userWorkspaceLayout.upsert({
@@ -253,10 +253,12 @@ export class WorkspaceService {
   /**
    * Ensure required widgets are present in layout.
    * Adds missing required widgets at the end.
+   * Step 3.2: Conditional required — reconciliation only when financial access present.
    */
   private ensureRequiredWidgets(
     widgets: WidgetPosition[],
     pageId: string,
+    userPermissions?: string[],
   ): WidgetPosition[] {
     const page = getPageDefinition(pageId);
     if (!page) return widgets;
@@ -272,10 +274,16 @@ export class WorkspaceService {
     }
 
     for (const reqId of page.requiredWidgets) {
-      if (existingIds.has(reqId)) continue;
-
+      // Step 3.2: Conditional required — check section permission
       const def = getWidgetDefinition(reqId);
       if (!def) continue;
+
+      // If widget has sectionPermission, only require it when user has that permission
+      if (def.sectionPermission && userPermissions) {
+        if (!userPermissions.includes(def.sectionPermission)) continue;
+      }
+
+      if (existingIds.has(reqId)) continue;
 
       result.push({
         widgetId: reqId,
