@@ -26,9 +26,10 @@
 | Repository | `https://github.com/seldom733-hash/travelhub1` |
 | Branch | `master` |
 | Base SHA | `ce77af3c90d65b042fa6834146636b92b66f7507` |
-| Final SHA | `ce77af3c90d65b042fa6834146636b92b66f7507` (docs-only, code unchanged) |
+| Final SHA | `b6e050ea17b120c26f1cd45d506119d00e1c1ad1` (docs-only, code unchanged) |
 | Upstream | `origin/master` |
-| Worktree | Clean (only untracked docs — no staged/modified production files) |
+| Tracked Round 3 scope | Clean (0 modified tracked, 0 staged) |
+| Repository worktree | Not clean — pre-existing untracked files present (не modified, не staged, не в scope Round 3) |
 | Ancestor check | ✅ HEAD matches base SHA |
 | Recent commits | `ce77af3` docs(step-3.2): design server-side section authority and admin role permissions |
 
@@ -177,7 +178,8 @@ PHASE 3 — STEP 3.2 — DESIGN REMEDIATION ROUND 3 — VERDICT A — READY FOR 
 - [x] Stage C остаётся future UI/API scope, но persistence foundation готова в Stage A
 - [x] Изменены только два docs-файла (architecture + report)
 - [x] git diff --check проходит (no whitespace errors)
-- [x] Worktree clean (только untracked docs)
+- [x] Tracked Round 3 scope clean (0 modified tracked, 0 staged)
+- [x] Pre-existing untracked files не modified/staged/deleted
 
 ---
 
@@ -206,8 +208,9 @@ PHASE 3 — STEP 3.2 — DESIGN REMEDIATION ROUND 3 — VERDICT A — READY FOR 
 | Production code changes | 0 |
 | Schema/migration changes | 0 |
 | git diff --check | Clean |
-| HEAD == upstream | Yes (`ce77af3`) |
-| Worktree clean | Yes (only untracked docs) |
+| HEAD == upstream | Yes (`b6e050e`) |
+| Tracked scope | Clean (0 modified tracked, 0 staged) |
+| Repository worktree | Not clean — pre-existing untracked files present |
 
 ---
 

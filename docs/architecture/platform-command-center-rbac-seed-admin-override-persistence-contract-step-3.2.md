@@ -87,7 +87,7 @@ Admin override → НЕ переживает restart
 | `platform-command-center-server-side-section-authority...step-3.2.md` §5.3 | «Seed only creates Permission catalog rows. Does NOT recreate RolePermission assignments» | Seed выполняет `toAdd` + `toRevoke` — авторитетная синхронизация RolePermission | Seed синхронизирует RolePermission по ROLE_PERMISSIONS; это деструктивно для Admin overrides |
 | `platform-command-center-server-side-section-authority...step-3.2.md` §5.3 | «Admin CAN modify RolePermission rows at runtime. Seed will NOT overwrite Admin changes on restart» | `toAdd` восстанавливает отозванные defaults; `toRevoke` удаляет не-MATRIX grants | Admin changes **уничтожаются** при restart |
 | `platform-command-center-server-side-section-authority...step-3.2.md` §6.2 | «Seed creates Permission rows + RolePermission defaults. Restart: seed creates only missing Permission rows; existing RolePermission preserved» | Строка 81–90: `toRevoke` удаляет ставшие «лишними» после restart links | Seed не «создаёт отсутствующие» — он удаляет «лишние» |
-| `platform-command-center-server-side-section-authority...step-3.2.md` §6.3 | «Seed creates Permission row; no RolePermission auto-assigned. Admin must explicitly grant» | `toAdd` автоматически создаёт RolePermission для ВСЕХ permissions из ROLE_PERMISSIONS | Auto-assigned для矩阵内の permissions |
+| `platform-command-center-server-side-section-authority...step-3.2.md` §6.3 | «Seed creates Permission row; no RolePermission auto-assigned. Admin must explicitly grant» | `toAdd` автоматически создаёт RolePermission для ВСЕХ permissions из ROLE_PERMISSIONS | Auto-assigned для permissions, присутствующих в ROLE_PERMISSIONS matrix |
 | Отчёт Round 2 §6 | «Current persistence: RolePermission rows are effective state» | Seed синхронизирует при каждом startup — RolePermission ≠ persisted effective state | RolePermission является **ephemeral state**, синхронизируемым seed'ом |
 | Отчёт Round 2 §7 | «Seed creates Permission + RolePermission defaults (idempotent)» | Seed выполняет авторитетную синхронизацию (toAdd/toRevoke), не простое «создание отсутствующих» | Seed выполняет destructive reconciliation |
 | Отчёт Round 2 §7 | «Admin modifies RolePermission; preserved across restart» | Контрадикция с фактическим seed'ом | Admin changes **не** переживают restart |
@@ -113,7 +113,7 @@ System Role Defaults
 | Концепт | Определение | Хранение | Изменение |
 |---|---|---|---|
 | **System Defaults** | Определение safe default assignments для каждой роли | `ROLE_PERMISSIONS` в коде — reference, documentation, tests, explicit reset | Только через code change + deploy |
-| **Effective State** | Текущие assignments для каждой роли | `RolePermission` rows в БД | Stage A: seed/bootstrap; Stage C: Admin mutations |
+| **Effective State** | Текущие assignments для каждой роли | `RolePermission` rows в БД | Stage A: one-time Prisma migration; Stage C: Admin mutations |
 
 ### 4.3 Target seed behavior (Stage A)
 
@@ -122,8 +122,9 @@ seedRoles():
   1. Role upsert (айдемпотентно) — БЕЗ ИЗМЕНЕНИЙ
   2. Permission catalog createMany (айдемпотентно) — БЕЗ ИЗМЕНЕНИЙ
   3. STOP — НЕ выполняет toAdd/toRevoke для RolePermission
-  4. RolePermission создание — только через one-time migration/bootstrap
 ```
+
+RolePermission default assignments создаются **только** через one-time Prisma migration. Startup seed НЕ materializes ROLE_PERMISSIONS в RolePermission rows.
 
 ### 4.4 Target RolePermission lifecycle
 
@@ -156,11 +157,12 @@ seedRoles():
 
 | Аспект | Решение |
 |---|---|
-| Применение к new installations | Да — через current ROLE_PERMISSIONS в коде |
+| Fresh installations | Defaults определяются **migration history**, а не runtime materialization ROLE_PERMISSIONS |
 | Применение к existing installations | Только через **явную data migration** с security approval |
-| Какие grants/revocations допустимы | Только для permissions, реально изменённых в ROLE_PERMISSIONS |
-| Защита Admin intent | Migration проверяет: если Admin изменил specific assignment — НЕ перезаписывать |
-| Алгоритм | `IF permission NOT IN currentRolePermissions AND adminDidNotModify(role, permission) THEN grant` |
+| Новый permission code | One-time migration безопасно создаёт Permission + default assignments: до появления code Admin не мог создать override |
+| Изменение default для существующего permission | Отсутствие/наличие RolePermission **не раскрывает** Admin intent. Автоматическое определение `adminDidNotModify` невозможно без persisted override/provenance metadata |
+| Emergency/security revocation | Targeted data migration с отдельным security approval; сознательно меняет effective state |
+| Future three-way merge | Требует persisted provenance/override model в Stage C. Нельзя придумывать его наличие сейчас |
 
 ---
 
@@ -172,7 +174,7 @@ seedRoles():
 | Safe default assignments для согласованных ролей | `backend/src/security/permissions.constants.ts` (ROLE_PERMISSIONS) | Production code | Определение базовых assignments | YES |
 | One-time Prisma migration: Permission catalog + default RolePermission | `backend/prisma/migrations/XXXX_add_dashboard_permissions/migration.sql` | Migration | Идемпотентное создание Permission rows + default RolePermission assignments | YES |
 | **Прекращение destructive startup synchronization** | `backend/src/security/security.service.ts` (`seedRoles()`) | Production code | Удалить `toAdd`/`toRevoke` логику для RolePermission | YES — критично |
-| Versioned bootstrap marker (опционально) | `backend/prisma/schema.prisma` ( nueva tabla `SchemaMeta` или version field) | Schema + Migration | Уникализация «был ли уже bootstrap» без ненадёжной `RolePermission.count() === 0` | NO (migration sufficient) |
+| Versioned bootstrap marker (опционально) | `backend/prisma/schema.prisma` (новая таблица `SchemaMeta` или version field) | Schema + Migration | Уникализация «был ли уже bootstrap» без ненадёжной `RolePermission.count() === 0` | NO (migration sufficient) |
 | Server-side summary section filtering | `backend/src/modules/dashboard/dashboard.service.ts` | Production code | Фильтрация sections по user permissions | YES |
 | `availableSections` response contract | `backend/src/modules/dashboard/dashboard.types.ts` | Production code | DTO для authorized sections | YES |
 | Trends metric → section authorization | `backend/src/modules/dashboard/dashboard.service.ts` | Production code | Блокировка unauthorized metrics | YES |
@@ -193,7 +195,7 @@ seedRoles():
 - Seed продолжает создавать Permission catalog (айдемпотентно)
 - Seed НЕ создаёт/синхронизирует RolePermission
 
-**B. SchemaMeta table** (если cần дополнительная гибкость):
+**B. SchemaMeta table** (если нужна дополнительная гибкость):
 - Новая таблица `SchemaMeta { key String PK, value String, updatedAt DateTime }`
 - Хранит `rbac_bootstrap_version` или `last_dashboard_permission_migration`
 - Seed проверяет version перед applied seed logic
@@ -210,7 +212,7 @@ seedRoles():
 |---|---|---|
 | 1 | Fresh DB получает все согласованные default role assignments | После bootstrap: для каждой роли из ROLE_PERMISSIONS существуют RolePermission rows для ВСЕХ permissions из её массива |
 | 2 | Второй запуск bootstrap/startup не создаёт duplicate links | После второго `onModuleInit()`: количество RolePermission rows не изменилось |
-| 3 | Удалённый default `RolePermission` не возвращается после `onModuleInit()` | Admin удаляет `MARKETER → dashboard.financial.read`. Restart. Link НЕ появляется. |
+| 3 | Удалённый default `RolePermission` не возвращается после `onModuleInit()` | Admin удаляет `MARKETER → dashboard.marketplace.read`. Restart. Link НЕ появляется. |
 | 4 | Добавленный non-default `RolePermission` не удаляется после `onModuleInit()` | Admin добавляет `FINANCE → analytics.read`. Restart. Link сохраняется. |
 | 5 | Новый permission catalog row создаётся без изменения несвязанных effective assignments | Добавить новый permission в ROLE_PERMISSIONS. Seed создаёт Permission row. Существующие RolePermission для других permissions не изменяются. |
 
@@ -230,7 +232,7 @@ seedRoles():
 | # | Тест | Expected behavior |
 |---|---|---|
 | 12 | Direct effective grant сохраняется после restart simulation | Вставка RolePermission (FINANCE → analytics.read). Seed. Link сохраняется. |
-| 13 | Direct effective revoke сохраняется после restart simulation | Удаление RolePermission (MARKETER → dashboard.financial.read). Seed. Link не появляется. |
+| 13 | Direct effective revoke сохраняется после restart simulation | Удаление RolePermission (MARKETER → dashboard.marketplace.read). Seed. Link не появляется. |
 | 14 | Explicit reset algorithm восстанавливает только system defaults выбранной роли | Удалить все RolePermission для FINANCE, восстановить из ROLE_PERMISSIONS. Другие роли не изменены. |
 
 **Примечание:** Тесты 12–14 могут оставаться Stage C implementation, но их **algorithm и acceptance criteria** определяются сейчас.
@@ -261,7 +263,7 @@ Stage C — Admin Permission Management UI
 ```
 
 **Stage A** устанавливает:
--.persistence foundation (RolePermission = effective state, seed не перезаписывает)
+- Persistence foundation (RolePermission = effective state, seed не перезаписывает)
 - section-level permissions (5 новых)
 - server-side filtering
 - test contract
