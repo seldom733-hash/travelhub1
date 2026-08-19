@@ -217,6 +217,14 @@ export interface TimeSeriesResponse {
   }>;
 }
 
+export interface CurrencyReconciliation {
+  currency: string;
+  totalPayments: string;
+  totalRefunds: string;
+  netPayments: string;
+  totalCommission: string;
+}
+
 export interface FinancialReconciliationResponse {
   period: {
     start: string;
@@ -224,12 +232,18 @@ export interface FinancialReconciliationResponse {
     timezone: string;
     preset: string;
   };
+  /** @deprecated Use currencies[] for multi-currency reconciliation. */
   currency: string;
+  /** @deprecated Use currencies[] for multi-currency reconciliation. */
   totalPayments: string;
+  /** @deprecated Use currencies[] for multi-currency reconciliation. */
   totalRefunds: string;
+  /** @deprecated Use currencies[] for multi-currency reconciliation. */
   netPayments: string;
+  /** @deprecated Use currencies[] for multi-currency reconciliation. */
   totalCommission: string;
   totalLedgerEntries: number;
+  currencies: CurrencyReconciliation[];
 }
 
 // ─── Authorization Helpers ──────────────────────────────────────────────────
@@ -645,13 +659,14 @@ export class AnalyticsService {
       if (o.sellerPartnerId) orderPartnerMap.set(o.id, o.sellerPartnerId);
     }
 
-    // Group by partner
+    // Group by partner — values stored as INTEGER CENTS (no JS float on money)
+    // HIGH-NEW-1 fix: eliminate parseFloat accumulation for monetary values
     const byPartner = new Map<
       string,
       {
-        gmvByCurrency: Record<string, number>;
-        revenueByCurrency: Record<string, number>;
-        commissionByCurrency: Record<string, number>;
+        gmvByCurrency: Record<string, number>; // cents
+        revenueByCurrency: Record<string, number>; // cents
+        commissionByCurrency: Record<string, number>; // cents
         ordersCount: number;
         bookingsCount: number;
         confirmedBookings: number;
@@ -675,18 +690,18 @@ export class AnalyticsService {
       }
     };
 
-    // Merge orders (GMV)
+    // Merge orders (GMV) — accumulate in INTEGER CENTS
     for (const o of orders) {
       const pid = o.sellerPartnerId!;
       ensurePartner(pid);
       const data = byPartner.get(pid)!;
       const cur = o.currency || "USD";
-      const amt = parseFloat(String(o.amount ?? "0"));
-      data.gmvByCurrency[cur] = (data.gmvByCurrency[cur] || 0) + amt;
+      const cents = Math.round(parseFloat(String(o.amount ?? "0")) * 100);
+      data.gmvByCurrency[cur] = (data.gmvByCurrency[cur] || 0) + cents;
       data.ordersCount++;
     }
 
-    // Merge payments (Revenue) — join via orderId → sellerPartnerId
+    // Merge payments (Revenue) — join via orderId → sellerPartnerId, INTEGER CENTS
     for (const p of payments) {
       const pid = orderPartnerMap.get(p.orderId);
       if (!pid) continue;
@@ -694,20 +709,20 @@ export class AnalyticsService {
       ensurePartner(pid);
       const data = byPartner.get(pid)!;
       const cur = p.currency || "USD";
-      const amt = parseFloat(String(p.amount ?? "0"));
-      data.revenueByCurrency[cur] = (data.revenueByCurrency[cur] || 0) + amt;
+      const cents = Math.round(parseFloat(String(p.amount ?? "0")) * 100);
+      data.revenueByCurrency[cur] = (data.revenueByCurrency[cur] || 0) + cents;
     }
 
-    // Merge commissions
+    // Merge commissions — INTEGER CENTS
     for (const c of commissions) {
       const pid = c.partnerId;
       if (!pid) continue;
       ensurePartner(pid);
       const data = byPartner.get(pid)!;
       const cur = c.currency || "USD";
-      const amt = parseFloat(String(c.amount ?? "0"));
+      const cents = Math.round(parseFloat(String(c.amount ?? "0")) * 100);
       data.commissionByCurrency[cur] =
-        (data.commissionByCurrency[cur] || 0) + amt;
+        (data.commissionByCurrency[cur] || 0) + cents;
     }
 
     // Merge bookings (via product → partner)
@@ -748,28 +763,21 @@ export class AnalyticsService {
         preset: current.preset,
       },
       partners: [...byPartner.entries()].map(([pid, data]) => {
+        // Convert integer cents back to Decimal strings (no JS float on output)
+        const centsToDecimal = (cents: number) => (cents / 100).toFixed(2);
         const gmv = primaryCurrencyTotal(
-          sumDecimalString(
-            Object.entries(data.gmvByCurrency).map(([currency, amt]) => ({
-              amount: amt.toFixed(2),
-              currency,
-            })),
+          Object.fromEntries(
+            Object.entries(data.gmvByCurrency).map(([c, cents]) => [c, centsToDecimal(cents)]),
           ),
         );
         const revenue = primaryCurrencyTotal(
-          sumDecimalString(
-            Object.entries(data.revenueByCurrency).map(([currency, amt]) => ({
-              amount: amt.toFixed(2),
-              currency,
-            })),
+          Object.fromEntries(
+            Object.entries(data.revenueByCurrency).map(([c, cents]) => [c, centsToDecimal(cents)]),
           ),
         );
         const commission = primaryCurrencyTotal(
-          sumDecimalString(
-            Object.entries(data.commissionByCurrency).map(([currency, amt]) => ({
-              amount: amt.toFixed(2),
-              currency,
-            })),
+          Object.fromEntries(
+            Object.entries(data.commissionByCurrency).map(([c, cents]) => [c, centsToDecimal(cents)]),
           ),
         );
         const completionRate =
@@ -938,9 +946,10 @@ export class AnalyticsService {
       case "bookings":
         return this.prisma.booking.count({ where });
       case "payments":
+        // HIGH-NEW-2 fix: use paidAt (canonical lifecycle timestamp)
         return this.prisma.payment.count({
           where: {
-            createdAt: { gte: bucket.start, lt: bucket.endExclusive },
+            paidAt: { gte: bucket.start, lt: bucket.endExclusive },
             status: "CAPTURED",
           },
         });
@@ -995,12 +1004,23 @@ export class AnalyticsService {
       refundsByCurrency,
     );
 
+    // MEDIUM-NEW-1 fix: currency-separated reconciliation
     const allCurrencies = new Set([
       ...Object.keys(paymentsByCurrency),
       ...Object.keys(refundsByCurrency),
       ...Object.keys(commissionByCurrency),
     ]);
-    const primaryCur = [...allCurrencies][0] || "USD";
+    const sortedCurrencies = [...allCurrencies].sort();
+    const primaryCur = sortedCurrencies[0] || "USD";
+
+    // Build per-currency reconciliation entries
+    const currencies: CurrencyReconciliation[] = sortedCurrencies.map((cur) => ({
+      currency: cur,
+      totalPayments: paymentsByCurrency[cur] || "0.00",
+      totalRefunds: refundsByCurrency[cur] || "0.00",
+      netPayments: netPaymentsByCurrency[cur] || "0.00",
+      totalCommission: commissionByCurrency[cur] || "0.00",
+    }));
 
     return {
       period: {
@@ -1009,12 +1029,15 @@ export class AnalyticsService {
         timezone: current.timezone,
         preset: current.preset,
       },
+      // Deprecated primary-currency fields (backward compatible)
       currency: primaryCur,
       totalPayments: paymentsByCurrency[primaryCur] || "0.00",
       totalRefunds: refundsByCurrency[primaryCur] || "0.00",
       netPayments: netPaymentsByCurrency[primaryCur] || "0.00",
       totalCommission: commissionByCurrency[primaryCur] || "0.00",
       totalLedgerEntries: Number(ledgerEntries[0]?.cnt || 0),
+      // Currency-separated reconciliation (canonical)
+      currencies,
     };
   }
 }

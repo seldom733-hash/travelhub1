@@ -293,12 +293,25 @@ describe("Step 3.3 — Analytics Foundation (e2e)", () => {
       expect(Array.isArray(res.body.buckets)).toBe(true);
       expect(res.body.buckets.length).toBeGreaterThan(0);
     });
+
+    it("payments metric uses paidAt (not createdAt)", async () => {
+      const adminLogin = await login("admin", "admin123");
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/analytics/time-series")
+        .set("Authorization", `Bearer ${adminLogin.accessToken}`)
+        .query({ preset: "MONTH", metric: "payments" })
+        .expect(200);
+
+      // Should return valid response with buckets
+      expect(res.body.granularity).toBeDefined();
+      expect(Array.isArray(res.body.buckets)).toBe(true);
+    });
   });
 
   // ─── 10. Financial Reconciliation ───────────────────────────────────
 
   describe("Financial Reconciliation", () => {
-    it("returns reconciliation summary", async () => {
+    it("returns reconciliation summary with currencies array", async () => {
       const adminLogin = await login("admin", "admin123");
       const res = await request(app.getHttpServer())
         .get("/api/v1/analytics/financial-reconciliation")
@@ -306,12 +319,16 @@ describe("Step 3.3 — Analytics Foundation (e2e)", () => {
         .query({ preset: "MONTH" })
         .expect(200);
 
+      // Backward-compatible fields
       expect(res.body.currency).toBeDefined();
       expect(res.body.totalPayments).toBeDefined();
       expect(res.body.totalRefunds).toBeDefined();
       expect(res.body.netPayments).toBeDefined();
       expect(res.body.totalCommission).toBeDefined();
       expect(typeof res.body.totalLedgerEntries).toBe("number");
+
+      // Currency-separated reconciliation (MEDIUM-NEW-1)
+      expect(Array.isArray(res.body.currencies)).toBe(true);
     });
   });
 

@@ -466,3 +466,193 @@ describe("AnalyticsService — Partner Performance (HIGH-6)", () => {
     expect(partner!.bookingCompletionRate).toBe(200);
   });
 });
+
+// ─── Round 2: Time Series payments uses paidAt (HIGH-NEW-2) ──────────────────
+
+describe("AnalyticsService — Time Series payments paidAt (HIGH-NEW-2)", () => {
+  it("payments metric uses paidAt not createdAt", async () => {
+    const prisma = createMockPrisma();
+    prisma.order.findMany.mockResolvedValue([]);
+    prisma.payment.findMany.mockResolvedValue([]);
+    prisma.refund.findMany.mockResolvedValue([]);
+    prisma.commission.findMany.mockResolvedValue([]);
+    prisma.customer.findMany.mockResolvedValue([]);
+    prisma.booking.findMany.mockResolvedValue([]);
+    prisma.partner.findMany.mockResolvedValue([]);
+    prisma.product.findMany.mockResolvedValue([]);
+    prisma.checkoutIntent.findMany.mockResolvedValue([]);
+    // Time series buckets → each bucket calls getMetricCountForBucket
+    prisma.payment.count.mockResolvedValue(5);
+
+    const service = new AnalyticsService(prisma);
+    await service.getTimeSeries(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u1", role: "ADMIN", partnerId: null } as any,
+      "payments",
+    );
+
+    // Find the payment.count call — should use paidAt
+    const countCalls = prisma.payment.count.mock.calls;
+    expect(countCalls.length).toBeGreaterThan(0);
+    const firstCall = countCalls[0][0];
+    expect(firstCall.where.paidAt).toBeDefined();
+    expect(firstCall.where.createdAt).toBeUndefined();
+    expect(firstCall.where.status).toBe("CAPTURED");
+  });
+});
+
+// ─── Round 2: Partner Performance integer-cent exactness (HIGH-NEW-1) ────────
+
+describe("AnalyticsService — Partner Performance integer-cent (HIGH-NEW-1)", () => {
+  it("does not produce float corruption with classic 0.10 + 0.20 + 0.30", async () => {
+    const prisma = createMockPrisma();
+    prisma.order.findMany.mockResolvedValue([
+      { id: "o1", sellerPartnerId: "p1", amount: "0.10", currency: "USD" },
+      { id: "o2", sellerPartnerId: "p1", amount: "0.20", currency: "USD" },
+      { id: "o3", sellerPartnerId: "p1", amount: "0.30", currency: "USD" },
+    ]);
+    prisma.payment.findMany.mockImplementation((args: any) => {
+      if (args.where?.status === "CAPTURED") {
+        return Promise.resolve([
+          { amount: "0.10", currency: "USD", orderId: "o1" },
+          { amount: "0.20", currency: "USD", orderId: "o2" },
+          { amount: "0.30", currency: "USD", orderId: "o3" },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    prisma.commission.findMany.mockResolvedValue([
+      { partnerId: "p1", amount: "0.10", currency: "USD" },
+      { partnerId: "p1", amount: "0.20", currency: "USD" },
+      { partnerId: "p1", amount: "0.30", currency: "USD" },
+    ]);
+    prisma.booking.findMany.mockResolvedValue([]);
+    prisma.partner.findMany.mockResolvedValue([
+      { id: "p1", name: "Test Partner" },
+    ]);
+    prisma.product.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    const service = new AnalyticsService(prisma);
+    const result = await service.getPartnerPerformance(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u1", role: "ADMIN", partnerId: null } as any,
+    );
+
+    const partner = result.partners[0];
+    // 0.10 + 0.20 + 0.30 = 0.60 exactly
+    expect(partner.gmv).toBe("0.60");
+    expect(partner.revenue).toBe("0.60");
+    expect(partner.commission).toBe("0.60");
+    // Must NOT contain float artifacts
+    expect(partner.gmv).not.toContain("6000000000000001");
+    expect(partner.revenue).not.toContain("6000000000000001");
+  });
+
+  it("handles large values without precision loss", async () => {
+    const prisma = createMockPrisma();
+    prisma.order.findMany.mockResolvedValue([
+      { id: "o1", sellerPartnerId: "p1", amount: "999999.99", currency: "USD" },
+      { id: "o2", sellerPartnerId: "p1", amount: "0.01", currency: "USD" },
+    ]);
+    prisma.payment.findMany.mockImplementation((args: any) => {
+      if (args.where?.status === "CAPTURED") {
+        return Promise.resolve([
+          { amount: "999999.99", currency: "USD", orderId: "o1" },
+          { amount: "0.01", currency: "USD", orderId: "o2" },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    prisma.commission.findMany.mockResolvedValue([]);
+    prisma.booking.findMany.mockResolvedValue([]);
+    prisma.partner.findMany.mockResolvedValue([
+      { id: "p1", name: "Test Partner" },
+    ]);
+    prisma.product.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    const service = new AnalyticsService(prisma);
+    const result = await service.getPartnerPerformance(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u1", role: "ADMIN", partnerId: null } as any,
+    );
+
+    const partner = result.partners[0];
+    // 999999.99 + 0.01 = 1000000.00 exactly
+    expect(partner.gmv).toBe("1000000.00");
+    expect(partner.revenue).toBe("1000000.00");
+  });
+});
+
+// ─── Round 2: Financial Reconciliation multi-currency (MEDIUM-NEW-1) ──────────
+
+describe("AnalyticsService — Financial Reconciliation multi-currency (MEDIUM-NEW-1)", () => {
+  it("returns currency-separated reconciliation", async () => {
+    const prisma = createMockPrisma();
+    prisma.payment.findMany.mockResolvedValue([
+      { id: "p1", amount: "500.00", currency: "USD" },
+      { id: "p2", amount: "300.00", currency: "EUR" },
+    ]);
+    prisma.refund.findMany.mockResolvedValue([
+      { id: "r1", amount: "50.00", currency: "USD" },
+    ]);
+    prisma.commission.findMany.mockResolvedValue([
+      { id: "c1", amount: "25.00", currency: "USD" },
+      { id: "c2", amount: "15.00", currency: "EUR" },
+    ]);
+    prisma.$queryRaw.mockResolvedValue([{ cnt: BigInt(10) }]);
+
+    const service = new AnalyticsService(prisma);
+    const result = await service.getFinancialReconciliation(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u1", role: "ADMIN", partnerId: null } as any,
+    );
+
+    // currencies array should contain both USD and EUR
+    expect(result.currencies).toBeDefined();
+    expect(result.currencies.length).toBe(2);
+
+    const usd = result.currencies.find((c) => c.currency === "USD");
+    const eur = result.currencies.find((c) => c.currency === "EUR");
+
+    expect(usd).toBeDefined();
+    expect(usd!.totalPayments).toBe("500.00");
+    expect(usd!.totalRefunds).toBe("50.00");
+    expect(usd!.netPayments).toBe("450.00");
+    expect(usd!.totalCommission).toBe("25.00");
+
+    expect(eur).toBeDefined();
+    expect(eur!.totalPayments).toBe("300.00");
+    expect(eur!.totalRefunds).toBe("0.00");
+    expect(eur!.netPayments).toBe("300.00");
+    expect(eur!.totalCommission).toBe("15.00");
+
+    // No fake combined total — USD + EUR are separate
+    expect(usd!.totalPayments).not.toBe("800.00");
+
+    // Backward-compatible primary fields still present
+    expect(result.currency).toBeDefined();
+    expect(result.totalPayments).toBeDefined();
+  });
+
+  it("returns deterministic currency ordering (sorted)", async () => {
+    const prisma = createMockPrisma();
+    prisma.payment.findMany.mockResolvedValue([
+      { id: "p1", amount: "100.00", currency: "AZN" },
+      { id: "p2", amount: "200.00", currency: "EUR" },
+      { id: "p3", amount: "300.00", currency: "USD" },
+    ]);
+    prisma.refund.findMany.mockResolvedValue([]);
+    prisma.commission.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([{ cnt: BigInt(0) }]);
+
+    const service = new AnalyticsService(prisma);
+    const result = await service.getFinancialReconciliation(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u1", role: "ADMIN", partnerId: null } as any,
+    );
+
+    expect(result.currencies.map((c) => c.currency)).toEqual(["AZN", "EUR", "USD"]);
+  });
+});
