@@ -357,23 +357,197 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
     });
   });
 
-  // ─── 9. RBAC filtering ─────────────────────────────────────────────
+  // ─── 9. RBAC filtering + Step 3.2 page gate ─────────────────────────
 
-  describe("RBAC filtering", () => {
-    it("BUYER with no analytics permissions gets empty widgets", async () => {
+  describe("RBAC filtering + page gate", () => {
+    it("BUYER without analytics.read gets 403 on GET command-center", async () => {
       const { token: buyerToken } = await createUserWithRole(
         RoleCode.BUYER,
         "ws_rbac_buyer",
       );
 
-      const res = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .get("/api/v1/workspaces/command-center")
         .set("Authorization", `Bearer ${buyerToken}`)
+        .expect(403);
+    });
+
+    it("BUYER without analytics.read gets 403 on GET command-center/widgets", async () => {
+      const { token: buyerToken } = await createUserWithRole(
+        RoleCode.BUYER,
+        "ws_rbac_buyer_w",
+      );
+
+      await request(app.getHttpServer())
+        .get("/api/v1/workspaces/command-center/widgets")
+        .set("Authorization", `Bearer ${buyerToken}`)
+        .expect(403);
+    });
+
+    it("FINANCE without analytics.read gets 403 on GET command-center", async () => {
+      const { token: financeToken } = await createUserWithRole(
+        RoleCode.FINANCE,
+        "ws_rbac_finance",
+      );
+
+      await request(app.getHttpServer())
+        .get("/api/v1/workspaces/command-center")
+        .set("Authorization", `Bearer ${financeToken}`)
+        .expect(403);
+    });
+
+    it("PARTNER without analytics.read gets 403 on GET command-center", async () => {
+      const { token: partnerToken } = await createUserWithRole(
+        RoleCode.PARTNER,
+        "ws_rbac_partner",
+      );
+
+      await request(app.getHttpServer())
+        .get("/api/v1/workspaces/command-center")
+        .set("Authorization", `Bearer ${partnerToken}`)
+        .expect(403);
+    });
+
+    it("MARKETER with analytics.read gets 200 on GET command-center", async () => {
+      const { token: marketerToken } = await createUserWithRole(
+        RoleCode.MARKETER,
+        "ws_rbac_marketer",
+      );
+
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/workspaces/command-center")
+        .set("Authorization", `Bearer ${marketerToken}`)
         .expect(200);
 
-      // BUYER typically lacks analytics.read — should get 0 or few widgets
-      // (only widgets without permission restriction)
-      expect(Array.isArray(res.body.widgets)).toBe(true);
+      expect(res.body.pageId).toBe("command-center");
+      expect(res.body.constructorEnabled).toBe(true);
+    });
+
+    it("FINANCE with persisted analytics.read grant gets 200 on GET", async () => {
+      const { token: financeToken, userId } = await createUserWithRole(
+        RoleCode.FINANCE,
+        "ws_rbac_finance_grant",
+      );
+
+      // Create persisted grant: FINANCE → analytics.read
+      const adminLogin = await login("admin", "admin123");
+      const financeRole = await prisma.role.findUnique({ where: { code: RoleCode.FINANCE } });
+      const analyticsPerm = await prisma.permission.findUnique({ where: { code: "analytics.read" } });
+      let grantCreated = false;
+      try {
+        await prisma.rolePermission.create({
+          data: { roleId: financeRole!.id, permissionId: analyticsPerm!.id },
+        });
+        grantCreated = true;
+
+        // Re-login to get updated permissions
+        const newLogin = await login(`ws_test_ws_rbac_finance_grant_${userId}`, "TestPassword123!");
+        const res = await request(app.getHttpServer())
+          .get("/api/v1/workspaces/command-center")
+          .set("Authorization", `Bearer ${newLogin.accessToken}`)
+          .expect(200);
+
+        expect(res.body.pageId).toBe("command-center");
+      } finally {
+        // Cleanup: remove persisted grant
+        if (grantCreated) {
+          await prisma.rolePermission.delete({
+            where: { roleId_permissionId: { roleId: financeRole!.id, permissionId: analyticsPerm!.id } },
+          }).catch(() => {});
+        }
+      }
+    });
+
+    it("after removing persisted grant, GET returns 403 again", async () => {
+      const { token: financeToken, userId } = await createUserWithRole(
+        RoleCode.FINANCE,
+        "ws_rbac_finance_revoke",
+      );
+
+      const adminLogin = await login("admin", "admin123");
+      const financeRole = await prisma.role.findUnique({ where: { code: RoleCode.FINANCE } });
+      const analyticsPerm = await prisma.permission.findUnique({ where: { code: "analytics.read" } });
+      let grantCreated = false;
+      try {
+        await prisma.rolePermission.create({
+          data: { roleId: financeRole!.id, permissionId: analyticsPerm!.id },
+        });
+        grantCreated = true;
+
+        // Re-login — should now have analytics.read
+        const newLogin = await login(`ws_test_ws_rbac_finance_revoke_${userId}`, "TestPassword123!");
+        await request(app.getHttpServer())
+          .get("/api/v1/workspaces/command-center")
+          .set("Authorization", `Bearer ${newLogin.accessToken}`)
+          .expect(200);
+
+        // Remove the grant
+        await prisma.rolePermission.delete({
+          where: { roleId_permissionId: { roleId: financeRole!.id, permissionId: analyticsPerm!.id } },
+        });
+        grantCreated = false;
+
+        // Re-login — should lose access
+        const revokedLogin = await login(`ws_test_ws_rbac_finance_revoke_${userId}`, "TestPassword123!");
+        await request(app.getHttpServer())
+          .get("/api/v1/workspaces/command-center")
+          .set("Authorization", `Bearer ${revokedLogin.accessToken}`)
+          .expect(403);
+      } finally {
+        if (grantCreated) {
+          await prisma.rolePermission.delete({
+            where: { roleId_permissionId: { roleId: financeRole!.id, permissionId: analyticsPerm!.id } },
+          }).catch(() => {});
+        }
+      }
+    });
+
+    it("user with analytics.read but no dashboard.customize gets 403 on PUT/DELETE", async () => {
+      // ANALYST has analytics.read + dashboard.customize by default
+      // We need a role with analytics.read but NOT dashboard.customize
+      // MARKETER has analytics.read + dashboard.customize
+      // FINANCE has neither — we use persisted grant for analytics.read only
+      const { token: financeToken, userId } = await createUserWithRole(
+        RoleCode.FINANCE,
+        "ws_rbac_customize",
+      );
+
+      const financeRole = await prisma.role.findUnique({ where: { code: RoleCode.FINANCE } });
+      const analyticsPerm = await prisma.permission.findUnique({ where: { code: "analytics.read" } });
+      let grantCreated = false;
+      try {
+        await prisma.rolePermission.create({
+          data: { roleId: financeRole!.id, permissionId: analyticsPerm!.id },
+        });
+        grantCreated = true;
+
+        const newLogin = await login(`ws_test_ws_rbac_customize_${userId}`, "TestPassword123!");
+
+        // GET should work (has analytics.read)
+        await request(app.getHttpServer())
+          .get("/api/v1/workspaces/command-center")
+          .set("Authorization", `Bearer ${newLogin.accessToken}`)
+          .expect(200);
+
+        // PUT should fail (no dashboard.customize)
+        await request(app.getHttpServer())
+          .put("/api/v1/workspaces/command-center/layout")
+          .set("Authorization", `Bearer ${newLogin.accessToken}`)
+          .send({ widgets: [{ widgetId: "gmv", x: 0, y: 0, w: 1, h: 1, visible: true }] })
+          .expect(403);
+
+        // DELETE should fail (no dashboard.customize)
+        await request(app.getHttpServer())
+          .delete("/api/v1/workspaces/command-center/layout")
+          .set("Authorization", `Bearer ${newLogin.accessToken}`)
+          .expect(403);
+      } finally {
+        if (grantCreated) {
+          await prisma.rolePermission.delete({
+            where: { roleId_permissionId: { roleId: financeRole!.id, permissionId: analyticsPerm!.id } },
+          }).catch(() => {});
+        }
+      }
     });
   });
 

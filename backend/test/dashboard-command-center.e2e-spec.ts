@@ -288,4 +288,125 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
       expect(exec.ordersCreated.drillDown).toBeDefined();
     });
   });
+
+  // ─── 10. Section Authority (Step 3.2) ─────────────────────────────
+
+  describe("Section Authority", () => {
+    it("ADMIN gets 4 authorized sections in canonical order", async () => {
+      const adminLogin = await login("admin", "admin123");
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/dashboard/command-center")
+        .set("Authorization", `Bearer ${adminLogin.accessToken}`)
+        .query({ preset: "MONTH" })
+        .expect(200);
+
+      expect(res.body.availableSections).toEqual(["executive", "operational", "financial", "marketplace"]);
+      expect(res.body.sections.executive).toBeDefined();
+      expect(res.body.sections.operational).toBeDefined();
+      expect(res.body.sections.financial).toBeDefined();
+      expect(res.body.sections.marketplace).toBeDefined();
+    });
+
+    it("MARKETER gets only executive and marketplace sections", async () => {
+      const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_section_marketer");
+
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/dashboard/command-center")
+        .set("Authorization", `Bearer ${marketerToken}`)
+        .query({ preset: "MONTH" })
+        .expect(200);
+
+      expect(res.body.availableSections).toEqual(["executive", "marketplace"]);
+      expect(res.body.sections.executive).toBeDefined();
+      expect(res.body.sections.marketplace).toBeDefined();
+      expect(res.body.sections.operational).toBeUndefined();
+      expect(res.body.sections.financial).toBeUndefined();
+    });
+
+    it("availableSections matches actually returned sections", async () => {
+      const adminLogin = await login("admin", "admin123");
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/dashboard/command-center")
+        .set("Authorization", `Bearer ${adminLogin.accessToken}`)
+        .query({ preset: "MONTH" })
+        .expect(200);
+
+      for (const section of res.body.availableSections) {
+        expect(res.body.sections[section]).toBeDefined();
+      }
+    });
+
+    it("availableMetrics contains only supported + authorized metrics", async () => {
+      const adminLogin = await login("admin", "admin123");
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/dashboard/command-center")
+        .set("Authorization", `Bearer ${adminLogin.accessToken}`)
+        .query({ preset: "MONTH" })
+        .expect(200);
+
+      expect(res.body.availableMetrics).toContain("orders");
+      expect(res.body.availableMetrics).toContain("bookings");
+      expect(res.body.availableMetrics).toContain("payments");
+      expect(res.body.availableMetrics).toContain("customers");
+      expect(res.body.availableMetrics).toContain("commissions");
+    });
+
+    it("MARKETER availableMetrics excludes financial metrics", async () => {
+      const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_metrics_marketer");
+
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/dashboard/command-center")
+        .set("Authorization", `Bearer ${marketerToken}`)
+        .query({ preset: "MONTH" })
+        .expect(200);
+
+      expect(res.body.availableMetrics).toContain("orders");
+      expect(res.body.availableMetrics).toContain("bookings");
+      expect(res.body.availableMetrics).toContain("customers");
+      expect(res.body.availableMetrics).not.toContain("payments");
+      expect(res.body.availableMetrics).not.toContain("commissions");
+    });
+
+    it("financial read model not called without Financial permission", async () => {
+      const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_financial_skip");
+
+      await request(app.getHttpServer())
+        .get("/api/v1/dashboard/command-center")
+        .set("Authorization", `Bearer ${marketerToken}`)
+        .query({ preset: "MONTH" })
+        .expect(200);
+
+      // Financial section should be absent — reconciliation not called
+    });
+
+    it("unknown trend metric returns 404", async () => {
+      const adminLogin = await login("admin", "admin123");
+      await request(app.getHttpServer())
+        .get("/api/v1/dashboard/command-center/trends")
+        .set("Authorization", `Bearer ${adminLogin.accessToken}`)
+        .query({ preset: "MONTH", metric: "nonexistent" })
+        .expect(404);
+    });
+
+    it("unauthorized trend metric returns 403", async () => {
+      const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_trend_403");
+
+      // MARKETER has no dashboard.financial.read → payments should be 403
+      await request(app.getHttpServer())
+        .get("/api/v1/dashboard/command-center/trends")
+        .set("Authorization", `Bearer ${marketerToken}`)
+        .query({ preset: "MONTH", metric: "payments" })
+        .expect(403);
+    });
+
+    it("FINANCE without analytics.read gets 403 on command center", async () => {
+      const { token: financeToken } = await createUserWithRole(RoleCode.FINANCE, "dash_finance_403");
+
+      await request(app.getHttpServer())
+        .get("/api/v1/dashboard/command-center")
+        .set("Authorization", `Bearer ${financeToken}`)
+        .query({ preset: "MONTH" })
+        .expect(403);
+    });
+  });
 });

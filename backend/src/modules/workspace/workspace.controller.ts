@@ -37,12 +37,19 @@ export class WorkspaceController {
    * GET /api/v1/workspaces/:pageId
    * Returns effective layout: system default + role default + user override,
    * filtered by RBAC, with required widgets restored.
+   * Step 3.2: Requires analytics.read for Command Center (page gate).
    */
   @Get(":pageId")
   async getEffectiveLayout(
     @Param("pageId") pageId: string,
     @CurrentUser() user: AuthUser,
   ) {
+    // Step 3.2: analytics.read page gate for Command Center
+    if (pageId === "command-center") {
+      if (!user.permissions.includes("analytics.read")) {
+        throw new ForbiddenException("analytics.read required for Command Center");
+      }
+    }
     return this.workspaceService.getEffectiveLayout(
       user.id,
       pageId,
@@ -54,12 +61,19 @@ export class WorkspaceController {
   /**
    * GET /api/v1/workspaces/:pageId/widgets
    * Returns available widgets for a page, filtered by user permissions.
+   * Step 3.2: Requires analytics.read for Command Center (page gate).
    */
   @Get(":pageId/widgets")
   async getAvailableWidgets(
     @Param("pageId") pageId: string,
     @CurrentUser() user: AuthUser,
   ) {
+    // Step 3.2: analytics.read page gate for Command Center
+    if (pageId === "command-center") {
+      if (!user.permissions.includes("analytics.read")) {
+        throw new ForbiddenException("analytics.read required for Command Center");
+      }
+    }
     return this.workspaceService.getAvailableWidgets(
       pageId,
       user.permissions,
