@@ -785,7 +785,7 @@ Aggregated KPI/read models без владения operational entities.
 · **Step 3.2 --- Dashboard UI**\
 KPI, alerts, queues, shortcuts, AI insights.
 
-· **Step 3.3 --- Analytics Foundation**\
+· **Step 3.3 --- Analytics Foundation** ⏳ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW (2026-08-19; period/comparison/granularity resolvers, Company KPI/Partner Performance/Conversion Funnel/Time Series read models, AnalyticsController with RBAC; unit 853/853, frontend 135/135, migrate 58/58, artifact PASS=163; NEXT = STEP 3.3 STRICT REVIEW).\
 Metrics, dimensions, aggregation/read models.
 
 · **Step 3.3A --- Analytics Source-of-Truth & Fact Model**\
