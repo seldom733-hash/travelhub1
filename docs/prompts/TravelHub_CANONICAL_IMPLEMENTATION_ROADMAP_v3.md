@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-18 (Step 2.17C ✅ STRICT REVIEW COMPLETED — APPROVED; Service Templates decision gates DD-024…DD-029 RESOLVED; Universal Pricing Model Amendment INTEGRATED — docs/architecture/universal-pricing-model.md; Canonical Roadmap Gap & Status Reconciliation Audit COMPLETED 2026-08-12 — статусы 1.12.3/1.18/1.18A/2.0/2.6 синхронизированы; Step 2.7 ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES; Step 2.8 ✅ STRICT REVIEW COMPLETED — APPROVED; Step 2.8A ✅ STRICT REVIEW COMPLETED — APPROVED; Step 2.9 ◀ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW (2026-08-13))\
+**Дата актуализации:** 2026-08-19 (Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E Global Workspace Constructor Foundation ✅ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW; Step 2.17C ✅ STRICT REVIEW COMPLETED — APPROVED; Service Templates decision gates DD-024…DD-029 RESOLVED; Universal Pricing Model Amendment INTEGRATED — docs/architecture/universal-pricing-model.md; Canonical Roadmap Gap & Status Reconciliation Audit COMPLETED 2026-08-12 — статусы 1.12.3/1.18/1.18A/2.0/2.6 синхронизированы; Step 2.7 ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES; Step 2.8 ✅ STRICT REVIEW COMPLETED — APPROVED; Step 2.8A ✅ STRICT REVIEW COMPLETED — APPROVED; Step 2.9 ◀ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW (2026-08-13))\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -779,13 +779,13 @@ balance, settlement reconciliation, temporal integrity.
 
 · **Step 3.0 --- Phase 3 Entry Audit** ⏳ NOT STARTED (2026-08-19; Phase 3 Entry Reconciliation — VERDICT A — canonical Phase 3 exists with 50+ steps; first executable step = Step 3.0; Phase 2 formal exit BLOCKED on 2.17B but independent Phase 3 work may begin; steps 3.0–3.41, 3.43–3.47 independent of 2.17B; only production/perf steps 3.42, 3.48–3.49 depend on qualification env; NEXT = PHASE 3 — STEP 3.0 — PHASE 3 ENTRY AUDIT).
 
-· **Step 3.1 --- Dashboard / Command Center Backend**\
+· **Step 3.1 --- Dashboard / Command Center Backend** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-19; aggregated KPI/read models без владения operational entities; Command Center + Trends endpoints; 21 KPI across executive/operational/financial/marketplace sections; RBAC analytics.read; e2e dashboard-command-center 9/9; unit 921/921; frontend 150/150; backend tsc/build PASS; migrate 59/59 drift 0; отчёт — `docs/prompts/PHASE_3_STEP_3.1_DASHBOARD_COMMAND_CENTER_BACKEND_STRICT_REVIEW_REPORT.md`; NEXT = REPOSITORY-FIRST PHASE 3 SEQUENCING AFTER STEP 3.1 APPROVAL).
 Aggregated KPI/read models без владения operational entities.
 
 · **Step 3.2 --- Dashboard UI**\
 KPI, alerts, queues, shortcuts, AI insights.
 
-· **Step 3.3 --- Analytics Foundation** ⏳ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW (2026-08-19; period/comparison/granularity resolvers, Company KPI/Partner Performance/Conversion Funnel/Time Series read models, AnalyticsController with RBAC; unit 853/853, frontend 135/135, migrate 58/58, artifact PASS=163; NEXT = STEP 3.3 STRICT REVIEW).\
+· **Step 3.3 --- Analytics Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-19; period/comparison/granularity resolvers, Company KPI/Partner Performance/Conversion Funnel/Time Series read models, AnalyticsController with RBAC; unit 853/853, frontend 135/135, migrate 58/58, artifact PASS=163; FINAL STRICT RE-REVIEW APPROVED — 0 defects; отчёт — `docs/prompts/PHASE_3_STEP_3.3_ANALYTICS_FOUNDATION_FINAL_STRICT_RE_REVIEW_REPORT.md`; NEXT = REPOSITORY-FIRST PHASE 3 SEQUENCING AFTER STEP 3.3 APPROVAL).
 Metrics, dimensions, aggregation/read models.
 
 · **Step 3.3A --- Analytics Source-of-Truth & Fact Model**\
@@ -814,6 +814,9 @@ Product-led Marketplace, Storefront, Buyer Request, Direct/Manual, будущи�
 Custom Domain/API. Future metrics: request count, matching/delivery rate,
 seller response rate, time-to-first-proposal, proposals/request, selection
 rate, Request→Quote/Sale/Order conversion.
+
+· **Step 3.3E --- Global Workspace Constructor Foundation** ✅ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW (2026-08-19; architecture addendum commit `26e1d9c`; canonical Page Registry (6 pages) + Widget Registry (29 widgets); Effective Layout Resolver (System Default → Role Default → User Override); `UserWorkspaceLayout` persistence (Prisma JSON, unique (userId, pageId), migration 20260819121404); 4 API endpoints (GET layout, GET widgets, PUT save, DELETE reset); RBAC filtering, required widget restoration, config sanitization, versioning; frontend foundation (workspace-api.ts, use-workspace.ts hooks); backend unit 35 workspace tests + 921/921 total; frontend vitest 150/150; backend tsc/build PASS; frontend tsc/build PASS; migrate 59/59 drift 0; отчёт — `docs/prompts/PHASE_3_GLOBAL_WORKSPACE_CONSTRUCTOR_FOUNDATION_IMPLEMENTATION_REPORT.md`; NEXT = GLOBAL WORKSPACE CONSTRUCTOR FOUNDATION — STRICT REVIEW).
+Общий backend/frontend foundation для кастомизации layout страниц (Command Center, Analytics, CRM, Orders, Bookings, Catalog). Page-agnostic, widget-registry driven. Не реализует полноценный Dashboard UI (Step 3.2 станет первым visual consumer).
 
 · **Step 3.4 --- Analytics Center UI**\
 Sales, Orders, Bookings, Finance, Products, Partners,
