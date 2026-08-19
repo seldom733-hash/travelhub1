@@ -20,7 +20,7 @@
  * - MEDIUM-4: Multi-currency returns currency-separated aggregates
  */
 
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   AnalyticsPeriodPreset,
@@ -273,12 +273,17 @@ export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private resolveQueryPeriod(dto: AnalyticsQueryDto): ComparisonPeriods {
-    const period = resolvePeriod({
-      preset: dto.preset,
-      startDate: dto.startDate,
-      endDate: dto.endDate,
-      timezone: dto.timezone,
-    });
+    let period;
+    try {
+      period = resolvePeriod({
+        preset: dto.preset,
+        startDate: dto.startDate,
+        endDate: dto.endDate,
+        timezone: dto.timezone,
+      });
+    } catch (err: any) {
+      throw new BadRequestException(err?.message || "Invalid period parameters");
+    }
     const comparison =
       dto.comparison !== false ? resolveComparison(period) : undefined;
     return {

@@ -8,7 +8,7 @@
  * Remediation: Strict Review VERDICT B findings closure.
  */
 
-import { Controller, Get, Query } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Query } from "@nestjs/common";
 import {
   IsBoolean,
   IsEnum,
@@ -63,7 +63,7 @@ class AnalyticsQueryDto {
  */
 type AnalyticsUser = AuthedRequest["user"];
 
-@Controller("api/v1/analytics")
+@Controller("analytics")
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 

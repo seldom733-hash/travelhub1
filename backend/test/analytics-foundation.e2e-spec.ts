@@ -131,7 +131,17 @@ describe("Step 3.3 — Analytics Foundation (e2e)", () => {
 
   describe("BUYER role denied", () => {
     it("BUYER cannot access analytics endpoints", async () => {
-      const buyerLogin = await login("buyer", "buyer123");
+      // Create a BUYER user via admin API
+      const adminLogin = await login("admin", "admin123");
+      const username = `analytics_buyer_${Date.now()}`;
+      const createRes = await request(app.getHttpServer())
+        .post("/api/v1/users")
+        .set("Authorization", `Bearer ${adminLogin.accessToken}`)
+        .send({ username, password: "TestPassword123!", roleCode: "BUYER" })
+        .expect(201);
+      createdUsers.push(createRes.body.id);
+
+      const buyerLogin = await login(username, "TestPassword123!");
       await request(app.getHttpServer())
         .get("/api/v1/analytics/company-kpi")
         .set("Authorization", `Bearer ${buyerLogin.accessToken}`)
