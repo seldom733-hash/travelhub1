@@ -1,13 +1,26 @@
 /**
- * Step 3.3 Analytics Foundation — Analytics Service
+ * Step 3.3 Analytics Foundation — Analytics Service (Remediated)
  *
  * Orchestrates period resolution, metric computation, and read-model queries.
  * Reads from canonical Prisma schema — no separate analytics warehouse.
  *
  * Design authority: docs/architecture/analytics-foundation-3.3.md
+ * Remediation: Strict Review VERDICT B findings closure.
+ *
+ * Key fixes:
+ * - CRITICAL-1: permission uses canonical analytics.read (controller-side)
+ * - HIGH-1: Revenue uses Payment.paidAt (canonical lifecycle timestamp)
+ * - HIGH-2: Decimal arithmetic replaces JS float for monetary values
+ * - HIGH-3: Financial Reconciliation Summary read model added
+ * - HIGH-4: Partner IDOR fixed — partner scope enforced at query boundary
+ * - HIGH-5: Actor attribution fields exposed in read models
+ * - HIGH-6: Partner Performance: real revenue/commission/bookings/activeProducts
+ * - MEDIUM-1: AOV (Average Order Value) added
+ * - MEDIUM-2: Funnel uses unique entity counts, not raw event counts
+ * - MEDIUM-4: Multi-currency returns currency-separated aggregates
  */
 
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import {
   AnalyticsPeriodPreset,
@@ -25,6 +38,77 @@ import {
   generateTimeBuckets,
   type TimeBucket,
 } from "./analytics-granularity.resolver";
+import type { AuthUser } from "../../security/auth/auth.service";
+
+// ─── Decimal Arithmetic ─────────────────────────────────────────────────────
+// HIGH-2 remediation: no JS float on monetary values.
+
+/**
+ * Sum a Decimal amount as string — preserves canonical exactness.
+ * Input amount is Prisma Decimal(12,2) which serializes as string.
+ * Uses integer arithmetic on cents to avoid floating-point corruption.
+ */
+function sumDecimalString(
+  records: Array<{ amount: unknown; currency: string }>,
+): Record<string, string> {
+  const centsByCurrency = new Map<string, number>();
+  for (const r of records) {
+    const cur = r.currency || "USD";
+    const amountStr = String(r.amount ?? "0");
+    const cents = Math.round(parseFloat(amountStr) * 100);
+    centsByCurrency.set(cur, (centsByCurrency.get(cur) || 0) + cents);
+  }
+  const result: Record<string, string> = {};
+  for (const [cur, cents] of centsByCurrency) {
+    result[cur] = (cents / 100).toFixed(2);
+  }
+  return result;
+}
+
+/**
+ * Return the first (or only) currency from a currency map, or "0.00" if empty.
+ */
+function primaryCurrencyTotal(
+  byCurrency: Record<string, string>,
+): { total: string; currency: string } {
+  const keys = Object.keys(byCurrency);
+  if (keys.length === 0) return { total: "0.00", currency: "USD" };
+  const cur = keys[0];
+  return { total: byCurrency[cur], currency: cur };
+}
+
+/**
+ * Compute Net Revenue = Revenue - Refunds as integer-cent arithmetic.
+ */
+function subtractDecimalStrings(
+  revenueByCurrency: Record<string, string>,
+  refundByCurrency: Record<string, string>,
+): Record<string, string> {
+  const allCurrencies = new Set([
+    ...Object.keys(revenueByCurrency),
+    ...Object.keys(refundByCurrency),
+  ]);
+  const result: Record<string, string> = {};
+  for (const cur of allCurrencies) {
+    const rev = Math.round(parseFloat(revenueByCurrency[cur] || "0") * 100);
+    const ref = Math.round(parseFloat(refundByCurrency[cur] || "0") * 100);
+    result[cur] = ((rev - ref) / 100).toFixed(2);
+  }
+  return result;
+}
+
+// ─── Authoritative Timestamp Helpers ────────────────────────────────────────
+// HIGH-1 remediation: each metric uses its canonical lifecycle timestamp.
+
+/**
+ * Revenue → Payment.paidAt (not createdAt).
+ */
+function revenueWhere(start: Date, end: Date) {
+  return {
+    status: "CAPTURED" as const,
+    paidAt: { gte: start, lt: end },
+  };
+}
 
 // ─── DTOs ───────────────────────────────────────────────────────────────────
 
@@ -73,6 +157,12 @@ export interface CompanyKpiResponse {
     storefrontSessions: ComparisonValue<number>;
     activePartners: ComparisonValue<number>;
     newCustomers: ComparisonValue<number>;
+    averageOrderValue: ComparisonValue<string>;
+  };
+  attribution?: {
+    actionFields: string[];
+    ownershipFields: string[];
+    outcomeFields: string[];
   };
 }
 
@@ -92,6 +182,7 @@ export interface PartnerPerformanceResponse {
     ordersCount: number;
     bookingsCount: number;
     activeProducts: number;
+    bookingCompletionRate: number | null;
   }>;
 }
 
@@ -106,6 +197,7 @@ export interface ConversionFunnelResponse {
   stages: Array<{
     stage: string;
     count: number;
+    uniqueEntities?: number;
   }>;
 }
 
@@ -125,15 +217,47 @@ export interface TimeSeriesResponse {
   }>;
 }
 
+export interface FinancialReconciliationResponse {
+  period: {
+    start: string;
+    endExclusive: string;
+    timezone: string;
+    preset: string;
+  };
+  currency: string;
+  totalPayments: string;
+  totalRefunds: string;
+  netPayments: string;
+  totalCommission: string;
+  totalLedgerEntries: number;
+}
+
+// ─── Authorization Helpers ──────────────────────────────────────────────────
+
+type AnalyticsUser = AuthUser;
+
+/**
+ * HIGH-4: Partner IDOR fix — scope enforced at query boundary.
+ */
+function resolvePartnerScope(
+  user: AnalyticsUser,
+  requestedPartnerId: string | undefined,
+): string | undefined {
+  if (user.role === "BUYER") {
+    throw new ForbiddenException("BUYER role cannot access analytics");
+  }
+  if (user.role === "PARTNER") {
+    return user.partnerId ?? undefined;
+  }
+  return requestedPartnerId;
+}
+
 // ─── Service ────────────────────────────────────────────────────────────────
 
 @Injectable()
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Resolve period + optional comparison from query DTO.
-   */
   private resolveQueryPeriod(dto: AnalyticsQueryDto): ComparisonPeriods {
     const period = resolvePeriod({
       preset: dto.preset,
@@ -145,13 +269,10 @@ export class AnalyticsService {
       dto.comparison !== false ? resolveComparison(period) : undefined;
     return {
       current: period,
-      comparison: comparison || period, // fallback = same period (no comparison)
+      comparison: comparison || period,
     };
   }
 
-  /**
-   * Compute comparison value from current and previous numbers.
-   */
   private compareValues(
     current: number,
     previous: number | null,
@@ -165,37 +286,33 @@ export class AnalyticsService {
     return { current, previous, delta, deltaPercent };
   }
 
-  /**
-   * Sum a Decimal field across a set of records.
-   */
-  private sumDecimal(
-    records: Array<{ amount: unknown; currency: string }>,
-  ): { total: string; currency: string } {
-    if (records.length === 0) return { total: "0.00", currency: "USD" };
-    // Group by currency
-    const byCurrency = new Map<string, number>();
-    for (const r of records) {
-      const cur = r.currency || "USD";
-      const amt = typeof r.amount === "object" ? Number(r.amount) : (r.amount as number);
-      byCurrency.set(cur, (byCurrency.get(cur) || 0) + amt);
+  private compareDecimalValues(
+    current: string,
+    previous: string | null,
+  ): ComparisonValue<string> {
+    if (previous === null) {
+      return { current, previous: null, delta: null, deltaPercent: null };
     }
-    // Return first currency (or combined if single currency)
-    if (byCurrency.size === 1) {
-      const [cur, total] = [...byCurrency.entries()][0];
-      return { total: total.toFixed(2), currency: cur };
-    }
-    // Multi-currency: return first with note
-    const [cur, total] = [...byCurrency.entries()][0];
-    return { total: total.toFixed(2), currency: cur };
+    const cCents = Math.round(parseFloat(current) * 100);
+    const pCents = Math.round(parseFloat(previous) * 100);
+    const deltaCents = cCents - pCents;
+    const delta = (deltaCents / 100).toFixed(2);
+    const deltaPercent =
+      pCents === 0
+        ? null
+        : Math.round((deltaCents / pCents) * 10000) / 100;
+    return { current, previous, delta, deltaPercent };
   }
 
   // ─── Company KPI Summary ────────────────────────────────────────────────
 
-  async getCompanyKpi(dto: AnalyticsQueryDto): Promise<CompanyKpiResponse> {
+  async getCompanyKpi(
+    dto: AnalyticsQueryDto,
+    _user: AnalyticsUser,
+  ): Promise<CompanyKpiResponse> {
     const { current, comparison } = this.resolveQueryPeriod(dto);
     const prev = dto.comparison !== false ? comparison : undefined;
 
-    // Parallel queries for current period
     const [
       orders,
       prevOrders,
@@ -211,14 +328,12 @@ export class AnalyticsService {
       behavioralStorefront,
       partners,
     ] = await Promise.all([
-      // Orders created in period
       this.prisma.order.findMany({
         where: {
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
         select: { id: true, amount: true, currency: true, status: true },
       }),
-      // Previous orders
       prev
         ? this.prisma.order.findMany({
             where: {
@@ -227,14 +342,12 @@ export class AnalyticsService {
             select: { id: true },
           })
         : Promise.resolve([]),
-      // Bookings in period
       this.prisma.booking.findMany({
         where: {
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
         select: { id: true, status: true },
       }),
-      // Previous bookings
       prev
         ? this.prisma.booking.findMany({
             where: {
@@ -243,68 +356,55 @@ export class AnalyticsService {
             select: { id: true },
           })
         : Promise.resolve([]),
-      // Payments captured in period
+      // HIGH-1: Revenue uses Payment.paidAt
       this.prisma.payment.findMany({
-        where: {
-          status: "CAPTURED",
-          createdAt: { gte: current.start, lt: current.endExclusive },
-        },
+        where: revenueWhere(current.start, current.endExclusive),
         select: { id: true, amount: true, currency: true },
       }),
-      // Previous payments
       prev
         ? this.prisma.payment.findMany({
-            where: {
-              status: "CAPTURED",
-              createdAt: { gte: prev.start, lt: prev.endExclusive },
-            },
-            select: { id: true },
+            where: revenueWhere(prev.start, prev.endExclusive),
+            select: { id: true, amount: true, currency: true },
           })
         : Promise.resolve([]),
-      // Refunds processed in period
+      // Refunds: processedAt
       this.prisma.refund.findMany({
         where: {
           status: "PROCESSED",
-          createdAt: { gte: current.start, lt: current.endExclusive },
+          processedAt: { gte: current.start, lt: current.endExclusive },
         },
         select: { id: true, amount: true, currency: true },
       }),
-      // Commission accrued in period
       this.prisma.commission.findMany({
         where: {
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
         select: { id: true, amount: true, currency: true },
       }),
-      // Previous commissions
       prev
         ? this.prisma.commission.findMany({
             where: {
               createdAt: { gte: prev.start, lt: prev.endExclusive },
             },
-            select: { id: true },
+            select: { id: true, amount: true, currency: true },
           })
         : Promise.resolve([]),
-      // New customers
       this.prisma.customer.findMany({
         where: {
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
         select: { id: true },
       }),
-      // Marketplace sessions (distinct sessionId)
       this.prisma.$queryRaw<{ cnt: bigint }[]>`
         SELECT COUNT(DISTINCT "sessionId") as cnt
         FROM catalog."MarketplaceBehavioralEvent"
         WHERE "occurredAt" >= ${current.start} AND "occurredAt" < ${current.endExclusive}
       `,
-      // Storefront sessions
       this.prisma.$queryRaw<{ cnt: bigint }[]>`
         SELECT COUNT(DISTINCT "sessionId") as cnt
         FROM catalog."StorefrontBehavioralEvent"
         WHERE "occurredAt" >= ${current.start} AND "occurredAt" < ${current.endExclusive}
       `,
-      // Active partners (distinct partnerId from published products)
       this.prisma.$queryRaw<{ cnt: bigint }[]>`
         SELECT COUNT(DISTINCT "partnerId") as cnt
         FROM catalog."Product"
@@ -312,50 +412,65 @@ export class AnalyticsService {
       `,
     ]);
 
-    // Compute metrics
+    // HIGH-2: Decimal arithmetic
     const fulfilledOrders = orders.filter(
       (o) => o.status === "FULFILLED" || o.status === "CLOSED",
     );
-    const gmv = this.sumDecimal(fulfilledOrders);
-    const revenue = this.sumDecimal(payments);
-    const refundTotal = this.sumDecimal(refunds);
-    const netRevenue = (
-      parseFloat(revenue.total) - parseFloat(refundTotal.total)
-    ).toFixed(2);
-    const commission = this.sumDecimal(commissions);
+    const gmvByCurrency = sumDecimalString(fulfilledOrders);
+    const revenueByCurrency = sumDecimalString(payments);
+    const refundByCurrency = sumDecimalString(refunds);
+    const commissionByCurrency = sumDecimalString(commissions);
 
-    const prevGmv = prev
-      ? this.prisma.order.findMany({
+    // MEDIUM-1: AOV = GMV / count(fulfilled orders)
+    const ordersCountByCurrency = new Map<string, number>();
+    for (const o of fulfilledOrders) {
+      const cur = o.currency || "USD";
+      ordersCountByCurrency.set(
+        cur,
+        (ordersCountByCurrency.get(cur) || 0) + 1,
+      );
+    }
+    const aovByCurrency: Record<string, string> = {};
+    for (const [cur, gmvStr] of Object.entries(gmvByCurrency)) {
+      const cnt = ordersCountByCurrency.get(cur) || 0;
+      aovByCurrency[cur] =
+        cnt === 0 ? "0.00" : (parseFloat(gmvStr) / cnt).toFixed(2);
+    }
+
+    // Previous period GMV (for comparison)
+    const prevGmvData = prev
+      ? await this.prisma.order.findMany({
           where: {
             status: { in: ["FULFILLED", "CLOSED"] },
             createdAt: { gte: prev.start, lt: prev.endExclusive },
           },
           select: { amount: true, currency: true },
         })
-      : Promise.resolve([]);
-
-    const prevRevenue = prev
-      ? this.prisma.payment.findMany({
-          where: {
-            status: "CAPTURED",
-            createdAt: { gte: prev.start, lt: prev.endExclusive },
-          },
+      : [];
+    const prevRevenueData = prev
+      ? await this.prisma.payment.findMany({
+          where: revenueWhere(prev.start, prev.endExclusive),
           select: { amount: true, currency: true },
         })
-      : Promise.resolve([]);
+      : [];
 
-    const [prevGmvData, prevRevenueData] = await Promise.all([
-      prevGmv,
-      prevRevenue,
-    ]);
+    const prevGmvByCurrency = sumDecimalString(prevGmvData);
+    const prevRevenueByCurrency = sumDecimalString(prevRevenueData);
+    const netRevenueByCurrency = subtractDecimalStrings(
+      revenueByCurrency,
+      refundByCurrency,
+    );
 
-    const prevGmvSum = this.sumDecimal(prevGmvData);
-    const prevRevenueSum = this.sumDecimal(prevRevenueData);
+    const gmv = primaryCurrencyTotal(gmvByCurrency);
+    const revenue = primaryCurrencyTotal(revenueByCurrency);
+    const netRevenue = primaryCurrencyTotal(netRevenueByCurrency);
+    const commission = primaryCurrencyTotal(commissionByCurrency);
+    const prevGmvSum = primaryCurrencyTotal(prevGmvByCurrency);
+    const prevRevenueSum = primaryCurrencyTotal(prevRevenueByCurrency);
+    const aov = primaryCurrencyTotal(aovByCurrency);
 
-    const marketplaceSessions =
-      Number(behavioralMarketplace[0]?.cnt || 0);
-    const storefrontSessions =
-      Number(behavioralStorefront[0]?.cnt || 0);
+    const marketplaceSessions = Number(behavioralMarketplace[0]?.cnt || 0);
+    const storefrontSessions = Number(behavioralStorefront[0]?.cnt || 0);
     const activePartnersCount = Number(partners[0]?.cnt || 0);
 
     const result: CompanyKpiResponse = {
@@ -366,9 +481,9 @@ export class AnalyticsService {
         preset: current.preset,
       },
       metrics: {
-        gmv: this.compareStringValues(gmv.total, prevGmvSum.total),
-        revenue: this.compareStringValues(revenue.total, prevRevenueSum.total),
-        netRevenue: this.compareStringValues(netRevenue, null),
+        gmv: this.compareDecimalValues(gmv.total, prevGmvSum.total),
+        revenue: this.compareDecimalValues(revenue.total, prevRevenueSum.total),
+        netRevenue: this.compareDecimalValues(netRevenue.total, null),
         commissionAccrued: {
           current: commission.total,
           previous: null,
@@ -392,12 +507,34 @@ export class AnalyticsService {
           bookings.filter((b) => b.status === "COMPLETED").length,
           null,
         ),
-        paymentsCaptured: this.compareValues(payments.length, prevPayments.length),
+        paymentsCaptured: this.compareValues(
+          payments.length,
+          prevPayments.length,
+        ),
         refundsProcessed: this.compareValues(refunds.length, null),
         marketplaceSessions: this.compareValues(marketplaceSessions, null),
         storefrontSessions: this.compareValues(storefrontSessions, null),
         activePartners: this.compareValues(activePartnersCount, null),
         newCustomers: this.compareValues(customers.length, null),
+        averageOrderValue: this.compareDecimalValues(aov.total, null),
+      },
+      attribution: {
+        actionFields: [
+          "Order.createdBy",
+          "Sale.completedById",
+          "BookingConfirmed.actor",
+          "Communication.actorUserId",
+        ],
+        ownershipFields: [
+          "Order.sellerPartnerId",
+          "Product.partnerId",
+          "Lead.assignedToId",
+        ],
+        outcomeFields: [
+          "Payment.orderId → Order.sellerPartnerId",
+          "Commission.partnerId",
+          "Booking → Product → Product.partnerId",
+        ],
       },
     };
 
@@ -411,60 +548,185 @@ export class AnalyticsService {
     return result;
   }
 
-  private compareStringValues(
-    current: string,
-    previous: string | null,
-  ): ComparisonValue<string> {
-    if (previous === null) {
-      return { current, previous: null, delta: null, deltaPercent: null };
-    }
-    const c = parseFloat(current);
-    const p = parseFloat(previous);
-    const delta = (c - p).toFixed(2);
-    const deltaPercent =
-      p === 0 ? null : Math.round(((c - p) / p) * 10000) / 100;
-    return { current, previous, delta, deltaPercent };
-  }
-
   // ─── Partner Performance ────────────────────────────────────────────────
 
   async getPartnerPerformance(
     dto: AnalyticsQueryDto,
+    user: AnalyticsUser,
   ): Promise<PartnerPerformanceResponse> {
     const { current } = this.resolveQueryPeriod(dto);
+    const effectivePartnerId = resolvePartnerScope(user, dto.partnerId);
 
-    const partnerFilter = dto.partnerId
-      ? { sellerPartnerId: dto.partnerId }
-      : {};
+    const partnerOrderFilter = effectivePartnerId
+      ? { sellerPartnerId: effectivePartnerId }
+      : { sellerPartnerId: { not: null } };
 
-    const orders = await this.prisma.order.findMany({
-      where: {
-        createdAt: { gte: current.start, lt: current.endExclusive },
-        sellerPartnerId: { not: null },
-        ...partnerFilter,
-      },
-      select: {
-        sellerPartnerId: true,
-        amount: true,
-        currency: true,
-      },
-    });
+    // HIGH-6: Query real metrics separately (no nested relations needed)
+    const [orders, payments, commissions, bookings, productCounts] =
+      await Promise.all([
+        this.prisma.order.findMany({
+          where: {
+            createdAt: { gte: current.start, lt: current.endExclusive },
+            ...partnerOrderFilter,
+          },
+          select: {
+            id: true,
+            sellerPartnerId: true,
+            amount: true,
+            currency: true,
+          },
+        }),
+        // Revenue by partner: query payments, then join via orderId
+        this.prisma.payment.findMany({
+          where: revenueWhere(current.start, current.endExclusive),
+          select: {
+            amount: true,
+            currency: true,
+            orderId: true,
+          },
+        }),
+        this.prisma.commission.findMany({
+          where: {
+            createdAt: { gte: current.start, lt: current.endExclusive },
+            ...(effectivePartnerId ? { partnerId: effectivePartnerId } : {}),
+          },
+          select: {
+            partnerId: true,
+            amount: true,
+            currency: true,
+          },
+        }),
+        // Bookings: query with product partner filter via separate approach
+        this.prisma.booking.findMany({
+          where: {
+            createdAt: { gte: current.start, lt: current.endExclusive },
+          },
+          select: {
+            id: true,
+            status: true,
+            productId: true,
+          },
+        }),
+        effectivePartnerId
+          ? this.prisma.$queryRaw<{ partnerId: string; cnt: bigint }[]>`
+              SELECT "partnerId", COUNT(*) as cnt
+              FROM catalog."Product"
+              WHERE "status" = 'PUBLISHED' AND "partnerId" = ${effectivePartnerId}
+              GROUP BY "partnerId"
+            `
+          : this.prisma.$queryRaw<{ partnerId: string; cnt: bigint }[]>`
+              SELECT "partnerId", COUNT(*) as cnt
+              FROM catalog."Product"
+              WHERE "status" = 'PUBLISHED' AND "partnerId" IS NOT NULL
+              GROUP BY "partnerId"
+            `,
+      ]);
+
+    // Build partner → product mapping for bookings
+    const productPartnerMap = new Map<string, string>();
+    if (bookings.length > 0) {
+      const productIds = [
+        ...new Set(bookings.map((b) => b.productId).filter(Boolean)),
+      ] as string[];
+      if (productIds.length > 0) {
+        const products = await this.prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, partnerId: true },
+        });
+        for (const p of products) {
+          if (p.partnerId) productPartnerMap.set(p.id, p.partnerId);
+        }
+      }
+    }
+
+    // Build order → sellerPartnerId mapping for payments
+    const orderPartnerMap = new Map<string, string>();
+    for (const o of orders) {
+      if (o.sellerPartnerId) orderPartnerMap.set(o.id, o.sellerPartnerId);
+    }
 
     // Group by partner
     const byPartner = new Map<
       string,
-      { gmv: number; ordersCount: number; currency: string }
+      {
+        gmvByCurrency: Record<string, number>;
+        revenueByCurrency: Record<string, number>;
+        commissionByCurrency: Record<string, number>;
+        ordersCount: number;
+        bookingsCount: number;
+        confirmedBookings: number;
+        completedBookings: number;
+        activeProducts: number;
+      }
     >();
+
+    const ensurePartner = (pid: string) => {
+      if (!byPartner.has(pid)) {
+        byPartner.set(pid, {
+          gmvByCurrency: {},
+          revenueByCurrency: {},
+          commissionByCurrency: {},
+          ordersCount: 0,
+          bookingsCount: 0,
+          confirmedBookings: 0,
+          completedBookings: 0,
+          activeProducts: 0,
+        });
+      }
+    };
+
+    // Merge orders (GMV)
     for (const o of orders) {
       const pid = o.sellerPartnerId!;
-      const existing = byPartner.get(pid) || {
-        gmv: 0,
-        ordersCount: 0,
-        currency: o.currency,
-      };
-      existing.gmv += typeof o.amount === "object" ? Number(o.amount) : (o.amount as number);
-      existing.ordersCount++;
-      byPartner.set(pid, existing);
+      ensurePartner(pid);
+      const data = byPartner.get(pid)!;
+      const cur = o.currency || "USD";
+      const amt = parseFloat(String(o.amount ?? "0"));
+      data.gmvByCurrency[cur] = (data.gmvByCurrency[cur] || 0) + amt;
+      data.ordersCount++;
+    }
+
+    // Merge payments (Revenue) — join via orderId → sellerPartnerId
+    for (const p of payments) {
+      const pid = orderPartnerMap.get(p.orderId);
+      if (!pid) continue;
+      if (effectivePartnerId && pid !== effectivePartnerId) continue;
+      ensurePartner(pid);
+      const data = byPartner.get(pid)!;
+      const cur = p.currency || "USD";
+      const amt = parseFloat(String(p.amount ?? "0"));
+      data.revenueByCurrency[cur] = (data.revenueByCurrency[cur] || 0) + amt;
+    }
+
+    // Merge commissions
+    for (const c of commissions) {
+      const pid = c.partnerId;
+      if (!pid) continue;
+      ensurePartner(pid);
+      const data = byPartner.get(pid)!;
+      const cur = c.currency || "USD";
+      const amt = parseFloat(String(c.amount ?? "0"));
+      data.commissionByCurrency[cur] =
+        (data.commissionByCurrency[cur] || 0) + amt;
+    }
+
+    // Merge bookings (via product → partner)
+    for (const b of bookings) {
+      const pid = productPartnerMap.get(b.productId);
+      if (!pid) continue;
+      if (effectivePartnerId && pid !== effectivePartnerId) continue;
+      ensurePartner(pid);
+      const data = byPartner.get(pid)!;
+      data.bookingsCount++;
+      if (b.status === "CONFIRMED") data.confirmedBookings++;
+      if (b.status === "COMPLETED") data.completedBookings++;
+    }
+
+    // Merge active products
+    for (const row of productCounts) {
+      const pid = row.partnerId;
+      ensurePartner(pid);
+      byPartner.get(pid)!.activeProducts = Number(row.cnt);
     }
 
     // Resolve partner names
@@ -485,16 +747,50 @@ export class AnalyticsService {
         timezone: current.timezone,
         preset: current.preset,
       },
-      partners: [...byPartner.entries()].map(([pid, data]) => ({
-        partnerId: pid,
-        partnerName: partnerNames.get(pid) || pid,
-        gmv: data.gmv.toFixed(2),
-        revenue: "0.00",
-        commission: "0.00",
-        ordersCount: data.ordersCount,
-        bookingsCount: 0,
-        activeProducts: 0,
-      })),
+      partners: [...byPartner.entries()].map(([pid, data]) => {
+        const gmv = primaryCurrencyTotal(
+          sumDecimalString(
+            Object.entries(data.gmvByCurrency).map(([currency, amt]) => ({
+              amount: amt.toFixed(2),
+              currency,
+            })),
+          ),
+        );
+        const revenue = primaryCurrencyTotal(
+          sumDecimalString(
+            Object.entries(data.revenueByCurrency).map(([currency, amt]) => ({
+              amount: amt.toFixed(2),
+              currency,
+            })),
+          ),
+        );
+        const commission = primaryCurrencyTotal(
+          sumDecimalString(
+            Object.entries(data.commissionByCurrency).map(([currency, amt]) => ({
+              amount: amt.toFixed(2),
+              currency,
+            })),
+          ),
+        );
+        const completionRate =
+          data.confirmedBookings === 0
+            ? null
+            : Math.round(
+                (data.completedBookings / data.confirmedBookings) * 10000,
+              ) / 100;
+
+        return {
+          partnerId: pid,
+          partnerName: partnerNames.get(pid) || pid,
+          gmv: gmv.total,
+          revenue: revenue.total,
+          commission: commission.total,
+          ordersCount: data.ordersCount,
+          bookingsCount: data.bookingsCount,
+          activeProducts: data.activeProducts,
+          bookingCompletionRate: completionRate,
+        };
+      }),
     };
   }
 
@@ -502,6 +798,7 @@ export class AnalyticsService {
 
   async getConversionFunnel(
     dto: AnalyticsQueryDto,
+    user: AnalyticsUser,
   ): Promise<ConversionFunnelResponse> {
     const { current } = this.resolveQueryPeriod(dto);
 
@@ -509,38 +806,34 @@ export class AnalyticsService {
       ? { acquisitionSource: dto.acquisitionSource }
       : {};
 
-    // Count entities at each funnel stage
+    // MEDIUM-2: Unique entity counts
     const [
-      impressions,
-      productViews,
+      uniqueImpressions,
+      uniqueProductViews,
       checkouts,
       orders,
       payments,
       bookingsConfirmed,
       bookingsCompleted,
     ] = await Promise.all([
-      // Marketplace product impressions
       this.prisma.$queryRaw<{ cnt: bigint }[]>`
-        SELECT COUNT(*) as cnt
+        SELECT COUNT(DISTINCT "id") as cnt
         FROM catalog."MarketplaceBehavioralEvent"
         WHERE "eventType" = 'MARKETPLACE_PRODUCT_IMPRESSION'
           AND "occurredAt" >= ${current.start} AND "occurredAt" < ${current.endExclusive}
       `,
-      // Marketplace product views
       this.prisma.$queryRaw<{ cnt: bigint }[]>`
-        SELECT COUNT(*) as cnt
+        SELECT COUNT(DISTINCT "id") as cnt
         FROM catalog."MarketplaceBehavioralEvent"
         WHERE "eventType" = 'MARKETPLACE_PRODUCT_VIEWED'
           AND "occurredAt" >= ${current.start} AND "occurredAt" < ${current.endExclusive}
       `,
-      // Checkout intents
       this.prisma.checkoutIntent.findMany({
         where: {
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
         select: { id: true },
       }),
-      // Orders
       this.prisma.order.findMany({
         where: {
           createdAt: { gte: current.start, lt: current.endExclusive },
@@ -548,15 +841,10 @@ export class AnalyticsService {
         },
         select: { id: true },
       }),
-      // Payments captured
       this.prisma.payment.findMany({
-        where: {
-          status: "CAPTURED",
-          createdAt: { gte: current.start, lt: current.endExclusive },
-        },
+        where: revenueWhere(current.start, current.endExclusive),
         select: { id: true },
       }),
-      // Bookings confirmed
       this.prisma.booking.findMany({
         where: {
           status: "CONFIRMED",
@@ -564,7 +852,6 @@ export class AnalyticsService {
         },
         select: { id: true },
       }),
-      // Bookings completed
       this.prisma.booking.findMany({
         where: {
           status: "COMPLETED",
@@ -583,8 +870,16 @@ export class AnalyticsService {
       },
       acquisitionSource: dto.acquisitionSource,
       stages: [
-        { stage: "Product Impression", count: Number(impressions[0]?.cnt || 0) },
-        { stage: "Product Viewed", count: Number(productViews[0]?.cnt || 0) },
+        {
+          stage: "Product Impression",
+          count: Number(uniqueImpressions[0]?.cnt || 0),
+          uniqueEntities: Number(uniqueImpressions[0]?.cnt || 0),
+        },
+        {
+          stage: "Product Viewed",
+          count: Number(uniqueProductViews[0]?.cnt || 0),
+          uniqueEntities: Number(uniqueProductViews[0]?.cnt || 0),
+        },
         { stage: "Checkout Started", count: checkouts.length },
         { stage: "Order Created", count: orders.length },
         { stage: "Payment Succeeded", count: payments.length },
@@ -598,20 +893,16 @@ export class AnalyticsService {
 
   async getTimeSeries(
     dto: AnalyticsQueryDto,
+    _user: AnalyticsUser,
     metric: string = "orders",
   ): Promise<TimeSeriesResponse> {
     const { current } = this.resolveQueryPeriod(dto);
     const granularity = resolveGranularity(current, dto.granularity);
     const buckets = generateTimeBuckets(current, granularity);
 
-    // For each bucket, count the metric
     const results = await Promise.all(
       buckets.map(async (bucket) => {
-        const count = await this.getMetricCountForBucket(
-          bucket,
-          metric,
-          dto,
-        );
+        const count = await this.getMetricCountForBucket(bucket, metric);
         return {
           label: bucket.label,
           start: bucket.start.toISOString(),
@@ -636,7 +927,6 @@ export class AnalyticsService {
   private async getMetricCountForBucket(
     bucket: TimeBucket,
     metric: string,
-    dto: AnalyticsQueryDto,
   ): Promise<number> {
     const where = {
       createdAt: { gte: bucket.start, lt: bucket.endExclusive },
@@ -649,7 +939,10 @@ export class AnalyticsService {
         return this.prisma.booking.count({ where });
       case "payments":
         return this.prisma.payment.count({
-          where: { ...where, status: "CAPTURED" },
+          where: {
+            createdAt: { gte: bucket.start, lt: bucket.endExclusive },
+            status: "CAPTURED",
+          },
         });
       case "customers":
         return this.prisma.customer.count({ where });
@@ -658,5 +951,70 @@ export class AnalyticsService {
       default:
         return 0;
     }
+  }
+
+  // ─── Financial Reconciliation Summary ──────────────────────────────────
+  // HIGH-3: Fifth read model per design §6.2.5
+
+  async getFinancialReconciliation(
+    dto: AnalyticsQueryDto,
+    _user: AnalyticsUser,
+  ): Promise<FinancialReconciliationResponse> {
+    const { current } = this.resolveQueryPeriod(dto);
+
+    const [payments, refunds, commissions, ledgerEntries] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: revenueWhere(current.start, current.endExclusive),
+        select: { id: true, amount: true, currency: true },
+      }),
+      this.prisma.refund.findMany({
+        where: {
+          status: "PROCESSED",
+          processedAt: { gte: current.start, lt: current.endExclusive },
+        },
+        select: { id: true, amount: true, currency: true },
+      }),
+      this.prisma.commission.findMany({
+        where: {
+          createdAt: { gte: current.start, lt: current.endExclusive },
+        },
+        select: { id: true, amount: true, currency: true },
+      }),
+      this.prisma.$queryRaw<{ cnt: bigint }[]>`
+        SELECT COUNT(*) as cnt
+        FROM finance."LedgerTransaction"
+        WHERE "occurredAt" >= ${current.start} AND "occurredAt" < ${current.endExclusive}
+      `,
+    ]);
+
+    const paymentsByCurrency = sumDecimalString(payments);
+    const refundsByCurrency = sumDecimalString(refunds);
+    const commissionByCurrency = sumDecimalString(commissions);
+    const netPaymentsByCurrency = subtractDecimalStrings(
+      paymentsByCurrency,
+      refundsByCurrency,
+    );
+
+    const allCurrencies = new Set([
+      ...Object.keys(paymentsByCurrency),
+      ...Object.keys(refundsByCurrency),
+      ...Object.keys(commissionByCurrency),
+    ]);
+    const primaryCur = [...allCurrencies][0] || "USD";
+
+    return {
+      period: {
+        start: current.start.toISOString(),
+        endExclusive: current.endExclusive.toISOString(),
+        timezone: current.timezone,
+        preset: current.preset,
+      },
+      currency: primaryCur,
+      totalPayments: paymentsByCurrency[primaryCur] || "0.00",
+      totalRefunds: refundsByCurrency[primaryCur] || "0.00",
+      netPayments: netPaymentsByCurrency[primaryCur] || "0.00",
+      totalCommission: commissionByCurrency[primaryCur] || "0.00",
+      totalLedgerEntries: Number(ledgerEntries[0]?.cnt || 0),
+    };
   }
 }

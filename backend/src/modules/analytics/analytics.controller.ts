@@ -1,10 +1,11 @@
 /**
- * Step 3.3 Analytics Foundation — Analytics Controller
+ * Step 3.3 Analytics Foundation — Analytics Controller (Remediated)
  *
  * API endpoints for analytics queries. All endpoints require authentication
  * and appropriate permissions.
  *
  * Design authority: docs/architecture/analytics-foundation-3.3.md
+ * Remediation: Strict Review VERDICT B findings closure.
  */
 
 import { Controller, Get, Query } from "@nestjs/common";
@@ -18,7 +19,8 @@ import {
 import { AnalyticsService } from "./analytics.service";
 import { AnalyticsPeriodPreset } from "./analytics-period.resolver";
 import { AnalyticsGranularity } from "./analytics-granularity.resolver";
-import { RequirePermissions } from "../../security/auth/decorators";
+import { RequirePermissions, CurrentUser } from "../../security/auth/decorators";
+import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 
 class AnalyticsQueryDto {
   @IsEnum(AnalyticsPeriodPreset)
@@ -55,6 +57,12 @@ class AnalyticsQueryDto {
   acquisitionSource?: string;
 }
 
+/**
+ * Analytics controller type: user with canonical identity fields.
+ * Matches AuthUser from AuthService.
+ */
+type AnalyticsUser = AuthedRequest["user"];
+
 @Controller("api/v1/analytics")
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
@@ -63,50 +71,76 @@ export class AnalyticsController {
    * GET /api/v1/analytics/company-kpi
    *
    * Company-wide KPI summary for Dashboard/Command Center consumption.
-   * Requires: finance.analytics.read or analytics.company.read
+   * Requires: analytics.read (canonical permission).
    */
   @Get("company-kpi")
-  @RequirePermissions("finance.analytics.read")
-  async getCompanyKpi(@Query() query: AnalyticsQueryDto) {
-    return this.analyticsService.getCompanyKpi(query);
+  @RequirePermissions("analytics.read")
+  async getCompanyKpi(
+    @Query() query: AnalyticsQueryDto,
+    @CurrentUser() user: AnalyticsUser,
+  ) {
+    return this.analyticsService.getCompanyKpi(query, user);
   }
 
   /**
    * GET /api/v1/analytics/partner-performance
    *
    * Partner-scoped performance metrics.
-   * Requires: finance.analytics.read or analytics.partner.read
+   * Requires: analytics.read (canonical permission).
+   * PARTNER role: automatically scoped to own partnerId.
    */
   @Get("partner-performance")
-  @RequirePermissions("finance.analytics.read")
-  async getPartnerPerformance(@Query() query: AnalyticsQueryDto) {
-    return this.analyticsService.getPartnerPerformance(query);
+  @RequirePermissions("analytics.read")
+  async getPartnerPerformance(
+    @Query() query: AnalyticsQueryDto,
+    @CurrentUser() user: AnalyticsUser,
+  ) {
+    return this.analyticsService.getPartnerPerformance(query, user);
   }
 
   /**
    * GET /api/v1/analytics/conversion-funnel
    *
    * Marketplace/Storefront conversion funnel.
-   * Requires: finance.analytics.read or analytics.funnel.read
+   * Requires: analytics.read (canonical permission).
    */
   @Get("conversion-funnel")
-  @RequirePermissions("finance.analytics.read")
-  async getConversionFunnel(@Query() query: AnalyticsQueryDto) {
-    return this.analyticsService.getConversionFunnel(query);
+  @RequirePermissions("analytics.read")
+  async getConversionFunnel(
+    @Query() query: AnalyticsQueryDto,
+    @CurrentUser() user: AnalyticsUser,
+  ) {
+    return this.analyticsService.getConversionFunnel(query, user);
   }
 
   /**
    * GET /api/v1/analytics/time-series
    *
    * Generic time-series data with auto-selected granularity.
-   * Requires: finance.analytics.read or analytics.timeseries.read
+   * Requires: analytics.read (canonical permission).
    */
   @Get("time-series")
-  @RequirePermissions("finance.analytics.read")
+  @RequirePermissions("analytics.read")
   async getTimeSeries(
     @Query() query: AnalyticsQueryDto,
-    @Query("metric") metric?: string,
+    @Query("metric") metric: string | undefined,
+    @CurrentUser() user: AnalyticsUser,
   ) {
-    return this.analyticsService.getTimeSeries(query, metric || "orders");
+    return this.analyticsService.getTimeSeries(query, user, metric || "orders");
+  }
+
+  /**
+   * GET /api/v1/analytics/financial-reconciliation
+   *
+   * Financial reconciliation summary (read-only).
+   * Requires: analytics.read (canonical permission).
+   */
+  @Get("financial-reconciliation")
+  @RequirePermissions("analytics.read")
+  async getFinancialReconciliation(
+    @Query() query: AnalyticsQueryDto,
+    @CurrentUser() user: AnalyticsUser,
+  ) {
+    return this.analyticsService.getFinancialReconciliation(query, user);
   }
 }
