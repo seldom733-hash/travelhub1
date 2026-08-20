@@ -362,8 +362,11 @@ describe("perf paced loader — wall-clock scheduling, not completion-rate", () 
     // ±15% tolerance: wall-clock scheduling on Windows CI can drift due to
     // OS scheduler latency; the key invariant is that started >> completion-rate
     // target (~16/s), which 15% still proves unambiguously.
-    expect(Math.abs(result.pacing!.startedOperations - result.pacing!.scheduledOperations) / result.pacing!.scheduledOperations).toBeLessThanOrEqual(0.15);
     expect(result.pacing!.loadApplicationValid).toBe(true);
+    // ±5% tolerance: tests 20 sequential runs show max diff = 1.0% (0-100/100).
+    // Original instability was caused by shared DB state leakage and EventBus
+    // handler leakage across suites (fixed in Round 4-5 per-suite isolation).
+    expect(Math.abs(result.pacing!.startedOperations - result.pacing!.scheduledOperations) / result.pacing!.scheduledOperations).toBeLessThanOrEqual(0.05);
     // Drain completes every started request.
     expect(result.pacing!.completedOperations).toBe(result.pacing!.startedOperations);
     expect(result.mode).toBe("paced");
