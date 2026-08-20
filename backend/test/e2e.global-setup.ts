@@ -11,13 +11,23 @@
  * CONCURRENCY: only one e2e run at a time against the same test DB is supported
  * (two simultaneous runs would drop each other's database).
  */
-import { execFileSync, execSync } from "child_process";
+import { execSync } from "child_process";
 import * as path from "path";
+import { Client } from "pg";
 import { extractDatabaseName, maintenanceUrl, resolveTestDatabaseUrl } from "./e2e-db-config";
 
 const BACKEND_DIR = path.resolve(__dirname, "..");
-const PG_ENV = { ...process.env, PGCONNECT_TIMEOUT: "10" };
-const psql = process.platform === "win32" ? "psql.exe" : "psql";
+
+/** Execute a SQL statement against PostgreSQL via Node.js pg client (no psql binary needed). */
+async function pgExec(url: string, sql: string): Promise<void> {
+  const client = new Client({ connectionString: url, connectionTimeoutMillis: 10_000 });
+  try {
+    await client.connect();
+    await client.query(sql);
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
 
 export default async function globalSetup(): Promise<void> {
   const url = resolveTestDatabaseUrl();
@@ -27,28 +37,13 @@ export default async function globalSetup(): Promise<void> {
 
   process.stdout.write(`[e2e] Preparing isolated test DB "${dbName}" (${url})\n`);
 
-  // 1. Drop + recreate the test database. WITH (FORCE) terminates leftover connections.
-  try {
-    execFileSync(psql, [admin, "-v", "ON_ERROR_STOP=1", "-c", `DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`], {
-      stdio: "inherit",
-      env: PG_ENV,
-    });
-    execFileSync(psql, [admin, "-v", "ON_ERROR_STOP=1", "-c", `CREATE DATABASE "${dbName}"`], {
-      stdio: "inherit",
-      env: PG_ENV,
-    });
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(
-        "[e2e] psql was not found on PATH. PostgreSQL client tools (psql) are required to create the isolated test DB.",
-      );
-    }
-    throw err;
-  }
+  // 1. Terminate existing connections, then drop + recreate the test database.
+  await pgExec(admin, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${dbName}' AND pid != pg_backend_pid()`);
+  await pgExec(admin, `DROP DATABASE IF EXISTS "${dbName}"`);
+  await pgExec(admin, `CREATE DATABASE "${dbName}"`);
+  process.stdout.write(`[e2e] Database "${dbName}" recreated.\n`);
 
-  // 2. Apply the real Prisma migrations (prisma.config.ts reads process.env first,
-  //    so DATABASE_URL below overrides backend/.env — the dev DB is never touched).
-  //    execSync (shell) is required on Windows to launch npx.cmd.
+  // 2. Apply the real Prisma migrations.
   process.stdout.write("[e2e] Applying Prisma migrations (prisma migrate deploy)...\n");
   execSync("npx prisma migrate deploy", {
     cwd: BACKEND_DIR,
