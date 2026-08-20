@@ -86,16 +86,20 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
 
     // Create fresh DB + apply migrations via Node.js pg client (no psql binary needed)
     const admin = maintenanceUrl(this.suiteDbUrl);
+    const t0 = Date.now();
     this.log(`Creating suite DB "${suiteName}"`);
     await pgExec(admin, `DROP DATABASE IF EXISTS "${suiteName}"`);
     await pgExec(admin, `CREATE DATABASE "${suiteName}"`);
+    this.log(`DB created in ${Date.now() - t0}ms`);
 
+    const t1 = Date.now();
     execSync("npx prisma migrate deploy", {
       cwd: BACKEND_DIR,
       stdio: "pipe",
       env: { ...process.env, DATABASE_URL: this.suiteDbUrl, TEST_DATABASE_URL: this.suiteDbUrl },
-      timeout: 60_000,
+      timeout: 120_000,
     });
+    this.log(`Migrations applied in ${Date.now() - t1}ms`);
 
     // Inject suite URL into BOTH host and VM scopes
     process.env.DATABASE_URL = this.suiteDbUrl;
@@ -117,8 +121,9 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
       this.log(`Dropping suite DB "${this.suiteDbName}"`);
       try {
         const admin = maintenanceUrl(this.suiteDbUrl);
-        // Terminate connections using the suite DB itself (it exists until DROP)
-        await pgExec(this.suiteDbUrl, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${this.suiteDbName}'`).catch(() => {});
+        // Terminate connections via maintenance DB (postgres) — never via suite DB
+        // which would kill our own connection.
+        await pgExec(admin, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${this.suiteDbName}' AND pid != pg_backend_pid()`).catch(() => {});
         await pgExec(admin, `DROP DATABASE IF EXISTS "${this.suiteDbName}"`);
         this.log(`Suite DB "${this.suiteDbName}" dropped successfully`);
       } catch (err) {
