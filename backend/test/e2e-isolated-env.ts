@@ -17,7 +17,24 @@ import { extractDatabaseName, maintenanceUrl, replaceDbName, shortHash } from ".
 
 const BACKEND_DIR = path.resolve(__dirname, "..");
 const psql = process.platform === "win32" ? "psql.exe" : "psql";
-const PG_ENV = { ...process.env, PGCONNECT_TIMEOUT: "10" };
+
+/**
+ * Build psql-friendly env from a postgresql:// URL.
+ * psql does NOT parse connection URIs — it needs PGHOST/PGPORT/PGUSER/PGPASSWORD
+ * as separate env vars (or .pgpass). CI has no .pgpass, so we must extract them.
+ */
+function pgEnvFromUrl(url: string): Record<string, string> {
+  const parsed = new URL(url);
+  return {
+    ...process.env,
+    PGHOST: parsed.hostname || "localhost",
+    PGPORT: parsed.port || "5432",
+    PGUSER: parsed.username || "postgres",
+    PGPASSWORD: parsed.password || "",
+    PGDATABASE: parsed.pathname.replace(/^\//, "") || "postgres",
+    PGCONNECT_TIMEOUT: "10",
+  };
+}
 
 /** Saved env state for exact restoration. */
 interface SavedEnv {
@@ -167,9 +184,12 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
   }
 
   private psqlExec(targetUrl: string, sql: string): void {
-    execFileSync(psql, [maintenanceUrl(targetUrl), "-v", "ON_ERROR_STOP=1", "-c", sql], {
+    // targetUrl is already the maintenance URL (postgres DB);
+    // extract PG* env vars from it so psql can authenticate.
+    const env = pgEnvFromUrl(targetUrl);
+    execFileSync(psql, ["-v", "ON_ERROR_STOP=1", "-c", sql], {
       stdio: "pipe",
-      env: PG_ENV,
+      env,
       timeout: 30_000,
     });
   }
