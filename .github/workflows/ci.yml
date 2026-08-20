@@ -74,20 +74,15 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install PostgreSQL client (psql) for E2E isolation
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
-      - name: Verify psql is available
-        run: psql --version
-
       - name: Unit tests
         run: npx jest --runInBand --forceExit
 
       # E2E run sequentially (one e2e run per test DB is supported).
+      # Isolation uses Node.js pg client (no psql binary required).
       # MinIO binary for media tests is self-bootstrapped by test/e2e.minio.ts
       # (version-pinned download + SHA-256 check, cached in .tools/minio).
       - name: E2E tests (serial, isolated test DB)
-        run: npx jest --config test/jest-e2e.json --runInBand --forceExit --verbose
+        run: npx jest --config test/jest-e2e.json --runInBand --forceExit
         env:
           TEST_DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/travelhub1_test"
           S3_ENDPOINT: "http://127.0.0.1:19000"

@@ -10,30 +10,23 @@
  * Cleanup failures are promoted to suite failures (not silently swallowed).
  */
 import NodeEnvironment from "jest-environment-node";
-import { execFileSync, execSync } from "child_process";
+import { execSync } from "child_process";
 import * as path from "path";
 import type { EnvironmentContext, JestEnvironmentConfig } from "@jest/environment";
 import { extractDatabaseName, maintenanceUrl, replaceDbName, shortHash } from "./e2e-db-config";
+import { Client } from "pg";
 
 const BACKEND_DIR = path.resolve(__dirname, "..");
-const psql = process.platform === "win32" ? "psql.exe" : "psql";
 
-/**
- * Build psql-friendly env from a postgresql:// URL.
- * psql does NOT parse connection URIs — it needs PGHOST/PGPORT/PGUSER/PGPASSWORD
- * as separate env vars (or .pgpass). CI has no .pgpass, so we must extract them.
- */
-function pgEnvFromUrl(url: string): Record<string, string> {
-  const parsed = new URL(url);
-  return {
-    ...process.env,
-    PGHOST: parsed.hostname || "localhost",
-    PGPORT: parsed.port || "5432",
-    PGUSER: parsed.username || "postgres",
-    PGPASSWORD: parsed.password || "",
-    PGDATABASE: parsed.pathname.replace(/^\//, "") || "postgres",
-    PGCONNECT_TIMEOUT: "10",
-  };
+/** Execute a SQL statement against a PostgreSQL database via Node.js pg client. */
+async function pgExec(url: string, sql: string): Promise<void> {
+  const client = new Client({ connectionString: url, connectionTimeoutMillis: 10_000 });
+  try {
+    await client.connect();
+    await client.query(sql);
+  } finally {
+    await client.end().catch(() => {});
+  }
 }
 
 /** Saved env state for exact restoration. */
@@ -91,11 +84,11 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
       vmSuiteHash: this.global.process.env.E2E_SUITE_TEST_PATH_HASH,
     };
 
-    // Create fresh DB + apply migrations
+    // Create fresh DB + apply migrations via Node.js pg client (no psql binary needed)
     const admin = maintenanceUrl(this.suiteDbUrl);
     this.log(`Creating suite DB "${suiteName}"`);
-    this.psqlExec(admin, `DROP DATABASE IF EXISTS "${suiteName}" WITH (FORCE)`);
-    this.psqlExec(admin, `CREATE DATABASE "${suiteName}"`);
+    await pgExec(admin, `DROP DATABASE IF EXISTS "${suiteName}"`);
+    await pgExec(admin, `CREATE DATABASE "${suiteName}"`);
 
     execSync("npx prisma migrate deploy", {
       cwd: BACKEND_DIR,
@@ -124,8 +117,9 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
       this.log(`Dropping suite DB "${this.suiteDbName}"`);
       try {
         const admin = maintenanceUrl(this.suiteDbUrl);
-        this.psqlExec(admin, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${this.suiteDbName}'`);
-        this.psqlExec(admin, `DROP DATABASE IF EXISTS "${this.suiteDbName}" WITH (FORCE)`);
+        // Terminate connections using the suite DB itself (it exists until DROP)
+        await pgExec(this.suiteDbUrl, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${this.suiteDbName}'`).catch(() => {});
+        await pgExec(admin, `DROP DATABASE IF EXISTS "${this.suiteDbName}"`);
         this.log(`Suite DB "${this.suiteDbName}" dropped successfully`);
       } catch (err) {
         cleanupError = new Error(`Failed to drop suite DB "${this.suiteDbName}": ${(err as Error).message}`);
@@ -183,15 +177,8 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
     }
   }
 
-  private psqlExec(targetUrl: string, sql: string): void {
-    // targetUrl is already the maintenance URL (postgres DB);
-    // extract PG* env vars from it so psql can authenticate.
-    const env = pgEnvFromUrl(targetUrl);
-    execFileSync(psql, ["-v", "ON_ERROR_STOP=1", "-c", sql], {
-      stdio: "pipe",
-      env,
-      timeout: 30_000,
-    });
+  private async pgExec(url: string, sql: string): Promise<void> {
+    await pgExec(url, sql);
   }
 
   private log(msg: string): void {
