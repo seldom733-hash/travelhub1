@@ -696,4 +696,23 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
       expect(res.body.layoutVersion).toBeGreaterThanOrEqual(1);
     });
   });
+
+  // ─── 12. DB isolation contract ──────────────────────────────────────────
+
+  describe("Per-suite DB isolation contract", () => {
+    it("Prisma connects to suite DB, not the base travelhub1_test", async () => {
+      const rows = await prisma.$queryRawUnsafe<{ current_database: string }[]>(
+        "SELECT current_database()",
+      );
+      const dbName = rows[0].current_database;
+
+      // Must NOT be the shared base DB
+      expect(dbName).not.toBe("travelhub1_test");
+      // Must contain the base prefix (travelhub1_)
+      expect(dbName).toMatch(/^travelhub1_/);
+      // Must end with _test (suffix rule)
+      expect(dbName).toMatch(/_test$/i);
+      console.log(`[contract] current_database = ${dbName} (expected suite DB)`);
+    });
+  });
 });

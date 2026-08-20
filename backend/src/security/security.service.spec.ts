@@ -28,8 +28,12 @@ function createMockPrisma() {
     store.roles.set(code, { code, title: `Role ${code}` });
   }
 
+  // Track whether admin user exists (for P2002 re-verify tests)
+  let adminExists = true;
+
   return {
     _store: store,
+    _setAdminExists: (v: boolean) => { adminExists = v; },
     role: {
       upsert: jest.fn().mockImplementation(async ({ where, create }: any) => {
         if (!store.roles.has(where.code)) {
@@ -68,7 +72,7 @@ function createMockPrisma() {
     user: {
       count: jest.fn().mockResolvedValue(1),
       findUnique: jest.fn().mockImplementation(async ({ where }: any) => {
-        if (where?.username === "admin") return { id: "admin-id" };
+        if (where?.username === "admin") return adminExists ? { id: "admin-id" } : null;
         return null;
       }),
       create: jest.fn(),
@@ -166,5 +170,61 @@ describe("SecurityService — Seed Contract (mock-based unit tests)", () => {
 
     // Permission createMany only on first run
     expect(prisma.permission.createMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SecurityService — seedAdmin P2002 handling", () => {
+  it("skips seed when P2002 fires and admin user exists (concurrent create)", async () => {
+    const prisma = createMockPrisma();
+    // Initial check: admin does NOT exist → proceed to create
+    prisma.user.findUnique
+      .mockResolvedValueOnce(null) // initial check: no admin → create
+      .mockResolvedValueOnce({ id: "admin-id" }); // P2002 re-verify: admin found
+    prisma.user.create.mockImplementation(async () => {
+      const err: any = new Error("Unique constraint failed");
+      err.code = "P2002";
+      throw err;
+    });
+    const service = new SecurityService(
+      prisma as any, createMockIds() as any, createMockCrm() as any,
+    );
+
+    await service.onModuleInit();
+
+    // Should NOT throw — P2002 + admin exists = skip
+    const adminFindCalls = prisma.user.findUnique.mock.calls.filter(
+      ([arg]: any) => arg?.where?.username === "admin"
+    );
+    expect(adminFindCalls.length).toBe(2);
+  });
+
+  it("rethrows P2002 when admin user does NOT exist after catch (unexpected conflict)", async () => {
+    const prisma = createMockPrisma();
+    // First findUnique (initial check): no admin → proceed to create
+    prisma.user.findUnique
+      .mockResolvedValueOnce(null) // initial check: no admin
+      .mockResolvedValueOnce(null); // P2002 re-verify: admin still not found → rethrow
+    prisma.user.create.mockImplementation(async () => {
+      const err: any = new Error("Unique constraint failed on different field");
+      err.code = "P2002";
+      throw err;
+    });
+    const service = new SecurityService(
+      prisma as any, createMockIds() as any, createMockCrm() as any,
+    );
+
+    // The error message contains "Unique constraint" not "P2002" — it rethrows the original
+    await expect(service.onModuleInit()).rejects.toThrow("Unique constraint failed on different field");
+  });
+
+  it("rethrows non-P2002 errors from user.create", async () => {
+    const prisma = createMockPrisma();
+    prisma.user.findUnique.mockResolvedValueOnce(null); // initial check
+    prisma.user.create.mockRejectedValue(new Error("DB connection lost"));
+    const service = new SecurityService(
+      prisma as any, createMockIds() as any, createMockCrm() as any,
+    );
+
+    await expect(service.onModuleInit()).rejects.toThrow("DB connection lost");
   });
 });

@@ -2,7 +2,8 @@
  * Jest custom TestEnvironment for per-suite PostgreSQL database isolation.
  *
  * Strategy: CREATE DATABASE + prisma migrate deploy per suite (idempotent, ~2-3s).
- * Combined with require cache reset to prevent NestJS @Global() module leakage.
+ * The suite DB URL is injected into both `process.env` and `this.global.process.env`
+ * so that setupFiles, AppModule, and PrismaService all connect to the isolated DB.
  */
 import NodeEnvironment from "jest-environment-node";
 import { execFileSync, execSync } from "child_process";
@@ -18,9 +19,12 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
   private suiteDbName: string | null = null;
   private suiteDbUrl: string | null = null;
   private baseTestUrl: string | null = null;
+  private readonly testPath: string;
 
   constructor(config: JestEnvironmentConfig, context: any) {
     super(config, context);
+    // Persist testPath from manifest — reliable across all Jest versions
+    this.testPath = context.testPath ?? "unknown";
   }
 
   override async setup(): Promise<void> {
@@ -34,8 +38,7 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
     if (!baseName) throw new Error(`[e2e-env] Cannot parse DB name from ${baseTestUrl}`);
 
     // Suite DB: <prefix>_<hash>_<pid>_test (must end with _test)
-    const testPath = (this as any).testPath ?? "unknown";
-    const pathHash = shortHash(testPath);
+    const pathHash = shortHash(this.testPath);
     const prefix = baseName.replace(/_test$/i, "");
     const suiteName = `${prefix}_${pathHash}_${process.pid}_test`;
     if (!/test$/i.test(suiteName)) {
@@ -58,9 +61,14 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
       timeout: 60_000,
     });
 
-    // 2. Override env vars BEFORE any import (setupFiles haven't run yet)
+    // 2. Override env vars in BOTH process.env and this.global.process.env.
+    //    - process.env: visible to setupFiles (e2e.env.ts) and any CJS require
+    //    - this.global.process.env: visible to the test file's process.env
+    //      (Jest creates an isolated global per testEnvironment instance)
     process.env.DATABASE_URL = this.suiteDbUrl!;
     process.env.TEST_DATABASE_URL = this.suiteDbUrl!;
+    this.global.process.env.DATABASE_URL = this.suiteDbUrl!;
+    this.global.process.env.TEST_DATABASE_URL = this.suiteDbUrl!;
     this.log(`Suite DB ready: ${suiteName}`);
   }
 
@@ -77,25 +85,12 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
       }
     }
 
-    // 2. Restore base URL
+    // 2. Restore base URL in both environments
     if (this.baseTestUrl) {
       process.env.DATABASE_URL = this.baseTestUrl;
       process.env.TEST_DATABASE_URL = this.baseTestUrl;
-    }
-
-    // 3. Reset require cache for app source modules and NestJS internals.
-    // This forces fresh module instantiation for the next suite, preventing
-    // @Global() module singleton leakage (Prisma, EventBus, Security).
-    // Note: EventBusService now has onModuleDestroy to clear handlers,
-    // but the module reference cache still needs clearing for fresh providers.
-    for (const key of Object.keys(require.cache)) {
-      if (
-        key.includes("/src/") ||
-        key.includes("/generated/") ||
-        (key.includes("/node_modules/@nestjs/") && !key.includes("/common/"))
-      ) {
-        delete require.cache[key];
-      }
+      this.global.process.env.DATABASE_URL = this.baseTestUrl;
+      this.global.process.env.TEST_DATABASE_URL = this.baseTestUrl;
     }
 
     await super.teardown();

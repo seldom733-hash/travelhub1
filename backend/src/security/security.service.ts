@@ -98,8 +98,18 @@ export class SecurityService implements OnModuleInit {
     } catch (err: any) {
       // P2002 = unique constraint — another suite or concurrent init already created it.
       if (err?.code === "P2002") {
-        this.logger.log(`Admin user '${ADMIN_USERNAME}' already exists (P2002), skipping seed`);
-        return;
+        // Re-verify: the admin user MUST exist after P2002.
+        // If another field conflicted (not username), rethrow.
+        const recheck = await this.prisma.user.findUnique({
+          where: { username: ADMIN_USERNAME },
+          select: { id: true },
+        });
+        if (recheck) {
+          this.logger.log(`Admin user '${ADMIN_USERNAME}' already exists (P2002), skipping seed`);
+          return;
+        }
+        // P2002 fired but admin not found — unexpected conflict, rethrow.
+        throw err;
       }
       throw err;
     }

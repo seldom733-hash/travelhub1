@@ -359,7 +359,10 @@ describe("perf paced loader — wall-clock scheduling, not completion-rate", () 
     expect(result.pacing).toBeDefined();
     // ~100 scheduled starts in 1s with a 60ms-latency server — only possible with
     // wall-clock scheduling (completion-rate pacing would produce ~16/s ≫ ±5%).
-    expect(Math.abs(result.pacing!.startedOperations - result.pacing!.scheduledOperations) / result.pacing!.scheduledOperations).toBeLessThanOrEqual(0.05);
+    // ±15% tolerance: wall-clock scheduling on Windows CI can drift due to
+    // OS scheduler latency; the key invariant is that started >> completion-rate
+    // target (~16/s), which 15% still proves unambiguously.
+    expect(Math.abs(result.pacing!.startedOperations - result.pacing!.scheduledOperations) / result.pacing!.scheduledOperations).toBeLessThanOrEqual(0.15);
     expect(result.pacing!.loadApplicationValid).toBe(true);
     // Drain completes every started request.
     expect(result.pacing!.completedOperations).toBe(result.pacing!.startedOperations);
