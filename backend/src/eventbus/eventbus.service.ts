@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, OnModuleDestroy } from "@nestjs/common";
 import { Prisma } from "../generated/prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { createRequestId, getRequestContext, normalizeCorrelationId, runWithRequestContext } from "../shared/request-context";
@@ -136,11 +136,17 @@ export type EventHandler = (event: OutboxEnvelope) => void | Promise<void>;
  * RabbitMQ/Kafka без изменения бизнес-кода доменов.
  */
 @Injectable()
-export class EventBusService {
+export class EventBusService implements OnModuleDestroy {
   private readonly handlers = new Map<string, EventHandler[]>();
   private readonly anyHandlers: EventHandler[] = [];
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Lifecycle: clear handler registrations to prevent cross-suite leakage. */
+  onModuleDestroy(): void {
+    this.handlers.clear();
+    this.anyHandlers.length = 0;
+  }
 
   /** Подписка на событие конкретного типа. */
   on(type: string, handler: EventHandler): void {

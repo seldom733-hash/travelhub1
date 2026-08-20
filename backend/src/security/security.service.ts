@@ -72,25 +72,37 @@ export class SecurityService implements OnModuleInit {
     this.logger.log("RBAC roles/permissions seeded");
   }
 
-  /** Создание администратора по умолчанию (только если пользователей нет). */
+  /** Создание администратора по умолчанию (идемпотентно). */
   private async seedAdmin(): Promise<void> {
-    const count = await this.prisma.user.count();
-    if (count > 0) return;
+    const existing = await this.prisma.user.findUnique({
+      where: { username: ADMIN_USERNAME },
+      select: { id: true },
+    });
+    if (existing) return;
 
     const role = await this.prisma.role.findUniqueOrThrow({ where: { code: RoleCode.ADMIN } });
     const code = await this.ids.nextCode(this.prisma as unknown as Prisma.TransactionClient, "USR");
     const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
-    await this.prisma.user.create({
-      data: {
-        code,
-        username: ADMIN_USERNAME,
-        passwordHash,
-        fullName: ADMIN_FULL_NAME,
-        status: UserStatus.ACTIVE,
-        roleId: role.id,
-      },
-    });
-    this.logger.log(`Seeded admin user '${ADMIN_USERNAME}' (role ADMIN)`);
+    try {
+      await this.prisma.user.create({
+        data: {
+          code,
+          username: ADMIN_USERNAME,
+          passwordHash,
+          fullName: ADMIN_FULL_NAME,
+          status: UserStatus.ACTIVE,
+          roleId: role.id,
+        },
+      });
+      this.logger.log(`Seeded admin user '${ADMIN_USERNAME}' (role ADMIN)`);
+    } catch (err: any) {
+      // P2002 = unique constraint — another suite or concurrent init already created it.
+      if (err?.code === "P2002") {
+        this.logger.log(`Admin user '${ADMIN_USERNAME}' already exists (P2002), skipping seed`);
+        return;
+      }
+      throw err;
+    }
   }
 
   /** Права пользователя (из его роли). */

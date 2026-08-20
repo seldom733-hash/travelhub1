@@ -67,6 +67,11 @@ function createMockPrisma() {
     },
     user: {
       count: jest.fn().mockResolvedValue(1),
+      findUnique: jest.fn().mockImplementation(async ({ where }: any) => {
+        if (where?.username === "admin") return { id: "admin-id" };
+        return null;
+      }),
+      create: jest.fn(),
     },
   };
 }

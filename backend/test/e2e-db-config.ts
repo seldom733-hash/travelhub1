@@ -40,6 +40,21 @@ export function maintenanceUrl(url: string): string {
   return url.replace(/\/([^/?]+)(?:\?|$)/, "/postgres");
 }
 
+/** Replace the database name in a postgresql:// URL. */
+export function replaceDbName(url: string, newDbName: string): string {
+  return url.replace(/\/([^/?]+)(?:\?|$)/, `/${newDbName}`);
+}
+
+/** Short deterministic hash for a string (used for suite DB names). */
+export function shortHash(input: string): string {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i);
+    hash = ((hash << 5) - hash + char) | 0;
+  }
+  return Math.abs(hash).toString(36).slice(0, 8);
+}
+
 function assertSafeTestUrl(url: string): void {
   if (!url.startsWith("postgresql://") && !url.startsWith("postgres://")) {
     throw new Error(`[e2e] TEST_DATABASE_URL must be a postgresql:// URL, got: ${url}`);
