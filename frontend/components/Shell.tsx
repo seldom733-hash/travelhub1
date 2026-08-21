@@ -22,6 +22,7 @@ interface NavItem {
  */
 const NAV: NavItem[] = [
   { href: "/app/dashboard", icon: "🏠", label: "Рабочий стол" },
+  { href: "/app/command-center", icon: "📊", label: "Command Center", permission: "analytics.read" },
   { href: "/app/catalog", icon: "📚", label: "Catalog Center", permission: "catalog.product.read" },
   { href: "/app/orders", icon: "🧾", label: "Order Center", permission: "order.read" },
   { href: "/app/bookings", icon: "📑", label: "Booking Center", permission: "booking.read" },

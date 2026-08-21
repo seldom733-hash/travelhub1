@@ -29,6 +29,8 @@ export interface WidgetDefinition {
   category: "KPI" | "chart" | "alert" | "list" | "custom";
   title: string;
   permission: string | null;
+  /** Section-level permission. null = no section gate. */
+  sectionPermission: string | null;
   minW: number;
   minH: number;
   maxW: number;

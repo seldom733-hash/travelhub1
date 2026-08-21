@@ -24,6 +24,7 @@ const mockWidgetDefinition: WidgetDefinition = {
   category: "KPI",
   title: "GMV",
   permission: "analytics.read",
+  sectionPermission: "dashboard.executive.read",
   minW: 1,
   minH: 1,
   maxW: 2,
