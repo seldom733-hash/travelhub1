@@ -500,6 +500,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.no_sections": { ru: "Нет доступных разделов. Обратитесь к администратору для настройки прав доступа.", az: "Əlçatan bölmələr yoxdur. Giriş hüquqlarını tənzimləmək üçün administratora müraciət edin.", en: "No available sections. Contact an administrator to configure access permissions." },
   "cc.update_error": { ru: "Ошибка обновления", az: "Yenilənmə xətası", en: "Update error" },
   "cc.layout_unavailable": { ru: "Персональный layout временно недоступен. Показан безопасный read-only режим.", az: "Şəxsi layout müvəqqəti olaraq əlçatan deyil. Təhlükəsiz read-only rejim göstərilir.", en: "Personal layout temporarily unavailable. Showing safe read-only mode." },
+  "cc.retry": { ru: "Повторить", az: "Yenidən cəhd et", en: "Retry" },
   "cc.readonly_fallback": { ru: "Layout недоступен — показаны разрешённые данные без настройки.", az: "Layout əlçatandır — icazə verilən məlumatlar tənzimləmə olmadan göstərilir.", en: "Layout unavailable — showing authorized data without customization." },
   "cc.period": { ru: "Период", az: "Dövr", en: "Period" },
   "cc.comparison": { ru: "Сравнение", az: "Müqayisə", en: "Comparison" },
@@ -556,9 +557,11 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.funnel.paymentsCaptured": { ru: "Payments Captured", az: "Tutulmuş ödənişlər", en: "Payments Captured" },
   "cc.funnel.refundsProcessed": { ru: "Refunds Processed", az: "Emal olunmuş geri qayıtışlar", en: "Refunds Processed" },
   "cc.funnel.conversion": { ru: "Funnel Conversion", az: "Funnel konversiyası", en: "Funnel Conversion" },
+  "cc.funnel.title": { ru: "Conversion Funnel", az: "Konversiya funneli", en: "Conversion Funnel" },
   // trend titles
   "cc.trend.orders": { ru: "Orders Trend", az: "Sifarişlər trendi", en: "Orders Trend" },
   "cc.trend.bookings": { ru: "Bookings Trend", az: "Bronlar trendi", en: "Bookings Trend" },
+  "cc.trend.revenue": { ru: "Revenue Trend", az: "Gəlir trendi", en: "Revenue Trend" },
   // period labels
   "cc.period.TODAY": { ru: "Сегодня", az: "Bu gün", en: "Today" },
   "cc.period.LAST_3_DAYS": { ru: "3 дня", az: "3 gün", en: "3 days" },

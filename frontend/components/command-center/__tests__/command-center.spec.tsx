@@ -178,7 +178,7 @@ describe("dashboard-api", () => {
     });
 
     it("throws ForbiddenError on 403", async () => {
-      fetchSpy.mockResolvedValueOnce(new Response("", { status: 403 }));
+      fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ message: "analytics.read required" }), { status: 403 }));
       const { dashboardApi } = await import("@/lib/dashboard-api");
       await expect(dashboardApi.getSummary({ preset: "MONTH", timezone: "UTC" })).rejects.toThrow("analytics.read");
     });

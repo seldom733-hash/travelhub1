@@ -1,80 +1,67 @@
 "use client";
 
-import { type CommandCenterSummary, type DashboardSection, type PeriodPreset } from "@/lib/dashboard-api";
-import { type EffectiveLayout, type WidgetPosition, type WidgetDefinition } from "@/lib/workspace-api";
+import { type CommandCenterSummary, type DashboardSection, type PeriodPreset, SUPPORTED_TREND_METRICS } from "@/lib/dashboard-api";
+import { type WidgetDefinition, type WidgetPosition } from "@/lib/workspace-api";
 import { t, type Locale } from "@/lib/i18n";
 import { KpiCard } from "./KpiCard";
 import { TrendWidget } from "./TrendWidget";
 import { OperationalSection } from "./OperationalSection";
 import { FinancialSection } from "./FinancialSection";
 
+/** KPI field mapping: widgetId → section + field name + format. */
+const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; format?: "currency" | "percent" | "number" }> = {
+  "gmv":              { section: "executive", field: "gmv", format: "currency" },
+  "revenue":          { section: "executive", field: "revenue", format: "currency" },
+  "net-revenue":      { section: "executive", field: "netRevenue", format: "currency" },
+  "orders":           { section: "executive", field: "ordersCreated" },
+  "bookings":         { section: "executive", field: "bookingsRequested" },
+  "aov":              { section: "executive", field: "averageOrderValue", format: "currency" },
+  "conversion":       { section: "executive", field: "conversionRate", format: "percent" },
+  "funnel":           { section: "operational", field: "funnel" },
+  "commission":       { section: "financial", field: "commissionAccrued", format: "currency" },
+  "payments":         { section: "financial", field: "totalPayments", format: "currency" },
+  "net-payments":     { section: "financial", field: "netPayments", format: "currency" },
+  "reconciliation":   { section: "financial", field: "reconciliationStatus" },
+  "sessions":         { section: "marketplace", field: "marketplaceSessions" },
+  "storefront-sessions": { section: "marketplace", field: "storefrontSessions" },
+  "partners":         { section: "marketplace", field: "activePartners" },
+  "customers":        { section: "marketplace", field: "newCustomers" },
+};
+
+/** Trend widgets: widgetId → metric. */
+const TREND_WIDGETS: Record<string, string> = {
+  "orders-trend": "orders",
+  "bookings-trend": "bookings",
+  // revenue-trend is registered but unsupported — handled specially
+};
+
+/** IDs that are NOT rendered as cards (composite/trend/special). */
+const NON_CARD_IDS = new Set(["funnel", "orders-trend", "bookings-trend", "revenue-trend"]);
+
+const SECTION_META: Record<DashboardSection, { titleKey: string; icon: string }> = {
+  executive: { titleKey: "cc.section.executive", icon: "📈" },
+  operational: { titleKey: "cc.section.operational", icon: "⚙️" },
+  financial: { titleKey: "cc.section.financial", icon: "💰" },
+  marketplace: { titleKey: "cc.section.marketplace", icon: "🏪" },
+};
+
 interface Props {
   summary: CommandCenterSummary | null;
   authorizedSections: DashboardSection[];
   loading: boolean;
-  layout: EffectiveLayout | null;
-  editing: boolean;
-  draft: WidgetPosition[] | null;
+  positions: WidgetPosition[];
+  allWidgetDefs: WidgetDefinition[];
   availableMetrics: string[];
   periodPreset: PeriodPreset;
   customStart?: string;
   customEnd?: string;
   comparison: boolean;
-  allWidgetDefs: WidgetDefinition[];
   locale?: Locale;
 }
 
-/** Check if a widget ID is visible in the given positions. */
-function isWidgetVisible(positions: WidgetPosition[], widgetId: string): boolean {
-  const pos = positions.find((wp) => wp.widgetId === widgetId);
-  return pos?.visible === true;
-}
-
-/** Check if a section has at least one visible widget from its widget set. */
-function sectionHasVisibleWidgets(
-  positions: WidgetPosition[],
-  sectionWidgetIds: string[],
-): boolean {
-  return sectionWidgetIds.some((id) => isWidgetVisible(positions, id));
-}
-
-const SECTION_META: Record<DashboardSection, { titleKey: string; icon: string; widgetIds: string[] }> = {
-  executive: {
-    titleKey: "cc.section.executive",
-    icon: "📈",
-    widgetIds: ["gmv", "revenue", "net-revenue", "orders", "bookings", "aov", "conversion", "orders-trend", "bookings-trend", "revenue-trend"],
-  },
-  operational: {
-    titleKey: "cc.section.operational",
-    icon: "⚙️",
-    widgetIds: ["funnel"],
-  },
-  financial: {
-    titleKey: "cc.section.financial",
-    icon: "💰",
-    widgetIds: ["commission", "payments", "net-payments", "reconciliation"],
-  },
-  marketplace: {
-    titleKey: "cc.section.marketplace",
-    icon: "🏪",
-    widgetIds: ["sessions", "storefront-sessions", "partners", "customers"],
-  },
-};
-
 export function SectionGrid({
-  summary,
-  authorizedSections,
-  loading,
-  layout,
-  editing,
-  draft,
-  availableMetrics,
-  periodPreset,
-  customStart,
-  customEnd,
-  comparison,
-  allWidgetDefs,
-  locale = "ru",
+  summary, authorizedSections, loading, positions,
+  allWidgetDefs, availableMetrics, periodPreset, customStart, customEnd, locale = "ru",
 }: Props) {
   if (loading && !summary) {
     return (
@@ -85,82 +72,73 @@ export function SectionGrid({
       </div>
     );
   }
-
   if (!summary) return null;
 
-  // Use draft when editing, otherwise use persisted layout
-  const activePositions = (editing && draft) ? draft : (layout?.widgets ?? []);
+  // R2-05: Sort positions by y then x to determine render order
+  const sortedPositions = [...positions].sort((a, b) => a.y - b.y || a.x - b.x);
 
-  // Section is shown if:
-  // 1. Server authorized it (availableSections)
-  // 2. Summary has section data
-  // 3. At least one widget in the section is visible
+  // Filter to visible only
+  const visiblePositions = sortedPositions.filter((wp) => wp.visible);
+
+  // Group visible positions by section
+  const sectionPositions: Record<DashboardSection, WidgetPosition[]> = {
+    executive: [], operational: [], financial: [], marketplace: [],
+  };
+  for (const wp of visiblePositions) {
+    const mapping = WIDGET_MAP[wp.widgetId];
+    if (mapping) sectionPositions[mapping.section].push(wp);
+  }
+
   const hasSection = (section: DashboardSection) =>
     authorizedSections.includes(section) &&
     summary.sections[section] !== undefined &&
-    sectionHasVisibleWidgets(activePositions, SECTION_META[section].widgetIds);
-
-  // Widget definitions for lookup
-  const getDef = (widgetId: string) => allWidgetDefs.find((d) => d.widgetId === widgetId);
+    sectionPositions[section].length > 0;
 
   return (
     <div className="mt-8 space-y-8">
-      {/* Executive Section */}
+      {/* Executive Section — cards in positions order */}
       {hasSection("executive") && summary.sections.executive && (
         <section aria-labelledby="section-executive">
           <h2 id="section-executive" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
             {SECTION_META.executive.icon} {t(SECTION_META.executive.titleKey, locale)}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {isWidgetVisible(activePositions, "gmv") && (
-              <KpiCard title={t("cc.kpi.gmv", locale)} value={summary.sections.executive.gmv} format="currency" />
-            )}
-            {isWidgetVisible(activePositions, "revenue") && (
-              <KpiCard title={t("cc.kpi.revenue", locale)} value={summary.sections.executive.revenue} format="currency" />
-            )}
-            {isWidgetVisible(activePositions, "net-revenue") && (
-              <KpiCard title={t("cc.kpi.netRevenue", locale)} value={summary.sections.executive.netRevenue} format="currency" />
-            )}
-            {isWidgetVisible(activePositions, "orders") && (
-              <KpiCard title={t("cc.kpi.orders", locale)} value={summary.sections.executive.ordersCreated} />
-            )}
-            {isWidgetVisible(activePositions, "bookings") && (
-              <KpiCard title={t("cc.kpi.bookings", locale)} value={summary.sections.executive.bookingsRequested} />
-            )}
-            {isWidgetVisible(activePositions, "aov") && (
-              <KpiCard title={t("cc.kpi.aov", locale)} value={summary.sections.executive.averageOrderValue} format="currency" />
-            )}
-            {isWidgetVisible(activePositions, "conversion") && (
-              <KpiCard title={t("cc.kpi.conversion", locale)} value={summary.sections.executive.conversionRate} format="percent" />
-            )}
+            {sectionPositions.executive
+              .filter((wp) => !NON_CARD_IDS.has(wp.widgetId))
+              .map((wp) => {
+                const mapping = WIDGET_MAP[wp.widgetId];
+                if (!mapping) return null;
+                const val = (summary.sections.executive as Record<string, unknown>)?.[mapping.field];
+                if (!val || typeof val !== "object") return null;
+                return (
+                  <KpiCard
+                    key={wp.widgetId}
+                    title={t(`cc.kpi.${wp.widgetId}`, locale) || wp.widgetId}
+                    value={val as import("@/lib/dashboard-api").KpiValue}
+                    format={mapping.format as "currency" | "percent" | undefined}
+                  />
+                );
+              })}
           </div>
-          {/* Executive trends — only registered trend widgets, using server metrics */}
+          {/* Trends — in positions order */}
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            {isWidgetVisible(activePositions, "orders-trend") && (
-              <TrendWidget
-                metric="orders"
-                title={t("cc.trend.orders", locale)}
-                section="executive"
-                periodPreset={periodPreset}
-                customStart={customStart}
-                customEnd={customEnd}
-                availableMetrics={availableMetrics}
-                locale={locale}
-              />
-            )}
-            {isWidgetVisible(activePositions, "bookings-trend") && (
-              <TrendWidget
-                metric="bookings"
-                title={t("cc.trend.bookings", locale)}
-                section="executive"
-                periodPreset={periodPreset}
-                customStart={customStart}
-                customEnd={customEnd}
-                availableMetrics={availableMetrics}
-                locale={locale}
-              />
-            )}
-            {isWidgetVisible(activePositions, "revenue-trend") && (
+            {sectionPositions.executive
+              .filter((wp) => wp.widgetId in TREND_WIDGETS)
+              .map((wp) => (
+                <TrendWidget
+                  key={wp.widgetId}
+                  metric={TREND_WIDGETS[wp.widgetId]}
+                  title={t(`cc.trend.${TREND_WIDGETS[wp.widgetId]}`, locale) || wp.widgetId}
+                  section="executive"
+                  periodPreset={periodPreset}
+                  customStart={customStart}
+                  customEnd={customEnd}
+                  availableMetrics={availableMetrics}
+                  locale={locale}
+                />
+              ))}
+            {/* revenue-trend: suppressed (R2-12) — only shown if position exists and metric unsupported */}
+            {sectionPositions.executive.some((wp) => wp.widgetId === "revenue-trend") && (
               <TrendWidget
                 metric="revenue"
                 title="Revenue Trend"
@@ -179,8 +157,7 @@ export function SectionGrid({
       {hasSection("operational") && summary.sections.operational && (
         <OperationalSection
           data={summary.sections.operational}
-          positions={activePositions}
-          editing={editing}
+          positions={sectionPositions.operational}
           locale={locale}
         />
       )}
@@ -189,31 +166,34 @@ export function SectionGrid({
       {hasSection("financial") && summary.sections.financial && (
         <FinancialSection
           data={summary.sections.financial}
-          positions={activePositions}
-          editing={editing}
+          positions={sectionPositions.financial}
           locale={locale}
         />
       )}
 
-      {/* Marketplace Section */}
+      {/* Marketplace Section — cards in positions order */}
       {hasSection("marketplace") && summary.sections.marketplace && (
         <section aria-labelledby="section-marketplace">
           <h2 id="section-marketplace" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
             {SECTION_META.marketplace.icon} {t(SECTION_META.marketplace.titleKey, locale)}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {isWidgetVisible(activePositions, "sessions") && (
-              <KpiCard title={t("cc.kpi.sessions", locale)} value={summary.sections.marketplace.marketplaceSessions} />
-            )}
-            {isWidgetVisible(activePositions, "storefront-sessions") && (
-              <KpiCard title={t("cc.kpi.storefrontSessions", locale)} value={summary.sections.marketplace.storefrontSessions} />
-            )}
-            {isWidgetVisible(activePositions, "partners") && (
-              <KpiCard title={t("cc.kpi.partners", locale)} value={summary.sections.marketplace.activePartners} />
-            )}
-            {isWidgetVisible(activePositions, "customers") && (
-              <KpiCard title={t("cc.kpi.customers", locale)} value={summary.sections.marketplace.newCustomers} />
-            )}
+            {sectionPositions.marketplace
+              .filter((wp) => !NON_CARD_IDS.has(wp.widgetId))
+              .map((wp) => {
+                const mapping = WIDGET_MAP[wp.widgetId];
+                if (!mapping) return null;
+                const val = (summary.sections.marketplace as Record<string, unknown>)?.[mapping.field];
+                if (!val || typeof val !== "object") return null;
+                return (
+                  <KpiCard
+                    key={wp.widgetId}
+                    title={t(`cc.kpi.${wp.widgetId}`, locale) || wp.widgetId}
+                    value={val as import("@/lib/dashboard-api").KpiValue}
+                    format={mapping.format as "currency" | "percent" | undefined}
+                  />
+                );
+              })}
           </div>
         </section>
       )}

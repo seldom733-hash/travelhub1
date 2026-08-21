@@ -3,6 +3,8 @@
  *
  * Fetches summary and trends from the Step 3.1 backend.
  * All period/comparison/timezone logic delegated to backend.
+ *
+ * R2-09: Typed HTTP errors for proper component state classification.
  */
 
 import { api } from "./api";
@@ -87,7 +89,7 @@ export interface TrendResponse {
 
 // ─── SUPPORTED TREND METRICS ─────────────────────────────────────────
 
-/** Backend-supported trend metrics. */
+/** Backend-supported trend metrics. revenue is NOT supported. */
 export const SUPPORTED_TREND_METRICS = ["orders", "bookings", "payments", "customers", "commissions"] as const;
 
 export type SupportedTrendMetric = (typeof SUPPORTED_TREND_METRICS)[number];
@@ -99,6 +101,39 @@ export function dataSourceToTrendMetric(dataSource: string): SupportedTrendMetri
     return metric as SupportedTrendMetric;
   }
   return null;
+}
+
+// ─── TYPED HTTP ERRORS ───────────────────────────────────────────────
+
+export class HttpError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "HttpError";
+  }
+}
+
+export class UnauthorizedError extends HttpError {
+  constructor(message = "Authentication required") {
+    super(message, 401);
+    this.name = "UnauthorizedError";
+  }
+}
+
+export class ForbiddenError extends HttpError {
+  constructor(message = "Access denied") {
+    super(message, 403);
+    this.name = "ForbiddenError";
+  }
+}
+
+export class TrendNotAvailableError extends HttpError {
+  constructor(message = "Trend metric not supported") {
+    super(message, 404);
+    this.name = "TrendNotAvailableError";
+  }
 }
 
 // ─── API CLIENT ──────────────────────────────────────────────────────
@@ -129,8 +164,11 @@ export const dashboardApi = {
     const url = `/api/v1/dashboard/command-center?${searchParams.toString()}`;
     const res = await fetch(url, { credentials: "include", signal });
     if (!res.ok) {
-      if (res.status === 403) throw new ForbiddenError("analytics.read required");
-      throw new Error(`HTTP ${res.status}`);
+      const body = await res.json().catch(() => ({}));
+      const msg = body.message || `HTTP ${res.status}`;
+      if (res.status === 401) throw new UnauthorizedError(msg);
+      if (res.status === 403) throw new ForbiddenError(msg);
+      throw new HttpError(msg, res.status);
     }
     return res.json() as Promise<CommandCenterSummary>;
   },
@@ -148,27 +186,13 @@ export const dashboardApi = {
     const url = `/api/v1/dashboard/command-center/trends?${searchParams.toString()}`;
     const res = await fetch(url, { credentials: "include", signal });
     if (res.ok) return res.json() as Promise<TrendResponse>;
-    if (res.status === 403) throw new ForbiddenError("Trend not authorized");
-    if (res.status === 404) throw new TrendNotAvailableError("Trend metric not supported");
-    throw new Error(`HTTP ${res.status}`);
+    const body = await res.json().catch(() => ({}));
+    const msg = body.message || `HTTP ${res.status}`;
+    if (res.status === 403) throw new ForbiddenError(msg);
+    if (res.status === 404) throw new TrendNotAvailableError(msg);
+    throw new HttpError(msg, res.status);
   },
 };
-
-// ─── ERRORS ──────────────────────────────────────────────────────────
-
-export class ForbiddenError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ForbiddenError";
-  }
-}
-
-export class TrendNotAvailableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TrendNotAvailableError";
-  }
-}
 
 // ─── PERIOD HELPERS ──────────────────────────────────────────────────
 
