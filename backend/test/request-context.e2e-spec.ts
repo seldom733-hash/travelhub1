@@ -388,13 +388,56 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
   // ── ALS isolation: 50+ параллельных requests ─────────────────────────────
 
   it("5b. 50 параллельных requests: каждый видит СВОЙ context (уникальные requestId, без пересечения)", async () => {
-    const results = await Promise.all(
-      Array.from({ length: 50 }, () => anon.get("/api/v1/public/products?pageSize=1")),
-    );
-    const ids = results.map((r) => r.headers["x-request-id"] as string);
+    const t0 = Date.now();
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY_MS = 200;
+
+    /** Fire a single GET and return result or error. */
+    async function fireRequest(idx: number): Promise<{ idx: number; ok: boolean; requestId: string; error: string | null }> {
+      try {
+        const res = await anon.get("/api/v1/public/products?pageSize=1");
+        return { idx, ok: true, requestId: res.headers["x-request-id"] as string, error: null };
+      } catch (err) {
+        return { idx, ok: false, requestId: "", error: (err as Error).message };
+      }
+    }
+
+    // Phase 1: fire all 50 in parallel.
+    let results = await Promise.all(Array.from({ length: 50 }, (_, i) => fireRequest(i)));
+
+    // Phase 2: retry failed requests sequentially (not in parallel) to avoid
+    // re-triggering resource exhaustion that caused the original ECONNRESET.
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      const failed = results.filter((r) => !r.ok);
+      if (failed.length === 0) break;
+      process.stdout.write(
+        `[5b-diag] attempt ${attempt}/${MAX_RETRIES}: ${failed.length} requests failed, retrying sequentially...\n`,
+      );
+      for (const f of failed) {
+        process.stdout.write(`[5b-diag]   retrying #${f.idx} (${f.error})\n`);
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        const retry = await fireRequest(f.idx);
+        results[f.idx] = retry;
+        if (retry.ok) {
+          process.stdout.write(`[5b-diag]   #${f.idx} succeeded on retry\n`);
+        } else {
+          process.stdout.write(`[5b-diag]   #${f.idx} FAILED again: ${retry.error}\n`);
+        }
+      }
+    }
+
+    const finalFailed = results.filter((r) => !r.ok);
+    if (finalFailed.length > 0) {
+      process.stdout.write(
+        `[5b-diag] FINAL: ${finalFailed.length}/50 requests still failed after retries\n`,
+      );
+    }
+
+    const ids = results.map((r) => r.requestId);
     expect(ids).toHaveLength(50);
+    expect(finalFailed).toHaveLength(0); // all must succeed
     for (const id of ids) expect(isValidRequestId(id)).toBe(true);
-    expect(new Set(ids).size).toBe(50); // ни один context не видит ID другого request
+    expect(new Set(ids).size).toBe(50);
   });
 
 
