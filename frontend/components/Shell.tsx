@@ -92,7 +92,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   // рендер детей блокирован до редиректа (review: исключает вспышку внутреннего UI
   // и лишние internal API-запросы от внешней роли). BUYER → /account (Step 1.13).
   if (!mounted || !user || isExternalRole(user.role)) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">Загрузка…</div>;
+    return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">{t("state.loading", locale)}</div>;
   }
 
   const visibleNav = NAV.filter((item) => canAccess(user, item.permission));
@@ -154,13 +154,13 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             href="/"
             className="mb-2 block w-full rounded-lg border border-white/10 px-3 py-1.5 text-center text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
           >
-            На витрину →
+            {t("nav.to_marketplace", locale)} →
           </Link>
           <button
             onClick={logout}
             className="w-full rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
           >
-            Выйти
+            {t("nav.logout", locale)}
           </button>
         </div>
       </aside>
