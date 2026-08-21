@@ -1,26 +1,29 @@
 /**
  * Jest `globalSetup`: prepares the isolated test database for e2e.
- *  - drops + recreates the test DB (guarded: name must contain "test");
- *  - applies the REAL Prisma migrations from prisma/migrations (migrate deploy);
- *  - fails loudly on any error (ON_ERROR_STOP + execFileSync throws).
  *
- * Runs once per jest invocation, before any test file. Dropping + recreating at
- * the START guarantees every run starts from a deterministic, empty state even
- * after a crashed run. globalTeardown leaves the DB for post-mortem inspection.
+ * Strategy:
+ *  1. Drop + recreate the test DB (apply real Prisma migrations)
+ *  2. Create a template DB from the test DB (for per-suite fast cloning)
  *
- * CONCURRENCY: only one e2e run at a time against the same test DB is supported
- * (two simultaneous runs would drop each other's database).
+ * The template DB is created ONCE per jest invocation, then each suite
+ * creates its own DB from the template (instant, no migrations needed).
  */
 import { execSync } from "child_process";
 import * as path from "path";
 import { Client } from "pg";
-import { extractDatabaseName, maintenanceUrl, resolveTestDatabaseUrl } from "./e2e-db-config";
+import {
+  extractDatabaseName,
+  maintenanceUrl,
+  replaceDbName,
+  resolveTestDatabaseUrl,
+} from "./e2e-db-config";
 
 const BACKEND_DIR = path.resolve(__dirname, "..");
+const TEMPLATE_DB_NAME = "template_travelhub_test";
 
-/** Execute a SQL statement against PostgreSQL via Node.js pg client (no psql binary needed). */
+/** Execute SQL against a PostgreSQL database via Node.js pg client. */
 async function pgExec(url: string, sql: string): Promise<void> {
-  const client = new Client({ connectionString: url, connectionTimeoutMillis: 10_000 });
+  const client = new Client({ connectionString: url, connectionTimeoutMillis: 15_000 });
   try {
     await client.connect();
     await client.query(sql);
@@ -37,13 +40,16 @@ export default async function globalSetup(): Promise<void> {
 
   process.stdout.write(`[e2e] Preparing isolated test DB "${dbName}" (${url})\n`);
 
-  // 1. Terminate existing connections, then drop + recreate the test database.
-  await pgExec(admin, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${dbName}' AND pid != pg_backend_pid()`);
+  // 1. Terminate connections, drop + recreate the test database.
+  await pgExec(
+    admin,
+    `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${dbName}' AND pid != pg_backend_pid()`,
+  );
   await pgExec(admin, `DROP DATABASE IF EXISTS "${dbName}"`);
   await pgExec(admin, `CREATE DATABASE "${dbName}"`);
-  process.stdout.write(`[e2e] Database "${dbName}" recreated.\n`);
+  process.stdout.write(`[e2e] Database "${dbName}" created.\n`);
 
-  // 2. Apply the real Prisma migrations.
+  // 2. Apply the real Prisma migrations to the test database.
   process.stdout.write("[e2e] Applying Prisma migrations (prisma migrate deploy)...\n");
   execSync("npx prisma migrate deploy", {
     cwd: BACKEND_DIR,
@@ -51,5 +57,16 @@ export default async function globalSetup(): Promise<void> {
     env: { ...process.env, DATABASE_URL: url, TEST_DATABASE_URL: url },
   });
 
-  process.stdout.write("[e2e] Test DB ready.\n");
+  // 3. Create template database from the migrated test database.
+  //    The template DB is used by e2e-isolated-env.ts for instant per-suite cloning.
+  //    We connect via the maintenance DB (admin), not the template itself.
+  process.stdout.write(`[e2e] Creating template database "${TEMPLATE_DB_NAME}"...\n`);
+  await pgExec(admin, `DROP DATABASE IF EXISTS "${TEMPLATE_DB_NAME}"`);
+  await pgExec(
+    admin,
+    `CREATE DATABASE "${TEMPLATE_DB_NAME}" TEMPLATE "${dbName}"`,
+  );
+  process.stdout.write(`[e2e] Template "${TEMPLATE_DB_NAME}" created.\n`);
+
+  process.stdout.write("[e2e] Test DB + template ready.\n");
 }

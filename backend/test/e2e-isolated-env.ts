@@ -1,26 +1,25 @@
 /**
  * Jest custom TestEnvironment for per-suite PostgreSQL database isolation.
  *
- * Each E2E suite gets its own PostgreSQL database:
- *   1. CREATE DATABASE <suite_name>
- *   2. prisma migrate deploy
- *   3. Inject suite URL into host process.env AND Jest VM this.global.process.env
- *   4. On teardown: terminate connections, drop DB, restore exact previous env
+ * Strategy: template-based isolation
+ *   1. globalSetup creates base DB with migrations, then creates a template DB
+ *   2. Each suite CREATEs its DB from the template (instant, no migrations)
+ *   3. Teardown drops the suite DB
  *
- * Cleanup failures are promoted to suite failures (not silently swallowed).
+ * This keeps per-suite isolation while avoiding 76×60 migration overhead.
  */
 import NodeEnvironment from "jest-environment-node";
-import { execSync } from "child_process";
 import * as path from "path";
 import type { EnvironmentContext, JestEnvironmentConfig } from "@jest/environment";
-import { extractDatabaseName, maintenanceUrl, replaceDbName, shortHash } from "./e2e-db-config";
 import { Client } from "pg";
+import { extractDatabaseName, maintenanceUrl, replaceDbName, shortHash } from "./e2e-db-config";
 
 const BACKEND_DIR = path.resolve(__dirname, "..");
+const TEMPLATE_DB_NAME = "template_travelhub_test";
 
-/** Execute a SQL statement against a PostgreSQL database via Node.js pg client. */
+/** Execute SQL against a PostgreSQL database via Node.js pg client. */
 async function pgExec(url: string, sql: string): Promise<void> {
-  const client = new Client({ connectionString: url, connectionTimeoutMillis: 10_000 });
+  const client = new Client({ connectionString: url, connectionTimeoutMillis: 15_000 });
   try {
     await client.connect();
     await client.query(sql);
@@ -50,7 +49,6 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
 
   constructor(config: JestEnvironmentConfig, context: EnvironmentContext) {
     super(config, context);
-    // EnvironmentContext.testPath is non-optional in the type definition
     this.testPath = context.testPath;
     this.pathHash = shortHash(this.testPath);
   }
@@ -84,22 +82,13 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
       vmSuiteHash: this.global.process.env.E2E_SUITE_TEST_PATH_HASH,
     };
 
-    // Create fresh DB + apply migrations via Node.js pg client (no psql binary needed)
+    // Create suite DB from template (instant — no migrations needed)
     const admin = maintenanceUrl(this.suiteDbUrl);
     const t0 = Date.now();
-    this.log(`Creating suite DB "${suiteName}"`);
+    this.log(`Creating suite DB "${suiteName}" from template "${TEMPLATE_DB_NAME}"`);
     await pgExec(admin, `DROP DATABASE IF EXISTS "${suiteName}"`);
-    await pgExec(admin, `CREATE DATABASE "${suiteName}"`);
-    this.log(`DB created in ${Date.now() - t0}ms`);
-
-    const t1 = Date.now();
-    execSync("npx prisma migrate deploy", {
-      cwd: BACKEND_DIR,
-      stdio: "pipe",
-      env: { ...process.env, DATABASE_URL: this.suiteDbUrl, TEST_DATABASE_URL: this.suiteDbUrl },
-      timeout: 120_000,
-    });
-    this.log(`Migrations applied in ${Date.now() - t1}ms`);
+    await pgExec(admin, `CREATE DATABASE "${suiteName}" TEMPLATE "${TEMPLATE_DB_NAME}"`);
+    this.log(`DB created from template in ${Date.now() - t0}ms`);
 
     // Inject suite URL into BOTH host and VM scopes
     process.env.DATABASE_URL = this.suiteDbUrl;
@@ -115,15 +104,15 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
   }
 
   override async teardown(): Promise<void> {
-    // 1. Terminate connections + drop suite DB (capture error for authoritative cleanup)
     let cleanupError: Error | null = null;
     if (this.suiteDbName && this.suiteDbUrl) {
       this.log(`Dropping suite DB "${this.suiteDbName}"`);
       try {
         const admin = maintenanceUrl(this.suiteDbUrl);
-        // Terminate connections via maintenance DB (postgres) — never via suite DB
-        // which would kill our own connection.
-        await pgExec(admin, `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${this.suiteDbName}' AND pid != pg_backend_pid()`).catch(() => {});
+        await pgExec(
+          admin,
+          `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${this.suiteDbName}' AND pid != pg_backend_pid()`,
+        ).catch(() => {});
         await pgExec(admin, `DROP DATABASE IF EXISTS "${this.suiteDbName}"`);
         this.log(`Suite DB "${this.suiteDbName}" dropped successfully`);
       } catch (err) {
@@ -137,7 +126,11 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
       this.restoreEnv("DATABASE_URL", this.savedEnv.hostDatabaseUrl, this.savedEnv.vmDatabaseUrl);
       this.restoreEnv("TEST_DATABASE_URL", this.savedEnv.hostTestDatabaseUrl, this.savedEnv.vmTestDatabaseUrl);
       this.restoreEnv("E2E_SUITE_DB_NAME", this.savedEnv.hostSuiteDbName, this.savedEnv.vmSuiteDbName);
-      this.restoreEnv("E2E_SUITE_TEST_PATH_HASH", this.savedEnv.hostSuiteHash, this.savedEnv.vmSuiteHash);
+      this.restoreEnv(
+        "E2E_SUITE_TEST_PATH_HASH",
+        this.savedEnv.hostSuiteHash,
+        this.savedEnv.vmSuiteHash,
+      );
     }
 
     // 3. Always call super.teardown()
@@ -163,27 +156,21 @@ export default class IsolatedDbEnvironment extends NodeEnvironment {
   }
 
   private validateDbName(name: string): void {
-    // PostgreSQL identifier limit is 63 bytes
     if (name.length > 63) {
       throw new Error(`[e2e-env] Suite DB name "${name}" exceeds 63 characters (${name.length})`);
     }
-    // Must contain only lowercase ASCII letters, digits, underscores
     if (!/^[a-z0-9_]+$/.test(name)) {
-      throw new Error(`[e2e-env] Suite DB name "${name}" contains invalid characters (only lowercase ASCII, digits, _ allowed)`);
+      throw new Error(
+        `[e2e-env] Suite DB name "${name}" contains invalid characters (only lowercase ASCII, digits, _ allowed)`,
+      );
     }
-    // Must end with _test
     if (!/test$/.test(name)) {
       throw new Error(`[e2e-env] Suite DB name "${name}" does not end with "_test"`);
     }
-    // Must not match common dangerous names
     const forbidden = ["postgres", "template0", "template1", "travelhub1", "travelhub1_test"];
     if (forbidden.includes(name)) {
       throw new Error(`[e2e-env] Suite DB name "${name}" matches a protected name`);
     }
-  }
-
-  private async pgExec(url: string, sql: string): Promise<void> {
-    await pgExec(url, sql);
   }
 
   private log(msg: string): void {
