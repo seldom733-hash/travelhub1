@@ -518,6 +518,16 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.hide_available": { ru: "Скрыть доступные", az: "Əlçatanları gizlət", en: "Hide available" },
   "cc.all_added": { ru: "Все доступные виджеты уже добавлены", az: "Bütün əlçatan vidgetlər artıq əlavə edilib", en: "All available widgets are already added" },
   "cc.layout_settings": { ru: "Настройка макета", az: "Tərtibat tənzimləməsi", en: "Layout settings" },
+  // sidebar navigation
+  "nav.dashboard": { ru: "Рабочий стол", az: "İş masası", en: "Dashboard" },
+  "nav.command_center": { ru: "Command Center", az: "İdarəetmə mərkəzi", en: "Command Center" },
+  "nav.catalog": { ru: "Каталог", az: "Kataloq", en: "Catalog" },
+  "nav.orders": { ru: "Заказы", az: "Sifarişlər", en: "Orders" },
+  "nav.bookings": { ru: "Бронирования", az: "Bronlar", en: "Bookings" },
+  "nav.crm": { ru: "CRM", az: "CRM", en: "CRM" },
+  "nav.partner_onboarding": { ru: "Партнёры (онбординг)", az: "Tərəfdaşlar (onboarding)", en: "Partners (onboarding)" },
+  "nav.seller_profiles": { ru: "Продавцы", az: "Satıcılar", en: "Sellers" },
+  "nav.users": { ru: "Пользователи", az: "İstifadəçilər", en: "Users" },
   "cc_utc": { ru: "UTC", az: "UTC", en: "UTC" },
   // section names
   "cc.section.executive": { ru: "Сводные показатели", az: "İdarəetmə Xülasəsi", en: "Executive Summary" },

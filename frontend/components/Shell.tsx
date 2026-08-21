@@ -6,11 +6,12 @@ import { useEffect, useState } from "react";
 import { api, auth } from "@/lib/api";
 import { useCurrentUser } from "@/lib/use-user";
 import { homeForRole, isExternalRole } from "@/lib/routes";
+import { useLocale, t } from "@/lib/i18n";
 
 interface NavItem {
   href: string;
   icon: string;
-  label: string;
+  labelKey: string;
   /** Гранулярное право, открывающее раздел (RBAC Matrix §4). */
   permission?: string;
 }
@@ -21,15 +22,15 @@ interface NavItem {
  * только на внутренние Work Centers (§14).
  */
 const NAV: NavItem[] = [
-  { href: "/app/dashboard", icon: "🏠", label: "Рабочий стол" },
-  { href: "/app/command-center", icon: "📊", label: "Command Center", permission: "analytics.read" },
-  { href: "/app/catalog", icon: "📚", label: "Catalog Center", permission: "catalog.product.read" },
-  { href: "/app/orders", icon: "🧾", label: "Order Center", permission: "order.read" },
-  { href: "/app/bookings", icon: "📑", label: "Booking Center", permission: "booking.read" },
-  { href: "/app/crm", icon: "🤝", label: "CRM mini", permission: "crm.customer.read" },
-  { href: "/app/partners/onboarding", icon: "📋", label: "Partner onboarding", permission: "partner.onboarding.review" },
-  { href: "/app/seller-profiles", icon: "🛡", label: "Seller profiles", permission: "seller_public_profile.review" },
-  { href: "/app/users", icon: "👥", label: "Пользователи", permission: "settings.write" },
+  { href: "/app/dashboard", icon: "🏠", labelKey: "nav.dashboard" },
+  { href: "/app/command-center", icon: "📊", labelKey: "nav.command_center", permission: "analytics.read" },
+  { href: "/app/catalog", icon: "📚", labelKey: "nav.catalog", permission: "catalog.product.read" },
+  { href: "/app/orders", icon: "🧾", labelKey: "nav.orders", permission: "order.read" },
+  { href: "/app/bookings", icon: "📑", labelKey: "nav.bookings", permission: "booking.read" },
+  { href: "/app/crm", icon: "🤝", labelKey: "nav.crm", permission: "crm.customer.read" },
+  { href: "/app/partners/onboarding", icon: "📋", labelKey: "nav.partner_onboarding", permission: "partner.onboarding.review" },
+  { href: "/app/seller-profiles", icon: "🛡", labelKey: "nav.seller_profiles", permission: "seller_public_profile.review" },
+  { href: "/app/users", icon: "👥", labelKey: "nav.users", permission: "settings.write" },
 ];
 
 /** Маршрут → требуемое право (для редиректа при прямом переходе). */
@@ -47,6 +48,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const user = useCurrentUser();
+  const locale = useLocale();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -129,7 +131,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 }`}
               >
                 <span className="w-5 text-center text-base">{item.icon}</span>
-                {item.label}
+                {t(item.labelKey, locale)}
               </Link>
             );
           })}
