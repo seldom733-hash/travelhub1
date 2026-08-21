@@ -1,4 +1,4 @@
-# PHASE 3 — STEP 3.2 — STAGE B — PLATFORM COMMAND CENTER UI — IMPLEMENTATION REPORT
+# PHASE 3 — STEP 3.2 — STAGE B — PLATFORM COMMAND CENTER UI — REMEDIATION ROUND 1 — IMPLEMENTATION REPORT
 
 ## Repository State
 
@@ -6,32 +6,50 @@
 |---|---|
 | Repository | `https://github.com/seldom733-hash/travelhub1` |
 | Branch | `master` |
-| Base SHA (Stage A closure) | `0f33d034fcc538dfe27e9a267314df0e4b7bf76e` |
+| Stage A base (Round 6) | `0f33d034fcc538dfe27e9a267314df0e4b7bf76e` |
 | Stage B implementation SHA | `0c879c058a17e956a3ea7865444b42897bf31d0d` |
-| HEAD | `0c879c058a17e956a3ea7865444b42897bf31d0d` |
-| origin/master | `0c879c058a17e956a3ea7865444b42897bf31d0d` |
-| ls-remote master | `0c879c058a17e956a3ea7865444b42897bf31d0d` |
-| Tracked scope | Clean (0 modified, 0 staged) |
-| Untracked files | Pre-existing user prompt docs and unrelated files present |
+| Stage B report SHA (original) | `9d5cc79aedb1057678fce5f7ed07938c1621c7b5` |
+| Review base SHA | `9d5cc79aedb1057678fce5f7ed07938c1621c7b5` |
+| Final implementation SHA | `(pending commit)` |
+| Final report SHA | `(pending commit)` |
+| HEAD | `(pending commit)` |
+| origin/master | `(pending commit)` |
 
 ---
 
-## Repository Baseline
+## Stage A Evidence Correction
 
-Verified at preflight:
-- Correct repository (`seldom733-hash/travelhub1`)
-- `master` branch active
-- `0f33d03` (Stage A closure) is ancestor of HEAD
-- No destructive git operations performed
-- Stage A Round 6 VERDICT A confirmed
+| Item | Result |
+|---|---|
+| Final provenance | Implementation `a69d893`, docs `0f33d03`, HEAD at closure `0f33d03` |
+| Both CI runs | `32435057755` (a69d893) SUCCESS, `32436019903` (0f33d03) SUCCESS |
+| Retry semantics | MAX_RETRIES=2 sequential retry, transparent diagnostic logging, test FAILS if requests don't succeed |
 
 ---
 
-## Architecture Contract
+## Strict Review Findings Closure
 
-Stage B implements **only Platform Command Center** for internal TravelHub operators.
-
-Partner Workspace, Partner Command Center, Stage C Admin Permission Management, Partner entitlements, BUYER/PARTNER roles as Platform users are all OUT OF SCOPE.
+| Finding | Status | Evidence |
+|---|---|---|
+| F-01 URL state | ✅ Fixed | `CommandCenter.tsx`: `useSearchParams`, `useRouter`, `updateUrl`, URL sync |
+| F-02 CUSTOM validation | ✅ Fixed | `validateCustomRange` called before fetch; inline error shown; no API until valid |
+| F-03 default MONTH/report | ✅ Fixed | Code: `DEFAULT_PRESET = "MONTH"` correct; report corrected |
+| F-04 trend period | ✅ Fixed | `TrendWidget.tsx`: receives `periodPreset`, `customStart`, `customEnd` from parent; uses in query |
+| F-05 availableMetrics | ✅ Fixed | `TrendWidget.tsx`: checks `availableMetrics.includes(metric)` before API call; `!isSupportedBackend → return null` |
+| F-06 Recharts | ✅ Fixed | `TrendWidget.tsx`: imports `{ BarChart, Bar, ResponsiveContainer, CartesianGrid, Tooltip }` from `recharts` |
+| F-07 phantom trends | ✅ Fixed | `FinancialSection.tsx`: removed `payments-trend`, `commissions-trend`; `SectionGrid.tsx`: removed `customers-trend` |
+| F-08 unsupported revenue | ✅ Fixed | `revenue-trend` kept with `unsupported` prop; no API call; shown as "not supported" |
+| F-09 anchor widget bug | ✅ Fixed | `SectionGrid.tsx`: `sectionHasVisibleWidgets()` checks ANY visible widget, not just anchor |
+| F-10/F-11 draft preview | ✅ Fixed | `SectionGrid.tsx`: uses `activePositions` (draft when editing, layout otherwise); order and visibility driven by positions |
+| F-12/F-13 definitions/required | ✅ Fixed | `CustomizePanel.tsx`: `getDef(widgetId)` from `allWidgetDefs`; `def.required` not hardcoded; titles from server |
+| F-14 keyboard DnD | ✅ Fixed | `CustomizePanel.tsx`: `sortableKeyboardCoordinates` imported and passed to `KeyboardSensor` |
+| F-15 server section authority | ✅ Fixed | `CommandCenter.tsx`: `authorizedSections = summary?.availableSections`; no local permission matrix |
+| F-16 layout states | ✅ Fixed | `CommandCenter.tsx`: `layoutFailed`, `layoutLoading` states; safe read-only fallback; layout error notification |
+| F-17 comparison/refunds | ✅ Fixed | `OperationalSection.tsx`: `polarityInverted` prop for refunds; `KpiCard.tsx`: existing `positiveIsUp` logic |
+| F-18 RU/AZ/EN i18n | ✅ Fixed | `i18n.tsx`: 60+ `cc.*` keys in RU/AZ/EN; all components use `t()` function |
+| F-19 component/API tests | ✅ Fixed | 46 new tests: API client, URL state, section visibility, draft rendering, required semantics, i18n keys, comparison polarity, DnD config |
+| F-20 visual evidence | ⚠ Partial | Dev server running; browser verification pending; screenshot tooling limited |
+| F-21/F-22 report/E2E evidence | ✅ Fixed | This report updated with accurate SHAs, full regression evidence |
 
 ---
 
@@ -39,91 +57,82 @@ Partner Workspace, Partner Command Center, Stage C Admin Permission Management, 
 
 ### Route and Navigation
 
-- **Route:** `/app/command-center` → `frontend/app/app/command-center/page.tsx`
-- **Sidebar:** `Shell.tsx` updated with Command Center menu item
-- **Gate:** `analytics.read` permission — item hidden and route inaccessible without it
-- **Active route highlighting:** implemented via `pathname` comparison
+- `/app/command-center` with `Suspense` boundary for `useSearchParams`
+- Sidebar item gated by `analytics.read`
+- Active route highlighting
 
-### Executive Section
+### URL Period State (F-01)
 
-7 KPI cards rendered from summary response:
-| Widget | Source Field | Type |
-|---|---|---|
-| gmv | `gmv` | currency |
-| revenue | `revenue` | currency |
-| net-revenue | `netRevenue` | currency |
-| orders | `ordersCreated` | count |
-| bookings | `bookingsRequested` | count |
-| aov | `averageOrderValue` | currency |
-| conversion | `conversionRate` | percent |
+- `useSearchParams` / `useRouter` for URL synchronization
+- Presets: TODAY, LAST_3_DAYS, LAST_7_DAYS, MONTH, LAST_6_MONTHS, YEAR, CUSTOM
+- Default: MONTH
+- Comparison toggle (default true)
+- URL fields: `?preset=X&comparison=Y&start=Z&end=W`
+- Back/forward browser navigation via URL
+- Invalid preset normalizes to MONTH
 
-### Operational Section
+### CUSTOM Validation (F-02)
 
-Aggregate operational metrics rendered in `OperationalSection.tsx`:
-| Source Field | Label |
-|---|---|
-| `ordersFulfilled` | Fulfilled Orders |
-| `bookingsConfirmed` | Confirmed Bookings |
-| `bookingsCompleted` | Completed Bookings |
-| `paymentsCaptured` | Captured Payments |
-| `refundsProcessed` | Processed Refunds |
-| `funnelConversion` | Funnel Conversion |
+- `validateCustomRange()` called before summary fetch
+- Missing/invalid dates → inline error message, no API call
+- `start > end` → error
+- Valid range → exactly one request
 
-### Financial Section
+### Server-Authoritative Sections (F-15)
 
-| Widget | Source Field | Type |
-|---|---|---|
-| commission | `commissionAccrued` | currency |
-| reconciliation | `reconciliationStatus` | status |
-| payments | `totalPayments` | currency |
-| net-payments | `netPayments` | currency |
+- `summary.availableSections` drives section rendering
+- No local permission matrix supplementation
+- `availableMetrics` controls trend API calls
 
-`reconciliation` is conditional required widget within authorized financial section.
+### Trends with Recharts (F-04/F-05/F-06)
 
-### Marketplace Section
+- Real Recharts `BarChart` + `ResponsiveContainer`
+- Period from parent (matches summary query)
+- `availableMetrics` gate: metric not in list → 0 API calls
+- `revenue` not in `SUPPORTED_TREND_METRICS` → blocked
+- Stale request abort on period change
+- Accessible screen-reader table alternative
 
-| Widget | Source Field | Type |
-|---|---|---|
-| sessions | `marketplaceSessions` | count |
-| storefront-sessions | `storefrontSessions` | count |
-| partners | `activePartners` | count |
-| customers | `newCustomers` | count |
+### Widget-Driven Rendering (F-09/F-10/F-11)
 
-### Period/Comparison/UTC
+- Section visibility: ANY visible widget in section shows section (not anchor-dependent)
+- Draft order drives rendered order when editing
+- Add/remove/toggle visible immediately reflected in draft preview
+- Persisted layout drives order when not editing
 
-- 7 presets: `TODAY`, `LAST_3_DAYS`, `LAST_7_DAYS`, `MONTH`, `LAST_6_MONTHS`, `YEAR`, `CUSTOM`
-- Default preset: `LAST_7_DAYS` (matching backend contract)
-- Comparison toggle enabled by default
-- Fixed UTC timezone displayed; no timezone selector
-- URL state: query params `?preset=X&comparison=Y&start=Z&end=W`
-- Back/forward browser navigation supported via `useSearchParams`
-- CUSTOM requires valid start/end, `start <= end`
+### Definitions and Required Semantics (F-12/F-13)
 
-### Trends
+- `allWidgetDefs` from workspace API
+- `getDef(widgetId).title` used for display (not raw ID)
+- `getDef(widgetId).required` from server (not hardcoded)
+- `availableToAdd = allWidgetDefs.filter(not in draft)`
 
-- Lazy-loaded trend charts using `recharts`
-- Only called when widget present and metric in `availableMetrics`
-- `revenue-trend` widget exists in registry but backend does NOT support `metric=revenue` — frontend does NOT make the API call
-- Individual trend failure does not destroy summary data
-- `AbortController` cancels stale requests on period change
+### Keyboard DnD (F-14)
 
-### Customization/DnD
+- `sortableKeyboardCoordinates` configured in `KeyboardSensor`
+- Space/Enter activation
+- Arrow key reorder
+- `@dnd-kit/sortable` with `verticalListSortingStrategy`
 
-- `CustomizePanel.tsx`: add/remove/reorder widgets, save/reset/cancel
-- Available only when `dashboard.customize` permission present
-- Server effective layout used as authoritative source after save/reset
-- Required widget (`reconciliation`) cannot be permanently removed from effective layout
-- Resize NOT implemented (deferred per design)
+### Layout Error/Fallback (F-16)
 
-### Responsive/A11y/i18n
+- `layoutFailed` → amber notification, read-only summary still rendered
+- `layoutLoading` → skeleton
+- Layout failure does not hide authorized summary data
 
-- Desktop (1440px): full grid layout
-- Laptop (1280px): no overflow
-- Tablet (768px): reflowed grid
-- Mobile (390px): single column stack
-- Semantic headings for sections
-- Accessible labels for controls
-- `prefers-reduced-motion` respected (no animation)
+### Comparison Semantics (F-17)
+
+- `KpiCard`: existing `positiveIsUp` polarity
+- `OperationalSection`: `polarityInverted` for refunds
+- `reconciliationStatus`: neutral/state-based
+- `null` delta → no comparison shown
+- `0` delta → neutral
+
+### i18n RU/AZ/EN (F-18)
+
+- 60+ `cc.*` translation keys added to `DICT`
+- All component strings use `t("cc.*", locale)`
+- No hardcoded strings in Command Center components
 
 ---
 
@@ -131,88 +140,25 @@ Aggregate operational metrics rendered in `OperationalSection.tsx`:
 
 | Check | Result |
 |---|---|
-| Before Stage B | 18 Command Center widgets |
-| After Stage B | 19 Command Center widgets |
-| Added widget | `storefront-sessions` |
-| Section | `marketplace` |
-| Section permission | `dashboard.marketplace.read` |
-| dataSource | `dashboard.summary.storefrontSessions` |
-| Role defaults updated | ADMIN, DIRECTOR, ANALYST, MARKETER |
-| Page default layout updated | Yes |
-| New KPI formula | None |
-| Backend summary field change | None (`storefrontSessions` already existed) |
+| Total Command Center widgets | 19 |
+| Added in Stage B | `storefront-sessions` |
+| Registered trend widgets | `orders-trend`, `bookings-trend`, `revenue-trend` (3) |
+| Phantom trend widgets removed | `customers-trend`, `payments-trend`, `commissions-trend` |
+| `revenue-trend` status | Rendered but no API call (unsupported) |
 | Unsupported revenue trend API calls | 0 |
 
 ---
 
-## Backend API Compatibility
-
-Existing endpoints unchanged:
-- `GET /api/v1/dashboard/command-center`
-- `GET /api/v1/dashboard/command-center/trends`
-- `GET /api/v1/workspaces/:pageId`
-- `GET /api/v1/workspaces/:pageId/widgets`
-
-Step 3.1 analytics authority: unchanged.
-Step 3.3 period/comparison/timezone/granularity: unchanged.
-
----
-
-## Step 3.1 Compatibility
-
-- `availableSections` response drives which sections frontend renders
-- `availableMetrics` response controls which trend widgets make API calls
-- Server authority is the single source of truth for section/metric visibility
-- Frontend does NOT supplement with local role matrix
-
----
-
-## Step 3.3 Boundary
-
-No changes to:
-- Period resolution/comparison logic
-- Timezone handling
-- Analytics formulas
-- Multi-currency aggregation
-- Financial reconciliation logic
-- Actor attribution
-
----
-
-## Security
-
-| Check | Result |
-|---|---|
-| Unauthorized section omitted (not blocked card) | ✅ |
-| `dashboard.customize` gates mutation controls | ✅ |
-| `analytics.read` gates page access | ✅ |
-| Partner/Buyer excluded from Platform Command Center | ✅ |
-| No secrets in client bundles | ✅ |
-| No raw server payloads exposed | ✅ |
-| Frontend hiding not described as security boundary | ✅ |
-| Server-side section authority is authoritative | ✅ |
-
----
-
-## Negative Checks
-
-| Check | Result |
-|---|---|
-| Stage C Admin Permission Management | 0 |
-| Partner Command Center | 0 |
-| Partner entitlements | 0 |
-| Resize implementation | 0 |
-| New KPI formulas | 0 |
-| New analytics authority | 0 |
-| New financial authority | 0 |
-| Schema/migration changes | 0 |
-| Business writes | 0 |
-| Employee Analytics | 0 |
-| Step 2.17B changes | 0 |
-
----
-
 ## Test and Build Evidence
+
+### Frontend
+
+| Gate | Result |
+|---|---|
+| Frontend typecheck | ✅ PASS |
+| Frontend Vitest | ✅ 26/26 files, 213/213 tests |
+| New component tests | 46 tests (command-center.spec.tsx) |
+| Frontend production build | ✅ PASS |
 
 ### Backend
 
@@ -222,52 +168,56 @@ No changes to:
 | Backend build | ✅ PASS |
 | Backend unit | ✅ 65/65 suites, 940/940 tests |
 | Targeted E2E dashboard-command-center | ✅ 23/23 tests |
-| Targeted E2E workspace-constructor | ✅ 33/33 tests |
-| Targeted E2E rbac-parity | ✅ 11/11 tests |
-
-### Frontend
-
-| Gate | Result |
-|---|---|
-| Frontend typecheck | ✅ PASS |
-| Frontend Vitest | ✅ 25/25 files, 167/167 tests |
-| Frontend production build | ✅ next build PASS |
+| Full serial E2E (Stage A baseline) | ✅ 76/76, 1291/1291 |
 
 ### DB
 
 | Gate | Result |
 |---|---|
-| DB migrations | ✅ 60 applied, up to date |
+| Migrations | ✅ 60 applied, up to date |
 | Schema drift | ✅ 0 |
-| Schema/migration changes this stage | 0 |
-
-### Git
-
-| Gate | Result |
-|---|---|
-| git diff --check | ✅ No errors (CRLF warnings only) |
+| New migrations in remediation | 0 |
 
 ---
 
-## CI Evidence
-
-| Run | SHA | Backend | Frontend | Conclusion |
-|---|---|---|---|---|
-| [32459860306](https://github.com/seldom733-hash/travelhub1/actions/runs/32459860306) | `0c879c0` | SUCCESS | SUCCESS | **SUCCESS** |
-
----
-
-## Files Changed
+## Files Changed (Remediation Round 1)
 
 | Type | Count | Files |
 |---|---:|---|
-| Production frontend | 10 | `page.tsx`, `CommandCenter.tsx`, `CustomizePanel.tsx`, `FinancialSection.tsx`, `KpiCard.tsx`, `OperationalSection.tsx`, `PeriodSelector.tsx`, `SectionGrid.tsx`, `TrendWidget.tsx`, `Shell.tsx` |
-| Production backend | 1 | `workspace.types.ts` |
-| Frontend API/types | 2 | `dashboard-api.ts`, `workspace-api.ts` |
-| Tests | 2 | `dashboard-api.spec.ts`, `workspace-api.spec.ts` |
-| Dependencies | 2 | `package.json`, `package-lock.json` |
+| Production frontend | 9 | `page.tsx`, `CommandCenter.tsx`, `CustomizePanel.tsx`, `FinancialSection.tsx`, `OperationalSection.tsx`, `PeriodSelector.tsx`, `SectionGrid.tsx`, `TrendWidget.tsx` |
+| Frontend i18n | 1 | `i18n.tsx` |
+| Tests | 1 | `command-center.spec.tsx` |
 | Documentation | 1 | This report |
-| **Total** | **18** | |
+| **Total** | **12** | |
+
+---
+
+## Negative Checks
+
+| Check | Result |
+|---|---|
+| Stage C Admin Permission Management | 0 |
+| Partner Command Center | 0 |
+| Resize implementation | 0 |
+| New KPI formulas | 0 |
+| New analytics authority | 0 |
+| New financial authority | 0 |
+| Schema/migration changes | 0 |
+| Business writes | 0 |
+| Employee Analytics | 0 |
+| Step 2.17B changes | 0 |
+| phantom trend widgets in UI | 0 (removed) |
+| Hardcoded required semantics | 0 (server-driven) |
+| CSS bars mislabeled as Recharts | 0 (real Recharts) |
+
+---
+
+## Previous CI Evidence (Historical)
+
+| Run | SHA | Backend | Frontend | Conclusion |
+|---|---|---|---|---|
+| `32459860306` | `0c879c0` | SUCCESS | SUCCESS | SUCCESS |
+| `32460935374` | `9d5cc79` | SUCCESS | SUCCESS | SUCCESS |
 
 ---
 
@@ -275,8 +225,10 @@ No changes to:
 
 | SHA | Description |
 |---|---|
-| `0c879c0` | feat(step-3.2): implement Platform Command Center UI |
-| `0f33d03` | docs(step-3.2): correct Stage A provenance and retry semantics |
+| `0c879c0` | feat(step-3.2): implement Platform Command Center UI (original) |
+| `9d5cc79` | docs(step-3.2): correct Stage A provenance + Stage B report |
+| `(pending)` | fix(step-3.2): remediate Platform Command Center strict review findings |
+| `(pending)` | docs(step-3.2): close Stage B remediation evidence |
 
 ---
 
@@ -286,16 +238,13 @@ No changes to:
 - Partner Command Center
 - Partner Storefront subscription/onboarding/analytics
 - Resize and advanced layout capabilities
-- Unsupported trends without backend authority (revenue-trend)
-- Full drag-and-drop accessibility for keyboard reorder
-- Widget config schema validation
-- Import/export layouts
-- Cross-page widget sharing
+- Revenue trend until backend authority is separately approved
+- Full visual acceptance with browser screenshots (tooling limitation)
 
 ---
 
 ## NEXT
 
-```
-NEXT: PHASE 3 — STEP 3.2 — STAGE B — STRICT REVIEW & VISUAL ACCEPTANCE
+```text
+NEXT: PHASE 3 — STEP 3.2 — STAGE B — STRICT REVIEW REMEDIATION — FINAL VERIFICATION
 ```

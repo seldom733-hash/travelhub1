@@ -2,22 +2,24 @@
 
 import { useState, useCallback } from "react";
 import { type WidgetDefinition, type WidgetPosition } from "@/lib/workspace-api";
-import type { WidgetType } from "@/lib/workspace-api";
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { t, type Locale } from "@/lib/i18n";
 
 interface Props {
   draft: WidgetPosition[];
-  availableWidgets: WidgetDefinition[];
-  allWidgets: WidgetPosition[];
+  allWidgetDefs: WidgetDefinition[];
   onAdd: (widget: WidgetDefinition) => void;
   onRemove: (widgetId: string) => void;
   onReorder: (from: number, to: number) => void;
   onSave: () => void;
   onReset: () => void;
   onToggleVisible: (widgetId: string) => void;
+  isSaving?: boolean;
+  locale?: Locale;
 }
 
 function SortableItem({
@@ -27,6 +29,7 @@ function SortableItem({
   visible,
   onToggle,
   onRemove,
+  locale,
 }: {
   widgetId: string;
   title: string;
@@ -34,6 +37,7 @@ function SortableItem({
   visible: boolean;
   onToggle: () => void;
   onRemove: () => void;
+  locale: Locale;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: widgetId });
   const style = {
@@ -54,18 +58,18 @@ function SortableItem({
         {...attributes}
         {...listeners}
         className="cursor-grab text-slate-400 hover:text-slate-600"
-        aria-label="Перетащить"
+        aria-label={t("cc.widget_drag", locale)}
       >
         ⠿
       </button>
       <span className={`flex-1 ${visible ? "text-slate-900" : "text-slate-400 line-through"}`}>
         {title}
-        {required && <span className="ml-1 text-xs text-slate-400">(обязательный)</span>}
+        {required && <span className="ml-1 text-xs text-slate-400">{t("cc.widget_required", locale)}</span>}
       </span>
       <button
         onClick={onToggle}
         className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-        aria-label={visible ? "Скрыть виджет" : "Показать виджет"}
+        aria-label={visible ? t("cc.widget_hide", locale) : t("cc.widget_show", locale)}
       >
         {visible ? "👁" : "👁‍🗨"}
       </button>
@@ -73,7 +77,7 @@ function SortableItem({
         <button
           onClick={onRemove}
           className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500"
-          aria-label="Удалить виджет"
+          aria-label={t("cc.widget_remove", locale)}
         >
           ✕
         </button>
@@ -84,19 +88,21 @@ function SortableItem({
 
 export function CustomizePanel({
   draft,
-  availableWidgets,
+  allWidgetDefs,
   onAdd,
   onRemove,
   onReorder,
   onSave,
   onReset,
   onToggleVisible,
+  isSaving = false,
+  locale = "ru",
 }: Props) {
   const [showAdd, setShowAdd] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const handleDragEnd = useCallback(
@@ -110,34 +116,44 @@ export function CustomizePanel({
     [draft, onReorder],
   );
 
+  // Get definition for a widget (for title and required semantics)
+  const getDef = (widgetId: string): WidgetDefinition | undefined =>
+    allWidgetDefs.find((d) => d.widgetId === widgetId);
+
+  // Widgets already in draft
+  const draftIds = new Set(draft.map((w) => w.widgetId));
+  // Available widgets not yet in draft
+  const availableToAdd = allWidgetDefs.filter((d) => !draftIds.has(d.widgetId));
+
   return (
-    <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4" role="region" aria-label="Настройка макета">
+    <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4" role="region" aria-label={t("cc.layout_settings", locale)}>
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-blue-900">Настройка макета</h3>
+        <h3 className="text-sm font-semibold text-blue-900">{t("cc.layout_settings", locale)}</h3>
         <div className="flex gap-2">
           <button
             onClick={onReset}
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
           >
-            Сбросить
+            {t("cc.reset", locale)}
           </button>
           <button
             onClick={onSave}
-            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+            disabled={isSaving}
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            Сохранить
+            {t("cc.save", locale)}
           </button>
         </div>
       </div>
 
-      {/* Current widgets */}
+      {/* Current widgets — ordered by draft (positions drive rendering) */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={draft.map((w) => w.widgetId)} strategy={verticalListSortingStrategy}>
           <div className="mt-3 space-y-1.5">
             {draft.map((wp) => {
-              // Find title from allWidgets or availableWidgets
-              const title = wp.widgetId; // Fallback
-              const isRequired = wp.widgetId === "reconciliation"; // Known required widget
+              const def = getDef(wp.widgetId);
+              const title = def?.title ?? wp.widgetId;
+              const isRequired = def?.required ?? false;
               return (
                 <SortableItem
                   key={wp.widgetId}
@@ -147,6 +163,7 @@ export function CustomizePanel({
                   visible={wp.visible}
                   onToggle={() => onToggleVisible(wp.widgetId)}
                   onRemove={() => onRemove(wp.widgetId)}
+                  locale={locale}
                 />
               );
             })}
@@ -160,11 +177,11 @@ export function CustomizePanel({
           onClick={() => setShowAdd(!showAdd)}
           className="text-xs font-medium text-blue-600 hover:text-blue-800"
         >
-          {showAdd ? "Скрыть доступные" : "+ Добавить виджет"}
+          {showAdd ? t("cc.hide_available", locale) : t("cc.add_widget", locale)}
         </button>
-        {showAdd && availableWidgets.length > 0 && (
+        {showAdd && availableToAdd.length > 0 && (
           <div className="mt-2 space-y-1">
-            {availableWidgets.map((w) => (
+            {availableToAdd.map((w) => (
               <button
                 key={w.widgetId}
                 onClick={() => onAdd(w)}
@@ -172,19 +189,19 @@ export function CustomizePanel({
               >
                 <span>+</span>
                 <span>{w.title}</span>
-                <span className="ml-auto text-xs text-slate-400">{(w as WidgetDefinition).sectionPermission?.split(".")[1] ?? w.category}</span>
+                <span className="ml-auto text-xs text-slate-400">{w.sectionPermission?.split(".")[1] ?? w.category}</span>
               </button>
             ))}
           </div>
         )}
-        {showAdd && availableWidgets.length === 0 && (
-          <p className="mt-2 text-xs text-slate-400">Все доступные виджеты уже добавлены</p>
+        {showAdd && availableToAdd.length === 0 && (
+          <p className="mt-2 text-xs text-slate-400">{t("cc.all_added", locale)}</p>
         )}
       </div>
 
       {/* Keyboard hint */}
       <p className="mt-3 text-[10px] text-slate-400">
-        Перетаскивайте для изменения порядка. Клавиша Enter для переупорядочивания.
+        {t("cc.drag_hint", locale)}
       </p>
     </div>
   );
