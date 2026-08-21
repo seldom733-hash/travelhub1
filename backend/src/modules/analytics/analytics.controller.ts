@@ -8,14 +8,13 @@
  * Remediation: Strict Review VERDICT B findings closure.
  */
 
-import { BadRequestException, Controller, Get, Query } from "@nestjs/common";
-import {
-  IsBoolean,
+import { BadRequestException, Controller, Get, Query } from "@nestjs/common";import { IsBoolean,
   IsEnum,
   IsOptional,
   IsString,
   Matches,
 } from "class-validator";
+import { Transform } from "class-transformer";
 import { AnalyticsService } from "./analytics.service";
 import { AnalyticsPeriodPreset } from "./analytics-period.resolver";
 import { AnalyticsGranularity } from "./analytics-granularity.resolver";
@@ -41,6 +40,7 @@ class AnalyticsQueryDto {
   timezone?: string;
 
   @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   comparison?: boolean;
 

@@ -15,6 +15,7 @@ import {
   IsString,
   Matches,
 } from "class-validator";
+import { Transform, Type } from "class-transformer";
 import { DashboardService } from "./dashboard.service";
 import { RequirePermissions, CurrentUser } from "../../security/auth/decorators";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
@@ -40,6 +41,7 @@ class DashboardQueryDto {
   timezone?: string;
 
   @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   comparison?: boolean;
 }
