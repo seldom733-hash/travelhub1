@@ -1,0 +1,13 @@
+const base = 'http://localhost:3000/api/admin/bookings?period=month';
+const get = async (url) => (await fetch(url)).json();
+const kpi = await get(base);
+const g = async (status) => (await get(base + '&status=' + encodeURIComponent(status))).pagination.total;
+const awaiting = kpi.kpi.awaitingPayment.value;
+const paid = kpi.kpi.paidBookings.value;
+const confirmed = kpi.kpi.confirmedBookings.value;
+const cancelled = kpi.kpi.cancelledBookings.value;
+console.log('KPI awaitingPayment:', awaiting, '| table PENDING,CONFIRMED:', await g('PENDING,CONFIRMED'));
+console.log('KPI paidBookings:', paid, '| table PAID,COMPLETED:', await g('PAID,COMPLETED'));
+console.log('KPI confirmedBookings:', confirmed, '| table CONFIRMED,PAID,COMPLETED:', await g('CONFIRMED,PAID,COMPLETED'));
+console.log('KPI cancelledBookings:', cancelled, '| table REFUNDED:', await g('REFUNDED'));
+console.log('(old single-status) PENDING only:', await g('PENDING'), '| PAID only:', await g('PAID'));

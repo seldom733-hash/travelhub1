@@ -1,0 +1,25 @@
+{
+  "checks": [
+    {
+      "name": "0 chain failures (0 raw 500 at chain level)",
+      "passed": true,
+      "detail": "failures=0"
+    },
+    {
+      "name": "1 Order per successful chain (no duplicates)",
+      "passed": true,
+      "detail": "ordersCreated=108 chainsStarted=108 chainsFailed=0 dupSales=0"
+    },
+    {
+      "name": "event-chain convergence (OrderCreated consumed)",
+      "passed": true,
+      "detail": "orderCreated=108 consumedInbox=108 orders=108"
+    },
+    {
+      "name": "load application validity (±5%)",
+      "passed": false,
+      "detail": "burst started=108 scheduled=300 diffPct=64% (tolerance ±5%)"
+    }
+  ],
+  "verdict": "FAIL"
+}

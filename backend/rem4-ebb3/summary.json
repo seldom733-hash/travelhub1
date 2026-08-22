@@ -1,0 +1,74 @@
+{
+  "runId": "rem4-ebb3",
+  "profile": "eventbus-burst",
+  "mode": "exploratory",
+  "timestamp": "2026-08-17T20:28:03.117Z",
+  "status": "DONE",
+  "verdict": {
+    "harnessExecution": "PASS",
+    "correctness": "PASS",
+    "measurement": "RECORDED",
+    "sloQualification": "NOT EVALUATED — AUTHORITY REQUIRED"
+  },
+  "load": {
+    "mode": "paced",
+    "byLabel": {},
+    "byRouteClass": {},
+    "totals": {
+      "totalRequests": 0,
+      "expected": 250,
+      "unexpected4xx": 0,
+      "unexpected409": 0,
+      "unexpected429": 0,
+      "unexpected5xx": 0,
+      "timeouts": 0,
+      "transportErrors": 0
+    },
+    "expectedStatuses": 250,
+    "unexpectedStatuses": 0,
+    "requestsPerSec": 185,
+    "successfulPerSec": 185,
+    "measurementMs": 1354,
+    "perBaseUrl": {},
+    "warmup": {
+      "durationMs": 0,
+      "requests": 0
+    }
+  },
+  "eventBus": {
+    "mode": "burst",
+    "seeded": 250,
+    "published": 250,
+    "drainMs": 1354,
+    "pendingAfter": 0,
+    "failedAfterExcludingPoison": 0,
+    "poisonIsolated": true,
+    "workers": 1,
+    "workerIntervalMs": 500,
+    "workerBatch": 100,
+    "drainGateMs": 180000
+  },
+  "multiInstance": null,
+  "dataset": null,
+  "datasetDrain": null,
+  "topology": {
+    "appInstances": 0,
+    "workerInstances": 1
+  },
+  "worker": {
+    "intervalMs": 500,
+    "batch": 100,
+    "overridesRejected": "N/A (exploratory)"
+  },
+  "memoryTrend": {
+    "status": "MEASURED",
+    "startRssMb": 919,
+    "peakRssMb": 1010,
+    "endRssMb": 1010,
+    "peakHeapUsedMb": 768,
+    "samples": 2,
+    "durationMs": 2648
+  },
+  "qualificationConfigValid": "N/A (exploratory)",
+  "note": "EXPLORATORY / HARNESS VALIDATION PROFILE — NOT production SLO, NOT production capacity target"
+}

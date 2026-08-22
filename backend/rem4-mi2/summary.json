@@ -1,0 +1,197 @@
+{
+  "runId": "rem4-mi2",
+  "profile": "multi-instance",
+  "mode": "exploratory",
+  "timestamp": "2026-08-17T20:27:42.121Z",
+  "status": "DONE",
+  "verdict": {
+    "harnessExecution": "PASS",
+    "correctness": "PASS",
+    "measurement": "RECORDED",
+    "sloQualification": "NOT EVALUATED — AUTHORITY REQUIRED"
+  },
+  "load": {
+    "mode": "paced",
+    "byLabel": {
+      "auth.session": {
+        "count": 667,
+        "stats": {
+          "count": 667,
+          "min": 0.9346999999979744,
+          "p50": 3.517100000000937,
+          "p95": 18.70089999999982,
+          "p99": 19.952699999998003,
+          "max": 24.813999999998487,
+          "mean": 6.651824737631191
+        },
+        "outcomes": {
+          "expected": 667,
+          "unexpected4xx": 0,
+          "unexpected409": 0,
+          "unexpected429": 0,
+          "unexpected5xx": 0,
+          "timeout": 0,
+          "transportError": 0
+        }
+      },
+      "public.products": {
+        "count": 667,
+        "stats": {
+          "count": 667,
+          "min": 3.3668999999972584,
+          "p50": 5.527599999993981,
+          "p95": 22.052800000001298,
+          "p99": 23.780399999999645,
+          "max": 28.0512000000017,
+          "mean": 7.3552890554723085
+        },
+        "outcomes": {
+          "expected": 667,
+          "unexpected4xx": 0,
+          "unexpected409": 0,
+          "unexpected429": 0,
+          "unexpected5xx": 0,
+          "timeout": 0,
+          "transportError": 0
+        }
+      },
+      "sales.list": {
+        "count": 666,
+        "stats": {
+          "count": 666,
+          "min": 10.821399999997084,
+          "p50": 19.83419999999751,
+          "p95": 37.00489999999991,
+          "p99": 42.61750000000029,
+          "max": 49.15740000000005,
+          "mean": 23.50320285285293
+        },
+        "outcomes": {
+          "expected": 666,
+          "unexpected4xx": 0,
+          "unexpected409": 0,
+          "unexpected429": 0,
+          "unexpected5xx": 0,
+          "timeout": 0,
+          "transportError": 0
+        }
+      }
+    },
+    "byRouteClass": {
+      "A": {
+        "count": 1334,
+        "stats": {
+          "count": 1334,
+          "min": 0.9346999999979744,
+          "p50": 4.997499999997672,
+          "p95": 20.1890999999996,
+          "p99": 23.098900000000867,
+          "max": 28.0512000000017,
+          "mean": 7.00355689655175
+        },
+        "outcomes": {
+          "expected": 1334,
+          "unexpected4xx": 0,
+          "unexpected409": 0,
+          "unexpected429": 0,
+          "unexpected5xx": 0,
+          "timeout": 0,
+          "transportError": 0
+        }
+      },
+      "B": {
+        "count": 666,
+        "stats": {
+          "count": 666,
+          "min": 10.821399999997084,
+          "p50": 19.83419999999751,
+          "p95": 37.00489999999991,
+          "p99": 42.61750000000029,
+          "max": 49.15740000000005,
+          "mean": 23.50320285285293
+        },
+        "outcomes": {
+          "expected": 666,
+          "unexpected4xx": 0,
+          "unexpected409": 0,
+          "unexpected429": 0,
+          "unexpected5xx": 0,
+          "timeout": 0,
+          "transportError": 0
+        }
+      }
+    },
+    "totals": {
+      "totalRequests": 2000,
+      "expected": 2000,
+      "unexpected4xx": 0,
+      "unexpected409": 0,
+      "unexpected429": 0,
+      "unexpected5xx": 0,
+      "timeouts": 0,
+      "transportErrors": 0
+    },
+    "expectedStatuses": 2000,
+    "unexpectedStatuses": 0,
+    "requestsPerSec": 100,
+    "successfulPerSec": 100,
+    "measurementMs": 20007,
+    "perBaseUrl": {
+      "http://127.0.0.1:51814": 1150,
+      "http://127.0.0.1:51812": 1150
+    },
+    "warmup": {
+      "durationMs": 3000,
+      "requests": 300
+    },
+    "pacing": {
+      "targetRps": 100,
+      "scheduledOperations": 2000,
+      "startedOperations": 2000,
+      "completedOperations": 2000,
+      "achievedStartRate": 100.00500275151333,
+      "achievedCompletionRate": 99.965012245714,
+      "schedulerLagMs": 3.597,
+      "maxConcurrencyObserved": 5,
+      "loadApplicationValid": true,
+      "loadValidityDetail": "burst started=2000 scheduled=2000 diffPct=0.00% (tolerance ±5%)"
+    }
+  },
+  "eventBus": null,
+  "multiInstance": {
+    "appInstances": 2,
+    "workerInstances": 2,
+    "perAppRequestCounts": {
+      "http://127.0.0.1:51814": 1150,
+      "http://127.0.0.1:51812": 1150
+    },
+    "probeSeeded": 200,
+    "probePublished": 200,
+    "probePendingAfter": 0,
+    "eventbusDrainMs": 8,
+    "rps": 100,
+    "durationMs": 20000
+  },
+  "dataset": null,
+  "datasetDrain": null,
+  "topology": {
+    "appInstances": 2,
+    "workerInstances": 2
+  },
+  "worker": {
+    "intervalMs": 500,
+    "batch": 100,
+    "overridesRejected": "N/A (exploratory)"
+  },
+  "memoryTrend": {
+    "status": "MEASURED",
+    "startRssMb": 929,
+    "peakRssMb": 1198,
+    "endRssMb": 1198,
+    "peakHeapUsedMb": 963,
+    "samples": 7,
+    "durationMs": 25724
+  },
+  "qualificationConfigValid": "N/A (exploratory)",
+  "note": "EXPLORATORY / HARNESS VALIDATION PROFILE — NOT production SLO, NOT production capacity target"
+}

@@ -1,0 +1,30 @@
+{
+  "checks": [
+    {
+      "name": "all seeded events published",
+      "passed": true,
+      "detail": "published=250 seeded=250"
+    },
+    {
+      "name": "residual PENDING = 0",
+      "passed": true,
+      "detail": "pending=0"
+    },
+    {
+      "name": "no unexpected FAILED",
+      "passed": true,
+      "detail": "failed=0"
+    },
+    {
+      "name": "poison isolated (stays FAILED)",
+      "passed": true,
+      "detail": "poison remained FAILED"
+    },
+    {
+      "name": "burst drained within bound",
+      "passed": true,
+      "detail": "drainMs=1354 published=250/250 pending=0"
+    }
+  ],
+  "verdict": "PASS"
+}

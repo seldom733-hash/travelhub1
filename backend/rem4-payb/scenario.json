@@ -1,0 +1,10 @@
+{
+  "profile": "payment-burst",
+  "kind": "payment",
+  "rps": 10,
+  "durationMs": 15000,
+  "requestCount": 150,
+  "poolSize": 120,
+  "facts": 120,
+  "noopKeys": 40
+}

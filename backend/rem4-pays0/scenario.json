@@ -1,0 +1,10 @@
+{
+  "profile": "payment-steady",
+  "kind": "payment",
+  "rps": 2,
+  "durationMs": 15000,
+  "requestCount": 30,
+  "poolSize": 30,
+  "facts": 30,
+  "noopKeys": 0
+}

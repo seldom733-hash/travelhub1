@@ -1,0 +1,150 @@
+{
+  "runId": "rem4-pays",
+  "profile": "payment-steady",
+  "mode": "exploratory",
+  "timestamp": "2026-08-17T20:21:08.086Z",
+  "status": "DONE",
+  "verdict": {
+    "harnessExecution": "PASS",
+    "correctness": "FAIL",
+    "measurement": "RECORDED",
+    "sloQualification": "NOT EVALUATED — AUTHORITY REQUIRED"
+  },
+  "load": {
+    "mode": "paced",
+    "byLabel": {
+      "payment.create": {
+        "count": 40,
+        "stats": {
+          "count": 40,
+          "min": 30.758600000001024,
+          "p50": 53.460299999998824,
+          "p95": 85.33179999999993,
+          "p99": 89.52629999999772,
+          "max": 89.52629999999772,
+          "mean": 51.63184250000031
+        },
+        "outcomes": {
+          "expected": 40,
+          "unexpected4xx": 0,
+          "unexpected409": 0,
+          "unexpected429": 0,
+          "unexpected5xx": 0,
+          "timeout": 0,
+          "transportError": 0
+        }
+      }
+    },
+    "byRouteClass": {
+      "E": {
+        "count": 40,
+        "stats": {
+          "count": 40,
+          "min": 30.758600000001024,
+          "p50": 53.460299999998824,
+          "p95": 85.33179999999993,
+          "p99": 89.52629999999772,
+          "max": 89.52629999999772,
+          "mean": 51.63184250000031
+        },
+        "outcomes": {
+          "expected": 40,
+          "unexpected4xx": 0,
+          "unexpected409": 0,
+          "unexpected429": 0,
+          "unexpected5xx": 0,
+          "timeout": 0,
+          "transportError": 0
+        }
+      }
+    },
+    "totals": {
+      "totalRequests": 40,
+      "expected": 40,
+      "unexpected4xx": 0,
+      "unexpected409": 0,
+      "unexpected429": 0,
+      "unexpected5xx": 0,
+      "timeouts": 0,
+      "transportErrors": 0
+    },
+    "expectedStatuses": 40,
+    "unexpectedStatuses": 0,
+    "requestsPerSec": 2,
+    "successfulPerSec": 2,
+    "measurementMs": 19561,
+    "perBaseUrl": {
+      "http://127.0.0.1:53443": 42
+    },
+    "warmup": {
+      "durationMs": 1000,
+      "requests": 2
+    },
+    "pacing": {
+      "targetRps": 2,
+      "scheduledOperations": 40,
+      "startedOperations": 40,
+      "completedOperations": 40,
+      "achievedStartRate": 1.998769987699877,
+      "achievedCompletionRate": 2.0448852308164205,
+      "schedulerLagMs": 6.625,
+      "maxConcurrencyObserved": 1,
+      "loadApplicationValid": true,
+      "loadValidityDetail": "burst started=40 scheduled=40 diffPct=0.00% (tolerance ±5%)"
+    }
+  },
+  "eventBus": null,
+  "multiInstance": null,
+  "dataset": {
+    "users": 8,
+    "products": 6,
+    "customers": 10,
+    "quotes": 8,
+    "orderChains": 8,
+    "paymentCapableOrders": 8,
+    "ledger": 20,
+    "eventBusSeed": 30
+  },
+  "datasetDrain": {
+    "afterChains": {
+      "completed": true,
+      "iterations": 1,
+      "published": 0,
+      "retried": 0,
+      "elapsedMs": 5,
+      "remainingPending": 0,
+      "remainingRetryableFailed": 0,
+      "batchSize": 200
+    },
+    "afterProbes": {
+      "completed": true,
+      "iterations": 1,
+      "published": 30,
+      "retried": 0,
+      "elapsedMs": 50,
+      "remainingPending": 0,
+      "remainingRetryableFailed": 0,
+      "batchSize": 200
+    }
+  },
+  "topology": {
+    "appInstances": 1,
+    "workerInstances": 0
+  },
+  "worker": {
+    "intervalMs": 500,
+    "batch": 100,
+    "overridesRejected": "N/A (exploratory)"
+  },
+  "memoryTrend": {
+    "status": "MEASURED",
+    "startRssMb": 937,
+    "peakRssMb": 1058,
+    "endRssMb": 858,
+    "peakHeapUsedMb": 805,
+    "samples": 10,
+    "durationMs": 41990
+  },
+  "qualificationConfigValid": "N/A (exploratory)",
+  "note": "EXPLORATORY / HARNESS VALIDATION PROFILE — NOT production SLO, NOT production capacity target"
+}

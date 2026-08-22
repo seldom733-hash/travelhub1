@@ -1,0 +1,50 @@
+{
+  "checks": [
+    {
+      "name": "unexpected 5xx = 0",
+      "passed": true,
+      "detail": "unexpected5xx=0"
+    },
+    {
+      "name": "unexpected 4xx = 0",
+      "passed": true,
+      "detail": "unexpected4xx=0"
+    },
+    {
+      "name": "unexpected 409 = 0",
+      "passed": true,
+      "detail": "unexpected409=0"
+    },
+    {
+      "name": "unexpected 429 = 0",
+      "passed": true,
+      "detail": "unexpected429=0"
+    },
+    {
+      "name": "timeouts = 0",
+      "passed": true,
+      "detail": "timeouts=0"
+    },
+    {
+      "name": "transport errors = 0",
+      "passed": true,
+      "detail": "transport=0"
+    },
+    {
+      "name": "payment facts = min(pool, started), 0 duplicates per order",
+      "passed": true,
+      "detail": "facts=100 expected=100 before=0 dupOrders=0"
+    },
+    {
+      "name": "idempotency slots == requests reaching the API (measurement + warm-up)",
+      "passed": true,
+      "detail": "completedSlots=1932 started=1882 warmup=50 reached=1932"
+    },
+    {
+      "name": "one-active-payment invariant (<=1 per order)",
+      "passed": true,
+      "detail": "perOrderMax=1 pool=100"
+    }
+  ],
+  "verdict": "PASS"
+}

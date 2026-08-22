@@ -1,0 +1,11 @@
+{
+  "profile": "booking-order-steady",
+  "kind": "booking",
+  "rps": 6,
+  "durationMs": 20000,
+  "scheduled": 120,
+  "started": 120,
+  "completed": 120,
+  "ordersCreated": 120,
+  "chainP95Ms": 550.4919999999984
+}

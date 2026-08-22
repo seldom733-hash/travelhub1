@@ -1,0 +1,55 @@
+{
+  "checks": [
+    {
+      "name": "unexpected 5xx = 0",
+      "passed": true,
+      "detail": "unexpected5xx=0"
+    },
+    {
+      "name": "unexpected 4xx = 0",
+      "passed": true,
+      "detail": "unexpected4xx=0"
+    },
+    {
+      "name": "unexpected 409 = 0",
+      "passed": true,
+      "detail": "unexpected409=0"
+    },
+    {
+      "name": "unexpected 429 = 0",
+      "passed": true,
+      "detail": "unexpected429=0"
+    },
+    {
+      "name": "timeouts = 0",
+      "passed": true,
+      "detail": "timeouts=0"
+    },
+    {
+      "name": "transport errors = 0",
+      "passed": true,
+      "detail": "transport=0"
+    },
+    {
+      "name": "HTTP traffic distributed across both app instances",
+      "passed": true,
+      "detail": "perApp={\"http://127.0.0.1:51814\":1150,\"http://127.0.0.1:51812\":1150}"
+    },
+    {
+      "name": "EventBus competition drained (published == seeded, 0 pending)",
+      "passed": true,
+      "detail": "published=200/200 pending=0 drainMs=8 workers=2"
+    },
+    {
+      "name": "0 duplicate business effects (no raw 500, idempotent reads)",
+      "passed": true,
+      "detail": "unexpected5xx=0"
+    },
+    {
+      "name": "load application validity (±5%)",
+      "passed": true,
+      "detail": "burst started=2000 scheduled=2000 diffPct=0.00% (tolerance ±5%)"
+    }
+  ],
+  "verdict": "PASS"
+}

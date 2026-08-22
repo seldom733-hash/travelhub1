@@ -1,0 +1,11 @@
+{
+  "profile": "booking-order-burst",
+  "kind": "booking",
+  "rps": 20,
+  "durationMs": 15000,
+  "scheduled": 300,
+  "started": 134,
+  "completed": 134,
+  "ordersCreated": 134,
+  "chainP95Ms": 6930.9226999999955
+}

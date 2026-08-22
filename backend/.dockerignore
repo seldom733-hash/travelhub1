@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+test
+rem4-*
+rem5-*
+rem6-*
+rem7-*
+.freebuff-dbg
+artifacts
+*.log
+.env

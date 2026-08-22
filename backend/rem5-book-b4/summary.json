@@ -1,0 +1,128 @@
+{
+  "runId": "rem5-book-b4",
+  "profile": "booking-order-burst",
+  "mode": "exploratory",
+  "timestamp": "2026-08-17T20:02:46.728Z",
+  "status": "DONE",
+  "verdict": {
+    "harnessExecution": "PASS",
+    "correctness": "FAIL",
+    "measurement": "RECORDED",
+    "sloQualification": "NOT EVALUATED — AUTHORITY REQUIRED"
+  },
+  "load": {
+    "mode": "paced",
+    "byLabel": {},
+    "byRouteClass": {
+      "D": {
+        "count": 134,
+        "stats": {
+          "count": 134,
+          "min": 3293.6434999999983,
+          "p50": 6494.458499999997,
+          "p95": 6930.9226999999955,
+          "p99": 7012.812399999999,
+          "max": 7031.5007000000005,
+          "mean": 6020.082920149255
+        },
+        "outcomes": {
+          "expected": 134,
+          "unexpected4xx": 0,
+          "unexpected409": 0,
+          "unexpected429": 0,
+          "unexpected5xx": 0,
+          "timeout": 0,
+          "transportError": 0
+        }
+      }
+    },
+    "totals": {
+      "totalRequests": 134,
+      "expected": 134,
+      "unexpected4xx": 0,
+      "unexpected409": 0,
+      "unexpected429": 0,
+      "unexpected5xx": 0,
+      "timeouts": 0,
+      "transportErrors": 0
+    },
+    "expectedStatuses": 134,
+    "unexpectedStatuses": 0,
+    "requestsPerSec": 9,
+    "successfulPerSec": 9,
+    "measurementMs": 15000,
+    "perBaseUrl": {
+      "http://127.0.0.1:61117": 134
+    },
+    "warmup": {
+      "durationMs": 0,
+      "requests": 0
+    },
+    "pacing": {
+      "targetRps": 20,
+      "scheduledOperations": 300,
+      "startedOperations": 134,
+      "completedOperations": 134,
+      "achievedStartRate": 8.783516048078193,
+      "achievedCompletionRate": 8.933333333333334,
+      "schedulerLagMs": 0,
+      "maxConcurrencyObserved": 50,
+      "loadApplicationValid": false,
+      "loadValidityDetail": "burst started=134 scheduled=300 diffPct=55.333333333333336% (tolerance ±5%)"
+    }
+  },
+  "eventBus": null,
+  "multiInstance": null,
+  "dataset": {
+    "users": 8,
+    "products": 6,
+    "customers": 10,
+    "quotes": 8,
+    "orderChains": 8,
+    "paymentCapableOrders": 8,
+    "ledger": 20,
+    "eventBusSeed": 30
+  },
+  "datasetDrain": {
+    "afterChains": {
+      "completed": true,
+      "iterations": 1,
+      "published": 0,
+      "retried": 0,
+      "elapsedMs": 7,
+      "remainingPending": 0,
+      "remainingRetryableFailed": 0,
+      "batchSize": 200
+    },
+    "afterProbes": {
+      "completed": true,
+      "iterations": 1,
+      "published": 30,
+      "retried": 0,
+      "elapsedMs": 65,
+      "remainingPending": 0,
+      "remainingRetryableFailed": 0,
+      "batchSize": 200
+    }
+  },
+  "topology": {
+    "appInstances": 1,
+    "workerInstances": 0
+  },
+  "worker": {
+    "intervalMs": 500,
+    "batch": 100,
+    "overridesRejected": "N/A (exploratory)"
+  },
+  "memoryTrend": {
+    "status": "MEASURED",
+    "startRssMb": 923,
+    "peakRssMb": 1297,
+    "endRssMb": 1297,
+    "peakHeapUsedMb": 1065,
+    "samples": 7,
+    "durationMs": 28024
+  },
+  "qualificationConfigValid": "N/A (exploratory)",
+  "note": "EXPLORATORY / HARNESS VALIDATION PROFILE — NOT production SLO, NOT production capacity target"
+}

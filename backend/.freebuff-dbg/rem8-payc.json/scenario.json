@@ -1,0 +1,10 @@
+{
+  "profile": "payment-concurrency",
+  "kind": "payment",
+  "rps": 0,
+  "durationMs": 30000,
+  "requestCount": 100,
+  "poolSize": 100,
+  "facts": 100,
+  "noopKeys": 2527
+}

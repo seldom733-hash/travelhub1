@@ -1,0 +1,14 @@
+{
+  "appInstances": 2,
+  "workerInstances": 2,
+  "perAppRequestCounts": {
+    "http://127.0.0.1:51814": 1150,
+    "http://127.0.0.1:51812": 1150
+  },
+  "probeSeeded": 200,
+  "probePublished": 200,
+  "probePendingAfter": 0,
+  "eventbusDrainMs": 8,
+  "rps": 100,
+  "durationMs": 20000
+}

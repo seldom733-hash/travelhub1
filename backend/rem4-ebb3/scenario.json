@@ -1,0 +1,13 @@
+{
+  "mode": "burst",
+  "seeded": 250,
+  "published": 250,
+  "drainMs": 1354,
+  "pendingAfter": 0,
+  "failedAfterExcludingPoison": 0,
+  "poisonIsolated": true,
+  "workers": 1,
+  "workerIntervalMs": 500,
+  "workerBatch": 100,
+  "drainGateMs": 180000
+}

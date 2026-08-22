@@ -1,0 +1,13 @@
+{
+  "mode": "recovery",
+  "seeded": 250,
+  "published": 250,
+  "drainMs": 1343,
+  "pendingAfter": 0,
+  "failedAfterExcludingPoison": 0,
+  "poisonIsolated": true,
+  "workers": 1,
+  "workerIntervalMs": 500,
+  "workerBatch": 100,
+  "drainGateMs": 120000
+}
