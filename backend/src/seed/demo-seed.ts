@@ -762,6 +762,88 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
   return { orderData, paymentData, bookingData, commissionData };
 }
 
+// ─── Catalog Health (Step 6) ───────────────────────────────────────────────
+
+async function seedCatalogHealth() {
+  console.log(`\n🏥 Seeding catalog health scenarios...`);
+
+  // Archive old test DRAFT products (DBG, Step 1.9, etc.)
+  const archived = await prisma.$executeRaw`
+    UPDATE "catalog"."Product" SET status = 'ARCHIVED'::"catalog"."ProductStatus"
+    WHERE status = 'DRAFT'::"catalog"."ProductStatus"
+  `;
+  console.log(`  📦 Archived ${archived} old test products`);
+
+  // Add 30 published products WITHOUT orders (new listings, no sales yet)
+  const newProducts = await prisma.$executeRaw`
+    INSERT INTO "catalog"."Product" (id, code, type, title, slug, status, "categoryId", "partnerId", "createdAt", "updatedAt")
+    SELECT
+      gen_random_uuid(),
+      'PRD-' || lpad((300 + row_number() OVER())::text, 8, '0'),
+      (CASE (row_number() OVER() % 6)
+        WHEN 0 THEN 'TOUR'::"catalog"."ProductType"
+        WHEN 1 THEN 'EXCURSION'::"catalog"."ProductType"
+        WHEN 2 THEN 'EXCURSION'::"catalog"."ProductType"
+        WHEN 3 THEN 'EXCURSION'::"catalog"."ProductType"
+        WHEN 4 THEN 'GUIDE'::"catalog"."ProductType"
+        ELSE 'TOUR'::"catalog"."ProductType"
+      END),
+      (CASE (row_number() OVER() % 30)
+        WHEN 0 THEN 'Baku Food Tour Premium'
+        WHEN 1 THEN 'Gabala Ski Resort Package'
+        WHEN 2 THEN 'Shamakhi Astrophotography Tour'
+        WHEN 3 THEN 'Baku Street Art Walking Tour'
+        WHEN 4 THEN 'Gobustan Night Camping'
+        WHEN 5 THEN 'Sheki Silk Road Bicycle Tour'
+        WHEN 6 THEN 'Baku Modern Art Gallery Tour'
+        WHEN 7 THEN 'Caspian Sea Fishing Charter'
+        WHEN 8 THEN 'Azerbaijan Carpet Workshop'
+        WHEN 9 THEN 'Baku Rooftop Yoga Session'
+        WHEN 10 THEN 'Absheron Hot Springs Trip'
+        WHEN 11 THEN 'Baku Photography Masterclass'
+        WHEN 12 THEN 'Gobustan Archaeology Dig'
+        WHEN 13 THEN 'Sheki Traditional Music Night'
+        WHEN 14 THEN 'Baku Wine Cheese Evening'
+        WHEN 15 THEN 'Gabala Horseback Riding'
+        WHEN 16 THEN 'Baku Architecture Photo Walk'
+        WHEN 17 THEN 'Gobustan Mud Volcano Safari'
+        WHEN 18 THEN 'Baku Culinary Arts Workshop'
+        WHEN 19 THEN 'Sheki Handicraft Shopping'
+        WHEN 20 THEN 'Baku Sunset Yacht Cruise'
+        WHEN 21 THEN 'Gabala Adventure Park Pass'
+        WHEN 22 THEN 'Baku Cultural Heritage Walk'
+        WHEN 23 THEN 'Gobustan Petroglyphs Tour'
+        WHEN 24 THEN 'Baku Night Market Experience'
+        WHEN 25 THEN 'Sheki Palace Garden Tour'
+        WHEN 26 THEN 'Baku Coffee Culture Walk'
+        WHEN 27 THEN 'Gabala Lake Kayaking'
+        WHEN 28 THEN 'Baku Street Food Adventure'
+        WHEN 29 THEN 'Azerbaijan Tea Ceremony'
+      END),
+      'new-listing-' || (row_number() OVER()),
+      'PUBLISHED'::"catalog"."ProductStatus",
+      (SELECT id FROM "catalog"."Category" WHERE slug = 'tours' LIMIT 1),
+      (SELECT id FROM "crm"."Partner" WHERE code = 'PRN-00000003' LIMIT 1),
+      NOW(),
+      NOW()
+    FROM generate_series(1, 30)
+  `;
+  console.log(`  📝 Added ${newProducts} new listing products (without orders)`);
+
+  // Add publication channels for new products
+  await prisma.$executeRaw`
+    INSERT INTO "catalog"."ProductPublicationChannel" (id, "productId", channel, "createdAt")
+    SELECT gen_random_uuid(), p.id, 'MARKETPLACE'::"catalog"."PublicationChannel", NOW()
+    FROM "catalog"."Product" p WHERE p.slug LIKE 'new-listing-%'
+      AND NOT EXISTS (SELECT 1 FROM "catalog"."ProductPublicationChannel" c WHERE c."productId" = p.id)
+  `;
+
+  // Final catalog health summary
+  const published = await prisma.product.count({ where: { status: "PUBLISHED" as any } });
+  const archived = await prisma.product.count({ where: { status: "ARCHIVED" as any } });
+  console.log(`  ✅ Catalog: ${published} PUBLISHED, ${archived} ARCHIVED`);
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -786,10 +868,13 @@ async function main() {
     // 4. Storefronts
     await seedStorefronts(partners);
 
-    // 5. Orders + Payments + Bookings + Commissions
-    await seedOrders(products);
+  // 5. Orders + Payments + Bookings + Commissions
+  await seedOrders(products);
 
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  // 6. Archive old test DRAFT products + add new listings without orders
+  await seedCatalogHealth();
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log("\n═══════════════════════════════════════════════════");
     console.log(`✅ Seed completed in ${elapsed}s`);
     console.log("═══════════════════════════════════════════════════");
