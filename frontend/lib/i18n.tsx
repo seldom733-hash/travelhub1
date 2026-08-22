@@ -534,6 +534,36 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.section.operational": { ru: "Операционная деятельность", az: "Əməliyyat fəaliyyəti", en: "Operational Activity" },
   "cc.section.financial": { ru: "Финансы", az: "Maliyyə", en: "Financial" },
   "cc.section.marketplace": { ru: "Маркетплейс", az: "Bazar yeri", en: "Marketplace" },
+  // V3 sections
+  "cc.section.catalog": { ru: "Здоровье каталога", az: "Kataloq saglamligi", en: "Catalog Health" },
+  "cc.section.channels": { ru: "Здоровье каналов", az: "Kanal saglamligi", en: "Channel Health" },
+  "cc.section.attention": { ru: "Требует внимания", az: "Diqqet teleb edir", en: "Needs Attention" },
+  "cc.section.insights": { ru: "AI Decision Feed", az: "AI Qərar Lentesi", en: "AI Decision Feed" },
+  // V3 KPI labels — Catalog Health
+  "cc.v3.catalog.publishedServices": { ru: "Опубликованные услуги", az: "Dərc olunmus xidmetler", en: "Published Services" },
+  "cc.v3.catalog.archivedServices": { ru: "Архивные услуги", az: "Arxiv xidmetler", en: "Archived Services" },
+  "cc.v3.catalog.servicesWithoutSales": { ru: "Без продаж", az: "Satis olmadan", en: "Without Sales" },
+  "cc.v3.catalog.highDemandServices": { ru: "Высокий спрос", az: "Yuksek telebat", en: "High Demand" },
+  "cc.v3.catalog.lowConversionServices": { ru: "Низкая конверсия", az: "Asagi konversiya", en: "Low Conversion" },
+  "cc.v3.catalog.totalCategories": { ru: "Категории", az: "Kateqoriyalar", en: "Categories" },
+  // V3 KPI labels — Channel Health
+  "cc.v3.channels.marketplaceRevenue": { ru: "Выручка маркетплейса", az: "Bazar yeri geliri", en: "Marketplace Revenue" },
+  "cc.v3.channels.storefrontRevenue": { ru: "Выручка витрин", az: "Vitrin geliri", en: "Storefront Revenue" },
+  "cc.v3.channels.marketplaceOrders": { ru: "Заказы маркетплейса", az: "Bazar yeri sifarislari", en: "Marketplace Orders" },
+  "cc.v3.channels.storefrontOrders": { ru: "Заказы витрин", az: "Vitrin sifarislari", en: "Storefront Orders" },
+  "cc.v3.channels.marketplaceConversion": { ru: "Конверсия маркетплейса", az: "Bazar yeri konversiyasi", en: "Marketplace Conversion" },
+  "cc.v3.channels.storefrontConversion": { ru: "Конверсия витрин", az: "Vitrin konversiyasi", en: "Storefront Conversion" },
+  // V3 KPI labels — Needs Attention
+  "cc.v3.attention.pendingConfirmations": { ru: "Ожидают подтверждения", az: "Təsdiq gözləyir", en: "Pending Confirmations" },
+  "cc.v3.attention.failedPayments": { ru: "Неудачные платежи", az: "Ugursuz odenisler", en: "Failed Payments" },
+  "cc.v3.attention.cancellations": { ru: "Отмены (7 дн.)", az: "Ləğvetmələr (7 gun)", en: "Cancellations (7d)" },
+  "cc.v3.attention.pendingRefunds": { ru: "Ожидают возврата", az: "Geri qaytarma gozleyir", en: "Pending Refunds" },
+  "cc.v3.attention.upcomingBookings": { ru: "Будущие бронирования", az: "Gələcək bronlar", en: "Upcoming Bookings" },
+  "cc.v3.attention.servicesWithoutSales": { ru: "Услуги без продаж", az: "Satis olmadan xidmetler", en: "Services Without Sales" },
+  // V3 AI Feed
+  "cc.ai.risks": { ru: "Риски", az: "Risklər", en: "Risks" },
+  "cc.ai.opportunities": { ru: "Возможности", az: "Imkanlar", en: "Opportunities" },
+  "cc.ai.catalog": { ru: "Каталог", az: "Katalog", en: "Catalog" },
   // KPI titles
   "cc.kpi.gmv": { ru: "GMV", az: "GMV", en: "GMV" },
   "cc.kpi.revenue": { ru: "Выручка", az: "Gəlir", en: "Revenue" },

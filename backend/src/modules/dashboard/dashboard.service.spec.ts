@@ -16,6 +16,14 @@ import { DashboardService } from "./dashboard.service";
 import { AnalyticsPeriodPreset } from "../analytics/analytics-period.resolver";
 import { NotFoundException, ForbiddenException } from "@nestjs/common";
 
+// ─── Mock PrismaService ───────────────────────────────────────────────────
+const mockPrisma = {
+  product: { count: jest.fn().mockResolvedValue(0) },
+  category: { count: jest.fn().mockResolvedValue(0) },
+  order: { count: jest.fn().mockResolvedValue(0) },
+  $queryRawUnsafe: jest.fn().mockResolvedValue([{ count: 0 }]),
+} as any;
+
 // ─── Mock Analytics Service ─────────────────────────────────────────────────
 
 function createMockAnalytics() {
@@ -143,7 +151,7 @@ const MOCK_NO_SECTIONS = {
 describe("DashboardService — Command Center", () => {
   it("returns 4 sections with all 18 KPI cards", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter(
       { preset: "MONTH" },
       MOCK_ADMIN,
@@ -201,7 +209,7 @@ describe("DashboardService — Command Center", () => {
 
   it("forwards period parameters to Step 3.3", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     await service.getCommandCenter(
       { preset: "CUSTOM", startDate: "2026-01-01", endDate: "2026-01-31", timezone: "Asia/Baku" },
       MOCK_ADMIN,
@@ -220,7 +228,7 @@ describe("DashboardService — Command Center", () => {
 
   it("forward comparison parameter", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     await service.getCommandCenter(
       { preset: "MONTH", comparison: false },
       MOCK_ADMIN,
@@ -234,7 +242,7 @@ describe("DashboardService — Command Center", () => {
 
   it("computes conversion rate correctly", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     // paymentsCaptured=40, ordersCreated=50 → 80%
@@ -264,7 +272,7 @@ describe("DashboardService — Command Center", () => {
         averageOrderValue: { current: "0.00", previous: null, delta: null, deltaPercent: null },
       },
     });
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.sections.executive!.conversionRate.current).toBe("0.00");
@@ -273,7 +281,7 @@ describe("DashboardService — Command Center", () => {
 
   it("funnel conversion = last stage / first stage", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     // First=1000, Last=20 → 2%
@@ -282,7 +290,7 @@ describe("DashboardService — Command Center", () => {
 
   it("maps all monetary KPIs with currency", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     // GMV has currency from Step 3.3
@@ -294,7 +302,7 @@ describe("DashboardService — Command Center", () => {
 
   it("drillDown targets are set for all KPIs", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.sections.executive!.gmv.drillDown?.target).toBe("analytics");
@@ -309,7 +317,7 @@ describe("DashboardService — Command Center", () => {
 describe("DashboardService — Trends", () => {
   it("forwards to Step 3.3 Time Series", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getTrends(
       { preset: "MONTH", metric: "orders" },
       MOCK_ADMIN,
@@ -323,7 +331,7 @@ describe("DashboardService — Trends", () => {
 
   it("defaults metric to orders", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getTrends({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.metric).toBe("orders");
@@ -331,7 +339,7 @@ describe("DashboardService — Trends", () => {
 
   it("forwards timezone to Step 3.3", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     await service.getTrends(
       { preset: "MONTH", timezone: "Asia/Baku" },
       MOCK_ADMIN,
@@ -386,7 +394,7 @@ describe("DashboardService — Empty State", () => {
       currencies: [],
     });
 
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.sections.executive!.gmv.current).toBe("0.00");
@@ -400,7 +408,7 @@ describe("DashboardService — Empty State", () => {
 describe("DashboardService — Section Authority", () => {
   it("ADMIN gets all 4 sections + availableSections + availableMetrics", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.sections.executive).toBeDefined();
@@ -417,7 +425,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("MARKETER gets only Executive + Marketplace sections", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
 
     expect(result.sections.executive).toBeDefined();
@@ -429,7 +437,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("MARKETER availableMetrics excludes financial metrics", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
 
     expect(result.availableMetrics).toContain("orders");
@@ -441,7 +449,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("user with page permission but no section permissions gets empty sections/metrics", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_NO_SECTIONS);
 
     expect(result.sections).toEqual({});
@@ -451,7 +459,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("financial read model not called without Financial permission", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
 
     expect(analytics.getFinancialReconciliation).not.toHaveBeenCalled();
@@ -459,7 +467,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("funnel read model not called without Operational permission", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
     await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
 
     expect(analytics.getConversionFunnel).not.toHaveBeenCalled();
@@ -471,7 +479,7 @@ describe("DashboardService — Section Authority", () => {
 describe("DashboardService — Trends Authority", () => {
   it("unknown metric returns 404", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
 
     await expect(
       service.getTrends({ preset: "MONTH", metric: "nonexistent" }, MOCK_ADMIN),
@@ -480,7 +488,7 @@ describe("DashboardService — Trends Authority", () => {
 
   it("unauthorized metric returns 403", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
 
     // MARKETER has no dashboard.financial.read → payments should be 403
     await expect(
@@ -490,7 +498,7 @@ describe("DashboardService — Trends Authority", () => {
 
   it("MARKETER can access orders (executive), bookings (executive), customers (marketplace)", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
 
     const orders = await service.getTrends({ preset: "MONTH", metric: "orders" }, MOCK_MARKETER);
     expect(orders.metric).toBe("orders");
@@ -504,7 +512,7 @@ describe("DashboardService — Trends Authority", () => {
 
   it("unauthorized/unknown metric does not call analytics service", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics);
+    const service = new DashboardService(analytics, mockPrisma);
 
     await expect(
       service.getTrends({ preset: "MONTH", metric: "nonexistent" }, MOCK_ADMIN),

@@ -47,11 +47,15 @@ const CHART_IDS = new Set(["orders-trend", "bookings-trend", "revenue-trend"]);
 /** IDs for KPI cards — NOT rendered as cards. */
 const NON_KPI_IDS = new Set(["revenue-trend"]);
 
-const SECTION_META: Record<DashboardSection, { titleKey: string; icon: string }> = {
+const SECTION_META: Record<string, { titleKey: string; icon: string }> = {
   executive: { titleKey: "cc.section.executive", icon: "📈" },
   operational: { titleKey: "cc.section.operational", icon: "⚙️" },
   financial: { titleKey: "cc.section.financial", icon: "💰" },
   marketplace: { titleKey: "cc.section.marketplace", icon: "🏪" },
+  catalog: { titleKey: "cc.section.catalog", icon: "📦" },
+  channels: { titleKey: "cc.section.channels", icon: "🔀" },
+  attention: { titleKey: "cc.section.attention", icon: "⚠️" },
+  insights: { titleKey: "cc.section.insights", icon: "🤖" },
 };
 
 /** Reconciliation badge for special KPI rendering. */
@@ -106,6 +110,7 @@ export function SectionGrid({
   // Group visible positions by section
   const sectionPositions: Record<DashboardSection, WidgetPosition[]> = {
     executive: [], operational: [], financial: [], marketplace: [],
+    catalog: [], channels: [], attention: [], insights: [],
   };
   for (const wp of visiblePositions) {
     const mapping = WIDGET_MAP[wp.widgetId];
@@ -237,6 +242,120 @@ export function SectionGrid({
           </div>
         </section>
       )}
+
+      {/* ─── Catalog Health Section ────────────────────────────────── */}
+      {hasSection("catalog") && summary.sections.catalog && (
+        <V3Section id="catalog" data={summary.sections.catalog} />
+      )}
+
+      {/* ─── Channel Health Section ────────────────────────────────── */}
+      {hasSection("channels") && summary.sections.channels && (
+        <V3Section id="channels" data={summary.sections.channels} />
+      )}
+
+      {/* ─── Needs Attention Section ───────────────────────────────── */}
+      {hasSection("attention") && summary.sections.attention && (
+        <V3Section id="attention" data={summary.sections.attention} />
+      )}
+
+      {/* ─── AI Decision Feed Section ──────────────────────────────── */}
+      {hasSection("insights") && summary.sections.insights && (
+        <AiInsightsSection data={summary.sections.insights} locale={locale} />
+      )}
     </div>
+  );
+}
+
+// ─── V3 Generic Section ───────────────────────────────────────────────────
+
+/** Generic renderer for V3 KPI sections (catalog, channels, attention). */
+function V3Section({ id, data }: { id: string; data: Record<string, any> }) {
+  const meta = SECTION_META[id];
+  if (!meta) return null;
+  const entries = Object.entries(data).filter(([, v]) => v && typeof v === "object" && "current" in v);
+  if (entries.length === 0) return null;
+
+  return (
+    <section aria-labelledby={`section-${id}`}>
+      <h2 id={`section-${id}`} className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+        {meta.icon} {meta.titleKey.replace("cc.section.", "").replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+      </h2>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {entries.map(([key, val]) => {
+          const v = val as { current: number | string | null; currency?: string; drillDown?: { target: string } };
+          const displayValue = v.currency ? `${v.current} ${v.currency}` : String(v.current ?? "—");
+          const label = t(`cc.v3.${id}.${key}`, "ru") || key.replace(/([A-Z])/g, " $1").replace(/-/g, " ");
+          return (
+            <div key={key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
+              <div className="mt-2 text-2xl font-bold text-slate-900">{displayValue}</div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ─── AI Decision Feed ─────────────────────────────────────────────────────
+
+interface AiInsightsSectionProps {
+  data: {
+    risks: Array<{ title: string; detail: string; severity: string }>;
+    opportunities: Array<{ title: string; detail: string; potential: string }>;
+    catalogInsights: Array<{ title: string; detail: string }>;
+  };
+  locale?: Locale;
+}
+
+function AiInsightsSection({ data, locale = "ru" }: AiInsightsSectionProps) {
+  const hasContent = data.risks.length > 0 || data.opportunities.length > 0 || data.catalogInsights.length > 0;
+  if (!hasContent) return null;
+
+  return (
+    <section aria-labelledby="section-insights">
+      <h2 id="section-insights" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+        {SECTION_META.insights.icon} {t(SECTION_META.insights.titleKey, locale)}
+      </h2>
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Risks */}
+        {data.risks.length > 0 && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-red-800">⚠️ {t("cc.ai.risks", locale)}</h3>
+            {data.risks.map((r, i) => (
+              <div key={i} className="mb-2">
+                <div className="text-sm font-medium text-red-900">{r.title}</div>
+                <div className="text-xs text-red-700">{r.detail}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Opportunities */}
+        {data.opportunities.length > 0 && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-emerald-800">🚀 {t("cc.ai.opportunities", locale)}</h3>
+            {data.opportunities.map((o, i) => (
+              <div key={i} className="mb-2">
+                <div className="text-sm font-medium text-emerald-900">{o.title}</div>
+                <div className="text-xs text-emerald-700">{o.detail}</div>
+                {o.potential && <div className="text-xs font-medium text-emerald-600">{o.potential}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Catalog Insights */}
+        {data.catalogInsights.length > 0 && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-amber-800">📦 {t("cc.ai.catalog", locale)}</h3>
+            {data.catalogInsights.map((c, i) => (
+              <div key={i} className="mb-2">
+                <div className="text-sm font-medium text-amber-900">{c.title}</div>
+                <div className="text-xs text-amber-700">{c.detail}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

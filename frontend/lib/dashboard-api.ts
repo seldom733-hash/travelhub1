@@ -11,7 +11,7 @@ import { api } from "./api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────
 
-export type DashboardSection = "executive" | "operational" | "financial" | "marketplace";
+export type DashboardSection = "executive" | "operational" | "financial" | "marketplace" | "catalog" | "channels" | "attention" | "insights";
 
 export type PeriodPreset = "TODAY" | "LAST_3_DAYS" | "LAST_7_DAYS" | "MONTH" | "LAST_6_MONTHS" | "YEAR" | "CUSTOM";
 
@@ -64,6 +64,35 @@ export interface CommandCenterSummary {
       storefrontSessions: KpiValue;
       activePartners: KpiValue;
       newCustomers: KpiValue;
+    };
+    catalog?: {
+      publishedServices: KpiValue;
+      archivedServices: KpiValue;
+      servicesWithoutSales: KpiValue;
+      highDemandServices: KpiValue;
+      lowConversionServices: KpiValue;
+      totalCategories: KpiValue;
+    };
+    channels?: {
+      marketplaceRevenue: KpiValue;
+      storefrontRevenue: KpiValue;
+      marketplaceOrders: KpiValue;
+      storefrontOrders: KpiValue;
+      marketplaceConversion: KpiValue;
+      storefrontConversion: KpiValue;
+    };
+    attention?: {
+      pendingConfirmations: KpiValue;
+      failedPayments: KpiValue;
+      cancellations: KpiValue;
+      pendingRefunds: KpiValue;
+      upcomingBookings: KpiValue;
+      servicesWithoutSales: KpiValue;
+    };
+    insights?: {
+      risks: Array<{ title: string; detail: string; severity: string }>;
+      opportunities: Array<{ title: string; detail: string; potential: string }>;
+      catalogInsights: Array<{ title: string; detail: string }>;
     };
   };
 }
