@@ -318,7 +318,7 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
       expect(res.body.sections.marketplace).toBeDefined();
     });
 
-    it("MARKETER gets all sections (analytics.read grants all V3 sections)", async () => {
+    it("MARKETER gets executive, marketplace, catalog, channels, insights — NOT financial/operational", async () => {
       const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_section_marketer");
 
       const res = await request(app.getHttpServer())
@@ -331,6 +331,10 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
       expect(res.body.availableSections).toContain("marketplace");
       expect(res.body.sections.executive).toBeDefined();
       expect(res.body.sections.marketplace).toBeDefined();
+      // MARKETER must NOT see these sections
+      expect(res.body.sections.financial).toBeUndefined();
+      expect(res.body.sections.operational).toBeUndefined();
+      expect(res.body.sections.attention).toBeUndefined();
     });
 
     it("availableSections matches actually returned sections", async () => {
@@ -361,7 +365,7 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
       expect(res.body.availableMetrics).toContain("commissions");
     });
 
-    it("MARKETER availableMetrics includes all metrics (analytics.read grants all)", async () => {
+    it("MARKETER availableMetrics excludes financial metrics", async () => {
       const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_metrics_marketer");
 
       const res = await request(app.getHttpServer())
@@ -373,14 +377,14 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
       expect(res.body.availableMetrics).toContain("orders");
       expect(res.body.availableMetrics).toContain("bookings");
       expect(res.body.availableMetrics).toContain("customers");
-      expect(res.body.availableMetrics).toContain("payments");
-      expect(res.body.availableMetrics).toContain("commissions");
+      // MARKETER must NOT see financial metrics
+      expect(res.body.availableMetrics).not.toContain("payments");
+      expect(res.body.availableMetrics).not.toContain("commissions");
     });
 
-    it("financial read model called when user has analytics.read", async () => {
+    it("financial read model NOT called for MARKETER (no dashboard.financial.read)", async () => {
       const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_financial_skip");
 
-      // Spy on AnalyticsService.getFinancialReconciliation
       const analyticsService = app.get(AnalyticsService);
       const spy = jest.spyOn(analyticsService, "getFinancialReconciliation").mockResolvedValue({
         period: { start: "", endExclusive: "", timezone: "UTC", preset: "MONTH" },
@@ -394,14 +398,14 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
       } as any);
 
       try {
-        await request(app.getHttpServer())
+        const res = await request(app.getHttpServer())
           .get("/api/v1/dashboard/command-center")
           .set("Authorization", `Bearer ${marketerToken}`)
           .query({ preset: "MONTH" })
           .expect(200);
 
-        // Financial section present — analytics.read grants all V3 sections
-        expect(spy).toHaveBeenCalled();
+        // Financial section must NOT be present for MARKETER
+        expect(res.body.sections.financial).toBeUndefined();
       } finally {
         spy.mockRestore();
       }
@@ -457,14 +461,21 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
       }
     });
 
-    it("FINANCE without analytics.read gets 403 on command center", async () => {
-      const { token: financeToken } = await createUserWithRole(RoleCode.FINANCE, "dash_finance_403");
+    it("FINANCE gets executive, financial, attention — NOT marketplace/catalog", async () => {
+      const { token: financeToken } = await createUserWithRole(RoleCode.FINANCE, "dash_finance_sections");
 
-      await request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .get("/api/v1/dashboard/command-center")
         .set("Authorization", `Bearer ${financeToken}`)
         .query({ preset: "MONTH" })
-        .expect(403);
+        .expect(200);
+
+      expect(res.body.sections.executive).toBeDefined();
+      expect(res.body.sections.financial).toBeDefined();
+      expect(res.body.sections.attention).toBeDefined();
+      expect(res.body.sections.marketplace).toBeUndefined();
+      expect(res.body.sections.catalog).toBeUndefined();
+      expect(res.body.sections.channels).toBeUndefined();
     });
   });
 });
