@@ -393,15 +393,17 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
         .expect(403);
     });
 
-    it("FINANCE without analytics.read gets 403 on GET command-center", async () => {
-      const { token: financeToken } = await createUserWithRole(
-        RoleCode.FINANCE,
-        "ws_rbac_finance",
+    it("PARTNER without analytics.read gets 403 on GET command-center (page gate)", async () => {
+      // FINANCE now has analytics.read per Stage A granular RBAC;
+      // use PARTNER which lacks it to test page gate.
+      const { token: partnerToken } = await createUserWithRole(
+        RoleCode.PARTNER,
+        "ws_rbac_page_gate",
       );
 
       await request(app.getHttpServer())
         .get("/api/v1/workspaces/command-center")
-        .set("Authorization", `Bearer ${financeToken}`)
+        .set("Authorization", `Bearer ${partnerToken}`)
         .expect(403);
     });
 
@@ -458,15 +460,15 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
       expect(res.body.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("FINANCE without analytics.read gets 403 on GET command-center/widgets", async () => {
-      const { token: financeToken } = await createUserWithRole(
-        RoleCode.FINANCE,
-        "ws_rbac_finance_w",
+    it("PARTNER without analytics.read gets 403 on GET command-center/widgets (page gate)", async () => {
+      const { token: partnerToken } = await createUserWithRole(
+        RoleCode.PARTNER,
+        "ws_rbac_page_gate_w",
       );
 
       await request(app.getHttpServer())
         .get("/api/v1/workspaces/command-center/widgets")
-        .set("Authorization", `Bearer ${financeToken}`)
+        .set("Authorization", `Bearer ${partnerToken}`)
         .expect(403);
     });
 
@@ -482,19 +484,19 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
         .expect(403);
     });
 
-    it("FINANCE with persisted analytics.read grant gets 200 on GET", async () => {
+    it("PARTNER with persisted analytics.read grant gets 200 on GET", async () => {
       const { username } = await createUserWithRole(
-        RoleCode.FINANCE,
-        "ws_fin_grant",
+        RoleCode.PARTNER,
+        "ws_partner_grant",
       );
 
-      // Create persisted grant: FINANCE → analytics.read
-      const financeRole = await prisma.role.findUnique({ where: { code: RoleCode.FINANCE } });
+      // Create persisted grant: PARTNER → analytics.read (admin override)
+      const partnerRole = await prisma.role.findUnique({ where: { code: RoleCode.PARTNER } });
       const analyticsPerm = await prisma.permission.findUnique({ where: { code: "analytics.read" } });
       let grantCreated = false;
       try {
         await prisma.rolePermission.create({
-          data: { roleId: financeRole!.id, permissionId: analyticsPerm!.id },
+          data: { roleId: partnerRole!.id, permissionId: analyticsPerm!.id },
         });
         grantCreated = true;
 
@@ -518,7 +520,7 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
         // Cleanup: remove persisted grant
         if (grantCreated) {
           await prisma.rolePermission.delete({
-            where: { roleId_permissionId: { roleId: financeRole!.id, permissionId: analyticsPerm!.id } },
+            where: { roleId_permissionId: { roleId: partnerRole!.id, permissionId: analyticsPerm!.id } },
           }).catch(() => {});
         }
       }
@@ -526,16 +528,16 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
 
     it("after removing persisted grant, GET returns 403 again", async () => {
       const { userId, username } = await createUserWithRole(
-        RoleCode.FINANCE,
-        "ws_fin_revoke",
+        RoleCode.PARTNER,
+        "ws_partner_revoke",
       );
 
-      const financeRole = await prisma.role.findUnique({ where: { code: RoleCode.FINANCE } });
+      const partnerRole = await prisma.role.findUnique({ where: { code: RoleCode.PARTNER } });
       const analyticsPerm = await prisma.permission.findUnique({ where: { code: "analytics.read" } });
       let grantCreated = false;
       try {
         await prisma.rolePermission.create({
-          data: { roleId: financeRole!.id, permissionId: analyticsPerm!.id },
+          data: { roleId: partnerRole!.id, permissionId: analyticsPerm!.id },
         });
         grantCreated = true;
 
@@ -552,7 +554,7 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
 
         // Remove the grant
         await prisma.rolePermission.delete({
-          where: { roleId_permissionId: { roleId: financeRole!.id, permissionId: analyticsPerm!.id } },
+          where: { roleId_permissionId: { roleId: partnerRole!.id, permissionId: analyticsPerm!.id } },
         });
         grantCreated = false;
 
@@ -569,54 +571,39 @@ describe("Phase 3 — Workspace Constructor Foundation (e2e)", () => {
       } finally {
         if (grantCreated) {
           await prisma.rolePermission.delete({
-            where: { roleId_permissionId: { roleId: financeRole!.id, permissionId: analyticsPerm!.id } },
+            where: { roleId_permissionId: { roleId: partnerRole!.id, permissionId: analyticsPerm!.id } },
           }).catch(() => {});
         }
       }
     });
 
     it("user with analytics.read but no dashboard.customize gets 403 on PUT/DELETE", async () => {
+      // FINANCE has analytics.read (page gate) but NOT dashboard.customize
       const { username } = await createUserWithRole(
         RoleCode.FINANCE,
         "ws_nocustom",
       );
 
-      const financeRole = await prisma.role.findUnique({ where: { code: RoleCode.FINANCE } });
-      const analyticsPerm = await prisma.permission.findUnique({ where: { code: "analytics.read" } });
-      let grantCreated = false;
-      try {
-        await prisma.rolePermission.create({
-          data: { roleId: financeRole!.id, permissionId: analyticsPerm!.id },
-        });
-        grantCreated = true;
+      const newLogin = await login(username, "TestPassword123!");
 
-        const newLogin = await login(username, "TestPassword123!");
+      // GET should work (has analytics.read)
+      await request(app.getHttpServer())
+        .get("/api/v1/workspaces/command-center")
+        .set("Authorization", `Bearer ${newLogin.accessToken}`)
+        .expect(200);
 
-        // GET should work (has analytics.read)
-        await request(app.getHttpServer())
-          .get("/api/v1/workspaces/command-center")
-          .set("Authorization", `Bearer ${newLogin.accessToken}`)
-          .expect(200);
+      // PUT should fail (no dashboard.customize)
+      await request(app.getHttpServer())
+        .put("/api/v1/workspaces/command-center/layout")
+        .set("Authorization", `Bearer ${newLogin.accessToken}`)
+        .send({ widgets: [{ widgetId: "gmv", x: 0, y: 0, w: 1, h: 1, visible: true }] })
+        .expect(403);
 
-        // PUT should fail (no dashboard.customize)
-        await request(app.getHttpServer())
-          .put("/api/v1/workspaces/command-center/layout")
-          .set("Authorization", `Bearer ${newLogin.accessToken}`)
-          .send({ widgets: [{ widgetId: "gmv", x: 0, y: 0, w: 1, h: 1, visible: true }] })
-          .expect(403);
-
-        // DELETE should fail (no dashboard.customize)
-        await request(app.getHttpServer())
-          .delete("/api/v1/workspaces/command-center/layout")
-          .set("Authorization", `Bearer ${newLogin.accessToken}`)
-          .expect(403);
-      } finally {
-        if (grantCreated) {
-          await prisma.rolePermission.delete({
-            where: { roleId_permissionId: { roleId: financeRole!.id, permissionId: analyticsPerm!.id } },
-          }).catch(() => {});
-        }
-      }
+      // DELETE should fail (no dashboard.customize)
+      await request(app.getHttpServer())
+        .delete("/api/v1/workspaces/command-center/layout")
+        .set("Authorization", `Bearer ${newLogin.accessToken}`)
+        .expect(403);
     });
   });
 
