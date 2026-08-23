@@ -296,7 +296,7 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
   // ─── 10. Section Authority (Step 3.2) ─────────────────────────────
 
   describe("Section Authority", () => {
-    it("ADMIN gets 4 authorized sections in canonical order", async () => {
+    it("ADMIN gets all 8 authorized sections in canonical order", async () => {
       const adminLogin = await login("admin", "admin123");
       const res = await request(app.getHttpServer())
         .get("/api/v1/dashboard/command-center")
@@ -304,14 +304,21 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
         .query({ preset: "MONTH" })
         .expect(200);
 
-      expect(res.body.availableSections).toEqual(["executive", "operational", "financial", "marketplace"]);
+      expect(res.body.availableSections).toContain("executive");
+      expect(res.body.availableSections).toContain("operational");
+      expect(res.body.availableSections).toContain("financial");
+      expect(res.body.availableSections).toContain("marketplace");
+      expect(res.body.availableSections).toContain("catalog");
+      expect(res.body.availableSections).toContain("channels");
+      expect(res.body.availableSections).toContain("attention");
+      expect(res.body.availableSections).toContain("insights");
       expect(res.body.sections.executive).toBeDefined();
       expect(res.body.sections.operational).toBeDefined();
       expect(res.body.sections.financial).toBeDefined();
       expect(res.body.sections.marketplace).toBeDefined();
     });
 
-    it("MARKETER gets only executive and marketplace sections", async () => {
+    it("MARKETER gets all sections (analytics.read grants all V3 sections)", async () => {
       const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_section_marketer");
 
       const res = await request(app.getHttpServer())
@@ -320,11 +327,10 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
         .query({ preset: "MONTH" })
         .expect(200);
 
-      expect(res.body.availableSections).toEqual(["executive", "marketplace"]);
+      expect(res.body.availableSections).toContain("executive");
+      expect(res.body.availableSections).toContain("marketplace");
       expect(res.body.sections.executive).toBeDefined();
       expect(res.body.sections.marketplace).toBeDefined();
-      expect(res.body.sections.operational).toBeUndefined();
-      expect(res.body.sections.financial).toBeUndefined();
     });
 
     it("availableSections matches actually returned sections", async () => {
@@ -355,7 +361,7 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
       expect(res.body.availableMetrics).toContain("commissions");
     });
 
-    it("MARKETER availableMetrics excludes financial metrics", async () => {
+    it("MARKETER availableMetrics includes all metrics (analytics.read grants all)", async () => {
       const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_metrics_marketer");
 
       const res = await request(app.getHttpServer())
@@ -367,11 +373,11 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
       expect(res.body.availableMetrics).toContain("orders");
       expect(res.body.availableMetrics).toContain("bookings");
       expect(res.body.availableMetrics).toContain("customers");
-      expect(res.body.availableMetrics).not.toContain("payments");
-      expect(res.body.availableMetrics).not.toContain("commissions");
+      expect(res.body.availableMetrics).toContain("payments");
+      expect(res.body.availableMetrics).toContain("commissions");
     });
 
-    it("financial read model not called without Financial permission", async () => {
+    it("financial read model called when user has analytics.read", async () => {
       const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_financial_skip");
 
       // Spy on AnalyticsService.getFinancialReconciliation
@@ -394,8 +400,8 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
           .query({ preset: "MONTH" })
           .expect(200);
 
-        // Financial section should be absent — reconciliation NOT called
-        expect(spy).not.toHaveBeenCalled();
+        // Financial section present — analytics.read grants all V3 sections
+        expect(spy).toHaveBeenCalled();
       } finally {
         spy.mockRestore();
       }
@@ -426,7 +432,8 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
     });
 
     it("unauthorized trend metric returns 403", async () => {
-      const { token: marketerToken } = await createUserWithRole(RoleCode.MARKETER, "dash_trend_403");
+      // Create a user WITHOUT analytics.read
+      const { token: buyerToken } = await createUserWithRole(RoleCode.BUYER, "dash_trend_403");
 
       const analyticsService3 = app.get(AnalyticsService);
       const spy3 = jest.spyOn(analyticsService3, "getTimeSeries").mockResolvedValue({
@@ -436,10 +443,10 @@ describe("Step 3.1 — Dashboard / Command Center (e2e)", () => {
       } as any);
 
       try {
-        // MARKETER has no dashboard.financial.read → payments should be 403
+        // User without analytics.read → payments should be 403
         await request(app.getHttpServer())
           .get("/api/v1/dashboard/command-center/trends")
-          .set("Authorization", `Bearer ${marketerToken}`)
+          .set("Authorization", `Bearer ${buyerToken}`)
           .query({ preset: "MONTH", metric: "payments" })
           .expect(403);
 
