@@ -53,8 +53,10 @@ function createMockAnalytics() {
         refundsProcessed: { current: 3, previous: 2, delta: 1, deltaPercent: 50 },
         marketplaceSessions: { current: 1000, previous: 800, delta: 200, deltaPercent: 25 },
         storefrontSessions: { current: 500, previous: 400, delta: 100, deltaPercent: 25 },
-        activePartners: { current: 15, previous: null, delta: null, deltaPercent: null },
-        newCustomers: { current: 20, previous: 15, delta: 5, deltaPercent: 33.33 },
+        marketplacePartners: { current: 15, previous: null, delta: null, deltaPercent: null },
+        storefrontPartners: { current: 8, previous: null, delta: null, deltaPercent: null },
+        marketplaceCustomers: { current: 20, previous: 15, delta: 5, deltaPercent: 33.33 },
+        storefrontCustomers: { current: 12, previous: 10, delta: 2, deltaPercent: 20 },
         averageOrderValue: { current: "3.00", previous: "3.00", delta: "0.00", deltaPercent: 0 },
       },
       attribution: {
@@ -199,8 +201,10 @@ describe("DashboardService — Command Center", () => {
     // All cards are present and valid.
     expect(result.sections.marketplace!.marketplaceSessions).toBeDefined();
     expect(result.sections.marketplace!.storefrontSessions).toBeDefined();
-    expect(result.sections.marketplace!.activePartners).toBeDefined();
-    expect(result.sections.marketplace!.newCustomers).toBeDefined();
+    expect(result.sections.marketplace!.marketplacePartners).toBeDefined();
+    expect(result.sections.marketplace!.storefrontPartners).toBeDefined();
+    expect(result.sections.marketplace!.marketplaceCustomers).toBeDefined();
+    expect(result.sections.marketplace!.storefrontCustomers).toBeDefined();
 
     // Attribution
     expect(result.attribution).toBeDefined();
@@ -267,8 +271,10 @@ describe("DashboardService — Command Center", () => {
         refundsProcessed: { current: 0, previous: null, delta: null, deltaPercent: null },
         marketplaceSessions: { current: 0, previous: null, delta: null, deltaPercent: null },
         storefrontSessions: { current: 0, previous: null, delta: null, deltaPercent: null },
-        activePartners: { current: 0, previous: null, delta: null, deltaPercent: null },
-        newCustomers: { current: 0, previous: null, delta: null, deltaPercent: null },
+        marketplacePartners: { current: 0, previous: null, delta: null, deltaPercent: null },
+        storefrontPartners: { current: 0, previous: null, delta: null, deltaPercent: null },
+        marketplaceCustomers: { current: 0, previous: null, delta: null, deltaPercent: null },
+        storefrontCustomers: { current: 0, previous: null, delta: null, deltaPercent: null },
         averageOrderValue: { current: "0.00", previous: null, delta: null, deltaPercent: null },
       },
     });
@@ -308,7 +314,7 @@ describe("DashboardService — Command Center", () => {
     expect(result.sections.executive!.gmv.drillDown?.target).toBe("analytics");
     expect(result.sections.operational!.ordersFulfilled.drillDown?.target).toBe("orders");
     expect(result.sections.financial!.totalPayments.drillDown?.target).toBe("finance");
-    expect(result.sections.marketplace!.newCustomers.drillDown?.target).toBe("crm");
+    expect(result.sections.marketplace!.marketplaceCustomers.drillDown?.target).toBe("analytics");
   });
 });
 
@@ -374,8 +380,10 @@ describe("DashboardService — Empty State", () => {
         refundsProcessed: { current: 0, previous: null, delta: null, deltaPercent: null },
         marketplaceSessions: { current: 0, previous: null, delta: null, deltaPercent: null },
         storefrontSessions: { current: 0, previous: null, delta: null, deltaPercent: null },
-        activePartners: { current: 0, previous: null, delta: null, deltaPercent: null },
-        newCustomers: { current: 0, previous: null, delta: null, deltaPercent: null },
+        marketplacePartners: { current: 0, previous: null, delta: null, deltaPercent: null },
+        storefrontPartners: { current: 0, previous: null, delta: null, deltaPercent: null },
+        marketplaceCustomers: { current: 0, previous: null, delta: null, deltaPercent: null },
+        storefrontCustomers: { current: 0, previous: null, delta: null, deltaPercent: null },
         averageOrderValue: { current: "0.00", previous: null, delta: null, deltaPercent: null },
       },
     });

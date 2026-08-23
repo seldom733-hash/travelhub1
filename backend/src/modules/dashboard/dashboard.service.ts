@@ -65,6 +65,8 @@ export const METRIC_SECTION_MAP: Record<string, DashboardSection> = {
   bookings: "executive",
   payments: "financial",
   customers: "marketplace",
+  "marketplace-customers": "marketplace",
+  "storefront-customers": "marketplace",
   commissions: "financial",
 };
 
@@ -157,8 +159,10 @@ export interface CommandCenterResponse {
     marketplace?: {
       marketplaceSessions: KpiValue;
       storefrontSessions: KpiValue;
-      activePartners: KpiValue;
-      newCustomers: KpiValue;
+      marketplacePartners: KpiValue;
+      storefrontPartners: KpiValue;
+      marketplaceCustomers: KpiValue;
+      storefrontCustomers: KpiValue;
     };
     catalog?: CatalogHealthResponse;
     channels?: ChannelHealthResponse;
@@ -780,8 +784,10 @@ export class DashboardService {
     return {
       marketplaceSessions: this.toKpiValue(m.marketplaceSessions, "analytics"),
       storefrontSessions: this.toKpiValue(m.storefrontSessions, "analytics"),
-      activePartners: this.toKpiValue(m.activePartners, "analytics"),
-      newCustomers: this.toKpiValue(m.newCustomers, "crm"),
+      marketplacePartners: this.toKpiValue(m.marketplacePartners, "analytics"),
+      storefrontPartners: this.toKpiValue(m.storefrontPartners, "analytics"),
+      marketplaceCustomers: this.toKpiValue(m.marketplaceCustomers, "analytics"),
+      storefrontCustomers: this.toKpiValue(m.storefrontCustomers, "analytics"),
     };
   }
 }

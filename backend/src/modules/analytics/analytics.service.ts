@@ -155,8 +155,10 @@ export interface CompanyKpiResponse {
     refundsProcessed: ComparisonValue<number>;
     marketplaceSessions: ComparisonValue<number>;
     storefrontSessions: ComparisonValue<number>;
-    activePartners: ComparisonValue<number>;
-    newCustomers: ComparisonValue<number>;
+    marketplacePartners: ComparisonValue<number>;
+    storefrontPartners: ComparisonValue<number>;
+    marketplaceCustomers: ComparisonValue<number>;
+    storefrontCustomers: ComparisonValue<number>;
     averageOrderValue: ComparisonValue<string>;
   };
   attribution?: {
@@ -342,10 +344,12 @@ export class AnalyticsService {
       refunds,
       commissions,
       prevCommissions,
-      customers,
+      marketplaceCustomers,
+      storefrontCustomers,
       behavioralMarketplace,
       behavioralStorefront,
-      partners,
+      marketplacePartners,
+      storefrontPartners,
     ] = await Promise.all([
       this.prisma.order.findMany({
         where: {
@@ -408,11 +412,21 @@ export class AnalyticsService {
             select: { id: true, amount: true, currency: true },
           })
         : Promise.resolve([]),
-      this.prisma.customer.findMany({
+      // Marketplace customers: unique buyers who placed orders via MARKETPLACE
+      this.prisma.order.findMany({
         where: {
+          acquisitionSource: "MARKETPLACE",
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
-        select: { id: true },
+        select: { customerId: true },
+      }),
+      // Storefront customers: unique buyers who placed orders via PARTNER_STOREFRONT
+      this.prisma.order.findMany({
+        where: {
+          acquisitionSource: "PARTNER_STOREFRONT",
+          createdAt: { gte: current.start, lt: current.endExclusive },
+        },
+        select: { customerId: true },
       }),
       this.prisma.$queryRaw<{ cnt: bigint }[]>`
         SELECT COUNT(DISTINCT "sessionId") as cnt
@@ -424,10 +438,18 @@ export class AnalyticsService {
         FROM catalog."StorefrontBehavioralEvent"
         WHERE "occurredAt" >= ${current.start} AND "occurredAt" < ${current.endExclusive}
       `,
+      // Marketplace partners: partners with ≥1 PUBLISHED product in MARKETPLACE channel
+      this.prisma.$queryRaw<{ cnt: bigint }[]>`
+        SELECT COUNT(DISTINCT p."partnerId") as cnt
+        FROM catalog."Product" p
+        INNER JOIN catalog."ProductPublicationChannel" ppc ON ppc."productId" = p.id
+        WHERE p."status" = 'PUBLISHED' AND p."partnerId" IS NOT NULL AND ppc."channel" = 'MARKETPLACE'
+      `,
+      // Storefront partners: partners with ≥1 active storefront
       this.prisma.$queryRaw<{ cnt: bigint }[]>`
         SELECT COUNT(DISTINCT "partnerId") as cnt
-        FROM catalog."Product"
-        WHERE "status" = 'PUBLISHED' AND "partnerId" IS NOT NULL
+        FROM storefront."PartnerStorefront"
+        WHERE "entitlementStatus" = 'ACTIVE' AND "partnerId" IS NOT NULL
       `,
     ]);
 
@@ -490,7 +512,10 @@ export class AnalyticsService {
 
     const marketplaceSessions = Number(behavioralMarketplace[0]?.cnt || 0);
     const storefrontSessions = Number(behavioralStorefront[0]?.cnt || 0);
-    const activePartnersCount = Number(partners[0]?.cnt || 0);
+    const marketplacePartnersCount = Number(marketplacePartners[0]?.cnt || 0);
+    const storefrontPartnersCount = Number(storefrontPartners[0]?.cnt || 0);
+    const marketplaceCustomersCount = new Set(marketplaceCustomers.map(c => c.customerId).filter(Boolean)).size;
+    const storefrontCustomersCount = new Set(storefrontCustomers.map(c => c.customerId).filter(Boolean)).size;
 
     const result: CompanyKpiResponse = {
       period: {
@@ -533,8 +558,10 @@ export class AnalyticsService {
         refundsProcessed: this.compareValues(refunds.length, null),
         marketplaceSessions: this.compareValues(marketplaceSessions, null),
         storefrontSessions: this.compareValues(storefrontSessions, null),
-        activePartners: this.compareValues(activePartnersCount, null),
-        newCustomers: this.compareValues(customers.length, null),
+        marketplacePartners: this.compareValues(marketplacePartnersCount, null),
+        storefrontPartners: this.compareValues(storefrontPartnersCount, null),
+        marketplaceCustomers: this.compareValues(marketplaceCustomersCount, null),
+        storefrontCustomers: this.compareValues(storefrontCustomersCount, null),
         averageOrderValue: this.compareDecimalValues(aov.total, null),
       },
       attribution: {
@@ -960,6 +987,20 @@ export class AnalyticsService {
         });
       case "customers":
         return this.prisma.customer.count({ where });
+      case "marketplace-customers": {
+        const orders = await this.prisma.order.findMany({
+          where: { acquisitionSource: "MARKETPLACE", ...where },
+          select: { customerId: true },
+        });
+        return new Set(orders.map(o => o.customerId).filter(Boolean)).size;
+      }
+      case "storefront-customers": {
+        const orders = await this.prisma.order.findMany({
+          where: { acquisitionSource: "PARTNER_STOREFRONT", ...where },
+          select: { customerId: true },
+        });
+        return new Set(orders.map(o => o.customerId).filter(Boolean)).size;
+      }
       case "commissions":
         return this.prisma.commission.count({ where });
       default:

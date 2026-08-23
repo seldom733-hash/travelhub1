@@ -31,8 +31,10 @@ const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; for
   // ─── Marketplace ────────────────────────────────────────────────
   "sessions":         { section: "marketplace", field: "marketplaceSessions" },
   "storefront-sessions": { section: "marketplace", field: "storefrontSessions" },
-  "partners":         { section: "marketplace", field: "activePartners" },
-  "customers":        { section: "marketplace", field: "newCustomers" },
+  "marketplace-partners": { section: "marketplace", field: "marketplacePartners" },
+  "storefront-partners":  { section: "marketplace", field: "storefrontPartners" },
+  "marketplace-customers": { section: "marketplace", field: "marketplaceCustomers" },
+  "storefront-customers":  { section: "marketplace", field: "storefrontCustomers" },
 };
 
 /** Trend widgets: widgetId → metric. */
