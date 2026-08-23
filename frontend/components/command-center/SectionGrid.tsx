@@ -35,6 +35,9 @@ const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; for
   "storefront-partners":  { section: "marketplace", field: "storefrontPartners" },
   "marketplace-customers": { section: "marketplace", field: "marketplaceCustomers" },
   "storefront-customers":  { section: "marketplace", field: "storefrontCustomers" },
+  // backward-compat: old layout IDs → map to first split field
+  "partners":        { section: "marketplace", field: "marketplacePartners" },
+  "customers":       { section: "marketplace", field: "marketplaceCustomers" },
 };
 
 /** Trend widgets: widgetId → metric. */

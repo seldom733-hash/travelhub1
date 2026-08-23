@@ -53,3 +53,4 @@ backend/.backups/
 
 # Step 2.17B perf harness run artifacts (generated, bulk) — never commit by default
 backend/artifacts/performance/
+login.json
