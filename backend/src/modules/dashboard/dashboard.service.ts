@@ -440,12 +440,15 @@ export class DashboardService {
         WHERE o."acquisitionSource" = 'MARKETPLACE'
           AND c."createdAt" >= $1 AND c."createdAt" < $2
       `, period.start, period.end).then(r => Number(r[0]?.total ?? 0)),
-      // Storefront Revenue = TravelHub commission from Storefront sales
-      this.prisma.$queryRawUnsafe<{ total: bigint }[]>(`
-        SELECT COALESCE(sum(c.amount), 0) as total FROM finance."Commission" c
-        JOIN "order"."Order" o ON o.id = c."orderId"
-        WHERE o."acquisitionSource" = 'PARTNER_STOREFRONT'
-          AND c."createdAt" >= $1 AND c."createdAt" < $2
+      // Storefront Revenue = subscription revenue (Premium plans $199/month)
+      this.prisma.$queryRawUnsafe<{ total: number }[]>(`
+        SELECT COALESCE(SUM(sp."priceUsd"), 0) as total
+        FROM catalog."StorefrontSubscription" s
+        JOIN catalog."StorefrontSubscriptionPlan" sp ON sp.id = s."planId"
+        WHERE s.status = 'ACTIVE'
+          AND sp."priceUsd" > 0
+          AND s."currentPeriodStart" < $2
+          AND s."currentPeriodEnd" > $1
       `, period.start, period.end).then(r => Number(r[0]?.total ?? 0)),
     ]);
 

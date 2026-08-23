@@ -550,7 +550,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.v3.channels.marketplaceGmv": { ru: "GMV Marketplace", az: "GMV Marketplace", en: "GMV Marketplace" },
   "cc.v3.channels.storefrontGmv": { ru: "GMV Storefront", az: "GMV Storefront", en: "GMV Storefront" },
   "cc.v3.channels.marketplaceRevenue": { ru: "Выручка Marketplace", az: "Marketplace gəliri", en: "Marketplace Revenue" },
-  "cc.v3.channels.storefrontRevenue": { ru: "Выручка Storefront", az: "Storefront gəliri", en: "Storefront Revenue" },
+  "cc.v3.channels.storefrontRevenue": { ru: "Подписки Storefront", az: "Storefront abunəlikləri", en: "Storefront Subscriptions" },
   "cc.v3.channels.marketplaceOrders": { ru: "Заказы Marketplace", az: "Marketplace sifarişləri", en: "Marketplace Orders" },
   "cc.v3.channels.storefrontOrders": { ru: "Заказы Storefront", az: "Storefront sifarişləri", en: "Storefront Orders" },
   "cc.v3.channels.marketplaceConversion": { ru: "Конверсия Marketplace", az: "Marketplace konvertsiyası", en: "Marketplace Conversion" },

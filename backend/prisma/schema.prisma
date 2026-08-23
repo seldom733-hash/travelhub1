@@ -1283,8 +1283,74 @@ model PartnerStorefront {
 
   /// Storefront-owned media (logo/hero) — private storage, controlled upload.
   media StorefrontMedia[]
+  /// Subscription linking this storefront to a billing plan.
+  subscription StorefrontSubscription?
 
   @@index([status])
+  @@schema("catalog")
+}
+
+/// Storefront subscription plan — master data.
+/// Two canonical plans: FREE_TRIAL (first month free) and PREMIUM ($199/month).
+enum StorefrontPlanType {
+  FREE_TRIAL
+  PREMIUM
+
+  @@schema("catalog")
+}
+
+model StorefrontSubscriptionPlan {
+  id        String   @id @default(uuid())
+  code      String   @unique // SUB-PLAN-001
+  name      String   // "First Month Free" / "Premium"
+  planType  StorefrontPlanType
+  /// Monthly price in USD. 0 for free trial.
+  priceUsd  Decimal  @db.Decimal(10, 2)
+  /// Billing period in days. 30 for monthly.
+  periodDays Int     @default(30)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions StorefrontSubscription[]
+
+  @@schema("catalog")
+}
+
+/// Storefront subscription — links a storefront to a plan with billing history.
+enum StorefrontSubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+
+  @@schema("catalog")
+}
+
+model StorefrontSubscription {
+  id          String   @id @default(uuid())
+  code        String   @unique // SUB-00000001
+  storefrontId String
+  storefront   PartnerStorefront @relation(fields: [storefrontId], references: [id], onDelete: Cascade)
+  planId      String
+  plan        StorefrontSubscriptionPlan @relation(fields: [planId], references: [id])
+  status      StorefrontSubscriptionStatus @default(ACTIVE)
+  /// When the current billing period starts.
+  currentPeriodStart DateTime
+  /// When the current billing period ends (exclusive).
+  currentPeriodEnd   DateTime
+  /// When the subscription was created.
+  startedAt   DateTime @default(now())
+  /// When cancelled (null if active).
+  cancelledAt DateTime?
+  /// Total amount paid to date.
+  totalPaidUsd Decimal @db.Decimal(10, 2) @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([storefrontId])
+  @@index([status])
+  @@index([currentPeriodEnd])
   @@schema("catalog")
 }
 
