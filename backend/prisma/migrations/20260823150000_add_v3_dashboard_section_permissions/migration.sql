@@ -1,5 +1,5 @@
 -- Stage A: Granular RBAC Remediation
--- Add 4 new V3 section permissions + role assignments
+-- Add 4 new V3 section permissions + missing page gate + section grants
 
 -- 1. Add missing Permission rows
 INSERT INTO "security"."Permission" ("id", "code", "description") VALUES
@@ -33,7 +33,7 @@ WHERE r."code" = 'MARKETER'
   AND p."code" IN ('dashboard.catalog.read', 'dashboard.channels.read', 'dashboard.insights.read')
   AND NOT EXISTS (SELECT 1 FROM "security"."RolePermission" rp WHERE rp."roleId" = r."id" AND rp."permissionId" = p."id");
 
--- 5. ANALYST gets catalog
+-- 5. ANALYST gets catalog (already has executive/operational/financial/marketplace from old migration)
 INSERT INTO "security"."RolePermission" ("roleId", "permissionId")
 SELECT r."id", p."id"
 FROM "security"."Role" r, "security"."Permission" p
@@ -41,15 +41,15 @@ WHERE r."code" = 'ANALYST'
   AND p."code" IN ('dashboard.catalog.read')
   AND NOT EXISTS (SELECT 1 FROM "security"."RolePermission" rp WHERE rp."roleId" = r."id" AND rp."permissionId" = p."id");
 
--- 6. FINANCE gets attention
+-- 6. FINANCE: add missing page gate + section grants
 INSERT INTO "security"."RolePermission" ("roleId", "permissionId")
 SELECT r."id", p."id"
 FROM "security"."Role" r, "security"."Permission" p
 WHERE r."code" = 'FINANCE'
-  AND p."code" IN ('dashboard.attention.read')
+  AND p."code" IN ('analytics.read', 'dashboard.executive.read', 'dashboard.financial.read', 'dashboard.attention.read')
   AND NOT EXISTS (SELECT 1 FROM "security"."RolePermission" rp WHERE rp."roleId" = r."id" AND rp."permissionId" = p."id");
 
--- 7. OPERATOR gets page gate + operational + attention
+-- 7. OPERATOR: add page gate + operational + attention
 INSERT INTO "security"."RolePermission" ("roleId", "permissionId")
 SELECT r."id", p."id"
 FROM "security"."Role" r, "security"."Permission" p
