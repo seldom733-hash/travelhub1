@@ -91,6 +91,8 @@ export interface CatalogHealthResponse {
 }
 
 export interface ChannelHealthResponse {
+  marketplaceGmv: KpiValue;
+  storefrontGmv: KpiValue;
   marketplaceRevenue: KpiValue;
   storefrontRevenue: KpiValue;
   marketplaceOrders: KpiValue;
@@ -389,7 +391,7 @@ export class DashboardService {
   ): Promise<ChannelHealthResponse> {
     const period = this.getPeriodBounds(analyticsDto);
 
-    const [mpOrders, sfOrders, mpRevenue, sfRevenue] = await Promise.all([
+    const [mpOrders, sfOrders, mpPaidOrders, sfPaidOrders, mpGmv, sfGmv, mpCommission, sfCommission] = await Promise.all([
       // Marketplace orders count
       this.prisma.$queryRawUnsafe<{ count: bigint }[]>(`
         SELECT count(*) as count FROM "order"."Order" o
@@ -402,28 +404,59 @@ export class DashboardService {
         WHERE o."acquisitionSource" = 'PARTNER_STOREFRONT'
           AND o."createdAt" >= $1 AND o."createdAt" < $2
       `, period.start, period.end).then(r => Number(r[0]?.count ?? 0)),
-      // Marketplace revenue
+      // Marketplace paid orders (for conversion)
+      this.prisma.$queryRawUnsafe<{ count: bigint }[]>(`
+        SELECT count(*) as count FROM "order"."Order" o
+        WHERE o."acquisitionSource" = 'MARKETPLACE'
+          AND o."paymentStatus" IN ('PAID'::"order"."OrderPaymentStatus", 'REFUNDED'::"order"."OrderPaymentStatus")
+          AND o."createdAt" >= $1 AND o."createdAt" < $2
+      `, period.start, period.end).then(r => Number(r[0]?.count ?? 0)),
+      // Storefront paid orders (for conversion)
+      this.prisma.$queryRawUnsafe<{ count: bigint }[]>(`
+        SELECT count(*) as count FROM "order"."Order" o
+        WHERE o."acquisitionSource" = 'PARTNER_STOREFRONT'
+          AND o."paymentStatus" IN ('PAID'::"order"."OrderPaymentStatus", 'REFUNDED'::"order"."OrderPaymentStatus")
+          AND o."createdAt" >= $1 AND o."createdAt" < $2
+      `, period.start, period.end).then(r => Number(r[0]?.count ?? 0)),
+      // GMV Marketplace = total paidAmount of Marketplace orders
       this.prisma.$queryRawUnsafe<{ total: bigint }[]>(`
         SELECT COALESCE(sum(o."paidAmount"), 0) as total FROM "order"."Order" o
         WHERE o."acquisitionSource" = 'MARKETPLACE'
           AND o."paymentStatus" IN ('PAID'::"order"."OrderPaymentStatus", 'REFUNDED'::"order"."OrderPaymentStatus")
           AND o."createdAt" >= $1 AND o."createdAt" < $2
       `, period.start, period.end).then(r => Number(r[0]?.total ?? 0)),
-      // Storefront revenue
+      // GMV Storefront = total paidAmount of Storefront orders
       this.prisma.$queryRawUnsafe<{ total: bigint }[]>(`
         SELECT COALESCE(sum(o."paidAmount"), 0) as total FROM "order"."Order" o
         WHERE o."acquisitionSource" = 'PARTNER_STOREFRONT'
           AND o."paymentStatus" IN ('PAID'::"order"."OrderPaymentStatus", 'REFUNDED'::"order"."OrderPaymentStatus")
           AND o."createdAt" >= $1 AND o."createdAt" < $2
       `, period.start, period.end).then(r => Number(r[0]?.total ?? 0)),
+      // Marketplace Revenue = TravelHub commission from Marketplace sales
+      this.prisma.$queryRawUnsafe<{ total: bigint }[]>(`
+        SELECT COALESCE(sum(c.amount), 0) as total FROM finance."Commission" c
+        JOIN "order"."Order" o ON o.id = c."orderId"
+        WHERE o."acquisitionSource" = 'MARKETPLACE'
+          AND c."createdAt" >= $1 AND c."createdAt" < $2
+      `, period.start, period.end).then(r => Number(r[0]?.total ?? 0)),
+      // Storefront Revenue = TravelHub commission from Storefront sales
+      this.prisma.$queryRawUnsafe<{ total: bigint }[]>(`
+        SELECT COALESCE(sum(c.amount), 0) as total FROM finance."Commission" c
+        JOIN "order"."Order" o ON o.id = c."orderId"
+        WHERE o."acquisitionSource" = 'PARTNER_STOREFRONT'
+          AND c."createdAt" >= $1 AND c."createdAt" < $2
+      `, period.start, period.end).then(r => Number(r[0]?.total ?? 0)),
     ]);
 
-    const mpConversion = mpOrders === 0 ? 0 : Math.round((mpOrders / (mpOrders + 10)) * 10000) / 100;
-    const sfConversion = sfOrders === 0 ? 0 : Math.round((sfOrders / (sfOrders + 3)) * 10000) / 100;
+    // Conversion = paid orders / total orders (same formula as executive section)
+    const mpConversion = mpOrders === 0 ? 0 : Math.round((mpPaidOrders / mpOrders) * 10000) / 100;
+    const sfConversion = sfOrders === 0 ? 0 : Math.round((sfPaidOrders / sfOrders) * 10000) / 100;
 
     return {
-      marketplaceRevenue: this.moneyKpi(mpRevenue, "AZN", "finance"),
-      storefrontRevenue: this.moneyKpi(sfRevenue, "AZN", "finance"),
+      marketplaceGmv: this.moneyKpi(mpGmv, "AZN", "analytics"),
+      storefrontGmv: this.moneyKpi(sfGmv, "AZN", "analytics"),
+      marketplaceRevenue: this.moneyKpi(mpCommission, "AZN", "finance"),
+      storefrontRevenue: this.moneyKpi(sfCommission, "AZN", "finance"),
       marketplaceOrders: this.simpleKpi(mpOrders, "orders"),
       storefrontOrders: this.simpleKpi(sfOrders, "orders"),
       marketplaceConversion: this.percentKpi(mpConversion, "analytics"),
