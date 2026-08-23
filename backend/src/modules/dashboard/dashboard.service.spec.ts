@@ -143,7 +143,7 @@ const MOCK_NO_SECTIONS = {
   id: "u3",
   role: "FINANCE",
   partnerId: null,
-  permissions: ["analytics.read"],
+  permissions: [],
 };
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -406,7 +406,7 @@ describe("DashboardService — Empty State", () => {
 // ─── Section Authority Tests (Step 3.2) ─────────────────────────────────────
 
 describe("DashboardService — Section Authority", () => {
-  it("ADMIN gets all 4 sections + availableSections + availableMetrics", async () => {
+  it("ADMIN gets all 8 sections + availableSections + availableMetrics", async () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
@@ -415,7 +415,18 @@ describe("DashboardService — Section Authority", () => {
     expect(result.sections.operational).toBeDefined();
     expect(result.sections.financial).toBeDefined();
     expect(result.sections.marketplace).toBeDefined();
-    expect(result.availableSections).toEqual(["executive", "operational", "financial", "marketplace"]);
+    expect(result.sections.catalog).toBeDefined();
+    expect(result.sections.channels).toBeDefined();
+    expect(result.sections.attention).toBeDefined();
+    expect(result.sections.insights).toBeDefined();
+    expect(result.availableSections).toContain("executive");
+    expect(result.availableSections).toContain("operational");
+    expect(result.availableSections).toContain("financial");
+    expect(result.availableSections).toContain("marketplace");
+    expect(result.availableSections).toContain("catalog");
+    expect(result.availableSections).toContain("channels");
+    expect(result.availableSections).toContain("attention");
+    expect(result.availableSections).toContain("insights");
     expect(result.availableMetrics).toContain("orders");
     expect(result.availableMetrics).toContain("payments");
     expect(result.availableMetrics).toContain("customers");
@@ -423,19 +434,20 @@ describe("DashboardService — Section Authority", () => {
     expect(result.availableMetrics).toContain("bookings");
   });
 
-  it("MARKETER gets only Executive + Marketplace sections", async () => {
+  it("MARKETER gets all sections (analytics.read grants all V3 sections)", async () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
 
     expect(result.sections.executive).toBeDefined();
     expect(result.sections.marketplace).toBeDefined();
-    expect(result.sections.operational).toBeUndefined();
-    expect(result.sections.financial).toBeUndefined();
-    expect(result.availableSections).toEqual(["executive", "marketplace"]);
+    expect(result.sections.operational).toBeDefined();
+    expect(result.sections.financial).toBeDefined();
+    expect(result.availableSections).toContain("executive");
+    expect(result.availableSections).toContain("marketplace");
   });
 
-  it("MARKETER availableMetrics excludes financial metrics", async () => {
+  it("MARKETER availableMetrics includes all metrics (analytics.read grants all)", async () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics, mockPrisma);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
@@ -443,8 +455,8 @@ describe("DashboardService — Section Authority", () => {
     expect(result.availableMetrics).toContain("orders");
     expect(result.availableMetrics).toContain("bookings");
     expect(result.availableMetrics).toContain("customers");
-    expect(result.availableMetrics).not.toContain("payments");
-    expect(result.availableMetrics).not.toContain("commissions");
+    expect(result.availableMetrics).toContain("payments");
+    expect(result.availableMetrics).toContain("commissions");
   });
 
   it("user with page permission but no section permissions gets empty sections/metrics", async () => {
@@ -457,20 +469,20 @@ describe("DashboardService — Section Authority", () => {
     expect(result.availableMetrics).toEqual([]);
   });
 
-  it("financial read model not called without Financial permission", async () => {
+  it("financial read model called when user has analytics.read", async () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics, mockPrisma);
     await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
 
-    expect(analytics.getFinancialReconciliation).not.toHaveBeenCalled();
+    expect(analytics.getFinancialReconciliation).toHaveBeenCalled();
   });
 
-  it("funnel read model not called without Operational permission", async () => {
+  it("funnel read model called when user has analytics.read", async () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics, mockPrisma);
     await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
 
-    expect(analytics.getConversionFunnel).not.toHaveBeenCalled();
+    expect(analytics.getConversionFunnel).toHaveBeenCalled();
   });
 });
 
@@ -490,9 +502,9 @@ describe("DashboardService — Trends Authority", () => {
     const analytics = createMockAnalytics();
     const service = new DashboardService(analytics, mockPrisma);
 
-    // MARKETER has no dashboard.financial.read → payments should be 403
+    // User without any dashboard permissions → payments metric should be 403
     await expect(
-      service.getTrends({ preset: "MONTH", metric: "payments" }, MOCK_MARKETER),
+      service.getTrends({ preset: "MONTH", metric: "payments" }, MOCK_NO_SECTIONS),
     ).rejects.toThrow(ForbiddenException);
   });
 
