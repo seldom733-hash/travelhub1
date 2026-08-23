@@ -117,10 +117,12 @@ export function SectionGrid({
     if (mapping) sectionPositions[mapping.section].push(wp);
   }
 
+  const V3_SECTIONS = new Set<DashboardSection>(["catalog", "channels", "attention", "insights"]);
+
   const hasSection = (section: DashboardSection) =>
     authorizedSections.includes(section) &&
     summary.sections[section] !== undefined &&
-    sectionPositions[section].length > 0;
+    (V3_SECTIONS.has(section) || sectionPositions[section].length > 0);
 
   /** Render KPI cards for a section, in position order. */
   function renderKpiCards(
@@ -245,17 +247,17 @@ export function SectionGrid({
 
       {/* ─── Catalog Health Section ────────────────────────────────── */}
       {hasSection("catalog") && summary.sections.catalog && (
-        <V3Section id="catalog" data={summary.sections.catalog} />
+        <V3Section id="catalog" data={summary.sections.catalog} locale={locale} />
       )}
 
       {/* ─── Channel Health Section ────────────────────────────────── */}
       {hasSection("channels") && summary.sections.channels && (
-        <V3Section id="channels" data={summary.sections.channels} />
+        <V3Section id="channels" data={summary.sections.channels} locale={locale} />
       )}
 
       {/* ─── Needs Attention Section ───────────────────────────────── */}
       {hasSection("attention") && summary.sections.attention && (
-        <V3Section id="attention" data={summary.sections.attention} />
+        <V3Section id="attention" data={summary.sections.attention} locale={locale} />
       )}
 
       {/* ─── AI Decision Feed Section ──────────────────────────────── */}
@@ -269,7 +271,7 @@ export function SectionGrid({
 // ─── V3 Generic Section ───────────────────────────────────────────────────
 
 /** Generic renderer for V3 KPI sections (catalog, channels, attention). */
-function V3Section({ id, data }: { id: string; data: Record<string, any> }) {
+function V3Section({ id, data, locale = "ru" }: { id: string; data: Record<string, any>; locale?: Locale }) {
   const meta = SECTION_META[id];
   if (!meta) return null;
   const entries = Object.entries(data).filter(([, v]) => v && typeof v === "object" && "current" in v);
@@ -278,7 +280,7 @@ function V3Section({ id, data }: { id: string; data: Record<string, any> }) {
   return (
     <section aria-labelledby={`section-${id}`}>
       <h2 id={`section-${id}`} className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
-        {meta.icon} {meta.titleKey.replace("cc.section.", "").replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+        {meta.icon} {t(meta.titleKey, locale)}
       </h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {entries.map(([key, val]) => {
