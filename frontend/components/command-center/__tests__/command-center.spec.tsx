@@ -44,7 +44,7 @@ function makeSummary(overrides: Partial<CommandCenterSummary["sections"]> = {}):
       executive: {
         gmv: makeKpi(100000, 90000, 10000, 11.1),
         revenue: makeKpi(25000, 22000, 3000, 13.6),
-        netRevenue: makeKpi(20000, 18000, 2000, 11.1),
+        refunds: makeKpi(500, 600, -100, -16.7),
         ordersCreated: makeKpi(500, 450, 50, 11.1),
         bookingsRequested: makeKpi(300, 280, 20, 7.1),
         averageOrderValue: makeKpi(50, 49, 1, 2.0),
@@ -278,7 +278,7 @@ describe("section visibility", () => {
       { widgetId: "revenue", x: 0, y: 0, w: 1, h: 1, visible: true },
       // gmv is NOT in positions (hidden/removed)
     ];
-    const sectionWidgetIds = ["gmv", "revenue", "net-revenue", "orders", "bookings", "aov", "conversion"];
+    const sectionWidgetIds = ["gmv", "revenue", "refunds", "orders", "bookings", "aov", "conversion"];
     const hasVisible = sectionWidgetIds.some((id) =>
       positions.some((p) => p.widgetId === id && p.visible)
     );
@@ -289,7 +289,7 @@ describe("section visibility", () => {
     const positions: WidgetPosition[] = [
       { widgetId: "gmv", x: 0, y: 0, w: 1, h: 1, visible: false },
     ];
-    const sectionWidgetIds = ["gmv", "revenue", "net-revenue", "orders", "bookings", "aov", "conversion"];
+    const sectionWidgetIds = ["gmv", "revenue", "refunds", "orders", "bookings", "aov", "conversion"];
     const hasVisible = sectionWidgetIds.some((id) =>
       positions.some((p) => p.widgetId === id && p.visible)
     );

@@ -20,6 +20,8 @@ export interface KpiValue {
   previous: number | null;
   delta: number | null;
   deltaPercent: number | null;
+  /** B.2: explicit platform reporting currency for monetary KPIs. */
+  currency?: string;
 }
 
 export interface CommandCenterSummary {
@@ -39,7 +41,7 @@ export interface CommandCenterSummary {
     executive?: {
       gmv: KpiValue;
       revenue: KpiValue;
-      netRevenue: KpiValue;
+      refunds: KpiValue;
       ordersCreated: KpiValue;
       bookingsRequested: KpiValue;
       averageOrderValue: KpiValue;
@@ -82,6 +84,29 @@ export interface CommandCenterSummary {
       storefrontConversion: KpiValue;
     };
     attention?: {
+      summary: {
+        open: number;
+        acknowledged: number;
+        total: number;
+        slaBreached: number;
+      };
+      signals: Array<{
+        id: string;
+        code: string;
+        title: string;
+        description: string;
+        category: string;
+        status: string;
+        affectedCount: number;
+        evidence: Array<{ key: string; value: string | number; unit?: string }>;
+        firstDetectedAt: string;
+        lastDetectedAt: string;
+        observationCount: number;
+        acknowledgedAt?: string;
+        resolvedAt?: string;
+        dismissedAt?: string;
+        availableActions: string[];
+      }>;
       pendingConfirmations: KpiValue;
       failedPayments: KpiValue;
       cancellations: KpiValue;

@@ -66,13 +66,26 @@ function sumDecimalString(
 }
 
 /**
- * Return the first (or only) currency from a currency map, or "0.00" if empty.
+ * PLATFORM REPORTING CURRENCY — single source of truth for aggregated KPIs.
+ * B.1 Remediation: all PLATFORM management KPIs use AZN.
+ */
+const PLATFORM_REPORTING_CURRENCY = "AZN";
+
+/**
+ * Return the platform reporting currency total from a currency map.
+ * Prefers PLATFORM_REPORTING_CURRENCY (AZN); falls back to first available.
+ * B.2: all Executive monetary KPIs must render in AZN.
  */
 function primaryCurrencyTotal(
   byCurrency: Record<string, string>,
 ): { total: string; currency: string } {
   const keys = Object.keys(byCurrency);
-  if (keys.length === 0) return { total: "0.00", currency: "USD" };
+  if (keys.length === 0) return { total: "0.00", currency: PLATFORM_REPORTING_CURRENCY };
+  // Prefer platform reporting currency
+  if (byCurrency[PLATFORM_REPORTING_CURRENCY] !== undefined) {
+    return { total: byCurrency[PLATFORM_REPORTING_CURRENCY], currency: PLATFORM_REPORTING_CURRENCY };
+  }
+  // Fallback: first available
   const cur = keys[0];
   return { total: byCurrency[cur], currency: cur };
 }
@@ -160,6 +173,10 @@ export interface CompanyKpiResponse {
     marketplaceCustomers: ComparisonValue<number>;
     storefrontCustomers: ComparisonValue<number>;
     averageOrderValue: ComparisonValue<string>;
+    refunds: ComparisonValue<string>;
+    refundsCurrency: string;
+    gmvCurrency: string;
+    revenueCurrency: string;
   };
   attribution?: {
     actionFields: string[];
@@ -563,6 +580,14 @@ export class AnalyticsService {
         marketplaceCustomers: this.compareValues(marketplaceCustomersCount, null),
         storefrontCustomers: this.compareValues(storefrontCustomersCount, null),
         averageOrderValue: this.compareDecimalValues(aov.total, null),
+        // B.2: Refunds as monetary sum (replaces false Net Revenue)
+        refunds: this.compareDecimalValues(
+          primaryCurrencyTotal(refundByCurrency).total,
+          null,
+        ),
+        refundsCurrency: primaryCurrencyTotal(refundByCurrency).currency,
+        gmvCurrency: gmv.currency,
+        revenueCurrency: revenue.currency,
       },
       attribution: {
         actionFields: [
@@ -1057,7 +1082,10 @@ export class AnalyticsService {
       ...Object.keys(commissionByCurrency),
     ]);
     const sortedCurrencies = [...allCurrencies].sort();
-    const primaryCur = sortedCurrencies[0] || "USD";
+    // B.2 Remediation: prefer PLATFORM_REPORTING_CURRENCY (AZN)
+    const primaryCur = allCurrencies.has(PLATFORM_REPORTING_CURRENCY)
+      ? PLATFORM_REPORTING_CURRENCY
+      : sortedCurrencies[0] || PLATFORM_REPORTING_CURRENCY;
 
     // Build per-currency reconciliation entries
     const currencies: CurrencyReconciliation[] = sortedCurrencies.map((cur) => ({

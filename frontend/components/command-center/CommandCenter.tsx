@@ -40,7 +40,7 @@ function isValidPreset(v: string): v is PeriodPreset {
 
 /** Known Command Center widget IDs — used for layout fallback. */
 const ALL_CC_WIDGET_IDS = [
-  "gmv", "revenue", "net-revenue", "orders", "bookings", "aov", "conversion",
+  "gmv", "revenue", "refunds", "orders", "bookings", "aov", "conversion",
   "orders-trend", "bookings-trend", "revenue-trend",
   "funnel",
   "commission", "reconciliation", "payments", "net-payments",

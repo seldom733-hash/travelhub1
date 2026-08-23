@@ -25,6 +25,14 @@ import {
 import { AnalyticsGranularity } from "../analytics/analytics-granularity.resolver";
 import { resolvePeriod } from "../analytics/analytics-period.resolver";
 import { PrismaService } from "../../prisma/prisma.service";
+import { DecisionSignalService } from "./decision-signal.service";
+import type { DecisionSignalDetector } from "./decision-signal.types";
+import { PendingBookingsDetector } from "./detectors/pending-bookings.detector";
+import { FailedPaymentsDetector } from "./detectors/failed-payments.detector";
+import { RecentCancellationsDetector } from "./detectors/recent-cancellations.detector";
+import { PendingRefundsDetector } from "./detectors/pending-refunds.detector";
+import { UpcomingBookingsDetector } from "./detectors/upcoming-bookings.detector";
+import { ServicesWithoutSalesDetector } from "./detectors/services-without-sales.detector";
 
 // ─── DTOs ───────────────────────────────────────────────────────────────────
 
@@ -81,6 +89,7 @@ export interface KpiValue {
   previous: string | number | null;
   delta: string | number | null;
   deltaPercent: number | null;
+  /** B.2: explicit platform reporting currency (AZN) for monetary KPIs. */
   drillDown?: { target: string; query?: Record<string, string> };
 }
 
@@ -105,6 +114,30 @@ export interface ChannelHealthResponse {
 }
 
 export interface NeedsAttentionResponse {
+  summary: {
+    open: number;
+    acknowledged: number;
+    total: number;
+    slaBreached: number;
+  };
+  signals: Array<{
+    id: string;
+    code: string;
+    title: string;
+    description: string;
+    category: string;
+    status: string;
+    affectedCount: number;
+    evidence: Array<{ key: string; value: string | number; unit?: string }>;
+    firstDetectedAt: string;
+    lastDetectedAt: string;
+    observationCount: number;
+    acknowledgedAt?: string;
+    resolvedAt?: string;
+    dismissedAt?: string;
+    availableActions: string[];
+  }>;
+  // Legacy counters — derived from signals for backward compat
   pendingConfirmations: KpiValue;
   failedPayments: KpiValue;
   cancellations: KpiValue;
@@ -136,7 +169,7 @@ export interface CommandCenterResponse {
     executive?: {
       gmv: KpiValue;
       revenue: KpiValue;
-      netRevenue: KpiValue;
+      refunds: KpiValue;
       ordersCreated: KpiValue;
       bookingsRequested: KpiValue;
       averageOrderValue: KpiValue;
@@ -197,10 +230,23 @@ export interface TrendResponse {
 
 @Injectable()
 export class DashboardService {
+  private readonly detectors: DecisionSignalDetector[];
+
   constructor(
     private readonly analyticsService: AnalyticsService,
     private readonly prisma: PrismaService,
-  ) {}
+    private readonly decisionSignalService: DecisionSignalService,
+  ) {
+    // Instantiate detectors internally (no DI needed for optional params)
+    this.detectors = [
+      new PendingBookingsDetector(prisma),
+      new FailedPaymentsDetector(prisma),
+      new RecentCancellationsDetector(prisma),
+      new PendingRefundsDetector(prisma),
+      new UpcomingBookingsDetector(prisma),
+      new ServicesWithoutSalesDetector(prisma),
+    ];
+  }
 
   /**
    * GET /api/v1/dashboard/command-center
@@ -474,54 +520,142 @@ export class DashboardService {
 
   // ─── V3: Needs Attention ────────────────────────────────────────────────
 
+  /** Signal code → human-readable title mapping */
+  private static readonly SIGNAL_TITLES: Record<string, string> = {
+    BOOKING_CONFIRMATION_DELAY: "Задержка подтверждения бронирований",
+    FAILED_PAYMENTS: "Неуспешные платежи",
+    RECENT_CANCELLATIONS: "Недавние отмены заказов",
+    PENDING_REFUNDS: "Ожидают обработки возвраты",
+    UPCOMING_BOOKINGS: "Предстоящие бронирования",
+    SERVICES_WITHOUT_SALES: "Услуги без продаж",
+  };
+
+  /** Signal code → factual description template */
+  private static readonly SIGNAL_DESCRIPTIONS: Record<string, (evidence: any[]) => string> = {
+    BOOKING_CONFIRMATION_DELAY: (e) => {
+      const count = e.find((x: any) => x.key === "pendingConfirmationCount");
+      const min = e.find((x: any) => x.key === "oldestPendingMinutes");
+      return `${count?.value ?? 0} бронирований等待确认，最老ое ${(min?.value ?? 0)} мин. назад`;
+    },
+    FAILED_PAYMENTS: (e) => {
+      const count = e.find((x: any) => x.key === "failedCount");
+      return `${count?.value ?? 0} неуспешных платежей`;
+    },
+    RECENT_CANCELLATIONS: (e) => {
+      const count = e.find((x: any) => x.key === "cancellationCount");
+      return `${count?.value ?? 0} отмен за последние 7 дней`;
+    },
+    PENDING_REFUNDS: (e) => {
+      const count = e.find((x: any) => x.key === "pendingRefundCount");
+      return `${count?.value ?? 0} возвратов ожидают обработки`;
+    },
+    UPCOMING_BOOKINGS: (e) => {
+      const count = e.find((x: any) => x.key === "upcomingCount");
+      const days = e.find((x: any) => x.key === "daysUntilNearest");
+      return `${count?.value ?? 0} бронирований, ближайшее через ${days?.value ?? 0} дн.`;
+    },
+    SERVICES_WITHOUT_SALES: (e) => {
+      const count = e.find((x: any) => x.key === "unsoldProductCount");
+      return `${count?.value ?? 0} опубликованных услуг без заказов`;
+    },
+  };
+
   private async buildNeedsAttention(): Promise<NeedsAttentionResponse> {
-    const [
-      pendingConfirmations,
-      failedPayments,
-      recentCancellations,
-      pendingRefunds,
-      upcomingBookings,
-      servicesWithoutSales,
-    ] = await Promise.all([
-      // Orders waiting for confirmation (SENT_TO_BOOKING)
-      this.prisma.order.count({ where: { status: "SENT_TO_BOOKING" as any } }),
-      // Failed payments
-      this.prisma.$queryRawUnsafe<{ count: bigint }[]>(`
-        SELECT count(*) as count FROM "finance"."Payment" p
-        WHERE p.status = 'FAILED'::"finance"."PaymentStatus"
-      `).then(r => Number(r[0]?.count ?? 0)),
-      // Recent cancellations (last 7 days)
-      this.prisma.$queryRawUnsafe<{ count: bigint }[]>(`
-        SELECT count(*) as count FROM "order"."Order" o
-        WHERE o.status = 'CANCELLED'::"order"."OrderStatus"
-          AND o."createdAt" > NOW() - INTERVAL '7 days'
-      `).then(r => Number(r[0]?.count ?? 0)),
-      // Pending refunds
-      this.prisma.$queryRawUnsafe<{ count: bigint }[]>(`
-        SELECT count(*) as count FROM "finance"."Refund" r
-        WHERE r.status = 'REQUESTED'::"finance"."RefundStatus"
-      `).then(r => Number(r[0]?.count ?? 0)),
-      // Upcoming bookings (service date in future)
-      this.prisma.$queryRawUnsafe<{ count: bigint }[]>(`
-        SELECT count(*) as count FROM "booking"."Booking" b
-        WHERE b.status IN ('CONFIRMED'::"booking"."BookingStatus", 'NEW'::"booking"."BookingStatus")
-          AND b."serviceDate" > NOW()
-      `).then(r => Number(r[0]?.count ?? 0)),
-      // Published services without any orders
-      this.prisma.$queryRawUnsafe<{ count: bigint }[]>(`
-        SELECT count(*) as count FROM "catalog"."Product" p
-        WHERE p.status = 'PUBLISHED'::"catalog"."ProductStatus"
-          AND NOT EXISTS (SELECT 1 FROM "order"."OrderItem" oi WHERE oi."productId" = p.id)
-      `).then(r => Number(r[0]?.count ?? 0)),
+    // Run all detectors to populate/update DecisionSignals
+    await this.decisionSignalService.runDetectors(this.detectors);
+
+    // Query active signals (OPEN + ACKNOWLEDGED) for the queue
+    const activeSignals = await (this.prisma as any).decisionSignal.findMany({
+      where: { status: { in: ["OPEN", "ACKNOWLEDGED"] } },
+      orderBy: [{ status: "asc" }, { lastDetectedAt: "desc" }],
+      take: 100,
+    });
+
+    // Query counts for summary
+    const [openCount, ackCount, totalActive] = await Promise.all([
+      (this.prisma as any).decisionSignal.count({ where: { status: "OPEN" } }),
+      (this.prisma as any).decisionSignal.count({ where: { status: "ACKNOWLEDGED" } }),
+      (this.prisma as any).decisionSignal.count({ where: { status: { in: ["OPEN", "ACKNOWLEDGED"] } } }),
     ]);
 
+    // SLA breached = signals where oldest pending > 4 hours (240 min)
+    const slaThreshold = new Date(Date.now() - 240 * 60 * 1000);
+    const slaBreached = activeSignals.filter(
+      (s: any) => s.status === "OPEN" && new Date(s.firstDetectedAt) < slaThreshold,
+    ).length;
+
+    // Build queue items from signals
+    const queueSignals = activeSignals.map((s: any) => {
+      const evidence = (s.evidence as any[]) ?? [];
+      const title = DashboardService.SIGNAL_TITLES[s.code] ?? s.code;
+      const descFn = DashboardService.SIGNAL_DESCRIPTIONS[s.code];
+      const description = descFn ? descFn(evidence) : s.code;
+
+      const affectedEntities = (s.affectedEntities as any[]) ?? [];
+      const availableActions: string[] = [];
+      if (s.status === "OPEN") {
+        availableActions.push("acknowledge", "resolve", "dismiss");
+      } else if (s.status === "ACKNOWLEDGED") {
+        availableActions.push("resolve");
+      }
+
+      return {
+        id: s.id,
+        code: s.code,
+        title,
+        description,
+        category: s.category,
+        status: s.status,
+        affectedCount: affectedEntities.length,
+        evidence: evidence.map((e: any) => ({
+          key: e.key,
+          value: e.value,
+          unit: e.unit,
+        })),
+        firstDetectedAt: s.firstDetectedAt?.toISOString?.() ?? s.firstDetectedAt,
+        lastDetectedAt: s.lastDetectedAt?.toISOString?.() ?? s.lastDetectedAt,
+        observationCount: s.observationCount,
+        acknowledgedAt: s.acknowledgedAt?.toISOString?.() ?? s.acknowledgedAt,
+        resolvedAt: s.resolvedAt?.toISOString?.() ?? s.resolvedAt,
+        dismissedAt: s.dismissedAt?.toISOString?.() ?? s.dismissedAt,
+        availableActions,
+      };
+    });
+
+    // Derive legacy counters from signals for backward compatibility
+    const findCounter = (code: string) => {
+      const signal = queueSignals.find((s: any) => s.code === code);
+      return signal?.affectedCount ?? 0;
+    };
+
+    // Also check resolved/dismissed for complete counters
+    const allSignals = await (this.prisma as any).decisionSignal.findMany({
+      where: { status: { in: ["OPEN", "ACKNOWLEDGED", "RESOLVED", "DISMISSED"] } },
+      select: { code: true, status: true, affectedEntities: true },
+    });
+
+    const totalByCode = (code: string) => {
+      const matching = allSignals.filter((s: any) => s.code === code);
+      return matching.reduce((sum: number, s: any) => {
+        const entities = (s.affectedEntities as any[]) ?? [];
+        return sum + entities.length;
+      }, 0);
+    };
+
     return {
-      pendingConfirmations: this.simpleKpi(pendingConfirmations, "orders"),
-      failedPayments: this.simpleKpi(failedPayments, "finance"),
-      cancellations: this.simpleKpi(recentCancellations, "orders"),
-      pendingRefunds: this.simpleKpi(pendingRefunds, "finance"),
-      upcomingBookings: this.simpleKpi(upcomingBookings, "bookings"),
-      servicesWithoutSales: this.simpleKpi(servicesWithoutSales, "analytics"),
+      summary: {
+        open: openCount,
+        acknowledged: ackCount,
+        total: totalActive,
+        slaBreached,
+      },
+      signals: queueSignals,
+      pendingConfirmations: this.simpleKpi(findCounter("BOOKING_CONFIRMATION_DELAY"), "orders"),
+      failedPayments: this.simpleKpi(findCounter("FAILED_PAYMENTS"), "finance"),
+      cancellations: this.simpleKpi(findCounter("RECENT_CANCELLATIONS"), "orders"),
+      pendingRefunds: this.simpleKpi(findCounter("PENDING_REFUNDS"), "finance"),
+      upcomingBookings: this.simpleKpi(findCounter("UPCOMING_BOOKINGS"), "bookings"),
+      servicesWithoutSales: this.simpleKpi(findCounter("SERVICES_WITHOUT_SALES"), "analytics"),
     };
   }
 
@@ -628,12 +762,14 @@ export class DashboardService {
   private toKpiValue<T extends string | number>(
     comparisonValue: { current: T; previous: T | null; delta: T | null; deltaPercent: number | null },
     drillDownTarget: string,
+    currency?: string,
   ): KpiValue {
     return {
       current: comparisonValue.current,
       previous: comparisonValue.previous,
       delta: comparisonValue.delta,
       deltaPercent: comparisonValue.deltaPercent,
+      currency,
       drillDown: { target: drillDownTarget },
     };
   }
@@ -722,12 +858,12 @@ export class DashboardService {
   private buildExecutiveSection(kpi: CompanyKpiResponse) {
     const m = kpi.metrics;
     return {
-      gmv: this.toKpiValue(m.gmv, "analytics"),
-      revenue: this.toKpiValue(m.revenue, "analytics"),
-      netRevenue: this.toKpiValue(m.netRevenue, "analytics"),
+      gmv: this.toKpiValue(m.gmv, "analytics", m.gmvCurrency),
+      revenue: this.toKpiValue(m.revenue, "analytics", m.revenueCurrency),
+      refunds: this.toKpiValue(m.refunds, "finance", m.refundsCurrency),
       ordersCreated: this.toKpiValue(m.ordersCreated, "orders"),
       bookingsRequested: this.toKpiValue(m.bookingsRequested, "bookings"),
-      averageOrderValue: this.toKpiValue(m.averageOrderValue, "analytics"),
+      averageOrderValue: this.toKpiValue(m.averageOrderValue, "analytics", m.gmvCurrency),
       conversionRate: this.computeConversionRate(m.paymentsCaptured, m.ordersCreated),
     };
   }
@@ -752,7 +888,7 @@ export class DashboardService {
     reconciliation: FinancialReconciliationResponse,
   ) {
     return {
-      commissionAccrued: this.toKpiValue(kpi.metrics.commissionAccrued, "finance"),
+      commissionAccrued: this.toKpiValue(kpi.metrics.commissionAccrued, "finance", kpi.metrics.revenueCurrency),
       reconciliationStatus: {
         current: reconciliation.totalLedgerEntries,
         previous: null,

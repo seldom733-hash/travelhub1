@@ -18,7 +18,11 @@ import { PrismaService } from "../../prisma/prisma.service";
 @Module({
   imports: [AnalyticsModule],
   controllers: [DashboardController, DecisionSignalController],
-  providers: [DashboardService, DecisionSignalService, PrismaService],
+  providers: [
+    PrismaService,
+    DecisionSignalService,
+    DashboardService,
+  ],
   exports: [DashboardService, DecisionSignalService],
 })
 export class DashboardModule {}

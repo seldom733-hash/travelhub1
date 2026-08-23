@@ -141,7 +141,12 @@ export class DecisionSignalService {
     }
     where.category = { in: allowedCategories };
 
-    if (query.status) where.status = query.status;
+    if (query.statuses) {
+      const statusList = query.statuses.split(",").map((s) => s.trim()).filter(Boolean);
+      where.status = { in: statusList };
+    } else if (query.status) {
+      where.status = query.status;
+    }
     if (query.category) {
       // User can filter further within their allowed set
       if (!allowedCategories.includes(query.category)) {

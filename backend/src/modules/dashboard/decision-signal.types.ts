@@ -54,6 +54,8 @@ export interface DecisionSignalResponse {
 
 export interface SignalListQuery {
   status?: SignalLifecycleStatus;
+  /** Comma-separated multi-status filter, e.g. "OPEN,ACKNOWLEDGED" */
+  statuses?: string;
   category?: SignalCategory;
   code?: string;
   page?: number;

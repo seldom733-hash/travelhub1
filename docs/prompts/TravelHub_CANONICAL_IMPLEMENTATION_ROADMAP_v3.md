@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-19 (Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E Global Workspace Constructor Foundation ✅ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW; Step 2.17C ✅ STRICT REVIEW COMPLETED — APPROVED; Service Templates decision gates DD-024…DD-029 RESOLVED; Universal Pricing Model Amendment INTEGRATED — docs/architecture/universal-pricing-model.md; Canonical Roadmap Gap & Status Reconciliation Audit COMPLETED 2026-08-12 — статусы 1.12.3/1.18/1.18A/2.0/2.6 синхронизированы; Step 2.7 ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES; Step 2.8 ✅ STRICT REVIEW COMPLETED — APPROVED; Step 2.8A ✅ STRICT REVIEW COMPLETED — APPROVED; Step 2.9 ◀ IMPLEMENTATION COMPLETED — WAITING FOR STRICT REVIEW (2026-08-13))\
+**Дата актуализации:** 2026-08-24 (Phase 3 Reconciliation — VERDICT A; Step 3.2 ✅ DEPLOYED — 8-section model; Decision Intelligence Stages A–B.2 ✅ FULLY CLOSED; Stage C ✅ VERDICT A — COMPLETE; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Service Templates DD-024…DD-029 RESOLVED; Universal Pricing Integrated; Canonical Roadmap Reconciliation COMPLETED 2026-08-24 — all Phase 3 history verified; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -782,8 +782,34 @@ balance, settlement reconciliation, temporal integrity.
 · **Step 3.1 --- Dashboard / Command Center Backend** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-19; aggregated KPI/read models без владения operational entities; Command Center + Trends endpoints; 21 KPI across executive/operational/financial/marketplace sections; RBAC analytics.read; e2e dashboard-command-center 9/9; unit 921/921; frontend 150/150; backend tsc/build PASS; migrate 59/59 drift 0; отчёт — `docs/prompts/PHASE_3_STEP_3.1_DASHBOARD_COMMAND_CENTER_BACKEND_STRICT_REVIEW_REPORT.md`; NEXT = REPOSITORY-FIRST PHASE 3 SEQUENCING AFTER STEP 3.1 APPROVAL).
 Aggregated KPI/read models без владения operational entities.
 
-· **Step 3.2 --- Dashboard UI**\
+· **Step 3.2 --- Dashboard UI** ✅ IMPLEMENTATION COMPLETED — 8-SECTION MODEL DEPLOYED (2026-08-24; Stage A server-side section authority + RBAC + granular section permissions + V3 8-section model + storefront revenue + i18n + CI stabilization — 6 remediation rounds; Decision Intelligence stages A–B.2 built on top; отчёт — `docs/prompts/PHASE_3_STEP_3.2_STAGE_A_SERVER_SIDE_SECTION_AUTHORITY_IMPLEMENTATION_REPORT.md`, `docs/prompts/PHASE_3_STEP_3.2_STAGE_B_PLATFORM_COMMAND_CENTER_UI_IMPLEMENTATION_REPORT.md`; runtime evidence — 7×₼, 0×$; NEXT = Decision Intelligence Stage C).\
 KPI, alerts, queues, shortcuts, AI insights.
+
+## Decision Intelligence — Command Center
+
+· **Stage A --- RBAC Remediation** ✅ VERDICT A — COMPLETE (2026-08-24; 8 granular section permissions: `dashboard.executive.read`, `dashboard.operational.read`, `dashboard.financial.read`, `dashboard.marketplace.read`, `dashboard.catalog.read`, `dashboard.channels.read`, `dashboard.attention.read`, `dashboard.insights.read`; migration + e2e; отчёт — `docs/prompts/PHASE_3_COMMAND_CENTER_DECISION_INTELLIGENCE_STAGE_A_RBAC_REMEDIATION_REPORT.md`; commits `1cbb9e3` (report), `13aa5ea` (code)).
+
+· **Stage B --- Decision Signal Foundation** ✅ VERDICT A — COMPLETE (2026-08-24; `DecisionSignal` entity with lifecycle, dedup, RBAC-aware list/get; `PendingBookingsDetector`; `decision-signals` API; отчёт — `docs/prompts/PHASE_3_COMMAND_CENTER_DECISION_INTELLIGENCE_STAGE_B_DECISION_SIGNAL_FOUNDATION_REPORT.md`; commit `1ce1eb4`).
+
+· **Stage B.1 --- Business Model & Financial Metrics Authority Reconciliation** ✅ FULLY CLOSED (3 sub-stages: B.1 Original → VERDICT B; B.1 Remediation → VERDICT A; B.1 Policy Closure — Refund Commission Reversal → VERDICT A; authoritative decisions: ADR-PLATFORM-BUSINESS-PERSPECTIVE-SEPARATION §1–§17; reports — `docs/prompts/PHASE_3_STAGE_B1_BUSINESS_MODEL_FINANCIAL_METRICS_AUTHORITY_RECONCILIATION_REPORT.md`, `docs/prompts/PHASE_3_STAGE_B1_REMEDIATION_REPORT.md`, `docs/prompts/PHASE_3_STAGE_B1_POLICY_CLOSURE_REFUND_COMMISSION_REVERSAL_REPORT.md`).
+
+· **Stage B.2 --- Executive Financial KPI Semantic Hotfix** ✅ FULLY CLOSED (2 sub-stages: B.2 Initial → VERDICT A reported → runtime acceptance FAILED; B.2 Remediation — Runtime AZN Currency Authority Closure → VERDICT A; runtime evidence — 7×₼, 0×$; reports — `docs/prompts/PHASE_3_STAGE_B2_EXECUTIVE_FINANCIAL_KPI_SEMANTIC_HOTFIX_REPORT.md`, `docs/prompts/PHASE_3_STAGE_B2_REMEDIATION_RUNTIME_AZN_CURRENCY_AUTHORITY_CLOSURE_REPORT.md`).
+
+· **Stage C --- Needs Attention → Decision Queue** ✅ VERDICT A — COMPLETE (2026-08-24; 6 detectors (PendingBookings, FailedPayments, RecentCancellations, PendingRefunds, UpcomingBookings, ServicesWithoutSales); DecisionQueue UI with lifecycle actions (acknowledge/resolve/dismiss); Active/History filter tabs; human-readable signal titles (RU/AZ/EN); structured evidence display; multi-status API filter; RBAC server-side; 7×₼, 0×$ runtime evidence; tests 50 backend + 213 frontend; report — `docs/prompts/PHASE_3_STAGE_C_NEEDS_ATTENTION_DECISION_QUEUE_IMPLEMENTATION_REPORT.md`).
+
+· **Stage D --- WHY Attribution (Deterministic)** ⏳ NOT STARTED (Dependencies: Stage B; scope: evidence-based, non-hallucinatory WHY attribution from structured domain facts).
+
+· **Stage E --- Impact Scoring** ⏳ NOT STARTED (Dependencies: Stage D; scope: business impact importance scoring without hardcoded pseudo-economics).
+
+· **Stage F --- Action Routing** ⏳ NOT STARTED (Dependencies: Stage C; scope: what should user do, who owns action, deep links, workflow routing, permission-aware).
+
+· **Stage G --- AI Decision Feed Reconciliation** ⏳ NOT STARTED (Dependencies: Stage D, Stage E; scope: remove hardcoded feed logic, use DecisionSignal/evidence, WHY/IMPACT integration).
+
+· **Stage H --- Executive/Operational/Financial Decision Enrichment** ⏳ NOT STARTED (Dependencies: Stage C, Stage D, Stage E; scope: Expected/Collected/Outstanding Revenue, Revenue Mix, broader financial management beyond B.2 hotfix; B.2 ≠ final financial architecture).
+
+· **Stage I --- Storefront Revenue Semantic Fix** ⏳ NOT STARTED (Dependencies: Stage H (partial), Step 3.29D (billing engine); scope: priceUsd migration, AZN billing, MRR/ARR semantics, dynamic pricing; List Price ≠ Contracted Price).
+
+· **Stage J --- Regression / Security / Evidence Closure** ⏳ NOT STARTED (Dependencies: all previous stages; scope: full regression, security, financial invariants, Decision Intelligence, runtime/browser evidence, documentation consistency).
 
 · **Step 3.3 --- Analytics Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-19; period/comparison/granularity resolvers, Company KPI/Partner Performance/Conversion Funnel/Time Series read models, AnalyticsController with RBAC; unit 853/853, frontend 135/135, migrate 58/58, artifact PASS=163; FINAL STRICT RE-REVIEW APPROVED — 0 defects; отчёт — `docs/prompts/PHASE_3_STEP_3.3_ANALYTICS_FOUNDATION_FINAL_STRICT_RE_REVIEW_REPORT.md`; NEXT = REPOSITORY-FIRST PHASE 3 SEQUENCING AFTER STEP 3.3 APPROVAL).
 Metrics, dimensions, aggregation/read models.

@@ -107,7 +107,7 @@ export const PAGE_REGISTRY: PageDefinition[] = [
     defaultWidgets: [
       "gmv",
       "revenue",
-      "net-revenue",
+      "refunds",
       "orders",
       "bookings",
       "aov",
@@ -135,7 +135,7 @@ export const PAGE_REGISTRY: PageDefinition[] = [
       ADMIN: [
         "gmv",
         "revenue",
-        "net-revenue",
+        "refunds",
         "orders",
         "bookings",
         "aov",
@@ -160,7 +160,7 @@ export const PAGE_REGISTRY: PageDefinition[] = [
       DIRECTOR: [
         "gmv",
         "revenue",
-        "net-revenue",
+        "refunds",
         "orders",
         "bookings",
         "aov",
@@ -185,7 +185,7 @@ export const PAGE_REGISTRY: PageDefinition[] = [
       ANALYST: [
         "gmv",
         "revenue",
-        "net-revenue",
+        "refunds",
         "orders",
         "bookings",
         "aov",
@@ -210,7 +210,7 @@ export const PAGE_REGISTRY: PageDefinition[] = [
       MARKETER: [
         "gmv",
         "revenue",
-        "net-revenue",
+        "refunds",
         "orders",
         "bookings",
         "aov",
@@ -323,7 +323,7 @@ export const WIDGET_REGISTRY: WidgetDefinition[] = [
     version: 1,
   },
   {
-    widgetId: "net-revenue",
+    widgetId: "refunds",
     pageIds: ["command-center"],
     type: "kpi-card",
     category: "KPI",

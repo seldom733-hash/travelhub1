@@ -23,7 +23,7 @@ import {
   DismissSignalDto,
 } from "./decision-signal.types";
 
-@Controller("api/v1/dashboard/decision-signals")
+@Controller("dashboard/decision-signals")
 @RequirePermissions("analytics.read")
 export class DecisionSignalController {
   constructor(private readonly signalService: DecisionSignalService) {}

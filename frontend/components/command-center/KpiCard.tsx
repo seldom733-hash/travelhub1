@@ -11,12 +11,24 @@ interface Props {
   positiveIsUp?: boolean;
 }
 
+/** Currency symbol map — Intl.NumberFormat lacks ₼ for AZN in Chromium. */
+const CURRENCY_SYMBOL: Record<string, string> = { AZN: "\u20bc", USD: "$", EUR: "\u20ac" };
+
 function formatValue(v: number | null, format: string, currency: string): string {
   if (v === null || v === undefined) return "—";
   if (format === "currency") {
+    // B.2 Remediation: PLATFORM REPORTING CURRENCY = AZN
+    // Intl.NumberFormat returns "AZN" instead of "₼" — use explicit symbol
+    const sym = CURRENCY_SYMBOL[currency];
+    if (sym) {
+      return new Intl.NumberFormat("ru-RU", {
+        style: "decimal",
+        maximumFractionDigits: 0,
+      }).format(v) + " " + sym;
+    }
     return new Intl.NumberFormat("ru-RU", {
       style: "currency",
-      currency: currency || "USD",
+      currency: currency || "AZN",
       maximumFractionDigits: 0,
     }).format(v);
   }
@@ -30,8 +42,11 @@ function formatValue(v: number | null, format: string, currency: string): string
   return new Intl.NumberFormat("ru-RU").format(v);
 }
 
-export function KpiCard({ title, value, format = "number", currency = "USD", positiveIsUp = true }: Props) {
-  const formatted = formatValue(value.current, format, currency);
+export function KpiCard({ title, value, format = "number", currency = "AZN", positiveIsUp = true }: Props) {
+  // B.2: prefer currency from KpiValue (backend-reported) over prop default
+  // B.2 Remediation: PLATFORM REPORTING CURRENCY = AZN
+  const effectiveCurrency = value.currency || currency;
+  const formatted = formatValue(value.current, format, effectiveCurrency);
   const hasDelta = value.deltaPercent !== null && value.deltaPercent !== undefined;
 
   // Determine polarity

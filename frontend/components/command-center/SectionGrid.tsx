@@ -5,13 +5,14 @@ import { type WidgetDefinition, type WidgetPosition } from "@/lib/workspace-api"
 import { t, type Locale } from "@/lib/i18n";
 import { KpiCard } from "./KpiCard";
 import { TrendWidget } from "./TrendWidget";
+import { DecisionQueue } from "./DecisionQueue";
 
 /** KPI field mapping: widgetId → section + field name + format. */
 const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; format?: "currency" | "percent" | "number" }> = {
   // ─── Executive ──────────────────────────────────────────────────
   "gmv":              { section: "executive", field: "gmv", format: "currency" },
   "revenue":          { section: "executive", field: "revenue", format: "currency" },
-  "net-revenue":      { section: "executive", field: "netRevenue", format: "currency" },
+  "refunds":          { section: "executive", field: "refunds", format: "currency" },
   "orders":           { section: "executive", field: "ordersCreated" },
   "bookings":         { section: "executive", field: "bookingsRequested" },
   "aov":              { section: "executive", field: "averageOrderValue", format: "currency" },
@@ -260,9 +261,21 @@ export function SectionGrid({
         <V3Section id="channels" data={summary.sections.channels} locale={locale} />
       )}
 
-      {/* ─── Needs Attention Section ───────────────────────────────── */}
+      {/* ─── Needs Attention → Decision Queue ──────────────────────── */}
       {hasSection("attention") && summary.sections.attention && (
-        <V3Section id="attention" data={summary.sections.attention} locale={locale} />
+        <DecisionQueue
+          signals={summary.sections.attention.signals ?? []}
+          summary={summary.sections.attention.summary ?? { open: 0, acknowledged: 0, total: 0, slaBreached: 0 }}
+          locale={locale}
+          onAction={async (signalId, action) => {
+            const res = await fetch(`/api/v1/dashboard/decision-signals/${signalId}/${action}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+            });
+            if (!res.ok) throw new Error(`Action failed: ${res.status}`);
+          }}
+        />
       )}
 
       {/* ─── AI Decision Feed Section ──────────────────────────────── */}
