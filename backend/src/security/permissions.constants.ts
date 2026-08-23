@@ -212,11 +212,15 @@ export const PERMISSIONS = {
 
   // ── Dashboard / Command Center (Step 3.2, server-side section authority) ──
   // Section-level permissions: page gate = analytics.read;
-  // section data authorized via these permissions.
+  // section data authorized via these independent granular permissions.
   "dashboard.executive.read": "Чтение Executive KPIs (GMV, Revenue, Orders, Bookings, AOV, Conversion)",
   "dashboard.operational.read": "Чтение Operational KPIs (Orders Fulfilled, Bookings Confirmed, Funnel)",
   "dashboard.financial.read": "Чтение Financial KPIs (Commission, Reconciliation, Payments)",
   "dashboard.marketplace.read": "Чтение Marketplace KPIs (Sessions, Partners, Customers)",
+  "dashboard.catalog.read": "Чтение Catalog Health (Published, Archived, Without Sales, High Demand, Low Conversion)",
+  "dashboard.channels.read": "Чтение Channel Health (Marketplace/Storefront GMV, Revenue, Orders, Conversion)",
+  "dashboard.attention.read": "Чтение Needs Attention (Pending Confirmations, Failed Payments, Cancellations, Refunds)",
+  "dashboard.insights.read": "Чтение AI Decision Feed (Risks, Opportunities, Catalog Insights)",
   "dashboard.customize": "Настройка layout Command Center (save/reset) — не расширяет доступ к данным",
 } as const;
 
@@ -266,11 +270,15 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "partner.onboarding.review",
     // Step 1.16: DIRECTOR читает communications (cross-domain контекст).
     "communication.read",
-    // Step 3.2: Command Center section authority — DIRECTOR получает все секции.
+    // Step 3.2: Command Center section authority — DIRECTOR получает все 8 секций.
     "dashboard.executive.read",
     "dashboard.operational.read",
     "dashboard.financial.read",
     "dashboard.marketplace.read",
+    "dashboard.catalog.read",
+    "dashboard.channels.read",
+    "dashboard.attention.read",
+    "dashboard.insights.read",
     "dashboard.customize",
   ],
 
@@ -312,6 +320,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "documents.read",
     "settings.read",
     "audit.read",
+    // Step 3.2: FINANCE — Executive + Financial + Attention (payment/refund risks).
+    "dashboard.executive.read",
+    "dashboard.financial.read",
+    "dashboard.attention.read",
   ],
 
   MARKETER: [
@@ -328,9 +340,12 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "analytics.read",
     "reports.read",
     "settings.read",
-    // Step 3.2: Command Center section authority — MARKETER получает Executive + Marketplace.
+    // Step 3.2: Command Center section authority — MARKETER получает Executive + Marketplace + Catalog + Channels + Insights.
     "dashboard.executive.read",
     "dashboard.marketplace.read",
+    "dashboard.catalog.read",
+    "dashboard.channels.read",
+    "dashboard.insights.read",
     "dashboard.customize",
   ],
 
@@ -363,11 +378,12 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "audit.read",
     "analytics.read",
     "reports.read",
-    // Step 3.2: Command Center section authority — ANALYST получает все секции.
+    // Step 3.2: Command Center section authority — ANALYST получает Executive + Operational + Financial + Marketplace + Catalog.
     "dashboard.executive.read",
     "dashboard.operational.read",
     "dashboard.financial.read",
     "dashboard.marketplace.read",
+    "dashboard.catalog.read",
     "dashboard.customize",
   ],
 
@@ -458,6 +474,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // Step 1.16: OPERATOR фиксирует коммуникации по Order/Booking/Customer.
     "communication.read",
     "communication.create",
+    // Step 3.2: OPERATOR — page gate + Operational + Attention (booking SLA).
+    "analytics.read",
+    "dashboard.operational.read",
+    "dashboard.attention.read",
   ],
 
   // Step 1.3: PARTNER НЕ имеет unrestricted catalog.product.read — только

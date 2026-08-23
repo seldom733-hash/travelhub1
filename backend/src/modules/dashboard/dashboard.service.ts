@@ -47,14 +47,14 @@ export type DashboardSection = "executive" | "operational" | "financial" | "mark
 
 /** Canonical section → permission mapping. Single source of truth. */
 export const SECTION_PERMISSION_MAP: Record<DashboardSection, string> = {
-  executive: "analytics.read",
-  operational: "analytics.read",
-  financial: "analytics.read",
-  marketplace: "analytics.read",
-  catalog: "analytics.read",
-  channels: "analytics.read",
-  attention: "analytics.read",
-  insights: "analytics.read",
+  executive: "dashboard.executive.read",
+  operational: "dashboard.operational.read",
+  financial: "dashboard.financial.read",
+  marketplace: "dashboard.marketplace.read",
+  catalog: "dashboard.catalog.read",
+  channels: "dashboard.channels.read",
+  attention: "dashboard.attention.read",
+  insights: "dashboard.insights.read",
 };
 
 const ALL_SECTIONS: DashboardSection[] = ["executive", "operational", "financial", "marketplace", "catalog", "channels", "attention", "insights"];
