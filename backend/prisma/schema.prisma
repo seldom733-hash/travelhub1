@@ -26,7 +26,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance"]
+  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision"]
 }
 
 // ─────────────────────────────── events.* ────────────────────────────────
@@ -4207,4 +4207,61 @@ model UserWorkspaceLayout {
   @@index([userId])
   @@index([pageId])
   @@schema("security")
+}
+
+// ─── DECISION INTELLIGENCE (Phase 3 Command Center)
+// Decision Signals — detected business conditions important enough to track,
+// acknowledge, resolve, or act upon. NOT generic KPIs, not analytics reports,
+// not AI opinions. Hybrid model: dynamic facts + persisted lifecycle state.
+// Owner: Command Center / Decision Intelligence module.
+model DecisionSignal {
+  id              String             @id @default(uuid())
+  /// Stable signal code — detector-specific identifier.
+  code            String
+  /// Operational category: OPERATIONAL / FINANCIAL / CATALOG / CHANNEL.
+  category        String
+  /// Lifecycle state: OPEN / ACKNOWLEDGED / RESOLVED / DISMISSED.
+  status          SignalStatus       @default(OPEN)
+  /// Detector module that produced this signal.
+  source          String
+  /// Deterministic fingerprint: detectorKey + business scope.
+  /// Used for dedup: one active signal per fingerprint.
+  fingerprint     String             @unique
+  /// JSON array of typed entity references: [{entityType, entityId}].
+  affectedEntities Json
+  /// JSON array of structured evidence: [{key, value, unit?, source, observedAt}].
+  evidence        Json
+  /// Timestamp when this signal was first detected.
+  firstDetectedAt DateTime           @default(now())
+  /// Timestamp of most recent detection/re-observation.
+  lastDetectedAt  DateTime           @default(now())
+  /// Acknowledgement: {at, byUserId, byUsername}.
+  acknowledgedAt  DateTime?
+  acknowledgedBy  String?
+  /// Resolution: {at, byUserId, byUsername, reason?}.
+  resolvedAt      DateTime?
+  resolvedBy      String?
+  /// Dismissal: {at, byUserId, byUsername, reason?}.
+  dismissedAt     DateTime?
+  dismissedBy     String?
+  /// Count of re-observations (recurrence tracking).
+  observationCount Int                @default(1)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@index([code])
+  @@index([lastDetectedAt])
+  @@index([source])
+  @@schema("decision")
+}
+
+enum SignalStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+
+  @@schema("decision")
 }
