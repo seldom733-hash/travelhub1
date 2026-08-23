@@ -448,7 +448,7 @@ export class AnalyticsService {
       // Storefront partners: partners with ≥1 active storefront
       this.prisma.$queryRaw<{ cnt: bigint }[]>`
         SELECT COUNT(DISTINCT "partnerId") as cnt
-        FROM storefront."PartnerStorefront"
+        FROM catalog."PartnerStorefront"
         WHERE "entitlementStatus" = 'ACTIVE' AND "partnerId" IS NOT NULL
       `,
     ]);
