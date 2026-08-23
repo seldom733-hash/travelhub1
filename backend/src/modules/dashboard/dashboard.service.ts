@@ -23,6 +23,7 @@ import {
   type TimeSeriesResponse,
 } from "../analytics/analytics.service";
 import { AnalyticsGranularity } from "../analytics/analytics-granularity.resolver";
+import { resolvePeriod } from "../analytics/analytics-period.resolver";
 import { PrismaService } from "../../prisma/prisma.service";
 
 // ─── DTOs ───────────────────────────────────────────────────────────────────
@@ -645,39 +646,22 @@ export class DashboardService {
     return { current: value.toFixed(2), previous: null, delta: null, deltaPercent: null, drillDown: { target: drillDown } };
   }
 
-  /** Get period bounds from analytics DTO. */
+  /** Get period bounds from analytics DTO — reuses Step 3.3 period resolution. */
   private getPeriodBounds(dto: AnalyticsQueryDto): { start: Date; end: Date } {
-    const now = new Date();
-    let start: Date;
-    let end = new Date(now);
+    const tz = dto.timezone || "UTC";
 
-    switch (dto.preset) {
-      case "MONTH":
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        break;
-      case "YEAR":
-        start = new Date(now.getFullYear(), 0, 1);
-        end = new Date(now.getFullYear() + 1, 0, 1);
-        break;
-      case "LAST_7_DAYS":
-        start = new Date(now.getTime() - 7 * 86400000);
-        break;
-      case "LAST_7_DAYS":
-        start = new Date(now.getTime() - 7 * 86400000);
-        break;
-      case "LAST_6_MONTHS":
-        start = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-        break;
-      default:
-        start = new Date(now.getFullYear(), 0, 1);
-        end = new Date(now.getFullYear() + 1, 0, 1);
-    }
+    // Delegate to the canonical analytics period resolver (Step 3.3 authority)
+    const resolved = resolvePeriod({
+      preset: dto.preset as any,
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+      timezone: tz,
+    });
 
-    if (dto.startDate) start = new Date(dto.startDate);
-    if (dto.endDate) end = new Date(dto.endDate);
-
-    return { start, end };
+    return {
+      start: new Date(resolved.start),
+      end: new Date(resolved.endExclusive),
+    };
   }
 
   private computeConversionRate(
