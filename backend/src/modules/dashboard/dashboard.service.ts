@@ -231,6 +231,11 @@ export interface CommandCenterResponse {
       storefrontPartners: KpiValue;
       marketplaceCustomers: KpiValue;
       storefrontCustomers: KpiValue;
+      // Stage I: Storefront SaaS billing metrics
+      storefrontMrr: KpiValue;
+      storefrontArr: KpiValue;
+      storefrontCollected: KpiValue;
+      storefrontOutstanding: KpiValue;
     };
     catalog?: CatalogHealthResponse;
     channels?: ChannelHealthResponse;
@@ -333,6 +338,12 @@ export class DashboardService {
       sectionSet.has("insights") ? this.buildAiDecisionFeed() : null,
     ]);
 
+    // Stage I: Billing metrics from authoritative SubscriptionContract/Invoice/Payment
+    let billingMetrics: { mrr: number; arr: number; collected: number; outstanding: number } | null = null;
+    if (sectionSet.has("marketplace")) {
+      billingMetrics = await this.computeBillingMetrics();
+    }
+
     // Build only authorized sections
     const sections: CommandCenterResponse["sections"] = {};
     if (sectionSet.has("executive")) {
@@ -345,7 +356,7 @@ export class DashboardService {
       sections.financial = this.buildFinancialSection(kpi, reconciliation);
     }
     if (sectionSet.has("marketplace")) {
-      sections.marketplace = this.buildMarketplaceSection(kpi);
+      sections.marketplace = this.buildMarketplaceSection(kpi, billingMetrics);
     }
     if (catalogHealth) sections.catalog = catalogHealth;
     if (channelHealth) sections.channels = channelHealth;
@@ -1054,7 +1065,10 @@ export class DashboardService {
     };
   }
 
-  private buildMarketplaceSection(kpi: CompanyKpiResponse) {
+  private buildMarketplaceSection(
+    kpi: CompanyKpiResponse,
+    billing: { mrr: number; arr: number; collected: number; outstanding: number } | null,
+  ) {
     const m = kpi.metrics;
     return {
       marketplaceSessions: this.toKpiValue(m.marketplaceSessions, "analytics"),
@@ -1063,6 +1077,56 @@ export class DashboardService {
       storefrontPartners: this.toKpiValue(m.storefrontPartners, "analytics"),
       marketplaceCustomers: this.toKpiValue(m.marketplaceCustomers, "analytics"),
       storefrontCustomers: this.toKpiValue(m.storefrontCustomers, "analytics"),
+      // Stage I: Authoritative billing metrics from SubscriptionContract/Invoice/Payment
+      storefrontMrr: this.moneyKpi(billing?.mrr ?? 0, "AZN", "finance"),
+      storefrontArr: this.moneyKpi(billing?.arr ?? 0, "AZN", "finance"),
+      storefrontCollected: this.moneyKpi(billing?.collected ?? 0, "AZN", "finance"),
+      storefrontOutstanding: this.moneyKpi(billing?.outstanding ?? 0, "AZN", "finance"),
+    };
+  }
+
+  /**
+   * Stage I: Compute MRR/ARR/Collected/Outstanding from billing authority.
+   * MRR = SUM(contract.totalAmount) WHERE subscription.status IN (ACTIVE) AND contract.isActive
+   * ARR = MRR × 12
+   * Collected = SUM(payment.amount) WHERE payment.status = SUCCEEDED AND paidAt in period
+   * Outstanding = SUM(invoice.totalAmount - paid) WHERE invoice.status = OPEN
+   */
+  private async computeBillingMetrics(): Promise<{ mrr: number; arr: number; collected: number; outstanding: number }> {
+    const [mrrResult, collectedResult, outstandingResult] = await Promise.all([
+      // MRR: sum of active contracted totals for ACTIVE subscriptions
+      this.prisma.$queryRaw<{ total: string }[]>`
+        SELECT COALESCE(SUM(c."contractedTotalAmount"), 0) as total
+        FROM catalog."SubscriptionContract" c
+        JOIN catalog."StorefrontSubscription" s ON s.id = c."subscriptionId"
+        WHERE c."isActive" = true
+          AND s.status IN ('ACTIVE', 'PAST_DUE')
+      `,
+      // Collected: successful payments in period (use current month as default)
+      this.prisma.$queryRaw<{ total: string }[]>`
+        SELECT COALESCE(SUM(p.amount), 0) as total
+        FROM catalog."SubscriptionPayment" p
+        WHERE p.status = 'SUCCEEDED'
+          AND p."paidAt" >= date_trunc('month', NOW())
+          AND p."paidAt" < date_trunc('month', NOW()) + interval '1 month'
+      `,
+      // Outstanding: sum of (invoice.total - paid) for OPEN invoices
+      this.prisma.$queryRaw<{ total: string }[]>`
+        SELECT COALESCE(SUM(i."totalAmount") - COALESCE((
+          SELECT SUM(p2.amount) FROM catalog."SubscriptionPayment" p2
+          WHERE p2."invoiceId" = i.id AND p2.status = 'SUCCEEDED'
+        ), 0), 0) as total
+        FROM catalog."SubscriptionInvoice" i
+        WHERE i.status = 'OPEN'
+      `,
+    ]);
+
+    const mrr = Number(mrrResult[0]?.total ?? 0);
+    return {
+      mrr,
+      arr: mrr * 12,
+      collected: Number(collectedResult[0]?.total ?? 0),
+      outstanding: Number(outstandingResult[0]?.total ?? 0),
     };
   }
 }

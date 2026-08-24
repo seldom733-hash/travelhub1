@@ -759,6 +759,15 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.kpi.marketplace-customers": { ru: "Покупатели Marketplace", az: "Marketplace Alıcıları", en: "Marketplace Buyers" },
   "cc.kpi.marketplaceCustomers": { ru: "Покупатели Marketplace", az: "Marketplace Alıcıları", en: "Marketplace Buyers" },
   "cc.kpi.storefront-customers": { ru: "Покупатели Storefront", az: "Storefront Alıcıları", en: "Storefront Buyers" },
+  // Stage I: Storefront SaaS billing metrics
+  "cc.kpi.storefront-mrr": { ru: "MRR Storefront", az: "Storefront MRR", en: "Storefront MRR" },
+  "cc.kpi.storefront-mrr.subtitle": { ru: "Ежемесячный повторяющийся доход", az: "Aylıq təkrarlanan gəlir", en: "Monthly recurring revenue" },
+  "cc.kpi.storefront-arr": { ru: "ARR Storefront", az: "Storefront ARR", en: "Storefront ARR" },
+  "cc.kpi.storefront-arr.subtitle": { ru: "Годовой повторяющийся доход", az: "İllik təkrarlanan gəlir", en: "Annual recurring revenue" },
+  "cc.kpi.storefront-collected": { ru: "Получено", az: "Toplanmış", en: "Collected" },
+  "cc.kpi.storefront-collected.subtitle": { ru: "Фактически полученные платежи за подписки", az: "Abunəliklər üzrə həqiqətən alınmış ödənişlər", en: "Actual subscription payments received" },
+  "cc.kpi.storefront-outstanding": { ru: "К оплате", az: "Ödənilməmiş", en: "Outstanding" },
+  "cc.kpi.storefront-outstanding.subtitle": { ru: "Неоплаченные счета-фактуры", az: "Ödənilməmiş fakturalar", en: "Unpaid invoices" },
   "cc.kpi.storefrontCustomers": { ru: "Покупатели Storefront", az: "Storefront Alıcıları", en: "Storefront Buyers" },
   // reconciliation statuses
   "cc.recon.balanced": { ru: "✓ Баланс", az: "✓ Balans", en: "✓ Balanced" },

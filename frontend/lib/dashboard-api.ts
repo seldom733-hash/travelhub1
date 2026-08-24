@@ -76,6 +76,11 @@ export interface CommandCenterSummary {
       storefrontPartners: KpiValue;
       marketplaceCustomers: KpiValue;
       storefrontCustomers: KpiValue;
+      // Stage I: Storefront SaaS billing metrics
+      storefrontMrr: KpiValue;
+      storefrontArr: KpiValue;
+      storefrontCollected: KpiValue;
+      storefrontOutstanding: KpiValue;
     };
     catalog?: {
       publishedServices: KpiValue;

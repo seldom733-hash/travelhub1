@@ -47,6 +47,11 @@ const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; for
   "storefront-partners":  { section: "marketplace", field: "storefrontPartners" },
   "marketplace-customers": { section: "marketplace", field: "marketplaceCustomers" },
   "storefront-customers":  { section: "marketplace", field: "storefrontCustomers" },
+  // Stage I: Storefront SaaS billing metrics
+  "storefront-mrr":        { section: "marketplace", field: "storefrontMrr", format: "currency" },
+  "storefront-arr":        { section: "marketplace", field: "storefrontArr", format: "currency" },
+  "storefront-collected":  { section: "marketplace", field: "storefrontCollected", format: "currency" },
+  "storefront-outstanding": { section: "marketplace", field: "storefrontOutstanding", format: "currency" },
   // backward-compat: old layout IDs → map to first split field
   "partners":        { section: "marketplace", field: "marketplacePartners" },
   "customers":       { section: "marketplace", field: "marketplaceCustomers" },

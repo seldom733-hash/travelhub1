@@ -22,6 +22,7 @@ const mockPrisma = {
   category: { count: jest.fn().mockResolvedValue(0) },
   order: { count: jest.fn().mockResolvedValue(0) },
   $queryRawUnsafe: jest.fn().mockResolvedValue([{ count: 0 }]),
+  $queryRaw: jest.fn().mockResolvedValue([{ total: "0" }]),
   decisionSignal: {
     findMany: jest.fn().mockResolvedValue([]),
     count: jest.fn().mockResolvedValue(0),
