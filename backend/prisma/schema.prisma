@@ -1299,6 +1299,33 @@ enum StorefrontPlanType {
   @@schema("catalog")
 }
 
+/// Billing interval for subscription recurrence.
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+
+  @@schema("catalog")
+}
+
+/// Status of a subscription invoice.
+enum SubscriptionInvoiceStatus {
+  OPEN
+  PAID
+  VOID
+  OVERDUE
+
+  @@schema("catalog")
+}
+
+/// Status of a subscription payment record.
+enum SubscriptionPaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+
+  @@schema("catalog")
+}
+
 model StorefrontSubscriptionPlan {
   id        String   @id @default(uuid())
   code      String   @unique // SUB-PLAN-001
@@ -1313,12 +1340,14 @@ model StorefrontSubscriptionPlan {
   updatedAt DateTime @updatedAt
 
   subscriptions StorefrontSubscription[]
+  contracts    SubscriptionContract[]
 
   @@schema("catalog")
 }
 
 /// Storefront subscription — links a storefront to a plan with billing history.
 enum StorefrontSubscriptionStatus {
+  TRIAL
   ACTIVE
   CANCELLED
   EXPIRED
@@ -1348,9 +1377,93 @@ model StorefrontSubscription {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  contracts             SubscriptionContract[]
+  invoices             SubscriptionInvoice[]
+
   @@unique([storefrontId])
   @@index([status])
   @@index([currentPeriodEnd])
+  @@schema("catalog")
+}
+
+/// Authoritative subscription contract — snapshot of agreed pricing.
+/// List Price ≠ Contracted Price: contract stores the actual agreed amount.
+/// Changing plan list price does NOT alter existing contracts.
+model SubscriptionContract {
+  id                   String   @id @default(uuid())
+  code                 String   @unique // SC-00000001
+  subscriptionId       String
+  subscription         StorefrontSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  planId               String
+  plan                 StorefrontSubscriptionPlan @relation(fields: [planId], references: [id])
+  /// Authoritative contracted unit amount (NOT list price).
+  contractedUnitAmount Decimal  @db.Decimal(10, 2)
+  /// Canonical billing currency: AZN.
+  currency             String   @default("AZN")
+  billingInterval      BillingInterval @default(MONTHLY)
+  /// Billable host/seat quantity.
+  quantity             Int      @default(1)
+  /// Total = unitAmount × quantity (snapshot).
+  contractedTotalAmount Decimal @db.Decimal(12, 2)
+  effectiveFrom        DateTime
+  effectiveTo          DateTime?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  invoices             SubscriptionInvoice[]
+
+  @@index([subscriptionId])
+  @@index([isActive])
+  @@schema("catalog")
+}
+
+/// Subscription invoice — one per billing period, monetary snapshot immutable after OPEN.
+model SubscriptionInvoice {
+  id               String   @id @default(uuid())
+  code             String   @unique // SINV-00000001
+  contractId       String
+  contract         SubscriptionContract @relation(fields: [contractId], references: [id])
+  subscriptionId   String
+  subscription     StorefrontSubscription @relation(fields: [subscriptionId], references: [id])
+  /// Monetary snapshot from contract at invoice time.
+  subtotalAmount   Decimal  @db.Decimal(12, 2)
+  discountAmount   Decimal  @db.Decimal(12, 2) @default(0)
+  totalAmount      Decimal  @db.Decimal(12, 2)
+  currency         String   @default("AZN")
+  status           SubscriptionInvoiceStatus @default(OPEN)
+  /// Billing period this invoice covers.
+  periodStart      DateTime
+  periodEnd        DateTime
+  issuedAt         DateTime @default(now())
+  dueAt            DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  payments         SubscriptionPayment[]
+
+  @@unique([contractId, periodStart])
+  @@index([subscriptionId])
+  @@index([status])
+  @@schema("catalog")
+}
+
+/// Payment against a subscription invoice.
+model SubscriptionPayment {
+  id          String   @id @default(uuid())
+  code        String   @unique // SPAY-00000001
+  invoiceId   String
+  invoice     SubscriptionInvoice @relation(fields: [invoiceId], references: [id])
+  amount      Decimal  @db.Decimal(12, 2)
+  currency    String   @default("AZN")
+  status      SubscriptionPaymentStatus @default(PENDING)
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@index([status])
   @@schema("catalog")
 }
 
