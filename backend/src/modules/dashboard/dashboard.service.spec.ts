@@ -37,6 +37,16 @@ const mockDecisionSignalService = {
   runDetector: jest.fn().mockResolvedValue([]),
 };
 
+// ─── Mock WhyAttributionService ─────────────────────────────────────────────
+const mockWhyAttributionService = {
+  computeAttribution: jest.fn().mockReturnValue(null),
+};
+
+const mockActionDerivationService = { deriveActions: jest.fn().mockReturnValue([]), hasDerivations: jest.fn().mockReturnValue(true) };
+const mockImpactAttributionService = {
+  computeImpact: jest.fn().mockReturnValue(null),
+};
+
 // ─── Mock Analytics Service ─────────────────────────────────────────────────
 
 function createMockAnalytics() {
@@ -74,6 +84,12 @@ function createMockAnalytics() {
         refundsCurrency: "AZN",
         gmvCurrency: "AZN",
         revenueCurrency: "AZN",
+        netRevenue: { current: "10.00", previous: "80.00", delta: "-70.00", deltaPercent: -87.5 },
+        // GMV Lifecycle
+        qualifiedGmv: { current: "180.00", previous: "150.00", delta: "30.00", deltaPercent: 20 },
+        completedGmv: { current: "150.00", previous: "120.00", delta: "30.00", deltaPercent: 25 },
+        collectedGmv: { current: "170.00", previous: "140.00", delta: "30.00", deltaPercent: 21.43 },
+        outstandingGmv: { current: "10.00", previous: "10.00", delta: "0.00", deltaPercent: 0 },
       },
       attribution: {
         actionFields: ["Order.createdBy"],
@@ -203,7 +219,7 @@ const MOCK_NO_SECTIONS = {
 describe("DashboardService — Command Center", () => {
   it("returns 4 sections with all 18 KPI cards", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter(
       { preset: "MONTH" },
       MOCK_ADMIN,
@@ -240,11 +256,12 @@ describe("DashboardService — Command Center", () => {
     expect(result.sections.operational!.refundsProcessed).toBeDefined();
     expect(result.sections.operational!.funnelConversion).toBeDefined();
 
-    // Financial: 4 KPIs
+    // Financial: 5 KPIs
     expect(result.sections.financial!.commissionAccrued).toBeDefined();
     expect(result.sections.financial!.reconciliationStatus).toBeDefined();
     expect(result.sections.financial!.totalPayments).toBeDefined();
     expect(result.sections.financial!.netPayments).toBeDefined();
+    expect(result.sections.financial!.totalRefunds).toBeDefined();
 
     // Marketplace: 4 KPIs (but 18 total = 7+6+4+4 = 21? Let me count: actually 7+6+4+4=21)
     // Design says 18, but sections have 7+6+4+4=21. The design KPI count was approximate.
@@ -263,7 +280,7 @@ describe("DashboardService — Command Center", () => {
 
   it("forwards period parameters to Step 3.3", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     await service.getCommandCenter(
       { preset: "CUSTOM", startDate: "2026-01-01", endDate: "2026-01-31", timezone: "Asia/Baku" },
       MOCK_ADMIN,
@@ -282,7 +299,7 @@ describe("DashboardService — Command Center", () => {
 
   it("forward comparison parameter", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     await service.getCommandCenter(
       { preset: "MONTH", comparison: false },
       MOCK_ADMIN,
@@ -296,7 +313,7 @@ describe("DashboardService — Command Center", () => {
 
   it("computes conversion rate correctly", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     // paymentsCaptured=40, ordersCreated=50 → 80%
@@ -329,9 +346,14 @@ describe("DashboardService — Command Center", () => {
         refundsCurrency: "AZN",
         gmvCurrency: "AZN",
         revenueCurrency: "AZN",
+        netRevenue: { current: "0.00", previous: null, delta: null, deltaPercent: null },
+        qualifiedGmv: { current: "0.00", previous: null, delta: null, deltaPercent: null },
+        completedGmv: { current: "0.00", previous: null, delta: null, deltaPercent: null },
+        collectedGmv: { current: "0.00", previous: null, delta: null, deltaPercent: null },
+        outstandingGmv: { current: "0.00", previous: null, delta: null, deltaPercent: null },
       },
     });
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.sections.executive!.conversionRate.current).toBe("0.00");
@@ -340,7 +362,7 @@ describe("DashboardService — Command Center", () => {
 
   it("funnel conversion = last stage / first stage", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     // First=1000, Last=20 → 2%
@@ -349,7 +371,7 @@ describe("DashboardService — Command Center", () => {
 
   it("maps all monetary KPIs with currency", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     // GMV has currency from Step 3.3
@@ -361,7 +383,7 @@ describe("DashboardService — Command Center", () => {
 
   it("drillDown targets are set for all KPIs", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.sections.executive!.gmv.drillDown?.target).toBe("analytics");
@@ -376,7 +398,7 @@ describe("DashboardService — Command Center", () => {
 describe("DashboardService — Trends", () => {
   it("forwards to Step 3.3 Time Series", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getTrends(
       { preset: "MONTH", metric: "orders" },
       MOCK_ADMIN,
@@ -390,7 +412,7 @@ describe("DashboardService — Trends", () => {
 
   it("defaults metric to orders", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getTrends({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.metric).toBe("orders");
@@ -398,7 +420,7 @@ describe("DashboardService — Trends", () => {
 
   it("forwards timezone to Step 3.3", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     await service.getTrends(
       { preset: "MONTH", timezone: "Asia/Baku" },
       MOCK_ADMIN,
@@ -441,6 +463,11 @@ describe("DashboardService — Empty State", () => {
         refundsCurrency: "AZN",
         gmvCurrency: "AZN",
         revenueCurrency: "AZN",
+        netRevenue: { current: "0.00", previous: null, delta: null, deltaPercent: null },
+        qualifiedGmv: { current: "0.00", previous: null, delta: null, deltaPercent: null },
+        completedGmv: { current: "0.00", previous: null, delta: null, deltaPercent: null },
+        collectedGmv: { current: "0.00", previous: null, delta: null, deltaPercent: null },
+        outstandingGmv: { current: "0.00", previous: null, delta: null, deltaPercent: null },
       },
     });
     analytics.getConversionFunnel.mockResolvedValue({
@@ -458,7 +485,7 @@ describe("DashboardService — Empty State", () => {
       currencies: [],
     });
 
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.sections.executive!.gmv.current).toBe("0.00");
@@ -472,7 +499,7 @@ describe("DashboardService — Empty State", () => {
 describe("DashboardService — Section Authority", () => {
   it("ADMIN gets all 8 sections + availableSections + availableMetrics", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(result.sections.executive).toBeDefined();
@@ -500,7 +527,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("MARKETER gets executive, marketplace, catalog, channels, insights — NOT financial/operational", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
 
     expect(result.sections.executive).toBeDefined();
@@ -520,7 +547,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("MARKETER availableMetrics excludes financial metrics", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
 
     expect(result.availableMetrics).toContain("orders");
@@ -532,7 +559,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("user with page permission but no section permissions gets empty sections/metrics", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_NO_SECTIONS);
 
     expect(result.sections).toEqual({});
@@ -542,7 +569,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("FINANCE gets executive, financial, attention — NOT marketplace/catalog/channels", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_FINANCE);
 
     expect(result.sections.executive).toBeDefined();
@@ -557,7 +584,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("ANALYST gets executive, operational, financial, marketplace, catalog — NOT channels/attention/insights", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     const result = await service.getCommandCenter({ preset: "MONTH" }, MOCK_ANALYST);
 
     expect(result.sections.executive).toBeDefined();
@@ -572,7 +599,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("financial read model NOT called for MARKETER (no dashboard.financial.read)", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     await service.getCommandCenter({ preset: "MONTH" }, MOCK_MARKETER);
 
     // Financial reconciliation should NOT be called for MARKETER
@@ -581,7 +608,7 @@ describe("DashboardService — Section Authority", () => {
 
   it("funnel read model called for user with dashboard.operational.read", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
     await service.getCommandCenter({ preset: "MONTH" }, MOCK_ADMIN);
 
     expect(analytics.getConversionFunnel).toHaveBeenCalled();
@@ -593,7 +620,7 @@ describe("DashboardService — Section Authority", () => {
 describe("DashboardService — Trends Authority", () => {
   it("unknown metric returns 404", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
 
     await expect(
       service.getTrends({ preset: "MONTH", metric: "nonexistent" }, MOCK_ADMIN),
@@ -602,7 +629,7 @@ describe("DashboardService — Trends Authority", () => {
 
   it("unauthorized metric returns 403", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
 
     // User without any dashboard permissions → payments metric should be 403
     await expect(
@@ -612,7 +639,7 @@ describe("DashboardService — Trends Authority", () => {
 
   it("MARKETER can access executive + marketplace trends, NOT financial", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
 
     const orders = await service.getTrends({ preset: "MONTH", metric: "orders" }, MOCK_MARKETER);
     expect(orders.metric).toBe("orders");
@@ -635,7 +662,7 @@ describe("DashboardService — Trends Authority", () => {
 
   it("FINANCE can access financial + executive trends, NOT marketplace", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
 
     const payments = await service.getTrends({ preset: "MONTH", metric: "payments" }, MOCK_FINANCE);
     expect(payments.metric).toBe("payments");
@@ -651,7 +678,7 @@ describe("DashboardService — Trends Authority", () => {
 
   it("unauthorized/unknown metric does not call analytics service", async () => {
     const analytics = createMockAnalytics();
-    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any);
+    const service = new DashboardService(analytics, mockPrisma, mockDecisionSignalService as any, mockWhyAttributionService as any, mockImpactAttributionService as any, mockActionDerivationService as any);
 
     await expect(
       service.getTrends({ preset: "MONTH", metric: "nonexistent" }, MOCK_ADMIN),

@@ -26,7 +26,13 @@ import { AnalyticsGranularity } from "../analytics/analytics-granularity.resolve
 import { resolvePeriod } from "../analytics/analytics-period.resolver";
 import { PrismaService } from "../../prisma/prisma.service";
 import { DecisionSignalService } from "./decision-signal.service";
-import type { DecisionSignalDetector } from "./decision-signal.types";
+import { WhyAttributionService } from "./why-attribution.service";
+import { ImpactAttributionService } from "./impact-attribution.service";
+import { ActionDerivationService } from "./action-derivation.service";
+import type { ActionDefinition } from "./action-contract.types";
+import type { DecisionImpact } from "./impact-attribution.types";
+import type { DecisionSignalDetector, SignalEvidenceItem } from "./decision-signal.types";
+import type { WhyAttribution } from "./why-attribution.types";
 import { PendingBookingsDetector } from "./detectors/pending-bookings.detector";
 import { FailedPaymentsDetector } from "./detectors/failed-payments.detector";
 import { RecentCancellationsDetector } from "./detectors/recent-cancellations.detector";
@@ -91,6 +97,8 @@ export interface KpiValue {
   deltaPercent: number | null;
   /** B.2: explicit platform reporting currency (AZN) for monetary KPIs. */
   drillDown?: { target: string; query?: Record<string, string> };
+  /** Reconciled display value for integer presentation (OPTION B). Used by KpiCard for display; authoritative `current` remains exact for analytics/comparison. */
+  displayCurrent?: string | number;
 }
 
 export interface CatalogHealthResponse {
@@ -113,6 +121,23 @@ export interface ChannelHealthResponse {
   storefrontConversion: KpiValue;
 }
 
+export interface WhyAttributionDto {
+  status: string;
+  primaryDriver?: {
+    textKey: string;
+    factualValue: string | number;
+    evidenceRefs: string[];
+  };
+  contributingFactors: Array<{
+    textKey: string;
+    factualValue: string | number;
+    evidenceRefs: string[];
+  }>;
+  evidenceStrength: string;
+  evidenceRefs: string[];
+  rule: { ruleId: string; ruleVersion: string };
+}
+
 export interface NeedsAttentionResponse {
   summary: {
     open: number;
@@ -123,12 +148,16 @@ export interface NeedsAttentionResponse {
   signals: Array<{
     id: string;
     code: string;
-    title: string;
-    description: string;
+    titleKey: string;
+    descriptionKey: string;
+    descriptionParams: Record<string, string | number>;
     category: string;
     status: string;
     affectedCount: number;
     evidence: Array<{ key: string; value: string | number; unit?: string }>;
+    why: WhyAttributionDto | null;
+    impact: DecisionImpact | null;
+    actions: ActionDefinition[];
     firstDetectedAt: string;
     lastDetectedAt: string;
     observationCount: number;
@@ -147,9 +176,9 @@ export interface NeedsAttentionResponse {
 }
 
 export interface AiDecisionFeedResponse {
-  risks: Array<{ title: string; detail: string; severity: "high" | "medium" | "low" }>;
-  opportunities: Array<{ title: string; detail: string; potential: string }>;
-  catalogInsights: Array<{ title: string; detail: string }>;
+  risks: Array<{ titleKey: string; titleParams: Record<string, string | number>; detailKey: string; detailParams: Record<string, string | number>; severity: "high" | "medium" | "low" }>;
+  opportunities: Array<{ titleKey: string; titleParams: Record<string, string | number>; detailKey: string; detailParams: Record<string, string | number>; orders: number; period: number }>;
+  catalogInsights: Array<{ titleKey: string; titleParams: Record<string, string | number>; detailKey: string; detailParams: Record<string, string | number> }>;
 }
 
 export interface CommandCenterResponse {
@@ -174,6 +203,11 @@ export interface CommandCenterResponse {
       bookingsRequested: KpiValue;
       averageOrderValue: KpiValue;
       conversionRate: KpiValue;
+      // GMV Lifecycle (Policy Closure)
+      qualifiedGmv: KpiValue;
+      completedGmv: KpiValue;
+      collectedGmv: KpiValue;
+      outstandingGmv: KpiValue;
     };
     operational?: {
       ordersFulfilled: KpiValue;
@@ -188,6 +222,7 @@ export interface CommandCenterResponse {
       reconciliationStatus: KpiValue;
       totalPayments: KpiValue;
       netPayments: KpiValue;
+      totalRefunds: KpiValue;
     };
     marketplace?: {
       marketplaceSessions: KpiValue;
@@ -236,6 +271,9 @@ export class DashboardService {
     private readonly analyticsService: AnalyticsService,
     private readonly prisma: PrismaService,
     private readonly decisionSignalService: DecisionSignalService,
+    private readonly whyAttributionService: WhyAttributionService,
+    private readonly impactAttributionService: ImpactAttributionService,
+    private readonly actionDerivationService: ActionDerivationService,
   ) {
     // Instantiate detectors internally (no DI needed for optional params)
     this.detectors = [
@@ -291,7 +329,7 @@ export class DashboardService {
     const [catalogHealth, channelHealth, needsAttention, aiFeed] = await Promise.all([
       sectionSet.has("catalog") ? this.buildCatalogHealth() : null,
       sectionSet.has("channels") ? this.buildChannelHealth(analyticsDto, user as any) : null,
-      sectionSet.has("attention") ? this.buildNeedsAttention() : null,
+      sectionSet.has("attention") ? this.buildNeedsAttention(user) : null,
       sectionSet.has("insights") ? this.buildAiDecisionFeed() : null,
     ]);
 
@@ -521,46 +559,59 @@ export class DashboardService {
   // ─── V3: Needs Attention ────────────────────────────────────────────────
 
   /** Signal code → human-readable title mapping */
-  private static readonly SIGNAL_TITLES: Record<string, string> = {
-    BOOKING_CONFIRMATION_DELAY: "Задержка подтверждения бронирований",
-    FAILED_PAYMENTS: "Неуспешные платежи",
-    RECENT_CANCELLATIONS: "Недавние отмены заказов",
-    PENDING_REFUNDS: "Ожидают обработки возвраты",
-    UPCOMING_BOOKINGS: "Предстоящие бронирования",
-    SERVICES_WITHOUT_SALES: "Услуги без продаж",
+  /** Signal code → i18n key for title (no hardcoded language in backend) */
+  private static readonly SIGNAL_TITLE_KEYS: Record<string, string> = {
+    BOOKING_CONFIRMATION_DELAY: "cc.signal.title.BOOKING_CONFIRMATION_DELAY",
+    FAILED_PAYMENTS: "cc.signal.title.FAILED_PAYMENTS",
+    RECENT_CANCELLATIONS: "cc.signal.title.RECENT_CANCELLATIONS",
+    PENDING_REFUNDS: "cc.signal.title.PENDING_REFUNDS",
+    UPCOMING_BOOKINGS: "cc.signal.title.UPCOMING_BOOKINGS",
+    SERVICES_WITHOUT_SALES: "cc.signal.title.SERVICES_WITHOUT_SALES",
   };
 
-  /** Signal code → factual description template */
-  private static readonly SIGNAL_DESCRIPTIONS: Record<string, (evidence: any[]) => string> = {
-    BOOKING_CONFIRMATION_DELAY: (e) => {
-      const count = e.find((x: any) => x.key === "pendingConfirmationCount");
-      const min = e.find((x: any) => x.key === "oldestPendingMinutes");
-      return `${count?.value ?? 0} бронирований等待确认，最老ое ${(min?.value ?? 0)} мин. назад`;
+  /** Signal code → i18n key for description + params builder */
+  private static readonly SIGNAL_DESC_KEYS: Record<string, { key: string; params: (e: any[]) => Record<string, string | number> }> = {
+    BOOKING_CONFIRMATION_DELAY: {
+      key: "cc.signal.desc.BOOKING_CONFIRMATION_DELAY",
+      params: (e) => ({
+        count: e.find((x: any) => x.key === "pendingConfirmationCount")?.value ?? 0,
+        minutes: e.find((x: any) => x.key === "oldestPendingMinutes")?.value ?? 0,
+      }),
     },
-    FAILED_PAYMENTS: (e) => {
-      const count = e.find((x: any) => x.key === "failedCount");
-      return `${count?.value ?? 0} неуспешных платежей`;
+    FAILED_PAYMENTS: {
+      key: "cc.signal.desc.FAILED_PAYMENTS",
+      params: (e) => ({
+        count: e.find((x: any) => x.key === "failedCount")?.value ?? 0,
+      }),
     },
-    RECENT_CANCELLATIONS: (e) => {
-      const count = e.find((x: any) => x.key === "cancellationCount");
-      return `${count?.value ?? 0} отмен за последние 7 дней`;
+    RECENT_CANCELLATIONS: {
+      key: "cc.signal.desc.RECENT_CANCELLATIONS",
+      params: (e) => ({
+        count: e.find((x: any) => x.key === "cancellationCount")?.value ?? 0,
+      }),
     },
-    PENDING_REFUNDS: (e) => {
-      const count = e.find((x: any) => x.key === "pendingRefundCount");
-      return `${count?.value ?? 0} возвратов ожидают обработки`;
+    PENDING_REFUNDS: {
+      key: "cc.signal.desc.PENDING_REFUNDS",
+      params: (e) => ({
+        count: e.find((x: any) => x.key === "pendingRefundCount")?.value ?? 0,
+      }),
     },
-    UPCOMING_BOOKINGS: (e) => {
-      const count = e.find((x: any) => x.key === "upcomingCount");
-      const days = e.find((x: any) => x.key === "daysUntilNearest");
-      return `${count?.value ?? 0} бронирований, ближайшее через ${days?.value ?? 0} дн.`;
+    UPCOMING_BOOKINGS: {
+      key: "cc.signal.desc.UPCOMING_BOOKINGS",
+      params: (e) => ({
+        count: e.find((x: any) => x.key === "upcomingCount")?.value ?? 0,
+        days: e.find((x: any) => x.key === "daysUntilNearest")?.value ?? 0,
+      }),
     },
-    SERVICES_WITHOUT_SALES: (e) => {
-      const count = e.find((x: any) => x.key === "unsoldProductCount");
-      return `${count?.value ?? 0} опубликованных услуг без заказов`;
+    SERVICES_WITHOUT_SALES: {
+      key: "cc.signal.desc.SERVICES_WITHOUT_SALES",
+      params: (e) => ({
+        count: e.find((x: any) => x.key === "unsoldProductCount")?.value ?? 0,
+      }),
     },
   };
 
-  private async buildNeedsAttention(): Promise<NeedsAttentionResponse> {
+  private async buildNeedsAttention(user?: { id: string; role: string; partnerId?: string | null; permissions: string[] }): Promise<NeedsAttentionResponse> {
     // Run all detectors to populate/update DecisionSignals
     await this.decisionSignalService.runDetectors(this.detectors);
 
@@ -587,9 +638,11 @@ export class DashboardService {
     // Build queue items from signals
     const queueSignals = activeSignals.map((s: any) => {
       const evidence = (s.evidence as any[]) ?? [];
-      const title = DashboardService.SIGNAL_TITLES[s.code] ?? s.code;
-      const descFn = DashboardService.SIGNAL_DESCRIPTIONS[s.code];
-      const description = descFn ? descFn(evidence) : s.code;
+      // i18n: send keys instead of hardcoded locale strings
+      const titleKey = DashboardService.SIGNAL_TITLE_KEYS[s.code] ?? `cc.signal.title.${s.code}`;
+      const descEntry = DashboardService.SIGNAL_DESC_KEYS[s.code];
+      const descriptionKey = descEntry?.key ?? `cc.signal.desc.${s.code}`;
+      const descriptionParams = descEntry ? descEntry.params(evidence) : {};
 
       const affectedEntities = (s.affectedEntities as any[]) ?? [];
       const availableActions: string[] = [];
@@ -602,8 +655,9 @@ export class DashboardService {
       return {
         id: s.id,
         code: s.code,
-        title,
-        description,
+        titleKey,
+        descriptionKey,
+        descriptionParams,
         category: s.category,
         status: s.status,
         affectedCount: affectedEntities.length,
@@ -612,6 +666,8 @@ export class DashboardService {
           value: e.value,
           unit: e.unit,
         })),
+        why: null as WhyAttributionDto | null,
+        actions: [] as ActionDefinition[],
         firstDetectedAt: s.firstDetectedAt?.toISOString?.() ?? s.firstDetectedAt,
         lastDetectedAt: s.lastDetectedAt?.toISOString?.() ?? s.lastDetectedAt,
         observationCount: s.observationCount,
@@ -641,6 +697,32 @@ export class DashboardService {
         return sum + entities.length;
       }, 0);
     };
+
+    // Stage D: compute WHY attribution for each signal
+    for (const signal of queueSignals) {
+      signal.why = this.whyAttributionService.computeAttribution(
+        signal.code,
+        signal.evidence as SignalEvidenceItem[],
+      );
+    }
+
+    // Stage E: compute IMPACT for each signal
+    for (const signal of queueSignals) {
+      signal.impact = this.impactAttributionService.computeImpact(
+        signal.code,
+        signal.evidence as SignalEvidenceItem[],
+      );
+    }
+
+    // Stage F: derive available actions for each signal
+    const userPermissions = user?.permissions ?? [];
+    for (const signal of queueSignals) {
+      signal.actions = this.actionDerivationService.deriveActions(
+        signal.code,
+        signal.evidence as Array<{ key: string; value: string | number }>,
+        userPermissions,
+      );
+    }
 
     return {
       summary: {
@@ -711,18 +793,23 @@ export class DashboardService {
     const risks: AiDecisionFeedResponse["risks"] = [];
     if (delayedBookings.count > 0) {
       risks.push({
-        title: `${delayedBookings.count} bookings delayed`,
-        detail: `Potential value: ${delayedBookings.value} AZN`,
-        severity: delayedBookings.count > 5 ? "high" : "medium",
+        titleKey: "cc.ai.risk.delayed_bookings.title",
+        titleParams: { count: delayedBookings.count },
+        detailKey: "cc.ai.risk.delayed_bookings.detail",
+        detailParams: { value: delayedBookings.value, count: delayedBookings.count },
+        severity: "medium",
       });
     }
 
     const opportunities: AiDecisionFeedResponse["opportunities"] = [];
     for (const hd of highDemand) {
       opportunities.push({
-        title: `${hd.title} — high demand`,
-        detail: `${hd.orders} orders in last 30 days. Consider increasing exposure.`,
-        potential: `+${Number(hd.orders) * 15} AZN/week`,
+        titleKey: "cc.ai.opp.high_demand.title",
+        titleParams: { name: hd.title },
+        detailKey: "cc.ai.opp.high_demand.detail",
+        detailParams: { orders: Number(hd.orders), days: 30 },
+        orders: Number(hd.orders),
+        period: 30,
       });
     }
 
@@ -730,14 +817,18 @@ export class DashboardService {
     for (const lc of lowConversion) {
       const rate = Number(lc.total) > 0 ? Math.round((Number(lc.paid) / Number(lc.total)) * 100) : 0;
       catalogInsights.push({
-        title: `${lc.title} — low conversion`,
-        detail: `Only ${rate}% paid (${lc.paid}/${lc.total} orders). Review pricing/content.`,
+        titleKey: "cc.ai.cat.low_paid_share.title",
+        titleParams: { name: lc.title },
+        detailKey: "cc.ai.cat.low_paid_share.detail",
+        detailParams: { rate, paid: Number(lc.paid), total: Number(lc.total) },
       });
     }
     for (const arch of archivedStrong) {
       catalogInsights.push({
-        title: `${arch.title} — strong historical performance`,
-        detail: `${arch.orders} orders before archiving. Consider reactivation or replacement.`,
+        titleKey: "cc.ai.cat.historical.title",
+        titleParams: { name: arch.title },
+        detailKey: "cc.ai.cat.historical.detail",
+        detailParams: { orders: Number(arch.orders) },
       });
     }
 
@@ -857,14 +948,49 @@ export class DashboardService {
 
   private buildExecutiveSection(kpi: CompanyKpiResponse) {
     const m = kpi.metrics;
+    // ── Reconciled integer presentation (OPTION B) ──
+    // Displayed Outstanding = round(GMV) - round(Collected) so that
+    // integer cards are visually consistent: GMV - Collected = Outstanding.
+    const exactGmv = parseFloat(String(m.qualifiedGmv.current || "0"));
+    const exactCollected = parseFloat(String(m.collectedGmv.current || "0"));
+    const displayedOutstanding = Math.max(0, Math.round(exactGmv) - Math.round(exactCollected));
+    // Previous period reconciliation for delta computation
+    const prevGmv = m.qualifiedGmv.previous != null ? parseFloat(String(m.qualifiedGmv.previous)) : null;
+    const prevCollected = m.collectedGmv.previous != null ? parseFloat(String(m.collectedGmv.previous)) : null;
+    const displayedPrevOutstanding = prevGmv != null && prevCollected != null
+      ? Math.max(0, Math.round(prevGmv) - Math.round(prevCollected))
+      : null;
+
+    const gmvKpi = this.toKpiValue(m.gmv, "analytics", m.gmvCurrency);
+    const revenueKpi = this.toKpiValue(m.revenue, "analytics", m.revenueCurrency);
+    const refundsKpi = this.toKpiValue(m.refunds, "finance", m.refundsCurrency);
+    const qualifiedGmvKpi = this.toKpiValue(m.qualifiedGmv, "analytics", m.gmvCurrency);
+    const completedGmvKpi = this.toKpiValue(m.completedGmv, "analytics", m.gmvCurrency);
+    const collectedGmvKpi = this.toKpiValue(m.collectedGmv, "analytics", m.gmvCurrency);
+    const outstandingGmvKpi = this.toKpiValue(m.outstandingGmv, "analytics", m.gmvCurrency);
+    // Override outstanding displayCurrent with reconciled value
+    outstandingGmvKpi.displayCurrent = displayedOutstanding;
+    // Reconciled delta: difference of displayed integers
+    if (displayedPrevOutstanding !== null) {
+      outstandingGmvKpi.delta = displayedOutstanding - displayedPrevOutstanding;
+      outstandingGmvKpi.deltaPercent = displayedPrevOutstanding !== 0
+        ? Math.round(((displayedOutstanding - displayedPrevOutstanding) / displayedPrevOutstanding) * 10000) / 100
+        : null;
+    }
+
     return {
-      gmv: this.toKpiValue(m.gmv, "analytics", m.gmvCurrency),
-      revenue: this.toKpiValue(m.revenue, "analytics", m.revenueCurrency),
-      refunds: this.toKpiValue(m.refunds, "finance", m.refundsCurrency),
+      gmv: gmvKpi,
+      revenue: revenueKpi,
+      refunds: refundsKpi,
       ordersCreated: this.toKpiValue(m.ordersCreated, "orders"),
       bookingsRequested: this.toKpiValue(m.bookingsRequested, "bookings"),
       averageOrderValue: this.toKpiValue(m.averageOrderValue, "analytics", m.gmvCurrency),
       conversionRate: this.computeConversionRate(m.paymentsCaptured, m.ordersCreated),
+      // GMV Lifecycle (Policy Closure)
+      qualifiedGmv: qualifiedGmvKpi,
+      completedGmv: completedGmvKpi,
+      collectedGmv: collectedGmvKpi,
+      outstandingGmv: outstandingGmvKpi,
     };
   }
 
@@ -887,6 +1013,32 @@ export class DashboardService {
     kpi: CompanyKpiResponse,
     reconciliation: FinancialReconciliationResponse,
   ) {
+    // Stage H enrichment: use kpi.metrics for comparison data where available.
+    // kpi.metrics.revenue = Payment Volume (SUM Payment.amount WHERE status=CAPTURED AND paidAt in period)
+    // kpi.metrics.refunds = SUM Refund.amount WHERE status=PROCESSED AND processedAt in period
+    // kpi.metrics.netRevenue = revenue - refunds (currently no comparison)
+    // reconciliation.* = same event-period sums from FinancialReconciliationResponse
+
+    const totalPaymentsValue = {
+      current: reconciliation.totalPayments,
+      currency: reconciliation.currency,
+      // Use kpi.metrics.revenue comparison (same underlying data)
+      previous: kpi.metrics.revenue.previous,
+      delta: kpi.metrics.revenue.delta,
+      deltaPercent: kpi.metrics.revenue.deltaPercent,
+      drillDown: { target: "finance" } as const,
+    };
+
+    const netPaymentsValue = {
+      current: reconciliation.netPayments,
+      currency: reconciliation.currency,
+      // Compute comparison: netPayments = payments - refunds
+      previous: kpi.metrics.netRevenue.previous,
+      delta: kpi.metrics.netRevenue.delta,
+      deltaPercent: kpi.metrics.netRevenue.deltaPercent,
+      drillDown: { target: "finance" } as const,
+    };
+
     return {
       commissionAccrued: this.toKpiValue(kpi.metrics.commissionAccrued, "finance", kpi.metrics.revenueCurrency),
       reconciliationStatus: {
@@ -896,22 +1048,9 @@ export class DashboardService {
         deltaPercent: null,
         drillDown: { target: "finance" },
       },
-      totalPayments: {
-        current: reconciliation.totalPayments,
-        currency: reconciliation.currency,
-        previous: null,
-        delta: null,
-        deltaPercent: null,
-        drillDown: { target: "finance" },
-      },
-      netPayments: {
-        current: reconciliation.netPayments,
-        currency: reconciliation.currency,
-        previous: null,
-        delta: null,
-        deltaPercent: null,
-        drillDown: { target: "finance" },
-      },
+      totalPayments: totalPaymentsValue,
+      netPayments: netPaymentsValue,
+      totalRefunds: this.toKpiValue(kpi.metrics.refunds, "finance", kpi.metrics.refundsCurrency),
     };
   }
 

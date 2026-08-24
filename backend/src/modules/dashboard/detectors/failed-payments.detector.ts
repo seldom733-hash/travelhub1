@@ -1,6 +1,7 @@
 // ─── Failed Payments Detector ────────────────────────────────────────────────
 // Detects payments with FAILED status that need attention.
-// Evidence: count, oldest failed payment, affected amounts.
+// Stage D: enriched with paymentMethod grouping for WHY attribution.
+// Evidence: count, oldest failed payment, affected amounts, paymentMethod groups.
 
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -26,6 +27,7 @@ export class FailedPaymentsDetector implements DecisionSignalDetector {
         createdAt: true,
         amount: true,
         currency: true,
+        paymentMethod: true,
       },
       orderBy: { createdAt: "asc" },
       take: 200,
@@ -50,6 +52,18 @@ export class FailedPaymentsDetector implements DecisionSignalDetector {
       entityId: p.id,
     }));
 
+    // Stage D enrichment: group by paymentMethod for WHY attribution
+    const methodGroups = new Map<string, number>();
+    for (const p of failedPayments) {
+      const method = p.paymentMethod ?? "UNKNOWN";
+      methodGroups.set(method, (methodGroups.get(method) ?? 0) + 1);
+    }
+    // Deterministic: sorted by method code
+    const sortedGroups = [...methodGroups.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([code, count]) => `${code}:${count}`)
+      .join(";");
+
     const now = new Date().toISOString();
     const evidence: SignalEvidenceItem[] = [
       {
@@ -70,6 +84,13 @@ export class FailedPaymentsDetector implements DecisionSignalDetector {
         key: "totalFailedAmount",
         value: totalAmount,
         unit: currency,
+        source: "finance.PAYMENT",
+        observedAt: now,
+      },
+      // Stage D: paymentMethod grouping for WHY
+      {
+        key: "failureCodeGroups",
+        value: sortedGroups,
         source: "finance.PAYMENT",
         observedAt: now,
       },

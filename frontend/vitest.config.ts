@@ -11,7 +11,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["lib/**/*.spec.ts", "lib/**/*.spec.tsx", "components/**/*.spec.tsx", "app/**/*.spec.tsx"],
+    include: ["lib/**/*.spec.ts", "lib/**/*.spec.tsx", "components/**/*.spec.ts", "components/**/*.spec.tsx", "app/**/*.spec.tsx"],
     setupFiles: ["./test/setup.ts"],
   },
   resolve: {

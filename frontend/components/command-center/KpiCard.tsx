@@ -9,6 +9,8 @@ interface Props {
   currency?: string;
   /** Whether higher values are positive (default true). */
   positiveIsUp?: boolean;
+  /** Optional subtitle/tooltip explaining the metric semantics. */
+  subtitle?: string;
 }
 
 /** Currency symbol map — Intl.NumberFormat lacks ₼ for AZN in Chromium. */
@@ -42,11 +44,13 @@ function formatValue(v: number | null, format: string, currency: string): string
   return new Intl.NumberFormat("ru-RU").format(v);
 }
 
-export function KpiCard({ title, value, format = "number", currency = "AZN", positiveIsUp = true }: Props) {
+export function KpiCard({ title, value, format = "number", currency = "AZN", positiveIsUp = true, subtitle }: Props) {
   // B.2: prefer currency from KpiValue (backend-reported) over prop default
   // B.2 Remediation: PLATFORM REPORTING CURRENCY = AZN
   const effectiveCurrency = value.currency || currency;
-  const formatted = formatValue(value.current, format, effectiveCurrency);
+  // Use displayCurrent for reconciled integer presentation when available
+  const displayValue = value.displayCurrent ?? value.current;
+  const formatted = formatValue(displayValue, format, effectiveCurrency);
   const hasDelta = value.deltaPercent !== null && value.deltaPercent !== undefined;
 
   // Determine polarity
@@ -61,7 +65,7 @@ export function KpiCard({ title, value, format = "number", currency = "AZN", pos
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" title={subtitle}>
       <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</div>
       <div className="mt-2 text-2xl font-bold text-slate-900">{formatted}</div>
       {hasDelta && (

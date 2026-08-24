@@ -33,7 +33,7 @@ async function bootstrap(): Promise<void> {
   app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
   app.useGlobalFilters(new AppExceptionFilter());
 
-  const port = Number(process.env.PORT ?? 4000);
+  const port = Number(process.env.PORT) || 4000;
   await app.listen(port);
   console.log(`TravelHub Phase 1 API ready: http://localhost:${port}/api/v1`);
 }

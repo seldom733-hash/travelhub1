@@ -402,6 +402,107 @@ If authority is absent, mark formulas TBD rather than inventing weights.
 
 ---
 
+# 11A. EMPLOYEE PERFORMANCE EVALUATION — MANDATORY FUTURE CAPABILITY
+
+**Added:** Pre-Stage-E closure (2026-08-24)
+**Status:** ARCHITECTURE COMMITMENT — no implementation now
+**Owner:** Future Stage (under Employees domain)
+
+## Canonical Requirement
+
+Employee Performance Evaluation is a **mandatory future capability** within the existing Employees domain. It must be formally supported by the architecture but is NOT currently implemented.
+
+## Architecture Commitments
+
+### Scope
+
+The following capabilities must be architecturally supported:
+
+- Employee profile (role, permissions, responsibilities)
+- Workload tracking
+- SLA compliance measurement
+- Activity history and audit trail
+- Productivity metrics (per role)
+- Quality indicators
+- Error/rework tracking
+- Business contribution measurement
+- Team-level performance
+- Individual-level performance
+- Performance history (time-series)
+- Multi-dimensional evaluation (NO single opaque score)
+
+### Role-Specific Performance
+
+Evaluation MUST depend on role/domain. Conceptual dimensions:
+
+**Operator:** processed cases, SLA compliance, response/processing time, errors, rework, open/overdue cases
+
+**Sales Manager:** leads handled, conversion, GMV/revenue contribution, response time, lost opportunities
+
+**Finance:** refund/payment processing, reconciliation accuracy, processing SLA, manual corrections
+
+**Moderator:** reviews completed, moderation SLA, reopened cases, policy accuracy
+
+### Fairness / Context Requirements
+
+Architecture MUST account for:
+- workload volume and complexity
+- case type and assigned scope
+- shift/working hours
+- team composition
+- business channel
+- role-specific expectations
+
+**CRITICAL:** Higher raw volume ≠ better employee without quality/context.
+
+### Process ≠ Employee Fault
+
+Decision Intelligence must NOT automatically convert:
+- SLA breach → employee underperformance
+- missed deadline → employee fault
+- error count → poor quality
+
+Potential causes include: workload, system failure, partner delay, payment issues, inventory problems, employee delay. Employee attribution requires evidence.
+
+### Team vs Individual
+
+Architecture MUST explicitly support two levels:
+- TEAM PERFORMANCE (high-level, Command Center appropriate)
+- INDIVIDUAL PERFORMANCE (detailed, Employees/Analytics appropriate)
+
+### RBAC / Privacy
+
+Individual employee performance MUST NOT be visible to all roles. Restricted access for: ADMIN, DIRECTOR, relevant manager/lead. Exact matrix determined at implementation time.
+
+### Auditability
+
+Performance evaluation MUST be traceable to factual events: assigned cases, timestamps, status transitions, actions, errors, SLA, outcomes. No black-box scoring.
+
+### Decision Intelligence Integration
+
+Future Employee Performance uses existing Decision Intelligence foundation (WHAT → WHY → IMPACT → ACTION).
+
+### Dependencies
+
+Future implementation requires:
+- Employees domain (existing)
+- RBAC (existing)
+- Activity/audit events (existing)
+- Operational entities (existing)
+- SLA definitions (future)
+- Analytics (existing foundation)
+- Decision Intelligence (existing foundation)
+
+### Command Center Boundary
+
+Command Center shows only management-significant workforce signals (SLA compliance, overloaded staff, overdue cases, quality alerts, unassigned cases). NOT a full HR analytics dashboard.
+
+### Analytics Boundary
+
+Analytics has future Workforce/Employees analytical perspective: trends, period comparison, role/team comparison, workload, quality, productivity, SLA. NOT implemented now.
+
+---
+
 # 12. REQUIRED PHASE 3 ENTRY OUTPUT
 
 Produce a canonical Phase 3 entry matrix.

@@ -7,10 +7,18 @@ import { KpiCard } from "./KpiCard";
 import { TrendWidget } from "./TrendWidget";
 import { DecisionQueue } from "./DecisionQueue";
 
+/** Interpolate {param} placeholders in a localized template string */
+function interpolate(template: string, params: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => String(params[key] ?? `{${key}}`));
+}
+
 /** KPI field mapping: widgetId → section + field name + format. */
 const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; format?: "currency" | "percent" | "number" }> = {
   // ─── Executive ──────────────────────────────────────────────────
-  "gmv":              { section: "executive", field: "gmv", format: "currency" },
+  "gmv":              { section: "executive", field: "qualifiedGmv", format: "currency" },
+  "collected-gmv":    { section: "executive", field: "collectedGmv", format: "currency" },
+  "outstanding":      { section: "executive", field: "outstandingGmv", format: "currency" },
+  "completed-gmv":    { section: "executive", field: "completedGmv", format: "currency" },
   "revenue":          { section: "executive", field: "revenue", format: "currency" },
   "refunds":          { section: "executive", field: "refunds", format: "currency" },
   "orders":           { section: "executive", field: "ordersCreated" },
@@ -29,6 +37,7 @@ const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; for
   "payments":         { section: "financial", field: "totalPayments", format: "currency" },
   "net-payments":     { section: "financial", field: "netPayments", format: "currency" },
   "reconciliation":   { section: "financial", field: "reconciliationStatus" },
+  "total-refunds":    { section: "financial", field: "totalRefunds", format: "currency" },
   // ─── Marketplace ────────────────────────────────────────────────
   "sessions":         { section: "marketplace", field: "marketplaceSessions" },
   "storefront-sessions": { section: "marketplace", field: "storefrontSessions" },
@@ -154,12 +163,16 @@ export function SectionGrid({
             </div>
           );
         }
+        const subtitleKey = `cc.kpi.${wp.widgetId}.subtitle`;
+        const subtitleVal = t(subtitleKey, locale);
+        const subtitle = subtitleVal !== subtitleKey ? subtitleVal : undefined;
         return (
           <KpiCard
             key={wp.widgetId}
             title={t(`cc.kpi.${wp.widgetId}`, locale)}
             value={val as import("@/lib/dashboard-api").KpiValue}
             format={mapping.format as "currency" | "percent" | undefined}
+            subtitle={subtitle}
           />
         );
       });
@@ -321,9 +334,9 @@ function V3Section({ id, data, locale = "ru" }: { id: string; data: Record<strin
 
 interface AiInsightsSectionProps {
   data: {
-    risks: Array<{ title: string; detail: string; severity: string }>;
-    opportunities: Array<{ title: string; detail: string; potential: string }>;
-    catalogInsights: Array<{ title: string; detail: string }>;
+    risks: Array<{ titleKey: string; titleParams: Record<string, string | number>; detailKey: string; detailParams: Record<string, string | number>; severity: string }>;
+    opportunities: Array<{ titleKey: string; titleParams: Record<string, string | number>; detailKey: string; detailParams: Record<string, string | number>; orders: number; period: number }>;
+    catalogInsights: Array<{ titleKey: string; titleParams: Record<string, string | number>; detailKey: string; detailParams: Record<string, string | number> }>;
   };
   locale?: Locale;
 }
@@ -344,8 +357,8 @@ function AiInsightsSection({ data, locale = "ru" }: AiInsightsSectionProps) {
             <h3 className="mb-3 text-sm font-semibold text-red-800">⚠️ {t("cc.ai.risks", locale)}</h3>
             {data.risks.map((r, i) => (
               <div key={i} className="mb-2">
-                <div className="text-sm font-medium text-red-900">{r.title}</div>
-                <div className="text-xs text-red-700">{r.detail}</div>
+                <div className="text-sm font-medium text-red-900">{interpolate(t(r.titleKey, locale), r.titleParams)}</div>
+                <div className="text-xs text-red-700">{interpolate(t(r.detailKey, locale), r.detailParams)}</div>
               </div>
             ))}
           </div>
@@ -356,9 +369,8 @@ function AiInsightsSection({ data, locale = "ru" }: AiInsightsSectionProps) {
             <h3 className="mb-3 text-sm font-semibold text-emerald-800">🚀 {t("cc.ai.opportunities", locale)}</h3>
             {data.opportunities.map((o, i) => (
               <div key={i} className="mb-2">
-                <div className="text-sm font-medium text-emerald-900">{o.title}</div>
-                <div className="text-xs text-emerald-700">{o.detail}</div>
-                {o.potential && <div className="text-xs font-medium text-emerald-600">{o.potential}</div>}
+                <div className="text-sm font-medium text-emerald-900">{interpolate(t(o.titleKey, locale), o.titleParams)}</div>
+                <div className="text-xs text-emerald-700">{interpolate(t(o.detailKey, locale), o.detailParams)}</div>
               </div>
             ))}
           </div>
@@ -369,8 +381,8 @@ function AiInsightsSection({ data, locale = "ru" }: AiInsightsSectionProps) {
             <h3 className="mb-3 text-sm font-semibold text-amber-800">📦 {t("cc.ai.catalog", locale)}</h3>
             {data.catalogInsights.map((c, i) => (
               <div key={i} className="mb-2">
-                <div className="text-sm font-medium text-amber-900">{c.title}</div>
-                <div className="text-xs text-amber-700">{c.detail}</div>
+                <div className="text-sm font-medium text-amber-900">{interpolate(t(c.titleKey, locale), c.titleParams)}</div>
+                <div className="text-xs text-amber-700">{interpolate(t(c.detailKey, locale), c.detailParams)}</div>
               </div>
             ))}
           </div>

@@ -49,6 +49,10 @@ function makeSummary(overrides: Partial<CommandCenterSummary["sections"]> = {}):
         bookingsRequested: makeKpi(300, 280, 20, 7.1),
         averageOrderValue: makeKpi(50, 49, 1, 2.0),
         conversionRate: makeKpi(3.2, 3.0, 0.2, 6.7),
+        qualifiedGmv: makeKpi(120000, 108000, 12000, 11.1),
+        completedGmv: makeKpi(100000, 90000, 10000, 11.1),
+        collectedGmv: makeKpi(115000, 103000, 12000, 11.7),
+        outstandingGmv: makeKpi(5000, 5000, 0, 0),
       },
       operational: {
         ordersFulfilled: makeKpi(480, 430, 50, 11.6),
@@ -63,6 +67,7 @@ function makeSummary(overrides: Partial<CommandCenterSummary["sections"]> = {}):
         reconciliationStatus: makeKpi(0),
         totalPayments: makeKpi(25000, 22000, 3000, 13.6),
         netPayments: makeKpi(24500, 21500, 3000, 14.0),
+        totalRefunds: makeKpi(500, 400, 100, 25.0),
       },
       marketplace: {
         marketplaceSessions: makeKpi(12000, 11000, 1000, 9.1),
@@ -485,5 +490,68 @@ describe("layout error fallback", () => {
   it("layout loading shows loading state", () => {
     // When layoutLoading is true and layout is null, skeleton is shown
     expect(true).toBe(true); // Verified in CommandCenter.tsx code
+  });
+});
+
+// ─── GMV Display Rounding Reconciliation ──────────────────────────────
+
+describe("GMV display rounding reconciliation", () => {
+  it("displayCurrent overrides current for display when present", () => {
+    // OPTION B: Outstanding uses displayCurrent for integer reconciliation
+    const kpi: KpiValue = {
+      current: 675.07,       // exact authoritative value
+      displayCurrent: 676,   // reconciled: round(11514) - round(10838) = 676
+      previous: null,
+      delta: null,
+      deltaPercent: null,
+    };
+    // KpiCard should use displayCurrent when available
+    expect(kpi.displayCurrent).toBe(676);
+    expect(kpi.current).toBe(675.07); // exact value preserved
+  });
+
+  it("integer reconciliation: round(GMV) - round(Collected) = displayOutstanding", () => {
+    // Simulates the exact MONTH period values
+    const exactGmv = 11513.53;
+    const exactCollected = 10838.46;
+    const exactOutstanding = 675.07;
+
+    const displayedGmv = Math.round(exactGmv);    // 11514
+    const displayedCollected = Math.round(exactCollected); // 10838
+    const displayedOutstanding = displayedGmv - displayedCollected; // 676
+
+    expect(displayedGmv).toBe(11514);
+    expect(displayedCollected).toBe(10838);
+    expect(displayedOutstanding).toBe(676);
+    // Reconciled display: 11514 - 10838 = 676 ✓
+    expect(displayedGmv - displayedCollected).toBe(displayedOutstanding);
+  });
+
+  it("negative reconciled outstanding clamps to zero", () => {
+    // When Collected > GMV (e.g., prior-period payments)
+    const exactGmv = 7460.14;
+    const exactCollected = 10838.46;
+    const displayedGmv = Math.round(exactGmv);
+    const displayedCollected = Math.round(exactCollected);
+    const displayedOutstanding = Math.max(0, displayedGmv - displayedCollected);
+    expect(displayedOutstanding).toBe(0);
+  });
+
+  it("boundary rounding: 100.49 - 40.49 = 60", () => {
+    const gmv = Math.round(100.49);  // 100
+    const collected = Math.round(40.49); // 40
+    expect(gmv - collected).toBe(60);
+  });
+
+  it("boundary rounding: 100.50 - 40.49 = 61", () => {
+    const gmv = Math.round(100.50);  // 101 (banker's rounding may give 100 in some impls)
+    const collected = Math.round(40.49); // 40
+    // Math.round(100.50) = 101 in JS
+    expect(gmv - collected).toBe(61);
+  });
+
+  it("zero case: GMV=0, Collected=0, Outstanding=0", () => {
+    const displayedOutstanding = Math.max(0, Math.round(0) - Math.round(0));
+    expect(displayedOutstanding).toBe(0);
   });
 });

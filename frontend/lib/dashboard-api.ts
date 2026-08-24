@@ -22,6 +22,8 @@ export interface KpiValue {
   deltaPercent: number | null;
   /** B.2: explicit platform reporting currency for monetary KPIs. */
   currency?: string;
+  /** Reconciled display value for integer presentation. */
+  displayCurrent?: number | null;
 }
 
 export interface CommandCenterSummary {
@@ -46,6 +48,11 @@ export interface CommandCenterSummary {
       bookingsRequested: KpiValue;
       averageOrderValue: KpiValue;
       conversionRate: KpiValue;
+      // GMV Lifecycle (Policy Closure)
+      qualifiedGmv: KpiValue;
+      completedGmv: KpiValue;
+      collectedGmv: KpiValue;
+      outstandingGmv: KpiValue;
     };
     operational?: {
       ordersFulfilled: KpiValue;
@@ -60,6 +67,7 @@ export interface CommandCenterSummary {
       reconciliationStatus: KpiValue;
       totalPayments: KpiValue;
       netPayments: KpiValue;
+      totalRefunds: KpiValue;
     };
     marketplace?: {
       marketplaceSessions: KpiValue;
@@ -93,12 +101,48 @@ export interface CommandCenterSummary {
       signals: Array<{
         id: string;
         code: string;
-        title: string;
-        description: string;
+        titleKey: string;
+        descriptionKey: string;
+        descriptionParams: Record<string, string | number>;
         category: string;
         status: string;
         affectedCount: number;
         evidence: Array<{ key: string; value: string | number; unit?: string }>;
+        why: {
+          status: string;
+          primaryDriver?: { textKey: string; factualValue: string | number; evidenceRefs: string[] };
+          contributingFactors: Array<{ textKey: string; factualValue: string | number; evidenceRefs: string[] }>;
+          evidenceStrength: string;
+          evidenceRefs: string[];
+          rule: { ruleId: string; ruleVersion: string };
+        } | null;
+        impact: {
+          status: string;
+          dimensions: Array<{
+            type: string;
+            label: string;
+            value: string | number;
+            unit?: string;
+            strength: string;
+            evidenceRefs: string[];
+          }>;
+          summary: { text: string; textKey: string };
+          rule: { ruleId: string; ruleVersion: string };
+        } | null;
+        actions: Array<{
+          actionCode: string;
+          signalCode: string;
+          titleKey: string;
+          descriptionKey?: string;
+          params?: Record<string, string | number>;
+          actionType: string;
+          target: { type: string; route?: string; filters?: Record<string, string | number> };
+          requiredPermission: string;
+          executionMode: string;
+          confirmationRequired: boolean;
+          eligible: boolean;
+          ineligibleReasonKey?: string;
+        }>;
         firstDetectedAt: string;
         lastDetectedAt: string;
         observationCount: number;
@@ -115,9 +159,9 @@ export interface CommandCenterSummary {
       servicesWithoutSales: KpiValue;
     };
     insights?: {
-      risks: Array<{ title: string; detail: string; severity: string }>;
-      opportunities: Array<{ title: string; detail: string; potential: string }>;
-      catalogInsights: Array<{ title: string; detail: string }>;
+      risks: Array<{ titleKey: string; titleParams: Record<string, string | number>; detailKey: string; detailParams: Record<string, string | number>; severity: string }>;
+      opportunities: Array<{ titleKey: string; titleParams: Record<string, string | number>; detailKey: string; detailParams: Record<string, string | number>; orders: number; period: number }>;
+      catalogInsights: Array<{ titleKey: string; titleParams: Record<string, string | number>; detailKey: string; detailParams: Record<string, string | number> }>;
     };
   };
 }

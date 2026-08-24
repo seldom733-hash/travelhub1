@@ -12,6 +12,9 @@ import { DashboardController } from "./dashboard.controller";
 import { DashboardService } from "./dashboard.service";
 import { DecisionSignalController } from "./decision-signal.controller";
 import { DecisionSignalService } from "./decision-signal.service";
+import { WhyAttributionService } from "./why-attribution.service";
+import { ImpactAttributionService } from "./impact-attribution.service";
+import { ActionDerivationService } from "./action-derivation.service";
 import { AnalyticsModule } from "../analytics/analytics.module";
 import { PrismaService } from "../../prisma/prisma.service";
 
@@ -21,8 +24,11 @@ import { PrismaService } from "../../prisma/prisma.service";
   providers: [
     PrismaService,
     DecisionSignalService,
+    WhyAttributionService,
+    ImpactAttributionService,
+    ActionDerivationService,
     DashboardService,
   ],
-  exports: [DashboardService, DecisionSignalService],
+  exports: [DashboardService, DecisionSignalService, WhyAttributionService, ImpactAttributionService, ActionDerivationService],
 })
 export class DashboardModule {}

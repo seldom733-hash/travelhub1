@@ -21,15 +21,16 @@ export class RecentCancellationsDetector implements DecisionSignalDetector {
   async detect(): Promise<DetectedCondition[]> {
     const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+    const nowTs = new Date(Date.now());
     const cancelled = await (this.prisma as any).order.findMany({
       where: {
         status: "CANCELLED",
-        createdAt: { gt: cutoff },
+        createdAt: { gt: cutoff, lte: nowTs },
       },
       select: {
         id: true,
         createdAt: true,
-        total: true,
+        amount: true,
         currency: true,
       },
       orderBy: { createdAt: "asc" },
@@ -44,7 +45,7 @@ export class RecentCancellationsDetector implements DecisionSignalDetector {
     );
 
     const totalGmv = cancelled.reduce(
-      (sum: number, o: any) => sum + Number(o.total ?? 0),
+      (sum: number, o: any) => sum + Number(o.amount ?? 0),
       0,
     );
 

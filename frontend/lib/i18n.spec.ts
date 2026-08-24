@@ -41,4 +41,51 @@ describe("i18n (Step 1.7 §17 — RU/AZ/EN foundation)", () => {
     expect(DEFAULT_LOCALE).toBe("ru");
     expect(["ru", "az", "en"] as Locale[]).toEqual(expect.arrayContaining(["ru", "az", "en"]));
   });
+
+  // ── GMV Lifecycle i18n Regression ─────────────────────────────────────
+  it("GMV lifecycle labels resolve for all three locales (no raw keys)", () => {
+    const widgets = ["gmv", "collected-gmv", "outstanding", "completed-gmv"];
+    for (const w of widgets) {
+      const key = `cc.kpi.${w}`;
+      for (const locale of ["ru", "az", "en"] as Locale[]) {
+        const val = t(key, locale);
+        // t() returns the raw key if not found
+        expect(val).not.toBe(key);
+        expect(val.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("GMV lifecycle subtitles resolve for all three locales", () => {
+    const widgets = ["gmv", "collected-gmv", "outstanding", "completed-gmv"];
+    for (const w of widgets) {
+      const key = `cc.kpi.${w}.subtitle`;
+      for (const locale of ["ru", "az", "en"] as Locale[]) {
+        const val = t(key, locale);
+        expect(val).not.toBe(key);
+        expect(val.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("no GMV lifecycle label contains raw cc.kpi prefix", () => {
+    const widgets = ["gmv", "collected-gmv", "outstanding", "completed-gmv"];
+    for (const w of widgets) {
+      const key = `cc.kpi.${w}`;
+      const ru = t(key, "ru");
+      const az = t(key, "az");
+      const en = t(key, "en");
+      expect(ru).not.toMatch(/^cc\./);
+      expect(az).not.toMatch(/^cc\./);
+      expect(en).not.toMatch(/^cc\./);
+    }
+  });
+
+  it("Revenue/Payment Volume label resolves (no raw key)", () => {
+    for (const locale of ["ru", "az", "en"] as Locale[]) {
+      const val = t("cc.kpi.revenue", locale);
+      expect(val).not.toBe("cc.kpi.revenue");
+      expect(val.length).toBeGreaterThan(0);
+    }
+  });
 });

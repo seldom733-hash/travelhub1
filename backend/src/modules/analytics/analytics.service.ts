@@ -66,6 +66,28 @@ function sumDecimalString(
 }
 
 /**
+ * Sum a specific Decimal field as string — preserves canonical exactness.
+ * Variant of sumDecimalString that sums a named field instead of `amount`.
+ */
+function sumDecimalField(
+  records: Array<Record<string, unknown>>,
+  fieldName: string,
+): Record<string, string> {
+  const centsByCurrency = new Map<string, number>();
+  for (const r of records) {
+    const cur = String(r.currency || "USD");
+    const amountStr = String(r[fieldName] ?? "0");
+    const cents = Math.round(parseFloat(amountStr) * 100);
+    centsByCurrency.set(cur, (centsByCurrency.get(cur) || 0) + cents);
+  }
+  const result: Record<string, string> = {};
+  for (const [cur, cents] of centsByCurrency) {
+    result[cur] = (cents / 100).toFixed(2);
+  }
+  return result;
+}
+
+/**
  * PLATFORM REPORTING CURRENCY — single source of truth for aggregated KPIs.
  * B.1 Remediation: all PLATFORM management KPIs use AZN.
  */
@@ -177,6 +199,15 @@ export interface CompanyKpiResponse {
     refundsCurrency: string;
     gmvCurrency: string;
     revenueCurrency: string;
+    // ── GMV Lifecycle metrics (Policy Closure) ──
+    /** Qualified GMV: SUM(amount) WHERE status NOT IN (NEW, CANCELLED), COHORT by createdAt */
+    qualifiedGmv: ComparisonValue<string>;
+    /** Completed GMV: SUM(amount) WHERE status IN (FULFILLED, CLOSED), COHORT by createdAt */
+    completedGmv: ComparisonValue<string>;
+    /** Collected GMV: SUM(paidAmount) WHERE status NOT IN (NEW, CANCELLED), COHORT by createdAt */
+    collectedGmv: ComparisonValue<string>;
+    /** Outstanding GMV: qualifiedGmv - collectedGmv, COHORT */
+    outstandingGmv: ComparisonValue<string>;
   };
   attribution?: {
     actionFields: string[];
@@ -372,7 +403,7 @@ export class AnalyticsService {
         where: {
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
-        select: { id: true, amount: true, currency: true, status: true },
+        select: { id: true, amount: true, paidAmount: true, currency: true, status: true },
       }),
       prev
         ? this.prisma.order.findMany({
@@ -479,6 +510,17 @@ export class AnalyticsService {
     const refundByCurrency = sumDecimalString(refunds);
     const commissionByCurrency = sumDecimalString(commissions);
 
+    // ── GMV Lifecycle (Policy Closure) ──
+    // Qualified GMV: all orders except NEW/CANCELLED (economic qualification)
+    const qualifiedOrders = orders.filter(
+      (o) => o.status !== "NEW" && o.status !== "CANCELLED",
+    );
+    const qualifiedGmvByCurrency = sumDecimalString(qualifiedOrders);
+    // Completed GMV = current GMV (FULFILLED + CLOSED)
+    const completedGmvByCurrency = gmvByCurrency;
+    // Collected GMV: SUM(paidAmount) for qualified orders
+    const collectedGmvByCurrency = sumDecimalField(qualifiedOrders, "paidAmount");
+
     // MEDIUM-1: AOV = GMV / count(fulfilled orders)
     const ordersCountByCurrency = new Map<string, number>();
     for (const o of fulfilledOrders) {
@@ -511,6 +553,16 @@ export class AnalyticsService {
           select: { amount: true, currency: true },
         })
       : [];
+    // Previous period GMV lifecycle metrics
+    const prevQualifiedData = prev
+      ? await this.prisma.order.findMany({
+          where: {
+            status: { notIn: ["NEW", "CANCELLED"] },
+            createdAt: { gte: prev.start, lt: prev.endExclusive },
+          },
+          select: { amount: true, paidAmount: true, currency: true },
+        })
+      : [];
 
     const prevGmvByCurrency = sumDecimalString(prevGmvData);
     const prevRevenueByCurrency = sumDecimalString(prevRevenueData);
@@ -526,6 +578,16 @@ export class AnalyticsService {
     const prevGmvSum = primaryCurrencyTotal(prevGmvByCurrency);
     const prevRevenueSum = primaryCurrencyTotal(prevRevenueByCurrency);
     const aov = primaryCurrencyTotal(aovByCurrency);
+    // GMV Lifecycle totals
+    const qualifiedGmv = primaryCurrencyTotal(qualifiedGmvByCurrency);
+    const completedGmv = primaryCurrencyTotal(completedGmvByCurrency);
+    const collectedGmv = primaryCurrencyTotal(collectedGmvByCurrency);
+    // Outstanding = GMV - Collected (per currency, integer cents)
+    const outstandingByCurrency = subtractDecimalStrings(qualifiedGmvByCurrency, collectedGmvByCurrency);
+    const outstandingGmv = primaryCurrencyTotal(outstandingByCurrency);
+    const prevQualifiedGmv = primaryCurrencyTotal(sumDecimalString(prevQualifiedData));
+    const prevCollectedGmv = primaryCurrencyTotal(sumDecimalField(prevQualifiedData, "paidAmount"));
+    const prevOutstanding = primaryCurrencyTotal(subtractDecimalStrings(sumDecimalString(prevQualifiedData), sumDecimalField(prevQualifiedData, "paidAmount")));
 
     const marketplaceSessions = Number(behavioralMarketplace[0]?.cnt || 0);
     const storefrontSessions = Number(behavioralStorefront[0]?.cnt || 0);
@@ -588,6 +650,11 @@ export class AnalyticsService {
         refundsCurrency: primaryCurrencyTotal(refundByCurrency).currency,
         gmvCurrency: gmv.currency,
         revenueCurrency: revenue.currency,
+        // ── GMV Lifecycle (Policy Closure) ──
+        qualifiedGmv: this.compareDecimalValues(qualifiedGmv.total, prevQualifiedGmv.total),
+        completedGmv: this.compareDecimalValues(completedGmv.total, prevGmvSum.total),
+        collectedGmv: this.compareDecimalValues(collectedGmv.total, prevCollectedGmv.total),
+        outstandingGmv: this.compareDecimalValues(outstandingGmv.total, prevOutstanding.total),
       },
       attribution: {
         actionFields: [

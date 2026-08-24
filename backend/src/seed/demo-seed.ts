@@ -23,6 +23,7 @@
  * - Does NOT touch production data (only demo mode)
  */
 
+import "dotenv/config";
 import { PrismaClient, Prisma } from "../generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
@@ -317,13 +318,12 @@ async function seedCustomers() {
 
     batchData.push({
       id,
-      code,
-      type: "PERSON",
+      code,        type: "PERSON" as any,
       firstName,
       lastName,
       email,
       phone: `+994${randomBetween(50, 99)}${randomBetween(1000000, 9999999)}`,
-      status: "ACTIVE",
+      status: "ACTIVE" as any,
       version: 1,
       createdAt,
       updatedAt: createdAt,
@@ -487,6 +487,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
   const orderItems: Array<{
     id: string; orderId: string; productId: string; productCode: string; title: string;
     type: string; quantity: number; price: Prisma.Decimal; currency: string; amount: Prisma.Decimal;
+    serviceDate: Date;
   }> = [];
   const paymentData: Array<{
     id: string; code: string; orderId: string; amount: Prisma.Decimal; currency: string;
@@ -762,6 +763,222 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
   return { orderData, paymentData, bookingData, commissionData };
 }
 
+// ─── Refunds (Step 2.13) ─────────────────────────────────────────────────
+
+async function seedRefunds(paymentData: Array<{ id: string; orderId: string; amount: Prisma.Decimal; currency: string; partnerId: string; createdAt: Date; paidAt?: Date }>) {
+  console.log(`\n💸 Seeding refunds...`);
+
+  // Select a subset of PAID payments to refund (mix of full and partial)
+  const refundable = paymentData.filter(p => p.paidAt && Number(p.amount) > 20);
+  const refundCount = Math.min(refundable.length, 50);
+  let refundsInserted = 0;
+
+  // Deterministic subset: every ~20th payment gets a refund
+  const refundSubset = refundable.filter((_, i) => i % 20 === 0).slice(0, refundCount);
+
+  for (let i = 0; i < refundSubset.length; i++) {
+    const p = refundSubset[i];
+    const id = uuid(`refund-${i + 1}`);
+    const code = `RFD-${String(i + 1).padStart(8, "0")}`;
+    const isFull = i % 3 === 0; // 1/3 full refunds, 2/3 partial
+    const refundAmount = isFull ? Number(p.amount) : Number(p.amount) * 0.5;
+    // Half PROCESSED (historical), half REQUESTED (pending for detector)
+    const isPending = i % 2 === 0;
+    const status = isPending ? "REQUESTED" : "PROCESSED";
+    const createdAt = new Date(p.paidAt!.getTime() + randomBetween(1, 30) * 86400000);
+
+    try {
+      await prisma.refund.upsert({
+        where: { id },
+        create: {
+          id, code, paymentId: p.id, orderId: p.orderId,
+          amount: decimal(refundAmount), currency: p.currency,
+          status: status as any,
+          reason: isFull ? "Customer request — full cancellation" : "Partial service issue",
+          version: 1,
+          createdAt, updatedAt: createdAt,
+          requestedAt: createdAt,
+          approvedAt: isPending ? undefined : createdAt,
+          processedAt: isPending ? undefined : new Date(createdAt.getTime() + 2 * 86400000),
+          isActiveRefund: true,
+        },
+        update: {},
+      });
+      refundsInserted++;
+    } catch (e: any) { /* skip duplicates */ }
+  }
+  console.log(`  ✅ ${refundsInserted} refunds created (${refundSubset.length - refundsInserted} skipped)`);
+}
+
+// ─── Failed Payments & Pending Bookings ────────────────────────────────────
+
+async function seedDetectorTriggers() {
+  console.log(`\n🔍 Seeding detector trigger data...`);
+
+  // 1. Failed payments (FailedPaymentsDetector)
+  console.log(`  💳 Adding failed payments...`);
+  const partners = await prisma.partner.findMany({ select: { id: true }, take: 10 });
+  const customers = await prisma.customer.findMany({ select: { id: true }, take: 10 });
+  let failedInserted = 0;
+  const paymentMethods = ["CARD", "BANK_TRANSFER", "MOBILE_PAYMENT"];
+
+  for (let i = 0; i < 8; i++) {
+    const id = uuid(`failed-payment-${i + 1}`);
+    const code = `PAY-F${String(i + 1).padStart(7, "0")}`;
+    const amount = [120, 85, 250, 45, 300, 60, 180, 95][i];
+    const method = paymentMethods[i % paymentMethods.length];
+    // Spread across months — some old (for detector), some recent
+    const month = i < 4 ? randomBetween(0, 5) : randomBetween(6, 11);
+    const createdAt = randomDateInMonth(month, 2026);
+
+    try {
+      await prisma.payment.upsert({
+        where: { id },
+        create: {
+          id, code, orderId: uuid(`order-detector-${i + 100}`),
+          amount: decimal(amount), currency: "AZN",
+          status: "FAILED" as any,
+          paymentMethod: method,
+          partnerId: partners[i % partners.length]?.id,
+          createdAt, updatedAt: createdAt,
+          isActivePayment: true, version: 1,
+        },
+        update: {},
+      });
+      failedInserted++;
+    } catch (e: any) { /* skip */ }
+  }
+  console.log(`  ✅ ${failedInserted} failed payments added`);
+
+  // 2. Pending bookings (PendingBookingsDetector — AWAITING_CONFIRMATION > 4h)
+  console.log(`  🏨 Adding pending bookings...`);
+  let pendingInserted = 0;
+  const products = await prisma.product.findMany({ where: { status: "PUBLISHED" as any }, select: { id: true }, take: 10 });
+
+  for (let i = 0; i < 5; i++) {
+    const id = uuid(`pending-booking-${i + 1}`);
+    const code = `BKG-P${String(i + 1).padStart(7, "0")}`;
+    // Created 6-24 hours ago (beyond 4h SLA)
+    const hoursAgo = [6, 8, 12, 18, 24][i];
+    const createdAt = new Date(Date.now() - hoursAgo * 3600000);
+    const serviceDate = new Date(createdAt.getTime() + randomBetween(3, 14) * 86400000);
+
+    try {
+      await prisma.booking.upsert({
+        where: { id },
+        create: {
+          id, code, orderId: uuid(`order-pending-${i + 100}`),
+          productId: products[i % products.length]?.id ?? products[0].id,
+          status: "AWAITING_CONFIRMATION" as any,
+          amount: decimal([250, 180, 350, 120, 420][i]),
+          currency: "AZN",
+          serviceDate, createdAt, updatedAt: createdAt, version: 1,
+        },
+        update: {},
+      });
+      pendingInserted++;
+    } catch (e: any) { /* skip */ }
+  }
+  console.log(`  ✅ ${pendingInserted} pending bookings added (beyond 4h SLA)`);
+}
+
+// ─── Storefront Subscriptions & Customers ───────────────────────────────────
+
+async function seedStorefrontData() {
+  console.log(`\n🏪 Seeding storefront subscriptions & customers...`);
+
+  // 1. Ensure subscription plans exist
+  const freePlanId = uuid("plan-free-trial");
+  const premiumPlanId = uuid("plan-premium");
+
+  await prisma.storefrontSubscriptionPlan.upsert({
+    where: { id: freePlanId },
+    create: {
+      id: freePlanId, code: "SUB-PLAN-001", name: "First Month Free",
+      planType: "FREE_TRIAL", priceUsd: decimal(0), periodDays: 30,
+      isActive: true, createdAt: new Date(2026, 0, 1), updatedAt: new Date(2026, 0, 1),
+    },
+    update: {},
+  });
+  await prisma.storefrontSubscriptionPlan.upsert({
+    where: { id: premiumPlanId },
+    create: {
+      id: premiumPlanId, code: "SUB-PLAN-002", name: "Premium",
+      planType: "PREMIUM", priceUsd: decimal(199), periodDays: 30,
+      isActive: true, createdAt: new Date(2026, 0, 1), updatedAt: new Date(2026, 0, 1),
+    },
+    update: {},
+  });
+  console.log(`  ✅ Subscription plans created`);
+
+  // 2. Create subscriptions for active storefronts
+  const storefronts = await prisma.partnerStorefront.findMany({
+    where: { status: "ACTIVE" as any },
+    select: { id: true },
+  });
+  let subscriptionsInserted = 0;
+
+  for (let i = 0; i < storefronts.length; i++) {
+    const sf = storefronts[i];
+    const id = uuid(`subscription-${i + 1}`);
+    const code = `SUB-${String(i + 1).padStart(8, "0")}`;
+    const isFree = i < 2; // First 2 on free trial
+    const planId = isFree ? freePlanId : premiumPlanId;
+    const periodStart = new Date(2026, 0, 15);
+    const periodEnd = new Date(2026, 1, 15);
+
+    try {
+      await prisma.storefrontSubscription.upsert({
+        where: { id },
+        create: {
+          id, code, storefrontId: sf.id, planId,
+          status: "ACTIVE" as any,
+          currentPeriodStart: periodStart, currentPeriodEnd: periodEnd,
+          startedAt: new Date(2026, 0, 1),
+          totalPaidUsd: decimal(isFree ? 0 : 199),
+          createdAt: new Date(2026, 0, 1), updatedAt: new Date(2026, 0, 1),
+        },
+        update: {},
+      });
+      subscriptionsInserted++;
+    } catch (e: any) { /* skip */ }
+  }
+  console.log(`  ✅ ${subscriptionsInserted} subscriptions created`);
+
+  // 3. Storefront customers (up to 70, distributed unevenly)
+  console.log(`  👥 Creating storefront customers...`);
+  const storefrontCustomers = [];
+  const distribution = [12, 10, 8, 7, 6, 5, 4, 4, 3, 3]; // uneven distribution
+  let sfCustCount = 0;
+
+  for (let i = 0; i < Math.min(storefronts.length, distribution.length); i++) {
+    const sfId = storefronts[i]?.id;
+    if (!sfId) continue;
+    for (let j = 0; j < distribution[i]; j++) {
+      const idx = sfCustCount++;
+      const id = uuid(`sf-customer-${idx}`);
+      storefrontCustomers.push({
+        id, code: `SFC-${String(idx + 1).padStart(8, "0")}`,
+        type: "PERSON" as any,
+        firstName: FIRST_NAMES[idx % FIRST_NAMES.length],
+        lastName: LAST_NAMES[(idx + 50) % LAST_NAMES.length],
+        email: `sf-customer${idx + 1}@demo.travelhub.local`,
+        phone: `+994${randomBetween(50, 99)}${randomBetween(1000000, 9999999)}`,
+        status: "ACTIVE" as any,
+        version: 1,
+        createdAt: randomDateInMonth(randomBetween(0, 11), 2026),
+        updatedAt: new Date(),
+      });
+    }
+  }
+
+  if (storefrontCustomers.length > 0) {
+    await prisma.customer.createMany({ data: storefrontCustomers, skipDuplicates: true });
+  }
+  console.log(`  ✅ ${storefrontCustomers.length} storefront customers created`);
+}
+
+
 // ─── Catalog Health (Step 6) ───────────────────────────────────────────────
 
 async function seedCatalogHealth() {
@@ -840,8 +1057,8 @@ async function seedCatalogHealth() {
 
   // Final catalog health summary
   const published = await prisma.product.count({ where: { status: "PUBLISHED" as any } });
-  const archived = await prisma.product.count({ where: { status: "ARCHIVED" as any } });
-  console.log(`  ✅ Catalog: ${published} PUBLISHED, ${archived} ARCHIVED`);
+  const archivedCount = await prisma.product.count({ where: { status: "ARCHIVED" as any } });
+  console.log(`  ✅ Catalog: ${published} PUBLISHED, ${archivedCount} ARCHIVED`);
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────
@@ -869,9 +1086,18 @@ async function main() {
     await seedStorefronts(partners);
 
   // 5. Orders + Payments + Bookings + Commissions
-  await seedOrders(products);
+  const { paymentData } = await seedOrders(products);
 
-  // 6. Archive old test DRAFT products + add new listings without orders
+  // 6. Refunds (Step 2.13)
+  await seedRefunds(paymentData);
+
+  // 7. Detector triggers (failed payments, pending bookings)
+  await seedDetectorTriggers();
+
+  // 8. Storefront subscriptions & customers
+  await seedStorefrontData();
+
+  // 9. Archive old test DRAFT products + add new listings without orders
   await seedCatalogHealth();
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -890,6 +1116,8 @@ async function main() {
       prisma.commission.count(),
       prisma.productPublicationChannel.count(),
       prisma.partnerStorefront.count(),
+      prisma.refund.count(),
+      prisma.storefrontSubscription.count(),
     ]);
 
     console.log("\n📊 Final database counts:");
@@ -902,6 +1130,8 @@ async function main() {
     console.log(`  Commissions:         ${counts[6]}`);
     console.log(`  Publications:        ${counts[7]}`);
     console.log(`  Storefronts:         ${counts[8]}`);
+    console.log(`  Refunds:             ${counts[9]}`);
+    console.log(`  Subscriptions:       ${counts[10]}`);
 
   } catch (error) {
     console.error("\n❌ Seed failed:", error);
