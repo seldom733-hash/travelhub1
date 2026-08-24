@@ -171,6 +171,46 @@ export interface Customer {
   createdAt: string;
 }
 
+export interface CustomerDetail extends Customer {
+  contacts: { id: string; code: string; name: string; email: string | null; phone: string | null; role: string | null }[];
+  history: { id: string; action: string; from: string | null; to: string | null; comment: string | null; createdAt: string }[];
+  partnerRelations: PartnerCustomerRelation[];
+  orders: { id: string; code: string; number: string; status: string; paymentStatus: string; amount: string; paidAmount: string; currency: string; createdAt: string }[];
+  bookings: { id: string; code: string; status: string; amount: string; currency: string; createdAt: string }[];
+  payments: { id: string; code: string; status: string; amount: string; currency: string; createdAt: string }[];
+  summary: { totalOrders: number; totalBookings: number; totalPayments: number };
+}
+
+export interface Partner {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  countryCode: string | null;
+  contactEmail: string | null;
+  registrationNumber: string | null;
+  createdAt: string;
+}
+
+export interface PartnerDetail extends Partner {
+  customerRelations: PartnerCustomerRelation[];
+}
+
+export interface PartnerCustomerRelation {
+  id: string;
+  partnerId: string;
+  customerId: string;
+  status: string;
+  leadSource: string | null;
+  assignedTo: string | null;
+  lifecycle: string | null;
+  tags: string[];
+  notes: string | null;
+  createdAt: string;
+  customer?: Customer;
+  partner?: Partner;
+}
+
 export interface Order {
   id: string;
   code: string;

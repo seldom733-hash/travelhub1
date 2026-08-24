@@ -1683,6 +1683,7 @@ model Customer {
 
   contacts    Contact[]
   history     CustomerHistory[]
+  partnerRelations PartnerCustomerRelation[] // Step 3.5B
 
   @@index([status])
   @@schema("crm")
@@ -1743,6 +1744,9 @@ model Partner {
   @@unique([contactEmail], where: { contactEmail: { not: null } }, map: "Partner_unique_contactEmail")
   @@unique([registrationNumber], where: { registrationNumber: { not: null } }, map: "Partner_unique_registrationNumber")
   @@schema("crm")
+
+  // Step 3.5B — reverse relation to PartnerCustomerRelation
+  customerRelations PartnerCustomerRelation[]
 }
 
 model Supplier {
@@ -1771,6 +1775,50 @@ model CustomerHistory {
   createdAt  DateTime @default(now())
 
   @@index([customerId])
+  @@schema("crm")
+}
+
+/// Step 3.5B — Partner ↔ Customer relationship.
+/// Один Customer может иметь отношения с несколькими Partners.
+/// Partner-specific data (notes, tags, lifecycle, manager) НЕ являются global Customer fields.
+model PartnerCustomerRelation {
+  id           String    @id @default(uuid())
+  partnerId    String
+  partner      Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  status       EntityStatus @default(ACTIVE)
+  leadSource   String?   // Storefront/Direct/Manual/Marketplace
+  assignedTo   String?   // manager/user ID
+  lifecycle    String?   // LEAD/PROSPECT/ACTIVE/CHURNED (partner-specific)
+  tags         String[]  // partner-specific tags
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  version      Int       @default(1)
+  history      PartnerCustomerRelationHistory[] // Step 3.5B audit trail
+
+  @@unique([partnerId, customerId])
+  @@index([partnerId])
+  @@index([customerId])
+  @@schema("crm")
+}
+
+/// Step 3.5B — Audit trail for PartnerCustomerRelation changes.
+model PartnerCustomerRelationHistory {
+  id                    String   @id @default(uuid())
+  relationId            String
+  relation              PartnerCustomerRelation @relation(fields: [relationId], references: [id], onDelete: Cascade)
+  action                String
+  from                  String?
+  to                    String?
+  fields                Json?
+  actorId               String?
+  actorName             String?
+  comment               String?
+  createdAt             DateTime @default(now())
+
+  @@index([relationId])
   @@schema("crm")
 }
 

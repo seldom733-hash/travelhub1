@@ -196,6 +196,51 @@ export class CrmController {
   createSupplier(@Body() dto: CreateSupplierDto) {
     return this.crm.createSupplier(dto.name, dto.companyId);
   }
+
+  // ── Step 3.5 — Partner List/Detail ──────────────────────────────────────
+
+  @Get("partners")
+  @RequirePermissions("crm.partner.read")
+  listPartners(@Query() query: ListCustomersQuery) {
+    return this.crm.listPartners(query);
+  }
+
+  @Get("partners/:id")
+  @RequirePermissions("crm.partner.read")
+  getPartner(@Param("id") id: string) {
+    return this.crm.getPartner(id);
+  }
+
+  // ── Step 3.5 — Customer Detail with relations ───────────────────────────
+
+  @Get("customers/:id/detail")
+  @RequirePermissions("crm.customer.read")
+  getCustomerDetail(@Param("id") id: string) {
+    return this.crm.getCustomerDetail(id);
+  }
+
+  // ── Step 3.5B — Partner Customer Relations ──────────────────────────────
+
+  @Post("partners/:partnerId/customers/:customerId")
+  @RequirePermissions("crm.partner.write")
+  createPartnerCustomerRelation(
+    @Param("partnerId") partnerId: string,
+    @Param("customerId") customerId: string,
+    @Body() dto: { leadSource?: string; assignedTo?: string; lifecycle?: string; tags?: string[]; notes?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.crm.createPartnerCustomerRelation(partnerId, customerId, dto, actor.username);
+  }
+
+  @Patch("partner-customer-relations/:relationId")
+  @RequirePermissions("crm.partner.write")
+  updatePartnerCustomerRelation(
+    @Param("relationId") relationId: string,
+    @Body() dto: { status?: EntityStatus; lifecycle?: string; tags?: string[]; notes?: string; assignedTo?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.crm.updatePartnerCustomerRelation(relationId, dto, actor.username);
+  }
 }
 
 export { ValidateNested };

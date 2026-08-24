@@ -420,4 +420,194 @@ export class CrmService {
   async listSuppliers() {
     return this.prisma.supplier.findMany({ orderBy: { name: "asc" } });
   }
+
+  // ── Partner List/Detail (Step 3.5 — CRM Completion) ────────────────────
+
+  async listPartners(query: CustomerListQuery) {
+    const page = Math.max(1, query.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+    const where: Prisma.PartnerWhereInput = {
+      ...(query.status ? { status: query.status as EntityStatus } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { name: { contains: query.search, mode: "insensitive" } },
+              { code: { contains: query.search, mode: "insensitive" } },
+              { contactEmail: { contains: query.search, mode: "insensitive" } },
+              { registrationNumber: { contains: query.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.partner.findMany({
+        where,
+        orderBy: { name: "asc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.partner.count({ where }),
+    ]);
+
+    return { items, total, page, pageSize };
+  }
+
+  async getPartner(id: string) {
+    const partner = await this.prisma.partner.findUnique({
+      where: { id },
+      include: {
+        customerRelations: {
+          include: { customer: true },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+    if (!partner) throw new NotFoundError(`Partner ${id} not found`);
+    return partner;
+  }
+
+  // ── Customer Detail with related data (Step 3.5) ──────────────────────
+
+  async getCustomerDetail(id: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id },
+      include: {
+        contacts: { orderBy: { createdAt: "asc" } },
+        history: { orderBy: { createdAt: "desc" }, take: 50 },
+        partnerRelations: {
+          include: { partner: true },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+    if (!customer) throw new NotFoundError(`Customer ${id} not found`);
+
+    // Aggregate orders from direct customerId reference
+    const orders = await this.prisma.order.findMany({
+      where: { customerId: id },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { id: true, code: true, number: true, status: true, paymentStatus: true, amount: true, paidAmount: true, currency: true, createdAt: true },
+    });
+
+    // Get order IDs for cross-schema queries (no FK — ADR-0001)
+    const orderIds = orders.map((o) => o.id);
+
+    // Bookings and Payments reference orderId directly (no Prisma relation)
+    const [bookings, payments, totalOrders, totalBookings, totalPayments] = await Promise.all([
+      orderIds.length > 0
+        ? this.prisma.booking.findMany({
+            where: { orderId: { in: orderIds } },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+            select: { id: true, code: true, status: true, amount: true, currency: true, createdAt: true },
+          })
+        : Promise.resolve([]),
+      orderIds.length > 0
+        ? this.prisma.payment.findMany({
+            where: { orderId: { in: orderIds } },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+            select: { id: true, code: true, status: true, amount: true, currency: true, createdAt: true },
+          })
+        : Promise.resolve([]),
+      this.prisma.order.count({ where: { customerId: id } }),
+      orderIds.length > 0
+        ? this.prisma.booking.count({ where: { orderId: { in: orderIds } } })
+        : Promise.resolve(0),
+      orderIds.length > 0
+        ? this.prisma.payment.count({ where: { orderId: { in: orderIds } } })
+        : Promise.resolve(0),
+    ]);
+
+    return {
+      ...customer,
+      orders,
+      bookings,
+      payments,
+      summary: {
+        totalOrders,
+        totalBookings,
+        totalPayments,
+      },
+    };
+  }
+
+  // ── Partner Customer Relations (Step 3.5B) ──────────────────────────────
+
+  async createPartnerCustomerRelation(partnerId: string, customerId: string, input: { leadSource?: string; assignedTo?: string; lifecycle?: string; tags?: string[]; notes?: string }, actor?: string) {
+    const partner = await this.prisma.partner.findUnique({ where: { id: partnerId }, select: { id: true } });
+    if (!partner) throw new NotFoundError(`Partner ${partnerId} not found`);
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { id: true } });
+    if (!customer) throw new NotFoundError(`Customer ${customerId} not found`);
+
+    const existing = await this.prisma.partnerCustomerRelation.findUnique({ where: { partnerId_customerId: { partnerId, customerId } } });
+    if (existing) throw new ConflictError(`Relation between partner ${partnerId} and customer ${customerId} already exists`);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const relation = await tx.partnerCustomerRelation.create({
+        data: {
+          partnerId,
+          customerId,
+          leadSource: input.leadSource ?? null,
+          assignedTo: input.assignedTo ?? null,
+          lifecycle: input.lifecycle ?? "LEAD",
+          tags: input.tags ?? [],
+          notes: input.notes ?? null,
+        },
+      });
+
+      await tx.partnerCustomerRelationHistory.create({
+        data: {
+          relationId: relation.id,
+          action: "created",
+          to: "ACTIVE",
+          actorId: actor ?? null,
+          actorName: actor ?? null,
+          comment: "Partner-Customer relation created",
+        },
+      });
+
+      return relation;
+    });
+
+    return result;
+  }
+
+  async updatePartnerCustomerRelation(relationId: string, input: { status?: EntityStatus; lifecycle?: string; tags?: string[]; notes?: string; assignedTo?: string }, actor?: string) {
+    const existing = await this.prisma.partnerCustomerRelation.findUnique({ where: { id: relationId } });
+    if (!existing) throw new NotFoundError(`Partner-Customer relation ${relationId} not found`);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const relation = await tx.partnerCustomerRelation.update({
+        where: { id: relationId },
+        data: {
+          status: input.status ?? existing.status,
+          lifecycle: input.lifecycle ?? existing.lifecycle,
+          tags: input.tags ?? existing.tags,
+          notes: input.notes ?? existing.notes,
+          assignedTo: input.assignedTo ?? existing.assignedTo,
+          version: { increment: 1 },
+        },
+      });
+
+      await tx.partnerCustomerRelationHistory.create({
+        data: {
+          relationId,
+          action: "update",
+          from: existing.status,
+          to: relation.status,
+          fields: input as Prisma.InputJsonValue,
+          actorId: actor ?? null,
+          actorName: actor ?? null,
+          comment: "Partner-Customer relation updated",
+        },
+      });
+
+      return relation;
+    });
+
+    return result;
+  }
 }
