@@ -855,7 +855,7 @@ Booking request/confirm, Payment capture, Refund, Settlement/Payout.
 
 ## CRM
 
-· **Step 3.5 --- CRM Completion**\
+· **Step 3.5 --- CRM Completion** ✅ COMPLETE (2026-08-25; CRM workspace with Customers/Partners tabs; PartnerCustomerRelation schema (Step 3.5B); Partner list/detail endpoints; Customer detail with orders/bookings/payments aggregation; full i18n RU/AZ/EN; backend 1042/1042 + frontend 72/72 tests; migration 20260824214302; report — `docs/prompts/PHASE_3_STEP_3_5_CRM_COMPLETION_REPORT.md`; commit `17f66cd`).\
 Customer `CUS-*`, Contact `CNT-*`, Company `COM-*`, Partner `PAR-*`,
 Supplier `SUP-*`.
 
