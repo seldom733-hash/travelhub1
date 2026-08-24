@@ -721,6 +721,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.kpi.revenue": { ru: "Объём платежей", az: "Ödəniş həcmi", en: "Payment Volume" },
   "cc.kpi.revenue.subtitle": { ru: "Фактически полученные платежи за период", az: "Dövr üçün həqiqətən alınmış ödənişlər", en: "Payments actually received in period" },
   "cc.kpi.refunds": { ru: "Возвраты", az: "Geri qayıtışlar", en: "Refunds" },
+  "cc.kpi.refunds.subtitle": { ru: "Сумма возвратов за период", az: "Dövr üçün geri qayıtış məbləği", en: "Refund amount in period" },
   "cc.kpi.orders": { ru: "Заказы", az: "Sifarişlər", en: "Orders" },
   "cc.kpi.bookings": { ru: "Бронирования", az: "Bronlar", en: "Bookings" },
   "cc.kpi.aov": { ru: "Средний чек", az: "Orta çek", en: "Avg Order Value" },

@@ -20,7 +20,7 @@ const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; for
   "outstanding":      { section: "executive", field: "outstandingGmv", format: "currency" },
   "completed-gmv":    { section: "executive", field: "completedGmv", format: "currency" },
   "revenue":          { section: "executive", field: "revenue", format: "currency" },
-  "refunds":          { section: "executive", field: "refunds", format: "currency" },
+  "refunds":          { section: "financial", field: "totalRefunds", format: "currency" },
   "orders":           { section: "executive", field: "ordersCreated" },
   "bookings":         { section: "executive", field: "bookingsRequested" },
   "aov":              { section: "executive", field: "averageOrderValue", format: "currency" },
@@ -38,6 +38,8 @@ const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; for
   "net-payments":     { section: "financial", field: "netPayments", format: "currency" },
   "reconciliation":   { section: "financial", field: "reconciliationStatus" },
   "total-refunds":    { section: "financial", field: "totalRefunds", format: "currency" },
+  // backward-compat: old 'net-revenue' alias → net payments
+  "net-revenue":       { section: "financial", field: "netPayments", format: "currency" },
   // ─── Marketplace ────────────────────────────────────────────────
   "sessions":         { section: "marketplace", field: "marketplaceSessions" },
   "storefront-sessions": { section: "marketplace", field: "storefrontSessions" },

@@ -72,8 +72,10 @@ export interface CommandCenterSummary {
     marketplace?: {
       marketplaceSessions: KpiValue;
       storefrontSessions: KpiValue;
-      activePartners: KpiValue;
-      newCustomers: KpiValue;
+      marketplacePartners: KpiValue;
+      storefrontPartners: KpiValue;
+      marketplaceCustomers: KpiValue;
+      storefrontCustomers: KpiValue;
     };
     catalog?: {
       publishedServices: KpiValue;
