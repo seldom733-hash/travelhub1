@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-24 (Phase 3 Reconciliation — VERDICT A; Step 3.2 ✅ DEPLOYED — 8-section model; Decision Intelligence Stages A–B.2 ✅ FULLY CLOSED; Stage C ✅ VERDICT A — COMPLETE; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Service Templates DD-024…DD-029 RESOLVED; Universal Pricing Integrated; Canonical Roadmap Reconciliation COMPLETED 2026-08-24 — all Phase 3 history verified; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED)\
+**Дата актуализации:** 2026-08-25 (Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -777,7 +777,7 @@ balance, settlement reconciliation, temporal integrity.
 
 ## Управление и аналитика
 
-· **Step 3.0 --- Phase 3 Entry Audit** ⏳ NOT STARTED (2026-08-19; Phase 3 Entry Reconciliation — VERDICT A — canonical Phase 3 exists with 50+ steps; first executable step = Step 3.0; Phase 2 formal exit BLOCKED on 2.17B but independent Phase 3 work may begin; steps 3.0–3.41, 3.43–3.47 independent of 2.17B; only production/perf steps 3.42, 3.48–3.49 depend on qualification env; NEXT = PHASE 3 — STEP 3.0 — PHASE 3 ENTRY AUDIT).
+· **Step 3.0 --- Phase 3 Entry Audit** ✅ COMPLETE (2026-08-19; Phase 3 Entry Reconciliation — VERDICT A — canonical Phase 3 exists with 50+ steps; Phase 2 formal exit BLOCKED on 2.17B but independent Phase 3 work may begin; steps 3.0–3.41, 3.43–3.47 independent of 2.17B; only production/perf steps 3.42, 3.48–3.49 depend on qualification env; report — `docs/prompts/PHASE_3_ENTRY_AND_CANONICAL_ROADMAP_RECONCILIATION_REPORT.md`; Post-Phase-3 Roadmap Reconciliation — report `docs/prompts/POST_PHASE_3_CANONICAL_ROADMAP_RECONCILIATION_AND_NEXT_STAGE_REPORT.md`).
 
 · **Step 3.1 --- Dashboard / Command Center Backend** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-19; aggregated KPI/read models без владения operational entities; Command Center + Trends endpoints; 21 KPI across executive/operational/financial/marketplace sections; RBAC analytics.read; e2e dashboard-command-center 9/9; unit 921/921; frontend 150/150; backend tsc/build PASS; migrate 59/59 drift 0; отчёт — `docs/prompts/PHASE_3_STEP_3.1_DASHBOARD_COMMAND_CENTER_BACKEND_STRICT_REVIEW_REPORT.md`; NEXT = REPOSITORY-FIRST PHASE 3 SEQUENCING AFTER STEP 3.1 APPROVAL).
 Aggregated KPI/read models без владения operational entities.
@@ -797,19 +797,19 @@ KPI, alerts, queues, shortcuts, AI insights.
 
 · **Stage C --- Needs Attention → Decision Queue** ✅ VERDICT A — COMPLETE (2026-08-24; 6 detectors (PendingBookings, FailedPayments, RecentCancellations, PendingRefunds, UpcomingBookings, ServicesWithoutSales); DecisionQueue UI with lifecycle actions (acknowledge/resolve/dismiss); Active/History filter tabs; human-readable signal titles (RU/AZ/EN); structured evidence display; multi-status API filter; RBAC server-side; 7×₼, 0×$ runtime evidence; tests 50 backend + 213 frontend; report — `docs/prompts/PHASE_3_STAGE_C_NEEDS_ATTENTION_DECISION_QUEUE_IMPLEMENTATION_REPORT.md`).
 
-· **Stage D --- WHY Attribution (Deterministic)** ⏳ NOT STARTED (Dependencies: Stage B; scope: evidence-based, non-hallucinatory WHY attribution from structured domain facts).
+· **Stage D --- WHY Attribution (Deterministic)** ✅ COMPLETE (deterministic, evidence-based WHY attribution from structured domain facts; 6 signal types; 4 WHY statuses; report — `docs/prompts/PHASE_3_STAGE_D_WHY_ATTRIBUTION_DETERMINISTIC_IMPLEMENTATION_REPORT.md`; commit — see Phase 3 closure `0858147`).
 
-· **Stage E --- Impact Scoring** ⏳ NOT STARTED (Dependencies: Stage D; scope: business impact importance scoring without hardcoded pseudo-economics).
+· **Stage E --- Impact Scoring** ✅ COMPLETE (evidence-based impact scoring; 4 statuses: PROVEN / PARTIALLY_PROVEN / INFORMATIONAL / INSUFFICIENT_EVIDENCE; 0 fabricated pseudo-economics; report — `docs/prompts/PHASE_3_STAGE_E_IMPACT_SCORING_EVIDENCE_BASED_IMPLEMENTATION_REPORT.md`; commit — see Phase 3 closure `0858147`).
 
-· **Stage F --- Action Routing** ⏳ NOT STARTED (Dependencies: Stage C; scope: what should user do, who owns action, deep links, workflow routing, permission-aware).
+· **Stage F --- Action Routing** ✅ COMPLETE (NAVIGATION_ONLY boundary enforced; 6 signals → 6 destinations; RBAC-aware action routing; no lifecycle mutation from navigation; report — `docs/prompts/PHASE_3_STAGE_F_ACTION_ROUTING_NAVIGATION_ONLY_IMPLEMENTATION_REPORT.md`; commit — see Phase 3 closure `0858147`).
 
-· **Stage G --- AI Decision Feed Reconciliation** ⏳ NOT STARTED (Dependencies: Stage D, Stage E; scope: remove hardcoded feed logic, use DecisionSignal/evidence, WHY/IMPACT integration).
+· **Stage G --- AI Decision Feed Reconciliation** ✅ COMPLETE (Category B informational insights; separate from DecisionSignal authority; no executable actions; no fabricated financial uplift; RU/AZ/EN localized; report — `docs/prompts/PHASE_3_STAGE_G_AI_DECISION_FEED_RECONCILIATION_IMPLEMENTATION_REPORT.md`; commit — see Phase 3 closure `0858147`).
 
-· **Stage H --- Executive/Operational/Financial Decision Enrichment** ⏳ NOT STARTED (Dependencies: Stage C, Stage D, Stage E; scope: Expected/Collected/Outstanding Revenue, Revenue Mix, broader financial management beyond B.2 hotfix; B.2 ≠ final financial architecture).
+· **Stage H --- Executive/Operational/Financial Decision Enrichment** ✅ COMPLETE (financial enrichment of Decision Signals; widget registry reconciliation; Post-H reconciliation COMPLETE; report — `docs/prompts/PHASE_3_POST_STAGE_H_COMMAND_CENTER_WIDGET_REGISTRY_MARKETPLACE_ENRICHMENT_RECONCILIATION_REPORT.md`; commit `caed3c9`).
 
-· **Stage I --- Storefront Revenue Semantic Fix** ⏳ NOT STARTED (Dependencies: Stage H (partial), Step 3.29D (billing engine); scope: priceUsd migration, AZN billing, MRR/ARR semantics, dynamic pricing; List Price ≠ Contracted Price).
+· **Stage I --- Storefront Revenue Semantic Fix** ✅ COMPLETE (MRR/ARR/Collected/Outstanding from SubscriptionContract/SubscriponInvoice/SubscriptionPayment; List ≠ Contract enforced; Post-I V2 Widget Registry Reconciliation COMPLETE; report — `docs/prompts/PHASE_3_STAGE_I_STOREFRONT_REVENUE_SEMANTIC_FIX_IMPLEMENTATION_REPORT.md`; commit `59228eb`).
 
-· **Stage J --- Regression / Security / Evidence Closure** ⏳ NOT STARTED (Dependencies: all previous stages; scope: full regression, security, financial invariants, Decision Intelligence, runtime/browser evidence, documentation consistency).
+· **Stage J --- Regression / Security / Evidence Closure** ✅ VERDICT A — COMPLETE (final trust gate for Phase 3; 161/161 backend + 81/81 frontend + TSC clean; financial semantic dictionary frozen; RBAC/tenant isolation verified; localization RU/AZ/EN clean; 1 P2 accepted — Channel Health priceUsd deferred; report — `docs/prompts/PHASE_3_STAGE_J_FINAL_REGRESSION_SECURITY_EVIDENCE_CLOSURE_REPORT.md`; commit `0858147`; **Phase 3 Command Center C→J CLOSED**).
 
 · **Step 3.3 --- Analytics Foundation** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-19; period/comparison/granularity resolvers, Company KPI/Partner Performance/Conversion Funnel/Time Series read models, AnalyticsController with RBAC; unit 853/853, frontend 135/135, migrate 58/58, artifact PASS=163; FINAL STRICT RE-REVIEW APPROVED — 0 defects; отчёт — `docs/prompts/PHASE_3_STEP_3.3_ANALYTICS_FOUNDATION_FINAL_STRICT_RE_REVIEW_REPORT.md`; NEXT = REPOSITORY-FIRST PHASE 3 SEQUENCING AFTER STEP 3.3 APPROVAL).
 Metrics, dimensions, aggregation/read models.
@@ -1060,7 +1060,7 @@ Themes, configurable sections, richer branding/navigation/settings.
 · **Step 3.29C --- Partner Custom Domain Foundation**\
 DNS verification, TLS/CDN/provisioning.
 
-· **Step 3.29D --- Storefront SaaS Plans / Entitlements**\
+· **Step 3.29D --- Storefront SaaS Plans / Entitlements** ✅ COMPLETE — STOREFRONT SUBSCRIPTION BILLING FOUNDATION (2026-08-25; SubscriptionContract / SubscriptionInvoice / SubscriptionPayment models; AZN billing; List Price ≠ Contracted Price enforced; host-count pricing; invoice idempotency; overpayment rejection; currency mismatch rejection; trial→paid deterministic conversion; 8 contracts seeded; MRR/ARR/Collected/Outstanding computed from billing authority; 15/15 billing unit tests; report — `docs/prompts/PHASE_3_STEP_3_29D_STOREFRONT_SUBSCRIPTION_BILLING_FOUNDATION_IMPLEMENTATION_REPORT.md`; commit `9d659ef`).\
 Configurable plans (working labels may be START/BUSINESS/PRO): product
 limits, branding, custom domain, analytics, Partner CRM and other
 feature entitlements. Prices are commercial configuration, not hardcoded
