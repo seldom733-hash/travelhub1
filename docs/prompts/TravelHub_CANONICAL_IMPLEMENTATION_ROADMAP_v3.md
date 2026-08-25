@@ -1131,6 +1131,167 @@ Product rating и Seller rating отдельно.
 · **Step 3.35 --- Marketplace SEO / Localization**\
 RU/AZ/EN metadata, canonical URLs, sitemap, structured data.
 
+## Booking Commercial Terms & Agreement Foundation (Phase 3 Additive Reconciliation)
+
+**Статус: PLANNED — NOT STARTED**
+**Дата записи:** 2026-08-25
+**Тип:** Future capability — documentation reconciliation (НЕ production implementation)
+**Архитектурный документ:** `docs/architecture/booking-commercial-terms-agreement-versioning-audit.md`
+**Prompt:** `docs/prompts/PHASE_3_BOOKING_COMMERCIAL_TERMS_AGREEMENT_ARCHITECTURE_ROADMAP_RECONCILIATION.md`
+
+Данный capability фиксирует новые согласованные бизнес-требования TravelHub,
+которые необходимо реализовать в будущих implementation steps. Domain ownership
+распределяется между Catalog, Order, Booking, Finance и Agreement/Document.
+CRM остаётся read-only consumer.
+
+· **Step F.1 --- Service Commercial Policy Model** ⏳ PLANNED
+Supplier определяет коммерческие условия при публикации услуги: payment
+timing policy (PAY_AFTER_CONFIRMATION, PAY_IMMEDIATELY), full/partial payment
+options, deposit/installment amounts, payment deadlines, grace period,
+missed-payment policy (AUTO_CANCEL_AFTER_GRACE, MANUAL_REVIEW,
+PLATFORM_APPROVED), cancellation policy, refund policy. TravelHub валидирует
+system boundaries, но не изобретает supplier deadlines.
+Зависимости: Service lifecycle (1.8A–1.8D).
+
+· **Step F.2 --- Service Terms Versioning** ⏳ PLANNED
+Service commercial terms версионируются. Перезапись текущих terms без
+сохранения предыдущего состояния запрещена. Versioned fields: price, currency,
+payment policy, installment schedule template, deadlines, grace period,
+missed-payment, cancellation, refund, availability terms.
+Invariant: supplier changes Service after customer booking ≠ existing
+Booking terms change.
+Зависимости: F.1, Product.version (существует).
+
+· **Step F.3 --- Payment Schedule Templates** ⏳ PLANNED
+Supplier определяет templates: deposit amount/%, deadline for deposit,
+remaining balance, final payment deadline (conceptually N hours/days before
+service start; invariant: final deadline < service start), intermediate
+installments (optional), grace period, missed-payment policy.
+System constraints: min/max deadlines, allowed units, validation against
+service start time.
+Зависимости: F.1.
+
+· **Step F.4 --- Customer Payment Option Selection** ⏳ PLANNED
+При booking flow клиент выбирает из разрешённых supplier вариантов:
+full payment или partial payment по опубликованному графику. Selection
+становится частью immutable commercial snapshot.
+Зависимости: F.1, F.3.
+
+· **Step F.5 --- Booking Commercial Snapshot** ⏳ PLANNED
+При бронировании создаётся immutable snapshot (BookingCommercialTermsSnapshot):
+serviceId, serviceVersion, supplierId, customer/order/booking ref, price,
+currency, quantity/participants, selected payment option, payment schedule,
+deadlines, grace period, missed-payment policy, cancellation policy,
+refund policy, other material terms, createdAt.
+Invariant: downstream Service edits НЕ мутируют frozen snapshot.
+Зависимости: F.2, F.4.
+
+· **Step F.6 --- Installment Schedule Instantiation** ⏳ PLANNED
+При partial payment создаётся concrete Payment Plan:
+total amount → installment 1 (amount, due rule/dueAt, status) →
+installment 2… → final dueAt. Changes to Service payment policy после
+booking НЕ изменяют instantiated plan.
+Зависимости: F.5, Finance (2.12 Payment exists).
+
+· **Step F.7 --- Customer Acceptance** ⏳ PLANNED
+Перед final booking submission клиент явно подтверждает terms:
+acceptedAt, acceptedTermsVersion, acceptedDocumentId, acceptedDocumentHash,
+customer identity/reference. Additional metadata — privacy/legal policy dependent.
+Зависимости: F.5.
+
+· **Step F.8 --- Supplier Confirmation Separation** ⏳ PLANNED
+Различать Supplier published service terms и Supplier confirmed concrete
+booking — разные юридические/операционные события. Two-stage document flow
+dля PAY_AFTER_CONFIRMATION: (1) Booking Request Terms (customer accepted at
+submission), (2) Confirmed Booking Agreement (supplier confirmed →
+paymentDeadlineAt finalized). Второй документ НЕ изменяет условия первого.
+Зависимости: F.5, Booking lifecycle (2.9 exists).
+
+· **Step F.9 --- Agreement Generation & Versioning** ⏳ PLANNED
+При бронировании формируется immutable agreement document
+(BookingTermsAgreement): agreement/document ID, Order/Booking/Service IDs,
+service version, Supplier, Customer, service date/time, price, currency,
+quantity, selected payment policy, schedule, deadlines, grace period,
+missed-payment consequences, cancellation/refund policies, supplier
+confirmation terms, document version, createdAt, language.
+Same canonical version для Customer + Supplier + TravelHub audit.
+Document hash (content hash) для immutability proof.
+Доставка: Customer account, Supplier workspace, email/notification,
+downloadable document.
+Зависимости: F.7, F.8, Document delivery capability.
+
+· **Step F.10 --- Amendments** ⏳ PLANNED
+После бронирования: DO NOT overwrite original agreement. Создать
+Amendment (или новую agreement version) linked to previous.
+Хранить: previousVersion, newVersion, reason, changed terms,
+accepted/confirmed by parties, timestamps.
+Зависимости: F.9.
+
+· **Step F.11 --- Audit Trail Extension** ⏳ PLANNED
+Расширить audit trail: Service terms changed, Service version published,
+Booking request created, Terms accepted by customer, Supplier confirmed/rejected,
+Payment schedule instantiated, Payment received/overdue, Booking
+expired/cancelled, Refund events, Supplier settlement events, Agreement
+generated/delivered, Amendment created/accepted.
+Зависимости: F.1–F.10, Events infrastructure (1.15A exists).
+
+· **Step F.12 --- CRM Consumption** ⏳ PLANNED
+CRM отображает агрегированные состояния: Order status, Booking status,
+Supplier confirmation, Customer payment status, amount paid/outstanding,
+next payment deadline, overdue state, Supplier settlement, Service terms
+version, Agreement status/link, Customer acceptance, Supplier confirmation
+timestamp. CRM НЕ становится authority этих данных.
+Зависимости: F.1–F.11, CRM Step 3.5 exists.
+
+· **Step F.13 --- Operational / Command Center Integration** ⏳ PLANNED
+Future operational filters: Customer paid + supplier not confirmed,
+Supplier confirmed + customer not paid, Partially paid, Payment deadline
+approaching, Payment overdue, Completed service + supplier not paid,
+Customer refunded + supplier already paid, Agreement not accepted,
+Agreement amendment pending.
+Future command center signals: Confirmed bookings awaiting customer payment,
+Payment deadline approaching, Overdue installment, Paid booking awaiting
+supplier confirmation, Completed service awaiting supplier settlement.
+Каждый signal — evidence-based authority.
+Зависимости: F.1–F.12, Decision Queue infrastructure (Stages A–J exist).
+
+**Data Authority Map:**
+- Service commercial terms → Catalog (Product/Tariff) — PARTIAL EXISTS
+- Service versioning → Catalog (Product.version) — EXISTS
+- Booking commercial snapshot → future (Booking) — NOT STARTED
+- Customer payment → Finance (Payment exists, 2.12) — PARTIAL
+- Supplier settlement → Finance (Settlement exists, 2.10B) — PARTIAL
+- Agreement → future (Order/Booking) — NOT STARTED
+- CRM → read-only consumer — EXISTS (Step 3.5)
+
+**Domain ownership:**
+- Catalog: service terms, versioning
+- Order: order-level snapshot, acquisition propagation
+- Booking: booking-level snapshot, service-time model
+- Finance: Payment, Refund, Settlement, Payout, Commission
+- Agreement/Document: agreement generation, versioning, hash, delivery
+- Communication: notification delivery
+- Partner workspace: service term editing UI
+- Customer storefront: service card display, booking acceptance
+- CRM: read-only consumer
+
+**PSP relationship:** Actual collection, payment processing, refund
+execution — deferred до canonical PSP selection (Step 2.12B BLOCKED).
+Domain foundation может быть реализована частично до реального PSP.
+
+**CRM relationship:** CRM Step 3.5 и последующие iterations должны
+учитывать будущее отображение, но НЕ вводить локальный payment/contract
+truth. CRM fields must consume canonical authorities.
+
+**Deferred design decisions:** exact payment-policy enums, min/max
+deadlines, number of installments, grace-period rules, legal acceptance
+metadata, document format, signature requirements, amendment rules,
+jurisdiction-specific wording, canonical base/list price for mixed
+pricing.
+
+**Implementation status:** NOT STARTED (PLANNED).
+Production code НЕ изменён. Runtime НЕ реализован.
+
 ## Moderation / Communication
 
 · **Step 3.36 --- Moderation Center Full**\
