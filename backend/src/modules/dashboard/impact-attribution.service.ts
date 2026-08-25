@@ -163,7 +163,7 @@ function impactFailedPayments(evidence: EvidenceItem[]): DecisionImpact {
   const count = findNum(evidence, "failedCount") ?? 0;
   const oldestMin = findNum(evidence, "oldestFailedMinutes") ?? 0;
   const amount = findNum(evidence, "totalFailedAmount") ?? 0;
-  const groups = findStr(evidence, "failureCodeGroups") ?? "";
+  const groups = findStr(evidence, "paymentMethodGroups") ?? "";
 
   const dimensions: ImpactDimension[] = [];
 
@@ -196,7 +196,7 @@ function impactFailedPayments(evidence: EvidenceItem[]): DecisionImpact {
       },
       value: groups,
       strength: "FACTUAL",
-      evidenceRefs: ["failureCodeGroups"],
+      evidenceRefs: ["paymentMethodGroups"],
     });
   }
 

@@ -119,7 +119,7 @@ describe("ImpactAttributionService", () => {
         ev("failedCount", 4),
         ev("oldestFailedMinutes", 120),
         ev("totalFailedAmount", 500),
-        ev("failureCodeGroups", "CARD:3, BANK:1"),
+        ev("paymentMethodGroups", "CARD:3, BANK:1"),
       ];
       const result = service.computeImpact("FAILED_PAYMENTS", evidence);
       expect(result).not.toBeNull();

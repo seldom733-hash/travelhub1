@@ -50,7 +50,7 @@ describe("WhyAttributionService", () => {
     it("output is stable across multiple calls", () => {
       const evidence = [
         ev("failedCount", 5),
-        ev("failureCodeGroups", "DECLINED:3;TIMEOUT:2"),
+        ev("paymentMethodGroups", "DECLINED:3;TIMEOUT:2"),
         ev("oldestFailedMinutes", 60),
         ev("totalFailedAmount", 250),
       ];
@@ -137,7 +137,7 @@ describe("WhyAttributionService", () => {
       expect(result!.contributingFactors).toEqual([]);
     });
 
-    it("FAILED_PAYMENTS without failureCodeGroups → OBSERVED_DRIVER without grouping", () => {
+    it("FAILED_PAYMENTS without paymentMethodGroups → OBSERVED_DRIVER without grouping", () => {
       const evidence = [
         ev("failedCount", 4),
         ev("oldestFailedMinutes", 60),
@@ -158,7 +158,7 @@ describe("WhyAttributionService", () => {
     it("equal failure code groups → sorted alphabetically for determinism", () => {
       const evidence = [
         ev("failedCount", 4),
-        ev("failureCodeGroups", "TIMEOUT:2;DECLINED:2"),
+        ev("paymentMethodGroups", "TIMEOUT:2;DECLINED:2"),
         ev("oldestFailedMinutes", 30),
         ev("totalFailedAmount", 100),
       ];
@@ -178,14 +178,14 @@ describe("WhyAttributionService", () => {
     it("evidence array order does not affect output", () => {
       const evidenceA = [
         ev("failedCount", 5),
-        ev("failureCodeGroups", "DECLINED:3;TIMEOUT:2"),
+        ev("paymentMethodGroups", "DECLINED:3;TIMEOUT:2"),
         ev("oldestFailedMinutes", 60),
         ev("totalFailedAmount", 250),
       ];
 
       const evidenceB = [
         ev("totalFailedAmount", 250),
-        ev("failureCodeGroups", "DECLINED:3;TIMEOUT:2"),
+        ev("paymentMethodGroups", "DECLINED:3;TIMEOUT:2"),
         ev("failedCount", 5),
         ev("oldestFailedMinutes", 60),
       ];
@@ -232,7 +232,7 @@ describe("WhyAttributionService", () => {
     it("dominant failure code → OBSERVED_DRIVER with grouping", () => {
       const result = service.computeAttribution("FAILED_PAYMENTS", [
         ev("failedCount", 5),
-        ev("failureCodeGroups", "DECLINED:4;TIMEOUT:1"),
+        ev("paymentMethodGroups", "DECLINED:4;TIMEOUT:1"),
         ev("oldestFailedMinutes", 60),
         ev("totalFailedAmount", 250),
       ]);
@@ -359,7 +359,7 @@ describe("WhyAttributionService", () => {
     it("no business action generation", () => {
       const result = service.computeAttribution("FAILED_PAYMENTS", [
         ev("failedCount", 10),
-        ev("failureCodeGroups", "DECLINED:10"),
+        ev("paymentMethodGroups", "DECLINED:10"),
       ]);
 
       expect(result).not.toHaveProperty("recommendedAction");

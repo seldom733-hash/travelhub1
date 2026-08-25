@@ -75,12 +75,7 @@ function presentPendingBookings(evidence: EvidenceItem[], locale: Locale): Evide
   const get = (key: string) => evidence.find((e) => e.key === key);
   const result: EvidenceDisplay[] = [];
 
-  const count = get("pendingConfirmationCount");
-  if (count) result.push({
-    label: t("cc.evidence.pendingConfirmationCount", locale),
-    value: String(count.value),
-    highlight: true,
-  });
+  // Count (pendingConfirmationCount) omitted — already shown in description subtitle.
 
   const oldest = get("oldestPendingMinutes");
   if (oldest) result.push({
@@ -107,12 +102,7 @@ function presentFailedPayments(evidence: EvidenceItem[], locale: Locale): Eviden
   const get = (key: string) => evidence.find((e) => e.key === key);
   const result: EvidenceDisplay[] = [];
 
-  const count = get("failedCount");
-  if (count) result.push({
-    label: t("cc.evidence.failedCount", locale),
-    value: String(count.value),
-    highlight: true,
-  });
+  // Count (failedCount) omitted — already shown in description subtitle.
 
   const oldest = get("oldestFailedMinutes");
   if (oldest) result.push({
@@ -126,7 +116,7 @@ function presentFailedPayments(evidence: EvidenceItem[], locale: Locale): Eviden
     value: formatMoney(Number(amount.value), locale),
   });
 
-  const groups = get("failureCodeGroups");
+  const groups = get("paymentMethodGroups");
   if (groups) {
     // Parse and localize payment method distribution
     const raw = String(groups.value);
@@ -141,7 +131,7 @@ function presentFailedPayments(evidence: EvidenceItem[], locale: Locale): Eviden
       return `${label}: ${cnt}`;
     }).join(", ");
     result.push({
-      label: t("cc.evidence.failureCodeGroups", locale),
+      label: t("cc.evidence.paymentMethodGroups", locale),
       value: formatted,
     });
   }
@@ -153,12 +143,7 @@ function presentRecentCancellations(evidence: EvidenceItem[], locale: Locale): E
   const get = (key: string) => evidence.find((e) => e.key === key);
   const result: EvidenceDisplay[] = [];
 
-  const count = get("cancellationCount");
-  if (count) result.push({
-    label: t("cc.evidence.cancellationCount", locale),
-    value: String(count.value),
-    highlight: true,
-  });
+  // Count (cancellationCount) omitted — already shown in description subtitle.
 
   const oldest = get("oldestCancellationMinutes");
   if (oldest) result.push({
@@ -185,12 +170,7 @@ function presentPendingRefunds(evidence: EvidenceItem[], locale: Locale): Eviden
   const get = (key: string) => evidence.find((e) => e.key === key);
   const result: EvidenceDisplay[] = [];
 
-  const count = get("pendingRefundCount");
-  if (count) result.push({
-    label: t("cc.evidence.pendingRefundCount", locale),
-    value: String(count.value),
-    highlight: true,
-  });
+  // Count (pendingRefundCount) omitted — already shown in description subtitle.
 
   const oldest = get("oldestPendingMinutes");
   if (oldest) result.push({
@@ -211,12 +191,7 @@ function presentUpcomingBookings(evidence: EvidenceItem[], locale: Locale): Evid
   const get = (key: string) => evidence.find((e) => e.key === key);
   const result: EvidenceDisplay[] = [];
 
-  const count = get("upcomingCount");
-  if (count) result.push({
-    label: t("cc.evidence.upcomingCount", locale),
-    value: String(count.value),
-    highlight: true,
-  });
+  // Count (upcomingCount) omitted — already shown in description subtitle.
 
   const days = get("daysUntilNearest");
   if (days) result.push({
@@ -239,12 +214,7 @@ function presentServicesWithoutSales(evidence: EvidenceItem[], locale: Locale): 
   const get = (key: string) => evidence.find((e) => e.key === key);
   const result: EvidenceDisplay[] = [];
 
-  const unsoldCount = get("unsoldProductCount");
-  if (unsoldCount) result.push({
-    label: t("cc.evidence.unsoldProductCount", locale),
-    value: String(unsoldCount.value),
-    highlight: true,
-  });
+  // Count (unsoldProductCount) omitted — already shown in description subtitle.
 
   const withAvail = get("withAvailabilityCount");
   const withoutAvail = get("withoutAvailabilityCount");

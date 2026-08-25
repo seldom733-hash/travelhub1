@@ -9,30 +9,7 @@ import { useState, useCallback } from "react";
 import { t, type Locale } from "../../lib/i18n";
 import { presentEvidence, type EvidenceDisplay } from "./signal-evidence.presenter";
 
-// Re-export formatters from evidence presenter for IMPACT rendering
-const formatDuration = (minutes: number, locale: Locale): string => {
-  if (minutes < 60) {
-    return locale === "ru" ? `${minutes} мин` : locale === "az" ? `${minutes} dəq` : `${minutes}m`;
-  }
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h < 24) {
-    const mPart = m > 0 ? ` ${m}${locale === "ru" ? " мин" : locale === "az" ? " dəq" : "m"}` : "";
-    return `${h}${locale === "ru" ? " ч" : locale === "az" ? " saat" : "h"}${mPart}`;
-  }
-  const d = Math.floor(h / 24);
-  const hRem = h % 24;
-  const hPart = hRem > 0 ? ` ${hRem}${locale === "ru" ? " ч" : locale === "az" ? " saat" : "h"}` : "";
-  return `${d}${locale === "ru" ? " дн" : locale === "az" ? " gün" : "d"}${hPart}`;
-};
 
-const formatMoney = (amount: number, locale: Locale): string => {
-  const formatted = new Intl.NumberFormat(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US", {
-    style: "decimal",
-    maximumFractionDigits: 0,
-  }).format(amount);
-  return `${formatted} ₼`;
-};
 
 /** Interpolate {param} placeholders in a localized template string */
 function interpolate(template: string, params: Record<string, string | number>): string {
@@ -252,10 +229,7 @@ function QueueItem({
             {interpolate(t(signal.descriptionKey, locale), signal.descriptionParams)}
           </p>
         </div>
-        <div className="text-right text-xs text-slate-500 whitespace-nowrap">
-          <div>{t("cc.queue.entities", locale)}: {signal.affectedCount}</div>
-          <div>{t("cc.queue.observations", locale)}: {signal.observationCount}</div>
-        </div>
+
       </div>
 
       {/* Evidence — typed presentation adapter (no raw keys) */}
@@ -313,66 +287,9 @@ function QueueItem({
         </div>
       )}
 
-      {/* Stage E: IMPACT Block */}
-      {signal.impact && (
-        <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
-          <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
-            {t("cc.impact.title", locale)}
-          </div>
-          {signal.impact.status === "INSUFFICIENT_EVIDENCE" ? (
-            <p className="text-xs text-slate-500 italic">
-              {t("cc.impact.insufficient", locale)}
-            </p>
-          ) : (
-            <div className="space-y-1.5">
-              {signal.impact.dimensions.map((dim, i) => {
-                // Resolve label: prefer i18n labelKey, fallback to label
-                const dimLabel = dim.labelKey ? t(dim.labelKey, locale) : dim.label;
-                const dimParams = dim.params ?? {};
-                // Resolve summary text if present
-                const resolvedLabel = dimParams.summaryTextKey
-                  ? `${dimLabel}: ${t(dimParams.summaryTextKey as string, locale)}`
-                  : interpolate(dimLabel, dimParams);
-                // Format value by unit type
-                let displayValue: string;
-                if (dim.unit === "AZN" && typeof dim.value === "number") {
-                  displayValue = formatMoney(dim.value, locale);
-                } else if (dim.unit === "count" && typeof dim.value === "number") {
-                  displayValue = new Intl.NumberFormat(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US", { style: "decimal", maximumFractionDigits: 0 }).format(dim.value);
-                } else if (dim.unit === "minutes" && typeof dim.value === "number") {
-                  displayValue = formatDuration(dim.value, locale);
-                } else if (dim.unit === "days" && typeof dim.value === "number") {
-                  displayValue = locale === "ru" ? `${dim.value} дн.` : locale === "az" ? `${dim.value} gün` : `${dim.value}d`;
-                } else if (typeof dim.value === "number") {
-                  displayValue = new Intl.NumberFormat(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US", { style: "decimal", maximumFractionDigits: 0 }).format(dim.value);
-                } else if (typeof dim.value === "string" && dim.value.includes(":")) {
-                  // Localize payment method distribution (e.g. "BANK_TRANSFER:3;CARD:3")
-                  const paymentMethodLabels: Record<string, Record<string, string>> = {
-                    BANK_TRANSFER: { ru: "Банковский перевод", az: "Bank köçürməsi", en: "Bank transfer" },
-                    CARD: { ru: "Карта", az: "Kart", en: "Card" },
-                    MOBILE_PAYMENT: { ru: "Мобильный платёж", az: "Mobil ödəniş", en: "Mobile payment" },
-                  };
-                  displayValue = String(dim.value).split(";").map((g) => {
-                    const [method, cnt] = g.split(":");
-                    const label = paymentMethodLabels[method]?.[locale] ?? method;
-                    return `${label}: ${cnt}`;
-                  }).join(", ");
-                } else {
-                  displayValue = String(dim.value);
-                }
-                return (
-                  <div key={i} className="flex items-start gap-2 text-xs">
-                    <span className="shrink-0 text-slate-500 min-w-[120px]">{resolvedLabel}</span>
-                    <span className={dim.strength === "FACTUAL" ? "text-slate-900 font-medium" : "text-slate-600"}>
-                      {displayValue}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Stage E: IMPACT Block — hidden when dimensions duplicate evidence */}
+      {/* IMPACT intentionally omitted: all dimensions mirror evidence fields. */}
+      {/* Evidence section is the authoritative metrics layer. */}
 
       {/* Stage F: ACTION Block */}
       {signal.actions && signal.actions.length > 0 && (

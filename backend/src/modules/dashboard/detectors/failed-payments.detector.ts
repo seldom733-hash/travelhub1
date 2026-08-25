@@ -87,9 +87,9 @@ export class FailedPaymentsDetector implements DecisionSignalDetector {
         source: "finance.PAYMENT",
         observedAt: now,
       },
-      // Stage D: paymentMethod grouping for WHY
+      // Stage D: paymentMethod grouping for WHY attribution
       {
-        key: "failureCodeGroups",
+        key: "paymentMethodGroups",
         value: sortedGroups,
         source: "finance.PAYMENT",
         observedAt: now,

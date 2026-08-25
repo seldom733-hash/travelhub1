@@ -132,7 +132,7 @@ describe("Decision Queue Localization Guards", () => {
       "unsoldProductCount", "productNames", "withAvailabilityCount",
       "withoutAvailabilityCount", "pendingConfirmationCount", "oldestPendingMinutes",
       "affectedGmv", "slaThresholdMinutes", "failedCount", "oldestFailedMinutes",
-      "totalFailedAmount", "failureCodeGroups", "cancellationCount",
+      "totalFailedAmount", "paymentMethodGroups", "cancellationCount",
       "oldestCancellationMinutes", "periodDays", "pendingRefundCount",
       "totalRefundAmount", "upcomingCount", "daysUntilNearest", "totalUpcomingGmv",
     ];

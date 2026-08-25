@@ -84,7 +84,7 @@ export interface WhyAttribution {
 
 export interface FailedPaymentEvidenceExtra {
   /** Grouped by failure code: [{code: "DECLINED", count: 3}, ...] */
-  failureCodeGroups?: Array<{ code: string; count: number }>;
+  paymentMethodGroups?: Array<{ code: string; count: number }>;
 }
 
 export interface CancellationEvidenceExtra {

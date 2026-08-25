@@ -114,12 +114,12 @@ export class WhyAttributionService {
       return this.insufficientEvidence(rule);
     }
 
-    // Check for failureCodeGroups — enriched evidence from detector
-    const failureCodeGroupsRaw = this.findStr(evidence, "failureCodeGroups");
+    // Check for paymentMethodGroups — enriched evidence from detector
+    const paymentMethodGroupsRaw = this.findStr(evidence, "paymentMethodGroups");
 
-    if (failureCodeGroupsRaw) {
-      // Parse grouped failure codes (deterministic string format from detector)
-      const groups = this.parseFailureCodeGroups(failureCodeGroupsRaw);
+    if (paymentMethodGroupsRaw) {
+      // Parse grouped payment methods (deterministic string format from detector)
+      const groups = this.parseFailureCodeGroups(paymentMethodGroupsRaw);
 
       if (groups.length > 0) {
         // Find dominant group (largest count; ties → alphabetical by code for determinism)
@@ -129,17 +129,17 @@ export class WhyAttributionService {
         const dominant = sorted[0];
 
         const primaryDriver: WhyPrimaryDriver = {
-          textKey: "cc.why.payment_failure.driver_dominant_code",
+          textKey: "cc.why.payment_failure.driver_dominant_method",
           factualValue: `${dominant.count} из ${count} — ${dominant.code}`,
-          evidenceRefs: ["failedCount", "failureCodeGroups"],
+          evidenceRefs: ["failedCount", "paymentMethodGroups"],
         };
 
         const contributingFactors: WhyContributingFactor[] = [];
         if (sorted.length > 1) {
           contributingFactors.push({
-            textKey: "cc.why.payment_failure.factor_other_codes",
+            textKey: "cc.why.payment_failure.factor_other_methods",
             factualValue: sorted.length - 1,
-            evidenceRefs: ["failureCodeGroups"],
+            evidenceRefs: ["paymentMethodGroups"],
           });
         }
 
@@ -150,7 +150,7 @@ export class WhyAttributionService {
           primaryDriver,
           contributingFactors,
           evidenceStrength: strength,
-          evidenceRefs: ["failedCount", "failureCodeGroups", "oldestFailedMinutes", "totalFailedAmount"],
+          evidenceRefs: ["failedCount", "paymentMethodGroups", "oldestFailedMinutes", "totalFailedAmount"],
           rule,
         };
       }

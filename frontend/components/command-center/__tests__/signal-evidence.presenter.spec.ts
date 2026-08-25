@@ -22,7 +22,7 @@ const RAW_KEYS_TO_GUARD = [
   "failedCount",
   "oldestFailedMinutes",
   "totalFailedAmount",
-  "failureCodeGroups",
+  "paymentMethodGroups",
   "cancellationCount",
   "oldestCancellationMinutes",
   "periodDays",
@@ -64,7 +64,7 @@ describe("Signal Evidence Presenters", () => {
     const result = presentEvidence("SERVICES_WITHOUT_SALES", evidence, "ru");
     const labels = result.map((r) => r.label);
 
-    expect(labels).toContain("Услуг без заказов");
+    // Count (unsoldProductCount) omitted — already in description subtitle
     expect(labels).toContain("Доступность");
     expect(labels).toContain("Примеры услуг");
 
@@ -104,7 +104,7 @@ describe("Signal Evidence Presenters", () => {
     const result = presentEvidence("PENDING_BOOKINGS", evidence, "ru");
     const labels = result.map((r) => r.label);
 
-    expect(labels).toContain("Ожидают подтверждения");
+    // Count (pendingConfirmationCount) omitted — already in description subtitle
     expect(labels).toContain("Самое длительное ожидание");
     expect(labels).toContain("Затронутый объём");
     expect(labels).toContain("Порог SLA");
@@ -121,15 +121,15 @@ describe("Signal Evidence Presenters", () => {
       { key: "failedCount", value: 4 },
       { key: "oldestFailedMinutes", value: 120 },
       { key: "totalFailedAmount", value: 500 },
-      { key: "failureCodeGroups", value: "CARD:3, BANK:1" },
+      { key: "paymentMethodGroups", value: "CARD:3;BANK:1" },
     ];
     const result = presentEvidence("FAILED_PAYMENTS", evidence, "ru");
     const labels = result.map((r) => r.label);
 
-    expect(labels).toContain("Неуспешных платежей");
+    // Count (failedCount) omitted — already in description subtitle
     expect(labels).toContain("Самый старый сбой");
     expect(labels).toContain("Сумма неуспешных");
-    expect(labels).toContain("Группы ошибок");
+    expect(labels).toContain("Способы оплаты");
   });
 
   // ── PENDING_REFUNDS ───────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ describe("Signal Evidence Presenters", () => {
     const result = presentEvidence("PENDING_REFUNDS", evidence, "ru");
     const labels = result.map((r) => r.label);
 
-    expect(labels).toContain("Ожидают возврата");
+    // Count (pendingRefundCount) omitted — already in description subtitle
     expect(labels).toContain("Самое длительное ожидание");
     expect(labels).toContain("Сумма возвратов");
   });
@@ -160,7 +160,7 @@ describe("Signal Evidence Presenters", () => {
     const result = presentEvidence("RECENT_CANCELLATIONS", evidence, "ru");
     const labels = result.map((r) => r.label);
 
-    expect(labels).toContain("Отмен");
+    // Count (cancellationCount) omitted — already in description subtitle
     expect(labels).toContain("Самая старая отмена");
     expect(labels).toContain("Затронутый объём");
     expect(labels).toContain("За период");
@@ -177,7 +177,7 @@ describe("Signal Evidence Presenters", () => {
     const result = presentEvidence("UPCOMING_BOOKINGS", evidence, "ru");
     const labels = result.map((r) => r.label);
 
-    expect(labels).toContain("Предстоящих бронирований");
+    // Count (upcomingCount) omitted — already in description subtitle
     expect(labels).toContain("До ближайшего");
     expect(labels).toContain("Объём предстоящих");
   });
@@ -196,7 +196,7 @@ describe("Signal Evidence Presenters", () => {
         { key: "failedCount", value: 3 },
         { key: "oldestFailedMinutes", value: 120 },
         { key: "totalFailedAmount", value: 500 },
-        { key: "failureCodeGroups", value: "CARD:2" },
+        { key: "paymentMethodGroups", value: "CARD:2" },
       ],
       RECENT_CANCELLATIONS: [
         { key: "cancellationCount", value: 2 },
@@ -251,12 +251,12 @@ describe("Signal Evidence Presenters", () => {
 
   it("EN labels resolve for all signal codes", () => {
     const samples: Array<{ code: string; evidence: Array<{ key: string; value: string | number }> }> = [
-      { code: "PENDING_BOOKINGS", evidence: [{ key: "pendingConfirmationCount", value: 3 }] },
-      { code: "FAILED_PAYMENTS", evidence: [{ key: "failedCount", value: 2 }] },
-      { code: "RECENT_CANCELLATIONS", evidence: [{ key: "cancellationCount", value: 1 }] },
-      { code: "PENDING_REFUNDS", evidence: [{ key: "pendingRefundCount", value: 5 }] },
-      { code: "UPCOMING_BOOKINGS", evidence: [{ key: "upcomingCount", value: 4 }] },
-      { code: "SERVICES_WITHOUT_SALES", evidence: [{ key: "unsoldProductCount", value: 10 }] },
+      { code: "PENDING_BOOKINGS", evidence: [{ key: "pendingConfirmationCount", value: 3 }, { key: "oldestPendingMinutes", value: 120 }] },
+      { code: "FAILED_PAYMENTS", evidence: [{ key: "failedCount", value: 2 }, { key: "oldestFailedMinutes", value: 60 }] },
+      { code: "RECENT_CANCELLATIONS", evidence: [{ key: "cancellationCount", value: 1 }, { key: "oldestCancellationMinutes", value: 300 }] },
+      { code: "PENDING_REFUNDS", evidence: [{ key: "pendingRefundCount", value: 5 }, { key: "oldestPendingMinutes", value: 200 }] },
+      { code: "UPCOMING_BOOKINGS", evidence: [{ key: "upcomingCount", value: 4 }, { key: "daysUntilNearest", value: 2 }] },
+      { code: "SERVICES_WITHOUT_SALES", evidence: [{ key: "unsoldProductCount", value: 10 }, { key: "withAvailabilityCount", value: 3 }, { key: "withoutAvailabilityCount", value: 7 }] },
     ];
     for (const { code, evidence } of samples) {
       const result = presentEvidence(code, evidence, "en");

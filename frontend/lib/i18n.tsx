@@ -619,9 +619,9 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.why.booking_delay.driver": { ru: "Бронирования ожидают подтверждения сверх SLA", az: "Bronlar SLA-dan çox gözləyir", en: "Bookings awaiting confirmation beyond SLA" },
   "cc.why.booking_delay.factor_gmv": { ru: "Затронутый объём", az: "Təsir olunan həcm", en: "Affected volume" },
   // WHY text keys — Payments
-  "cc.why.payment_failure.driver_dominant_code": { ru: "Доминирующий код ошибки", az: "Dominant xəta kodu", en: "Dominant error code" },
+  "cc.why.payment_failure.driver_dominant_method": { ru: "Доминирующий способ оплаты", az: "Dominant ödəniş üsulu", en: "Dominant payment method" },
   "cc.why.payment_failure.driver_count": { ru: "Зафиксированы неуспешные платежи", az: "Uğursuz ödənişlər qeydə alınıb", en: "Failed payments recorded" },
-  "cc.why.payment_failure.factor_other_codes": { ru: "Другие коды ошибок", az: "Digər xəta kodları", en: "Other error codes" },
+  "cc.why.payment_failure.factor_other_methods": { ru: "Другие способы оплаты", az: "Digər ödəniş üsulları", en: "Other payment methods" },
   // WHY text keys — Cancellations
   "cc.why.cancellation.driver_reason": { ru: "Доминирующая причина отмены", az: "Dominant ləğv səbəbi", en: "Dominant cancellation reason" },
   "cc.why.cancellation.driver_by": { ru: "Инициатор отмены", az: "Ləğv edən tərəf", en: "Cancelled by" },
@@ -639,7 +639,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.evidence.failedCount": { ru: "Неуспешных платежей", az: "Uğursuz ödənişlər", en: "Failed payments" },
   "cc.evidence.oldestFailedMinutes": { ru: "Самый старый сбой", az: "Ən köhnə uğursuzluq", en: "Oldest failure" },
   "cc.evidence.totalFailedAmount": { ru: "Сумма неуспешных", az: "Uğursuzların məbləği", en: "Failed amount" },
-  "cc.evidence.failureCodeGroups": { ru: "Группы ошибок", az: "Xəta qrupları", en: "Error groups" },
+  "cc.evidence.paymentMethodGroups": { ru: "Способы оплаты", az: "Ödəniş üsulları", en: "Payment methods" },
   "cc.evidence.cancellationCount": { ru: "Отмен", az: "Ləğv edilmələr", en: "Cancellations" },
   "cc.evidence.oldestCancellationMinutes": { ru: "Самая старая отмена", az: "Ən köhnə ləğv", en: "Oldest cancellation" },
   "cc.evidence.periodDays": { ru: "За период", az: "Dövr ərzində", en: "Over period" },
