@@ -440,11 +440,13 @@ export class OrderService {
     };
 
     // ROUND 5: cancelledWithin=N → orders cancelled in the last N days (detector: RECENT_CANCELLATIONS)
+    // Detector predicate: createdAt > (now - N days) AND createdAt <= now
     if (query.cancelledWithin) {
       const days = parseInt(query.cancelledWithin, 10);
       if (days > 0 && days <= 365) {
         const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-        where.createdAt = { gte: cutoff };
+        const nowTs = new Date(Date.now());
+        where.createdAt = { gt: cutoff, lte: nowTs };
       }
     }
 
