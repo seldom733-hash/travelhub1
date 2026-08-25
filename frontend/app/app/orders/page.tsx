@@ -6,6 +6,7 @@ import { api, type Order, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
+import Pagination from "@/components/Pagination";
 import { useCan } from "@/lib/use-can";
 import ActionButtons from "@/components/ActionButtons";
 
@@ -23,6 +24,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   const [selected, setSelected] = useState<Order | null>(null);
   const [bookings, setBookings] = useState<{ id: string; code: string; status: string }[]>([]);
   const [search, setSearch] = useState(initialSearch || "");
+  const [page, setPage] = useState(1);
   const [statusFilter] = useState(initialStatus);
   const [paymentStatusFilter] = useState(initialPaymentStatus);
   const [cancelledWithin] = useState(initialCancelledWithin);
@@ -68,6 +70,8 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
       if (cancelledWithin) qs.set("cancelledWithin", cancelledWithin);
       if (paymentFailed) qs.set("paymentFailed", paymentFailed);
       if (pendingRefund) qs.set("pendingRefund", pendingRefund);
+      qs.set("page", String(page));
+      qs.set("pageSize", "20");
       const res = await api.get<Page<Order>>(`/orders?${qs.toString()}`);
       setData(res);
     } catch (e) {
@@ -80,7 +84,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter, paymentStatusFilter, cancelledWithin, paymentFailed, pendingRefund]);
+  }, [search, statusFilter, paymentStatusFilter, cancelledWithin, paymentFailed, pendingRefund, page]);
 
   const openDetail = async (id: string) => {
     const [order, bk] = await Promise.all([
@@ -175,56 +179,44 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               <tbody>
                 {(data?.items ?? []).map((o) => (
                   <tr
-                    key={o.id}
-                    onClick={() => void openDetail(o.id)}
-                    className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${
-                      selected?.id === o.id ? "bg-blue-50/60" : ""
-                    }`}
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="font-mono text-xs text-blue-600">{o.code}</div>
-                      <div className="text-xs text-slate-400">{o.number}</div>
-                    </td>
-                    <td className="px-4 py-2.5 font-medium text-slate-800">
-                      {Number(o.amount).toFixed(2)} {o.currency}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-500">{o.items?.length ?? 0}</td>
-                    <td className="px-4 py-2.5">
-                      <StatusBadge status={o.status} />
-                    </td>                    <td className="px-4 py-2.5">
-                      <StatusBadge status={o.paymentStatus} />
-                    </td>
-                    {paymentFailed === "true" && (
+                      key={o.id}
+                      onClick={() => void openDetail(o.id)}
+                      className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${
+                        selected?.id === o.id ? "bg-blue-50/60" : ""
+                      }`}
+                    >
                       <td className="px-4 py-2.5">
-                        <span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-medium text-red-700">
-                          Неуспешный
-                        </span>
+                        <div className="font-mono text-xs text-blue-600">{o.code}</div>
+                        <div className="text-xs text-slate-400">{o.number}</div>
                       </td>
-                    )}
-                    {pendingRefund === "true" && (
-                      <td className="px-4 py-2.5">
-                        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">
-                          Ожидает обработки
-                        </span>
+                      <td className="px-4 py-2.5 font-medium text-slate-800">
+                        {Number(o.amount).toFixed(2)} {o.currency}
                       </td>
-                    )}
-                    {cancelledWithin && (
-                      <td className="px-4 py-2.5 text-xs text-slate-600">
-                        {o.createdAt ? new Date(o.createdAt).toLocaleDateString('ru-RU') : '—'}
-                      </td>
-                    )}
-                  </tr>
+                      <td className="px-4 py-2.5 text-slate-500">{o.items?.length ?? 0}</td>
+                      <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
+                      <td className="px-4 py-2.5"><StatusBadge status={o.paymentStatus} /></td>
+                      {paymentFailed === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-medium text-red-700">Неуспешный</span></td>}
+                      {pendingRefund === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">Ожидает обработки</span></td>}
+                      {cancelledWithin && <td className="px-4 py-2.5 text-xs text-slate-600">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ru-RU") : "—"}</td>}
+                    </tr>
                 ))}
-
-{(data?.items ?? []).length === 0 && (
+                {(data?.items ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">
+                    <td colSpan={4 + (paymentFailed === "true" ? 1 : 0) + (pendingRefund === "true" ? 1 : 0) + (cancelledWithin ? 1 : 0)} className="px-4 py-8 text-center text-sm text-slate-400">
                       Заказов пока нет
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            {data && data.total > 0 && (
+              <Pagination
+                page={page}
+                pageSize={20}
+                total={data.total}
+                onPageChange={(p) => { setPage(p); setSelected(null); }}
+              />
+            )}
           </div>
         </div>
       </div>

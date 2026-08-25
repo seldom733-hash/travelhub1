@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { sellerApi, type SellerProposalView } from "@/lib/seller-api";
+import Pagination from "@/components/Pagination";
 import { t, useLocale } from "@/lib/i18n";
 import { formatLocation } from "@/lib/locations";
 
@@ -33,6 +34,7 @@ export default function SellerProfilesReviewPage() {
   const [items, setItems] = useState<SellerProposalView[]>([]);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<SellerProposalView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -46,7 +48,7 @@ export default function SellerProfilesReviewPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await sellerApi.listProposals({ status: statusFilter || undefined, pageSize: 50 });
+      const res = await sellerApi.listProposals({ status: statusFilter || undefined, page, pageSize: 20 });
       setItems(res.items);
       setTotal(res.total);
     } catch (e) {
@@ -54,7 +56,7 @@ export default function SellerProfilesReviewPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, page]);
 
   useEffect(() => {
     void loadQueue();
@@ -172,6 +174,11 @@ export default function SellerProfilesReviewPage() {
                 </li>
               ))}
             </ul>
+          )}
+          {total > 20 && (
+            <div className="px-4 pb-2">
+              <Pagination page={page} pageSize={20} total={total} onPageChange={setPage} />
+            </div>
           )}
         </section>
 

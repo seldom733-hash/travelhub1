@@ -450,10 +450,10 @@ export class OrderService {
 
     // ROUND 5: paymentFailed=true → orders that have at least one FAILED payment (detector: FAILED_PAYMENTS)
     if (query.paymentFailed === "true") {
-      const failedOrderIds = await (this.prisma as any).$queryRawUnsafe(
-        `SELECT DISTINCT "orderId" FROM "finance"."Payment" WHERE status = 'FAILED'::"finance"."PaymentStatus"`,
+      const failedPayments = await this.prisma.$queryRawUnsafe(
+        `SELECT DISTINCT "orderId" FROM "finance"."Payment" WHERE status = 'FAILED'`,
       );
-      const ids = failedOrderIds.map((r: any) => r.orderId);
+      const ids = (failedPayments as any[]).map((r) => r.orderId as string);
       if (ids.length === 0) {
         return { items: [], total: 0, page, pageSize };
       }
@@ -462,10 +462,10 @@ export class OrderService {
 
     // ROUND 5: pendingRefund=true → orders that have at least one REQUESTED refund (detector: PENDING_REFUNDS)
     if (query.pendingRefund === "true") {
-      const refundOrderIds = await (this.prisma as any).$queryRawUnsafe(
-        `SELECT DISTINCT "orderId" FROM "finance"."Refund" WHERE status = 'REQUESTED'::"finance"."RefundStatus"`,
+      const pendingRefunds = await this.prisma.$queryRawUnsafe(
+        `SELECT DISTINCT "orderId" FROM "finance"."Refund" WHERE status = 'REQUESTED'`,
       );
-      const ids = refundOrderIds.map((r: any) => r.orderId);
+      const ids = (pendingRefunds as any[]).map((r) => r.orderId as string);
       if (ids.length === 0) {
         return { items: [], total: 0, page, pageSize };
       }

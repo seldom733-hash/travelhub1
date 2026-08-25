@@ -6,6 +6,7 @@ import { api, type Booking, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
+import Pagination from "@/components/Pagination";
 import { useCan } from "@/lib/use-can";
 import ActionButtons from "@/components/ActionButtons";
 
@@ -22,6 +23,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }
   const [data, setData] = useState<Page<Booking> | null>(null);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [orderRef, setOrderRef] = useState<{ code: string; number: string; status: string } | null>(null);
+  const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Derived filter labels for display
@@ -53,7 +55,8 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }
     setBusy(true);
     try {
       const qs = new URLSearchParams();
-      qs.set('pageSize', '100');
+      qs.set('pageSize', '20');
+      qs.set('page', String(page));
       if (upcomingOnly) qs.set('upcoming', 'true');
       if (overdueOnly) qs.set('overdue', 'true');
       if (slaMinutes) qs.set('slaMinutes', slaMinutes);
@@ -69,7 +72,8 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }
 
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upcomingOnly, statusFilter, overdueOnly, slaMinutes, page]);
 
   const openDetail = async (id: string) => {
     const booking = await api.get<Booking>(`/bookings/${id}`);
@@ -166,27 +170,19 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{b.orderId.slice(0, 8)}…</td>
                     <td className="px-4 py-2.5 font-medium text-slate-800">{Number(b.amount).toFixed(2)}</td>
                     <td className="px-4 py-2.5 text-slate-500">{b.passengers?.length ?? 0}</td>
-                    <td className="px-4 py-2.5">
-                      <StatusBadge status={b.status} />
-                    </td>
-                    {(upcomingOnly || overdueOnly) && (
-                      <td className="px-4 py-2.5 text-xs text-slate-600">
-                        {b.serviceDate ? new Date(b.serviceDate).toLocaleDateString('ru-RU') : '—'}
-                      </td>
-                    )}
-                    {overdueOnly && (
-                      <td className="px-4 py-2.5">
-                        {(() => {
-                          const created = new Date(b.createdAt).getTime();
-                          const mins = Math.floor((Date.now() - created) / 60000);
-                          const h = Math.floor(mins / 60);
-                          const d = Math.floor(h / 24);
-                          if (d > 0) return <span className="text-xs font-medium text-red-600">{d} дн. {h % 24} ч.</span>;
-                          if (h > 0) return <span className="text-xs font-medium text-red-600">{h} ч. {mins % 60} мин</span>;
-                          return <span className="text-xs text-slate-500">{mins} мин</span>;
-                        })()}
-                      </td>
-                    )}
+                    <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
+                    {(upcomingOnly || overdueOnly) && <td className="px-4 py-2.5 text-xs text-slate-600">{b.serviceDate ? new Date(b.serviceDate).toLocaleDateString("ru-RU") : "—"}</td>}
+                    {overdueOnly && <td className="px-4 py-2.5">
+                      {(() => {
+                        const created = new Date(b.createdAt).getTime();
+                        const mins = Math.floor((Date.now() - created) / 60000);
+                        const h = Math.floor(mins / 60);
+                        const d = Math.floor(h / 24);
+                        if (d > 0) return <span className="text-xs font-medium text-red-600">{d} дн. {h % 24} ч.</span>;
+                        if (h > 0) return <span className="text-xs font-medium text-red-600">{h} ч. {mins % 60} мин</span>;
+                        return <span className="text-xs text-slate-500">{mins} мин</span>;
+                      })()}
+                    </td>}
                   </tr>
                 ))}
                 {(data?.items ?? []).length === 0 && (
@@ -198,6 +194,14 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }
                 )}
               </tbody>
             </table>
+            {data && data.total > 0 && (
+              <Pagination
+                page={page}
+                pageSize={20}
+                total={data.total}
+                onPageChange={(p) => { setPage(p); setSelected(null); }}
+              />
+            )}
           </div>
         </div>
       </div>

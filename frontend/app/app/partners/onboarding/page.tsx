@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { partnerOnboardingApi, type PartnerApplicationView, type ReviewQueueItem } from "@/lib/partner-onboarding-api";
+import Pagination from "@/components/Pagination";
 import { useLocale, t } from "@/lib/i18n";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -25,6 +26,7 @@ export default function PartnerOnboardingReviewPage() {
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   type ReviewDetail = PartnerApplicationView & { user: { id: string; username: string; email: string | null } };
   const [selected, setSelected] = useState<ReviewDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,7 +39,7 @@ export default function PartnerOnboardingReviewPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await partnerOnboardingApi.listReviewQueue({ status: statusFilter || undefined, search: search || undefined, pageSize: 50 });
+      const res = await partnerOnboardingApi.listReviewQueue({ status: statusFilter || undefined, search: search || undefined, page, pageSize: 20 });
       setItems(res.items);
       setTotal(res.total);
     } catch (e) {
@@ -45,7 +47,7 @@ export default function PartnerOnboardingReviewPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, search]);
+  }, [statusFilter, search, page]);
 
   useEffect(() => {
     void loadQueue();
@@ -145,6 +147,11 @@ export default function PartnerOnboardingReviewPage() {
                 </li>
               ))}
             </ul>
+          )}
+          {total > 20 && (
+            <div className="px-4 pb-2">
+              <Pagination page={page} pageSize={20} total={total} onPageChange={setPage} />
+            </div>
           )}
         </section>
 

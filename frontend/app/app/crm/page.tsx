@@ -5,6 +5,7 @@ import { api, type Customer, type CustomerDetail, type Partner, type PartnerDeta
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
+import Pagination from "@/components/Pagination";
 import PanelFrame from "@/components/PanelFrame";
 import { useCan } from "@/lib/use-can";
 import { useLocale, t } from "@/lib/i18n";
@@ -22,6 +23,7 @@ export default function CrmPage() {
   const [customerData, setCustomerData] = useState<Page<Customer> | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDetail | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [customerPage, setCustomerPage] = useState(1);
   const [customerDetailTab, setCustomerDetailTab] = useState<"overview" | "orders" | "bookings" | "payments" | "relations">("overview");
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -35,30 +37,35 @@ export default function CrmPage() {
   const [partnerData, setPartnerData] = useState<Page<Partner> | null>(null);
   const [selectedPartner, setSelectedPartner] = useState<PartnerDetail | null>(null);
   const [partnerSearch, setPartnerSearch] = useState("");
+  const [partnerPage, setPartnerPage] = useState(1);
 
   // ── Customer loading ──
   const loadCustomers = useCallback(async () => {
     try {
       const qs = new URLSearchParams();
       if (customerSearch) qs.set("search", customerSearch);
+      qs.set("page", String(customerPage));
+      qs.set("pageSize", "20");
       const res = await api.get<Page<Customer>>(`/customers?${qs.toString()}`);
       setCustomerData(res);
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [customerSearch]);
+  }, [customerSearch, customerPage]);
 
   // ── Partner loading ──
   const loadPartners = useCallback(async () => {
     try {
       const qs = new URLSearchParams();
       if (partnerSearch) qs.set("search", partnerSearch);
+      qs.set("page", String(partnerPage));
+      qs.set("pageSize", "20");
       const res = await api.get<Page<Partner>>(`/partners?${qs.toString()}`);
       setPartnerData(res);
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [partnerSearch]);
+  }, [partnerSearch, partnerPage]);
 
   useEffect(() => { void loadCustomers(); }, [loadCustomers]);
   useEffect(() => { if (tab === "partners") void loadPartners(); }, [tab, loadPartners]);
@@ -272,6 +279,9 @@ export default function CrmPage() {
                   )}
                 </tbody>
               </table>
+              {customerData && customerData.total > 0 && (
+                <Pagination page={customerPage} pageSize={20} total={customerData.total} onPageChange={(p) => { setCustomerPage(p); setSelectedCustomer(null); }} />
+              )}
             </div>
           )}
 
@@ -307,6 +317,9 @@ export default function CrmPage() {
                   )}
                 </tbody>
               </table>
+              {partnerData && partnerData.total > 0 && (
+                <Pagination page={partnerPage} pageSize={20} total={partnerData.total} onPageChange={(p) => { setPartnerPage(p); setSelectedPartner(null); }} />
+              )}
             </div>
           )}
         </div>

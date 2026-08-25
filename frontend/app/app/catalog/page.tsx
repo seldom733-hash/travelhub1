@@ -7,6 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
 import PanelFrame from "@/components/PanelFrame";
+import Pagination from "@/components/Pagination";
 import TariffEditor, { newTariffDraft, tariffDraftsFrom, type TariffDraft } from "@/components/TariffEditor";
 import { useCan } from "@/lib/use-can";
 
@@ -26,6 +27,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
   const [data, setData] = useState<Page<Product> | null>(null);
   const [selected, setSelected] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [status, setStatus] = useState(initialStatus);
   const [unsold] = useState(initialUnsold);
   const [availability] = useState(initialAvailability);
@@ -65,6 +67,8 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
       if (status) qs.set("status", status);
       if (unsold) qs.set("unsold", unsold);
       if (availability) qs.set("availability", availability);
+      qs.set("page", String(page));
+      qs.set("pageSize", "20");
       const res = await api.get<Page<Product>>(`/products?${qs.toString()}`);
       setData(res);
       if (selected && !res.items.some((p) => p.id === selected.id)) setSelected(null);
@@ -78,7 +82,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, unsold, availability]);
+  }, [search, status, unsold, availability, page]);
 
   const openDetail = async (id: string) => {
     setShowCreate(false);
@@ -280,23 +284,9 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
                     <td className="px-4 py-2.5 font-medium text-slate-800">{p.title}</td>
                     <td className="px-4 py-2.5 text-slate-500">{p.type}</td>
                     <td className="px-4 py-2.5 text-slate-500">{p.tariffs?.length ?? 0}</td>
-                    <td className="px-4 py-2.5">
-                      <StatusBadge status={p.status} />
-                    </td>
-                    {unsold === "true" && (
-                      <td className="px-4 py-2.5">
-                        <span className="inline-flex items-center rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-medium text-green-700">
-                          0 заказов
-                        </span>
-                      </td>
-                    )}
-                    {availability === "missing" && (
-                      <td className="px-4 py-2.5">
-                        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">
-                          Не настроена
-                        </span>
-                      </td>
-                    )}
+                    <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
+                    {unsold === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-medium text-green-700">0 заказов</span></td>}
+                    {availability === "missing" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">Не настроена</span></td>}
                   </tr>
                 ))}
                 {(data?.items ?? []).length === 0 && (
@@ -308,6 +298,14 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
                 )}
               </tbody>
             </table>
+            {data && data.total > 0 && (
+              <Pagination
+                page={page}
+                pageSize={20}
+                total={data.total}
+                onPageChange={(p) => { setPage(p); setSelected(null); }}
+              />
+            )}
           </div>
         </div>
       </div>
