@@ -65,16 +65,21 @@ export default function CrmPage() {
   const [editForm, setEditForm] = useState({ firstName: "", lastName: "", companyName: "", phone: "" });
   const [error, setError] = useState("");
 
-  // ── Partner CRM state ──
-  const [partnerData, setPartnerData] = useState<Page<PartnerCustomer> | null>(null);
-  const [selectedPartnerCustomer, setSelectedPartnerCustomer] = useState<PartnerCustomerDetail | null>(null);
+  // ── Platform Partner CRM state ──
+  const [partnerListData, setPartnerListData] = useState<Page<Partner> | null>(null);
+  const [selectedPartner, setSelectedPartner] = useState<PartnerDetail | null>(null);
   const [partnerSearch, setPartnerSearch] = useState("");
   const [partnerPage, setPartnerPage] = useState(1);
-  const [partnerDetailTab, setPartnerDetailTab] = useState<"overview" | "orders" | "bookings" | "payments" | "relations">("overview");
+  const [partnerDetailTab, setPartnerDetailTab] = useState<"overview" | "services" | "orders" | "bookings" | "customers" | "storefront">("overview");
+  const [partnerCustomerDetailTab, setPartnerCustomerDetailTab] = useState<"overview" | "orders" | "bookings" | "payments" | "relations">("overview");
+  const [partnerError, setPartnerError] = useState("");
+
+  // ── Partner Customer CRM state (3.5C partner context) ──
+  const [partnerData, setPartnerData] = useState<Page<PartnerCustomer> | null>(null);
+  const [selectedPartnerCustomer, setSelectedPartnerCustomer] = useState<PartnerCustomerDetail | null>(null);
   const [showIntake, setShowIntake] = useState(false);
   const [intaking, setIntaking] = useState(false);
   const [intakeForm, setIntakeForm] = useState({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "" });
-  const [partnerError, setPartnerError] = useState("");
 
   // ── Platform Customer loading ──
   const loadCustomers = useCallback(async () => {
@@ -90,7 +95,21 @@ export default function CrmPage() {
     }
   }, [customerSearch, customerPage]);
 
-  // ── Partner Customer loading ──
+  // ── Platform Partner loading ──
+  const loadPartners = useCallback(async () => {
+    try {
+      const qs = new URLSearchParams();
+      if (partnerSearch) qs.set("search", partnerSearch);
+      qs.set("page", String(partnerPage));
+      qs.set("pageSize", "20");
+      const res = await api.get<Page<Partner>>(`/partners?${qs.toString()}`);
+      setPartnerListData(res);
+    } catch (e) {
+      setPartnerError((e as Error).message);
+    }
+  }, [partnerSearch, partnerPage]);
+
+  // ── Partner Customer loading (partner context) ──
   const loadPartnerCustomers = useCallback(async () => {
     try {
       const qs = new URLSearchParams();
@@ -105,9 +124,13 @@ export default function CrmPage() {
   }, [partnerSearch, partnerPage]);
 
   useEffect(() => {
-    if (crmContext === "platform") void loadCustomers();
-    else void loadPartnerCustomers();
-  }, [crmContext, loadCustomers, loadPartnerCustomers]);
+    if (crmContext === "platform") {
+      if (tab === "customers") void loadCustomers();
+      else void loadPartners();
+    } else {
+      void loadPartnerCustomers();
+    }
+  }, [crmContext, tab, loadCustomers, loadPartners, loadPartnerCustomers]);
 
   // ── Platform Customer actions ──
   const openCustomerDetail = async (id: string) => {
@@ -123,9 +146,20 @@ export default function CrmPage() {
     }
   };
 
+  // ── Platform Partner actions ──
+  const openPartnerDetail = async (id: string) => {
+    setPartnerDetailTab("overview");
+    try {
+      const detail = await api.get<PartnerDetail>(`/partners/${id}`);
+      setSelectedPartner(detail);
+    } catch (e) {
+      setPartnerError((e as Error).message);
+    }
+  };
+
   // ── Partner Customer actions ──
   const openPartnerCustomerDetail = async (id: string) => {
-    setPartnerDetailTab("overview");
+    setPartnerCustomerDetailTab("overview");
     try {
       const detail = await api.get<PartnerCustomerDetail>(`/partner/customers/${id}`);
       setSelectedPartnerCustomer(detail);
@@ -208,18 +242,25 @@ export default function CrmPage() {
                 { label: t("crm.total_customers", locale), value: customerData?.total ?? 0, icon: "👥" },
               ]} />
             )}
+            {tab === "partners" && (
+              <Kpi items={[
+                { label: t("crm.total_partners", locale), value: partnerListData?.total ?? 0, icon: "🏢" },
+              ]} />
+            )}
 
             {/* Search */}
             <div className="flex flex-wrap items-center gap-2">
               <input
-                value={tab === "customers" ? customerSearch : ""}
-                onChange={(e) => setCustomerSearch(e.target.value)}
+                value={tab === "customers" ? customerSearch : partnerSearch}
+                onChange={(e) => tab === "customers" ? setCustomerSearch(e.target.value) : setPartnerSearch(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { tab === "customers" ? void loadCustomers() : void loadPartners(); } }}
                 placeholder={t("crm.search.placeholder", locale)}
                 className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
             {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
+            {partnerError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{partnerError}</div>}
 
             {/* Customer Table */}
             {tab === "customers" && (
@@ -254,6 +295,40 @@ export default function CrmPage() {
                 )}
               </div>
             )}
+
+            {/* Partner Table */}
+            {tab === "partners" && (
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
+                      <th className="px-4 py-2.5 font-medium">{t("crm.col.name", locale)}</th>
+                      <th className="px-4 py-2.5 font-medium">{t("crm.col.email", locale)}</th>
+                      <th className="px-4 py-2.5 font-medium">{t("crm.col.country", locale)}</th>
+                      <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(partnerListData?.items ?? []).map((p) => (
+                      <tr key={p.id} onClick={() => void openPartnerDetail(p.id)} className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${selectedPartner?.id === p.id ? "bg-blue-50/60" : ""}`}>
+                        <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{p.code}</td>
+                        <td className="px-4 py-2.5 font-medium text-slate-800">{p.name}</td>
+                        <td className="px-4 py-2.5 text-slate-500">{p.contactEmail ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-slate-500">{p.countryCode ?? "—"}</td>
+                        <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
+                      </tr>
+                    ))}
+                    {(partnerListData?.items ?? []).length === 0 && (
+                      <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">{t("crm.partners_empty", locale)}</td></tr>
+                    )}
+                  </tbody>
+                </table>
+                {partnerListData && partnerListData.total > 0 && (
+                  <Pagination page={partnerPage} pageSize={20} total={partnerListData.total} onPageChange={(p) => { setPartnerPage(p); setSelectedPartner(null); }} />
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -274,6 +349,12 @@ export default function CrmPage() {
                   {t(`crm.detail.${dt}`, locale)}
                 </button>
               ))}
+              <button onClick={() => setCustomerDetailTab("refunds" as any)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${customerDetailTab === ("refunds" as any) ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}>
+                {t("crm.detail.refunds", locale)}
+              </button>
+              <button onClick={() => setCustomerDetailTab("history" as any)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${customerDetailTab === ("history" as any) ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}>
+                {t("crm.detail.history", locale)}
+              </button>
             </div>
             <div className="space-y-3 p-5 text-sm">
               {customerDetailTab === "overview" && (
@@ -327,6 +408,127 @@ export default function CrmPage() {
                       {r.lifecycle && <div className="mt-1 text-slate-500">{r.lifecycle}</div>}
                     </div>
                   ))}
+                </div>
+              )}
+              {customerDetailTab === "relations" && selectedCustomer.partnerRelations.length === 0 && (
+                <div className="py-4 text-center text-xs text-slate-400">{t("crm.detail.no_relations", locale)}</div>
+              )}
+
+              {/* Refunds */}
+              {(customerDetailTab as string) === "refunds" && (
+                <div className="space-y-2">
+                  <div className="text-xs text-slate-500 mb-2">{t("crm.detail.refunds_hint", locale)}</div>
+                  <div className="py-4 text-center text-xs text-slate-400">{t("crm.detail.refunds_unavailable", locale)}</div>
+                </div>
+              )}
+
+              {/* History */}
+              {(customerDetailTab as string) === "history" && (
+                <div className="space-y-2">
+                  {selectedCustomer.history.length > 0 ? (
+                    selectedCustomer.history.map((h) => (
+                      <div key={h.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-slate-700">{h.action}</span>
+                          <span className="text-slate-400">{new Date(h.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        {h.from && h.to && (
+                          <div className="mt-1 text-slate-500">{h.from} → {h.to}</div>
+                        )}
+                        {h.comment && <div className="mt-1 text-slate-400">{h.comment}</div>}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.detail.no_history", locale)}</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </aside>
+        )}
+
+        {/* Partner 360 Detail Panel */}
+        {!showCreate && selectedPartner && (
+          <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
+            <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <div className="font-mono text-xs text-blue-600">{selectedPartner.code}</div>
+                <div className="text-lg font-bold text-slate-900">{selectedPartner.name}</div>
+                <StatusBadge status={selectedPartner.status} />
+              </div>
+              <button onClick={() => setSelectedPartner(null)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100">✕</button>
+            </div>
+            <div className="flex gap-1 border-b border-slate-100 px-4 pt-2">
+              {(["overview", "services", "orders", "bookings", "customers", "storefront"] as const).map((dt) => (
+                <button key={dt} onClick={() => setPartnerDetailTab(dt)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${partnerDetailTab === dt ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}>
+                  {t(`crm.partner_detail.${dt}`, locale)}
+                </button>
+              ))}
+            </div>
+            <div className="space-y-3 p-5 text-sm">
+              {/* Overview */}
+              {partnerCustomerDetailTab === "overview" && (
+                <>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-slate-700">{selectedPartner.contactEmail ?? "—"}</div></div>
+                    <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.country", locale)}</div><div className="font-medium text-slate-700">{selectedPartner.countryCode ?? "—"}</div></div>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                    <div className="text-slate-400">{t("crm.col.registration_number", locale)}</div>
+                    <div className="font-medium text-slate-700">{selectedPartner.registrationNumber ?? "—"}</div>
+                  </div>
+                  <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-center">
+                    <div className="font-bold text-blue-700">{selectedPartner.customerRelations.length}</div>
+                    <div className="text-blue-500">{t("crm.partner_detail.total_relations", locale)}</div>
+                  </div>
+                </>
+              )}
+
+              {/* Services */}
+              {partnerDetailTab === "services" && (
+                <div className="py-4 text-center text-xs text-slate-400">
+                  {t("crm.partner_detail.services_hint", locale)}
+                </div>
+              )}
+
+              {/* Orders */}
+              {partnerDetailTab === "orders" && (
+                <div className="py-4 text-center text-xs text-slate-400">
+                  {t("crm.partner_detail.orders_hint", locale)}
+                </div>
+              )}
+
+              {/* Bookings */}
+              {partnerDetailTab === "bookings" && (
+                <div className="py-4 text-center text-xs text-slate-400">
+                  {t("crm.partner_detail.bookings_hint", locale)}
+                </div>
+              )}
+
+              {/* Customers */}
+              {partnerDetailTab === "customers" && (
+                <div className="space-y-2">
+                  {selectedPartner.customerRelations.length > 0 ? (
+                    selectedPartner.customerRelations.map((r) => (
+                      <div key={r.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-slate-700">{r.customer?.firstName} {r.customer?.lastName}</span>
+                          <StatusBadge status={r.status} />
+                        </div>
+                        {r.lifecycle && <div className="mt-1 text-slate-500">{r.lifecycle}</div>}
+                        {r.leadSource && <div className="mt-1 text-slate-400">{t("crm.col.lead_source", locale)}: {r.leadSource}</div>}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.partner_detail.no_customers", locale)}</div>
+                  )}
+                </div>
+              )}
+
+              {/* Storefront */}
+              {partnerDetailTab === "storefront" && (
+                <div className="py-4 text-center text-xs text-slate-400">
+                  {t("crm.partner_detail.storefront_hint", locale)}
                 </div>
               )}
             </div>
@@ -466,14 +668,14 @@ export default function CrmPage() {
 
           <div className="flex gap-1 border-b border-slate-100 px-4 pt-2">
             {(["overview", "orders", "bookings", "payments", "relations"] as const).map((dt) => (
-              <button key={dt} onClick={() => setPartnerDetailTab(dt)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${partnerDetailTab === dt ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}>
+              <button key={dt} onClick={() => setPartnerCustomerDetailTab(dt)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${partnerCustomerDetailTab === dt ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}>
                 {t(`crm.detail.${dt}`, locale)}
               </button>
             ))}
           </div>
 
           <div className="space-y-3 p-5 text-sm">
-            {partnerDetailTab === "overview" && (
+            {partnerCustomerDetailTab === "overview" && (
               <>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-slate-700">{selectedPartnerCustomer.email}</div></div>
@@ -499,8 +701,7 @@ export default function CrmPage() {
                   <div className="rounded-lg bg-purple-50 px-3 py-2 text-center"><div className="font-bold text-purple-700">{selectedPartnerCustomer.summary.totalPayments}</div><div className="text-purple-500">{t("crm.detail.total_payments", locale)}</div></div>
                 </div>
               </>
-            )}
-            {partnerDetailTab === "orders" && selectedPartnerCustomer.orders.length > 0 && (
+            )}              {partnerCustomerDetailTab === "orders" && selectedPartnerCustomer.orders.length > 0 && (
               <div className="space-y-2">
                 {selectedPartnerCustomer.orders.map((o) => (
                   <div key={o.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
@@ -509,8 +710,7 @@ export default function CrmPage() {
                   </div>
                 ))}
               </div>
-            )}
-            {partnerDetailTab === "bookings" && selectedPartnerCustomer.bookings.length > 0 && (
+            )}              {partnerCustomerDetailTab === "bookings" && selectedPartnerCustomer.bookings.length > 0 && (
               <div className="space-y-2">
                 {selectedPartnerCustomer.bookings.map((b) => (
                   <div key={b.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
@@ -519,8 +719,7 @@ export default function CrmPage() {
                   </div>
                 ))}
               </div>
-            )}
-            {partnerDetailTab === "payments" && selectedPartnerCustomer.payments.length > 0 && (
+            )}              {partnerCustomerDetailTab === "payments" && selectedPartnerCustomer.payments.length > 0 && (
               <div className="space-y-2">
                 {selectedPartnerCustomer.payments.map((p) => (
                   <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
@@ -529,8 +728,7 @@ export default function CrmPage() {
                   </div>
                 ))}
               </div>
-            )}
-            {partnerDetailTab === "relations" && crmTier === "PRO" && selectedPartnerCustomer._relation && (
+            )}              {partnerCustomerDetailTab === "relations" && crmTier === "PRO" && selectedPartnerCustomer._relation && (
               <div className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
                 <div className="font-medium text-slate-700">{t("crm.detail.your_relation", locale)}</div>
                 <div className="mt-1 text-slate-500">{selectedPartnerCustomer._relation.lifecycle ?? "—"}</div>
