@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api, type Customer, type CustomerDetail, type Partner, type PartnerDetail, type PartnerCustomer, type PartnerCustomerDetail, type CrmTierResponse, type PartnerIntakeResult, type Page } from "@/lib/api";
+import Link from "next/link";
+import { api, type Customer, type Partner, type PartnerCustomer, type PartnerCustomerDetail, type CrmTierResponse, type PartnerIntakeResult, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
@@ -53,10 +54,10 @@ export default function CrmPage() {
 
   // ── Platform CRM state ──
   const [customerData, setCustomerData] = useState<Page<Customer> | null>(null);
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerDetail | null>(null);
+  // selectedCustomer removed — use dedicated /app/crm/customers/:id page
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerPage, setCustomerPage] = useState(1);
-  const [customerDetailTab, setCustomerDetailTab] = useState<"overview" | "orders" | "bookings" | "payments" | "relations">("overview");
+  // customerDetailTab removed — use dedicated /app/crm/customers/:id page
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ type: "PERSON", firstName: "", lastName: "", companyName: "", email: "", phone: "" });
@@ -68,10 +69,10 @@ export default function CrmPage() {
 
   // ── Platform Partner CRM state ──
   const [partnerListData, setPartnerListData] = useState<Page<Partner> | null>(null);
-  const [selectedPartner, setSelectedPartner] = useState<PartnerDetail | null>(null);
+  // selectedPartner removed — use dedicated /app/crm/partners/:id page
   const [partnerSearch, setPartnerSearch] = useState("");
   const [partnerPage, setPartnerPage] = useState(1);
-  const [partnerDetailTab, setPartnerDetailTab] = useState<"overview" | "services" | "orders" | "bookings" | "customers" | "storefront">("overview");
+  // partnerDetailTab removed — use dedicated /app/crm/partners/:id page
   const [partnerCustomerDetailTab, setPartnerCustomerDetailTab] = useState<"overview" | "orders" | "bookings" | "payments" | "relations">("overview");
   const [partnerError, setPartnerError] = useState("");
   const [partnerLoadError, setPartnerLoadError] = useState(false);
@@ -138,30 +139,7 @@ export default function CrmPage() {
     }
   }, [crmContext, tab, loadCustomers, loadPartners, loadPartnerCustomers]);
 
-  // ── Platform Customer actions ──
-  const openCustomerDetail = async (id: string) => {
-    setShowCreate(false);
-    setEditing(false);
-    setCustomerDetailTab("overview");
-    try {
-      const detail = await api.get<CustomerDetail>(`/customers/${id}/detail`);
-      setSelectedCustomer(detail);
-    } catch {
-      const detail = await api.get<Customer>(`/customers/${id}`);
-      setSelectedCustomer({ ...detail, contacts: [], history: [], partnerRelations: [], orders: [], bookings: [], payments: [], refunds: [], summary: { totalOrders: 0, totalBookings: 0, totalPayments: 0, totalRefunds: 0 } } as CustomerDetail);
-    }
-  };
-
-  // ── Platform Partner actions ──
-  const openPartnerDetail = async (id: string) => {
-    setPartnerDetailTab("overview");
-    try {
-      const detail = await api.get<PartnerDetail>(`/partners/${id}`);
-      setSelectedPartner(detail);
-    } catch (e) {
-      setPartnerError((e as Error).message);
-    }
-  };
+  // ── Entity navigation now uses dedicated /app/crm/customers/:id and /app/crm/partners/:id pages ──
 
   // ── Partner Customer actions ──
   const openPartnerCustomerDetail = async (id: string) => {
@@ -234,7 +212,7 @@ export default function CrmPage() {
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-slate-200 bg-slate-50 px-6 pt-2">
-            <button onClick={() => { setTab("customers"); setSelectedCustomer(null); }} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "customers" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+            <button onClick={() => setTab("customers")} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "customers" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
               {t("crm.tab.customers", locale)}
             </button>
             <button onClick={() => { setTab("partners"); }} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "partners" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
@@ -299,9 +277,9 @@ export default function CrmPage() {
                   </thead>
                   <tbody>
                     {(customerData?.items ?? []).map((c) => (
-                      <tr key={c.id} onClick={() => void openCustomerDetail(c.id)} className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${selectedCustomer?.id === c.id ? "bg-blue-50/60" : ""}`}>
-                        <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{c.code}</td>
-                        <td className="px-4 py-2.5 font-medium text-slate-800">{displayName(c)}</td>
+                      <tr key={c.id} className="border-b border-slate-50 transition-colors hover:bg-blue-50/50">
+                        <td className="px-4 py-2.5"><Link href={`/app/crm/customers/${c.id}`} className="font-mono text-xs text-blue-600 hover:underline">{c.code}</Link></td>
+                        <td className="px-4 py-2.5"><Link href={`/app/crm/customers/${c.id}`} className="font-medium text-slate-800 hover:underline">{displayName(c)}</Link></td>
                         <td className="px-4 py-2.5 text-slate-500">{c.email}</td>
                         <td className="px-4 py-2.5 text-slate-500">{c.type === "COMPANY" ? t("crm.type.company", locale) : t("crm.type.person", locale)}</td>
                         <td className="px-4 py-2.5"><StatusBadge status={c.status} /></td>
@@ -313,7 +291,7 @@ export default function CrmPage() {
                   </tbody>
                 </table>
                 {customerData && customerData.total > 0 && (
-                  <Pagination page={customerPage} pageSize={20} total={customerData.total} onPageChange={(p) => { setCustomerPage(p); setSelectedCustomer(null); }} />
+                  <Pagination page={customerPage} pageSize={20} total={customerData.total} onPageChange={(p) => setCustomerPage(p)} />
                 )}
               </div>
             )}
@@ -333,9 +311,9 @@ export default function CrmPage() {
                   </thead>
                   <tbody>
                     {(partnerListData?.items ?? []).map((p) => (
-                      <tr key={p.id} onClick={() => void openPartnerDetail(p.id)} className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${selectedPartner?.id === p.id ? "bg-blue-50/60" : ""}`}>
-                        <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{p.code}</td>
-                        <td className="px-4 py-2.5 font-medium text-slate-800">{p.name}</td>
+                      <tr key={p.id} className="border-b border-slate-50 transition-colors hover:bg-blue-50/50">
+                        <td className="px-4 py-2.5"><Link href={`/app/crm/partners/${p.id}`} className="font-mono text-xs text-blue-600 hover:underline">{p.code}</Link></td>
+                        <td className="px-4 py-2.5"><Link href={`/app/crm/partners/${p.id}`} className="font-medium text-slate-800 hover:underline">{p.name}</Link></td>
                         <td className="px-4 py-2.5 text-slate-500">{p.contactEmail ?? "—"}</td>
                         <td className="px-4 py-2.5 text-slate-500">{p.countryCode ?? "—"}</td>
                         <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
@@ -347,312 +325,12 @@ export default function CrmPage() {
                   </tbody>
                 </table>
                 {partnerListData && partnerListData.total > 0 && (
-                  <Pagination page={partnerPage} pageSize={20} total={partnerListData.total} onPageChange={(p) => { setPartnerPage(p); setSelectedPartner(null); }} />
+                  <Pagination page={partnerPage} pageSize={20} total={partnerListData.total} onPageChange={(p) => setPartnerPage(p)} />
                 )}
               </div>
             )}
           </div>
         </div>
-
-        {/* Customer Detail Panel */}
-        {!showCreate && selectedCustomer && (
-          <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
-            <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
-              <div>
-                <div className="font-mono text-xs text-blue-600">{selectedCustomer.code}</div>
-                <div className="text-lg font-bold text-slate-900">{displayName(selectedCustomer)}</div>
-                <StatusBadge status={selectedCustomer.status} />
-              </div>
-              <button onClick={() => setSelectedCustomer(null)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100">✕</button>
-            </div>
-            <div className="flex gap-1 border-b border-slate-100 px-4 pt-2">
-              {(["overview", "orders", "bookings", "payments", "relations"] as const).map((dt) => (
-                <button key={dt} onClick={() => setCustomerDetailTab(dt)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${customerDetailTab === dt ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}>
-                  {t(`crm.detail.${dt}`, locale)}
-                </button>
-              ))}
-              <button onClick={() => setCustomerDetailTab("refunds" as any)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${customerDetailTab === ("refunds" as any) ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}>
-                {t("crm.detail.refunds", locale)}
-              </button>
-              <button onClick={() => setCustomerDetailTab("history" as any)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${customerDetailTab === ("history" as any) ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}>
-                {t("crm.detail.history", locale)}
-              </button>
-            </div>
-            <div className="space-y-3 p-5 text-sm">
-              {customerDetailTab === "overview" && (
-                <>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-slate-700">{selectedCustomer.email}</div></div>
-                    <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.create.form.phone", locale)}</div><div className="font-medium text-slate-700">{selectedCustomer.phone ?? "—"}</div></div>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2 text-xs">
-                    <div className="rounded-lg bg-blue-50 px-3 py-2 text-center"><div className="font-bold text-blue-700">{selectedCustomer.summary.totalOrders}</div><div className="text-blue-500">{t("crm.detail.total_orders", locale)}</div></div>
-                    <div className="rounded-lg bg-green-50 px-3 py-2 text-center"><div className="font-bold text-green-700">{selectedCustomer.summary.totalBookings}</div><div className="text-green-500">{t("crm.detail.total_bookings", locale)}</div></div>
-                    <div className="rounded-lg bg-purple-50 px-3 py-2 text-center"><div className="font-bold text-purple-700">{selectedCustomer.summary.totalPayments}</div><div className="text-purple-500">{t("crm.detail.total_payments", locale)}</div></div>
-                    <div className="rounded-lg bg-red-50 px-3 py-2 text-center"><div className="font-bold text-red-700">{selectedCustomer.summary.totalRefunds ?? 0}</div><div className="text-red-500">{t("crm.detail.total_refunds", locale)}</div></div>
-                  </div>
-                </>
-              )}
-              {customerDetailTab === "orders" && selectedCustomer.orders.length > 0 && (
-                <div className="space-y-2">
-                  {selectedCustomer.orders.map((o) => (
-                    <div key={o.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                      <div className="flex items-center justify-between"><span className="font-mono text-blue-600">{o.code}</span><StatusBadge status={o.status} /></div>
-                      <div className="mt-1 text-slate-500">{o.number} · {o.amount} {o.currency}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {customerDetailTab === "bookings" && selectedCustomer.bookings.length > 0 && (
-                <div className="space-y-2">
-                  {selectedCustomer.bookings.map((b) => (
-                    <div key={b.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                      <div className="flex items-center justify-between"><span className="font-mono text-blue-600">{b.code}</span><StatusBadge status={b.status} /></div>
-                      <div className="mt-1 text-slate-500">{b.amount} {b.currency}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {customerDetailTab === "payments" && selectedCustomer.payments.length > 0 && (
-                <div className="space-y-2">
-                  {selectedCustomer.payments.map((p) => (
-                    <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                      <div className="flex items-center justify-between"><span className="font-mono text-blue-600">{p.code}</span><StatusBadge status={p.status} /></div>
-                      <div className="mt-1 text-slate-500">{p.amount} {p.currency}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {customerDetailTab === "relations" && selectedCustomer.partnerRelations.length > 0 && (
-                <div className="space-y-2">
-                  {selectedCustomer.partnerRelations.map((r) => (
-                    <div key={r.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                      <div className="flex items-center justify-between"><span className="font-medium text-slate-700">{r.partner?.name ?? r.partnerId}</span><StatusBadge status={r.status} /></div>
-                      {r.lifecycle && <div className="mt-1 text-slate-500">{r.lifecycle}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {customerDetailTab === "relations" && selectedCustomer.partnerRelations.length === 0 && (
-                <div className="py-4 text-center text-xs text-slate-400">{t("crm.detail.no_relations", locale)}</div>
-              )}
-
-              {/* Refunds */}
-              {(customerDetailTab as string) === "refunds" && (
-                <div className="space-y-2">
-                  {selectedCustomer.refunds && selectedCustomer.refunds.length > 0 ? (
-                    selectedCustomer.refunds.map((r) => (
-                      <div key={r.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-blue-600">{r.code}</span>
-                          <StatusBadge status={r.status} />
-                        </div>
-                        <div className="mt-1 text-slate-500">{r.amount} {r.currency}</div>
-                        {r.reason && <div className="mt-1 text-slate-400">{r.reason}</div>}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.detail.no_refunds", locale)}</div>
-                  )}
-                </div>
-              )}
-
-              {/* History */}
-              {(customerDetailTab as string) === "history" && (
-                <div className="space-y-2">
-                  {selectedCustomer.history.length > 0 ? (
-                    selectedCustomer.history.map((h) => (
-                      <div key={h.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-slate-700">{h.action}</span>
-                          <span className="text-slate-400">{new Date(h.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        {h.from && h.to && (
-                          <div className="mt-1 text-slate-500">{h.from} → {h.to}</div>
-                        )}
-                        {h.comment && <div className="mt-1 text-slate-400">{h.comment}</div>}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.detail.no_history", locale)}</div>
-                  )}
-                </div>
-              )}
-            </div>
-          </aside>
-        )}
-
-        {/* Partner 360 Detail Panel */}
-        {!showCreate && selectedPartner && (
-          <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
-            <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
-              <div>
-                <div className="font-mono text-xs text-blue-600">{selectedPartner.code}</div>
-                <div className="text-lg font-bold text-slate-900">{selectedPartner.name}</div>
-                <StatusBadge status={selectedPartner.status} />
-              </div>
-              <button onClick={() => setSelectedPartner(null)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100">✕</button>
-            </div>
-            <div className="flex gap-1 border-b border-slate-100 px-4 pt-2">
-              {(["overview", "services", "orders", "bookings", "customers", "storefront"] as const).map((dt) => (
-                <button key={dt} onClick={() => setPartnerDetailTab(dt)} className={`rounded-t-lg px-3 py-1.5 text-xs font-medium transition-colors ${partnerDetailTab === dt ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:text-slate-600"}`}>
-                  {t(`crm.partner_detail.${dt}`, locale)}
-                </button>
-              ))}
-            </div>
-            <div className="space-y-3 p-5 text-sm">
-              {/* Overview */}
-              {partnerDetailTab === "overview" && (
-                <>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-slate-700">{selectedPartner.contactEmail ?? "—"}</div></div>
-                    <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.country", locale)}</div><div className="font-medium text-slate-700">{selectedPartner.countryCode ?? "—"}</div></div>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                    <div className="text-slate-400">{t("crm.col.registration_number", locale)}</div>
-                    <div className="font-medium text-slate-700">{selectedPartner.registrationNumber ?? "—"}</div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-blue-50 px-3 py-2 text-center"><div className="font-bold text-blue-700">{selectedPartner.totalProducts}</div><div className="text-blue-500">{t("crm.partner_detail.total_services", locale)}</div></div>
-                    <div className="rounded-lg bg-green-50 px-3 py-2 text-center"><div className="font-bold text-green-700">{selectedPartner.totalOrders}</div><div className="text-green-500">{t("crm.partner_detail.total_orders", locale)}</div></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-purple-50 px-3 py-2 text-center"><div className="font-bold text-purple-700">{selectedPartner.totalBookings}</div><div className="text-purple-500">{t("crm.partner_detail.total_bookings", locale)}</div></div>
-                    <div className="rounded-lg bg-amber-50 px-3 py-2 text-center"><div className="font-bold text-amber-700">{selectedPartner.totalCustomers}</div><div className="text-amber-500">{t("crm.partner_detail.total_relations", locale)}</div></div>
-                  </div>
-                  {selectedPartner.storefront && (
-                    <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs">
-                      <div className="text-emerald-400">{t("crm.partner_detail.storefront", locale)}</div>
-                      <div className="font-medium text-emerald-700">{selectedPartner.storefront.businessName ?? selectedPartner.storefront.slug}</div>
-                      <div className="mt-1 flex gap-2"><StatusBadge status={selectedPartner.storefront.status} /><StatusBadge status={selectedPartner.storefront.entitlementStatus} /></div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Services */}
-              {partnerDetailTab === "services" && (
-                <div className="space-y-2">
-                  {selectedPartner.products.length > 0 ? (
-                    selectedPartner.products.map((p) => (
-                      <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-blue-600">{p.code}</span>
-                          <StatusBadge status={p.status} />
-                        </div>
-                        <div className="mt-1 font-medium text-slate-700">{p.title}</div>
-                        <div className="mt-1 text-slate-400">{p.type}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.partner_detail.no_services", locale)}</div>
-                  )}
-                  {selectedPartner.totalProducts > 20 && (
-                    <div className="text-center text-xs text-slate-400">{t("crm.showing_of", locale)}</div>
-                  )}
-                </div>
-              )}
-
-              {/* Orders */}
-              {partnerDetailTab === "orders" && (
-                <div className="space-y-2">
-                  {selectedPartner.orders.length > 0 ? (
-                    selectedPartner.orders.map((o) => (
-                      <div key={o.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-blue-600">{o.code}</span>
-                          <StatusBadge status={o.status} />
-                        </div>
-                        <div className="mt-1 text-slate-500">{o.number} · {o.amount} {o.currency}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.partner_detail.no_orders", locale)}</div>
-                  )}
-                  {selectedPartner.totalOrders > 20 && (
-                    <div className="text-center text-xs text-slate-400">{t("crm.showing_of", locale)}</div>
-                  )}
-                </div>
-              )}
-
-              {/* Bookings */}
-              {partnerDetailTab === "bookings" && (
-                <div className="space-y-2">
-                  {selectedPartner.bookings.length > 0 ? (
-                    selectedPartner.bookings.map((b) => (
-                      <div key={b.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-blue-600">{b.code}</span>
-                          <StatusBadge status={b.status} />
-                        </div>
-                        <div className="mt-1 text-slate-500">{b.amount} {b.currency}</div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.partner_detail.no_bookings", locale)}</div>
-                  )}
-                  {selectedPartner.totalBookings > 20 && (
-                    <div className="text-center text-xs text-slate-400">{t("crm.showing_of", locale)}</div>
-                  )}
-                </div>
-              )}
-
-              {/* Customers */}
-              {partnerDetailTab === "customers" && (
-                <div className="space-y-2">
-                  {selectedPartner.customerRelations.length > 0 ? (
-                    selectedPartner.customerRelations.map((r) => (
-                      <div key={r.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-slate-700">{r.customer?.firstName} {r.customer?.lastName}</span>
-                          <StatusBadge status={r.status} />
-                        </div>
-                        {r.lifecycle && <div className="mt-1 text-slate-500">{r.lifecycle}</div>}
-                        {r.leadSource && <div className="mt-1 text-slate-400">{t("crm.col.lead_source", locale)}: {r.leadSource}</div>}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.partner_detail.no_customers", locale)}</div>
-                  )}
-                </div>
-              )}
-
-              {/* Storefront */}
-              {partnerDetailTab === "storefront" && (
-                <div className="space-y-2">
-                  {selectedPartner.storefront ? (
-                    <>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.partner_detail.storefront_code", locale)}</div><div className="font-mono font-medium text-slate-700">{selectedPartner.storefront.code}</div></div>
-                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.partner_detail.storefront_slug", locale)}</div><div className="font-medium text-slate-700">/{selectedPartner.storefront.slug}</div></div>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                        <div className="text-slate-400">{t("crm.partner_detail.storefront_name", locale)}</div>
-                        <div className="font-medium text-slate-700">{selectedPartner.storefront.businessName ?? "—"}</div>
-                      </div>
-                      {selectedPartner.storefront.tagline && (
-                        <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                          <div className="text-slate-400">{t("crm.partner_detail.storefront_tagline", locale)}</div>
-                          <div className="font-medium text-slate-700">{selectedPartner.storefront.tagline}</div>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.partner_detail.storefront_status", locale)}</div><div className="mt-1"><StatusBadge status={selectedPartner.storefront.status} /></div></div>
-                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.partner_detail.storefront_entitlement", locale)}</div><div className="mt-1"><StatusBadge status={selectedPartner.storefront.entitlementStatus} /></div></div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.partner_detail.storefront_locale", locale)}</div><div className="font-medium text-slate-700">{selectedPartner.storefront.defaultLocale}</div></div>
-                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.country", locale)}</div><div className="font-medium text-slate-700">{selectedPartner.storefront.countryCode ?? "—"}</div></div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.partner_detail.no_storefront", locale)}</div>
-                  )}
-                </div>
-              )}
-            </div>
-          </aside>
-        )}
       </div>
     );
   }
