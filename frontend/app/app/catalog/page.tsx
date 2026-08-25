@@ -263,6 +263,8 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
                   <th className="px-4 py-2.5 font-medium">Тип</th>
                   <th className="px-4 py-2.5 font-medium">Тарифы</th>
                   <th className="px-4 py-2.5 font-medium">Статус</th>
+                  {unsold === "true" && <th className="px-4 py-2.5 font-medium text-blue-600">Заказы</th>}
+                  {availability === "missing" && <th className="px-4 py-2.5 font-medium text-amber-600">Доступность</th>}
                 </tr>
               </thead>
               <tbody>
@@ -281,6 +283,20 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
                     <td className="px-4 py-2.5">
                       <StatusBadge status={p.status} />
                     </td>
+                    {unsold === "true" && (
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-medium text-green-700">
+                          0 заказов
+                        </span>
+                      </td>
+                    )}
+                    {availability === "missing" && (
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          Не настроена
+                        </span>
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {(data?.items ?? []).length === 0 && (

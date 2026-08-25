@@ -167,6 +167,9 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                   <th className="px-4 py-2.5 font-medium">Позиции</th>
                   <th className="px-4 py-2.5 font-medium">Статус</th>
                   <th className="px-4 py-2.5 font-medium">Оплата</th>
+                  {paymentFailed === "true" && <th className="px-4 py-2.5 font-medium text-red-600">Платёж</th>}
+                  {pendingRefund === "true" && <th className="px-4 py-2.5 font-medium text-amber-600">Возврат</th>}
+                  {cancelledWithin && <th className="px-4 py-2.5 font-medium text-slate-600">Дата отмены</th>}
                 </tr>
               </thead>
               <tbody>
@@ -188,13 +191,32 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                     <td className="px-4 py-2.5 text-slate-500">{o.items?.length ?? 0}</td>
                     <td className="px-4 py-2.5">
                       <StatusBadge status={o.status} />
-                    </td>
-                    <td className="px-4 py-2.5">
+                    </td>                    <td className="px-4 py-2.5">
                       <StatusBadge status={o.paymentStatus} />
                     </td>
+                    {paymentFailed === "true" && (
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-medium text-red-700">
+                          Неуспешный
+                        </span>
+                      </td>
+                    )}
+                    {pendingRefund === "true" && (
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          Ожидает обработки
+                        </span>
+                      </td>
+                    )}
+                    {cancelledWithin && (
+                      <td className="px-4 py-2.5 text-xs text-slate-600">
+                        {o.createdAt ? new Date(o.createdAt).toLocaleDateString('ru-RU') : '—'}
+                      </td>
+                    )}
                   </tr>
                 ))}
-                {(data?.items ?? []).length === 0 && (
+
+{(data?.items ?? []).length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">
                       Заказов пока нет
