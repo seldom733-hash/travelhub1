@@ -53,6 +53,10 @@ class ListOrdersQuery {
 
   @IsOptional()
   @IsString()
+  paymentStatus?: string;
+
+  @IsOptional()
+  @IsString()
   customerId?: string;
 
   @IsOptional()

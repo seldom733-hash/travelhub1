@@ -18,7 +18,7 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-slate-600 hover:bg-slate-700", only: ["NEW", "PREPARING_REQUEST", "SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION", "CONFIRMED", "IN_SERVICE"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-function BookingsContent({ upcomingOnly }: { upcomingOnly: boolean }) {
+function BookingsContent({ upcomingOnly, statusFilter, overdueOnly }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean }) {
   const [data, setData] = useState<Page<Booking> | null>(null);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [orderRef, setOrderRef] = useState<{ code: string; number: string; status: string } | null>(null);
@@ -40,18 +40,13 @@ function BookingsContent({ upcomingOnly }: { upcomingOnly: boolean }) {
   const load = async () => {
     setBusy(true);
     try {
-      const res = await api.get<Page<Booking>>(`/bookings?pageSize=100`);
-      // Client-side upcoming filter: bookings with future dates
-      if (upcomingOnly) {
-        const now = new Date();
-        const upcoming = res.items.filter((b) => {
-          const date = b.serviceDate ? new Date(b.serviceDate) : null;
-          return date && date > now;
-        });
-        setData({ ...res, items: upcoming, total: upcoming.length });
-      } else {
-        setData(res);
-      }
+      const qs = new URLSearchParams();
+      qs.set('pageSize', '100');
+      if (upcomingOnly) qs.set('upcoming', 'true');
+      if (overdueOnly) qs.set('overdue', 'true');
+      if (statusFilter) qs.set('status', statusFilter);
+      const res = await api.get<Page<Booking>>(`/bookings?${qs.toString()}`);
+      setData(res);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -234,7 +229,13 @@ function BookingsContent({ upcomingOnly }: { upcomingOnly: boolean }) {
 
 function BookingsWithParams() {
   const sp = useSearchParams();
-  return <BookingsContent upcomingOnly={sp.get("upcoming") === "true"} />;
+  return (
+    <BookingsContent
+      upcomingOnly={sp.get("upcoming") === "true"}
+      statusFilter={sp.get("status") || undefined}
+      overdueOnly={sp.get("overdue") === "true"}
+    />
+  );
 }
 
 export default function BookingsPage() {

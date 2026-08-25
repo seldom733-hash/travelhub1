@@ -92,8 +92,26 @@ export class DecisionSignalService {
       where: { fingerprint: condition.fingerprint },
     });
 
-    if (existing && existing.status !== "RESOLVED" && existing.status !== "DISMISSED") {
-      // Re-observation: update evidence, lastDetectedAt, observationCount
+    if (existing) {
+      if (existing.status === "RESOLVED" || existing.status === "DISMISSED") {
+        // Canonical re-observation: reopen RESOLVED/DISMISSED signal when condition re-detected
+        const reopened = await (this.prisma as any).decisionSignal.update({
+          where: { id: existing.id },
+          data: {
+            status: "OPEN" as SignalStatus,
+            evidence: condition.evidence as any,
+            affectedEntities: condition.affectedEntities as any,
+            lastDetectedAt: now,
+            observationCount: { increment: 1 },
+            resolvedAt: null,
+            resolvedBy: null,
+            dismissedAt: null,
+            dismissedBy: null,
+          },
+        });
+        return this.toResponse(reopened);
+      }
+      // Active re-observation: update evidence, lastDetectedAt, observationCount
       const updated = await (this.prisma as any).decisionSignal.update({
         where: { id: existing.id },
         data: {

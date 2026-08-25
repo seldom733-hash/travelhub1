@@ -58,9 +58,9 @@ function deriveFailedPaymentActions(
       descriptionKey: "cc.action.openFailedPayments.desc",
       actionType: "NAVIGATE",
       target: {
-        type: "PAYMENT",
+        type: "ORDER",
         route: "/app/orders",
-        filters: { status: "FAILED" },
+        filters: { paymentStatus: "UNPAID" },
       },
       requiredPermission: "finance.payment.read",
       executionMode: "NAVIGATION_ONLY",
@@ -109,9 +109,9 @@ function derivePendingRefundActions(
       descriptionKey: "cc.action.openPendingRefunds.desc",
       actionType: "NAVIGATE",
       target: {
-        type: "REFUND",
+        type: "ORDER",
         route: "/app/orders",
-        filters: { refundStatus: "PENDING" },
+        filters: { status: "CANCELLED" },
       },
       requiredPermission: "finance.refund.read",
       executionMode: "NAVIGATION_ONLY",
@@ -162,7 +162,7 @@ function deriveServicesWithoutSalesActions(
       target: {
         type: "PRODUCT",
         route: "/app/catalog",
-        filters: { status: "ACTIVE" },
+        filters: { status: "PUBLISHED" },
       },
       requiredPermission: "catalog.product.read",
       executionMode: "NAVIGATION_ONLY",
@@ -183,7 +183,7 @@ function deriveServicesWithoutSalesActions(
       target: {
         type: "PRODUCT",
         route: "/app/catalog",
-        filters: { status: "ACTIVE" },
+        filters: { status: "PUBLISHED" },
       },
       requiredPermission: "catalog.availability.write",
       executionMode: "NAVIGATION_ONLY",

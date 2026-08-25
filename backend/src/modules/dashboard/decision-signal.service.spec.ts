@@ -346,10 +346,10 @@ describe("DecisionSignalService", () => {
       expect(prisma.decisionSignal.update).toHaveBeenCalled();
     });
 
-    it("does not reobserve RESOLVED signals", async () => {
+    it("reopens RESOLVED signals when condition re-detected", async () => {
       const resolved = mockSignalRow({ status: "RESOLVED" });
       prisma.decisionSignal.findUnique.mockResolvedValue(resolved);
-      prisma.decisionSignal.create.mockResolvedValue(mockSignalRow());
+      prisma.decisionSignal.update.mockResolvedValue({ ...resolved, status: "OPEN" });
 
       const detector = {
         key: "test-detector",
@@ -366,8 +366,9 @@ describe("DecisionSignalService", () => {
 
       const results = await service.runDetector(detector);
       expect(results).toHaveLength(1);
-      // Creates a new signal (old one was RESOLVED)
-      expect(prisma.decisionSignal.create).toHaveBeenCalled();
+      // Reopens existing RESOLVED signal (canonical re-observation)
+      expect(prisma.decisionSignal.update).toHaveBeenCalled();
+      expect(prisma.decisionSignal.create).not.toHaveBeenCalled();
     });
   });
 

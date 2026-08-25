@@ -425,7 +425,7 @@ export class OrderService {
   }
 
   async listOrders(
-    query: { status?: string; customerId?: string; search?: string; page?: number; pageSize?: number },
+    query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; page?: number; pageSize?: number },
     viewer?: TravelerViewer,
   ) {
     const page = Math.max(1, query.page ?? 1);
@@ -433,6 +433,7 @@ export class OrderService {
     const where: Prisma.OrderWhereInput = {
       ...(query.status ? { status: query.status as OrderStatus } : {}),
       ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.paymentStatus ? { paymentStatus: query.paymentStatus as any as import("../../generated/prisma/client").OrderPaymentStatus } : {}),
       ...(query.search
         ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }, { number: { contains: query.search, mode: "insensitive" } }] }
         : {}),

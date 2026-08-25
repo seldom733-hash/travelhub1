@@ -18,12 +18,13 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-red-600 hover:bg-red-700", only: ["NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "PROBLEM", "SUSPENDED"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-function OrdersContent({ initialStatus }: { initialStatus: string }) {
+function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus }: { initialStatus: string; initialSearch?: string; initialPaymentStatus?: string }) {
   const [data, setData] = useState<Page<Order> | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
   const [bookings, setBookings] = useState<{ id: string; code: string; status: string }[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch || "");
   const [statusFilter] = useState(initialStatus);
+  const [paymentStatusFilter] = useState(initialPaymentStatus);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Ролевой UI: доступные команды определяются granular permissions (RBAC Matrix §4).
@@ -47,6 +48,7 @@ function OrdersContent({ initialStatus }: { initialStatus: string }) {
       const qs = new URLSearchParams();
       if (search) qs.set("search", search);
       if (statusFilter) qs.set("status", statusFilter);
+      if (paymentStatusFilter) qs.set("paymentStatus", paymentStatusFilter);
       const res = await api.get<Page<Order>>(`/orders?${qs.toString()}`);
       setData(res);
     } catch (e) {
@@ -59,7 +61,7 @@ function OrdersContent({ initialStatus }: { initialStatus: string }) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [search, statusFilter, paymentStatusFilter]);
 
   const openDetail = async (id: string) => {
     const [order, bk] = await Promise.all([
@@ -270,7 +272,13 @@ function OrdersContent({ initialStatus }: { initialStatus: string }) {
 
 function OrdersWithParams() {
   const sp = useSearchParams();
-  return <OrdersContent initialStatus={sp.get("status") ?? ""} />;
+  return (
+    <OrdersContent
+      initialStatus={sp.get("status") ?? ""}
+      initialSearch={sp.get("search") ?? ""}
+      initialPaymentStatus={sp.get("paymentStatus") ?? ""}
+    />
+  );
 }
 
 export default function OrdersPage() {

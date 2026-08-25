@@ -108,13 +108,18 @@ export class BookingService {
     private readonly query: BookingQueryService,
   ) {}
 
-  async listBookings(query: { status?: string; orderId?: string; search?: string; page?: number; pageSize?: number }) {
+  async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; page?: number; pageSize?: number }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+    const now = new Date();
     const where: Prisma.BookingWhereInput = {
       ...(query.status ? { status: query.status as BookingStatus } : {}),
       ...(query.orderId ? { orderId: query.orderId } : {}),
       ...(query.search ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }] } : {}),
+      // upcoming=true → serviceDate >= today (non-terminal bookings only)
+      ...(query.upcoming === "true" ? { serviceDate: { gte: now } } : {}),
+      // overdue=true → serviceDate < today AND status is active (not terminal)
+      ...(query.overdue === "true" ? { serviceDate: { lt: now }, status: { in: ACTIVE } } : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.booking.findMany({
