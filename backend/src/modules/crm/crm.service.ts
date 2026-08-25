@@ -421,6 +421,106 @@ export class CrmService {
     return this.prisma.supplier.findMany({ orderBy: { name: "asc" } });
   }
 
+  // ── Step 3.5 Round 5 — Customer Commercial Partners from Transactional Activity ──
+
+  /**
+   * Derive commercial Partner relationships from canonical transactional activity.
+   * Hard invariant: PartnerCustomerRelation is OPTIONAL enrichment, not required.
+   * Commercial relationship exists when Order.customerId = customer AND Order.sellerPartnerId = partner.
+   */
+  async getCustomerPartners(customerId: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { id: true } });
+    if (!customer) throw new NotFoundError(`Customer ${customerId} not found`);
+
+    // Get distinct partners from customer's orders
+    const partnerOrders = await this.prisma.order.findMany({
+      where: { customerId },
+      select: { sellerPartnerId: true, id: true, amount: true, currency: true, createdAt: true, status: true },
+    });
+
+    // Group by partner and aggregate
+    const partnerMap = new Map<string, { orderCount: number; totalAmount: number; currency: string; lastActivity: Date; orderIds: string[] }>();
+    for (const o of partnerOrders) {
+      if (!o.sellerPartnerId) continue;
+      const existing = partnerMap.get(o.sellerPartnerId);
+      if (existing) {
+        existing.orderCount++;
+        existing.totalAmount += Number(o.amount);
+        if (o.createdAt > existing.lastActivity) existing.lastActivity = o.createdAt;
+        existing.orderIds.push(o.id);
+      } else {
+        partnerMap.set(o.sellerPartnerId, {
+          orderCount: 1,
+          totalAmount: Number(o.amount),
+          currency: o.currency,
+          lastActivity: o.createdAt,
+          orderIds: [o.id],
+        });
+      }
+    }
+
+    // Get bookings count per partner
+    const allOrderIds = partnerOrders.map((o) => o.id);
+    const partnerBookings = allOrderIds.length > 0
+      ? await this.prisma.booking.findMany({
+          where: { orderId: { in: allOrderIds } },
+          select: { orderId: true },
+        })
+      : [];
+    const bookingCountByOrder = new Map<string, number>();
+    for (const b of partnerBookings) {
+      bookingCountByOrder.set(b.orderId, (bookingCountByOrder.get(b.orderId) ?? 0) + 1);
+    }
+
+    // Fetch partner identities
+    const partnerIds = Array.from(partnerMap.keys());
+    const partners = partnerIds.length > 0
+      ? await this.prisma.partner.findMany({
+          where: { id: { in: partnerIds } },
+          select: { id: true, code: true, name: true, status: true },
+        })
+      : [];
+    const partnerIdentityMap = new Map(partners.map((p) => [p.id, p]));
+
+    // Get optional PartnerCustomerRelation enrichment
+    const relations = await this.prisma.partnerCustomerRelation.findMany({
+      where: { customerId },
+      select: { partnerId: true, lifecycle: true, leadSource: true, assignedTo: true },
+    });
+    const relationMap = new Map(relations.map((r) => [r.partnerId, r]));
+
+    // Build result
+    const result = partnerIds.map((pid) => {
+      const agg = partnerMap.get(pid)!;
+      let totalBookings = 0;
+      for (const oid of agg.orderIds) {
+        totalBookings += bookingCountByOrder.get(oid) ?? 0;
+      }
+      const identity = partnerIdentityMap.get(pid);
+      const relation = relationMap.get(pid);
+      return {
+        partnerId: pid,
+        partnerCode: identity?.code ?? null,
+        partnerName: identity?.name ?? pid,
+        partnerStatus: identity?.status ?? null,
+        orderCount: agg.orderCount,
+        totalBookings,
+        totalAmount: agg.totalAmount,
+        currency: agg.currency,
+        lastActivity: agg.lastActivity.toISOString(),
+        // Optional CRM enrichment
+        lifecycle: relation?.lifecycle ?? null,
+        leadSource: relation?.leadSource ?? null,
+        assignedTo: relation?.assignedTo ?? null,
+      };
+    });
+
+    // Sort by last activity descending
+    result.sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
+
+    return { items: result, total: result.length };
+  }
+
   // ── Partner List/Detail (Step 3.5 — CRM Completion) ────────────────────
 
   async listPartners(query: CustomerListQuery) {
@@ -495,13 +595,76 @@ export class CrmService {
       : [];
     const totalBookings = orderIds.length > 0
       ? await this.prisma.booking.count({ where: { orderId: { in: orderIds } } })
-      : 0;
-
-    // PartnerStorefront state
+      : 0;    // PartnerStorefront state
     const storefront = await (this.prisma as any).partnerStorefront.findUnique({
       where: { partnerId: id },
       select: { id: true, code: true, slug: true, status: true, entitlementStatus: true, businessName: true, tagline: true, defaultLocale: true, countryCode: true, cityCode: true },
     });
+
+    // Commercial customers from transactional activity (distinct by customerId)
+    const distinctCustomerIds = [...new Set(orders.map((o) => o.customerId).filter((c): c is string => c !== null))];
+    const commercialCustomers = distinctCustomerIds.length > 0
+      ? await this.prisma.customer.findMany({
+          where: { id: { in: distinctCustomerIds } },
+          select: { id: true, code: true, firstName: true, lastName: true, companyName: true, email: true, status: true },
+        })
+      : [];
+    const customerIdentityMap = new Map(commercialCustomers.map((c) => [c.id, c]));
+
+    // Aggregate per customer: orders, bookings, amount, last activity
+    const customerAggMap = new Map<string, { orderCount: number; totalAmount: number; currency: string; lastActivity: Date; bookingCount: number }>();
+    for (const o of orders) {
+      if (!o.customerId) continue;
+      const existing = customerAggMap.get(o.customerId);
+      const bookingCountForOrder = bookings.filter((b) => b.orderId === o.id).length;
+      if (existing) {
+        existing.orderCount++;
+        existing.totalAmount += Number(o.amount);
+        existing.bookingCount += bookingCountForOrder;
+        if (o.createdAt > existing.lastActivity) existing.lastActivity = o.createdAt;
+      } else {
+        customerAggMap.set(o.customerId, {
+          orderCount: 1,
+          totalAmount: Number(o.amount),
+          currency: o.currency,
+          lastActivity: o.createdAt,
+          bookingCount: bookingCountForOrder,
+        });
+      }
+    }
+
+    // Get optional PartnerCustomerRelation enrichment
+    const relations = await this.prisma.partnerCustomerRelation.findMany({
+      where: { partnerId: id },
+      select: { customerId: true, lifecycle: true, leadSource: true, assignedTo: true },
+    });
+    const relationMap = new Map(relations.map((r) => [r.customerId, r]));
+
+    // Build enriched commercial customer list
+    const enrichedCustomers = distinctCustomerIds.map((cid) => {
+      const identity = customerIdentityMap.get(cid);
+      const agg = customerAggMap.get(cid)!;
+      const relation = relationMap.get(cid);
+      return {
+        customerId: cid,
+        customerCode: identity?.code ?? null,
+        firstName: identity?.firstName ?? null,
+        lastName: identity?.lastName ?? null,
+        companyName: identity?.companyName ?? null,
+        email: identity?.email ?? null,
+        customerStatus: identity?.status ?? null,
+        orderCount: agg.orderCount,
+        bookingCount: agg.bookingCount,
+        totalAmount: agg.totalAmount,
+        currency: agg.currency,
+        lastActivity: agg.lastActivity.toISOString(),
+        // Optional CRM enrichment
+        lifecycle: relation?.lifecycle ?? null,
+        leadSource: relation?.leadSource ?? null,
+        assignedTo: relation?.assignedTo ?? null,
+      };
+    });
+    enrichedCustomers.sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
 
     return {
       ...partner,
@@ -511,7 +674,8 @@ export class CrmService {
       totalOrders,
       bookings,
       totalBookings,
-      totalCustomers: partner.customerRelations.length,
+      totalCustomers: enrichedCustomers.length,
+      commercialCustomers: enrichedCustomers,
       storefront,
     };
   }
@@ -550,7 +714,7 @@ export class CrmService {
             where: { orderId: { in: orderIds } },
             orderBy: { createdAt: "desc" },
             take: 20,
-            select: { id: true, code: true, status: true, amount: true, currency: true, createdAt: true },
+            select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, productId: true, createdAt: true },
           })
         : Promise.resolve([]),
       orderIds.length > 0
@@ -558,7 +722,7 @@ export class CrmService {
             where: { orderId: { in: orderIds } },
             orderBy: { createdAt: "desc" },
             take: 20,
-            select: { id: true, code: true, status: true, amount: true, currency: true, createdAt: true },
+            select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true },
           })
         : Promise.resolve([]),
       this.prisma.order.count({ where: { customerId: id } }),
@@ -569,6 +733,14 @@ export class CrmService {
         ? this.prisma.payment.count({ where: { orderId: { in: orderIds } } })
         : Promise.resolve(0),
     ]);
+
+    // Enrich payments with Order context (code, number, item count)
+    const orderMap = new Map(orders.map((o) => [o.id, o]));
+    const enrichedPayments = payments.map((p) => ({
+      ...p,
+      orderCode: orderMap.get(p.orderId)?.code ?? null,
+      orderNumber: orderMap.get(p.orderId)?.number ?? null,
+    }));
 
     // Refunds: Customer → Order → Payment → Refund (cross-schema, no FK)
     const paymentIds = payments.map((p) => p.id);
@@ -584,12 +756,21 @@ export class CrmService {
         ])
       : [[], 0];
 
+    // Enrich refunds with Payment and Order context
+    const paymentMap = new Map(payments.map((p) => [p.id, p]));
+    const enrichedRefunds = refunds.map((r) => ({
+      ...r,
+      paymentCode: paymentMap.get(r.paymentId)?.code ?? null,
+      orderCode: orderMap.get(r.orderId)?.code ?? null,
+      orderNumber: orderMap.get(r.orderId)?.number ?? null,
+    }));
+
     return {
       ...customer,
       orders,
       bookings,
-      payments,
-      refunds,
+      payments: enrichedPayments,
+      refunds: enrichedRefunds,
       summary: {
         totalOrders,
         totalBookings,

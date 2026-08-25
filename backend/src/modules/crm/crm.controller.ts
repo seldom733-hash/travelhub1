@@ -219,6 +219,14 @@ export class CrmController {
     return this.crm.getCustomerDetail(id);
   }
 
+  // ── Step 3.5 Round 5 — Customer commercial partners from transactional activity ──
+
+  @Get("customers/:id/partners")
+  @RequirePermissions("crm.customer.read")
+  getCustomerPartners(@Param("id") id: string) {
+    return this.crm.getCustomerPartners(id);
+  }
+
   // ── Step 3.5B — Partner Customer Relations ──────────────────────────────
 
   @Post("partners/:partnerId/customers/:customerId")

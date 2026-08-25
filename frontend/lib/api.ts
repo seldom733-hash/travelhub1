@@ -176,10 +176,25 @@ export interface CustomerDetail extends Customer {
   history: { id: string; action: string; from: string | null; to: string | null; comment: string | null; createdAt: string }[];
   partnerRelations: PartnerCustomerRelation[];
   orders: { id: string; code: string; number: string; status: string; paymentStatus: string; amount: string; paidAmount: string; currency: string; createdAt: string }[];
-  bookings: { id: string; code: string; status: string; amount: string; currency: string; createdAt: string }[];
-  payments: { id: string; code: string; status: string; amount: string; currency: string; createdAt: string }[];
-  refunds: { id: string; code: string; amount: string; currency: string; status: string; reason: string | null; paymentId: string; orderId: string; createdAt: string }[];
+  bookings: { id: string; code: string; status: string; amount: string; currency: string; orderId: string; productId: string; createdAt: string }[];
+  payments: { id: string; code: string; status: string; amount: string; currency: string; orderId: string; paymentMethod: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string }[];
+  refunds: { id: string; code: string; amount: string; currency: string; status: string; reason: string | null; paymentId: string; orderId: string; paymentCode: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string }[];
   summary: { totalOrders: number; totalBookings: number; totalPayments: number; totalRefunds: number };
+}
+
+export interface CustomerPartner {
+  partnerId: string;
+  partnerCode: string | null;
+  partnerName: string;
+  partnerStatus: string | null;
+  orderCount: number;
+  totalBookings: number;
+  totalAmount: number;
+  currency: string;
+  lastActivity: string;
+  lifecycle: string | null;
+  leadSource: string | null;
+  assignedTo: string | null;
 }
 
 export interface Partner {
@@ -202,6 +217,7 @@ export interface PartnerDetail extends Partner {
   bookings: { id: string; code: string; status: string; amount: string; currency: string; orderId: string; createdAt: string }[];
   totalBookings: number;
   totalCustomers: number;
+  commercialCustomers: { customerId: string; customerCode: string | null; firstName: string | null; lastName: string | null; companyName: string | null; email: string | null; customerStatus: string | null; orderCount: number; bookingCount: number; totalAmount: number; currency: string; lastActivity: string; lifecycle: string | null; leadSource: string | null; assignedTo: string | null }[];
   storefront: { id: string; code: string; slug: string; status: string; entitlementStatus: string; businessName: string | null; tagline: string | null; defaultLocale: string; countryCode: string | null; cityCode: string | null } | null;
 }
 

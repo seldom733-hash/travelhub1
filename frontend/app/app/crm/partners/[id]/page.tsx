@@ -155,7 +155,7 @@ export default function Partner360Page() {
                 partner.products.map((p) => (
                   <div key={p.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
                     <div className="flex items-center justify-between">
-                      <Link href={`/app/catalog`} className="font-mono text-blue-600 hover:underline">{p.code}</Link>
+                      <Link href={`/app/catalog/${p.id}`} className="font-mono text-blue-600 hover:underline">{p.code}</Link>
                       <StatusBadge status={p.status} />
                     </div>
                     <div className="mt-1 font-medium text-slate-700">{p.title}</div>
@@ -178,7 +178,7 @@ export default function Partner360Page() {
                 partner.orders.map((o) => (
                   <div key={o.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
                     <div className="flex items-center justify-between">
-                      <Link href={`/app/orders`} className="font-mono text-blue-600 hover:underline">{o.code}</Link>
+                      <Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.code}</Link>
                       <StatusBadge status={o.status} />
                     </div>
                     <div className="mt-1 text-slate-500">{o.number} · {o.amount} {o.currency}</div>
@@ -200,7 +200,7 @@ export default function Partner360Page() {
                 partner.bookings.map((b) => (
                   <div key={b.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
                     <div className="flex items-center justify-between">
-                      <Link href={`/app/bookings`} className="font-mono text-blue-600 hover:underline">{b.code}</Link>
+                      <Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.code}</Link>
                       <StatusBadge status={b.status} />
                     </div>
                     <div className="mt-1 text-slate-500">{b.amount} {b.currency}</div>
@@ -215,18 +215,23 @@ export default function Partner360Page() {
             </div>
           )}
 
-          {/* Customers */}
+          {/* Customers — derived from commercial transactional activity */}
           {tab === "customers" && (
             <div className="space-y-2">
-              {partner.customerRelations.length > 0 ? (
-                partner.customerRelations.map((r) => (
-                  <div key={r.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
+              {partner.commercialCustomers.length > 0 ? (
+                partner.commercialCustomers.map((c) => (
+                  <div key={c.customerId} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
                     <div className="flex items-center justify-between">
-                      <Link href={`/app/crm/customers/${r.customerId}`} className="font-medium text-blue-600 hover:underline">{r.customer?.firstName} {r.customer?.lastName}</Link>
-                      <StatusBadge status={r.status} />
+                      <Link href={`/app/crm/customers/${c.customerId}`} className="font-medium text-blue-600 hover:underline">{c.companyName ?? `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim()}</Link>
+                      {c.customerStatus && <StatusBadge status={c.customerStatus} />}
                     </div>
-                    {r.lifecycle && <div className="mt-1 text-slate-500">{r.lifecycle}</div>}
-                    {r.leadSource && <div className="mt-1 text-slate-400">{t("crm.col.lead_source", locale)}: {r.leadSource}</div>}
+                    <div className="mt-1 flex gap-3 text-slate-500">
+                      <span>{c.orderCount} {t("crm.detail.orders", locale)}</span>
+                      <span>{c.bookingCount} {t("crm.detail.bookings", locale)}</span>
+                      <span>{c.totalAmount} {c.currency}</span>
+                    </div>
+                    {c.lifecycle && <div className="mt-1 text-slate-400">{t("crm.col.lifecycle", locale)}: {c.lifecycle}</div>}
+                    {c.leadSource && <div className="mt-1 text-slate-400">{t("crm.col.lead_source", locale)}: {c.leadSource}</div>}
                   </div>
                 ))
               ) : (
