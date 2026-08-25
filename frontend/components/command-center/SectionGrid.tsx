@@ -55,6 +55,22 @@ const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; for
   // backward-compat: old layout IDs → map to first split field
   "partners":        { section: "marketplace", field: "marketplacePartners" },
   "customers":       { section: "marketplace", field: "marketplaceCustomers" },
+  // ─── Catalog Health ──────────────────────────────────────────────
+  "published-services":     { section: "catalog", field: "publishedServices" },
+  "archived-services":      { section: "catalog", field: "archivedServices" },
+  "services-without-sales": { section: "catalog", field: "servicesWithoutSales" },
+  "high-demand-services":   { section: "catalog", field: "highDemandServices" },
+  "low-conversion-services": { section: "catalog", field: "lowConversionServices" },
+  "total-categories":       { section: "catalog", field: "totalCategories" },
+  // ─── Channel Health ──────────────────────────────────────────────
+  "marketplace-gmv":       { section: "channels", field: "marketplaceGmv", format: "currency" },
+  "storefront-gmv":        { section: "channels", field: "storefrontGmv", format: "currency" },
+  "marketplace-revenue":   { section: "channels", field: "marketplaceRevenue", format: "currency" },
+  "storefront-revenue":    { section: "channels", field: "storefrontRevenue", format: "currency" },
+  "marketplace-orders":    { section: "channels", field: "marketplaceOrders" },
+  "storefront-orders":     { section: "channels", field: "storefrontOrders" },
+  "marketplace-conversion": { section: "channels", field: "marketplaceConversion", format: "percent" },
+  "storefront-conversion":  { section: "channels", field: "storefrontConversion", format: "percent" },
 };
 
 /** Trend widgets: widgetId → metric. */
@@ -273,12 +289,12 @@ export function SectionGrid({
 
       {/* ─── Catalog Health Section ────────────────────────────────── */}
       {hasSection("catalog") && summary.sections.catalog && (
-        <V3Section id="catalog" data={summary.sections.catalog} locale={locale} />
+        <V3Section id="catalog" data={summary.sections.catalog} positions={positions} locale={locale} />
       )}
 
       {/* ─── Channel Health Section ────────────────────────────────── */}
       {hasSection("channels") && summary.sections.channels && (
-        <V3Section id="channels" data={summary.sections.channels} locale={locale} />
+        <V3Section id="channels" data={summary.sections.channels} positions={positions} locale={locale} />
       )}
 
       {/* ─── Needs Attention → Decision Queue ──────────────────────── */}
@@ -308,11 +324,23 @@ export function SectionGrid({
 
 // ─── V3 Generic Section ───────────────────────────────────────────────────
 
-/** Generic renderer for V3 KPI sections (catalog, channels, attention). */
-function V3Section({ id, data, locale = "ru" }: { id: string; data: Record<string, any>; locale?: Locale }) {
+/** Generic renderer for V3 KPI sections (catalog, channels). Respects widget visibility. */
+function V3Section({ id, data, positions, locale = "ru" }: { id: string; data: Record<string, any>; positions?: WidgetPosition[]; locale?: Locale }) {
   const meta = SECTION_META[id];
   if (!meta) return null;
-  const entries = Object.entries(data).filter(([, v]) => v && typeof v === "object" && "current" in v);
+
+  // Filter entries based on visible widget positions
+  const entries = Object.entries(data).filter(([key, v]) => {
+    if (!v || typeof v !== "object" || !("current" in v)) return false;
+    // If positions provided, only show visible widgets
+    if (positions && positions.length > 0) {
+      const mapping = WIDGET_MAP[key];
+      if (!mapping) return false;
+      const wp = positions.find((p) => p.widgetId === key);
+      return wp?.visible ?? false;
+    }
+    return true;
+  });
   if (entries.length === 0) return null;
 
   return (
@@ -322,9 +350,23 @@ function V3Section({ id, data, locale = "ru" }: { id: string; data: Record<strin
       </h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {entries.map(([key, val]) => {
-          const v = val as { current: number | string | null; currency?: string; drillDown?: { target: string } };
+          const mapping = WIDGET_MAP[key];
+          const v = val as import("@/lib/dashboard-api").KpiValue;
+          const format = mapping?.format as "currency" | "percent" | undefined;
+          const label = t(`cc.kpi.${key}`, locale) || t(`cc.v3.${id}.${key}`, locale) || key.replace(/([A-Z])/g, " $1").replace(/-/g, " ");
+          // Use KpiCard for proper formatting when we have a mapping
+          if (mapping) {
+            return (
+              <KpiCard
+                key={key}
+                title={label}
+                value={v}
+                format={format}
+              />
+            );
+          }
+          // Fallback for unmapped entries
           const displayValue = v.currency ? `${v.current} ${v.currency}` : String(v.current ?? "—");
-          const label = t(`cc.v3.${id}.${key}`, "ru") || key.replace(/([A-Z])/g, " $1").replace(/-/g, " ");
           return (
             <div key={key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>

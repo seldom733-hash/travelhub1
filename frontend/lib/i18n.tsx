@@ -769,6 +769,22 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.kpi.storefront-outstanding": { ru: "К оплате", az: "Ödənilməmiş", en: "Outstanding" },
   "cc.kpi.storefront-outstanding.subtitle": { ru: "Неоплаченные счета-фактуры", az: "Ödənilməmiş fakturalar", en: "Unpaid invoices" },
   "cc.kpi.storefrontCustomers": { ru: "Покупатели Storefront", az: "Storefront Alıcıları", en: "Storefront Buyers" },
+  // Catalog Health KPIs
+  "cc.kpi.published-services": { ru: "Опубликованные услуги", az: "Dərc olunmuş xidmətlər", en: "Published Services" },
+  "cc.kpi.archived-services": { ru: "Архивные услуги", az: "Arxiv xidmətlər", en: "Archived Services" },
+  "cc.kpi.services-without-sales": { ru: "Без продаж", az: "Satış olmadan", en: "Without Sales" },
+  "cc.kpi.high-demand-services": { ru: "Высокий спрос", az: "Yüksək tələbat", en: "High Demand" },
+  "cc.kpi.low-conversion-services": { ru: "Низкая конверсия", az: "Aşağı konversiya", en: "Low Conversion" },
+  "cc.kpi.total-categories": { ru: "Категории", az: "Kateqoriyalar", en: "Categories" },
+  // Channel Health KPIs
+  "cc.kpi.marketplace-gmv": { ru: "GMV Marketplace", az: "GMV Marketplace", en: "Marketplace GMV" },
+  "cc.kpi.storefront-gmv": { ru: "GMV Storefront", az: "GMV Storefront", en: "Storefront GMV" },
+  "cc.kpi.marketplace-revenue": { ru: "Выручка Marketplace", az: "Marketplace gəliri", en: "Marketplace Revenue" },
+  "cc.kpi.storefront-revenue": { ru: "Выручка Storefront", az: "Storefront gəliri", en: "Storefront Revenue" },
+  "cc.kpi.marketplace-orders": { ru: "Заказы Marketplace", az: "Marketplace sifarişləri", en: "Marketplace Orders" },
+  "cc.kpi.storefront-orders": { ru: "Заказы Storefront", az: "Storefront sifarişləri", en: "Storefront Orders" },
+  "cc.kpi.marketplace-conversion": { ru: "Конверсия Marketplace", az: "Marketplace konvertsiyası", en: "Marketplace Conversion" },
+  "cc.kpi.storefront-conversion": { ru: "Конверсия Storefront", az: "Storefront konvertsiyası", en: "Storefront Conversion" },
   // reconciliation statuses
   "cc.recon.balanced": { ru: "✓ Баланс", az: "✓ Balans", en: "✓ Balanced" },
   "cc.recon.discrepancy": { ru: "⚠ Расхождение", az: "⚠ Fərq", en: "⚠ Discrepancy" },
