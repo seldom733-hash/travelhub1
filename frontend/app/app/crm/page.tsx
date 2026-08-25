@@ -64,6 +64,7 @@ export default function CrmPage() {
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState({ firstName: "", lastName: "", companyName: "", phone: "" });
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState(false);
 
   // ── Platform Partner CRM state ──
   const [partnerListData, setPartnerListData] = useState<Page<Partner> | null>(null);
@@ -73,6 +74,7 @@ export default function CrmPage() {
   const [partnerDetailTab, setPartnerDetailTab] = useState<"overview" | "services" | "orders" | "bookings" | "customers" | "storefront">("overview");
   const [partnerCustomerDetailTab, setPartnerCustomerDetailTab] = useState<"overview" | "orders" | "bookings" | "payments" | "relations">("overview");
   const [partnerError, setPartnerError] = useState("");
+  const [partnerLoadError, setPartnerLoadError] = useState(false);
 
   // ── Partner Customer CRM state (3.5C partner context) ──
   const [partnerData, setPartnerData] = useState<Page<PartnerCustomer> | null>(null);
@@ -84,6 +86,7 @@ export default function CrmPage() {
   // ── Platform Customer loading ──
   const loadCustomers = useCallback(async () => {
     try {
+      setLoadError(false);
       const qs = new URLSearchParams();
       if (customerSearch) qs.set("search", customerSearch);
       qs.set("page", String(customerPage));
@@ -91,6 +94,7 @@ export default function CrmPage() {
       const res = await api.get<Page<Customer>>(`/customers?${qs.toString()}`);
       setCustomerData(res);
     } catch (e) {
+      setLoadError(true);
       setError((e as Error).message);
     }
   }, [customerSearch, customerPage]);
@@ -98,6 +102,7 @@ export default function CrmPage() {
   // ── Platform Partner loading ──
   const loadPartners = useCallback(async () => {
     try {
+      setPartnerLoadError(false);
       const qs = new URLSearchParams();
       if (partnerSearch) qs.set("search", partnerSearch);
       qs.set("page", String(partnerPage));
@@ -105,6 +110,7 @@ export default function CrmPage() {
       const res = await api.get<Page<Partner>>(`/partners?${qs.toString()}`);
       setPartnerListData(res);
     } catch (e) {
+      setPartnerLoadError(true);
       setPartnerError((e as Error).message);
     }
   }, [partnerSearch, partnerPage]);
@@ -237,12 +243,12 @@ export default function CrmPage() {
           </div>
 
           <div className="space-y-4 p-6">
-            {tab === "customers" && (
+            {tab === "customers" && !loadError && (
               <Kpi items={[
                 { label: t("crm.total_customers", locale), value: customerData?.total ?? 0, icon: "👥" },
               ]} />
             )}
-            {tab === "partners" && (
+            {tab === "partners" && !partnerLoadError && (
               <Kpi items={[
                 { label: t("crm.total_partners", locale), value: partnerListData?.total ?? 0, icon: "🏢" },
               ]} />
@@ -259,8 +265,24 @@ export default function CrmPage() {
               />
             </div>
 
-            {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
-            {partnerError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{partnerError}</div>}
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                <div className="font-medium">{t("crm.error.load_failed", locale)}</div>
+                <div className="mt-1 text-xs text-red-500">{error}</div>
+                <button onClick={() => tab === "customers" ? void loadCustomers() : void loadPartners()} className="mt-2 rounded border border-red-300 bg-white px-3 py-1 text-xs text-red-600 hover:bg-red-50">
+                  {t("crm.error.retry", locale)}
+                </button>
+              </div>
+            )}
+            {partnerError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                <div className="font-medium">{t("crm.error.load_failed", locale)}</div>
+                <div className="mt-1 text-xs text-red-500">{partnerError}</div>
+                <button onClick={() => void loadPartners()} className="mt-2 rounded border border-red-300 bg-white px-3 py-1 text-xs text-red-600 hover:bg-red-50">
+                  {t("crm.error.retry", locale)}
+                </button>
+              </div>
+            )}
 
             {/* Customer Table */}
             {tab === "customers" && (
