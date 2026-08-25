@@ -89,7 +89,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
           categoryId: query.categoryId || undefined,
           sort: query.sort,
           page: query.page,
-          pageSize: 10,
+          pageSize: 20,
         })
         .then((res) => {
           if (!alive) return;
@@ -156,7 +156,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
     syncUrl({ q, filter, categoryId, sort, page: p });
   };
 
-  const pageSize = 10;
+  const pageSize = 20;
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { accountApi, type OwnOrdersResult } from "@/lib/account-api";
 import { formatDate, formatPrice, orderStatusLabel, paymentStatusLabel, t, useLocale } from "@/lib/i18n";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 /**
  * PHASE 1 STEP 1.13 §7 — /account/orders (Buyer Cabinet read-model foundation).

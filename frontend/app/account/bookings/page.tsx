@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { accountApi, type OwnBookingsResult } from "@/lib/account-api";
 import { bookingStatusLabel, formatDate, formatPrice, t, useLocale } from "@/lib/i18n";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 /**
  * PHASE 1 STEP 1.13 §8 — /account/bookings (Buyer Cabinet read-model foundation).

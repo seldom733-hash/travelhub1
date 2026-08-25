@@ -6,6 +6,8 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
 import PanelFrame from "@/components/PanelFrame";
+import Pagination from "@/components/Pagination";
+import { useLocale } from "@/lib/i18n";
 
 const ROLES: { code: string; title: string }[] = [
   { code: "ADMIN", title: "Администратор" },
@@ -20,21 +22,36 @@ const ROLES: { code: string; title: string }[] = [
   { code: "BUYER", title: "Покупатель" },
 ];
 
+interface UsersResult {
+  items: PlatformUser[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export default function UsersPage() {
+  const locale = useLocale();
   const [users, setUsers] = useState<PlatformUser[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [draftSearch, setDraftSearch] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ username: "", password: "", fullName: "", email: "", roleCode: "OPERATOR" });
 
-  const load = async () => {
+  const load = async (p: number, q: string) => {
     setBusy(true);
     try {
-      const qs = search ? `?search=${encodeURIComponent(search)}` : "";
-      const res = await api.get<PlatformUser[]>(`/users${qs}`);
-      setUsers(res);
+      const sp = new URLSearchParams();
+      sp.set("page", String(p));
+      sp.set("pageSize", "20");
+      if (q) sp.set("search", q);
+      const res = await api.get<UsersResult>(`/users?${sp.toString()}`);
+      setUsers(res.items);
+      setTotal(res.total);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -43,15 +60,21 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    void load();
+    void load(page, search);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [page, search]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearch(draftSearch);
+    setPage(1);
+  };
 
   const assignRole = async (id: string, roleCode: string) => {
     setError("");
     try {
       await api.patch(`/users/${id}/role`, { roleCode });
-      await load();
+      await load(page, search);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -61,7 +84,7 @@ export default function UsersPage() {
     setError("");
     try {
       await api.patch(`/users/${id}/status`, { status });
-      await load();
+      await load(page, search);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -83,18 +106,13 @@ export default function UsersPage() {
       });
       setShowCreate(false);
       setForm({ username: "", password: "", fullName: "", email: "", roleCode: "OPERATOR" });
-      await load();
+      await load(1, search);
+      setPage(1);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setCreating(false);
     }
-  };
-
-  const counts = {
-    total: users.length,
-    active: users.filter((u) => u.status === "ACTIVE").length,
-    inactive: users.filter((u) => u.status === "INACTIVE").length,
   };
 
   return (
@@ -106,7 +124,7 @@ export default function UsersPage() {
           breadcrumbs={["TravelHub", "Пользователи"]}
           actions={
             <button
-              onClick={() => void load()}
+              onClick={() => void load(page, search)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
             >
               ⟳ Обновить
@@ -117,27 +135,32 @@ export default function UsersPage() {
         <div className="space-y-4 p-6">
           <Kpi
             items={[
-              { label: "Всего пользователей", value: counts.total, icon: "👥" },
-              { label: "Активные", value: counts.active, icon: "✅", accent: "#059669" },
-              { label: "Неактивные", value: counts.inactive, icon: "⏸", accent: "#94a3b8" },
+              { label: "Всего пользователей", value: total, icon: "👥" },
             ]}
           />
 
-          <div className="flex flex-wrap items-center gap-2">
+          <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-2">
             <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={draftSearch}
+              onChange={(e) => setDraftSearch(e.target.value)}
               placeholder="Поиск: username, email, имя…"
               className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
             <button
+              type="submit"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              Найти
+            </button>
+            <button
+              type="button"
               onClick={() => setShowCreate((v) => !v)}
               className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
             >
               ＋ Создать пользователя
             </button>
             {busy && <span className="text-xs text-slate-400">загрузка…</span>}
-          </div>
+          </form>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 
@@ -202,6 +225,9 @@ export default function UsersPage() {
                 )}
               </tbody>
             </table>
+            {total > 0 && (
+              <Pagination page={page} pageSize={20} total={total} locale={locale} onPageChange={setPage} />
+            )}
           </div>
         </div>
       </div>

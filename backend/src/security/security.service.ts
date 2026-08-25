@@ -130,37 +130,42 @@ export class SecurityService implements OnModuleInit {
     return perms.includes(permission);
   }
 
-  /** Список пользователей (ADMIN/DIRECTOR). */
-  listUsers(query: { search?: string; page?: number; pageSize?: number }) {
+  /** Список пользователей (ADMIN/DIRECTOR) — серверная пагинация. */
+  async listUsers(query: { search?: string; page?: number; pageSize?: number }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
-    return this.prisma.user.findMany({
-      where: query.search
-        ? {
-            OR: [
-              { username: { contains: query.search, mode: "insensitive" } },
-              { email: { contains: query.search, mode: "insensitive" } },
-              { fullName: { contains: query.search, mode: "insensitive" } },
-            ],
-          }
-        : undefined,
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      select: {
-        id: true,
-        code: true,
-        username: true,
-        email: true,
-        fullName: true,
-        status: true,
-        role: { select: { code: true, title: true } },
-        partnerId: true,
-        customerId: true,
-        lastLoginAt: true,
-        createdAt: true,
-      },
-    });
+    const where: Prisma.UserWhereInput | undefined = query.search
+      ? {
+          OR: [
+            { username: { contains: query.search, mode: "insensitive" as const } },
+            { email: { contains: query.search, mode: "insensitive" as const } },
+            { fullName: { contains: query.search, mode: "insensitive" as const } },
+          ],
+        }
+      : undefined;
+    const [items, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          code: true,
+          username: true,
+          email: true,
+          fullName: true,
+          status: true,
+          role: { select: { code: true, title: true } },
+          partnerId: true,
+          customerId: true,
+          lastLoginAt: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { items, total, page, pageSize };
   }
 
   /** Смена роли пользователя (audit обязателен). */
