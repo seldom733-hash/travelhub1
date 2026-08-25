@@ -850,6 +850,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.detail.payments": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
   "crm.detail.history": { ru: "История", az: "Tarixçə", en: "History" },
   "crm.detail.relations": { ru: "Партнёрские связи", az: "Tərəfdaş əlaqələri", en: "Partner relations" },
+  "crm.detail.partners": { ru: "Партнёры", az: "Tərəfdaşlar", en: "Partners" },
   "crm.detail.orders_empty": { ru: "Заказов нет", az: "Sifariş yoxdur", en: "No orders" },
   "crm.detail.bookings_empty": { ru: "Бронирований нет", az: "Bron yoxdur", en: "No bookings" },
   "crm.detail.payments_empty": { ru: "Платежей нет", az: "Ödəniş yoxdur", en: "No payments" },
