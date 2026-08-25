@@ -148,7 +148,7 @@ export default function CrmPage() {
       setSelectedCustomer(detail);
     } catch {
       const detail = await api.get<Customer>(`/customers/${id}`);
-      setSelectedCustomer({ ...detail, contacts: [], history: [], partnerRelations: [], orders: [], bookings: [], payments: [], summary: { totalOrders: 0, totalBookings: 0, totalPayments: 0 } } as CustomerDetail);
+      setSelectedCustomer({ ...detail, contacts: [], history: [], partnerRelations: [], orders: [], bookings: [], payments: [], refunds: [], summary: { totalOrders: 0, totalBookings: 0, totalPayments: 0, totalRefunds: 0 } } as CustomerDetail);
     }
   };
 
@@ -385,10 +385,11 @@ export default function CrmPage() {
                     <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-slate-700">{selectedCustomer.email}</div></div>
                     <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.create.form.phone", locale)}</div><div className="font-medium text-slate-700">{selectedCustomer.phone ?? "—"}</div></div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-4 gap-2 text-xs">
                     <div className="rounded-lg bg-blue-50 px-3 py-2 text-center"><div className="font-bold text-blue-700">{selectedCustomer.summary.totalOrders}</div><div className="text-blue-500">{t("crm.detail.total_orders", locale)}</div></div>
                     <div className="rounded-lg bg-green-50 px-3 py-2 text-center"><div className="font-bold text-green-700">{selectedCustomer.summary.totalBookings}</div><div className="text-green-500">{t("crm.detail.total_bookings", locale)}</div></div>
                     <div className="rounded-lg bg-purple-50 px-3 py-2 text-center"><div className="font-bold text-purple-700">{selectedCustomer.summary.totalPayments}</div><div className="text-purple-500">{t("crm.detail.total_payments", locale)}</div></div>
+                    <div className="rounded-lg bg-red-50 px-3 py-2 text-center"><div className="font-bold text-red-700">{selectedCustomer.summary.totalRefunds ?? 0}</div><div className="text-red-500">{t("crm.detail.total_refunds", locale)}</div></div>
                   </div>
                 </>
               )}
@@ -439,8 +440,20 @@ export default function CrmPage() {
               {/* Refunds */}
               {(customerDetailTab as string) === "refunds" && (
                 <div className="space-y-2">
-                  <div className="text-xs text-slate-500 mb-2">{t("crm.detail.refunds_hint", locale)}</div>
-                  <div className="py-4 text-center text-xs text-slate-400">{t("crm.detail.refunds_unavailable", locale)}</div>
+                  {selectedCustomer.refunds && selectedCustomer.refunds.length > 0 ? (
+                    selectedCustomer.refunds.map((r) => (
+                      <div key={r.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-blue-600">{r.code}</span>
+                          <StatusBadge status={r.status} />
+                        </div>
+                        <div className="mt-1 text-slate-500">{r.amount} {r.currency}</div>
+                        {r.reason && <div className="mt-1 text-slate-400">{r.reason}</div>}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.detail.no_refunds", locale)}</div>
+                  )}
                 </div>
               )}
 
@@ -489,7 +502,7 @@ export default function CrmPage() {
             </div>
             <div className="space-y-3 p-5 text-sm">
               {/* Overview */}
-              {partnerCustomerDetailTab === "overview" && (
+              {partnerDetailTab === "overview" && (
                 <>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-slate-700">{selectedPartner.contactEmail ?? "—"}</div></div>
@@ -499,31 +512,88 @@ export default function CrmPage() {
                     <div className="text-slate-400">{t("crm.col.registration_number", locale)}</div>
                     <div className="font-medium text-slate-700">{selectedPartner.registrationNumber ?? "—"}</div>
                   </div>
-                  <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-center">
-                    <div className="font-bold text-blue-700">{selectedPartner.customerRelations.length}</div>
-                    <div className="text-blue-500">{t("crm.partner_detail.total_relations", locale)}</div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg bg-blue-50 px-3 py-2 text-center"><div className="font-bold text-blue-700">{selectedPartner.totalProducts}</div><div className="text-blue-500">{t("crm.partner_detail.total_services", locale)}</div></div>
+                    <div className="rounded-lg bg-green-50 px-3 py-2 text-center"><div className="font-bold text-green-700">{selectedPartner.totalOrders}</div><div className="text-green-500">{t("crm.partner_detail.total_orders", locale)}</div></div>
                   </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg bg-purple-50 px-3 py-2 text-center"><div className="font-bold text-purple-700">{selectedPartner.totalBookings}</div><div className="text-purple-500">{t("crm.partner_detail.total_bookings", locale)}</div></div>
+                    <div className="rounded-lg bg-amber-50 px-3 py-2 text-center"><div className="font-bold text-amber-700">{selectedPartner.totalCustomers}</div><div className="text-amber-500">{t("crm.partner_detail.total_relations", locale)}</div></div>
+                  </div>
+                  {selectedPartner.storefront && (
+                    <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs">
+                      <div className="text-emerald-400">{t("crm.partner_detail.storefront", locale)}</div>
+                      <div className="font-medium text-emerald-700">{selectedPartner.storefront.businessName ?? selectedPartner.storefront.slug}</div>
+                      <div className="mt-1 flex gap-2"><StatusBadge status={selectedPartner.storefront.status} /><StatusBadge status={selectedPartner.storefront.entitlementStatus} /></div>
+                    </div>
+                  )}
                 </>
               )}
 
               {/* Services */}
               {partnerDetailTab === "services" && (
-                <div className="py-4 text-center text-xs text-slate-400">
-                  {t("crm.partner_detail.services_hint", locale)}
+                <div className="space-y-2">
+                  {selectedPartner.products.length > 0 ? (
+                    selectedPartner.products.map((p) => (
+                      <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-blue-600">{p.code}</span>
+                          <StatusBadge status={p.status} />
+                        </div>
+                        <div className="mt-1 font-medium text-slate-700">{p.title}</div>
+                        <div className="mt-1 text-slate-400">{p.type}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.partner_detail.no_services", locale)}</div>
+                  )}
+                  {selectedPartner.totalProducts > 20 && (
+                    <div className="text-center text-xs text-slate-400">{t("crm.showing_of", locale)}</div>
+                  )}
                 </div>
               )}
 
               {/* Orders */}
               {partnerDetailTab === "orders" && (
-                <div className="py-4 text-center text-xs text-slate-400">
-                  {t("crm.partner_detail.orders_hint", locale)}
+                <div className="space-y-2">
+                  {selectedPartner.orders.length > 0 ? (
+                    selectedPartner.orders.map((o) => (
+                      <div key={o.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-blue-600">{o.code}</span>
+                          <StatusBadge status={o.status} />
+                        </div>
+                        <div className="mt-1 text-slate-500">{o.number} · {o.amount} {o.currency}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.partner_detail.no_orders", locale)}</div>
+                  )}
+                  {selectedPartner.totalOrders > 20 && (
+                    <div className="text-center text-xs text-slate-400">{t("crm.showing_of", locale)}</div>
+                  )}
                 </div>
               )}
 
               {/* Bookings */}
               {partnerDetailTab === "bookings" && (
-                <div className="py-4 text-center text-xs text-slate-400">
-                  {t("crm.partner_detail.bookings_hint", locale)}
+                <div className="space-y-2">
+                  {selectedPartner.bookings.length > 0 ? (
+                    selectedPartner.bookings.map((b) => (
+                      <div key={b.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-blue-600">{b.code}</span>
+                          <StatusBadge status={b.status} />
+                        </div>
+                        <div className="mt-1 text-slate-500">{b.amount} {b.currency}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.partner_detail.no_bookings", locale)}</div>
+                  )}
+                  {selectedPartner.totalBookings > 20 && (
+                    <div className="text-center text-xs text-slate-400">{t("crm.showing_of", locale)}</div>
+                  )}
                 </div>
               )}
 
@@ -549,8 +619,35 @@ export default function CrmPage() {
 
               {/* Storefront */}
               {partnerDetailTab === "storefront" && (
-                <div className="py-4 text-center text-xs text-slate-400">
-                  {t("crm.partner_detail.storefront_hint", locale)}
+                <div className="space-y-2">
+                  {selectedPartner.storefront ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.partner_detail.storefront_code", locale)}</div><div className="font-mono font-medium text-slate-700">{selectedPartner.storefront.code}</div></div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.partner_detail.storefront_slug", locale)}</div><div className="font-medium text-slate-700">/{selectedPartner.storefront.slug}</div></div>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                        <div className="text-slate-400">{t("crm.partner_detail.storefront_name", locale)}</div>
+                        <div className="font-medium text-slate-700">{selectedPartner.storefront.businessName ?? "—"}</div>
+                      </div>
+                      {selectedPartner.storefront.tagline && (
+                        <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                          <div className="text-slate-400">{t("crm.partner_detail.storefront_tagline", locale)}</div>
+                          <div className="font-medium text-slate-700">{selectedPartner.storefront.tagline}</div>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.partner_detail.storefront_status", locale)}</div><div className="mt-1"><StatusBadge status={selectedPartner.storefront.status} /></div></div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.partner_detail.storefront_entitlement", locale)}</div><div className="mt-1"><StatusBadge status={selectedPartner.storefront.entitlementStatus} /></div></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.partner_detail.storefront_locale", locale)}</div><div className="font-medium text-slate-700">{selectedPartner.storefront.defaultLocale}</div></div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2"><div className="text-slate-400">{t("crm.col.country", locale)}</div><div className="font-medium text-slate-700">{selectedPartner.storefront.countryCode ?? "—"}</div></div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="py-4 text-center text-xs text-slate-400">{t("crm.partner_detail.no_storefront", locale)}</div>
+                  )}
                 </div>
               )}
             </div>

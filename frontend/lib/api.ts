@@ -178,7 +178,8 @@ export interface CustomerDetail extends Customer {
   orders: { id: string; code: string; number: string; status: string; paymentStatus: string; amount: string; paidAmount: string; currency: string; createdAt: string }[];
   bookings: { id: string; code: string; status: string; amount: string; currency: string; createdAt: string }[];
   payments: { id: string; code: string; status: string; amount: string; currency: string; createdAt: string }[];
-  summary: { totalOrders: number; totalBookings: number; totalPayments: number };
+  refunds: { id: string; code: string; amount: string; currency: string; status: string; reason: string | null; paymentId: string; orderId: string; createdAt: string }[];
+  summary: { totalOrders: number; totalBookings: number; totalPayments: number; totalRefunds: number };
 }
 
 export interface Partner {
@@ -194,6 +195,14 @@ export interface Partner {
 
 export interface PartnerDetail extends Partner {
   customerRelations: PartnerCustomerRelation[];
+  products: { id: string; code: string; title: string; type: string; status: string; slug: string; createdAt: string }[];
+  totalProducts: number;
+  orders: { id: string; code: string; number: string; status: string; paymentStatus: string; amount: string; currency: string; customerId: string | null; createdAt: string }[];
+  totalOrders: number;
+  bookings: { id: string; code: string; status: string; amount: string; currency: string; orderId: string; createdAt: string }[];
+  totalBookings: number;
+  totalCustomers: number;
+  storefront: { id: string; code: string; slug: string; status: string; entitlementStatus: string; businessName: string | null; tagline: string | null; defaultLocale: string; countryCode: string | null; cityCode: string | null } | null;
 }
 
 export interface PartnerCustomerRelation {

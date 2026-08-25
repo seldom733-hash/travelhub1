@@ -464,7 +464,56 @@ export class CrmService {
       },
     });
     if (!partner) throw new NotFoundError(`Partner ${id} not found`);
-    return partner;
+
+    // Aggregate: products (services) owned by this partner
+    const products = await this.prisma.product.findMany({
+      where: { partnerId: id },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { id: true, code: true, title: true, type: true, status: true, slug: true, createdAt: true },
+    });
+    const totalProducts = await this.prisma.product.count({ where: { partnerId: id } });
+
+    // Aggregate: orders where this partner is seller
+    const orders = await this.prisma.order.findMany({
+      where: { sellerPartnerId: id },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { id: true, code: true, number: true, status: true, paymentStatus: true, amount: true, currency: true, customerId: true, createdAt: true },
+    });
+    const totalOrders = await this.prisma.order.count({ where: { sellerPartnerId: id } });
+
+    // Aggregate: bookings through partner's orders
+    const orderIds = orders.map((o) => o.id);
+    const bookings = orderIds.length > 0
+      ? await this.prisma.booking.findMany({
+          where: { orderId: { in: orderIds } },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, createdAt: true },
+        })
+      : [];
+    const totalBookings = orderIds.length > 0
+      ? await this.prisma.booking.count({ where: { orderId: { in: orderIds } } })
+      : 0;
+
+    // PartnerStorefront state
+    const storefront = await (this.prisma as any).partnerStorefront.findUnique({
+      where: { partnerId: id },
+      select: { id: true, code: true, slug: true, status: true, entitlementStatus: true, businessName: true, tagline: true, defaultLocale: true, countryCode: true, cityCode: true },
+    });
+
+    return {
+      ...partner,
+      products,
+      totalProducts,
+      orders,
+      totalOrders,
+      bookings,
+      totalBookings,
+      totalCustomers: partner.customerRelations.length,
+      storefront,
+    };
   }
 
   // ── Customer Detail with related data (Step 3.5) ──────────────────────
@@ -521,15 +570,31 @@ export class CrmService {
         : Promise.resolve(0),
     ]);
 
+    // Refunds: Customer → Order → Payment → Refund (cross-schema, no FK)
+    const paymentIds = payments.map((p) => p.id);
+    const [refunds, totalRefunds] = paymentIds.length > 0
+      ? await Promise.all([
+          this.prisma.refund.findMany({
+            where: { paymentId: { in: paymentIds } },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+            select: { id: true, code: true, amount: true, currency: true, status: true, reason: true, paymentId: true, orderId: true, createdAt: true },
+          }),
+          this.prisma.refund.count({ where: { paymentId: { in: paymentIds } } }),
+        ])
+      : [[], 0];
+
     return {
       ...customer,
       orders,
       bookings,
       payments,
+      refunds,
       summary: {
         totalOrders,
         totalBookings,
         totalPayments,
+        totalRefunds,
       },
     };
   }
