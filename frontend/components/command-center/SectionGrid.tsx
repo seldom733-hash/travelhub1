@@ -309,7 +309,11 @@ export function SectionGrid({
               headers: { "Content-Type": "application/json" },
               credentials: "include",
             });
-            if (!res.ok) throw new Error(`Action failed: ${res.status}`);
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              const msg = (body as { message?: string }).message ?? `Action failed: ${res.status}`;
+              throw new Error(msg);
+            }
           }}
         />
       )}

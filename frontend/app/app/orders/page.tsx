@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api, type Order, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -21,7 +22,9 @@ export default function OrdersPage() {
   const [data, setData] = useState<Page<Order> | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
   const [bookings, setBookings] = useState<{ id: string; code: string; status: string }[]>([]);
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
+  const [statusFilter] = useState(() => searchParams.get("status") ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Ролевой UI: доступные команды определяются granular permissions (RBAC Matrix §4).
@@ -44,6 +47,7 @@ export default function OrdersPage() {
     try {
       const qs = new URLSearchParams();
       if (search) qs.set("search", search);
+      if (statusFilter) qs.set("status", statusFilter);
       const res = await api.get<Page<Order>>(`/orders?${qs.toString()}`);
       setData(res);
     } catch (e) {

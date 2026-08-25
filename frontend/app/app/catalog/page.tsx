@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api, type Page, type Product } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -24,8 +25,9 @@ const PRODUCT_TYPES = [
 export default function CatalogPage() {
   const [data, setData] = useState<Page<Product> | null>(null);
   const [selected, setSelected] = useState<Product | null>(null);
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(() => searchParams.get("status") ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Ролевой UI: публикация — catalog.product.publish; создание — catalog.product.write (матрица: ADMIN/MODERATOR).

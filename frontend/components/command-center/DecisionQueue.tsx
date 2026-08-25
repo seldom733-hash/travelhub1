@@ -217,13 +217,18 @@ function QueueItem({
   isSlaBreached?: boolean;
 }) {
   const [loading, setLoading] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const handleAction = useCallback(
     async (action: string) => {
       if (!onAction) return;
       setLoading(action);
+      setActionError(null);
       try {
         await onAction(signal.id, action);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setActionError(msg);
       } finally {
         setLoading(null);
       }
@@ -445,6 +450,11 @@ function QueueItem({
             </button>
           )}
         </div>
+        {actionError && (
+          <div className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-600">
+            {actionError}
+          </div>
+        )}
       </div>
     </div>
   );

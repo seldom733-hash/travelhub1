@@ -162,7 +162,7 @@ function deriveServicesWithoutSalesActions(
       target: {
         type: "PRODUCT",
         route: "/app/catalog",
-        filters: { status: "ACTIVE", unsold: "true" },
+        filters: { status: "ACTIVE" },
       },
       requiredPermission: "catalog.product.read",
       executionMode: "NAVIGATION_ONLY",
@@ -183,7 +183,7 @@ function deriveServicesWithoutSalesActions(
       target: {
         type: "PRODUCT",
         route: "/app/catalog",
-        filters: { status: "ACTIVE", availability: "none" },
+        filters: { status: "ACTIVE" },
       },
       requiredPermission: "catalog.availability.write",
       executionMode: "NAVIGATION_ONLY",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api, type Booking, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -21,8 +22,10 @@ export default function BookingsPage() {
   const [data, setData] = useState<Page<Booking> | null>(null);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [orderRef, setOrderRef] = useState<{ code: string; number: string; status: string } | null>(null);
+  const searchParams = useSearchParams();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const upcomingOnly = searchParams.get("upcoming") === "true";
   // Ролевой UI: права на команды Booking (RBAC Matrix §4).
   const canSend = useCan("booking.send_supplier");
   const canConfirm = useCan("booking.confirm");
@@ -40,7 +43,17 @@ export default function BookingsPage() {
     setBusy(true);
     try {
       const res = await api.get<Page<Booking>>(`/bookings?pageSize=100`);
-      setData(res);
+      // Client-side upcoming filter: bookings with future dates
+      if (upcomingOnly) {
+        const now = new Date();
+        const upcoming = res.items.filter((b) => {
+          const date = b.serviceDate ? new Date(b.serviceDate) : null;
+          return date && date > now;
+        });
+        setData({ ...res, items: upcoming, total: upcoming.length });
+      } else {
+        setData(res);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
