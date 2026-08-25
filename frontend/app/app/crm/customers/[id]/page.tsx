@@ -112,126 +112,176 @@ export default function Customer360Page() {
                 <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.col.email", locale)}</div><div className="break-all font-medium text-slate-700">{customer.email}</div></div>
                 <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.create.form.phone", locale)}</div><div className="font-medium text-slate-700">{customer.phone ?? "—"}</div></div>
               </div>
-              <div className="grid grid-cols-4 gap-3 text-xs">
+              <div className="grid grid-cols-5 gap-3 text-xs">
                 <div className="rounded-lg bg-blue-50 px-4 py-3 text-center"><div className="font-bold text-blue-700">{customer.summary.totalOrders}</div><div className="text-blue-500">{t("crm.detail.total_orders", locale)}</div></div>
                 <div className="rounded-lg bg-green-50 px-4 py-3 text-center"><div className="font-bold text-green-700">{customer.summary.totalBookings}</div><div className="text-green-500">{t("crm.detail.total_bookings", locale)}</div></div>
                 <div className="rounded-lg bg-purple-50 px-4 py-3 text-center"><div className="font-bold text-purple-700">{customer.summary.totalPayments}</div><div className="text-purple-500">{t("crm.detail.total_payments", locale)}</div></div>
                 <div className="rounded-lg bg-red-50 px-4 py-3 text-center"><div className="font-bold text-red-700">{customer.summary.totalRefunds ?? 0}</div><div className="text-red-500">{t("crm.detail.total_refunds", locale)}</div></div>
-              </div>
-              <div className="rounded-lg bg-amber-50 px-4 py-3 text-xs text-center">
-                <div className="font-bold text-amber-700">{partners.length}</div>
-                <div className="text-amber-500">{t("crm.detail.total_partners", locale)}</div>
+                <div className="rounded-lg bg-amber-50 px-4 py-3 text-center"><div className="font-bold text-amber-700">{partners.length}</div><div className="text-amber-500">{t("crm.detail.total_partners", locale)}</div></div>
               </div>
             </>
           )}
 
-          {/* Orders */}
+          {/* Orders — TABLE */}
           {tab === "orders" && (
-            <div className="space-y-2">
-              {customer.orders.length > 0 ? customer.orders.map((o) => (
-                <div key={o.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.code}</Link>
-                    <StatusBadge status={o.status} />
-                  </div>
-                  <div className="mt-1 text-slate-500">{o.number} · {o.amount} {o.currency}</div>
-                </div>
-              )) : <div className="py-8 text-center text-xs text-slate-400">{t("crm.detail.no_orders", locale)}</div>}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.number", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.amount", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customer.orders.length > 0 ? customer.orders.map((o) => (
+                    <tr key={o.id} className="border-b border-slate-50 hover:bg-blue-50/30">
+                      <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.code}</Link></td>
+                      <td className="px-4 py-2.5 text-slate-500">{o.number}</td>
+                      <td className="px-4 py-2.5 font-medium text-slate-700">{o.amount} {o.currency}</td>
+                      <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
+                    </tr>
+                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_orders", locale)}</td></tr>}
+                </tbody>
+              </table>
             </div>
           )}
 
-          {/* Bookings */}
+          {/* Bookings — TABLE */}
           {tab === "bookings" && (
-            <div className="space-y-2">
-              {customer.bookings.length > 0 ? customer.bookings.map((b) => (
-                <div key={b.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.code}</Link>
-                    <StatusBadge status={b.status} />
-                  </div>
-                  <div className="mt-1 text-slate-500">{b.amount} {b.currency}</div>
-                </div>
-              )) : <div className="py-8 text-center text-xs text-slate-400">{t("crm.detail.no_bookings", locale)}</div>}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.amount", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customer.bookings.length > 0 ? customer.bookings.map((b) => (
+                    <tr key={b.id} className="border-b border-slate-50 hover:bg-blue-50/30">
+                      <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.code}</Link></td>
+                      <td className="px-4 py-2.5 font-medium text-slate-700">{b.amount} {b.currency}</td>
+                      <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
+                    </tr>
+                  )) : <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_bookings", locale)}</td></tr>}
+                </tbody>
+              </table>
             </div>
           )}
 
-          {/* Payments — enriched with business context */}
+          {/* Payments — TABLE with business context */}
           {tab === "payments" && (
-            <div className="space-y-2">
-              {customer.payments.length > 0 ? customer.payments.map((p) => (
-                <div key={p.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-blue-600">{p.code}</span>
-                    <StatusBadge status={p.status} />
-                  </div>
-                  <div className="mt-1 font-medium text-slate-700">{p.amount} {p.currency}</div>
-                  {p.orderCode && (
-                    <div className="mt-1 text-slate-500">
-                      {t("crm.detail.pays_for_order", locale)} <Link href={`/app/orders/${p.orderId}`} className="text-blue-600 hover:underline">{p.orderCode}</Link>
-                      {p.orderNumber && <span className="text-slate-400"> ({p.orderNumber})</span>}
-                    </div>
-                  )}
-                  {p.paymentMethod && <div className="mt-1 text-slate-400">{p.paymentMethod}</div>}
-                </div>
-              )) : <div className="py-8 text-center text-xs text-slate-400">{t("crm.detail.no_payments", locale)}</div>}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.payment_code", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.purpose", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.amount", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.method", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customer.payments.length > 0 ? customer.payments.map((p) => (
+                    <tr key={p.id} className="border-b border-slate-50 hover:bg-blue-50/30">
+                      <td className="px-4 py-2.5 font-mono text-slate-600">{p.code}</td>
+                      <td className="px-4 py-2.5 text-slate-500">
+                        {p.orderCode ? (
+                          <Link href={`/app/orders/${p.orderId}`} className="text-blue-600 hover:underline">{p.orderCode}</Link>
+                        ) : "—"}
+                        {p.orderNumber && <span className="ml-1 text-slate-400">({p.orderNumber})</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{p.amount} {p.currency}</td>
+                      <td className="px-4 py-2.5 text-slate-500">{p.paymentMethod ?? "—"}</td>
+                      <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
+                    </tr>
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_payments", locale)}</td></tr>}
+                </tbody>
+              </table>
             </div>
           )}
 
-          {/* Partners — derived from commercial transactional activity */}
+          {/* Partners — TABLE with commercial aggregates */}
           {tab === "partners" && (
-            <div className="space-y-2">
-              {partners.length > 0 ? partners.map((p) => (
-                <div key={p.partnerId} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <Link href={`/app/crm/partners/${p.partnerId}`} className="font-medium text-blue-600 hover:underline">{p.partnerName}</Link>
-                    {p.partnerStatus && <StatusBadge status={p.partnerStatus} />}
-                  </div>
-                  <div className="mt-1 flex gap-3 text-slate-500">
-                    <span>{p.orderCount} {t("crm.detail.orders", locale)}</span>
-                    <span>{p.totalBookings} {t("crm.detail.bookings", locale)}</span>
-                    <span>{p.totalAmount} {p.currency}</span>
-                  </div>
-                  {p.lifecycle && <div className="mt-1 text-slate-400">{t("crm.col.lifecycle", locale)}: {p.lifecycle}</div>}
-                  {p.leadSource && <div className="mt-1 text-slate-400">{t("crm.col.lead_source", locale)}: {p.leadSource}</div>}
-                </div>
-              )) : <div className="py-8 text-center text-xs text-slate-400">{t("crm.detail.no_partners", locale)}</div>}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.partner", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.detail.orders", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.detail.bookings", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.amount", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {partners.length > 0 ? partners.map((p) => (
+                    <tr key={p.partnerId} className="border-b border-slate-50 hover:bg-blue-50/30">
+                      <td className="px-4 py-2.5"><Link href={`/app/crm/partners/${p.partnerId}`} className="font-medium text-blue-600 hover:underline">{p.partnerName}</Link></td>
+                      <td className="px-4 py-2.5 text-right text-slate-600">{p.orderCount}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-600">{p.totalBookings}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{p.totalAmount.toFixed(2)} {p.currency}</td>
+                      <td className="px-4 py-2.5">{p.partnerStatus ? <StatusBadge status={p.partnerStatus} /> : "—"}</td>
+                    </tr>
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_partners", locale)}</td></tr>}
+                </tbody>
+              </table>
             </div>
           )}
 
-          {/* Refunds — enriched with business context */}
+          {/* Refunds — TABLE with business context */}
           {tab === "refunds" && (
-            <div className="space-y-2">
-              {customer.refunds && customer.refunds.length > 0 ? customer.refunds.map((r) => (
-                <div key={r.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-blue-600">{r.code}</span>
-                    <StatusBadge status={r.status} />
-                  </div>
-                  <div className="mt-1 font-medium text-slate-700">{r.amount} {r.currency}</div>
-                  {r.orderCode && (
-                    <div className="mt-1 text-slate-500">
-                      {t("crm.detail.refund_for_order", locale)} <Link href={`/app/orders/${r.orderId}`} className="text-blue-600 hover:underline">{r.orderCode}</Link>
-                      {r.orderNumber && <span className="text-slate-400"> ({r.orderNumber})</span>}
-                    </div>
-                  )}
-                  {r.paymentCode && <div className="mt-1 text-slate-400">{t("crm.detail.source_payment", locale)}: {r.paymentCode}</div>}
-                  {r.reason && <div className="mt-1 text-slate-400">{t("crm.detail.reason", locale)}: {r.reason}</div>}
-                </div>
-              )) : <div className="py-8 text-center text-xs text-slate-400">{t("crm.detail.no_refunds", locale)}</div>}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.refund_code", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.purpose", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.source_payment", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.amount", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.reason", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customer.refunds && customer.refunds.length > 0 ? customer.refunds.map((r) => (
+                    <tr key={r.id} className="border-b border-slate-50 hover:bg-blue-50/30">
+                      <td className="px-4 py-2.5 font-mono text-slate-600">{r.code}</td>
+                      <td className="px-4 py-2.5 text-slate-500">
+                        {r.orderCode ? (
+                          <Link href={`/app/orders/${r.orderId}`} className="text-blue-600 hover:underline">{r.orderCode}</Link>
+                        ) : "—"}
+                        {r.orderNumber && <span className="ml-1 text-slate-400">({r.orderNumber})</span>}
+                      </td>
+                      <td className="px-4 py-2.5 font-mono text-slate-500">{r.paymentCode ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{r.amount} {r.currency}</td>
+                      <td className="px-4 py-2.5 text-slate-500 max-w-[200px] truncate" title={r.reason ?? undefined}>{r.reason ?? "—"}</td>
+                      <td className="px-4 py-2.5"><StatusBadge status={r.status} /></td>
+                    </tr>
+                  )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_refunds", locale)}</td></tr>}
+                </tbody>
+              </table>
             </div>
           )}
 
-          {/* History */}
+          {/* History — TIMELINE */}
           {tab === "history" && (
             <div className="space-y-2">
               {customer.history.length > 0 ? customer.history.map((h) => (
-                <div key={h.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-slate-700">{h.action}</span>
-                    <span className="text-slate-400">{new Date(h.createdAt).toLocaleDateString()}</span>
+                <div key={h.id} className="flex items-start gap-3 rounded-lg border border-slate-100 px-4 py-3 text-xs">
+                  <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-blue-400" />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-slate-700">{h.action}</span>
+                      <span className="text-slate-400">{new Date(h.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    {h.from && h.to && <div className="mt-1 text-slate-500">{h.from} → {h.to}</div>}
+                    {h.comment && <div className="mt-1 text-slate-400">{h.comment}</div>}
                   </div>
-                  {h.from && h.to && <div className="mt-1 text-slate-500">{h.from} → {h.to}</div>}
-                  {h.comment && <div className="mt-1 text-slate-400">{h.comment}</div>}
                 </div>
               )) : <div className="py-8 text-center text-xs text-slate-400">{t("crm.detail.no_history", locale)}</div>}
             </div>
