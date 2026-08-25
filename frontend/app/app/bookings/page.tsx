@@ -18,12 +18,24 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-slate-600 hover:bg-slate-700", only: ["NEW", "PREPARING_REQUEST", "SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION", "CONFIRMED", "IN_SERVICE"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-function BookingsContent({ upcomingOnly, statusFilter, overdueOnly }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean }) {
+function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean; slaMinutes?: string }) {
   const [data, setData] = useState<Page<Booking> | null>(null);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [orderRef, setOrderRef] = useState<{ code: string; number: string; status: string } | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Derived filter labels for display
+  const activeFilters: string[] = [];
+  if (upcomingOnly) activeFilters.push("Предстоящие");
+  if (overdueOnly) activeFilters.push(`Подтверждение: SLA нарушен (${slaMinutes ?? 240} мин)`);
+  if (statusFilter) {
+    const statusLabels: Record<string, string> = {
+      AWAITING_CONFIRMATION: "Ожидает подтверждения",
+      CONFIRMED: "Подтверждено",
+      CANCELLED: "Отменено",
+    };
+    activeFilters.push(statusLabels[statusFilter] ?? `Статус: ${statusFilter}`);
+  }
   // Ролевой UI: права на команды Booking (RBAC Matrix §4).
   const canSend = useCan("booking.send_supplier");
   const canConfirm = useCan("booking.confirm");
@@ -44,6 +56,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly }: { upcoming
       qs.set('pageSize', '100');
       if (upcomingOnly) qs.set('upcoming', 'true');
       if (overdueOnly) qs.set('overdue', 'true');
+      if (slaMinutes) qs.set('slaMinutes', slaMinutes);
       if (statusFilter) qs.set('status', statusFilter);
       const res = await api.get<Page<Booking>>(`/bookings?${qs.toString()}`);
       setData(res);
@@ -115,6 +128,15 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly }: { upcoming
             ]}
           />
 
+          {activeFilters.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {activeFilters.map((f, i) => (
+                <span key={i} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
           {busy && <span className="text-xs text-slate-400">загрузка…</span>}
 
@@ -234,6 +256,7 @@ function BookingsWithParams() {
       upcomingOnly={sp.get("upcoming") === "true"}
       statusFilter={sp.get("status") || undefined}
       overdueOnly={sp.get("overdue") === "true"}
+      slaMinutes={sp.get("slaMinutes") || undefined}
     />
   );
 }

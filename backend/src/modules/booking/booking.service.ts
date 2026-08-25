@@ -108,7 +108,7 @@ export class BookingService {
     private readonly query: BookingQueryService,
   ) {}
 
-  async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; page?: number; pageSize?: number }) {
+  async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; slaMinutes?: string; page?: number; pageSize?: number }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const now = new Date();
@@ -116,10 +116,16 @@ export class BookingService {
       ...(query.status ? { status: query.status as BookingStatus } : {}),
       ...(query.orderId ? { orderId: query.orderId } : {}),
       ...(query.search ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }] } : {}),
-      // upcoming=true → serviceDate >= today (non-terminal bookings only)
-      ...(query.upcoming === "true" ? { serviceDate: { gte: now } } : {}),
-      // overdue=true → serviceDate < today AND status is active (not terminal)
-      ...(query.overdue === "true" ? { serviceDate: { lt: now }, status: { in: ACTIVE } } : {}),
+      // ROUND 5: upcoming=true → detector: status IN (CONFIRMED, NEW) AND serviceDate >= now
+      ...(query.upcoming === "true" ? {
+        status: { in: ["CONFIRMED", "NEW"] as BookingStatus[] },
+        serviceDate: { gte: now },
+      } : {}),
+      // ROUND 5: overdue=true → detector: status = AWAITING_CONFIRMATION AND createdAt < (now - SLA)
+      ...(query.overdue === "true" ? {
+        status: "AWAITING_CONFIRMATION" as BookingStatus,
+        createdAt: { lt: new Date(Date.now() - (parseInt(query.slaMinutes ?? "240", 10)) * 60 * 1000) },
+      } : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.booking.findMany({

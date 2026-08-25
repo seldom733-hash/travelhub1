@@ -18,13 +18,29 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-red-600 hover:bg-red-700", only: ["NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "PROBLEM", "SUSPENDED"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus }: { initialStatus: string; initialSearch?: string; initialPaymentStatus?: string }) {
+function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, initialCancelledWithin, initialPaymentFailed, initialPendingRefund }: { initialStatus: string; initialSearch?: string; initialPaymentStatus?: string; initialCancelledWithin?: string; initialPaymentFailed?: string; initialPendingRefund?: string }) {
   const [data, setData] = useState<Page<Order> | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
   const [bookings, setBookings] = useState<{ id: string; code: string; status: string }[]>([]);
   const [search, setSearch] = useState(initialSearch || "");
   const [statusFilter] = useState(initialStatus);
   const [paymentStatusFilter] = useState(initialPaymentStatus);
+  const [cancelledWithin] = useState(initialCancelledWithin);
+  const [paymentFailed] = useState(initialPaymentFailed);
+  const [pendingRefund] = useState(initialPendingRefund);
+  // Derived filter labels for display
+  const activeFilters: string[] = [];
+  if (statusFilter) {
+    const statusLabels: Record<string, string> = { CANCELLED: "Статус: Отменён" };
+    activeFilters.push(statusLabels[statusFilter] ?? `Статус: ${statusFilter}`);
+  }
+  if (paymentStatusFilter) {
+    const psLabels: Record<string, string> = { UNPAID: "Оплата: Не оплачен" };
+    activeFilters.push(psLabels[paymentStatusFilter] ?? `Оплата: ${paymentStatusFilter}`);
+  }
+  if (cancelledWithin) activeFilters.push(`Период: последние ${cancelledWithin} дн.`);
+  if (paymentFailed === "true") activeFilters.push("Платёж: Неуспешный");
+  if (pendingRefund === "true") activeFilters.push("Возврат: Ожидает обработки");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Ролевой UI: доступные команды определяются granular permissions (RBAC Matrix §4).
@@ -49,6 +65,9 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus }: {
       if (search) qs.set("search", search);
       if (statusFilter) qs.set("status", statusFilter);
       if (paymentStatusFilter) qs.set("paymentStatus", paymentStatusFilter);
+      if (cancelledWithin) qs.set("cancelledWithin", cancelledWithin);
+      if (paymentFailed) qs.set("paymentFailed", paymentFailed);
+      if (pendingRefund) qs.set("pendingRefund", pendingRefund);
       const res = await api.get<Page<Order>>(`/orders?${qs.toString()}`);
       setData(res);
     } catch (e) {
@@ -61,7 +80,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus }: {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter, paymentStatusFilter]);
+  }, [search, statusFilter, paymentStatusFilter, cancelledWithin, paymentFailed, pendingRefund]);
 
   const openDetail = async (id: string) => {
     const [order, bk] = await Promise.all([
@@ -125,6 +144,15 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus }: {
               placeholder="Поиск: ORD-…, TH-…"
               className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
+            {activeFilters.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {activeFilters.map((f, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                    {f}
+                  </span>
+                ))}
+              </div>
+            )}
             {busy && <span className="text-xs text-slate-400">загрузка…</span>}
           </div>
 
@@ -277,6 +305,9 @@ function OrdersWithParams() {
       initialStatus={sp.get("status") ?? ""}
       initialSearch={sp.get("search") ?? ""}
       initialPaymentStatus={sp.get("paymentStatus") ?? ""}
+      initialCancelledWithin={sp.get("cancelledWithin") ?? ""}
+      initialPaymentFailed={sp.get("paymentFailed") ?? ""}
+      initialPendingRefund={sp.get("pendingRefund") ?? ""}
     />
   );
 }

@@ -145,6 +145,16 @@ class ListProductsQuery {
   @IsOptional()
   @IsString()
   sort?: string;
+
+  /** ROUND 5: Products with zero orders (detector: SERVICES_WITHOUT_SALES). */
+  @IsOptional()
+  @IsString()
+  unsold?: string;
+
+  /** ROUND 5: Products without availability configured (detector: REVIEW_AVAILABILITY). */
+  @IsOptional()
+  @IsString()
+  availability?: string;
 }
 
 class CreateCategoryDto {

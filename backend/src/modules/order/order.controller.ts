@@ -63,6 +63,21 @@ class ListOrdersQuery {
   @IsString()
   search?: string;
 
+  /** ROUND 5: orders cancelled within N days (detector: RECENT_CANCELLATIONS). */
+  @IsOptional()
+  @IsString()
+  cancelledWithin?: string;
+
+  /** ROUND 5: orders with at least one FAILED payment (detector: FAILED_PAYMENTS). */
+  @IsOptional()
+  @IsString()
+  paymentFailed?: string;
+
+  /** ROUND 5: orders with at least one REQUESTED refund (detector: PENDING_REFUNDS). */
+  @IsOptional()
+  @IsString()
+  pendingRefund?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

@@ -22,11 +22,27 @@ const PRODUCT_TYPES = [
   { code: "PHOTOGRAPHER", title: "Фотограф" },
 ];
 
-function CatalogContent({ initialStatus }: { initialStatus: string }) {
+function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: { initialStatus: string; initialUnsold?: string; initialAvailability?: string }) {
   const [data, setData] = useState<Page<Product> | null>(null);
   const [selected, setSelected] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(initialStatus);
+  const [unsold] = useState(initialUnsold);
+  const [availability] = useState(initialAvailability);
+  // Derived filter labels for display
+  const activeFilters: string[] = [];
+  if (status) {
+    const statusLabels: Record<string, string> = {
+      DRAFT: "Черновик",
+      COMPLETE: "Заполнен",
+      REVIEWED: "Проверен",
+      PUBLISHED: "Опубликован",
+      ARCHIVED: "Архивирован",
+    };
+    activeFilters.push(statusLabels[status] ?? `Статус: ${status}`);
+  }
+  if (unsold === "true") activeFilters.push("Без продаж");
+  if (availability === "missing") activeFilters.push("Доступность: Не настроена");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Ролевой UI: публикация — catalog.product.publish; создание — catalog.product.write (матрица: ADMIN/MODERATOR).
@@ -47,6 +63,8 @@ function CatalogContent({ initialStatus }: { initialStatus: string }) {
       const qs = new URLSearchParams();
       if (search) qs.set("search", search);
       if (status) qs.set("status", status);
+      if (unsold) qs.set("unsold", unsold);
+      if (availability) qs.set("availability", availability);
       const res = await api.get<Page<Product>>(`/products?${qs.toString()}`);
       setData(res);
       if (selected && !res.items.some((p) => p.id === selected.id)) setSelected(null);
@@ -60,7 +78,7 @@ function CatalogContent({ initialStatus }: { initialStatus: string }) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status]);
+  }, [search, status, unsold, availability]);
 
   const openDetail = async (id: string) => {
     setShowCreate(false);
@@ -221,6 +239,15 @@ function CatalogContent({ initialStatus }: { initialStatus: string }) {
               <option value="PUBLISHED">Опубликован</option>
               <option value="ARCHIVED">Архивирован</option>
             </select>
+            {activeFilters.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {activeFilters.map((f, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                    {f}
+                  </span>
+                ))}
+              </div>
+            )}
             {busy && <span className="text-xs text-slate-400">загрузка…</span>}
           </div>
 
@@ -478,7 +505,13 @@ function CatalogContent({ initialStatus }: { initialStatus: string }) {
 
 function CatalogWithParams() {
   const sp = useSearchParams();
-  return <CatalogContent initialStatus={sp.get("status") ?? ""} />;
+  return (
+    <CatalogContent
+      initialStatus={sp.get("status") ?? ""}
+      initialUnsold={sp.get("unsold") ?? ""}
+      initialAvailability={sp.get("availability") ?? ""}
+    />
+  );
 }
 
 export default function CatalogPage() {

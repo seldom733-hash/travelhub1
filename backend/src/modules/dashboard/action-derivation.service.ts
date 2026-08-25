@@ -11,6 +11,8 @@
  * - No fabricated financial claims
  * - No LLM-generated actions
  * - No opaque priority scoring
+ *
+ * ROUND 5 FIX: All destination filters now match detector predicates exactly.
  */
 
 import { Injectable } from "@nestjs/common";
@@ -22,10 +24,19 @@ import type {
 
 // ── Per-Signal Action Derivation ────────────────────────────────────────────
 
+/**
+ * BOOKING_CONFIRMATION_DELAY detector:
+ *   status = AWAITING_CONFIRMATION AND createdAt < (now - SLA minutes)
+ *
+ * Destination MUST match: bookings awaiting confirmation beyond SLA.
+ */
 function deriveBookingDelayActions(
   signalCode: string,
-  _evidence: Array<{ key: string; value: string | number }>,
+  evidence: Array<{ key: string; value: string | number }>,
 ): ActionDefinition[] {
+  const slaMinutes = evidence.find((e) => e.key === "slaThresholdMinutes");
+  const sla = slaMinutes ? Number(slaMinutes.value) : 240;
+
   return [
     {
       actionCode: "OPEN_DELAYED_BOOKINGS",
@@ -36,7 +47,7 @@ function deriveBookingDelayActions(
       target: {
         type: "BOOKING",
         route: "/app/bookings",
-        filters: { status: "CONFIRMED", overdue: "true" },
+        filters: { status: "AWAITING_CONFIRMATION", overdue: "true", slaMinutes: String(sla) },
       },
       requiredPermission: "booking.read",
       executionMode: "NAVIGATION_ONLY",
@@ -46,6 +57,13 @@ function deriveBookingDelayActions(
   ];
 }
 
+/**
+ * FAILED_PAYMENTS detector:
+ *   Payment.status = FAILED
+ *
+ * Destination MUST map failed payments to affected orders.
+ * Orders page can filter by orders that have at least one FAILED payment.
+ */
 function deriveFailedPaymentActions(
   signalCode: string,
   _evidence: Array<{ key: string; value: string | number }>,
@@ -60,7 +78,7 @@ function deriveFailedPaymentActions(
       target: {
         type: "ORDER",
         route: "/app/orders",
-        filters: { paymentStatus: "UNPAID" },
+        filters: { paymentFailed: "true" },
       },
       requiredPermission: "finance.payment.read",
       executionMode: "NAVIGATION_ONLY",
@@ -70,10 +88,19 @@ function deriveFailedPaymentActions(
   ];
 }
 
+/**
+ * RECENT_CANCELLATIONS detector:
+ *   Order.status = CANCELLED AND Order.createdAt > (now - 7 days)
+ *
+ * Destination MUST preserve the 7-day time window.
+ */
 function deriveCancellationActions(
   signalCode: string,
-  _evidence: Array<{ key: string; value: string | number }>,
+  evidence: Array<{ key: string; value: string | number }>,
 ): ActionDefinition[] {
+  const periodDays = evidence.find((e) => e.key === "periodDays");
+  const days = periodDays ? Number(periodDays.value) : 7;
+
   return [
     {
       actionCode: "OPEN_CANCELLED_ORDERS",
@@ -84,7 +111,7 @@ function deriveCancellationActions(
       target: {
         type: "ORDER",
         route: "/app/orders",
-        filters: { status: "CANCELLED" },
+        filters: { status: "CANCELLED", cancelledWithin: String(days) },
       },
       requiredPermission: "order.read",
       executionMode: "NAVIGATION_ONLY",
@@ -94,13 +121,17 @@ function deriveCancellationActions(
   ];
 }
 
+/**
+ * PENDING_REFUNDS detector:
+ *   Refund.status = REQUESTED
+ *
+ * Destination MUST map pending refunds to affected orders.
+ * Orders page can filter by orders that have at least one REQUESTED refund.
+ */
 function derivePendingRefundActions(
   signalCode: string,
-  evidence: Array<{ key: string; value: string | number }>,
+  _evidence: Array<{ key: string; value: string | number }>,
 ): ActionDefinition[] {
-  const count = evidence.find((e) => e.key === "pendingRefundCount");
-  const refundCount = count ? Number(count.value) : 0;
-
   return [
     {
       actionCode: "OPEN_PENDING_REFUNDS",
@@ -111,7 +142,7 @@ function derivePendingRefundActions(
       target: {
         type: "ORDER",
         route: "/app/orders",
-        filters: { status: "CANCELLED" },
+        filters: { pendingRefund: "true" },
       },
       requiredPermission: "finance.refund.read",
       executionMode: "NAVIGATION_ONLY",
@@ -121,6 +152,12 @@ function derivePendingRefundActions(
   ];
 }
 
+/**
+ * UPCOMING_BOOKINGS detector:
+ *   Booking.status IN (CONFIRMED, NEW) AND Booking.serviceDate > now()
+ *
+ * Destination MUST filter by same status set AND future serviceDate.
+ */
 function deriveUpcomingBookingActions(
   signalCode: string,
   _evidence: Array<{ key: string; value: string | number }>,
@@ -145,6 +182,16 @@ function deriveUpcomingBookingActions(
   ];
 }
 
+/**
+ * SERVICES_WITHOUT_SALES detector:
+ *   Product.status = PUBLISHED AND NOT EXISTS (OrderItem WHERE productId = Product.id)
+ *
+ * Two actions:
+ * 1. OPEN_UNSOLD_SERVICES — show PUBLISHED products without any orders
+ * 2. REVIEW_AVAILABILITY — show PUBLISHED products without availability configured
+ *
+ * These are independent predicates even if they happen to return similar sets.
+ */
 function deriveServicesWithoutSalesActions(
   signalCode: string,
   evidence: Array<{ key: string; value: string | number }>,
@@ -162,7 +209,7 @@ function deriveServicesWithoutSalesActions(
       target: {
         type: "PRODUCT",
         route: "/app/catalog",
-        filters: { status: "PUBLISHED" },
+        filters: { status: "PUBLISHED", unsold: "true" },
       },
       requiredPermission: "catalog.product.read",
       executionMode: "NAVIGATION_ONLY",
@@ -183,7 +230,7 @@ function deriveServicesWithoutSalesActions(
       target: {
         type: "PRODUCT",
         route: "/app/catalog",
-        filters: { status: "PUBLISHED" },
+        filters: { status: "PUBLISHED", availability: "missing" },
       },
       requiredPermission: "catalog.availability.write",
       executionMode: "NAVIGATION_ONLY",

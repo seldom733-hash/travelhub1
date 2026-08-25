@@ -425,7 +425,7 @@ export class OrderService {
   }
 
   async listOrders(
-    query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; page?: number; pageSize?: number },
+    query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; page?: number; pageSize?: number },
     viewer?: TravelerViewer,
   ) {
     const page = Math.max(1, query.page ?? 1);
@@ -438,6 +438,39 @@ export class OrderService {
         ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }, { number: { contains: query.search, mode: "insensitive" } }] }
         : {}),
     };
+
+    // ROUND 5: cancelledWithin=N → orders cancelled in the last N days (detector: RECENT_CANCELLATIONS)
+    if (query.cancelledWithin) {
+      const days = parseInt(query.cancelledWithin, 10);
+      if (days > 0 && days <= 365) {
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        where.createdAt = { gte: cutoff };
+      }
+    }
+
+    // ROUND 5: paymentFailed=true → orders that have at least one FAILED payment (detector: FAILED_PAYMENTS)
+    if (query.paymentFailed === "true") {
+      const failedOrderIds = await (this.prisma as any).$queryRawUnsafe(
+        `SELECT DISTINCT "orderId" FROM "finance"."Payment" WHERE status = 'FAILED'::"finance"."PaymentStatus"`,
+      );
+      const ids = failedOrderIds.map((r: any) => r.orderId);
+      if (ids.length === 0) {
+        return { items: [], total: 0, page, pageSize };
+      }
+      where.id = { in: ids };
+    }
+
+    // ROUND 5: pendingRefund=true → orders that have at least one REQUESTED refund (detector: PENDING_REFUNDS)
+    if (query.pendingRefund === "true") {
+      const refundOrderIds = await (this.prisma as any).$queryRawUnsafe(
+        `SELECT DISTINCT "orderId" FROM "finance"."Refund" WHERE status = 'REQUESTED'::"finance"."RefundStatus"`,
+      );
+      const ids = refundOrderIds.map((r: any) => r.orderId);
+      if (ids.length === 0) {
+        return { items: [], total: 0, page, pageSize };
+      }
+      where.id = { in: ids };
+    }
     const [items, total] = await Promise.all([
       this.prisma.order.findMany({
         where,

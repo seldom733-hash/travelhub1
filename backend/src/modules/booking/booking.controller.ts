@@ -27,6 +27,16 @@ class ListBookingsQuery {
   @IsString()
   upcoming?: string;
 
+  /** ROUND 5: bookings overdue for confirmation (detector: BOOKING_CONFIRMATION_DELAY). */
+  @IsOptional()
+  @IsString()
+  overdue?: string;
+
+  /** ROUND 5: SLA threshold in minutes for overdue filter. */
+  @IsOptional()
+  @IsString()
+  slaMinutes?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

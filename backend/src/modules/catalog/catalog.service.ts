@@ -110,6 +110,10 @@ export interface ProductListQuery {
   filter?: string;
   /** updated_desc (default) | updated_asc | created_desc | title_asc. */
   sort?: string;
+  /** ROUND 5: Products with zero orders (detector: SERVICES_WITHOUT_SALES). */
+  unsold?: string;
+  /** ROUND 5: Products without availability configured (detector: REVIEW_AVAILABILITY). */
+  availability?: string;
 }
 
 /**
@@ -320,6 +324,31 @@ export class CatalogService implements OnModuleInit {
         // Пустое пересечение — не «молча обрезанный» список, а корректный пустой результат.
         return { items: [], total: 0, page, pageSize };
       }
+    }
+
+    // ROUND 5: unsold=true → products with zero orders (detector: SERVICES_WITHOUT_SALES)
+    if (query.unsold === "true") {
+      where.id = {
+        notIn: await (async () => {
+          const sold = await (this.prisma as any).$queryRawUnsafe(
+            `SELECT DISTINCT "productId" FROM "order"."OrderItem"`,
+          );
+          return sold.map((r: any) => r.productId);
+        })(),
+      };
+    }
+
+    // ROUND 5: availability=missing → products without availability records
+    if (query.availability === "missing") {
+      where.id = {
+        ...(typeof where.id === "object" && where.id !== null ? where.id : {}),
+        notIn: await (async () => {
+          const withAvail = await (this.prisma as any).$queryRawUnsafe(
+            `SELECT DISTINCT "productId" FROM "catalog"."Availability"`,
+          );
+          return withAvail.map((r: any) => r.productId);
+        })(),
+      };
     }
 
     const [items, total] = await Promise.all([
