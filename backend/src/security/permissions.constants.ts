@@ -53,6 +53,10 @@ export const PERMISSIONS = {
   "crm.company.write": "Управление компаниями",
   "crm.partner.write": "Управление партнёрами",
   "crm.supplier.write": "Управление поставщиками",
+  // Step 3.5C: Partner own-scope CRM (relations + intake)
+  "crm.customer.read_own": "Чтение собственных CRM-отношений (partner own-scope)",
+  "crm.customer.create_own": "Прямое добавление клиента/лида в собственный CRM (partner intake)",
+  "crm.customer.update_own": "Обновление собственных CRM-отношений (lifecycle/tags/notes)",
 
   // ── Order ─────────────────────────────────────────────────────────────
   "order.read": "Чтение заказов",
@@ -540,6 +544,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // на канонически распределённые requests).
     "reverse.proposal.read_own",
     "reverse.proposal.write_own",
+    // Step 3.5C: PARTNER — own-scope CRM (Customer relations + direct intake)
+    "crm.customer.read_own",
+    "crm.customer.create_own",
+    "crm.customer.update_own",
   ],
 
   // Step 1.3 review fix: BUYER БЕЗ unrestricted internal catalog.product.read —

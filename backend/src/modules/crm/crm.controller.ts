@@ -241,6 +241,51 @@ export class CrmController {
   ) {
     return this.crm.updatePartnerCustomerRelation(relationId, dto, actor.username);
   }
+
+  // ── Step 3.5C — Three-Context Partner CRM ─────────────────────────────
+
+  @Get("partner/customers")
+  @RequirePermissions("crm.customer.read_own")
+  listPartnerCustomers(
+    @Query() query: ListCustomersQuery,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.crm.listPartnerCustomers(actor, query);
+  }
+
+  @Get("partner/customers/:id")
+  @RequirePermissions("crm.customer.read_own")
+  getPartnerCustomerDetail(
+    @Param("id") id: string,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.crm.getPartnerCustomerDetail(id, actor);
+  }
+
+  @Get("partner/crm-tier")
+  @RequirePermissions("crm.customer.read_own")
+  getCrmTier(@CurrentUser() actor: AuthedRequest["user"]) {
+    return this.crm.getCrmTier(actor.partnerId ?? "").then((tier) => ({ tier }));
+  }
+
+  @Post("partner/customers/intake")
+  @RequirePermissions("crm.customer.create_own")
+  intakePartnerCustomer(
+    @Body() dto: { firstName?: string; lastName?: string; companyName?: string; email: string; phone?: string; leadSource?: string; lifecycle?: string; tags?: string[]; notes?: string; assignedTo?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.crm.intakePartnerCustomer(actor, dto, actor.username);
+  }
+
+  @Patch("partner/relations/:relationId")
+  @RequirePermissions("crm.customer.update_own")
+  updatePartnerRelation(
+    @Param("relationId") relationId: string,
+    @Body() dto: { status?: EntityStatus; lifecycle?: string; tags?: string[]; notes?: string; assignedTo?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.crm.updatePartnerRelation(relationId, actor, dto, actor.username);
+  }
 }
 
 export { ValidateNested };

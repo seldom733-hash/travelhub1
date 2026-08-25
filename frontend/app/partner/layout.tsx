@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { api, auth } from "@/lib/api";
+import { api, auth, type CrmTierResponse } from "@/lib/api";
 import { useCurrentUser } from "@/lib/use-user";
 import { isInternalRole } from "@/lib/routes";
 import { useLocale } from "@/lib/i18n";
@@ -25,13 +25,18 @@ import LocaleSelector from "@/components/public/LocaleSelector";
  * - дети рендерятся только для PARTNER (нет вспышки внутреннего UI).
  * Backend остаётся авторитетным: эти проверки — UX-барьер, не security.
  */
-const CABINET_NAV = [
+// Base navigation items (always visible for approved PARTNER)
+const BASE_NAV = [
   { href: "/partner", labelKey: "partner.nav.overview", icon: "🏠" },
   { href: "/partner/products", labelKey: "partner.nav.products", icon: "🧳" },
   { href: "/partner/products/new", labelKey: "partner.nav.new_product", icon: "➕" },
   { href: "/partner/seller-profile", labelKey: "partner.nav.seller_identity", icon: "🛡" },
   { href: "/partner/storefront", labelKey: "partner.nav.storefront", icon: "🏪" },
 ] as const;
+
+// Tier-aware CRM entry — added after base items for approved PARTNER
+const CUSTOMER_NAV_BASIC = { href: "/partner/customers", labelKey: "partner.nav.customers", icon: "👤" } as const;
+const CUSTOMER_NAV_PRO = { href: "/partner/customers", labelKey: "partner.nav.crm", icon: "👥" } as const;
 
 const ONBOARDING_NAV = [{ href: "/partner/onboarding", labelKey: "partner.nav.onboarding", icon: "📝" }] as const;
 
@@ -46,10 +51,20 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
   const user = useCurrentUser();
   const locale = useLocale();
   const [mounted, setMounted] = useState(false);
+  const [crmTier, setCrmTier] = useState<"BASIC" | "PRO" | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Step 3.5C: resolve CRM tier for partner navigation
+  useEffect(() => {
+    if (!user || user.role !== "PARTNER" || !user.partnerId) return;
+    api
+      .get<CrmTierResponse>("/partner/crm-tier")
+      .then((res) => setCrmTier(res.tier))
+      .catch(() => setCrmTier("BASIC"));
+  }, [user]);
 
   // Auth boundary: anonymous /partner/* перехватывается proxy.ts (server-side,
   // по отсутствию HttpOnly cookie). Клиентский !auth.token-guard здесь НЕ
@@ -86,7 +101,9 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
     return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">…</div>;
   }
 
-  const NAV = pending ? ONBOARDING_NAV : CABINET_NAV;
+  const NAV = pending
+    ? ONBOARDING_NAV
+    : [...BASE_NAV, crmTier === "PRO" ? CUSTOMER_NAV_PRO : CUSTOMER_NAV_BASIC];
 
   const logout = () => {
     void api.post("/auth/logout").catch(() => undefined);
@@ -99,7 +116,8 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
       {/* ── Header ── */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
-          <Link href="/partner" className="flex shrink-0 items-center gap-2" aria-label={pt("partner.nav.cabinet", locale)}>
+          {/* Workspace title — static label, NOT a link */}
+          <div className="flex shrink-0 items-center gap-2" role="presentation">
             <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-base font-bold text-white">T</div>
             <span className="text-base font-bold text-slate-900">
               Travel<span className="text-emerald-600">Hub</span>
@@ -107,7 +125,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
                 {pt("partner.nav.cabinet", locale)}
               </span>
             </span>
-          </Link>
+          </div>
 
           <nav className="flex items-center gap-1 text-sm" aria-label={pt("partner.nav.cabinet", locale)}>
             {NAV.map((item) => {

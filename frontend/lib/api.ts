@@ -211,6 +211,47 @@ export interface PartnerCustomerRelation {
   partner?: Partner;
 }
 
+// Step 3.5C — Three-Context CRM
+export interface PartnerCustomer {
+  id: string;
+  code: string;
+  type: string;
+  firstName: string | null;
+  lastName: string | null;
+  companyName: string | null;
+  email: string;
+  phone: string | null;
+  status: string;
+  createdAt: string;
+  _relation?: {
+    id: string;
+    lifecycle: string | null;
+    leadSource: string | null;
+    tags: string[];
+    notes: string | null;
+    assignedTo: string | null;
+  };
+}
+
+export interface PartnerCustomerDetail extends PartnerCustomer {
+  orders: { id: string; code: string; number: string; status: string; paymentStatus: string; amount: string; paidAmount: string; currency: string; createdAt: string }[];
+  bookings: { id: string; code: string; status: string; amount: string; currency: string; createdAt: string }[];
+  payments: { id: string; code: string; status: string; amount: string; currency: string; createdAt: string }[];
+  summary: { totalOrders: number; totalBookings: number; totalPayments: number };
+  _tier: "BASIC" | "PRO";
+}
+
+export interface CrmTierResponse {
+  tier: "BASIC" | "PRO";
+}
+
+export interface PartnerIntakeResult {
+  customerId: string;
+  relationId: string;
+  customerCreated: boolean;
+  tier: "BASIC" | "PRO";
+}
+
 export interface Order {
   id: string;
   code: string;

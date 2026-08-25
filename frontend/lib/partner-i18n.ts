@@ -20,8 +20,16 @@ export const PARTNER_DICT: Record<string, Record<Locale, string>> = {
   "partner.nav.storefront": { ru: "Витрина", az: "Vitrin", en: "Storefront" },
   "partner.nav.account": { ru: "Аккаунт", az: "Hesab", en: "Account" },
   "partner.nav.logout": { ru: "Выйти", az: "Çıxış", en: "Sign out" },
+  "partner.nav.customers": { ru: "Клиенты", az: "Müştərilər", en: "Customers" },
+  "partner.nav.crm": { ru: "CRM", az: "CRM", en: "CRM" },
   "partner.nav.to_marketplace": { ru: "На витрину", az: "Vitrinə", en: "To marketplace" },
   "partner.nav.lang": { ru: "Язык", az: "Dil", en: "Language" },
+
+  // CRM (partner)
+  "partner.crm.add_customer": { ru: "Добавить клиента", az: "Müştəri əlavə et", en: "Add customer" },
+  "partner.crm.total_customers": { ru: "Всего клиентов", az: "Cəmi müştəri", en: "Total customers" },
+  "partner.crm.my_customers": { ru: "Мои клиенты", az: "Müştərilərim", en: "My customers" },
+  "partner.crm.search_placeholder": { ru: "Поиск по имени или email…", az: "Ad və ya email ilə axtar…", en: "Search by name or email…" },
 
   // overview
   "partner.overview.title": { ru: "Обзор услуг", az: "Xidmətlərin icmalı", en: "Products overview" },

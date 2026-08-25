@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, ForbiddenException } from "@nestjs/common";
 import type { Prisma, CustomerType, EntityStatus } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
@@ -602,6 +602,408 @@ export class CrmService {
           actorId: actor ?? null,
           actorName: actor ?? null,
           comment: "Partner-Customer relation updated",
+        },
+      });
+
+      return relation;
+    });
+
+    return result;
+  }
+
+  // ── Step 3.5C — Three-Context CRM ─────────────────────────────────────
+
+  /**
+   * CRM tier for a partner: BASIC (Marketplace) or PRO (Storefront Pro).
+   * Determined by: partner has an ACTIVE PartnerStorefront with entitlementStatus = ACTIVE.
+   */
+  async getCrmTier(partnerId: string): Promise<"BASIC" | "PRO"> {
+    const storefront = await (this.prisma as any).partnerStorefront.findUnique({
+      where: { partnerId },
+      select: { status: true, entitlementStatus: true },
+    });
+    if (storefront?.status === "ACTIVE" && storefront?.entitlementStatus === "ACTIVE") {
+      return "PRO";
+    }
+    return "BASIC";
+  }
+
+  /**
+   * Extract partnerId from authenticated actor context.
+   */
+  private assertPartnerActor(actor?: { partnerId?: string | null }): string {
+    if (!actor?.partnerId) {
+      throw new ForbiddenException("Partner account required for partner CRM operations");
+    }
+    return actor.partnerId;
+  }
+
+  /**
+   * Step 3.5C — Three-context customer list.
+   * - BASIC: customers from marketplace orders (sellerPartnerId = partnerId)
+   * - PRO: customers from PartnerCustomerRelation + marketplace orders
+   * Server-scoped: actor.partnerId is the ONLY source of partner scope.
+   */
+  async listPartnerCustomers(
+    partnerActor: { partnerId?: string | null },
+    query: CustomerListQuery,
+  ) {
+    const partnerId = this.assertPartnerActor(partnerActor);
+    const page = Math.max(1, query.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+    const tier = await this.getCrmTier(partnerId);
+
+    if (tier === "BASIC") {
+      // Marketplace Basic: customers from own marketplace orders
+      const orderWhere: any = { sellerPartnerId: partnerId };
+      if (query.search) {
+        const s = query.search.toLowerCase();
+        orderWhere.customer = {
+          OR: [
+            { email: { contains: s, mode: "insensitive" } },
+            { firstName: { contains: s, mode: "insensitive" } },
+            { lastName: { contains: s, mode: "insensitive" } },
+            { companyName: { contains: s, mode: "insensitive" } },
+            { code: { contains: s, mode: "insensitive" } },
+          ],
+        };
+      }
+
+      // Get distinct customer IDs from partner's orders
+      const orderCustomers = await this.prisma.order.findMany({
+        where: orderWhere,
+        select: { customerId: true },
+        distinct: ["customerId"],
+      });
+      const customerIds = orderCustomers
+        .map((o) => o.customerId)
+        .filter((id): id is string => id !== null);
+
+      if (customerIds.length === 0) {
+        return { items: [], total: 0, page, pageSize, tier };
+      }
+
+      const customerWhere: any = { id: { in: customerIds } };
+      if (query.status) customerWhere.status = query.status;
+
+      const [customers, total] = await Promise.all([
+        this.prisma.customer.findMany({
+          where: customerWhere,
+          orderBy: { createdAt: "desc" },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
+        this.prisma.customer.count({ where: customerWhere }),
+      ]);
+
+      return { items: customers, total, page, pageSize, tier };
+    }
+
+    // Storefront Pro: customers from PartnerCustomerRelation
+    const relationWhere: Prisma.PartnerCustomerRelationWhereInput = {
+      partnerId,
+      ...(query.status ? { status: query.status as EntityStatus } : {}),
+    };
+
+    const [relations, totalRelations] = await Promise.all([
+      this.prisma.partnerCustomerRelation.findMany({
+        where: relationWhere,
+        include: {
+          customer: {
+            select: {
+              id: true, code: true, type: true, firstName: true, lastName: true,
+              companyName: true, email: true, phone: true, status: true, createdAt: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.partnerCustomerRelation.count({ where: relationWhere }),
+    ]);
+
+    let items = relations.map((r) => ({
+      ...r.customer,
+      _relation: { id: r.id, lifecycle: r.lifecycle, leadSource: r.leadSource, tags: r.tags, notes: r.notes, assignedTo: r.assignedTo },
+    }));
+
+    if (query.search) {
+      const s = query.search.toLowerCase();
+      items = items.filter((item) =>
+        item.email.toLowerCase().includes(s) ||
+        (item.firstName ?? '').toLowerCase().includes(s) ||
+        (item.lastName ?? '').toLowerCase().includes(s) ||
+        (item.companyName ?? '').toLowerCase().includes(s) ||
+        item.code.toLowerCase().includes(s),
+      );
+    }
+
+    return { items, total: totalRelations, page, pageSize, tier };
+  }
+
+  /**
+   * Step 3.5C — Three-context customer detail.
+   * - BASIC: customer identity + own marketplace orders/bookings/payments
+   * - PRO: full Customer 360 with relation fields
+   * Server-scoped: actor.partnerId is the ONLY source of partner scope.
+   */
+  async getPartnerCustomerDetail(
+    customerId: string,
+    partnerActor: { partnerId?: string | null },
+  ) {
+    const partnerId = this.assertPartnerActor(partnerActor);
+    const tier = await this.getCrmTier(partnerId);
+
+    // Verify access: Basic checks orders, Pro checks relation
+    if (tier === "BASIC") {
+      const orderCount = await this.prisma.order.count({
+        where: { customerId, sellerPartnerId: partnerId },
+      });
+      if (orderCount === 0) throw new NotFoundError(`Customer ${customerId} not found in partner marketplace`);
+    } else {
+      const relation = await this.prisma.partnerCustomerRelation.findUnique({
+        where: { partnerId_customerId: { partnerId, customerId } },
+      });
+      if (!relation) throw new NotFoundError(`Customer ${customerId} not found in partner CRM`);
+    }
+
+    // Get customer (basic identity)
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: {
+        id: true, code: true, type: true, firstName: true, lastName: true,
+        companyName: true, email: true, phone: true, status: true, createdAt: true,
+      },
+    });
+    if (!customer) throw new NotFoundError(`Customer ${customerId} not found`);
+
+    // Partner-scoped orders: only orders where sellerPartnerId = actor.partnerId
+    const orders = await this.prisma.order.findMany({
+      where: { customerId, sellerPartnerId: partnerId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true, code: true, number: true, status: true, paymentStatus: true,
+        amount: true, paidAmount: true, currency: true, createdAt: true,
+      },
+    });
+
+    const orderIds = orders.map((o) => o.id);
+
+    const [bookings, payments, totalOrders, totalBookings, totalPayments] = await Promise.all([
+      orderIds.length > 0
+        ? this.prisma.booking.findMany({
+            where: { orderId: { in: orderIds } },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+            select: { id: true, code: true, status: true, amount: true, currency: true, createdAt: true },
+          })
+        : Promise.resolve([]),
+      orderIds.length > 0
+        ? this.prisma.payment.findMany({
+            where: { orderId: { in: orderIds } },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+            select: { id: true, code: true, status: true, amount: true, currency: true, createdAt: true },
+          })
+        : Promise.resolve([]),
+      this.prisma.order.count({ where: { customerId, sellerPartnerId: partnerId } }),
+      orderIds.length > 0
+        ? this.prisma.booking.count({ where: { orderId: { in: orderIds } } })
+        : Promise.resolve(0),
+      orderIds.length > 0
+        ? this.prisma.payment.count({ where: { orderId: { in: orderIds } } })
+        : Promise.resolve(0),
+    ]);
+
+    const result: any = {
+      ...customer,
+      orders, bookings, payments,
+      summary: { totalOrders, totalBookings, totalPayments },
+      _tier: tier,
+    };
+
+    // Pro-only: relation fields
+    if (tier === "PRO") {
+      const relation = await this.prisma.partnerCustomerRelation.findUnique({
+        where: { partnerId_customerId: { partnerId, customerId } },
+      });
+      if (relation) {
+        result._relation = {
+          id: relation.id, lifecycle: relation.lifecycle, leadSource: relation.leadSource,
+          tags: relation.tags, notes: relation.notes, assignedTo: relation.assignedTo,
+        };
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Step 3.5C — Storefront Pro direct customer intake.
+   * GATED: only PRO tier can use direct intake.
+   * Creates canonical Customer (if needed) + PartnerCustomerRelation in one transaction.
+   * Server-scoped: actor.partnerId is the ONLY source of partner scope.
+   */
+  async intakePartnerCustomer(
+    partnerActor: { partnerId?: string | null },
+    input: {
+      firstName?: string;
+      lastName?: string;
+      companyName?: string;
+      email: string;
+      phone?: string;
+      leadSource?: string;
+      lifecycle?: string;
+      tags?: string[];
+      notes?: string;
+      assignedTo?: string;
+    },
+    actorUsername?: string,
+  ) {
+    const partnerId = this.assertPartnerActor(partnerActor);
+    const tier = await this.getCrmTier(partnerId);
+    if (tier !== "PRO") {
+      throw new ForbiddenException("Direct customer intake requires Storefront Pro CRM entitlement");
+    }
+
+    const partner = await this.prisma.partner.findUnique({ where: { id: partnerId }, select: { id: true } });
+    if (!partner) throw new NotFoundError(`Partner ${partnerId} not found`);
+
+    const email = normalizeEmail(input.email);
+
+    return this.prisma.$transaction(async (tx) => {
+      let customerId: string;
+      let customerCreated = false;
+
+      const existing = await tx.customer.findUnique({ where: { email }, select: { id: true } });
+      if (existing) {
+        customerId = existing.id;
+      } else {
+        const code = await this.ids.nextCode(tx, "CUS");
+        const customer = await tx.customer.create({
+          data: {
+            code,
+            type: input.companyName ? "COMPANY" : "PERSON",
+            firstName: input.firstName ?? null,
+            lastName: input.lastName ?? null,
+            companyName: input.companyName ?? null,
+            email,
+            phone: input.phone ?? null,
+            status: "ACTIVE",
+            version: 1,
+          },
+          select: { id: true, code: true },
+        });
+        customerId = customer.id;
+        customerCreated = true;
+
+        await tx.customerHistory.create({
+          data: {
+            customerId: customer.id,
+            action: "created",
+            to: "ACTIVE",
+            actorId: partnerId,
+            actorName: actorUsername ?? null,
+            comment: "Storefront Pro direct intake (Step 3.5C)",
+          },
+        });
+
+        await this.eventBus.emit(tx, {
+          aggregateType: "Customer",
+          aggregateId: customer.id,
+          eventType: DomainEvents.CustomerCreated,
+          payload: {
+            customerId: customer.id,
+            code: customer.code,
+            name: input.companyName ?? `${input.firstName ?? ""} ${input.lastName ?? ""}`.trim(),
+          } as CustomerEventPayload,
+        });
+      }
+
+      const existingRelation = await tx.partnerCustomerRelation.findUnique({
+        where: { partnerId_customerId: { partnerId, customerId } },
+      });
+      if (existingRelation) {
+        throw new ConflictError(
+          customerCreated
+            ? `Customer created but already has relation with this partner`
+            : `Customer already exists in partner CRM`,
+        );
+      }
+
+      const relation = await tx.partnerCustomerRelation.create({
+        data: {
+          partnerId, customerId,
+          leadSource: input.leadSource ?? "DIRECT",
+          lifecycle: input.lifecycle ?? "LEAD",
+          tags: input.tags ?? [],
+          notes: input.notes ?? null,
+          assignedTo: input.assignedTo ?? null,
+        },
+      });
+
+      await tx.partnerCustomerRelationHistory.create({
+        data: {
+          relationId: relation.id,
+          action: "created",
+          to: "ACTIVE",
+          actorId: partnerId,
+          actorName: actorUsername ?? null,
+          comment: `Storefront Pro direct intake (leadSource: ${input.leadSource ?? "DIRECT"})`,
+        },
+      });
+
+      return { customerId, relationId: relation.id, customerCreated, tier };
+    });
+  }
+
+  /**
+   * Step 3.5C — Storefront Pro relation update.
+   * GATED: only PRO tier can update relation fields.
+   * Server-scoped: actor.partnerId is the ONLY source of partner scope.
+   */
+  async updatePartnerRelation(
+    relationId: string,
+    partnerActor: { partnerId?: string | null },
+    input: { status?: EntityStatus; lifecycle?: string; tags?: string[]; notes?: string; assignedTo?: string },
+    actorUsername?: string,
+  ) {
+    const partnerId = this.assertPartnerActor(partnerActor);
+    const tier = await this.getCrmTier(partnerId);
+    if (tier !== "PRO") {
+      throw new ForbiddenException("Relation management requires Storefront Pro CRM entitlement");
+    }
+
+    const existing = await this.prisma.partnerCustomerRelation.findUnique({ where: { id: relationId } });
+    if (!existing) throw new NotFoundError(`Partner-Customer relation ${relationId} not found`);
+
+    if (existing.partnerId !== partnerId) {
+      throw new ForbiddenException(`Relation ${relationId} does not belong to partner ${partnerId}`);
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const relation = await tx.partnerCustomerRelation.update({
+        where: { id: relationId },
+        data: {
+          status: input.status ?? existing.status,
+          lifecycle: input.lifecycle ?? existing.lifecycle,
+          tags: input.tags ?? existing.tags,
+          notes: input.notes ?? existing.notes,
+          assignedTo: input.assignedTo ?? existing.assignedTo,
+          version: { increment: 1 },
+        },
+      });
+
+      await tx.partnerCustomerRelationHistory.create({
+        data: {
+          relationId, action: "update",
+          from: existing.status, to: relation.status,
+          fields: input as Prisma.InputJsonValue,
+          actorId: partnerId,
+          actorName: actorUsername ?? null,
+          comment: "Storefront Pro CRM relation updated (Step 3.5C)",
         },
       });
 

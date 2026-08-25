@@ -860,6 +860,25 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.create.form.email": { ru: "Email *", az: "E-poçt *", en: "Email *" },
   "crm.create.form.phone": { ru: "Телефон", az: "Telefon", en: "Phone" },
   "crm.create.form.submit": { ru: "Создать клиента", az: "Müştəri yaratmaq", en: "Create customer" },
+  // Step 3.5C — Three-Context CRM
+  "crm.title_pro": { ru: "CRM — Storefront Pro", az: "CRM — Storefront Pro", en: "CRM — Storefront Pro" },
+  "crm.title_basic": { ru: "Управление клиентами", az: "Müştəri idarəetməsi", en: "Customer Management" },
+  "crm.context.platform": { ru: "Платформа", az: "Platforma", en: "Platform" },
+  "crm.context.marketplace_basic": { ru: "Marketplace — Базовый", az: "Marketplace — Əsas", en: "Marketplace — Basic" },
+  "crm.context.storefront_pro": { ru: "Storefront — Полный CRM", az: "Storefront — Tam CRM", en: "Storefront — Full CRM" },
+  "crm.my_customers": { ru: "Мои клиенты", az: "Müştərilərim", en: "My customers" },
+  "crm.add_customer": { ru: "Добавить клиента", az: "Müştəri əlavə et", en: "Add customer" },
+  "crm.col.lifecycle": { ru: "Этап", az: "Mərhələ", en: "Lifecycle" },
+  "crm.col.lead_source": { ru: "Источник", az: "Mənbə", en: "Lead source" },
+  "crm.col.tags": { ru: "Теги", az: "Teqlər", en: "Tags" },
+  "crm.col.notes": { ru: "Заметки", az: "Qeydlər", en: "Notes" },
+  "crm.detail.your_relation": { ru: "Ваша связь с клиентом", az: "Müştəri ilə əlaqəniz", en: "Your customer relation" },
+  "crm.intake.lead_source": { ru: "Источник привлечения", az: "Cəlb mənbəyi", en: "Lead source" },
+  "crm.intake.notes": { ru: "Заметки", az: "Qeydlər", en: "Notes" },
+  "crm.intake.submit": { ru: "Добавить клиента", az: "Müştəri əlavə et", en: "Add customer" },
+  "crm.lead_source.direct": { ru: "Прямой контакт", az: "Birbaşa əlaqə", en: "Direct contact" },
+  "crm.lead_source.marketplace": { ru: "Marketplace", az: "Marketplace", en: "Marketplace" },
+  "crm.lead_source.referral": { ru: "Рекомендация", az: "Tövsiyə", en: "Referral" },
 };
 
 /** Локализованная строка по ключу (fallback — сам ключ, затем default locale). */
