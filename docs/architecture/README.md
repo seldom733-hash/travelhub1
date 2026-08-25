@@ -12,6 +12,7 @@
 | `architecture/README.md` | Этот индекс |
 | `architecture/temporal-readiness.md` | Temporal & Analytics Readiness (Step 1.13A): taxonomy, source-of-truth matrix, gaps |
 | `architecture/booking-commercial-terms-agreement-versioning-audit.md` | Booking Commercial Terms, Payment Schedules, Agreement Versioning & Audit (Phase 3 additive reconciliation) |
+| `architecture/supplier-settlement-balance-payout-transparency-audit.md` | Supplier Settlement Terms / Balance / Payout Release / Trust & Transparency (Phase 3 additive amendment) |
 | `adr/ADR-0001-modular-monolith.md` | Выбор архитектуры и стека |
 | `adr/ADR-0002-auth-rbac.md` | Аутентификация и RBAC (Phase 2) |
 | `adr/ADR-0009-correlation-request-context.md` | Correlation / Request ID infrastructure (Step 1.15) |

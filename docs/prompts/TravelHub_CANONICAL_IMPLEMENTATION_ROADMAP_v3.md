@@ -1292,6 +1292,130 @@ pricing.
 **Implementation status:** NOT STARTED (PLANNED).
 Production code НЕ изменён. Runtime НЕ реализован.
 
+## Supplier Settlement, Balance & Payout Transparency Foundation (Phase 3 Additive Amendment)
+
+**Статус: PLANNED — NOT STARTED**
+**Дата записи:** 2026-08-25
+**Тип:** Future capability — documentation-only reconciliation (НЕ production implementation)
+**Архитектурный документ:** `docs/architecture/supplier-settlement-balance-payout-transparency-audit.md`
+**Prompt:** `docs/prompts/PHASE_3_SUPPLIER_SETTLEMENT_BALANCE_PAYOUT_TRUST_ARCHITECTURE_RECONCILIATION.md`
+
+Canonical invariant: Customer Payment Terms ≠ Supplier Settlement Terms ≠ Supplier Payout.
+Two immutable snapshots per booking. Settlement policy versioned.
+Customer installments do NOT automatically define supplier payouts.
+Supplier Trust & Transparency Contract: no hidden balances, no unexplained holds.
+
+· **Step S.1 --- Supplier Settlement Policy Model** ⏳ PLANNED
+Supplier settlement policy: release conditions, commission rules, reserve rules,
+payout cadence, refund/chargeback responsibility, adjustment rules.
+Business-defined per partner contract/category/tier.
+Зависимости: Finance (2.10B exists).
+
+· **Step S.2 --- Settlement Policy Versioning** ⏳ PLANNED
+Settlement policy versioned. Future policy changes do NOT rewrite historical bookings.
+Snapshot at booking time.
+Зависимости: S.1.
+
+· **Step S.3 --- Booking Settlement Terms Snapshot** ⏳ PLANNED
+Immutable snapshot (SupplierSettlementTermsSnapshot): bookingId, orderId, supplierId,
+partnerAgreementVersion, settlementPolicyVersion, commission rule, entitlement rule,
+release conditions, reserve rule, payout cadence, refund/chargeback responsibility,
+currency, effectiveAt.
+Зависимости: S.2, Booking Commercial Snapshot (F.5).
+
+· **Step S.4 --- Supplier Entitlement Engine** ⏳ PLANNED
+Gross → Commission → Refund/Chargeback adjustments → Net Entitlement.
+Append-only ledger entries. Balance = projection from ledger.
+Зависимости: S.3, Finance (2.12 Payment, 2.12E Commission).
+
+· **Step S.5 --- Release Conditions / Milestones** ⏳ PLANNED
+Configurable release conditions: supplier confirmed, customer paid, service milestone,
+service completed, refund window passed, manual review, contract-specific.
+Early release / working capital support.
+Зависимости: S.4.
+
+· **Step S.6 --- Reserve / Holdback** ⏳ PLANNED
+Reserve/holdback: refund exposure, chargeback exposure, risk policy, contractual.
+Every hold: amount, reason, source, releaseCondition, expectedReleaseAt, policy.
+Зависимости: S.5.
+
+· **Step S.7 --- Settlement Financial Ledger** ⏳ PLANNED
+Append-only supplier financial ledger: accrual, commission, reserve, release,
+adjustment, payout. Balance = projection. No manual balance mutations.
+Зависимости: S.4, Ledger (2.10A exists).
+
+· **Step S.8 --- Supplier Balance Projection** ⏳ PLANNED
+Outstanding balance = Awaiting + Available + Reserve + Processing.
+Multi-currency: native currency + canonical FX conversion.
+Negative balance / receivable / future payout offset.
+Зависимости: S.7.
+
+· **Step S.9 --- Payout Eligibility** ⏳ PLANNED
+Payout eligibility: release conditions satisfied, no active holds, eligible amount > 0.
+Authoritative payout-eligibility computation from ledger.
+Зависимости: S.5, S.7.
+
+· **Step S.10 --- Payout Lifecycle** ⏳ PLANNED
+Payout lifecycle: ELIGIBLE → INITIATED → PROCESSING → COMPLETED | FAILED.
+Actual PSP execution deferred to PSP integration (2.12B).
+Logical payout can be designed before real PSP.
+Зависимости: S.9, PSP (2.12B — BLOCKED).
+
+· **Step S.11 --- Adjustments / Negative Balance** ⏳ PLANNED
+Refund/chargeback/commission corrections/authorized manual adjustments.
+Negative balance: future payout offset. Historical payout immutable.
+Зависимости: S.7, S.10.
+
+· **Step S.12 --- Supplier Settlement Statement** ⏳ PLANNED
+Period statement: opening balance, accruals, commissions, reserves, releases,
+adjustments, payouts, closing balance. Generated from canonical ledger.
+Export/download capability.
+Зависимости: S.7, S.8.
+
+· **Step S.13 --- Supplier Payout Forecast** ⏳ PLANNED
+Forecast: available now, expected 7 days, 8–30 days, depends on conditions.
+Unknown dates: show condition, not false precise date.
+Зависимости: S.8, S.9.
+
+· **Step S.14 --- Partner Finance Visibility** ⏳ PLANNED
+Partner Finance center: balance, upcoming payouts, payout history, settlement ledger,
+statements, adjustments, reserve, booking/order drill-down.
+Supplier Trust & Transparency: no hidden balances, every hold explained.
+Зависимости: S.8–S.13, Partner workspace.
+
+· **Step S.15 --- Platform Settlement Monitoring** ⏳ PLANNED
+Platform Command Center: Outstanding Supplier Balance, Available for Payout,
+Awaiting Release, Reserve, Payout Processing, Accrued/Paid (flow).
+Reconciliation: PIT components sum to Outstanding.
+Зависимости: S.8, S.14.
+
+· **Step S.16 --- Platform Payout Aging / Liquidity View** ⏳ PLANNED
+Aging buckets: Today/1–3/4–7/8–30/>30/Overdue.
+Liquidity: supplier liabilities, payable, upcoming, overdue.
+Operational liquidity planning ≠ free cash.
+Зависимости: S.15.
+
+· **Step S.17 --- CRM / Order / Booking Read Models** ⏳ PLANNED
+CRM summary: settlement status, available, paid, outstanding.
+Order/Booking detail: customer payment + supplier settlement dual blocks.
+CRM = consumer, NOT authority.
+Зависимости: S.14, CRM Step 3.5.
+
+· **Step S.18 --- Decision Signals** ⏳ PLANNED
+Future signals: payout overdue, reserve high, payout failure, negative balance,
+reconciliation mismatch, liquidity concentration.
+Evidence-based authority.
+Зависимости: S.15, Decision Queue infrastructure.
+
+· **Step S.19 --- Security / Audit / Reconciliation Closure** ⏳ PLANNED
+RBAC: PLATFORM Finance/Admin, PARTNER own-scope only.
+No cross-partner visibility. No IDOR. No frontend-only financial authority.
+Audit: all settlement events traceable. Reconciliation invariants proven.
+Зависимости: S.1–S.18.
+
+**Implementation status:** NOT STARTED (PLANNED).
+Production code НЕ изменён. DB schema НЕ изменён. Runtime НЕ реализован.
+
 ## Moderation / Communication
 
 · **Step 3.36 --- Moderation Center Full**\
