@@ -35,7 +35,7 @@ function deriveBookingDelayActions(
       actionType: "NAVIGATE",
       target: {
         type: "BOOKING",
-        route: "/bookings",
+        route: "/app/bookings",
         filters: { status: "CONFIRMED", overdue: "true" },
       },
       requiredPermission: "booking.read",
@@ -59,7 +59,7 @@ function deriveFailedPaymentActions(
       actionType: "NAVIGATE",
       target: {
         type: "PAYMENT",
-        route: "/payments",
+        route: "/app/orders",
         filters: { status: "FAILED" },
       },
       requiredPermission: "finance.payment.read",
@@ -83,7 +83,7 @@ function deriveCancellationActions(
       actionType: "NAVIGATE",
       target: {
         type: "ORDER",
-        route: "/orders",
+        route: "/app/orders",
         filters: { status: "CANCELLED" },
       },
       requiredPermission: "order.read",
@@ -110,7 +110,7 @@ function derivePendingRefundActions(
       actionType: "NAVIGATE",
       target: {
         type: "REFUND",
-        route: "/payments",
+        route: "/app/orders",
         filters: { refundStatus: "PENDING" },
       },
       requiredPermission: "finance.refund.read",
@@ -134,7 +134,7 @@ function deriveUpcomingBookingActions(
       actionType: "NAVIGATE",
       target: {
         type: "BOOKING",
-        route: "/bookings",
+        route: "/app/bookings",
         filters: { upcoming: "true" },
       },
       requiredPermission: "booking.read",
@@ -161,7 +161,7 @@ function deriveServicesWithoutSalesActions(
       actionType: "NAVIGATE",
       target: {
         type: "PRODUCT",
-        route: "/products",
+        route: "/app/catalog",
         filters: { status: "ACTIVE", unsold: "true" },
       },
       requiredPermission: "catalog.product.read",
@@ -182,7 +182,7 @@ function deriveServicesWithoutSalesActions(
       actionType: "REVIEW",
       target: {
         type: "PRODUCT",
-        route: "/products",
+        route: "/app/catalog",
         filters: { status: "ACTIVE", availability: "none" },
       },
       requiredPermission: "catalog.availability.write",
