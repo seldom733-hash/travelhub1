@@ -24,6 +24,10 @@ class ListBookingsQuery {
   search?: string;
 
   @IsOptional()
+  @IsString()
+  upcoming?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)

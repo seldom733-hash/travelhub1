@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type Order, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
@@ -18,13 +18,12 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-red-600 hover:bg-red-700", only: ["NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "PROBLEM", "SUSPENDED"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-export default function OrdersPage() {
+function OrdersContent({ initialStatus }: { initialStatus: string }) {
   const [data, setData] = useState<Page<Order> | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
   const [bookings, setBookings] = useState<{ id: string; code: string; status: string }[]>([]);
-  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [statusFilter] = useState(() => searchParams.get("status") ?? "");
+  const [statusFilter] = useState(initialStatus);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Ролевой UI: доступные команды определяются granular permissions (RBAC Matrix §4).
@@ -266,5 +265,18 @@ export default function OrdersPage() {
         </aside>
       )}
     </div>
+  );
+}
+
+function OrdersWithParams() {
+  const sp = useSearchParams();
+  return <OrdersContent initialStatus={sp.get("status") ?? ""} />;
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+      <OrdersWithParams />
+    </Suspense>
   );
 }

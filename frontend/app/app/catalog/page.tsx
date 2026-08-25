@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type Page, type Product } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
@@ -22,12 +22,11 @@ const PRODUCT_TYPES = [
   { code: "PHOTOGRAPHER", title: "Фотограф" },
 ];
 
-export default function CatalogPage() {
+function CatalogContent({ initialStatus }: { initialStatus: string }) {
   const [data, setData] = useState<Page<Product> | null>(null);
   const [selected, setSelected] = useState<Product | null>(null);
-  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState(() => searchParams.get("status") ?? "");
+  const [status, setStatus] = useState(initialStatus);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Ролевой UI: публикация — catalog.product.publish; создание — catalog.product.write (матрица: ADMIN/MODERATOR).
@@ -474,5 +473,18 @@ export default function CatalogPage() {
         </aside>
       )}
     </div>
+  );
+}
+
+function CatalogWithParams() {
+  const sp = useSearchParams();
+  return <CatalogContent initialStatus={sp.get("status") ?? ""} />;
+}
+
+export default function CatalogPage() {
+  return (
+    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+      <CatalogWithParams />
+    </Suspense>
   );
 }

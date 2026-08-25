@@ -626,12 +626,13 @@ export class DashboardService {
     // Run all detectors to populate/update DecisionSignals
     await this.decisionSignalService.runDetectors(this.detectors);
 
-    // Query active signals (OPEN + ACKNOWLEDGED) for the queue
-    const activeSignals = await (this.prisma as any).decisionSignal.findMany({
-      where: { status: { in: ["OPEN", "ACKNOWLEDGED"] } },
+    // Query ALL signals (active + historical) for the queue
+    const allQueueSignals = await (this.prisma as any).decisionSignal.findMany({
+      where: { status: { in: ["OPEN", "ACKNOWLEDGED", "RESOLVED", "DISMISSED"] } },
       orderBy: [{ status: "asc" }, { lastDetectedAt: "desc" }],
-      take: 100,
+      take: 200,
     });
+    const activeSignals = allQueueSignals.filter((s: any) => s.status === "OPEN" || s.status === "ACKNOWLEDGED");
 
     // Query counts for summary
     const [openCount, ackCount, totalActive] = await Promise.all([
@@ -646,8 +647,8 @@ export class DashboardService {
       (s: any) => s.status === "OPEN" && new Date(s.firstDetectedAt) < slaThreshold,
     ).length;
 
-    // Build queue items from signals
-    const queueSignals = activeSignals.map((s: any) => {
+    // Build queue items from ALL signals (active + historical)
+    const queueSignals = allQueueSignals.map((s: any) => {
       const evidence = (s.evidence as any[]) ?? [];
       // i18n: send keys instead of hardcoded locale strings
       const titleKey = DashboardService.SIGNAL_TITLE_KEYS[s.code] ?? `cc.signal.title.${s.code}`;

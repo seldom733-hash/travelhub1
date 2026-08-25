@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type Booking, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
@@ -18,14 +18,12 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-slate-600 hover:bg-slate-700", only: ["NEW", "PREPARING_REQUEST", "SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION", "CONFIRMED", "IN_SERVICE"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-export default function BookingsPage() {
+function BookingsContent({ upcomingOnly }: { upcomingOnly: boolean }) {
   const [data, setData] = useState<Page<Booking> | null>(null);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [orderRef, setOrderRef] = useState<{ code: string; number: string; status: string } | null>(null);
-  const searchParams = useSearchParams();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const upcomingOnly = searchParams.get("upcoming") === "true";
   // Ролевой UI: права на команды Booking (RBAC Matrix §4).
   const canSend = useCan("booking.send_supplier");
   const canConfirm = useCan("booking.confirm");
@@ -231,5 +229,18 @@ export default function BookingsPage() {
         </aside>
       )}
     </div>
+  );
+}
+
+function BookingsWithParams() {
+  const sp = useSearchParams();
+  return <BookingsContent upcomingOnly={sp.get("upcoming") === "true"} />;
+}
+
+export default function BookingsPage() {
+  return (
+    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+      <BookingsWithParams />
+    </Suspense>
   );
 }
