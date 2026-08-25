@@ -1112,11 +1112,14 @@ export class DashboardService {
       `,
       // Outstanding: sum of (invoice.total - paid) for OPEN invoices
       this.prisma.$queryRaw<{ total: string }[]>`
-        SELECT COALESCE(SUM(i."totalAmount") - COALESCE((
-          SELECT SUM(p2.amount) FROM catalog."SubscriptionPayment" p2
-          WHERE p2."invoiceId" = i.id AND p2.status = 'SUCCEEDED'
-        ), 0), 0) as total
+        SELECT COALESCE(SUM(i."totalAmount" - COALESCE(paid.total_paid, 0)), 0) as total
         FROM catalog."SubscriptionInvoice" i
+        LEFT JOIN (
+          SELECT "invoiceId", SUM(amount) as total_paid
+          FROM catalog."SubscriptionPayment"
+          WHERE status = 'SUCCEEDED'
+          GROUP BY "invoiceId"
+        ) paid ON paid."invoiceId" = i.id
         WHERE i.status = 'OPEN'
       `,
     ]);
