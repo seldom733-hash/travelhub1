@@ -7,6 +7,33 @@ import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError } from "../../shared/errors";
 import { normalizeEmail } from "../../shared/field-validation";
 
+// ── Shared sorting helpers ───────────────────────────────────────────────────
+type SortDirection = 'asc' | 'desc';
+
+function parseSortDirection(raw?: string): SortDirection {
+  return raw?.toLowerCase() === 'asc' ? 'asc' : 'desc';
+}
+
+function buildSortClause(
+  sortBy: string | undefined,
+  sortDirection: string | undefined,
+  allowlist: Record<string, string>,
+  defaultSort: Record<string, SortDirection>,
+): Record<string, SortDirection>[] {
+  if (!sortBy || !(sortBy in allowlist)) {
+    // Default: [{ createdAt: 'desc' }, { id: 'desc' }]
+    return [
+      ...Object.entries(defaultSort).map(([k, v]) => ({ [k]: v })),
+      { id: 'desc' },
+    ];
+  }
+  const dir = parseSortDirection(sortDirection);
+  return [{ [allowlist[sortBy]]: dir }, { id: 'desc' }];
+}
+
+/** Stable tie-breaker: always append id for deterministic pagination. */
+const TIE_BREAKER = { id: 'desc' as SortDirection };
+
 export interface CreateCustomerInput {
   type?: CustomerType;
   firstName?: string;
@@ -36,6 +63,8 @@ export interface CustomerListQuery {
   status?: string;
   page?: number;
   pageSize?: number;
+  sortBy?: string;
+  sortDirection?: string;
 }
 
 export interface EnsureBuyerCustomerInput {
@@ -147,10 +176,17 @@ export class CrmService {
         : {}),
     };
 
+    const orderBy = buildSortClause(
+      query.sortBy,
+      query.sortDirection,
+      { code: 'code', name: 'companyName', email: 'email', status: 'status', createdAt: 'createdAt' },
+      { createdAt: 'desc' },
+    );
+
     const [items, total] = await Promise.all([
       this.prisma.customer.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -540,10 +576,17 @@ export class CrmService {
         : {}),
     };
 
+    const orderBy = buildSortClause(
+      query.sortBy,
+      query.sortDirection,
+      { code: 'code', name: 'name', email: 'contactEmail', country: 'countryCode', status: 'status', createdAt: 'createdAt' },
+      { name: 'asc' },
+    );
+
     const [items, total] = await Promise.all([
       this.prisma.partner.findMany({
         where,
-        orderBy: { name: "asc" },
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -553,7 +596,7 @@ export class CrmService {
     return { items, total, page, pageSize };
   }
 
-  async getPartner(id: string) {
+  async getPartner(id: string, sort?: { sortBy?: string; sortDirection?: string }) {
     const partner = await this.prisma.partner.findUnique({
       where: { id },
       include: {
@@ -568,7 +611,12 @@ export class CrmService {
     // Aggregate: products (services) owned by this partner
     const products = await this.prisma.product.findMany({
       where: { partnerId: id },
-      orderBy: { createdAt: "desc" },
+      orderBy: buildSortClause(
+        sort?.sortBy,
+        sort?.sortDirection,
+        { code: 'code', name: 'title', type: 'type', status: 'status', createdAt: 'createdAt' },
+        { createdAt: 'desc' },
+      ),
       take: 20,
       select: { id: true, code: true, title: true, type: true, status: true, slug: true, createdAt: true },
     });
@@ -577,7 +625,12 @@ export class CrmService {
     // Aggregate: orders where this partner is seller
     const orders = await this.prisma.order.findMany({
       where: { sellerPartnerId: id },
-      orderBy: { createdAt: "desc" },
+      orderBy: buildSortClause(
+        sort?.sortBy,
+        sort?.sortDirection,
+        { code: 'code', createdAt: 'createdAt', amount: 'amount', status: 'status' },
+        { createdAt: 'desc' },
+      ),
       take: 20,
       select: { id: true, code: true, number: true, status: true, paymentStatus: true, amount: true, currency: true, customerId: true, createdAt: true },
     });
@@ -588,7 +641,12 @@ export class CrmService {
     const bookings = orderIds.length > 0
       ? await this.prisma.booking.findMany({
           where: { orderId: { in: orderIds } },
-          orderBy: { createdAt: "desc" },
+          orderBy: buildSortClause(
+            sort?.sortBy,
+            sort?.sortDirection,
+            { code: 'code', createdAt: 'createdAt', amount: 'amount', status: 'status' },
+            { createdAt: 'desc' },
+          ),
           take: 20,
           select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, createdAt: true },
         })
@@ -682,7 +740,7 @@ export class CrmService {
 
   // ── Customer Detail with related data (Step 3.5) ──────────────────────
 
-  async getCustomerDetail(id: string) {
+  async getCustomerDetail(id: string, sort?: { sortBy?: string; sortDirection?: string }) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
       include: {
@@ -699,7 +757,12 @@ export class CrmService {
     // Aggregate orders from direct customerId reference
     const orders = await this.prisma.order.findMany({
       where: { customerId: id },
-      orderBy: { createdAt: "desc" },
+      orderBy: buildSortClause(
+        sort?.sortBy,
+        sort?.sortDirection,
+        { code: 'code', name: 'number', createdAt: 'createdAt', amount: 'amount', status: 'status' },
+        { createdAt: 'desc' },
+      ),
       take: 20,
       select: { id: true, code: true, number: true, status: true, paymentStatus: true, amount: true, paidAmount: true, currency: true, createdAt: true },
     });
@@ -712,7 +775,12 @@ export class CrmService {
       orderIds.length > 0
         ? this.prisma.booking.findMany({
             where: { orderId: { in: orderIds } },
-            orderBy: { createdAt: "desc" },
+            orderBy: buildSortClause(
+              sort?.sortBy,
+              sort?.sortDirection,
+              { code: 'code', createdAt: 'createdAt', amount: 'amount', status: 'status' },
+              { createdAt: 'desc' },
+            ),
             take: 20,
             select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, productId: true, createdAt: true },
           })
@@ -720,7 +788,12 @@ export class CrmService {
       orderIds.length > 0
         ? this.prisma.payment.findMany({
             where: { orderId: { in: orderIds } },
-            orderBy: { createdAt: "desc" },
+            orderBy: buildSortClause(
+              sort?.sortBy,
+              sort?.sortDirection,
+              { code: 'code', paymentDate: 'paidAt', amount: 'amount', status: 'status' },
+              { createdAt: 'desc' },
+            ),
             take: 20,
             select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true, paidAt: true },
           })
@@ -748,7 +821,12 @@ export class CrmService {
       ? await Promise.all([
           this.prisma.refund.findMany({
             where: { paymentId: { in: paymentIds } },
-            orderBy: { createdAt: "desc" },
+            orderBy: buildSortClause(
+              sort?.sortBy,
+              sort?.sortDirection,
+              { code: 'code', refundDate: 'processedAt', amount: 'amount', status: 'status' },
+              { createdAt: 'desc' },
+            ),
             take: 20,
             select: { id: true, code: true, amount: true, currency: true, status: true, reason: true, paymentId: true, orderId: true, createdAt: true, processedAt: true },
           }),

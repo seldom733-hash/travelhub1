@@ -6,35 +6,61 @@ import Link from "next/link";
 import { api, type CustomerDetail, type CustomerPartner } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
+import SortableHeader, { type SortState, type SortDirection } from "@/components/SortableHeader";
 import { useLocale, t } from "@/lib/i18n";
 
 type Tab = "overview" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "history";
+
+function useQueryState() {
+  const [tab, setTab] = useState<Tab>("overview");
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get("tab");
+    if (tabParam && ["overview", "orders", "bookings", "payments", "partners", "refunds", "history"].includes(tabParam)) {
+      setTab(tabParam as Tab);
+    }
+    const sortByParam = params.get("sortBy");
+    const sortDirParam = params.get("sortDirection");
+    if (sortByParam) setSortBy(sortByParam);
+    if (sortDirParam && (sortDirParam === "asc" || sortDirParam === "desc")) setSortDirection(sortDirParam);
+  }, []);
+
+  const updateQuery = useCallback((updates: Record<string, string | null>) => {
+    const url = new URL(window.location.href);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null) {
+        url.searchParams.delete(key);
+      } else {
+        url.searchParams.set(key, value);
+      }
+    }
+    window.history.replaceState({}, "", url.toString());
+  }, []);
+
+  return { tab, sortBy, sortDirection, setTab, setSortBy, setSortDirection, updateQuery };
+}
 
 export default function Customer360Page() {
   const params = useParams();
   const locale = useLocale();
   const id = params.id as string;
+  const { tab, sortBy, sortDirection, setTab, setSortBy, setSortDirection, updateQuery } = useQueryState();
 
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [partners, setPartners] = useState<CustomerPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<Tab>("overview");
-
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const tabParam = searchParams.get("tab");
-    if (tabParam && ["overview", "orders", "bookings", "payments", "partners", "refunds", "history"].includes(tabParam)) {
-      setTab(tabParam as Tab);
-    }
-  }, []);
 
   const loadCustomer = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
+      const sortParam = sortBy ? `?sortBy=${sortBy}&sortDirection=${sortDirection}` : "";
       const [detail, partnersData] = await Promise.all([
-        api.get<CustomerDetail>(`/customers/${id}/detail`),
+        api.get<CustomerDetail>(`/customers/${id}/detail${sortParam}`),
         api.get<{ items: CustomerPartner[] }>(`/customers/${id}/partners`),
       ]);
       setCustomer(detail);
@@ -44,16 +70,23 @@ export default function Customer360Page() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, sortBy, sortDirection]);
 
   useEffect(() => { void loadCustomer(); }, [loadCustomer]);
 
   const handleTabChange = (newTab: Tab) => {
     setTab(newTab);
-    const url = new URL(window.location.href);
-    url.searchParams.set("tab", newTab);
-    window.history.replaceState({}, "", url.toString());
+    setSortBy(null);
+    updateQuery({ tab: newTab, sortBy: null, sortDirection: null });
   };
+
+  const handleSort = (field: string, direction: SortDirection) => {
+    setSortBy(field);
+    setSortDirection(direction);
+    updateQuery({ sortBy: field, sortDirection: direction });
+  };
+
+  const sortState: SortState | null = sortBy ? { sortBy, sortDirection } : null;
 
   const displayName = (c: { firstName?: string | null; lastName?: string | null; companyName?: string | null }) =>
     c.companyName ?? (`${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || "—");
@@ -122,16 +155,17 @@ export default function Customer360Page() {
             </>
           )}
 
-          {/* Orders — TABLE */}
+          {/* Orders — TABLE with sortable headers */}
           {tab === "orders" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">                    <tr>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.number", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.created_at", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.amount", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
+                    <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.number", locale)}</SortableHeader>
+                    <SortableHeader field="createdAt" currentSort={sortState} onSort={handleSort}>{t("crm.col.created_at", locale)}</SortableHeader>
+                    <SortableHeader field="amount" currentSort={sortState} onSort={handleSort} alignRight>{t("crm.col.amount", locale)}</SortableHeader>
+                    <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
@@ -149,16 +183,16 @@ export default function Customer360Page() {
             </div>
           )}
 
-          {/* Bookings — TABLE */}
+          {/* Bookings — TABLE with sortable headers */}
           {tab === "bookings" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.created_at", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.amount", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                    <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
+                    <SortableHeader field="createdAt" currentSort={sortState} onSort={handleSort}>{t("crm.col.created_at", locale)}</SortableHeader>
+                    <SortableHeader field="amount" currentSort={sortState} onSort={handleSort} alignRight>{t("crm.col.amount", locale)}</SortableHeader>
+                    <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
@@ -175,18 +209,18 @@ export default function Customer360Page() {
             </div>
           )}
 
-          {/* Payments — TABLE with business context */}
+          {/* Payments — TABLE with sortable headers and business context */}
           {tab === "payments" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.payment_code", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.payment_date", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.purpose", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.amount", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.method", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                    <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.payment_code", locale)}</SortableHeader>
+                    <SortableHeader field="paymentDate" currentSort={sortState} onSort={handleSort}>{t("crm.col.payment_date", locale)}</SortableHeader>
+                    <th className="px-4 py-2.5 font-medium text-[10px] uppercase tracking-wide text-slate-400">{t("crm.col.purpose", locale)}</th>
+                    <SortableHeader field="amount" currentSort={sortState} onSort={handleSort} alignRight>{t("crm.col.amount", locale)}</SortableHeader>
+                    <th className="px-4 py-2.5 font-medium text-[10px] uppercase tracking-wide text-slate-400">{t("crm.col.method", locale)}</th>
+                    <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
@@ -216,11 +250,11 @@ export default function Customer360Page() {
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.partner", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.detail.orders", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.detail.bookings", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.order_amount", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                    <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.partner", locale)}</SortableHeader>
+                    <SortableHeader field="orderCount" currentSort={sortState} onSort={handleSort} alignRight>{t("crm.detail.orders", locale)}</SortableHeader>
+                    <SortableHeader field="bookingCount" currentSort={sortState} onSort={handleSort} alignRight>{t("crm.detail.bookings", locale)}</SortableHeader>
+                    <SortableHeader field="amount" currentSort={sortState} onSort={handleSort} alignRight>{t("crm.col.order_amount", locale)}</SortableHeader>
+                    <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
@@ -238,19 +272,17 @@ export default function Customer360Page() {
             </div>
           )}
 
-          {/* Refunds — TABLE with business context */}
+          {/* Refunds — TABLE with sortable headers and business context */}
           {tab === "refunds" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.refund_code", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.refund_date", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.purpose", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.source_payment", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.amount", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.reason", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                    <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.refund_code", locale)}</SortableHeader>
+                    <SortableHeader field="refundDate" currentSort={sortState} onSort={handleSort}>{t("crm.col.refund_date", locale)}</SortableHeader>
+                    <th className="px-4 py-2.5 font-medium text-[10px] uppercase tracking-wide text-slate-400">{t("crm.col.purpose", locale)}</th>
+                    <SortableHeader field="amount" currentSort={sortState} onSort={handleSort} alignRight>{t("crm.col.amount", locale)}</SortableHeader>
+                    <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
@@ -264,18 +296,16 @@ export default function Customer360Page() {
                         ) : "—"}
                         {r.orderNumber && <span className="ml-1 text-slate-400">({r.orderNumber})</span>}
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-slate-500">{r.paymentCode ?? "—"}</td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{r.amount} {r.currency}</td>
-                      <td className="px-4 py-2.5 text-slate-500 max-w-[200px] truncate" title={r.reason ?? undefined}>{r.reason ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={r.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_refunds", locale)}</td></tr>}
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_refunds", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* History — TIMELINE */}
+          {/* History — TIMELINE (fixed chronological order, no sorting) */}
           {tab === "history" && (
             <div className="space-y-2">
               {customer.history.length > 0 ? customer.history.map((h) => (

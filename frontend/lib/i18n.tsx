@@ -106,6 +106,9 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "sort.newest": { ru: "Сначала новые", az: "Əvvəlcə yenilər", en: "Newest first" },
   "sort.price_asc": { ru: "Цена: по возрастанию", az: "Qiymət: artan", en: "Price: low to high" },
   "sort.price_desc": { ru: "Цена: по убыванию", az: "Qiymət: azalan", en: "Price: high to low" },
+  "sort.asc": { ru: "По возрастанию", az: "Artan", en: "Ascending" },
+  "sort.desc": { ru: "По убыванию", az: "Azalan", en: "Descending" },
+  "sort.sort_by": { ru: "Сортировка по", az: "Sıralama", en: "Sort by" },
 
   // category page
   "category.not_found_title": { ru: "Категория не найдена", az: "Kateqoriya tapılmadı", en: "Category not found" },

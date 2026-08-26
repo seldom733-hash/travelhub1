@@ -75,6 +75,14 @@ class ListCustomersQuery {
   @IsNumber()
   @Min(1)
   pageSize?: number;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  sortDirection?: string;
 }
 
 class CreateContactDto {
@@ -207,16 +215,22 @@ export class CrmController {
 
   @Get("partners/:id")
   @RequirePermissions("crm.partner.read")
-  getPartner(@Param("id") id: string) {
-    return this.crm.getPartner(id);
+  getPartner(
+    @Param("id") id: string,
+    @Query() query: { sortBy?: string; sortDirection?: string },
+  ) {
+    return this.crm.getPartner(id, { sortBy: query.sortBy, sortDirection: query.sortDirection });
   }
 
   // ── Step 3.5 — Customer Detail with relations ───────────────────────────
 
   @Get("customers/:id/detail")
   @RequirePermissions("crm.customer.read")
-  getCustomerDetail(@Param("id") id: string) {
-    return this.crm.getCustomerDetail(id);
+  getCustomerDetail(
+    @Param("id") id: string,
+    @Query() query: { sortBy?: string; sortDirection?: string },
+  ) {
+    return this.crm.getCustomerDetail(id, { sortBy: query.sortBy, sortDirection: query.sortDirection });
   }
 
   // ── Step 3.5 Round 5 — Customer commercial partners from transactional activity ──
