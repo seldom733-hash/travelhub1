@@ -19,6 +19,10 @@ class ListUsersQuery {
 
   @IsOptional()
   @IsString()
+  roleCode?: string;
+
+  @IsOptional()
+  @IsString()
   sortBy?: string;
 
   @IsOptional()

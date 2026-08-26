@@ -53,6 +53,7 @@ export default function Customer360Page() {
   const [partners, setPartners] = useState<CustomerPartner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [tabStatusFilter, setTabStatusFilter] = useState<string | undefined>(undefined);
 
   const loadCustomer = useCallback(async () => {
     try {
@@ -158,6 +159,18 @@ export default function Customer360Page() {
           {/* Orders — TABLE with sortable headers */}
           {tab === "orders" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
+                <select value={tabStatusFilter ?? ''} onChange={(e) => setTabStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+                  <option value="">Все статусы</option>
+                  <option value="NEW">Новый</option>
+                  <option value="IN_PROCESSING">В обработке</option>
+                  <option value="READY_FOR_BOOKING">Готов к бронированию</option>
+                  <option value="FULFILLED">Исполнен</option>
+                  <option value="CLOSED">Закрыт</option>
+                  <option value="CANCELLED">Отменён</option>
+                </select>
+                {tabStatusFilter && <button onClick={() => setTabStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+              </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
@@ -169,7 +182,7 @@ export default function Customer360Page() {
                   </tr>
                 </thead>
                 <tbody>
-                  {customer.orders.length > 0 ? customer.orders.map((o) => (
+                  {(tabStatusFilter ? customer.orders.filter(o => o.status === tabStatusFilter) : customer.orders).length > 0 ? (tabStatusFilter ? customer.orders.filter(o => o.status === tabStatusFilter) : customer.orders).map((o) => (
                     <tr key={o.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.code}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{o.number}</td>
@@ -177,7 +190,7 @@ export default function Customer360Page() {
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{o.amount} {o.currency}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_orders", locale)}</td></tr>}
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{tabStatusFilter ? 'Нет данных по выбранным фильтрам' : t("crm.detail.no_orders", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -186,6 +199,19 @@ export default function Customer360Page() {
           {/* Bookings — TABLE with sortable headers */}
           {tab === "bookings" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
+                <select value={tabStatusFilter ?? ''} onChange={(e) => setTabStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+                  <option value="">Все статусы</option>
+                  <option value="NEW">Новое</option>
+                  <option value="SENT_TO_SUPPLIER">Отправлено</option>
+                  <option value="AWAITING_CONFIRMATION">Ожидает</option>
+                  <option value="CONFIRMED">Подтверждено</option>
+                  <option value="IN_SERVICE">В сервисе</option>
+                  <option value="COMPLETED">Завершено</option>
+                  <option value="CANCELLED">Отменено</option>
+                </select>
+                {tabStatusFilter && <button onClick={() => setTabStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+              </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
@@ -196,14 +222,14 @@ export default function Customer360Page() {
                   </tr>
                 </thead>
                 <tbody>
-                  {customer.bookings.length > 0 ? customer.bookings.map((b) => (
+                  {(tabStatusFilter ? customer.bookings.filter(b => b.status === tabStatusFilter) : customer.bookings).length > 0 ? (tabStatusFilter ? customer.bookings.filter(b => b.status === tabStatusFilter) : customer.bookings).map((b) => (
                     <tr key={b.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.code}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(b.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{b.amount} {b.currency}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_bookings", locale)}</td></tr>}
+                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{tabStatusFilter ? 'Нет данных по выбранным фильтрам' : t("crm.detail.no_bookings", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -212,6 +238,15 @@ export default function Customer360Page() {
           {/* Payments — TABLE with sortable headers and business context */}
           {tab === "payments" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
+                <select value={tabStatusFilter ?? ''} onChange={(e) => setTabStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+                  <option value="">Все статусы</option>
+                  <option value="CAPTURED">Захвачен</option>
+                  <option value="PENDING">Ожидание</option>
+                  <option value="FAILED">Ошибка</option>
+                </select>
+                {tabStatusFilter && <button onClick={() => setTabStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+              </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
@@ -224,7 +259,7 @@ export default function Customer360Page() {
                   </tr>
                 </thead>
                 <tbody>
-                  {customer.payments.length > 0 ? customer.payments.map((p) => (
+                  {(tabStatusFilter ? customer.payments.filter(p => p.status === tabStatusFilter) : customer.payments).length > 0 ? (tabStatusFilter ? customer.payments.filter(p => p.status === tabStatusFilter) : customer.payments).map((p) => (
                     <tr key={p.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5 font-mono text-slate-600">{p.code}</td>
                       <td className="px-4 py-2.5 text-slate-500">{p.paidAt ? new Date(p.paidAt).toLocaleDateString() : "—"}</td>
@@ -238,7 +273,7 @@ export default function Customer360Page() {
                       <td className="px-4 py-2.5 text-slate-500">{p.paymentMethod ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_payments", locale)}</td></tr>}
+                  )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{tabStatusFilter ? 'Нет данных по выбранным фильтрам' : t("crm.detail.no_payments", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -275,6 +310,16 @@ export default function Customer360Page() {
           {/* Refunds — TABLE with sortable headers and business context */}
           {tab === "refunds" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
+                <select value={tabStatusFilter ?? ''} onChange={(e) => setTabStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+                  <option value="">Все статусы</option>
+                  <option value="REQUESTED">Запрошен</option>
+                  <option value="APPROVED">Одобрен</option>
+                  <option value="PROCESSED">Обработан</option>
+                  <option value="REJECTED">Отклонён</option>
+                </select>
+                {tabStatusFilter && <button onClick={() => setTabStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+              </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
@@ -286,7 +331,7 @@ export default function Customer360Page() {
                   </tr>
                 </thead>
                 <tbody>
-                  {customer.refunds && customer.refunds.length > 0 ? customer.refunds.map((r) => (
+                  {(tabStatusFilter ? (customer.refunds || []).filter(r => r.status === tabStatusFilter) : (customer.refunds || [])).length > 0 ? (tabStatusFilter ? (customer.refunds || []).filter(r => r.status === tabStatusFilter) : (customer.refunds || [])).map((r) => (
                     <tr key={r.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5 font-mono text-slate-600">{r.code}</td>
                       <td className="px-4 py-2.5 text-slate-500">{r.processedAt ? new Date(r.processedAt).toLocaleDateString() : "—"}</td>
@@ -299,7 +344,7 @@ export default function Customer360Page() {
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{r.amount} {r.currency}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={r.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_refunds", locale)}</td></tr>}
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{tabStatusFilter ? 'Нет данных по выбранным фильтрам' : t("crm.detail.no_refunds", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>

@@ -40,6 +40,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [draftSearch, setDraftSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [roleFilter, setRoleFilter] = useState<string | undefined>(undefined);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -52,7 +53,7 @@ export default function UsersPage() {
     setPage(1);
   };
 
-  const load = async (p: number, q: string, sortField?: string, sortDir?: SortDirection, status?: string) => {
+  const load = async (p: number, q: string, sortField?: string, sortDir?: SortDirection, status?: string, roleCode?: string) => {
     setBusy(true);
     try {
       const sp = new URLSearchParams();
@@ -62,6 +63,7 @@ export default function UsersPage() {
       if (sortField) sp.set("sortBy", sortField);
       if (sortDir) sp.set("sortDirection", sortDir);
       if (status) sp.set("status", status);
+      if (roleCode) sp.set("roleCode", roleCode);
       const res = await api.get<UsersResult>(`/users?${sp.toString()}`);
       setUsers(res.items);
       setTotal(res.total);
@@ -73,9 +75,9 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    void load(page, search, sortBy, sortDirection, statusFilter);
+    void load(page, search, sortBy, sortDirection, statusFilter, roleFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search, sortBy, sortDirection, statusFilter]);
+  }, [page, search, sortBy, sortDirection, statusFilter, roleFilter]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +89,7 @@ export default function UsersPage() {
     setError("");
     try {
       await api.patch(`/users/${id}/role`, { roleCode });
-      await load(page, search, sortBy, sortDirection, statusFilter);
+      await load(page, search, sortBy, sortDirection, statusFilter, roleFilter);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -97,7 +99,7 @@ export default function UsersPage() {
     setError("");
     try {
       await api.patch(`/users/${id}/status`, { status });
-      await load(page, search, sortBy, sortDirection, statusFilter);
+      await load(page, search, sortBy, sortDirection, statusFilter, roleFilter);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -119,7 +121,7 @@ export default function UsersPage() {
       });
       setShowCreate(false);
       setForm({ username: "", password: "", fullName: "", email: "", roleCode: "OPERATOR" });
-      await load(1, search, sortBy, sortDirection, statusFilter);
+      await load(1, search, sortBy, sortDirection, statusFilter, roleFilter);
       setPage(1);
     } catch (e) {
       setError((e as Error).message);
@@ -137,7 +139,7 @@ export default function UsersPage() {
           breadcrumbs={["TravelHub", "Пользователи"]}
           actions={
             <button
-              onClick={() => void load(page, search, sortBy, sortDirection, statusFilter)}
+              onClick={() => void load(page, search, sortBy, sortDirection, statusFilter, roleFilter)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
             >
               ⟳ Обновить
@@ -174,6 +176,23 @@ export default function UsersPage() {
               <option value="ACTIVE">Активен</option>
               <option value="INACTIVE">Неактивен</option>
               <option value="LOCKED">Заблокирован</option>
+            </select>
+            <select
+              value={roleFilter ?? ''}
+              onChange={(e) => { setRoleFilter(e.target.value || undefined); setPage(1); }}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+            >
+              <option value="">Все роли</option>
+              <option value="ADMIN">Администратор</option>
+              <option value="DIRECTOR">Директор</option>
+              <option value="SALES_MANAGER">Менеджер продаж</option>
+              <option value="OPERATOR">Оператор</option>
+              <option value="FINANCE">Финансы</option>
+              <option value="ANALYST">Аналитик</option>
+              <option value="MODERATOR">Модератор</option>
+              <option value="PARTNER">Партнёр</option>
+              <option value="BUYER">Покупатель</option>
+              <option value="MARKETER">Маркетолог</option>
             </select>
             <button
               type="button"

@@ -142,11 +142,12 @@ export class SecurityService implements OnModuleInit {
   };
 
   /** Список пользователей (ADMIN/DIRECTOR) — серверная пагинация. */
-  async listUsers(query: { search?: string; status?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number }) {
+  async listUsers(query: { search?: string; status?: string; roleCode?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const where: Prisma.UserWhereInput = {
       ...(query.status ? { status: query.status as any } : {}),
+      ...(query.roleCode ? { role: { code: query.roleCode as any } } : {}),
       ...(query.search
         ? {
             OR: [
