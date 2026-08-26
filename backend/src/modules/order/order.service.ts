@@ -10,6 +10,7 @@ import {
   type OrderRefPayload,
   type OrderRequestedPayload,
 } from "../../eventbus/domain-events";
+import { buildSortClause, type SortDirection } from '../../shared/sort';
 import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
@@ -60,6 +61,16 @@ const TRANSITIONS: Record<string, { from: OrderStatus[]; to: OrderStatus }> = {
   cancel: { from: ACTIVE_STATUSES, to: "CANCELLED" },
   problem: { from: ACTIVE_STATUSES.filter((s) => s !== "PROBLEM"), to: "PROBLEM" },
   suspend: { from: ACTIVE_STATUSES.filter((s) => s !== "SUSPENDED"), to: "SUSPENDED" },
+};
+
+const ORDER_SORT_ALLOWLIST: Record<string, string> = {
+  code: 'code',
+  number: 'number',
+  createdAt: 'createdAt',
+  amount: 'amount',
+  status: 'status',
+  paymentStatus: 'paymentStatus',
+  currency: 'currency',
 };
 
 const ACTION_LABELS: Record<OrderAction, string> = {
@@ -425,7 +436,7 @@ export class OrderService {
   }
 
   async listOrders(
-    query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; page?: number; pageSize?: number },
+    query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number },
     viewer?: TravelerViewer,
   ) {
     const page = Math.max(1, query.page ?? 1);
@@ -476,7 +487,7 @@ export class OrderService {
     const [items, total] = await Promise.all([
       this.prisma.order.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: buildSortClause(query.sortBy, query.sortDirection, ORDER_SORT_ALLOWLIST, { createdAt: 'desc' }),
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: { items: true, travelers: true },

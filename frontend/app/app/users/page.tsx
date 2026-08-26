@@ -8,6 +8,7 @@ import Kpi from "@/components/Kpi";
 import PanelFrame from "@/components/PanelFrame";
 import Pagination from "@/components/Pagination";
 import { useLocale } from "@/lib/i18n";
+import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 
 const ROLES: { code: string; title: string }[] = [
   { code: "ADMIN", title: "Администратор" },
@@ -34,6 +35,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState<PlatformUser[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
+  const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [draftSearch, setDraftSearch] = useState("");
   const [error, setError] = useState("");
@@ -42,13 +45,21 @@ export default function UsersPage() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ username: "", password: "", fullName: "", email: "", roleCode: "OPERATOR" });
 
-  const load = async (p: number, q: string) => {
+  const handleSort = (field: string, direction: SortDirection) => {
+    setSortBy(field);
+    setSortDirection(direction);
+    setPage(1);
+  };
+
+  const load = async (p: number, q: string, sortField?: string, sortDir?: SortDirection) => {
     setBusy(true);
     try {
       const sp = new URLSearchParams();
       sp.set("page", String(p));
       sp.set("pageSize", "20");
       if (q) sp.set("search", q);
+      if (sortField) sp.set("sortBy", sortField);
+      if (sortDir) sp.set("sortDirection", sortDir);
       const res = await api.get<UsersResult>(`/users?${sp.toString()}`);
       setUsers(res.items);
       setTotal(res.total);
@@ -60,9 +71,9 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    void load(page, search);
+    void load(page, search, sortBy, sortDirection);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search]);
+  }, [page, search, sortBy, sortDirection]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +85,7 @@ export default function UsersPage() {
     setError("");
     try {
       await api.patch(`/users/${id}/role`, { roleCode });
-      await load(page, search);
+      await load(page, search, sortBy, sortDirection);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -84,7 +95,7 @@ export default function UsersPage() {
     setError("");
     try {
       await api.patch(`/users/${id}/status`, { status });
-      await load(page, search);
+      await load(page, search, sortBy, sortDirection);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -106,7 +117,7 @@ export default function UsersPage() {
       });
       setShowCreate(false);
       setForm({ username: "", password: "", fullName: "", email: "", roleCode: "OPERATOR" });
-      await load(1, search);
+      await load(1, search, sortBy, sortDirection);
       setPage(1);
     } catch (e) {
       setError((e as Error).message);
@@ -124,7 +135,7 @@ export default function UsersPage() {
           breadcrumbs={["TravelHub", "Пользователи"]}
           actions={
             <button
-              onClick={() => void load(page, search)}
+              onClick={() => void load(page, search, sortBy, sortDirection)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
             >
               ⟳ Обновить
@@ -168,11 +179,11 @@ export default function UsersPage() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">Код</th>
-                  <th className="px-4 py-2.5 font-medium">Пользователь</th>
+                  <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Код</SortableHeader>
+                  <SortableHeader field="fullName" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Пользователь</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">Роль</th>
-                  <th className="px-4 py-2.5 font-medium">Статус</th>
-                  <th className="px-4 py-2.5 font-medium">Последний вход</th>
+                  <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Статус</SortableHeader>
+                  <SortableHeader field="lastLoginAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Последний вход</SortableHeader>
                 </tr>
               </thead>
               <tbody>

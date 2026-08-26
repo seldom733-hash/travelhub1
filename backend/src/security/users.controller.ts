@@ -14,6 +14,14 @@ class ListUsersQuery {
   search?: string;
 
   @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  sortDirection?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)

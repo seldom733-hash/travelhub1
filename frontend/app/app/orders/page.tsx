@@ -9,6 +9,7 @@ import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
 import { useCan } from "@/lib/use-can";
 import ActionButtons from "@/components/ActionButtons";
+import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 
 const ACTIONS = [
   { action: "process", label: "Принять в работу", cls: "bg-sky-600 hover:bg-sky-700", only: ["NEW"] },
@@ -19,7 +20,7 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-red-600 hover:bg-red-700", only: ["NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "PROBLEM", "SUSPENDED"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, initialCancelledWithin, initialPaymentFailed, initialPendingRefund }: { initialStatus: string; initialSearch?: string; initialPaymentStatus?: string; initialCancelledWithin?: string; initialPaymentFailed?: string; initialPendingRefund?: string }) {
+function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, initialCancelledWithin, initialPaymentFailed, initialPendingRefund, initialSortBy, initialSortDirection }: { initialStatus: string; initialSearch?: string; initialPaymentStatus?: string; initialCancelledWithin?: string; initialPaymentFailed?: string; initialPendingRefund?: string; initialSortBy?: string; initialSortDirection?: SortDirection }) {
   const [data, setData] = useState<Page<Order> | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
   const [bookings, setBookings] = useState<{ id: string; code: string; status: string }[]>([]);
@@ -30,6 +31,15 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   const [cancelledWithin] = useState(initialCancelledWithin);
   const [paymentFailed] = useState(initialPaymentFailed);
   const [pendingRefund] = useState(initialPendingRefund);
+  const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
+  const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
+
+  const handleSort = (field: string, direction: SortDirection) => {
+    setSortBy(field);
+    setSortDirection(direction);
+    setPage(1);
+  };
+
   // Derived filter labels for display
   const activeFilters: string[] = [];
   if (statusFilter) {
@@ -70,6 +80,8 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
       if (cancelledWithin) qs.set("cancelledWithin", cancelledWithin);
       if (paymentFailed) qs.set("paymentFailed", paymentFailed);
       if (pendingRefund) qs.set("pendingRefund", pendingRefund);
+      if (sortBy) qs.set("sortBy", sortBy);
+      if (sortDirection) qs.set("sortDirection", sortDirection);
       qs.set("page", String(page));
       qs.set("pageSize", "20");
       const res = await api.get<Page<Order>>(`/orders?${qs.toString()}`);
@@ -84,7 +96,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter, paymentStatusFilter, cancelledWithin, paymentFailed, pendingRefund, page]);
+  }, [search, statusFilter, paymentStatusFilter, cancelledWithin, paymentFailed, pendingRefund, sortBy, sortDirection, page]);
 
   const openDetail = async (id: string) => {
     const [order, bk] = await Promise.all([
@@ -166,14 +178,14 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">Заказ</th>
-                  <th className="px-4 py-2.5 font-medium">Сумма</th>
+                  <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Заказ</SortableHeader>
+                  <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort} alignRight>Сумма</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">Позиции</th>
-                  <th className="px-4 py-2.5 font-medium">Статус</th>
-                  <th className="px-4 py-2.5 font-medium">Оплата</th>
+                  <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Статус</SortableHeader>
+                  <SortableHeader field="paymentStatus" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Оплата</SortableHeader>
                   {paymentFailed === "true" && <th className="px-4 py-2.5 font-medium text-red-600">Платёж</th>}
                   {pendingRefund === "true" && <th className="px-4 py-2.5 font-medium text-amber-600">Возврат</th>}
-                  {cancelledWithin && <th className="px-4 py-2.5 font-medium text-slate-600">Дата отмены</th>}
+                  {cancelledWithin && <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата отмены</SortableHeader>}
                 </tr>
               </thead>
               <tbody>
@@ -322,6 +334,8 @@ function OrdersWithParams() {
       initialCancelledWithin={sp.get("cancelledWithin") ?? ""}
       initialPaymentFailed={sp.get("paymentFailed") ?? ""}
       initialPendingRefund={sp.get("pendingRefund") ?? ""}
+      initialSortBy={sp.get("sortBy") ?? undefined}
+      initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
     />
   );
 }

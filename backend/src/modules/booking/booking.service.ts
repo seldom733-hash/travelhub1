@@ -5,6 +5,7 @@ import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type BookingEventPayload } from "../../eventbus/domain-events";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { BookingQueryService } from "./booking-query.service";
+import { buildSortClause } from '../../shared/sort';
 
 export type BookingAction =
   | "prepare"
@@ -100,6 +101,14 @@ const ACTION_LABELS: Record<BookingAction, string> = {
  * consumer-ы НЕ реализуют независимые переходы; compensation-консьюмер
  * OrderCancelled использует те же guards/CAS (см. booking.subscribers.ts).
  */
+const BOOKING_SORT_ALLOWLIST: Record<string, string> = {
+  code: 'code',
+  createdAt: 'createdAt',
+  amount: 'amount',
+  status: 'status',
+  serviceDate: 'serviceDate',
+};
+
 @Injectable()
 export class BookingService {
   constructor(
@@ -108,7 +117,7 @@ export class BookingService {
     private readonly query: BookingQueryService,
   ) {}
 
-  async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; slaMinutes?: string; page?: number; pageSize?: number }) {
+  async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; slaMinutes?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const now = new Date();
@@ -130,7 +139,7 @@ export class BookingService {
     const [items, total] = await Promise.all([
       this.prisma.booking.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: buildSortClause(query.sortBy, query.sortDirection, BOOKING_SORT_ALLOWLIST, { createdAt: 'desc' }),
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: { passengers: { select: { id: true, firstName: true, lastName: true } } },

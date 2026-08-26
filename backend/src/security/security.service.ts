@@ -11,6 +11,7 @@ import {
 import { RoleCode, UserStatus } from "../generated/prisma/enums";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../shared/errors";
 import { normalizeEmail } from "../shared/field-validation";
+import { buildSortClause } from '../shared/sort';
 import { getRequestContext } from "../shared/request-context";
 import type { Prisma } from "../generated/prisma/client";
 
@@ -130,8 +131,18 @@ export class SecurityService implements OnModuleInit {
     return perms.includes(permission);
   }
 
+  private static readonly USER_SORT_ALLOWLIST: Record<string, string> = {
+    code: 'code',
+    username: 'username',
+    email: 'email',
+    fullName: 'fullName',
+    status: 'status',
+    lastLoginAt: 'lastLoginAt',
+    createdAt: 'createdAt',
+  };
+
   /** Список пользователей (ADMIN/DIRECTOR) — серверная пагинация. */
-  async listUsers(query: { search?: string; page?: number; pageSize?: number }) {
+  async listUsers(query: { search?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const where: Prisma.UserWhereInput | undefined = query.search
@@ -146,7 +157,7 @@ export class SecurityService implements OnModuleInit {
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: buildSortClause(query.sortBy, query.sortDirection, SecurityService.USER_SORT_ALLOWLIST, { createdAt: 'desc' }),
         skip: (page - 1) * pageSize,
         take: pageSize,
         select: {

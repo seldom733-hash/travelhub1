@@ -7,32 +7,7 @@ import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError } from "../../shared/errors";
 import { normalizeEmail } from "../../shared/field-validation";
 
-// ── Shared sorting helpers ───────────────────────────────────────────────────
-type SortDirection = 'asc' | 'desc';
-
-function parseSortDirection(raw?: string): SortDirection {
-  return raw?.toLowerCase() === 'asc' ? 'asc' : 'desc';
-}
-
-function buildSortClause(
-  sortBy: string | undefined,
-  sortDirection: string | undefined,
-  allowlist: Record<string, string>,
-  defaultSort: Record<string, SortDirection>,
-): Record<string, SortDirection>[] {
-  if (!sortBy || !(sortBy in allowlist)) {
-    // Default: [{ createdAt: 'desc' }, { id: 'desc' }]
-    return [
-      ...Object.entries(defaultSort).map(([k, v]) => ({ [k]: v })),
-      { id: 'desc' },
-    ];
-  }
-  const dir = parseSortDirection(sortDirection);
-  return [{ [allowlist[sortBy]]: dir }, { id: 'desc' }];
-}
-
-/** Stable tie-breaker: always append id for deterministic pagination. */
-const TIE_BREAKER = { id: 'desc' as SortDirection };
+import { buildSortClause, type SortDirection } from '../../shared/sort';
 
 export interface CreateCustomerInput {
   type?: CustomerType;

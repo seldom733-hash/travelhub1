@@ -9,6 +9,7 @@ import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
 import { useCan } from "@/lib/use-can";
 import ActionButtons from "@/components/ActionButtons";
+import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 
 const ACTIONS = [
   { action: "send", label: "Отправить поставщику", cls: "bg-cyan-600 hover:bg-cyan-700", only: ["NEW", "PREPARING_REQUEST"] },
@@ -19,11 +20,13 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-slate-600 hover:bg-slate-700", only: ["NEW", "PREPARING_REQUEST", "SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION", "CONFIRMED", "IN_SERVICE"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean; slaMinutes?: string }) {
+function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, initialSortBy, initialSortDirection }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean; slaMinutes?: string; initialSortBy?: string; initialSortDirection?: SortDirection }) {
   const [data, setData] = useState<Page<Booking> | null>(null);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [orderRef, setOrderRef] = useState<{ code: string; number: string; status: string } | null>(null);
   const [page, setPage] = useState(1);
+  const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
+  const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Derived filter labels for display
@@ -51,6 +54,12 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }
     cancel: canCancel,
   };
 
+  const handleSort = (field: string, direction: SortDirection) => {
+    setSortBy(field);
+    setSortDirection(direction);
+    setPage(1);
+  };
+
   const load = async () => {
     setBusy(true);
     try {
@@ -61,6 +70,8 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }
       if (overdueOnly) qs.set('overdue', 'true');
       if (slaMinutes) qs.set('slaMinutes', slaMinutes);
       if (statusFilter) qs.set('status', statusFilter);
+      if (sortBy) qs.set('sortBy', sortBy);
+      if (sortDirection) qs.set('sortDirection', sortDirection);
       const res = await api.get<Page<Booking>>(`/bookings?${qs.toString()}`);
       setData(res);
     } catch (e) {
@@ -73,7 +84,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [upcomingOnly, statusFilter, overdueOnly, slaMinutes, page]);
+  }, [upcomingOnly, statusFilter, overdueOnly, slaMinutes, sortBy, sortDirection, page]);
 
   const openDetail = async (id: string) => {
     const booking = await api.get<Booking>(`/bookings/${id}`);
@@ -148,12 +159,12 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes }
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">Код</th>
+                  <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Код</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">Заказ</th>
-                  <th className="px-4 py-2.5 font-medium">Сумма</th>
+                  <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort} alignRight>Сумма</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">Пассажиры</th>
-                  <th className="px-4 py-2.5 font-medium">Статус</th>
-                  {(upcomingOnly || overdueOnly) && <th className="px-4 py-2.5 font-medium text-blue-600">Дата услуги</th>}
+                  <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Статус</SortableHeader>
+                  {(upcomingOnly || overdueOnly) && <SortableHeader field="serviceDate" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата услуги</SortableHeader>}
                   {overdueOnly && <th className="px-4 py-2.5 font-medium text-red-600">Ожидание</th>}
                 </tr>
               </thead>
@@ -281,6 +292,8 @@ function BookingsWithParams() {
       statusFilter={sp.get("status") || undefined}
       overdueOnly={sp.get("overdue") === "true"}
       slaMinutes={sp.get("slaMinutes") || undefined}
+      initialSortBy={sp.get("sortBy") ?? undefined}
+      initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
     />
   );
 }
