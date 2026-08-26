@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-25 (Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED)\
+**Дата актуализации:** 2026-08-27 (Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -858,6 +858,24 @@ Booking request/confirm, Payment capture, Refund, Settlement/Payout.
 · **Step 3.5 --- CRM Completion** ✅ COMPLETE (2026-08-25; CRM workspace with Customers/Partners tabs; PartnerCustomerRelation schema (Step 3.5B); Partner list/detail endpoints; Customer detail with orders/bookings/payments aggregation; full i18n RU/AZ/EN; backend 1042/1042 + frontend 72/72 tests; migration 20260824214302; report — `docs/prompts/PHASE_3_STEP_3_5_CRM_COMPLETION_REPORT.md`; commit `17f66cd`).\
 Customer `CUS-*`, Contact `CNT-*`, Company `COM-*`, Partner `PAR-*`,
 Supplier `SUP-*`.
+
+· **Step 3.5 --- Shared Table Controls** ✅ FINAL CLOSED (2026-08-26; project-wide shared table sorting + filtering + URL state + structural parity; SortableHeader wired to all tables; server-authoritative single-column sorting; complete filter coverage across all entity lists; Bookings search + 360 authority closure; 243 frontend tests; report — `docs/prompts/PHASE_3_SHARED_TABLE_CONTROLS_ROUND_2C_FINAL_URL_STATE_BOOKINGS_SEARCH_360_AUTHORITY_CLOSURE_REPORT.md`; commit `ec2e65c`).
+
+· **Step 3.5 --- Operational Notes** ✅ FULLY CLOSED (2026-08-26; internal CRM notes on all 11 entity types; data model + migration + backend authority; Notes API with RBAC + audit + edit/delete lifecycle; Customer 360 / Partner 360 Notes UI; create-form initial note integration with atomic entity-note transactions; Payment/Refund create-flow coverage closure; 99 backend unit tests + 243 frontend tests; reports — `docs/prompts/PHASE_3_STEP_3.5_PLATFORM_CRM_OPERATIONAL_NOTES_ROUND_2D.1_MISSING_CREATE_FLOW_COVERAGE_CLOSURE_REPORT.md`; commit chain `e0fe7bb→a13e280→8b9999f→64c6563→88af625→b6b0365`).
+
+· **Step 3.5.3 --- CRM Communications + Activity Timeline**
+
+  · Round 1 — Architecture + Current-State + Data-Source + RBAC / Tenant Authority Reconciliation ✅ CLOSED (2026-08-27; denormalized CrmActivity read model selected; 10 source types; ~20 activity types; cursor pagination; two-level RBAC; report — `docs/prompts/PHASE_3_STEP_3.5.3_CRM_COMMUNICATIONS_ACTIVITY_TIMELINE_ARCHITECTURE_RECONCILIATION_REPORT.md`; commit `2b0438a`).
+
+  · Round 2A — Activity Read Model + Data Model + Migration + Source Adapters + Backfill/Rebuild Foundation ✅ CLOSED (2026-08-27; CrmActivity schema with 3 enums; unique dedup constraint + 4 query indexes; 10 source adapters; idempotent projector; cursor pagination foundation; backfill/rebuild service; 36 unit tests; report — `docs/prompts/PHASE_3_STEP_3.5.3_CRM_ACTIVITY_ROUND_2A_READ_MODEL_MIGRATION_SOURCE_ADAPTERS_BACKFILL_FOUNDATION_REPORT.md`; commit `227c9e6`).
+
+  · Round 2B — Activity API + RBAC + Cursor Pagination + Server-Side Filtering + Subject Authority ⏭ NEXT
+
+  · Round 2C — Customer 360 Activity UI + Existing History Migration/Replacement ⬜ NOT STARTED
+
+  · Round 2D — Partner 360 Activity UI + Communications / Deep Links ⬜ NOT STARTED
+
+  · Round 2E — Runtime + Security + Backfill/Rebuild Closure ⬜ NOT STARTED
 
 · **Step 3.5A --- Partner CRM Foundation --- NEW CANONICAL
 REQUIREMENT**\
