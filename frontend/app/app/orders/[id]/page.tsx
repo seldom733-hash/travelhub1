@@ -6,7 +6,9 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
+import OperationalNotes from "@/components/OperationalNotes";
 import { useLocale, t } from "@/lib/i18n";
+import { useCurrentUser } from "@/lib/use-user";
 
 interface OrderDetail {
   id: string;
@@ -28,6 +30,7 @@ interface OrderDetail {
 export default function OrderDetailPage() {
   const params = useParams();
   const locale = useLocale();
+  const user = useCurrentUser();
   const id = params.id as string;
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -125,6 +128,17 @@ export default function OrderDetailPage() {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Notes — Operational Notes */}
+          {user && (
+            <OperationalNotes
+              entityType="Order"
+              entityId={id}
+              permissions={user.permissions}
+              currentUserId={user.id}
+              currentRole={user.role}
+            />
           )}
         </div>
       </div>

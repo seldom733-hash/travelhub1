@@ -972,6 +972,31 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.lead_source.direct": { ru: "Прямой контакт", az: "Birbaşa əlaqə", en: "Direct contact" },
   "crm.lead_source.marketplace": { ru: "Marketplace", az: "Marketplace", en: "Marketplace" },
   "crm.lead_source.referral": { ru: "Рекомендация", az: "Tövsiyə", en: "Referral" },
+  // ── Operational Notes (Phase 3 Step 3.5 Round 2C) ─────────────────────────────────────────────────────────────────────────
+  "notes.title": { ru: "Примечания", az: "Qeydlər", en: "Notes" },
+  "notes.add": { ru: "Добавить примечание", az: "Qeyd əlavə et", en: "Add note" },
+  "notes.add_placeholder": { ru: "Текст примечания…", az: "Qeyd mətni…", en: "Note text…" },
+  "notes.edit": { ru: "Редактировать", az: "Redaktə et", en: "Edit" },
+  "notes.delete": { ru: "Удалить", az: "Sil", en: "Delete" },
+  "notes.save": { ru: "Сохранить", az: "Saxla", en: "Save" },
+  "notes.cancel": { ru: "Отмена", az: "Lığv et", en: "Cancel" },
+  "notes.empty": { ru: "Примечаний пока нет", az: "Hələ qeyd yoxdur", en: "No notes yet" },
+  "notes.forbidden": { ru: "Нет доступа к примечаниям", az: "Qeydlərə giriş yoxdur", en: "Access denied" },
+  "notes.load_error": { ru: "Не удалось загрузить примечания", az: "Qeydlər yüklənə bilmədi", en: "Failed to load notes" },
+  "notes.create_error": { ru: "Ошибка создания примечания", az: "Qeyd yaratmaq xətası", en: "Failed to create note" },
+  "notes.edit_error": { ru: "Ошибка сохранения", az: "Saxlama xətası", en: "Failed to save" },
+  "notes.creating": { ru: "Создание…", az: "Yaradılır…", en: "Creating…" },
+  "notes.saving": { ru: "Сохранение…", az: "Saxlanılır…", en: "Saving…" },
+  "notes.created": { ru: "Создано", az: "Yaradılıb", en: "Created" },
+  "notes.edited": { ru: "Изменено", az: "Dəyişdirilib", en: "Edited" },
+  "notes.delete_confirm": { ru: "Удалить примечание?", az: "Qeydi silmək?", en: "Delete note?" },
+  "notes.delete_yes": { ru: "Да", az: "Bəli", en: "Yes" },
+  "notes.retry": { ru: "Повторить", az: "Yenidən cəhd et", en: "Retry" },
+  "notes.unknown_author": { ru: "Неизвестно", az: "Naməlum", en: "Unknown" },
+  "notes.validation_empty": { ru: "Текст не может быть пустым", az: "Mətn boş ola bilməz", en: "Text cannot be empty" },
+  "notes.validation_max": { ru: "Текст не может превышать 5000 символов", az: "Mətn 5000 simvoldan çox ola bilməz", en: "Text cannot exceed 5000 characters" },
+  "crm.detail.notes": { ru: "Примечания", az: "Qeydlər", en: "Notes" },
+
 };
 
 /** Локализованная строка по ключу (fallback — сам ключ, затем default locale). */

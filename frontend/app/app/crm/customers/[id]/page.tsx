@@ -7,9 +7,11 @@ import { api, type CustomerDetail, type CustomerPartner } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import SortableHeader, { type SortState, type SortDirection } from "@/components/SortableHeader";
+import OperationalNotes from "@/components/OperationalNotes";
 import { useLocale, t } from "@/lib/i18n";
+import { useCurrentUser } from "@/lib/use-user";
 
-type Tab = "overview" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "history";
+type Tab = "overview" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "history" | "notes";
 
 function useQueryState() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -19,7 +21,7 @@ function useQueryState() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
-    if (tabParam && ["overview", "orders", "bookings", "payments", "partners", "refunds", "history"].includes(tabParam)) {
+    if (tabParam && ["overview", "orders", "bookings", "payments", "partners", "refunds", "history", "notes"].includes(tabParam)) {
       setTab(tabParam as Tab);
     }
     const sortByParam = params.get("sortBy");
@@ -46,6 +48,7 @@ function useQueryState() {
 export default function Customer360Page() {
   const params = useParams();
   const locale = useLocale();
+  const user = useCurrentUser();
   const id = params.id as string;
   const { tab, sortBy, sortDirection, setTab, setSortBy, setSortDirection, updateQuery } = useQueryState();
 
@@ -105,7 +108,7 @@ export default function Customer360Page() {
     );
   }
 
-  const tabs: Tab[] = ["overview", "orders", "bookings", "payments", "partners", "refunds", "history"];
+  const tabs: Tab[] = ["overview", "orders", "bookings", "payments", "partners", "refunds", "history", "notes"];
 
   return (
     <div className="flex h-full flex-col">
@@ -367,6 +370,17 @@ export default function Customer360Page() {
                 </div>
               )) : <div className="py-8 text-center text-xs text-slate-400">{t("crm.detail.no_history", locale)}</div>}
             </div>
+          )}
+
+          {/* Notes — Operational Notes */}
+          {tab === "notes" && user && (
+            <OperationalNotes
+              entityType="Customer"
+              entityId={id}
+              permissions={user.permissions}
+              currentUserId={user.id}
+              currentRole={user.role}
+            />
           )}
         </div>
       </div>

@@ -6,7 +6,9 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
+import OperationalNotes from "@/components/OperationalNotes";
 import { useLocale, t } from "@/lib/i18n";
+import { useCurrentUser } from "@/lib/use-user";
 
 interface ProductDetail {
   id: string;
@@ -25,6 +27,7 @@ interface ProductDetail {
 export default function ProductDetailPage() {
   const params = useParams();
   const locale = useLocale();
+  const user = useCurrentUser();
   const id = params.id as string;
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
@@ -107,6 +110,17 @@ export default function ProductDetailPage() {
               <div className="rounded-lg bg-green-50 px-4 py-3"><div className="text-slate-400">{t("catalog.col.published", locale)}</div><div className="font-medium text-green-700">{new Date(product.publishedAt).toLocaleDateString()}</div></div>
             )}
           </div>
+
+          {/* Notes — Operational Notes */}
+          {user && (
+            <OperationalNotes
+              entityType="Product"
+              entityId={id}
+              permissions={user.permissions}
+              currentUserId={user.id}
+              currentRole={user.role}
+            />
+          )}
         </div>
       </div>
     </div>

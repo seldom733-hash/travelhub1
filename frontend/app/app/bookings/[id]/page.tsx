@@ -6,7 +6,9 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
+import OperationalNotes from "@/components/OperationalNotes";
 import { useLocale, t } from "@/lib/i18n";
+import { useCurrentUser } from "@/lib/use-user";
 
 interface BookingDetail {
   id: string;
@@ -22,6 +24,7 @@ interface BookingDetail {
 export default function BookingDetailPage() {
   const params = useParams();
   const locale = useLocale();
+  const user = useCurrentUser();
   const id = params.id as string;
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
@@ -89,6 +92,17 @@ export default function BookingDetailPage() {
             <div className="text-slate-400">{t("crm.col.service", locale)}</div>
             <Link href={`/app/catalog/${booking.productId}`} className="font-medium text-blue-600 hover:underline">{booking.productId}</Link>
           </div>
+
+          {/* Notes — Operational Notes */}
+          {user && (
+            <OperationalNotes
+              entityType="Booking"
+              entityId={id}
+              permissions={user.permissions}
+              currentUserId={user.id}
+              currentRole={user.role}
+            />
+          )}
         </div>
       </div>
     </div>

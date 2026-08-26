@@ -308,3 +308,44 @@ export interface Booking {
   passengers?: { id: string; firstName: string; lastName: string; passportNumber: string | null }[];
   history?: { id: string; action: string; from: string | null; to: string | null; comment: string | null; createdAt: string }[];
 }
+
+// ── Operational Notes (Phase 3 Step 3.5 Round 2C) ───────────────────────
+
+export interface OperationalNote {
+  id: string;
+  entityType: string;
+  entityId: string;
+  text: string;
+  visibility: string;
+  authorUserId: string | null;
+  authorName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  editedAt: string | null;
+  deletedAt: string | null;
+  deletedBy: string | null;
+}
+
+export interface OperationalNotesPage {
+  notes: OperationalNote[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export const operationalNotesApi = {
+  list: (entityType: string, entityId: string, page?: number, pageSize?: number) => {
+    const params = new URLSearchParams();
+    if (page) params.set('page', String(page));
+    if (pageSize) params.set('pageSize', String(pageSize));
+    const qs = params.toString();
+    return api.get<OperationalNotesPage>(`/operational-notes/${entityType}/${entityId}${qs ? '?' + qs : ''}`);
+  },
+  create: (entityType: string, entityId: string, text: string) =>
+    api.post<OperationalNote>(`/operational-notes/${entityType}/${entityId}`, { text }),
+  update: (noteId: string, text: string) =>
+    api.patch<OperationalNote>(`/operational-notes/${noteId}`, { text }),
+  delete: (noteId: string) =>
+    api.del<void>(`/operational-notes/${noteId}`),
+};
