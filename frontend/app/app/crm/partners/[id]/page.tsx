@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api, type PartnerDetail } from "@/lib/api";
@@ -49,6 +49,17 @@ export default function Partner360Page() {
     url.searchParams.set("tab", newTab);
     window.history.replaceState({}, "", url.toString());
   };
+
+  // Build customer lookup for cross-referencing orders
+  const customerMap = useMemo(() => {
+    if (!partner) return new Map<string, { firstName: string | null; lastName: string | null; companyName: string | null }>();
+    return new Map(
+      partner.commercialCustomers.map((c) => [
+        c.customerId,
+        { firstName: c.firstName, lastName: c.lastName, companyName: c.companyName },
+      ])
+    );
+  }, [partner]);
 
   if (loading) {
     return <div className="flex h-full items-center justify-center"><div className="text-sm text-slate-400">{t("crm.loading", locale)}</div></div>;
@@ -134,6 +145,7 @@ export default function Partner360Page() {
                     <th className="px-4 py-2.5 font-medium">{t("crm.col.name", locale)}</th>
                     <th className="px-4 py-2.5 font-medium">{t("crm.col.type", locale)}</th>
                     <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.created_at", locale)}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -143,8 +155,9 @@ export default function Partner360Page() {
                       <td className="px-4 py-2.5 font-medium text-slate-700">{p.title}</td>
                       <td className="px-4 py-2.5 text-slate-500">{p.type}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
+                      <td className="px-4 py-2.5 text-slate-500">{new Date(p.createdAt).toLocaleDateString()}</td>
                     </tr>
-                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{t("crm.partner_detail.no_services", locale)}</td></tr>}
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("crm.partner_detail.no_services", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -158,6 +171,8 @@ export default function Partner360Page() {
                   <tr>
                     <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
                     <th className="px-4 py-2.5 font-medium">{t("crm.col.number", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.customer", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.created_at", locale)}</th>
                     <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.amount", locale)}</th>
                     <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
                   </tr>
@@ -167,10 +182,16 @@ export default function Partner360Page() {
                     <tr key={o.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.code}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{o.number}</td>
+                      <td className="px-4 py-2.5">
+                        {o.customerId && customerMap.has(o.customerId) ? (
+                          <Link href={`/app/crm/customers/${o.customerId}`} className="text-blue-600 hover:underline">{customerMap.get(o.customerId)!.companyName ?? `${customerMap.get(o.customerId)!.firstName ?? ""} ${customerMap.get(o.customerId)!.lastName ?? ""}`.trim()}</Link>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-500">{new Date(o.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{o.amount} {o.currency}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{t("crm.partner_detail.no_orders", locale)}</td></tr>}
+                  )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{t("crm.partner_detail.no_orders", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -183,6 +204,7 @@ export default function Partner360Page() {
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
                     <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.created_at", locale)}</th>
                     <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.amount", locale)}</th>
                     <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
                   </tr>
@@ -191,10 +213,11 @@ export default function Partner360Page() {
                   {partner.bookings.length > 0 ? partner.bookings.map((b) => (
                     <tr key={b.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.code}</Link></td>
+                      <td className="px-4 py-2.5 text-slate-500">{new Date(b.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{b.amount} {b.currency}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-400">{t("crm.partner_detail.no_bookings", locale)}</td></tr>}
+                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{t("crm.partner_detail.no_bookings", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -209,7 +232,8 @@ export default function Partner360Page() {
                     <th className="px-4 py-2.5 font-medium">{t("crm.col.customer", locale)}</th>
                     <th className="px-4 py-2.5 font-medium text-right">{t("crm.detail.orders", locale)}</th>
                     <th className="px-4 py-2.5 font-medium text-right">{t("crm.detail.bookings", locale)}</th>
-                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.amount", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium text-right">{t("crm.col.order_amount", locale)}</th>
+                    <th className="px-4 py-2.5 font-medium">{t("crm.col.last_activity", locale)}</th>
                     <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
                   </tr>
                 </thead>
@@ -220,9 +244,10 @@ export default function Partner360Page() {
                       <td className="px-4 py-2.5 text-right text-slate-600">{c.orderCount}</td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{c.bookingCount}</td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{c.totalAmount.toFixed(2)} {c.currency}</td>
+                      <td className="px-4 py-2.5 text-slate-500">{c.lastActivity ? new Date(c.lastActivity).toLocaleDateString() : "—"}</td>
                       <td className="px-4 py-2.5">{c.customerStatus ? <StatusBadge status={c.customerStatus} /> : "—"}</td>
                     </tr>
-                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("crm.partner_detail.no_customers", locale)}</td></tr>}
+                  )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{t("crm.partner_detail.no_customers", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
