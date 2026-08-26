@@ -15,6 +15,10 @@ class ListUsersQuery {
 
   @IsOptional()
   @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
   sortBy?: string;
 
   @IsOptional()

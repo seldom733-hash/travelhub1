@@ -287,6 +287,7 @@ export interface Order {
   currency: string;
   amount: string;
   serviceDate: string | null;
+  cancelledAt: string | null;
   version: number;
   createdAt: string;
   items?: { id: string; title: string; productCode: string; quantity: number; price: string; amount: string }[];

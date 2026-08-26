@@ -142,18 +142,21 @@ export class SecurityService implements OnModuleInit {
   };
 
   /** Список пользователей (ADMIN/DIRECTOR) — серверная пагинация. */
-  async listUsers(query: { search?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number }) {
+  async listUsers(query: { search?: string; status?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
-    const where: Prisma.UserWhereInput | undefined = query.search
-      ? {
-          OR: [
-            { username: { contains: query.search, mode: "insensitive" as const } },
-            { email: { contains: query.search, mode: "insensitive" as const } },
-            { fullName: { contains: query.search, mode: "insensitive" as const } },
-          ],
-        }
-      : undefined;
+    const where: Prisma.UserWhereInput = {
+      ...(query.status ? { status: query.status as any } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { username: { contains: query.search, mode: "insensitive" as const } },
+              { email: { contains: query.search, mode: "insensitive" as const } },
+              { fullName: { contains: query.search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    };
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({
         where,

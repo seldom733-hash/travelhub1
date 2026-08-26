@@ -65,6 +65,10 @@ class ListCustomersQuery {
   status?: string;
 
   @IsOptional()
+  @IsString()
+  customerType?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)

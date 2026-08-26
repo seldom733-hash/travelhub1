@@ -67,6 +67,7 @@ const ORDER_SORT_ALLOWLIST: Record<string, string> = {
   code: 'code',
   number: 'number',
   createdAt: 'createdAt',
+  cancelledAt: 'cancelledAt',
   amount: 'amount',
   status: 'status',
   paymentStatus: 'paymentStatus',

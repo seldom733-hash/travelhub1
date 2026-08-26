@@ -36,6 +36,7 @@ export interface CreateContactInput {
 export interface CustomerListQuery {
   search?: string;
   status?: string;
+  customerType?: string;
   page?: number;
   pageSize?: number;
   sortBy?: string;
@@ -138,6 +139,7 @@ export class CrmService {
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const where: Prisma.CustomerWhereInput = {
       ...(query.status ? { status: query.status as EntityStatus } : {}),
+      ...(query.customerType ? { type: query.customerType as CustomerType } : {}),
       ...(query.search
         ? {
             OR: [
@@ -154,7 +156,7 @@ export class CrmService {
     const orderBy = buildSortClause(
       query.sortBy,
       query.sortDirection,
-      { code: 'code', name: 'companyName', email: 'email', status: 'status', createdAt: 'createdAt' },
+      { code: 'code', name: 'companyName', type: 'type', email: 'email', status: 'status', createdAt: 'createdAt' },
       { createdAt: 'desc' },
     );
 

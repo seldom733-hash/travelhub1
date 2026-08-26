@@ -185,7 +185,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                   <SortableHeader field="paymentStatus" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Оплата</SortableHeader>
                   {paymentFailed === "true" && <th className="px-4 py-2.5 font-medium text-red-600">Платёж</th>}
                   {pendingRefund === "true" && <th className="px-4 py-2.5 font-medium text-amber-600">Возврат</th>}
-                  {cancelledWithin && <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата отмены</SortableHeader>}
+                  {cancelledWithin && <SortableHeader field="cancelledAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата отмены</SortableHeader>}
                 </tr>
               </thead>
               <tbody>
@@ -209,7 +209,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                       <td className="px-4 py-2.5"><StatusBadge status={o.paymentStatus} /></td>
                       {paymentFailed === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-medium text-red-700">Неуспешный</span></td>}
                       {pendingRefund === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">Ожидает обработки</span></td>}
-                      {cancelledWithin && <td className="px-4 py-2.5 text-xs text-slate-600">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ru-RU") : "—"}</td>}
+                      {cancelledWithin && <td className="px-4 py-2.5 text-xs text-slate-600">{o.cancelledAt ? new Date(o.cancelledAt).toLocaleDateString("ru-RU") : "—"}</td>}
                     </tr>
                 ))}
                 {(data?.items ?? []).length === 0 && (

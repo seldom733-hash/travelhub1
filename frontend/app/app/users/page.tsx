@@ -39,6 +39,7 @@ export default function UsersPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [draftSearch, setDraftSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -51,7 +52,7 @@ export default function UsersPage() {
     setPage(1);
   };
 
-  const load = async (p: number, q: string, sortField?: string, sortDir?: SortDirection) => {
+  const load = async (p: number, q: string, sortField?: string, sortDir?: SortDirection, status?: string) => {
     setBusy(true);
     try {
       const sp = new URLSearchParams();
@@ -60,6 +61,7 @@ export default function UsersPage() {
       if (q) sp.set("search", q);
       if (sortField) sp.set("sortBy", sortField);
       if (sortDir) sp.set("sortDirection", sortDir);
+      if (status) sp.set("status", status);
       const res = await api.get<UsersResult>(`/users?${sp.toString()}`);
       setUsers(res.items);
       setTotal(res.total);
@@ -71,9 +73,9 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    void load(page, search, sortBy, sortDirection);
+    void load(page, search, sortBy, sortDirection, statusFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search, sortBy, sortDirection]);
+  }, [page, search, sortBy, sortDirection, statusFilter]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +87,7 @@ export default function UsersPage() {
     setError("");
     try {
       await api.patch(`/users/${id}/role`, { roleCode });
-      await load(page, search, sortBy, sortDirection);
+      await load(page, search, sortBy, sortDirection, statusFilter);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -95,7 +97,7 @@ export default function UsersPage() {
     setError("");
     try {
       await api.patch(`/users/${id}/status`, { status });
-      await load(page, search, sortBy, sortDirection);
+      await load(page, search, sortBy, sortDirection, statusFilter);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -117,7 +119,7 @@ export default function UsersPage() {
       });
       setShowCreate(false);
       setForm({ username: "", password: "", fullName: "", email: "", roleCode: "OPERATOR" });
-      await load(1, search, sortBy, sortDirection);
+      await load(1, search, sortBy, sortDirection, statusFilter);
       setPage(1);
     } catch (e) {
       setError((e as Error).message);
@@ -135,7 +137,7 @@ export default function UsersPage() {
           breadcrumbs={["TravelHub", "Пользователи"]}
           actions={
             <button
-              onClick={() => void load(page, search, sortBy, sortDirection)}
+              onClick={() => void load(page, search, sortBy, sortDirection, statusFilter)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
             >
               ⟳ Обновить
@@ -163,6 +165,16 @@ export default function UsersPage() {
             >
               Найти
             </button>
+            <select
+              value={statusFilter ?? ''}
+              onChange={(e) => { setStatusFilter(e.target.value || undefined); setPage(1); }}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+            >
+              <option value="">Все статусы</option>
+              <option value="ACTIVE">Активен</option>
+              <option value="INACTIVE">Неактивен</option>
+              <option value="LOCKED">Заблокирован</option>
+            </select>
             <button
               type="button"
               onClick={() => setShowCreate((v) => !v)}

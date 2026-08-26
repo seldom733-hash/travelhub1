@@ -69,6 +69,8 @@ export default function CrmPage() {
   // selectedCustomer removed — use dedicated /app/crm/customers/:id page
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerPage, setCustomerPage] = useState(1);
+  const [customerStatusFilter, setCustomerStatusFilter] = useState<string | undefined>(undefined);
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<string | undefined>(undefined);
   // customerDetailTab removed — use dedicated /app/crm/customers/:id page
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -84,6 +86,7 @@ export default function CrmPage() {
   // selectedPartner removed — use dedicated /app/crm/partners/:id page
   const [partnerSearch, setPartnerSearch] = useState("");
   const [partnerPage, setPartnerPage] = useState(1);
+  const [partnerStatusFilter, setPartnerStatusFilter] = useState<string | undefined>(undefined);
   // partnerDetailTab removed — use dedicated /app/crm/partners/:id page
   const [partnerCustomerDetailTab, setPartnerCustomerDetailTab] = useState<"overview" | "orders" | "bookings" | "payments" | "relations">("overview");
   const [partnerError, setPartnerError] = useState("");
@@ -102,6 +105,8 @@ export default function CrmPage() {
       setLoadError(false);
       const qs = new URLSearchParams();
       if (customerSearch) qs.set("search", customerSearch);
+      if (customerStatusFilter) qs.set("status", customerStatusFilter);
+      if (customerTypeFilter) qs.set("customerType", customerTypeFilter);
       qs.set("page", String(customerPage));
       qs.set("pageSize", "20");
       if (sortBy) qs.set("sortBy", sortBy);
@@ -112,7 +117,7 @@ export default function CrmPage() {
       setLoadError(true);
       setError((e as Error).message);
     }
-  }, [customerSearch, customerPage, sortBy, sortDirection]);
+  }, [customerSearch, customerPage, sortBy, sortDirection, customerStatusFilter, customerTypeFilter]);
 
   // ── Platform Partner loading ──
   const loadPartners = useCallback(async () => {
@@ -120,6 +125,7 @@ export default function CrmPage() {
       setPartnerLoadError(false);
       const qs = new URLSearchParams();
       if (partnerSearch) qs.set("search", partnerSearch);
+      if (partnerStatusFilter) qs.set("status", partnerStatusFilter);
       qs.set("page", String(partnerPage));
       qs.set("pageSize", "20");
       if (sortBy) qs.set("sortBy", sortBy);
@@ -130,7 +136,7 @@ export default function CrmPage() {
       setPartnerLoadError(true);
       setPartnerError((e as Error).message);
     }
-  }, [partnerSearch, partnerPage, sortBy, sortDirection]);
+  }, [partnerSearch, partnerPage, sortBy, sortDirection, partnerStatusFilter]);
 
   // ── Partner Customer loading (partner context) ──
   const loadPartnerCustomers = useCallback(async () => {
@@ -248,7 +254,7 @@ export default function CrmPage() {
               ]} />
             )}
 
-            {/* Search */}
+            {/* Search + Filters */}
             <div className="flex flex-wrap items-center gap-2">
               <input
                 value={tab === "customers" ? customerSearch : partnerSearch}
@@ -257,6 +263,41 @@ export default function CrmPage() {
                 placeholder={t("crm.search.placeholder", locale)}
                 className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               />
+              {tab === 'customers' && (
+                <>
+                  <select value={customerTypeFilter ?? ''} onChange={(e) => { setCustomerTypeFilter(e.target.value || undefined); setCustomerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400">
+                    <option value="">{t('crm.filter.type.all', locale)}</option>
+                    <option value="PERSON">{t('crm.type.person', locale)}</option>
+                    <option value="COMPANY">{t('crm.type.company', locale)}</option>
+                  </select>
+                  <select value={customerStatusFilter ?? ''} onChange={(e) => { setCustomerStatusFilter(e.target.value || undefined); setCustomerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400">
+                    <option value="">{t('crm.filter.status.all', locale)}</option>
+                    <option value="ACTIVE">{t('crm.status.active', locale)}</option>
+                    <option value="INACTIVE">{t('crm.status.inactive', locale)}</option>
+                    <option value="SUSPENDED">{t('crm.status.suspended', locale)}</option>
+                  </select>
+                  {(customerTypeFilter || customerStatusFilter) && (
+                    <button onClick={() => { setCustomerTypeFilter(undefined); setCustomerStatusFilter(undefined); setCustomerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
+                      ✕ {t('crm.filter.clear', locale)}
+                    </button>
+                  )}
+                </>
+              )}
+              {tab === 'partners' && (
+                <>
+                  <select value={partnerStatusFilter ?? ''} onChange={(e) => { setPartnerStatusFilter(e.target.value || undefined); setPartnerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400">
+                    <option value="">{t('crm.filter.status.all', locale)}</option>
+                    <option value="ACTIVE">{t('crm.status.active', locale)}</option>
+                    <option value="INACTIVE">{t('crm.status.inactive', locale)}</option>
+                    <option value="SUSPENDED">{t('crm.status.suspended', locale)}</option>
+                  </select>
+                  {partnerStatusFilter && (
+                    <button onClick={() => { setPartnerStatusFilter(undefined); setPartnerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
+                      ✕ {t('crm.filter.clear', locale)}
+                    </button>
+                  )}
+                </>
+              )}
             </div>
 
             {error && (
@@ -287,6 +328,7 @@ export default function CrmPage() {
                       <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
                       <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.name", locale)}</SortableHeader>
                       <SortableHeader field="email" currentSort={sortState} onSort={handleSort}>{t("crm.col.email", locale)}</SortableHeader>
+                      <SortableHeader field="type" currentSort={sortState} onSort={handleSort}>{t("crm.col.type", locale)}</SortableHeader>
                       <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                     </tr>
                   </thead>
