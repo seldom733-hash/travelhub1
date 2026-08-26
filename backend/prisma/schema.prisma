@@ -4461,3 +4461,103 @@ enum SignalStatus {
 
   @@schema("decision")
 }
+
+// ─────────────────────────── crm.* activity timeline ───────────────────────────
+
+enum CrmActivitySourceType {
+  OPERATIONAL_NOTE
+  ORDER
+  BOOKING
+  PAYMENT
+  REFUND
+  MESSAGE
+  AUDIT_EVENT
+  CUSTOMER_HISTORY
+  BUYER_REQUEST
+  PARTNER_APPLICATION
+
+  @@schema("crm")
+}
+
+enum CrmActivityActivityType {
+  // Operational Note
+  NOTE_CREATED
+
+  // Order
+  ORDER_CREATED
+  ORDER_STATUS_CHANGED
+  ORDER_CANCELLED
+
+  // Booking
+  BOOKING_CREATED
+  BOOKING_STATUS_CHANGED
+  BOOKING_COMPLETED
+
+  // Payment
+  PAYMENT_CREATED
+  PAYMENT_CAPTURED
+
+  // Refund
+  REFUND_CREATED
+  REFUND_PROCESSED
+
+  // Message
+  MESSAGE_SENT
+
+  // Audit (business-safe subset)
+  AUDIT_CUSTOMER_CREATED
+  AUDIT_CUSTOMER_STATUS_CHANGED
+  AUDIT_PARTNER_APPROVED
+
+  // Customer History (legacy, migrated)
+  CUSTOMER_HISTORY_CREATED
+  CUSTOMER_HISTORY_STATUS_CHANGED
+  CUSTOMER_HISTORY_UPDATED
+
+  // Buyer Request
+  BUYER_REQUEST_CREATED
+  BUYER_REQUEST_SUBMITTED
+  BUYER_REQUEST_CANCELLED
+
+  // Partner Application
+  PARTNER_APPLICATION_SUBMITTED
+  PARTNER_APPLICATION_APPROVED
+  PARTNER_APPLICATION_REJECTED
+
+  @@schema("crm")
+}
+
+enum CrmActivitySubjectType {
+  CUSTOMER
+  PARTNER
+
+  @@schema("crm")
+}
+
+model CrmActivity {
+  id            String                   @id @default(uuid())
+  sourceType    CrmActivitySourceType
+  sourceId      String                   // canonical source entity ID
+  sourceEvent   String                   // event discriminator (e.g. "created", "status:CAPTURED")
+  activityType  CrmActivityActivityType
+  subjectType   CrmActivitySubjectType
+  subjectId     String                   // customer.id or partner.id
+  customerId    String?                  // denormalized for efficient Customer 360 queries
+  partnerId     String?                  // denormalized for efficient Partner 360 queries
+  occurredAt    DateTime                 // canonical business timestamp from source
+  actorUserId   String?                  // server-derived from source/audit
+  actorName     String?                  // display snapshot
+  title         String                   // i18n key or resolved display text
+  summary       String?                  // role-filtered preview (truncated)
+  metadata      Json?                    // role-filtered source-specific data
+  deepLink      String?                  // relative route (e.g. /app/orders/:id)
+  visibility    String                   @default("INTERNAL") // INTERNAL|PARTNER_VISIBLE|CUSTOMER_VISIBLE
+  projectedAt   DateTime                 @default(now())
+
+  @@unique([sourceType, sourceId, sourceEvent], name: "CrmActivity_dedupe_key")
+  @@index([customerId, occurredAt, id], name: "CrmActivity_customer_timeline")
+  @@index([partnerId, occurredAt, id], name: "CrmActivity_partner_timeline")
+  @@index([sourceType, sourceId], name: "CrmActivity_source_identity")
+  @@index([activityType, occurredAt], name: "CrmActivity_activity_type_time")
+  @@schema("crm")
+}
