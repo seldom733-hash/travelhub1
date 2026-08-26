@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SecurityService } from '../../security/security.service';
 import {
   type OperationalEntityType,
   type OperationalNoteVisibility,
@@ -10,7 +11,7 @@ import {
   isValidEntityType,
   isValidVisibility,
 } from './operational-notes.types';
-import type { AuthUser } from '../../security/auth/auth.service';
+import { ForbiddenError, NotFoundError } from '../../shared/errors';
 
 /* ------------------------------------------------------------------ */
 /*  Entity Resolver — validates parent existence + scope               */
@@ -20,14 +21,11 @@ export interface ParentResolution {
   entityType: OperationalEntityType;
   entityId: string;
   exists: boolean;
-  scopeField?: string;
-  scopeValue?: string | null;
 }
 
 /**
  * Resolve a parent entity for note attachment.
  * Validates: entityType is canonical, entityId is valid UUID, parent exists.
- * Returns resolution with scope info for later scope inheritance.
  */
 async function resolveNoteParent(
   prisma: PrismaService,
@@ -35,115 +33,93 @@ async function resolveNoteParent(
   entityId: string,
 ): Promise<ParentResolution> {
   if (!isValidEntityType(entityType)) {
-    throw new Error(`Invalid entity type: ${entityType}`);
+    throw new BadRequestException(`Invalid entity type: ${entityType}`);
   }
   if (!entityId || entityId.trim().length === 0) {
-    throw new Error('Entity ID is required');
+    throw new BadRequestException('Entity ID is required');
   }
 
   let exists = false;
-  let scopeField: string | undefined;
-  let scopeValue: string | null = null;
 
-  // Validate parent existence per entity type
   switch (entityType) {
     case 'Customer': {
-      const row = await prisma.customer.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.customer.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     case 'Partner': {
-      const row = await prisma.partner.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.partner.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     case 'Order': {
-      const row = await prisma.order.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.order.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     case 'Booking': {
-      const row = await prisma.booking.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.booking.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     case 'Payment': {
-      const row = await prisma.payment.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.payment.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     case 'Refund': {
-      const row = await prisma.refund.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.refund.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     case 'Product': {
-      const row = await prisma.product.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.product.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     case 'Fulfillment': {
-      const row = await prisma.fulfillment.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.fulfillment.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     case 'Reservation': {
-      const row = await prisma.reservation.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.reservation.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     case 'BuyerRequest': {
-      const row = await prisma.buyerRequest.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.buyerRequest.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     case 'PartnerApplication': {
-      const row = await prisma.partnerApplication.findUnique({
-        where: { id: entityId },
-        select: { id: true },
-      });
+      const row = await prisma.partnerApplication.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;
       break;
     }
     default:
-      throw new Error(`Unhandled entity type: ${entityType}`);
+      throw new BadRequestException(`Unhandled entity type: ${entityType}`);
   }
 
   if (!exists) {
-    throw new Error(`${entityType} with id ${entityId} not found`);
+    throw new NotFoundException(`${entityType} with id ${entityId} not found`);
   }
 
   return { entityType: entityType as OperationalEntityType, entityId, exists };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Auth User type (subset for RBAC checks)                           */
+/* ------------------------------------------------------------------ */
+
+export interface NotesActor {
+  userId: string;
+  username: string;
+  fullName?: string | null;
+  role: string;
+  permissions: string[];
+  partnerId?: string | null;
+  customerId?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -152,11 +128,24 @@ async function resolveNoteParent(
 
 @Injectable()
 export class OperationalNotesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly security: SecurityService,
+  ) {}
+
+  /**
+   * Check if actor has a specific permission.
+   */
+  private requirePermission(actor: NotesActor, permission: string): void {
+    if (!actor.permissions.includes(permission)) {
+      throw new ForbiddenException(`Missing permission: ${permission}`);
+    }
+  }
 
   /**
    * Validate and create an OperationalNote.
    * Server-authoritative: author, timestamp, visibility, entityType, entityId.
+   * RBAC: operational-notes.create permission required.
    */
   async createNote(
     input: {
@@ -165,14 +154,17 @@ export class OperationalNotesService {
       text: string;
       visibility?: string;
     },
-    actor: { userId: string; username: string; fullName?: string | null },
+    actor: NotesActor,
   ) {
+    // RBAC: check permission
+    this.requirePermission(actor, 'operational-notes.create');
+
     // Validate text
     const validatedText = validateNoteText(input.text);
 
     // Validate entityType
     if (!isValidEntityType(input.entityType)) {
-      throw new Error(`Invalid entity type: ${input.entityType}. Must be one of: ${VALID_ENTITY_TYPES.join(', ')}`);
+      throw new BadRequestException(`Invalid entity type: ${input.entityType}. Must be one of: ${VALID_ENTITY_TYPES.join(', ')}`);
     }
 
     // Validate visibility
@@ -183,7 +175,7 @@ export class OperationalNotesService {
     // Validate parent exists
     const parent = await resolveNoteParent(this.prisma, input.entityType, input.entityId);
     if (!parent.exists) {
-      throw new Error(`${input.entityType} with id ${input.entityId} not found`);
+      throw new NotFoundException(`${input.entityType} with id ${input.entityId} not found`);
     }
 
     // Create note with server-authoritative fields
@@ -195,6 +187,22 @@ export class OperationalNotesService {
         visibility,
         authorUserId: actor.userId,
         authorName: actor.fullName ?? actor.username,
+      },
+    });
+
+    // Audit: note.created
+    await this.security.audit(undefined, {
+      userId: actor.userId,
+      username: actor.username,
+      action: 'operational_note.created',
+      resource: 'OperationalNote',
+      resourceId: note.id,
+      details: {
+        entityType: note.entityType,
+        entityId: note.entityId,
+        visibility: note.visibility,
+        parentType: note.entityType,
+        parentId: note.entityId,
       },
     });
 
@@ -228,13 +236,13 @@ export class OperationalNotesService {
 
         // Validate entityType
         if (!isValidEntityType(entityType)) {
-          throw new Error(`Invalid entity type: ${entityType}`);
+          throw new BadRequestException(`Invalid entity type: ${entityType}`);
         }
 
         // Validate parent exists within transaction
         const parent = await resolveNoteParent(tx as any, entityType, entityId);
         if (!parent.exists) {
-          throw new Error(`${entityType} with id ${entityId} not found`);
+          throw new NotFoundException(`${entityType} with id ${entityId} not found`);
         }
 
         // Server-authoritative note creation
@@ -256,19 +264,24 @@ export class OperationalNotesService {
 
   /**
    * List notes for an entity with pagination support.
+   * RBAC: operational-notes.read permission required.
    * Notes are append-only, ordered by createdAt DESC, id DESC (deterministic).
    */
   async listNotes(
     entityType: string,
     entityId: string,
+    actor: NotesActor,
     options?: {
       page?: number;
       pageSize?: number;
       includeDeleted?: boolean;
     },
   ) {
+    // RBAC: check permission
+    this.requirePermission(actor, 'operational-notes.read');
+
     if (!isValidEntityType(entityType)) {
-      throw new Error(`Invalid entity type: ${entityType}`);
+      throw new BadRequestException(`Invalid entity type: ${entityType}`);
     }
 
     const page = Math.max(1, options?.page ?? 1);
@@ -302,6 +315,7 @@ export class OperationalNotesService {
 
   /**
    * Get a single note by ID.
+   * Used internally for update/delete scope resolution.
    */
   async getNoteById(noteId: string) {
     return this.prisma.operationalNote.findUnique({
@@ -310,64 +324,114 @@ export class OperationalNotesService {
   }
 
   /**
-   * Update a note's text. Only the author or ADMIN can update.
-   * Sets editedAt timestamp.
+   * Update a note's text.
+   * RBAC: operational-notes.update permission required.
+   * Authorization: author OR ADMIN override.
+   * Audit: operational_note.updated.
    */
   async updateNote(
     noteId: string,
     newText: string,
-    actor: { userId: string; role: string },
+    actor: NotesActor,
   ) {
+    // RBAC: check permission
+    this.requirePermission(actor, 'operational-notes.update');
+
     const validatedText = validateNoteText(newText);
     const note = await this.prisma.operationalNote.findUnique({
       where: { id: noteId, deletedAt: null },
     });
 
     if (!note) {
-      throw new Error('Note not found');
+      throw new NotFoundException('Note not found or has been deleted');
     }
 
     // Authorization: only author or ADMIN can edit
     if (note.authorUserId !== actor.userId && actor.role !== 'ADMIN') {
-      throw new Error('Not authorized to edit this note');
+      throw new ForbiddenException('Not authorized to edit this note');
     }
 
-    return this.prisma.operationalNote.update({
+    const beforeText = note.text;
+    const updated = await this.prisma.operationalNote.update({
       where: { id: noteId },
       data: {
         text: validatedText,
         editedAt: new Date(),
       },
     });
+
+    // Audit: note.updated
+    await this.security.audit(undefined, {
+      userId: actor.userId,
+      username: actor.username,
+      action: 'operational_note.updated',
+      resource: 'OperationalNote',
+      resourceId: noteId,
+      details: {
+        entityType: note.entityType,
+        entityId: note.entityId,
+        parentType: note.entityType,
+        parentId: note.entityId,
+        beforeText: beforeText.length > 200 ? beforeText.substring(0, 200) + '...' : beforeText,
+        afterText: validatedText.length > 200 ? validatedText.substring(0, 200) + '...' : validatedText,
+      },
+    });
+
+    return updated;
   }
 
   /**
-   * Soft-delete a note. Only the author or ADMIN can delete.
+   * Soft-delete a note.
+   * RBAC: operational-notes.delete permission required.
+   * Authorization: author OR ADMIN override.
+   * Audit: operational_note.deleted.
    */
   async deleteNote(
     noteId: string,
-    actor: { userId: string; role: string },
+    actor: NotesActor,
   ) {
+    // RBAC: check permission
+    this.requirePermission(actor, 'operational-notes.delete');
+
     const note = await this.prisma.operationalNote.findUnique({
       where: { id: noteId, deletedAt: null },
     });
 
     if (!note) {
-      throw new Error('Note not found');
+      throw new NotFoundException('Note not found or has been deleted');
     }
 
     // Authorization: only author or ADMIN can delete
     if (note.authorUserId !== actor.userId && actor.role !== 'ADMIN') {
-      throw new Error('Not authorized to delete this note');
+      throw new ForbiddenException('Not authorized to delete this note');
     }
 
-    return this.prisma.operationalNote.update({
+    const deleted = await this.prisma.operationalNote.update({
       where: { id: noteId },
       data: {
         deletedAt: new Date(),
         deletedBy: actor.userId,
       },
     });
+
+    // Audit: note.deleted
+    await this.security.audit(undefined, {
+      userId: actor.userId,
+      username: actor.username,
+      action: 'operational_note.deleted',
+      resource: 'OperationalNote',
+      resourceId: noteId,
+      details: {
+        entityType: note.entityType,
+        entityId: note.entityId,
+        parentType: note.entityType,
+        parentId: note.entityId,
+        authorUserId: note.authorUserId,
+        authorName: note.authorName,
+      },
+    });
+
+    return deleted;
   }
 
   /**

@@ -501,4 +501,8 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "dashboard.financial.read": "Чтение Financial KPIs (Commission, Reconciliation, Payments)",
   "dashboard.marketplace.read": "Чтение Marketplace KPIs (Sessions, Partners, Customers)",
   "dashboard.customize": "Настройка layout Command Center (save/reset)",
+  "operational-notes.read": "Чтение operational notes",
+  "operational-notes.create": "Создание operational notes",
+  "operational-notes.update": "Редактирование operational notes",
+  "operational-notes.delete": "Удаление operational notes (soft-delete)",
 };

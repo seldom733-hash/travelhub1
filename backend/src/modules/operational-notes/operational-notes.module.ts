@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { OperationalNotesController } from './operational-notes.controller';
 import { OperationalNotesService } from './operational-notes.service';
+import { SecurityModule } from '../../security/security.module';
 
 /**
  * PHASE 3 STEP 3.5 — Operational Notes Module
@@ -8,9 +10,11 @@ import { OperationalNotesService } from './operational-notes.service';
  * Order, Booking, Payment, Refund, Product, Fulfillment, Reservation,
  * BuyerRequest, PartnerApplication.
  *
- * No controller in Round 2A. API endpoints arrive in Round 2B.
+ * Round 2B: API endpoints with RBAC + audit.
  */
 @Module({
+  imports: [SecurityModule],
+  controllers: [OperationalNotesController],
   providers: [OperationalNotesService],
   exports: [OperationalNotesService],
 })

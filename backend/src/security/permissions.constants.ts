@@ -200,6 +200,12 @@ export const PERMISSIONS = {
   "seller_public_profile.request_changes": "Запрос изменений в предложении публичной идентичности",
   "seller_public_profile.hide_identity": "Скрытие/восстановление публичной идентичности продавца",
 
+  // ── Operational Notes (Phase 3 Step 3.5, Round 2B) ─────────────────────
+  "operational-notes.read": "Чтение operational notes",
+  "operational-notes.create": "Создание operational notes",
+  "operational-notes.update": "Редактирование operational notes",
+  "operational-notes.delete": "Удаление operational notes (soft-delete)",
+
   // ── Cross-cutting ─────────────────────────────────────────────────────
   "support.read": "Чтение обращений поддержки",
   "support.write": "Обработка обращений поддержки",
@@ -286,6 +292,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "dashboard.attention.read",
     "dashboard.insights.read",
     "dashboard.customize",
+    // Phase 3 Step 3.5 Round 2B: DIRECTOR — read-only operational notes.
+    "operational-notes.read",
   ],
 
   FINANCE: [
@@ -330,6 +338,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "dashboard.executive.read",
     "dashboard.financial.read",
     "dashboard.attention.read",
+    // Phase 3 Step 3.5 Round 2B: FINANCE — read-only operational notes.
+    "operational-notes.read",
   ],
 
   MARKETER: [
@@ -353,6 +363,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "dashboard.channels.read",
     "dashboard.insights.read",
     "dashboard.customize",
+    // Phase 3 Step 3.5 Round 2B: MARKETER — read-only operational notes.
+    "operational-notes.read",
   ],
 
   ANALYST: [
@@ -391,6 +403,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "dashboard.marketplace.read",
     "dashboard.catalog.read",
     "dashboard.customize",
+    // Phase 3 Step 3.5 Round 2B: ANALYST — read-only operational notes.
+    "operational-notes.read",
   ],
 
   // Step 1.3 review fix: MODERATOR имеет ТОЛЬКО moderation-права — review/approve/
@@ -453,6 +467,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // Step 1.16: SALES_MANAGER фиксирует/читает коммуникации по клиентам.
     "communication.read",
     "communication.create",
+    // Phase 3 Step 3.5 Round 2B: SALES_MANAGER — read + create operational notes.
+    "operational-notes.read",
+    "operational-notes.create",
   ],
 
   OPERATOR: [
@@ -486,6 +503,11 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "analytics.read",
     "dashboard.operational.read",
     "dashboard.attention.read",
+    // Phase 3 Step 3.5 Round 2B: OPERATOR — full CRUD operational notes.
+    "operational-notes.read",
+    "operational-notes.create",
+    "operational-notes.update",
+    "operational-notes.delete",
   ],
 
   // Step 1.3: PARTNER НЕ имеет unrestricted catalog.product.read — только
