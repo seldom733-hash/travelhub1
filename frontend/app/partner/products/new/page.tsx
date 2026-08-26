@@ -44,6 +44,7 @@ export default function NewProductPage() {
   const [values, setValues] = useState<ProductEditorValues>(initialValues);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [initialNote, setInitialNote] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -86,6 +87,7 @@ export default function NewProductPage() {
         categoryId,
         attributes: values.attributes,
         tariffs: tariffDraftsToPayload(values.tariffs),
+        initialNote: initialNote.trim() || undefined,
       });
       router.push(`/partner/products/${res.product.id}`);
     } catch (err) {
@@ -119,6 +121,23 @@ export default function NewProductPage() {
         submitLabel={pt("partner.form.save", locale)}
         mediaCount={0}
       />
+
+      {/* Примечание */}
+      <div className="mt-4">
+        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("notes.initial_note", locale)}</label>
+        <textarea
+          value={initialNote}
+          onChange={(e) => setInitialNote(e.target.value)}
+          rows={3}
+          maxLength={5000}
+          aria-label={pt("notes.initial_note", locale)}
+          className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+          placeholder={pt("notes.initial_note_helper", locale)}
+        />
+        <div className="mt-1 text-right text-xs text-slate-400">
+          {initialNote.length}/5000 {pt("notes.initial_note_max", locale)}
+        </div>
+      </div>
     </div>
   );
 }

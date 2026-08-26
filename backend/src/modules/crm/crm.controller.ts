@@ -31,6 +31,10 @@ class CreateCustomerDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsOptional()
+  @IsString()
+  initialNote?: string;
 }
 
 class UpdateCustomerDto {
@@ -297,7 +301,7 @@ export class CrmController {
   @Post("partner/customers/intake")
   @RequirePermissions("crm.customer.create_own")
   intakePartnerCustomer(
-    @Body() dto: { firstName?: string; lastName?: string; companyName?: string; email: string; phone?: string; leadSource?: string; lifecycle?: string; tags?: string[]; notes?: string; assignedTo?: string },
+    @Body() dto: { firstName?: string; lastName?: string; companyName?: string; email: string; phone?: string; leadSource?: string; lifecycle?: string; tags?: string[]; notes?: string; assignedTo?: string; initialNote?: string },
     @CurrentUser() actor: AuthedRequest["user"],
   ) {
     return this.crm.intakePartnerCustomer(actor, dto, actor.username);

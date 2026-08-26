@@ -54,6 +54,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ type: "TOUR", title: "", slug: "", description: "" });
+  const [initialNote, setInitialNote] = useState("");
   const [tariffs, setTariffs] = useState<TariffDraft[]>([newTariffDraft()]);
   // Ролевой UI: редактирование продукта — catalog.product.write (PATCH /products/:id).
   // UpdateProductDto поддерживает только title/description/tariffs (slug — только при создании).
@@ -176,10 +177,12 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
         tariffs: tariffs
           .filter((t) => t.name.trim() && t.price !== "" && !Number.isNaN(Number(t.price)))
           .map((t) => ({ name: t.name.trim(), price: Number(t.price), currency: t.currency || "RUB" })),
+        initialNote: initialNote.trim() || undefined,
       });
       setShowCreate(false);
       setForm({ type: "TOUR", title: "", slug: "", description: "" });
       setTariffs([newTariffDraft()]);
+      setInitialNote("");
       await load();
       setSelected(created);
     } catch (e) {
@@ -367,6 +370,23 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                 className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
                 placeholder="Краткое описание услуги…"
               />
+            </div>
+
+            {/* Примечание */}
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Примечание</label>
+              <textarea
+                value={initialNote}
+                onChange={(e) => setInitialNote(e.target.value)}
+                rows={3}
+                maxLength={5000}
+                aria-label="Примечание"
+                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+                placeholder="Внутренняя заметка для сотрудников"
+              />
+              <div className="mt-1 text-right text-xs text-slate-400">
+                {initialNote.length}/5000
+              </div>
             </div>
 
             {/* Тарифы */}

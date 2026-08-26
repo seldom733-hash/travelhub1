@@ -5,6 +5,7 @@ import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type ProductEventPayload } from "../../eventbus/domain-events";
 import { IdsService } from "../../shared/ids.service";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationDomainError } from "../../shared/errors";
+import { normalizeInitialNote } from "../operational-notes/operational-notes.types";
 import { buildSortClause } from "../../shared/sort";
 import { uniqueConstraintNames } from "../../shared/prisma-errors";
 import { validateAttributes, validateCategorySlug, validateSchemaConfig, toCategoryEditorContract, type AttributeDef, type CategoryEditorSchemaContract } from "./category-schema.validation";
@@ -87,6 +88,8 @@ export interface CreateProductInput {
   partnerId?: string | null;
   /** Причина ownership override (админ-действие, аудируется). */
   ownershipReason?: string;
+  /** Phase 3 Round 2D: optional initial OperationalNote (same transaction). */
+  initialNote?: string;
 }
 
 export interface UpdateProductInput {
@@ -285,7 +288,23 @@ export class CatalogService implements OnModuleInit {
         payload: { productId: product.id, code: product.code, title: product.title, type: product.type } as ProductEventPayload,
       });
 
-      return { product, eventId };
+      // Phase 3 Round 2D: optional initial OperationalNote (same transaction)
+      const noteText = normalizeInitialNote(input.initialNote);
+      let initialNote: any = null;
+      if (noteText) {
+        initialNote = await tx.operationalNote.create({
+          data: {
+            entityType: "Product",
+            entityId: product.id,
+            text: noteText,
+            visibility: "INTERNAL",
+            authorUserId: actor?.id ?? null,
+            authorName: actor?.username ?? null,
+          },
+        });
+      }
+
+      return { product, eventId, initialNote };
     });
 
     await this.eventBus.publishPending();

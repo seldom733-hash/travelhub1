@@ -78,6 +78,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ type: "PERSON", firstName: "", lastName: "", companyName: "", email: "", phone: "" });
+  const [initialNote, setInitialNote] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState({ firstName: "", lastName: "", companyName: "", phone: "" });
@@ -100,7 +101,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
   const [selectedPartnerCustomer, setSelectedPartnerCustomer] = useState<PartnerCustomerDetail | null>(null);
   const [showIntake, setShowIntake] = useState(false);
   const [intaking, setIntaking] = useState(false);
-  const [intakeForm, setIntakeForm] = useState({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "" });
+  const [intakeForm, setIntakeForm] = useState({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "", initialNote: "" });
 
   // ── Platform Customer loading ──
   const loadCustomers = useCallback(async () => {
@@ -193,15 +194,48 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
         phone: intakeForm.phone.trim() || undefined,
         leadSource: intakeForm.leadSource || undefined,
         notes: intakeForm.notes.trim() || undefined,
+        initialNote: intakeForm.initialNote.trim() || undefined,
       });
       setShowIntake(false);
-      setIntakeForm({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "" });
+      setIntakeForm({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "", initialNote: "" });
       await loadPartnerCustomers();
       await openPartnerCustomerDetail(result.customerId);
     } catch (e) {
       setPartnerError((e as Error).message);
     } finally {
       setIntaking(false);
+    }
+  };
+
+  const createCustomer = async () => {
+    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setError("Укажите корректный email");
+      return;
+    }
+    if (initialNote.trim().length > 5000) {
+      setError("Примечание не может превышать 5000 символов");
+      return;
+    }
+    setCreating(true);
+    setError("");
+    try {
+      await api.post("/customers", {
+        type: form.type,
+        firstName: form.firstName.trim() || undefined,
+        lastName: form.lastName.trim() || undefined,
+        companyName: form.companyName.trim() || undefined,
+        email: form.email.trim(),
+        phone: form.phone.trim() || undefined,
+        initialNote: initialNote.trim() || undefined,
+      });
+      setShowCreate(false);
+      setForm({ type: "PERSON", firstName: "", lastName: "", companyName: "", email: "", phone: "" });
+      setInitialNote("");
+      await loadCustomers();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -391,7 +425,66 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
             )}
           </div>
         </div>
-      </div>
+
+      {/* Platform CRM: Create Customer Panel */}
+      {showCreate && (
+        <PanelFrame title={t("crm.create_customer", locale)} subtitle="Platform CRM" onClose={() => { setShowCreate(false); setInitialNote(""); }}>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.type", locale)}</label>
+            <select
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+            >
+              <option value="PERSON">{t("crm.type.person", locale)}</option>
+              <option value="COMPANY">{t("crm.type.company", locale)}</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.firstName", locale)}</label>
+            <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.lastName", locale)}</label>
+            <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.companyName", locale)}</label>
+            <input value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.email", locale)} *</label>
+            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" placeholder="email@example.com" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.create.form.phone", locale)}</label>
+            <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("notes.initial_note", locale)}</label>
+            <textarea
+              value={initialNote}
+              onChange={(e) => setInitialNote(e.target.value)}
+              rows={3}
+              maxLength={5000}
+              aria-label={t("notes.initial_note", locale)}
+              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              placeholder={t("notes.initial_note_helper", locale)}
+            />
+            <div className="mt-1 text-right text-xs text-slate-400">
+              {initialNote.length}/5000 {t("notes.initial_note_max", locale)}
+            </div>
+          </div>
+          <button
+            onClick={() => void createCustomer()}
+            disabled={creating || !form.email.trim()}
+            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {creating ? t("crm.detail.creating", locale) : t("crm.create_customer", locale)}
+          </button>
+        </PanelFrame>
+      )}
+    </div>
     );
   }
 
@@ -502,6 +595,21 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
           <div>
             <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.intake.notes", locale)}</label>
             <textarea value={intakeForm.notes} onChange={(e) => setIntakeForm({ ...intakeForm, notes: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400" rows={3} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("notes.initial_note", locale)}</label>
+            <textarea
+              value={intakeForm.initialNote}
+              onChange={(e) => setIntakeForm({ ...intakeForm, initialNote: e.target.value })}
+              rows={3}
+              maxLength={5000}
+              aria-label={t("notes.initial_note", locale)}
+              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+              placeholder={t("notes.initial_note_helper", locale)}
+            />
+            <div className="mt-1 text-right text-xs text-slate-400">
+              {intakeForm.initialNote.length}/5000
+            </div>
           </div>
           <button onClick={() => void createIntake()} disabled={intaking || !intakeForm.email.trim()} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
             {intaking ? t("crm.detail.creating", locale) : t("crm.intake.submit", locale)}

@@ -69,6 +69,11 @@ class CreateProductDto {
   @IsOptional()
   @IsString()
   ownershipReason?: string;
+
+  // Phase 3 Round 2D: optional initial OperationalNote
+  @IsOptional()
+  @IsString()
+  initialNote?: string;
 }
 
 class SetChannelsDto {

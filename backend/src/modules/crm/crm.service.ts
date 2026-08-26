@@ -6,6 +6,7 @@ import { DomainEvents, type CustomerEventPayload, type PartnerEventPayload } fro
 import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError } from "../../shared/errors";
 import { normalizeEmail } from "../../shared/field-validation";
+import { normalizeInitialNote } from "../operational-notes/operational-notes.types";
 
 import { buildSortClause, type SortDirection } from '../../shared/sort';
 
@@ -16,6 +17,7 @@ export interface CreateCustomerInput {
   companyName?: string;
   email: string;
   phone?: string;
+  initialNote?: string;
 }
 
 export interface UpdateCustomerInput {
@@ -127,7 +129,23 @@ export class CrmService {
         } as CustomerEventPayload,
       });
 
-      return { customer, eventId };
+      // Phase 3 Round 2D: optional initial OperationalNote (same transaction)
+      const noteText = normalizeInitialNote(input.initialNote);
+      let initialNote: any = null;
+      if (noteText) {
+        initialNote = await tx.operationalNote.create({
+          data: {
+            entityType: "Customer",
+            entityId: customer.id,
+            text: noteText,
+            visibility: "INTERNAL",
+            authorUserId: null,
+            authorName: actor ?? null,
+          },
+        });
+      }
+
+      return { customer, eventId, initialNote };
     });
 
     await this.eventBus.publishPending();
@@ -1160,6 +1178,7 @@ export class CrmService {
       tags?: string[];
       notes?: string;
       assignedTo?: string;
+      initialNote?: string;
     },
     actorUsername?: string,
   ) {
@@ -1256,7 +1275,23 @@ export class CrmService {
         },
       });
 
-      return { customerId, relationId: relation.id, customerCreated, tier };
+      // Phase 3 Round 2D: optional initial OperationalNote (same transaction)
+      const noteText = normalizeInitialNote(input.initialNote);
+      let initialNote: any = null;
+      if (noteText && customerCreated) {
+        initialNote = await tx.operationalNote.create({
+          data: {
+            entityType: "Customer",
+            entityId: customerId,
+            text: noteText,
+            visibility: "INTERNAL",
+            authorUserId: null,
+            authorName: actorUsername ?? null,
+          },
+        });
+      }
+
+      return { customerId, relationId: relation.id, customerCreated, tier, initialNote };
     });
   }
 

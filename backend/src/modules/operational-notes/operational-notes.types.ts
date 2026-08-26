@@ -82,3 +82,19 @@ export function validateNoteText(text: string): string {
   }
   return trimmed;
 }
+
+/**
+ * Normalize an optional initialNote from a create DTO.
+ * Returns null if omitted/empty/whitespace-only, trimmed text if valid,
+ * throws if >5000 chars.
+ */
+export function normalizeInitialNote(text: string | null | undefined): string | null {
+  if (text === null || text === undefined) return null;
+  if (typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.length > MAX_NOTE_TEXT_LENGTH) {
+    throw new Error(`Initial note must not exceed ${MAX_NOTE_TEXT_LENGTH} characters`);
+  }
+  return trimmed;
+}

@@ -269,6 +269,7 @@ export const partnerApi = {
     categoryId?: string;
     attributes?: Record<string, unknown>;
     tariffs?: { name: string; price: number; currency?: string }[];
+    initialNote?: string;
   }): Promise<{ product: { id: string }; eventId?: string }> => api.post(`/products`, body),
   updateProduct: (
     id: string,

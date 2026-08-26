@@ -37,7 +37,7 @@ export default function PartnerCustomersPage() {
   // ── Pro-only: intake ──
   const [showIntake, setShowIntake] = useState(false);
   const [intaking, setIntaking] = useState(false);
-  const [intakeForm, setIntakeForm] = useState({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "" });
+  const [intakeForm, setIntakeForm] = useState({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "", initialNote: "" });
 
   // ── Pro-only: relation editing ──
   const [editingRelation, setEditingRelation] = useState(false);
@@ -111,9 +111,10 @@ export default function PartnerCustomersPage() {
         phone: intakeForm.phone.trim() || undefined,
         leadSource: intakeForm.leadSource || undefined,
         notes: intakeForm.notes.trim() || undefined,
+        initialNote: intakeForm.initialNote.trim() || undefined,
       });
       setShowIntake(false);
-      setIntakeForm({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "" });
+      setIntakeForm({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "", initialNote: "" });
       await loadCustomers();
       await openDetail(result.customerId);
     } catch (e) {
@@ -307,6 +308,21 @@ export default function PartnerCustomersPage() {
           <div>
             <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Заметки</label>
             <textarea value={intakeForm.notes} onChange={(e) => setIntakeForm({ ...intakeForm, notes: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" rows={3} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Примечание</label>
+            <textarea
+              value={intakeForm.initialNote}
+              onChange={(e) => setIntakeForm({ ...intakeForm, initialNote: e.target.value })}
+              rows={3}
+              maxLength={5000}
+              aria-label="Примечание"
+              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400"
+              placeholder="Внутренняя заметка для сотрудников"
+            />
+            <div className="mt-1 text-right text-xs text-slate-400">
+              {intakeForm.initialNote.length}/5000
+            </div>
           </div>
           <button
             onClick={() => void createIntake()}

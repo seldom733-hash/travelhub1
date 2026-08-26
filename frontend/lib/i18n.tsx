@@ -996,6 +996,10 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "notes.validation_empty": { ru: "Текст не может быть пустым", az: "Mətn boş ola bilməz", en: "Text cannot be empty" },
   "notes.validation_max": { ru: "Текст не может превышать 5000 символов", az: "Mətn 5000 simvoldan çox ola bilməz", en: "Text cannot exceed 5000 characters" },
   "crm.detail.notes": { ru: "Примечания", az: "Qeydlər", en: "Notes" },
+  // Phase 3 Round 2D: initial note field in create forms
+  "notes.initial_note": { ru: "Примечание", az: "Qeyd", en: "Note" },
+  "notes.initial_note_helper": { ru: "Внутренняя заметка для сотрудников", az: "İşçilər üçün daxili qeyd", en: "Internal note for staff" },
+  "notes.initial_note_max": { ru: "до 5000 символов", az: "5000 simvola qədər", en: "up to 5000 characters" },
 
 };
 

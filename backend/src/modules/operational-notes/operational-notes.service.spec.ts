@@ -17,6 +17,7 @@
 
 import {
   validateNoteText,
+  normalizeInitialNote,
   isValidEntityType,
   isValidVisibility,
   MAX_NOTE_TEXT_LENGTH,
@@ -843,5 +844,249 @@ describe('OperationalNotesService - Authority Matrix', () => {
     expect(note.text).toBe('Waiting for bank confirmation');
     expect(note).not.toHaveProperty('paidAt');
     expect(note).not.toHaveProperty('status');
+  });
+});
+
+// ─── normalizeInitialNote Tests (Phase 3 Round 2D) ─────────────────
+
+describe('normalizeInitialNote', () => {
+  it('returns null for undefined', () => {
+    expect(normalizeInitialNote(undefined)).toBeNull();
+  });
+
+  it('returns null for null', () => {
+    expect(normalizeInitialNote(null)).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(normalizeInitialNote('')).toBeNull();
+  });
+
+  it('returns null for whitespace-only string', () => {
+    expect(normalizeInitialNote('   \n\t  ')).toBeNull();
+  });
+
+  it('trims and returns valid text', () => {
+    expect(normalizeInitialNote('  Ожидаем оплату  ')).toBe('Ожидаем оплату');
+  });
+
+  it('supports Unicode text (RU/AZ/EN)', () => {
+    expect(normalizeInitialNote('Приметка на русском')).toBe('Приметка на русском');
+    expect(normalizeInitialNote('Azərbaycan qeydi')).toBe('Azərbaycan qeydi');
+    expect(normalizeInitialNote('English note')).toBe('English note');
+  });
+
+  it('supports multiline text', () => {
+    expect(normalizeInitialNote('Line 1\nLine 2\nLine 3')).toBe('Line 1\nLine 2\nLine 3');
+  });
+
+  it('rejects text exceeding 5000 characters', () => {
+    const longText = 'x'.repeat(5001);
+    expect(() => normalizeInitialNote(longText)).toThrow('must not exceed 5000');
+  });
+
+  it('accepts text at exactly 5000 characters', () => {
+    const maxText = 'x'.repeat(5000);
+    expect(normalizeInitialNote(maxText)).toBe(maxText);
+  });
+
+  it('returns null for non-string values', () => {
+    expect(normalizeInitialNote(123 as any)).toBeNull();
+    expect(normalizeInitialNote(true as any)).toBeNull();
+  });
+});
+
+// ─── Entity-Specific Initial Note Integration Tests ─────────────────
+
+describe('createEntityWithInitialNote - All Entity Types', () => {
+  function createMockPrisma() {
+    const makeFindUnique = (exists: boolean) => jest.fn().mockResolvedValue(exists ? { id: 'test-id' } : null);
+    return {
+      $transaction: jest.fn(async (fn: any) => fn({
+        customer: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'cust-1', code: 'CUS-000001' }) },
+        partner: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'par-1', code: 'PAR-000001' }) },
+        order: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'ord-1', code: 'ORD-000001' }) },
+        booking: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'bkg-1', code: 'BKG-000001' }) },
+        payment: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'pay-1', code: 'PAY-000001' }) },
+        refund: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'rfd-1', code: 'RFD-000001' }) },
+        product: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'prd-1', code: 'PRD-000001' }) },
+        fulfillment: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'ful-1' }) },
+        reservation: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'res-1' }) },
+        buyerRequest: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'brq-1' }) },
+        partnerApplication: { findUnique: makeFindUnique(true), create: jest.fn().mockResolvedValue({ id: 'app-1' }) },
+        operationalNote: { create: jest.fn().mockImplementation((args: any) => Promise.resolve({ id: 'note-1', ...args.data })) },
+      })),
+    };
+  }
+
+  const actor = { userId: 'user-1', username: 'admin', fullName: 'Admin User' };
+
+  const ENTITY_TYPES = ['Customer', 'Partner', 'Order', 'Booking', 'Payment', 'Refund', 'Product'] as const;
+
+  for (const entityType of ENTITY_TYPES) {
+    it(`${entityType}: creates entity + initial note atomically`, async () => {
+      const prisma = createMockPrisma();
+      const service = new (OperationalNotesService as any)(prisma, {});
+      const result = await service.createEntityWithInitialNote(
+        async (tx: any) => ({ id: `${entityType.toLowerCase()}-1` }),
+        entityType,
+        (entity: any) => entity.id,
+        'Test initial note',
+        actor,
+      );
+      expect(result.entity).toBeDefined();
+      expect(result.note).toBeDefined();
+      expect(result.note.text).toBe('Test initial note');
+      expect(result.note.visibility).toBe('INTERNAL');
+    });
+
+    it(`${entityType}: no note when initialNote is null`, async () => {
+      const prisma = createMockPrisma();
+      const service = new (OperationalNotesService as any)(prisma, {});
+      const result = await service.createEntityWithInitialNote(
+        async (tx: any) => ({ id: `${entityType.toLowerCase()}-1` }),
+        entityType,
+        (entity: any) => entity.id,
+        null,
+        actor,
+      );
+      expect(result.entity).toBeDefined();
+      expect(result.note).toBeNull();
+    });
+
+    it(`${entityType}: no note when initialNote is empty string`, async () => {
+      const prisma = createMockPrisma();
+      const service = new (OperationalNotesService as any)(prisma, {});
+      const result = await service.createEntityWithInitialNote(
+        async (tx: any) => ({ id: `${entityType.toLowerCase()}-1` }),
+        entityType,
+        (entity: any) => entity.id,
+        '   ',
+        actor,
+      );
+      expect(result.entity).toBeDefined();
+      expect(result.note).toBeNull();
+    });
+
+    it(`${entityType}: rejects note > 5000 chars - parent not created`, async () => {
+      const prisma = createMockPrisma();
+      const service = new (OperationalNotesService as any)(prisma, {});
+      await expect(
+        service.createEntityWithInitialNote(
+          async (tx: any) => ({ id: `${entityType.toLowerCase()}-1` }),
+          entityType,
+          (entity: any) => entity.id,
+          'x'.repeat(5001),
+          actor,
+        ),
+      ).rejects.toThrow('5000');
+    });
+
+    it(`${entityType}: server sets authorUserId and authorName`, async () => {
+      const prisma = createMockPrisma();
+      const service = new (OperationalNotesService as any)(prisma, {});
+      const result = await service.createEntityWithInitialNote(
+        async (tx: any) => ({ id: `${entityType.toLowerCase()}-1` }),
+        entityType,
+        (entity: any) => entity.id,
+        'Note with author',
+        actor,
+      );
+      expect(result.note.authorUserId).toBe('user-1');
+      expect(result.note.authorName).toBe('Admin User');
+    });
+  }
+
+  it('BuyerRequest: external-flow does not create INTERNAL note', async () => {
+    const prisma = createMockPrisma();
+    const service = new (OperationalNotesService as any)(prisma, {});
+    // External buyer request should NOT create an internal note
+    const result = await service.createEntityWithInitialNote(
+      async (tx: any) => ({ id: 'brq-1' }),
+      'BuyerRequest',
+      (entity: any) => entity.id,
+      null, // External: no initialNote
+      { userId: 'buyer-1', username: 'buyer', fullName: 'Buyer' },
+    );
+    expect(result.entity).toBeDefined();
+    expect(result.note).toBeNull();
+  });
+
+  it('PartnerApplication: external-flow does not create INTERNAL note', async () => {
+    const prisma = createMockPrisma();
+    const service = new (OperationalNotesService as any)(prisma, {});
+    const result = await service.createEntityWithInitialNote(
+      async (tx: any) => ({ id: 'app-1' }),
+      'PartnerApplication',
+      (entity: any) => entity.id,
+      null, // External: no initialNote
+      { userId: 'applicant-1', username: 'applicant', fullName: 'Applicant' },
+    );
+    expect(result.entity).toBeDefined();
+    expect(result.note).toBeNull();
+  });
+});
+
+// ─── Authority Forgery Tests ──────────────────────────────────────────
+
+describe('Initial Note Authority Forgery', () => {
+  function createMockPrisma() {
+    return {
+      $transaction: jest.fn(async (fn: any) => fn({
+        customer: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'cust-1' }),
+          create: jest.fn().mockResolvedValue({ id: 'cust-1', code: 'CUS-000001' }),
+        },
+        operationalNote: {
+          create: jest.fn().mockImplementation((args: any) =>
+            Promise.resolve({ id: 'note-1', ...args.data }),
+          ),
+        },
+      })),
+    };
+  }
+
+  it('client cannot forge authorUserId', async () => {
+    const prisma = createMockPrisma();
+    const service = new (OperationalNotesService as any)(prisma, {});
+    const actor = { userId: 'real-user', username: 'real', fullName: 'Real' };
+    const result = await service.createEntityWithInitialNote(
+      async (tx: any) => ({ id: 'cust-1' }),
+      'Customer',
+      (e: any) => e.id,
+      'test note',
+      actor,
+    );
+    expect(result.note.authorUserId).toBe('real-user');
+    expect(result.note.authorUserId).not.toBe('forged-admin');
+  });
+
+  it('visibility is always INTERNAL regardless of input', async () => {
+    const prisma = createMockPrisma();
+    const service = new (OperationalNotesService as any)(prisma, {});
+    const actor = { userId: 'user-1', username: 'user', fullName: 'User' };
+    const result = await service.createEntityWithInitialNote(
+      async (tx: any) => ({ id: 'cust-1' }),
+      'Customer',
+      (e: any) => e.id,
+      'test note',
+      actor,
+    );
+    expect(result.note.visibility).toBe('INTERNAL');
+  });
+
+  it('entityType and entityId come from create flow, not client', async () => {
+    const prisma = createMockPrisma();
+    const service = new (OperationalNotesService as any)(prisma, {});
+    const actor = { userId: 'user-1', username: 'user', fullName: 'User' };
+    const result = await service.createEntityWithInitialNote(
+      async (tx: any) => ({ id: 'actual-entity-id' }),
+      'Customer',
+      (e: any) => e.id,
+      'test note',
+      actor,
+    );
+    expect(result.note.entityType).toBe('Customer');
+    expect(result.note.entityId).toBe('actual-entity-id');
   });
 });
