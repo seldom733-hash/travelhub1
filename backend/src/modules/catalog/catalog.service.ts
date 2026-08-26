@@ -5,6 +5,7 @@ import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type ProductEventPayload } from "../../eventbus/domain-events";
 import { IdsService } from "../../shared/ids.service";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationDomainError } from "../../shared/errors";
+import { buildSortClause } from "../../shared/sort";
 import { uniqueConstraintNames } from "../../shared/prisma-errors";
 import { validateAttributes, validateCategorySlug, validateSchemaConfig, toCategoryEditorContract, type AttributeDef, type CategoryEditorSchemaContract } from "./category-schema.validation";
 import { isIanaTimeZone } from "../../shared/service-time";
@@ -114,6 +115,9 @@ export interface ProductListQuery {
   unsold?: string;
   /** ROUND 5: Products without availability configured (detector: REVIEW_AVAILABILITY). */
   availability?: string;
+  /** Shared Table Sorting: server-side single-column sort. */
+  sortBy?: string;
+  sortDirection?: string;
 }
 
 /**
@@ -354,7 +358,7 @@ export class CatalogService implements OnModuleInit {
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
-        orderBy: this.listOrderBy(query.sort),
+        orderBy: this.listOrderBy(query.sort, query.sortBy, query.sortDirection),
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {
@@ -477,7 +481,20 @@ export class CatalogService implements OnModuleInit {
   }
 
   /** Step 1.8: orderBy для My Products (updated_desc — по умолчанию). */
-  private listOrderBy(sort?: string): Prisma.ProductOrderByWithRelationInput[] {
+  private static readonly CATALOG_SORT_ALLOWLIST: Record<string, string> = {
+    code: 'code',
+    name: 'title',
+    type: 'type',
+    status: 'status',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt',
+  };
+
+  /** Shared Table Sorting: supports sortBy/sortDirection or legacy sort param. */
+  private listOrderBy(sort?: string, sortBy?: string, sortDirection?: string): Prisma.ProductOrderByWithRelationInput[] {
+    if (sortBy) {
+      return buildSortClause(sortBy, sortDirection, CatalogService.CATALOG_SORT_ALLOWLIST, { createdAt: 'desc' });
+    }
     switch (sort) {
       case "updated_asc":
         return [{ updatedAt: "asc" }];

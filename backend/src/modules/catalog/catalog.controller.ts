@@ -6,6 +6,7 @@ import { ProductStatus, ProductType, PublicationChannel, RoleCode } from "../../
 import { CatalogService } from "./catalog.service";
 import { ProductMediaService } from "./media/product-media.service";
 import { ValidationDomainError } from "../../shared/errors";
+import { buildSortClause, type SortDirection } from "../../shared/sort";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, Public, RequirePermissions } from "../../security/auth/decorators";
@@ -155,6 +156,15 @@ class ListProductsQuery {
   @IsOptional()
   @IsString()
   availability?: string;
+
+  // Shared Table Sorting contract: server-side single-column sort
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  sortDirection?: SortDirection;
 }
 
 class CreateCategoryDto {

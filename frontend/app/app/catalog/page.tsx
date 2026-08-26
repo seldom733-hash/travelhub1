@@ -8,6 +8,7 @@ import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
 import PanelFrame from "@/components/PanelFrame";
 import Pagination from "@/components/Pagination";
+import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import TariffEditor, { newTariffDraft, tariffDraftsFrom, type TariffDraft } from "@/components/TariffEditor";
 import { useCan } from "@/lib/use-can";
 
@@ -23,7 +24,7 @@ const PRODUCT_TYPES = [
   { code: "PHOTOGRAPHER", title: "Фотограф" },
 ];
 
-function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: { initialStatus: string; initialUnsold?: string; initialAvailability?: string }) {
+function CatalogContent({ initialStatus, initialUnsold, initialAvailability, initialSortBy, initialSortDirection }: { initialStatus: string; initialUnsold?: string; initialAvailability?: string; initialSortBy?: string; initialSortDirection?: SortDirection }) {
   const [data, setData] = useState<Page<Product> | null>(null);
   const [selected, setSelected] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
@@ -59,6 +60,16 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ title: "", description: "" });
 
+  const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
+  const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
+
+  const sortState = sortBy ? { sortBy, sortDirection: sortDirection ?? ("desc" as SortDirection) } : null;
+
+  const handleSort = (field: string, direction: SortDirection) => {
+    setSortBy(field);
+    setSortDirection(direction);
+    setPage(1);
+  };
   const load = async () => {
     setBusy(true);
     try {
@@ -67,6 +78,8 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
       if (status) qs.set("status", status);
       if (unsold) qs.set("unsold", unsold);
       if (availability) qs.set("availability", availability);
+      if (sortBy) qs.set("sortBy", sortBy);
+      if (sortDirection) qs.set("sortDirection", sortDirection);
       qs.set("page", String(page));
       qs.set("pageSize", "20");
       const res = await api.get<Page<Product>>(`/products?${qs.toString()}`);
@@ -82,7 +95,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, unsold, availability, page]);
+  }, [search, status, unsold, availability, sortBy, sortDirection, page]);
 
   const openDetail = async (id: string) => {
     setShowCreate(false);
@@ -262,11 +275,11 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability }: {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">Код</th>
-                  <th className="px-4 py-2.5 font-medium">Название</th>
-                  <th className="px-4 py-2.5 font-medium">Тип</th>
+                  <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>Код</SortableHeader>
+                  <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>Название</SortableHeader>
+                  <SortableHeader field="type" currentSort={sortState} onSort={handleSort}>Тип</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">Тарифы</th>
-                  <th className="px-4 py-2.5 font-medium">Статус</th>
+                  <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>Статус</SortableHeader>
                   {unsold === "true" && <th className="px-4 py-2.5 font-medium text-blue-600">Заказы</th>}
                   {availability === "missing" && <th className="px-4 py-2.5 font-medium text-amber-600">Доступность</th>}
                 </tr>
@@ -524,6 +537,8 @@ function CatalogWithParams() {
       initialStatus={sp.get("status") ?? ""}
       initialUnsold={sp.get("unsold") ?? ""}
       initialAvailability={sp.get("availability") ?? ""}
+      initialSortBy={sp.get("sortBy") ?? undefined}
+      initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
     />
   );
 }
