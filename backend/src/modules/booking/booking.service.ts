@@ -117,6 +117,33 @@ export class BookingService {
     private readonly query: BookingQueryService,
   ) {}
 
+  /**
+   * Resolve search term to matching booking IDs.
+   * Searches: booking code, passenger name, order number.
+   * Cross-schema references use separate queries (ADR-0001).
+   */
+  private async resolveBookingSearchIds(search: string): Promise<string[]> {
+    const s = search.trim();
+    if (!s) return [];
+    const bookingIds = new Set<string>();
+    // 1) Match booking code
+    const byCode = await (this.prisma as any).booking.findMany({ where: { code: { contains: s, mode: "insensitive" } }, select: { id: true } });
+    for (const r of byCode) bookingIds.add(r.id);
+    // 2) Match traveler/passenger names → find orderIds → find bookings
+    const travelers = await (this.prisma as any).orderTraveler.findMany({ where: { OR: [{ firstName: { contains: s, mode: "insensitive" } }, { lastName: { contains: s, mode: "insensitive" } }] }, select: { orderId: true } });
+    const orderIds = new Set<string>();
+    for (const t of travelers) { if (t.orderId) orderIds.add(t.orderId); }
+    // 3) Match order number
+    const orders = await (this.prisma as any).order.findMany({ where: { number: { contains: s, mode: "insensitive" } }, select: { id: true } });
+    for (const o of orders) orderIds.add(o.id);
+    // 4) Find bookings by matching order IDs
+    if (orderIds.size > 0) {
+      const byOrder = await (this.prisma as any).booking.findMany({ where: { orderId: { in: [...orderIds] } }, select: { id: true } });
+      for (const b of byOrder) bookingIds.add(b.id);
+    }
+    return [...bookingIds];
+  }
+
   async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; slaMinutes?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
@@ -124,7 +151,7 @@ export class BookingService {
     const where: Prisma.BookingWhereInput = {
       ...(query.status ? { status: query.status as BookingStatus } : {}),
       ...(query.orderId ? { orderId: query.orderId } : {}),
-      ...(query.search ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }] } : {}),
+      ...(query.search ? { id: { in: await this.resolveBookingSearchIds(query.search) } } : {}),
       // ROUND 5: upcoming=true → detector: status IN (CONFIRMED, NEW) AND serviceDate >= now
       ...(query.upcoming === "true" ? {
         status: { in: ["CONFIRMED", "NEW"] as BookingStatus[] },

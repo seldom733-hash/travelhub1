@@ -20,13 +20,14 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-slate-600 hover:bg-slate-700", only: ["NEW", "PREPARING_REQUEST", "SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION", "CONFIRMED", "IN_SERVICE"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, initialSortBy, initialSortDirection }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean; slaMinutes?: string; initialSortBy?: string; initialSortDirection?: SortDirection }) {
+function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, initialSortBy, initialSortDirection, initialSearch }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean; slaMinutes?: string; initialSortBy?: string; initialSortDirection?: SortDirection; initialSearch?: string }) {
   const [data, setData] = useState<Page<Booking> | null>(null);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [orderRef, setOrderRef] = useState<{ code: string; number: string; status: string } | null>(null);
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
+  const [search, setSearch] = useState(initialSearch || "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Derived filter labels for display
@@ -65,6 +66,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
     try {
       const qs = new URLSearchParams();
       qs.set('pageSize', '20');
+      if (search) qs.set('search', search);
       qs.set('page', String(page));
       if (upcomingOnly) qs.set('upcoming', 'true');
       if (overdueOnly) qs.set('overdue', 'true');
@@ -84,7 +86,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [upcomingOnly, statusFilter, overdueOnly, slaMinutes, sortBy, sortDirection, page]);
+  }, [upcomingOnly, statusFilter, overdueOnly, slaMinutes, sortBy, sortDirection, page, search]);
 
   const openDetail = async (id: string) => {
     const booking = await api.get<Booking>(`/bookings/${id}`);
@@ -142,6 +144,14 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
               { label: "Отменено/отклонено", value: counts.cancelled, icon: "🚫", accent: "#dc2626" },
             ]}
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void load(); }}
+              placeholder="Поиск: BKG-…, ORD-…, имя пассажира…"
+              className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            />
 
           {activeFilters.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -154,6 +164,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
           )}
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
           {busy && <span className="text-xs text-slate-400">загрузка…</span>}
+          </div>
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm">
@@ -294,6 +305,7 @@ function BookingsWithParams() {
       slaMinutes={sp.get("slaMinutes") || undefined}
       initialSortBy={sp.get("sortBy") ?? undefined}
       initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
+      initialSearch={sp.get("search") ?? ""}
     />
   );
 }

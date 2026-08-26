@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, type Customer, type Partner, type PartnerCustomer, type PartnerCustomerDetail, type CrmTierResponse, type PartnerIntakeResult, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
@@ -9,6 +9,7 @@ import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
 import PanelFrame from "@/components/PanelFrame";
 import SortableHeader, { type SortState, type SortDirection } from "@/components/SortableHeader";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCan } from "@/lib/use-can";
 import { useCurrentUser } from "@/lib/use-user";
 import { useLocale, t } from "@/lib/i18n";
@@ -22,15 +23,17 @@ type CrmContext = "platform" | "basic" | "pro";
  * 2. MARKETPLACE BASIC — limited customer management for marketplace partners
  * 3. STOREFRONT PRO — full CRM for partners with active Storefront
  */
-export default function CrmPage() {
+function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCustomerSearch, initialCustomerStatus, initialCustomerType, initialCustomerPage, initialPartnerSearch, initialPartnerStatus, initialPartnerPage }: { initialTab?: string; initialSortBy?: string; initialSortDirection?: string; initialCustomerSearch?: string; initialCustomerStatus?: string; initialCustomerType?: string; initialCustomerPage?: number; initialPartnerSearch?: string; initialPartnerStatus?: string; initialPartnerPage?: number }) {
   const locale = useLocale();
   const currentUser = useCurrentUser();
   const [crmContext, setCrmContext] = useState<CrmContext>("platform");
   const [crmTier, setCrmTier] = useState<"BASIC" | "PRO" | null>(null);
-  const [tab, setTab] = useState<Tab>("customers");
-  const [sortBy, setSortBy] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [tab, setTab] = useState<Tab>((initialTab === "partners" ? "partners" : "customers") as Tab);
+  const [sortBy, setSortBy] = useState<string | null>(initialSortBy ?? null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>((initialSortDirection as SortDirection) || "desc");
 
+  const router = useRouter();
+  const isInitialMount = useRef(true);
   const sortState: SortState | null = sortBy ? { sortBy, sortDirection } : null;
 
   const handleSort = (field: string, direction: SortDirection) => {
@@ -67,10 +70,10 @@ export default function CrmPage() {
   // ── Platform CRM state ──
   const [customerData, setCustomerData] = useState<Page<Customer> | null>(null);
   // selectedCustomer removed — use dedicated /app/crm/customers/:id page
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [customerPage, setCustomerPage] = useState(1);
-  const [customerStatusFilter, setCustomerStatusFilter] = useState<string | undefined>(undefined);
-  const [customerTypeFilter, setCustomerTypeFilter] = useState<string | undefined>(undefined);
+  const [customerSearch, setCustomerSearch] = useState(initialCustomerSearch ?? "");
+  const [customerPage, setCustomerPage] = useState(initialCustomerPage ?? 1);
+  const [customerStatusFilter, setCustomerStatusFilter] = useState<string | undefined>(initialCustomerStatus || undefined);
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<string | undefined>(initialCustomerType || undefined);
   // customerDetailTab removed — use dedicated /app/crm/customers/:id page
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -84,9 +87,9 @@ export default function CrmPage() {
   // ── Platform Partner CRM state ──
   const [partnerListData, setPartnerListData] = useState<Page<Partner> | null>(null);
   // selectedPartner removed — use dedicated /app/crm/partners/:id page
-  const [partnerSearch, setPartnerSearch] = useState("");
-  const [partnerPage, setPartnerPage] = useState(1);
-  const [partnerStatusFilter, setPartnerStatusFilter] = useState<string | undefined>(undefined);
+  const [partnerSearch, setPartnerSearch] = useState(initialPartnerSearch ?? "");
+  const [partnerPage, setPartnerPage] = useState(initialPartnerPage ?? 1);
+  const [partnerStatusFilter, setPartnerStatusFilter] = useState<string | undefined>(initialPartnerStatus || undefined);
   // partnerDetailTab removed — use dedicated /app/crm/partners/:id page
   const [partnerCustomerDetailTab, setPartnerCustomerDetailTab] = useState<"overview" | "orders" | "bookings" | "payments" | "relations">("overview");
   const [partnerError, setPartnerError] = useState("");
@@ -590,5 +593,31 @@ export default function CrmPage() {
         </aside>
       )}
     </div>
+  );
+}
+
+function CrmWithParams() {
+  const sp = useSearchParams();
+  return (
+    <CrmContent
+      initialTab={sp.get("tab") ?? undefined}
+      initialSortBy={sp.get("sortBy") ?? undefined}
+      initialSortDirection={sp.get("sortDirection") ?? undefined}
+      initialCustomerSearch={sp.get("search") ?? undefined}
+      initialCustomerStatus={sp.get("status") ?? undefined}
+      initialCustomerType={sp.get("type") ?? undefined}
+      initialCustomerPage={sp.get("page") ? parseInt(sp.get("page")!, 10) : undefined}
+      initialPartnerSearch={sp.get("pSearch") ?? undefined}
+      initialPartnerStatus={sp.get("pStatus") ?? undefined}
+      initialPartnerPage={sp.get("pPage") ? parseInt(sp.get("pPage")!, 10) : undefined}
+    />
+  );
+}
+
+export default function CrmPage() {
+  return (
+    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+      <CrmWithParams />
+    </Suspense>
   );
 }

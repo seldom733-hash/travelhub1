@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { api, type PlatformUser } from "@/lib/api";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
@@ -30,23 +31,26 @@ interface UsersResult {
   pageSize: number;
 }
 
-export default function UsersPage() {
+function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy, initialSortDirection, initialPage }: { initialSearch?: string; initialStatus?: string; initialRole?: string; initialSortBy?: string; initialSortDirection?: string; initialPage?: number }) {
   const locale = useLocale();
   const [users, setUsers] = useState<PlatformUser[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [sortBy, setSortBy] = useState<string | undefined>(undefined);
-  const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(undefined);
-  const [search, setSearch] = useState("");
-  const [draftSearch, setDraftSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
-  const [roleFilter, setRoleFilter] = useState<string | undefined>(undefined);
+  const [page, setPage] = useState(initialPage ?? 1);
+  const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
+  const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection as SortDirection | undefined);
+  // search already initialized above
+  const [draftSearch, setDraftSearch] = useState(initialSearch ?? "");
+  const [search, setSearch] = useState(initialSearch ?? "");
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(initialStatus || undefined);
+  const [roleFilter, setRoleFilter] = useState<string | undefined>(initialRole || undefined);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ username: "", password: "", fullName: "", email: "", roleCode: "OPERATOR" });
 
+  const router = useRouter();
+  const isInitialMount = useRef(true);
   const handleSort = (field: string, direction: SortDirection) => {
     setSortBy(field);
     setSortDirection(direction);
@@ -78,6 +82,20 @@ export default function UsersPage() {
     void load(page, search, sortBy, sortDirection, statusFilter, roleFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, search, sortBy, sortDirection, statusFilter, roleFilter]);
+
+  // URL sync
+  useEffect(() => {
+    if (isInitialMount.current) { isInitialMount.current = false; return; }
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (statusFilter) params.set("status", statusFilter);
+    if (roleFilter) params.set("role", roleFilter);
+    if (sortBy) params.set("sortBy", sortBy);
+    if (sortDirection) params.set("sortDirection", sortDirection);
+    if (page > 1) params.set("page", String(page));
+    const qs = params.toString();
+    router.replace(qs ? `/app/users?${qs}` : "/app/users", { scroll: false });
+  }, [search, statusFilter, roleFilter, sortBy, sortDirection, page]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -347,5 +365,27 @@ export default function UsersPage() {
         </PanelFrame>
       )}
     </div>
+  );
+}
+
+function UsersWithParams() {
+  const sp = useSearchParams();
+  return (
+    <UsersContent
+      initialSearch={sp.get("search") ?? undefined}
+      initialStatus={sp.get("status") ?? undefined}
+      initialRole={sp.get("role") ?? undefined}
+      initialSortBy={sp.get("sortBy") ?? undefined}
+      initialSortDirection={sp.get("sortDirection") ?? undefined}
+      initialPage={sp.get("page") ? parseInt(sp.get("page")!, 10) : undefined}
+    />
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+      <UsersWithParams />
+    </Suspense>
   );
 }
