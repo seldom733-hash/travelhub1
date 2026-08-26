@@ -1822,6 +1822,41 @@ model PartnerCustomerRelationHistory {
   @@schema("crm")
 }
 
+/// PHASE 3 STEP 3.5 — Shared Operational Note entity.
+/// Polymorphic reference: entityType + entityId (no cross-schema FK, ADR-0001).
+/// Append-only operational context: manually entered business notes.
+/// NOT a replacement for status, business dates, reasons, audit events, or history.
+///
+/// Invariants:
+///  - authorUserId: server-authoritative (authenticated actor), never client-forged
+///  - createdAt/updatedAt: server/DB authoritative, never client-forged
+///  - visibility: defaults to INTERNAL, server-controlled
+///  - entityType: strict enum, server-controlled (not arbitrary free text)
+///  - entityId: validated parent existence + scope, server-resolved
+///  - text: plain text, max 5000 chars, trimmed, non-empty on record creation
+///  - scope: inherited from parent entity, never broadened
+///  - Ordering: (createdAt DESC, id DESC) deterministic, tie-break stable
+///  - Pagination: notes are append-only / unbounded, independently pageable
+///  - Soft delete: deletedAt/deletedBy preserve audit trail
+model OperationalNote {
+  id           String   @id @default(uuid())
+  entityType   String   // Customer|Partner|Order|Booking|Payment|Refund|Product|Fulfillment|Reservation|BuyerRequest|PartnerApplication
+  entityId     String
+  text         String   @db.Text // 1-5000 chars, plain text
+  visibility   String   @default("INTERNAL") // INTERNAL|PARTNER_VISIBLE|CUSTOMER_VISIBLE
+  authorUserId String?
+  authorName   String?  // snapshot for historical rendering
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  editedAt     DateTime?
+  deletedAt    DateTime?
+  deletedBy    String?
+
+  @@index([entityType, entityId, createdAt])
+  @@index([authorUserId, createdAt])
+  @@schema("crm")
+}
+
 // ─────────────────────────────── order.* ─────────────────────────────────
 
 enum OrderStatus {
