@@ -8,6 +8,7 @@ import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
 import PanelFrame from "@/components/PanelFrame";
+import SortableHeader, { type SortState, type SortDirection } from "@/components/SortableHeader";
 import { useCan } from "@/lib/use-can";
 import { useCurrentUser } from "@/lib/use-user";
 import { useLocale, t } from "@/lib/i18n";
@@ -27,6 +28,17 @@ export default function CrmPage() {
   const [crmContext, setCrmContext] = useState<CrmContext>("platform");
   const [crmTier, setCrmTier] = useState<"BASIC" | "PRO" | null>(null);
   const [tab, setTab] = useState<Tab>("customers");
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const sortState: SortState | null = sortBy ? { sortBy, sortDirection } : null;
+
+  const handleSort = (field: string, direction: SortDirection) => {
+    setSortBy(field);
+    setSortDirection(direction);
+    setCustomerPage(1);
+    setPartnerPage(1);
+  };
 
   // ── Permissions ──
   const canWrite = useCan("crm.customer.write");
@@ -92,13 +104,15 @@ export default function CrmPage() {
       if (customerSearch) qs.set("search", customerSearch);
       qs.set("page", String(customerPage));
       qs.set("pageSize", "20");
+      if (sortBy) qs.set("sortBy", sortBy);
+      if (sortBy) qs.set("sortDirection", sortDirection);
       const res = await api.get<Page<Customer>>(`/customers?${qs.toString()}`);
       setCustomerData(res);
     } catch (e) {
       setLoadError(true);
       setError((e as Error).message);
     }
-  }, [customerSearch, customerPage]);
+  }, [customerSearch, customerPage, sortBy, sortDirection]);
 
   // ── Platform Partner loading ──
   const loadPartners = useCallback(async () => {
@@ -108,13 +122,15 @@ export default function CrmPage() {
       if (partnerSearch) qs.set("search", partnerSearch);
       qs.set("page", String(partnerPage));
       qs.set("pageSize", "20");
+      if (sortBy) qs.set("sortBy", sortBy);
+      if (sortBy) qs.set("sortDirection", sortDirection);
       const res = await api.get<Page<Partner>>(`/partners?${qs.toString()}`);
       setPartnerListData(res);
     } catch (e) {
       setPartnerLoadError(true);
       setPartnerError((e as Error).message);
     }
-  }, [partnerSearch, partnerPage]);
+  }, [partnerSearch, partnerPage, sortBy, sortDirection]);
 
   // ── Partner Customer loading (partner context) ──
   const loadPartnerCustomers = useCallback(async () => {
@@ -268,11 +284,10 @@ export default function CrmPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                     <tr>
-                      <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
-                      <th className="px-4 py-2.5 font-medium">{t("crm.col.name", locale)}</th>
-                      <th className="px-4 py-2.5 font-medium">{t("crm.col.email", locale)}</th>
-                      <th className="px-4 py-2.5 font-medium">{t("crm.col.type", locale)}</th>
-                      <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                      <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
+                      <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.name", locale)}</SortableHeader>
+                      <SortableHeader field="email" currentSort={sortState} onSort={handleSort}>{t("crm.col.email", locale)}</SortableHeader>
+                      <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                     </tr>
                   </thead>
                   <tbody>
@@ -302,11 +317,11 @@ export default function CrmPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                     <tr>
-                      <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
-                      <th className="px-4 py-2.5 font-medium">{t("crm.col.name", locale)}</th>
-                      <th className="px-4 py-2.5 font-medium">{t("crm.col.email", locale)}</th>
-                      <th className="px-4 py-2.5 font-medium">{t("crm.col.country", locale)}</th>
-                      <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                      <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
+                      <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.name", locale)}</SortableHeader>
+                      <SortableHeader field="email" currentSort={sortState} onSort={handleSort}>{t("crm.col.email", locale)}</SortableHeader>
+                      <SortableHeader field="country" currentSort={sortState} onSort={handleSort}>{t("crm.col.country", locale)}</SortableHeader>
+                      <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                     </tr>
                   </thead>
                   <tbody>
@@ -383,12 +398,10 @@ export default function CrmPage() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("crm.col.name", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("crm.col.email", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("crm.col.type", locale)}</th>
-                  {crmTier === "PRO" && <th className="px-4 py-2.5 font-medium">{t("crm.col.lifecycle", locale)}</th>}
-                  <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
+                  <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("crm.col.code", locale)}</SortableHeader>
+                  <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("crm.col.name", locale)}</SortableHeader>
+                  <SortableHeader field="email" currentSort={sortState} onSort={handleSort}>{t("crm.col.email", locale)}</SortableHeader>
+                  <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
                 </tr>
               </thead>
               <tbody>
