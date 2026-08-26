@@ -272,7 +272,7 @@ export class FinanceController {
     // raw req.body — forged server-owned поля (money/status/milestones/...) → 422.
     assertNoForbiddenKeys(req.body, PAYMENT_CREATE_FORBIDDEN_KEYS);
     return this.payments.createPayment(
-      { orderId: dto.orderId, paymentMethod: dto.paymentMethod ?? null },
+      { orderId: dto.orderId, paymentMethod: dto.paymentMethod ?? null, initialNote: dto.initialNote },
       { id: actor.id, username: actor.username },
     );
   }
@@ -319,7 +319,7 @@ export class FinanceController {
     // raw req.body — forged server-owned поля (money/status/milestones/...) → 422.
     assertNoForbiddenKeys(req.body, REFUND_CREATE_FORBIDDEN_KEYS);
     return this.refunds.createRefund(
-      { paymentId: dto.paymentId, amount: dto.amount, reason: dto.reason ?? null },
+      { paymentId: dto.paymentId, amount: dto.amount, reason: dto.reason ?? null, initialNote: dto.initialNote },
       { id: actor.id, username: actor.username },
     );
   }

@@ -42,6 +42,7 @@ import { getRequestContext } from "../../shared/request-context";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type PaymentEventPayload } from "../../eventbus/domain-events";
 import { validateFrozenMoneyFact } from "../sales/sales.money";
+import { normalizeInitialNote } from "../operational-notes/operational-notes.types";
 
 /** Cardinality partial unique index (schema): ≤1 активный Payment на Order. */
 const PAYMENT_ONE_ACTIVE_PER_ORDER = "Payment_one_active_per_order";
@@ -75,13 +76,17 @@ export class PaymentService {
    * create с активным Payment → существующий факт (no-op, identical retry =
    * same effect); concurrent duplicate → P2002 → controlled 409.
    */
-  async createPayment(input: { orderId: string; paymentMethod?: string | null }, actor: Actor): Promise<Record<string, unknown>> {
+  async createPayment(input: { orderId: string; paymentMethod?: string | null; initialNote?: string }, actor: Actor): Promise<Record<string, unknown>> {
     const orderId = input.orderId.trim();
     if (!orderId) throw new ValidationDomainError("orderId is required");
     const paymentMethod = input.paymentMethod ? input.paymentMethod.trim() : null;
     if (paymentMethod && paymentMethod.length > 64) {
       throw new ValidationDomainError("paymentMethod must not exceed 64 characters");
     }
+
+    // Phase 3 Round 2D.1: validate initialNote BEFORE transaction (pre-tx validation)
+    // so >5000 rejection prevents Payment creation entirely.
+    const noteText = normalizeInitialNote(input.initialNote);
 
     // READ-only cross-context read (ADR-0001): Order — owner обязательства.
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
@@ -150,6 +155,21 @@ export class PaymentService {
           eventType: DomainEvents.PaymentCreated,
           payload: emitPayload(created.id, created.code),
         });
+
+        // Phase 3 Round 2D.1: optional initial OperationalNote (same transaction)
+        if (noteText) {
+          await tx.operationalNote.create({
+            data: {
+              entityType: "Payment",
+              entityId: created.id,
+              text: noteText,
+              visibility: "INTERNAL",
+              authorUserId: actor.id,
+              authorName: actor.username,
+            },
+          });
+        }
+
         return this.paymentDto(created);
       });
     } catch (err) {

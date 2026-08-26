@@ -28,6 +28,7 @@ interface PrismaStub {
     aggregate: jest.Mock;
   };
   refundHistory: { create: jest.Mock };
+  operationalNote: { create: jest.Mock };
   $executeRaw: jest.Mock;
   $transaction: jest.Mock;
 }
@@ -73,6 +74,7 @@ function makePrismaStub(): PrismaStub {
       aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
     },
     refundHistory: { create: jest.fn().mockResolvedValue({ id: "h1" }) },
+    operationalNote: { create: jest.fn().mockImplementation((args: any) => Promise.resolve({ id: "note-1", ...args.data })) },
     $executeRaw: jest.fn().mockResolvedValue(undefined),
     $transaction: jest.fn(),
   };
@@ -166,6 +168,64 @@ describe("RefundService (Step 2.13)", () => {
       prisma.refund.create.mockRejectedValue({ code: "P2002", meta: { target: ["Refund_one_active_per_payment_amount"] } });
       const service = makeService(prisma);
       await expect(service.createRefund({ paymentId: "pay-1", amount: "50" }, ACTOR)).rejects.toThrow(ConflictError);
+    });
+
+    // ── Phase 3 Round 2D.1: initialNote integration ──────────────────────
+
+    it("createRefund with initialNote: Refund + OperationalNote created atomically", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      await service.createRefund({ paymentId: "pay-1", amount: "50", initialNote: "Клиент запросил возврат за неоказанную услугу" }, ACTOR);
+      expect(prisma.refund.create).toHaveBeenCalled();
+      expect(prisma.operationalNote.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            entityType: "Refund",
+            entityId: expect.any(String),
+            text: "Клиент запросил возврат за неоказанную услугу",
+            visibility: "INTERNAL",
+            authorUserId: "u1",
+            authorName: "fin1",
+          }),
+        }),
+      );
+    });
+
+    it("createRefund without initialNote: Refund created, no OperationalNote", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      await service.createRefund({ paymentId: "pay-1", amount: "50" }, ACTOR);
+      expect(prisma.refund.create).toHaveBeenCalled();
+      expect(prisma.operationalNote.create).not.toHaveBeenCalled();
+    });
+
+    it("createRefund with empty initialNote: Refund created, no OperationalNote", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      await service.createRefund({ paymentId: "pay-1", amount: "50", initialNote: "   " }, ACTOR);
+      expect(prisma.refund.create).toHaveBeenCalled();
+      expect(prisma.operationalNote.create).not.toHaveBeenCalled();
+    });
+
+    it("createRefund with >5000 initialNote: note rejected, Refund NOT created (pre-tx validation)", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      await expect(
+        service.createRefund({ paymentId: "pay-1", amount: "50", initialNote: "x".repeat(5001) }, ACTOR),
+      ).rejects.toThrow("5000");
+      expect(prisma.refund.create).not.toHaveBeenCalled();
+      expect(prisma.operationalNote.create).not.toHaveBeenCalled();
+    });
+
+    it("initialNote does NOT affect Refund status/processedAt/reason/amount", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      const result = await service.createRefund({ paymentId: "pay-1", amount: "50", initialNote: "Test note" }, ACTOR);
+      expect(result.status).toBe("REQUESTED");
+      expect(result.amount).toBe("50");
+      expect(result.reason).toBeNull();
+      // processedAt should be null (not set by note)
+      expect(result.processedAt).toBeNull();
     });
   });
 

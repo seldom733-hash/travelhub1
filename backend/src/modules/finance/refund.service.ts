@@ -42,6 +42,7 @@ import { RefundStatus } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
 import { IdsService } from "../../shared/ids.service";
 import { SecurityService } from "../../security/security.service";
+import { normalizeInitialNote } from "../operational-notes/operational-notes.types";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { uniqueConstraintNames } from "../../shared/prisma-errors";
 import { EventBusService } from "../../eventbus/eventbus.service";
@@ -78,7 +79,7 @@ export class RefundService {
    * (paymentId+amount, НЕ-FAILED) → существующий факт (no-op); concurrent
    * duplicate → P2002 → controlled 409. Payment НЕ мутируется.
    */
-  async createRefund(input: { paymentId: string; amount: string; reason?: string | null }, actor: Actor): Promise<Record<string, unknown>> {
+  async createRefund(input: { paymentId: string; amount: string; reason?: string | null; initialNote?: string }, actor: Actor): Promise<Record<string, unknown>> {
     const paymentId = input.paymentId.trim();
     if (!paymentId) throw new ValidationDomainError("paymentId is required");
     const amount = validateRefundAmount(input.amount);
@@ -87,6 +88,10 @@ export class RefundService {
       throw new ValidationDomainError("reason must not exceed 255 characters");
     }
     const amountDecimal = new Prisma.Decimal(amount);
+
+    // Phase 3 Round 2D.1: validate initialNote BEFORE transaction (pre-tx validation)
+    // so >5000 rejection prevents Refund creation entirely.
+    const noteText = normalizeInitialNote(input.initialNote);
 
     // READ-only cross-context read (ADR-0001): Payment — owner обязательства.
     const payment = await this.prisma.payment.findUnique({ where: { id: paymentId } });
@@ -170,6 +175,21 @@ export class RefundService {
           eventType: DomainEvents.RefundCreated,
           payload: emitPayload(created.id, created.code),
         });
+
+        // Phase 3 Round 2D.1: optional initial OperationalNote (same transaction)
+        if (noteText) {
+          await tx.operationalNote.create({
+            data: {
+              entityType: "Refund",
+              entityId: created.id,
+              text: noteText,
+              visibility: "INTERNAL",
+              authorUserId: actor.id,
+              authorName: actor.username,
+            },
+          });
+        }
+
         return this.refundDto(created);
       });
     } catch (err) {

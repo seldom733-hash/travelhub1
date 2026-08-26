@@ -21,6 +21,7 @@ interface PrismaStub {
   order: { findUnique: jest.Mock };
   payment: { findFirst: jest.Mock; findUnique: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
   paymentHistory: { create: jest.Mock };
+  operationalNote: { create: jest.Mock };
   $transaction: jest.Mock;
 }
 
@@ -64,6 +65,7 @@ function makePrismaStub(): PrismaStub {
       findUniqueOrThrow: jest.fn().mockResolvedValue(PAYMENT_ROW),
     },
     paymentHistory: { create: jest.fn().mockResolvedValue({ id: "h1" }) },
+    operationalNote: { create: jest.fn().mockImplementation((args: any) => Promise.resolve({ id: "note-1", ...args.data })) },
     $transaction: jest.fn(),
   };
   prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
@@ -133,6 +135,64 @@ describe("PaymentService (Step 2.12)", () => {
       prisma.payment.create.mockRejectedValue({ code: "P2002", meta: { target: ["Payment_one_active_per_order"] } });
       const service = makeService(prisma);
       await expect(service.createPayment({ orderId: "ord-1" }, ACTOR)).rejects.toThrow(ConflictError);
+    });
+
+    // ── Phase 3 Round 2D.1: initialNote integration ──────────────────────
+
+    it("createPayment with initialNote: Payment + OperationalNote created atomically", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      await service.createPayment({ orderId: "ord-1", initialNote: "Ожидаем банковское подтверждение" }, ACTOR);
+      expect(prisma.payment.create).toHaveBeenCalled();
+      expect(prisma.operationalNote.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            entityType: "Payment",
+            entityId: expect.any(String),
+            text: "Ожидаем банковское подтверждение",
+            visibility: "INTERNAL",
+            authorUserId: "u1",
+            authorName: "fin1",
+          }),
+        }),
+      );
+    });
+
+    it("createPayment without initialNote: Payment created, no OperationalNote", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      await service.createPayment({ orderId: "ord-1" }, ACTOR);
+      expect(prisma.payment.create).toHaveBeenCalled();
+      expect(prisma.operationalNote.create).not.toHaveBeenCalled();
+    });
+
+    it("createPayment with empty initialNote: Payment created, no OperationalNote", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      await service.createPayment({ orderId: "ord-1", initialNote: "   " }, ACTOR);
+      expect(prisma.payment.create).toHaveBeenCalled();
+      expect(prisma.operationalNote.create).not.toHaveBeenCalled();
+    });
+
+    it("createPayment with >5000 initialNote: note rejected, Payment NOT created (pre-tx validation)", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      await expect(
+        service.createPayment({ orderId: "ord-1", initialNote: "x".repeat(5001) }, ACTOR),
+      ).rejects.toThrow("5000");
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+      expect(prisma.operationalNote.create).not.toHaveBeenCalled();
+    });
+
+    it("initialNote does NOT affect Payment status/paidAt/amount/currency", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      const result = await service.createPayment({ orderId: "ord-1", initialNote: "Test note" }, ACTOR);
+      expect(result.status).toBe("PENDING");
+      expect(result.amount).toBe("150");
+      expect(result.currency).toBe("USD");
+      // paidAt should be null (not set by note)
+      expect(result.paidAt).toBeNull();
     });
   });
 

@@ -482,6 +482,12 @@ export class CreatePaymentDto {
   @MinLength(1)
   @MaxLength(64)
   paymentMethod?: string;
+
+  // Phase 3 Round 2D.1: optional initial OperationalNote (internal, max 5000)
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  initialNote?: string;
 }
 
 /** Whitelist-query для чтения Payment (Finance Center). */
@@ -559,6 +565,12 @@ export class CreateRefundDto {
   @MinLength(1)
   @MaxLength(255)
   reason?: string;
+
+  // Phase 3 Round 2D.1: optional initial OperationalNote (internal, max 5000)
+  @IsOptional()
+  @IsString()
+  @MaxLength(5000)
+  initialNote?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
