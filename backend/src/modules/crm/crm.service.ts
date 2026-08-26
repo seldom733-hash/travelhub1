@@ -722,7 +722,7 @@ export class CrmService {
             where: { orderId: { in: orderIds } },
             orderBy: { createdAt: "desc" },
             take: 20,
-            select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true },
+            select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true, paidAt: true },
           })
         : Promise.resolve([]),
       this.prisma.order.count({ where: { customerId: id } }),
@@ -750,7 +750,7 @@ export class CrmService {
             where: { paymentId: { in: paymentIds } },
             orderBy: { createdAt: "desc" },
             take: 20,
-            select: { id: true, code: true, amount: true, currency: true, status: true, reason: true, paymentId: true, orderId: true, createdAt: true },
+            select: { id: true, code: true, amount: true, currency: true, status: true, reason: true, paymentId: true, orderId: true, createdAt: true, processedAt: true },
           }),
           this.prisma.refund.count({ where: { paymentId: { in: paymentIds } } }),
         ])

@@ -177,8 +177,8 @@ export interface CustomerDetail extends Customer {
   partnerRelations: PartnerCustomerRelation[];
   orders: { id: string; code: string; number: string; status: string; paymentStatus: string; amount: string; paidAmount: string; currency: string; createdAt: string }[];
   bookings: { id: string; code: string; status: string; amount: string; currency: string; orderId: string; productId: string; createdAt: string }[];
-  payments: { id: string; code: string; status: string; amount: string; currency: string; orderId: string; paymentMethod: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string }[];
-  refunds: { id: string; code: string; amount: string; currency: string; status: string; reason: string | null; paymentId: string; orderId: string; paymentCode: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string }[];
+  payments: { id: string; code: string; status: string; amount: string; currency: string; orderId: string; paymentMethod: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string; paidAt: string | null }[];
+  refunds: { id: string; code: string; amount: string; currency: string; status: string; reason: string | null; paymentId: string; orderId: string; paymentCode: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string; processedAt: string | null }[];
   summary: { totalOrders: number; totalBookings: number; totalPayments: number; totalRefunds: number };
 }
 
