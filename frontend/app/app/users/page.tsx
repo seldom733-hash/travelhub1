@@ -38,9 +38,8 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
   const [page, setPage] = useState(initialPage ?? 1);
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection as SortDirection | undefined);
-  // search already initialized above
-  const [draftSearch, setDraftSearch] = useState(initialSearch ?? "");
   const [search, setSearch] = useState(initialSearch ?? "");
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | undefined>(initialStatus || undefined);
   const [roleFilter, setRoleFilter] = useState<string | undefined>(initialRole || undefined);
   const [dateFrom, setDateFrom] = useState("");
@@ -101,10 +100,12 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
     router.replace(qs ? `/app/users?${qs}` : "/app/users", { scroll: false });
   }, [search, statusFilter, roleFilter, sortBy, sortDirection, page, dateFrom, dateTo]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearch(draftSearch);
-    setPage(1);
+  const handleSearchChange = (value: string) => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setSearch(value);
+      setPage(1);
+    }, 300);
   };
 
   const assignRole = async (id: string, roleCode: string) => {
@@ -172,23 +173,17 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
         <div className="space-y-4 p-6">
           <Kpi
             items={[
-              { label: "Всего пользователей", value: total, icon: "👥" },
+              { label: t("admin.kpi.total_users", locale), value: total, icon: "👥" },
             ]}
           />
 
-          <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
-              value={draftSearch}
-              onChange={(e) => setDraftSearch(e.target.value)}
+              defaultValue={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder={t("admin.search.placeholder_users", locale)}
               className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
-            <button
-              type="submit"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              {t("admin.table.find", locale)}
-            </button>
             <select
               value={statusFilter ?? ''}
               onChange={(e) => { setStatusFilter(e.target.value || undefined); setPage(1); }}
@@ -217,9 +212,9 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               <option value="MARKETER">{t("user.role.MARKETER", locale)}</option>
             </select>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">С</span>
+              <span className="text-xs text-slate-400">{t("admin.filter.date_from", locale)}</span>
               <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
-              <span className="text-xs text-slate-400">По</span>
+              <span className="text-xs text-slate-400">{t("admin.filter.date_to", locale)}</span>
               <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
             </div>
             <button
@@ -228,9 +223,8 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
             >
               {t("admin.table.create_user", locale)}
-            </button>
-            {busy && <span className="text-xs text-slate-400">загрузка…</span>}
-          </form>
+            </button>              {busy && <span className="text-xs text-slate-400">{t("admin.table.loading", locale)}</span>}
+          </div>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 
@@ -246,12 +240,12 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               </colgroup>
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Код</SortableHeader>
-                  <SortableHeader field="fullName" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Пользователь</SortableHeader>
-                  <th className="px-4 py-2.5 font-medium">Роль</th>
-                  <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Статус</SortableHeader>
-                  <SortableHeader field="lastLoginAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Последний вход</SortableHeader>
-                  <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата регистрации</SortableHeader>
+                  <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.code", locale)}</SortableHeader>
+                  <SortableHeader field="fullName" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.user", locale)}</SortableHeader>
+                  <th className="px-4 py-2.5 font-medium">{t("admin.table.col.role", locale)}</th>
+                  <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.status", locale)}</SortableHeader>
+                  <SortableHeader field="lastLoginAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.last_login", locale)}</SortableHeader>
+                  <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.created_at", locale)}</SortableHeader>
                 </tr>
               </thead>
               <tbody>
@@ -283,7 +277,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                         <StatusBadge status={u.status} />
                         <button
                           onClick={() => void setStatus(u.id, nextStatus(u.status))}
-                          title={`Сменить статус (сейчас: ${u.status})`}
+                          title={`${t("admin.status.change_title", locale)}${u.status})`}
                           className="rounded-md px-1.5 py-0.5 text-xs text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
                         >
                           ↻
@@ -301,7 +295,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                 {users.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
-                      Пользователей не найдено
+                      {t("admin.table.empty_users", locale)}
                     </td>
                   </tr>
                 )}
@@ -317,21 +311,21 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
       {/* Side Panel: создание пользователя */}
       {showCreate && (
         <PanelFrame
-          title="Создать пользователя"
-          subtitle="Персонал платформы (роль из матрицы RBAC)"
+          title={t("admin.form.panel_title", locale)}
+          subtitle={t("admin.form.panel_subtitle", locale)}
           onClose={() => setShowCreate(false)}
         >
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Логин *</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.username_label", locale)}</label>
               <input
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
-                placeholder="operator1"
+                placeholder={t("admin.form.username_placeholder", locale)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Пароль * (мин. 8)</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.password_label", locale)}</label>
               <input
                 type="password"
                 value={form.password}
@@ -341,25 +335,25 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Имя</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.fullName_label", locale)}</label>
               <input
                 value={form.fullName}
                 onChange={(e) => setForm({ ...form, fullName: e.target.value })}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
-                placeholder="Оператор Иванов"
+                placeholder={t("admin.form.fullName_placeholder", locale)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Email</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.email_label", locale)}</label>
               <input
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
-                placeholder="user@travelhub.local"
+                placeholder={t("admin.form.email_placeholder", locale)}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Роль *</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.role_label", locale)}</label>
               <select
                 value={form.roleCode}
                 onChange={(e) => setForm({ ...form, roleCode: e.target.value })}
@@ -378,11 +372,11 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               disabled={creating || form.username.length < 3 || form.password.length < 8}
               className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {creating ? "Создание…" : "Создать"}
+              {creating ? t("admin.form.creating", locale) : t("admin.form.create", locale)}
             </button>
 
             <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
-              🔐 Смена роли и статуса аудитируется в security.AuditLog. Новые роли не создаются — только канонические из RBAC Matrix.
+              {t("admin.form.audit_note", locale)}
             </div>
         </PanelFrame>
       )}
