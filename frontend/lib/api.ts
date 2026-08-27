@@ -335,6 +335,50 @@ export interface OperationalNotesPage {
   totalPages: number;
 }
 
+// ── CRM Activity (Phase 3 Step 3.5.3 Round 2C) ─────────────────────────
+
+export interface ActivityItem {
+  id: string;
+  sourceType: string;
+  sourceId: string;
+  activityType: string;
+  occurredAt: string;
+  actor: { userId: string; name: string | null } | null;
+  title: string;
+  summary: string | null;
+  deepLink: string | null;
+}
+
+export interface ActivityPage {
+  items: ActivityItem[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export const activityApi = {
+  listCustomer: (
+    customerId: string,
+    opts?: {
+      sourceType?: string;
+      activityType?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      cursor?: string;
+      limit?: number;
+    },
+  ) => {
+    const sp = new URLSearchParams();
+    if (opts?.sourceType) sp.set('sourceType', opts.sourceType);
+    if (opts?.activityType) sp.set('activityType', opts.activityType);
+    if (opts?.dateFrom) sp.set('dateFrom', opts.dateFrom);
+    if (opts?.dateTo) sp.set('dateTo', opts.dateTo);
+    if (opts?.cursor) sp.set('cursor', opts.cursor);
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    const qs = sp.toString();
+    return api.get<ActivityPage>(`/customers/${customerId}/activity${qs ? '?' + qs : ''}`);
+  },
+};
+
 export const operationalNotesApi = {
   list: (entityType: string, entityId: string, page?: number, pageSize?: number) => {
     const params = new URLSearchParams();

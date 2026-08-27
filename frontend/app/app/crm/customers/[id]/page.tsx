@@ -8,10 +8,11 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import SortableHeader, { type SortState, type SortDirection } from "@/components/SortableHeader";
 import OperationalNotes from "@/components/OperationalNotes";
+import CustomerActivity from "@/components/CustomerActivity";
 import { useLocale, t } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 
-type Tab = "overview" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "history" | "notes";
+type Tab = "overview" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "history" | "notes" | "activity";
 
 function useQueryState() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -21,7 +22,7 @@ function useQueryState() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
-    if (tabParam && ["overview", "orders", "bookings", "payments", "partners", "refunds", "history", "notes"].includes(tabParam)) {
+    if (tabParam && ["overview", "orders", "bookings", "payments", "partners", "refunds", "history", "notes", "activity"].includes(tabParam)) {
       setTab(tabParam as Tab);
     }
     const sortByParam = params.get("sortBy");
@@ -108,7 +109,7 @@ export default function Customer360Page() {
     );
   }
 
-  const tabs: Tab[] = ["overview", "orders", "bookings", "payments", "partners", "refunds", "history", "notes"];
+  const tabs: Tab[] = ["overview", "activity", "orders", "bookings", "payments", "partners", "refunds", "history", "notes"];
 
   return (
     <div className="flex h-full flex-col">
@@ -157,6 +158,11 @@ export default function Customer360Page() {
                 <div className="rounded-lg bg-amber-50 px-4 py-3 text-center"><div className="font-bold text-amber-700">{partners.length}</div><div className="text-amber-500">{t("crm.detail.total_partners", locale)}</div></div>
               </div>
             </>
+          )}
+
+          {/* Activity — Timeline via CrmActivity read model */}
+          {tab === "activity" && (
+            <CustomerActivity customerId={id} />
           )}
 
           {/* Orders — TABLE with sortable headers */}

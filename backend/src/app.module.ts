@@ -16,6 +16,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
 import { WorkspaceModule } from "./modules/workspace/workspace.module";
 import { IdempotencyModule } from "./shared/idempotency/idempotency.module";
 import { OperationalNotesModule } from "./modules/operational-notes/operational-notes.module";
+import { CrmActivityModule } from "./modules/crm-activity/crm-activity.module";
 import { IdempotencyInterceptor } from "./shared/idempotency/idempotency.interceptor";
 import { SecurityModule } from "./security/security.module";
 import { JwtAuthGuard } from "./security/auth/jwt-auth.guard";
@@ -29,7 +30,7 @@ import { PermissionsGuard } from "./security/auth/permissions.guard";
  * открывает эндпоинты), PermissionsGuard глобально (проверка @RequirePermissions).
  */
 @Module({
-  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, OrderModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, AnalyticsModule, DashboardModule, WorkspaceModule, IdempotencyModule, OperationalNotesModule],
+  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, CrmActivityModule, OrderModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, AnalyticsModule, DashboardModule, WorkspaceModule, IdempotencyModule, OperationalNotesModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
