@@ -43,6 +43,8 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
   const [search, setSearch] = useState(initialSearch ?? "");
   const [statusFilter, setStatusFilter] = useState<string | undefined>(initialStatus || undefined);
   const [roleFilter, setRoleFilter] = useState<string | undefined>(initialRole || undefined);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -57,7 +59,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
     setPage(1);
   };
 
-  const load = async (p: number, q: string, sortField?: string, sortDir?: SortDirection, status?: string, roleCode?: string) => {
+  const load = async (p: number, q: string, sortField?: string, sortDir?: SortDirection, status?: string, roleCode?: string, df?: string, dt?: string) => {
     setBusy(true);
     try {
       const sp = new URLSearchParams();
@@ -68,6 +70,8 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
       if (sortDir) sp.set("sortDirection", sortDir);
       if (status) sp.set("status", status);
       if (roleCode) sp.set("roleCode", roleCode);
+      if (df) sp.set("dateFrom", df);
+      if (dt) sp.set("dateTo", dt);
       const res = await api.get<UsersResult>(`/users?${sp.toString()}`);
       setUsers(res.items);
       setTotal(res.total);
@@ -79,9 +83,9 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
   };
 
   useEffect(() => {
-    void load(page, search, sortBy, sortDirection, statusFilter, roleFilter);
+    void load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search, sortBy, sortDirection, statusFilter, roleFilter]);
+  }, [page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo]);
 
   // URL sync
   useEffect(() => {
@@ -95,7 +99,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
     if (page > 1) params.set("page", String(page));
     const qs = params.toString();
     router.replace(qs ? `/app/users?${qs}` : "/app/users", { scroll: false });
-  }, [search, statusFilter, roleFilter, sortBy, sortDirection, page]);
+  }, [search, statusFilter, roleFilter, sortBy, sortDirection, page, dateFrom, dateTo]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +111,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
     setError("");
     try {
       await api.patch(`/users/${id}/role`, { roleCode });
-      await load(page, search, sortBy, sortDirection, statusFilter, roleFilter);
+      await load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -117,7 +121,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
     setError("");
     try {
       await api.patch(`/users/${id}/status`, { status });
-      await load(page, search, sortBy, sortDirection, statusFilter, roleFilter);
+      await load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -139,7 +143,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
       });
       setShowCreate(false);
       setForm({ username: "", password: "", fullName: "", email: "", roleCode: "OPERATOR" });
-      await load(1, search, sortBy, sortDirection, statusFilter, roleFilter);
+      await load(1, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo);
       setPage(1);
     } catch (e) {
       setError((e as Error).message);
@@ -157,7 +161,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
           breadcrumbs={["TravelHub", "Пользователи"]}
           actions={
             <button
-              onClick={() => void load(page, search, sortBy, sortDirection, statusFilter, roleFilter)}
+              onClick={() => void load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
             >
               ⟳ Обновить
@@ -212,6 +216,12 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               <option value="BUYER">Покупатель</option>
               <option value="MARKETER">Маркетолог</option>
             </select>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-slate-400">С</span>
+              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
+              <span className="text-xs text-slate-400">По</span>
+              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
+            </div>
             <button
               type="button"
               onClick={() => setShowCreate((v) => !v)}
@@ -225,7 +235,15 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "28%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "12%" }} />
+              </colgroup>
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Код</SortableHeader>
@@ -233,6 +251,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                   <th className="px-4 py-2.5 font-medium">Роль</th>
                   <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Статус</SortableHeader>
                   <SortableHeader field="lastLoginAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Последний вход</SortableHeader>
+                  <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата создания</SortableHeader>
                 </tr>
               </thead>
               <tbody>
@@ -274,11 +293,14 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                     <td className="px-4 py-2.5 text-xs text-slate-500">
                       {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("ru") : "—"}
                     </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500">
+                      {u.createdAt ? new Date(u.createdAt).toLocaleDateString("ru-RU") : "—"}
+                    </td>
                   </tr>
                 ))}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
                       Пользователей не найдено
                     </td>
                   </tr>

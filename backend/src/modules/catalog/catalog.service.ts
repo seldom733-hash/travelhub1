@@ -121,6 +121,9 @@ export interface ProductListQuery {
   /** Shared Table Sorting: server-side single-column sort. */
   sortBy?: string;
   sortDirection?: string;
+  /** Date range filtering (inclusive). ISO-8601 date strings. */
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 /**
@@ -339,6 +342,13 @@ export class CatalogService implements OnModuleInit {
       ...(query.search
         ? { OR: [{ title: { contains: query.search, mode: "insensitive" } }, { code: { contains: query.search, mode: "insensitive" } }] }
         : {}),
+      // Date range filtering on publishedAt (canonical publication date)
+      ...(query.dateFrom || query.dateTo ? {
+        publishedAt: {
+          ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+          ...(query.dateTo ? { lte: new Date(new Date(query.dateTo).getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
+        },
+      } : {}),
     };
 
     if (query.filter) {
@@ -444,7 +454,18 @@ export class CatalogService implements OnModuleInit {
       };
     });
 
-    return { items: rows, total, page, pageSize };
+    // KPI aggregates: count by status across full matching dataset (not just current page)
+    const aggregatesWhere = { ...where };
+    const [countPublished, countDrafts, countArchived] = await Promise.all([
+      this.prisma.product.count({ where: { ...aggregatesWhere, status: 'PUBLISHED' } }),
+      this.prisma.product.count({ where: { ...aggregatesWhere, status: 'DRAFT' } }),
+      this.prisma.product.count({ where: { ...aggregatesWhere, status: 'ARCHIVED' } }),
+    ]);
+
+    return {
+      items: rows, total, page, pageSize,
+      aggregates: { published: countPublished, drafts: countDrafts, archived: countArchived },
+    };
   }
 
   /**

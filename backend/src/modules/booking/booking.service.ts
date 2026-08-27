@@ -144,7 +144,7 @@ export class BookingService {
     return [...bookingIds];
   }
 
-  async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; slaMinutes?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number }) {
+  async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; slaMinutes?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const now = new Date();
@@ -163,6 +163,13 @@ export class BookingService {
         createdAt: { lt: new Date(Date.now() - (parseInt(query.slaMinutes ?? "240", 10)) * 60 * 1000) },
       } : {}),
     };
+    // Date range filtering on createdAt (inclusive end-of-day)
+    if (query.dateFrom || query.dateTo) {
+      where.createdAt = {
+        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+        ...(query.dateTo ? { lte: new Date(new Date(query.dateTo).getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
+      };
+    }
     const [items, total] = await Promise.all([
       this.prisma.booking.findMany({
         where,
@@ -173,7 +180,13 @@ export class BookingService {
       }),
       this.prisma.booking.count({ where }),
     ]);
-    return { items, total, page, pageSize };
+    // KPI aggregates
+    const [countAwaiting, countConfirmed, countCancelled] = await Promise.all([
+      this.prisma.booking.count({ where: { ...where, status: { in: ['SENT_TO_SUPPLIER', 'AWAITING_CONFIRMATION'] as any } } }),
+      this.prisma.booking.count({ where: { ...where, status: { in: ['CONFIRMED', 'IN_SERVICE', 'COMPLETED'] as any } } }),
+      this.prisma.booking.count({ where: { ...where, status: { in: ['CANCELLED', 'SUPPLIER_REJECTED'] as any } } }),
+    ]);
+    return { items, total, page, pageSize, aggregates: { awaiting: countAwaiting, confirmed: countConfirmed, cancelled: countCancelled } };
   }
 
   async getBooking(id: string, viewer?: import("../../shared/pii").TravelerViewer) {

@@ -170,6 +170,15 @@ class ListProductsQuery {
   @IsOptional()
   @IsString()
   sortDirection?: SortDirection;
+
+  // Date range filtering (inclusive)
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
 }
 
 class CreateCategoryDto {

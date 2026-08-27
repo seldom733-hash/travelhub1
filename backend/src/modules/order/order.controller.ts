@@ -80,11 +80,17 @@ class ListOrdersQuery {
 
   @IsOptional()
   @IsString()
-  sortBy?: string;
+  sortBy?: string;  @IsOptional()
+  @IsString()
+  sortDirection?: string;
 
   @IsOptional()
   @IsString()
-  sortDirection?: string;
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
 
   @IsOptional()
   @Type(() => Number)

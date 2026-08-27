@@ -11,6 +11,8 @@ import Pagination from "@/components/Pagination";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import TariffEditor, { newTariffDraft, tariffDraftsFrom, type TariffDraft } from "@/components/TariffEditor";
 import { useCan } from "@/lib/use-can";
+import { useLocale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 
 const PRODUCT_TYPES = [
   { code: "TOUR", title: "Тур" },
@@ -25,12 +27,15 @@ const PRODUCT_TYPES = [
 ];
 
 function CatalogContent({ initialStatus, initialUnsold, initialAvailability, initialSortBy, initialSortDirection }: { initialStatus: string; initialUnsold?: string; initialAvailability?: string; initialSortBy?: string; initialSortDirection?: SortDirection }) {
+  const locale = useLocale();
   const [data, setData] = useState<Page<Product> | null>(null);
   const [selected, setSelected] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState(initialStatus);
   const [productType, setProductType] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [unsold] = useState(initialUnsold);
   const [availability] = useState(initialAvailability);
   // Derived filter labels for display
@@ -83,6 +88,8 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
       if (availability) qs.set("availability", availability);
       if (sortBy) qs.set("sortBy", sortBy);
       if (sortDirection) qs.set("sortDirection", sortDirection);
+      if (dateFrom) qs.set("dateFrom", dateFrom);
+      if (dateTo) qs.set("dateTo", dateTo);
       qs.set("page", String(page));
       qs.set("pageSize", "20");
       const res = await api.get<Page<Product>>(`/products?${qs.toString()}`);
@@ -98,7 +105,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, productType, unsold, availability, sortBy, sortDirection, page]);
+  }, [search, status, productType, unsold, availability, sortBy, sortDirection, page, dateFrom, dateTo]);
 
   const openDetail = async (id: string) => {
     setShowCreate(false);
@@ -196,9 +203,9 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
 
   const counts = {
     total: data?.total ?? 0,
-    published: data?.items.filter((p) => p.status === "PUBLISHED").length ?? 0,
-    drafts: data?.items.filter((p) => p.status === "DRAFT").length ?? 0,
-    archived: data?.items.filter((p) => p.status === "ARCHIVED").length ?? 0,
+    published: data?.aggregates?.published ?? data?.items.filter((p) => p.status === "PUBLISHED").length ?? 0,
+    drafts: data?.aggregates?.drafts ?? data?.items.filter((p) => p.status === "DRAFT").length ?? 0,
+    archived: data?.aggregates?.archived ?? data?.items.filter((p) => p.status === "ARCHIVED").length ?? 0,
   };
 
   return (
@@ -218,14 +225,14 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                   }}
                   className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
                 >
-                  ＋ Создать продукт
+                  {t("admin.catalog.create_btn", locale)}
                 </button>
               )}
               <button
                 onClick={() => void load()}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
               >
-                ⟳ Обновить
+                {t("admin.table.refresh", locale)}
               </button>
             </div>
           }
@@ -234,10 +241,10 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
         <div className="space-y-4 p-6">
           <Kpi
             items={[
-              { label: "Всего продуктов", value: counts.total, icon: "📦" },
-              { label: "Опубликовано", value: counts.published, icon: "✅", accent: "#059669" },
-              { label: "Черновики", value: counts.drafts, icon: "📝", accent: "#64748b" },
-              { label: "В архиве", value: counts.archived, icon: "🗄", accent: "#94a3b8" },
+              { label: t("admin.kpi.total_products", locale), value: counts.total, icon: "📦" },
+              { label: t("admin.kpi.published", locale), value: counts.published, icon: "✅", accent: "#059669" },
+              { label: t("admin.kpi.drafts", locale), value: counts.drafts, icon: "📝", accent: "#64748b" },
+              { label: t("admin.kpi.archived", locale), value: counts.archived, icon: "🗄", accent: "#94a3b8" },
             ]}
           />
 
@@ -246,7 +253,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск по названию или коду…"
+              placeholder={t("admin.search.placeholder_catalog", locale)}
               className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
             <select
@@ -254,7 +261,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               onChange={(e) => { setStatus(e.target.value); setPage(1); }}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 outline-none focus:border-blue-400"
             >
-              <option value="">Все статусы</option>
+              <option value="">{t("admin.filter.all_statuses", locale)}</option>
               <option value="DRAFT">Черновик</option>
               <option value="COMPLETE">Заполнен</option>
               <option value="REVIEWED">Проверен</option>
@@ -266,11 +273,17 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               onChange={(e) => { setProductType(e.target.value); setPage(1); }}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 outline-none focus:border-blue-400"
             >
-              <option value="">Все типы</option>
+              <option value="">{t("admin.filter.all_types", locale)}</option>
               {PRODUCT_TYPES.map((t) => (
                 <option key={t.code} value={t.code}>{t.title}</option>
               ))}
             </select>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-slate-400">С</span>
+              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
+              <span className="text-xs text-slate-400">По</span>
+              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
+            </div>
             {activeFilters.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {activeFilters.map((f, i) => (
@@ -280,22 +293,31 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                 ))}
               </div>
             )}
-            {busy && <span className="text-xs text-slate-400">загрузка…</span>}
+            {busy && <span className="text-xs text-slate-400">{t("admin.table.loading", locale)}</span>}
           </div>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 
           {/* Table */}
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "28%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "12%" }} />
+              </colgroup>
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>Код</SortableHeader>
-                  <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>Название</SortableHeader>
-                  <SortableHeader field="type" currentSort={sortState} onSort={handleSort}>Тип</SortableHeader>
-                  <th className="px-4 py-2.5 font-medium">Тарифы</th>
-                  <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>Статус</SortableHeader>
-                  <SortableHeader field="publishedAt" currentSort={sortState} onSort={handleSort}>Публикация</SortableHeader>
+                  <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("admin.table.col.code", locale)}</SortableHeader>
+                  <SortableHeader field="name" currentSort={sortState} onSort={handleSort}>{t("admin.table.col.name", locale)}</SortableHeader>
+                  <SortableHeader field="type" currentSort={sortState} onSort={handleSort}>{t("admin.table.col.type", locale)}</SortableHeader>
+                  <th className="px-4 py-2.5 font-medium">{t("admin.table.col.tariffs", locale)}</th>
+                  <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("admin.table.col.status", locale)}</SortableHeader>
+                  <SortableHeader field="publishedAt" currentSort={sortState} onSort={handleSort}>{t("admin.table.col.published_at", locale)}</SortableHeader>
                   {unsold === "true" && <th className="px-4 py-2.5 font-medium text-blue-600">Заказы</th>}
                   {availability === "missing" && <th className="px-4 py-2.5 font-medium text-amber-600">Доступность</th>}
                 </tr>
@@ -322,7 +344,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                 {(data?.items ?? []).length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
-                      Продуктов пока нет
+                      {t("admin.table.empty_catalog", locale)}
                     </td>
                   </tr>
                 )}

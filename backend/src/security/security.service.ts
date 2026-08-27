@@ -142,7 +142,7 @@ export class SecurityService implements OnModuleInit {
   };
 
   /** Список пользователей (ADMIN/DIRECTOR) — серверная пагинация. */
-  async listUsers(query: { search?: string; status?: string; roleCode?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number }) {
+  async listUsers(query: { search?: string; status?: string; roleCode?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const where: Prisma.UserWhereInput = {
@@ -158,6 +158,13 @@ export class SecurityService implements OnModuleInit {
           }
         : {}),
     };
+    // Date range filtering on createdAt (inclusive end-of-day)
+    if (query.dateFrom || query.dateTo) {
+      where.createdAt = {
+        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+        ...(query.dateTo ? { lte: new Date(new Date(query.dateTo).getTime() + 86400000 - 1) } : {}),
+      };
+    }
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
@@ -180,7 +187,13 @@ export class SecurityService implements OnModuleInit {
       }),
       this.prisma.user.count({ where }),
     ]);
-    return { items, total, page, pageSize };
+    // KPI aggregates
+    const [countActive, countInactive, countLocked] = await Promise.all([
+      this.prisma.user.count({ where: { ...where, status: 'ACTIVE' as any } }),
+      this.prisma.user.count({ where: { ...where, status: 'INACTIVE' as any } }),
+      this.prisma.user.count({ where: { ...where, status: 'LOCKED' as any } }),
+    ]);
+    return { items, total, page, pageSize, aggregates: { active: countActive, inactive: countInactive, locked: countLocked } };
   }
 
   /** Смена роли пользователя (audit обязателен). */

@@ -140,6 +140,7 @@ export interface Page<T> {
   total: number;
   page: number;
   pageSize: number;
+  aggregates?: Record<string, number>;
 }
 
 export interface Product {

@@ -437,7 +437,7 @@ export class OrderService {
   }
 
   async listOrders(
-    query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number },
+    query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string },
     viewer?: TravelerViewer,
   ) {
     const page = Math.max(1, query.page ?? 1);
@@ -450,6 +450,18 @@ export class OrderService {
         ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }, { number: { contains: query.search, mode: "insensitive" } }] }
         : {}),
     };
+
+    // Date range filtering on createdAt (inclusive end-of-day)
+    if (query.dateFrom || query.dateTo) {
+      const dateRange: Prisma.DateTimeFilter = {};
+      if (query.dateFrom) dateRange.gte = new Date(query.dateFrom);
+      if (query.dateTo) dateRange.lte = new Date(new Date(query.dateTo).getTime() + 24 * 60 * 60 * 1000 - 1);
+      if (where.createdAt && typeof where.createdAt === 'object' && !Array.isArray(where.createdAt)) {
+        Object.assign(where.createdAt, dateRange);
+      } else {
+        where.createdAt = dateRange;
+      }
+    }
 
     // ROUND 5: cancelledWithin=N → orders cancelled in the last N days (detector: RECENT_CANCELLATIONS)
     // Detector predicate: createdAt > (now - N days) AND createdAt <= now
@@ -495,12 +507,20 @@ export class OrderService {
       }),
       this.prisma.order.count({ where }),
     ]);
+    // KPI aggregates: count by status across full matching dataset
+    const [countActive, countReady, countClosed] = await Promise.all([
+      this.prisma.order.count({ where: { ...where, status: { in: ['NEW', 'IN_PROCESSING', 'WAITING_FOR_DATA', 'READY_FOR_BOOKING', 'SENT_TO_BOOKING'] as any } } }),
+      this.prisma.order.count({ where: { ...where, status: 'READY_FOR_BOOKING' as any } }),
+      this.prisma.order.count({ where: { ...where, status: { in: ['CLOSED', 'CANCELLED'] as any } } }),
+    ]);
+
     // Step 1.17: field-level redaction — traveler PII виден только OPERATOR/ADMIN.
     return {
       items: items.map((o) => ({ ...o, travelers: redactTravelersPii(o.travelers ?? [], viewer) })),
       total,
       page,
       pageSize,
+      aggregates: { active: countActive, ready: countReady, closed: countClosed },
     };
   }
 

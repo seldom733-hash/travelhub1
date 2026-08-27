@@ -10,6 +10,7 @@ import Pagination from "@/components/Pagination";
 import { useCan } from "@/lib/use-can";
 import ActionButtons from "@/components/ActionButtons";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
+import { useLocale, t } from "@/lib/i18n";
 
 const ACTIONS = [
   { action: "send", label: "Отправить поставщику", cls: "bg-cyan-600 hover:bg-cyan-700", only: ["NEW", "PREPARING_REQUEST"] },
@@ -21,6 +22,7 @@ const ACTIONS = [
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
 function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, initialSortBy, initialSortDirection, initialSearch }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean; slaMinutes?: string; initialSortBy?: string; initialSortDirection?: SortDirection; initialSearch?: string }) {
+  const locale = useLocale();
   const [data, setData] = useState<Page<Booking> | null>(null);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [orderRef, setOrderRef] = useState<{ code: string; number: string; status: string } | null>(null);
@@ -29,6 +31,8 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
   const [search, setSearch] = useState(initialSearch || "");
   const [bookingStatusFilter, setBookingStatusFilter] = useState(statusFilter ?? "");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Derived filter labels for display
@@ -83,6 +87,8 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
       if (bookingStatusFilter) qs.set('status', bookingStatusFilter);
       if (sortBy) qs.set('sortBy', sortBy);
       if (sortDirection) qs.set('sortDirection', sortDirection);
+      if (dateFrom) qs.set('dateFrom', dateFrom);
+      if (dateTo) qs.set('dateTo', dateTo);
       const res = await api.get<Page<Booking>>(`/bookings?${qs.toString()}`);
       setData(res);
     } catch (e) {
@@ -95,7 +101,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [upcomingOnly, bookingStatusFilter, overdueOnly, slaMinutes, sortBy, sortDirection, page, search]);
+  }, [upcomingOnly, bookingStatusFilter, overdueOnly, slaMinutes, sortBy, sortDirection, page, search, dateFrom, dateTo]);
 
   const openDetail = async (id: string) => {
     const booking = await api.get<Booking>(`/bookings/${id}`);
@@ -123,9 +129,9 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
 
   const counts = {
     total: data?.total ?? 0,
-    awaiting: data?.items.filter((b) => ["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION"].includes(b.status)).length ?? 0,
-    confirmed: data?.items.filter((b) => ["CONFIRMED", "IN_SERVICE", "COMPLETED"].includes(b.status)).length ?? 0,
-    cancelled: data?.items.filter((b) => ["CANCELLED", "SUPPLIER_REJECTED"].includes(b.status)).length ?? 0,
+    awaiting: data?.aggregates?.awaiting ?? data?.items.filter((b) => ["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION"].includes(b.status)).length ?? 0,
+    confirmed: data?.aggregates?.confirmed ?? data?.items.filter((b) => ["CONFIRMED", "IN_SERVICE", "COMPLETED"].includes(b.status)).length ?? 0,
+    cancelled: data?.aggregates?.cancelled ?? data?.items.filter((b) => ["CANCELLED", "SUPPLIER_REJECTED"].includes(b.status)).length ?? 0,
   };
 
   return (
@@ -147,10 +153,10 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
         <div className="space-y-4 p-6">
           <Kpi
             items={[
-              { label: "Всего броней", value: counts.total, icon: "📑" },
-              { label: "Ждут поставщика", value: counts.awaiting, icon: "📨", accent: "#06b6d4" },
-              { label: "Подтверждено", value: counts.confirmed, icon: "✅", accent: "#059669" },
-              { label: "Отменено/отклонено", value: counts.cancelled, icon: "🚫", accent: "#dc2626" },
+              { label: t("admin.kpi.total_bookings", locale), value: counts.total, icon: "📑" },
+              { label: t("admin.kpi.awaiting", locale), value: counts.awaiting, icon: "📨", accent: "#06b6d4" },
+              { label: t("admin.kpi.confirmed", locale), value: counts.confirmed, icon: "✅", accent: "#059669" },
+              { label: t("admin.kpi.cancelled", locale), value: counts.cancelled, icon: "🚫", accent: "#dc2626" },
             ]}
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -158,7 +164,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               onKeyDown={(e) => { if (e.key === 'Enter') void load(); }}
-              placeholder="Поиск: BKG-…, ORD-…, имя пассажира…"
+              placeholder={t("admin.search.placeholder_bookings", locale)}
               className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
             <select
@@ -166,7 +172,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
               onChange={(e) => { setBookingStatusFilter(e.target.value); setPage(1); updateUrl({ status: e.target.value }); }}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             >
-              <option value="">Все статусы</option>
+              <option value="">{t("admin.filter.all_statuses", locale)}</option>
               <option value="SENT_TO_SUPPLIER">Отправлен поставщику</option>
               <option value="AWAITING_CONFIRMATION">Ожидает подтверждения</option>
               <option value="CONFIRMED">Подтверждено</option>
@@ -175,6 +181,12 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
               <option value="CANCELLED">Отменено</option>
               <option value="SUPPLIER_REJECTED">Отклонено поставщиком</option>
             </select>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-slate-400">С</span>
+              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
+              <span className="text-xs text-slate-400">По</span>
+              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
+            </div>
 
           {activeFilters.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -190,7 +202,17 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
           </div>
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-left text-sm">
+            <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "10%" }} />
+              </colgroup>
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Код</SortableHeader>
