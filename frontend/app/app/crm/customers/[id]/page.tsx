@@ -12,7 +12,7 @@ import CustomerActivity from "@/components/CustomerActivity";
 import { useLocale, t } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 
-type Tab = "overview" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "history" | "notes" | "activity";
+type Tab = "overview" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "notes" | "activity";
 
 function useQueryState() {
   const [tab, setTab] = useState<Tab>("overview");
@@ -22,7 +22,7 @@ function useQueryState() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
-    if (tabParam && ["overview", "orders", "bookings", "payments", "partners", "refunds", "history", "notes", "activity"].includes(tabParam)) {
+    if (tabParam && ["overview", "orders", "bookings", "payments", "partners", "refunds", "notes", "activity"].includes(tabParam)) {
       setTab(tabParam as Tab);
     }
     const sortByParam = params.get("sortBy");
@@ -109,7 +109,7 @@ export default function Customer360Page() {
     );
   }
 
-  const tabs: Tab[] = ["overview", "activity", "orders", "bookings", "payments", "partners", "refunds", "history", "notes"];
+  const tabs: Tab[] = ["overview", "activity", "orders", "bookings", "payments", "partners", "refunds", "notes"];
 
   return (
     <div className="flex h-full flex-col">
@@ -356,25 +356,6 @@ export default function Customer360Page() {
                   )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{tabStatusFilter ? 'Нет данных по выбранным фильтрам' : t("crm.detail.no_refunds", locale)}</td></tr>}
                 </tbody>
               </table>
-            </div>
-          )}
-
-          {/* History — TIMELINE (fixed chronological order, no sorting) */}
-          {tab === "history" && (
-            <div className="space-y-2">
-              {customer.history.length > 0 ? customer.history.map((h) => (
-                <div key={h.id} className="flex items-start gap-3 rounded-lg border border-slate-100 px-4 py-3 text-xs">
-                  <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-blue-400" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium text-slate-700">{h.action}</span>
-                      <span className="text-slate-400">{new Date(h.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    {h.from && h.to && <div className="mt-1 text-slate-500">{h.from} → {h.to}</div>}
-                    {h.comment && <div className="mt-1 text-slate-400">{h.comment}</div>}
-                  </div>
-                </div>
-              )) : <div className="py-8 text-center text-xs text-slate-400">{t("crm.detail.no_history", locale)}</div>}
             </div>
           )}
 

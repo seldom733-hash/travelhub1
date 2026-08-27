@@ -1,4 +1,5 @@
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SecurityService } from '../../security/security.service';
 import {
@@ -128,9 +129,12 @@ export interface NotesActor {
 
 @Injectable()
 export class OperationalNotesService {
+  private readonly logger = new Logger(OperationalNotesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly security: SecurityService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -206,7 +210,62 @@ export class OperationalNotesService {
       },
     });
 
+    // Live projection into CrmActivity (fire-and-forget, non-blocking)
+    this.projectToActivity(note).catch((err) => {
+      this.logger.warn(`Live projection failed for note ${note.id}: ${err}`);
+    });
+
     return note;
+  }
+
+  /**
+   * Project an OperationalNote into CrmActivity read model.
+   * Lazy-resolves CrmActivityService to avoid circular dependency.
+   */
+  private async projectToActivity(note: any): Promise<void> {
+    try {
+      const { CrmActivityService } = require('../crm-activity/crm-activity.service');
+      const activityService = this.moduleRef.get(CrmActivityService, { strict: false });
+      const { CrmActivitySourceType, CrmActivityActivityType, CrmActivitySubjectType } = require('../../generated/prisma/enums');
+
+      let subjectType: string;
+      let subjectId: string;
+      let customerId: string | null = null;
+      let partnerId: string | null = null;
+
+      if (note.entityType === 'Customer') {
+        subjectType = CrmActivitySubjectType.CUSTOMER;
+        subjectId = note.entityId;
+        customerId = note.entityId;
+      } else if (note.entityType === 'Partner') {
+        subjectType = CrmActivitySubjectType.PARTNER;
+        subjectId = note.entityId;
+        partnerId = note.entityId;
+      } else {
+        return; // other entity types not projected in v1
+      }
+
+      await activityService.projectActivity({
+        sourceType: CrmActivitySourceType.OPERATIONAL_NOTE,
+        sourceId: note.id,
+        sourceEvent: 'created',
+        activityType: CrmActivityActivityType.NOTE_CREATED,
+        subjectType,
+        subjectId,
+        customerId,
+        partnerId,
+        occurredAt: note.createdAt,
+        actorUserId: note.authorUserId,
+        actorName: note.authorName,
+        title: 'NOTE_CREATED',
+        summary: note.text?.slice(0, 100) ?? null,
+        metadata: { visibility: note.visibility },
+        deepLink: null,
+        visibility: 'INTERNAL',
+      });
+    } catch (err) {
+      this.logger.warn(`Live projection error for note ${note.id}: ${err}`);
+    }
   }
 
   /**

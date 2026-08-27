@@ -155,9 +155,6 @@ export default function CustomerActivity({ customerId }: { customerId: string })
                     </span>
                     <span className="font-medium text-slate-700">{eventLabel}</span>
                   </div>
-                  {item.title && (
-                    <div className="mt-1 truncate text-slate-600">{item.title}</div>
-                  )}
                   {item.summary && (
                     <div className="mt-0.5 truncate text-slate-400">{item.summary}</div>
                   )}

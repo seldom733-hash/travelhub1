@@ -346,11 +346,21 @@ export class CrmActivityController {
   /**
    * POST /crm-activity/backfill
    * Full rebuild: clear + reproject from all canonical sources.
-   * ADMIN only. Idempotent.
+   * ADMIN only. Idempotent. Concurrency-locked.
    */
+  private static isRebuilding = false;
+
   @Post('crm-activity/backfill')
   @RequirePermissions('crm.activity.read')
   async backfillAll() {
-    return this.activityService.rebuildAll();
+    if (CrmActivityController.isRebuilding) {
+      throw new ForbiddenException('Rebuild already in progress');
+    }
+    CrmActivityController.isRebuilding = true;
+    try {
+      return await this.activityService.rebuildAll();
+    } finally {
+      CrmActivityController.isRebuilding = false;
+    }
   }
 }
