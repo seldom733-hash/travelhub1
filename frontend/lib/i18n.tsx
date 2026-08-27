@@ -891,6 +891,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.partner_detail.bookings": { ru: "Бронирования", az: "Bronlar", en: "Bookings" },
   "crm.partner_detail.customers": { ru: "Клиенты", az: "Müştərilər", en: "Customers" },
   "crm.partner_detail.storefront": { ru: "Витрина", az: "Vitrin", en: "Storefront" },
+  "crm.partner_detail.activity": { ru: "Активность", az: "Fəaliyyət", en: "Activity" },
   "crm.partner_detail.notes": { ru: "Примечания", az: "Qeydlər", en: "Notes" },
   "crm.partner_detail.total_relations": { ru: "Клиентских связей", az: "Müştəri əlaqələri", en: "Customer relations" },
   "crm.partner_detail.services_hint": { ru: "Каталог услуг партнёра отображается в каталоге.", az: "Tərəfdaşın xidmət kataloqu kataloqda göstərilir.", en: "Partner services are shown in the catalog." },
