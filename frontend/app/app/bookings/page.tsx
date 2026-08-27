@@ -28,19 +28,20 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
   const [search, setSearch] = useState(initialSearch || "");
+  const [bookingStatusFilter, setBookingStatusFilter] = useState(statusFilter ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Derived filter labels for display
   const activeFilters: string[] = [];
   if (upcomingOnly) activeFilters.push("Предстоящие");
   if (overdueOnly) activeFilters.push(`Подтверждение: SLA нарушен (${slaMinutes ?? 240} мин)`);
-  if (statusFilter) {
+  if (bookingStatusFilter) {
     const statusLabels: Record<string, string> = {
       AWAITING_CONFIRMATION: "Ожидает подтверждения",
       CONFIRMED: "Подтверждено",
       CANCELLED: "Отменено",
     };
-    activeFilters.push(statusLabels[statusFilter] ?? `Статус: ${statusFilter}`);
+    activeFilters.push(statusLabels[bookingStatusFilter] ?? `Статус: ${bookingStatusFilter}`);
   }
   // Ролевой UI: права на команды Booking (RBAC Matrix §4).
   const canSend = useCan("booking.send_supplier");
@@ -55,10 +56,18 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
     cancel: canCancel,
   };
 
+  const updateUrl = (params: Record<string, string>) => {
+    const sp = new URLSearchParams(window.location.search);
+    for (const [k, v] of Object.entries(params)) {
+      if (v) sp.set(k, v); else sp.delete(k);
+    }
+    window.history.replaceState(null, '', `?${sp.toString()}`);
+  };
   const handleSort = (field: string, direction: SortDirection) => {
     setSortBy(field);
     setSortDirection(direction);
     setPage(1);
+    updateUrl({ sortBy: field, sortDirection: direction });
   };
 
   const load = async () => {
@@ -71,7 +80,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
       if (upcomingOnly) qs.set('upcoming', 'true');
       if (overdueOnly) qs.set('overdue', 'true');
       if (slaMinutes) qs.set('slaMinutes', slaMinutes);
-      if (statusFilter) qs.set('status', statusFilter);
+      if (bookingStatusFilter) qs.set('status', bookingStatusFilter);
       if (sortBy) qs.set('sortBy', sortBy);
       if (sortDirection) qs.set('sortDirection', sortDirection);
       const res = await api.get<Page<Booking>>(`/bookings?${qs.toString()}`);
@@ -86,7 +95,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [upcomingOnly, statusFilter, overdueOnly, slaMinutes, sortBy, sortDirection, page, search]);
+  }, [upcomingOnly, bookingStatusFilter, overdueOnly, slaMinutes, sortBy, sortDirection, page, search]);
 
   const openDetail = async (id: string) => {
     const booking = await api.get<Booking>(`/bookings/${id}`);
@@ -147,11 +156,25 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
           <div className="flex flex-wrap items-center gap-2">
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               onKeyDown={(e) => { if (e.key === 'Enter') void load(); }}
               placeholder="Поиск: BKG-…, ORD-…, имя пассажира…"
               className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
+            <select
+              value={bookingStatusFilter}
+              onChange={(e) => { setBookingStatusFilter(e.target.value); setPage(1); updateUrl({ status: e.target.value }); }}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Все статусы</option>
+              <option value="SENT_TO_SUPPLIER">Отправлен поставщику</option>
+              <option value="AWAITING_CONFIRMATION">Ожидает подтверждения</option>
+              <option value="CONFIRMED">Подтверждено</option>
+              <option value="IN_SERVICE">В обслуживании</option>
+              <option value="COMPLETED">Завершено</option>
+              <option value="CANCELLED">Отменено</option>
+              <option value="SUPPLIER_REJECTED">Отклонено поставщиком</option>
+            </select>
 
           {activeFilters.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -171,6 +194,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Код</SortableHeader>
+                  <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">Заказ</th>
                   <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort} alignRight>Сумма</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">Пассажиры</th>
@@ -189,6 +213,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
                     }`}
                   >
                     <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{b.code}</td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500">{b.createdAt ? new Date(b.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{b.orderId.slice(0, 8)}…</td>
                     <td className="px-4 py-2.5 font-medium text-slate-800">{Number(b.amount).toFixed(2)}</td>
                     <td className="px-4 py-2.5 text-slate-500">{b.passengers?.length ?? 0}</td>

@@ -26,18 +26,26 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   const [bookings, setBookings] = useState<{ id: string; code: string; status: string }[]>([]);
   const [search, setSearch] = useState(initialSearch || "");
   const [page, setPage] = useState(1);
-  const [statusFilter] = useState(initialStatus);
-  const [paymentStatusFilter] = useState(initialPaymentStatus);
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState(initialPaymentStatus);
   const [cancelledWithin] = useState(initialCancelledWithin);
   const [paymentFailed] = useState(initialPaymentFailed);
   const [pendingRefund] = useState(initialPendingRefund);
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
 
+  const updateUrl = (params: Record<string, string>) => {
+    const sp = new URLSearchParams(window.location.search);
+    for (const [k, v] of Object.entries(params)) {
+      if (v) sp.set(k, v); else sp.delete(k);
+    }
+    window.history.replaceState(null, '', `?${sp.toString()}`);
+  };
   const handleSort = (field: string, direction: SortDirection) => {
     setSortBy(field);
     setSortDirection(direction);
     setPage(1);
+    updateUrl({ sortBy: field, sortDirection: direction });
   };
 
   // Derived filter labels for display
@@ -156,10 +164,35 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
           <div className="flex flex-wrap items-center gap-2">
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder="Поиск: ORD-…, TH-…"
               className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); updateUrl({ status: e.target.value }); }}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Все статусы</option>
+              <option value="NEW">Новый</option>
+              <option value="IN_PROCESSING">В обработке</option>
+              <option value="WAITING_FOR_DATA">Ожидание данных</option>
+              <option value="READY_FOR_BOOKING">Готов к бронированию</option>
+              <option value="SENT_TO_BOOKING">Отправлен в бронирование</option>
+              <option value="CLOSED">Закрыт</option>
+              <option value="CANCELLED">Отменён</option>
+            </select>
+            <select
+              value={paymentStatusFilter}
+              onChange={(e) => { setPaymentStatusFilter(e.target.value); setPage(1); updateUrl({ paymentStatus: e.target.value }); }}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Все оплаты</option>
+              <option value="UNPAID">Не оплачен</option>
+              <option value="PARTIALLY_PAID">Частично оплачен</option>
+              <option value="PAID">Оплачен</option>
+              <option value="REFUNDED">Возврат</option>
+            </select>
             {activeFilters.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {activeFilters.map((f, i) => (
@@ -179,6 +212,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Заказ</SortableHeader>
+                  <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата</SortableHeader>
                   <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort} alignRight>Сумма</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">Позиции</th>
                   <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Статус</SortableHeader>
@@ -201,6 +235,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                         <div className="font-mono text-xs text-blue-600">{o.code}</div>
                         <div className="text-xs text-slate-400">{o.number}</div>
                       </td>
+                      <td className="px-4 py-2.5 text-xs text-slate-500">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
                       <td className="px-4 py-2.5 font-medium text-slate-800">
                         {Number(o.amount).toFixed(2)} {o.currency}
                       </td>
@@ -214,7 +249,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                 ))}
                 {(data?.items ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={4 + (paymentFailed === "true" ? 1 : 0) + (pendingRefund === "true" ? 1 : 0) + (cancelledWithin ? 1 : 0)} className="px-4 py-8 text-center text-sm text-slate-400">
+                    <td colSpan={5 + (paymentFailed === "true" ? 1 : 0) + (pendingRefund === "true" ? 1 : 0) + (cancelledWithin ? 1 : 0)} className="px-4 py-8 text-center text-sm text-slate-400">
                       Заказов пока нет
                     </td>
                   </tr>

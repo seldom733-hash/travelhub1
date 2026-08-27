@@ -30,6 +30,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState(initialStatus);
+  const [productType, setProductType] = useState("");
   const [unsold] = useState(initialUnsold);
   const [availability] = useState(initialAvailability);
   // Derived filter labels for display
@@ -77,6 +78,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
       const qs = new URLSearchParams();
       if (search) qs.set("search", search);
       if (status) qs.set("status", status);
+      if (productType) qs.set("type", productType);
       if (unsold) qs.set("unsold", unsold);
       if (availability) qs.set("availability", availability);
       if (sortBy) qs.set("sortBy", sortBy);
@@ -96,7 +98,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, unsold, availability, sortBy, sortDirection, page]);
+  }, [search, status, productType, unsold, availability, sortBy, sortDirection, page]);
 
   const openDetail = async (id: string) => {
     setShowCreate(false);
@@ -249,7 +251,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
             />
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              onChange={(e) => { setStatus(e.target.value); setPage(1); }}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 outline-none focus:border-blue-400"
             >
               <option value="">Все статусы</option>
@@ -258,6 +260,16 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               <option value="REVIEWED">Проверен</option>
               <option value="PUBLISHED">Опубликован</option>
               <option value="ARCHIVED">Архивирован</option>
+            </select>
+            <select
+              value={productType}
+              onChange={(e) => { setProductType(e.target.value); setPage(1); }}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 outline-none focus:border-blue-400"
+            >
+              <option value="">Все типы</option>
+              {PRODUCT_TYPES.map((t) => (
+                <option key={t.code} value={t.code}>{t.title}</option>
+              ))}
             </select>
             {activeFilters.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
@@ -283,6 +295,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                   <SortableHeader field="type" currentSort={sortState} onSort={handleSort}>Тип</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">Тарифы</th>
                   <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>Статус</SortableHeader>
+                  <SortableHeader field="publishedAt" currentSort={sortState} onSort={handleSort}>Публикация</SortableHeader>
                   {unsold === "true" && <th className="px-4 py-2.5 font-medium text-blue-600">Заказы</th>}
                   {availability === "missing" && <th className="px-4 py-2.5 font-medium text-amber-600">Доступность</th>}
                 </tr>
@@ -301,13 +314,14 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                     <td className="px-4 py-2.5 text-slate-500">{p.type}</td>
                     <td className="px-4 py-2.5 text-slate-500">{p.tariffs?.length ?? 0}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500">{p.publishedAt ? new Date(p.publishedAt).toLocaleDateString("ru-RU") : "—"}</td>
                     {unsold === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-medium text-green-700">0 заказов</span></td>}
                     {availability === "missing" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">Не настроена</span></td>}
                   </tr>
                 ))}
                 {(data?.items ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
                       Продуктов пока нет
                     </td>
                   </tr>

@@ -61,7 +61,7 @@ export default function SortableHeader({
       <button
         type="button"
         onClick={handleClick}
-        className={`inline-flex items-center gap-1 text-left text-[10px] font-medium uppercase tracking-wide transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ${alignRight ? 'flex-row-reverse text-right' : ''}`}
+        className={`inline-flex items-center gap-1 text-left text-xs font-medium uppercase tracking-wide text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ${alignRight ? 'flex-row-reverse text-right' : ''}`}
         aria-sort={isActive ? (direction === "asc" ? "ascending" : "descending") : "none"}
         title={isActive ? `Sorted ${direction === "asc" ? "ascending" : "descending"}` : "Click to sort"}
       >

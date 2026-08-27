@@ -507,6 +507,7 @@ export class CatalogService implements OnModuleInit {
     status: 'status',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
+    publishedAt: 'publishedAt',
   };
 
   /** Shared Table Sorting: supports sortBy/sortDirection or legacy sort param. */
