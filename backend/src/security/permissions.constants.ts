@@ -47,6 +47,7 @@ export const PERMISSIONS = {
   "catalog.media.read_for_moderation": "Чтение media для модерации (MODERATOR)",
 
   // ── CRM ───────────────────────────────────────────────────────────────
+  "crm.activity.read": "Чтение CRM Activity Timeline (customer/partner activity feeds)",
   "crm.customer.read": "Чтение клиентов",
   "crm.customer.write": "Создание/изменение клиентов",
   "crm.contact.write": "Управление контактами",
@@ -294,6 +295,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "dashboard.customize",
     // Phase 3 Step 3.5 Round 2B: DIRECTOR — read-only operational notes.
     "operational-notes.read",
+    // Phase 3 Step 3.5.3 Round 2B: DIRECTOR — CRM Activity Timeline read.
+    "crm.activity.read",
   ],
 
   FINANCE: [
@@ -340,6 +343,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "dashboard.attention.read",
     // Phase 3 Step 3.5 Round 2B: FINANCE — read-only operational notes.
     "operational-notes.read",
+    // Phase 3 Step 3.5.3 Round 2B: FINANCE — CRM Activity Timeline read.
+    "crm.activity.read",
   ],
 
   MARKETER: [
@@ -365,6 +370,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "dashboard.customize",
     // Phase 3 Step 3.5 Round 2B: MARKETER — read-only operational notes.
     "operational-notes.read",
+    // Phase 3 Step 3.5.3 Round 2B: MARKETER — CRM Activity Timeline read.
+    "crm.activity.read",
   ],
 
   ANALYST: [
@@ -405,6 +412,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "dashboard.customize",
     // Phase 3 Step 3.5 Round 2B: ANALYST — read-only operational notes.
     "operational-notes.read",
+    // Phase 3 Step 3.5.3 Round 2B: ANALYST — CRM Activity Timeline read.
+    "crm.activity.read",
   ],
 
   // Step 1.3 review fix: MODERATOR имеет ТОЛЬКО moderation-права — review/approve/
@@ -470,6 +479,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // Phase 3 Step 3.5 Round 2B: SALES_MANAGER — read + create operational notes.
     "operational-notes.read",
     "operational-notes.create",
+    // Phase 3 Step 3.5.3 Round 2B: SALES_MANAGER — CRM Activity Timeline read.
+    "crm.activity.read",
   ],
 
   OPERATOR: [
@@ -508,6 +519,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "operational-notes.create",
     "operational-notes.update",
     "operational-notes.delete",
+    // Phase 3 Step 3.5.3 Round 2B: OPERATOR — CRM Activity Timeline read.
+    "crm.activity.read",
   ],
 
   // Step 1.3: PARTNER НЕ имеет unrestricted catalog.product.read — только
