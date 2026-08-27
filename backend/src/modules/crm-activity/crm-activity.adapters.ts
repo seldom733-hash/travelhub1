@@ -192,7 +192,8 @@ export class PaymentAdapter implements SourceAdapter {
   project(source: any, event?: string): ActivityProjection | null {
     if (!source) return null;
 
-    const customerId = source.customerId ?? null;
+    // Canonical ownership: direct customerId first, then order-derived via Order.customerId
+    const customerId = source.customerId ?? source.order?.customerId ?? null;
     const partnerId = source.order?.sellerPartnerId ?? source.partnerId ?? null;
 
     const isCaptured = event === 'captured' || (source.status === 'CAPTURED' && source.paidAt);
@@ -228,17 +229,18 @@ export class PaymentAdapter implements SourceAdapter {
 
   async backfill(prisma: any): Promise<ActivityProjection[]> {
     // Cross-schema: Payment has customerId/partnerId directly; orderId for order ref
+    // Round 2C.2R: also fetch Order.customerId for canonical ownership resolution
     const payments = await prisma.payment.findMany({ orderBy: { createdAt: 'asc' } });
     if (payments.length === 0) return [];
-    const orderIds = [...new Set(payments.map((p: any) => p.orderId))];
+    const orderIds = [...new Set(payments.map((p: any) => p.orderId).filter(Boolean))];
     const orders = await prisma.order.findMany({
       where: { id: { in: orderIds } },
-      select: { id: true, sellerPartnerId: true },
+      select: { id: true, customerId: true, sellerPartnerId: true },
     });
     const orderMap = new Map(orders.map((o: any) => [o.id, o]));
     const enriched = payments.map((p: any) => ({ ...p, order: orderMap.get(p.orderId) ?? null }));
     const projections: ActivityProjection[] = [];
-    for (const p of payments) {
+    for (const p of enriched) {
       // Always emit PAYMENT_CREATED
       const created = this.project(p, 'created');
       if (created) projections.push(created);

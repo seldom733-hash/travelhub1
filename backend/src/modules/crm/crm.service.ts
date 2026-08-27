@@ -762,11 +762,23 @@ export class CrmService {
       select: { id: true, code: true, number: true, status: true, paymentStatus: true, amount: true, paidAmount: true, currency: true, createdAt: true },
     });
 
-    // Get order IDs for cross-schema queries (no FK — ADR-0001)
+    // ── Canonical Payment Ownership (Round 2C.2R) ─────────────────────────
+    // Payment customer is resolved via:
+    //   1. Direct: Payment.customerId == customer.id
+    //   2. Order-derived: Payment.orderId → Order.customerId == customer.id
+    // Merge + dedupe by Payment.id, then paginate/sort.
+
+    // orderIds from the paginated orders (for UI bookings tab)
     const orderIds = orders.map((o) => o.id);
 
-    // Bookings and Payments reference orderId directly (no Prisma relation)
-    const [bookings, payments, totalOrders, totalBookings, totalPayments] = await Promise.all([
+    // Get ALL order IDs for this customer (no limit) for payment resolution
+    const allOrderIds = (await this.prisma.order.findMany({
+      where: { customerId: id },
+      select: { id: true },
+    })).map((o) => o.id);
+
+    // Bookings still use the paginated order set (UI tab)
+    const [bookings, totalOrders, totalBookings] = await Promise.all([
       orderIds.length > 0
         ? this.prisma.booking.findMany({
             where: { orderId: { in: orderIds } },
@@ -780,38 +792,78 @@ export class CrmService {
             select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, productId: true, createdAt: true },
           })
         : Promise.resolve([]),
-      orderIds.length > 0
-        ? this.prisma.payment.findMany({
-            where: { orderId: { in: orderIds } },
-            orderBy: buildSortClause(
-              sort?.sortBy,
-              sort?.sortDirection,
-              { code: 'code', paymentDate: 'paidAt', amount: 'amount', status: 'status' },
-              { createdAt: 'desc' },
-            ),
-            take: 20,
-            select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true, paidAt: true },
-          })
-        : Promise.resolve([]),
       this.prisma.order.count({ where: { customerId: id } }),
       orderIds.length > 0
         ? this.prisma.booking.count({ where: { orderId: { in: orderIds } } })
         : Promise.resolve(0),
-      orderIds.length > 0
-        ? this.prisma.payment.count({ where: { orderId: { in: orderIds } } })
-        : Promise.resolve(0),
+    ]);
+    // Note: orderIds = first 20 orders (for UI bookings tab)
+    // allOrderIds = ALL order IDs (for canonical payment resolution)
+
+    // Canonical payments: direct + order-derived, deduped
+    const paymentSelect = { id: true, code: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true, paidAt: true } as const;
+    const [directPayments, orderPayments] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: { customerId: id },
+        select: paymentSelect,
+      }),
+      allOrderIds.length > 0
+        ? this.prisma.payment.findMany({
+            where: { orderId: { in: allOrderIds } },
+            select: paymentSelect,
+          })
+        : Promise.resolve([]),
     ]);
 
+    // Merge + dedupe: direct payments take precedence (same row if dual-link)
+    const paymentMapById = new Map<string, typeof directPayments[number]>();
+    for (const p of orderPayments) paymentMapById.set(p.id, p);
+    for (const p of directPayments) paymentMapById.set(p.id, p); // direct overwrites if dual-link
+    let canonicalPayments = Array.from(paymentMapById.values());
+
+    // Deterministic sort on merged set
+    const paymentSortKey = sort?.sortBy === 'paymentDate' ? 'paidAt'
+      : sort?.sortBy === 'code' ? 'code'
+      : sort?.sortBy === 'amount' ? 'amount'
+      : sort?.sortBy === 'status' ? 'status'
+      : 'createdAt';
+    const paymentSortDir: 'asc' | 'desc' = sort?.sortDirection === 'asc' ? 'asc' : 'desc';
+    canonicalPayments.sort((a, b) => {
+      const aVal = a[paymentSortKey] ?? a.createdAt;
+      const bVal = b[paymentSortKey] ?? b.createdAt;
+      if (aVal === null && bVal === null) return 0;
+      if (aVal === null) return 1;
+      if (bVal === null) return -1;
+      const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+      return paymentSortDir === 'desc' ? -cmp : cmp;
+    });
+
+    const totalPayments = canonicalPayments.length;
+    canonicalPayments = canonicalPayments.slice(0, 20);
+
     // Enrich payments with Order context (code, number, item count)
-    const orderMap = new Map(orders.map((o) => [o.id, o]));
-    const enrichedPayments = payments.map((p) => ({
+    // orderMap includes both paginated orders (full objects) and on-demand fetched ones
+    const orderMap = new Map<string, { code: string; number: string }>();
+    for (const o of orders) orderMap.set(o.id, { code: o.code, number: o.number });
+    // For orders not in the paginated set, fetch their code/number on demand
+    const missingOrderIds = canonicalPayments
+      .map(p => p.orderId)
+      .filter((oid): oid is string => !!oid && !orderMap.has(oid));
+    if (missingOrderIds.length > 0) {
+      const missingOrders = await this.prisma.order.findMany({
+        where: { id: { in: missingOrderIds } },
+        select: { id: true, code: true, number: true },
+      });
+      for (const o of missingOrders) orderMap.set(o.id, { code: o.code, number: o.number });
+    }
+    const enrichedPayments = canonicalPayments.map((p) => ({
       ...p,
-      orderCode: orderMap.get(p.orderId)?.code ?? null,
-      orderNumber: orderMap.get(p.orderId)?.number ?? null,
+      orderCode: orderMap.get(p.orderId!)?.code ?? null,
+      orderNumber: orderMap.get(p.orderId!)?.number ?? null,
     }));
 
     // Refunds: Customer → Order → Payment → Refund (cross-schema, no FK)
-    const paymentIds = payments.map((p) => p.id);
+    const paymentIds = canonicalPayments.map((p) => p.id);
     const [refunds, totalRefunds] = paymentIds.length > 0
       ? await Promise.all([
           this.prisma.refund.findMany({
@@ -830,10 +882,10 @@ export class CrmService {
       : [[], 0];
 
     // Enrich refunds with Payment and Order context
-    const paymentMap = new Map(payments.map((p) => [p.id, p]));
+    const paymentLookup = new Map(canonicalPayments.map((p) => [p.id, p]));
     const enrichedRefunds = refunds.map((r) => ({
       ...r,
-      paymentCode: paymentMap.get(r.paymentId)?.code ?? null,
+      paymentCode: paymentLookup.get(r.paymentId)?.code ?? null,
       orderCode: orderMap.get(r.orderId)?.code ?? null,
       orderNumber: orderMap.get(r.orderId)?.number ?? null,
     }));
