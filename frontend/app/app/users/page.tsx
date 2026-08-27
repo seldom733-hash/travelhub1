@@ -251,7 +251,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                   <th className="px-4 py-2.5 font-medium">Роль</th>
                   <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Статус</SortableHeader>
                   <SortableHeader field="lastLoginAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Последний вход</SortableHeader>
-                  <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата создания</SortableHeader>
+                  <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата регистрации</SortableHeader>
                 </tr>
               </thead>
               <tbody>

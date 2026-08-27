@@ -355,7 +355,7 @@ export class CatalogService implements OnModuleInit {
       const hasMatches = await this.applyLifecycleFilter(query.filter, where, actor);
       if (!hasMatches) {
         // Пустое пересечение — не «молча обрезанный» список, а корректный пустой результат.
-        return { items: [], total: 0, page, pageSize };
+        return { items: [], total: 0, page, pageSize, aggregates: { published: 0, drafts: 0, archived: 0 } };
       }
     }
 

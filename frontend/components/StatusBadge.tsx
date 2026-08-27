@@ -1,56 +1,120 @@
 "use client";
 
-const STATUS_META: Record<string, { label: string; cls: string }> = {
+import { useLocale, t } from "@/lib/i18n";
+
+/**
+ * Locale-aware status badge.
+ *
+ * Maps canonical enum values to i18n keys.
+ * Falls back to raw status value if no mapping exists.
+ */
+
+/** Maps status enum → i18n key. Covers all domain statuses. */
+const STATUS_I18N_KEY: Record<string, string> = {
   // Product
-  DRAFT: { label: "Черновик", cls: "bg-slate-100 text-slate-600 border-slate-200" },
-  COMPLETE: { label: "Заполнен", cls: "bg-sky-50 text-sky-700 border-sky-200" },
-  REVIEWED: { label: "Проверен", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  PUBLISHED: { label: "Опубликован", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  CHANGED: { label: "Изменён", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  ARCHIVED: { label: "Архивирован", cls: "bg-slate-100 text-slate-500 border-slate-200" },
-  SUSPENDED: { label: "Приостановлен", cls: "bg-orange-50 text-orange-700 border-orange-200" },
+  DRAFT: "status.product.DRAFT",
+  COMPLETE: "status.product.COMPLETE",
+  REVIEWED: "status.product.REVIEWED",
+  PUBLISHED: "status.product.PUBLISHED",
+  CHANGED: "status.product.CHANGED",
+  ARCHIVED: "status.product.ARCHIVED",
   // Order
-  NEW: { label: "Новый", cls: "bg-slate-100 text-slate-600 border-slate-200" },
-  IN_PROCESSING: { label: "В работе", cls: "bg-sky-50 text-sky-700 border-sky-200" },
-  WAITING_FOR_DATA: { label: "Ожидает данных", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  READY_FOR_BOOKING: { label: "Готов к бронированию", cls: "bg-violet-50 text-violet-700 border-violet-200" },
-  SENT_TO_BOOKING: { label: "Передан в Booking", cls: "bg-cyan-50 text-cyan-700 border-cyan-200" },
-  PARTIALLY_FULFILLED: { label: "Частично исполнен", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  FULFILLED: { label: "Исполнен", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  READY_TO_CLOSE: { label: "Готов к закрытию", cls: "bg-teal-50 text-teal-700 border-teal-200" },
-  CLOSED: { label: "Закрыт", cls: "bg-slate-100 text-slate-500 border-slate-200" },
-  CANCELLED: { label: "Отменён", cls: "bg-red-50 text-red-600 border-red-200" },
-  PROBLEM: { label: "Проблемный", cls: "bg-red-100 text-red-700 border-red-300" },
+  NEW: "status.order.NEW",
+  IN_PROCESSING: "status.order.IN_PROCESSING",
+  WAITING_FOR_DATA: "status.order.WAITING_FOR_DATA",
+  READY_FOR_BOOKING: "status.order.READY_FOR_BOOKING",
+  SENT_TO_BOOKING: "status.order.SENT_TO_BOOKING",
+  PARTIALLY_FULFILLED: "status.order.PARTIALLY_FULFILLED",
+  FULFILLED: "status.order.FULFILLED",
+  READY_TO_CLOSE: "status.order.READY_TO_CLOSE",
+  CLOSED: "status.order.CLOSED",
+  CANCELLED: "status.order.CANCELLED",
+  PROBLEM: "status.order.PROBLEM",
+  SUSPENDED: "status.order.SUSPENDED",
   // Booking
-  PREPARING_REQUEST: { label: "Готовится запрос", cls: "bg-sky-50 text-sky-700 border-sky-200" },
-  SENT_TO_SUPPLIER: { label: "Отправлен поставщику", cls: "bg-cyan-50 text-cyan-700 border-cyan-200" },
-  AWAITING_CONFIRMATION: { label: "Ждёт подтверждения", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  CONFIRMED: { label: "Подтверждено", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  IN_SERVICE: { label: "Исполняется", cls: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-  COMPLETED: { label: "Завершено", cls: "bg-emerald-100 text-emerald-800 border-emerald-300" },
-  SUPPLIER_REJECTED: { label: "Отклонено", cls: "bg-red-50 text-red-600 border-red-200" },
-  NEEDS_CLARIFICATION: { label: "Требует уточнения", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  CHANGE_REQUESTED: { label: "Изменение запрошено", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  CANCELLATION_REQUESTED: { label: "Отмена запрошена", cls: "bg-orange-50 text-orange-700 border-orange-200" },
+  PREPARING_REQUEST: "status.booking.PREPARING_REQUEST",
+  SENT_TO_SUPPLIER: "status.booking.SENT_TO_SUPPLIER",
+  AWAITING_CONFIRMATION: "status.booking.AWAITING_CONFIRMATION",
+  CONFIRMED: "status.booking.CONFIRMED",
+  IN_SERVICE: "status.booking.IN_SERVICE",
+  COMPLETED: "status.booking.COMPLETED",
+  SUPPLIER_REJECTED: "status.booking.SUPPLIER_REJECTED",
+  NEEDS_CLARIFICATION: "status.booking.NEEDS_CLARIFICATION",
+  CHANGE_REQUESTED: "status.booking.CHANGE_REQUESTED",
+  CANCELLATION_REQUESTED: "status.booking.CANCELLATION_REQUESTED",
   // Payment
-  UNPAID: { label: "Не оплачено", cls: "bg-slate-100 text-slate-600 border-slate-200" },
-  PARTIALLY_PAID: { label: "Частично оплачено", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  PAID: { label: "Оплачено", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  REFUNDED: { label: "Возвращено", cls: "bg-slate-100 text-slate-500 border-slate-200" },
-  // Common
-  ACTIVE: { label: "Активен", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  INACTIVE: { label: "Неактивен", cls: "bg-slate-100 text-slate-500 border-slate-200" },
-  LOCKED: { label: "Заблокирован", cls: "bg-red-50 text-red-600 border-red-200" },
+  UNPAID: "status.payment.UNPAID",
+  PARTIALLY_PAID: "status.payment.PARTIALLY_PAID",
+  PAID: "status.payment.PAID",
+  REFUNDED: "status.payment.REFUNDED",
+  // Common (users, CRM, etc.)
+  ACTIVE: "status.common.ACTIVE",
+  INACTIVE: "status.common.INACTIVE",
+  LOCKED: "status.common.LOCKED",
+  // CRM statuses
+  SUBMITTED: "status.crm.SUBMITTED",
+  IN_REVIEW: "status.crm.IN_REVIEW",
+  APPROVED: "status.crm.APPROVED",
+  REJECTED: "status.crm.REJECTED",
+  CHANGES_REQUESTED: "status.crm.CHANGES_REQUESTED",
+};
+
+/** Tailwind classes for status badge color. */
+const STATUS_CLS: Record<string, string> = {
+  DRAFT: "bg-slate-100 text-slate-600 border-slate-200",
+  COMPLETE: "bg-sky-50 text-sky-700 border-sky-200",
+  REVIEWED: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  PUBLISHED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  CHANGED: "bg-amber-50 text-amber-700 border-amber-200",
+  ARCHIVED: "bg-slate-100 text-slate-500 border-slate-200",
+  SUSPENDED: "bg-orange-50 text-orange-700 border-orange-200",
+  NEW: "bg-slate-100 text-slate-600 border-slate-200",
+  IN_PROCESSING: "bg-sky-50 text-sky-700 border-sky-200",
+  WAITING_FOR_DATA: "bg-amber-50 text-amber-700 border-amber-200",
+  READY_FOR_BOOKING: "bg-violet-50 text-violet-700 border-violet-200",
+  SENT_TO_BOOKING: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  PARTIALLY_FULFILLED: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  FULFILLED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  READY_TO_CLOSE: "bg-teal-50 text-teal-700 border-teal-200",
+  CLOSED: "bg-slate-100 text-slate-500 border-slate-200",
+  CANCELLED: "bg-red-50 text-red-600 border-red-200",
+  PROBLEM: "bg-red-100 text-red-700 border-red-300",
+  PREPARING_REQUEST: "bg-sky-50 text-sky-700 border-sky-200",
+  SENT_TO_SUPPLIER: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  AWAITING_CONFIRMATION: "bg-amber-50 text-amber-700 border-amber-200",
+  CONFIRMED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  IN_SERVICE: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  COMPLETED: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  SUPPLIER_REJECTED: "bg-red-50 text-red-600 border-red-200",
+  NEEDS_CLARIFICATION: "bg-amber-50 text-amber-700 border-amber-200",
+  CHANGE_REQUESTED: "bg-amber-50 text-amber-700 border-amber-200",
+  CANCELLATION_REQUESTED: "bg-orange-50 text-orange-700 border-orange-200",
+  UNPAID: "bg-slate-100 text-slate-600 border-slate-200",
+  PARTIALLY_PAID: "bg-amber-50 text-amber-700 border-amber-200",
+  PAID: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  REFUNDED: "bg-slate-100 text-slate-500 border-slate-200",
+  ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  INACTIVE: "bg-slate-100 text-slate-500 border-slate-200",
+  LOCKED: "bg-red-50 text-red-600 border-red-200",
+  SUBMITTED: "bg-amber-50 text-amber-700 border-amber-200",
+  IN_REVIEW: "bg-sky-50 text-sky-700 border-sky-200",
+  APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  REJECTED: "bg-red-50 text-red-600 border-red-200",
+  CHANGES_REQUESTED: "bg-orange-50 text-orange-700 border-orange-200",
 };
 
 export default function StatusBadge({ status }: { status: string }) {
-  const meta = STATUS_META[status] ?? { label: status, cls: "bg-slate-100 text-slate-600 border-slate-200" };
+  const locale = useLocale();
+  const i18nKey = STATUS_I18N_KEY[status];
+  const label = i18nKey ? t(i18nKey, locale) : status;
+  const cls = STATUS_CLS[status] ?? "bg-slate-100 text-slate-600 border-slate-200";
+
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${meta.cls}`}
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${cls}`}
     >
       <span className="size-1.5 rounded-full bg-current opacity-70" />
-      {meta.label}
+      {label}
     </span>
   );
 }

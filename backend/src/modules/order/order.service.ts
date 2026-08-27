@@ -481,7 +481,7 @@ export class OrderService {
       );
       const ids = (failedPayments as any[]).map((r) => r.orderId as string);
       if (ids.length === 0) {
-        return { items: [], total: 0, page, pageSize };
+        return { items: [], total: 0, page, pageSize, aggregates: { active: 0, ready: 0, closed: 0 } };
       }
       where.id = { in: ids };
     }
@@ -493,7 +493,7 @@ export class OrderService {
       );
       const ids = (pendingRefunds as any[]).map((r) => r.orderId as string);
       if (ids.length === 0) {
-        return { items: [], total: 0, page, pageSize };
+        return { items: [], total: 0, page, pageSize, aggregates: { active: 0, ready: 0, closed: 0 } };
       }
       where.id = { in: ids };
     }

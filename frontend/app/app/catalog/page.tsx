@@ -203,9 +203,9 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
 
   const counts = {
     total: data?.total ?? 0,
-    published: data?.aggregates?.published ?? data?.items.filter((p) => p.status === "PUBLISHED").length ?? 0,
-    drafts: data?.aggregates?.drafts ?? data?.items.filter((p) => p.status === "DRAFT").length ?? 0,
-    archived: data?.aggregates?.archived ?? data?.items.filter((p) => p.status === "ARCHIVED").length ?? 0,
+    published: data?.aggregates?.published ?? 0,
+    drafts: data?.aggregates?.drafts ?? 0,
+    archived: data?.aggregates?.archived ?? 0,
   };
 
   return (

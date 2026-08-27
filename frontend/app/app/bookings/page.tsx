@@ -129,9 +129,9 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
 
   const counts = {
     total: data?.total ?? 0,
-    awaiting: data?.aggregates?.awaiting ?? data?.items.filter((b) => ["SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION"].includes(b.status)).length ?? 0,
-    confirmed: data?.aggregates?.confirmed ?? data?.items.filter((b) => ["CONFIRMED", "IN_SERVICE", "COMPLETED"].includes(b.status)).length ?? 0,
-    cancelled: data?.aggregates?.cancelled ?? data?.items.filter((b) => ["CANCELLED", "SUPPLIER_REJECTED"].includes(b.status)).length ?? 0,
+    awaiting: data?.aggregates?.awaiting ?? 0,
+    confirmed: data?.aggregates?.confirmed ?? 0,
+    cancelled: data?.aggregates?.cancelled ?? 0,
   };
 
   return (
@@ -215,14 +215,14 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
               </colgroup>
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Код</SortableHeader>
-                  <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата</SortableHeader>
-                  <th className="px-4 py-2.5 font-medium">Заказ</th>
-                  <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort} alignRight>Сумма</SortableHeader>
-                  <th className="px-4 py-2.5 font-medium">Пассажиры</th>
-                  <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Статус</SortableHeader>
-                  {(upcomingOnly || overdueOnly) && <SortableHeader field="serviceDate" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата услуги</SortableHeader>}
-                  {overdueOnly && <th className="px-4 py-2.5 font-medium text-red-600">Ожидание</th>}
+                  <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.code", locale)}</SortableHeader>
+                  <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.date", locale)}</SortableHeader>
+                  <th className="px-4 py-2.5 font-medium">{t("admin.table.col.code", locale)}</th>
+                  <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort} > {t("admin.table.col.amount", locale)} </SortableHeader>
+                  <th className="px-4 py-2.5 font-medium">{t("admin.table.col.passengers", locale)}</th>
+                  <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.status", locale)}</SortableHeader>
+                  {(upcomingOnly || overdueOnly) && <SortableHeader field="serviceDate" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}> {t("admin.table.col.service_date", locale)} </SortableHeader>}
+                  {overdueOnly && <th className="px-4 py-2.5 font-medium text-red-600">{t("admin.table.col.waiting", locale)}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -237,7 +237,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
                     <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{b.code}</td>
                     <td className="px-4 py-2.5 text-xs text-slate-500">{b.createdAt ? new Date(b.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{b.orderId.slice(0, 8)}…</td>
-                    <td className="px-4 py-2.5 font-medium text-slate-800">{Number(b.amount).toFixed(2)}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-800 text-center">{Number(b.amount).toFixed(2)}</td>
                     <td className="px-4 py-2.5 text-slate-500">{b.passengers?.length ?? 0}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
                     {(upcomingOnly || overdueOnly) && <td className="px-4 py-2.5 text-xs text-slate-600">{b.serviceDate ? new Date(b.serviceDate).toLocaleDateString("ru-RU") : "—"}</td>}

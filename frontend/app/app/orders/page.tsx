@@ -136,9 +136,9 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
 
   const counts = {
     total: data?.total ?? 0,
-    active: data?.aggregates?.active ?? data?.items.filter((o) => ["NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING", "SENT_TO_BOOKING"].includes(o.status)).length ?? 0,
-    ready: data?.aggregates?.ready ?? data?.items.filter((o) => o.status === "READY_FOR_BOOKING").length ?? 0,
-    closed: data?.aggregates?.closed ?? data?.items.filter((o) => ["CLOSED", "CANCELLED"].includes(o.status)).length ?? 0,
+    active: data?.aggregates?.active ?? 0,
+    ready: data?.aggregates?.ready ?? 0,
+    closed: data?.aggregates?.closed ?? 0,
   };
 
   return (
@@ -235,7 +235,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                 <tr>
                   <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.code", locale)}</SortableHeader>
                   <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.date", locale)}</SortableHeader>
-                  <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort} alignRight>{t("admin.table.col.amount", locale)}</SortableHeader>
+                  <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort} >{t("admin.table.col.amount", locale)}</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">{t("admin.table.col.items", locale)}</th>
                   <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Статус</SortableHeader>
                   <SortableHeader field="paymentStatus" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Оплата</SortableHeader>
@@ -258,7 +258,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                         <div className="text-xs text-slate-400">{o.number}</div>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-500">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
-                      <td className="px-4 py-2.5 font-medium text-slate-800">
+                      <td className="px-4 py-2.5 font-medium text-slate-800 text-center">
                         {Number(o.amount).toFixed(2)} {o.currency}
                       </td>
                       <td className="px-4 py-2.5 text-slate-500">{o.items?.length ?? 0}</td>
