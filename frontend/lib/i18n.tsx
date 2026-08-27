@@ -982,6 +982,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "admin.table.col.date": { ru: "Дата", az: "Tarix", en: "Date" },
   "admin.table.col.amount": { ru: "Сумма", az: "Məbləğ", en: "Amount" },
   "admin.table.col.items": { ru: "Позиции", az: "Mövqelər", en: "Items" },
+  "admin.table.col.refund": { ru: "Возврат", az: "Geri qaytarma", en: "Refund" },
+  "admin.table.col.cancel_date": { ru: "Дата отмены", az: "Ləğv tarixi", en: "Cancel date" },
   "admin.table.col.payment": { ru: "Оплата", az: "Ödəniş", en: "Payment" },
   "admin.table.col.passengers": { ru: "Пассажиры", az: "Sərnişinlər", en: "Passengers" },
   "admin.table.col.user": { ru: "Пользователь", az: "İstifadəçi", en: "User" },

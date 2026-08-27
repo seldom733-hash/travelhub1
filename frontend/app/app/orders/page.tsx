@@ -152,7 +152,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               onClick={() => void load()}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
             >
-              ⟳ Обновить
+              {t("admin.table.refresh", locale)}
             </button>
           }
         />
@@ -237,11 +237,11 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                   <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.date", locale)}</SortableHeader>
                   <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort} >{t("admin.table.col.amount", locale)}</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">{t("admin.table.col.items", locale)}</th>
-                  <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Статус</SortableHeader>
-                  <SortableHeader field="paymentStatus" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Оплата</SortableHeader>
-                  {paymentFailed === "true" && <th className="px-4 py-2.5 font-medium text-red-600">Платёж</th>}
-                  {pendingRefund === "true" && <th className="px-4 py-2.5 font-medium text-amber-600">Возврат</th>}
-                  {cancelledWithin && <SortableHeader field="cancelledAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>Дата отмены</SortableHeader>}
+                  <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.status", locale)}</SortableHeader>
+                  <SortableHeader field="paymentStatus" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.payment", locale)}</SortableHeader>
+                  {paymentFailed === "true" && <th className="px-4 py-2.5 font-medium text-red-600">{t("admin.table.col.payment", locale)}</th>}
+                  {pendingRefund === "true" && <th className="px-4 py-2.5 font-medium text-amber-600">{t("admin.table.col.refund", locale)}</th>}
+                  {cancelledWithin && <SortableHeader field="cancelledAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}> {t("admin.table.col.cancel_date", locale)} </SortableHeader>}
                 </tr>
               </thead>
               <tbody>

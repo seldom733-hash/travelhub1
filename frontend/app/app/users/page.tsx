@@ -8,20 +8,20 @@ import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
 import PanelFrame from "@/components/PanelFrame";
 import Pagination from "@/components/Pagination";
-import { useLocale } from "@/lib/i18n";
+import { useLocale, t } from "@/lib/i18n";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 
-const ROLES: { code: string; title: string }[] = [
-  { code: "ADMIN", title: "Администратор" },
-  { code: "DIRECTOR", title: "Директор" },
-  { code: "FINANCE", title: "Финансы" },
-  { code: "MARKETER", title: "Маркетолог" },
-  { code: "ANALYST", title: "Аналитик" },
-  { code: "MODERATOR", title: "Модератор" },
-  { code: "SALES_MANAGER", title: "Менеджер продаж" },
-  { code: "OPERATOR", title: "Оператор" },
-  { code: "PARTNER", title: "Партнёр" },
-  { code: "BUYER", title: "Покупатель" },
+const ROLES: { code: string; titleKey: string }[] = [
+  { code: "ADMIN", titleKey: "user.role.ADMIN" },
+  { code: "DIRECTOR", titleKey: "user.role.DIRECTOR" },
+  { code: "FINANCE", titleKey: "user.role.FINANCE" },
+  { code: "MARKETER", titleKey: "user.role.MARKETER" },
+  { code: "ANALYST", titleKey: "user.role.ANALYST" },
+  { code: "MODERATOR", titleKey: "user.role.MODERATOR" },
+  { code: "SALES_MANAGER", titleKey: "user.role.SALES_MANAGER" },
+  { code: "OPERATOR", titleKey: "user.role.OPERATOR" },
+  { code: "PARTNER", titleKey: "user.role.PARTNER" },
+  { code: "BUYER", titleKey: "user.role.BUYER" },
 ];
 
 interface UsersResult {
@@ -157,14 +157,14 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
       {/* Workspace */}
       <div className="flex min-w-0 flex-1 flex-col">
         <PageHeader
-          title="Пользователи"
-          breadcrumbs={["TravelHub", "Пользователи"]}
+          title={t("nav.users", locale)}
+          breadcrumbs={["TravelHub", t("nav.users", locale)]}
           actions={
             <button
               onClick={() => void load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
             >
-              ⟳ Обновить
+              {t("admin.table.refresh", locale)}
             </button>
           }
         />
@@ -180,41 +180,41 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
             <input
               value={draftSearch}
               onChange={(e) => setDraftSearch(e.target.value)}
-              placeholder="Поиск: username, email, имя…"
+              placeholder={t("admin.search.placeholder_users", locale)}
               className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
             <button
               type="submit"
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
             >
-              Найти
+              {t("admin.table.find", locale)}
             </button>
             <select
               value={statusFilter ?? ''}
               onChange={(e) => { setStatusFilter(e.target.value || undefined); setPage(1); }}
               className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400"
             >
-              <option value="">Все статусы</option>
-              <option value="ACTIVE">Активен</option>
-              <option value="INACTIVE">Неактивен</option>
-              <option value="LOCKED">Заблокирован</option>
+              <option value="">{t("admin.filter.all_statuses", locale)}</option>
+              <option value="ACTIVE">{t("user.status.ACTIVE", locale)}</option>
+              <option value="INACTIVE">{t("user.status.INACTIVE", locale)}</option>
+              <option value="LOCKED">{t("user.status.LOCKED", locale)}</option>
             </select>
             <select
               value={roleFilter ?? ''}
               onChange={(e) => { setRoleFilter(e.target.value || undefined); setPage(1); }}
               className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400"
             >
-              <option value="">Все роли</option>
-              <option value="ADMIN">Администратор</option>
-              <option value="DIRECTOR">Директор</option>
-              <option value="SALES_MANAGER">Менеджер продаж</option>
-              <option value="OPERATOR">Оператор</option>
-              <option value="FINANCE">Финансы</option>
-              <option value="ANALYST">Аналитик</option>
-              <option value="MODERATOR">Модератор</option>
-              <option value="PARTNER">Партнёр</option>
-              <option value="BUYER">Покупатель</option>
-              <option value="MARKETER">Маркетолог</option>
+              <option value="">{t("admin.filter.all_roles", locale)}</option>
+              <option value="ADMIN">{t("user.role.ADMIN", locale)}</option>
+              <option value="DIRECTOR">{t("user.role.DIRECTOR", locale)}</option>
+              <option value="SALES_MANAGER">{t("user.role.SALES_MANAGER", locale)}</option>
+              <option value="OPERATOR">{t("user.role.OPERATOR", locale)}</option>
+              <option value="FINANCE">{t("user.role.FINANCE", locale)}</option>
+              <option value="ANALYST">{t("user.role.ANALYST", locale)}</option>
+              <option value="MODERATOR">{t("user.role.MODERATOR", locale)}</option>
+              <option value="PARTNER">{t("user.role.PARTNER", locale)}</option>
+              <option value="BUYER">{t("user.role.BUYER", locale)}</option>
+              <option value="MARKETER">{t("user.role.MARKETER", locale)}</option>
             </select>
             <div className="flex items-center gap-1">
               <span className="text-xs text-slate-400">С</span>
@@ -227,7 +227,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               onClick={() => setShowCreate((v) => !v)}
               className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
             >
-              ＋ Создать пользователя
+              {t("admin.table.create_user", locale)}
             </button>
             {busy && <span className="text-xs text-slate-400">загрузка…</span>}
           </form>
@@ -273,7 +273,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                       >
                         {ROLES.map((r) => (
                           <option key={r.code} value={r.code}>
-                            {r.title}
+                            {t(r.titleKey, locale)}
                           </option>
                         ))}
                       </select>
@@ -367,7 +367,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
               >
                 {ROLES.map((r) => (
                   <option key={r.code} value={r.code}>
-                    {r.title}
+                    {t(r.titleKey, locale)}
                   </option>
                 ))}
               </select>
