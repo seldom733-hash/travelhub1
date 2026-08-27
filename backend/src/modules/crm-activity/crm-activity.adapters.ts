@@ -98,16 +98,8 @@ export class OrderAdapter implements SourceAdapter {
     if (!source) return null;
 
     const customerId = source.customerId ?? null;
-    // Partner binding via items → product → partner
-    let partnerId: string | null = null;
-    if (source.items && Array.isArray(source.items)) {
-      for (const item of source.items) {
-        if (item.product?.partnerId) {
-          partnerId = item.product.partnerId;
-          break;
-        }
-      }
-    }
+    // Partner binding: Order.sellerPartnerId (denormalized at creation)
+    const partnerId = source.sellerPartnerId ?? null;
 
     return {
       sourceType: CrmActivitySourceType.ORDER,
@@ -136,7 +128,6 @@ export class OrderAdapter implements SourceAdapter {
 
   async backfill(prisma: any): Promise<ActivityProjection[]> {
     const orders = await prisma.order.findMany({
-      include: { items: { include: { product: { select: { partnerId: true } } } } },
       orderBy: { createdAt: 'asc' },
     });
     return orders.map((o: any) => this.project(o)).filter(Boolean) as ActivityProjection[];
@@ -151,12 +142,9 @@ export class BookingAdapter implements SourceAdapter {
   project(source: any): ActivityProjection | null {
     if (!source) return null;
 
-    // Booking → Order → Customer; Booking → Product → Partner
+    // Booking → Order → Customer; Booking → Order.sellerPartnerId → Partner
     const customerId = source.order?.customerId ?? null;
-    let partnerId: string | null = null;
-    if (source.product?.partnerId) {
-      partnerId = source.product.partnerId;
-    }
+    const partnerId = source.order?.sellerPartnerId ?? null;
 
     return {
       sourceType: CrmActivitySourceType.BOOKING,
@@ -182,14 +170,17 @@ export class BookingAdapter implements SourceAdapter {
   }
 
   async backfill(prisma: any): Promise<ActivityProjection[]> {
-    const bookings = await prisma.booking.findMany({
-      include: {
-        order: { select: { customerId: true } },
-        product: { select: { partnerId: true } },
-      },
-      orderBy: { createdAt: 'asc' },
+    // Cross-schema: Booking.orderId → Order.customerId + Order.sellerPartnerId
+    const bookings = await prisma.booking.findMany({ orderBy: { createdAt: 'asc' } });
+    if (bookings.length === 0) return [];
+    const orderIds = [...new Set(bookings.map((b: any) => b.orderId))];
+    const orders = await prisma.order.findMany({
+      where: { id: { in: orderIds } },
+      select: { id: true, customerId: true, sellerPartnerId: true },
     });
-    return bookings.map((b: any) => this.project(b)).filter(Boolean) as ActivityProjection[];
+    const orderMap = new Map(orders.map((o: any) => [o.id, o]));
+    const enriched = bookings.map((b: any) => ({ ...b, order: orderMap.get(b.orderId) ?? null }));
+    return enriched.map((b: any) => this.project(b)).filter(Boolean) as ActivityProjection[];
   }
 }
 
@@ -202,15 +193,7 @@ export class PaymentAdapter implements SourceAdapter {
     if (!source) return null;
 
     const customerId = source.customerId ?? null;
-    let partnerId: string | null = null;
-    if (source.order?.items) {
-      for (const item of source.order.items) {
-        if (item.product?.partnerId) {
-          partnerId = item.product.partnerId;
-          break;
-        }
-      }
-    }
+    const partnerId = source.order?.sellerPartnerId ?? source.partnerId ?? null;
 
     const isCaptured = event === 'captured' || (source.status === 'CAPTURED' && source.paidAt);
     const activityType = isCaptured
@@ -244,14 +227,16 @@ export class PaymentAdapter implements SourceAdapter {
   }
 
   async backfill(prisma: any): Promise<ActivityProjection[]> {
-    const payments = await prisma.payment.findMany({
-      include: {
-        order: {
-          include: { items: { include: { product: { select: { partnerId: true } } } } },
-        },
-      },
-      orderBy: { createdAt: 'asc' },
+    // Cross-schema: Payment has customerId/partnerId directly; orderId for order ref
+    const payments = await prisma.payment.findMany({ orderBy: { createdAt: 'asc' } });
+    if (payments.length === 0) return [];
+    const orderIds = [...new Set(payments.map((p: any) => p.orderId))];
+    const orders = await prisma.order.findMany({
+      where: { id: { in: orderIds } },
+      select: { id: true, sellerPartnerId: true },
     });
+    const orderMap = new Map(orders.map((o: any) => [o.id, o]));
+    const enriched = payments.map((p: any) => ({ ...p, order: orderMap.get(p.orderId) ?? null }));
     const projections: ActivityProjection[] = [];
     for (const p of payments) {
       // Always emit PAYMENT_CREATED
@@ -276,15 +261,7 @@ export class RefundAdapter implements SourceAdapter {
     if (!source) return null;
 
     const customerId = source.payment?.customerId ?? null;
-    let partnerId: string | null = null;
-    if (source.payment?.order?.items) {
-      for (const item of source.payment.order.items) {
-        if (item.product?.partnerId) {
-          partnerId = item.product.partnerId;
-          break;
-        }
-      }
-    }
+    const partnerId = source.payment?.order?.sellerPartnerId ?? source.payment?.partnerId ?? null;
 
     const isProcessed = event === 'processed' || (source.status === 'PROCESSED' && source.processedAt);
     const activityType = isProcessed
@@ -319,17 +296,25 @@ export class RefundAdapter implements SourceAdapter {
   }
 
   async backfill(prisma: any): Promise<ActivityProjection[]> {
-    const refunds = await prisma.refund.findMany({
-      include: {
-        payment: {
-          include: {
-            order: {
-              include: { items: { include: { product: { select: { partnerId: true } } } } },
-            },
-          },
-        },
-      },
-      orderBy: { createdAt: 'asc' },
+    // Cross-schema: Refund → Payment (by paymentId) → Order (by orderId)
+    const refunds = await prisma.refund.findMany({ orderBy: { createdAt: 'asc' } });
+    if (refunds.length === 0) return [];
+    const paymentIds = [...new Set(refunds.map((r: any) => r.paymentId))];
+    const payments = await prisma.payment.findMany({
+      where: { id: { in: paymentIds } },
+      select: { id: true, customerId: true, partnerId: true, orderId: true },
+    });
+    const paymentMap = new Map<string, any>(payments.map((p: any) => [p.id, p]));
+    const orderIds = [...new Set(payments.map((p: any) => p.orderId))];
+    const orders = await prisma.order.findMany({
+      where: { id: { in: orderIds } },
+      select: { id: true, sellerPartnerId: true },
+    });
+    const orderMap = new Map<string, any>(orders.map((o: any) => [o.id, o]));
+    const enriched = refunds.map((r: any) => {
+      const pay: any = paymentMap.get(r.paymentId) ?? null;
+      const ord: any = pay ? orderMap.get(pay.orderId) ?? null : null;
+      return { ...r, payment: pay ? { ...pay, order: ord } : null };
     });
     const projections: ActivityProjection[] = [];
     for (const r of refunds) {
