@@ -431,6 +431,7 @@ export default function Partner360Page() {
                 <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-blue-400">{t("crm.intake.lead_source", locale)}</label>
                 <select value={intakeForm.leadSource} onChange={(e) => setIntakeForm({ ...intakeForm, leadSource: e.target.value })} className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400">
                   <option value="DIRECT">{t("crm.lead_source.direct", locale)}</option>
+                  <option value="STOREFRONT">{t("crm.lead_source.storefront", locale)}</option>
                   <option value="PHONE">{t("crm.lead_source.phone", locale)}</option>
                   <option value="OFFICE">{t("crm.lead_source.office", locale)}</option>
                   <option value="EMAIL">{t("crm.lead_source.email", locale)}</option>

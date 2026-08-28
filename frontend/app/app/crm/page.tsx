@@ -255,11 +255,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
             breadcrumbs={["TravelHub", t("crm.title", locale)]}
             actions={
               <div className="flex items-center gap-2">
-                {tab === "customers" && canWrite && (
-                  <button onClick={() => { setEditing(false); setShowCreate((v) => !v); }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700">
-                    ＋ {t("crm.create_customer", locale)}
-                  </button>
-                )}
+                {/* Step 3.6A: Platform CRM Create Customer removed — Platform manages identity, not sales CRM */}
                 <button onClick={() => void loadCustomers()} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">⟳</button>
               </div>
             }
@@ -599,8 +595,13 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
             <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.intake.lead_source", locale)}</label>
             <select value={intakeForm.leadSource} onChange={(e) => setIntakeForm({ ...intakeForm, leadSource: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400">
               <option value="DIRECT">{t("crm.lead_source.direct", locale)}</option>
+              <option value="STOREFRONT">{t("crm.lead_source.storefront", locale)}</option>
+              <option value="PHONE">{t("crm.lead_source.phone", locale)}</option>
+              <option value="OFFICE">{t("crm.lead_source.office", locale)}</option>
+              <option value="EMAIL">{t("crm.lead_source.email", locale)}</option>
               <option value="MARKETPLACE">{t("crm.lead_source.marketplace", locale)}</option>
               <option value="REFERRAL">{t("crm.lead_source.referral", locale)}</option>
+              <option value="OTHER">{t("crm.lead_source.other", locale)}</option>
             </select>
           </div>
           <div>

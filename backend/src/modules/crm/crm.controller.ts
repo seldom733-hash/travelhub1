@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { Type } from "class-transformer";
 import { IsEmail, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from "class-validator";
 import { CustomerType, EntityStatus } from "../../generated/prisma/enums";
@@ -7,6 +7,14 @@ import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
+import { VALID_LEAD_SOURCES } from "./crm-lead-source.constants";
+
+/** Validate leadSource against canonical values. Null/undefined = allowed. */
+function assertValidLeadSource(source: string | null | undefined): void {
+  if (source && !VALID_LEAD_SOURCES.includes(source)) {
+    throw new BadRequestException(`Invalid leadSource '${source}'. Valid: ${VALID_LEAD_SOURCES.join(", ")}`);
+  }
+}
 
 class CreateCustomerDto {
   @IsOptional()
@@ -304,6 +312,7 @@ export class CrmController {
     @Body() dto: { firstName?: string; lastName?: string; companyName?: string; email: string; phone?: string; leadSource?: string; lifecycle?: string; tags?: string[]; notes?: string; assignedTo?: string; initialNote?: string },
     @CurrentUser() actor: AuthedRequest["user"],
   ) {
+    assertValidLeadSource(dto.leadSource);
     return this.crm.intakePartnerCustomer(actor, dto, actor.username);
   }
 
@@ -331,6 +340,7 @@ export class CrmController {
     @Body() dto: { firstName?: string; lastName?: string; companyName?: string; email: string; phone?: string; leadSource?: string; lifecycle?: string; tags?: string[]; notes?: string; assignedTo?: string; initialNote?: string },
     @CurrentUser() actor: AuthedRequest["user"],
   ) {
+    assertValidLeadSource(dto.leadSource);
     return this.crm.platformIntakeCustomer(partnerId, dto, actor.username);
   }
 }

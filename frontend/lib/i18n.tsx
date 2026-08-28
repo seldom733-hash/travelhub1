@@ -1117,6 +1117,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.intake.submit": { ru: "Добавить клиента", az: "Müştəri əlavə et", en: "Add customer" },
   "crm.lead_source.direct": { ru: "Прямой контакт", az: "Birbaşa əlaqə", en: "Direct contact" },
   "crm.lead_source.marketplace": { ru: "Marketplace", az: "Marketplace", en: "Marketplace" },
+  "crm.lead_source.storefront": { ru: "Витрина Partner", az: "Partnyor vitrini", en: "Partner Storefront" },
   "crm.lead_source.referral": { ru: "Рекомендация", az: "Tövsiyə", en: "Referral" },
   "crm.lead_source.phone": { ru: "Телефон", az: "Telefon", en: "Phone" },
   "crm.lead_source.office": { ru: "Офис", az: "Ofis", en: "Office" },

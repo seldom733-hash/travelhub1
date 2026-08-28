@@ -6,7 +6,7 @@ import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
 import StatusBadge from "@/components/StatusBadge";
 import PanelFrame from "@/components/PanelFrame";
-import { useLocale } from "@/lib/i18n";
+import { useLocale, t } from "@/lib/i18n";
 import { pt } from "@/lib/partner-i18n";
 import { useCurrentUser } from "@/lib/use-user";
 
@@ -298,11 +298,16 @@ export default function PartnerCustomersPage() {
             <input value={intakeForm.phone} onChange={(e) => setIntakeForm({ ...intakeForm, phone: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Источник лида</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.intake.lead_source", locale)}</label>
             <select value={intakeForm.leadSource} onChange={(e) => setIntakeForm({ ...intakeForm, leadSource: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400">
-              <option value="DIRECT">Прямой</option>
-              <option value="MARKETPLACE">Marketplace</option>
-              <option value="REFERRAL">Рекомендация</option>
+              <option value="DIRECT">{t("crm.lead_source.direct", locale)}</option>
+              <option value="STOREFRONT">{t("crm.lead_source.storefront", locale)}</option>
+              <option value="PHONE">{t("crm.lead_source.phone", locale)}</option>
+              <option value="OFFICE">{t("crm.lead_source.office", locale)}</option>
+              <option value="EMAIL">{t("crm.lead_source.email", locale)}</option>
+              <option value="MARKETPLACE">{t("crm.lead_source.marketplace", locale)}</option>
+              <option value="REFERRAL">{t("crm.lead_source.referral", locale)}</option>
+              <option value="OTHER">{t("crm.lead_source.other", locale)}</option>
             </select>
           </div>
           <div>
