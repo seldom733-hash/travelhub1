@@ -228,6 +228,15 @@ export class CatalogService implements OnModuleInit {
         ownershipOverride = true;
       }
 
+      // Step 3.6B: every NEW commercial Product must have a Partner owner.
+      // Platform actors (ADMIN/staff) cannot create ownerless Products.
+      // If TravelHub needs to sell, use a TravelHub-owned Partner via Partner Workspace.
+      if (!partnerId) {
+        throw new ForbiddenError(
+          "Commercial Product creation requires a Partner owner. Platform actors cannot create ownerless Products.",
+        );
+      }
+
       const product = await tx.product.create({
         data: {
           code,

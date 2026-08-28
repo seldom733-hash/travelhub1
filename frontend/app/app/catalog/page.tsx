@@ -217,17 +217,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
           breadcrumbs={["TravelHub", "Catalog Center"]}
           actions={
             <div className="flex items-center gap-2">
-              {canWrite && (
-                <button
-                  onClick={() => {
-                    setEditing(false);
-                    setShowCreate((v) => !v);
-                  }}
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
-                >
-                  {t("admin.catalog.create_btn", locale)}
-                </button>
-              )}
+              {/* Step 3.6B: Platform Create Product removed — Platform is marketplace operator, not seller */}
               <button
                 onClick={() => void load()}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
