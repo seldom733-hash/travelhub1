@@ -275,6 +275,7 @@ export interface PartnerIntakeResult {
   customerId: string;
   relationId: string;
   customerCreated: boolean;
+  relationCreated: boolean;
   tier: "BASIC" | "PRO";
 }
 

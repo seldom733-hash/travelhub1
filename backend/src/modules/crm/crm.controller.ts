@@ -316,6 +316,23 @@ export class CrmController {
   ) {
     return this.crm.updatePartnerRelation(relationId, actor, dto, actor.username);
   }
+
+  // ── Step 3.5C — Platform CRM Admin Intake ──────────────────────────────
+
+  /**
+   * Platform CRM admin can intake a customer for ANY partner.
+   * Unlike POST /partner/customers/intake (partner-context), this endpoint
+   * uses an explicit partnerId path parameter and crm.partner.write permission.
+   */
+  @Post("partners/:partnerId/intake")
+  @RequirePermissions("crm.partner.write")
+  platformIntakeCustomer(
+    @Param("partnerId") partnerId: string,
+    @Body() dto: { firstName?: string; lastName?: string; companyName?: string; email: string; phone?: string; leadSource?: string; lifecycle?: string; tags?: string[]; notes?: string; assignedTo?: string; initialNote?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.crm.platformIntakeCustomer(partnerId, dto, actor.username);
+  }
 }
 
 export { ValidateNested };

@@ -1306,40 +1306,40 @@ export class CrmService {
             name: input.companyName ?? `${input.firstName ?? ""} ${input.lastName ?? ""}`.trim(),
           } as CustomerEventPayload,
         });
-      }
-
-      const existingRelation = await tx.partnerCustomerRelation.findUnique({
+      }      const existingRelation = await tx.partnerCustomerRelation.findUnique({
         where: { partnerId_customerId: { partnerId, customerId } },
       });
+
+      let relationCreated = false;
+      let relation: any;
+
       if (existingRelation) {
-        throw new ConflictError(
-          customerCreated
-            ? `Customer created but already has relation with this partner`
-            : `Customer already exists in partner CRM`,
-        );
+        // Step 3.5C: REUSE existing relation (no throw)
+        relation = existingRelation;
+      } else {
+        relation = await tx.partnerCustomerRelation.create({
+          data: {
+            partnerId, customerId,
+            leadSource: input.leadSource ?? "DIRECT",
+            lifecycle: input.lifecycle ?? "LEAD",
+            tags: input.tags ?? [],
+            notes: input.notes ?? null,
+            assignedTo: input.assignedTo ?? null,
+          },
+        });
+        relationCreated = true;
+
+        await tx.partnerCustomerRelationHistory.create({
+          data: {
+            relationId: relation.id,
+            action: "created",
+            to: "ACTIVE",
+            actorId: partnerId,
+            actorName: actorUsername ?? null,
+            comment: `Direct intake (leadSource: ${input.leadSource ?? "DIRECT"})`,
+          },
+        });
       }
-
-      const relation = await tx.partnerCustomerRelation.create({
-        data: {
-          partnerId, customerId,
-          leadSource: input.leadSource ?? "DIRECT",
-          lifecycle: input.lifecycle ?? "LEAD",
-          tags: input.tags ?? [],
-          notes: input.notes ?? null,
-          assignedTo: input.assignedTo ?? null,
-        },
-      });
-
-      await tx.partnerCustomerRelationHistory.create({
-        data: {
-          relationId: relation.id,
-          action: "created",
-          to: "ACTIVE",
-          actorId: partnerId,
-          actorName: actorUsername ?? null,
-          comment: `Storefront Pro direct intake (leadSource: ${input.leadSource ?? "DIRECT"})`,
-        },
-      });
 
       // Phase 3 Round 2D: optional initial OperationalNote (same transaction)
       const noteText = normalizeInitialNote(input.initialNote);
@@ -1357,7 +1357,7 @@ export class CrmService {
         });
       }
 
-      return { customerId, relationId: relation.id, customerCreated, tier, initialNote };
+      return { customerId, relationId: relation.id, customerCreated, relationCreated, tier, initialNote };
     });
   }
 
@@ -1413,5 +1413,146 @@ export class CrmService {
     });
 
     return result;
+  }
+
+  // ── Step 3.5C — Platform CRM Admin Intake ──────────────────────────────
+
+  /**
+   * Platform CRM admin intake: creates/ensures Customer identity + PartnerCustomerRelation
+   * for an explicit partnerId. Unlike intakePartnerCustomer (partner-context), this method
+   * does NOT require actor.partnerId — it takes partnerId explicitly.
+   * No PRO-tier gating: Platform CRM admins can intake for any partner.
+   */
+  async platformIntakeCustomer(
+    partnerId: string,
+    input: {
+      firstName?: string;
+      lastName?: string;
+      companyName?: string;
+      email: string;
+      phone?: string;
+      leadSource?: string;
+      lifecycle?: string;
+      tags?: string[];
+      notes?: string;
+      assignedTo?: string;
+      initialNote?: string;
+    },
+    actorUsername?: string,
+  ) {
+    const partner = await this.prisma.partner.findUnique({ where: { id: partnerId }, select: { id: true, name: true } });
+    if (!partner) throw new NotFoundError(`Partner ${partnerId} not found`);
+
+    const email = normalizeEmail(input.email);
+
+    return this.prisma.$transaction(async (tx) => {
+      let customerId: string;
+      let customerCreated = false;
+
+      const existing = await tx.customer.findUnique({ where: { email }, select: { id: true } });
+      if (existing) {
+        customerId = existing.id;
+      } else {
+        const code = await this.ids.nextCode(tx, "CUS");
+        const customer = await tx.customer.create({
+          data: {
+            code,
+            type: input.companyName ? "COMPANY" : "PERSON",
+            firstName: input.firstName ?? null,
+            lastName: input.lastName ?? null,
+            companyName: input.companyName ?? null,
+            email,
+            phone: input.phone ?? null,
+            status: "ACTIVE",
+            version: 1,
+          },
+          select: { id: true, code: true },
+        });
+        customerId = customer.id;
+        customerCreated = true;
+
+        await tx.customerHistory.create({
+          data: {
+            customerId: customer.id,
+            action: "created",
+            to: "ACTIVE",
+            actorId: actorUsername ?? null,
+            actorName: actorUsername ?? null,
+            comment: "Platform CRM admin intake (Step 3.5C)",
+          },
+        });
+
+        await this.eventBus.emit(tx, {
+          aggregateType: "Customer",
+          aggregateId: customer.id,
+          eventType: DomainEvents.CustomerCreated,
+          payload: {
+            customerId: customer.id,
+            code: customer.code,
+            name: input.companyName ?? `${input.firstName ?? ""} ${input.lastName ?? ""}`.trim(),
+          } as CustomerEventPayload,
+        });
+      }
+
+      const existingRelation = await tx.partnerCustomerRelation.findUnique({
+        where: { partnerId_customerId: { partnerId, customerId } },
+      });
+
+      let relationCreated = false;
+      let relation: any;
+
+      if (existingRelation) {
+        // Step 3.5C: REUSE existing relation (no throw)
+        relation = existingRelation;
+      } else {
+        relation = await tx.partnerCustomerRelation.create({
+          data: {
+            partnerId, customerId,
+            leadSource: input.leadSource ?? "DIRECT",
+            lifecycle: input.lifecycle ?? "LEAD",
+            tags: input.tags ?? [],
+            notes: input.notes ?? null,
+            assignedTo: input.assignedTo ?? null,
+          },
+        });
+        relationCreated = true;
+
+        await tx.partnerCustomerRelationHistory.create({
+          data: {
+            relationId: relation.id,
+            action: "created",
+            to: "ACTIVE",
+            actorId: actorUsername ?? null,
+            actorName: actorUsername ?? null,
+            comment: `Platform CRM admin intake (leadSource: ${input.leadSource ?? "DIRECT"})`,
+          },
+        });
+      }
+
+      // Optional initial OperationalNote (same transaction)
+      const noteText = normalizeInitialNote(input.initialNote);
+      let initialNote: any = null;
+      if (noteText && customerCreated) {
+        initialNote = await tx.operationalNote.create({
+          data: {
+            entityType: "Customer",
+            entityId: customerId,
+            text: noteText,
+            visibility: "INTERNAL",
+            authorUserId: null,
+            authorName: actorUsername ?? null,
+          },
+        });
+      }
+
+      return {
+        customerId,
+        relationId: relation.id,
+        customerCreated,
+        relationCreated,
+        partnerName: partner.name,
+        initialNote,
+      };
+    });
   }
 }

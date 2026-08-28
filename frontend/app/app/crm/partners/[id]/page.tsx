@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { api, type PartnerDetail } from "@/lib/api";
+import { api, type PartnerDetail, type PartnerIntakeResult } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import SortableHeader, { type SortState, type SortDirection } from "@/components/SortableHeader";
@@ -11,6 +11,7 @@ import OperationalNotes from "@/components/OperationalNotes";
 import PartnerActivity from "@/components/PartnerActivity";
 import { useLocale, t } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
+import { useCan } from "@/lib/use-can";
 
 type Tab = "overview" | "activity" | "services" | "orders" | "bookings" | "customers" | "storefront" | "notes";
 
@@ -61,6 +62,13 @@ export default function Partner360Page() {
   const [orderStatusFilter, setOrderStatusFilter] = useState<string | undefined>(undefined);
   const [bookingStatusFilter, setBookingStatusFilter] = useState<string | undefined>(undefined);
   const [customerStatusFilter, setCustomerStatusFilter] = useState<string | undefined>(undefined);
+  // ── Step 3.5C — Platform CRM intake ──
+  const [showIntake, setShowIntake] = useState(false);
+  const [intaking, setIntaking] = useState(false);
+  const [intakeSuccess, setIntakeSuccess] = useState<{ customerId: string; customerCreated: boolean; relationCreated: boolean } | null>(null);
+  const [intakeError, setIntakeError] = useState("");
+  const [intakeForm, setIntakeForm] = useState({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "", initialNote: "" });
+  const canWrite = useCan("crm.partner.write");
 
   const loadPartner = useCallback(async () => {
     try {
@@ -109,6 +117,35 @@ export default function Partner360Page() {
       ])
     );
   }, [partner]);
+
+  const createIntake = async () => {
+    if (!intakeForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(intakeForm.email.trim())) {
+      setIntakeError(t("crm.intake.error.email_invalid", locale));
+      return;
+    }
+    setIntaking(true);
+    setIntakeError("");
+    setIntakeSuccess(null);
+    try {
+      const result = await api.post<PartnerIntakeResult>(`/partners/${id}/intake`, {
+        firstName: intakeForm.firstName.trim() || undefined,
+        lastName: intakeForm.lastName.trim() || undefined,
+        companyName: intakeForm.companyName.trim() || undefined,
+        email: intakeForm.email.trim(),
+        phone: intakeForm.phone.trim() || undefined,
+        leadSource: intakeForm.leadSource || undefined,
+        notes: intakeForm.notes.trim() || undefined,
+        initialNote: intakeForm.initialNote.trim() || undefined,
+      });
+      setIntakeSuccess({ customerId: result.customerId, customerCreated: result.customerCreated, relationCreated: result.relationCreated });
+      setIntakeForm({ firstName: "", lastName: "", companyName: "", email: "", phone: "", leadSource: "DIRECT", notes: "", initialNote: "" });
+      void loadPartner();
+    } catch (e) {
+      setIntakeError((e as Error).message);
+    } finally {
+      setIntaking(false);
+    }
+  };
 
   if (loading) {
     return <div className="flex h-full items-center justify-center"><div className="text-sm text-slate-400">{t("crm.loading", locale)}</div></div>;
@@ -307,6 +344,11 @@ export default function Partner360Page() {
           {tab === "customers" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
+                {canWrite && (
+                  <button onClick={() => { setShowIntake(!showIntake); setIntakeSuccess(null); setIntakeError(""); }} className="rounded bg-blue-600 px-2.5 py-1 text-[10px] font-semibold text-white hover:bg-blue-700">
+                    ＋ {t("crm.add_customer", locale)}
+                  </button>
+                )}
                 <select value={customerStatusFilter ?? ''} onChange={(e) => setCustomerStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
                   <option value="">{t('crm.filter.status.all', locale)}</option>
                   <option value="ACTIVE">{t('status.common.ACTIVE', locale)}</option>
@@ -339,6 +381,75 @@ export default function Partner360Page() {
                   )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{customerStatusFilter ? t("crm.filter.status.none", locale) : t("crm.partner_detail.no_customers", locale)}</td></tr>}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Step 3.5C — Platform CRM intake panel */}
+          {showIntake && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-blue-900">{t("crm.intake.title", locale)}</h3>
+                <button onClick={() => setShowIntake(false)} className="text-blue-400 hover:text-blue-600">✕</button>
+              </div>
+              {intakeSuccess && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">
+                  {intakeSuccess.customerCreated
+                    ? t("crm.intake.success.new_customer", locale)
+                    : t("crm.intake.success.existing_customer", locale)}
+                  {intakeSuccess.relationCreated
+                    ? ` ${t("crm.intake.success.relation_created", locale)}`
+                    : ` ${t("crm.intake.success.relation_reused", locale)}`}
+                  <Link href={`/app/crm/customers/${intakeSuccess.customerId}`} className="ml-2 font-medium text-blue-600 hover:underline">
+                    → {t("crm.intake.view_customer", locale)}
+                  </Link>
+                </div>
+              )}
+              {intakeError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-600">{intakeError}</div>}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-blue-400">{t("crm.create.form.firstName", locale)}</label>
+                  <input value={intakeForm.firstName} onChange={(e) => setIntakeForm({ ...intakeForm, firstName: e.target.value })} className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-blue-400">{t("crm.create.form.lastName", locale)}</label>
+                  <input value={intakeForm.lastName} onChange={(e) => setIntakeForm({ ...intakeForm, lastName: e.target.value })} className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400" />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-blue-400">{t("crm.create.form.companyName", locale)}</label>
+                <input value={intakeForm.companyName} onChange={(e) => setIntakeForm({ ...intakeForm, companyName: e.target.value })} className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-blue-400">{t("crm.create.form.email", locale)} *</label>
+                <input type="email" value={intakeForm.email} onChange={(e) => setIntakeForm({ ...intakeForm, email: e.target.value })} className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400" placeholder="email@example.com" />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-blue-400">{t("crm.create.form.phone", locale)}</label>
+                <input value={intakeForm.phone} onChange={(e) => setIntakeForm({ ...intakeForm, phone: e.target.value })} className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400" />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-blue-400">{t("crm.intake.lead_source", locale)}</label>
+                <select value={intakeForm.leadSource} onChange={(e) => setIntakeForm({ ...intakeForm, leadSource: e.target.value })} className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400">
+                  <option value="DIRECT">{t("crm.lead_source.direct", locale)}</option>
+                  <option value="PHONE">{t("crm.lead_source.phone", locale)}</option>
+                  <option value="OFFICE">{t("crm.lead_source.office", locale)}</option>
+                  <option value="EMAIL">{t("crm.lead_source.email", locale)}</option>
+                  <option value="MARKETPLACE">{t("crm.lead_source.marketplace", locale)}</option>
+                  <option value="REFERRAL">{t("crm.lead_source.referral", locale)}</option>
+                  <option value="OTHER">{t("crm.lead_source.other", locale)}</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-blue-400">{t("crm.intake.notes", locale)}</label>
+                <textarea value={intakeForm.notes} onChange={(e) => setIntakeForm({ ...intakeForm, notes: e.target.value })} className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400" rows={2} />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-blue-400">{t("notes.initial_note", locale)}</label>
+                <textarea value={intakeForm.initialNote} onChange={(e) => setIntakeForm({ ...intakeForm, initialNote: e.target.value })} className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400" rows={2} maxLength={5000} />
+              </div>
+              <button onClick={() => void createIntake()} disabled={intaking || !intakeForm.email.trim()} className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                {intaking ? t("crm.detail.creating", locale) : t("crm.intake.submit", locale)}
+              </button>
             </div>
           )}
 

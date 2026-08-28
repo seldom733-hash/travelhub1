@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-28 (Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE)\
+**Дата актуализации:** 2026-08-28 (Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -909,14 +909,15 @@ notes/tags/lifecycle/lead status/manager/tasks/source/history не
 являются глобальными Customer fields. Strict tenant/object isolation:
 Partner A не видит Partner B relationship data.
 
-· **Step 3.5C --- Partner CRM Lead & Direct Customer Intake**\
+· **Step 3.5C --- Partner CRM Lead & Direct Customer Intake** ✅ COMPLETE (2026-08-28; VERDICT A — canonical intake flow implemented; intakePartnerCustomer PCR reuse (ConflictError removed); Platform CRM admin intake POST /partners/:id/intake; identity resolution by email; Customer reuse + PCR ensure; scenarios A-E verified; 11 intake tests; 1247/1247 backend + 243/243 frontend PASS; i18n RU/AZ/EN; report — `PHASE_3_STEP_3.5C_PARTNER_CRM_LEAD_DIRECT_CUSTOMER_INTAKE_IMPLEMENTATION_REPORT.md`; commit TBD).\
 Storefront/phone/office/manual/direct lead intake; возможность Partner
 создавать CRM lead/customer relationship без создания дубликата
-глобальной identity. Source минимум Storefront/Direct/Manual CRM, с
-безопасным matching/dedup policy.
+глобальной identity. Source: Direct/Phone/Office/Email/Marketplace/Referral/Other.
+Platform CRM admin intake (POST /partners/:id/intake) + Partner-context intake
+(POST /partner/customers/intake). Deterministic identity by email. PCR reuse.
 
-· **Step 3.5D --- Partner CRM Entitlement & Capability Model**\
-CRM capabilities зависят от Storefront SaaS plan/entitlement. Не
+· **Step 3.5D --- Partner CRM Entitlement & Capability Model** \
+NEW CANONICAL NEXT — CRM capabilities зависят от Storefront SaaS plan/entitlement. Не
 связывать доступ только с наличием Storefront record. Подготовить
 Basic/Pro/Business capability matrix без hardcoded commercial prices.
 
