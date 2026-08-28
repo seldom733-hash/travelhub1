@@ -163,12 +163,12 @@ export default function PartnerCustomersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-slate-900">
-            {isPro ? "CRM" : pt("partner.nav.customers", locale)}
+            {isPro ? pt("partner.nav.crm", locale) : pt("partner.nav.customers", locale)}
           </h1>
           <p className="mt-0.5 text-xs text-slate-500">
             {isPro
-              ? "Полное управление клиентской базой"
-              : "Клиенты из ваших marketplace-заказов"}
+              ? pt("partner.crm.description.pro", locale)
+              : pt("partner.crm.description.basic", locale)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -239,12 +239,12 @@ export default function PartnerCustomersPage() {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Код</th>
-              <th className="px-4 py-2.5 font-medium">Имя</th>
-              <th className="px-4 py-2.5 font-medium">Email</th>
-              <th className="px-4 py-2.5 font-medium">Тип</th>
-              {isPro && <th className="px-4 py-2.5 font-medium">Лайфсайкл</th>}
-              <th className="px-4 py-2.5 font-medium">Статус</th>
+              <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">{t("crm.col.name", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">{t("crm.col.email", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">{t("crm.col.type", locale)}</th>
+              {isPro && <th className="px-4 py-2.5 font-medium">{pt("partner.crm.source", locale)}</th>}
+              <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
             </tr>
           </thead>
           <tbody>
@@ -259,15 +259,15 @@ export default function PartnerCustomersPage() {
                 <td className="px-4 py-2.5 font-mono text-xs text-emerald-600">{c.code}</td>
                 <td className="px-4 py-2.5 font-medium text-slate-800">{displayName(c)}</td>
                 <td className="px-4 py-2.5 text-slate-500">{c.email}</td>
-                <td className="px-4 py-2.5 text-slate-500">{c.type === "COMPANY" ? "Компания" : "Физлицо"}</td>
-                {isPro && <td className="px-4 py-2.5 text-slate-500">{(c as any)._relation?.lifecycle ?? "—"}</td>}
+                <td className="px-4 py-2.5 text-slate-500">{c.type === "COMPANY" ? t("crm.type.company", locale) : t("crm.type.person", locale)}</td>
+                {isPro && <td className="px-4 py-2.5 text-slate-500">{(c as any)._relation?.leadSource ?? "—"}</td>}
                 <td className="px-4 py-2.5"><StatusBadge status={c.status} /></td>
               </tr>
             ))}
             {(customerData?.items ?? []).length === 0 && (
               <tr>
                 <td colSpan={isPro ? 6 : 5} className="px-4 py-8 text-center text-sm text-slate-400">
-                  Клиентов пока нет
+                  {pt("partner.crm.empty", locale)}
                 </td>
               </tr>
             )}
@@ -279,26 +279,29 @@ export default function PartnerCustomersPage() {
       </div>
 
       {/* ── Intake Panel (Pro only) ── */}
-      {showIntake && isPro && (
-        <PanelFrame title={pt("partner.crm.add_customer", locale)} subtitle="STOREFRONT PRO" onClose={() => setShowIntake(false)}>
+      {showIntake && isPro && (          <PanelFrame title={pt("partner.crm.add_customer", locale)} subtitle="STOREFRONT PRO" onClose={() => setShowIntake(false)}>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Имя</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.first_name", locale)}</label>
             <input value={intakeForm.firstName} onChange={(e) => setIntakeForm({ ...intakeForm, firstName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Фамилия</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.last_name", locale)}</label>
             <input value={intakeForm.lastName} onChange={(e) => setIntakeForm({ ...intakeForm, lastName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Email *</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.email", locale)}</label>
             <input value={intakeForm.email} onChange={(e) => setIntakeForm({ ...intakeForm, email: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Телефон</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.phone", locale)}</label>
             <input value={intakeForm.phone} onChange={(e) => setIntakeForm({ ...intakeForm, phone: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.intake.lead_source", locale)}</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.company", locale)}</label>
+            <input value={intakeForm.companyName} onChange={(e) => setIntakeForm({ ...intakeForm, companyName: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.source", locale)}</label>
             <select value={intakeForm.leadSource} onChange={(e) => setIntakeForm({ ...intakeForm, leadSource: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400">
               <option value="DIRECT">{t("crm.lead_source.direct", locale)}</option>
               <option value="STOREFRONT">{t("crm.lead_source.storefront", locale)}</option>
@@ -311,19 +314,19 @@ export default function PartnerCustomersPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Заметки</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.notes", locale)}</label>
             <textarea value={intakeForm.notes} onChange={(e) => setIntakeForm({ ...intakeForm, notes: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-emerald-400" rows={3} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">Примечание</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("partner.crm.intake.initial_note", locale)}</label>
             <textarea
               value={intakeForm.initialNote}
               onChange={(e) => setIntakeForm({ ...intakeForm, initialNote: e.target.value })}
               rows={3}
               maxLength={5000}
-              aria-label="Примечание"
+              aria-label={pt("partner.crm.intake.initial_note", locale)}
               className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400"
-              placeholder="Внутренняя заметка для сотрудников"
+              placeholder={pt("partner.crm.intake.initial_note_ph", locale)}
             />
             <div className="mt-1 text-right text-xs text-slate-400">
               {intakeForm.initialNote.length}/5000
@@ -334,7 +337,7 @@ export default function PartnerCustomersPage() {
             disabled={intaking || !intakeForm.email.trim()}
             className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {intaking ? "Сохранение…" : "Добавить клиента"}
+            {intaking ? pt("partner.crm.intake.saving", locale) : pt("partner.crm.intake.submit", locale)}
           </button>
         </PanelFrame>
       )}
@@ -366,7 +369,7 @@ export default function PartnerCustomersPage() {
                     detailTab === dt ? "bg-emerald-50 text-emerald-600" : "text-slate-400 hover:text-slate-600"
                   }`}
                 >
-                  {dt === "overview" ? "Обзор" : dt === "orders" ? "Заказы" : dt === "bookings" ? "Брони" : dt === "payments" ? "Платежи" : "Отношения"}
+                  {dt === "overview" ? pt("partner.crm.tab.overview", locale) : dt === "orders" ? pt("partner.crm.tab.orders", locale) : dt === "bookings" ? pt("partner.crm.tab.bookings", locale) : dt === "payments" ? pt("partner.crm.tab.payments", locale) : pt("partner.crm.tab.relations", locale)}
                 </button>
               ))}
             </div>
@@ -378,11 +381,11 @@ export default function PartnerCustomersPage() {
                 <>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-lg bg-slate-50 px-3 py-2">
-                      <div className="text-slate-400">Email</div>
+                      <div className="text-slate-400">{pt("partner.crm.email", locale)}</div>
                       <div className="break-all font-medium text-slate-700">{selectedCustomer.email}</div>
                     </div>
                     <div className="rounded-lg bg-slate-50 px-3 py-2">
-                      <div className="text-slate-400">Телефон</div>
+                      <div className="text-slate-400">{pt("partner.crm.phone", locale)}</div>
                       <div className="font-medium text-slate-700">{selectedCustomer.phone ?? "—"}</div>
                     </div>
                   </div>
@@ -391,18 +394,18 @@ export default function PartnerCustomersPage() {
                   {isPro && selectedCustomer._relation && (
                     <div className="space-y-2 text-xs">
                       <div className="rounded-lg bg-emerald-50 px-3 py-2">
-                        <div className="text-emerald-400">Лайфсайкл</div>
+                        <div className="text-emerald-400">{pt("partner.crm.lifecycle", locale)}</div>
                         <div className="font-medium text-emerald-700">{selectedCustomer._relation.lifecycle ?? "—"}</div>
                       </div>
                       {selectedCustomer._relation.leadSource && (
                         <div className="rounded-lg bg-blue-50 px-3 py-2">
-                          <div className="text-blue-400">Источник лида</div>
-                          <div className="font-medium text-blue-700">{selectedCustomer._relation.leadSource}</div>
+                          <div className="text-blue-400">{pt("partner.crm.source", locale)}</div>
+                          <div className="font-medium text-blue-700">{t(`crm.lead_source.${selectedCustomer._relation.leadSource.toLowerCase()}`, locale) ?? selectedCustomer._relation.leadSource}</div>
                         </div>
                       )}
                       {selectedCustomer._relation.tags.length > 0 && (
                         <div className="rounded-lg bg-violet-50 px-3 py-2">
-                          <div className="text-violet-400">Теги</div>
+                          <div className="text-violet-400">{pt("partner.crm.tags", locale)}</div>
                           <div className="mt-1 flex flex-wrap gap-1">
                             {selectedCustomer._relation.tags.map((tag) => (
                               <span key={tag} className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] text-violet-700">{tag}</span>
@@ -412,7 +415,7 @@ export default function PartnerCustomersPage() {
                       )}
                       {selectedCustomer._relation.notes && (
                         <div className="rounded-lg bg-slate-50 px-3 py-2">
-                          <div className="text-slate-400">Заметки</div>
+                          <div className="text-slate-400">{pt("partner.crm.notes", locale)}</div>
                           <div className="whitespace-pre-wrap font-medium text-slate-700">{selectedCustomer._relation.notes}</div>
                         </div>
                       )}
@@ -422,22 +425,22 @@ export default function PartnerCustomersPage() {
                   {/* Basic: simple info */}
                   {!isPro && (
                     <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                      Marketplace Basic — показываются только данные из ваших заказов.
+                      Marketplace Basic — {pt("partner.crm.description.basic", locale).toLowerCase()}.
                     </div>
                   )}
 
                   <div className="grid grid-cols-3 gap-2 text-xs">
                     <div className="rounded-lg bg-blue-50 px-3 py-2 text-center">
                       <div className="font-bold text-blue-700">{selectedCustomer.summary.totalOrders}</div>
-                      <div className="text-blue-500">Заказы</div>
+                      <div className="text-blue-500">{pt("partner.crm.summary.orders", locale)}</div>
                     </div>
                     <div className="rounded-lg bg-green-50 px-3 py-2 text-center">
                       <div className="font-bold text-green-700">{selectedCustomer.summary.totalBookings}</div>
-                      <div className="text-green-500">Брони</div>
+                      <div className="text-green-500">{pt("partner.crm.summary.bookings", locale)}</div>
                     </div>
                     <div className="rounded-lg bg-purple-50 px-3 py-2 text-center">
                       <div className="font-bold text-purple-700">{selectedCustomer.summary.totalPayments}</div>
-                      <div className="text-purple-500">Платежи</div>
+                      <div className="text-purple-500">{pt("partner.crm.summary.payments", locale)}</div>
                     </div>
                   </div>
                 </>
@@ -447,7 +450,7 @@ export default function PartnerCustomersPage() {
               {detailTab === "orders" && (
                 <div className="space-y-2">
                   {selectedCustomer.orders.length === 0 ? (
-                    <div className="py-4 text-center text-xs text-slate-400">Заказов нет</div>
+                    <div className="py-4 text-center text-xs text-slate-400">{pt("partner.crm.empty.orders", locale)}</div>
                   ) : (
                     selectedCustomer.orders.map((o) => (
                       <div key={o.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
@@ -466,7 +469,7 @@ export default function PartnerCustomersPage() {
               {detailTab === "bookings" && (
                 <div className="space-y-2">
                   {selectedCustomer.bookings.length === 0 ? (
-                    <div className="py-4 text-center text-xs text-slate-400">Бронирований нет</div>
+                    <div className="py-4 text-center text-xs text-slate-400">{pt("partner.crm.empty.bookings", locale)}</div>
                   ) : (
                     selectedCustomer.bookings.map((b) => (
                       <div key={b.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
@@ -485,7 +488,7 @@ export default function PartnerCustomersPage() {
               {detailTab === "payments" && (
                 <div className="space-y-2">
                   {selectedCustomer.payments.length === 0 ? (
-                    <div className="py-4 text-center text-xs text-slate-400">Платежей нет</div>
+                    <div className="py-4 text-center text-xs text-slate-400">{pt("partner.crm.empty.payments", locale)}</div>
                   ) : (
                     selectedCustomer.payments.map((p) => (
                       <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
@@ -507,23 +510,29 @@ export default function PartnerCustomersPage() {
                     editingRelation ? (
                       <div className="space-y-3">
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-slate-400">Лайфсайкл</label>
-                          <input value={relationForm.lifecycle} onChange={(e) => setRelationForm({ ...relationForm, lifecycle: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
+                          <label className="mb-1 block text-xs font-medium text-slate-400">{pt("partner.crm.lifecycle", locale)}</label>
+                          <select value={relationForm.lifecycle} onChange={(e) => setRelationForm({ ...relationForm, lifecycle: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400">
+                            <option value="">—</option>
+                            <option value="LEAD">LEAD</option>
+                            <option value="PROSPECT">PROSPECT</option>
+                            <option value="ACTIVE">ACTIVE</option>
+                            <option value="CHURNED">CHURNED</option>
+                          </select>
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-slate-400">Теги (через запятую)</label>
+                          <label className="mb-1 block text-xs font-medium text-slate-400">{pt("partner.crm.relation.tags_hint", locale)}</label>
                           <input value={relationForm.tags} onChange={(e) => setRelationForm({ ...relationForm, tags: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-slate-400">Заметки</label>
+                          <label className="mb-1 block text-xs font-medium text-slate-400">{pt("partner.crm.notes", locale)}</label>
                           <textarea value={relationForm.notes} onChange={(e) => setRelationForm({ ...relationForm, notes: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-emerald-400" rows={3} />
                         </div>
                         <div className="flex gap-2">
                           <button onClick={() => void saveRelation()} disabled={savingRelation} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
-                            {savingRelation ? "…" : "Сохранить"}
+                            {savingRelation ? "…" : pt("partner.crm.relation.save", locale)}
                           </button>
                           <button onClick={() => setEditingRelation(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-600 hover:bg-slate-50">
-                            Отмена
+                            {pt("partner.crm.relation.cancel", locale)}
                           </button>
                         </div>
                       </div>
@@ -531,8 +540,8 @@ export default function PartnerCustomersPage() {
                       <div className="space-y-2">
                         <div className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-slate-700">Ваше отношение</span>
-                            <button onClick={() => setEditingRelation(true)} className="text-emerald-600 hover:text-emerald-700">Редактировать</button>
+                            <span className="font-medium text-slate-700">{pt("partner.crm.relation.my_relation", locale)}</span>
+                            <button onClick={() => setEditingRelation(true)} className="text-emerald-600 hover:text-emerald-700">{pt("partner.crm.relation.edit", locale)}</button>
                           </div>
                           <div className="mt-1 text-slate-500">{selectedCustomer._relation.lifecycle ?? "—"}</div>
                           {selectedCustomer._relation.leadSource && (
@@ -541,12 +550,12 @@ export default function PartnerCustomersPage() {
                         </div>
                       </div>
                     )
-                  ) : !isPro ? (
+                  ) :                  !isPro ? (
                     <div className="rounded-lg bg-amber-50 px-3 py-3 text-xs text-amber-700">
-                      Управление отношениями доступно только для Storefront Pro.
+                      {pt("partner.crm.empty.relations_basic", locale)}
                     </div>
                   ) : (
-                    <div className="py-4 text-center text-xs text-slate-400">Отношений нет</div>
+                    <div className="py-4 text-center text-xs text-slate-400">{pt("partner.crm.empty.relations", locale)}</div>
                   )}
                 </>
               )}

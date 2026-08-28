@@ -31,6 +31,62 @@ export const PARTNER_DICT: Record<string, Record<Locale, string>> = {
   "partner.crm.my_customers": { ru: "Мои клиенты", az: "Müştərilərim", en: "My customers" },
   "partner.crm.search_placeholder": { ru: "Поиск по имени или email…", az: "Ad və ya email ilə axtar…", en: "Search by name or email…" },
 
+  // Partner CRM detail tabs
+  "partner.crm.tab.overview": { ru: "Обзор", az: "İcmal", en: "Overview" },
+  "partner.crm.tab.orders": { ru: "Заказы", az: "Sifarişlər", en: "Orders" },
+  "partner.crm.tab.bookings": { ru: "Брони", az: "Bronlar", en: "Bookings" },
+  "partner.crm.tab.payments": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
+  "partner.crm.tab.relations": { ru: "Отношения", az: "Əlaqələr", en: "Relations" },
+  "partner.crm.tab.activity": { ru: "Активность", az: "Fəaliyyət", en: "Activity" },
+
+  // Partner CRM detail labels
+  "partner.crm.email": { ru: "Email", az: "E-poçt", en: "Email" },
+  "partner.crm.phone": { ru: "Телефон", az: "Telefon", en: "Phone" },
+  "partner.crm.lifecycle": { ru: "Лайфсайкл", az: "Ömür dövrü", en: "Lifecycle" },
+  "partner.crm.source": { ru: "Источник", az: "Mənbə", en: "Source" },
+  "partner.crm.tags": { ru: "Теги", az: "Teqlər", en: "Tags" },
+  "partner.crm.notes": { ru: "Заметки", az: "Qeydlər", en: "Notes" },
+  "partner.crm.summary.orders": { ru: "Заказы", az: "Sifarişlər", en: "Orders" },
+  "partner.crm.summary.bookings": { ru: "Брони", az: "Bronlar", en: "Bookings" },
+  "partner.crm.summary.payments": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
+
+  // Partner CRM empty states
+  "partner.crm.empty": { ru: "Клиентов пока нет", az: "Hələ müştəri yoxdur", en: "No customers yet" },
+  "partner.crm.empty.orders": { ru: "Заказов нет", az: "Sifarişlər yoxdur", en: "No orders" },
+  "partner.crm.empty.bookings": { ru: "Бронирований нет", az: "Bron yoxdur", en: "No bookings" },
+  "partner.crm.empty.payments": { ru: "Платежей нет", az: "Ödəniş yoxdur", en: "No payments" },
+  "partner.crm.empty.relations": { ru: "Отношений нет", az: "Əlaqələr yoxdur", en: "No relations" },
+  "partner.crm.empty.relations_basic": { ru: "Управление отношениями доступно только для Storefront Pro.", az: "Əlaqə idarəetməsi yalnız Storefront Pro üçün mövcuddur.", en: "Relation management is available for Storefront Pro only." },
+
+  // Partner CRM relation edit
+  "partner.crm.relation.edit": { ru: "Редактировать", az: "Redaktə et", en: "Edit" },
+  "partner.crm.relation.save": { ru: "Сохранить", az: "Yadda saxla", en: "Save" },
+  "partner.crm.relation.cancel": { ru: "Отмена", az: "Ləğv et", en: "Cancel" },
+  "partner.crm.relation.my_relation": { ru: "Ваше отношение", az: "Sizin əlaqəniz", en: "Your relation" },
+  "partner.crm.relation.tags_hint": { ru: "Теги (через запятую)", az: "Teqlər (vergül ilə)", en: "Tags (comma-separated)" },
+
+  // Partner CRM intake form labels
+  "partner.crm.intake.first_name": { ru: "Имя", az: "Ad", en: "First name" },
+  "partner.crm.intake.last_name": { ru: "Фамилия", az: "Soyad", en: "Last name" },
+  "partner.crm.intake.email": { ru: "Email *", az: "E-poçt *", en: "Email *" },
+  "partner.crm.intake.phone": { ru: "Телефон", az: "Telefon", en: "Phone" },
+  "partner.crm.intake.company": { ru: "Компания", az: "Şirkət", en: "Company" },
+  "partner.crm.intake.source": { ru: "Источник лида", az: "Lider mənbəyi", en: "Lead source" },
+  "partner.crm.intake.notes": { ru: "Заметки", az: "Qeydlər", en: "Notes" },
+  "partner.crm.intake.initial_note": { ru: "Примечание", az: "Qeyd", en: "Internal note" },
+  "partner.crm.intake.initial_note_ph": { ru: "Внутренняя заметка для сотрудников", az: "İşçilər üçün daxili qeyd", en: "Internal note for staff" },
+  "partner.crm.intake.saving": { ru: "Сохранение…", az: "Saxlanılır…", en: "Saving…" },
+  "partner.crm.intake.submit": { ru: "Добавить клиента", az: "Müştəri əlavə et", en: "Add customer" },
+
+  // Partner CRM Basic/Pro descriptions
+  "partner.crm.description.pro": { ru: "Полное управление клиентской базой", az: "Müştəri bazasının tam idarəsi", en: "Full customer management" },
+  "partner.crm.description.basic": { ru: "Клиенты из ваших marketplace-заказов", az: "Marketplace sifarişlərinizdən müştərilər", en: "Customers from your marketplace orders" },
+
+  // Partner CRM error
+  "partner.crm.error.load_failed": { ru: "Не удалось загрузить данные", az: "Məlumat yüklənmədi", en: "Failed to load data" },
+  "partner.crm.error.retry": { ru: "Повторить", az: "Təkrar", en: "Retry" },
+  "partner.crm.error.email_invalid": { ru: "Укажите корректный email", az: "Düzgün e-poçt daxil edin", en: "Enter a valid email" },
+
   // overview
   "partner.overview.title": { ru: "Обзор услуг", az: "Xidmətlərin icmalı", en: "Products overview" },
   "partner.overview.subtitle": {
