@@ -1203,6 +1203,33 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "activity.event.PARTNER_APPLICATION_SUBMITTED": { ru: "Заявка партнёра отправлена", az: "Tərəfdaş ərizəsi göndərildi", en: "Partner application submitted" },
   "activity.event.PARTNER_APPLICATION_APPROVED": { ru: "Заявка партнёра одобрена", az: "Tərəfdaş ərizəsi təsdiqləndi", en: "Partner application approved" },
 
+  // Step 3.6 — CRM Analytics
+  "crm.analytics.tab": { ru: "Аналитика", az: "Analitika", en: "Analytics" },
+  "crm.analytics.loading": { ru: "Загрузка аналитики…", az: "Analitika yüklənir…", en: "Loading analytics…" },
+  "crm.analytics.error": { ru: "Ошибка загрузки аналитики", az: "Analitika yüklənmə xətası", en: "Failed to load analytics" },
+  "crm.analytics.no_data": { ru: "Нет данных", az: "Məlumat yoxdur", en: "No data" },
+  "crm.analytics.total_customers": { ru: "Всего клиентов", az: "Ümumi müştərilər", en: "Total customers" },
+  "crm.analytics.total_customers.subtitle": { ru: "уникальных клиентов", az: "ünikal müştəri", en: "unique customers" },
+  "crm.analytics.total_relationships": { ru: "Связи", az: "Əlaqələr", en: "Relationships" },
+  "crm.analytics.total_relationships.subtitle": { ru: "клиент–партнёр", az: "müştəri–tərəfdaş", en: "customer–partner" },
+  "crm.analytics.new_relationships": { ru: "Новые связи", az: "Yeni əlaqələr", en: "New relationships" },
+  "crm.analytics.new_relationships.subtitle": { ru: "за период", az: "dövr ərzində", en: "in period" },
+  "crm.analytics.commercially_active": { ru: "Активные клиенты", az: "Aktiv müştərilər", en: "Commercially active" },
+  "crm.analytics.commercially_active.subtitle": { ru: "с заказами", az: "sifarişləri olan", en: "with orders" },
+  "crm.analytics.lifecycle": { ru: "Жизненный цикл", az: "Ömür dövrü", en: "Lifecycle" },
+  "crm.analytics.source": { ru: "Источник", az: "Mənbə", en: "Source" },
+  "crm.analytics.manager": { ru: "Менеджер", az: "Menecer", en: "Manager" },
+  "crm.analytics.new_by_source": { ru: "Новые по источнику", az: "Mənbə üzrə yeni", en: "New by source" },
+  "crm.analytics.filter.period": { ru: "Период:", az: "Dövr:", en: "Period:" },
+  "crm.analytics.filter.from": { ru: "С", az: "Başlama", en: "From" },
+  "crm.analytics.filter.to": { ru: "По", az: "Bitiş", en: "To" },
+  "analytics.preset.TODAY": { ru: "Сегодня", az: "Bu gün", en: "Today" },
+  "analytics.preset.LAST_3_DAYS": { ru: "3 дня", az: "3 gün", en: "3 days" },
+  "analytics.preset.LAST_7_DAYS": { ru: "7 дней", az: "7 gün", en: "7 days" },
+  "analytics.preset.MONTH": { ru: "Месяц", az: "Ay", en: "Month" },
+  "analytics.preset.LAST_6_MONTHS": { ru: "6 месяцев", az: "6 ay", en: "6 months" },
+  "analytics.preset.YEAR": { ru: "Год", az: "İl", en: "Year" },
+
 };
 
 /** Локализованная строка по ключу (fallback — сам ключ, затем default locale). */

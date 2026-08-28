@@ -356,6 +356,37 @@ export interface ActivityPage {
   hasMore: boolean;
 }
 
+// ── CRM Analytics (Phase 3 Step 3.5E / Step 3.6) ─────────────────────
+
+export interface CrmAnalyticsMetrics {
+  totalCustomers: number;
+  totalRelationships: number;
+  lifecycleBreakdown: Record<string, number> | null;
+  sourceBreakdown: Record<string, number> | null;
+  managerBreakdown: Record<string, number> | null;
+  newRelationships: number;
+  newBySource: Record<string, number> | null;
+  commerciallyActiveCustomers: number;
+}
+
+export interface CrmAnalyticsResponse {
+  period?: { start: string; endExclusive: string; timezone: string; preset: string };
+  scope?: { partnerId: string | null; label: string };
+  metrics: CrmAnalyticsMetrics;
+}
+
+export type CrmAnalyticsPreset = 'TODAY' | 'LAST_3_DAYS' | 'LAST_7_DAYS' | 'MONTH' | 'LAST_6_MONTHS' | 'YEAR' | 'CUSTOM';
+
+export const crmAnalyticsApi = {
+  getCrmAnalytics: (opts?: { preset?: CrmAnalyticsPreset; startDate?: string; endDate?: string }) => {
+    const sp = new URLSearchParams();
+    sp.set('preset', opts?.preset ?? 'LAST_6_MONTHS');
+    if (opts?.startDate) sp.set('startDate', opts.startDate);
+    if (opts?.endDate) sp.set('endDate', opts.endDate);
+    return api.get<CrmAnalyticsResponse>(`/analytics/crm?${sp.toString()}`);
+  },
+};
+
 export const activityApi = {
   listCustomer: (
     customerId: string,

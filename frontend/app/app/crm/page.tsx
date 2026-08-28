@@ -14,7 +14,9 @@ import { useCan } from "@/lib/use-can";
 import { useCurrentUser } from "@/lib/use-user";
 import { useLocale, t } from "@/lib/i18n";
 
-type Tab = "customers" | "partners";
+import CrmAnalytics from "@/components/CrmAnalytics";
+
+type Tab = "customers" | "partners" | "analytics";
 type CrmContext = "platform" | "basic" | "pro";
 
 /**
@@ -28,7 +30,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
   const currentUser = useCurrentUser();
   const [crmContext, setCrmContext] = useState<CrmContext>("platform");
   const [crmTier, setCrmTier] = useState<"BASIC" | "PRO" | null>(null);
-  const [tab, setTab] = useState<Tab>((initialTab === "partners" ? "partners" : "customers") as Tab);
+  const [tab, setTab] = useState<Tab>((initialTab === "partners" ? "partners" : initialTab === "analytics" ? "analytics" : "customers") as Tab);
   const [sortBy, setSortBy] = useState<string | null>(initialSortBy ?? null);
   const [sortDirection, setSortDirection] = useState<SortDirection>((initialSortDirection as SortDirection) || "desc");
 
@@ -159,7 +161,8 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
   useEffect(() => {
     if (crmContext === "platform") {
       if (tab === "customers") void loadCustomers();
-      else void loadPartners();
+      else if (tab === "partners") void loadPartners();
+      // analytics tab has its own data loader (CrmAnalytics component)
     } else {
       void loadPartnerCustomers();
     }
@@ -276,6 +279,9 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
             </button>
             <button onClick={() => { setTab("partners"); }} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "partners" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
               {t("crm.tab.partners", locale)}
+            </button>
+            <button onClick={() => { setTab("analytics"); }} className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "analytics" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+              {t("crm.analytics.tab", locale)}
             </button>
           </div>
 
@@ -422,6 +428,11 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                   <Pagination page={partnerPage} pageSize={20} total={partnerListData.total} onPageChange={(p) => setPartnerPage(p)} />
                 )}
               </div>
+            )}
+
+            {/* Analytics Tab */}
+            {tab === "analytics" && (
+              <CrmAnalytics />
             )}
           </div>
         </div>
