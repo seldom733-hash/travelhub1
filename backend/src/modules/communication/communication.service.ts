@@ -31,6 +31,7 @@ import {
   assertValidContext,
   assertValidParticipant,
 } from "./communication.validation";
+import { hasForbiddenText } from "../../shared/anti-disintermediation";
 
 const PAGE_SIZE_MAX = 50;
 const PAGE_SIZE_DEFAULT = 20;
@@ -193,6 +194,8 @@ export class CommunicationService {
       direction: { not: CommunicationDirection.INTERNAL }, // INTERNAL — не внешняя
     };
 
+    const partnerTier = actor.role === RoleCode.PARTNER && actor.partnerId ? await this.resolvePartnerTier(actor.partnerId) : undefined;
+
     const [items, total] = await Promise.all([
       this.prisma.communication.findMany({
         where,
@@ -204,7 +207,7 @@ export class CommunicationService {
     ]);
 
     return {
-      items: items.map((r) => this.toDto(r, { redactUserIds: true })),
+      items: items.map((r) => this.toDto(r, { redactUserIds: true, partnerTier })),
       total,
       page: p,
       pageSize: ps,
@@ -230,7 +233,8 @@ export class CommunicationService {
         row.type !== CommunicationType.NOTE &&
         row.direction !== CommunicationDirection.INTERNAL;
       if (!visible) throw new NotFoundError(`Communication ${code} not found`);
-      return this.toDto(row, { redactUserIds: true });
+      const partnerTier = actor.role === RoleCode.PARTNER && actor.partnerId ? await this.resolvePartnerTier(actor.partnerId) : undefined;
+      return this.toDto(row, { redactUserIds: true, partnerTier });
     }
     return this.toDto(row, { redactUserIds: false });
   }
@@ -272,6 +276,8 @@ export class CommunicationService {
       direction: { not: CommunicationDirection.INTERNAL },
     };
 
+    const resolvedTier = actor.role === RoleCode.PARTNER && actor.partnerId ? await this.resolvePartnerTier(actor.partnerId) : undefined;
+
     const [items, total] = await Promise.all([
       this.prisma.communication.findMany({
         where,
@@ -283,7 +289,7 @@ export class CommunicationService {
     ]);
 
     return {
-      items: items.map((r) => this.toDto(r, { redactUserIds: actor.role !== RoleCode.ADMIN && actor.role !== RoleCode.DIRECTOR })),
+      items: items.map((r) => this.toDto(r, { redactUserIds: actor.role !== RoleCode.ADMIN && actor.role !== RoleCode.DIRECTOR, partnerTier: resolvedTier })),
       total,
       page: p,
       pageSize: ps,
@@ -466,11 +472,49 @@ export class CommunicationService {
   }
 
   /**
+   * Step 3.7B.2 — Resolve Partner tier from PartnerStorefront.
+   * ACTIVE storefront + ACTIVE entitlement → PRO; otherwise → BASIC.
+   */
+  private async resolvePartnerTier(partnerId: string): Promise<"BASIC" | "PRO"> {
+    const storefront = await (this.prisma as any).partnerStorefront.findUnique({
+      where: { partnerId },
+      select: { status: true, entitlementStatus: true },
+    });
+    if (storefront?.status === "ACTIVE" && storefront?.entitlementStatus === "ACTIVE") {
+      return "PRO";
+    }
+    return "BASIC";
+  }
+
+  /**
+   * Step 3.7B.2 — Sanitize Communication body for Marketplace Basic.
+   * Reuses canonical shared/anti-disintermediation.ts detector.
+   * Replaces contact-bearing segments with [contact hidden].
+   * Deterministic, does not reveal original contact, does not alter stored fact.
+   */
+  private sanitizeBodyForBasic(body: string): string {
+    // Split body into segments: contact-bearing and non-contact.
+    // Use the same regex patterns as hasForbiddenText but replace instead of reject.
+    const CONTACT_PATTERNS = [
+      { label: "email", re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g },
+      { label: "phone", re: /(?<![A-Za-z0-9])(\+?\d[\d\s().-]{7,}\d)(?![A-Za-z0-9])/g },
+      { label: "url", re: /(https?:\/\/|www\.)[A-Za-z0-9.-]+/gi },
+      { label: "social", re: /(t\.me\/|wa\.me\/|@[A-Za-z0-9_]{4,}|instagram\.com|facebook\.com|vk\.com|youtube\.com)/gi },
+    ];
+    let result = body;
+    for (const pattern of CONTACT_PATTERNS) {
+      result = result.replace(pattern.re, "[contact hidden]");
+    }
+    return result;
+  }
+
+  /**
    * DTO whitelist (§38). `redactUserIds` (own-view): internal USER ids не
    * нужны BUYER/PARTNER — тип остаётся, id → null. CUSTOMER/PARTNER refs
    * сохраняются (это собственный scope читающего).
+   * Step 3.7B.2: partnerTier="BASIC" → sanitize body contact patterns.
    */
-  private toDto(row: Communication, opts: { redactUserIds: boolean }): CommunicationDto {
+  private toDto(row: Communication, opts: { redactUserIds: boolean; partnerTier?: "BASIC" | "PRO" }): CommunicationDto {
     const redact = (type: CommunicationParticipantType | null, id: string | null): { type: CommunicationParticipantType; id: string | null } | null => {
       if (!type) return null;
       if (opts.redactUserIds && type === CommunicationParticipantType.USER) {
@@ -478,6 +522,7 @@ export class CommunicationService {
       }
       return { type, id };
     };
+    const body = opts.partnerTier === "BASIC" ? this.sanitizeBodyForBasic(row.body ?? "") : row.body;
     return {
       id: row.id,
       code: row.code,
@@ -486,7 +531,7 @@ export class CommunicationService {
       direction: row.direction,
       status: row.status,
       subject: row.subject,
-      body: row.body,
+      body,
       contextType: row.contextType,
       contextId: row.contextId,
       sender: redact(row.senderType, row.senderId),
