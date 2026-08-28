@@ -535,8 +535,43 @@ export class OrderService {
       },
     });
     if (!order) throw new NotFoundError(`Order ${id} not found`);
+
+    // ── Related-entity display name enrichment (Round 2E.2R.1) ──
+    // Batch-resolve customer + partner display names (no N+1)
+    const relatedIds: string[] = [];
+    if (order.customerId) relatedIds.push(order.customerId);
+    if (order.sellerPartnerId) relatedIds.push(order.sellerPartnerId);
+
+    let customerDisplay: { id: string; displayName: string } | null = null;
+    let partnerDisplay: { id: string; displayName: string } | null = null;
+
+    if (order.customerId) {
+      const c = await this.prisma.customer.findUnique({
+        where: { id: order.customerId },
+        select: { id: true, firstName: true, lastName: true, companyName: true },
+      });
+      if (c) {
+        const name = c.companyName ?? ((`${c.firstName ?? ""} ${c.lastName ?? ""}`.trim()) || null);
+        customerDisplay = { id: c.id, displayName: name ?? c.id };
+      }
+    }
+    if (order.sellerPartnerId) {
+      const p = await this.prisma.partner.findUnique({
+        where: { id: order.sellerPartnerId },
+        select: { id: true, name: true },
+      });
+      if (p) {
+        partnerDisplay = { id: p.id, displayName: p.name || p.id };
+      }
+    }
+
     // Step 1.17: field-level redaction — traveler PII виден только OPERATOR/ADMIN.
-    return { ...order, travelers: redactTravelersPii(order.travelers ?? [], viewer) };
+    return {
+      ...order,
+      travelers: redactTravelersPii(order.travelers ?? [], viewer),
+      customerDisplayName: customerDisplay?.displayName ?? null,
+      partnerDisplayName: partnerDisplay?.displayName ?? null,
+    };
   }
 
   async updateTravelers(orderId: string, travelers: TravelerUpdateInput[], actor?: string) {

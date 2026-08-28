@@ -41,7 +41,33 @@ export class BookingQueryService {
       },
     });
     if (!booking) throw new NotFoundError(`Booking ${id} not found`);
+
+    // ── Related-entity display name enrichment (Round 2E.2R.1) ──
+    // Batch-resolve order code + product title (no N+1)
+    let orderDisplay: { id: string; code: string } | null = null;
+    let productDisplay: { id: string; title: string } | null = null;
+
+    if (booking.orderId) {
+      const o = await this.prisma.order.findUnique({
+        where: { id: booking.orderId },
+        select: { id: true, code: true },
+      });
+      if (o) orderDisplay = { id: o.id, code: o.code };
+    }
+    if (booking.productId) {
+      const prod = await this.prisma.product.findUnique({
+        where: { id: booking.productId },
+        select: { id: true, title: true },
+      });
+      if (prod) productDisplay = { id: prod.id, title: prod.title };
+    }
+
     // Step 1.17: field-level redaction — passenger PII виден только OPERATOR/ADMIN.
-    return { ...booking, passengers: redactTravelersPii(booking.passengers ?? [], viewer) };
+    return {
+      ...booking,
+      passengers: redactTravelersPii(booking.passengers ?? [], viewer),
+      orderCode: orderDisplay?.code ?? null,
+      productTitle: productDisplay?.title ?? null,
+    };
   }
 }

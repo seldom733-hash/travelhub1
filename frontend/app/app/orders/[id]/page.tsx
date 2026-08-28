@@ -22,6 +22,8 @@ interface OrderDetail {
   currency: string;
   customerId: string | null;
   sellerPartnerId: string | null;
+  customerDisplayName: string | null;
+  partnerDisplayName: string | null;
   createdAt: string;
   updatedAt: string;
   items?: { id: string; title: string; type: string; quantity: number; price: string; amount: string; currency: string }[];
@@ -97,14 +99,14 @@ export default function OrderDetailPage() {
           {order.customerId && (
             <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs">
               <div className="text-slate-400">{t("crm.col.customer", locale)}</div>
-              <Link href={`/app/crm/customers/${order.customerId}`} className="font-medium text-blue-600 hover:underline">{order.customerId}</Link>
+              <Link href={`/app/crm/customers/${order.customerId}`} className="font-medium text-blue-600 hover:underline">{order.customerDisplayName ?? order.customerId}</Link>
             </div>
           )}
 
           {order.sellerPartnerId && (
             <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs">
               <div className="text-slate-400">{t("crm.col.seller_partner", locale)}</div>
-              <Link href={`/app/crm/partners/${order.sellerPartnerId}`} className="font-medium text-blue-600 hover:underline">{order.sellerPartnerId}</Link>
+              <Link href={`/app/crm/partners/${order.sellerPartnerId}`} className="font-medium text-blue-600 hover:underline">{order.partnerDisplayName ?? order.sellerPartnerId}</Link>
             </div>
           )}
 

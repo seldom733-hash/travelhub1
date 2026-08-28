@@ -18,6 +18,8 @@ interface BookingDetail {
   status: string;
   amount: string;
   currency: string | null;
+  orderCode: string | null;
+  productTitle: string | null;
   createdAt: string;
 }
 
@@ -85,12 +87,12 @@ export default function BookingDetailPage() {
 
           <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs">
             <div className="text-slate-400">{t("crm.col.order", locale)}</div>
-            <Link href={`/app/orders/${booking.orderId}`} className="font-medium text-blue-600 hover:underline">{booking.orderId}</Link>
+            <Link href={`/app/orders/${booking.orderId}`} className="font-medium text-blue-600 hover:underline">{booking.orderCode ?? booking.orderId}</Link>
           </div>
 
           <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs">
             <div className="text-slate-400">{t("crm.col.service", locale)}</div>
-            <Link href={`/app/catalog/${booking.productId}`} className="font-medium text-blue-600 hover:underline">{booking.productId}</Link>
+            <Link href={`/app/catalog/${booking.productId}`} className="font-medium text-blue-600 hover:underline">{booking.productTitle ?? booking.productId}</Link>
           </div>
 
           {/* Notes — Operational Notes */}
