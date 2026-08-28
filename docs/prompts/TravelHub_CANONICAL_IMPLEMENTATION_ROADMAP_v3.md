@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-28 (Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE)\
+**Дата актуализации:** 2026-08-29 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -921,17 +921,38 @@ CRM capabilities зависят от Storefront SaaS plan/entitlement. Не
 связывать доступ только с наличием Storefront record. Basic/Pro capability matrix
 documented. Canonical resolver: getCrmTier(). Entitlement ≠ Permission.
 
-· **Step 3.5E --- Partner CRM Analytics Read Model** ✅ COMPLETE (2026-08-28; VERDICT A — shared CRM analytics read model on existing AnalyticsService; getCrmAnalytics() with lifecycle/source/manager breakdowns; Platform + Partner scope via resolvePartnerScope(); GET /analytics/crm endpoint; 7 targeted tests; 1254/1247+7 backend + 243/243 frontend PASS; 0 schema/migration; report — `PHASE_3_STEP_3.5E_PARTNER_CRM_ANALYTICS_READ_MODEL_IMPLEMENTATION_REPORT.md`; commit TBD).\nShared CRM analytics: lifecycle, source, manager breakdowns, new relationships,
+· **Step 3.5E --- Partner CRM Analytics Read Model** ✅ COMPLETE (2026-08-28; VERDICT A — shared CRM analytics read model on existing AnalyticsService; getCrmAnalytics() with lifecycle/source/manager breakdowns; Platform + Partner scope via resolvePartnerScope(); GET /analytics/crm endpoint; 7 targeted tests; 1254/1247+7 backend + 243/243 frontend PASS; 0 schema/migration; report — `PHASE_3_STEP_3.5E_PARTNER_CRM_ANALYTICS_READ_MODEL_IMPLEMENTATION_REPORT.md`; commit `9674ce0`).\nShared CRM analytics: lifecycle, source, manager breakdowns, new relationships,
 commercially active customers. Platform cross-partner + Partner scoped.
 Existing AnalyticsService reused. No new engine.
 
-· **Step 3.6 --- CRM Center UI** \
-NEW CANONICAL NEXT — Internal TravelHub 360° customer/partner/company view, history,
-relations, activities.
+· **Step 3.6 --- CRM Center UI** ✅ COMPLETE (2026-08-29; VERDICT A — CRM Analytics UI consumer implemented; CrmAnalytics component with 4 KPI cards + 6 period presets + 4 breakdown cards; API client + i18n RU/AZ/EN; 243/243 frontend + 65/65 analytics PASS; commit `4d58f00`; report — `PHASE_3_STEP_3.6_CRM_CENTER_UI_IMPLEMENTATION_REPORT.md`).
+Platform CRM Center with Analytics tab consuming `GET /analytics/crm`.
+Existing CRM surfaces (Customers/Partners/360/Activity/Notes) preserved as regression baseline.
 
-· **Step 3.6A --- Partner CRM UI**\
+· **Step 3.6A --- Partner CRM Source / Entitlement** ✅ COMPLETE (2026-08-29; VERDICT A — Marketplace auto-attribution + first-source preservation + canonical 8-source contract + Platform Create Customer removed + STOREFRONT source added + historical backfill 593 PCR; 10/10 auto-attribution tests; 106/106 CRM + 65/65 analytics + 243/243 frontend PASS; commit `cf582c6`; report — `PHASE_3_STEP_3.6A_PARTNER_CRM_SOURCE_ENTITLEMENT_IMPLEMENTATION_REPORT.md`).
+`MarketplacePcrAttributionConsumer` on `OrderCreated` — auto-creates PCR with `leadSource=MARKETPLACE`.
+Canonical sources: MARKETPLACE/STOREFRONT/DIRECT/PHONE/OFFICE/EMAIL/REFERRAL/OTHER.
+Partner intake validated against canonical source list.
+Platform Create Customer UI removed.
+
+· **Step 3.6B --- Platform Service Ownership / Action Authority** ✅ COMPLETE (2026-08-29; VERDICT A — Platform Create Product removed + server-side ownerless denial; 31 legacy ownerless Products classified (30 TEST/SEED + 1 UNKNOWN); 171/171 CRM+Analytics + 243/243 frontend PASS; commit `1ced16b`; report — `PHASE_3_PLATFORM_SERVICE_OWNERSHIP_ACTION_AUTHORITY_IMPLEMENTATION_REPORT.md`).
+Platform Catalog: Create Product button removed. `CatalogService.createProduct()` throws `ForbiddenError` when `partnerId` is null.
+Partner creation preserved: `partnerId` derived from `actor.partnerId` (anti-spoofing).
+`Product.partnerId NOT NULL` — NOT READY (legacy ownerless Products preserved).
+
+· **Step 3.6C --- Platform Financial / Governance Action Authority** ✅ COMPLETE (2026-08-29; VERDICT A — Payment reason enforced + permission separation + Refund authority separated + Product governance separated; 171/171 CRM+Analytics + 243/243 frontend PASS; commit `2c61c83`; report — `PHASE_3_STEP_3.6C_PLATFORM_FINANCIAL_GOVERNANCE_IMPLEMENTATION_REPORT.md`).
+Refund: `finance.refund.write` (create) / `finance.refund.approve` (approve) / `finance.refund.execute` (process/fail). SoD: SAME-ACTOR ALLOWED.
+Product: Platform moderation = `catalog.product.moderate`; publish/archive = `catalog.product.publish`.
+Payment: reason field added to `CreatePaymentDto`.
+
+· **Step 3.6C.1 --- Final Remediation / Evidence Closure** ✅ COMPLETE (2026-08-29; VERDICT A — Payment reason mandatory server-side + Payment permission separated (create/manage) + Order/Booking reason enforcement + audit trail; 171/171 CRM+Analytics + 243/243 frontend PASS; commit `d737eef`; report — `PHASE_3_STEP_3.6C.1_FINAL_REMEDIATION_CLOSURE_REPORT.md`).
+Payment: `finance.payment.create` (initiate) / `finance.payment.manage` (confirm/fail/cancel). Reason REQUIRED for manual initiation.
+Order: `OrderActionDto` + `reason` field → `OrderHistory.comment`.
+Booking: `BookingActionDto` + `reason` field → `BookingHistory.comment`.
+
+· **Step 3.6D --- Partner CRM UI**\
 Отдельный `/partner/*` CRM workspace; никогда не выдавать PARTNER
-внутренний `/app/crm`.
+внутренний `/app/crm`. Отдельный implementation prompt.
 
 · **Step 3.7 --- Communication Integration**\
 `CML-*`, email/message/contact history, CRM/Sales/Order/Support links.
@@ -1973,33 +1994,37 @@ DONE-семантика применяется с этого amendment (prospect
 ✅ DONE-маркеры (Steps 2.1–2.5B) установлены в рамках той же конвенции
 implementation → strict review → approval и остаются валидными.
 
-### Текущее состояние (verified 2026-08-10)
+### Текущее состояние (verified 2026-08-29)
 
 | Item | Status |
 |---|---|
 | Step 2.5 — Order Creation Consumer | ✅ DONE (committed 3afefc8) |
 | Step 2.5A — Order Temporal Contract | ✅ DONE (committed 3afefc8) |
 | Service Templates / Period Pricing & Availability Amendment | ✅ APPROVED WITH REVIEW FIXES (docs) |
-| Step 2.5B — Acquisition Source Propagation | ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (реализация не коммичена, dirty tree) |
-| Reverse Marketplace ADR (ADR-0012) | ✅ APPROVED (ADR-0012 STRICT REVIEW, docs/adr/ADR-0012) |
+| Step 2.5B — Acquisition Source Propagation | ✅ DONE (committed 3afefc8) |
+| Reverse Marketplace ADR (ADR-0012) | ✅ APPROVED (docs/adr/ADR-0012) |
+| Step 2.2A–2.2F — Reverse Marketplace | ✅ DONE (STRICT REVIEW APPROVED) |
+| Steps 1.8A–1.8D — Service Templates | ✅ DONE (STRICT REVIEW APPROVED) |
+| Steps 2.6–2.9A — Core Commercial Flow | ✅ DONE (STRICT REVIEW APPROVED) |
+| Steps 2.10–2.13A — Finance | ✅ DONE (STRICT REVIEW APPROVED) |
+| Step 2.14E — Commission Policy | ✅ DONE (STRICT REVIEW APPROVED) |
+| Step 2.17 — Platform Hardening | ✅ DONE (STRICT REVIEW APPROVED) |
+| Step 2.17A — Backup & DR | ✅ DONE (STRICT REVIEW APPROVED) |
+| Step 2.17B — Load/Performance Qualification | ⚠ VERDICT B — NOT APPROVED (EventBus backlog + Booking burst) |
+| Step 2.17C — Schema Versioning | ✅ DONE (STRICT REVIEW APPROVED) |
+| Step 2.18 — Phase 2 Exit Audit | ⚠ BLOCKED BY 2.17B |
+| Steps 3.0–3.5E.1 — Phase 3 CRM Foundation | ✅ DONE |
+| Step 3.6 — CRM Center UI | ✅ DONE (committed 4d58f00) |
+| Step 3.6A — Partner CRM Source / Entitlement | ✅ DONE (committed cf582c6) |
+| Step 3.6B — Platform Service Ownership | ✅ DONE (committed 1ced16b) |
+| Step 3.6C — Financial / Governance Authority | ✅ DONE (committed 2c61c83) |
+| Step 3.6C.1 — Final Remediation / Evidence Closure | ✅ DONE (committed d737eef) |
+| Step 3.6D — Partner CRM UI | ▶ NEXT |
 
-**Current completed boundary:** Steps 2.5 / 2.5A / 2.5B (2.5B — review
-approved; commit ожидает явной команды) + Reverse Marketplace ADR-0012
-✅ APPROVED (STRICT REVIEW) + Step 2.2A ✅ STRICT REVIEW COMPLETED —
-APPROVED + Step 2.2B ✅ STRICT REVIEW COMPLETED — APPROVED WITH
-REVIEW FIXES (BuyerRequest foundation; FIX 1: recursive preferences
-PII-скан; FIX 2: lifecycle-команды loud-422 на forged keys; FIX 3–5:
-race final-state/category-snapshot/nested-PII e2e; doc: PAX
-category-neutrality + destination source).
+**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.6C.1 (all VERDICT A).
 
-**Currently active item (исторический снапшот на 2026-08-10; актуальная последовательность — раздел «Полная авторитетная последовательность после 2.5B» ниже):** Step 2.2C — STRICT REVIEW COMPLETED
-(APPROVED WITH REVIEW FIXES; Matching & Distribution: reverse.
-BuyerRequestDistribution, system matching command, Seller inbox,
-strict containment coverage).
-
-**Exact NEXT item (исторический снапшот на 2026-08-10):** `PHASE 2 — STEP 2.2D — SELLER PROPOSAL FOUNDATION`
-(читает reverse.BuyerRequestDistribution напрямую; 2.2C одобрена;
-2.2D запускается отдельным implementation prompt).
+**Canonical NEXT:** `PHASE 3 — STEP 3.6D — PARTNER CRM UI`
+(Отдельный `/partner/*` CRM workspace; никогда не выдавать PARTNER внутренний `/app/crm`).
 
 ### Полная авторитетная последовательность после 2.5B
 
@@ -2044,7 +2069,29 @@ strict containment coverage).
 28. **STEP 2.8 — STRICT REVIEW** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-12; отчёт — PHASE_2_STEP_2.8_BOOKINGREQUESTED_TO_BOOKING_CREATION_STRICT_REVIEW.md)
 29. **STEP 2.8A — BOOKING SERVICE DATE / TIME MODEL** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-13; см. секцию Step 2.8A выше; регрессия 949/949 e2e + 475 unit + 135 frontend + build + migrate 45/45 drift 0)
 29A. **PHASE 2 — STEP 2.8A — STRICT REVIEW** ✅ STRICT REVIEW COMPLETED — APPROVED (2026-08-13; отчёт PHASE_2_STEP_2.8A_BOOKING_SERVICE_DATE_TIME_MODEL_STRICT_REVIEW.md; 0 дефектов)
-29B. **PHASE 2 — STEP 2.9 — BOOKING LIFECYCLE COMPLETION** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-13; независимый adversarial-аудит: write-path (ровно 3 Booking-owned writer-а, категория 4 = 0), единая state-machine authority, compensation OrderCancelled (CAS + history + BookingCancelled, терминальные не трогаются), born-CANCELLED (§15 — создание сразу в CANCELLED при OrderCancelled-раньше-BookingRequested, `created_cancelled`, без BookingCancelled — перехода не было), BookingCompleted vs BookingStatusChanged (canonical факт + технический reconcile-контракт 2.5A, не конкурируют — BookingCompleted без consumer-а), AWAITING_CONFIRMATION — резервный код без producer-а (как READY_TO_CLOSE), §46 Order reconciliation matrix M1–M8 (все 8 комбинаций e2e; cancelled-only/rejected-only НЕ → FULFILLED; PROBLEM не перезаписывается reconcile), Availability release ownership — schema явно фиксирует owner-step, release нигде не реализован (системно), 2.9 не освобождает — OK; REVIEW FIXES: (1) order-status guard в bookingAction — lifecycle-команды (кроме cancel) на брони заказа CANCELLED/CLOSED → 409 (инвариант §15 детерминирован; компенсация-vs-command race закрыта для последовательного сценария), (2) `problem` self-transition исключён (alignment с Order), (3) race-тесты compensation-vs-confirm/complete; регрессия воспроизведена независимо: 994/994 serial e2e (55 suite) + 475 unit + 135 frontend + build + migrate 45/45; детали — `docs/architecture/booking-lifecycle-completion.md` (§16/§16A); отчёт — `docs/prompts/PHASE_2_STEP_2.9_BOOKING_LIFECYCLE_COMPLETION_STRICT_REVIEW_REPORT.md` (RETROSPECTIVE EVIDENCE RECONSTRUCTION: оригинальный отчёт-артефакт отсутствовал; результаты реконструированы из committed evidence, implementation/review-fixes верифицированы в commit `1bc19b7`); NEXT = Step 2.9A) полный канонический Booking lifecycle: единственный authority `BookingService.bookingAction` + CAS (`updateMany id+status+version`, как Order 1.14 §19); producer-ы для Screen Design статусов (prepare→PREPARING_REQUEST, requestClarification/resume→NEEDS_CLARIFICATION, requestChange/resolveChange→CHANGE_REQUESTED, requestCancellation→CANCELLATION_REQUESTED; AWAITING_CONFIRMATION — резервный без producer-а); canonical `BookingCompleted` (ровно одно на реальный complete; BookingStatusChanged остаётся техническим для approved reconcile-контракта 2.5A); **компенсация Step 2.8-race §15** — `OrderCancelled` → booking-order-cancelled-consumer отменяет активные брони (CAS + history `cancelled_order` + result BookingCancelled), гонка Order-cancel vs Booking-create в обоих порядках детерминирована (создание сразу в CANCELLED при уже отменённом заказе, `created_cancelled`); терминальные не перезаписываются; Order-cancel после Booking exists — компенсируется (никакого delete/refund/Finance/availability-release — ownership не определён); frozen факты immutable (money/acquisition/service occurrence 2.8A), никакого второго hold; Order feedback без изменений (Order-owned reconcile); RBAC/IDOR/mass-assignment (новые actions → существующие permissions booking.send_supplier/confirm/request_change/cancel); e2e booking-lifecycle-completion 34 теста (negative §41 + positive/race §42) + rbac-actions расширен; регрессия: см. отчёт; Migration N/A (все статусы уже в enum); детали — `docs/architecture/booking-lifecycle-completion.md`; NEXT = STEP 2.9 STRICT REVIEW)
+29B. **PHASE 2 — STEP 2.9 — BOOKING LIFECYCLE COMPLETION** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-13; независимый adversarial-аудит: write-path (ровно 3 Booking-owned writer-а, категория 4 = 0), единая state-machine authority, compensation OrderCancelled (CAS + history + BookingCancelled, терминальные не трогаются), born-CANCELLED (§15 — создание сразу в CANCELLED при OrderCancelled-раньше-BookingRequested, `created_cancelled`, без BookingCancelled — перехода не было), BookingCompleted vs BookingStatusChanged (canonical факт + технический reconcile-контракт 2.5A, не конкурируют — BookingCompleted без consumer-а), AWAITING_CONFIRMATION — резервный код без producer-а (как READY_TO_CLOSE), §46 Order reconciliation matrix M1–M8 (все 8 комбинаций e2e; cancelled-only/rejected-only НЕ → FULFILLED; PROBLEM не перезаписывается reconcile), Availability release ownership — schema явно фиксирует owner-step, release нигде не реализован (системно), 2.9 не освобождает — OK; REVIEW FIXES: (1) order-status guard в bookingAction — lifecycle-команды (кроме cancel) на брони заказа CANCELLED/CLOSED → 409 (инвариант §15 детерминирован; компенсация-vs-command race закрыта для последовательного сценария), (2) `problem` self-transition исключён (alignment с Order), (3) race-тесты compensation-vs-confirm/complete; регрессия воспроизведена независимо: 994/994 serial e2e (55 suite) + 475 unit + 135 frontend + build + migrate 45/45; детали — `docs/architecture/booking-lifecycle-completion.md` (§16/§16A); отчёт — `docs/prompts/PHASE_2_STEP_2.9_BOOKING_LIFECYCLE_COMPLETION_STRICT_REVIEW_REPORT.md` (RETROSPECTIVE EVIDENCE RECONSTRUCTION: оригинальный отчёт-артефакт отсутствовал; результаты реконструированы из committed evidence, implementation/review-fixes верифицированы в commit `1bc19b7`); NEXT = Step 2.9A) полный канонический Booking lifecycle: единственный authority `BookingService.bookingAction` + CAS (`updateMany id+status+version`, как Order 1.14 §19); producer-ы для Screen Design статусов (prepare→PREPARING_REQUEST, requestClarification/resume→NEEDS_CLARIFICATION, requestChange/resolveChange→CHANGE_REQUESTED, requestCancellation→CANCELLATION_REQUESTED; AWAITING_CONFIRMATION — резервный без producer-а); canonical `BookingCompleted` (ровно одно на реальный complete; BookingStatusChanged остаётся техническим для approved reconcile-контракта 2.5A); **компенсация Step 2.8-race §15** — `OrderCancelled` → booking-order-cancelled-consumer отменяет активные брони (CAS + history `cancelled_order` + result BookingCancelled), гонка Order-cancel vs Booking-create в обоих порядках детерминирована (создание сразу в CANCELLED при уже отменённом заказе, `created_cancelled`); терминальные не перезаписываются; Order-cancel после Booking exists — компенсируется (никакого delete/refund/Finance/availability-release — ownership не определён); frozen факты immutable (money/acquisition/service occurrence 2.8A), никакого второго hold; Order feedback без изменений (Order-owned reconcile); RBAC/IDOR/mass-assignment (новые actions → существующие permissions booking.send_supplier/confirm/request_change/cancel); e2e booking-lifecycle-completion 34 теста (negative §41 + positive/race §42) + rbac-actions расширен; регрессия: см. отчёт; Migration N/A (все статусы уже в enum); детали — `docs/architecture/booking-lifecycle-completion.md`; 30. **PHASE 3 — STEP 3.6 — CRM CENTER UI** ✅ COMPLETE (2026-08-29; VERDICT A — CRM Analytics UI consumer; CrmAnalytics 4 KPI + 6 period presets + 4 breakdowns; API client + i18n RU/AZ/EN; 243/243 frontend + 65/65 analytics; commit `4d58f00`).
+31. **PHASE 3 — STEP 3.6A — PARTNER CRM SOURCE / ENTITLEMENT** ✅ COMPLETE (2026-08-29; VERDICT A — MarketplacePcrAttributionConsumer on OrderCreated; auto-create PCR MARKETPLACE; first-source preservation; canonical 8-source contract; Platform Create Customer removed; STOREFRONT source added; historical backfill 593; 10/10 auto-attribution tests; 106/106 CRM + 65/65 analytics + 243/243 frontend; commit `cf582c6`).
+32. **PHASE 3 — STEP 3.6B — PLATFORM SERVICE OWNERSHIP / ACTION AUTHORITY** ✅ COMPLETE (2026-08-29; VERDICT A — Platform Create Product removed; server-side ownerless denial; 31 legacy classified (30 TEST/SEED + 1 UNKNOWN); Partner creation preserved; anti-spoofing verified; 171/171 CRM+Analytics + 243/243 frontend; commit `1ced16b`).
+33. **PHASE 3 — STEP 3.6C — PLATFORM FINANCIAL / GOVERNANCE ACTION AUTHORITY** ✅ COMPLETE (2026-08-29; VERDICT A — Payment reason enforced; Refund create/approve/execute separated; Product governance vs seller-edit separated; 171/171 CRM+Analytics + 243/243 frontend; commit `2c61c83`).
+34. **PHASE 3 — STEP 3.6C.1 — FINAL REMEDIATION / EVIDENCE CLOSURE** ✅ COMPLETE (2026-08-29; VERDICT A — Payment reason mandatory + permission separated (create/manage); Order/Booking reason enforcement + audit trail; 171/171 CRM+Analytics + 243/243 frontend; commit `d737eef`).
+
+**Platform ↔ Partner authority boundary established:**
+```
+PLATFORM = Marketplace Operator / Governance / Support / Security / Financial Control
+PARTNER  = Commercial Seller / Business Owner / Own Products / Own fulfillment
+
+Platform Create Customer  → ABSENT (Step 3.6A)
+Platform Create Product   → DENIED server-side (Step 3.6B)
+Platform Create Order     → DOES NOT EXIST
+Platform Create Booking   → DOES NOT EXIST
+Platform Payment create   → REASON REQUIRED, PERMISSION-SCOPED (Step 3.6C.1)
+Platform Refund           → CREATE/APPROVE/EXECUTE SEPARATED (Step 3.6C.1)
+Partner Product creation  → PRESERVED (actor.partnerId derived)
+Partner ownership spoof  → PREVENTED
+Product.partnerId NOT NULL → NOT READY (legacy preserved)
+```
+
+**Canonical NEXT:** `PHASE 3 — STEP 3.6D — PARTNER CRM UI`
 
 **Step 2.8A conditional dependency (детерминированный дефолт):** date-based
 period pricing/availability НЕ требует Step 2.8A; time-slot / exact
