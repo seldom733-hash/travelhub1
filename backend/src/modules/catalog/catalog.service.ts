@@ -568,14 +568,25 @@ export class CatalogService implements OnModuleInit {
     });
     if (!product) throw new NotFoundError(`Product ${id} not found`);
     this.policy.assertCanRead(actor, product.partnerId);
+
+    // ── Related-entity display name enrichment (Round 2E.2R.2) ──
+    let partnerDisplayName: string | null = null;
+    if (product.partnerId) {
+      const p = await this.prisma.partner.findUnique({
+        where: { id: product.partnerId },
+        select: { id: true, name: true },
+      });
+      if (p) partnerDisplayName = p.name || null;
+    }
+
     // Step 1.4 review fix 1: draft (change proposal N+1) виден ТОЛЬКО владельцу-PARTNER.
     // MODERATOR/staff читают проверяемое содержимое через snapshot submission, а не через
     // неопубликованный draft (unreviewed N+1 не раскрывается вне owner-контекста).
     if (actor && !this.policy.isOwner(actor, product.partnerId)) {
       const { draft: _draft, ...rest } = product;
-      return rest;
+      return { ...rest, partnerDisplayName };
     }
-    return product;
+    return { ...product, partnerDisplayName };
   }
 
   async updateProduct(id: string, input: UpdateProductInput, actor: AuthUser) {

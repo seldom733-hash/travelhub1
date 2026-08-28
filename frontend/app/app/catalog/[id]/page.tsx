@@ -18,6 +18,7 @@ interface ProductDetail {
   status: string;
   slug: string;
   partnerId: string | null;
+  partnerDisplayName: string | null;
   categoryId: string | null;
   description: string | null;
   createdAt: string;
@@ -93,7 +94,7 @@ export default function ProductDetailPage() {
           {product.partnerId && (
             <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs">
               <div className="text-slate-400">{t("catalog.col.partner", locale)}</div>
-              <Link href={`/app/crm/partners/${product.partnerId}`} className="font-medium text-blue-600 hover:underline">{product.partnerId}</Link>
+              <Link href={`/app/crm/partners/${product.partnerId}`} className="font-medium text-blue-600 hover:underline">{product.partnerDisplayName ?? product.partnerId}</Link>
             </div>
           )}
 
