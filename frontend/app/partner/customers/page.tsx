@@ -241,7 +241,7 @@ export default function PartnerCustomersPage() {
             <tr>
               <th className="px-4 py-2.5 font-medium">{t("crm.col.code", locale)}</th>
               <th className="px-4 py-2.5 font-medium">{t("crm.col.name", locale)}</th>
-              <th className="px-4 py-2.5 font-medium">{t("crm.col.email", locale)}</th>
+              {isPro && <th className="px-4 py-2.5 font-medium">{t("crm.col.email", locale)}</th>}
               <th className="px-4 py-2.5 font-medium">{t("crm.col.type", locale)}</th>
               {isPro && <th className="px-4 py-2.5 font-medium">{pt("partner.crm.source", locale)}</th>}
               <th className="px-4 py-2.5 font-medium">{t("crm.col.status", locale)}</th>
@@ -258,7 +258,7 @@ export default function PartnerCustomersPage() {
               >
                 <td className="px-4 py-2.5 font-mono text-xs text-emerald-600">{c.code}</td>
                 <td className="px-4 py-2.5 font-medium text-slate-800">{displayName(c)}</td>
-                <td className="px-4 py-2.5 text-slate-500">{c.email}</td>
+                {isPro && <td className="px-4 py-2.5 text-slate-500">{c.email}</td>}
                 <td className="px-4 py-2.5 text-slate-500">{c.type === "COMPANY" ? t("crm.type.company", locale) : t("crm.type.person", locale)}</td>
                 {isPro && <td className="px-4 py-2.5 text-slate-500">{(c as any)._relation?.leadSource ?? "—"}</td>}
                 <td className="px-4 py-2.5"><StatusBadge status={c.status} /></td>
@@ -380,14 +380,18 @@ export default function PartnerCustomersPage() {
               {detailTab === "overview" && (
                 <>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-slate-50 px-3 py-2">
-                      <div className="text-slate-400">{pt("partner.crm.email", locale)}</div>
-                      <div className="break-all font-medium text-slate-700">{selectedCustomer.email}</div>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 px-3 py-2">
-                      <div className="text-slate-400">{pt("partner.crm.phone", locale)}</div>
-                      <div className="font-medium text-slate-700">{selectedCustomer.phone ?? "—"}</div>
-                    </div>
+                    {isPro && (
+                      <>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-slate-400">{pt("partner.crm.email", locale)}</div>
+                          <div className="break-all font-medium text-slate-700">{selectedCustomer.email ?? "—"}</div>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 px-3 py-2">
+                          <div className="text-slate-400">{pt("partner.crm.phone", locale)}</div>
+                          <div className="font-medium text-slate-700">{selectedCustomer.phone ?? "—"}</div>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Pro: relation fields */}

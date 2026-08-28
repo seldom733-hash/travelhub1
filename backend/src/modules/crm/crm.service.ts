@@ -1071,9 +1071,17 @@ export class CrmService {
       const customerWhere: any = { id: { in: customerIds } };
       if (query.status) customerWhere.status = query.status;
 
+      // Step 3.7A: Marketplace Basic contact policy — omit direct-contact fields
+      const customerSelect = {
+        id: true, code: true, type: true, firstName: true, lastName: true,
+        companyName: true, status: true, createdAt: true,
+        // email and phone intentionally omitted for Marketplace Basic
+      } as const;
+
       const [customers, total] = await Promise.all([
         this.prisma.customer.findMany({
           where: customerWhere,
+          select: customerSelect,
           orderBy: { createdAt: "desc" },
           skip: (page - 1) * pageSize,
           take: pageSize,
@@ -1154,12 +1162,18 @@ export class CrmService {
     }
 
     // Get customer (basic identity)
+    // Step 3.7A: Marketplace Basic contact policy — omit direct-contact fields
+    const customerSelect: any = {
+      id: true, code: true, type: true, firstName: true, lastName: true,
+      companyName: true, status: true, createdAt: true,
+    };
+    if (tier === "PRO") {
+      customerSelect.email = true;
+      customerSelect.phone = true;
+    }
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
-      select: {
-        id: true, code: true, type: true, firstName: true, lastName: true,
-        companyName: true, email: true, phone: true, status: true, createdAt: true,
-      },
+      select: customerSelect,
     });
     if (!customer) throw new NotFoundError(`Customer ${customerId} not found`);
 
