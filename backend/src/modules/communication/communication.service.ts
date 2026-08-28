@@ -487,25 +487,63 @@ export class CommunicationService {
   }
 
   /**
-   * Step 3.7B.2 — Sanitize Communication body for Marketplace Basic.
+   * Canonical business-code prefixes registered in the repository.
+   * Source: shared/ids.service.ts — nextCode() callers.
+   * Format: PREFIX-######## (8 digits) or TH-YYYY-###### (6 digits).
+   * Used by sanitizeBodyForBasic() to protect business codes from false-positive
+   * contact detection.
+   */
+  private static readonly BUSINESS_CODE_PATTERN =
+    /\b(?:PRD|CAT|TRF|USR|PRN|CUS|CNT|ORD|BKG|PAY|RFD|INV|QTE|SAL|OPP|LED|CML)-\d{4,8}\b/g;
+  private static readonly ORDER_NUMBER_PATTERN = /\bTH-\d{4}-\d{6}\b/g;
+
+  /**
+   * Step 3.7B.2 + 3.7B.3 — Sanitize Communication body for Marketplace Basic.
    * Reuses canonical shared/anti-disintermediation.ts detector.
    * Replaces contact-bearing segments with [contact hidden].
+   * Step 3.7B.3: protects canonical business identifiers (ORD-*, BKG-*, TH-YYYY-*, etc.)
+   * from false-positive phone/contact detection using a protect-sanitize-restore pattern.
    * Deterministic, does not reveal original contact, does not alter stored fact.
    */
   private sanitizeBodyForBasic(body: string): string {
-    // Split body into segments: contact-bearing and non-contact.
-    // Use the same regex patterns as hasForbiddenText but replace instead of reject.
+    // Step 3.7B.3: Protect canonical business codes before contact sanitization.
+    // Extract known business-code patterns into numbered placeholders, apply
+    // contact sanitization, then restore the originals.
+    const protectedCodes: string[] = [];
+    const protect = (match: string): string => {
+      const idx = protectedCodes.length;
+      protectedCodes.push(match);
+      return ` BIZ${idx} `;
+    };
+
+    let safe = body;
+    safe = safe.replace(CommunicationService.BUSINESS_CODE_PATTERN, protect);
+    safe = safe.replace(CommunicationService.ORDER_NUMBER_PATTERN, protect);
+
+    // Apply canonical contact sanitization (same patterns as hasForbiddenText)
     const CONTACT_PATTERNS = [
       { label: "email", re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g },
       { label: "phone", re: /(?<![A-Za-z0-9])(\+?\d[\d\s().-]{7,}\d)(?![A-Za-z0-9])/g },
       { label: "url", re: /(https?:\/\/|www\.)[A-Za-z0-9.-]+/gi },
       { label: "social", re: /(t\.me\/|wa\.me\/|@[A-Za-z0-9_]{4,}|instagram\.com|facebook\.com|vk\.com|youtube\.com)/gi },
     ];
-    let result = body;
+    // ISO date-only (YYYY-MM-DD) exclusion — matches canonical shared/anti-disintermediation.ts
+    const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
     for (const pattern of CONTACT_PATTERNS) {
-      result = result.replace(pattern.re, "[contact hidden]");
+      if (pattern.label === "phone") {
+        // Phone regex can false-positive on ISO dates; skip date-only matches
+        safe = safe.replace(pattern.re, (match) =>
+          ISO_DATE_RE.test(match.trim()) ? match : "[contact hidden]",
+        );
+      } else {
+        safe = safe.replace(pattern.re, "[contact hidden]");
+      }
     }
-    return result;
+
+    // Step 3.7B.3: Restore protected business codes.
+    safe = safe.replace(/\x00BIZ(\d+)\x00/g, (_, idx) => protectedCodes[parseInt(idx, 10)]);
+
+    return safe;
   }
 
   /**
