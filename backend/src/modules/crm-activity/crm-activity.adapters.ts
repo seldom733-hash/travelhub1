@@ -262,7 +262,8 @@ export class RefundAdapter implements SourceAdapter {
   project(source: any, event?: string): ActivityProjection | null {
     if (!source) return null;
 
-    const customerId = source.payment?.customerId ?? null;
+    // Canonical ownership: direct customerId first, then order-derived via Order.customerId
+    const customerId = source.payment?.customerId ?? source.payment?.order?.customerId ?? null;
     const partnerId = source.payment?.order?.sellerPartnerId ?? source.payment?.partnerId ?? null;
 
     const isProcessed = event === 'processed' || (source.status === 'PROCESSED' && source.processedAt);
@@ -310,7 +311,7 @@ export class RefundAdapter implements SourceAdapter {
     const orderIds = [...new Set(payments.map((p: any) => p.orderId))];
     const orders = await prisma.order.findMany({
       where: { id: { in: orderIds } },
-      select: { id: true, sellerPartnerId: true },
+      select: { id: true, customerId: true, sellerPartnerId: true },
     });
     const orderMap = new Map<string, any>(orders.map((o: any) => [o.id, o]));
     const enriched = refunds.map((r: any) => {
@@ -319,7 +320,7 @@ export class RefundAdapter implements SourceAdapter {
       return { ...r, payment: pay ? { ...pay, order: ord } : null };
     });
     const projections: ActivityProjection[] = [];
-    for (const r of refunds) {
+    for (const r of enriched) {
       const created = this.project(r, 'created');
       if (created) projections.push(created);
       if (r.status === 'PROCESSED' && r.processedAt) {
