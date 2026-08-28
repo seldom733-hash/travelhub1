@@ -312,7 +312,7 @@ export class CatalogController {
 
   @Patch("products/:id")
   @RequirePermissions((req: AuthedRequest) =>
-    req.user.role === RoleCode.PARTNER ? ["catalog.product.update_own_draft"] : ["catalog.product.write"],
+    req.user.role === RoleCode.PARTNER ? ["catalog.product.update_own_draft"] : ["catalog.product.moderate"],
   )
   updateProduct(@Param("id") id: string, @Body() dto: UpdateProductDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.catalog.updateProduct(id, dto, actor);
@@ -324,7 +324,9 @@ export class CatalogController {
    * каналы отделены от lifecycle; изменение аудируется (ProductHistory).
    */
   @Put("products/:id/channels")
-  @RequirePermissions("catalog.product.channels_own")
+  @RequirePermissions((req: AuthedRequest) =>
+    req.user.role === RoleCode.PARTNER ? ["catalog.product.channels_own"] : ["catalog.product.moderate"],
+  )
   setChannels(@Param("id") id: string, @Body() dto: SetChannelsDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.catalog.setProductChannels(id, dto.channels as unknown as string[], actor);
   }

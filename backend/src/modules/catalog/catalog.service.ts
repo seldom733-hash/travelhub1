@@ -605,7 +605,7 @@ export class CatalogService implements OnModuleInit {
       // Step 1.3: object scope — PARTNER редактирует только СВОИ Product
       // (permission update_own_draft); ADMIN — через explicit permission (catalog.product.write);
       // MODERATOR — 403. partnerId НЕ может быть изменён (DTO его не содержит).
-      const managePermission = actor.role === RoleCode.PARTNER ? "catalog.product.update_own_draft" : "catalog.product.write";
+      const managePermission = actor.role === RoleCode.PARTNER ? "catalog.product.update_own_draft" : "catalog.product.moderate";
       this.policy.assertCanManage(actor, existing.partnerId, managePermission);
       // partnerId НЕ может быть изменён (DTO его не содержит, сервис не трогает).
 
@@ -1279,7 +1279,7 @@ export class CatalogService implements OnModuleInit {
   async setProductChannels(id: string, channels: string[], actor: AuthUser) {
     const product = await this.prisma.product.findUnique({ where: { id } });
     if (!product) throw new NotFoundError(`Product ${id} not found`);
-    const managePermission = actor.role === RoleCode.PARTNER ? "catalog.product.channels_own" : "catalog.product.write";
+    const managePermission = actor.role === RoleCode.PARTNER ? "catalog.product.channels_own" : "catalog.product.moderate";
     this.policy.assertCanManage(actor, product.partnerId, managePermission);
 
     const unique = [...new Set(channels.map((c) => c.trim()).filter(Boolean))];

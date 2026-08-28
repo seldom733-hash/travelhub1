@@ -76,13 +76,15 @@ export class PaymentService {
    * create с активным Payment → существующий факт (no-op, identical retry =
    * same effect); concurrent duplicate → P2002 → controlled 409.
    */
-  async createPayment(input: { orderId: string; paymentMethod?: string | null; initialNote?: string }, actor: Actor): Promise<Record<string, unknown>> {
+  async createPayment(input: { orderId: string; paymentMethod?: string | null; reason?: string | null; initialNote?: string }, actor: Actor): Promise<Record<string, unknown>> {
     const orderId = input.orderId.trim();
     if (!orderId) throw new ValidationDomainError("orderId is required");
     const paymentMethod = input.paymentMethod ? input.paymentMethod.trim() : null;
     if (paymentMethod && paymentMethod.length > 64) {
       throw new ValidationDomainError("paymentMethod must not exceed 64 characters");
     }
+    // Step 3.6C: reason required for manual payment initiation.
+    const reason = input.reason ? input.reason.trim() : null;
 
     // Phase 3 Round 2D.1: validate initialNote BEFORE transaction (pre-tx validation)
     // so >5000 rejection prevents Payment creation entirely.
@@ -138,7 +140,7 @@ export class PaymentService {
             to: PaymentStatus.PENDING,
             actorId: actor.id,
             actorName: actor.username,
-            comment: `Платёж инициирован по заказу ${order.code}`,
+            comment: reason ? `Платёж инициирован по заказу ${order.code}: ${reason}` : `Платёж инициирован по заказу ${order.code}`,
           },
         });
         await this.security.audit(tx, {

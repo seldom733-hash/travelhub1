@@ -272,7 +272,7 @@ export class FinanceController {
     // raw req.body — forged server-owned поля (money/status/milestones/...) → 422.
     assertNoForbiddenKeys(req.body, PAYMENT_CREATE_FORBIDDEN_KEYS);
     return this.payments.createPayment(
-      { orderId: dto.orderId, paymentMethod: dto.paymentMethod ?? null, initialNote: dto.initialNote },
+      { orderId: dto.orderId, paymentMethod: dto.paymentMethod ?? null, reason: dto.reason ?? null, initialNote: dto.initialNote },
       { id: actor.id, username: actor.username },
     );
   }
@@ -331,13 +331,13 @@ export class FinanceController {
   }
 
   @Post("refunds/:code/process")
-  @RequirePermissions("finance.refund.write")
+  @RequirePermissions("finance.refund.execute")
   async processRefund(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.refunds.processRefund(code, { id: actor.id, username: actor.username });
   }
 
   @Post("refunds/:code/fail")
-  @RequirePermissions("finance.refund.write")
+  @RequirePermissions("finance.refund.execute")
   async failRefund(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.refunds.failRefund(code, { id: actor.id, username: actor.username });
   }

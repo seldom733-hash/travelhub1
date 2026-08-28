@@ -483,6 +483,14 @@ export class CreatePaymentDto {
   @MaxLength(64)
   paymentMethod?: string;
 
+  // Step 3.6C: mandatory reason for manual/offline payment initiation.
+  // System/provider-initiated payments do not require reason (they bypass this DTO).
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  reason?: string;
+
   // Phase 3 Round 2D.1: optional initial OperationalNote (internal, max 5000)
   @IsOptional()
   @IsString()
