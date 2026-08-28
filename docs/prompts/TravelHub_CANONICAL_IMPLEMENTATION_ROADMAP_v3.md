@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-29 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Step 3.6D ✅ COMPLETE; Step 3.6D.1 ✅ COMPLETE; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE)\
+**Дата актуализации:** 2026-08-29 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Step 3.6D ✅ COMPLETE; Step 3.6D.1 ✅ COMPLETE; Step 3.7A ✅ COMPLETE; Step 3.7A.1 ✅ COMPLETE; Step 3.7A.2 ✅ COMPLETE; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -961,6 +961,26 @@ Deferred follow-up gaps: Partner CRM Activity (crm.activity.read not in PARTNER)
 
 · **Step 3.7 --- Communication Integration**\
 `CML-*`, email/message/contact history, CRM/Sales/Order/Support links.
+ARCHITECTURE AUDIT: VERDICT A — AUDIT COMPLETE (2026-08-29; commit `235d39d`; report — `PHASE_3_STEP_3.7_COMMUNICATION_INTEGRATION_ARCHITECTURE_REPOSITORY_GAP_AUDIT_REPORT.md`).
+
+· **Step 3.7A --- Marketplace Contact Policy Authority** ✅ COMPLETE\
+(2026-08-29; VERDICT A — server-side Marketplace Basic contact restriction;\
+getCrmTier() conditional Prisma select omits email/phone for BASIC;\
+frontend hides email column/cards for Basic;\
+commit `271fbe3`; report — `PHASE_3_STEP_3.7A_MARKETPLACE_CONTACT_POLICY_IMPLEMENTATION_REPORT.md`).
+
+· **Step 3.7A.1 --- Marketplace Contact Policy Runtime/Security/Entitlement Evidence** ✅ COMPLETE\
+(2026-08-29; VERDICT A — Basic tier=200, Pro tier=200 with email/phone,\
+cross-partner→404, Platform CRM unaffected, 106/106 CRM + 65/65 analytics + 243/243 frontend PASS;\
+commit `2c5b202`; report — `PHASE_3_STEP_3.7A.1_PARTNER_CRM_CONTACT_POLICY_EVIDENCE_CLOSURE_REPORT.md`).
+
+· **Step 3.7A.2 --- Final Runtime Evidence Closure** ✅ COMPLETE\
+(2026-08-29; VERDICT A — BASIC non-empty list/detail proven with fixture (email/phone ABSENT);\
+entitlement fallback (EXPIRED storefront → BASIC + restricted payload);\
+chat anti-disintermediation CONFIRMED WORKING (email→422, phone→422, URL→422);\
+correction: prior 3.7A.1 incorrectly stated "not chat-level" — catalog + chat both use\
+shared anti-disintermediation.ts regex; 126/126 CRM+Communication PASS;\
+commit `c543ab8`; report — `PHASE_3_STEP_3.7A.2_FINAL_RUNTIME_EVIDENCE_CLOSURE_REPORT.md`).
 
 ## Marketing
 
@@ -2026,12 +2046,15 @@ implementation → strict review → approval и остаются валидны
 | Step 3.6C.1 — Final Remediation / Evidence Closure | ✅ DONE (committed d737eef) |
 | Step 3.6D — Partner CRM UI | ✅ DONE (committed 2175e0f) |
 | Step 3.6D.1 — Partner CRM UI Evidence Closure | ✅ DONE (committed cc3317f) |
-| Step 3.7 — Communication Integration | ⏳ PLANNED |
+| Step 3.7 — Communication Integration Audit | ✅ DONE (committed 235d39d) |
+| Step 3.7A — Marketplace Contact Policy | ✅ DONE (committed 271fbe3) |
+| Step 3.7A.1 — Contact Policy Evidence Closure | ✅ DONE (committed 2c5b202) |
+| Step 3.7A.2 — Final Runtime Evidence Closure | ✅ DONE (committed c543ab8) |
 
-**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.6D.1 (all VERDICT A).
+**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.7A.2 (all VERDICT A).
 
-**Canonical NEXT:** `PHASE 3 — STEP 3.7 — COMMUNICATION INTEGRATION`
-(`CML-*`, email/message/contact history, CRM/Sales/Order/Support links).
+**Canonical NEXT:** `PHASE 3 — STEP 3.7B — COMMUNICATION BUSINESS-CONTEXT INTEGRATION`
+(Communication ↔ Order/Booking context links, CRM/Sales/Support integration).
 
 ### Полная авторитетная последовательность после 2.5B
 
@@ -2083,6 +2106,10 @@ implementation → strict review → approval и остаются валидны
 34. **PHASE 3 — STEP 3.6C.1 — FINAL REMEDIATION / EVIDENCE CLOSURE** ✅ COMPLETE (2026-08-29; VERDICT A — Payment reason mandatory + permission separated (create/manage); Order/Booking reason enforcement + audit trail; 171/171 CRM+Analytics + 243/243 frontend; commit `d737eef`).
 35. **PHASE 3 — STEP 3.6D — PARTNER CRM UI** ✅ COMPLETE (2026-08-29; VERDICT A — gap-first: i18n RU/AZ/EN + lifecycle select + leadSource column; existing /partner/customers reused; 106/106 CRM + 65/65 analytics + 243/243 frontend; commit `2175e0f`).
 36. **PHASE 3 — STEP 3.6D.1 — PARTNER CRM UI EVIDENCE CLOSURE** ✅ COMPLETE (2026-08-29; VERDICT A — Basic/Pro runtime proof, tenant isolation, Platform CRM isolation, anonymous guard, RU/AZ/EN; commit `cc3317f`).
+37. **PHASE 3 — STEP 3.7 — COMMUNICATION INTEGRATION AUDIT** ✅ COMPLETE (2026-08-29; VERDICT A — architecture/repository gap audit; communication schema, anti-disintermediation, reverse-conversation, tenant isolation inventoried; commit `235d39d`).
+38. **PHASE 3 — STEP 3.7A — MARKETPLACE CONTACT POLICY AUTHORITY** ✅ COMPLETE (2026-08-29; VERDICT A — server-side Basic contact restriction (email/phone omitted via conditional Prisma select); Pro preserved; Platform unaffected; commit `271fbe3`).
+39. **PHASE 3 — STEP 3.7A.1 — CONTACT POLICY EVIDENCE CLOSURE** ✅ COMPLETE (2026-08-29; VERDICT A — tier resolution, cross-partner isolation, Platform regression; 106/106 CRM + 65/65 analytics + 243/243 frontend; commit `2c5b202`).
+40. **PHASE 3 — STEP 3.7A.2 — FINAL RUNTIME EVIDENCE CLOSURE** ✅ COMPLETE (2026-08-29; VERDICT A — BASIC non-empty fixture proven (email/phone ABSENT); entitlement fallback (EXPIRED→BASIC); chat anti-disintermediation CONFIRMED (email→422, phone→422, URL→422); correction: 3.7A.1 incorrectly stated "not chat-level"; 126/126 CRM+Communication; commit `c543ab8`).
 
 **Platform ↔ Partner authority boundary established:**
 ```
@@ -2100,7 +2127,7 @@ Partner ownership spoof  → PREVENTED
 Product.partnerId NOT NULL → NOT READY (legacy preserved)
 ```
 
-**Canonical NEXT:** `PHASE 3 — STEP 3.6D — PARTNER CRM UI`
+**Canonical NEXT:** `PHASE 3 — STEP 3.7B — COMMUNICATION BUSINESS-CONTEXT INTEGRATION`
 
 **Step 2.8A conditional dependency (детерминированный дефолт):** date-based
 period pricing/availability НЕ требует Step 2.8A; time-slot / exact
