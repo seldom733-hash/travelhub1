@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-29 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE)\
+**Дата актуализации:** 2026-08-29 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Step 3.6D ✅ COMPLETE; Step 3.6D.1 ✅ COMPLETE; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -950,9 +950,14 @@ Payment: `finance.payment.create` (initiate) / `finance.payment.manage` (confirm
 Order: `OrderActionDto` + `reason` field → `OrderHistory.comment`.
 Booking: `BookingActionDto` + `reason` field → `BookingHistory.comment`.
 
-· **Step 3.6D --- Partner CRM UI**\
-Отдельный `/partner/*` CRM workspace; никогда не выдавать PARTNER
-внутренний `/app/crm`. Отдельный implementation prompt.
+· **Step 3.6D --- Partner CRM UI** ✅ COMPLETE (2026-08-29; VERDICT A — gap-first implementation of existing /partner/customers; i18n RU/AZ/EN (45 keys); lifecycle select (LEAD/PROSPECT/ACTIVE/CHURNED); leadSource column + locale-aware display; 106/106 CRM + 65/65 analytics + 243/243 frontend PASS; commit `2175e0f`; report — `PHASE_3_STEP_3.6D_PARTNER_CRM_UI_IMPLEMENTATION_REPORT.md`).
+Existing Partner CRM surfaces reused; no duplicate CRM root; no /partner/crm clone.
+Partner CRM route: `/partner/customers`.
+Marketplace Basic: customer list from orders, detail, no intake, no source/lifecycle editing.
+Storefront Pro: full CRM, intake, 8 sources, lifecycle, tags, notes.
+
+· **Step 3.6D.1 --- Partner CRM UI Runtime / Security / Git Evidence Closure** ✅ COMPLETE (2026-08-29; VERDICT A — runtime proof for Basic/Pro, tenant isolation, Platform CRM isolation, anonymous auth guard, RU/AZ/EN verified; 106/106 CRM + 65/65 analytics + 243/243 frontend PASS; commit `cc3317f`; report — `PHASE_3_STEP_3.6D.1_PARTNER_CRM_UI_EVIDENCE_CLOSURE_REPORT.md`).
+Deferred follow-up gaps: Partner CRM Activity (crm.activity.read not in PARTNER), Partner Operational Notes (operational-notes.read not in PARTNER), Partner Analytics (analytics.read not in PARTNER).
 
 · **Step 3.7 --- Communication Integration**\
 `CML-*`, email/message/contact history, CRM/Sales/Order/Support links.
@@ -2019,12 +2024,14 @@ implementation → strict review → approval и остаются валидны
 | Step 3.6B — Platform Service Ownership | ✅ DONE (committed 1ced16b) |
 | Step 3.6C — Financial / Governance Authority | ✅ DONE (committed 2c61c83) |
 | Step 3.6C.1 — Final Remediation / Evidence Closure | ✅ DONE (committed d737eef) |
-| Step 3.6D — Partner CRM UI | ▶ NEXT |
+| Step 3.6D — Partner CRM UI | ✅ DONE (committed 2175e0f) |
+| Step 3.6D.1 — Partner CRM UI Evidence Closure | ✅ DONE (committed cc3317f) |
+| Step 3.7 — Communication Integration | ⏳ PLANNED |
 
-**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.6C.1 (all VERDICT A).
+**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.6D.1 (all VERDICT A).
 
-**Canonical NEXT:** `PHASE 3 — STEP 3.6D — PARTNER CRM UI`
-(Отдельный `/partner/*` CRM workspace; никогда не выдавать PARTNER внутренний `/app/crm`).
+**Canonical NEXT:** `PHASE 3 — STEP 3.7 — COMMUNICATION INTEGRATION`
+(`CML-*`, email/message/contact history, CRM/Sales/Order/Support links).
 
 ### Полная авторитетная последовательность после 2.5B
 
@@ -2074,6 +2081,8 @@ implementation → strict review → approval и остаются валидны
 32. **PHASE 3 — STEP 3.6B — PLATFORM SERVICE OWNERSHIP / ACTION AUTHORITY** ✅ COMPLETE (2026-08-29; VERDICT A — Platform Create Product removed; server-side ownerless denial; 31 legacy classified (30 TEST/SEED + 1 UNKNOWN); Partner creation preserved; anti-spoofing verified; 171/171 CRM+Analytics + 243/243 frontend; commit `1ced16b`).
 33. **PHASE 3 — STEP 3.6C — PLATFORM FINANCIAL / GOVERNANCE ACTION AUTHORITY** ✅ COMPLETE (2026-08-29; VERDICT A — Payment reason enforced; Refund create/approve/execute separated; Product governance vs seller-edit separated; 171/171 CRM+Analytics + 243/243 frontend; commit `2c61c83`).
 34. **PHASE 3 — STEP 3.6C.1 — FINAL REMEDIATION / EVIDENCE CLOSURE** ✅ COMPLETE (2026-08-29; VERDICT A — Payment reason mandatory + permission separated (create/manage); Order/Booking reason enforcement + audit trail; 171/171 CRM+Analytics + 243/243 frontend; commit `d737eef`).
+35. **PHASE 3 — STEP 3.6D — PARTNER CRM UI** ✅ COMPLETE (2026-08-29; VERDICT A — gap-first: i18n RU/AZ/EN + lifecycle select + leadSource column; existing /partner/customers reused; 106/106 CRM + 65/65 analytics + 243/243 frontend; commit `2175e0f`).
+36. **PHASE 3 — STEP 3.6D.1 — PARTNER CRM UI EVIDENCE CLOSURE** ✅ COMPLETE (2026-08-29; VERDICT A — Basic/Pro runtime proof, tenant isolation, Platform CRM isolation, anonymous guard, RU/AZ/EN; commit `cc3317f`).
 
 **Platform ↔ Partner authority boundary established:**
 ```
