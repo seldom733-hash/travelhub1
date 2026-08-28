@@ -853,6 +853,5 @@ describe("Step 3.5E — CRM Analytics Read Model", () => {
     expect(result.metrics.totalRelationships).toBe(0);
     expect(result.metrics.lifecycleBreakdown).toEqual({});
     expect(result.metrics.commerciallyActiveCustomers).toBe(0);
-    expect(result.metrics.repeatCustomers).toBe(0);
   });
 });

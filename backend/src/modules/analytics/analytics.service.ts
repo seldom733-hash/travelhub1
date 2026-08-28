@@ -318,7 +318,12 @@ export interface CrmAnalyticsResponse {
     newRelationships: number;
     newBySource: Record<string, number>;
     commerciallyActiveCustomers: number;
-    repeatCustomers: number;
+    /**
+     * DEFERRED: no canonical business definition of "repeat customer" exists
+     * in repository. Possible definitions (2+ orders, 2+ completed orders,
+     * prior purchase before period, etc.) are NOT interchangeable.
+     * Removed from public contract per Step 3.5E.1 Finding A.
+     */
   };
 }
 
@@ -1346,7 +1351,6 @@ export class AnalyticsService {
         newRelationships: newPcrCount,
         newBySource: newBySourceBreakdown,
         commerciallyActiveCustomers: commerciallyActiveCount,
-        repeatCustomers: Math.max(0, commerciallyActiveCount - newPcrCount),
       },
     };
   }
