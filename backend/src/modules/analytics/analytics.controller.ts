@@ -143,4 +143,27 @@ export class AnalyticsController {
   ) {
     return this.analyticsService.getFinancialReconciliation(query, user);
   }
+
+  // ── Step 3.5E — Shared CRM Analytics Read Model ──────────────────────
+
+  /**
+   * GET /api/v1/analytics/crm
+   *
+   * Shared CRM analytics: lifecycle, source, manager breakdowns,
+   * new relationships, commercially active customers.
+   *
+   * Platform scope: cross-partner (authorized via analytics.read)
+   * Partner scope: current partner only (resolvePartnerScope)
+   *
+   * Requires: analytics.read (canonical permission).
+   * Entitlement: Basic/Pro analytics (getCrmTier not required for Platform).
+   */
+  @Get("crm")
+  @RequirePermissions("analytics.read")
+  async getCrmAnalytics(
+    @Query() query: AnalyticsQueryDto,
+    @CurrentUser() user: AnalyticsUser,
+  ) {
+    return this.analyticsService.getCrmAnalytics(query, user);
+  }
 }

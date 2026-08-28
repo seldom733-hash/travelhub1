@@ -656,3 +656,203 @@ describe("AnalyticsService — Financial Reconciliation multi-currency (MEDIUM-N
     expect(result.currencies.map((c) => c.currency)).toEqual(["AZN", "EUR", "USD"]);
   });
 });
+
+// ── Step 3.5E — CRM Analytics Tests ──────────────────────────────────────
+
+describe("Step 3.5E — CRM Analytics Read Model", () => {
+  function makeCrmMock() {
+    const prisma = createMockPrisma();
+    // Add partnerCustomerRelation mock
+    prisma.partnerCustomerRelation = {
+      count: jest.fn().mockResolvedValue(5),
+      groupBy: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn().mockResolvedValue([]),
+    } as any;
+    return prisma;
+  }
+
+  it("Platform scope: returns all metrics with label 'platform'", async () => {
+    const prisma = makeCrmMock();
+    prisma.partnerCustomerRelation.count.mockResolvedValue(10);
+    prisma.partnerCustomerRelation.groupBy
+      .mockResolvedValueOnce([{ lifecycle: "ACTIVE", _count: 7 }, { lifecycle: "LEAD", _count: 3 }])
+      .mockResolvedValueOnce([{ leadSource: "DIRECT", _count: 6 }, { leadSource: "PHONE", _count: 4 }])
+      .mockResolvedValueOnce([{ assignedTo: "mgr1", _count: 10 }])
+      .mockResolvedValueOnce([{ leadSource: "DIRECT", _count: 3 }]);
+    prisma.partnerCustomerRelation.findMany.mockResolvedValue([
+      { customerId: "c1" }, { customerId: "c2" }, { customerId: "c3" },
+    ]);
+    prisma.order.findMany.mockResolvedValue([
+      { customerId: "c1" }, { customerId: "c2" }, { customerId: "c1" },
+    ]);
+
+    const service = new AnalyticsService(prisma);
+    const result = await service.getCrmAnalytics(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u1", role: "ADMIN", partnerId: null } as any,
+    );
+
+    expect(result.scope.label).toBe("platform");
+    expect(result.scope.partnerId).toBeNull();
+    expect(result.metrics.totalCustomers).toBe(3);
+    expect(result.metrics.totalRelationships).toBe(10);
+    expect(result.metrics.lifecycleBreakdown).toEqual({ ACTIVE: 7, LEAD: 3 });
+    expect(result.metrics.sourceBreakdown).toEqual({ DIRECT: 6, PHONE: 4 });
+    expect(result.metrics.newRelationships).toBe(10);
+    expect(result.metrics.commerciallyActiveCustomers).toBe(2); // c1, c2
+  });
+
+  it("Partner scope: PARTNER role automatically scoped to own partnerId", async () => {
+    const prisma = makeCrmMock();
+    prisma.partnerCustomerRelation.count.mockResolvedValue(3);
+    prisma.partnerCustomerRelation.groupBy
+      .mockResolvedValueOnce([{ lifecycle: "ACTIVE", _count: 3 }])
+      .mockResolvedValueOnce([{ leadSource: "PHONE", _count: 3 }])
+      .mockResolvedValueOnce([{ assignedTo: null, _count: 3 }])
+      .mockResolvedValueOnce([{ leadSource: "PHONE", _count: 1 }]);
+    prisma.partnerCustomerRelation.findMany.mockResolvedValue([
+      { customerId: "c1" }, { customerId: "c2" }, { customerId: "c3" },
+    ]);
+    prisma.order.findMany.mockResolvedValue([{ customerId: "c1" }]);
+
+    const service = new AnalyticsService(prisma);
+    const result = await service.getCrmAnalytics(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u2", role: "PARTNER", partnerId: "partner-x" } as any,
+    );
+
+    expect(result.scope.label).toBe("partner");
+    expect(result.scope.partnerId).toBe("partner-x");
+  });
+
+  it("Partner A/B isolation: different partners get different results", async () => {
+    const prismaA = makeCrmMock();
+    prismaA.partnerCustomerRelation.count.mockResolvedValue(5);
+    prismaA.partnerCustomerRelation.groupBy
+      .mockResolvedValueOnce([{ lifecycle: "ACTIVE", _count: 5 }])
+      .mockResolvedValueOnce([{ leadSource: "DIRECT", _count: 5 }])
+      .mockResolvedValueOnce([{ assignedTo: null, _count: 5 }])
+      .mockResolvedValueOnce([{ leadSource: "DIRECT", _count: 2 }]);
+    prismaA.partnerCustomerRelation.findMany.mockResolvedValue([
+      { customerId: "c1" }, { customerId: "c2" }, { customerId: "c3" }, { customerId: "c4" }, { customerId: "c5" },
+    ]);
+    prismaA.order.findMany.mockResolvedValue([{ customerId: "c1" }]);
+
+    const serviceA = new AnalyticsService(prismaA);
+    const resultA = await serviceA.getCrmAnalytics(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "uA", role: "PARTNER", partnerId: "partner-a" } as any,
+    );
+
+    const prismaB = makeCrmMock();
+    prismaB.partnerCustomerRelation.count.mockResolvedValue(2);
+    prismaB.partnerCustomerRelation.groupBy
+      .mockResolvedValueOnce([{ lifecycle: "LEAD", _count: 2 }])
+      .mockResolvedValueOnce([{ leadSource: "OFFICE", _count: 2 }])
+      .mockResolvedValueOnce([{ assignedTo: null, _count: 2 }])
+      .mockResolvedValueOnce([{ leadSource: "OFFICE", _count: 1 }]);
+    prismaB.partnerCustomerRelation.findMany.mockResolvedValue([
+      { customerId: "c10" }, { customerId: "c11" },
+    ]);
+    prismaB.order.findMany.mockResolvedValue([]);
+
+    const serviceB = new AnalyticsService(prismaB);
+    const resultB = await serviceB.getCrmAnalytics(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "uB", role: "PARTNER", partnerId: "partner-b" } as any,
+    );
+
+    expect(resultA.metrics.totalCustomers).toBe(5);
+    expect(resultB.metrics.totalCustomers).toBe(2);
+    expect(resultA.metrics.lifecycleBreakdown).toEqual({ ACTIVE: 5 });
+    expect(resultB.metrics.lifecycleBreakdown).toEqual({ LEAD: 2 });
+  });
+
+  it("A→B→A isolation: Partner A result unchanged after B query", async () => {
+    const prisma = makeCrmMock();
+    prisma.partnerCustomerRelation.count
+      .mockResolvedValueOnce(5) // A total
+      .mockResolvedValueOnce(1) // A new
+      .mockResolvedValueOnce(2) // B total
+      .mockResolvedValueOnce(0) // B new
+      .mockResolvedValueOnce(5); // A again
+    prisma.partnerCustomerRelation.groupBy
+      .mockResolvedValue([{ lifecycle: "ACTIVE", _count: 5 }, { leadSource: "DIRECT", _count: 5 }, { assignedTo: null, _count: 5 }]);
+    prisma.partnerCustomerRelation.findMany
+      .mockResolvedValueOnce([{ customerId: "c1" }])
+      .mockResolvedValueOnce([{ customerId: "c2" }])
+      .mockResolvedValueOnce([{ customerId: "c1" }]);
+    prisma.order.findMany.mockResolvedValue([]);
+
+    const service = new AnalyticsService(prisma);
+    const rA1 = await service.getCrmAnalytics(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "uA", role: "PARTNER", partnerId: "partner-a" } as any,
+    );
+    const _rB = await service.getCrmAnalytics(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "uB", role: "PARTNER", partnerId: "partner-b" } as any,
+    );
+    const rA2 = await service.getCrmAnalytics(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "uA", role: "PARTNER", partnerId: "partner-a" } as any,
+    );
+
+    expect(rA1.metrics.totalCustomers).toBe(rA2.metrics.totalCustomers);
+  });
+
+  it("No double-counting: Customer with multiple Orders counted once", async () => {
+    const prisma = makeCrmMock();
+    prisma.partnerCustomerRelation.count.mockResolvedValue(1);
+    prisma.partnerCustomerRelation.groupBy
+      .mockResolvedValueOnce([{ lifecycle: "ACTIVE", _count: 1 }])
+      .mockResolvedValueOnce([{ leadSource: "DIRECT", _count: 1 }])
+      .mockResolvedValueOnce([{ assignedTo: null, _count: 1 }])
+      .mockResolvedValueOnce([{ leadSource: "DIRECT", _count: 1 }]);
+    prisma.partnerCustomerRelation.findMany.mockResolvedValue([{ customerId: "c1" }]);
+    // Same customer, multiple orders
+    prisma.order.findMany.mockResolvedValue([
+      { customerId: "c1" }, { customerId: "c1" }, { customerId: "c1" },
+    ]);
+
+    const service = new AnalyticsService(prisma);
+    const result = await service.getCrmAnalytics(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u1", role: "ADMIN", partnerId: null } as any,
+    );
+
+    // commerciallyActiveCustomers should be 1, not 3
+    expect(result.metrics.commerciallyActiveCustomers).toBe(1);
+  });
+
+  it("BUYER role denied", async () => {
+    const prisma = makeCrmMock();
+    const service = new AnalyticsService(prisma);
+    await expect(
+      service.getCrmAnalytics(
+        { preset: AnalyticsPeriodPreset.MONTH },
+        { id: "u1", role: "BUYER", partnerId: null } as any,
+      ),
+    ).rejects.toThrow("BUYER role cannot access analytics");
+  });
+
+  it("Empty dataset: zero counts, no errors", async () => {
+    const prisma = makeCrmMock();
+    prisma.partnerCustomerRelation.count.mockResolvedValue(0);
+    prisma.partnerCustomerRelation.groupBy.mockResolvedValue([]);
+    prisma.partnerCustomerRelation.findMany.mockResolvedValue([]);
+    prisma.order.findMany.mockResolvedValue([]);
+
+    const service = new AnalyticsService(prisma);
+    const result = await service.getCrmAnalytics(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u1", role: "ADMIN", partnerId: null } as any,
+    );
+
+    expect(result.metrics.totalCustomers).toBe(0);
+    expect(result.metrics.totalRelationships).toBe(0);
+    expect(result.metrics.lifecycleBreakdown).toEqual({});
+    expect(result.metrics.commerciallyActiveCustomers).toBe(0);
+    expect(result.metrics.repeatCustomers).toBe(0);
+  });
+});

@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-28 (Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE)\
+**Дата актуализации:** 2026-08-28 (Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -921,13 +921,12 @@ CRM capabilities зависят от Storefront SaaS plan/entitlement. Не
 связывать доступ только с наличием Storefront record. Basic/Pro capability matrix
 documented. Canonical resolver: getCrmTier(). Entitlement ≠ Permission.
 
-· **Step 3.5E --- Partner CRM Analytics Read Model** \
-NEW CANONICAL NEXT — Leads, conversion, repeat rate, LTV, segments, acquisition source,
-manager/team performance, Marketplace vs Storefront vs Direct --- только
-из canonical facts/events/timestamps.
+· **Step 3.5E --- Partner CRM Analytics Read Model** ✅ COMPLETE (2026-08-28; VERDICT A — shared CRM analytics read model on existing AnalyticsService; getCrmAnalytics() with lifecycle/source/manager breakdowns; Platform + Partner scope via resolvePartnerScope(); GET /analytics/crm endpoint; 7 targeted tests; 1254/1247+7 backend + 243/243 frontend PASS; 0 schema/migration; report — `PHASE_3_STEP_3.5E_PARTNER_CRM_ANALYTICS_READ_MODEL_IMPLEMENTATION_REPORT.md`; commit TBD).\nShared CRM analytics: lifecycle, source, manager breakdowns, new relationships,
+commercially active customers. Platform cross-partner + Partner scoped.
+Existing AnalyticsService reused. No new engine.
 
-· **Step 3.6 --- CRM Center UI**\
-Internal TravelHub 360° customer/partner/company view, history,
+· **Step 3.6 --- CRM Center UI** \
+NEW CANONICAL NEXT — Internal TravelHub 360° customer/partner/company view, history,
 relations, activities.
 
 · **Step 3.6A --- Partner CRM UI**\

@@ -296,6 +296,32 @@ export interface FinancialReconciliationResponse {
   currencies: CurrencyReconciliation[];
 }
 
+// ── Step 3.5E — CRM Analytics Response ─────────────────────────────────
+
+export interface CrmAnalyticsResponse {
+  period: {
+    start: string;
+    endExclusive: string;
+    timezone: string;
+    preset: string;
+  };
+  scope: {
+    partnerId: string | null;
+    label: "platform" | "partner";
+  };
+  metrics: {
+    totalCustomers: number;
+    totalRelationships: number;
+    lifecycleBreakdown: Record<string, number>;
+    sourceBreakdown: Record<string, number>;
+    managerBreakdown: Record<string, number>;
+    newRelationships: number;
+    newBySource: Record<string, number>;
+    commerciallyActiveCustomers: number;
+    repeatCustomers: number;
+  };
+}
+
 // ─── Authorization Helpers ──────────────────────────────────────────────────
 
 type AnalyticsUser = AuthUser;
@@ -1179,6 +1205,149 @@ export class AnalyticsService {
       totalLedgerEntries: Number(ledgerEntries[0]?.cnt || 0),
       // Currency-separated reconciliation (canonical)
       currencies,
+    };
+  }
+
+  // ── Step 3.5E — Shared CRM Analytics Read Model ──────────────────────
+
+  /**
+   * CRM Analytics: lifecycle breakdown, source breakdown, new relationships,
+   * commercially active customers, repeat customers.
+   *
+   * Platform scope: cross-partner (authorized)
+   * Partner scope: current partner only (resolvePartnerScope)
+   *
+   * Shared metric definitions: same source authority, same timestamp semantics,
+   * same aggregation rules. Scope is an input parameter.
+   */
+  async getCrmAnalytics(
+    dto: AnalyticsQueryDto,
+    user: AnalyticsUser,
+  ): Promise<CrmAnalyticsResponse> {
+    const { current } = this.resolveQueryPeriod(dto);
+    const effectivePartnerId = resolvePartnerScope(user, dto.partnerId);
+
+    // Scope: filter PCR by partnerId if partner-scoped
+    const pcrWhere: any = {
+      createdAt: { gte: current.start, lt: current.endExclusive },
+      ...(effectivePartnerId ? { partnerId: effectivePartnerId } : {}),
+    };
+
+    // All PCR (current snapshot) scoped to partner if applicable
+    const allPcrWhere: any = {
+      ...(effectivePartnerId ? { partnerId: effectivePartnerId } : {}),
+    };
+
+    const [
+      // Current PCR snapshot: total, by lifecycle, by source
+      totalPcr,
+      lifecycleCounts,
+      sourceCounts,
+      managerCounts,
+      // New relationships created during period
+      newPcrCount,
+      // New relationships by source during period
+      newBySource,
+      // Commercially active: distinct customers with orders during period
+      activeCustomerOrders,
+    ] = await Promise.all([
+      // Total PCR count
+      this.prisma.partnerCustomerRelation.count({ where: allPcrWhere }),
+      // PCR by lifecycle
+      this.prisma.partnerCustomerRelation.groupBy({
+        by: ["lifecycle"],
+        where: allPcrWhere,
+        _count: true,
+      }),
+      // PCR by lead source
+      this.prisma.partnerCustomerRelation.groupBy({
+        by: ["leadSource"],
+        where: allPcrWhere,
+        _count: true,
+      }),
+      // PCR by manager
+      this.prisma.partnerCustomerRelation.groupBy({
+        by: ["assignedTo"],
+        where: allPcrWhere,
+        _count: true,
+      }),
+      // New relationships in period
+      this.prisma.partnerCustomerRelation.count({ where: pcrWhere }),
+      // New relationships by source in period
+      this.prisma.partnerCustomerRelation.groupBy({
+        by: ["leadSource"],
+        where: pcrWhere,
+        _count: true,
+      }),
+      // Commercially active: distinct customers with orders in period
+      this.prisma.order.findMany({
+        where: {
+          createdAt: { gte: current.start, lt: current.endExclusive },
+          ...(effectivePartnerId ? { sellerPartnerId: effectivePartnerId } : {}),
+        },
+        select: { customerId: true },
+        distinct: ["customerId"],
+      }),
+    ]);
+
+    // Build lifecycle breakdown
+    const lifecycleBreakdown: Record<string, number> = {};
+    for (const row of lifecycleCounts) {
+      lifecycleBreakdown[row.lifecycle ?? "UNKNOWN"] = row._count;
+    }
+
+    // Build source breakdown
+    const sourceBreakdown: Record<string, number> = {};
+    for (const row of sourceCounts) {
+      sourceBreakdown[row.leadSource ?? "UNKNOWN"] = row._count;
+    }
+
+    // Build manager breakdown
+    const managerBreakdown: Record<string, number> = {};
+    for (const row of managerCounts) {
+      managerBreakdown[row.assignedTo ?? "UNASSIGNED"] = row._count;
+    }
+
+    // Build new by source
+    const newBySourceBreakdown: Record<string, number> = {};
+    for (const row of newBySource) {
+      newBySourceBreakdown[row.leadSource ?? "UNKNOWN"] = row._count;
+    }
+
+    // Commercially active customers count
+    const commerciallyActiveCount = new Set(
+      activeCustomerOrders.map((o) => o.customerId).filter(Boolean),
+    ).size;
+
+    // Total PCR with commercial activity (for "repeat" calculation)
+    const allPcrList = await this.prisma.partnerCustomerRelation.findMany({
+      where: allPcrWhere,
+      select: { customerId: true },
+    });
+    const totalPcrCustomers = new Set(allPcrList.map((r) => r.customerId)).size;
+
+    return {
+      period: {
+        start: current.start.toISOString(),
+        endExclusive: current.endExclusive.toISOString(),
+        timezone: current.timezone,
+        preset: current.preset,
+      },
+      scope: {
+        partnerId: effectivePartnerId ?? null,
+        label: effectivePartnerId ? "partner" : "platform",
+      },
+      metrics: {
+        totalCustomers: totalPcrCustomers,
+        totalRelationships: totalPcr,
+        lifecycleBreakdown,
+        sourceBreakdown,
+        managerBreakdown,
+        newRelationships: newPcrCount,
+        newBySource: newBySourceBreakdown,
+        commerciallyActiveCustomers: commerciallyActiveCount,
+        repeatCustomers: Math.max(0, commerciallyActiveCount - newPcrCount),
+      },
     };
   }
 }
