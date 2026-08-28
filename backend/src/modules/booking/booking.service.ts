@@ -194,7 +194,7 @@ export class BookingService {
   }
 
   /** Команда жизненного цикла бронирования. */
-  async bookingAction(bookingId: string, action: BookingAction, actor?: string) {
+  async bookingAction(bookingId: string, action: BookingAction, actor?: string, reason?: string | null) {
     const transition = TRANSITIONS[action];
     if (!transition) throw new ValidationDomainError(`Unknown action: ${action}`);
 
@@ -259,7 +259,7 @@ export class BookingService {
           to: transition.to,
           actorId: actor ?? null,
           actorName: actor ?? null,
-          comment: ACTION_LABELS[action],
+          comment: reason ? `${ACTION_LABELS[action]}: ${reason}` : ACTION_LABELS[action],
         },
       });
 

@@ -264,7 +264,7 @@ export class FinanceController {
   }
 
   @Post("payments")
-  @RequirePermissions("finance.payment.write")
+  @RequirePermissions("finance.payment.create")
   // Step 2.12H: payment-initiation boundary — защищённая операция (external
   // Idempotency-Key обязателен; retry/replay/divergent — контракт 2.12H).
   @Idempotent("payment.create")
@@ -278,19 +278,19 @@ export class FinanceController {
   }
 
   @Post("payments/:code/confirm")
-  @RequirePermissions("finance.payment.write")
+  @RequirePermissions("finance.payment.manage")
   async confirmPayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.payments.confirmPayment(code, { id: actor.id, username: actor.username });
   }
 
   @Post("payments/:code/fail")
-  @RequirePermissions("finance.payment.write")
+  @RequirePermissions("finance.payment.manage")
   async failPayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.payments.failPayment(code, { id: actor.id, username: actor.username });
   }
 
   @Post("payments/:code/cancel")
-  @RequirePermissions("finance.payment.write")
+  @RequirePermissions("finance.payment.manage")
   async cancelPayment(@Param("code") code: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.payments.cancelPayment(code, { id: actor.id, username: actor.username });
   }

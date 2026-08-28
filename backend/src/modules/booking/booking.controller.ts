@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Query, Req, UseGuards } from "@nestjs/common";
 import { Type } from "class-transformer";
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
 import { Request } from "express";
 import { BookingService, type BookingAction } from "./booking.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
@@ -85,6 +85,13 @@ class BookingActionDto {
     ] as const,
   )
   action!: BookingAction;
+
+  // Step 3.6C.1: mandatory reason for Platform support transitions.
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  reason?: string;
 }
 
 /**
@@ -147,6 +154,6 @@ export class BookingController {
     // assertNoForbiddenKeys, как в Sales/Reverse/Catalog/Order), а не
     // silent-strip через whitelist. Команда принимает ТОЛЬКО `action`.
     assertNoForbiddenKeys(req.body, BOOKING_ACTION_FORBIDDEN_KEYS);
-    return this.bookings.bookingAction(id, dto.action, actor.username);
+    return this.bookings.bookingAction(id, dto.action, actor.username, dto.reason ?? null);
   }
 }

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { Type } from "class-transformer";
-import { IsArray, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from "class-validator";
+import { IsArray, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength, ValidateNested } from "class-validator";
 import { Request } from "express";
 import { OrderService, type OrderAction } from "./order.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
@@ -37,6 +37,13 @@ class TravelerDto {
 class OrderActionDto {
   @IsEnum(["process", "markWaitingData", "resumeProcessing", "confirm", "send", "complete", "close", "cancel", "problem", "suspend"] as const)
   action!: OrderAction;
+
+  // Step 3.6C.1: mandatory reason for Platform support transitions.
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  reason?: string;
 }
 
 class UpdateTravelersDto {
@@ -155,7 +162,7 @@ export class OrderController {
     // assertNoForbiddenKeys, как в Sales/Reverse/Catalog), а не silent-strip
     // через whitelist. Команда принимает ТОЛЬКО `action`.
     assertNoForbiddenKeys(req.body, ORDER_ACTION_FORBIDDEN_KEYS);
-    return this.orders.orderAction(id, dto.action, actor.username);
+    return this.orders.orderAction(id, dto.action, actor.username, dto.reason ?? null);
   }
 
   @Patch("orders/:id/travelers")

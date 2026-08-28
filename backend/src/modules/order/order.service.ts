@@ -618,7 +618,7 @@ export class OrderService {
   }
 
   /** Команда жизненного цикла (переход статуса). */
-  async orderAction(orderId: string, action: OrderAction, actor?: string) {
+  async orderAction(orderId: string, action: OrderAction, actor?: string, reason?: string | null) {
     const transition = TRANSITIONS[action];
     if (!transition) throw new ValidationDomainError(`Unknown action: ${action}`);
 
@@ -681,7 +681,7 @@ export class OrderService {
           to: transition.to,
           actorId: actor ?? null,
           actorName: actor ?? null,
-          comment: ACTION_LABELS[action],
+          comment: reason ? `${ACTION_LABELS[action]}: ${reason}` : ACTION_LABELS[action],
         },
       });
 

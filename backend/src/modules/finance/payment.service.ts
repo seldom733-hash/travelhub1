@@ -83,8 +83,11 @@ export class PaymentService {
     if (paymentMethod && paymentMethod.length > 64) {
       throw new ValidationDomainError("paymentMethod must not exceed 64 characters");
     }
-    // Step 3.6C: reason required for manual payment initiation.
+    // Step 3.6C.1: reason REQUIRED for manual payment initiation.
     const reason = input.reason ? input.reason.trim() : null;
+    if (!reason || reason.length === 0) {
+      throw new ValidationDomainError("reason is required for manual payment initiation");
+    }
 
     // Phase 3 Round 2D.1: validate initialNote BEFORE transaction (pre-tx validation)
     // so >5000 rejection prevents Payment creation entirely.
