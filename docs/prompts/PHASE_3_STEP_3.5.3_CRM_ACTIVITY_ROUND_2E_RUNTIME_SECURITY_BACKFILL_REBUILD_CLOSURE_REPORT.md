@@ -209,17 +209,21 @@
 
 ### Failure 1
 - **Suite:** Source Adapters
-- **Test:** OrderAdapter — projects an Order with customerId and partner binding via items
+- **Test:** OrderAdapter — projects an Order with customerId and partner binding via sellerPartnerId
 - **Error:** Expected `partner-1`, Received `null`
-- **Classification:** C — obsolete/broken test (test data doesn't set `sellerPartnerId`)
-- **Relation to Step 3.5.3:** Unrelated — adapter code reads `source.sellerPartnerId` correctly; test fixture incomplete
+- **Classification:** C — stale fixture (test data doesn't set `sellerPartnerId`)
+- **Relation to Step 3.5.3:** Direct test coverage of Activity source adapters.
+  Failure caused by stale fixture not matching canonical `sellerPartnerId` authority.
+  Production defect: NO, after repository verification.
 
 ### Failure 2
 - **Suite:** Source Adapters
 - **Test:** BookingAdapter — projects a Booking with indirect customer/partner binding
 - **Error:** Expected `partner-1`, Received `null`
-- **Classification:** C — obsolete/broken test (test data doesn't set `order.sellerPartnerId`)
-- **Relation to Step 3.5.3:** Unrelated — adapter code reads `source.order?.sellerPartnerId` correctly; test fixture incomplete
+- **Classification:** C — stale fixture (test data doesn't set `order.sellerPartnerId`)
+- **Relation to Step 3.5.3:** Direct test coverage of Activity source adapters.
+  Failure caused by stale fixture not matching canonical `sellerPartnerId` authority.
+  Production defect: NO, after repository verification.
 
 - **New failures:** 0 ✓
 
@@ -291,7 +295,7 @@
 
 - **P0:** 0
 - **P1:** 0
-- **P2:** 2 pre-existing test fixture issues (baseline failures, см. §17)
+- **P2:** 0 (2 stale fixture issues resolved in Round 2E.1, см. §17)
 
 ## 25. COMMIT
 
@@ -300,4 +304,6 @@ Round 2E = 0 production code changes. Only report + roadmap update.
 ---
 
 *Отчёт создан: 2026-08-28*
+*Round 2E initial qualification found 2 stale fixture failures.*
+*Round 2E.1 reconciled them.*
 *VERDICT A — FULLY CLOSED*

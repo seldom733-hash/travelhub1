@@ -165,12 +165,13 @@ describe('Source Adapters', () => {
   describe('OrderAdapter', () => {
     const adapter = new OrderAdapter();
 
-    it('projects an Order with customerId and partner binding via items', () => {
+    it('projects an Order with customerId and partner binding via sellerPartnerId', () => {
       const order = {
         id: 'order-1',
         code: 'ORD-00000001',
         status: 'NEW',
         customerId: 'cust-1',
+        sellerPartnerId: 'partner-1',
         totalAmount: 1500,
         currency: 'AZN',
         createdAt: new Date('2026-08-03T09:00:00Z'),
@@ -202,7 +203,7 @@ describe('Source Adapters', () => {
         code: 'BK-00000001',
         status: 'CONFIRMED',
         createdAt: new Date('2026-08-04T14:00:00Z'),
-        order: { customerId: 'cust-1' },
+        order: { customerId: 'cust-1', sellerPartnerId: 'partner-1' },
         product: { partnerId: 'partner-1' },
       };
       const result = adapter.project(booking);

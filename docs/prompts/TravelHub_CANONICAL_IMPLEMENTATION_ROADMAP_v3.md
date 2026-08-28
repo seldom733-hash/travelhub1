@@ -879,6 +879,8 @@ Supplier `SUP-*`.
 
   · Round 2E — Runtime + Security + Backfill/Rebuild Closure ✅ CLOSED (2026-08-28; VERDICT A — end-to-end runtime + subject security + RBAC + rebuild safety + data consistency fully qualified; 0 production code changes; Customer 40 items, Partner 1964 items; rebuild 4257→3416 projected, 0 errors; concurrency 403 lock; idempotent; cross-subject leakage = 0; report — `PHASE_3_STEP_3.5.3_CRM_ACTIVITY_ROUND_2E_RUNTIME_SECURITY_BACKFILL_REBUILD_CLOSURE_REPORT.md`).
 
+  · Round 2E.1 — Final Test Fixture + Live Projection Evidence Closure ✅ CLOSED (2026-08-28; VERDICT A — 2 stale Source Adapter fixtures reconciled (OrderAdapter + BookingAdapter: added `sellerPartnerId` to match canonical authority); 1236 PASS / 0 FAIL; deterministic live projection proved (Operational Note → Activity without rebuild); cross-subject leakage = 0; RBAC 401/401/200; Customer Payment + Partner Activity regression PASS; report — `PHASE_3_STEP_3.5.3_CRM_ACTIVITY_ROUND_2E_1_FINAL_TEST_FIXTURE_LIVE_PROJECTION_EVIDENCE_CLOSURE_REPORT.md`).
+
 **Step 3.5.3 — CRM Communications + Activity Timeline — FULLY CLOSED**
 
 · **Step 3.5A --- Partner CRM Foundation --- NEW CANONICAL
