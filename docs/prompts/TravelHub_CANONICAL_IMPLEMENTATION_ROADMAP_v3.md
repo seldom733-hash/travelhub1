@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-27 (Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED)\
+**Дата актуализации:** 2026-08-28 (Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 FULLY CLOSED)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -871,11 +871,15 @@ Supplier `SUP-*`.
 
   · Round 2B — Activity API + RBAC + Cursor Pagination + Server-Side Filtering + Subject Authority ✅ CLOSED (2026-08-27; Customer/Partner Activity API endpoints; two-level RBAC (crm.activity.read page gate + 10 source-specific item gates); cursor pagination (occurredAt DESC, id DESC); server-side filters (sourceType, activityType, dateFrom, dateTo); subject authority; safe DTO projection; 49 controller tests; 85 CrmActivity tests total; report — `docs/prompts/PHASE_3_STEP_3.5.3_CRM_ACTIVITY_ROUND_2B_API_RBAC_CURSOR_FILTERING_SUBJECT_AUTHORITY_REPORT.md`; commit `b13f06d`).
 
-  · Round 2C — Customer 360 Activity UI + Existing History Migration/Replacement ⏭ NEXT
+  · Round 2C — Customer 360 Activity UI + Existing History Migration/Replacement + i18n + Live Projection ✅ CLOSED (2026-08-27; CustomerActivity.tsx + PartnerActivity.tsx; source/date filters; cursor pagination UI; deep links; RU/AZ/EN i18n; History tab removed; live projection; backfill hardening; reports — multiple; commits through `2ac80b6`).
 
-  · Round 2D — Partner 360 Activity UI + Communications / Deep Links ⬜ NOT STARTED
+  · Round 2C.2R — Payment Customer Ownership Remediation ✅ CLOSED (2026-08-27; canonical Payment ownership: source.customerId → order.customerId chain; 816/816 Activities with customerId; null customerId: 0; report — `PHASE_3_STEP_3.5.3_CRM_ACTIVITY_ROUND_2C_2R_PAYMENT_CUSTOMER_OWNERSHIP_AUTHORITY_REMEDIATION.md`; commit `990e599`).
 
-  · Round 2E — Runtime + Security + Backfill/Rebuild Closure ⬜ NOT STARTED
+  · Round 2D — Partner 360 Activity UI + Communications / Deep Links ✅ CLOSED (2026-08-27; PartnerActivity.tsx; 1964 items Baku Tours Pro; subject authority; i18n RU/AZ/EN; report — `PHASE_3_STEP_3.5.3_CRM_ACTIVITY_ROUND_2D_PARTNER_360_ACTIVITY_UI.md`; commit `2ac80b6`).
+
+  · Round 2E — Runtime + Security + Backfill/Rebuild Closure ✅ CLOSED (2026-08-28; VERDICT A — end-to-end runtime + subject security + RBAC + rebuild safety + data consistency fully qualified; 0 production code changes; Customer 40 items, Partner 1964 items; rebuild 4257→3416 projected, 0 errors; concurrency 403 lock; idempotent; cross-subject leakage = 0; report — `PHASE_3_STEP_3.5.3_CRM_ACTIVITY_ROUND_2E_RUNTIME_SECURITY_BACKFILL_REBUILD_CLOSURE_REPORT.md`).
+
+**Step 3.5.3 — CRM Communications + Activity Timeline — FULLY CLOSED**
 
 · **Step 3.5A --- Partner CRM Foundation --- NEW CANONICAL
 REQUIREMENT**\
