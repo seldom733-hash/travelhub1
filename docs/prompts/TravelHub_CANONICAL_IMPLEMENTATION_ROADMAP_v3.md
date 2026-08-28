@@ -1555,6 +1555,66 @@ Storefront/Partner CRM/Partner teams/finance/sales/customer
 relationships проходят cross-tenant IDOR/privacy audit; ни один Partner
 не получает данные другого Partner.
 
+· **Step 3.50 --- Workforce / Employee Performance Management --- CANONICAL ROADMAP ARCHITECTURE UPDATE (2026-08-28; roadmap/architecture definition — НЕ implementation; отчёт — `docs/prompts/WORKFORCE_EMPLOYEE_PERFORMANCE_MANAGEMENT_CANONICAL_ROADMAP_UPDATE_REPORT.md`):** Отдельный analytics/read-model layer для объективной оценки качества и эффективности подразделений и сотрудников по неделям, месяцам и произвольным периодам. Архитектурный принцип: Operational Events / Domain State → Employee/Department Attribution → Performance Metrics Engine → Period Aggregation → Performance Scorecards → Department/Employee Drill-down → Command Center / Analytics / Workforce UI. Не превращать в CrmActivity extension / простой Orders counter / leaderboard-only feature / часть Booking-Order entity / часть RBAC. CrmActivity может быть источником evidence, но не универсальным Performance datastore.
+
+  **Business Scopes:** PLATFORM (TravelHub оценивает собственные подразделения/сотрудников: Booking Operations, Sales/Orders, Finance, CRM/Support, Moderation, Marketing, other internal departments) + PARTNER / STOREFRONT PRO — FUTURE (Storefront Pro сможет оценивать собственных сотрудников; PLATFORM performance != PARTNER performance; Partner A != Partner B; Marketplace Basic != automatic Full Workforce Performance; entitlement и RBAC — разные axes).
+
+  **Organizational Hierarchy:** Workspace → Department → Team (future/optional) → Employee. Drill-down: Workspace → Department → Employee → Metric → Source records/events. Score должен быть объясним.
+
+  **Periods:** TODAY, CURRENT_WEEK, PREVIOUS_WEEK, CURRENT_MONTH, PREVIOUS_MONTH, CUSTOM_RANGE. Weekly/monthly boundaries — по canonical workspace/business timezone. Для каждой KPI: current, previous comparable period, absolute delta, percentage delta, trend. Не сравнивать периоды разной длительности без нормализации.
+
+  **Department Performance:** Dimensions: Productivity, Quality, SLA/Speed, Business Result, Reliability, Workload, Trend. KPI и веса зависят от department type. Одна universal formula запрещена. Department Score не вычислять простым average Employee Scores — учитывать department aggregate metrics, workload weighting, coverage, quality, SLA, outcomes.
+
+  **Department-Specific Metrics:** Booking Operations (bookings assigned/processed/confirmed/cancelled/completed, confirmation/cancellation rate, average handling/confirmation time, SLA compliance, overdue, rework/errors, customer-impacting errors, GMV handled/influenced); Sales/Orders (orders assigned/processed/completed/cancelled, conversion, GMV, Revenue, AOV, handling time, SLA, refund/cancellation impact, quality/errors); Finance (payments processed, successful/problem payments handled, refunds processed, refund processing time, financial exceptions, SLA, error rate, reconciliation issues, handled amount); CRM/Support (customers/cases handled, response time, resolution time, SLA, reopened issues, escalations, follow-up, operational actions, quality/errors). Architecture должна поддерживать department-specific metric profiles (Moderation/Marketing). Конкретные формулы — отдельный design stage.
+
+  **Employee Performance Score:** Explainable score 0–100. Conceptual dimensions: Productivity, Quality, SLA/Speed, Business Result, Reliability. Пример Booking Operator (design example): Productivity 25%, Quality 30%, SLA/Speed 20%, Business Result 15%, Reliability 10%. Requirements: formula role/department-specific, weights configurable/versioned, score explainable.
+
+  **Anti-Gaming / Fairness:** Система не должна стимулировать гонку за количеством, искусственное закрытие объектов, отказ от сложных кейсов, переброс сложных задач, лишние Notes/messages, скорость в ущерб качеству. Учитывать volume + quality + SLA + business outcome + reliability + complexity where available. Количество обработанных заказов не может быть единственным критерием. Количество Notes/messages само по себе не является quality score.
+
+  **Attribution — Critical:** Не использовать lastUpdatedBy = вся работа сотрудника / assignedTo = 100% credit. Один объект может обрабатываться несколькими сотрудниками. Предусмотреть event/action attribution: ORDER_CREATED → Employee A, ORDER_CONFIRMED → Employee B, PAYMENT_VERIFIED → Employee C, REFUND_APPROVED → Employee D, BOOKING_CONFIRMED → Employee E. Будущий attribution contract минимум для Order, Booking, Payment, Refund, CRM/Support, Operational Note, Moderation. Performance event должен уметь связывать: workspaceId, departmentId, employeeId, role/context, entityType/entityId, eventType/actionType, occurredAt, business value, quality outcome, SLA context, source/audit reference. Не добавлять поля/schema сейчас.
+
+  **Assignment vs Action vs Outcome:** ASSIGNMENT — кто получил; ACTION — кто реально сделал; OUTCOME — чем закончился процесс. Пример: Employee B подтвердил Booking, который позже отменил Customer — cancellation нельзя автоматически считать ошибкой B.
+
+  **Complexity / Workload (Future Normalization):** case complexity, workload, shift duration, part/full time, leave/absence, assignment volume, manual vs automatic, team handoff. 100 simple cases != 100 complex cases.
+
+  **Explainability:** Employee detail: Performance Score 88.7, Productivity 92, Quality 84, SLA 91, Business Result 87, Reliability 89. С drill-down до конкретных Orders/Bookings/etc., если RBAC позволяет.
+
+  **Weekly Scorecard:** Employee | Processed | Success | Avg Time | SLA | Quality | Score | Trend. Department weekly scorecard: overall score, volume, SLA, quality, business result, trend vs previous week.
+
+  **Monthly Scorecard:** Аналогично current month vs previous month. Monthly score нельзя вычислять простой средней weekly scores — использовать canonical components/weighted aggregates.
+
+  **History and Workload:** Weekly/monthly score history, department/employee/metric trend. Workload context: assigned, in progress, completed, overdue, average active workload, distribution by employee.
+
+  **Formula Versioning:** Formula должна иметь version identity: BookingOperatorScore/v1, SalesManagerScore/v2, effectiveFrom/effectiveTo, calculation provenance. Исторические scores нельзя silently пересчитывать новой формулой.
+
+  **Manual Overrides:** Если manual adjustment разрешён: original score, adjusted score, who/when/reason, before/after.
+
+  **Snapshot Strategy:** На design stage выбрать: live/on-demand, period snapshots, hybrid. Weekly/monthly history должна быть immutable/traceable либо reproducible.
+
+  **Data Quality:** Data completeness, unattributed events, unknown employee, missing department, invalid period, duplicate attribution. Различать 0 activity и insufficient/unavailable data.
+
+  **Automation vs Employee:** SYSTEM, AUTOMATION, EMPLOYEE, PARTNER_EMPLOYEE. Автоматическое действие не засчитывать сотруднику без attribution rule.
+
+  **Source Authority Matrix (Future Requirement):** | Domain | Volume | Quality | SLA | Outcome | Employee Attribution | Orders (required/required/required/required/required), Bookings (required/required/required/required/required), Payments (required/required/required/required/required), Refunds (required/required/required/required/required), CRM/Support (required/required/required/where applicable/required), Moderation (required/required/required/where applicable/required). Exact event list — design stage.
+
+  **Timezone:** Weekly/monthly boundaries — по canonical workspace/business timezone, а не неявному server/browser time.
+
+  **RBAC / Privacy (Future):** performance.read.self, performance.read.team, performance.read.department, performance.read.all, performance.manage, performance.configure. Performance data — sensitive internal data: server-side authorization, workspace isolation, department/team scope, audit trail, score configuration history, override audit. Frontend-hidden != security.
+
+  **Command Center Integration:** Command Center получает high-level Team Performance summary + deep link. Разделять Business Analytics vs Workforce Performance Analytics. Не дублировать весь Performance Center в Command Center.
+
+  **Analytics Integration:** Performance data интегрируется с существующим Analytics Foundation (Step 3.3) через read-model layer.
+
+  **Future UI IA:** Employees / Workforce → Overview, Departments, Employees, Performance, Workload, Roles & Permissions. Performance Center: department selector, period selector, week/month comparison, overall score, metric cards, trends, department/employee tables, drill-down, filters. Не внедрять UI сейчас.
+
+  **Dependencies:** Employees, Departments, Roles & Permissions, Orders, Bookings, Payments, Refunds, CRM, Audit/Event model, Analytics, Partner Workspace, Storefront Pro entitlements. Performance implementation должен идти после необходимых foundations.
+
+  **Out of Scope (Now):** DB tables, APIs, score engine, attribution migrations, UI/navigation, permissions/entitlements, scheduled jobs, weekly/monthly workers, exports, notifications, AI scoring, salary/bonus logic, HR disciplinary workflows. AI не должен быть authority официального employee score — в будущем AI может только объяснять trends/anomalies.
+
+  **Acceptance Direction:** Верификация department-specific metrics, event/action attribution, explainable versioned score, workload/fairness/timezone/data-quality/RBAC/privacy/override requirements, Command Center/Analytics integration, CrmActivity не превращён в Performance datastore, no implementation/schema/migrations started.
+
+  **Статус: ROADMAP ARCHITECTURE UPDATE — NOT STARTED (implementation).**
+
 ------------------------------------------------------------------------
 
 # ОБЯЗАТЕЛЬНЫЕ СКВОЗНЫЕ ТРЕБОВАНИЯ
