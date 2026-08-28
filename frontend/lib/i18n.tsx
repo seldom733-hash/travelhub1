@@ -844,6 +844,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.col.source_payment": { ru: "Платёж", az: "Ödəniş", en: "Payment" },
   "crm.col.reason": { ru: "Причина", az: "Səbəb", en: "Reason" },
   "crm.col.country": { ru: "Страна", az: "Ölkə", en: "Country" },
+  "crm.col.partner": { ru: "Партнёр", az: "Tərəfdaş", en: "Partner" },
+  "crm.filter.status.none": { ru: "Нет данных по фильтрам", az: "Filtreyə uyğun məlumat yoxdur", en: "No data matching filters" },
   "crm.type.person": { ru: "Физлицо", az: "Fiziki şəxs", en: "Person" },
   "crm.type.company": { ru: "Компания", az: "Şirkət", en: "Company" },
   "crm.filter.type.all": { ru: "Все типы", az: "Bütün növlər", en: "All types" },

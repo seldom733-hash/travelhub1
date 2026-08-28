@@ -56,13 +56,24 @@ export default function Partner360Page() {
   const [partner, setPartner] = useState<PartnerDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tabStatusFilter, setTabStatusFilter] = useState<string | undefined>(undefined);
+  // Per-tab status filters (server-side for orders/bookings/services)
+  const [serviceStatusFilter, setServiceStatusFilter] = useState<string | undefined>(undefined);
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string | undefined>(undefined);
+  const [bookingStatusFilter, setBookingStatusFilter] = useState<string | undefined>(undefined);
+  const [customerStatusFilter, setCustomerStatusFilter] = useState<string | undefined>(undefined);
 
   const loadPartner = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const sortParam = sortBy ? `?sortBy=${sortBy}&sortDirection=${sortDirection}` : "";
+      const params = new URLSearchParams();
+      if (sortBy) params.set("sortBy", sortBy);
+      if (sortDirection) params.set("sortDirection", sortDirection);
+      if (orderStatusFilter) params.set("status", orderStatusFilter);
+      if (bookingStatusFilter) params.set("bookingStatus", bookingStatusFilter);
+      if (serviceStatusFilter) params.set("productStatus", serviceStatusFilter);
+      const qs = params.toString();
+      const sortParam = qs ? `?${qs}` : "";
       const detail = await api.get<PartnerDetail>(`/partners/${id}${sortParam}`);
       setPartner(detail);
     } catch (e) {
@@ -70,7 +81,7 @@ export default function Partner360Page() {
     } finally {
       setLoading(false);
     }
-  }, [id, sortBy, sortDirection]);
+  }, [id, sortBy, sortDirection, orderStatusFilter, bookingStatusFilter, serviceStatusFilter]);
 
   useEffect(() => { void loadPartner(); }, [loadPartner]);
 
@@ -113,6 +124,11 @@ export default function Partner360Page() {
   }
 
   const tabs: Tab[] = ["overview", "activity", "services", "orders", "bookings", "customers", "storefront", "notes"];
+
+  // Client-side status filter for Customers tab (bounded commercialCustomers dataset)
+  const filteredCustomers = customerStatusFilter
+    ? partner.commercialCustomers.filter((c) => c.customerStatus === customerStatusFilter)
+    : partner.commercialCustomers;
 
   return (
     <div className="flex h-full flex-col">
@@ -173,18 +189,18 @@ export default function Partner360Page() {
             </>
           )}
 
-          {/* Services — TABLE with sortable headers */}
+          {/* Services — TABLE with sortable headers + server-side status filter */}
           {tab === "services" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
-                <select value={tabStatusFilter ?? ''} onChange={(e) => setTabStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
-                  <option value="">Все статусы</option>
-                  <option value="ACTIVE">Активна</option>
-                  <option value="INACTIVE">Неактивна</option>
-                  <option value="DRAFT">Черновик</option>
-                  <option value="ARCHIVED">В архиве</option>
+                <select value={serviceStatusFilter ?? ''} onChange={(e) => setServiceStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+                  <option value="">{t('crm.filter.status.all', locale)}</option>
+                  <option value="ACTIVE">{t('status.common.ACTIVE', locale)}</option>
+                  <option value="INACTIVE">{t('status.common.INACTIVE', locale)}</option>
+                  <option value="DRAFT">{t('status.product.DRAFT', locale)}</option>
+                  <option value="ARCHIVED">{t('status.product.ARCHIVED', locale)}</option>
                 </select>
-                {tabStatusFilter && <button onClick={() => setTabStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                {serviceStatusFilter && <button onClick={() => setServiceStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
               </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
@@ -197,7 +213,7 @@ export default function Partner360Page() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(tabStatusFilter ? partner.products.filter(p => p.status === tabStatusFilter) : partner.products).length > 0 ? (tabStatusFilter ? partner.products.filter(p => p.status === tabStatusFilter) : partner.products).map((p) => (
+                  {partner.products.length > 0 ? partner.products.map((p) => (
                     <tr key={p.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5"><Link href={`/app/catalog/${p.id}`} className="font-mono text-blue-600 hover:underline">{p.code}</Link></td>
                       <td className="px-4 py-2.5 font-medium text-slate-700">{p.title}</td>
@@ -205,25 +221,25 @@ export default function Partner360Page() {
                       <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(p.createdAt).toLocaleDateString()}</td>
                     </tr>
-                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{tabStatusFilter ? 'Нет данных по выбранным фильтрам' : t("crm.partner_detail.no_services", locale)}</td></tr>}
+                  )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{serviceStatusFilter ? t("crm.filter.status.none", locale) : t("crm.partner_detail.no_services", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Orders — TABLE with sortable headers */}
+          {/* Orders — TABLE with sortable headers + server-side status filter */}
           {tab === "orders" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
-                <select value={tabStatusFilter ?? ''} onChange={(e) => setTabStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
-                  <option value="">Все статусы</option>
-                  <option value="NEW">Новый</option>
-                  <option value="IN_PROCESSING">В обработке</option>
-                  <option value="FULFILLED">Исполнен</option>
-                  <option value="CLOSED">Закрыт</option>
-                  <option value="CANCELLED">Отменён</option>
+                <select value={orderStatusFilter ?? ''} onChange={(e) => setOrderStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+                  <option value="">{t('crm.filter.status.all', locale)}</option>
+                  <option value="NEW">{t('status.order.NEW', locale)}</option>
+                  <option value="IN_PROCESSING">{t('status.order.IN_PROCESSING', locale)}</option>
+                  <option value="FULFILLED">{t('status.order.FULFILLED', locale)}</option>
+                  <option value="CLOSED">{t('status.order.CLOSED', locale)}</option>
+                  <option value="CANCELLED">{t('status.order.CANCELLED', locale)}</option>
                 </select>
-                {tabStatusFilter && <button onClick={() => setTabStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                {orderStatusFilter && <button onClick={() => setOrderStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
               </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
@@ -235,22 +251,35 @@ export default function Partner360Page() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(tabStatusFilter ? partner.orders.filter(o => o.status === tabStatusFilter) : partner.orders).length > 0 ? (tabStatusFilter ? partner.orders.filter(o => o.status === tabStatusFilter) : partner.orders).map((o) => (
+                  {partner.orders.length > 0 ? partner.orders.map((o) => (
                     <tr key={o.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.code}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(o.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{o.amount} {o.currency}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{tabStatusFilter ? 'Нет данных по выбранным фильтрам' : t("crm.partner_detail.no_orders", locale)}</td></tr>}
+                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{orderStatusFilter ? t("crm.filter.status.none", locale) : t("crm.partner_detail.no_orders", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Bookings — TABLE with sortable headers */}
+          {/* Bookings — TABLE with sortable headers + server-side status filter (NEW) */}
           {tab === "bookings" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
+                <select value={bookingStatusFilter ?? ''} onChange={(e) => setBookingStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+                  <option value="">{t('crm.filter.status.all', locale)}</option>
+                  <option value="NEW">{t('status.booking.NEW', locale)}</option>
+                  <option value="SENT_TO_SUPPLIER">{t('status.booking.SENT_TO_SUPPLIER', locale)}</option>
+                  <option value="AWAITING_CONFIRMATION">{t('status.booking.AWAITING_CONFIRMATION', locale)}</option>
+                  <option value="CONFIRMED">{t('status.booking.CONFIRMED', locale)}</option>
+                  <option value="IN_SERVICE">{t('status.booking.IN_SERVICE', locale)}</option>
+                  <option value="COMPLETED">{t('status.booking.COMPLETED', locale)}</option>
+                  <option value="CANCELLED">{t('status.booking.CANCELLED', locale)}</option>
+                </select>
+                {bookingStatusFilter && <button onClick={() => setBookingStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+              </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
@@ -268,15 +297,24 @@ export default function Partner360Page() {
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{b.amount} {b.currency}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
                     </tr>
-                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{t("crm.partner_detail.no_bookings", locale)}</td></tr>}
+                  )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{bookingStatusFilter ? t("crm.filter.status.none", locale) : t("crm.partner_detail.no_bookings", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Customers — TABLE with commercial aggregates and sortable headers */}
+          {/* Customers — TABLE with commercial aggregates + client-side status filter */}
           {tab === "customers" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
+                <select value={customerStatusFilter ?? ''} onChange={(e) => setCustomerStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
+                  <option value="">{t('crm.filter.status.all', locale)}</option>
+                  <option value="ACTIVE">{t('status.common.ACTIVE', locale)}</option>
+                  <option value="INACTIVE">{t('status.common.INACTIVE', locale)}</option>
+                  <option value="LOCKED">{t('status.common.LOCKED', locale)}</option>
+                </select>
+                {customerStatusFilter && <button onClick={() => setCustomerStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+              </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>
@@ -289,7 +327,7 @@ export default function Partner360Page() {
                   </tr>
                 </thead>
                 <tbody>
-                  {partner.commercialCustomers.length > 0 ? partner.commercialCustomers.map((c) => (
+                  {filteredCustomers.length > 0 ? filteredCustomers.map((c) => (
                     <tr key={c.customerId} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5"><Link href={`/app/crm/customers/${c.customerId}`} className="font-medium text-blue-600 hover:underline">{c.companyName ?? `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim()}</Link></td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{c.orderCount}</td>
@@ -298,7 +336,7 @@ export default function Partner360Page() {
                       <td className="px-4 py-2.5 text-slate-500">{c.lastActivity ? new Date(c.lastActivity).toLocaleDateString() : "—"}</td>
                       <td className="px-4 py-2.5">{c.customerStatus ? <StatusBadge status={c.customerStatus} /> : "—"}</td>
                     </tr>
-                  )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{t("crm.partner_detail.no_customers", locale)}</td></tr>}
+                  )) : <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">{customerStatusFilter ? t("crm.filter.status.none", locale) : t("crm.partner_detail.no_customers", locale)}</td></tr>}
                 </tbody>
               </table>
             </div>

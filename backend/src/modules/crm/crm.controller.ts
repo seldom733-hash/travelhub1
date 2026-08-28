@@ -225,9 +225,9 @@ export class CrmController {
   @RequirePermissions("crm.partner.read")
   getPartner(
     @Param("id") id: string,
-    @Query() query: { sortBy?: string; sortDirection?: string },
+    @Query() query: { sortBy?: string; sortDirection?: string; status?: string; bookingStatus?: string; productStatus?: string },
   ) {
-    return this.crm.getPartner(id, { sortBy: query.sortBy, sortDirection: query.sortDirection });
+    return this.crm.getPartner(id, { sortBy: query.sortBy, sortDirection: query.sortDirection, status: query.status, bookingStatus: query.bookingStatus, productStatus: query.productStatus });
   }
 
   // ── Step 3.5 — Customer Detail with relations ───────────────────────────
@@ -236,9 +236,9 @@ export class CrmController {
   @RequirePermissions("crm.customer.read")
   getCustomerDetail(
     @Param("id") id: string,
-    @Query() query: { sortBy?: string; sortDirection?: string },
+    @Query() query: { sortBy?: string; sortDirection?: string; status?: string; bookingStatus?: string; paymentStatus?: string },
   ) {
-    return this.crm.getCustomerDetail(id, { sortBy: query.sortBy, sortDirection: query.sortDirection });
+    return this.crm.getCustomerDetail(id, { sortBy: query.sortBy, sortDirection: query.sortDirection, status: query.status, bookingStatus: query.bookingStatus, paymentStatus: query.paymentStatus });
   }
 
   // ── Step 3.5 Round 5 — Customer commercial partners from transactional activity ──

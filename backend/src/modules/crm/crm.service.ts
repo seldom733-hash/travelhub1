@@ -591,7 +591,7 @@ export class CrmService {
     return { items, total, page, pageSize };
   }
 
-  async getPartner(id: string, sort?: { sortBy?: string; sortDirection?: string }) {
+  async getPartner(id: string, sort?: { sortBy?: string; sortDirection?: string; status?: string; bookingStatus?: string; productStatus?: string }) {
     const partner = await this.prisma.partner.findUnique({
       where: { id },
       include: {
@@ -604,8 +604,10 @@ export class CrmService {
     if (!partner) throw new NotFoundError(`Partner ${id} not found`);
 
     // Aggregate: products (services) owned by this partner
+    const productWhere: any = { partnerId: id };
+    if (sort?.productStatus) productWhere.status = sort.productStatus;
     const products = await this.prisma.product.findMany({
-      where: { partnerId: id },
+      where: productWhere,
       orderBy: buildSortClause(
         sort?.sortBy,
         sort?.sortDirection,
@@ -615,11 +617,13 @@ export class CrmService {
       take: 20,
       select: { id: true, code: true, title: true, type: true, status: true, slug: true, createdAt: true },
     });
-    const totalProducts = await this.prisma.product.count({ where: { partnerId: id } });
+    const totalProducts = await this.prisma.product.count({ where: productWhere });
 
     // Aggregate: orders where this partner is seller
+    const orderWhere: any = { sellerPartnerId: id };
+    if (sort?.status) orderWhere.status = sort.status;
     const orders = await this.prisma.order.findMany({
-      where: { sellerPartnerId: id },
+      where: orderWhere,
       orderBy: buildSortClause(
         sort?.sortBy,
         sort?.sortDirection,
@@ -629,13 +633,15 @@ export class CrmService {
       take: 20,
       select: { id: true, code: true, number: true, status: true, paymentStatus: true, amount: true, currency: true, customerId: true, createdAt: true },
     });
-    const totalOrders = await this.prisma.order.count({ where: { sellerPartnerId: id } });
+    const totalOrders = await this.prisma.order.count({ where: orderWhere });
 
     // Aggregate: bookings through partner's orders
     const orderIds = orders.map((o) => o.id);
+    const bookingWhere: any = orderIds.length > 0 ? { orderId: { in: orderIds } } : { orderId: '__none__' };
+    if (sort?.bookingStatus) bookingWhere.status = sort.bookingStatus;
     const bookings = orderIds.length > 0
       ? await this.prisma.booking.findMany({
-          where: { orderId: { in: orderIds } },
+          where: bookingWhere,
           orderBy: buildSortClause(
             sort?.sortBy,
             sort?.sortDirection,
@@ -647,7 +653,7 @@ export class CrmService {
         })
       : [];
     const totalBookings = orderIds.length > 0
-      ? await this.prisma.booking.count({ where: { orderId: { in: orderIds } } })
+      ? await this.prisma.booking.count({ where: bookingWhere })
       : 0;    // PartnerStorefront state
     const storefront = await (this.prisma as any).partnerStorefront.findUnique({
       where: { partnerId: id },
@@ -735,7 +741,7 @@ export class CrmService {
 
   // ── Customer Detail with related data (Step 3.5) ──────────────────────
 
-  async getCustomerDetail(id: string, sort?: { sortBy?: string; sortDirection?: string }) {
+  async getCustomerDetail(id: string, sort?: { sortBy?: string; sortDirection?: string; status?: string; bookingStatus?: string; paymentStatus?: string }) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
       include: {
@@ -750,8 +756,10 @@ export class CrmService {
     if (!customer) throw new NotFoundError(`Customer ${id} not found`);
 
     // Aggregate orders from direct customerId reference
+    const orderWhere: any = { customerId: id };
+    if (sort?.status) orderWhere.status = sort.status;
     const orders = await this.prisma.order.findMany({
-      where: { customerId: id },
+      where: orderWhere,
       orderBy: buildSortClause(
         sort?.sortBy,
         sort?.sortDirection,
@@ -778,10 +786,12 @@ export class CrmService {
     })).map((o) => o.id);
 
     // Bookings still use the paginated order set (UI tab)
+    const bookingWhere: any = orderIds.length > 0 ? { orderId: { in: orderIds } } : { orderId: '__none__' };
+    if (sort?.bookingStatus) bookingWhere.status = sort.bookingStatus;
     const [bookings, totalOrders, totalBookings] = await Promise.all([
       orderIds.length > 0
         ? this.prisma.booking.findMany({
-            where: { orderId: { in: orderIds } },
+            where: bookingWhere,
             orderBy: buildSortClause(
               sort?.sortBy,
               sort?.sortDirection,
@@ -792,9 +802,9 @@ export class CrmService {
             select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, productId: true, createdAt: true },
           })
         : Promise.resolve([]),
-      this.prisma.order.count({ where: { customerId: id } }),
+      this.prisma.order.count({ where: orderWhere }),
       orderIds.length > 0
-        ? this.prisma.booking.count({ where: { orderId: { in: orderIds } } })
+        ? this.prisma.booking.count({ where: bookingWhere })
         : Promise.resolve(0),
     ]);
     // Note: orderIds = first 20 orders (for UI bookings tab)
@@ -802,14 +812,18 @@ export class CrmService {
 
     // Canonical payments: direct + order-derived, deduped
     const paymentSelect = { id: true, code: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true, paidAt: true } as const;
+    const directPaymentWhere: any = { customerId: id };
+    if (sort?.paymentStatus) directPaymentWhere.status = sort.paymentStatus;
+    const orderPaymentWhere: any = allOrderIds.length > 0 ? { orderId: { in: allOrderIds } } : { orderId: '__none__' };
+    if (sort?.paymentStatus) orderPaymentWhere.status = sort.paymentStatus;
     const [directPayments, orderPayments] = await Promise.all([
       this.prisma.payment.findMany({
-        where: { customerId: id },
+        where: directPaymentWhere,
         select: paymentSelect,
       }),
       allOrderIds.length > 0
         ? this.prisma.payment.findMany({
-            where: { orderId: { in: allOrderIds } },
+            where: orderPaymentWhere,
             select: paymentSelect,
           })
         : Promise.resolve([]),
