@@ -248,6 +248,95 @@ export class CommunicationService {
     return null;
   }
 
+  /** Step 3.7B — Business-context list for authorized actors. */
+  async listByBusinessContext(
+    contextType: CommunicationContextType,
+    contextId: string,
+    actor: { id: string; role: RoleCode; customerId: string | null; partnerId: string | null },
+    page = 1,
+    pageSize = PAGE_SIZE_DEFAULT,
+  ): Promise<CommunicationListResult> {
+    const p = Math.max(1, page);
+    const ps = Math.min(PAGE_SIZE_MAX, Math.max(1, pageSize));
+
+    // Validate context exists
+    await this.assertContextExists(contextType, contextId);
+
+    // Authorize actor against business context
+    await this.assertActorAuthorizedForContext(contextType, contextId, actor);
+
+    const where: Prisma.CommunicationWhereInput = {
+      contextType,
+      contextId,
+      type: { not: CommunicationType.NOTE },
+      direction: { not: CommunicationDirection.INTERNAL },
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.communication.findMany({
+        where,
+        orderBy: [{ occurredAt: "desc" }, { code: "asc" }],
+        skip: (p - 1) * ps,
+        take: ps,
+      }),
+      this.prisma.communication.count({ where }),
+    ]);
+
+    return {
+      items: items.map((r) => this.toDto(r, { redactUserIds: actor.role !== RoleCode.ADMIN && actor.role !== RoleCode.DIRECTOR })),
+      total,
+      page: p,
+      pageSize: ps,
+      hasMore: p * ps < total,
+    };
+  }
+
+  /** Step 3.7B — Authorize actor for business context access. */
+  private async assertActorAuthorizedForContext(
+    contextType: CommunicationContextType,
+    contextId: string,
+    actor: { id: string; role: RoleCode; customerId: string | null; partnerId: string | null },
+  ): Promise<void> {
+    // Internal staff with communication.read — authorized for any context
+    if (actor.role !== RoleCode.BUYER && actor.role !== RoleCode.PARTNER) return;
+
+    if (contextType === CommunicationContextType.CUSTOMER) {
+      if (actor.role === RoleCode.BUYER && actor.customerId === contextId) return;
+      throw new NotFoundError("Communication not found");
+    }
+    if (contextType === CommunicationContextType.PARTNER) {
+      if (actor.role === RoleCode.PARTNER && actor.partnerId === contextId) return;
+      throw new NotFoundError("Communication not found");
+    }
+    if (contextType === CommunicationContextType.ORDER) {
+      const order = await this.prisma.order.findUnique({ where: { id: contextId }, select: { customerId: true, sellerPartnerId: true } });
+      if (!order) throw new NotFoundError("Communication not found");
+      if (actor.role === RoleCode.BUYER && actor.customerId === order.customerId) return;
+      if (actor.role === RoleCode.PARTNER && actor.partnerId && actor.partnerId === order.sellerPartnerId) return;
+      throw new NotFoundError("Communication not found");
+    }
+    if (contextType === CommunicationContextType.BOOKING) {
+      const booking = await this.prisma.booking.findUnique({ where: { id: contextId }, select: { orderId: true } });
+      if (!booking) throw new NotFoundError("Communication not found");
+      const order = await this.prisma.order.findUnique({ where: { id: booking.orderId }, select: { customerId: true, sellerPartnerId: true } });
+      if (!order) throw new NotFoundError("Communication not found");
+      if (actor.role === RoleCode.BUYER && actor.customerId === order.customerId) return;
+      if (actor.role === RoleCode.PARTNER && actor.partnerId && actor.partnerId === order.sellerPartnerId) return;
+      throw new NotFoundError("Communication not found");
+    }
+    if (contextType === CommunicationContextType.BUYER_REQUEST) {
+      const request = await this.prisma.buyerRequest.findUnique({ where: { id: contextId }, select: { buyerId: true } });
+      if (!request) throw new NotFoundError("Communication not found");
+      if (actor.role === RoleCode.BUYER && actor.customerId === request.buyerId) return;
+      if (actor.role === RoleCode.PARTNER) {
+        const dist = await this.prisma.buyerRequestDistribution.findFirst({ where: { buyerRequestId: contextId, sellerId: actor.partnerId! }, select: { id: true } });
+        if (dist) return;
+      }
+      throw new NotFoundError("Communication not found");
+    }
+    throw new NotFoundError("Communication not found");
+  }
+
   private async assertContextExists(contextType: CommunicationContextType, contextId: string): Promise<void> {
     // Step 2.2E: BUYER_REQUEST — pre-sale conversation context (reverse.BuyerRequest,
     // read-only по ADR-0001). Сообщения потоков создаются peer-endpoint'ами;

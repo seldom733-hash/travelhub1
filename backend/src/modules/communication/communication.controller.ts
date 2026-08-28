@@ -167,6 +167,27 @@ export class CommunicationController {
     return this.communications.getOwn(actor, query.page, query.pageSize);
   }
 
+  /** Step 3.7B — List communications for a specific business context. */
+  @Get("context/:contextType/:contextId")
+  @RequirePermissions("communication.read_own")
+  listByContext(
+    @Param("contextType") contextType: string,
+    @Param("contextId") contextId: string,
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Query() query: OwnCommunicationsQuery,
+  ) {
+    if (!Object.values(CommunicationContextType).includes(contextType as CommunicationContextType)) {
+      throw new (require("../../shared/errors").ValidationDomainError)("Unsupported context type");
+    }
+    return this.communications.listByBusinessContext(
+      contextType as CommunicationContextType,
+      contextId,
+      actor,
+      query.page,
+      query.pageSize,
+    );
+  }
+
   @Get(":code")
   @RequirePermissions((req) =>
     req.user.role === RoleCode.BUYER || req.user.role === RoleCode.PARTNER
