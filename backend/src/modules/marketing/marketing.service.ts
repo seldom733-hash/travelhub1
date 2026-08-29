@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IdsService } from '../../shared/ids.service';
-import { NotFoundError, ValidationDomainError, ForbiddenError } from '../../shared/errors';
+import { NotFoundError, ValidationDomainError, ConflictError } from '../../shared/errors';
 import { uniqueConstraintNames } from '../../shared/prisma-errors';
 import type { AuthUser } from '../../security/auth/auth.service';
-import { CampaignStatus, RoleCode } from '../../generated/prisma/enums';
+import { CampaignStatus } from '../../generated/prisma/enums';
+import { Prisma } from '../../generated/prisma/client';
 
 // ── Allowed lifecycle transitions ──────────────────────────────────
 const ALLOWED_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
@@ -15,6 +16,27 @@ const ALLOWED_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
   COMPLETED: [],
   CANCELLED: [],
 };
+
+/** Supported attribution entity types — each maps to a canonical domain authority. */
+const VALID_ATTRIBUTION_ENTITY_TYPES = ['CUSTOMER', 'LEAD', 'ORDER', 'BOOKING'] as const;
+
+// ── Audience criteria contract ────────────────────────────────────
+// Whitelist: only CRM/segmentation-relevant fields.
+// Blocked: contact fields, tenant selectors, auth/password, arbitrary queries.
+const AUDIENCE_CRITERIA_ALLOWED_KEYS = new Set([
+  'lifecycle',       // PartnerCustomerRelation.lifecycle (LEAD/PROSPECT/ACTIVE/CHURNED)
+  'leadSource',      // PartnerCustomerRelation.leadSource
+  'tags',            // PartnerCustomerRelation.tags[]
+  'status',          // EntityStatus
+  'customerType',    // Person/Company
+]);
+
+const AUDIENCE_CRITERIA_BLOCKED_KEYS = new Set([
+  'email', 'phone', 'url', 'address', 'socialHandle',
+  'partnerId', 'tenantId', 'ownerId', 'createdById',
+  'password', 'auth', 'token', 'secret',
+  'rawSql', 'query', '$where', '$expr',
+]);
 
 // ── DTOs ───────────────────────────────────────────────────────────
 
@@ -182,6 +204,11 @@ export class MarketingService {
     if (!campaign) throw new NotFoundError('Campaign not found');
     this.assertOwnScope(actor, campaign.partnerId);
 
+    // Validate audience criteria contract
+    if (dto.criteria) {
+      this.validateAudienceCriteria(dto.criteria);
+    }
+
     const code = await this.ids.nextCode(this.prisma, 'MKA');
 
     return this.prisma.campaignAudience.create({
@@ -226,23 +253,40 @@ export class MarketingService {
     if (!campaign) throw new NotFoundError('Campaign not found');
     this.assertOwnScope(actor, campaign.partnerId);
 
-    // Validate entityType
-    const validEntityTypes = ['CUSTOMER', 'LEAD', 'ORDER', 'BOOKING'];
-    if (!validEntityTypes.includes(dto.entityType)) {
-      throw new ValidationDomainError(`entityType must be one of: ${validEntityTypes.join(', ')}`);
+    // Validate entityType (Step 3.8.2 — Defect B)
+    if (!(VALID_ATTRIBUTION_ENTITY_TYPES as readonly string[]).includes(dto.entityType)) {
+      throw new ValidationDomainError(`entityType must be one of: ${VALID_ATTRIBUTION_ENTITY_TYPES.join(', ')}`);
     }
 
-    return this.prisma.campaignAttribution.create({
-      data: {
-        campaignId: dto.campaignId,
-        entityType: dto.entityType,
-        entityId: dto.entityId,
-        attributionType: dto.attributionType ?? 'FIRST_TOUCH',
-        notes: dto.notes,
-        partnerId,
-        createdById: actor.id,
-      },
-    });
+    // Validate entity exists and type integrity (Step 3.8.2 — Defect A+B)
+    // Use campaign's partnerId for scope validation, not the actor's — Platform
+    // creating on a Partner campaign must still enforce Partner entity scope.
+    await this.validateEntityReference(dto.entityType, dto.entityId, campaign.partnerId);
+
+    try {
+      return await this.prisma.campaignAttribution.create({
+        data: {
+          campaignId: dto.campaignId,
+          entityType: dto.entityType,
+          entityId: dto.entityId,
+          attributionType: dto.attributionType ?? 'FIRST_TOUCH',
+          notes: dto.notes,
+          partnerId,
+          createdById: actor.id,
+        },
+      });
+    } catch (err) {
+      // Step 3.8.2 — Defect C: map duplicate (P2002) to controlled 409
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const names = uniqueConstraintNames(err);
+        if (names.some(n => n.includes('campaignId_entityType_entityId'))) {
+          throw new ConflictError(
+            `Attribution already exists for ${dto.entityType}:${dto.entityId} on this campaign`,
+          );
+        }
+      }
+      throw err;
+    }
   }
 
   async listAttributions(actor: AuthUser, campaignId: string) {
@@ -261,6 +305,131 @@ export class MarketingService {
       where: { entityType, entityId },
       orderBy: { attributedAt: 'desc' },
     });
+  }
+
+  // ── Entity reference validation (Step 3.8.2) ─────────────────
+
+  /**
+   * Validates that entityId exists in the canonical domain for entityType,
+   * and for Partner-scoped campaigns, that the entity belongs to the partner.
+   *
+   * Defect A: nonexistent entity → controlled 404
+   * Defect B: type confusion (ORDER+BookingId) → controlled 404
+   * Defect:   foreign tenant entity → controlled 404
+   */
+  private async validateEntityReference(
+    entityType: string,
+    entityId: string,
+    partnerId: string | null,
+  ): Promise<void> {
+    switch (entityType) {
+      case 'CUSTOMER': {
+        const customer = await this.prisma.customer.findUnique({ where: { id: entityId } });
+        if (!customer) {
+          throw new NotFoundError(`Customer ${entityId} not found`);
+        }
+        // Partner scope: must have active PartnerCustomerRelation
+        if (partnerId) {
+          const relation = await this.prisma.partnerCustomerRelation.findUnique({
+            where: { partnerId_customerId: { partnerId, customerId: entityId } },
+          });
+          if (!relation) {
+            throw new NotFoundError(`Customer ${entityId} not found in partner scope`);
+          }
+        }
+        break;
+      }
+
+      case 'LEAD': {
+        const lead = await this.prisma.lead.findUnique({ where: { id: entityId } });
+        if (!lead) {
+          throw new NotFoundError(`Lead ${entityId} not found`);
+        }
+        // Partner scope: Lead must be linked to a Customer in partner's scope
+        if (partnerId && lead.customerId) {
+          const relation = await this.prisma.partnerCustomerRelation.findUnique({
+            where: { partnerId_customerId: { partnerId, customerId: lead.customerId } },
+          });
+          if (!relation) {
+            throw new NotFoundError(`Lead ${entityId} not found in partner scope`);
+          }
+        } else if (partnerId && !lead.customerId) {
+          // Unlinked Lead cannot be attributed to a Partner campaign
+          throw new NotFoundError(`Lead ${entityId} has no customer link — cannot attribute to partner campaign`);
+        }
+        break;
+      }
+
+      case 'ORDER': {
+        const order = await this.prisma.order.findUnique({ where: { id: entityId } });
+        if (!order) {
+          throw new NotFoundError(`Order ${entityId} not found`);
+        }
+        // Partner scope: must be seller of this order
+        if (partnerId && order.sellerPartnerId !== partnerId) {
+          throw new NotFoundError(`Order ${entityId} not found in partner scope`);
+        }
+        break;
+      }
+
+      case 'BOOKING': {
+        const booking = await this.prisma.booking.findUnique({ where: { id: entityId } });
+        if (!booking) {
+          throw new NotFoundError(`Booking ${entityId} not found`);
+        }
+        // Partner scope: traverse Booking → Order → sellerPartnerId
+        if (partnerId) {
+          const order = await this.prisma.order.findUnique({ where: { id: booking.orderId } });
+          if (!order || order.sellerPartnerId !== partnerId) {
+            throw new NotFoundError(`Booking ${entityId} not found in partner scope`);
+          }
+        }
+        break;
+      }
+
+      default:
+        throw new ValidationDomainError(`entityType must be one of: ${VALID_ATTRIBUTION_ENTITY_TYPES.join(', ')}`);
+    }
+  }
+
+  // ── Audience criteria validation (Step 3.8.2 — Defect D) ─────
+
+  /**
+   * Validates audience criteria against the whitelisted contract.
+   * Only CRM/segmentation-relevant fields are allowed.
+   * Contact fields, tenant selectors, auth/password, and arbitrary queries are blocked.
+   */
+  private validateAudienceCriteria(criteria: Record<string, unknown>): void {
+    const keys = Object.keys(criteria);
+
+    // Check for blocked keys (security/tenant boundary)
+    for (const key of keys) {
+      if (AUDIENCE_CRITERIA_BLOCKED_KEYS.has(key)) {
+        throw new ValidationDomainError(
+          `Audience criteria field "${key}" is not allowed`,
+        );
+      }
+    }
+
+    // Check all keys are in the whitelist (no unknown fields)
+    for (const key of keys) {
+      if (!AUDIENCE_CRITERIA_ALLOWED_KEYS.has(key)) {
+        throw new ValidationDomainError(
+          `Audience criteria field "${key}" is not recognized. Allowed: ${[...AUDIENCE_CRITERIA_ALLOWED_KEYS].join(', ')}`,
+        );
+      }
+    }
+
+    // Validate nested structure: values must be string, string[], or primitive
+    for (const [key, value] of Object.entries(criteria)) {
+      if (value !== null && value !== undefined && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+        if (!Array.isArray(value) || !value.every(v => typeof v === 'string')) {
+          throw new ValidationDomainError(
+            `Audience criteria field "${key}" must be a string, number, boolean, or string array`,
+          );
+        }
+      }
+    }
   }
 
   // ── Scope helpers ──────────────────────────────────────────────
