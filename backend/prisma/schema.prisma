@@ -26,7 +26,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision", "marketing"]
+  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision", "marketing", "support"]
 }
 
 // ─────────────────────────────── events.* ────────────────────────────────
@@ -4666,4 +4666,147 @@ model CampaignAttribution {
   @@index([entityType, entityId])
   @@index([partnerId, campaignId])
   @@schema("marketing")
+}
+
+// ─────────────────────────── support.* ───────────────────────────
+
+enum SupportCaseType {
+  GENERAL
+  ORDER_ISSUE
+  BOOKING_ISSUE
+  PAYMENT_ISSUE
+  REFUND_REQUEST
+  TECHNICAL
+  BILLING
+  PARTNER_ISSUE
+  PRODUCT_QUALITY
+
+  @@schema("support")
+}
+
+enum SupportCasePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+
+  @@schema("support")
+}
+
+enum SupportCaseStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  WAITING_PARTNER
+  WAITING_INTERNAL
+  ESCALATED
+  RESOLVED
+  CLOSED
+
+  @@schema("support")
+}
+
+/// Support Case — canonical support ticket/issue tracking.
+/// Step 3.10: Ticket/Case, priority, SLA, assignment, escalation.
+/// References canonical entities (Order/Booking/Customer/Partner) by ID.
+/// Does NOT own their lifecycle — read-only references.
+model Case {
+  id              String               @id @default(uuid())
+  code            String               @unique // SUP-00000001
+  title           String
+  description     String?
+  caseType        SupportCaseType      @default(GENERAL)
+  priority        SupportCasePriority  @default(MEDIUM)
+  status          SupportCaseStatus    @default(OPEN)
+  source          String?              // e.g. "email", "phone", "chat", "api"
+
+  // ── Related entity references (no FK — cross-schema) ──
+  customerId      String?              // ref crm.Customer
+  orderId         String?              // ref order.Order
+  bookingId       String?              // ref booking.Booking
+
+  // ── Assignment ──
+  assignedToId    String?              // ref security.User
+
+  // ── SLA ──
+  slaDeadline     DateTime?
+  slaBreached     Boolean              @default(false)
+
+  // ── Escalation ──
+  escalatedAt     DateTime?
+  escalatedById   String?              // ref security.User
+  escalationReason String?
+
+  // ── Metadata ──
+  createdById     String               // ref security.User (creator)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  version         Int                  @default(1)
+
+  comments        CaseComment[]
+  caseLinks       CaseCommunicationLink[]
+  history         CaseHistory[]
+
+  @@index([status])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([bookingId])
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([createdAt])
+  @@schema("support")
+}
+
+/// Case comment — internal or customer-facing note on a support case.
+model CaseComment {
+  id          String   @id @default(uuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  authorId    String   // ref security.User
+  body        String
+  isInternal  Boolean  @default(false) // true = internal staff note, not visible to customer/partner
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  editedAt    DateTime?
+  deletedAt   DateTime?
+  deletedBy   String?
+
+  @@index([caseId])
+  @@index([authorId])
+  @@schema("support")
+}
+
+/// Junction: Support Case ↔ Communication.
+/// Allows linking a support case to existing Communication messages.
+model CaseCommunicationLink {
+  id              String   @id @default(uuid())
+  caseId          String
+  case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  communicationId String   // ref communication.Communication (no FK)
+  createdAt       DateTime @default(now())
+  createdById     String?
+
+  @@unique([caseId, communicationId])
+  @@index([communicationId])
+  @@schema("support")
+}
+
+/// Support Case audit history (append-only).
+model CaseHistory {
+  id          String   @id @default(uuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  action      String   // e.g. "created", "status:IN_PROGRESS", "assigned", "priority:HIGH"
+  actorId     String?  // ref security.User
+  actorName   String?
+  previousValue String?
+  newValue    String?
+  details     String?
+  createdAt   DateTime @default(now())
+
+  @@index([caseId])
+  @@index([createdAt])
+  @@schema("support")
 }

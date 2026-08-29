@@ -210,6 +210,11 @@ export const PERMISSIONS = {
   // ── Cross-cutting ─────────────────────────────────────────────────────
   "support.read": "Чтение обращений поддержки",
   "support.write": "Обработка обращений поддержки",
+  // Step 3.10: granular support case permissions
+  "support.case.create": "Создание support cases",
+  "support.case.read": "Чтение support cases",
+  "support.case.update": "Обновление support cases (status, priority, type, comments)",
+  "support.case.assign": "Назначение support cases исполнителю",
   "documents.read": "Чтение документов",
   "documents.write": "Управление документами",
   "settings.read": "Чтение настроек",
@@ -274,6 +279,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.settlement.read",
     "finance.payout.read",
     "support.read",
+    "support.case.read",
     "documents.read",
     "settings.read",
     "audit.read",
@@ -505,6 +511,11 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "booking.cancel",
     "support.read",
     "support.write",
+    // Step 3.10: OPERATOR gets full support case CRUD + assignment
+    "support.case.create",
+    "support.case.read",
+    "support.case.update",
+    "support.case.assign",
     "documents.read",
     "documents.write",
     // Step 1.16: OPERATOR фиксирует коммуникации по Order/Booking/Customer.
