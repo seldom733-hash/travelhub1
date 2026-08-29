@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useState } from "react";
 import { api, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -247,8 +247,8 @@ function MarketingContent() {
                 </thead>
                 <tbody>
                   {(campaigns?.items ?? []).map((c) => (
-                    <>
-                      <tr key={c.id} className="border-b border-slate-50 transition-colors hover:bg-blue-50/50">
+                    <Fragment key={c.id}>
+                      <tr className="border-b border-slate-50 transition-colors hover:bg-blue-50/50">
                         <td className="px-4 py-2.5">
                           <button onClick={() => void toggleCampaignDetail(c.id)} className="font-mono text-xs text-blue-600 hover:underline">
                             {c.code}
@@ -334,7 +334,7 @@ function MarketingContent() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                   {(campaigns?.items ?? []).length === 0 && !loading && (
                     <tr>
