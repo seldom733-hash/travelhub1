@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../../security/auth/jwt-auth.guard';
 import { PermissionsGuard } from '../../security/auth/permissions.guard';
 import { CurrentUser, RequirePermissions } from '../../security/auth/decorators';
 import type { AuthedRequest } from '../../security/auth/jwt-auth.guard';
-import { CampaignStatus } from '../../generated/prisma/enums';
+import { CampaignObjective, CampaignStatus } from '../../generated/prisma/enums';
 
 // ── DTOs ───────────────────────────────────────────────────────────
 
@@ -21,8 +21,8 @@ class CreateCampaignDto {
   description?: string;
 
   @IsOptional()
-  @IsString()
-  objective?: string;
+  @IsEnum(CampaignObjective)
+  objective?: CampaignObjective;
 
   @IsOptional()
   @IsString()
@@ -46,8 +46,8 @@ class UpdateCampaignDto {
   description?: string;
 
   @IsOptional()
-  @IsString()
-  objective?: string;
+  @IsEnum(CampaignObjective)
+  objective?: CampaignObjective;
 
   @IsOptional()
   @IsString()

@@ -1261,6 +1261,18 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "marketing.status.paused": { ru: "Приостановлено", az: "Dayandırılıb", en: "Paused" },
   "marketing.status.completed": { ru: "Завершено", az: "Tamamlanıb", en: "Completed" },
   "marketing.status.cancelled": { ru: "Отменено", az: "Ləğv edilib", en: "Cancelled" },
+  // Marketing objectives
+  "marketing.objective.awareness": { ru: "Узнаваемость", az: "Tanınma", en: "Awareness" },
+  "marketing.objective.engagement": { ru: "Вовлечённость", az: "İştirak", en: "Engagement" },
+  "marketing.objective.conversion": { ru: "Конверсия", az: "Konversiya", en: "Conversion" },
+  "marketing.objective.retention": { ru: "Удержание", az: "Saxlama", en: "Retention" },
+  "marketing.objective.reactivation": { ru: "Реактивация", az: "Reaktivasiya", en: "Reactivation" },
+  // Marketing criteria labels
+  "marketing.criteria.lifecycle": { ru: "Жизненный цикл", az: "Ömür dövrü", en: "Lifecycle" },
+  "marketing.criteria.leadSource": { ru: "Источник лида", az: "Lid mənbəyi", en: "Lead source" },
+  "marketing.criteria.tags": { ru: "Теги", az: "Etiketlər", en: "Tags" },
+  "marketing.criteria.status": { ru: "Статус", az: "Status", en: "Status" },
+  "marketing.criteria.customerType": { ru: "Тип клиента", az: "Müştəri tipi", en: "Customer type" },
   "marketing.total_campaigns": { ru: "Всего кампаний", az: "Cəmi kampaniya", en: "Total campaigns" },
   "marketing.total_audiences": { ru: "Всего аудиторий", az: "Cəmi auditoriya", en: "Total audiences" },
   "marketing.total_attributions": { ru: "Всего атрибуций", az: "Cəmi atributiyalar", en: "Total attributions" },

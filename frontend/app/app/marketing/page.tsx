@@ -68,6 +68,35 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   CANCELLED: [],
 };
 
+const OBJECTIVE_OPTIONS: Record<string, string> = {
+  AWARENESS: "marketing.objective.awareness",
+  ENGAGEMENT: "marketing.objective.engagement",
+  CONVERSION: "marketing.objective.conversion",
+  RETENTION: "marketing.objective.retention",
+  REACTIVATION: "marketing.objective.reactivation",
+};
+
+/** Whitelisted criteria keys for readable display */
+const CRITERIA_LABELS: Record<string, string> = {
+  lifecycle: "marketing.criteria.lifecycle",
+  leadSource: "marketing.criteria.leadSource",
+  tags: "marketing.criteria.tags",
+  status: "marketing.criteria.status",
+  customerType: "marketing.criteria.customerType",
+};
+
+function formatCriteria(criteria: Record<string, unknown>, locale: "ru" | "az" | "en"): { key: string; value: string }[] {
+  const result: { key: string; value: string }[] = [];
+  for (const [k, v] of Object.entries(criteria)) {
+    if (k in CRITERIA_LABELS) {
+      const label = t(CRITERIA_LABELS[k], locale);
+      const val = Array.isArray(v) ? v.join(", ") : String(v);
+      result.push({ key: label, value: val });
+    }
+  }
+  return result;
+}
+
 /* ── Main Component ────────────────────────────────────────────────────────── */
 
 function MarketingContent() {
@@ -81,7 +110,7 @@ function MarketingContent() {
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", objective: "" });
+  const [form, setForm] = useState({ name: "", description: "", objective: "" as string });
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
 
   // ── Load campaigns ──
@@ -132,7 +161,7 @@ function MarketingContent() {
       await api.post("/marketing/campaigns", {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
-        objective: form.objective.trim() || undefined,
+        objective: form.objective || undefined,
       });
       setShowCreate(false);
       setForm({ name: "", description: "", objective: "" });
@@ -299,9 +328,18 @@ function MarketingContent() {
                                         <span className="font-mono text-blue-600">{a.code}</span>
                                         <span className="font-medium text-slate-700">{a.name}</span>
                                         {a.criteria && (
-                                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
-                                            {JSON.stringify(a.criteria)}
-                                          </span>
+                                          <div className="flex flex-wrap gap-1">
+                                            {formatCriteria(a.criteria, locale).map(({ key, value }) => (
+                                              <span key={key} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                                {key}: {value}
+                                              </span>
+                                            ))}
+                                            {formatCriteria(a.criteria, locale).length === 0 && (
+                                              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                                                {JSON.stringify(a.criteria)}
+                                              </span>
+                                            )}
+                                          </div>
                                         )}
                                       </div>
                                     ))}
@@ -405,11 +443,16 @@ function MarketingContent() {
             <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
               {t("marketing.create.form.objective", locale)}
             </label>
-            <input
+            <select
               value={form.objective}
               onChange={(e) => setForm({ ...form, objective: e.target.value })}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
-            />
+            >
+              <option value="">—</option>
+              {Object.entries(OBJECTIVE_OPTIONS).map(([val, i18nKey]) => (
+                <option key={val} value={val}>{t(i18nKey, locale)}</option>
+              ))}
+            </select>
           </div>
           <button
             onClick={() => void createCampaign()}

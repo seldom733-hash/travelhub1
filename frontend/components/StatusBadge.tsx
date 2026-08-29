@@ -57,6 +57,9 @@ const STATUS_I18N_KEY: Record<string, string> = {
   APPROVED: "status.crm.APPROVED",
   REJECTED: "status.crm.REJECTED",
   CHANGES_REQUESTED: "status.crm.CHANGES_REQUESTED",
+  // Marketing
+  SCHEDULED: "marketing.status.scheduled",
+  PAUSED: "marketing.status.paused",
 };
 
 /** Tailwind classes for status badge color. */
@@ -101,6 +104,9 @@ const STATUS_CLS: Record<string, string> = {
   APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   REJECTED: "bg-red-50 text-red-600 border-red-200",
   CHANGES_REQUESTED: "bg-orange-50 text-orange-700 border-orange-200",
+  // Marketing
+  SCHEDULED: "bg-violet-50 text-violet-700 border-violet-200",
+  PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
 export default function StatusBadge({ status }: { status: string }) {
