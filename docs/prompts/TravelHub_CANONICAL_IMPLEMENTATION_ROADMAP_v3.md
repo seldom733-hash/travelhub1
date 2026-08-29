@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-29 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Step 3.6D ✅ COMPLETE; Step 3.6D.1 ✅ COMPLETE; Step 3.7A ✅ COMPLETE; Step 3.7A.1 ✅ COMPLETE; Step 3.7A.2 ✅ COMPLETE; Step 3.7B ✅ COMPLETE — STRICT REVIEW APPROVED; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE; Storefront Business Capability Model Architecture Amendment COMPLETED 2026-08-29)\
+**Дата актуализации:** 2026-08-29 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Step 3.6D ✅ COMPLETE; Step 3.6D.1 ✅ COMPLETE; Step 3.7A ✅ COMPLETE; Step 3.7A.1 ✅ COMPLETE; Step 3.7A.2 ✅ COMPLETE; Step 3.7B ✅ COMPLETE — STRICT REVIEW APPROVED; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE; Storefront Business Capability Model Architecture Amendment COMPLETED 2026-08-29; Step 3.8 ✅ COMPLETE — STRICT REVIEW APPROVED; Step 3.8.1 ✅ COMPLETE; Step 3.8.2 ✅ COMPLETE; Step 3.9 ✅ COMPLETE — STRICT REVIEW RE-QUALIFICATION APPROVED)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -987,7 +987,7 @@ commit `c543ab8`; report — `PHASE_3_STEP_3.7A.2_FINAL_RUNTIME_EVIDENCE_CLOSURE
 · **Step 3.8 --- Marketing Domain** ✅ APPROVED (STRICT REVIEW APPROVED 2026-08-29; implementation 541fe4b; evidence 8b32e34; remediation 38d88fd; final evidence closure b8627b7; strict review 4135025; Campaign/Audience/Attribution foundations; Platform-only Marketing RBAC (ADMIN/DIRECTOR/MARKETER/OPERATOR); lifecycle DRAFT→SCHEDULED→ACTIVE→PAUSED/COMPLETED/CANCELLED; entity validation + type integrity + duplicate handling (409); audience criteria whitelist/blacklist; partner-scoped data isolation; 89/89 tests + 49/49 runtime gates; deferred: Marketing UI, EMAIL/SMS/PUSH, consent, automation, multi-touch attribution, Partner Marketing entitlement).\
 Campaign, audience, channel, attribution, lifecycle.
 
-· **Step 3.9 --- Marketing Center UI**
+· **Step 3.9 --- Marketing Center UI** ✅ STRICT REVIEW RE-QUALIFICATION APPROVED — CLOSED (2026-08-29; VERDICT A — Platform Marketing Center UI; Platform Workspace Shell + design system reuse; navigation RBAC (marketing.campaign.read → ADMIN/DIRECTOR/MARKETER/OPERATOR); Campaign list/create/expand; lifecycle DRAFT→SCHEDULED→ACTIVE→PAUSED/COMPLETED/CANCELLED localized UI; Audience/Attribution tabs; bounded objective select (AWARENESS|ENGAGEMENT|CONVERSION|RETENTION|REACTIVATION) + @IsEnum backend validation; localized StatusBadge for marketing statuses; readable Audience criteria with i18n labels; 248/243+5 frontend + 45/45 backend marketing + backend TSC PASS; Strict Review VERDICT B (F3 P2: arbitrary objective→raw 500; F1 P3: raw status label; F2 P3: raw JSON criteria) → findings remediation → Re-Qualification VERDICT A → CLOSED; implementation c539e51 → remediation e8d54ad → Strict Review 5cf9066 → findings remediation cb3fef1; deferred: Partner/Storefront Marketing, transports, consent, automation, multi-touch attribution, Marketing Analytics, Sponsored Partner Promotion).
 
 ## Support
 
@@ -2097,11 +2097,12 @@ implementation → strict review → approval и остаются валидны
 | Step 3.7A.2 — Final Runtime Evidence Closure | ✅ DONE (committed c543ab8) |
 | Step 3.7B — Communication Business-Context Integration | ✅ DONE — STRICT REVIEW APPROVED (closed 27284ab) |
 | Step 3.8 — Marketing Domain | ✅ DONE — STRICT REVIEW APPROVED (closed 4135025) |
+| Step 3.9 — Marketing Center UI | ✅ DONE — STRICT REVIEW RE-QUALIFICATION APPROVED (closed cb3fef1) |
 
-**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.8 (all VERDICT A).
+**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.9 (all VERDICT A).
 
-**Canonical NEXT:** `PHASE 3 — STEP 3.9 — MARKETING CENTER UI`
-(Marketing UI frontend — next section after Marketing Domain foundation).
+**Canonical NEXT:** `PHASE 3 — STEP 3.10 — SUPPORT DOMAIN`
+(Marketing Center UI CLOSED. Next section in canonical roadmap ordering is Support Domain.)
 
 ### Полная авторитетная последовательность после 2.5B
 
@@ -2159,6 +2160,8 @@ implementation → strict review → approval и остаются валидны
 40. **PHASE 3 — STEP 3.7A.2 — FINAL RUNTIME EVIDENCE CLOSURE** ✅ COMPLETE (2026-08-29; VERDICT A — BASIC non-empty fixture proven (email/phone ABSENT); entitlement fallback (EXPIRED→BASIC); chat anti-disintermediation CONFIRMED (email→422, phone→422, URL→422); correction: 3.7A.1 incorrectly stated "not chat-level"; 126/126 CRM+Communication; commit `c543ab8`).
 41. **PHASE 3 — STOREFRONT BUSINESS CAPABILITY MODEL — ARCHITECTURE & ROADMAP AMENDMENT** ✅ DOCUMENTATION COMPLETE (2026-08-29; architecture decision + repository audit + gap matrix + future stage sequence; `docs/architecture/storefront-business-capability-model.md`; 6 future stages (3.29J–3.29O) placed in roadmap after 3.29H; no production code changes; canonical NEXT not changed).
 42. **PHASE 3 — STEP 3.7B — COMMUNICATION BUSINESS-CONTEXT INTEGRATION** ✅ STRICT REVIEW APPROVED — CLOSED (2026-08-29; VERDICT A — Communication ↔ ORDER/BOOKING business-context integration; server-authoritative participant/context consistency; Partner own/foreign tenant isolation; Marketplace Basic contact-safe projection; Storefront Pro legitimate original projection; live entitlement-aware Basic/Pro behavior; Platform legitimate original projection; unauthorized internal-staff denial; generic Communication create participant-bypass protection; reverse Marketplace anti-disintermediation regression; context-type confusion protection; Buyer/Customer own/foreign isolation; controlled error behavior; runtime persistence evidence; 44/44 Communication tests + Backend TSC PASS; implementation chain: 576b076 → 716dbd1 → d1c17d1 → 062d418 → d909fb3 → 3f9bab5 → 6a7bf0d → 7d95668 → 35ad2fa → 24b64f9; final Strict Review closure SHA: 27284ab).
+43. **PHASE 3 — STEP 3.9 — MARKETING CENTER UI** ✅ STRICT REVIEW RE-QUALIFICATION APPROVED — CLOSED (2026-08-29; VERDICT A — Platform Marketing Center UI; Workspace Shell + design system reuse; nav RBAC (ADMIN/DIRECTOR/MARKETER/OPERATOR); Campaign list/create/expand/lifecycle; Audience/Attribution tabs; bounded objective select + @IsEnum backend validation; localized StatusBadge; readable Audience criteria; 248 frontend + 45 backend marketing tests; Strict Review VERDICT B (F3 P2, F1/F2 P3) → findings remediation → Re-Qualification VERDICT A; implementation chain: c539e51 → e8d54ad → 5cf9066 → cb3fef1).
+44. **PHASE 3 — POST-STEP 3.9 — MARKETING PURPOSE / MARKETPLACE DEMAND / PROMOTIONS & FUNDING ARCHITECTURE AMENDMENT** ✅ DOCUMENTATION COMPLETE (2026-08-29; architecture amendment + repository gap audit + financial model design + governance authority + roadmap sync; `docs/prompts/MARKETING_PURPOSE_MARKETPLACE_DEMAND_PROMOTIONS_FUNDING_ARCHITECTURE_ROADMAP_AMENDMENT.md`; no production code changes).
 
 **Platform ↔ Partner authority boundary established:**
 ```
@@ -2174,13 +2177,13 @@ Platform Refund           → CREATE/APPROVE/EXECUTE SEPARATED (Step 3.6C.1)
 Partner Product creation  → PRESERVED (actor.partnerId derived)
 Partner ownership spoof  → PREVENTED
 Product.partnerId NOT NULL → NOT READY (legacy preserved)
-```**Canonical NEXT:** `PHASE 3 — STEP 3.9 — MARKETING CENTER UI`
+```**Canonical NEXT:** `PHASE 3 — STEP 3.10 — SUPPORT DOMAIN`
 
-Reason: Step 3.8 Marketing Domain is now CLOSED (Strict Review APPROVED). The Marketing Domain foundation (Campaign/Audience/Attribution) is complete. The next section in the canonical roadmap ordering is Marketing Center UI.
+Reason: Step 3.9 Marketing Center UI is now CLOSED (Strict Review Re-Qualification APPROVED). Platform Marketing Center UI is complete. The next section in the canonical roadmap ordering is Support Domain.
 
-Dependencies satisfied: Step 3.8 CLOSED; Marketing Domain foundation established.
+Dependencies satisfied: Step 3.9 CLOSED; Marketing Center UI complete.
 
-Blocking prerequisites: None for Marketing Center UI.
+Blocking prerequisites: None for Support Domain.
 
 **Step 2.8A conditional dependency (детерминированный дефолт):** date-based
 period pricing/availability НЕ требует Step 2.8A; time-slot / exact
