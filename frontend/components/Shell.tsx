@@ -29,6 +29,7 @@ const NAV: NavItem[] = [
   { href: "/app/bookings", icon: "📑", labelKey: "nav.bookings", permission: "booking.read" },
   { href: "/app/crm", icon: "🤝", labelKey: "nav.crm", permission: "crm.customer.read" },
   { href: "/app/marketing", icon: "📣", labelKey: "nav.marketing", permission: "marketing.campaign.read" },
+  { href: "/app/support", icon: "🎫", labelKey: "nav.support", permission: "support.case.read" },
   { href: "/app/partners/onboarding", icon: "📋", labelKey: "nav.partner_onboarding", permission: "partner.onboarding.review" },
   { href: "/app/seller-profiles", icon: "🛡", labelKey: "nav.seller_profiles", permission: "seller_public_profile.review" },
   { href: "/app/users", icon: "👥", labelKey: "nav.users", permission: "settings.write" },

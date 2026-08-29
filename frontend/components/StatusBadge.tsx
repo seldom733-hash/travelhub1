@@ -62,6 +62,18 @@ const STATUS_I18N_KEY: Record<string, string> = {
   PAUSED: "marketing.status.paused",
 };
 
+// Support statuses are mapped inline in StatusBadge component (support.status.* keys)
+const SUPPORT_STATUS_I18N: Record<string, string> = {
+  OPEN: "support.status.OPEN",
+  IN_PROGRESS: "support.status.IN_PROGRESS",
+  WAITING_CUSTOMER: "support.status.WAITING_CUSTOMER",
+  WAITING_PARTNER: "support.status.WAITING_PARTNER",
+  WAITING_INTERNAL: "support.status.WAITING_INTERNAL",
+  ESCALATED: "support.status.ESCALATED",
+  RESOLVED: "support.status.RESOLVED",
+  CLOSED: "support.status.CLOSED",
+};
+
 /** Tailwind classes for status badge color. */
 const STATUS_CLS: Record<string, string> = {
   DRAFT: "bg-slate-100 text-slate-600 border-slate-200",
@@ -109,11 +121,22 @@ const STATUS_CLS: Record<string, string> = {
   PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
+const SUPPORT_STATUS_CLS: Record<string, string> = {
+  OPEN: "bg-sky-50 text-sky-700 border-sky-200",
+  IN_PROGRESS: "bg-blue-50 text-blue-700 border-blue-200",
+  WAITING_CUSTOMER: "bg-amber-50 text-amber-700 border-amber-200",
+  WAITING_PARTNER: "bg-orange-50 text-orange-700 border-orange-200",
+  WAITING_INTERNAL: "bg-purple-50 text-purple-700 border-purple-200",
+  ESCALATED: "bg-red-50 text-red-600 border-red-200",
+  RESOLVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  CLOSED: "bg-slate-100 text-slate-500 border-slate-200",
+};
+
 export default function StatusBadge({ status }: { status: string }) {
   const locale = useLocale();
-  const i18nKey = STATUS_I18N_KEY[status];
+  const i18nKey = STATUS_I18N_KEY[status] ?? SUPPORT_STATUS_I18N[status];
   const label = i18nKey ? t(i18nKey, locale) : status;
-  const cls = STATUS_CLS[status] ?? "bg-slate-100 text-slate-600 border-slate-200";
+  const cls = STATUS_CLS[status] ?? SUPPORT_STATUS_CLS[status] ?? "bg-slate-100 text-slate-600 border-slate-200";
 
   return (
     <span
