@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-29 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Step 3.6D ✅ COMPLETE; Step 3.6D.1 ✅ COMPLETE; Step 3.7A ✅ COMPLETE; Step 3.7A.1 ✅ COMPLETE; Step 3.7A.2 ✅ COMPLETE; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE)\
+**Дата актуализации:** 2026-08-29 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Step 3.6D ✅ COMPLETE; Step 3.6D.1 ✅ COMPLETE; Step 3.7A ✅ COMPLETE; Step 3.7A.1 ✅ COMPLETE; Step 3.7A.2 ✅ COMPLETE; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE; Storefront Business Capability Model Architecture Amendment COMPLETED 2026-08-29)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -1159,6 +1159,51 @@ balances, net revenue.
 analytics и future marketing automation без смешения с Marketplace
 identity/disclosure.
 
+· **Step 3.29J --- Storefront Business Capability Model — Domain / Server Authority** ⏳ PLANNED\
+Canonical architecture decision documented (2026-08-29; `docs/architecture/storefront-business-capability-model.md`).\
+`StorefrontCapability` join table (storefrontId, categoryId, status);\
+lifecycle enum `ACTIVE | DISABLED`; server-side capability resolver;\
+API capability-gated operations; reuse `catalog.Category` as canonical registry (no duplicate taxonomy);\
+historical data preservation contract on disable;\
+Entitlement ≠ Business Capability ≠ Permission invariant preserved.\
+Зависимости: PartnerStorefront (1.12.1 exists), Category (exists), Entitlement (3.5D exists).\
+Статус: PLANNED — architecture/roadmap amendment completed; implementation NOT STARTED.
+
+· **Step 3.29K --- Storefront Settings — Capability Management UI** ⏳ PLANNED\
+`/partner/storefront/settings` → "Услуги бизнеса" / Business Services section;\
+view available capabilities; see currently active; enable new; disable active (with warnings);\\
+server-side enforcement (not frontend hiding).\
+Зависимости: 3.29J.
+
+· **Step 3.29L --- Public Storefront — Navigation / Search / Filter Projection** ⏳ PLANNED\
+Capability-derived public navigation;\
+capability-scoped search and filters;\
+homepage service blocks filtered by enabled capabilities;\
+server-side enforcement;\
+inactive capabilities absent from active discovery surfaces.\
+Зависимости: 3.29J.
+
+· **Step 3.29M --- Partner Back Office — Capability Projection** ⏳ PLANNED\
+Dashboard capability-aware sections/KPIs;\
+Analytics capability-aware dimensions/views;\
+Sales/Orders/Bookings filtered by enabled capabilities;\
+historical records preserved when capability disabled.\
+Зависимости: 3.29J.
+
+· **Step 3.29N --- Storefront Pro Back Office — Visual Alignment with Platform Design System** ⏳ PLANNED\
+Shared Workspace Shell + sidebar with partner-specific manifests;\
+visual consistency with Platform design system (shell, sidebar, header, KPI, grid, charts);\
+public Storefront retains partner brand (NOT forced to copy TravelHub).\
+Архитектурная граница: Platform Back Office design alignment ≠ forcing public Storefront visual copy.\
+Зависимости: 3.29E (Storefront Analytics), Workspace Shell (3.3E exists).
+
+· **Step 3.29O --- Storefront Onboarding — Capability Selection Integration** ⏳ PLANNED\
+Capability selection during Storefront onboarding flow;\
+enable-new-capability flow from Settings;\
+subscription plan ↔ capability mapping;\
+capability-specific activation prerequisites (supplier credentials, inventory, content).\
+Зависимости: 3.29J, 3.29D (Storefront Subscription exists).
+
 · **Step 3.29I --- Partner Commercial Calendar / Bulk Management UI** ⏳ NOT IMPLEMENTED (Roadmap Amendment: Service Templates / Period Pricing & Availability, post-baseline addition; **Universal Pricing Model Amendment INTEGRATED — UX-контракт annual calendar, см. `docs/architecture/universal-pricing-model.md` §14**)\
 Calendar/period view; bulk price editing; bulk availability editing;
 stop sell; create/copy periods (copy season/year где безопасно);
@@ -2110,6 +2155,7 @@ implementation → strict review → approval и остаются валидны
 38. **PHASE 3 — STEP 3.7A — MARKETPLACE CONTACT POLICY AUTHORITY** ✅ COMPLETE (2026-08-29; VERDICT A — server-side Basic contact restriction (email/phone omitted via conditional Prisma select); Pro preserved; Platform unaffected; commit `271fbe3`).
 39. **PHASE 3 — STEP 3.7A.1 — CONTACT POLICY EVIDENCE CLOSURE** ✅ COMPLETE (2026-08-29; VERDICT A — tier resolution, cross-partner isolation, Platform regression; 106/106 CRM + 65/65 analytics + 243/243 frontend; commit `2c5b202`).
 40. **PHASE 3 — STEP 3.7A.2 — FINAL RUNTIME EVIDENCE CLOSURE** ✅ COMPLETE (2026-08-29; VERDICT A — BASIC non-empty fixture proven (email/phone ABSENT); entitlement fallback (EXPIRED→BASIC); chat anti-disintermediation CONFIRMED (email→422, phone→422, URL→422); correction: 3.7A.1 incorrectly stated "not chat-level"; 126/126 CRM+Communication; commit `c543ab8`).
+41. **PHASE 3 — STOREFRONT BUSINESS CAPABILITY MODEL — ARCHITECTURE & ROADMAP AMENDMENT** ✅ DOCUMENTATION COMPLETE (2026-08-29; architecture decision + repository audit + gap matrix + future stage sequence; `docs/architecture/storefront-business-capability-model.md`; 6 future stages (3.29J–3.29O) placed in roadmap after 3.29H; no production code changes; canonical NEXT not changed).
 
 **Platform ↔ Partner authority boundary established:**
 ```
