@@ -26,7 +26,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision"]
+  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision", "marketing"]
 }
 
 // ─────────────────────────────── events.* ────────────────────────────────
@@ -2524,6 +2524,9 @@ model User {
   auditLogs              AuditLog[]
   partnerApplications    PartnerApplication[]
   workspaceLayouts       UserWorkspaceLayout[]
+  createdCampaigns       Campaign[]
+  createdAudiences       CampaignAudience[]
+  createdAttributions    CampaignAttribution[]
 
   @@index([roleId])
   @@index([status])
@@ -4560,4 +4563,107 @@ model CrmActivity {
   @@index([sourceType, sourceId], name: "CrmActivity_source_identity")
   @@index([activityType, occurredAt], name: "CrmActivity_activity_type_time")
   @@schema("crm")
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MARKETING — Step 3.8 Campaign Foundation
+// ═══════════════════════════════════════════════════════════════════
+
+/// Campaign lifecycle status.
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+
+  @@schema("marketing")
+}
+
+/// Campaign objective/type.
+enum CampaignObjective {
+  AWARENESS
+  ENGAGEMENT
+  CONVERSION
+  RETENTION
+  REACTIVATION
+
+  @@schema("marketing")
+}
+
+/// Marketing campaign — the core domain entity for Step 3.8.
+/// Platform-owned campaigns have partnerId = NULL.
+/// Partner-owned campaigns reference their partnerId.
+model Campaign {
+  id            String             @id @default(uuid())
+  code          String             @unique // MKT-* human-readable
+  name          String
+  description   String?
+  objective     CampaignObjective?
+  status        CampaignStatus     @default(DRAFT)
+  partnerId     String?            // NULL = Platform campaign
+  startAt       DateTime?
+  endAt         DateTime?
+  createdById   String
+  createdBy     User               @relation(fields: [createdById], references: [id])
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  version       Int                @default(1)
+
+  // Relations
+  audiences     CampaignAudience[]
+  attributions  CampaignAttribution[]
+
+  @@index([partnerId, status])
+  @@index([status, createdAt])
+  @@schema("marketing")
+}
+
+/// Audience — a saved segment/rule definition for targeting campaign recipients.
+/// Does NOT store customer data; references CRM filter criteria.
+model CampaignAudience {
+  id            String   @id @default(uuid())
+  code          String   @unique // MKA-* human-readable
+  campaignId    String
+  campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  // Segment criteria — stored as JSON for flexibility.
+  // Examples: { "lifecycle": ["LEAD","PROSPECT"], "leadSource": ["MARKETPLACE"], "tags": ["vip"] }
+  criteria      Json?
+  estimatedCount Int?    // snapshot count at creation/update time
+  partnerId     String?  // NULL = Platform audience
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  version       Int      @default(1)
+
+  @@index([campaignId])
+  @@index([partnerId])
+  @@schema("marketing")
+}
+
+/// Attribution — links a Campaign to a CRM entity (Customer/Lead/Order/Booking)
+/// for conversion tracking. Additive reference; does NOT mutate canonical source fields.
+model CampaignAttribution {
+  id            String   @id @default(uuid())
+  campaignId    String
+  campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  // Target entity — one of: CUSTOMER, LEAD, ORDER, BOOKING
+  entityType    String   // enum-like: CUSTOMER | LEAD | ORDER | BOOKING
+  entityId      String   // reference to the target entity
+  attributionType String @default("FIRST_TOUCH") // FIRST_TOUCH | LAST_TOUCH | MANUAL
+  attributedAt  DateTime @default(now())
+  notes         String?
+  partnerId     String?  // NULL = Platform attribution
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@unique([campaignId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@index([partnerId, campaignId])
+  @@schema("marketing")
 }
