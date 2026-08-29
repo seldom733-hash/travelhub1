@@ -123,15 +123,21 @@ Communication:  44/44 PASS (incl. 24 precision tests)
 Backend TSC:    PASS
 ```
 
-## L. Fixture Cleanup
+## L. Fixture Cleanup (Finalized)
 
 ```
+revbuyer_* fixtures identified: 4 (revbuyer_1787992845951, evbuyer_1787992728987, evbuyer_1787992756294, evb_1787992830659)
+revbuyer_* fixtures deleted: 4
+remaining Step 3.7B.4 revbuyer_* fixtures: 0
+remaining associated Customer records: 0
+synthetic contact-bearing Communications remaining: 0
+harmless evidence Communication remaining: 0
 Spoof Communications:        DELETED (0 persisted, confirmed)
 Valid evidence Communication: DELETED
 Reverse conversation fixture: DELETED
 BuyerRequest fixture:        DELETED
 BuyerRequestDistribution:    DELETED
-Synthetic buyers (revbuyer_*): left in DB (will be GC'd or ignored)
+Pre-existing synthetic CML-00000205 (3.7B.2 fixture): DELETED
 ```
 
 No synthetic PII or contact data remains in Communication fixtures.
@@ -150,10 +156,10 @@ docs/report:      docs/prompts/PHASE_3_STEP_3.7B.4_EVIDENCE_ONLY_FINAL_CLOSURE_R
 3.7B implementation SHA:       576b076
 3.7B.2 remediation SHA:        716dbd1
 3.7B.3 precision SHA:          d1c17d1
-3.7B.4 evidence/report SHA:    (this commit, to be created)
-Final HEAD:                    (after commit)
-origin/master:                 d1c17d1 (before push)
-HEAD == origin/master:         YES (after push)
+3.7B.4 evidence/report SHA:    062d418
+Final HEAD:                    062d418
+origin/master:                 062d418
+HEAD == origin/master:         YES
 production changes in 3.7B.4:  NONE
 working tree:                  pre-existing unrelated changes (unchanged)
 ```
