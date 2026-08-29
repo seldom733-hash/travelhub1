@@ -69,12 +69,15 @@ describe('SupportService', () => {
       caseComment: {
         create: jest.fn().mockResolvedValue({ id: 'comment-001', caseId: 'case-001', body: 'test', isInternal: false }),
         findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
       },
       caseCommunicationLink: {
         upsert: jest.fn().mockResolvedValue({ id: 'link-001' }),
+        count: jest.fn().mockResolvedValue(0),
       },
       caseHistory: {
         create: jest.fn().mockResolvedValue({}),
+        count: jest.fn().mockResolvedValue(0),
       },
       // F3: Related entities
       customer: { findUnique: jest.fn().mockResolvedValue({ id: 'cust-001' }) },
@@ -318,6 +321,114 @@ describe('SupportService', () => {
       expect(result).toHaveProperty('total');
       expect(result).toHaveProperty('open');
       expect(result).toHaveProperty('escalated');
+    });
+
+    // R10: WAITING aggregate
+    it('should include waiting count (sum of WAITING_CUSTOMER + WAITING_PARTNER + WAITING_INTERNAL)', async () => {
+      prisma.case.count
+        .mockResolvedValueOnce(10) // total
+        .mockResolvedValueOnce(3)  // open
+        .mockResolvedValueOnce(2)  // inProgress
+        .mockResolvedValueOnce(1)  // waitingCustomer
+        .mockResolvedValueOnce(1)  // waitingPartner
+        .mockResolvedValueOnce(0)  // waitingInternal
+        .mockResolvedValueOnce(1)  // escalated
+        .mockResolvedValueOnce(2)  // resolved
+        .mockResolvedValueOnce(0); // closed
+      const result = await service.getStats();
+      expect(result.waiting).toBe(2);
+      expect(result.total).toBe(10);
+    });
+
+    // R10: KPI excludes soft-deleted
+    it('should exclude soft-deleted cases from stats', async () => {
+      await service.getStats();
+      expect(prisma.case.count).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { deletedAt: null } }),
+      );
+    });
+  });
+
+  // R13: Soft delete tests
+  describe('softDeleteCase', () => {
+    it('should soft-delete an accidental case', async () => {
+      prisma.caseComment.count.mockResolvedValue(0);
+      prisma.caseHistory.count.mockResolvedValue(0);
+      prisma.caseCommunicationLink.count.mockResolvedValue(0);
+      const result = await service.softDeleteCase(mockActor, 'case-001', 'Created by mistake');
+      expect(result).toBeDefined();
+      expect(prisma.case.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            deletedAt: expect.any(Date),
+            deletedBy: 'user-001',
+            deletionReason: 'Created by mistake',
+          }),
+        }),
+      );
+    });
+
+    it('should create case_deleted audit history', async () => {
+      prisma.caseComment.count.mockResolvedValue(0);
+      prisma.caseHistory.count.mockResolvedValue(0);
+      prisma.caseCommunicationLink.count.mockResolvedValue(0);
+      await service.softDeleteCase(mockActor, 'case-001', 'mistake');
+      expect(prisma.caseHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: 'case_deleted' }),
+        }),
+      );
+    });
+
+    it('should block deletion of materially worked case', async () => {
+      prisma.caseComment.count.mockResolvedValue(2);
+      await expect(
+        service.softDeleteCase(mockActor, 'case-001', 'test'),
+      ).rejects.toThrow(ValidationDomainError);
+    });
+
+    it('should reject deletion of already-deleted case', async () => {
+      prisma.case.findUnique.mockResolvedValue({ ...mockCase, deletedAt: new Date() });
+      await expect(
+        service.softDeleteCase(mockActor, 'case-001', 'test'),
+      ).rejects.toThrow(ValidationDomainError);
+    });
+
+    it('should reject deletion of nonexistent case', async () => {
+      prisma.case.findUnique.mockResolvedValue(null);
+      await expect(
+        service.softDeleteCase(mockActor, 'nonexistent', 'test'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // R14: Title/description history events
+  describe('updateCase history (R14)', () => {
+    it('should audit title change', async () => {
+      await service.updateCase(mockActor, 'case-001', { title: 'New Title' });
+      expect(prisma.caseHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: 'title', previousValue: 'Test support case', newValue: 'New Title' }),
+        }),
+      );
+    });
+
+    it('should audit description change', async () => {
+      await service.updateCase(mockActor, 'case-001', { description: 'Updated desc' });
+      expect(prisma.caseHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: 'description' }),
+        }),
+      );
+    });
+
+    it('should audit priority change', async () => {
+      await service.updateCase(mockActor, 'case-001', { priority: 'HIGH' });
+      expect(prisma.caseHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: 'priority', previousValue: 'MEDIUM', newValue: 'HIGH' }),
+        }),
+      );
     });
   });
 });

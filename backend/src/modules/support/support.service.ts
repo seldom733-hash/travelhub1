@@ -134,7 +134,7 @@ export class SupportService {
     const p = Math.max(1, page);
     const ps = Math.min(50, Math.max(1, pageSize));
 
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (filters?.status) where.status = filters.status;
     if (filters?.priority) where.priority = filters.priority;
     if (filters?.caseType) where.caseType = filters.caseType;
@@ -222,6 +222,12 @@ export class SupportService {
     });
 
     // Audit significant changes
+    if (dto.title && dto.title !== existing.title) {
+      await this.addHistory(id, 'title', actor.id, actor.username, existing.title, dto.title);
+    }
+    if (dto.description !== undefined && dto.description !== existing.description) {
+      await this.addHistory(id, 'description', actor.id, actor.username, existing.description ?? null, dto.description ?? null);
+    }
     if (dto.priority && dto.priority !== existing.priority) {
       await this.addHistory(id, 'priority', actor.id, actor.username, existing.priority, dto.priority);
     }
@@ -368,18 +374,63 @@ export class SupportService {
     });
   }
 
-  // ── Stats ──────────────────────────────────────────────────────────
+  // ── Soft Delete (R13) ─────────────────────────────────────────────
 
-  async getStats() {
-    const [total, open, inProgress, escalated, resolved, closed] = await Promise.all([
-      (this.prisma as any).case.count(),
-      (this.prisma as any).case.count({ where: { status: 'OPEN' } }),
-      (this.prisma as any).case.count({ where: { status: 'IN_PROGRESS' } }),
-      (this.prisma as any).case.count({ where: { status: 'ESCALATED' } }),
-      (this.prisma as any).case.count({ where: { status: 'RESOLVED' } }),
-      (this.prisma as any).case.count({ where: { status: 'CLOSED' } }),
+  async softDeleteCase(actor: AuthUser, id: string, reason: string) {
+    const existing = await (this.prisma as any).case.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Support case not found');
+    if (existing.deletedAt) throw new ValidationDomainError('Case is already deleted');
+
+    // Material-history safeguard: block deletion of materially worked cases
+    const [commentCount, transitionCount, linkCount] = await Promise.all([
+      (this.prisma as any).caseComment.count({ where: { caseId: id, deletedAt: null } }),
+      (this.prisma as any).caseHistory.count({ where: { caseId: id, action: { startsWith: 'status:' } } }),
+      (this.prisma as any).caseCommunicationLink.count({ where: { caseId: id } }),
     ]);
 
-    return { total, open, inProgress, escalated, resolved, closed };
+    const materialCount = commentCount + transitionCount + linkCount;
+    if (materialCount > 0) {
+      throw new ValidationDomainError(
+        'Cannot delete a materially worked case (has comments, transitions, or communication links). Close the case instead.',
+      );
+    }
+
+    const updated = await (this.prisma as any).case.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        deletedBy: actor.id,
+        deletionReason: reason,
+      },
+    });
+
+    await this.addHistory(id, 'case_deleted', actor.id, actor.username, null, 'deleted', reason);
+
+    this.logger.log(`Case ${existing.code} soft-deleted by ${actor.username}: ${reason}`);
+    return updated;
+  }
+
+  // ── Stats (R10) ──────────────────────────────────────────────────
+
+  async getStats() {
+    const baseWhere = { deletedAt: null };
+
+    const [total, open, inProgress, waitingCustomer, waitingPartner, waitingInternal, escalated, resolved, closed] = await Promise.all([
+      (this.prisma as any).case.count({ where: baseWhere }),
+      (this.prisma as any).case.count({ where: { ...baseWhere, status: 'OPEN' } }),
+      (this.prisma as any).case.count({ where: { ...baseWhere, status: 'IN_PROGRESS' } }),
+      (this.prisma as any).case.count({ where: { ...baseWhere, status: 'WAITING_CUSTOMER' } }),
+      (this.prisma as any).case.count({ where: { ...baseWhere, status: 'WAITING_PARTNER' } }),
+      (this.prisma as any).case.count({ where: { ...baseWhere, status: 'WAITING_INTERNAL' } }),
+      (this.prisma as any).case.count({ where: { ...baseWhere, status: 'ESCALATED' } }),
+      (this.prisma as any).case.count({ where: { ...baseWhere, status: 'RESOLVED' } }),
+      (this.prisma as any).case.count({ where: { ...baseWhere, status: 'CLOSED' } }),
+    ]);
+
+    return {
+      total, open, inProgress,
+      waiting: waitingCustomer + waitingPartner + waitingInternal,
+      escalated, resolved, closed,
+    };
   }
 }

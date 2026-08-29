@@ -132,6 +132,7 @@ function SupportListContent() {
               { label: t("support.stats.total", effectiveLocale), value: stats.total, icon: "🎫" },
               { label: t("support.stats.open", effectiveLocale), value: stats.open, icon: "🔵" },
               { label: t("support.stats.in_progress", effectiveLocale), value: stats.inProgress, icon: "⚙️" },
+              { label: t("support.stats.waiting", effectiveLocale), value: stats.waiting, icon: "⏳" },
               { label: t("support.stats.escalated", effectiveLocale), value: stats.escalated, icon: "🔴" },
               { label: t("support.stats.resolved", effectiveLocale), value: stats.resolved, icon: "✅" },
               { label: t("support.stats.closed", effectiveLocale), value: stats.closed, icon: "📦" },

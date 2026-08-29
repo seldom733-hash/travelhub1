@@ -68,6 +68,7 @@ export interface SupportStats {
   total: number;
   open: number;
   inProgress: number;
+  waiting: number;
   escalated: number;
   resolved: number;
   closed: number;
@@ -101,6 +102,9 @@ export const HISTORY_EVENT_MAP: Record<string, { titleKey: string; showValues: b
   comment: { titleKey: "support.history.event.comment", showValues: false },
   priority: { titleKey: "support.history.event.priority", showValues: true },
   caseType: { titleKey: "support.history.event.caseType", showValues: true },
+  title: { titleKey: "support.history.event.title", showValues: true },
+  description: { titleKey: "support.history.event.description", showValues: false },
+  case_deleted: { titleKey: "support.history.event.case_deleted", showValues: false },
 };
 
 /** Detect status transition actions (status:STATUS format) */
@@ -131,8 +135,14 @@ export const supportApi = {
   create: (data: { title: string; description?: string; caseType?: string; priority?: string; source?: string }) =>
     api.post<SupportCase>("/support/cases", data),
 
+  update: (id: string, data: { title?: string; description?: string; caseType?: string; priority?: string }) =>
+    api.patch<SupportCase>(`/support/cases/${id}`, data),
+
   transition: (id: string, status: string) =>
     api.post<SupportCase>(`/support/cases/${id}/transition`, { status }),
+
+  delete: (id: string, reason: string) =>
+    api.post<SupportCase>(`/support/cases/${id}/delete`, { reason }),
 
   stats: () => api.get<SupportStats>("/support/stats"),
 };

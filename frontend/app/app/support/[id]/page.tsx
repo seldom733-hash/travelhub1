@@ -8,7 +8,7 @@ import { useLocale, t } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 import {
   supportApi, VALID_TRANSITIONS, isStatusTransition,
-  HISTORY_EVENT_MAP,
+  HISTORY_EVENT_MAP, CASE_TYPES, PRIORITIES,
   type SupportCase, type CaseHistory,
 } from "@/lib/support";
 
@@ -30,6 +30,136 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
+/* ── Delete Dialog (R13) ───────────────────────────────────────────────────── */
+
+function DeleteDialog({
+  caseCode,
+  onConfirm,
+  onCancel,
+  locale,
+}: {
+  caseCode: string;
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+  locale: "ru" | "az" | "en";
+}) {
+  const [reason, setReason] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xl max-w-md w-full space-y-4">
+        <h3 className="text-sm font-semibold text-slate-800">{t("support.delete.title", locale)}</h3>
+        <p className="text-xs text-slate-500">{t("support.delete.warning", locale)}</p>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-400">
+            {t("support.delete.reason_label", locale)} *
+          </label>
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+            maxLength={2000}
+          />
+        </div>
+        <div className="flex justify-end gap-3">
+          <button onClick={onCancel} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
+            {t("support.edit.cancel", locale)}
+          </button>
+          <button
+            onClick={() => { if (reason.trim()) onConfirm(reason.trim()); }}
+            disabled={!reason.trim()}
+            className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t("support.delete.confirm", locale)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Edit Mode (R12) ───────────────────────────────────────────────────────── */
+
+function EditPanel({
+  detail,
+  onSave,
+  onCancel,
+  locale,
+  saving,
+}: {
+  detail: SupportCase;
+  onSave: (data: { title: string; description: string; caseType: string; priority: string }) => void;
+  onCancel: () => void;
+  locale: "ru" | "az" | "en";
+  saving: boolean;
+}) {
+  const [title, setTitle] = useState(detail.title);
+  const [description, setDescription] = useState(detail.description ?? "");
+  const [caseType, setCaseType] = useState(detail.caseType);
+  const [priority, setPriority] = useState(detail.priority);
+
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-5 space-y-4">
+      <div>
+        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+          {t("support.edit.title_label", locale)}
+        </label>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+          maxLength={200}
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+          {t("support.edit.desc_label", locale)}
+        </label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={4}
+          maxLength={5000}
+          className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            {t("support.edit.type_label", locale)}
+          </label>
+          <select value={caseType} onChange={(e) => setCaseType(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400">
+            {CASE_TYPES.map((ty) => (
+              <option key={ty} value={ty}>{t(`support.type.${ty}`, locale)}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            {t("support.edit.priority_label", locale)}
+          </label>
+          <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400">
+            {PRIORITIES.map((p) => (
+              <option key={p} value={p}>{t(`support.priority.${p}`, locale)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex gap-3 pt-2">
+        <button onClick={onCancel} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
+          {t("support.edit.cancel", locale)}
+        </button>
+        <button
+          onClick={() => onSave({ title, description, caseType, priority })}
+          disabled={saving || !title.trim()}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {saving ? "…" : t("support.edit.save", locale)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Detail Content ────────────────────────────────────────────────────────── */
 
 function CaseDetailContent() {
@@ -43,9 +173,14 @@ function CaseDetailContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<"comments" | "history" | "communications">("comments");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [statusError, setStatusError] = useState("");
   const effectiveLocale = locale as "ru" | "az" | "en";
 
   const canUpdate = user?.permissions.includes("support.case.update") ?? false;
+  const canDelete = user?.permissions.includes("support.case.delete") ?? false;
 
   const loadDetail = useCallback(async () => {
     try {
@@ -61,13 +196,58 @@ function CaseDetailContent() {
 
   useEffect(() => { void loadDetail(); }, [loadDetail]);
 
-  const transition = async (status: string) => {
-    if (!detail) return;
+  // R5: Status dropdown transition
+  const handleStatusChange = async (newStatus: string) => {
+    if (!detail || newStatus === detail.status) return;
+    setStatusError("");
     try {
-      await supportApi.transition(detail.id, status);
+      await supportApi.transition(detail.id, newStatus);
+      await loadDetail();
+    } catch (e) {
+      setStatusError((e as Error).message);
+    }
+  };
+
+  // R11: Priority dropdown
+  const handlePriorityChange = async (newPriority: string) => {
+    if (!detail || newPriority === detail.priority) return;
+    try {
+      await supportApi.update(detail.id, { priority: newPriority });
       await loadDetail();
     } catch (e) {
       setError((e as Error).message);
+    }
+  };
+
+  // R12: Edit save
+  const handleEditSave = async (data: { title: string; description: string; caseType: string; priority: string }) => {
+    if (!detail) return;
+    setSaving(true);
+    try {
+      await supportApi.update(detail.id, data);
+      setEditing(false);
+      await loadDetail();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // R13: Soft delete
+  const handleDelete = async (reason: string) => {
+    if (!detail) return;
+    try {
+      await supportApi.delete(detail.id, reason);
+      router.push("/app/support");
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (msg.includes("materially worked")) {
+        setError(t("support.delete.material_block", effectiveLocale));
+      } else {
+        setError(msg);
+      }
+      setShowDelete(false);
     }
   };
 
@@ -94,11 +274,36 @@ function CaseDetailContent() {
         title={detail.code}
         breadcrumbs={["TravelHub", t("support.title", effectiveLocale), detail.code]}
         actions={
-          <button onClick={() => router.push("/app/support")} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
-            {t("support.detail.back", effectiveLocale)}
-          </button>
+          <div className="flex items-center gap-2">
+            {canUpdate && (
+              <button onClick={() => setEditing(!editing)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                {t("support.edit.btn", effectiveLocale)}
+              </button>
+            )}
+            {canDelete && (
+              <button onClick={() => setShowDelete(true)} className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                {t("support.delete.btn", effectiveLocale)}
+              </button>
+            )}
+            <button onClick={() => router.push("/app/support")} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+              {t("support.detail.back", effectiveLocale)}
+            </button>
+          </div>
         }
       />
+
+      {error && (
+        <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>
+      )}
+
+      {showDelete && (
+        <DeleteDialog
+          caseCode={detail.code}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDelete(false)}
+          locale={effectiveLocale}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-6 p-6 xl:grid-cols-3">
         {/* Left */}
@@ -112,18 +317,56 @@ function CaseDetailContent() {
             {detail.description && <p className="text-sm text-slate-500 whitespace-pre-wrap">{detail.description}</p>}
           </div>
 
-          {canUpdate && allowed.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                {t("support.detail.lifecycle_actions", effectiveLocale)}
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {allowed.map((next) => (
-                  <button key={next} onClick={() => void transition(next)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-800">
-                    → {t(`support.status.${next}`, effectiveLocale)}
-                  </button>
-                ))}
+          {/* R12: Edit panel */}
+          {editing && canUpdate && (
+            <EditPanel
+              detail={detail}
+              onSave={handleEditSave}
+              onCancel={() => { setEditing(false); setError(""); }}
+              locale={effectiveLocale}
+              saving={saving}
+            />
+          )}
+
+          {/* R5: Status dropdown + R11: Priority dropdown */}
+          {canUpdate && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center gap-6">
+                {/* R5: Status dropdown */}
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    {t("support.detail.status_change", effectiveLocale)}
+                  </label>
+                  <select
+                    value={detail.status}
+                    onChange={(e) => void handleStatusChange(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-blue-400"
+                  >
+                    <option value={detail.status}>{t(`support.status.${detail.status}`, effectiveLocale)}</option>
+                    {allowed.map((next) => (
+                      <option key={next} value={next}>{t(`support.status.${next}`, effectiveLocale)}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* R11: Priority dropdown */}
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    {t("support.detail.priority_change", effectiveLocale)}
+                  </label>
+                  <select
+                    value={detail.priority}
+                    onChange={(e) => void handlePriorityChange(e.target.value)}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-blue-400"
+                  >
+                    {PRIORITIES.map((p) => (
+                      <option key={p} value={p}>{t(`support.priority.${p}`, effectiveLocale)}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+              {statusError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{statusError}</div>
+              )}
             </div>
           )}
 
@@ -169,7 +412,9 @@ function CaseDetailContent() {
                           </div>
                         )}
                         {!isStatusTransition(h.action) && h.previousValue && h.newValue && (
-                          <div className="mt-0.5 text-slate-500">{h.previousValue} → {h.newValue}</div>
+                          <div className="mt-0.5 text-slate-500">
+                            {h.previousValue} → {h.newValue}
+                          </div>
                         )}
                         {h.details && <div className="mt-0.5 text-slate-400">{h.details}</div>}
                         <div className="mt-0.5 text-[10px] text-slate-400">

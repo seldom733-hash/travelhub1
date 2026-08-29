@@ -4745,6 +4745,11 @@ model Case {
   closedAt        DateTime?
   version         Int                  @default(1)
 
+  // ── Soft delete (R13) ──
+  deletedAt       DateTime?
+  deletedBy       String?
+  deletionReason  String?
+
   comments        CaseComment[]
   caseLinks       CaseCommunicationLink[]
   history         CaseHistory[]

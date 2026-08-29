@@ -1380,6 +1380,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "support.stats.total": { ru: "Всего", az: "Cəmi", en: "Total" },
   "support.stats.open": { ru: "Открытых", az: "Açıq", en: "Open" },
   "support.stats.in_progress": { ru: "В работе", az: "İşlənir", en: "In Progress" },
+  "support.stats.waiting": { ru: "Ожидают", az: "Gözləyir", en: "Waiting" },
   "support.stats.escalated": { ru: "Эскалированных", az: "Miqrasiya edilmiş", en: "Escalated" },
   "support.stats.resolved": { ru: "Решённых", az: "Həll edilmiş", en: "Resolved" },
   "support.stats.closed": { ru: "Закрытых", az: "Bağlanmış", en: "Closed" },
@@ -1396,6 +1397,25 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "support.form.cancel": { ru: "Отмена", az: "Ləğv et", en: "Cancel" },
   // detail
   "support.detail.lifecycle_actions": { ru: "Изменить статус", az: "Statusu dəyiş", en: "Change status" },
+  // R5: status dropdown
+  "support.detail.status_change": { ru: "Статус", az: "Status", en: "Status" },
+  // R11: priority dropdown
+  "support.detail.priority_change": { ru: "Приоритет", az: "Prioritet", en: "Priority" },
+  // R12: edit mode
+  "support.edit.title_label": { ru: "Заголовок", az: "Başlıq", en: "Title" },
+  "support.edit.desc_label": { ru: "Описание", az: "Təsvir", en: "Description" },
+  "support.edit.type_label": { ru: "Тип", az: "Növ", en: "Type" },
+  "support.edit.priority_label": { ru: "Приоритет", az: "Prioritet", en: "Priority" },
+  "support.edit.save": { ru: "Сохранить", az: "Yadda saxla", en: "Save" },
+  "support.edit.cancel": { ru: "Отмена", az: "Ləğv et", en: "Cancel" },
+  "support.edit.btn": { ru: "Редактировать", az: "Redaktə et", en: "Edit" },
+  // R13: delete
+  "support.delete.btn": { ru: "Удалить", az: "Sil", en: "Delete" },
+  "support.delete.title": { ru: "Удалить обращение?", az: "Müraciəti silmək?", en: "Delete case?" },
+  "support.delete.warning": { ru: "Удаление предназначено для ошибочно созданных обращений.", az: "Silmə yanlış yaradılmış müraciətlər üçündür.", en: "Deletion is for accidentally created cases." },
+  "support.delete.reason_label": { ru: "Причина удаления", az: "Silmə səbəbi", en: "Deletion reason" },
+  "support.delete.confirm": { ru: "Удалить", az: "Sil", en: "Delete" },
+  "support.delete.material_block": { ru: "Нельзя удалить обработанное обращение. Закройте его вместо этого.", az: "İşlənmiş müraciəti silmək olmur. Əvəzində bağlayın.", en: "Cannot delete a worked case. Close it instead." },
   "support.comment.internal_badge": { ru: "ВНУТРЕННИЙ", az: "DAXİLİ", en: "INTERNAL" },
   // history events
   "support.history.event.created": { ru: "Обращение создано", az: "Müraciət yaradıldı", en: "Case created" },
@@ -1405,6 +1425,9 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "support.history.event.priority": { ru: "Изменён приоритет", az: "Prioritet dəyişdirildi", en: "Priority changed" },
   "support.history.event.caseType": { ru: "Изменён тип", az: "Növ dəyişdirildi", en: "Type changed" },
   "support.history.event.status_changed": { ru: "Статус изменён", az: "Status dəyişdirildi", en: "Status changed" },
+  "support.history.event.title": { ru: "Изменён заголовок", az: "Başlıq dəyişdirildi", en: "Title changed" },
+  "support.history.event.description": { ru: "Изменено описание", az: "Təsvir dəyişdirildi", en: "Description changed" },
+  "support.history.event.case_deleted": { ru: "Обращение удалено", az: "Müraciət silindi", en: "Case deleted" },
 };
 
 /** Локализованная строка по ключу (fallback — сам ключ, затем default locale). */

@@ -215,6 +215,8 @@ export const PERMISSIONS = {
   "support.case.read": "Чтение support cases",
   "support.case.update": "Обновление support cases (status, priority, type, comments)",
   "support.case.assign": "Назначение support cases исполнителю",
+  // R13: ADMIN-only controlled soft deletion
+  "support.case.delete": "Административное мягкое удаление support cases (только ADMIN)",
   "documents.read": "Чтение документов",
   "documents.write": "Управление документами",
   "settings.read": "Чтение настроек",

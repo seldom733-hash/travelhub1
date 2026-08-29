@@ -87,6 +87,13 @@ class EscalateCaseBody {
   escalationReason!: string;
 }
 
+class SoftDeleteCaseBody {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  reason!: string;
+}
+
 class CreateCommentBody {
   @IsString()
   @MinLength(1)
@@ -201,6 +208,16 @@ export class SupportController {
     @CurrentUser() actor: AuthedRequest['user'],
   ) {
     return this.support.linkCommunication(actor, id, communicationId);
+  }
+
+  @Post('cases/:id/delete')
+  @RequirePermissions('support.case.delete')
+  softDeleteCase(
+    @Param('id') id: string,
+    @Body() dto: SoftDeleteCaseBody,
+    @CurrentUser() actor: AuthedRequest['user'],
+  ) {
+    return this.support.softDeleteCase(actor, id, dto.reason);
   }
 
   @Get('stats')
