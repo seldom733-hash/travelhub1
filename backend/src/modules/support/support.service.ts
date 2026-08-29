@@ -43,6 +43,7 @@ export interface UpdateCaseDto {
 
 export interface TransitionCaseDto {
   status: string;
+  escalationReason?: string;
 }
 
 export interface AssignCaseDto {
@@ -85,6 +86,20 @@ export class SupportService {
   // ── CRUD ───────────────────────────────────────────────────────────
 
   async createCase(actor: AuthUser, dto: CreateCaseDto) {
+    // F3: Validate related entity existence
+    if (dto.customerId) {
+      const customer = await (this.prisma as any).customer.findUnique({ where: { id: dto.customerId } });
+      if (!customer) throw new ValidationDomainError('Referenced customer does not exist');
+    }
+    if (dto.orderId) {
+      const order = await (this.prisma as any).order.findUnique({ where: { id: dto.orderId } });
+      if (!order) throw new ValidationDomainError('Referenced order does not exist');
+    }
+    if (dto.bookingId) {
+      const booking = await (this.prisma as any).booking.findUnique({ where: { id: dto.bookingId } });
+      if (!booking) throw new ValidationDomainError('Referenced booking does not exist');
+    }
+
     const code = await this.ids.nextCode(this.prisma, 'SUP');
 
     const caseRecord = await (this.prisma as any).case.create({
@@ -132,7 +147,16 @@ export class SupportService {
         orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
         skip: (p - 1) * ps,
         take: ps,
-        include: { comments: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 3 } },
+        include: {
+          comments: {
+            where: {
+              deletedAt: null,
+              isInternal: (actor.role === 'BUYER' || actor.role === 'PARTNER') ? false : undefined,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 3,
+          },
+        },
       }),
       (this.prisma as any).case.count({ where }),
     ]);
@@ -144,7 +168,14 @@ export class SupportService {
     const caseRecord = await (this.prisma as any).case.findUnique({
       where: { id },
       include: {
-        comments: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
+        comments: {
+          where: {
+            deletedAt: null,
+            // Server-authoritative filtering: internal comments only for internal staff
+            isInternal: (actor.role === 'BUYER' || actor.role === 'PARTNER') ? false : undefined,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
         caseLinks: true,
         history: { orderBy: { createdAt: 'desc' }, take: 20 },
       },
@@ -157,7 +188,13 @@ export class SupportService {
     const caseRecord = await (this.prisma as any).case.findUnique({
       where: { code },
       include: {
-        comments: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
+        comments: {
+          where: {
+            deletedAt: null,
+            isInternal: (actor.role === 'BUYER' || actor.role === 'PARTNER') ? false : undefined,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
         caseLinks: true,
         history: { orderBy: { createdAt: 'desc' }, take: 20 },
       },
@@ -215,10 +252,15 @@ export class SupportService {
       data.resolvedAt = null;
       data.closedAt = null;
     }
+    if (dto.status === 'ESCALATED') {
+      data.escalatedAt = new Date();
+      data.escalatedById = actor.id;
+      if (dto.escalationReason) data.escalationReason = dto.escalationReason;
+    }
 
     const updated = await (this.prisma as any).case.update({ where: { id }, data });
 
-    await this.addHistory(id, `status:${dto.status}`, actor.id, actor.username, existing.status, dto.status);
+    await this.addHistory(id, `status:${dto.status}`, actor.id, actor.username, existing.status, dto.status, dto.escalationReason);
 
     this.logger.log(`Case ${existing.code}: ${existing.status} → ${dto.status} by ${actor.username}`);
     return updated;
@@ -229,6 +271,13 @@ export class SupportService {
   async assignCase(actor: AuthUser, id: string, dto: AssignCaseDto) {
     const existing = await (this.prisma as any).case.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Support case not found');
+
+    // F3: Validate assignee existence and eligibility
+    const assignee = await (this.prisma as any).user.findUnique({ where: { id: dto.assignedToId } });
+    if (!assignee) throw new ValidationDomainError('Assignee user does not exist');
+    if (assignee.role === 'BUYER' || assignee.role === 'PARTNER') {
+      throw new ValidationDomainError('Cannot assign case to external roles (BUYER/PARTNER)');
+    }
 
     const updated = await (this.prisma as any).case.update({
       where: { id },
@@ -243,25 +292,8 @@ export class SupportService {
   // ── Escalation ─────────────────────────────────────────────────────
 
   async escalateCase(actor: AuthUser, id: string, dto: EscalateCaseDto) {
-    const existing = await (this.prisma as any).case.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Support case not found');
-    if (existing.status === 'CLOSED') {
-      throw new ValidationDomainError('Cannot escalate a closed support case');
-    }
-
-    const updated = await (this.prisma as any).case.update({
-      where: { id },
-      data: {
-        status: 'ESCALATED',
-        escalatedAt: new Date(),
-        escalatedById: actor.id,
-        escalationReason: dto.escalationReason,
-      },
-    });
-
-    await this.addHistory(id, 'escalated', actor.id, actor.username, existing.status, 'ESCALATED', dto.escalationReason);
-
-    return updated;
+    // F4: Delegate to canonical transition authority
+    return this.transitionCase(actor, id, { status: 'ESCALATED', escalationReason: dto.escalationReason });
   }
 
   // ── Comments ───────────────────────────────────────────────────────
@@ -299,6 +331,10 @@ export class SupportService {
   async linkCommunication(actor: AuthUser, caseId: string, communicationId: string) {
     const existing = await (this.prisma as any).case.findUnique({ where: { id: caseId } });
     if (!existing) throw new NotFoundException('Support case not found');
+
+    // F5: Validate communication existence
+    const communication = await (this.prisma as any).communication.findUnique({ where: { id: communicationId } });
+    if (!communication) throw new ValidationDomainError('Referenced communication does not exist');
 
     return (this.prisma as any).caseCommunicationLink.upsert({
       where: { caseId_communicationId: { caseId, communicationId } },

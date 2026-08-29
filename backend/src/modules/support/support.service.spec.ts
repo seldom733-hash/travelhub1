@@ -76,6 +76,13 @@ describe('SupportService', () => {
       caseHistory: {
         create: jest.fn().mockResolvedValue({}),
       },
+      // F3: Related entities
+      customer: { findUnique: jest.fn().mockResolvedValue({ id: 'cust-001' }) },
+      order: { findUnique: jest.fn().mockResolvedValue({ id: 'ord-001' }) },
+      booking: { findUnique: jest.fn().mockResolvedValue({ id: 'bk-001' }) },
+      user: { findUnique: jest.fn().mockResolvedValue({ id: 'user-002', role: 'OPERATOR' }) },
+      // F5: Communication entity
+      communication: { findUnique: jest.fn().mockResolvedValue({ id: 'comm-001' }) },
     };
 
     ids = {
@@ -112,6 +119,22 @@ describe('SupportService', () => {
           data: expect.objectContaining({ action: 'created' }),
         }),
       );
+    });
+
+    // F3: Negative matrix tests
+    it('should reject nonexistent customer', async () => {
+      prisma.customer.findUnique.mockResolvedValue(null);
+      await expect(service.createCase(mockActor, { title: 'Test', customerId: 'bad-id' })).rejects.toThrow();
+    });
+
+    it('should reject nonexistent order', async () => {
+      prisma.order.findUnique.mockResolvedValue(null);
+      await expect(service.createCase(mockActor, { title: 'Test', orderId: 'bad-id' })).rejects.toThrow();
+    });
+
+    it('should reject nonexistent booking', async () => {
+      prisma.booking.findUnique.mockResolvedValue(null);
+      await expect(service.createCase(mockActor, { title: 'Test', bookingId: 'bad-id' })).rejects.toThrow();
     });
   });
 
@@ -232,6 +255,17 @@ describe('SupportService', () => {
         }),
       );
     });
+
+    // F3: Negative matrix tests
+    it('should reject nonexistent assignee', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      await expect(service.assignCase(mockActor, 'case-001', { assignedToId: 'bad-id' })).rejects.toThrow();
+    });
+
+    it('should reject ineligible assignee (BUYER)', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'bad-user', role: 'BUYER' });
+      await expect(service.assignCase(mockActor, 'case-001', { assignedToId: 'bad-user' })).rejects.toThrow();
+    });
   });
 
   describe('escalateCase', () => {
@@ -267,6 +301,14 @@ describe('SupportService', () => {
     it('should throw NotFoundException for nonexistent case', async () => {
       prisma.case.findUnique.mockResolvedValue(null);
       await expect(service.addComment(mockActor, 'nonexistent', { body: 'test' })).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('linkCommunication', () => {
+    // F5: Negative matrix tests
+    it('should reject nonexistent communication', async () => {
+      prisma.communication.findUnique.mockResolvedValue(null);
+      await expect(service.linkCommunication(mockActor, 'case-001', 'bad-comm')).rejects.toThrow();
     });
   });
 
