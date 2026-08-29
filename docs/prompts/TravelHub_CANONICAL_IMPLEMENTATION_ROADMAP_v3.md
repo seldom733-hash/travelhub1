@@ -984,7 +984,7 @@ commit `c543ab8`; report — `PHASE_3_STEP_3.7A.2_FINAL_RUNTIME_EVIDENCE_CLOSURE
 
 ## Marketing
 
-· **Step 3.8 --- Marketing Domain**\
+· **Step 3.8 --- Marketing Domain** ✅ APPROVED (STRICT REVIEW APPROVED 2026-08-29; implementation 541fe4b; evidence 8b32e34; remediation 38d88fd; final evidence closure b8627b7; strict review 4135025; Campaign/Audience/Attribution foundations; Platform-only Marketing RBAC (ADMIN/DIRECTOR/MARKETER/OPERATOR); lifecycle DRAFT→SCHEDULED→ACTIVE→PAUSED/COMPLETED/CANCELLED; entity validation + type integrity + duplicate handling (409); audience criteria whitelist/blacklist; partner-scoped data isolation; 89/89 tests + 49/49 runtime gates; deferred: Marketing UI, EMAIL/SMS/PUSH, consent, automation, multi-touch attribution, Partner Marketing entitlement).\
 Campaign, audience, channel, attribution, lifecycle.
 
 · **Step 3.9 --- Marketing Center UI**
@@ -2096,11 +2096,12 @@ implementation → strict review → approval и остаются валидны
 | Step 3.7A.1 — Contact Policy Evidence Closure | ✅ DONE (committed 2c5b202) |
 | Step 3.7A.2 — Final Runtime Evidence Closure | ✅ DONE (committed c543ab8) |
 | Step 3.7B — Communication Business-Context Integration | ✅ DONE — STRICT REVIEW APPROVED (closed 27284ab) |
+| Step 3.8 — Marketing Domain | ✅ DONE — STRICT REVIEW APPROVED (closed 4135025) |
 
-**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.7B (all VERDICT A).
+**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.8 (all VERDICT A).
 
-**Canonical NEXT:** `PHASE 3 — STEP 3.8 — MARKETING DOMAIN`
-(Campaign, audience, channel, attribution, lifecycle — next section after Communication Integration).
+**Canonical NEXT:** `PHASE 3 — STEP 3.9 — MARKETING CENTER UI`
+(Marketing UI frontend — next section after Marketing Domain foundation).
 
 ### Полная авторитетная последовательность после 2.5B
 
@@ -2173,14 +2174,13 @@ Platform Refund           → CREATE/APPROVE/EXECUTE SEPARATED (Step 3.6C.1)
 Partner Product creation  → PRESERVED (actor.partnerId derived)
 Partner ownership spoof  → PREVENTED
 Product.partnerId NOT NULL → NOT READY (legacy preserved)
-```
+```**Canonical NEXT:** `PHASE 3 — STEP 3.9 — MARKETING CENTER UI`
 
-**Canonical NEXT:** `PHASE 3 — STEP 3.8 — MARKETING DOMAIN`
+Reason: Step 3.8 Marketing Domain is now CLOSED (Strict Review APPROVED). The Marketing Domain foundation (Campaign/Audience/Attribution) is complete. The next section in the canonical roadmap ordering is Marketing Center UI.
 
-Reason: Step 3.7B Communication Business-Context Integration is now CLOSED (Strict Review APPROVED). The Communication Integration series (3.7/3.7A/3.7B) is complete. The next section in the canonical roadmap ordering is Marketing.
+Dependencies satisfied: Step 3.8 CLOSED; Marketing Domain foundation established.
 
-Dependencies satisfied: Step 3.7B CLOSED; Communication domain foundation established.
-Blocking prerequisites: None for Marketing Domain foundation.
+Blocking prerequisites: None for Marketing Center UI.
 
 **Step 2.8A conditional dependency (детерминированный дефолт):** date-based
 period pricing/availability НЕ требует Step 2.8A; time-slot / exact
