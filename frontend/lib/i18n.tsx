@@ -1388,6 +1388,23 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "support.error.not_found": { ru: "Обращение не найдено", az: "Müraciət tapılmadı", en: "Case not found" },
   "support.error.retry": { ru: "Повторить", az: "Yenidən cəhd et", en: "Retry" },
   "support.cases_empty": { ru: "Обращений пока нет", az: "Hələ müraciət yoxdur", en: "No cases yet" },
+  // filter labels
+  "support.filter.all_status": { ru: "Статус — Все", az: "Status — Hamısı", en: "Status — All" },
+  "support.filter.all_priority": { ru: "Приоритет — Все", az: "Prioritet — Hamısı", en: "Priority — All" },
+  "support.filter.all_type": { ru: "Тип — Все", az: "Növ — Hamısı", en: "Type — All" },
+  // create form
+  "support.form.cancel": { ru: "Отмена", az: "Ləğv et", en: "Cancel" },
+  // detail
+  "support.detail.lifecycle_actions": { ru: "Изменить статус", az: "Statusu dəyiş", en: "Change status" },
+  "support.comment.internal_badge": { ru: "ВНУТРЕННИЙ", az: "DAXİLİ", en: "INTERNAL" },
+  // history events
+  "support.history.event.created": { ru: "Обращение создано", az: "Müraciət yaradıldı", en: "Case created" },
+  "support.history.event.assigned": { ru: "Назначен ответственный", az: "Məsul təyin edildi", en: "Assigned" },
+  "support.history.event.escalated": { ru: "Эскалация", az: "Miqrasiya", en: "Escalated" },
+  "support.history.event.comment": { ru: "Добавлен комментарий", az: "Şərh əlavə edildi", en: "Comment added" },
+  "support.history.event.priority": { ru: "Изменён приоритет", az: "Prioritet dəyişdirildi", en: "Priority changed" },
+  "support.history.event.caseType": { ru: "Изменён тип", az: "Növ dəyişdirildi", en: "Type changed" },
+  "support.history.event.status_changed": { ru: "Статус изменён", az: "Status dəyişdirildi", en: "Status changed" },
 };
 
 /** Локализованная строка по ключу (fallback — сам ключ, затем default locale). */
