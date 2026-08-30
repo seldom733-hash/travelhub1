@@ -183,9 +183,9 @@ function AnalyticsContent() {
       {m && (
         <Kpi items={[
           /* R4-02: KPI drill-down links */
-          { label: t("analytics.kpi.gmv", locale), value: fmt(m.gmv.current, m.gmvCurrency), icon: "\uD83D\uDCB0" },
-          { label: t("analytics.kpi.revenue", locale), value: fmt(m.revenue.current, m.revenueCurrency), icon: "\uD83D\uDCC8" },
-          { label: t("analytics.kpi.net_revenue", locale), value: fmt(m.netRevenue.current, m.revenueCurrency), icon: "\uD83D\uDCCA" },
+          { label: t("analytics.kpi.gmv", locale), value: fmt(m.gmv.current, m.gmvCurrency), icon: "\uD83D\uDCB0", href: "/app/orders" },
+          { label: t("analytics.kpi.revenue", locale), value: fmt(m.revenue.current, m.revenueCurrency), icon: "\uD83D\uDCC8", href: "/app/orders" },
+          { label: t("analytics.kpi.net_revenue", locale), value: fmt(m.netRevenue.current, m.revenueCurrency), icon: "\uD83D\uDCCA", href: "/app/orders" },
           /* RT7: Commission with currency */
           { label: t("analytics.kpi.commission", locale), value: fmt(m.commissionAccrued.current, m.commissionCurrency), icon: "\uD83C\uDFE6" },
           { label: t("analytics.kpi.orders", locale), value: m.ordersCreated.current, icon: "\uD83D\uDDCE\uFE0F", href: "/app/orders" },
@@ -195,10 +195,10 @@ function AnalyticsContent() {
           { label: t("analytics.kpi.sessions", locale), value: (m.marketplaceSessions.current ?? 0) + (m.storefrontSessions.current ?? 0), icon: "\uD83C\uDF10" },
           { label: t("analytics.kpi.customers", locale), value: (m.marketplaceCustomers.current ?? 0) + (m.storefrontCustomers.current ?? 0), icon: "\uD83D\uDC65", href: "/app/crm" },
           { label: t("analytics.kpi.partners", locale), value: (m.marketplacePartners.current ?? 0) + (m.storefrontPartners.current ?? 0), icon: "\uD83E\uDD1D", href: "/app/partners/onboarding" },
-          { label: t("analytics.kpi.qualified_gmv", locale), value: fmt(m.qualifiedGmv.current, m.gmvCurrency), icon: "\u2705" },
+          { label: t("analytics.kpi.qualified_gmv", locale), value: fmt(m.qualifiedGmv.current, m.gmvCurrency), icon: "\u2705", href: "/app/orders" },
           /* RT4: REMOVED duplicate — completedGmv = gmv (both FULFILLED+CLOSED) */
-          { label: t("analytics.kpi.collected_gmv", locale), value: fmt(m.collectedGmv.current, m.gmvCurrency), icon: "\uD83D\uDCB5" },
-          { label: t("analytics.kpi.outstanding_gmv", locale), value: fmt(m.outstandingGmv.current, m.gmvCurrency), icon: "\u23F3" },
+          { label: t("analytics.kpi.collected_gmv", locale), value: fmt(m.collectedGmv.current, m.gmvCurrency), icon: "\uD83D\uDCB5", href: "/app/orders" },
+          { label: t("analytics.kpi.outstanding_gmv", locale), value: fmt(m.outstandingGmv.current, m.gmvCurrency), icon: "\u23F3", href: "/app/orders" },
         ]} />
       )}
 
