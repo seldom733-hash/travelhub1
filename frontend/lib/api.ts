@@ -387,6 +387,118 @@ export const crmAnalyticsApi = {
   },
 };
 
+// ── Platform Analytics Engine (Step 3.3 / Pre-3.12 IA Separation) ─────
+
+export type AnalyticsPreset = 'TODAY' | 'LAST_3_DAYS' | 'LAST_7_DAYS' | 'MONTH' | 'LAST_6_MONTHS' | 'YEAR' | 'CUSTOM';
+
+interface ComparisonValue<T> {
+  current: T;
+  previous?: T;
+  changePercent?: number;
+}
+
+export interface CompanyKpiResponse {
+  period: { start: string; endExclusive: string; timezone: string; preset: string };
+  comparison?: { start: string; endExclusive: string };
+  metrics: {
+    gmv: ComparisonValue<string>;
+    revenue: ComparisonValue<string>;
+    netRevenue: ComparisonValue<string>;
+    commissionAccrued: ComparisonValue<string>;
+    ordersCreated: ComparisonValue<number>;
+    ordersFulfilled: ComparisonValue<number>;
+    bookingsRequested: ComparisonValue<number>;
+    bookingsConfirmed: ComparisonValue<number>;
+    bookingsCompleted: ComparisonValue<number>;
+    paymentsCaptured: ComparisonValue<number>;
+    refundsProcessed: ComparisonValue<number>;
+    marketplaceSessions: ComparisonValue<number>;
+    storefrontSessions: ComparisonValue<number>;
+    marketplacePartners: ComparisonValue<number>;
+    storefrontPartners: ComparisonValue<number>;
+    marketplaceCustomers: ComparisonValue<number>;
+    storefrontCustomers: ComparisonValue<number>;
+    averageOrderValue: ComparisonValue<string>;
+    refunds: ComparisonValue<string>;
+    refundsCurrency: string;
+    gmvCurrency: string;
+    revenueCurrency: string;
+    qualifiedGmv: ComparisonValue<string>;
+    completedGmv: ComparisonValue<string>;
+    collectedGmv: ComparisonValue<string>;
+    outstandingGmv: ComparisonValue<string>;
+  };
+}
+
+export interface ConversionFunnelResponse {
+  period: { start: string; endExclusive: string; timezone: string; preset: string };
+  stages: Array<{ stage: string; count: number; uniqueEntities?: number }>;
+}
+
+export interface TimeSeriesResponse {
+  period: { start: string; endExclusive: string; timezone: string; preset: string };
+  granularity: string;
+  buckets: Array<{ label: string; start: string; endExclusive: string; value: number }>;
+}
+
+export interface PartnerPerformanceResponse {
+  period: { start: string; endExclusive: string; timezone: string; preset: string };
+  partners: Array<{
+    partnerId: string; partnerName: string; gmv: string; revenue: string;
+    commission: string; ordersCount: number; bookingsCount: number;
+    activeProducts: number; bookingCompletionRate: number | null;
+  }>;
+}
+
+export interface FinancialReconciliationResponse {
+  period: { start: string; endExclusive: string; timezone: string; preset: string };
+  currencies: Array<{
+    currency: string; totalPayments: string; totalRefunds: string;
+    netPayments: string; totalCommission: string;
+  }>;
+  totalLedgerEntries: number;
+}
+
+export const analyticsApi = {
+  getCompanyKpi: (opts?: { preset?: AnalyticsPreset; startDate?: string; endDate?: string; comparison?: boolean }) => {
+    const sp = new URLSearchParams();
+    sp.set('preset', opts?.preset ?? 'MONTH');
+    if (opts?.startDate) sp.set('startDate', opts.startDate);
+    if (opts?.endDate) sp.set('endDate', opts.endDate);
+    if (opts?.comparison === false) sp.set('comparison', 'false');
+    return api.get<CompanyKpiResponse>(`/analytics/company-kpi?${sp.toString()}`);
+  },
+  getConversionFunnel: (opts?: { preset?: AnalyticsPreset; startDate?: string; endDate?: string }) => {
+    const sp = new URLSearchParams();
+    sp.set('preset', opts?.preset ?? 'MONTH');
+    if (opts?.startDate) sp.set('startDate', opts.startDate);
+    if (opts?.endDate) sp.set('endDate', opts.endDate);
+    return api.get<ConversionFunnelResponse>(`/analytics/conversion-funnel?${sp.toString()}`);
+  },
+  getTimeSeries: (opts?: { preset?: AnalyticsPreset; startDate?: string; endDate?: string; metric?: string }) => {
+    const sp = new URLSearchParams();
+    sp.set('preset', opts?.preset ?? 'MONTH');
+    if (opts?.startDate) sp.set('startDate', opts.startDate);
+    if (opts?.endDate) sp.set('endDate', opts.endDate);
+    if (opts?.metric) sp.set('metric', opts.metric);
+    return api.get<TimeSeriesResponse>(`/analytics/time-series?${sp.toString()}`);
+  },
+  getPartnerPerformance: (opts?: { preset?: AnalyticsPreset; startDate?: string; endDate?: string }) => {
+    const sp = new URLSearchParams();
+    sp.set('preset', opts?.preset ?? 'MONTH');
+    if (opts?.startDate) sp.set('startDate', opts.startDate);
+    if (opts?.endDate) sp.set('endDate', opts.endDate);
+    return api.get<PartnerPerformanceResponse>(`/analytics/partner-performance?${sp.toString()}`);
+  },
+  getFinancialReconciliation: (opts?: { preset?: AnalyticsPreset; startDate?: string; endDate?: string }) => {
+    const sp = new URLSearchParams();
+    sp.set('preset', opts?.preset ?? 'MONTH');
+    if (opts?.startDate) sp.set('startDate', opts.startDate);
+    if (opts?.endDate) sp.set('endDate', opts.endDate);
+    return api.get<FinancialReconciliationResponse>(`/analytics/financial-reconciliation?${sp.toString()}`);
+  },
+};
+
 export const activityApi = {
   listCustomer: (
     customerId: string,
