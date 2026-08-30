@@ -270,13 +270,12 @@ function AnalyticsContent() {
                   return (
                     <div
                       key={b.label}
-                      className="group relative flex flex-1 items-end"
+                      className="group relative flex-1 h-full flex items-end"
                     >
                       <div
                         className="w-full rounded-t bg-blue-500 transition-all hover:bg-blue-600"
                         style={{
                           height: `${h}%`,
-                          minHeight: b.value > 0 ? 3 : 0,
                         }}
                       />
                       {/* Tooltip on hover */}
