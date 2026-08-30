@@ -163,11 +163,11 @@ export class BookingService {
         createdAt: { lt: new Date(Date.now() - (parseInt(query.slaMinutes ?? "240", 10)) * 60 * 1000) },
       } : {}),
     };
-    // Date range filtering on createdAt (inclusive end-of-day)
+    // R5-04: Date range filtering on createdAt (exclusive end — consistent with Analytics half-open [from, to))
     if (query.dateFrom || query.dateTo) {
       where.createdAt = {
         ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-        ...(query.dateTo ? { lte: new Date(new Date(query.dateTo).getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
+        ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
       };
     }
     const [items, total] = await Promise.all([

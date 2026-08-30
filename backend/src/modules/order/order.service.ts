@@ -451,11 +451,11 @@ export class OrderService {
         : {}),
     };
 
-    // Date range filtering on createdAt (inclusive end-of-day)
+    // R5-03: Date range filtering on createdAt (exclusive end — consistent with Analytics half-open [from, to))
     if (query.dateFrom || query.dateTo) {
       const dateRange: Prisma.DateTimeFilter = {};
       if (query.dateFrom) dateRange.gte = new Date(query.dateFrom);
-      if (query.dateTo) dateRange.lte = new Date(new Date(query.dateTo).getTime() + 24 * 60 * 60 * 1000 - 1);
+      if (query.dateTo) dateRange.lt = new Date(query.dateTo);
       if (where.createdAt && typeof where.createdAt === 'object' && !Array.isArray(where.createdAt)) {
         Object.assign(where.createdAt, dateRange);
       } else {
