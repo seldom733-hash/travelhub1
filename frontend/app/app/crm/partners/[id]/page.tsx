@@ -19,6 +19,10 @@ function useQueryState() {
   const [tab, setTab] = useState<Tab>("overview");
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [periodFrom, setPeriodFrom] = useState<string | null>(null);
+  const [periodTo, setPeriodTo] = useState<string | null>(null);
+  const [periodPreset, setPeriodPreset] = useState<string | null>(null);
+  const [fromAnalytics, setFromAnalytics] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -30,6 +34,13 @@ function useQueryState() {
     const sortDirParam = params.get("sortDirection");
     if (sortByParam) setSortBy(sortByParam);
     if (sortDirParam && (sortDirParam === "asc" || sortDirParam === "desc")) setSortDirection(sortDirParam);
+    const fromParam = params.get("from");
+    const toParam = params.get("to");
+    const presetParam = params.get("preset");
+    if (fromParam) setPeriodFrom(fromParam);
+    if (toParam) setPeriodTo(toParam);
+    if (presetParam) setPeriodPreset(presetParam);
+    if (params.get("fromAnalytics") === "true") setFromAnalytics(true);
   }, []);
 
   const updateQuery = useCallback((updates: Record<string, string | null>) => {
@@ -44,7 +55,7 @@ function useQueryState() {
     window.history.replaceState({}, "", url.toString());
   }, []);
 
-  return { tab, sortBy, sortDirection, setTab, setSortBy, setSortDirection, updateQuery };
+  return { tab, sortBy, sortDirection, periodFrom, periodTo, periodPreset, fromAnalytics, setTab, setSortBy, setSortDirection, updateQuery };
 }
 
 export default function Partner360Page() {
@@ -52,7 +63,7 @@ export default function Partner360Page() {
   const locale = useLocale();
   const user = useCurrentUser();
   const id = params.id as string;
-  const { tab, sortBy, sortDirection, setTab, setSortBy, setSortDirection, updateQuery } = useQueryState();
+  const { tab, sortBy, sortDirection, periodFrom, periodTo, periodPreset, fromAnalytics, setTab, setSortBy, setSortDirection, updateQuery } = useQueryState();
 
   const [partner, setPartner] = useState<PartnerDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,6 +91,8 @@ export default function Partner360Page() {
       if (orderStatusFilter) params.set("status", orderStatusFilter);
       if (bookingStatusFilter) params.set("bookingStatus", bookingStatusFilter);
       if (serviceStatusFilter) params.set("productStatus", serviceStatusFilter);
+      if (periodFrom) params.set("dateFrom", periodFrom);
+      if (periodTo) params.set("dateTo", periodTo);
       const qs = params.toString();
       const sortParam = qs ? `?${qs}` : "";
       const detail = await api.get<PartnerDetail>(`/partners/${id}${sortParam}`);
@@ -89,7 +102,7 @@ export default function Partner360Page() {
     } finally {
       setLoading(false);
     }
-  }, [id, sortBy, sortDirection, orderStatusFilter, bookingStatusFilter, serviceStatusFilter]);
+  }, [id, sortBy, sortDirection, orderStatusFilter, bookingStatusFilter, serviceStatusFilter, periodFrom, periodTo]);
 
   useEffect(() => { void loadPartner(); }, [loadPartner]);
 
@@ -187,6 +200,14 @@ export default function Partner360Page() {
             </div>
           </div>
         </div>
+        {fromAnalytics && (periodFrom || periodPreset) && (
+          <div className="ml-auto">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs text-blue-600">
+              📊 {t("partner360.period_from_analytics", locale)}: {periodPreset ?? ""}
+              {periodFrom && periodTo && <span className="text-blue-400"> ({periodFrom} → {periodTo})</span>}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-1 border-b border-slate-200 bg-slate-50 px-6 pt-2">

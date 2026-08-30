@@ -591,7 +591,7 @@ export class CrmService {
     return { items, total, page, pageSize };
   }
 
-  async getPartner(id: string, sort?: { sortBy?: string; sortDirection?: string; status?: string; bookingStatus?: string; productStatus?: string }) {
+  async getPartner(id: string, sort?: { sortBy?: string; sortDirection?: string; status?: string; bookingStatus?: string; productStatus?: string; dateFrom?: string; dateTo?: string }) {
     const partner = await this.prisma.partner.findUnique({
       where: { id },
       include: {
@@ -622,6 +622,12 @@ export class CrmService {
     // Aggregate: orders where this partner is seller
     const orderWhere: any = { sellerPartnerId: id };
     if (sort?.status) orderWhere.status = sort.status;
+    if (sort?.dateFrom || sort?.dateTo) {
+      orderWhere.createdAt = {
+        ...(sort.dateFrom ? { gte: new Date(sort.dateFrom) } : {}),
+        ...(sort.dateTo ? { lt: new Date(sort.dateTo) } : {}),
+      };
+    }
     const orders = await this.prisma.order.findMany({
       where: orderWhere,
       orderBy: buildSortClause(
@@ -635,11 +641,27 @@ export class CrmService {
     });
     const totalOrders = await this.prisma.order.count({ where: orderWhere });
 
-    // Aggregate: bookings through partner's orders
-    const orderIds = orders.map((o) => o.id);
-    const bookingWhere: any = orderIds.length > 0 ? { orderId: { in: orderIds } } : { orderId: '__none__' };
+    // Aggregate: bookings through partner's products (matching Analytics semantics)
+    // Analytics attributes bookings via product.partnerId, not orderId → sellerPartnerId
+    const partnerProductIds = (
+      await this.prisma.product.findMany({
+        where: { partnerId: id },
+        select: { id: true },
+      })
+    ).map((p) => p.id);
+
+    const bookingWhere: any = partnerProductIds.length > 0
+      ? { productId: { in: partnerProductIds } }
+      : { productId: '__none__' };
     if (sort?.bookingStatus) bookingWhere.status = sort.bookingStatus;
-    const bookings = orderIds.length > 0
+    // Apply date filter to bookings (matching Analytics semantics: booking.createdAt in period)
+    if (sort?.dateFrom || sort?.dateTo) {
+      bookingWhere.createdAt = {
+        ...(sort.dateFrom ? { gte: new Date(sort.dateFrom) } : {}),
+        ...(sort.dateTo ? { lt: new Date(sort.dateTo) } : {}),
+      };
+    }
+    const bookings = partnerProductIds.length > 0
       ? await this.prisma.booking.findMany({
           where: bookingWhere,
           orderBy: buildSortClause(
@@ -652,7 +674,7 @@ export class CrmService {
           select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, createdAt: true },
         })
       : [];
-    const totalBookings = orderIds.length > 0
+    const totalBookings = partnerProductIds.length > 0
       ? await this.prisma.booking.count({ where: bookingWhere })
       : 0;    // PartnerStorefront state
     const storefront = await (this.prisma as any).partnerStorefront.findUnique({

@@ -243,18 +243,28 @@ export const METRIC_CONFIGS = {
     label: "Комиссия",
   },
 
-  // Table cell drill-down configs (Partner Performance)
+  // Table cell drill-down configs (Partner Performance) → Partner 360
+  "analytics.partner.name": {
+    metricId: "analytics.partner.name",
+    destinationType: "DETAIL_VIEW" as DestinationType,
+    destination: "/app/crm/partners",
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    extraParams: { tab: "overview" },
+    label: "Partner 360 — Обзор",
+  },
   "analytics.partner.gmv": {
     metricId: "analytics.partner.gmv",
-    destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destinationType: "DETAIL_VIEW" as DestinationType,
+    destination: "/app/crm/partners",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    extraParams: { tab: "overview" },
   },
   "analytics.partner.revenue": {
     metricId: "analytics.partner.revenue",
-    destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destinationType: "DETAIL_VIEW" as DestinationType,
+    destination: "/app/crm/partners",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    extraParams: { tab: "overview" },
   },
   "analytics.partner.commission": {
     metricId: "analytics.partner.commission",
@@ -264,25 +274,35 @@ export const METRIC_CONFIGS = {
   },
   "analytics.partner.orders": {
     metricId: "analytics.partner.orders",
-    destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destinationType: "DETAIL_VIEW" as DestinationType,
+    destination: "/app/crm/partners",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    extraParams: { tab: "orders" },
   },
   "analytics.partner.bookings": {
     metricId: "analytics.partner.bookings",
-    destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/bookings",
+    destinationType: "DETAIL_VIEW" as DestinationType,
+    destination: "/app/crm/partners",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    extraParams: { tab: "bookings" },
   },
 } as const;
 
-/** Table cell drill-down resolver — builds URL for table cells with partner scope */
+/** Table cell drill-down resolver — builds URL for table cells with partner scope.
+ * DETAIL_VIEW: appends partnerId as route segment (Partner 360).
+ * DOMAIN_ROUTE: appends partnerId as query param (Orders/Bookings Center).
+ */
 export function resolveTableCellDrilldown(
   config: MetricDrilldownConfig,
   period: PeriodContext,
   partnerId?: string,
 ): string {
-  const url = new URL(config.destination, window.location.origin);
+  // For DETAIL_VIEW, partnerId goes into the route path, not query params
+  const basePath = config.destinationType === "DETAIL_VIEW" && partnerId
+    ? `${config.destination}/${partnerId}`
+    : config.destination;
+
+  const url = new URL(basePath, window.location.origin);
 
   // Transfer period only for PERIOD_BOUND metrics
   if (config.periodPolicy === "PERIOD_BOUND") {
@@ -296,8 +316,8 @@ export function resolveTableCellDrilldown(
     url.searchParams.set("status", config.statusFilter.join(","));
   }
 
-  // Transfer partner scope
-  if (partnerId) {
+  // Transfer partner scope as query param only for DOMAIN_ROUTE
+  if (partnerId && config.destinationType !== "DETAIL_VIEW") {
     url.searchParams.set("partnerId", partnerId);
   }
 

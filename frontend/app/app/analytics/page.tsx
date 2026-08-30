@@ -322,17 +322,28 @@ function AnalyticsContent() {
               </thead>
               <tbody>
                 {pagePartners.map((p) => {
-                  const partnerOrdersUrl = resolveDrilldownUrl(
+                  const partnerNameUrl = resolveTableCellDrilldown(
+                    { ...METRIC_CONFIGS["analytics.partner.name"], partnerId: p.partnerId },
+                    periodContext,
+                    p.partnerId,
+                  );
+                  const partnerOrdersUrl = resolveTableCellDrilldown(
                     { ...METRIC_CONFIGS["analytics.partner.orders"], partnerId: p.partnerId },
                     periodContext,
+                    p.partnerId,
                   );
-                  const partnerBookingsUrl = resolveDrilldownUrl(
+                  const partnerBookingsUrl = resolveTableCellDrilldown(
                     { ...METRIC_CONFIGS["analytics.partner.bookings"], partnerId: p.partnerId },
                     periodContext,
+                    p.partnerId,
                   );
                   return (
                     <tr key={p.partnerId} className="border-b border-slate-50 hover:bg-blue-50/50">
-                      <td className="px-4 py-2.5 font-medium text-slate-800">{p.partnerName}</td>
+                      <td className="px-4 py-2.5 font-medium">
+                        <Link href={partnerNameUrl} className="text-blue-600 hover:text-blue-800 hover:underline">
+                          {p.partnerName}
+                        </Link>
+                      </td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{fmt(p.gmv)}</td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{fmt(p.revenue)}</td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{fmt(p.commission)}</td>

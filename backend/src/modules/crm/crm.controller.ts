@@ -233,9 +233,9 @@ export class CrmController {
   @RequirePermissions("crm.partner.read")
   getPartner(
     @Param("id") id: string,
-    @Query() query: { sortBy?: string; sortDirection?: string; status?: string; bookingStatus?: string; productStatus?: string },
+    @Query() query: { sortBy?: string; sortDirection?: string; status?: string; bookingStatus?: string; productStatus?: string; dateFrom?: string; dateTo?: string },
   ) {
-    return this.crm.getPartner(id, { sortBy: query.sortBy, sortDirection: query.sortDirection, status: query.status, bookingStatus: query.bookingStatus, productStatus: query.productStatus });
+    return this.crm.getPartner(id, { sortBy: query.sortBy, sortDirection: query.sortDirection, status: query.status, bookingStatus: query.bookingStatus, productStatus: query.productStatus, dateFrom: query.dateFrom, dateTo: query.dateTo });
   }
 
   // ── Step 3.5 — Customer Detail with relations ───────────────────────────
