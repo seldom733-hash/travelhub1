@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   analyticsApi,
   type AnalyticsPreset,
@@ -15,7 +16,7 @@ import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
 import { PeriodSelector } from "@/components/command-center/PeriodSelector";
 import { useLocale, t } from "@/lib/i18n";
-import { METRIC_CONFIGS, type PeriodContext } from "@/lib/metric-drilldown";
+import { METRIC_CONFIGS, type PeriodContext, resolveTableCellDrilldown, resolveDrilldownUrl } from "@/lib/metric-drilldown";
 
 /**
  * Pre-Step 3.12 — Analytics Round 4 Strict Remediation
@@ -320,27 +321,45 @@ function AnalyticsContent() {
                 </tr>
               </thead>
               <tbody>
-                {pagePartners.map((p) => (
-                  <tr key={p.partnerId} className="border-b border-slate-50 hover:bg-blue-50/50">
-                    <td className="px-4 py-2.5 font-medium text-slate-800">{p.partnerName}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600">{fmt(p.gmv)}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600">{fmt(p.revenue)}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600">{fmt(p.commission)}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600">{p.ordersCount}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600">{p.bookingsCount}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600">
-                      {p.bookingCompletionRate != null
-                        ? `${Math.min(p.bookingCompletionRate, 100).toFixed(1)}%`
-                        : "\u2014"}
-                    </td>
-                    {/* R4-03: Effective rate = Commission / GMV (clearly labeled as derived) */}
-                    <td className="px-4 py-2.5 text-right text-slate-600">
-                      {parseFloat(p.gmv) > 0
-                        ? `${((parseFloat(p.commission) / parseFloat(p.gmv)) * 100).toFixed(1)}%`
-                        : "\u2014"}
-                    </td>
-                  </tr>
-                ))}
+                {pagePartners.map((p) => {
+                  const partnerOrdersUrl = resolveDrilldownUrl(
+                    { ...METRIC_CONFIGS["analytics.partner.orders"], partnerId: p.partnerId },
+                    periodContext,
+                  );
+                  const partnerBookingsUrl = resolveDrilldownUrl(
+                    { ...METRIC_CONFIGS["analytics.partner.bookings"], partnerId: p.partnerId },
+                    periodContext,
+                  );
+                  return (
+                    <tr key={p.partnerId} className="border-b border-slate-50 hover:bg-blue-50/50">
+                      <td className="px-4 py-2.5 font-medium text-slate-800">{p.partnerName}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-600">{fmt(p.gmv)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-600">{fmt(p.revenue)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-600">{fmt(p.commission)}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        <Link href={partnerOrdersUrl} className="text-blue-600 hover:text-blue-800 hover:underline">
+                          {p.ordersCount}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <Link href={partnerBookingsUrl} className="text-blue-600 hover:text-blue-800 hover:underline">
+                          {p.bookingsCount}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-slate-600">
+                        {p.bookingCompletionRate != null
+                          ? `${Math.min(p.bookingCompletionRate, 100).toFixed(1)}%`
+                          : "\u2014"}
+                      </td>
+                      {/* R4-03: Effective rate = Commission / GMV (clearly labeled as derived) */}
+                      <td className="px-4 py-2.5 text-right text-slate-600">
+                        {parseFloat(p.gmv) > 0
+                          ? `${((parseFloat(p.commission) / parseFloat(p.gmv)) * 100).toFixed(1)}%`
+                          : "\u2014"}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -369,16 +388,26 @@ function AnalyticsContent() {
                 </tr>
               </thead>
               <tbody>
-                {finance.currencies.map((c) => (
-                  <tr key={c.currency} className="border-b border-slate-50 hover:bg-blue-50/50">
-                    <td className="px-4 py-2.5 font-medium text-slate-800">{c.currency}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600">{(c as any).paymentCount ?? "\u2014"}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600">{fmt(c.totalPayments)}</td>
-                    <td className="px-4 py-2.5 text-right text-red-500">{fmt(c.totalRefunds)}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600">{fmt(c.netPayments)}</td>
-                    <td className="px-4 py-2.5 text-right text-slate-600">{fmt(c.totalCommission)}</td>
-                  </tr>
-                ))}
+                {finance.currencies.map((c) => {
+                  const paymentUrl = resolveDrilldownUrl(
+                    { ...METRIC_CONFIGS["analytics.finance.payment_count"], currency: c.currency },
+                    periodContext,
+                  );
+                  return (
+                    <tr key={c.currency} className="border-b border-slate-50 hover:bg-blue-50/50">
+                      <td className="px-4 py-2.5 font-medium text-slate-800">{c.currency}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        <Link href={paymentUrl} className="text-blue-600 hover:text-blue-800 hover:underline">
+                          {(c as any).paymentCount ?? "\u2014"}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-slate-600">{fmt(c.totalPayments)}</td>
+                      <td className="px-4 py-2.5 text-right text-red-500">{fmt(c.totalRefunds)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-600">{fmt(c.netPayments)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-600">{fmt(c.totalCommission)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             <div className="px-4 py-2 text-xs text-slate-400">

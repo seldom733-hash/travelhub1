@@ -175,19 +175,22 @@ export const METRIC_CONFIGS = {
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
   },
 
-  // All-time stock metrics
+  // Period-bound active user metrics (unique customer IDs from Orders/Bookings in period)
   "analytics.customers": {
     metricId: "analytics.customers",
     destinationType: "DOMAIN_ROUTE" as DestinationType,
     destination: "/app/crm",
-    periodPolicy: "ALL_TIME" as PeriodPolicy,
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    label: "Активные клиенты",
   },
+  // All-time stock metrics (stable across all periods)
   "analytics.partners": {
     metricId: "analytics.partners",
     destinationType: "DOMAIN_ROUTE" as DestinationType,
     destination: "/app/crm",
     periodPolicy: "ALL_TIME" as PeriodPolicy,
     extraParams: { tab: "partners" },
+    label: "Всего партнёров",
   },
 
   // GMV lifecycle (all period-bound)
@@ -210,6 +213,103 @@ export const METRIC_CONFIGS = {
     destination: "/app/orders",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
   },
+  // Table cell drill-down configs (Financial Summary)
+  "analytics.finance.payment_count": {
+    metricId: "analytics.finance.payment_count",
+    destinationType: "DOMAIN_ROUTE" as DestinationType,
+    destination: "/app/orders",
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    label: "Кол-во платежей",
+  },
+  "analytics.finance.payments": {
+    metricId: "analytics.finance.payments",
+    destinationType: "DOMAIN_ROUTE" as DestinationType,
+    destination: "/app/orders",
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    label: "Платежи",
+  },
+  "analytics.finance.refunds": {
+    metricId: "analytics.finance.refunds",
+    destinationType: "NONE" as DestinationType,
+    destination: "",
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    label: "Возвраты",
+  },
+  "analytics.finance.commission": {
+    metricId: "analytics.finance.commission",
+    destinationType: "NONE" as DestinationType,
+    destination: "",
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    label: "Комиссия",
+  },
+
+  // Table cell drill-down configs (Partner Performance)
+  "analytics.partner.gmv": {
+    metricId: "analytics.partner.gmv",
+    destinationType: "DOMAIN_ROUTE" as DestinationType,
+    destination: "/app/orders",
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+  },
+  "analytics.partner.revenue": {
+    metricId: "analytics.partner.revenue",
+    destinationType: "DOMAIN_ROUTE" as DestinationType,
+    destination: "/app/orders",
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+  },
+  "analytics.partner.commission": {
+    metricId: "analytics.partner.commission",
+    destinationType: "NONE" as DestinationType,
+    destination: "",
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+  },
+  "analytics.partner.orders": {
+    metricId: "analytics.partner.orders",
+    destinationType: "DOMAIN_ROUTE" as DestinationType,
+    destination: "/app/orders",
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+  },
+  "analytics.partner.bookings": {
+    metricId: "analytics.partner.bookings",
+    destinationType: "DOMAIN_ROUTE" as DestinationType,
+    destination: "/app/bookings",
+    periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+  },
 } as const;
+
+/** Table cell drill-down resolver — builds URL for table cells with partner scope */
+export function resolveTableCellDrilldown(
+  config: MetricDrilldownConfig,
+  period: PeriodContext,
+  partnerId?: string,
+): string {
+  const url = new URL(config.destination, window.location.origin);
+
+  // Transfer period only for PERIOD_BOUND metrics
+  if (config.periodPolicy === "PERIOD_BOUND") {
+    if (period.from) url.searchParams.set("from", period.from);
+    if (period.to) url.searchParams.set("to", period.to);
+    if (period.preset) url.searchParams.set("preset", period.preset);
+  }
+
+  // Transfer status filter
+  if (config.statusFilter && config.statusFilter.length > 0) {
+    url.searchParams.set("status", config.statusFilter.join(","));
+  }
+
+  // Transfer partner scope
+  if (partnerId) {
+    url.searchParams.set("partnerId", partnerId);
+  }
+
+  // Transfer extra params
+  if (config.extraParams) {
+    for (const [k, v] of Object.entries(config.extraParams)) {
+      url.searchParams.set(k, v);
+    }
+  }
+
+  url.searchParams.set("fromAnalytics", "true");
+  return url.pathname + url.search;
+}
 
 export type MetricId = keyof typeof METRIC_CONFIGS;

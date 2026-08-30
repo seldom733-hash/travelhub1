@@ -148,8 +148,14 @@ export class BookingService {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const now = new Date();
+    // R5-C1: Support comma-separated multi-status
+    const bookingStatusFilter = query.status
+      ? query.status.includes(',')
+        ? { status: { in: query.status.split(',').map(s => s.trim()) as BookingStatus[] } }
+        : { status: query.status as BookingStatus }
+      : {};
     const where: Prisma.BookingWhereInput = {
-      ...(query.status ? { status: query.status as BookingStatus } : {}),
+      ...bookingStatusFilter,
       ...(query.orderId ? { orderId: query.orderId } : {}),
       ...(query.search ? { id: { in: await this.resolveBookingSearchIds(query.search) } } : {}),
       // ROUND 5: upcoming=true → detector: status IN (CONFIRMED, NEW) AND serviceDate >= now

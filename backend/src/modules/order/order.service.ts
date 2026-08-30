@@ -442,8 +442,14 @@ export class OrderService {
   ) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+    // R5-C1: Support comma-separated multi-status (e.g., "FULFILLED,CLOSED")
+    const statusFilter = query.status
+      ? query.status.includes(',')
+        ? { status: { in: query.status.split(',').map(s => s.trim()) as OrderStatus[] } }
+        : { status: query.status as OrderStatus }
+      : {};
     const where: Prisma.OrderWhereInput = {
-      ...(query.status ? { status: query.status as OrderStatus } : {}),
+      ...statusFilter,
       ...(query.customerId ? { customerId: query.customerId } : {}),
       ...(query.paymentStatus ? { paymentStatus: query.paymentStatus as any as import("../../generated/prisma/client").OrderPaymentStatus } : {}),
       ...(query.search

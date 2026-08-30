@@ -1254,7 +1254,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "analytics.kpi.aov": { ru: "Средний чек", az: "Orta çek", en: "Avg Order Value" },
   "analytics.kpi.refunds": { ru: "Возвраты", az: "Geri qaytarmalar", en: "Refunds" },
   "analytics.kpi.sessions": { ru: "Сессии", az: "Seanslar", en: "Sessions" },
-  "analytics.kpi.customers": { ru: "Клиенты", az: "Müştərilər", en: "Customers" },
+  "analytics.kpi.customers": { ru: "Активные клиенты", az: "Aktiv müştərilər", en: "Active Customers" },
   "analytics.kpi.partners": { ru: "Партнёры", az: "Tərəfdaşlar", en: "Partners" },
   "analytics.kpi.qualified_gmv": { ru: "Квалифицированный GMV", az: "Keyfiyyətli GMV", en: "Qualified GMV" },
   "analytics.kpi.completed_gmv": { ru: "Завершённый GMV", az: "Tamamlanmış GMV", en: "Completed GMV" },
