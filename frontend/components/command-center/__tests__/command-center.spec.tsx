@@ -441,7 +441,7 @@ describe("Command Center i18n keys", () => {
     expect(ccKeys.length).toBeGreaterThan(30);
     // Check essential keys
     expect(DICT["cc.title"]).toBeDefined();
-    expect(DICT["cc.title"].ru).toBe("Рабочий стол");
+    expect(DICT["cc.title"].ru).toBe("Command Center");
     expect(DICT["cc.title"].az).toBeTruthy();
     expect(DICT["cc.title"].en).toBeTruthy();
     expect(DICT["cc.access_denied"]).toBeDefined();
