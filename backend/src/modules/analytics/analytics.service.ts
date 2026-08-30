@@ -938,9 +938,12 @@ export class AnalyticsService {
         const completionRate =
           data.confirmedBookings === 0
             ? null
-            : Math.round(
-                (data.completedBookings / data.confirmedBookings) * 10000,
-              ) / 100;
+            : Math.min(
+                Math.round(
+                  (data.completedBookings / data.confirmedBookings) * 10000,
+                ) / 100,
+                100,
+              );
 
         return {
           partnerId: pid,

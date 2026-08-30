@@ -12,27 +12,31 @@ import {
 } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import Kpi from "@/components/Kpi";
+import Pagination from "@/components/Pagination";
+import { PeriodSelector } from "@/components/command-center/PeriodSelector";
 import { useLocale, t } from "@/lib/i18n";
 
-const PRESETS: AnalyticsPreset[] = [
-  "TODAY", "LAST_3_DAYS", "LAST_7_DAYS", "MONTH", "LAST_6_MONTHS", "YEAR",
-];
-
 /**
- * Pre-Step 3.12 — Analytics Navigation IA Separation (Round 2)
+ * Pre-Step 3.12 — Analytics Data / KPI / UI Contract Remediation
  *
  * Route: /app/analytics
  * Permission: analytics.read (server-authoritative)
  *
- * Deep analysis center: KPI, conversion funnel, time series,
- * partner performance, financial reconciliation.
- *
- * Command Center (/app/command-center) remains separate —
- * operational dashboard with different semantics.
+ * Deep analysis center with corrected semantics:
+ * - Revenue → Customer Payments (not Platform Revenue)
+ * - Funnel → Activity by Stage (not conversion funnel)
+ * - Completion capped at 100%
+ * - Shared PeriodSelector from Command Center
+ * - Proper time series metric identity
+ * - Bar chart with proportional rendering
+ * - Server-side pagination for tables
  */
 function AnalyticsContent() {
   const locale = useLocale();
   const [preset, setPreset] = useState<AnalyticsPreset>("MONTH");
+  const [comparison, setComparison] = useState(true);
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -42,13 +46,17 @@ function AnalyticsContent() {
   const [partners, setPartners] = useState<PartnerPerformanceResponse | null>(null);
   const [finance, setFinance] = useState<FinancialReconciliationResponse | null>(null);
 
+  // Partner pagination
+  const [partnerPage, setPartnerPage] = useState(1);
+  const PAGE_SIZE = 20;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const opts = { preset };
+      const opts = { preset, startDate: customStart || undefined, endDate: customEnd || undefined };
       const [k, f, ts, p, fin] = await Promise.all([
-        analyticsApi.getCompanyKpi(opts),
+        analyticsApi.getCompanyKpi({ ...opts, comparison }),
         analyticsApi.getConversionFunnel(opts),
         analyticsApi.getTimeSeries({ ...opts, metric: "orders" }),
         analyticsApi.getPartnerPerformance(opts),
@@ -59,12 +67,13 @@ function AnalyticsContent() {
       setTimeSeries(ts);
       setPartners(p);
       setFinance(fin);
+      setPartnerPage(1);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [preset]);
+  }, [preset, comparison, customStart, customEnd]);
 
   useEffect(() => {
     void load();
@@ -81,13 +90,13 @@ function AnalyticsContent() {
     return currency ? `${formatted} ${currency}` : formatted;
   };
 
-  const pct = (v: number | null | undefined) => {
-    if (v == null) return "";
-    const sign = v > 0 ? "+" : "";
-    return `${sign}${v.toFixed(1)}%`;
-  };
-
   const m = kpi?.metrics;
+
+  // Partner pagination
+  const allPartners = partners?.partners ?? [];
+  const partnerTotal = allPartners.length;
+  const partnerPages = Math.ceil(partnerTotal / PAGE_SIZE);
+  const pagePartners = allPartners.slice((partnerPage - 1) * PAGE_SIZE, partnerPage * PAGE_SIZE);
 
   return (
     <div className="p-6 lg:p-10 space-y-6">
@@ -95,21 +104,18 @@ function AnalyticsContent() {
         title={t("analytics.title", locale)}
         breadcrumbs={["TravelHub", t("analytics.title", locale)]}
         actions={
-          <div className="flex items-center gap-2">
-            {PRESETS.map((p) => (
-              <button
-                key={p}
-                onClick={() => setPreset(p)}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  preset === p
-                    ? "border-blue-400 bg-blue-50 text-blue-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {t(`analytics.preset.${p}`, locale)}
-              </button>
-            ))}
-          </div>
+          <PeriodSelector
+            preset={preset}
+            comparison={comparison}
+            customStart={customStart}
+            customEnd={customEnd}
+            customError={null}
+            onPresetChange={(p) => setPreset(p as AnalyticsPreset)}
+            onComparisonChange={setComparison}
+            onCustomStartChange={setCustomStart}
+            onCustomEndChange={setCustomEnd}
+            locale={locale}
+          />
         }
       />
 
@@ -152,7 +158,7 @@ function AnalyticsContent() {
         ]} />
       )}
 
-      {/* ── Conversion Funnel ── */}
+      {/* ── Activity by Stage (formerly Funnel) ── */}
       {funnel && funnel.stages.length > 0 && !loading && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
@@ -160,16 +166,16 @@ function AnalyticsContent() {
           </div>
           <div className="p-5">
             <div className="space-y-3">
-              {funnel.stages.map((stage, i) => {
-                const max = funnel.stages[0]?.count ?? 1;
+              {funnel.stages.map((stage) => {
+                const max = Math.max(...funnel.stages.map((s) => s.count), 1);
                 const pctWidth = max > 0 ? (stage.count / max) * 100 : 0;
                 return (
                   <div key={stage.stage} className="flex items-center gap-3">
-                    <div className="w-32 shrink-0 text-xs font-medium text-slate-600 truncate" title={stage.stage}>
+                    <div className="w-36 shrink-0 text-xs font-medium text-slate-600 truncate" title={stage.stage}>
                       {stage.stage}
                     </div>
                     <div className="flex-1">
-                      <div className="h-5 overflow-hidden rounded bg-slate-100">
+                      <div className="h-6 overflow-hidden rounded bg-slate-100">
                         <div
                           className="h-full rounded bg-blue-500 transition-all"
                           style={{ width: `${pctWidth}%` }}
@@ -178,8 +184,8 @@ function AnalyticsContent() {
                     </div>
                     <div className="w-20 shrink-0 text-right text-xs text-slate-500">
                       {stage.count.toLocaleString()}
-                      {stage.uniqueEntities != null && (
-                        <span className="text-slate-400"> ({stage.uniqueEntities})</span>
+                      {stage.uniqueEntities != null && stage.uniqueEntities !== stage.count && (
+                        <span className="text-slate-400"> ({stage.uniqueEntities} u)</span>
                       )}
                     </div>
                   </div>
@@ -190,27 +196,53 @@ function AnalyticsContent() {
         </div>
       )}
 
-      {/* ── Time Series ── */}
+      {/* ── Time Series (Orders) ── */}
       {timeSeries && timeSeries.buckets.length > 0 && !loading && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
+          <div className="border-b border-slate-100 bg-slate-50 px-5 py-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-700">
-              {t("analytics.timeseries.title", locale)} — {timeSeries.granularity}
+              {t("analytics.timeseries.title", locale)} — {t("analytics.kpi.orders", locale)}
             </h2>
+            <span className="text-xs text-slate-400">
+              {t("analytics.timeseries.granularity", locale)}: {timeSeries.granularity}
+            </span>
           </div>
           <div className="p-5">
-            <div className="flex items-end gap-1" style={{ height: 120 }}>
-              {timeSeries.buckets.map((b) => {
-                const max = Math.max(...timeSeries.buckets.map((x) => x.value), 1);
-                const h = (b.value / max) * 100;
-                return (
-                  <div key={b.label} className="flex flex-1 flex-col items-center gap-1" title={`${b.label}: ${b.value}`}>
-                    <div className="text-[9px] text-slate-400">{b.value}</div>
+            {/* Bar chart with proportional rendering */}
+            <div className="relative" style={{ height: 160 }}>
+              {/* Y-axis baseline at 0 */}
+              <div className="absolute inset-0 flex items-end gap-px">
+                {timeSeries.buckets.map((b) => {
+                  const max = Math.max(...timeSeries.buckets.map((x) => x.value), 1);
+                  const h = max > 0 ? (b.value / max) * 100 : 0;
+                  return (
                     <div
-                      className="w-full rounded-t bg-blue-500 transition-all"
-                      style={{ height: `${h}%`, minHeight: b.value > 0 ? 2 : 0 }}
-                    />
-                    <div className="text-[8px] text-slate-400 truncate max-w-full">{b.label}</div>
+                      key={b.label}
+                      className="group relative flex flex-1 items-end"
+                      title={`${b.label}: ${b.value}`}
+                    >
+                      <div
+                        className="w-full rounded-t bg-blue-500 transition-all hover:bg-blue-600"
+                        style={{ height: `${h}%`, minHeight: b.value > 0 ? 2 : 0 }}
+                      />
+                      {/* Tooltip on hover */}
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 rounded bg-slate-800 px-2 py-1 text-[10px] text-white group-hover:block">
+                        {b.label}: {b.value}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* X-axis labels (sparse) */}
+            <div className="mt-1 flex gap-px">
+              {timeSeries.buckets.map((b, i) => {
+                const showLabel = timeSeries.buckets.length <= 15 || i % Math.ceil(timeSeries.buckets.length / 15) === 0;
+                return (
+                  <div key={b.label} className="flex-1 text-center">
+                    {showLabel && (
+                      <span className="text-[8px] text-slate-400 truncate block">{b.label}</span>
+                    )}
                   </div>
                 );
               })}
@@ -220,7 +252,7 @@ function AnalyticsContent() {
       )}
 
       {/* ── Partner Performance ── */}
-      {partners && partners.partners.length > 0 && !loading && (
+      {partners && allPartners.length > 0 && !loading && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
             <h2 className="text-sm font-semibold text-slate-700">{t("analytics.partners.title", locale)}</h2>
@@ -239,7 +271,7 @@ function AnalyticsContent() {
                 </tr>
               </thead>
               <tbody>
-                {partners.partners.map((p) => (
+                {pagePartners.map((p) => (
                   <tr key={p.partnerId} className="border-b border-slate-50 hover:bg-blue-50/50">
                     <td className="px-4 py-2.5 font-medium text-slate-800">{p.partnerName}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600">{fmt(p.gmv)}</td>
@@ -248,17 +280,20 @@ function AnalyticsContent() {
                     <td className="px-4 py-2.5 text-right text-slate-600">{p.ordersCount}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600">{p.bookingsCount}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600">
-                      {p.bookingCompletionRate != null ? `${(p.bookingCompletionRate * 100).toFixed(0)}%` : "—"}
+                      {p.bookingCompletionRate != null ? `${Math.min(p.bookingCompletionRate, 100).toFixed(1)}%` : "—"}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {partnerPages > 1 && (
+            <Pagination page={partnerPage} pageSize={PAGE_SIZE} total={partnerTotal} onPageChange={setPartnerPage} />
+          )}
         </div>
       )}
 
-      {/* ── Financial Reconciliation ── */}
+      {/* ── Financial Summary ── */}
       {finance && finance.currencies.length > 0 && !loading && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
