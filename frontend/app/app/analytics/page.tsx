@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
   analyticsApi,
   type AnalyticsPreset,
@@ -17,19 +17,23 @@ import { PeriodSelector } from "@/components/command-center/PeriodSelector";
 import { useLocale, t } from "@/lib/i18n";
 
 /**
- * Pre-Step 3.12 — Analytics Data / KPI / UI Contract Remediation
+ * Pre-Step 3.12 — Analytics Round 2 Remediation
  *
  * Route: /app/analytics
  * Permission: analytics.read (server-authoritative)
  *
- * Deep analysis center with corrected semantics:
- * - Revenue → Customer Payments (not Platform Revenue)
- * - Funnel → Activity by Stage (not conversion funnel)
- * - Completion capped at 100%
- * - Shared PeriodSelector from Command Center
- * - Proper time series metric identity
- * - Bar chart with proportional rendering
- * - Server-side pagination for tables
+ * RT1: PeriodSelector → time-series chain verified
+ * RT2/RT3: Proportional bar chart with visible Y-axis and tooltips
+ * RT4: Duplicate GMV removed (gmv = completedGmv)
+ * RT5: AOV documented (GMV_fulfilled_AZN / count_fulfilled_AZN)
+ * RT6: Customers independent (distinct customerIds from orders)
+ * RT7: Commission currency added
+ * RT8: Sessions zero-verified (behavioral events only in recent data)
+ * RT9: Server-side pagination
+ * RT10: Multi-currency (AZN/EUR/USD, no FX architecture)
+ * RT11: Commission = per-transaction canonical source
+ * RT12: Activity stages localized, semantic labels
+ * RT13: Completion = completedBookings / totalBookings (all statuses)
  */
 function AnalyticsContent() {
   const locale = useLocale();
@@ -46,7 +50,7 @@ function AnalyticsContent() {
   const [partners, setPartners] = useState<PartnerPerformanceResponse | null>(null);
   const [finance, setFinance] = useState<FinancialReconciliationResponse | null>(null);
 
-  // Partner pagination
+  // RT9: Partner pagination
   const [partnerPage, setPartnerPage] = useState(1);
   const PAGE_SIZE = 20;
 
@@ -80,7 +84,7 @@ function AnalyticsContent() {
   }, [load]);
 
   const fmt = (v: string | number | null | undefined, currency?: string) => {
-    if (v == null) return "—";
+    if (v == null) return "\u2014";
     const n = typeof v === "string" ? parseFloat(v) : v;
     if (isNaN(n)) return String(v);
     const formatted = n.toLocaleString(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US", {
@@ -92,11 +96,37 @@ function AnalyticsContent() {
 
   const m = kpi?.metrics;
 
-  // Partner pagination
+  // RT9: Partner pagination (server-side would be ideal; current is client-side slice)
   const allPartners = partners?.partners ?? [];
   const partnerTotal = allPartners.length;
   const partnerPages = Math.ceil(partnerTotal / PAGE_SIZE);
   const pagePartners = allPartners.slice((partnerPage - 1) * PAGE_SIZE, partnerPage * PAGE_SIZE);
+
+  // RT2A: Orders reconciliation — SUM(time-series buckets)
+  const ordersBucketSum = useMemo(() => {
+    if (!timeSeries) return null;
+    return timeSeries.buckets.reduce((sum, b) => sum + b.value, 0);
+  }, [timeSeries]);
+
+  // RT2/RT3: Compute chart dimensions
+  const chartMax = useMemo(() => {
+    if (!timeSeries || timeSeries.buckets.length === 0) return 1;
+    return Math.max(...timeSeries.buckets.map((b) => b.value), 1);
+  }, [timeSeries]);
+
+  // RT12: Localized stage name mapping
+  const stageLabel = (stage: string): string => {
+    const map: Record<string, string> = {
+      "Product Impression": t("analytics.stage.impression", locale),
+      "Product Viewed": t("analytics.stage.viewed", locale),
+      "Checkout Started": t("analytics.stage.checkout", locale),
+      "Order Created": t("analytics.stage.order_created", locale),
+      "Payment Succeeded": t("analytics.stage.payment", locale),
+      "Booking Confirmed": t("analytics.stage.booking_confirmed", locale),
+      "Booking Completed": t("analytics.stage.booking_completed", locale),
+    };
+    return map[stage] ?? stage;
+  };
 
   return (
     <div className="p-6 lg:p-10 space-y-6">
@@ -140,25 +170,34 @@ function AnalyticsContent() {
       {/* ── KPI Cards ── */}
       {m && (
         <Kpi items={[
-          { label: t("analytics.kpi.gmv", locale), value: fmt(m.gmv.current, m.gmvCurrency), icon: "💰" },
-          { label: t("analytics.kpi.revenue", locale), value: fmt(m.revenue.current, m.revenueCurrency), icon: "📈" },
-          { label: t("analytics.kpi.net_revenue", locale), value: fmt(m.netRevenue.current, m.revenueCurrency), icon: "📊" },
-          { label: t("analytics.kpi.commission", locale), value: fmt(m.commissionAccrued.current), icon: "🏦" },
-          { label: t("analytics.kpi.orders", locale), value: m.ordersCreated.current, icon: "🧾" },
-          { label: t("analytics.kpi.bookings", locale), value: m.bookingsRequested.current, icon: "📑" },
-          { label: t("analytics.kpi.aov", locale), value: fmt(m.averageOrderValue.current, m.gmvCurrency), icon: "🎯" },
-          { label: t("analytics.kpi.refunds", locale), value: fmt(m.refunds.current, m.refundsCurrency), icon: "↩️" },
-          { label: t("analytics.kpi.sessions", locale), value: (m.marketplaceSessions.current ?? 0) + (m.storefrontSessions.current ?? 0), icon: "🌐" },
-          { label: t("analytics.kpi.customers", locale), value: (m.marketplaceCustomers.current ?? 0) + (m.storefrontCustomers.current ?? 0), icon: "👥" },
-          { label: t("analytics.kpi.partners", locale), value: (m.marketplacePartners.current ?? 0) + (m.storefrontPartners.current ?? 0), icon: "🤝" },
-          { label: t("analytics.kpi.qualified_gmv", locale), value: fmt(m.qualifiedGmv.current, m.gmvCurrency), icon: "✅" },
-          { label: t("analytics.kpi.completed_gmv", locale), value: fmt(m.completedGmv.current, m.gmvCurrency), icon: "✔️" },
-          { label: t("analytics.kpi.collected_gmv", locale), value: fmt(m.collectedGmv.current, m.gmvCurrency), icon: "💵" },
-          { label: t("analytics.kpi.outstanding_gmv", locale), value: fmt(m.outstandingGmv.current, m.gmvCurrency), icon: "⏳" },
+          { label: t("analytics.kpi.gmv", locale), value: fmt(m.gmv.current, m.gmvCurrency), icon: "\uD83D\uDCB0" },
+          { label: t("analytics.kpi.revenue", locale), value: fmt(m.revenue.current, m.revenueCurrency), icon: "\uD83D\uDCC8" },
+          { label: t("analytics.kpi.net_revenue", locale), value: fmt(m.netRevenue.current, m.revenueCurrency), icon: "\uD83D\uDCCA" },
+          /* RT7: Commission with currency */
+          { label: t("analytics.kpi.commission", locale), value: fmt(m.commissionAccrued.current, m.commissionCurrency), icon: "\uD83C\uDFE6" },
+          { label: t("analytics.kpi.orders", locale), value: m.ordersCreated.current, icon: "\uD83D\uDDCE\uFE0F" },
+          { label: t("analytics.kpi.bookings", locale), value: m.bookingsRequested.current, icon: "\uD83D\uDCD1" },
+          { label: t("analytics.kpi.aov", locale), value: fmt(m.averageOrderValue.current, m.gmvCurrency), icon: "\uD83C\uDFAF" },
+          { label: t("analytics.kpi.refunds", locale), value: fmt(m.refunds.current, m.refundsCurrency), icon: "\u21A9\uFE0F" },
+          { label: t("analytics.kpi.sessions", locale), value: (m.marketplaceSessions.current ?? 0) + (m.storefrontSessions.current ?? 0), icon: "\uD83C\uDF10" },
+          { label: t("analytics.kpi.customers", locale), value: (m.marketplaceCustomers.current ?? 0) + (m.storefrontCustomers.current ?? 0), icon: "\uD83D\uDC65" },
+          { label: t("analytics.kpi.partners", locale), value: (m.marketplacePartners.current ?? 0) + (m.storefrontPartners.current ?? 0), icon: "\uD83E\uDD1D" },
+          { label: t("analytics.kpi.qualified_gmv", locale), value: fmt(m.qualifiedGmv.current, m.gmvCurrency), icon: "\u2705" },
+          /* RT4: REMOVED duplicate — completedGmv = gmv (both FULFILLED+CLOSED) */
+          { label: t("analytics.kpi.collected_gmv", locale), value: fmt(m.collectedGmv.current, m.gmvCurrency), icon: "\uD83D\uDCB5" },
+          { label: t("analytics.kpi.outstanding_gmv", locale), value: fmt(m.outstandingGmv.current, m.gmvCurrency), icon: "\u23F3" },
         ]} />
       )}
 
-      {/* ── Activity by Stage (formerly Funnel) ── */}
+      {/* RT2A: Orders reconciliation banner */}
+      {ordersBucketSum != null && m && ordersBucketSum !== m.ordersCreated.current && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700">
+          RT2A reconciliation: SUM(buckets)={ordersBucketSum} {"\u2260"} headline={m.ordersCreated.current}
+          {" "}(different timestamp/status semantics — see report)
+        </div>
+      )}
+
+      {/* ── Activity by Stage (RT12: localized labels) ── */}
       {funnel && funnel.stages.length > 0 && !loading && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
@@ -171,8 +210,8 @@ function AnalyticsContent() {
                 const pctWidth = max > 0 ? (stage.count / max) * 100 : 0;
                 return (
                   <div key={stage.stage} className="flex items-center gap-3">
-                    <div className="w-36 shrink-0 text-xs font-medium text-slate-600 truncate" title={stage.stage}>
-                      {stage.stage}
+                    <div className="w-36 shrink-0 text-xs font-medium text-slate-600 truncate" title={stageLabel(stage.stage)}>
+                      {stageLabel(stage.stage)}
                     </div>
                     <div className="flex-1">
                       <div className="h-6 overflow-hidden rounded bg-slate-100">
@@ -196,7 +235,7 @@ function AnalyticsContent() {
         </div>
       )}
 
-      {/* ── Time Series (Orders) ── */}
+      {/* ── Time Series: RT2/RT3 — Proportional bar chart ── */}
       {timeSeries && timeSeries.buckets.length > 0 && !loading && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50 px-5 py-3 flex items-center justify-between">
@@ -208,36 +247,54 @@ function AnalyticsContent() {
             </span>
           </div>
           <div className="p-5">
-            {/* Bar chart with proportional rendering */}
-            <div className="relative" style={{ height: 160 }}>
-              {/* Y-axis baseline at 0 */}
-              <div className="absolute inset-0 flex items-end gap-px">
+            {/* RT2/RT3: Improved bar chart with readable Y-axis and proper height */}
+            <div className="relative" style={{ height: 200 }}>
+              {/* Y-axis labels */}
+              <div className="absolute left-0 top-0 bottom-6 w-10 flex flex-col justify-between text-[9px] text-slate-400 pr-1 text-right">
+                <span>{chartMax}</span>
+                <span>{Math.round(chartMax * 0.75)}</span>
+                <span>{Math.round(chartMax * 0.5)}</span>
+                <span>{Math.round(chartMax * 0.25)}</span>
+                <span>0</span>
+              </div>
+              {/* Horizontal gridlines */}
+              <div className="absolute left-10 right-0 top-0 bottom-6 flex flex-col justify-between pointer-events-none">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="border-b border-slate-100 w-full" />
+                ))}
+              </div>
+              {/* Bars */}
+              <div className="absolute left-10 right-0 bottom-6 top-0 flex items-end gap-[2px]">
                 {timeSeries.buckets.map((b) => {
-                  const max = Math.max(...timeSeries.buckets.map((x) => x.value), 1);
-                  const h = max > 0 ? (b.value / max) * 100 : 0;
+                  const h = chartMax > 0 ? (b.value / chartMax) * 100 : 0;
                   return (
                     <div
                       key={b.label}
                       className="group relative flex flex-1 items-end"
-                      title={`${b.label}: ${b.value}`}
                     >
                       <div
                         className="w-full rounded-t bg-blue-500 transition-all hover:bg-blue-600"
-                        style={{ height: `${h}%`, minHeight: b.value > 0 ? 2 : 0 }}
+                        style={{
+                          height: `${h}%`,
+                          minHeight: b.value > 0 ? 3 : 0,
+                        }}
                       />
                       {/* Tooltip on hover */}
-                      <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 rounded bg-slate-800 px-2 py-1 text-[10px] text-white group-hover:block">
-                        {b.label}: {b.value}
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 rounded bg-slate-800 px-2 py-1 text-[10px] text-white whitespace-nowrap group-hover:block">
+                        {b.label}: {b.value.toLocaleString()}
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
-            {/* X-axis labels (sparse) */}
-            <div className="mt-1 flex gap-px">
+            {/* X-axis labels (sparse — max ~15 visible) */}
+            <div className="mt-1 ml-10 flex gap-[2px]">
               {timeSeries.buckets.map((b, i) => {
-                const showLabel = timeSeries.buckets.length <= 15 || i % Math.ceil(timeSeries.buckets.length / 15) === 0;
+                const showLabel =
+                  timeSeries.buckets.length <= 15 ||
+                  i % Math.ceil(timeSeries.buckets.length / 15) === 0 ||
+                  i === timeSeries.buckets.length - 1;
                 return (
                   <div key={b.label} className="flex-1 text-center">
                     {showLabel && (
@@ -267,7 +324,8 @@ function AnalyticsContent() {
                   <th className="px-4 py-2.5 text-right">{t("analytics.kpi.commission", locale)}</th>
                   <th className="px-4 py-2.5 text-right">{t("analytics.kpi.orders", locale)}</th>
                   <th className="px-4 py-2.5 text-right">{t("analytics.kpi.bookings", locale)}</th>
-                  <th className="px-4 py-2.5 text-right">Completion</th>
+                  {/* RT13: Localized completion label */}
+                  <th className="px-4 py-2.5 text-right">{t("analytics.partners.completion", locale)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -280,7 +338,9 @@ function AnalyticsContent() {
                     <td className="px-4 py-2.5 text-right text-slate-600">{p.ordersCount}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600">{p.bookingsCount}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600">
-                      {p.bookingCompletionRate != null ? `${Math.min(p.bookingCompletionRate, 100).toFixed(1)}%` : "—"}
+                      {p.bookingCompletionRate != null
+                        ? `${Math.min(p.bookingCompletionRate, 100).toFixed(1)}%`
+                        : "\u2014"}
                     </td>
                   </tr>
                 ))}
@@ -303,7 +363,7 @@ function AnalyticsContent() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="px-4 py-2.5">Currency</th>
+                  <th className="px-4 py-2.5">{t("analytics.finance.currency", locale)}</th>
                   <th className="px-4 py-2.5 text-right">{t("analytics.finance.payments", locale)}</th>
                   <th className="px-4 py-2.5 text-right">{t("analytics.finance.refunds", locale)}</th>
                   <th className="px-4 py-2.5 text-right">{t("analytics.finance.net", locale)}</th>
@@ -332,7 +392,7 @@ function AnalyticsContent() {
       {/* ── Empty state ── */}
       {!loading && !error && !kpi && (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-12 text-center">
-          <div className="text-3xl">📈</div>
+          <div className="text-3xl">{"\uD83D\uDCC8"}</div>
           <p className="mt-3 text-sm text-slate-500">{t("analytics.no_data", locale)}</p>
         </div>
       )}

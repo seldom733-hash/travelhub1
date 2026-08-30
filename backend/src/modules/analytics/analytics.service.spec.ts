@@ -456,14 +456,12 @@ describe("AnalyticsService — Partner Performance (HIGH-6)", () => {
       { id: "u1", role: "ADMIN", partnerId: null } as any,
     );
 
-    // 2 completed / 1 confirmed (total 3 bookings, but only CONFIRMED+COMPLETED count)
-    // Actually: confirmed = 1, completed = 2 → rate = 2/1 = 200%?
-    // No — confirmedBookings = count where status=CONFIRMED (1)
-    // completedBookings = count where status=COMPLETED (2)
-    // rate = completed / confirmed = 2 / 1 = 200 — that's a valid rate
+    // RT13: New formula: completedBookings / totalBookings (all statuses)
+    // 3 bookings total: 1 CONFIRMED + 2 COMPLETED
+    // rate = 2/3 = 66.67%
     const partner = result.partners.find((p) => p.partnerId === "p1");
     expect(partner).toBeDefined();
-    expect(partner!.bookingCompletionRate).toBe(200);
+    expect(partner!.bookingCompletionRate).toBe(66.67);
   });
 });
 

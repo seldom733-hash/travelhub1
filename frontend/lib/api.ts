@@ -423,6 +423,7 @@ export interface CompanyKpiResponse {
     refundsCurrency: string;
     gmvCurrency: string;
     revenueCurrency: string;
+    commissionCurrency: string;
     qualifiedGmv: ComparisonValue<string>;
     completedGmv: ComparisonValue<string>;
     collectedGmv: ComparisonValue<string>;

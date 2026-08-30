@@ -199,6 +199,7 @@ export interface CompanyKpiResponse {
     refundsCurrency: string;
     gmvCurrency: string;
     revenueCurrency: string;
+    commissionCurrency: string;
     // ── GMV Lifecycle metrics (Policy Closure) ──
     /** Qualified GMV: SUM(amount) WHERE status NOT IN (NEW, CANCELLED), COHORT by createdAt */
     qualifiedGmv: ComparisonValue<string>;
@@ -681,6 +682,7 @@ export class AnalyticsService {
         refundsCurrency: primaryCurrencyTotal(refundByCurrency).currency,
         gmvCurrency: gmv.currency,
         revenueCurrency: revenue.currency,
+        commissionCurrency: commission.currency,
         // ── GMV Lifecycle (Policy Closure) ──
         qualifiedGmv: this.compareDecimalValues(qualifiedGmv.total, prevQualifiedGmv.total),
         completedGmv: this.compareDecimalValues(completedGmv.total, prevGmvSum.total),
@@ -935,12 +937,15 @@ export class AnalyticsService {
             Object.entries(data.commissionByCurrency).map(([c, cents]) => [c, centsToDecimal(cents)]),
           ),
         );
+        // RT13: Completion = completedBookings / totalBookings (all statuses in period).
+        // Previous formula used confirmedBookings as denominator, which caused >100%
+        // when bookings were confirmed before the period but completed within it.
         const completionRate =
-          data.confirmedBookings === 0
+          data.bookingsCount === 0
             ? null
             : Math.min(
                 Math.round(
-                  (data.completedBookings / data.confirmedBookings) * 10000,
+                  (data.completedBookings / data.bookingsCount) * 10000,
                 ) / 100,
                 100,
               );

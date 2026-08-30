@@ -1268,6 +1268,17 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "analytics.finance.net": { ru: "Чистые", az: "Xalis", en: "Net" },
   "analytics.finance.commission": { ru: "Комиссия", az: "Komissiya", en: "Commission" },
   "analytics.finance.ledger": { ru: "Записей в журнале", az: "Jurnal qeydləri", en: "Ledger entries" },
+  "analytics.finance.currency": { ru: "Валюта", az: "Valyuta", en: "Currency" },
+  // RT12: Localized activity stage labels
+  "analytics.stage.impression": { ru: "Показ предложения", az: "Təklifin göstərilməsi", en: "Product Impression" },
+  "analytics.stage.viewed": { ru: "Просмотр предложения", az: "Təklifin baxılması", en: "Product Viewed" },
+  "analytics.stage.checkout": { ru: "Начало оформления", az: "Sifarişin başlanması", en: "Checkout Started" },
+  "analytics.stage.order_created": { ru: "Заказ создан", az: "Sifariş yaradıldı", en: "Order Created" },
+  "analytics.stage.payment": { ru: "Оплата выполнена", az: "Ödəniş uğurla", en: "Payment Succeeded" },
+  "analytics.stage.booking_confirmed": { ru: "Бронирование подтверждено", az: "Bron təsdiqləndi", en: "Booking Confirmed" },
+  "analytics.stage.booking_completed": { ru: "Бронирование завершено", az: "Bron tamamlandı", en: "Booking Completed" },
+  // RT13: Localized completion header
+  "analytics.partners.completion": { ru: "Доля заверш.", az: "Tamamlanma", en: "Completion" },
 
   // ── Marketing Center ──
   "marketing.title": { ru: "Маркетинг", az: "Marketinq", en: "Marketing" },
