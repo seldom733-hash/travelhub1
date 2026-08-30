@@ -1241,6 +1241,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "analytics.error": { ru: "Ошибка загрузки", az: "Yükləmə xətası", en: "Load error" },
   "analytics.retry": { ru: "Повторить", az: "Yenidən cəhd et", en: "Retry" },
   "analytics.no_data": { ru: "Нет данных за период", az: "Dövr üçün məlumat yoxdur", en: "No data for period" },
+  // R4-01: CUSTOM period validation hint
+  "analytics.custom_dates_required": { ru: "Выберите дату начала и окончания периода", az: "Başlanğıc və bitiş tarixini seçin", en: "Select both start and end dates" },
   "analytics.period": { ru: "Период", az: "Dövr", en: "Period" },
   "analytics.comparison": { ru: "Сравнение", az: "Müqayisə", en: "Comparison" },
   "analytics.kpi.gmv": { ru: "GMV (выполненные)", az: "GMV (tamamlanmış)", en: "GMV (fulfilled)" },
@@ -1279,6 +1281,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "analytics.stage.booking_completed": { ru: "Бронирование завершено", az: "Bron tamamlandı", en: "Booking Completed" },
   // RT13: Localized completion header
   "analytics.partners.completion": { ru: "Доля заверш.", az: "Tamamlanma", en: "Completion" },
+  // R4-03: Commission rate column
+  "analytics.partners.commission_rate": { ru: "Ставка", az: "Dərəcə", en: "Rate" },
 
   // ── Marketing Center ──
   "marketing.title": { ru: "Маркетинг", az: "Marketinq", en: "Marketing" },

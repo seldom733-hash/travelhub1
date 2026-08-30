@@ -54,6 +54,9 @@ function AnalyticsContent() {
   const [partnerPage, setPartnerPage] = useState(1);
   const PAGE_SIZE = 20;
 
+  // R4-01: CUSTOM period — only fetch when BOTH dates are valid
+  const isCustomValid = preset !== "CUSTOM" || (customStart !== "" && customEnd !== "");
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -80,8 +83,10 @@ function AnalyticsContent() {
   }, [preset, comparison, customStart, customEnd]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (isCustomValid) {
+      void load();
+    }
+  }, [load, isCustomValid]);
 
   const fmt = (v: string | number | null | undefined, currency?: string) => {
     if (v == null) return "\u2014";
@@ -151,13 +156,20 @@ function AnalyticsContent() {
 
       <p className="text-sm text-slate-500">{t("analytics.subtitle", locale)}</p>
 
-      {loading && (
+      {/* R4-01: CUSTOM period validation hint */}
+      {preset === "CUSTOM" && !isCustomValid && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          {t("analytics.custom_dates_required", locale)}
+        </div>
+      )}
+
+      {loading && isCustomValid && (
         <div className="flex h-32 items-center justify-center">
           <div className="text-sm text-slate-400">{t("analytics.loading", locale)}</div>
         </div>
       )}
 
-      {error && (
+      {error && isCustomValid && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
           <div className="font-medium">{t("analytics.error", locale)}</div>
           <div className="mt-1 text-xs text-red-500">{error}</div>
@@ -170,18 +182,19 @@ function AnalyticsContent() {
       {/* ── KPI Cards ── */}
       {m && (
         <Kpi items={[
+          /* R4-02: KPI drill-down links */
           { label: t("analytics.kpi.gmv", locale), value: fmt(m.gmv.current, m.gmvCurrency), icon: "\uD83D\uDCB0" },
           { label: t("analytics.kpi.revenue", locale), value: fmt(m.revenue.current, m.revenueCurrency), icon: "\uD83D\uDCC8" },
           { label: t("analytics.kpi.net_revenue", locale), value: fmt(m.netRevenue.current, m.revenueCurrency), icon: "\uD83D\uDCCA" },
           /* RT7: Commission with currency */
           { label: t("analytics.kpi.commission", locale), value: fmt(m.commissionAccrued.current, m.commissionCurrency), icon: "\uD83C\uDFE6" },
-          { label: t("analytics.kpi.orders", locale), value: m.ordersCreated.current, icon: "\uD83D\uDDCE\uFE0F" },
-          { label: t("analytics.kpi.bookings", locale), value: m.bookingsRequested.current, icon: "\uD83D\uDCD1" },
+          { label: t("analytics.kpi.orders", locale), value: m.ordersCreated.current, icon: "\uD83D\uDDCE\uFE0F", href: "/app/orders" },
+          { label: t("analytics.kpi.bookings", locale), value: m.bookingsRequested.current, icon: "\uD83D\uDCD1", href: "/app/bookings" },
           { label: t("analytics.kpi.aov", locale), value: fmt(m.averageOrderValue.current, m.gmvCurrency), icon: "\uD83C\uDFAF" },
           { label: t("analytics.kpi.refunds", locale), value: fmt(m.refunds.current, m.refundsCurrency), icon: "\u21A9\uFE0F" },
           { label: t("analytics.kpi.sessions", locale), value: (m.marketplaceSessions.current ?? 0) + (m.storefrontSessions.current ?? 0), icon: "\uD83C\uDF10" },
-          { label: t("analytics.kpi.customers", locale), value: (m.marketplaceCustomers.current ?? 0) + (m.storefrontCustomers.current ?? 0), icon: "\uD83D\uDC65" },
-          { label: t("analytics.kpi.partners", locale), value: (m.marketplacePartners.current ?? 0) + (m.storefrontPartners.current ?? 0), icon: "\uD83E\uDD1D" },
+          { label: t("analytics.kpi.customers", locale), value: (m.marketplaceCustomers.current ?? 0) + (m.storefrontCustomers.current ?? 0), icon: "\uD83D\uDC65", href: "/app/crm" },
+          { label: t("analytics.kpi.partners", locale), value: (m.marketplacePartners.current ?? 0) + (m.storefrontPartners.current ?? 0), icon: "\uD83E\uDD1D", href: "/app/partners/onboarding" },
           { label: t("analytics.kpi.qualified_gmv", locale), value: fmt(m.qualifiedGmv.current, m.gmvCurrency), icon: "\u2705" },
           /* RT4: REMOVED duplicate — completedGmv = gmv (both FULFILLED+CLOSED) */
           { label: t("analytics.kpi.collected_gmv", locale), value: fmt(m.collectedGmv.current, m.gmvCurrency), icon: "\uD83D\uDCB5" },
@@ -325,6 +338,8 @@ function AnalyticsContent() {
                   <th className="px-4 py-2.5 text-right">{t("analytics.kpi.bookings", locale)}</th>
                   {/* RT13: Localized completion label */}
                   <th className="px-4 py-2.5 text-right">{t("analytics.partners.completion", locale)}</th>
+                  {/* R4-03: Commission rate column */}
+                  <th className="px-4 py-2.5 text-right">{t("analytics.partners.commission_rate", locale)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -339,6 +354,12 @@ function AnalyticsContent() {
                     <td className="px-4 py-2.5 text-right text-slate-600">
                       {p.bookingCompletionRate != null
                         ? `${Math.min(p.bookingCompletionRate, 100).toFixed(1)}%`
+                        : "\u2014"}
+                    </td>
+                    {/* R4-03: Commission rate = commission / GMV */}
+                    <td className="px-4 py-2.5 text-right text-slate-600">
+                      {parseFloat(p.gmv) > 0
+                        ? `${((parseFloat(p.commission) / parseFloat(p.gmv)) * 100).toFixed(1)}%`
                         : "\u2014"}
                     </td>
                   </tr>
