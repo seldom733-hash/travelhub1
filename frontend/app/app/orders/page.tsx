@@ -21,7 +21,7 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-red-600 hover:bg-red-700", only: ["NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "PROBLEM", "SUSPENDED"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, initialCancelledWithin, initialPaymentFailed, initialPendingRefund, initialSortBy, initialSortDirection }: { initialStatus: string; initialSearch?: string; initialPaymentStatus?: string; initialCancelledWithin?: string; initialPaymentFailed?: string; initialPendingRefund?: string; initialSortBy?: string; initialSortDirection?: SortDirection }) {
+function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, initialCancelledWithin, initialPaymentFailed, initialPendingRefund, initialSortBy, initialSortDirection, initialDateFrom, initialDateTo }: { initialStatus: string; initialSearch?: string; initialPaymentStatus?: string; initialCancelledWithin?: string; initialPaymentFailed?: string; initialPendingRefund?: string; initialSortBy?: string; initialSortDirection?: SortDirection; initialDateFrom?: string; initialDateTo?: string }) {
   const locale = useLocale();
   const [data, setData] = useState<Page<Order> | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
@@ -30,8 +30,8 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [paymentStatusFilter, setPaymentStatusFilter] = useState(initialPaymentStatus);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(initialDateFrom || "");
+  const [dateTo, setDateTo] = useState(initialDateTo || "");
   const [cancelledWithin] = useState(initialCancelledWithin);
   const [paymentFailed] = useState(initialPaymentFailed);
   const [pendingRefund] = useState(initialPendingRefund);
@@ -393,6 +393,8 @@ function OrdersWithParams() {
       initialPendingRefund={sp.get("pendingRefund") ?? ""}
       initialSortBy={sp.get("sortBy") ?? undefined}
       initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
+      initialDateFrom={sp.get("from") ?? sp.get("dateFrom") ?? ""}
+      initialDateTo={sp.get("to") ?? sp.get("dateTo") ?? ""}
     />
   );
 }

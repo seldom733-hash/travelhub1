@@ -15,25 +15,21 @@ import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
 import { PeriodSelector } from "@/components/command-center/PeriodSelector";
 import { useLocale, t } from "@/lib/i18n";
+import { METRIC_CONFIGS, type PeriodContext } from "@/lib/metric-drilldown";
 
 /**
- * Pre-Step 3.12 — Analytics Round 2 Remediation
+ * Pre-Step 3.12 — Analytics Round 4 Strict Remediation
  *
- * Route: /app/analytics
- * Permission: analytics.read (server-authoritative)
+ * Shared Metric Drill-down: all KPI cards use MetricDrilldownConfig
+ * for source traceability with period/filter preservation.
  *
- * RT1: PeriodSelector → time-series chain verified
- * RT2/RT3: Proportional bar chart with visible Y-axis and tooltips
- * RT4: Duplicate GMV removed (gmv = completedGmv)
- * RT5: AOV documented (GMV_fulfilled_AZN / count_fulfilled_AZN)
- * RT6: Customers independent (distinct customerIds from orders)
- * RT7: Commission currency added
- * RT8: Sessions zero-verified (behavioral events only in recent data)
- * RT9: Server-side pagination
- * RT10: Multi-currency (AZN/EUR/USD, no FX architecture)
- * RT11: Commission = per-transaction canonical source
- * RT12: Activity stages localized, semantic labels
- * RT13: Completion = completedBookings / totalBookings (all statuses)
+ * R4-02E: Shared drill-down framework
+ * R4-02A: Orders with period filter
+ * R4-02B: Bookings with period filter
+ * R4-02C: Customers = all-time stock
+ * R4-02D: Partners → CRM Partners tab
+ * R4-03: Commission rate = effective (Commission/GMV), clearly labeled
+ * Financial Summary: Payment Count column
  */
 function AnalyticsContent() {
   const locale = useLocale();
@@ -50,7 +46,6 @@ function AnalyticsContent() {
   const [partners, setPartners] = useState<PartnerPerformanceResponse | null>(null);
   const [finance, setFinance] = useState<FinancialReconciliationResponse | null>(null);
 
-  // RT9: Partner pagination
   const [partnerPage, setPartnerPage] = useState(1);
   const PAGE_SIZE = 20;
 
@@ -101,25 +96,33 @@ function AnalyticsContent() {
 
   const m = kpi?.metrics;
 
-  // RT9: Partner pagination (server-side would be ideal; current is client-side slice)
+  // Build period context for drill-down filter transfer
+  const periodContext: PeriodContext = useMemo(() => {
+    if (kpi?.period) {
+      return {
+        preset,
+        from: kpi.period.start.split("T")[0],
+        to: kpi.period.endExclusive.split("T")[0],
+      };
+    }
+    return { preset };
+  }, [kpi, preset]);
+
   const allPartners = partners?.partners ?? [];
   const partnerTotal = allPartners.length;
   const partnerPages = Math.ceil(partnerTotal / PAGE_SIZE);
   const pagePartners = allPartners.slice((partnerPage - 1) * PAGE_SIZE, partnerPage * PAGE_SIZE);
 
-  // RT2A: Orders reconciliation — SUM(time-series buckets)
   const ordersBucketSum = useMemo(() => {
     if (!timeSeries) return null;
     return timeSeries.buckets.reduce((sum, b) => sum + b.value, 0);
   }, [timeSeries]);
 
-  // RT2/RT3: Compute chart dimensions
   const chartMax = useMemo(() => {
     if (!timeSeries || timeSeries.buckets.length === 0) return 1;
     return Math.max(...timeSeries.buckets.map((b) => b.value), 1);
   }, [timeSeries]);
 
-  // RT12: Localized stage name mapping
   const stageLabel = (stage: string): string => {
     const map: Record<string, string> = {
       "Product Impression": t("analytics.stage.impression", locale),
@@ -156,7 +159,6 @@ function AnalyticsContent() {
 
       <p className="text-sm text-slate-500">{t("analytics.subtitle", locale)}</p>
 
-      {/* R4-01: CUSTOM period validation hint */}
       {preset === "CUSTOM" && !isCustomValid && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
           {t("analytics.custom_dates_required", locale)}
@@ -179,30 +181,29 @@ function AnalyticsContent() {
         </div>
       )}
 
-      {/* ── KPI Cards ── */}
+      {/* ── KPI Cards with Shared Drill-down ── */}
       {m && (
-        <Kpi items={[
-          /* R4-02: KPI drill-down links */
-          { label: t("analytics.kpi.gmv", locale), value: fmt(m.gmv.current, m.gmvCurrency), icon: "\uD83D\uDCB0", href: "/app/orders" },
-          { label: t("analytics.kpi.revenue", locale), value: fmt(m.revenue.current, m.revenueCurrency), icon: "\uD83D\uDCC8", href: "/app/orders" },
-          { label: t("analytics.kpi.net_revenue", locale), value: fmt(m.netRevenue.current, m.revenueCurrency), icon: "\uD83D\uDCCA", href: "/app/orders" },
-          /* RT7: Commission with currency */
-          { label: t("analytics.kpi.commission", locale), value: fmt(m.commissionAccrued.current, m.commissionCurrency), icon: "\uD83C\uDFE6" },
-          { label: t("analytics.kpi.orders", locale), value: m.ordersCreated.current, icon: "\uD83D\uDDCE\uFE0F", href: "/app/orders" },
-          { label: t("analytics.kpi.bookings", locale), value: m.bookingsRequested.current, icon: "\uD83D\uDCD1", href: "/app/bookings" },
-          { label: t("analytics.kpi.aov", locale), value: fmt(m.averageOrderValue.current, m.gmvCurrency), icon: "\uD83C\uDFAF" },
-          { label: t("analytics.kpi.refunds", locale), value: fmt(m.refunds.current, m.refundsCurrency), icon: "\u21A9\uFE0F" },
-          { label: t("analytics.kpi.sessions", locale), value: (m.marketplaceSessions.current ?? 0) + (m.storefrontSessions.current ?? 0), icon: "\uD83C\uDF10" },
-          { label: t("analytics.kpi.customers", locale), value: (m.marketplaceCustomers.current ?? 0) + (m.storefrontCustomers.current ?? 0), icon: "\uD83D\uDC65", href: "/app/crm" },
-          { label: t("analytics.kpi.partners", locale), value: (m.marketplacePartners.current ?? 0) + (m.storefrontPartners.current ?? 0), icon: "\uD83E\uDD1D", href: "/app/partners/onboarding" },
-          { label: t("analytics.kpi.qualified_gmv", locale), value: fmt(m.qualifiedGmv.current, m.gmvCurrency), icon: "\u2705", href: "/app/orders" },
-          /* RT4: REMOVED duplicate — completedGmv = gmv (both FULFILLED+CLOSED) */
-          { label: t("analytics.kpi.collected_gmv", locale), value: fmt(m.collectedGmv.current, m.gmvCurrency), icon: "\uD83D\uDCB5", href: "/app/orders" },
-          { label: t("analytics.kpi.outstanding_gmv", locale), value: fmt(m.outstandingGmv.current, m.gmvCurrency), icon: "\u23F3", href: "/app/orders" },
-        ]} />
+        <Kpi
+          period={periodContext}
+          items={[
+            { label: t("analytics.kpi.gmv", locale), value: fmt(m.gmv.current, m.gmvCurrency), icon: "\uD83D\uDCB0", drilldown: METRIC_CONFIGS["analytics.gmv"] },
+            { label: t("analytics.kpi.revenue", locale), value: fmt(m.revenue.current, m.revenueCurrency), icon: "\uD83D\uDCC8", drilldown: METRIC_CONFIGS["analytics.revenue"] },
+            { label: t("analytics.kpi.net_revenue", locale), value: fmt(m.netRevenue.current, m.revenueCurrency), icon: "\uD83D\uDCCA", drilldown: METRIC_CONFIGS["analytics.revenue"] },
+            { label: t("analytics.kpi.commission", locale), value: fmt(m.commissionAccrued.current, m.commissionCurrency), icon: "\uD83C\uDFE6", drilldown: METRIC_CONFIGS["analytics.commission"] },
+            { label: t("analytics.kpi.orders", locale), value: m.ordersCreated.current, icon: "\uD83D\uDDCE\uFE0F", drilldown: METRIC_CONFIGS["analytics.orders"] },
+            { label: t("analytics.kpi.bookings", locale), value: m.bookingsRequested.current, icon: "\uD83D\uDCD1", drilldown: METRIC_CONFIGS["analytics.bookings"] },
+            { label: t("analytics.kpi.aov", locale), value: fmt(m.averageOrderValue.current, m.gmvCurrency), icon: "\uD83C\uDFAF", drilldown: METRIC_CONFIGS["analytics.aov"] },
+            { label: t("analytics.kpi.refunds", locale), value: fmt(m.refunds.current, m.refundsCurrency), icon: "\u21A9\uFE0F", drilldown: METRIC_CONFIGS["analytics.refunds"] },
+            { label: t("analytics.kpi.sessions", locale), value: (m.marketplaceSessions.current ?? 0) + (m.storefrontSessions.current ?? 0), icon: "\uD83C\uDF10", drilldown: METRIC_CONFIGS["analytics.sessions"] },
+            { label: t("analytics.kpi.customers", locale), value: (m.marketplaceCustomers.current ?? 0) + (m.storefrontCustomers.current ?? 0), icon: "\uD83D\uDC65", drilldown: METRIC_CONFIGS["analytics.customers"] },
+            { label: t("analytics.kpi.partners", locale), value: (m.marketplacePartners.current ?? 0) + (m.storefrontPartners.current ?? 0), icon: "\uD83E\uDD1D", drilldown: METRIC_CONFIGS["analytics.partners"] },
+            { label: t("analytics.kpi.qualified_gmv", locale), value: fmt(m.qualifiedGmv.current, m.gmvCurrency), icon: "\u2705", drilldown: METRIC_CONFIGS["analytics.qualified_gmv"] },
+            { label: t("analytics.kpi.collected_gmv", locale), value: fmt(m.collectedGmv.current, m.gmvCurrency), icon: "\uD83D\uDCB5", drilldown: METRIC_CONFIGS["analytics.collected_gmv"] },
+            { label: t("analytics.kpi.outstanding_gmv", locale), value: fmt(m.outstandingGmv.current, m.gmvCurrency), icon: "\u23F3", drilldown: METRIC_CONFIGS["analytics.outstanding_gmv"] },
+          ]}
+        />
       )}
 
-      {/* RT2A: Orders reconciliation banner */}
       {ordersBucketSum != null && m && ordersBucketSum !== m.ordersCreated.current && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700">
           RT2A reconciliation: SUM(buckets)={ordersBucketSum} {"\u2260"} headline={m.ordersCreated.current}
@@ -210,7 +211,7 @@ function AnalyticsContent() {
         </div>
       )}
 
-      {/* ── Activity by Stage (RT12: localized labels) ── */}
+      {/* ── Activity by Stage ── */}
       {funnel && funnel.stages.length > 0 && !loading && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
@@ -228,10 +229,7 @@ function AnalyticsContent() {
                     </div>
                     <div className="flex-1">
                       <div className="h-6 overflow-hidden rounded bg-slate-100">
-                        <div
-                          className="h-full rounded bg-blue-500 transition-all"
-                          style={{ width: `${pctWidth}%` }}
-                        />
+                        <div className="h-full rounded bg-blue-500 transition-all" style={{ width: `${pctWidth}%` }} />
                       </div>
                     </div>
                     <div className="w-20 shrink-0 text-right text-xs text-slate-500">
@@ -248,7 +246,7 @@ function AnalyticsContent() {
         </div>
       )}
 
-      {/* ── Time Series: RT2/RT3 — Proportional bar chart ── */}
+      {/* ── Time Series Bar Chart ── */}
       {timeSeries && timeSeries.buckets.length > 0 && !loading && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50 px-5 py-3 flex items-center justify-between">
@@ -260,9 +258,7 @@ function AnalyticsContent() {
             </span>
           </div>
           <div className="p-5">
-            {/* RT2/RT3: Improved bar chart with readable Y-axis and proper height */}
             <div className="relative" style={{ height: 200 }}>
-              {/* Y-axis labels */}
               <div className="absolute left-0 top-0 bottom-6 w-10 flex flex-col justify-between text-[9px] text-slate-400 pr-1 text-right">
                 <span>{chartMax}</span>
                 <span>{Math.round(chartMax * 0.75)}</span>
@@ -270,28 +266,17 @@ function AnalyticsContent() {
                 <span>{Math.round(chartMax * 0.25)}</span>
                 <span>0</span>
               </div>
-              {/* Horizontal gridlines */}
               <div className="absolute left-10 right-0 top-0 bottom-6 flex flex-col justify-between pointer-events-none">
                 {[0, 1, 2, 3, 4].map((i) => (
                   <div key={i} className="border-b border-slate-100 w-full" />
                 ))}
               </div>
-              {/* Bars */}
               <div className="absolute left-10 right-0 bottom-6 top-0 flex items-end gap-[2px]">
                 {timeSeries.buckets.map((b) => {
                   const h = chartMax > 0 ? (b.value / chartMax) * 100 : 0;
                   return (
-                    <div
-                      key={b.label}
-                      className="group relative flex-1 h-full flex items-end"
-                    >
-                      <div
-                        className="w-full rounded-t bg-blue-500 transition-all hover:bg-blue-600"
-                        style={{
-                          height: `${h}%`,
-                        }}
-                      />
-                      {/* Tooltip on hover */}
+                    <div key={b.label} className="group relative flex-1 h-full flex items-end">
+                      <div className="w-full rounded-t bg-blue-500 transition-all hover:bg-blue-600" style={{ height: `${h}%` }} />
                       <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 rounded bg-slate-800 px-2 py-1 text-[10px] text-white whitespace-nowrap group-hover:block">
                         {b.label}: {b.value.toLocaleString()}
                       </div>
@@ -300,18 +285,12 @@ function AnalyticsContent() {
                 })}
               </div>
             </div>
-            {/* X-axis labels (sparse — max ~15 visible) */}
             <div className="mt-1 ml-10 flex gap-[2px]">
               {timeSeries.buckets.map((b, i) => {
-                const showLabel =
-                  timeSeries.buckets.length <= 15 ||
-                  i % Math.ceil(timeSeries.buckets.length / 15) === 0 ||
-                  i === timeSeries.buckets.length - 1;
+                const showLabel = timeSeries.buckets.length <= 15 || i % Math.ceil(timeSeries.buckets.length / 15) === 0 || i === timeSeries.buckets.length - 1;
                 return (
                   <div key={b.label} className="flex-1 text-center">
-                    {showLabel && (
-                      <span className="text-[8px] text-slate-400 truncate block">{b.label}</span>
-                    )}
+                    {showLabel && <span className="text-[8px] text-slate-400 truncate block">{b.label}</span>}
                   </div>
                 );
               })}
@@ -336,10 +315,8 @@ function AnalyticsContent() {
                   <th className="px-4 py-2.5 text-right">{t("analytics.kpi.commission", locale)}</th>
                   <th className="px-4 py-2.5 text-right">{t("analytics.kpi.orders", locale)}</th>
                   <th className="px-4 py-2.5 text-right">{t("analytics.kpi.bookings", locale)}</th>
-                  {/* RT13: Localized completion label */}
                   <th className="px-4 py-2.5 text-right">{t("analytics.partners.completion", locale)}</th>
-                  {/* R4-03: Commission rate column */}
-                  <th className="px-4 py-2.5 text-right">{t("analytics.partners.commission_rate", locale)}</th>
+                  <th className="px-4 py-2.5 text-right">{t("analytics.partners.effective_rate", locale)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -356,7 +333,7 @@ function AnalyticsContent() {
                         ? `${Math.min(p.bookingCompletionRate, 100).toFixed(1)}%`
                         : "\u2014"}
                     </td>
-                    {/* R4-03: Commission rate = commission / GMV */}
+                    {/* R4-03: Effective rate = Commission / GMV (clearly labeled as derived) */}
                     <td className="px-4 py-2.5 text-right text-slate-600">
                       {parseFloat(p.gmv) > 0
                         ? `${((parseFloat(p.commission) / parseFloat(p.gmv)) * 100).toFixed(1)}%`
@@ -373,7 +350,7 @@ function AnalyticsContent() {
         </div>
       )}
 
-      {/* ── Financial Summary ── */}
+      {/* ── Financial Summary with Payment Count ── */}
       {finance && finance.currencies.length > 0 && !loading && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
@@ -384,6 +361,7 @@ function AnalyticsContent() {
               <thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <th className="px-4 py-2.5">{t("analytics.finance.currency", locale)}</th>
+                  <th className="px-4 py-2.5 text-right">{t("analytics.finance.payment_count", locale)}</th>
                   <th className="px-4 py-2.5 text-right">{t("analytics.finance.payments", locale)}</th>
                   <th className="px-4 py-2.5 text-right">{t("analytics.finance.refunds", locale)}</th>
                   <th className="px-4 py-2.5 text-right">{t("analytics.finance.net", locale)}</th>
@@ -394,6 +372,7 @@ function AnalyticsContent() {
                 {finance.currencies.map((c) => (
                   <tr key={c.currency} className="border-b border-slate-50 hover:bg-blue-50/50">
                     <td className="px-4 py-2.5 font-medium text-slate-800">{c.currency}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-600">{(c as any).paymentCount ?? "\u2014"}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600">{fmt(c.totalPayments)}</td>
                     <td className="px-4 py-2.5 text-right text-red-500">{fmt(c.totalRefunds)}</td>
                     <td className="px-4 py-2.5 text-right text-slate-600">{fmt(c.netPayments)}</td>

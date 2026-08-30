@@ -1283,6 +1283,10 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "analytics.partners.completion": { ru: "Доля заверш.", az: "Tamamlanma", en: "Completion" },
   // R4-03: Commission rate column
   "analytics.partners.commission_rate": { ru: "Ставка", az: "Dərəcə", en: "Rate" },
+  // R4-03: Effective rate (derived, not configured)
+  "analytics.partners.effective_rate": { ru: "Эфф. ставка", az: "Eff. dərəcə", en: "Eff. Rate" },
+  // Financial Summary payment count
+  "analytics.finance.payment_count": { ru: "Платежей", az: "Ödənişlər", en: "Payments #" },
 
   // ── Marketing Center ──
   "marketing.title": { ru: "Маркетинг", az: "Marketinq", en: "Marketing" },

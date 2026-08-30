@@ -454,7 +454,7 @@ export interface PartnerPerformanceResponse {
 export interface FinancialReconciliationResponse {
   period: { start: string; endExclusive: string; timezone: string; preset: string };
   currencies: Array<{
-    currency: string; totalPayments: string; totalRefunds: string;
+    currency: string; paymentCount: number; totalPayments: string; totalRefunds: string;
     netPayments: string; totalCommission: string;
   }>;
   totalLedgerEntries: number;

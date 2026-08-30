@@ -21,7 +21,7 @@ const ACTIONS = [
   { action: "cancel", label: "Отменить", cls: "bg-slate-600 hover:bg-slate-700", only: ["NEW", "PREPARING_REQUEST", "SENT_TO_SUPPLIER", "AWAITING_CONFIRMATION", "CONFIRMED", "IN_SERVICE"] },
 ] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
-function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, initialSortBy, initialSortDirection, initialSearch }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean; slaMinutes?: string; initialSortBy?: string; initialSortDirection?: SortDirection; initialSearch?: string }) {
+function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, initialSortBy, initialSortDirection, initialSearch, initialDateFrom, initialDateTo }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean; slaMinutes?: string; initialSortBy?: string; initialSortDirection?: SortDirection; initialSearch?: string; initialDateFrom?: string; initialDateTo?: string }) {
   const locale = useLocale();
   const [data, setData] = useState<Page<Booking> | null>(null);
   const [selected, setSelected] = useState<Booking | null>(null);
@@ -31,8 +31,8 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
   const [search, setSearch] = useState(initialSearch || "");
   const [bookingStatusFilter, setBookingStatusFilter] = useState(statusFilter ?? "");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(initialDateFrom || "");
+  const [dateTo, setDateTo] = useState(initialDateTo || "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Derived filter labels for display
@@ -353,6 +353,8 @@ function BookingsWithParams() {
       initialSortBy={sp.get("sortBy") ?? undefined}
       initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
       initialSearch={sp.get("search") ?? ""}
+      initialDateFrom={sp.get("from") ?? sp.get("dateFrom") ?? ""}
+      initialDateTo={sp.get("to") ?? sp.get("dateTo") ?? ""}
     />
   );
 }

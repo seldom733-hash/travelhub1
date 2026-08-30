@@ -270,6 +270,7 @@ export interface TimeSeriesResponse {
 
 export interface CurrencyReconciliation {
   currency: string;
+  paymentCount: number;
   totalPayments: string;
   totalRefunds: string;
   netPayments: string;
@@ -1193,9 +1194,17 @@ export class AnalyticsService {
       ? PLATFORM_REPORTING_CURRENCY
       : sortedCurrencies[0] || PLATFORM_REPORTING_CURRENCY;
 
+    // Count payments per currency for paymentCount column
+    const paymentCountByCurrency: Record<string, number> = {};
+    for (const p of payments) {
+      const cur = p.currency || "USD";
+      paymentCountByCurrency[cur] = (paymentCountByCurrency[cur] || 0) + 1;
+    }
+
     // Build per-currency reconciliation entries
     const currencies: CurrencyReconciliation[] = sortedCurrencies.map((cur) => ({
       currency: cur,
+      paymentCount: paymentCountByCurrency[cur] || 0,
       totalPayments: paymentsByCurrency[cur] || "0.00",
       totalRefunds: refundsByCurrency[cur] || "0.00",
       netPayments: netPaymentsByCurrency[cur] || "0.00",
