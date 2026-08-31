@@ -12,7 +12,7 @@ import ActionButtons from "@/components/ActionButtons";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import AggregateSummary from "@/components/AggregateSummary";
 import { useLocale, t } from "@/lib/i18n";
-import SalesChannelScope, { type SalesChannelScope as ChannelScope, scopeToAcquisitionSource } from "@/components/SalesChannelScope";
+
 
 const ACTIONS = [
   { action: "process", label: "Принять в работу", cls: "bg-sky-600 hover:bg-sky-700", only: ["NEW"] },
@@ -39,13 +39,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   const [pendingRefund] = useState(initialPendingRefund);
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
-  const [channelScope, setChannelScope] = useState<ChannelScope>(() => {
-    if (typeof window !== "undefined") {
-      const urlChannel = new URLSearchParams(window.location.search).get("channel");
-      if (urlChannel === "MARKETPLACE" || urlChannel === "STOREFRONT") return urlChannel;
-    }
-    return "ALL";
-  });
+
 
   const updateUrl = (params: Record<string, string>) => {
     const sp = new URLSearchParams(window.location.search);
@@ -112,8 +106,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
       if (cancelledWithin) qs.set("cancelledWithin", cancelledWithin);
       if (paymentFailed) qs.set("paymentFailed", paymentFailed);
       if (pendingRefund) qs.set("pendingRefund", pendingRefund);
-      const acqSource = scopeToAcquisitionSource(channelScope);
-      if (acqSource) qs.set("acquisitionSource", acqSource);
+
       if (sortBy) qs.set("sortBy", sortBy);
       if (sortDirection) qs.set("sortDirection", sortDirection);
       if (dateFrom) qs.set("dateFrom", dateFrom);
@@ -132,7 +125,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, statusFilter, paymentStatusFilter, cancelledWithin, paymentFailed, pendingRefund, sortBy, sortDirection, page, dateFrom, dateTo, channelScope]);
+  }, [search, statusFilter, paymentStatusFilter, cancelledWithin, paymentFailed, pendingRefund, sortBy, sortDirection, page, dateFrom, dateTo]);
 
   const openDetail = async (id: string) => {
     const [order, bk] = await Promise.all([
@@ -190,10 +183,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <SalesChannelScope
-              value={channelScope}
-              onChange={(v) => { setChannelScope(v); setPage(1); updateUrl({ channel: v === "ALL" ? "" : v }); }}
-            />
+
             <input
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}

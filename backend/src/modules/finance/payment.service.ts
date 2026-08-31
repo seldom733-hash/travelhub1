@@ -296,18 +296,15 @@ export class PaymentService {
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 50, 100);
 
-    // Sales Channel scope: resolve Order IDs with matching acquisitionSource
-    let channelOrderIds: string[] | undefined;
-    if (query.acquisitionSource) {
-      const orders = await this.prisma.order.findMany({
-        where: { acquisitionSource: query.acquisitionSource },
-        select: { id: true },
-      });
-      channelOrderIds = orders.map(o => o.id);
-      // If no orders match, return empty result
-      if (channelOrderIds.length === 0) {
-        return { items: [], total: 0, page, pageSize, hasMore: false };
-      }
+    // Platform operational scope: default to MARKETPLACE via Order.acquisitionSource
+    const effectiveSource = query.acquisitionSource || "MARKETPLACE";
+    const channelOrders = await this.prisma.order.findMany({
+      where: { acquisitionSource: effectiveSource },
+      select: { id: true },
+    });
+    const channelOrderIds = channelOrders.map(o => o.id);
+    if (channelOrderIds.length === 0) {
+      return { items: [], total: 0, page, pageSize, hasMore: false };
     }
 
     const where: Prisma.PaymentWhereInput = {
@@ -320,7 +317,7 @@ export class PaymentService {
           ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
         },
       } : {}),
-      ...(channelOrderIds ? { orderId: { in: channelOrderIds } } : {}),
+      orderId: { in: channelOrderIds },
     };
 
     // Server-side sorting with deterministic tie-breaker on id

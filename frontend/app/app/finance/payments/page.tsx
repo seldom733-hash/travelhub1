@@ -18,7 +18,7 @@ import Pagination from "@/components/Pagination";
 import AggregateSummary from "@/components/AggregateSummary";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import { useLocale, t } from "@/lib/i18n";
-import SalesChannelScope, { type SalesChannelScope as ChannelScope, scopeToAcquisitionSource } from "@/components/SalesChannelScope";
+
 
 interface Payment {
   id: string;
@@ -64,13 +64,7 @@ function PaymentsContent({
   const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
-  const [channelScope, setChannelScope] = useState<ChannelScope>(() => {
-    if (typeof window !== "undefined") {
-      const urlChannel = new URLSearchParams(window.location.search).get("channel");
-      if (urlChannel === "MARKETPLACE" || urlChannel === "STOREFRONT") return urlChannel;
-    }
-    return "ALL";
-  });
+
 
   const updateUrl = (params: Record<string, string>) => {
     const sp = new URLSearchParams(window.location.search);
@@ -96,8 +90,7 @@ function PaymentsContent({
       if (dateFrom) qs.set("dateFrom", dateFrom);
       if (dateTo) qs.set("dateTo", dateTo);
       if (statusFilter) qs.set("status", statusFilter);
-      const acqSource = scopeToAcquisitionSource(channelScope);
-      if (acqSource) qs.set("acquisitionSource", acqSource);
+
       if (sortBy) qs.set("sortBy", sortBy);
       if (sortDirection) qs.set("sortDirection", sortDirection);
       qs.set("page", String(page));
@@ -109,7 +102,7 @@ function PaymentsContent({
     } finally {
       setLoading(false);
     }
-  }, [currency, dateFrom, dateTo, statusFilter, sortBy, sortDirection, page, channelScope]);
+  }, [currency, dateFrom, dateTo, statusFilter, sortBy, sortDirection, page]);
 
   useEffect(() => {
     void load();
@@ -171,10 +164,7 @@ function PaymentsContent({
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-2">
-            <SalesChannelScope
-              value={channelScope}
-              onChange={(v) => { setChannelScope(v); setPage(1); }}
-            />
+
             <select
               value={currency}
               onChange={(e) => { setCurrency(e.target.value); setPage(1); }}

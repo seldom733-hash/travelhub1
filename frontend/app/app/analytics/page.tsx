@@ -13,7 +13,7 @@ import {
 } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import Kpi from "@/components/Kpi";
-import SalesChannelScope, { type SalesChannelScope as ChannelScope, scopeToAcquisitionSource } from "@/components/SalesChannelScope";
+
 import Pagination from "@/components/Pagination";
 import { PeriodSelector } from "@/components/command-center/PeriodSelector";
 import { useLocale, t } from "@/lib/i18n";
@@ -55,13 +55,13 @@ function AnalyticsContent() {
   // R4-01: CUSTOM period — only fetch when BOTH dates are valid
   const isCustomValid = preset !== "CUSTOM" || (customStart !== "" && customEnd !== "");
 
-  const [channelScope, setChannelScope] = useState<ChannelScope>("ALL");
+
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const opts = { preset, startDate: customStart || undefined, endDate: customEnd || undefined, acquisitionSource: scopeToAcquisitionSource(channelScope) };
+      const opts = { preset, startDate: customStart || undefined, endDate: customEnd || undefined, acquisitionSource: "MARKETPLACE" };
       const [k, f, ts, p, fin] = await Promise.all([
         analyticsApi.getCompanyKpi({ ...opts, comparison }),
         analyticsApi.getConversionFunnel(opts),
@@ -80,7 +80,7 @@ function AnalyticsContent() {
     } finally {
       setLoading(false);
     }
-  }, [preset, comparison, customStart, customEnd, channelScope]);
+  }, [preset, comparison, customStart, customEnd]);
 
   useEffect(() => {
     if (isCustomValid) {
@@ -148,7 +148,6 @@ function AnalyticsContent() {
         breadcrumbs={["TravelHub", t("analytics.title", locale)]}
         actions={
           <div className="flex items-center gap-2">
-          <SalesChannelScope value={channelScope} onChange={setChannelScope} />
           <PeriodSelector
             preset={preset}
             comparison={comparison}

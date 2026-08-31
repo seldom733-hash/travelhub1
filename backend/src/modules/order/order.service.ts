@@ -455,7 +455,8 @@ export class OrderService {
       ...(query.search
         ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }, { number: { contains: query.search, mode: "insensitive" } }] }
         : {}),
-      ...(query.acquisitionSource ? { acquisitionSource: query.acquisitionSource } : {}),
+      // Platform operational scope: default to MARKETPLACE when no acquisitionSource specified
+      acquisitionSource: query.acquisitionSource || "MARKETPLACE",
     };
 
     // R5-03: Date range filtering on createdAt (exclusive end — consistent with Analytics half-open [from, to))

@@ -169,19 +169,17 @@ export class BookingService {
         createdAt: { lt: new Date(Date.now() - (parseInt(query.slaMinutes ?? "240", 10)) * 60 * 1000) },
       } : {}),
     };
-    // Sales Channel scope: filter via Order.acquisitionSource (Booking's own field is all NULL)
-    let channelOrderIds: string[] | undefined;
-    if (query.acquisitionSource) {
-      const orders = await this.prisma.order.findMany({
-        where: { acquisitionSource: query.acquisitionSource },
-        select: { id: true },
-      });
-      channelOrderIds = orders.map(o => o.id);
-      if (channelOrderIds.length === 0) {
-        return { items: [], total: 0, page, pageSize, hasMore: false };
-      }
-      where.orderId = { in: channelOrderIds };
+    // Platform operational scope: default to MARKETPLACE via Order.acquisitionSource
+    const effectiveSource = query.acquisitionSource || "MARKETPLACE";
+    const channelOrders = await this.prisma.order.findMany({
+      where: { acquisitionSource: effectiveSource },
+      select: { id: true },
+    });
+    const channelOrderIds = channelOrders.map(o => o.id);
+    if (channelOrderIds.length === 0) {
+      return { items: [], total: 0, page, pageSize, hasMore: false };
     }
+    where.orderId = { in: channelOrderIds };
     // R5-04: Date range filtering on createdAt (exclusive end — consistent with Analytics half-open [from, to))
     if (query.dateFrom || query.dateTo) {
       where.createdAt = {
