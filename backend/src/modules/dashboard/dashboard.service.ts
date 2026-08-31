@@ -57,7 +57,7 @@ export interface TrendQueryDto extends DashboardQueryDto {
 
 // ─── Section Authority (Step 3.2) ──────────────────────────────────────────
 
-export type DashboardSection = "executive" | "operational" | "financial" | "marketplace" | "catalog" | "channels" | "attention" | "insights";
+export type DashboardSection = "executive" | "operational" | "financial" | "marketplace" | "storefrontSaaS" | "catalog" | "channels" | "attention" | "insights";
 
 /** Canonical section → permission mapping. Single source of truth. */
 export const SECTION_PERMISSION_MAP: Record<DashboardSection, string> = {
@@ -65,13 +65,14 @@ export const SECTION_PERMISSION_MAP: Record<DashboardSection, string> = {
   operational: "dashboard.operational.read",
   financial: "dashboard.financial.read",
   marketplace: "dashboard.marketplace.read",
+  storefrontSaaS: "dashboard.marketplace.read",
   catalog: "dashboard.catalog.read",
   channels: "dashboard.channels.read",
   attention: "dashboard.attention.read",
   insights: "dashboard.insights.read",
 };
 
-const ALL_SECTIONS: DashboardSection[] = ["executive", "operational", "financial", "marketplace", "catalog", "channels", "attention", "insights"];
+const ALL_SECTIONS: DashboardSection[] = ["executive", "operational", "financial", "marketplace", "storefrontSaaS", "catalog", "channels", "attention", "insights"];
 
 /** Metric → section mapping for trends authorization. Only supported metrics. */
 export const METRIC_SECTION_MAP: Record<string, DashboardSection> = {
@@ -226,12 +227,12 @@ export interface CommandCenterResponse {
     };
     marketplace?: {
       marketplaceSessions: KpiValue;
-      storefrontSessions: KpiValue;
       marketplacePartners: KpiValue;
-      storefrontPartners: KpiValue;
       marketplaceCustomers: KpiValue;
-      storefrontCustomers: KpiValue;
-      // Stage I: Storefront SaaS billing metrics
+    };
+    storefrontSaaS?: {
+      storefrontSessions: KpiValue;
+      storefrontPartners: KpiValue;
       storefrontMrr: KpiValue;
       storefrontArr: KpiValue;
       storefrontCollected: KpiValue;
@@ -356,7 +357,8 @@ export class DashboardService {
       sections.financial = this.buildFinancialSection(kpi, reconciliation);
     }
     if (sectionSet.has("marketplace")) {
-      sections.marketplace = this.buildMarketplaceSection(kpi, billingMetrics);
+      sections.marketplace = this.buildMarketplaceSection(kpi);
+      sections.storefrontSaaS = this.buildStorefrontSaaSSection(kpi, billingMetrics);
     }
     if (catalogHealth) sections.catalog = catalogHealth;
     if (channelHealth) sections.channels = channelHealth;
@@ -1068,17 +1070,23 @@ export class DashboardService {
 
   private buildMarketplaceSection(
     kpi: CompanyKpiResponse,
-    billing: { mrr: number; arr: number; collected: number; outstanding: number } | null,
   ) {
     const m = kpi.metrics;
     return {
       marketplaceSessions: this.toKpiValue(m.marketplaceSessions, "analytics"),
-      storefrontSessions: this.toKpiValue(m.storefrontSessions, "analytics"),
       marketplacePartners: this.toKpiValue(m.marketplacePartners, "analytics"),
-      storefrontPartners: this.toKpiValue(m.storefrontPartners, "analytics"),
       marketplaceCustomers: this.toKpiValue(m.marketplaceCustomers, "analytics"),
-      storefrontCustomers: this.toKpiValue(m.storefrontCustomers, "analytics"),
-      // Stage I: Authoritative billing metrics from SubscriptionContract/Invoice/Payment
+    };
+  }
+
+  private buildStorefrontSaaSSection(
+    kpi: CompanyKpiResponse,
+    billing: { mrr: number; arr: number; collected: number; outstanding: number } | null,
+  ) {
+    const m = kpi.metrics;
+    return {
+      storefrontSessions: this.toKpiValue(m.storefrontSessions, "analytics"),
+      storefrontPartners: this.toKpiValue(m.storefrontPartners, "analytics"),
       storefrontMrr: this.moneyKpi(billing?.mrr ?? 0, "AZN", "finance"),
       storefrontArr: this.moneyKpi(billing?.arr ?? 0, "AZN", "finance"),
       storefrontCollected: this.moneyKpi(billing?.collected ?? 0, "AZN", "finance"),

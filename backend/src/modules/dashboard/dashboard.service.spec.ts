@@ -264,15 +264,18 @@ describe("DashboardService — Command Center", () => {
     expect(result.sections.financial!.netPayments).toBeDefined();
     expect(result.sections.financial!.totalRefunds).toBeDefined();
 
-    // Marketplace: 4 KPIs (but 18 total = 7+6+4+4 = 21? Let me count: actually 7+6+4+4=21)
-    // Design says 18, but sections have 7+6+4+4=21. The design KPI count was approximate.
-    // All cards are present and valid.
+    // Marketplace: 3 KPIs (Marketplace-only)
     expect(result.sections.marketplace!.marketplaceSessions).toBeDefined();
-    expect(result.sections.marketplace!.storefrontSessions).toBeDefined();
     expect(result.sections.marketplace!.marketplacePartners).toBeDefined();
-    expect(result.sections.marketplace!.storefrontPartners).toBeDefined();
     expect(result.sections.marketplace!.marketplaceCustomers).toBeDefined();
-    expect(result.sections.marketplace!.storefrontCustomers).toBeDefined();
+
+    // Storefront SaaS: separate section (6 KPIs)
+    expect(result.sections.storefrontSaaS!.storefrontSessions).toBeDefined();
+    expect(result.sections.storefrontSaaS!.storefrontPartners).toBeDefined();
+    expect(result.sections.storefrontSaaS!.storefrontMrr).toBeDefined();
+    expect(result.sections.storefrontSaaS!.storefrontArr).toBeDefined();
+    expect(result.sections.storefrontSaaS!.storefrontCollected).toBeDefined();
+    expect(result.sections.storefrontSaaS!.storefrontOutstanding).toBeDefined();
 
     // Attribution
     expect(result.attribution).toBeDefined();

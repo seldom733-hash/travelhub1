@@ -42,16 +42,15 @@ const WIDGET_MAP: Record<string, { section: DashboardSection; field: string; for
   "net-revenue":       { section: "financial", field: "netPayments", format: "currency" },
   // ─── Marketplace ────────────────────────────────────────────────
   "sessions":         { section: "marketplace", field: "marketplaceSessions" },
-  "storefront-sessions": { section: "marketplace", field: "storefrontSessions" },
   "marketplace-partners": { section: "marketplace", field: "marketplacePartners" },
-  "storefront-partners":  { section: "marketplace", field: "storefrontPartners" },
   "marketplace-customers": { section: "marketplace", field: "marketplaceCustomers" },
-  "storefront-customers":  { section: "marketplace", field: "storefrontCustomers" },
-  // Stage I: Storefront SaaS billing metrics
-  "storefront-mrr":        { section: "marketplace", field: "storefrontMrr", format: "currency" },
-  "storefront-arr":        { section: "marketplace", field: "storefrontArr", format: "currency" },
-  "storefront-collected":  { section: "marketplace", field: "storefrontCollected", format: "currency" },
-  "storefront-outstanding": { section: "marketplace", field: "storefrontOutstanding", format: "currency" },
+  // ─── Storefront SaaS ──────────────────────────────────────────
+  "storefront-sessions": { section: "storefrontSaaS", field: "storefrontSessions" },
+  "storefront-partners":  { section: "storefrontSaaS", field: "storefrontPartners" },
+  "storefront-mrr":        { section: "storefrontSaaS", field: "storefrontMrr", format: "currency" },
+  "storefront-arr":        { section: "storefrontSaaS", field: "storefrontArr", format: "currency" },
+  "storefront-collected":  { section: "storefrontSaaS", field: "storefrontCollected", format: "currency" },
+  "storefront-outstanding": { section: "storefrontSaaS", field: "storefrontOutstanding", format: "currency" },
   // backward-compat: old layout IDs → map to first split field
   "partners":        { section: "marketplace", field: "marketplacePartners" },
   "customers":       { section: "marketplace", field: "marketplaceCustomers" },
@@ -83,13 +82,12 @@ const TREND_WIDGETS: Record<string, string> = {
 const CHART_IDS = new Set(["orders-trend", "bookings-trend", "revenue-trend"]);
 
 /** IDs for KPI cards — NOT rendered as cards. */
-const NON_KPI_IDS = new Set(["revenue-trend"]);
-
-const SECTION_META: Record<string, { titleKey: string; icon: string }> = {
+const NON_KPI_IDS = new Set(["revenue-trend"]);  const SECTION_META: Record<string, { titleKey: string; icon: string }> = {
   executive: { titleKey: "cc.section.executive", icon: "📈" },
   operational: { titleKey: "cc.section.operational", icon: "⚙️" },
   financial: { titleKey: "cc.section.financial", icon: "💰" },
-  marketplace: { titleKey: "cc.section.marketplace", icon: "🏪" },
+  marketplace: { titleKey: "cc.section.marketplace", icon: "🛍" },
+  storefrontSaaS: { titleKey: "cc.section.storefrontSaaS", icon: "🏪" },
   catalog: { titleKey: "cc.section.catalog", icon: "📦" },
   channels: { titleKey: "cc.section.channels", icon: "🔀" },
   attention: { titleKey: "cc.section.attention", icon: "⚠️" },
@@ -148,7 +146,7 @@ export function SectionGrid({
   // Group visible positions by section
   const sectionPositions: Record<DashboardSection, WidgetPosition[]> = {
     executive: [], operational: [], financial: [], marketplace: [],
-    catalog: [], channels: [], attention: [], insights: [],
+    storefrontSaaS: [], catalog: [], channels: [], attention: [], insights: [],
   };
   for (const wp of visiblePositions) {
     const mapping = WIDGET_MAP[wp.widgetId];
@@ -283,6 +281,18 @@ export function SectionGrid({
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {renderKpiCards("marketplace", summary.sections.marketplace as Record<string, { current: number | string | null; previous: number | string | null; delta: number | string | null; deltaPercent: number | null }>)}
+          </div>
+        </section>
+      )}
+
+      {/* ─── Storefront SaaS Section ──────────────────────────────── */}
+      {hasSection("storefrontSaaS") && summary.sections.storefrontSaaS && (
+        <section aria-labelledby="section-storefrontSaaS">
+          <h2 id="section-storefrontSaaS" className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+            {SECTION_META.storefrontSaaS.icon} {t(SECTION_META.storefrontSaaS.titleKey, locale)}
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {renderKpiCards("storefrontSaaS", summary.sections.storefrontSaaS as Record<string, { current: number | string | null; previous: number | string | null; delta: number | string | null; deltaPercent: number | null }>)}
           </div>
         </section>
       )}

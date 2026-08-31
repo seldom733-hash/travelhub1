@@ -576,6 +576,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "cc.section.operational": { ru: "Операционная деятельность", az: "Əməliyyat fəaliyyəti", en: "Operational Activity" },
   "cc.section.financial": { ru: "Финансы", az: "Maliyyə", en: "Financial" },
   "cc.section.marketplace": { ru: "Маркетплейс", az: "Bazar yeri", en: "Marketplace" },
+  "cc.section.storefrontSaaS": { ru: "Storefront SaaS", az: "Storefront SaaS", en: "Storefront SaaS" },
   // V3 sections
   "cc.section.catalog": { ru: "Здоровье каталога", az: "Kataloq saglamligi", en: "Catalog Health" },
   "cc.section.channels": { ru: "Здоровье каналов", az: "Kanal saglamligi", en: "Channel Health" },

@@ -11,7 +11,7 @@ import { api } from "./api";
 
 // ─── TYPES ───────────────────────────────────────────────────────────
 
-export type DashboardSection = "executive" | "operational" | "financial" | "marketplace" | "catalog" | "channels" | "attention" | "insights";
+export type DashboardSection = "executive" | "operational" | "financial" | "marketplace" | "storefrontSaaS" | "catalog" | "channels" | "attention" | "insights";
 
 export type PeriodPreset = "TODAY" | "LAST_3_DAYS" | "LAST_7_DAYS" | "MONTH" | "LAST_6_MONTHS" | "YEAR" | "CUSTOM";
 
@@ -71,12 +71,12 @@ export interface CommandCenterSummary {
     };
     marketplace?: {
       marketplaceSessions: KpiValue;
-      storefrontSessions: KpiValue;
       marketplacePartners: KpiValue;
-      storefrontPartners: KpiValue;
       marketplaceCustomers: KpiValue;
-      storefrontCustomers: KpiValue;
-      // Stage I: Storefront SaaS billing metrics
+    };
+    storefrontSaaS?: {
+      storefrontSessions: KpiValue;
+      storefrontPartners: KpiValue;
       storefrontMrr: KpiValue;
       storefrontArr: KpiValue;
       storefrontCollected: KpiValue;
