@@ -504,6 +504,12 @@ export class PaymentListQueryDto {
   @MaxLength(64)
   orderId?: string;
 
+  /** Sales Channel scope: MARKETPLACE / PARTNER_STOREFRONT / omit = ALL */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  acquisitionSource?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(32)

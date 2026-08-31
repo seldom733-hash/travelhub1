@@ -26,6 +26,7 @@ import { useLocale, t, type Locale } from "@/lib/i18n";
 import { PeriodSelector } from "./PeriodSelector";
 import { SectionGrid } from "./SectionGrid";
 import { CustomizePanel } from "./CustomizePanel";
+import SalesChannelScope, { type SalesChannelScope as ChannelScope, scopeToAcquisitionSource } from "@/components/SalesChannelScope";
 
 const PAGE_ID = "command-center";
 const DEFAULT_PRESET: PeriodPreset = "MONTH";
@@ -103,6 +104,20 @@ export function CommandCenter() {
   const customStart = periodPreset === "CUSTOM" ? urlStart : "";
   const customEnd = periodPreset === "CUSTOM" ? urlEnd : "";
 
+  // ── URL-synced channel scope ──────────────────────────────────────
+  const urlChannel = (searchParams.get("channel") ?? "ALL").toUpperCase();
+  const channelScope: ChannelScope =
+    urlChannel === "MARKETPLACE" || urlChannel === "STOREFRONT" ? urlChannel : "ALL";
+  const setChannelScope = useCallback(
+    (scope: ChannelScope) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (scope === "ALL") params.delete("channel");
+      else params.set("channel", scope);
+      router.push(`?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
   const updateUrl = useCallback(
     (updates: Record<string, string | null>) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -170,6 +185,7 @@ export function CommandCenter() {
         preset: periodPreset,
         timezone: "UTC",
         comparison,
+        acquisitionSource: scopeToAcquisitionSource(channelScope),
       };
       if (periodPreset === "CUSTOM") {
         params.startDate = customStart;
@@ -188,7 +204,7 @@ export function CommandCenter() {
     } finally {
       if (seq === sequenceRef.current) setSummaryLoading(false);
     }
-  }, [periodPreset, comparison, customStart, customEnd, customError]);
+  }, [periodPreset, comparison, customStart, customEnd, customError, channelScope]);
 
   useEffect(() => {
     fetchSummary();
@@ -308,9 +324,10 @@ export function CommandCenter() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{t("cc.title", locale)}</h1>
-          <p className="mt-1 text-sm text-slate-500">{t("cc.subtitle", locale)} · UTC</p>
+          <p className="mt-1 text-sm text-slate-500">{t(`cc.subtitle.${channelScope.toLowerCase()}`, locale) || t("cc.subtitle", locale)} · UTC</p>
         </div>
         <div className="flex items-center gap-3">
+          <SalesChannelScope value={channelScope} onChange={setChannelScope} />
           <PeriodSelector
             preset={periodPreset} comparison={comparison}
             customStart={customStart} customEnd={customEnd} customError={customError}

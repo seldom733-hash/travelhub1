@@ -70,6 +70,11 @@ class ListOrdersQuery {
   @IsString()
   search?: string;
 
+  /** Sales Channel scope: MARKETPLACE / PARTNER_STOREFRONT / omit = ALL */
+  @IsOptional()
+  @IsString()
+  acquisitionSource?: string;
+
   /** ROUND 5: orders cancelled within N days (detector: RECENT_CANCELLATIONS). */
   @IsOptional()
   @IsString()

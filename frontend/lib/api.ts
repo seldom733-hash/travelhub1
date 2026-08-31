@@ -463,12 +463,13 @@ export interface FinancialReconciliationResponse {
 }
 
 export const analyticsApi = {
-  getCompanyKpi: (opts?: { preset?: AnalyticsPreset; startDate?: string; endDate?: string; comparison?: boolean }) => {
+  getCompanyKpi: (opts?: { preset?: AnalyticsPreset; startDate?: string; endDate?: string; comparison?: boolean; acquisitionSource?: string }) => {
     const sp = new URLSearchParams();
     sp.set('preset', opts?.preset ?? 'MONTH');
     if (opts?.startDate) sp.set('startDate', opts.startDate);
     if (opts?.endDate) sp.set('endDate', opts.endDate);
     if (opts?.comparison === false) sp.set('comparison', 'false');
+    if (opts?.acquisitionSource) sp.set('acquisitionSource', opts.acquisitionSource);
     return api.get<CompanyKpiResponse>(`/analytics/company-kpi?${sp.toString()}`);
   },
   getConversionFunnel: (opts?: { preset?: AnalyticsPreset; startDate?: string; endDate?: string }) => {

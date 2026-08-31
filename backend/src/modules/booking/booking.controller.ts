@@ -23,6 +23,11 @@ class ListBookingsQuery {
   @IsString()
   search?: string;
 
+  /** Sales Channel scope: MARKETPLACE / PARTNER_STOREFRONT / omit = ALL */
+  @IsOptional()
+  @IsString()
+  acquisitionSource?: string;
+
   @IsOptional()
   @IsString()
   upcoming?: string;

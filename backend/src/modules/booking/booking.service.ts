@@ -144,7 +144,7 @@ export class BookingService {
     return [...bookingIds];
   }
 
-  async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; slaMinutes?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string }) {
+  async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; slaMinutes?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string; acquisitionSource?: string }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const now = new Date();
@@ -169,6 +169,19 @@ export class BookingService {
         createdAt: { lt: new Date(Date.now() - (parseInt(query.slaMinutes ?? "240", 10)) * 60 * 1000) },
       } : {}),
     };
+    // Sales Channel scope: filter via Order.acquisitionSource (Booking's own field is all NULL)
+    let channelOrderIds: string[] | undefined;
+    if (query.acquisitionSource) {
+      const orders = await this.prisma.order.findMany({
+        where: { acquisitionSource: query.acquisitionSource },
+        select: { id: true },
+      });
+      channelOrderIds = orders.map(o => o.id);
+      if (channelOrderIds.length === 0) {
+        return { items: [], total: 0, page, pageSize, hasMore: false };
+      }
+      where.orderId = { in: channelOrderIds };
+    }
     // R5-04: Date range filtering on createdAt (exclusive end — consistent with Analytics half-open [from, to))
     if (query.dateFrom || query.dateTo) {
       where.createdAt = {

@@ -12,6 +12,7 @@ import ActionButtons from "@/components/ActionButtons";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import AggregateSummary from "@/components/AggregateSummary";
 import { useLocale, t } from "@/lib/i18n";
+import SalesChannelScope, { type SalesChannelScope as ChannelScope, scopeToAcquisitionSource } from "@/components/SalesChannelScope";
 
 const ACTIONS = [
   { action: "send", label: "Отправить поставщику", cls: "bg-cyan-600 hover:bg-cyan-700", only: ["NEW", "PREPARING_REQUEST"] },
@@ -32,6 +33,13 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
   const [search, setSearch] = useState(initialSearch || "");
   const [bookingStatusFilter, setBookingStatusFilter] = useState(statusFilter ?? "");
+  const [channelScope, setChannelScope] = useState<ChannelScope>(() => {
+    if (typeof window !== "undefined") {
+      const urlChannel = new URLSearchParams(window.location.search).get("channel");
+      if (urlChannel === "MARKETPLACE" || urlChannel === "STOREFRONT") return urlChannel;
+    }
+    return "ALL";
+  });
   const [dateFrom, setDateFrom] = useState(initialDateFrom || "");
   const [dateTo, setDateTo] = useState(initialDateTo || "");
   const [error, setError] = useState("");
@@ -86,6 +94,8 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
       if (overdueOnly) qs.set('overdue', 'true');
       if (slaMinutes) qs.set('slaMinutes', slaMinutes);
       if (bookingStatusFilter) qs.set('status', bookingStatusFilter);
+      const acqSource = scopeToAcquisitionSource(channelScope);
+      if (acqSource) qs.set('acquisitionSource', acqSource);
       if (sortBy) qs.set('sortBy', sortBy);
       if (sortDirection) qs.set('sortDirection', sortDirection);
       if (dateFrom) qs.set('dateFrom', dateFrom);
@@ -102,7 +112,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [upcomingOnly, bookingStatusFilter, overdueOnly, slaMinutes, sortBy, sortDirection, page, search, dateFrom, dateTo]);
+  }, [upcomingOnly, bookingStatusFilter, overdueOnly, slaMinutes, sortBy, sortDirection, page, search, dateFrom, dateTo, channelScope]);
 
   const openDetail = async (id: string) => {
     const booking = await api.get<Booking>(`/bookings/${id}`);
@@ -161,6 +171,10 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
             ]}
           />
           <div className="flex flex-wrap items-center gap-2">
+            <SalesChannelScope
+              value={channelScope}
+              onChange={(v) => { setChannelScope(v); setPage(1); }}
+            />
             <input
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}

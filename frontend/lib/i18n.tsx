@@ -490,7 +490,10 @@ export const DICT: Record<string, Record<Locale, string>> = {
   },
   // ── Command Center (Step 3.2 Stage B) ──────────────────────────────────
   "cc.title": { ru: "Центр управления", az: "İdarəetmə Mərkəzi", en: "Command Center" },
-  "cc.subtitle": { ru: "Агрегированные данные Marketplace", az: "Bazar yerinin aggreqasiya olunmuş məlumatları", en: "Aggregated marketplace data" },
+  "cc.subtitle": { ru: "Агрегированные данные платформы", az: "Platformanın aggreqasiya olunmuş məlumatları", en: "Aggregated platform data" },
+  "cc.subtitle.all": { ru: "Агрегированные данные платформы", az: "Platformanın aggreqasiya olunmuş məlumatları", en: "Aggregated platform data" },
+  "cc.subtitle.marketplace": { ru: "Данные Marketplace", az: "Marketplace məlumatları", en: "Marketplace data" },
+  "cc.subtitle.storefront": { ru: "Данные Storefront", az: "Storefront məlumatları", en: "Storefront data" },
   "cc.loading": { ru: "Загрузка данных…", az: "Məlumatlar yüklənir…", en: "Loading data…" },
   "cc.customize": { ru: "Настроить", az: "Tənzimlə", en: "Customize" },
   "cc.cancel": { ru: "Отмена", az: "Ləğv", en: "Cancel" },
@@ -550,6 +553,12 @@ export const DICT: Record<string, Record<Locale, string>> = {
   // Sidebar collapse
   "sidebar.collapse": { ru: "Свернуть меню", az: "Menyunu yığ", en: "Collapse menu" },
   "sidebar.expand": { ru: "Развернуть меню", az: "Menyunu genişləndir", en: "Expand menu" },
+  // Sales Channel Scope
+  "salesChannel.label": { ru: "Канал продаж", az: "Satış kanalı", en: "Sales channel" },
+  "salesChannel.all": { ru: "Все каналы", az: "Bütün kanallar", en: "All channels" },
+  "salesChannel.marketplace": { ru: "Marketplace", az: "Marketplace", en: "Marketplace" },
+  "salesChannel.storefront": { ru: "Storefront", az: "Storefront", en: "Storefront" },
+  "salesChannel.unknown": { ru: "Не определено", az: "Müəyyən edilməyib", en: "Not specified" },
   "nav.command_center": { ru: "Центр управления", az: "İdarəetmə Mərkəzi", en: "Command Center" },
   "nav.analytics": { ru: "Аналитика", az: "Analitika", en: "Analytics" },
   "nav.catalog": { ru: "Каталог", az: "Kataloq", en: "Catalog" },

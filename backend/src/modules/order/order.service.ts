@@ -437,7 +437,7 @@ export class OrderService {
   }
 
   async listOrders(
-    query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string },
+    query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string; acquisitionSource?: string },
     viewer?: TravelerViewer,
   ) {
     const page = Math.max(1, query.page ?? 1);
@@ -455,6 +455,7 @@ export class OrderService {
       ...(query.search
         ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }, { number: { contains: query.search, mode: "insensitive" } }] }
         : {}),
+      ...(query.acquisitionSource ? { acquisitionSource: query.acquisitionSource } : {}),
     };
 
     // R5-03: Date range filtering on createdAt (exclusive end — consistent with Analytics half-open [from, to))

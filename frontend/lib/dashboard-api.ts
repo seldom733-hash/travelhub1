@@ -249,6 +249,8 @@ export interface DashboardQueryParams {
   endDate?: string;
   timezone?: string;
   comparison?: boolean;
+  /** Sales Channel scope: MARKETPLACE / PARTNER_STOREFRONT / omit = ALL */
+  acquisitionSource?: string;
 }
 
 export interface TrendQueryParams extends DashboardQueryParams {
@@ -265,6 +267,7 @@ export const dashboardApi = {
     if (params.endDate) searchParams.set("endDate", params.endDate);
     if (params.timezone) searchParams.set("timezone", params.timezone);
     if (params.comparison !== undefined) searchParams.set("comparison", String(params.comparison));
+    if (params.acquisitionSource) searchParams.set("acquisitionSource", params.acquisitionSource);
 
     const url = `/api/v1/dashboard/command-center?${searchParams.toString()}`;
     const res = await fetch(url, { credentials: "include", signal });
