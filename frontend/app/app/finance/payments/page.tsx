@@ -30,16 +30,12 @@ interface Payment {
   status: string;
   paymentMethod: string | null;
   providerRef: string | null;
+  paidAt: string | null;
+  failedAt: string | null;
+  cancelledAt: string | null;
   version: number;
   createdAt: string;
 }
-
-const STATUS_LABELS: Record<string, { ru: string; az: string; en: string }> = {
-  CAPTURED: { ru: "Зачислен", az: "Kapitallaşdırılıb", en: "Captured" },
-  PENDING: { ru: "Ожидает", az: "Gözləyir", en: "Pending" },
-  FAILED: { ru: "Ошибка", az: "Xəta", en: "Failed" },
-  CANCELLED: { ru: "Отменён", az: "Ləğv edilib", en: "Cancelled" },
-};
 
 function PaymentsContent({
   initialCurrency,
@@ -119,23 +115,17 @@ function PaymentsContent({
     return cur ? `${formatted} ${cur}` : formatted;
   };
 
-  const statusLabel = (status: string) => {
-    const labels = STATUS_LABELS[status];
-    if (!labels) return status;
-    return labels[locale as keyof typeof labels] ?? labels.ru;
-  };
-
   // Compute aggregates over full filtered population (server-side total)
   const totalAmount = data?.items?.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) ?? 0;
   const totalRecords = data?.total ?? 0;
 
-  const sortState = sortBy ? { sortBy, sortDirection: sortDirection ?? "desc" as SortDirection } : null;
+  const sortState = sortBy ? { sortBy, sortDirection: sortDirection ?? ("desc" as SortDirection) } : null;
 
   return (
     <div className="flex h-full flex-col">
       <PageHeader
         title={t("finance.payments.title", locale) || "Платежи"}
-        breadcrumbs={["TravelHub", t("analytics.finance.title", locale) || "Финансы", t("finance.payments.title", locale) || "Платежи"]}
+        breadcrumbs={["TravelHub", t("finance.payments.title", locale) || "Платежи"]}
         actions={
           <Link
             href="/app/analytics"
@@ -163,7 +153,7 @@ function PaymentsContent({
               )}
               {statusFilter && (
                 <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700">
-                  {statusLabel(statusFilter)}
+                  <StatusBadge status={statusFilter} />
                 </span>
               )}
             </div>
@@ -187,15 +177,16 @@ function PaymentsContent({
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-400"
             >
               <option value="">{t("finance.filter.all_statuses", locale) || "Все статусы"}</option>
-              <option value="CAPTURED">{t("finance.status.captured", locale) || "Зачислен"}</option>
-              <option value="PENDING">{t("finance.status.pending", locale) || "Ожидает"}</option>
-              <option value="FAILED">{t("finance.status.failed", locale) || "Ошибка"}</option>
-              <option value="CANCELLED">{t("finance.status.cancelled", locale) || "Отменён"}</option>
+              <option value="PENDING">{t("status.entity.PENDING", locale) || "Ожидает"}</option>
+              <option value="CAPTURED">{t("status.entity.CAPTURED", locale) || "Зачислен"}</option>
+              <option value="AUTHORIZED">{t("status.entity.AUTHORIZED", locale) || "Авторизован"}</option>
+              <option value="FAILED">{t("status.entity.FAILED", locale) || "Ошибка"}</option>
+              <option value="CANCELLED">{t("status.entity.CANCELLED", locale) || "Отменён"}</option>
             </select>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">{t("common.from", locale) || "С"}</span>
+              <span className="text-xs text-slate-400">{t("common.from", locale)}</span>
               <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
-              <span className="text-xs text-slate-400">{t("common.to", locale) || "По"}</span>
+              <span className="text-xs text-slate-400">{t("common.to", locale)}</span>
               <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
             </div>
             {statusFilter && (
@@ -203,7 +194,7 @@ function PaymentsContent({
                 ✕ {t("finance.filter.clear_status", locale) || "Статус"}
               </button>
             )}
-            {loading && <span className="text-xs text-slate-400">{t("common.loading", locale) || "загрузка…"}</span>}
+            {loading && <span className="text-xs text-slate-400">{t("common.loading", locale)}</span>}
           </div>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
@@ -247,13 +238,19 @@ function PaymentsContent({
                   <SortableHeader field="amount" currentSort={sortState} onSort={handleSort} alignRight>{t("finance.col.amount", locale) || "Сумма"}</SortableHeader>
                   <SortableHeader field="currency" currentSort={sortState} onSort={handleSort}>{t("finance.col.currency", locale) || "Валюта"}</SortableHeader>
                   <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("finance.col.status", locale) || "Статус"}</SortableHeader>
-                  <th className="px-4 py-2.5 font-medium">{t("finance.col.method", locale) || "Метод"}</th>
                 </tr>
               </thead>
               <tbody>
                 {(data?.items ?? []).map((p) => (
                   <tr key={p.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                    <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{p.code}</td>
+                    <td className="px-4 py-2.5">
+                      <Link
+                        href={`/app/finance/payments/${p.code}`}
+                        className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {p.code}
+                      </Link>
+                    </td>
                     <td className="px-4 py-2.5 text-xs text-slate-500">
                       {p.createdAt ? new Date(p.createdAt).toLocaleDateString(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US") : "—"}
                     </td>
@@ -263,12 +260,11 @@ function PaymentsContent({
                     </td>
                     <td className="px-4 py-2.5 text-slate-500">{p.currency}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
-                    <td className="px-4 py-2.5 text-slate-500">{p.paymentMethod ?? "—"}</td>
                   </tr>
                 ))}
                 {(data?.items ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">
                       {t("finance.payments.empty", locale) || "Платежей пока нет"}
                     </td>
                   </tr>

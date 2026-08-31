@@ -973,6 +973,13 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "aggregate.payments": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
   "aggregate.aov": { ru: "Средний чек", az: "Orta çek", en: "Avg. order value" },
   "aggregate.completion_rate": { ru: "Процент исполнения", az: "İcra faizi", en: "Completion rate" },
+  // Common shared keys
+  "common.from": { ru: "С", az: "-dən", en: "From" },
+  "common.to": { ru: "По", az: "-ə qədər", en: "To" },
+  "common.loading": { ru: "Загрузка…", az: "Yüklənir…", en: "Loading…" },
+  "common.back": { ru: "← Назад", az: "← Geri", en: "← Back" },
+  "common.detail": { ru: "Подробнее", az: "Ətraflı", en: "Details" },
+  "common.id": { ru: "ID", az: "ID", en: "ID" },
   // Finance payments page
   "finance.payments.title": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
   "finance.payments.empty": { ru: "Платежей пока нет", az: "Hələ ödəniş yoxdur", en: "No payments yet" },
@@ -1069,6 +1076,13 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "status.crm.APPROVED": { ru: "Одобрено", az: "Təsdiqləndi", en: "Approved" },
   "status.crm.REJECTED": { ru: "Отклонено", az: "Rədd edildi", en: "Rejected" },
   "status.crm.CHANGES_REQUESTED": { ru: "Требуются правки", az: "Düzəliş tələb olunur", en: "Changes requested" },
+  // Payment entity statuses (Finance module Payment lifecycle)
+  "status.entity.PENDING": { ru: "Ожидает", az: "Gözləyir", en: "Pending" },
+  "status.entity.CAPTURED": { ru: "Зачислен", az: "Kapitallaşdırılıb", en: "Captured" },
+  "status.entity.AUTHORIZED": { ru: "Авторизован", az: "İcazə verilib", en: "Authorized" },
+  "status.entity.FAILED": { ru: "Ошибка", az: "Xəta", en: "Failed" },
+  "status.entity.CANCELLED": { ru: "Отменён", az: "Ləğv edilib", en: "Cancelled" },
+  "status.entity.REFUNDED": { ru: "Возврат", az: "Geri qaytarılıb", en: "Refunded" },
   // Product types
   "product.type.TOUR": { ru: "Тур", az: "Tur", en: "Tour" },
   "product.type.HOTEL": { ru: "Отель", az: "Otəl", en: "Hotel" },

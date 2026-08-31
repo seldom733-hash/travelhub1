@@ -47,6 +47,11 @@ const STATUS_I18N_KEY: Record<string, string> = {
   PARTIALLY_PAID: "status.payment.PARTIALLY_PAID",
   PAID: "status.payment.PAID",
   REFUNDED: "status.payment.REFUNDED",
+  // Payment entity statuses (Finance module — Payment lifecycle)
+  PENDING: "status.entity.PENDING",
+  CAPTURED: "status.entity.CAPTURED",
+  AUTHORIZED: "status.entity.AUTHORIZED",
+  // Note: FAILED and CANCELLED are shared with Order statuses above
   // Common (users, CRM, etc.)
   ACTIVE: "status.common.ACTIVE",
   INACTIVE: "status.common.INACTIVE",
@@ -116,6 +121,10 @@ const STATUS_CLS: Record<string, string> = {
   APPROVED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   REJECTED: "bg-red-50 text-red-600 border-red-200",
   CHANGES_REQUESTED: "bg-orange-50 text-orange-700 border-orange-200",
+  // Payment entity statuses
+  PENDING: "bg-amber-50 text-amber-700 border-amber-200",
+  CAPTURED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  AUTHORIZED: "bg-blue-50 text-blue-700 border-blue-200",
   // Marketing
   SCHEDULED: "bg-violet-50 text-violet-700 border-violet-200",
   PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
