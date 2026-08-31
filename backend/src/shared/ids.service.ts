@@ -104,4 +104,15 @@ export class IdsService {
   async nextCustomerCode(tx: Prisma.TransactionClient): Promise<string> {
     return this.nextCode(tx, "CUS");
   }
+
+  /**
+   * Step 3.12 — Storefront stable short code: SF001, SF002, ...
+   * Uses Hi/Lo block allocation on BusinessSequence (same concurrency-safe
+   * mechanism as nextCode). Prefix "SF" reserves a dedicated sequence namespace.
+   * Output format: SF + 3-digit zero-padded sequence (no hyphen — compact).
+   */
+  async nextStorefrontCode(_tx: Prisma.TransactionClient): Promise<string> {
+    const value = await this.allocate("SF");
+    return `SF${String(value).padStart(3, "0")}`;
+  }
 }
