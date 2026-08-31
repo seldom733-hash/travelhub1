@@ -435,7 +435,7 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
 
   it("9. legacy Order/Booking (до 2.5B) с NULL acquisitionSource остаются валидными, без backfill", async () => {
     const legacyOrder = await prisma.order.create({
-      data: { code: `ORD-LEG25B-${stamp}`, number: `TH-LEG25B-${stamp}`, customerId: null, status: "NEW", amount: new Prisma.Decimal(10) },
+      data: { code: `ORD-LEG25B-${stamp}`, referenceNumber: "MKT-ORD-000001", number: `TH-LEG25B-${stamp}`, customerId: null, status: "NEW", amount: new Prisma.Decimal(10) },
       select: { id: true },
     });
     created.orders.push(legacyOrder.id);
@@ -443,7 +443,7 @@ describe("Phase 2 Step 2.5B — Acquisition Source Propagation (e2e)", () => {
     expect(row.acquisitionSource).toBeNull();
 
     const legacyBooking = await prisma.booking.create({
-      data: { code: `BKG-LEG25B-${stamp}`, orderId: legacyOrder.id, productId: "p-legacy", status: "NEW", amount: 0 },
+      data: { code: `BKG-LEG25B-${stamp}`, referenceNumber: "MKT-BKG-000001", orderId: legacyOrder.id, productId: "p-legacy", status: "NEW", amount: 0 },
       select: { id: true },
     });
     const brow = await prisma.booking.findUniqueOrThrow({ where: { id: legacyBooking.id } });

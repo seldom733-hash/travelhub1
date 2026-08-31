@@ -800,7 +800,7 @@ describe("Phase 2 Step 2.9 — Booking Lifecycle Completion (e2e)", () => {
     const order = (await fixtureOrder()).order;
     created.orders.push(order.id);
     const legacy = await prisma.booking.create({
-      data: { code: `BKG-${stamp}-legacy`, orderId: order.id, productId: "00000000-0000-4000-8000-000000000001", status: "NEW", amount: 100, version: 1 },
+      data: { code: `BKG-${stamp}-legacy`, referenceNumber: "MKT-BKG-000001", orderId: order.id, productId: "00000000-0000-4000-8000-000000000001", status: "NEW", amount: 100, version: 1 },
       select: { id: true, code: true },
     });
     // legacy без orderItemId (до 2.8) — управляется lifecycle

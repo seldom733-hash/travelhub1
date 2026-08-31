@@ -4,6 +4,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService, type OutboxEnvelope } from "../../eventbus/eventbus.service";
 import { DomainEvents, type BookingEventPayload, type BookingRequestedPayload, type OrderRefPayload } from "../../eventbus/domain-events";
 import { IdsService } from "../../shared/ids.service";
+import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { uniqueConstraintNames } from "../../shared/prisma-errors";
 import { deriveServiceEndsAt, deriveServiceStartsAt, deriveServiceTimeType } from "../../shared/service-time";
 // Step 2.11: canonical frozen money fact validation (платформенный денежный
@@ -53,6 +54,7 @@ export class BookingSubscribers implements OnModuleInit {
     private readonly eventBus: EventBusService,
     private readonly prisma: PrismaService,
     private readonly ids: IdsService,
+    private readonly refNum: ReferenceNumberService,
   ) {}
 
   onModuleInit(): void {
@@ -122,6 +124,8 @@ export class BookingSubscribers implements OnModuleInit {
 
         for (const item of order.items) {
           const code = await this.ids.nextCode(tx, "BKG");
+          // Step 3.12 — tenant-scoped reference number for Booking
+          const bookingRefNum = await this.generateBookingReferenceNumber(tx, order, item);
           // Step 2.8: canonical cardinality 1 OrderItem → 1 Booking. orderItemId
           // (DB-level @unique) — надёжная защита от logically-duplicate
           // BookingRequested (разный eventId, тот же Order) и от concurrent
@@ -159,6 +163,7 @@ export class BookingSubscribers implements OnModuleInit {
               serviceEndsAt: deriveServiceEndsAt(itemServiceDate, orderServiceTime, orderServiceEndTime, orderServiceTimeZone),
               // Step 2.5B: frozen acquisition source из Order (READ-only,
               // ADR-0001 — Booking НЕ ре-выводит source; копия canonical факта).
+              referenceNumber: bookingRefNum,
               acquisitionSource: order.acquisitionSource ?? null,
               version: 1,
             },
@@ -310,6 +315,26 @@ export class BookingSubscribers implements OnModuleInit {
       if (this.isUniqueViolation(err)) return; // concurrent — уже обработано
       throw err;
     }
+  }
+
+  /**
+   * Step 3.12 — generate tenant-scoped reference number for Booking.
+   * Marketplace → MKT-BKG-{SEQ}; Storefront → {SF_CODE}-BKG-{SEQ}
+   */
+  private async generateBookingReferenceNumber(
+    tx: any,
+    order: { acquisitionSource: string | null; sellerPartnerId: string | null },
+    _item: { productId: string },
+  ): Promise<string> {
+    const source = order.acquisitionSource;
+    if (source === "PARTNER_STOREFRONT" && order.sellerPartnerId) {
+      const sf = await tx.partnerStorefront.findUnique({
+        where: { partnerId: order.sellerPartnerId },
+        select: { storefrontCode: true },
+      });
+      if (sf) return this.refNum.nextStorefrontReference(tx, sf.storefrontCode, "BKG");
+    }
+    return this.refNum.nextMarketplaceReference(tx, "BKG");
   }
 
   /**

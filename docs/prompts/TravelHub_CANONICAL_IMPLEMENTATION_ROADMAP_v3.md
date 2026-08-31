@@ -1907,6 +1907,70 @@ algorithmic dynamic-pricing engine); финальное имя/перечисл�
 -   Custom domain в будущем остаётся тем же Storefront tenant/channel, а
     не новым Product domain.
 
+## Tenant-Scoped Reference Number Contract (Phase 3 Pre-Step 3.12)
+
+Реализовано и верифицировано (SHA: `8a098c7`).
+
+### Архитектура
+
+- Internal UUID/PK ≠ legacy business code (ORD-*/BKG-*/PAY-*/RFD-*) ≠ referenceNumber.
+- referenceNumber — tenant-scoped human-readable business identifier для UI/search/support/exports.
+- referenceNumber НЕ заменяет internal UUID в authorization или relational integrity.
+
+### Namespace
+
+```
+Marketplace:  MKT-{TYPE}-{SEQUENCE}
+Storefront:   {SF_CODE}-{TYPE}-{SEQUENCE}
+SaaS:         SAAS-{SF_CODE}-{TYPE}-{SEQUENCE}  (RESERVED / NOT IMPLEMENTED)
+```
+
+TYPE = ORD | BKG | PAY | REF | INV
+
+### Storefront Code
+
+- `storefrontCode` — DB-stored, immutable after creation (SF001, SF002, ...).
+- Deterministic: `ROW_NUMBER() OVER (ORDER BY code)` при seed; `count() + 1` при создании.
+- Не зависит от company name, slug, owner, sort position.
+
+### Concurrency
+
+- Hi/Lo block allocation на `events.BusinessSequence` (block size = 100).
+- DB-level unique constraints на `referenceNumber` (defense-in-depth).
+- 0 duplicates доказано при 20 concurrent workers × multiple tenants.
+
+### Tenant-Chain Consistency
+
+Order → Booking → Payment → Refund: все объекты в одной tenant-цепочке используют одинаковый SF-префикс.
+0 cross-tenant namespace mismatches.
+
+### Security
+
+- Platform Orders/Bookings/Payments scope = MARKETPLACE (default).
+- Storefront records НЕ отображаются в Platform operational scope.
+- SF001 Partner не видит SF002 records (server-side tenant isolation).
+- Prefix — observability, НЕ authorization.
+
+### SF000 — Quarantine
+
+94 legacy/demo records с `acquisitionSource=PARTNER_STOREFRONT` но без authoritative PartnerStorefront:
+- 29 records: NULL sellerPartnerId.
+- 65 records: partner without PartnerStorefront.
+SF000 — quarantine marker, НЕ считается valid tenant-scoped commerce.
+
+### Residual Gaps
+
+- SAAS-namespace: NOT IMPLEMENTED (billing domain absent).
+- Invoice referenceNumber: nullable (0 rows).
+- 94 SF000 quarantine records (legacy/demo data).
+
+### Cart / Checkout — NOT IMPLEMENTED
+
+```
+Current V1:    1 Order = 1 Booking; 1 Order = 1..N Payments
+Target future: Cart → Checkout → 1 Order → 1..N Bookings → Consolidated Invoice → 1..N Payments
+```
+
 ## Reverse Marketplace / Commercial Capabilities (Roadmap Amendment)
 
 Не-negotiable инварианты request-led demand path (полный текст также в

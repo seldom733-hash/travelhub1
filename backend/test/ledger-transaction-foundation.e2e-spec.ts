@@ -401,7 +401,7 @@ describe("Phase 2 Step 2.10A — Ledger Transaction Foundation (e2e)", () => {
 
   it("14. ноль cross-domain мутаций: Order/Booking/Payment/Refund/Invoice/Commission/Availability не тронуты", async () => {
     const order = await prisma.order.create({
-      data: { code: `ORD-LEDGER-${stamp}`, number: `TH-2026-LEDGER-${stamp}` },
+      data: { code: `ORD-LEDGER-${stamp}`, referenceNumber: "MKT-ORD-000001", number: `TH-2026-LEDGER-${stamp}` },
     });
     created.orderIds.push(order.id);
     const before = {

@@ -89,7 +89,8 @@ function makeService(prisma: PrismaStub): RefundService {
     emit: jest.fn().mockResolvedValue("evt-1"),
     publishPending: jest.fn().mockResolvedValue(1),
   } as unknown as EventBusService;
-  return new RefundService(prisma as unknown as PrismaService, ids, security, eventBus);
+  const refNum = { nextMarketplaceReference: jest.fn().mockResolvedValue("MKT-REF-000001") } as unknown as any;
+  return new RefundService(prisma as unknown as PrismaService, ids, security, eventBus, refNum);
 }
 
 describe("RefundService (Step 2.13)", () => {

@@ -126,8 +126,8 @@ export class BookingService {
     const s = search.trim();
     if (!s) return [];
     const bookingIds = new Set<string>();
-    // 1) Match booking code
-    const byCode = await (this.prisma as any).booking.findMany({ where: { code: { contains: s, mode: "insensitive" } }, select: { id: true } });
+    // 1) Match booking code or referenceNumber
+    const byCode = await (this.prisma as any).booking.findMany({ where: { OR: [{ code: { contains: s, mode: "insensitive" } }, { referenceNumber: { contains: s, mode: "insensitive" } }] }, select: { id: true } });
     for (const r of byCode) bookingIds.add(r.id);
     // 2) Match traveler/passenger names → find orderIds → find bookings
     const travelers = await (this.prisma as any).orderTraveler.findMany({ where: { OR: [{ firstName: { contains: s, mode: "insensitive" } }, { lastName: { contains: s, mode: "insensitive" } }] }, select: { orderId: true } });

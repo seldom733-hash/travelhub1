@@ -283,6 +283,7 @@ export interface Order {
   id: string;
   code: string;
   number: string;
+  referenceNumber: string;
   customerId: string;
   status: string;
   paymentStatus: string;
@@ -300,6 +301,7 @@ export interface Order {
 export interface Booking {
   id: string;
   code: string;
+  referenceNumber: string;
   orderId: string;
   productId: string;
   status: string;

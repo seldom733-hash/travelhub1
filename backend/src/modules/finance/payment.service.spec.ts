@@ -79,7 +79,8 @@ function makeService(prisma: PrismaStub): PaymentService {
     emit: jest.fn().mockResolvedValue("evt-1"),
     publishPending: jest.fn().mockResolvedValue(1),
   } as unknown as EventBusService;
-  return new PaymentService(prisma as unknown as PrismaService, ids, security, eventBus);
+  const refNum = { nextMarketplaceReference: jest.fn().mockResolvedValue("MKT-PAY-000001") } as unknown as any;
+  return new PaymentService(prisma as unknown as PrismaService, ids, security, eventBus, refNum);
 }
 
 describe("PaymentService (Step 2.12)", () => {

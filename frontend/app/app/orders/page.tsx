@@ -285,7 +285,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                       }`}
                     >
                       <td className="px-4 py-2.5">
-                        <div className="font-mono text-xs text-blue-600">{o.code}</div>
+                        <div className="font-mono text-xs text-blue-600">{o.referenceNumber ?? o.code}</div>
                         <div className="text-xs text-slate-400">{o.number}</div>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-500">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
@@ -326,7 +326,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
           <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-blue-600">{selected.code}</span>
+                <span className="font-mono text-xs text-blue-600">{selected.referenceNumber ?? selected.code}</span>
                 <span className="font-mono text-xs text-slate-400">{selected.number}</span>
               </div>
               <div className="mt-1 flex gap-2">

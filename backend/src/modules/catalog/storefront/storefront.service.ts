@@ -203,11 +203,15 @@ export class StorefrontService {
 
     const row = await this.prisma.$transaction(async (tx) => {
       const code = await this.ids.nextCode(tx, "SF");
+      // Step 3.12 — deterministic storefrontCode (SF001, SF002, ...)
+      const sfCount = await tx.partnerStorefront.count();
+      const storefrontCode = `SF${String(sfCount + 1).padStart(3, "0")}`;
       let created: Prisma.PartnerStorefrontGetPayload<Record<string, never>>;
       try {
         created = await tx.partnerStorefront.create({
           data: {
             code,
+            storefrontCode,
             partnerId,
             slug: slugResult.slug!,
             status: "DRAFT",

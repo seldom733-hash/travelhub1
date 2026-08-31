@@ -12,6 +12,7 @@ import {
 } from "../../eventbus/domain-events";
 import { buildSortClause, type SortDirection } from '../../shared/sort';
 import { IdsService } from "../../shared/ids.service";
+import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
 import { isDateOnly } from "../../shared/date-only";
@@ -268,6 +269,7 @@ export class OrderService {
     private readonly prisma: PrismaService,
     private readonly ids: IdsService,
     private readonly eventBus: EventBusService,
+    private readonly refNum: ReferenceNumberService,
   ) {}
 
   /**
@@ -309,6 +311,9 @@ export class OrderService {
 
     const code = await this.ids.nextCode(tx, "ORD");
     const number = await this.ids.nextOrderNumber(tx);
+
+    // Step 3.12 — tenant-scoped reference number
+    const referenceNumber = await this.generateOrderReferenceNumber(tx, payload);
     const customerId = payload.customerId ?? null;
     const serviceDate = payload.serviceDate ? new Date(`${payload.serviceDate}T00:00:00.000Z`) : null;
     // Step 2.8A: frozen local temporal факты (verbatim; UTC instant НЕ
@@ -326,6 +331,7 @@ export class OrderService {
       data: {
         code,
         number,
+        referenceNumber,
         customerId,
         status: "NEW",
         paymentStatus: "UNPAID",
@@ -363,7 +369,7 @@ export class OrderService {
         sellerPartnerId: payload.sellerPartnerId ?? null,
         commissionSnapshot: payload.commissionSnapshot ? (payload.commissionSnapshot as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
-      select: { id: true, code: true, number: true, customerId: true },
+      select: { id: true, code: true, number: true, referenceNumber: true, customerId: true },
     });
 
     for (const it of payload.items) {
@@ -436,6 +442,25 @@ export class OrderService {
     return { order, eventId };
   }
 
+  /**
+   * Step 3.12 — generate tenant-scoped reference number for Order.
+   * Marketplace → MKT-ORD-{SEQ}; Storefront → {SF_CODE}-ORD-{SEQ}
+   */
+  private async generateOrderReferenceNumber(
+    tx: Prisma.TransactionClient,
+    payload: OrderRequestedPayload,
+  ): Promise<string> {
+    const source = payload.acquisitionSource;
+    if (source === "PARTNER_STOREFRONT" && payload.sellerPartnerId) {
+      const sf = await tx.partnerStorefront.findUnique({
+        where: { partnerId: payload.sellerPartnerId },
+        select: { storefrontCode: true },
+      });
+      if (sf) return this.refNum.nextStorefrontReference(tx, sf.storefrontCode, "ORD");
+    }
+    return this.refNum.nextMarketplaceReference(tx, "ORD");
+  }
+
   async listOrders(
     query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string; acquisitionSource?: string },
     viewer?: TravelerViewer,
@@ -453,7 +478,7 @@ export class OrderService {
       ...(query.customerId ? { customerId: query.customerId } : {}),
       ...(query.paymentStatus ? { paymentStatus: query.paymentStatus as any as import("../../generated/prisma/client").OrderPaymentStatus } : {}),
       ...(query.search
-        ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }, { number: { contains: query.search, mode: "insensitive" } }] }
+        ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }, { number: { contains: query.search, mode: "insensitive" } }, { referenceNumber: { contains: query.search, mode: "insensitive" } }] }
         : {}),
       // Platform operational scope: default to MARKETPLACE when no acquisitionSource specified
       acquisitionSource: query.acquisitionSource || "MARKETPLACE",
@@ -678,7 +703,7 @@ export class OrderService {
       }
       const updated = await tx.order.findUniqueOrThrow({
         where: { id: orderId },
-        select: { id: true, code: true, number: true, customerId: true, status: true, version: true },
+        select: { id: true, code: true, number: true, referenceNumber: true, customerId: true, status: true, version: true },
       });
 
       await tx.orderHistory.create({

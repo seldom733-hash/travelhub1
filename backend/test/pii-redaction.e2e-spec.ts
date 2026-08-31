@@ -110,7 +110,7 @@ describe("Step 1.17 — PII redaction: traveler/passenger в order/booking read 
 
     // Booking + Passenger (полные PII) — фикстура напрямую (детерминированно).
     const booking = await prisma.booking.create({
-      data: { code: `BKG-PII-${stamp}`, orderId: order.id, productId: "00000000-0000-0000-0000-000000000001", status: "NEW", amount: 100 },
+      data: { code: `BKG-PII-${stamp}`, referenceNumber: "MKT-BKG-000001", orderId: order.id, productId: "00000000-0000-0000-0000-000000000001", status: "NEW", amount: 100 },
     });
     created.bookings.push(booking.id);
     const passenger = await prisma.passenger.create({

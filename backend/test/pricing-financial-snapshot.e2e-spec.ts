@@ -304,7 +304,7 @@ describe("Phase 2 Step 2.11 — Pricing & Financial Snapshot (e2e)", () => {
     // Pre-2.11-like Booking: физически без currency (raw insert, как legacy).
     const legacy = await prisma.booking.create({
       data: {
-        code: `BKG-LG-${stamp}`,
+        code: `BKG-LG-${stamp}`, referenceNumber: "MKT-BKG-000001",
         orderId: order.id,
         productId: item.productId,
         orderItemId: item.id,

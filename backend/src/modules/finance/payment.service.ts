@@ -35,6 +35,7 @@ import { Prisma } from "../../generated/prisma/client";
 import { PaymentStatus } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
 import { IdsService } from "../../shared/ids.service";
+import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { SecurityService } from "../../security/security.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { uniqueConstraintNames } from "../../shared/prisma-errors";
@@ -65,6 +66,7 @@ export class PaymentService {
     private readonly ids: IdsService,
     private readonly security: SecurityService,
     private readonly eventBus: EventBusService,
+    private readonly refNum: ReferenceNumberService,
   ) {}
 
   // ── Payment creation ────────────────────────────────────────────────────────
@@ -123,9 +125,12 @@ export class PaymentService {
         if (existing) return this.paymentDto(existing);
 
         const code = await this.ids.nextCode(tx, "PAY");
+        // Step 3.12 — tenant-scoped reference number for Payment
+        const referenceNumber = await this.generatePaymentReferenceNumber(tx, order);
         const created = await tx.payment.create({
           data: {
             code,
+            referenceNumber,
             orderId: order.id,
             customerId: order.customerId ?? null,
             amount: order.amount,
@@ -187,6 +192,25 @@ export class PaymentService {
     } finally {
       await this.eventBus.publishPending();
     }
+  }
+
+  /**
+   * Step 3.12 — generate tenant-scoped reference number for Payment.
+   * Marketplace → MKT-PAY-{SEQ}; Storefront → {SF_CODE}-PAY-{SEQ}
+   */
+  private async generatePaymentReferenceNumber(
+    tx: any,
+    order: { acquisitionSource: string | null; sellerPartnerId: string | null },
+  ): Promise<string> {
+    const source = order.acquisitionSource;
+    if (source === "PARTNER_STOREFRONT" && order.sellerPartnerId) {
+      const sf = await tx.partnerStorefront.findUnique({
+        where: { partnerId: order.sellerPartnerId },
+        select: { storefrontCode: true },
+      });
+      if (sf) return this.refNum.nextStorefrontReference(tx, sf.storefrontCode, "PAY");
+    }
+    return this.refNum.nextMarketplaceReference(tx, "PAY");
   }
 
   // ── Lifecycle transitions (единственный state-machine authority) ──────────
@@ -359,6 +383,7 @@ export class PaymentService {
   private paymentDto(r: {
     id: string;
     code: string;
+    referenceNumber?: string | null;
     orderId: string;
     customerId: string | null;
     partnerId: string | null;
@@ -376,6 +401,7 @@ export class PaymentService {
     return {
       id: r.id,
       code: r.code,
+      referenceNumber: r.referenceNumber ?? null,
       orderId: r.orderId,
       customerId: r.customerId,
       partnerId: r.partnerId,

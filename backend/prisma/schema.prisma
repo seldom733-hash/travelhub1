@@ -1232,6 +1232,9 @@ model PartnerStorefront {
   id        String   @id @default(uuid())
   /// Стабильный публичный код (SF-00000001), генерирует Catalog (IdsService).
   code      String   @unique
+  /// Tenant-scoped short code (SF001, SF002, ...). Immutable after creation.
+  /// Deterministic: assigned by ROW_NUMBER() OVER (ORDER BY code).
+  storefrontCode String @unique
   /// Ссылка на crm.Partner (без FK). Одна витрина на Partner.
   partnerId String   @unique
   /// Публичный slug: normalized, URL-safe, immutable после создания.
@@ -1917,6 +1920,9 @@ model Order {
   id            String              @id @default(uuid())
   code          String              @unique // ORD-00000001
   number        String              @unique // TH-2026-000001
+  /// Tenant-scoped human-readable reference number.
+  /// Marketplace: MKT-ORD-{SEQ}; Storefront: {SF_CODE}-ORD-{SEQ}; SaaS: SAAS-{SF_CODE}-ORD-{SEQ}
+  referenceNumber String            @unique
   customerId    String? // ссылка на CRM, без FK; NULL — internal assisted flow
   status        OrderStatus         @default(NEW)
   paymentStatus OrderPaymentStatus  @default(UNPAID)
@@ -2138,6 +2144,9 @@ enum ReservationStatus {
 model Booking {
   id          String        @id @default(uuid())
   code        String        @unique // BKG-00000001
+  /// Tenant-scoped human-readable reference number.
+  /// Marketplace: MKT-BKG-{SEQ}; Storefront: {SF_CODE}-BKG-{SEQ}
+  referenceNumber String     @unique
   orderId     String // ссылка на Order, без FK
   productId   String // ссылка на Catalog, без FK
   /// Step 2.8: canonical linkage OrderItem ↔ Booking (1 OrderItem → ≤1 Booking,
@@ -3693,6 +3702,9 @@ enum PaymentStatus {
 model Payment {
   id            String        @id @default(uuid())
   code          String        @unique // PAY-00000001
+  /// Tenant-scoped human-readable reference number.
+  /// Marketplace: MKT-PAY-{SEQ}; Storefront: {SF_CODE}-PAY-{SEQ}
+  referenceNumber String      @unique
   /// ref order.Order, без FK (ADR-0001).
   orderId       String
   /// ref crm.Customer, без FK. NULL — internal assisted flow.
@@ -3806,6 +3818,9 @@ enum RefundStatus {
 model Refund {
   id         String       @id @default(uuid())
   code       String       @unique // RFD-00000001
+  /// Tenant-scoped human-readable reference number.
+  /// Marketplace: MKT-REF-{SEQ}; Storefront: {SF_CODE}-REF-{SEQ}
+  referenceNumber String?
   /// ref finance.Payment (без FK). Source authority — ТОЛЬКО CAPTURED.
   paymentId  String
   /// ref order.Order, без FK (server-derived из Payment.orderId — не клиентский).
@@ -3961,6 +3976,9 @@ enum InvoiceStatus {
 model Invoice {
   id         String        @id @default(uuid())
   code       String        @unique // INV-00000001
+  /// Tenant-scoped human-readable reference number (nullable — SaaS billing not yet implemented).
+  /// Marketplace: MKT-INV-{SEQ}; SaaS: SAAS-{SF_CODE}-INV-{SEQ}
+  referenceNumber String?
   /// ref order.Order, без FK.
   orderId    String
   /// ref crm.Customer, без FK.

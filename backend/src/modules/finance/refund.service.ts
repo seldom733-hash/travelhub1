@@ -41,6 +41,7 @@ import { Prisma } from "../../generated/prisma/client";
 import { RefundStatus } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
 import { IdsService } from "../../shared/ids.service";
+import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { SecurityService } from "../../security/security.service";
 import { normalizeInitialNote } from "../operational-notes/operational-notes.types";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
@@ -67,6 +68,7 @@ export class RefundService {
     private readonly ids: IdsService,
     private readonly security: SecurityService,
     private readonly eventBus: EventBusService,
+    private readonly refNum: ReferenceNumberService,
   ) {}
 
   // ── Refund creation ────────────────────────────────────────────────────────
@@ -136,10 +138,13 @@ export class RefundService {
         }
 
         const code = await this.ids.nextCode(tx, "RFD");
+        // Step 3.12 — tenant-scoped reference number for Refund
+        const referenceNumber = await this.generateRefundReferenceNumber(tx, payment);
         const now = new Date();
         const created = await tx.refund.create({
           data: {
             code,
+            referenceNumber,
             paymentId: payment.id,
             orderId: payment.orderId,
             amount: amountDecimal,
@@ -202,6 +207,29 @@ export class RefundService {
     } finally {
       await this.eventBus.publishPending();
     }
+  }
+
+  /**
+   * Step 3.12 — generate tenant-scoped reference number for Refund.
+   * Marketplace → MKT-REF-{SEQ}; Storefront → {SF_CODE}-REF-{SEQ}
+   */
+  private async generateRefundReferenceNumber(
+    tx: any,
+    payment: { orderId: string },
+  ): Promise<string> {
+    const order = await tx.order.findUnique({
+      where: { id: payment.orderId },
+      select: { acquisitionSource: true, sellerPartnerId: true },
+    });
+    if (!order) return this.refNum.nextMarketplaceReference(tx, "REF");
+    if (order.acquisitionSource === "PARTNER_STOREFRONT" && order.sellerPartnerId) {
+      const sf = await tx.partnerStorefront.findUnique({
+        where: { partnerId: order.sellerPartnerId },
+        select: { storefrontCode: true },
+      });
+      if (sf) return this.refNum.nextStorefrontReference(tx, sf.storefrontCode, "REF");
+    }
+    return this.refNum.nextMarketplaceReference(tx, "REF");
   }
 
   // ── Lifecycle transitions (единственный state-machine authority) ──────────
@@ -341,6 +369,7 @@ export class RefundService {
   private refundDto(r: {
     id: string;
     code: string;
+    referenceNumber?: string | null;
     paymentId: string;
     orderId: string;
     amount: Prisma.Decimal;
@@ -357,6 +386,7 @@ export class RefundService {
     return {
       id: r.id,
       code: r.code,
+      referenceNumber: r.referenceNumber ?? null,
       paymentId: r.paymentId,
       orderId: r.orderId,
       amount: r.amount.toString(),

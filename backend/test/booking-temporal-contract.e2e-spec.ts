@@ -394,7 +394,7 @@ describe("Phase 2 Step 2.9A — Booking Temporal Contract (e2e)", () => {
     expect(state.confirmedAt).toBeNull();
     // legacy null milestone строка читаема
     const legacy = await prisma.booking.create({
-      data: { code: `BKG-${stamp}-legacy-t`, orderId: order.id, productId: "00000000-0000-4000-8000-000000000001", status: "CONFIRMED", amount: 100, version: 1 },
+      data: { code: `BKG-${stamp}-legacy-t`, referenceNumber: "MKT-BKG-000001", orderId: order.id, productId: "00000000-0000-4000-8000-000000000001", status: "CONFIRMED", amount: 100, version: 1 },
       select: { id: true, code: true },
     });
     const detail = (await adminAgent.get(`/api/v1/bookings/${legacy.id}`).expect(200)).body;

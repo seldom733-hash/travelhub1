@@ -165,7 +165,7 @@ describe("Phase 2 Step 2.0 — Phase 2 entry audit (e2e)", () => {
   it("3. Order → Booking linkage: Booking.orderId → Order.customerId (canonical refs)", async () => {
     const booking = await prisma.booking.create({
       data: {
-        code: `BKG-AUDIT-${stamp}`,
+        code: `BKG-AUDIT-${stamp}`, referenceNumber: "MKT-BKG-000001",
         orderId: orderAId,
         productId: "00000000-0000-0000-0000-000000000000",
         amount: 123.45,
@@ -238,7 +238,7 @@ describe("Phase 2 Step 2.0 — Phase 2 entry audit (e2e)", () => {
   it("8. Entitlement ≠ Subscription: нет billing-моделей; entitlementStatus — enum NONE/ACTIVE/SUSPENDED/EXPIRED", async () => {
     const sf = await prisma.partnerStorefront.create({
       data: {
-        code: `SF-AUDIT-${stamp}`,
+        code: `SF-AUDIT-${stamp}`, storefrontCode: "SF099",
         partnerId: `partner-audit-${stamp}`,
         slug: `sf-audit-${stamp}`,
         status: "DRAFT",

@@ -273,7 +273,7 @@ describe("Phase 2 Step 2.8 — BookingRequested → Booking Creation (e2e)", () 
     // через shared-хелпер — классический meta.target / driver-adapter message).
     const err = await prisma.booking
       .create({
-        data: { code: "BKG-99999999", orderId: order.id, productId: "00000000-0000-4000-8000-000000000001", orderItemId: b.orderItemId, status: "NEW", version: 1 },
+        data: { code: "BKG-99999999", referenceNumber: "MKT-BKG-999999", orderId: order.id, productId: "00000000-0000-4000-8000-000000000001", orderItemId: b.orderItemId, status: "NEW", version: 1 },
       })
       .catch((e: unknown) => e);
     expect((err as { code?: string })?.code).toBe("P2002");

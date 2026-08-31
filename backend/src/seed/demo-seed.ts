@@ -447,11 +447,16 @@ async function seedStorefronts(partners: { id: string }[]) {
     const code = `SF-${String(i + 1).padStart(8, "0")}`;
     const status = t.storefrontActive ? "ACTIVE" : "DRAFT";
 
+    // Step 3.12 — deterministic storefrontCode (SF001, SF002, ...)
+    const sfCount = count + 1;
+    const storefrontCode = `SF${String(sfCount).padStart(3, "0")}`;
+
     await prisma.partnerStorefront.upsert({
       where: { id },
       create: {
         id,
         code,
+        storefrontCode,
         partnerId,
         slug: t.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
         status: status as any,
@@ -473,11 +478,11 @@ async function seedStorefronts(partners: { id: string }[]) {
   console.log(`  ✅ ${count} storefronts created`);
 }
 
-async function seedOrders(products: { id: string; partnerId: string; price: number; currency: string; title: string; archived: boolean }[]) {
+async function seedOrders(products: { id: string; partnerId: string; price: number; currency: string; title: string; archived: boolean }[], storefrontCodeMap: Map<string, string>) {
   console.log(`\n📋 Seeding ~${ORDER_TARGET} orders with seasonal distribution...`);
   const customers = await prisma.customer.findMany({ select: { id: true } });
   const orderData: Array<{
-    id: string; code: string; number: string; customerId: string; status: string;
+    id: string; code: string; number: string; referenceNumber: string; customerId: string; status: string;
     paymentStatus: string; currency: string; amount: Prisma.Decimal; paidAmount: Prisma.Decimal;
     refundedAmount: Prisma.Decimal; sellerPartnerId: string; createdAt: Date; updatedAt: Date;
     submittedAt: Date; confirmedAt?: Date; fulfilledAt?: Date; cancelledAt?: Date; closedAt?: Date;
@@ -490,11 +495,11 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
     serviceDate: Date;
   }> = [];
   const paymentData: Array<{
-    id: string; code: string; orderId: string; amount: Prisma.Decimal; currency: string;
+    id: string; code: string; referenceNumber: string; orderId: string; amount: Prisma.Decimal; currency: string;
     status: string; partnerId: string; createdAt: Date; updatedAt: Date; paidAt?: Date; isActivePayment: boolean; version: number;
   }> = [];
   const bookingData: Array<{
-    id: string; code: string; orderId: string; productId: string; status: string;
+    id: string; code: string; referenceNumber: string; orderId: string; productId: string; status: string;
     amount: Prisma.Decimal; currency: string; serviceDate: Date; createdAt: Date; updatedAt: Date; version: number;
     completedAt?: Date; cancelledAt?: Date; confirmedAt?: Date; acquisitionSource?: string;
   }> = [];
@@ -570,16 +575,23 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
     const sellerPartnerId = uuid(`partner-${partnerIdx >= 0 ? partnerIdx : 0}`);
     const commissionRate = PARTNER_TEMPLATES[partnerIdx >= 0 ? partnerIdx : 0]?.commissionRate ?? 0.10;
 
+    // Step 3.12 — deterministic reference number
+    const acqSrc = orderNum % 2 === 0 ? "MARKETPLACE" : "PARTNER_STOREFRONT";
+    const orderRefNum = acqSrc === "PARTNER_STOREFRONT" && storefrontCodeMap.has(sellerPartnerId)
+      ? `${storefrontCodeMap.get(sellerPartnerId)}-ORD-${String(orderNum).padStart(6, "0")}`
+      : `MKT-ORD-${String(orderNum).padStart(6, "0")}`;
+
     orderData.push({
       id, code: `ORD-${String(orderNum).padStart(8, "0")}`,
       number: `TH-2026-${String(orderNum).padStart(6, "0")}`,
+      referenceNumber: orderRefNum,
       customerId: customer.id, status: ps.status as any, paymentStatus: ps.paymentStatus as any,
       currency: product.currency, amount: decimal(amount), paidAmount: decimal(paidAmount),
       refundedAmount: decimal(refundedAmount), sellerPartnerId,
       createdAt: orderDate, updatedAt: orderDate,
       submittedAt: orderDate, confirmedAt, fulfilledAt, cancelledAt, closedAt,
       serviceDate,      // Deterministic channel: even orderNum → MARKETPLACE, odd → PARTNER_STOREFRONT
-      acquisitionSource: orderNum % 2 === 0 ? "MARKETPLACE" : "PARTNER_STOREFRONT",
+      acquisitionSource: acqSrc,
       commissionSnapshot: { rate: commissionRate, currency: product.currency },
       amountNum: amount,
     });
@@ -598,8 +610,12 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
     if (ps.paymentStatus !== "UNPAID") {
       const payStatus = ps.paymentStatus === "REFUNDED" ? "REFUNDED" :
         ps.paymentStatus === "PARTIALLY_PAID" ? "CAPTURED" : "CAPTURED";
+      const payRefNum = acqSrc === "PARTNER_STOREFRONT" && storefrontCodeMap.has(sellerPartnerId)
+        ? `${storefrontCodeMap.get(sellerPartnerId)}-PAY-${String(orderNum).padStart(6, "0")}`
+        : `MKT-PAY-${String(orderNum).padStart(6, "0")}`;
       paymentData.push({
         id: uuid(`payment-${orderNum}`), code: `PAY-${String(orderNum).padStart(8, "0")}`,
+        referenceNumber: payRefNum,
         orderId: id, amount: decimal(paidAmount), currency: product.currency,
         status: payStatus, partnerId: sellerPartnerId,
         createdAt: orderDate, updatedAt: orderDate,
@@ -612,8 +628,12 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
     if (["SENT_TO_BOOKING", "FULFILLED", "CLOSED"].includes(ps.status)) {
       const bkStatus = ps.status === "CLOSED" ? "COMPLETED" :
         ps.status === "FULFILLED" ? "IN_SERVICE" : "CONFIRMED";
+      const bkgRefNum = acqSrc === "PARTNER_STOREFRONT" && storefrontCodeMap.has(sellerPartnerId)
+        ? `${storefrontCodeMap.get(sellerPartnerId)}-BKG-${String(orderNum).padStart(6, "0")}`
+        : `MKT-BKG-${String(orderNum).padStart(6, "0")}`;
       bookingData.push({
         id: uuid(`booking-${orderNum}`), code: `BKG-${String(orderNum).padStart(8, "0")}`,
+        referenceNumber: bkgRefNum,
         orderId: id, productId: product.id, status: bkStatus as any,
         amount: decimal(amount), currency: product.currency,
         serviceDate, createdAt: orderDate, updatedAt: orderDate, version: 1,
@@ -647,7 +667,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
       await prisma.order.upsert({
         where: { id: o.id },
         create: {
-          id: o.id, code: o.code, number: o.number, customerId: o.customerId,
+          id: o.id, code: o.code, number: o.number, referenceNumber: o.referenceNumber, customerId: o.customerId,
           status: o.status as any, paymentStatus: o.paymentStatus as any,
           currency: o.currency, amount: o.amount, paidAmount: o.paidAmount, refundedAmount: o.refundedAmount,
           sellerPartnerId: o.sellerPartnerId, createdAt: o.createdAt, updatedAt: o.updatedAt,
@@ -689,7 +709,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
       await prisma.payment.upsert({
         where: { id: p.id },
         create: {
-          id: p.id, code: p.code, orderId: p.orderId, amount: p.amount, currency: p.currency,
+          id: p.id, code: p.code, referenceNumber: p.referenceNumber, orderId: p.orderId, amount: p.amount, currency: p.currency,
           status: p.status as any, partnerId: p.partnerId, createdAt: p.createdAt, updatedAt: p.updatedAt,
           paidAt: p.paidAt, isActivePayment: p.isActivePayment, version: p.version,
         },
@@ -709,7 +729,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
       await prisma.booking.upsert({
         where: { id: b.id },
         create: {
-          id: b.id, code: b.code, orderId: b.orderId, productId: b.productId, status: b.status as any,
+          id: b.id, code: b.code, referenceNumber: b.referenceNumber, orderId: b.orderId, productId: b.productId, status: b.status as any,
           amount: b.amount, currency: b.currency, serviceDate: b.serviceDate, createdAt: b.createdAt,
           updatedAt: b.updatedAt, version: b.version, completedAt: b.completedAt, confirmedAt: b.confirmedAt,
           acquisitionSource: b.acquisitionSource ?? undefined,
@@ -768,7 +788,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
 
 // ─── Refunds (Step 2.13) ─────────────────────────────────────────────────
 
-async function seedRefunds(paymentData: Array<{ id: string; orderId: string; amount: Prisma.Decimal; currency: string; partnerId: string; createdAt: Date; paidAt?: Date }>) {
+async function seedRefunds(paymentData: Array<{ id: string; orderId: string; amount: Prisma.Decimal; currency: string; partnerId: string; createdAt: Date; paidAt?: Date }>, storefrontCodeMap: Map<string, string>) {
   console.log(`\n💸 Seeding refunds...`);
 
   // Select a subset of PAID payments to refund (mix of full and partial)
@@ -790,11 +810,17 @@ async function seedRefunds(paymentData: Array<{ id: string; orderId: string; amo
     const status = isPending ? "REQUESTED" : "PROCESSED";
     const createdAt = new Date(p.paidAt!.getTime() + randomBetween(1, 30) * 86400000);
 
+    // Step 3.12 — refund reference number (derive from order acquisition source)
+    const refOrder = await prisma.order.findUnique({ where: { id: p.orderId }, select: { acquisitionSource: true, sellerPartnerId: true } });
+    const refAcq = refOrder?.acquisitionSource ?? "MARKETPLACE";
+    const refSfCode = refAcq === "PARTNER_STOREFRONT" && refOrder?.sellerPartnerId ? storefrontCodeMap.get(refOrder.sellerPartnerId) : undefined;
+    const refundRefNum = refSfCode ? `${refSfCode}-REF-${String(i + 1).padStart(6, "0")}` : `MKT-REF-${String(i + 1).padStart(6, "0")}`;
+
     try {
       await prisma.refund.upsert({
         where: { id },
         create: {
-          id, code, paymentId: p.id, orderId: p.orderId,
+          id, code, referenceNumber: refundRefNum, paymentId: p.id, orderId: p.orderId,
           amount: decimal(refundAmount), currency: p.currency,
           status: status as any,
           reason: isFull ? "Customer request — full cancellation" : "Partial service issue",
@@ -1088,11 +1114,16 @@ async function main() {
     // 4. Storefronts
     await seedStorefronts(partners);
 
+    // Step 3.12 — Build storefrontCode map from DB for reference number generation
+    const sfRows = await prisma.partnerStorefront.findMany({ select: { partnerId: true, storefrontCode: true } });
+    const storefrontCodeMap = new Map<string, string>();
+    for (const sf of sfRows) storefrontCodeMap.set(sf.partnerId, sf.storefrontCode);
+
   // 5. Orders + Payments + Bookings + Commissions
-  const { paymentData } = await seedOrders(products);
+  const { paymentData } = await seedOrders(products, storefrontCodeMap);
 
   // 6. Refunds (Step 2.13)
-  await seedRefunds(paymentData);
+  await seedRefunds(paymentData, storefrontCodeMap);
 
   // 7. Detector triggers (failed payments, pending bookings)
   await seedDetectorTriggers();

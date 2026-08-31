@@ -98,11 +98,14 @@ export async function createFixtureOrder(
     const code = await ids.nextCode(tx, "ORD");
     const number = await ids.nextOrderNumber(tx);
     const submittedAt = new Date();
+    // Step 3.12 — test fixture reference number
+    const referenceNumber = `MKT-ORD-${String(Math.floor(Math.random() * 999999) + 1).padStart(6, "0")}`;
 
     const order = await tx.order.create({
       data: {
         code,
         number,
+        referenceNumber,
         customerId: input.customerId,
         status: "NEW",
         paymentStatus: "UNPAID",

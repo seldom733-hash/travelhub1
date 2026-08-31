@@ -473,6 +473,7 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
     const legacy = await prisma.order.create({
       data: {
         code: `ORD-LEG-${stamp}`,
+        referenceNumber: "MKT-ORD-000001",
         number: `TH-LEG-${stamp}`,
         customerId: null,
         status: "NEW",
@@ -635,7 +636,7 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
     const auto = await prisma.booking.findFirstOrThrow({ where: { orderId } });
     // Вторая бронь напрямую — как вторая услуга заказа.
     const b2 = await prisma.booking.create({
-      data: { code: `BKG-${stamp}-r2`, orderId, productId: fx.productId, status: BookingStatus.AWAITING_CONFIRMATION, amount: 50 },
+      data: { code: `BKG-${stamp}-r2`, referenceNumber: "MKT-BKG-000001", orderId, productId: fx.productId, status: BookingStatus.AWAITING_CONFIRMATION, amount: 50 },
       select: { id: true },
     });
 
@@ -645,7 +646,7 @@ describe("Phase 2 Step 2.5A — Order Temporal Contract (e2e)", () => {
           aggregateType: "Booking",
           aggregateId: bookingId,
           eventType: DomainEvents.BookingStatusChanged,
-          payload: { bookingId, code: `BKG-${stamp}`, orderId, productId: fx.productId, from, to } as Prisma.InputJsonValue,
+          payload: { bookingId, code: `BKG-${stamp}`, referenceNumber: "MKT-BKG-000001", orderId, productId: fx.productId, from, to } as Prisma.InputJsonValue,
           status: "PENDING",
           retryable: true,
         },
