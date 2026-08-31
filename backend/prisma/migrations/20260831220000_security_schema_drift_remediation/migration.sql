@@ -95,80 +95,38 @@ INSERT INTO "security"."Role" ("id", "code", "title") VALUES
   ('role-operator', 'OPERATOR',       'Оператор'),
   ('role-partner',  'PARTNER',        'Партнёр'),
   ('role-buyer',    'BUYER',          'Покупатель')
-ON CONFLICT ("id") DO NOTHING;
+ON CONFLICT ("code") DO NOTHING;
 
--- 10. Migrate users from public.users → security.User
--- Old schema: id, email, passwordHash, firstName, lastName, role (enum), isActive
--- New schema: id, code, username, email, passwordHash, fullName, status, roleId, tokenVersion, etc.
-INSERT INTO "security"."User" (
-  "id", "code", "username", "email", "passwordHash", "fullName",
-  "status", "roleId", "tokenVersion", "version", "createdAt", "updatedAt"
-)
-SELECT
-  u.id,
-  'USR-' || LPAD(CAST(ROW_NUMBER() OVER (ORDER BY u.id) AS TEXT), 8, '0') AS "code",
-  u.email AS "username",
-  u.email,
-  u."passwordHash",
-  u."firstName" || ' ' || u."lastName" AS "fullName",
-  CASE WHEN u."isActive" THEN 'ACTIVE'::"security"."UserStatus" ELSE 'INACTIVE'::"security"."UserStatus" END AS "status",
-  CASE u.role
-    WHEN 'ADMIN' THEN 'role-admin'
-    WHEN 'PARTNER' THEN 'role-partner'
-    WHEN 'BUYER' THEN 'role-buyer'
-    WHEN 'ANALYST' THEN 'role-analyst'
-    ELSE 'role-buyer'
-  END AS "roleId",
-  0 AS "tokenVersion",
-  1 AS "version",
-  COALESCE(u."createdAt", CURRENT_TIMESTAMP) AS "createdAt",
-  COALESCE(u."updatedAt", CURRENT_TIMESTAMP) AS "updatedAt"
-FROM users u
-ON CONFLICT ("id") DO NOTHING;
+-- 10. Migrate users from public.users → security.User (only if public.users exists)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'users' AND table_schema = 'public') THEN
+    INSERT INTO "security"."User" (
+      "id", "code", "username", "email", "passwordHash", "fullName",
+      "status", "roleId", "tokenVersion", "version", "createdAt", "updatedAt"
+    )
+    SELECT
+      u.id,
+      'USR-' || LPAD(CAST(ROW_NUMBER() OVER (ORDER BY u.id) AS TEXT), 8, '0') AS "code",
+      u.email AS "username",
+      u.email,
+      u."passwordHash",
+      u."firstName" || ' ' || u."lastName" AS "fullName",
+      CASE WHEN u."isActive" THEN 'ACTIVE'::"security"."UserStatus" ELSE 'INACTIVE'::"security"."UserStatus" END AS "status",
+      CASE u.role
+        WHEN 'ADMIN' THEN 'role-admin'
+        WHEN 'PARTNER' THEN 'role-partner'
+        WHEN 'BUYER' THEN 'role-buyer'
+        WHEN 'ANALYST' THEN 'role-analyst'
+        ELSE 'role-buyer'
+      END AS "roleId",
+      0 AS "tokenVersion",
+      1 AS "version",
+      COALESCE(u."createdAt", CURRENT_TIMESTAMP) AS "createdAt",
+      COALESCE(u."updatedAt", CURRENT_TIMESTAMP) AS "updatedAt"
+    FROM users u
+    ON CONFLICT ("id") DO NOTHING;
+  END IF;
+END $$;
 
--- 11. Create _prisma_migrations table (required by Prisma migrate)
-CREATE TABLE IF NOT EXISTS "_prisma_migrations" (
-  "id" VARCHAR(36) NOT NULL,
-  "checksum" VARCHAR(64) NOT NULL,
-  "finished_at" TIMESTAMP(3),
-  "migration_name" VARCHAR(255) NOT NULL,
-  "logs" TEXT,
-  "rolled_back_at" TIMESTAMP(3),
-  "started_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "applied_steps_count" INTEGER NOT NULL DEFAULT 0,
-  CONSTRAINT "_prisma_migrations_pkey" PRIMARY KEY ("id")
-);
-
--- 12. Mark all existing migrations as applied
-INSERT INTO "_prisma_migrations" ("id", "checksum", "finished_at", "migration_name", "applied_steps_count")
-SELECT
-  '00000000-0000-0000-0000-' || LPAD(CAST(ROW_NUMBER() OVER (ORDER BY m.name) AS TEXT), 12, '0') AS "id",
-  'legacy-reconciled' AS "checksum",
-  CURRENT_TIMESTAMP AS "finished_at",
-  m.name AS "migration_name",
-  1 AS "applied_steps_count"
-FROM (
-  SELECT unnest(ARRAY[
-    '20260807190230_init',
-    '20260807190425_add_business_sequences',
-    '20260807191031_add_created_at',
-    '20260807194102_add_security_rbac',
-    '20260808015505_add_category_schema_foundation',
-    '20260808065315_add_product_media',
-    '20260808090000_enforce_single_primary_media',
-    '20260808120000_add_product_partner_scope_index',
-    '20260808140000_add_moderation_submissions',
-    '20260808150000_add_change_proposal_and_active_submission_invariant',
-    '20260808160000_add_partner_onboarding',
-    '20260808200000_add_public_seller_profile',
-    '20260808202608_add_partner_storefront',
-    '20260808205236_add_storefront_channels_entitlement',
-    '20260808211909_add_storefront_business_identity',
-    '20260808225507_add_storefront_behavioral_events',
-    '20260808230000_add_seller_geography',
-    '20260809110000_add_temporal_readiness',
-    '20260809130000_add_marketplace_behavioral_events',
-    '20260809140000_add_business_event_actor'
-  ]) AS name
-) m
-ON CONFLICT ("migration_name") DO NOTHING;
+-- Note: _prisma_migrations table and migration tracking are managed by
+-- Prisma's own migration engine. No manual INSERT needed here.

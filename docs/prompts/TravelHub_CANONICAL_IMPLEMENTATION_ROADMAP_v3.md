@@ -1,7 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
-**Дата актуализации:** 2026-08-30 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Step 3.6D ✅ COMPLETE; Step 3.6D.1 ✅ COMPLETE; Step 3.7A ✅ COMPLETE; Step 3.7A.1 ✅ COMPLETE; Step 3.7A.2 ✅ COMPLETE; Step 3.7B ✅ COMPLETE — STRICT REVIEW APPROVED; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE; Storefront Business Capability Model Architecture Amendment COMPLETED 2026-08-29; Step 3.8 ✅ COMPLETE — STRICT REVIEW APPROVED; Step 3.8.1 ✅ COMPLETE; Step 3.8.2 ✅ COMPLETE; Step 3.9 ✅ COMPLETE — STRICT REVIEW RE-QUALIFICATION APPROVED; Step 3.10 ✅ COMPLETE — STRICT REVIEW RE-QUALIFICATION APPROVED; Schema Drift & Auth Login Remediation ✅ COMPLETE)\
+**Дата актуализации:** 2026-08-30 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Step 3.6D ✅ COMPLETE; Step 3.6D.1 ✅ COMPLETE; Step 3.7A ✅ COMPLETE; Step 3.7A.1 ✅ COMPLETE; Step 3.7A.2 ✅ COMPLETE; Step 3.7B ✅ COMPLETE — STRICT REVIEW APPROVED; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE; Storefront Business Capability Model Architecture Amendment COMPLETED 2026-08-29; Step 3.8 ✅ COMPLETE — STRICT REVIEW APPROVED; Step 3.8.1 ✅ COMPLETE; Step 3.8.2 ✅ COMPLETE; Step 3.9 ✅ COMPLETE — STRICT REVIEW RE-QUALIFICATION APPROVED; Step 3.10 ✅ COMPLETE — STRICT REVIEW RE-QUALIFICATION APPROVED; Schema Drift & Auth Login Remediation ✅ COMPLETE; Fresh DB Evidence Closure ✅ COMPLETE)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
 clarification/review-fix.\
@@ -2038,6 +2038,22 @@ Runtime database (`travelhub1`) уже содержал `security.User` с ко�
 - Route smoke: 6/6 routes load ✅
 - Backend typecheck: PASS ✅
 - Frontend typecheck: FAIL (pre-existing `storefrontSessions` type mismatch) ✅ (scope)
+
+### Fresh DB Evidence Closure (Phase 3 Pre-Step 3.12)
+
+Разрешено на чистой изолированной PostgreSQL БД (`travelhub_fresh_evidence`):
+
+1. **Migration chain**: Все 74 миграции применены успешно на пустой БД — `prisma migrate deploy` → `All migrations have been successfully applied` ✅
+2. **Schema reconciliation**: 112 таблиц, 14 схем, `prisma validate` → PASS ✅
+3. **Security schema**: 8 таблиц (Role, User, Permission, AuditLog, etc.), 10 ролей, 140 permission ✅
+4. **Auth on fresh DB**:
+   - Valid login (`admin/Admin123!`) → 200 + accessToken ✅
+   - Wrong password → 401 Unauthorized ✅
+   - Unknown user → 401 Unauthorized ✅
+   - Disabled/inactive user (`disabled_user/INACTIVE`) → 401 "Account is not active" ✅
+5. **Migration idempotency**: `ON CONFLICT DO NOTHING` для roles — корректно обрабатывает повторные запуски ✅
+6. **Non-destructive runtime DB**: `travelhub1` — 70 users, 10 roles, login → PASS ✅
+7. **SHA**: Migration fix — included in `17b2bed`
 
 ## Reverse Marketplace / Commercial Capabilities (Roadmap Amendment)
 
