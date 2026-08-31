@@ -184,14 +184,15 @@ export const METRIC_CONFIGS = {
     extraParams: { tab: "customers" },
     label: "Активные клиенты",
   },
-  // All-time stock metrics (stable across all periods)
+  // Entitled partners — partners with marketplace presence (PUBLISHED products OR active storefronts)
+  // NOT a stock metric: excludes partners without marketplace entitlement
   "analytics.partners": {
     metricId: "analytics.partners",
     destinationType: "DOMAIN_ROUTE" as DestinationType,
     destination: "/app/crm",
     periodPolicy: "ALL_TIME" as PeriodPolicy,
-    extraParams: { tab: "partners" },
-    label: "Всего партнёров",
+    extraParams: { tab: "partners", entitled: "true" },
+    label: "Активные партнёры (marketplace)",
   },
 
   // GMV lifecycle (all period-bound)

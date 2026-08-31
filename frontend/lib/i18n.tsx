@@ -975,6 +975,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "aggregate.completion_rate": { ru: "Процент исполнения", az: "İcra faizi", en: "Completion rate" },
   // Finance payments page
   "finance.payments.title": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
+  // Entitled partners context
+  "crm.context.entitled_partners": { ru: "Активные партнёры (marketplace)", az: "Aktiv partnyorlar (marketpleys)", en: "Active partners (marketplace)" },
   "admin.search.placeholder_catalog": { ru: "Поиск по названию или коду…", az: "Ad və ya kod ilə axtar…", en: "Search by name or code…" },
   "admin.search.placeholder_orders": { ru: "Поиск: ORD-…, TH-…", az: "Axtar: ORD-…, TH-…", en: "Search: ORD-…, TH-…" },
   "admin.search.placeholder_bookings": { ru: "Поиск: BKG-…, ORD-…", az: "Axtar: BKG-…, ORD-…", en: "Search: BKG-…, ORD-…" },

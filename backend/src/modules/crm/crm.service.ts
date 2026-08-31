@@ -45,6 +45,7 @@ export interface CustomerListQuery {
   sortDirection?: string;
   dateFrom?: string;
   dateTo?: string;
+  entitled?: string;  // 'true' = filter to partners with marketplace entitlement
 }
 
 export interface EnsureBuyerCustomerInput {
@@ -589,25 +590,22 @@ export class CrmService {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
 
-    // SR-CRM-02: When period is specified, filter to partners with qualifying
-    // marketplace presence — matching Analytics 'Partners' EXACT semantics:
+    // Entitlement filter: partners with marketplace presence
+    // Applied when: dateFrom/dateTo specified (period drill-down) OR entitled=true (Analytics drill-down)
     // Analytics counts:
     //   marketplacePartners = DISTINCT partnerId FROM Product WHERE
     //     status='PUBLISHED' AND channel='MARKETPLACE'
     //   storefrontPartners = DISTINCT partnerId FROM PartnerStorefront WHERE
     //     entitlementStatus='ACTIVE'
-    // Total = marketplacePartners + storefrontPartners
-    // These are entitlement-based, NOT order-based.
+    // Total = union(marketplacePartners, storefrontPartners)
     let activePartnerIds: string[] | undefined;
-    if (query.dateFrom || query.dateTo) {
-      // Get partners with PUBLISHED marketplace products
+    if (query.dateFrom || query.dateTo || query.entitled === 'true') {
       const marketplacePartnerIds = await this.prisma.$queryRaw<{ partnerId: string }[]>`
         SELECT DISTINCT p."partnerId"
         FROM catalog."Product" p
         INNER JOIN catalog."ProductPublicationChannel" ppc ON ppc."productId" = p.id
         WHERE p."status" = 'PUBLISHED' AND p."partnerId" IS NOT NULL AND ppc."channel" = 'MARKETPLACE'
       `;
-      // Get partners with ACTIVE storefronts
       const storefrontPartnerIds = await this.prisma.$queryRaw<{ partnerId: string }[]>`
         SELECT DISTINCT "partnerId"
         FROM catalog."PartnerStorefront"

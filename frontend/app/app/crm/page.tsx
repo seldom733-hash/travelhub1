@@ -26,7 +26,7 @@ type CrmContext = "platform" | "basic" | "pro";
  * 2. MARKETPLACE BASIC — limited customer management for marketplace partners
  * 3. STOREFRONT PRO — full CRM for partners with active Storefront
  */
-function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCustomerSearch, initialCustomerStatus, initialCustomerType, initialCustomerPage, initialPartnerSearch, initialPartnerStatus, initialPartnerPage, initialDateFrom, initialDateTo }: { initialTab?: string; initialSortBy?: string; initialSortDirection?: string; initialCustomerSearch?: string; initialCustomerStatus?: string; initialCustomerType?: string; initialCustomerPage?: number; initialPartnerSearch?: string; initialPartnerStatus?: string; initialPartnerPage?: number; initialDateFrom?: string; initialDateTo?: string }) {
+function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCustomerSearch, initialCustomerStatus, initialCustomerType, initialCustomerPage, initialPartnerSearch, initialPartnerStatus, initialPartnerPage, initialDateFrom, initialDateTo, initialEntitled }: { initialTab?: string; initialSortBy?: string; initialSortDirection?: string; initialCustomerSearch?: string; initialCustomerStatus?: string; initialCustomerType?: string; initialCustomerPage?: number; initialPartnerSearch?: string; initialPartnerStatus?: string; initialPartnerPage?: number; initialDateFrom?: string; initialDateTo?: string; initialEntitled?: string }) {
   const locale = useLocale();
   const currentUser = useCurrentUser();
   const [crmContext, setCrmContext] = useState<CrmContext>("platform");
@@ -73,6 +73,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
   // ── Period filter (SR-CRM-01/SR-CRM-02) ──
   const [dateFrom, setDateFrom] = useState(initialDateFrom ?? "");
   const [dateTo, setDateTo] = useState(initialDateTo ?? "");
+  const [entitled, setEntitled] = useState(initialEntitled ?? "");
 
   // ── Platform CRM state ──
   const [customerData, setCustomerData] = useState<Page<Customer> | null>(null);
@@ -141,6 +142,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
       if (partnerStatusFilter) qs.set("status", partnerStatusFilter);
       if (dateFrom) qs.set("dateFrom", dateFrom);
       if (dateTo) qs.set("dateTo", dateTo);
+      if (entitled) qs.set("entitled", entitled);
       qs.set("page", String(partnerPage));
       qs.set("pageSize", "20");
       if (sortBy) qs.set("sortBy", sortBy);
@@ -151,7 +153,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
       setPartnerLoadError(true);
       setPartnerError((e as Error).message);
     }
-  }, [partnerSearch, partnerPage, sortBy, sortDirection, partnerStatusFilter, dateFrom, dateTo]);
+  }, [partnerSearch, partnerPage, sortBy, sortDirection, partnerStatusFilter, dateFrom, dateTo, entitled]);
 
   // ── Partner Customer loading (partner context) ──
   const loadPartnerCustomers = useCallback(async () => {
@@ -278,6 +280,11 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
             {dateFrom && dateTo && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
                 📊 {dateFrom} → {dateTo}
+              </span>
+            )}
+            {entitled === 'true' && !dateFrom && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                🏪 {t('crm.context.entitled_partners', locale) || 'Активные партнёры (marketplace)'}
               </span>
             )}
           </div>
@@ -757,6 +764,7 @@ function CrmWithParams() {
       initialPartnerPage={sp.get("pPage") ? parseInt(sp.get("pPage")!, 10) : undefined}
       initialDateFrom={sp.get("from") ?? undefined}
       initialDateTo={sp.get("to") ?? undefined}
+      initialEntitled={sp.get("entitled") ?? undefined}
     />
   );
 }

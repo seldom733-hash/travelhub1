@@ -107,6 +107,10 @@ class ListCustomersQuery {
   @IsOptional()
   @IsString()
   dateTo?: string;
+
+  @IsOptional()
+  @IsString()
+  entitled?: string;
 }
 
 class CreateContactDto {
