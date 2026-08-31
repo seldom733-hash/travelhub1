@@ -510,6 +510,19 @@ export class PaymentListQueryDto {
   status?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  currency?: string;
+
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

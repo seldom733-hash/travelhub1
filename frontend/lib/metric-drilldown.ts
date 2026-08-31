@@ -214,18 +214,18 @@ export const METRIC_CONFIGS = {
     destination: "/app/orders",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
   },
-  // Table cell drill-down configs (Financial Summary)
+  // Table cell drill-down configs (Financial Summary) → Payments registry
   "analytics.finance.payment_count": {
     metricId: "analytics.finance.payment_count",
     destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destination: "/app/finance/payments",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
     label: "Кол-во платежей",
   },
   "analytics.finance.payments": {
     metricId: "analytics.finance.payments",
     destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destination: "/app/finance/payments",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
     label: "Платежи",
   },

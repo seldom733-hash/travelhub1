@@ -192,8 +192,10 @@ export interface CompanyKpiResponse {
     storefrontSessions: ComparisonValue<number>;
     marketplacePartners: ComparisonValue<number>;
     storefrontPartners: ComparisonValue<number>;
+    totalActivePartners: ComparisonValue<number>;
     marketplaceCustomers: ComparisonValue<number>;
     storefrontCustomers: ComparisonValue<number>;
+    totalActiveCustomers: ComparisonValue<number>;
     averageOrderValue: ComparisonValue<string>;
     refunds: ComparisonValue<string>;
     refundsCurrency: string;
@@ -624,10 +626,30 @@ export class AnalyticsService {
 
     const marketplaceSessions = Number(behavioralMarketplace[0]?.cnt || 0);
     const storefrontSessions = Number(behavioralStorefront[0]?.cnt || 0);
+    // Partners: union of marketplace + storefront to prevent double-counting
+    const marketplacePartnerIdsList = await this.prisma.$queryRaw<{ partnerId: string }[]>`
+      SELECT DISTINCT p."partnerId"
+      FROM catalog."Product" p
+      INNER JOIN catalog."ProductPublicationChannel" ppc ON ppc."productId" = p.id
+      WHERE p."status" = 'PUBLISHED' AND p."partnerId" IS NOT NULL AND ppc."channel" = 'MARKETPLACE'
+    `;
+    const storefrontPartnerIdsList = await this.prisma.$queryRaw<{ partnerId: string }[]>`
+      SELECT DISTINCT "partnerId"
+      FROM catalog."PartnerStorefront"
+      WHERE "entitlementStatus" = 'ACTIVE' AND "partnerId" IS NOT NULL
+    `;
+    const totalActivePartnersCount = new Set([
+      ...marketplacePartnerIdsList.map(p => p.partnerId),
+      ...storefrontPartnerIdsList.map(p => p.partnerId),
+    ]).size;
     const marketplacePartnersCount = Number(marketplacePartners[0]?.cnt || 0);
     const storefrontPartnersCount = Number(storefrontPartners[0]?.cnt || 0);
-    const marketplaceCustomersCount = new Set(marketplaceCustomers.map(c => c.customerId).filter(Boolean)).size;
-    const storefrontCustomersCount = new Set(storefrontCustomers.map(c => c.customerId).filter(Boolean)).size;
+    const marketplaceCustomerIds = new Set(marketplaceCustomers.map(c => c.customerId).filter(Boolean));
+    const storefrontCustomerIds = new Set(storefrontCustomers.map(c => c.customerId).filter(Boolean));
+    const marketplaceCustomersCount = marketplaceCustomerIds.size;
+    const storefrontCustomersCount = storefrontCustomerIds.size;
+    // True unique count (union) — prevents double-counting customers in both channels
+    const totalActiveCustomersCount = new Set([...marketplaceCustomerIds, ...storefrontCustomerIds]).size;
 
     const result: CompanyKpiResponse = {
       period: {
@@ -672,8 +694,10 @@ export class AnalyticsService {
         storefrontSessions: this.compareValues(storefrontSessions, null),
         marketplacePartners: this.compareValues(marketplacePartnersCount, null),
         storefrontPartners: this.compareValues(storefrontPartnersCount, null),
+        totalActivePartners: this.compareValues(totalActivePartnersCount, null),
         marketplaceCustomers: this.compareValues(marketplaceCustomersCount, null),
         storefrontCustomers: this.compareValues(storefrontCustomersCount, null),
+        totalActiveCustomers: this.compareValues(totalActiveCustomersCount, null),
         averageOrderValue: this.compareDecimalValues(aov.total, null),
         // B.2: Refunds as monetary sum (replaces false Net Revenue)
         refunds: this.compareDecimalValues(

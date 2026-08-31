@@ -159,10 +159,15 @@ export class CrmService {
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
 
     // SR-CRM-01: When period is specified, filter to customers with qualifying
-    // activity (orders in period) — matching Analytics 'Active Customers' semantics
+    // activity — matching Analytics 'Active Customers' EXACT semantics:
+    // Analytics counts DISTINCT customerIds from Orders WHERE
+    //   acquisitionSource IN ('MARKETPLACE', 'PARTNER_STOREFRONT')
+    //   AND createdAt ∈ [from, to)
     let activeCustomerIds: string[] | undefined;
     if (query.dateFrom || query.dateTo) {
-      const orderWhere: any = {};
+      const orderWhere: any = {
+        acquisitionSource: { in: ['MARKETPLACE', 'PARTNER_STOREFRONT'] as any },
+      };
       if (query.dateFrom || query.dateTo) {
         orderWhere.createdAt = {
           ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
@@ -585,21 +590,33 @@ export class CrmService {
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
 
     // SR-CRM-02: When period is specified, filter to partners with qualifying
-    // activity (orders as seller in period) — matching Analytics Partner semantics
+    // marketplace presence — matching Analytics 'Partners' EXACT semantics:
+    // Analytics counts:
+    //   marketplacePartners = DISTINCT partnerId FROM Product WHERE
+    //     status='PUBLISHED' AND channel='MARKETPLACE'
+    //   storefrontPartners = DISTINCT partnerId FROM PartnerStorefront WHERE
+    //     entitlementStatus='ACTIVE'
+    // Total = marketplacePartners + storefrontPartners
+    // These are entitlement-based, NOT order-based.
     let activePartnerIds: string[] | undefined;
     if (query.dateFrom || query.dateTo) {
-      const orderWhere: any = {};
-      if (query.dateFrom || query.dateTo) {
-        orderWhere.createdAt = {
-          ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-          ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
-        };
-      }
-      const activeOrders = await this.prisma.order.findMany({
-        where: orderWhere,
-        select: { sellerPartnerId: true },
-      });
-      activePartnerIds = [...new Set(activeOrders.map((o) => o.sellerPartnerId).filter((p): p is string => p !== null))];
+      // Get partners with PUBLISHED marketplace products
+      const marketplacePartnerIds = await this.prisma.$queryRaw<{ partnerId: string }[]>`
+        SELECT DISTINCT p."partnerId"
+        FROM catalog."Product" p
+        INNER JOIN catalog."ProductPublicationChannel" ppc ON ppc."productId" = p.id
+        WHERE p."status" = 'PUBLISHED' AND p."partnerId" IS NOT NULL AND ppc."channel" = 'MARKETPLACE'
+      `;
+      // Get partners with ACTIVE storefronts
+      const storefrontPartnerIds = await this.prisma.$queryRaw<{ partnerId: string }[]>`
+        SELECT DISTINCT "partnerId"
+        FROM catalog."PartnerStorefront"
+        WHERE "entitlementStatus" = 'ACTIVE' AND "partnerId" IS NOT NULL
+      `;
+      activePartnerIds = [...new Set([
+        ...marketplacePartnerIds.map(p => p.partnerId),
+        ...storefrontPartnerIds.map(p => p.partnerId),
+      ])];
       if (activePartnerIds.length === 0) {
         return { items: [], total: 0, page, pageSize };
       }

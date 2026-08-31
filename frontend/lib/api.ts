@@ -416,8 +416,10 @@ export interface CompanyKpiResponse {
     storefrontSessions: ComparisonValue<number>;
     marketplacePartners: ComparisonValue<number>;
     storefrontPartners: ComparisonValue<number>;
+    totalActivePartners: ComparisonValue<number>;
     marketplaceCustomers: ComparisonValue<number>;
     storefrontCustomers: ComparisonValue<number>;
+    totalActiveCustomers: ComparisonValue<number>;
     averageOrderValue: ComparisonValue<string>;
     refunds: ComparisonValue<string>;
     refundsCurrency: string;

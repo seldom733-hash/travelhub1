@@ -292,12 +292,19 @@ export class PaymentService {
 
   // ── Read (Finance Center) ───────────────────────────────────────────────────
 
-  async list(query: { orderId?: string; status?: string; page?: number; pageSize?: number }) {
+  async list(query: { orderId?: string; status?: string; currency?: string; dateFrom?: string; dateTo?: string; page?: number; pageSize?: number }) {
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 50, 100);
     const where: Prisma.PaymentWhereInput = {
       ...(query.orderId ? { orderId: query.orderId } : {}),
       ...(query.status ? { status: query.status as PaymentStatus } : {}),
+      ...(query.currency ? { currency: query.currency } : {}),
+      ...(query.dateFrom || query.dateTo ? {
+        createdAt: {
+          ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+          ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+        },
+      } : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.payment.findMany({

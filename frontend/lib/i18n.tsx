@@ -973,6 +973,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "aggregate.payments": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
   "aggregate.aov": { ru: "Средний чек", az: "Orta çek", en: "Avg. order value" },
   "aggregate.completion_rate": { ru: "Процент исполнения", az: "İcra faizi", en: "Completion rate" },
+  // Finance payments page
+  "finance.payments.title": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
   "admin.search.placeholder_catalog": { ru: "Поиск по названию или коду…", az: "Ad və ya kod ilə axtar…", en: "Search by name or code…" },
   "admin.search.placeholder_orders": { ru: "Поиск: ORD-…, TH-…", az: "Axtar: ORD-…, TH-…", en: "Search: ORD-…, TH-…" },
   "admin.search.placeholder_bookings": { ru: "Поиск: BKG-…, ORD-…", az: "Axtar: BKG-…, ORD-…", en: "Search: BKG-…, ORD-…" },
