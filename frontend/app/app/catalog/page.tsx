@@ -11,7 +11,7 @@ import Pagination from "@/components/Pagination";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import TariffEditor, { newTariffDraft, tariffDraftsFrom, type TariffDraft } from "@/components/TariffEditor";
 import { useCan } from "@/lib/use-can";
-import { useLocale } from "@/lib/i18n";
+import { useLocale, formatPrice } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 
 const PRODUCT_TYPES = [
@@ -524,7 +524,7 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
                     <div key={t.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
                       <span className="font-mono text-xs text-slate-500">{t.code}</span>
                       <span className="font-medium text-slate-700">
-                        {Number(t.price).toFixed(2)} {t.currency}
+                        {formatPrice(t.price, t.currency, locale) ?? "—"}
                       </span>
                     </div>
                   ))}

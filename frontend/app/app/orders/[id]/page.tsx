@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import OperationalNotes from "@/components/OperationalNotes";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 
 interface OrderDetail {
@@ -91,9 +91,9 @@ export default function OrderDetailPage() {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="space-y-4 text-sm">
           <div className="grid grid-cols-3 gap-3 text-xs">
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.total_amount", locale)}</div><div className="font-bold text-slate-700">{order.amount} {order.currency}</div></div>
-            <div className="rounded-lg bg-green-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.paid_amount", locale)}</div><div className="font-medium text-green-700">{order.paidAmount} {order.currency}</div></div>
-            <div className="rounded-lg bg-red-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.refunded_amount", locale)}</div><div className="font-medium text-red-700">{order.refundedAmount} {order.currency}</div></div>
+            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.total_amount", locale)}</div><div className="font-bold text-slate-700">{formatPrice(order.amount, order.currency, locale) ?? "—"}</div></div>
+            <div className="rounded-lg bg-green-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.paid_amount", locale)}</div><div className="font-medium text-green-700">{formatPrice(order.paidAmount, order.currency, locale) ?? "—"}</div></div>
+            <div className="rounded-lg bg-red-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.refunded_amount", locale)}</div><div className="font-medium text-red-700">{formatPrice(order.refundedAmount, order.currency, locale) ?? "—"}</div></div>
           </div>
 
           {order.customerId && (
@@ -123,7 +123,7 @@ export default function OrderDetailPage() {
                   <div key={item.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
                     <div className="flex items-center justify-between">
                       <Link href={`/app/catalog/${item.id}`} className="font-medium text-blue-600 hover:underline">{item.title}</Link>
-                      <span className="text-slate-500">{item.amount} {item.currency}</span>
+                      <span className="text-slate-500">{formatPrice(item.amount, item.currency, locale) ?? "—"}</span>
                     </div>
                     <div className="mt-1 text-slate-400">{item.type} · ×{item.quantity}</div>
                   </div>

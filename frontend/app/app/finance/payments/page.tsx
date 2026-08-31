@@ -17,7 +17,7 @@ import StatusBadge from "@/components/StatusBadge";
 import Pagination from "@/components/Pagination";
 import AggregateSummary from "@/components/AggregateSummary";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 
 
 interface Payment {
@@ -111,11 +111,11 @@ function PaymentsContent({
   const fmt = (v: string, cur?: string) => {
     const n = parseFloat(v);
     if (isNaN(n)) return v;
-    const formatted = n.toLocaleString(
+    if (cur) return formatPrice(n, cur, locale) ?? v;
+    return n.toLocaleString(
       locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US",
       { minimumFractionDigits: 2, maximumFractionDigits: 2 },
     );
-    return cur ? `${formatted} ${cur}` : formatted;
   };
 
   // Compute aggregates over full filtered population (server-side total)

@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import OperationalNotes from "@/components/OperationalNotes";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 
 interface BookingDetail {
@@ -81,7 +81,7 @@ export default function BookingDetailPage() {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="space-y-4 text-sm">
           <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.total_amount", locale)}</div><div className="font-bold text-slate-700">{booking.amount} {booking.currency ?? ""}</div></div>
+            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.total_amount", locale)}</div><div className="font-bold text-slate-700">{formatPrice(booking.amount, booking.currency, locale) ?? "—"}</div></div>
             <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.col.created", locale)}</div><div className="font-medium text-slate-700">{new Date(booking.createdAt).toLocaleDateString()}</div></div>
           </div>
 

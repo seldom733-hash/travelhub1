@@ -16,7 +16,7 @@ import Kpi from "@/components/Kpi";
 
 import Pagination from "@/components/Pagination";
 import { PeriodSelector } from "@/components/command-center/PeriodSelector";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { METRIC_CONFIGS, type PeriodContext, resolveTableCellDrilldown, resolveDrilldownUrl } from "@/lib/metric-drilldown";
 import AggregateSummary from "@/components/AggregateSummary";
 
@@ -92,11 +92,11 @@ function AnalyticsContent() {
     if (v == null) return "\u2014";
     const n = typeof v === "string" ? parseFloat(v) : v;
     if (isNaN(n)) return String(v);
-    const formatted = n.toLocaleString(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US", {
+    if (currency) return formatPrice(n, currency, locale) ?? String(n);
+    return n.toLocaleString(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     });
-    return currency ? `${formatted} ${currency}` : formatted;
   };
 
   const m = kpi?.metrics;

@@ -1971,6 +1971,35 @@ Current V1:    1 Order = 1 Booking; 1 Order = 1..N Payments
 Target future: Cart → Checkout → 1 Order → 1..N Bookings → Consolidated Invoice → 1..N Payments
 ```
 
+## Global Currency Presentation Contract (Phase 3 Pre-Step 3.12 Remediation)
+
+Реализовано и верифицировано (SHA: `8a098c7`).
+
+### Problem
+
+Currency presentation across frontend surfaces was inconsistent:
+- Some pages used `formatPrice` from `i18n.tsx` (correct).
+- Others used raw `{amount} {currency}` or `.toFixed(2)` (incorrect).
+- AZN symbol was not rendering (Intl.NumberFormat lacks AZN support).
+
+### Solution
+
+1. **Shared formatter**: `formatPrice(amount, currency, locale)` in `frontend/lib/i18n.tsx`.
+   - AZN → `₼` (custom symbol mapping).
+   - USD → `$`, EUR → `€`.
+   - Locale-aware number formatting (thousands/decimal separators).
+2. **All frontend surfaces updated**: Orders, Bookings, Payments, CRM, Analytics, Catalog, Partner.
+3. **Unit tests**: 23/23 PASS (`frontend/lib/__tests__/money.spec.ts`).
+
+### Contract
+
+```
+Currency codes:  ISO 4217 (DB/API: "AZN", "USD", "EUR")
+Display symbols: ₼ (AZN), $ (USD), € (EUR)
+Number format:   locale-aware via Intl.NumberFormat
+Zero/null:      render as "—"
+```
+
 ## Reverse Marketplace / Commercial Capabilities (Roadmap Amendment)
 
 Не-negotiable инварианты request-led demand path (полный текст также в

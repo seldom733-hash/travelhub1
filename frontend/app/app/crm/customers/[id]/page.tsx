@@ -9,7 +9,7 @@ import StatusBadge from "@/components/StatusBadge";
 import SortableHeader, { type SortState, type SortDirection } from "@/components/SortableHeader";
 import OperationalNotes from "@/components/OperationalNotes";
 import CustomerActivity from "@/components/CustomerActivity";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 
 type Tab = "overview" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "notes" | "activity";
@@ -207,7 +207,7 @@ export default function Customer360Page() {
                       <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.code}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{o.number}</td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(o.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{o.amount} {o.currency}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(o.amount, o.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
                     </tr>
                   )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{orderStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_orders", locale)}</td></tr>}
@@ -246,7 +246,7 @@ export default function Customer360Page() {
                     <tr key={b.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.code}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(b.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{b.amount} {b.currency}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(b.amount, b.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
                     </tr>
                   )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{bookingStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_bookings", locale)}</td></tr>}
@@ -289,7 +289,7 @@ export default function Customer360Page() {
                         ) : "—"}
                         {p.orderNumber && <span className="ml-1 text-slate-400">({p.orderNumber})</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{p.amount} {p.currency}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(p.amount, p.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5 text-slate-500">{p.paymentMethod ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
                     </tr>
@@ -318,7 +318,7 @@ export default function Customer360Page() {
                       <td className="px-4 py-2.5"><Link href={`/app/crm/partners/${p.partnerId}`} className="font-medium text-blue-600 hover:underline">{p.partnerName}</Link></td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{p.orderCount}</td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{p.totalBookings}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{p.totalAmount.toFixed(2)} {p.currency}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(p.totalAmount, p.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5">{p.partnerStatus ? <StatusBadge status={p.partnerStatus} /> : "—"}</td>
                     </tr>
                   )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{t("crm.detail.no_partners", locale)}</td></tr>}
@@ -361,7 +361,7 @@ export default function Customer360Page() {
                         ) : "—"}
                         {r.orderNumber && <span className="ml-1 text-slate-400">({r.orderNumber})</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{r.amount} {r.currency}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(r.amount, r.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={r.status} /></td>
                     </tr>
                   )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">{refundStatusFilter ? t("crm.filter.status.none", locale) : t("crm.detail.no_refunds", locale)}</td></tr>}

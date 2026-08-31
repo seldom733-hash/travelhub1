@@ -1584,6 +1584,27 @@ export function t(key: string, locale: Locale): string {
  * Форматирование цены. amount <= 0 / null → null («Цена по запросу» на уровне UI).
  * Валюта НЕ локализуется (код валюты — технический), локализуется формат числа.
  */
+/**
+ * Canonical currency symbol mapping (Global Currency Presentation Contract).
+ * AZN is not widely supported in Intl.NumberFormat, so we map it explicitly.
+ */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  AZN: "₼",
+  USD: "$",
+  EUR: "€",
+};
+
+/**
+ * Format a monetary amount with locale-aware number formatting and
+ * canonical currency symbol.
+ *
+ * Contract:
+ *  - AZN → ₼
+ *  - USD → $
+ *  - EUR → €
+ *  - DB/API remain ISO codes (USD, AZN, EUR)
+ *  - locale-aware number formatting (thousands/decimal separators)
+ */
 export function formatPrice(
   amount: string | number | null | undefined,
   currency: string | null | undefined,
@@ -1592,9 +1613,20 @@ export function formatPrice(
   if (amount === null || amount === undefined || amount === "") return null;
   const n = Number(amount);
   if (Number.isNaN(n) || n <= 0) return null;
+  const cur = (currency ?? "USD").toUpperCase();
+  const symbol = CURRENCY_SYMBOLS[cur];
+  if (symbol) {
+    // Use custom symbol with locale-aware number formatting
+    const formatted = new Intl.NumberFormat(LOCALE_TAGS[locale], {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n);
+    return `${formatted} ${symbol}`;
+  }
+  // Fallback: use Intl.NumberFormat with ISO code
   return new Intl.NumberFormat(LOCALE_TAGS[locale], {
     style: "currency",
-    currency: (currency ?? "USD").toUpperCase(),
+    currency: cur,
     maximumFractionDigits: 2,
   }).format(n);
 }

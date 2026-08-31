@@ -11,7 +11,7 @@ import { useCan } from "@/lib/use-can";
 import ActionButtons from "@/components/ActionButtons";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import AggregateSummary from "@/components/AggregateSummary";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 
 
 const ACTIONS = [
@@ -290,7 +290,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-500">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
                       <td className="px-4 py-2.5 font-medium text-slate-800 text-center">
-                        {Number(o.amount).toFixed(2)} {o.currency}
+                        {formatPrice(o.amount, o.currency, locale) ?? "—"}
                       </td>
                       <td className="px-4 py-2.5 text-slate-500">{o.items?.length ?? 0}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
@@ -351,9 +351,9 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                     </div>
                     <div className="text-right">
                       <div className="font-medium text-slate-700">
-                        {i.quantity} × {Number(i.price).toFixed(2)}
+                        {i.quantity} × {formatPrice(i.price, selected?.currency, locale) ?? "—"}
                       </div>
-                      <div className="text-xs text-slate-400">{Number(i.amount).toFixed(2)}</div>
+                      <div className="text-xs text-slate-400">{formatPrice(i.amount, selected?.currency, locale) ?? "—"}</div>
                     </div>
                   </div>
                 ))}

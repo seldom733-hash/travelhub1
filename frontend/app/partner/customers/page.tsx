@@ -6,7 +6,7 @@ import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
 import StatusBadge from "@/components/StatusBadge";
 import PanelFrame from "@/components/PanelFrame";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { pt } from "@/lib/partner-i18n";
 import { useCurrentUser } from "@/lib/use-user";
 
@@ -462,7 +462,7 @@ export default function PartnerCustomersPage() {
                           <span className="font-mono text-emerald-600">{o.code}</span>
                           <StatusBadge status={o.status} />
                         </div>
-                        <div className="mt-1 text-slate-500">{o.number} · {o.amount} {o.currency}</div>
+                        <div className="mt-1 text-slate-500">{o.number} · {formatPrice(o.amount, o.currency, locale) ?? "—"}</div>
                       </div>
                     ))
                   )}
@@ -481,7 +481,7 @@ export default function PartnerCustomersPage() {
                           <span className="font-mono text-emerald-600">{b.code}</span>
                           <StatusBadge status={b.status} />
                         </div>
-                        <div className="mt-1 text-slate-500">{b.amount} {b.currency}</div>
+                        <div className="mt-1 text-slate-500">{formatPrice(b.amount, b.currency, locale) ?? "—"}</div>
                       </div>
                     ))
                   )}
@@ -500,7 +500,7 @@ export default function PartnerCustomersPage() {
                           <span className="font-mono text-emerald-600">{p.code}</span>
                           <StatusBadge status={p.status} />
                         </div>
-                        <div className="mt-1 text-slate-500">{p.amount} {p.currency}</div>
+                        <div className="mt-1 text-slate-500">{formatPrice(p.amount, p.currency, locale) ?? "—"}</div>
                       </div>
                     ))
                   )}

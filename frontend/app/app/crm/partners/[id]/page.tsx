@@ -10,7 +10,7 @@ import SortableHeader, { type SortState, type SortDirection } from "@/components
 import OperationalNotes from "@/components/OperationalNotes";
 import PartnerActivity from "@/components/PartnerActivity";
 import AggregateSummary from "@/components/AggregateSummary";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 import { useCan } from "@/lib/use-can";
 
@@ -336,7 +336,7 @@ export default function Partner360Page() {
                     <tr key={o.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.code}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(o.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{o.amount} {o.currency}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(o.amount, o.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
                     </tr>
                   )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{orderStatusFilter ? t("crm.filter.status.none", locale) : t("crm.partner_detail.no_orders", locale)}</td></tr>}
@@ -383,7 +383,7 @@ export default function Partner360Page() {
                     <tr key={b.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                       <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.code}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(b.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{b.amount} {b.currency}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(b.amount, b.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
                     </tr>
                   )) : <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{bookingStatusFilter ? t("crm.filter.status.none", locale) : t("crm.partner_detail.no_bookings", locale)}</td></tr>}
@@ -435,7 +435,7 @@ export default function Partner360Page() {
                       <td className="px-4 py-2.5"><Link href={`/app/crm/customers/${c.customerId}`} className="font-medium text-blue-600 hover:underline">{c.companyName ?? `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim()}</Link></td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{c.orderCount}</td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{c.bookingCount}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{c.totalAmount.toFixed(2)} {c.currency}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(c.totalAmount, c.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5 text-slate-500">{c.lastActivity ? new Date(c.lastActivity).toLocaleDateString() : "—"}</td>
                       <td className="px-4 py-2.5">{c.customerStatus ? <StatusBadge status={c.customerStatus} /> : "—"}</td>
                     </tr>

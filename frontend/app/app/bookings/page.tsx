@@ -11,7 +11,7 @@ import { useCan } from "@/lib/use-can";
 import ActionButtons from "@/components/ActionButtons";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import AggregateSummary from "@/components/AggregateSummary";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 
 
 const ACTIONS = [
@@ -252,7 +252,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
                     <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{b.code}</td>
                     <td className="px-4 py-2.5 text-xs text-slate-500">{b.createdAt ? new Date(b.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{b.orderId.slice(0, 8)}…</td>
-                    <td className="px-4 py-2.5 font-medium text-slate-800 text-center">{Number(b.amount).toFixed(2)}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-800 text-center">{formatPrice(b.amount, b.currency, locale) ?? "—"}</td>
                     <td className="px-4 py-2.5 text-slate-500">{b.passengers?.length ?? 0}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
                     {(upcomingOnly || overdueOnly) && <td className="px-4 py-2.5 text-xs text-slate-600">{b.serviceDate ? new Date(b.serviceDate).toLocaleDateString("ru-RU") : "—"}</td>}

@@ -306,6 +306,7 @@ export interface Booking {
   productId: string;
   status: string;
   amount: string;
+  currency?: string;
   serviceDate: string | null;
   version: number;
   createdAt: string;

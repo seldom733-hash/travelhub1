@@ -12,7 +12,7 @@ import SortableHeader, { type SortState, type SortDirection } from "@/components
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCan } from "@/lib/use-can";
 import { useCurrentUser } from "@/lib/use-user";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 
 import CrmAnalytics from "@/components/CrmAnalytics";
 import AggregateSummary from "@/components/AggregateSummary";
@@ -713,7 +713,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                 {selectedPartnerCustomer.orders.map((o) => (
                   <div key={o.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
                     <div className="flex items-center justify-between"><span className="font-mono text-blue-600">{o.code}</span><StatusBadge status={o.status} /></div>
-                    <div className="mt-1 text-slate-500">{o.number} · {o.amount} {o.currency}</div>
+                    <div className="mt-1 text-slate-500">{o.number} · {formatPrice(o.amount, o.currency, locale) ?? "—"}</div>
                   </div>
                 ))}
               </div>
@@ -722,7 +722,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                 {selectedPartnerCustomer.bookings.map((b) => (
                   <div key={b.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
                     <div className="flex items-center justify-between"><span className="font-mono text-blue-600">{b.code}</span><StatusBadge status={b.status} /></div>
-                    <div className="mt-1 text-slate-500">{b.amount} {b.currency}</div>
+                    <div className="mt-1 text-slate-500">{formatPrice(b.amount, b.currency, locale) ?? "—"}</div>
                   </div>
                 ))}
               </div>
@@ -731,7 +731,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                 {selectedPartnerCustomer.payments.map((p) => (
                   <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs">
                     <div className="flex items-center justify-between"><span className="font-mono text-blue-600">{p.code}</span><StatusBadge status={p.status} /></div>
-                    <div className="mt-1 text-slate-500">{p.amount} {p.currency}</div>
+                    <div className="mt-1 text-slate-500">{formatPrice(p.amount, p.currency, locale) ?? "—"}</div>
                   </div>
                 ))}
               </div>

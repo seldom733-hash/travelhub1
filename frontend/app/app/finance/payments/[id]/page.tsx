@@ -13,7 +13,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 
 interface PaymentDetail {
   id: string;
@@ -71,11 +71,11 @@ export default function PaymentDetailPage() {
   const fmt = (v: string, cur?: string) => {
     const n = parseFloat(v);
     if (isNaN(n)) return v;
-    const formatted = n.toLocaleString(
+    if (cur) return formatPrice(n, cur, locale) ?? v;
+    return n.toLocaleString(
       locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US",
       { minimumFractionDigits: 2, maximumFractionDigits: 2 },
     );
-    return cur ? `${formatted} ${cur}` : formatted;
   };
 
   const fmtDate = (iso: string | null) =>
