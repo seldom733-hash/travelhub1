@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, auth } from "@/lib/api";
 import { useCurrentUser } from "@/lib/use-user";
 import { homeForRole, isExternalRole } from "@/lib/routes";
@@ -47,15 +47,47 @@ const canAccess = (user: { permissions: string[] } | null, permission?: string) 
 const isDashboardPath = (href: string, pathname: string) =>
   href === "/app/dashboard" ? pathname === "/app" || pathname === "/app/dashboard" : pathname.startsWith(href);
 
+/** localStorage key for sidebar collapsed state. */
+const SIDEBAR_COLLAPSED_KEY = "th_sidebar_collapsed";
+
+function readCollapsedDefault(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const v = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    return v === "true";
+  } catch {
+    return false;
+  }
+}
+
 export default function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const user = useCurrentUser();
   const locale = useLocale();
   const [mounted, setMounted] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const collapsedRef = useRef(false);
 
+  // Hydrate collapsed state from localStorage after mount.
   useEffect(() => {
+    setCollapsed(readCollapsedDefault());
     setMounted(true);
+  }, []);
+
+  // Sync ref for animations / effects.
+  useEffect(() => {
+    collapsedRef.current = collapsed;
+  }, [collapsed]);
+
+  const toggleCollapse = useCallback(() => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+      } catch { /* noop */ }
+      return next;
+    });
   }, []);
 
   // Auth boundary: anonymous /app/* перехватывается proxy.ts (server-side,
@@ -66,8 +98,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   // Step 1.6 §11 + Step 1.8 + Step 1.13: внешние роли НЕ получают employee Work
   // Centers. PARTNER → /partner (Partner Cabinet), BUYER → /account (Buyer Cabinet).
-  // pathname в deps: редирект повторяется, если другой эффект успел перевести
-  // на /app/* до срабатывания этой проверки (race двух router.replace).
   useEffect(() => {
     if (!mounted || !user) return;
     if (isExternalRole(user.role)) {
@@ -78,7 +108,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   // Редирект с маршрута, на который у пользователя нет права.
   useEffect(() => {
     if (!mounted || !user) return;
-    // Внешние роли никогда не перенаправляются на /app/* (в т.ч. при нехватке прав).
     if (isExternalRole(user.role)) {
       router.replace(homeForRole(user.role));
       return;
@@ -90,10 +119,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   }, [mounted, pathname, user, router]);
 
   // До монтирования рендерим одинаковый заглушечный DOM (SSR = client, без hydration mismatch).
-  // Children НЕ рендерятся, пока user не разрешён: (a) без токена — boundary → /login;
-  // (b) внешние роли (PARTNER/BUYER) никогда не получают внутренние Work Centers —
-  // рендер детей блокирован до редиректа (review: исключает вспышку внутреннего UI
-  // и лишние internal API-запросы от внешней роли). BUYER → /account (Step 1.13).
   if (!mounted || !user || isExternalRole(user.role)) {
     return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">{t("state.loading", locale)}</div>;
   }
@@ -107,64 +132,122 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     router.replace("/login");
   };
 
+  const sidebarWidth = collapsed ? "w-[72px]" : "w-60";
+
   return (
     <div className="flex min-h-screen">
       {/* ── Sidebar ── */}
-      <aside className="thin-scroll sticky top-0 flex h-screen w-60 shrink-0 flex-col overflow-y-auto bg-slate-900 text-slate-200">
-        <Link href="/app/dashboard" className="flex items-center gap-2.5 border-b border-white/10 px-5 py-4">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white">T</div>
-          <div>
-            <div className="text-base font-bold text-white">
-              Travel<span className="text-blue-400">Hub</span>
+      <aside
+        className={`thin-scroll sticky top-0 flex h-screen shrink-0 flex-col overflow-y-auto bg-slate-900 text-slate-200 transition-all duration-200 ${sidebarWidth}`}
+      >
+        {/* Logo / Brand */}
+        <Link
+          href="/app/dashboard"
+          className={`flex items-center gap-2.5 border-b border-white/10 ${collapsed ? "justify-center px-2 py-4" : "px-5 py-4"}`}
+        >
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-base font-bold text-white">T</div>
+          {!collapsed && (
+            <div>
+              <div className="text-base font-bold text-white">
+                Travel<span className="text-blue-400">Hub</span>
+              </div>
+              <div className="text-[10px] text-slate-400">Internal App</div>
             </div>
-            <div className="text-[10px] text-slate-400">Internal App</div>
-          </div>
+          )}
         </Link>
+
+        {/* Toggle button */}
+        <button
+          onClick={toggleCollapse}
+          className="mx-2 mt-2 flex items-center justify-center rounded-lg py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? t("sidebar.expand", locale) : t("sidebar.collapse", locale)}
+          title={collapsed ? t("sidebar.expand", locale) : t("sidebar.collapse", locale)}
+        >
+          {collapsed ? "»" : "«"}
+        </button>
+
+        {/* Navigation */}
         <nav className="flex-1 py-3">
           {visibleNav.map((item) => {
             const active = isDashboardPath(item.href, pathname);
+            const label = t(item.labelKey, locale);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-5 py-2.5 text-sm transition-colors ${
+                className={`group relative flex items-center gap-3 px-5 py-2.5 text-sm transition-colors ${
+                  collapsed ? "justify-center px-2" : "px-5"
+                } ${
                   active
                     ? "border-r-2 border-blue-400 bg-blue-500/15 font-medium text-white"
                     : "text-slate-400 hover:bg-white/5 hover:text-white"
                 }`}
+                title={label}
+                aria-label={label}
               >
-                <span className="w-5 text-center text-base">{item.icon}</span>
-                {t(item.labelKey, locale)}
+                <span className="w-5 shrink-0 text-center text-base">{item.icon}</span>
+                {!collapsed && <span className="truncate">{label}</span>}
+                {/* Tooltip in collapsed mode */}
+                {collapsed && (
+                  <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                    {label}
+                  </span>
+                )}
               </Link>
             );
           })}
-          {hiddenCount > 0 && (
+          {!collapsed && hiddenCount > 0 && (
             <div className="mt-3 px-5 text-[10px] leading-relaxed text-slate-600">
-              {hiddenCount} раздел(ов) скрыто — нет прав доступа
+              {t("workspace.hidden_count", locale).replace("{n}", String(hiddenCount))}
             </div>
           )}
         </nav>
-        <div className="border-t border-white/10 px-5 py-4">
+
+        {/* User / Account area */}
+        <div className={`border-t border-white/10 ${collapsed ? "px-2 py-3" : "px-5 py-4"}`}>
           {user && (
-            <div className="mb-3">
-              <div className="truncate text-sm font-medium text-white">{user.fullName ?? user.username}</div>
-              <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-300">
-                {user.role}
-              </div>
+            <div className={collapsed ? "text-center" : "mb-3"}>
+              {collapsed ? (
+                <span className="inline-flex size-8 items-center justify-center rounded-full bg-blue-500/20 text-xs font-bold text-blue-300" title={user.fullName ?? user.username}>
+                  {(user.fullName ?? user.username).charAt(0).toUpperCase()}
+                </span>
+              ) : (
+                <>
+                  <div className="truncate text-sm font-medium text-white">{user.fullName ?? user.username}</div>
+                  <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-300">
+                    {user.role}
+                  </div>
+                </>
+              )}
             </div>
           )}
-          <Link
-            href="/"
-            className="mb-2 block w-full rounded-lg border border-white/10 px-3 py-1.5 text-center text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
-          >
-            {t("nav.to_marketplace", locale)} →
-          </Link>
-          <button
-            onClick={logout}
-            className="w-full rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
-          >
-            {t("nav.logout", locale)}
-          </button>
+          {!collapsed && (
+            <>
+              <Link
+                href="/"
+                className="mb-2 block w-full rounded-lg border border-white/10 px-3 py-1.5 text-center text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+              >
+                {t("nav.to_marketplace", locale)} →
+              </Link>
+              <button
+                onClick={logout}
+                className="w-full rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+              >
+                {t("nav.logout", locale)}
+              </button>
+            </>
+          )}
+          {collapsed && (
+            <button
+              onClick={logout}
+              className="mt-2 flex w-full items-center justify-center rounded-lg border border-white/10 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+              title={t("nav.logout", locale)}
+              aria-label={t("nav.logout", locale)}
+            >
+              🚪
+            </button>
+          )}
         </div>
       </aside>
 
