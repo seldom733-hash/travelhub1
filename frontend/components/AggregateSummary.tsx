@@ -16,7 +16,7 @@
  *   PAGINATION
  */
 
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 
 export interface AggregateField {
   /** i18n key or raw label */
@@ -63,11 +63,13 @@ export default function AggregateSummary({
   const fmt = (v: number | string, isMoney?: boolean, currency?: string) => {
     const n = typeof v === "string" ? parseFloat(v) : v;
     if (isNaN(n)) return String(v);
-    const formatted = n.toLocaleString(
+    if (isMoney && currency) {
+      return formatPrice(n, currency, locale) ?? String(n);
+    }
+    return n.toLocaleString(
       locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US",
-      { minimumFractionDigits: isMoney ? 2 : 0, maximumFractionDigits: isMoney ? 2 : 0 },
+      { minimumFractionDigits: 0, maximumFractionDigits: 0 },
     );
-    return currency ? `${formatted} ${currency}` : formatted;
   };
 
   if (loading) {

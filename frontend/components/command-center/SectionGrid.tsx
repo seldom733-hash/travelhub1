@@ -2,7 +2,7 @@
 
 import { type CommandCenterSummary, type DashboardSection, type PeriodPreset, SUPPORTED_TREND_METRICS } from "@/lib/dashboard-api";
 import { type WidgetDefinition, type WidgetPosition } from "@/lib/workspace-api";
-import { t, type Locale } from "@/lib/i18n";
+import { t, formatPrice, type Locale } from "@/lib/i18n";
 import { KpiCard } from "./KpiCard";
 import { TrendWidget } from "./TrendWidget";
 import { DecisionQueue } from "./DecisionQueue";
@@ -194,6 +194,7 @@ export function SectionGrid({
             value={val as import("@/lib/dashboard-api").KpiValue}
             format={mapping.format as "currency" | "percent" | undefined}
             subtitle={subtitle}
+            locale={locale}
           />
         );
       });
@@ -379,8 +380,11 @@ function V3Section({ id, data, positions, locale = "ru" }: { id: string; data: R
               />
             );
           }
-          // Fallback for unmapped entries
-          const displayValue = v.currency ? `${v.current} ${v.currency}` : String(v.current ?? "—");
+          // Fallback for unmapped entries — use shared formatPrice
+          const numericVal = typeof v.current === "number" ? v.current : v.current != null ? Number(v.current) : null;
+          const displayValue = v.currency && numericVal != null && !Number.isNaN(numericVal)
+            ? (formatPrice(numericVal, v.currency, locale) ?? String(v.current ?? "—"))
+            : String(v.current ?? "—");
           return (
             <div key={key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>

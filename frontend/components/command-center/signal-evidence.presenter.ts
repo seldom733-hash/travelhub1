@@ -46,13 +46,13 @@ function formatDuration(minutes: number, locale: Locale): string {
   return `${d}${locale === "ru" ? " дн" : locale === "az" ? " gün" : "d"}${hPart}`;
 }
 
-/** Format monetary value with AZN symbol */
+import { formatPrice } from "@/lib/i18n";
+
+/** Format monetary value using shared formatPrice */
 function formatMoney(amount: number, locale: Locale): string {
-  const formatted = new Intl.NumberFormat(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US", {
-    style: "decimal",
-    maximumFractionDigits: 0,
-  }).format(amount);
-  return `${formatted} ₼`;
+  // Backend reports in AZN for command center KPIs
+  const result = formatPrice(amount, "AZN", locale);
+  return result ?? `${amount} ₼`;
 }
 
 /** Compact array display: first N items + "...and X more" */

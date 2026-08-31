@@ -23,13 +23,13 @@ export function FinancialSection({ data, positions, locale = "ru" }: Props) {
       </h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {isVisible(positions, "commission") && (
-          <KpiCard title={t("cc.kpi.commission", locale)} value={data.commissionAccrued} format="currency" />
+          <KpiCard title={t("cc.kpi.commission", locale)} value={data.commissionAccrued} format="currency" locale={locale} />
         )}
         {isVisible(positions, "payments") && (
-          <KpiCard title={t("cc.kpi.payments", locale)} value={data.totalPayments} format="currency" />
+          <KpiCard title={t("cc.kpi.payments", locale)} value={data.totalPayments} format="currency" locale={locale} />
         )}
         {isVisible(positions, "net-payments") && (
-          <KpiCard title={t("cc.kpi.netPayments", locale)} value={data.netPayments} format="currency" />
+          <KpiCard title={t("cc.kpi.netPayments", locale)} value={data.netPayments} format="currency" locale={locale} />
         )}
         {isVisible(positions, "reconciliation") && (
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

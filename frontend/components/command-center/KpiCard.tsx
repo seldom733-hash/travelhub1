@@ -1,6 +1,8 @@
 "use client";
 
 import { type KpiValue } from "@/lib/dashboard-api";
+import { formatPrice } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
 
 interface Props {
   title: string;
@@ -11,46 +13,33 @@ interface Props {
   positiveIsUp?: boolean;
   /** Optional subtitle/tooltip explaining the metric semantics. */
   subtitle?: string;
+  /** Locale for currency formatting. */
+  locale?: Locale;
 }
 
-/** Currency symbol map — Intl.NumberFormat lacks ₼ for AZN in Chromium. */
-const CURRENCY_SYMBOL: Record<string, string> = { AZN: "\u20bc", USD: "$", EUR: "\u20ac" };
-
-function formatValue(v: number | null, format: string, currency: string): string {
+function formatValue(v: number | null, format: string, currency: string, locale: Locale): string {
   if (v === null || v === undefined) return "—";
   if (format === "currency") {
-    // B.2 Remediation: PLATFORM REPORTING CURRENCY = AZN
-    // Intl.NumberFormat returns "AZN" instead of "₼" — use explicit symbol
-    const sym = CURRENCY_SYMBOL[currency];
-    if (sym) {
-      return new Intl.NumberFormat("ru-RU", {
-        style: "decimal",
-        maximumFractionDigits: 0,
-      }).format(v) + " " + sym;
-    }
-    return new Intl.NumberFormat("ru-RU", {
-      style: "currency",
-      currency: currency || "AZN",
-      maximumFractionDigits: 0,
-    }).format(v);
+    // Use shared formatPrice for consistent currency presentation
+    const result = formatPrice(v, currency, locale);
+    return result ?? "—";
   }
   if (format === "percent") {
-    return new Intl.NumberFormat("ru-RU", {
+    return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US", {
       style: "percent",
       minimumFractionDigits: 1,
       maximumFractionDigits: 1,
     }).format(v / 100);
   }
-  return new Intl.NumberFormat("ru-RU").format(v);
+  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US").format(v);
 }
 
-export function KpiCard({ title, value, format = "number", currency = "AZN", positiveIsUp = true, subtitle }: Props) {
+export function KpiCard({ title, value, format = "number", currency = "AZN", positiveIsUp = true, subtitle, locale = "ru" }: Props) {
   // B.2: prefer currency from KpiValue (backend-reported) over prop default
-  // B.2 Remediation: PLATFORM REPORTING CURRENCY = AZN
   const effectiveCurrency = value.currency || currency;
   // Use displayCurrent for reconciled integer presentation when available
   const displayValue = value.displayCurrent ?? value.current;
-  const formatted = formatValue(displayValue, format, effectiveCurrency);
+  const formatted = formatValue(displayValue, format, effectiveCurrency, locale);
   const hasDelta = value.deltaPercent !== null && value.deltaPercent !== undefined;
 
   // Determine polarity

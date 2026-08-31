@@ -1997,8 +1997,18 @@ Currency presentation across frontend surfaces was inconsistent:
 Currency codes:  ISO 4217 (DB/API: "AZN", "USD", "EUR")
 Display symbols: ₼ (AZN), $ (USD), € (EUR)
 Number format:   locale-aware via Intl.NumberFormat
-Zero/null:      render as "—"
+Zero:            visible monetary zero ("0 ₼", "0 $", "0 €") — NOT "—"
+Null/undefined:  render as "—"
 ```
+
+### Round 2 Fixes (SHA: pending)
+- Zero semantics: `formatPrice(0, ...) → "0 ₼"` (was incorrectly returning null).
+- Command Center: KpiCard, SectionGrid, FinancialSection now use shared `formatPrice`.
+- signal-evidence.presenter: `formatMoney` now delegates to shared `formatPrice`.
+- AggregateSummary: raw `${formatted} ${currency}` replaced with `formatPrice`.
+- Price.tsx: 0 renders as monetary zero, not "по запросу".
+- Unit tests: 35/35 PASS (was 23).
+- Note: browser login blocked by pre-existing DB schema drift (no `username` column).
 
 ## Reverse Marketplace / Commercial Capabilities (Roadmap Amendment)
 

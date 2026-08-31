@@ -1612,7 +1612,8 @@ export function formatPrice(
 ): string | null {
   if (amount === null || amount === undefined || amount === "") return null;
   const n = Number(amount);
-  if (Number.isNaN(n) || n <= 0) return null;
+  if (Number.isNaN(n) || n < 0) return null;
+  // Note: 0 is a valid monetary value (e.g., "К оплате: 0 ₼") and renders as visible zero.
   const cur = (currency ?? "USD").toUpperCase();
   const symbol = CURRENCY_SYMBOLS[cur];
   if (symbol) {
