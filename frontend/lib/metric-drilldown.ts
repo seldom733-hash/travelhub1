@@ -221,14 +221,16 @@ export const METRIC_CONFIGS = {
     destinationType: "DOMAIN_ROUTE" as DestinationType,
     destination: "/app/finance/payments",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
-    label: "Кол-во платежей",
+    statusFilter: ["CAPTURED"],
+    label: "Успешные платежи",
   },
   "analytics.finance.payments": {
     metricId: "analytics.finance.payments",
     destinationType: "DOMAIN_ROUTE" as DestinationType,
     destination: "/app/finance/payments",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
-    label: "Платежи",
+    statusFilter: ["CAPTURED"],
+    label: "Успешные платежи",
   },
   "analytics.finance.refunds": {
     metricId: "analytics.finance.refunds",

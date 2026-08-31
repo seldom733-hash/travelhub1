@@ -975,6 +975,23 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "aggregate.completion_rate": { ru: "Процент исполнения", az: "İcra faizi", en: "Completion rate" },
   // Finance payments page
   "finance.payments.title": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
+  "finance.payments.empty": { ru: "Платежей пока нет", az: "Hələ ödəniş yoxdur", en: "No payments yet" },
+  "finance.filter.all_currencies": { ru: "Все валюты", az: "Bütün valyutalar", en: "All currencies" },
+  "finance.filter.all_statuses": { ru: "Все статусы", az: "Bütün statuslar", en: "All statuses" },
+  "finance.filter.clear_status": { ru: "Статус", az: "Status", en: "Status" },
+  "finance.status.captured": { ru: "Зачислен", az: "Kapitallaşdırılıb", en: "Captured" },
+  "finance.status.pending": { ru: "Ожидает", az: "Gözləyir", en: "Pending" },
+  "finance.status.failed": { ru: "Ошибка", az: "Xəta", en: "Failed" },
+  "finance.status.cancelled": { ru: "Отменён", az: "Ləğv edilib", en: "Cancelled" },
+  "finance.col.code": { ru: "Код", az: "Kod", en: "Code" },
+  "finance.col.date": { ru: "Дата", az: "Tarix", en: "Date" },
+  "finance.col.order": { ru: "Заказ", az: "Sifariş", en: "Order" },
+  "finance.col.amount": { ru: "Сумма", az: "Məbləğ", en: "Amount" },
+  "finance.col.currency": { ru: "Валюта", az: "Valyuta", en: "Currency" },
+  "finance.col.status": { ru: "Статус", az: "Status", en: "Status" },
+  "finance.col.method": { ru: "Метод", az: "Metod", en: "Method" },
+  "finance.aggregate.amount": { ru: "Сумма", az: "Məbləğ", en: "Amount" },
+  "finance.aggregate.payments": { ru: "Платежей", az: "Ödənişlər", en: "Payments" },
   // Entitled partners context
   "crm.context.entitled_partners": { ru: "Активные партнёры (marketplace)", az: "Aktiv partnyorlar (marketpleys)", en: "Active partners (marketplace)" },
   "admin.search.placeholder_catalog": { ru: "Поиск по названию или коду…", az: "Ad və ya kod ilə axtar…", en: "Search by name or code…" },
@@ -1304,7 +1321,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "partner360.orders_total": { ru: "Всего заказов", az: "Ümumi sifarişlər", en: "Total orders" },
   "partner360.bookings_total": { ru: "Всего бронирований", az: "Ümumi bronlar", en: "Total bookings" },
   // Financial Summary payment count
-  "analytics.finance.payment_count": { ru: "Платежей", az: "Ödənişlər", en: "Payments #" },
+  "analytics.finance.payment_count": { ru: "Успешные платежи", az: "Uğurlu ödənişlər", en: "Successful payments" },
 
   // ── Marketing Center ──
   "marketing.title": { ru: "Маркетинг", az: "Marketinq", en: "Marketing" },

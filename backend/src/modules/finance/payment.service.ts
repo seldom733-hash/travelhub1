@@ -292,7 +292,7 @@ export class PaymentService {
 
   // ── Read (Finance Center) ───────────────────────────────────────────────────
 
-  async list(query: { orderId?: string; status?: string; currency?: string; dateFrom?: string; dateTo?: string; page?: number; pageSize?: number }) {
+  async list(query: { orderId?: string; status?: string; currency?: string; dateFrom?: string; dateTo?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number }) {
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 50, 100);
     const where: Prisma.PaymentWhereInput = {
@@ -306,10 +306,27 @@ export class PaymentService {
         },
       } : {}),
     };
+
+    // Server-side sorting with deterministic tie-breaker on id
+    const sortField = query.sortBy || 'createdAt';
+    const sortDir = query.sortDirection === 'asc' ? 'asc' : 'desc';
+    const sortMap: Record<string, string> = {
+      createdAt: 'createdAt',
+      amount: 'amount',
+      currency: 'currency',
+      status: 'status',
+      code: 'code',
+    };
+    const field = sortMap[sortField] || 'createdAt';
+    const orderBy = [
+      { [field]: sortDir as Prisma.SortOrder },
+      { id: 'asc' as Prisma.SortOrder },  // deterministic tie-breaker
+    ];
+
     const [items, total] = await Promise.all([
       this.prisma.payment.findMany({
         where,
-        orderBy: [{ createdAt: "desc" }, { code: "asc" }],
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

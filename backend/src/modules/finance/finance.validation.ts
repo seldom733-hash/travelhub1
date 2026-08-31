@@ -523,6 +523,16 @@ export class PaymentListQueryDto {
   dateTo?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  sortDirection?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * RR-FIN-01 — Payment Drill-down from Financial Summary
+ * Financial Summary → Payments drill-down registry
  *
- * Minimal dedicated Payment registry page for Analytics → Financial Summary drill-down.
- * Uses canonical Payment query/service (GET /finance/payments) with currency/dateFrom/dateTo filters.
+ * Canonical formula: revenueWhere = { status: "CAPTURED", paidAt ∈ [from, to) }
+ * Drill-down passes: from, to, preset, currency, status=CAPTURED
+ * User can clear status filter to see full payment journal.
  */
 
 import { Suspense, useCallback, useEffect, useState } from "react";
@@ -15,6 +16,7 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Pagination from "@/components/Pagination";
 import AggregateSummary from "@/components/AggregateSummary";
+import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import { useLocale, t } from "@/lib/i18n";
 
 interface Payment {
@@ -32,16 +34,27 @@ interface Payment {
   createdAt: string;
 }
 
+const STATUS_LABELS: Record<string, { ru: string; az: string; en: string }> = {
+  CAPTURED: { ru: "Зачислен", az: "Kapitallaşdırılıb", en: "Captured" },
+  PENDING: { ru: "Ожидает", az: "Gözləyir", en: "Pending" },
+  FAILED: { ru: "Ошибка", az: "Xəta", en: "Failed" },
+  CANCELLED: { ru: "Отменён", az: "Ləğv edilib", en: "Cancelled" },
+};
+
 function PaymentsContent({
   initialCurrency,
   initialDateFrom,
   initialDateTo,
   initialStatus,
+  initialSortBy,
+  initialSortDirection,
 }: {
   initialCurrency?: string;
   initialDateFrom?: string;
   initialDateTo?: string;
   initialStatus?: string;
+  initialSortBy?: string;
+  initialSortDirection?: SortDirection;
 }) {
   const locale = useLocale();
   const [data, setData] = useState<Page<Payment> | null>(null);
@@ -52,6 +65,23 @@ function PaymentsContent({
   const [dateFrom, setDateFrom] = useState(initialDateFrom ?? "");
   const [dateTo, setDateTo] = useState(initialDateTo ?? "");
   const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
+  const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
+  const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
+
+  const updateUrl = (params: Record<string, string>) => {
+    const sp = new URLSearchParams(window.location.search);
+    for (const [k, v] of Object.entries(params)) {
+      if (v) sp.set(k, v); else sp.delete(k);
+    }
+    window.history.replaceState(null, "", `?${sp.toString()}`);
+  };
+
+  const handleSort = (field: string, direction: SortDirection) => {
+    setSortBy(field);
+    setSortDirection(direction);
+    setPage(1);
+    updateUrl({ sortBy: field, sortDirection: direction });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,6 +92,8 @@ function PaymentsContent({
       if (dateFrom) qs.set("dateFrom", dateFrom);
       if (dateTo) qs.set("dateTo", dateTo);
       if (statusFilter) qs.set("status", statusFilter);
+      if (sortBy) qs.set("sortBy", sortBy);
+      if (sortDirection) qs.set("sortDirection", sortDirection);
       qs.set("page", String(page));
       qs.set("pageSize", "20");
       const res = await api.get<Page<Payment>>(`/finance/payments?${qs.toString()}`);
@@ -71,7 +103,7 @@ function PaymentsContent({
     } finally {
       setLoading(false);
     }
-  }, [currency, dateFrom, dateTo, statusFilter, page]);
+  }, [currency, dateFrom, dateTo, statusFilter, sortBy, sortDirection, page]);
 
   useEffect(() => {
     void load();
@@ -87,9 +119,17 @@ function PaymentsContent({
     return cur ? `${formatted} ${cur}` : formatted;
   };
 
-  // Compute aggregates over full dataset
+  const statusLabel = (status: string) => {
+    const labels = STATUS_LABELS[status];
+    if (!labels) return status;
+    return labels[locale as keyof typeof labels] ?? labels.ru;
+  };
+
+  // Compute aggregates over full filtered population (server-side total)
   const totalAmount = data?.items?.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) ?? 0;
   const totalRecords = data?.total ?? 0;
+
+  const sortState = sortBy ? { sortBy, sortDirection: sortDirection ?? "desc" as SortDirection } : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -108,8 +148,8 @@ function PaymentsContent({
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="space-y-4">
-          {/* Period/Currency context badge */}
-          {(dateFrom || currency) && (
+          {/* Period/Currency/Status context badges */}
+          {(dateFrom || currency || statusFilter) && (
             <div className="flex items-center gap-3">
               {dateFrom && dateTo && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs text-blue-600">
@@ -119,6 +159,11 @@ function PaymentsContent({
               {currency && (
                 <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700">
                   {currency}
+                </span>
+              )}
+              {statusFilter && (
+                <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-medium text-amber-700">
+                  {statusLabel(statusFilter)}
                 </span>
               )}
             </div>
@@ -131,7 +176,7 @@ function PaymentsContent({
               onChange={(e) => { setCurrency(e.target.value); setPage(1); }}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-400"
             >
-              <option value="">Все валюты</option>
+              <option value="">{t("finance.filter.all_currencies", locale) || "Все валюты"}</option>
               <option value="AZN">AZN</option>
               <option value="USD">USD</option>
               <option value="EUR">EUR</option>
@@ -141,19 +186,24 @@ function PaymentsContent({
               onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-400"
             >
-              <option value="">Все статусы</option>
-              <option value="CAPTURED">Зачислен</option>
-              <option value="PENDING">Ожидает</option>
-              <option value="FAILED">Ошибка</option>
-              <option value="CANCELLED">Отменён</option>
+              <option value="">{t("finance.filter.all_statuses", locale) || "Все статусы"}</option>
+              <option value="CAPTURED">{t("finance.status.captured", locale) || "Зачислен"}</option>
+              <option value="PENDING">{t("finance.status.pending", locale) || "Ожидает"}</option>
+              <option value="FAILED">{t("finance.status.failed", locale) || "Ошибка"}</option>
+              <option value="CANCELLED">{t("finance.status.cancelled", locale) || "Отменён"}</option>
             </select>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">С</span>
+              <span className="text-xs text-slate-400">{t("common.from", locale) || "С"}</span>
               <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
-              <span className="text-xs text-slate-400">По</span>
+              <span className="text-xs text-slate-400">{t("common.to", locale) || "По"}</span>
               <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
             </div>
-            {loading && <span className="text-xs text-slate-400">загрузка…</span>}
+            {statusFilter && (
+              <button onClick={() => { setStatusFilter(""); setPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
+                ✕ {t("finance.filter.clear_status", locale) || "Статус"}
+              </button>
+            )}
+            {loading && <span className="text-xs text-slate-400">{t("common.loading", locale) || "загрузка…"}</span>}
           </div>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
@@ -162,7 +212,7 @@ function PaymentsContent({
           <AggregateSummary
             totalRecords={totalRecords}
             fields={[
-              { label: "Сумма", value: totalAmount, isMoney: true, currency: currency || undefined },
+              { label: t("finance.aggregate.amount", locale) || "Сумма", value: totalAmount, isMoney: true, currency: currency || undefined },
             ]}
             currencyTotals={
               !currency && data?.items
@@ -177,8 +227,8 @@ function PaymentsContent({
                     return Object.entries(byCurrency).map(([c, v]) => ({
                       currency: c,
                       fields: [
-                        { label: "Платежей", value: v.count },
-                        { label: "Сумма", value: v.amount, isMoney: true },
+                        { label: t("finance.aggregate.payments", locale) || "Платежей", value: v.count },
+                        { label: t("finance.aggregate.amount", locale) || "Сумма", value: v.amount, isMoney: true },
                       ],
                     }));
                   })()
@@ -186,18 +236,18 @@ function PaymentsContent({
             }
           />
 
-          {/* Payments Table */}
+          {/* Payments Table with sortable headers */}
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">Код</th>
-                  <th className="px-4 py-2.5 font-medium">Дата</th>
-                  <th className="px-4 py-2.5 font-medium">Заказ</th>
-                  <th className="px-4 py-2.5 font-medium text-right">Сумма</th>
-                  <th className="px-4 py-2.5 font-medium">Валюта</th>
-                  <th className="px-4 py-2.5 font-medium">Статус</th>
-                  <th className="px-4 py-2.5 font-medium">Метод</th>
+                  <SortableHeader field="code" currentSort={sortState} onSort={handleSort}>{t("finance.col.code", locale) || "Код"}</SortableHeader>
+                  <SortableHeader field="createdAt" currentSort={sortState} onSort={handleSort}>{t("finance.col.date", locale) || "Дата"}</SortableHeader>
+                  <th className="px-4 py-2.5 font-medium">{t("finance.col.order", locale) || "Заказ"}</th>
+                  <SortableHeader field="amount" currentSort={sortState} onSort={handleSort} alignRight>{t("finance.col.amount", locale) || "Сумма"}</SortableHeader>
+                  <SortableHeader field="currency" currentSort={sortState} onSort={handleSort}>{t("finance.col.currency", locale) || "Валюта"}</SortableHeader>
+                  <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("finance.col.status", locale) || "Статус"}</SortableHeader>
+                  <th className="px-4 py-2.5 font-medium">{t("finance.col.method", locale) || "Метод"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -205,7 +255,7 @@ function PaymentsContent({
                   <tr key={p.id} className="border-b border-slate-50 hover:bg-blue-50/30">
                     <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{p.code}</td>
                     <td className="px-4 py-2.5 text-xs text-slate-500">
-                      {p.createdAt ? new Date(p.createdAt).toLocaleDateString("ru-RU") : "—"}
+                      {p.createdAt ? new Date(p.createdAt).toLocaleDateString(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US") : "—"}
                     </td>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{p.orderId.slice(0, 8)}…</td>
                     <td className="px-4 py-2.5 text-right font-medium text-slate-700">
@@ -219,7 +269,7 @@ function PaymentsContent({
                 {(data?.items ?? []).length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">
-                      Платежей пока нет
+                      {t("finance.payments.empty", locale) || "Платежей пока нет"}
                     </td>
                   </tr>
                 )}
@@ -248,6 +298,8 @@ function PaymentsWithParams() {
       initialDateFrom={sp.get("from") ?? sp.get("dateFrom") ?? undefined}
       initialDateTo={sp.get("to") ?? sp.get("dateTo") ?? undefined}
       initialStatus={sp.get("status") ?? undefined}
+      initialSortBy={sp.get("sortBy") ?? undefined}
+      initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
     />
   );
 }
