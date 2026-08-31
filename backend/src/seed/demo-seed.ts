@@ -496,7 +496,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
   const bookingData: Array<{
     id: string; code: string; orderId: string; productId: string; status: string;
     amount: Prisma.Decimal; currency: string; serviceDate: Date; createdAt: Date; updatedAt: Date; version: number;
-    completedAt?: Date; cancelledAt?: Date; confirmedAt?: Date;
+    completedAt?: Date; cancelledAt?: Date; confirmedAt?: Date; acquisitionSource?: string;
   }> = [];
   const commissionData: Array<{
     id: string; code: string; orderId: string; partnerId: string; amount: Prisma.Decimal; currency: string;
@@ -578,7 +578,8 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
       refundedAmount: decimal(refundedAmount), sellerPartnerId,
       createdAt: orderDate, updatedAt: orderDate,
       submittedAt: orderDate, confirmedAt, fulfilledAt, cancelledAt, closedAt,
-      serviceDate, acquisitionSource: Math.random() < 0.6 ? "MARKETPLACE" : "PARTNER_STOREFRONT",
+      serviceDate,      // Deterministic channel: even orderNum → MARKETPLACE, odd → PARTNER_STOREFRONT
+      acquisitionSource: orderNum % 2 === 0 ? "MARKETPLACE" : "PARTNER_STOREFRONT",
       commissionSnapshot: { rate: commissionRate, currency: product.currency },
       amountNum: amount,
     });
@@ -618,6 +619,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
         serviceDate, createdAt: orderDate, updatedAt: orderDate, version: 1,
         completedAt: bkStatus === "COMPLETED" ? fulfilledAt : undefined,
         confirmedAt: confirmedAt,
+        acquisitionSource: orderNum % 2 === 0 ? "MARKETPLACE" : "PARTNER_STOREFRONT",
       });
     }
 
@@ -710,6 +712,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
           id: b.id, code: b.code, orderId: b.orderId, productId: b.productId, status: b.status as any,
           amount: b.amount, currency: b.currency, serviceDate: b.serviceDate, createdAt: b.createdAt,
           updatedAt: b.updatedAt, version: b.version, completedAt: b.completedAt, confirmedAt: b.confirmedAt,
+          acquisitionSource: b.acquisitionSource ?? undefined,
         },
         update: {},
       });
