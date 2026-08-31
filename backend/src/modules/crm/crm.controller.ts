@@ -99,6 +99,14 @@ class ListCustomersQuery {
   @IsOptional()
   @IsString()
   sortDirection?: string;
+
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
 }
 
 class CreateContactDto {

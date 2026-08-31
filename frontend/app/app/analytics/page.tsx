@@ -17,6 +17,7 @@ import Pagination from "@/components/Pagination";
 import { PeriodSelector } from "@/components/command-center/PeriodSelector";
 import { useLocale, t } from "@/lib/i18n";
 import { METRIC_CONFIGS, type PeriodContext, resolveTableCellDrilldown, resolveDrilldownUrl } from "@/lib/metric-drilldown";
+import AggregateSummary from "@/components/AggregateSummary";
 
 /**
  * Pre-Step 3.12 — Analytics Round 4 Strict Remediation
@@ -302,6 +303,15 @@ function AnalyticsContent() {
 
       {/* ── Partner Performance ── */}
       {partners && allPartners.length > 0 && !loading && (
+        <>
+        <AggregateSummary
+          totalRecords={partnerTotal}
+          fields={[
+            { label: "GMV", value: allPartners.reduce((sum, p) => sum + (parseFloat(p.gmv) || 0), 0), isMoney: true },
+            { label: t("analytics.kpi.orders", locale), value: allPartners.reduce((sum, p) => sum + p.ordersCount, 0) },
+            { label: t("analytics.kpi.bookings", locale), value: allPartners.reduce((sum, p) => sum + p.bookingsCount, 0) },
+          ]}
+        />
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
             <h2 className="text-sm font-semibold text-slate-700">{t("analytics.partners.title", locale)}</h2>
@@ -378,10 +388,28 @@ function AnalyticsContent() {
             <Pagination page={partnerPage} pageSize={PAGE_SIZE} total={partnerTotal} onPageChange={setPartnerPage} />
           )}
         </div>
+        </>
       )}
 
       {/* ── Financial Summary with Payment Count ── */}
       {finance && finance.currencies.length > 0 && !loading && (
+        <>
+        <AggregateSummary
+          totalRecords={finance.totalLedgerEntries}
+          fields={[
+            { label: t("analytics.finance.payments", locale), value: finance.currencies.reduce((sum, c) => sum + (parseFloat(c.totalPayments) || 0), 0), isMoney: true },
+            { label: t("analytics.finance.refunds", locale), value: finance.currencies.reduce((sum, c) => sum + (parseFloat(c.totalRefunds) || 0), 0), isMoney: true },
+            { label: t("analytics.finance.commission", locale), value: finance.currencies.reduce((sum, c) => sum + (parseFloat(c.totalCommission) || 0), 0), isMoney: true },
+          ]}
+          currencyTotals={finance.currencies.map((c) => ({
+            currency: c.currency,
+            fields: [
+              { label: t("analytics.finance.payments", locale), value: c.totalPayments, isMoney: true },
+              { label: t("analytics.finance.refunds", locale), value: c.totalRefunds, isMoney: true },
+              { label: t("analytics.finance.net", locale), value: c.netPayments, isMoney: true },
+            ],
+          }))}
+        />
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
             <h2 className="text-sm font-semibold text-slate-700">{t("analytics.finance.title", locale)}</h2>
@@ -426,6 +454,7 @@ function AnalyticsContent() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {/* ── Empty state ── */}

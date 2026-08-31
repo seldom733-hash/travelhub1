@@ -15,6 +15,7 @@ import { useCurrentUser } from "@/lib/use-user";
 import { useLocale, t } from "@/lib/i18n";
 
 import CrmAnalytics from "@/components/CrmAnalytics";
+import AggregateSummary from "@/components/AggregateSummary";
 
 type Tab = "customers" | "partners" | "analytics";
 type CrmContext = "platform" | "basic" | "pro";
@@ -25,7 +26,7 @@ type CrmContext = "platform" | "basic" | "pro";
  * 2. MARKETPLACE BASIC — limited customer management for marketplace partners
  * 3. STOREFRONT PRO — full CRM for partners with active Storefront
  */
-function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCustomerSearch, initialCustomerStatus, initialCustomerType, initialCustomerPage, initialPartnerSearch, initialPartnerStatus, initialPartnerPage }: { initialTab?: string; initialSortBy?: string; initialSortDirection?: string; initialCustomerSearch?: string; initialCustomerStatus?: string; initialCustomerType?: string; initialCustomerPage?: number; initialPartnerSearch?: string; initialPartnerStatus?: string; initialPartnerPage?: number }) {
+function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCustomerSearch, initialCustomerStatus, initialCustomerType, initialCustomerPage, initialPartnerSearch, initialPartnerStatus, initialPartnerPage, initialDateFrom, initialDateTo }: { initialTab?: string; initialSortBy?: string; initialSortDirection?: string; initialCustomerSearch?: string; initialCustomerStatus?: string; initialCustomerType?: string; initialCustomerPage?: number; initialPartnerSearch?: string; initialPartnerStatus?: string; initialPartnerPage?: number; initialDateFrom?: string; initialDateTo?: string }) {
   const locale = useLocale();
   const currentUser = useCurrentUser();
   const [crmContext, setCrmContext] = useState<CrmContext>("platform");
@@ -68,6 +69,10 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
       setCrmContext("platform");
     }
   }, [currentUser]);
+
+  // ── Period filter (SR-CRM-01/SR-CRM-02) ──
+  const [dateFrom, setDateFrom] = useState(initialDateFrom ?? "");
+  const [dateTo, setDateTo] = useState(initialDateTo ?? "");
 
   // ── Platform CRM state ──
   const [customerData, setCustomerData] = useState<Page<Customer> | null>(null);
@@ -113,6 +118,8 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
       if (customerSearch) qs.set("search", customerSearch);
       if (customerStatusFilter) qs.set("status", customerStatusFilter);
       if (customerTypeFilter) qs.set("customerType", customerTypeFilter);
+      if (dateFrom) qs.set("dateFrom", dateFrom);
+      if (dateTo) qs.set("dateTo", dateTo);
       qs.set("page", String(customerPage));
       qs.set("pageSize", "20");
       if (sortBy) qs.set("sortBy", sortBy);
@@ -123,7 +130,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
       setLoadError(true);
       setError((e as Error).message);
     }
-  }, [customerSearch, customerPage, sortBy, sortDirection, customerStatusFilter, customerTypeFilter]);
+  }, [customerSearch, customerPage, sortBy, sortDirection, customerStatusFilter, customerTypeFilter, dateFrom, dateTo]);
 
   // ── Platform Partner loading ──
   const loadPartners = useCallback(async () => {
@@ -132,6 +139,8 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
       const qs = new URLSearchParams();
       if (partnerSearch) qs.set("search", partnerSearch);
       if (partnerStatusFilter) qs.set("status", partnerStatusFilter);
+      if (dateFrom) qs.set("dateFrom", dateFrom);
+      if (dateTo) qs.set("dateTo", dateTo);
       qs.set("page", String(partnerPage));
       qs.set("pageSize", "20");
       if (sortBy) qs.set("sortBy", sortBy);
@@ -142,7 +151,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
       setPartnerLoadError(true);
       setPartnerError((e as Error).message);
     }
-  }, [partnerSearch, partnerPage, sortBy, sortDirection, partnerStatusFilter]);
+  }, [partnerSearch, partnerPage, sortBy, sortDirection, partnerStatusFilter, dateFrom, dateTo]);
 
   // ── Partner Customer loading (partner context) ──
   const loadPartnerCustomers = useCallback(async () => {
@@ -262,10 +271,15 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
           />
 
           {/* Platform context badge */}
-          <div className="px-6 pt-2">
+          <div className="px-6 pt-2 flex items-center gap-3">
             <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
               {t("crm.context.platform", locale)}
             </span>
+            {dateFrom && dateTo && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                📊 {dateFrom} → {dateTo}
+              </span>
+            )}
           </div>
 
           {/* Tabs */}
@@ -283,14 +297,20 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
 
           <div className="space-y-4 p-6">
             {tab === "customers" && !loadError && (
-              <Kpi items={[
-                { label: t("crm.total_customers", locale), value: customerData?.total ?? 0, icon: "👥" },
-              ]} />
+              <>
+                <Kpi items={[
+                  { label: t("crm.total_customers", locale), value: customerData?.total ?? 0, icon: "👥" },
+                ]} />
+                <AggregateSummary totalRecords={customerData?.total ?? 0} fields={[]} loading={!customerData && !loadError} />
+              </>
             )}
             {tab === "partners" && !partnerLoadError && (
-              <Kpi items={[
-                { label: t("crm.total_partners", locale), value: partnerListData?.total ?? 0, icon: "🏢" },
-              ]} />
+              <>
+                <Kpi items={[
+                  { label: t("crm.total_partners", locale), value: partnerListData?.total ?? 0, icon: "🏢" },
+                ]} />
+                <AggregateSummary totalRecords={partnerListData?.total ?? 0} fields={[]} loading={!partnerListData && !partnerLoadError} />
+              </>
             )}
 
             {/* Search + Filters */}
@@ -302,6 +322,11 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                 placeholder={t("crm.search.placeholder", locale)}
                 className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
               />
+              {dateFrom && dateTo && (
+                <button onClick={() => { setDateFrom(''); setDateTo(''); setCustomerPage(1); setPartnerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
+                  ✕ {t('crm.filter.clear_dates', locale) || 'Период'}
+                </button>
+              )}
               {tab === 'customers' && (
                 <>
                   <select value={customerTypeFilter ?? ''} onChange={(e) => { setCustomerTypeFilter(e.target.value || undefined); setCustomerPage(1); }} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-400">
@@ -730,6 +755,8 @@ function CrmWithParams() {
       initialPartnerSearch={sp.get("pSearch") ?? undefined}
       initialPartnerStatus={sp.get("pStatus") ?? undefined}
       initialPartnerPage={sp.get("pPage") ? parseInt(sp.get("pPage")!, 10) : undefined}
+      initialDateFrom={sp.get("from") ?? undefined}
+      initialDateTo={sp.get("to") ?? undefined}
     />
   );
 }

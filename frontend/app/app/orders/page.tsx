@@ -10,6 +10,7 @@ import Pagination from "@/components/Pagination";
 import { useCan } from "@/lib/use-can";
 import ActionButtons from "@/components/ActionButtons";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
+import AggregateSummary from "@/components/AggregateSummary";
 import { useLocale, t } from "@/lib/i18n";
 
 const ACTIONS = [
@@ -53,10 +54,21 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   };
 
   // Derived filter labels for display
+  const statusLabels: Record<string, string> = {
+    NEW: "Новый", IN_PROCESSING: "В обработке", WAITING_FOR_DATA: "Ожидание данных",
+    READY_FOR_BOOKING: "Готов к бронированию", SENT_TO_BOOKING: "Отправлен в бронирование",
+    PARTIALLY_FULFILLED: "Частично исполнен", FULFILLED: "Исполнен",
+    READY_TO_CLOSE: "Готов к закрытию", CLOSED: "Закрыт", CANCELLED: "Отменён",
+    PROBLEM: "Проблема", SUSPENDED: "Приостановлен",
+  };
   const activeFilters: string[] = [];
   if (statusFilter) {
-    const statusLabels: Record<string, string> = { CANCELLED: "Статус: Отменён" };
-    activeFilters.push(statusLabels[statusFilter] ?? `Статус: ${statusFilter}`);
+    const statuses = statusFilter.split(',').map(s => s.trim());
+    if (statuses.length === 1) {
+      activeFilters.push(`Статус: ${statusLabels[statuses[0]] ?? statuses[0]}`);
+    } else {
+      activeFilters.push(`Статус: ${statuses.map(s => statusLabels[s] ?? s).join(', ')}`);
+    }
   }
   if (paymentStatusFilter) {
     const psLabels: Record<string, string> = { UNPAID: "Оплата: Не оплачен" };
@@ -185,8 +197,13 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               <option value="WAITING_FOR_DATA">Ожидание данных</option>
               <option value="READY_FOR_BOOKING">Готов к бронированию</option>
               <option value="SENT_TO_BOOKING">Отправлен в бронирование</option>
+              <option value="PARTIALLY_FULFILLED">Частично исполнен</option>
+              <option value="FULFILLED">Исполнен</option>
+              <option value="READY_TO_CLOSE">Готов к закрытию</option>
               <option value="CLOSED">Закрыт</option>
               <option value="CANCELLED">Отменён</option>
+              <option value="PROBLEM">Проблема</option>
+              <option value="SUSPENDED">Приостановлен</option>
             </select>
             <select
               value={paymentStatusFilter}
@@ -218,6 +235,16 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
           </div>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
+
+          <AggregateSummary
+            totalRecords={counts.total}
+            fields={[
+              { label: t("admin.kpi.active", locale), value: counts.active },
+              { label: t("admin.kpi.ready_booking", locale), value: counts.ready },
+              { label: t("admin.kpi.closed", locale), value: counts.closed },
+            ]}
+            loading={busy}
+          />
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>

@@ -181,6 +181,7 @@ export const METRIC_CONFIGS = {
     destinationType: "DOMAIN_ROUTE" as DestinationType,
     destination: "/app/crm",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    extraParams: { tab: "customers" },
     label: "Активные клиенты",
   },
   // All-time stock metrics (stable across all periods)

@@ -9,6 +9,7 @@ import StatusBadge from "@/components/StatusBadge";
 import SortableHeader, { type SortState, type SortDirection } from "@/components/SortableHeader";
 import OperationalNotes from "@/components/OperationalNotes";
 import PartnerActivity from "@/components/PartnerActivity";
+import AggregateSummary from "@/components/AggregateSummary";
 import { useLocale, t } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 import { useCan } from "@/lib/use-can";
@@ -23,6 +24,7 @@ function useQueryState() {
   const [periodTo, setPeriodTo] = useState<string | null>(null);
   const [periodPreset, setPeriodPreset] = useState<string | null>(null);
   const [fromAnalytics, setFromAnalytics] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -41,6 +43,8 @@ function useQueryState() {
     if (toParam) setPeriodTo(toParam);
     if (presetParam) setPeriodPreset(presetParam);
     if (params.get("fromAnalytics") === "true") setFromAnalytics(true);
+    // SR-P360-05: Mark hydration complete so data load waits for period params
+    setIsHydrated(true);
   }, []);
 
   const updateQuery = useCallback((updates: Record<string, string | null>) => {
@@ -55,7 +59,7 @@ function useQueryState() {
     window.history.replaceState({}, "", url.toString());
   }, []);
 
-  return { tab, sortBy, sortDirection, periodFrom, periodTo, periodPreset, fromAnalytics, setTab, setSortBy, setSortDirection, updateQuery };
+  return { tab, sortBy, sortDirection, periodFrom, periodTo, periodPreset, fromAnalytics, isHydrated, setTab, setSortBy, setSortDirection, updateQuery };
 }
 
 export default function Partner360Page() {
@@ -63,7 +67,7 @@ export default function Partner360Page() {
   const locale = useLocale();
   const user = useCurrentUser();
   const id = params.id as string;
-  const { tab, sortBy, sortDirection, periodFrom, periodTo, periodPreset, fromAnalytics, setTab, setSortBy, setSortDirection, updateQuery } = useQueryState();
+  const { tab, sortBy, sortDirection, periodFrom, periodTo, periodPreset, fromAnalytics, isHydrated, setTab, setSortBy, setSortDirection, updateQuery } = useQueryState();
 
   const [partner, setPartner] = useState<PartnerDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,7 +108,10 @@ export default function Partner360Page() {
     }
   }, [id, sortBy, sortDirection, orderStatusFilter, bookingStatusFilter, serviceStatusFilter, periodFrom, periodTo]);
 
-  useEffect(() => { void loadPartner(); }, [loadPartner]);
+  useEffect(() => {
+    // SR-P360-05: Wait for URL params hydration before first data fetch
+    if (isHydrated) void loadPartner();
+  }, [isHydrated, loadPartner]);
 
   const handleTabChange = (newTab: Tab) => {
     setTab(newTab);
@@ -249,6 +256,13 @@ export default function Partner360Page() {
 
           {/* Services — TABLE with sortable headers + server-side status filter */}
           {tab === "services" && (
+            <>
+            <AggregateSummary
+              totalRecords={partner.totalProducts}
+              fields={[
+                { label: t("crm.partner_detail.total_services", locale), value: partner.totalProducts },
+              ]}
+            />
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
                 <select value={serviceStatusFilter ?? ''} onChange={(e) => setServiceStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
@@ -283,10 +297,19 @@ export default function Partner360Page() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
           {/* Orders — TABLE with sortable headers + server-side status filter */}
           {tab === "orders" && (
+            <>
+            <AggregateSummary
+              totalRecords={partner.totalOrders}
+              fields={[
+                { label: t("crm.detail.orders", locale), value: partner.totalOrders },
+                { label: t("crm.detail.bookings", locale), value: partner.totalBookings },
+              ]}
+            />
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
                 <select value={orderStatusFilter ?? ''} onChange={(e) => setOrderStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
@@ -320,10 +343,18 @@ export default function Partner360Page() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
           {/* Bookings — TABLE with sortable headers + server-side status filter (NEW) */}
           {tab === "bookings" && (
+            <>
+            <AggregateSummary
+              totalRecords={partner.totalBookings}
+              fields={[
+                { label: t("crm.detail.bookings", locale), value: partner.totalBookings },
+              ]}
+            />
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
                 <select value={bookingStatusFilter ?? ''} onChange={(e) => setBookingStatusFilter(e.target.value || undefined)} className="rounded border border-slate-200 bg-white px-2 py-1 text-xs outline-none focus:border-blue-400">
@@ -359,10 +390,19 @@ export default function Partner360Page() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
           {/* Customers — TABLE with commercial aggregates + client-side status filter */}
           {tab === "customers" && (
+            <>
+            <AggregateSummary
+              totalRecords={filteredCustomers.length}
+              fields={[
+                { label: t("crm.detail.orders", locale), value: filteredCustomers.reduce((sum, c) => sum + c.orderCount, 0) },
+                { label: t("crm.detail.bookings", locale), value: filteredCustomers.reduce((sum, c) => sum + c.bookingCount, 0) },
+              ]}
+            />
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2">
                 {canWrite && (
@@ -403,6 +443,7 @@ export default function Partner360Page() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
           {/* Step 3.5C — Platform CRM intake panel */}
