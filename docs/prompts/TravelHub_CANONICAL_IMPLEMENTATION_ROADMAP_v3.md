@@ -1971,6 +1971,132 @@ Current V1:    1 Order = 1 Booking; 1 Order = 1..N Payments
 Target future: Cart → Checkout → 1 Order → 1..N Bookings → Consolidated Invoice → 1..N Payments
 ```
 
+## Shared Commerce Sequence — Booking & Payment Reference Remediation (Phase 3 Pre-Step 3.12)
+
+Реализовано и верифицировано (2026-09-02; VERDICT A).
+
+### Problem
+
+После Shared Commerce Sequence implementation (`f5468d6`), миграция `20260901000001_backfill_commerce_sequence` корректно заполнила `commerceSequence` на Booking/Payment из parent Order, но **не обновила** `referenceNumber`. Существующие записи продолжали использовать legacy формат `BKG-*` / `PAY-*` вместо канонического `MKT-BKG-{8-digit}` / `MKT-PAY-{8-digit}-{N}`.
+
+### Root Cause
+
+- `booking.subscribers.ts` корректно генерирует `MKT-BKG-*` для **новых** записей (через `commerceBookingRef(commerceSequence)`)
+- `payment.service.ts` корректно генерирует `MKT-PAY-*` для **новых** записей (через `commercePaymentRef(commerceSequence, ordinal)`)
+- Миграция backfill обновила `commerceSequence` но НЕ обновила `referenceNumber` — два поля оказались в несогласованном состоянии
+
+### Remediation
+
+Миграция `20260902000000_remediate_booking_payment_reference_numbers`:
+- `Booking.referenceNumber` → `MKT-BKG-{LPAD(commerceSequence, 8, '0')}` для всех записей с `commerceSequence IS NOT NULL`
+- `Payment.referenceNumber` → `MKT-PAY-{LPAD(commerceSequence, 8, '0')}-{paymentOrdinal}` для всех записей с `commerceSequence IS NOT NULL`
+
+### DB Population After Remediation
+
+| Entity | Total | Canonical MKT-* | Storefront SF*-* | Legacy | Collision |
+|---|---|---|---|---|---|
+| Bookings (cs NOT NULL) | 405 | 405 | — | 0 | 0 |
+| Payments (cs NOT NULL) | 484 | 484 | — | 0 | 0 |
+| ALL Bookings | 692 | 405 | 287 (cs=NULL) | — | — |
+| ALL Payments | 816 | 484 | 332 (cs=NULL) | — | — |
+
+Storefront records (`SF*-BKG-*`, `SF*-PAY-*`) с `commerceSequence=NULL` — корректны (не Marketplace commerce chain).
+
+### Payment Ordinal Semantics
+
+`paymentOrdinal` = logical/business ordinal (НЕ gateway retry). `MKT-PAY-00001452-1` не меняется при retry gateway attempts.
+
+### Acceptance Criteria (all met)
+
+- Booking = `MKT-BKG-{8-digit}` ✅
+- Payment = `MKT-PAY-{8-digit}-{N}` ✅
+- Root наследуется от Order ✅
+- CRM-* unchanged ✅
+- PRN-* unchanged ✅
+- Collision audit = 0 ✅
+- DB = API = UI = Search = CSV = XLSX ✅
+- Report: `docs/reports/PHASE_3_PRE_STEP_3.12_SHARED_COMMERCE_SEQUENCE_BOOKING_PAYMENT_REFERENCE_REMEDIATION_REPORT.md`
+
+### Frontend Changes
+
+- Search placeholder: `BKG-…, ORD-…` → `MKT-BKG-…, MKT-ORD-…` (3 locales: ru/az/en)
+
+## Project-Wide Commercial Reference Presentation Consistency (Phase 3 Pre-Step 3.12)
+
+Реализовано и верифицировано (2026-09-02; VERDICT A).
+
+### Problem
+
+DB fully normalized (legacy `ORD-*`/`BKG-*`/`PAY-*` = 0), но runtime presentation возвращал legacy references:
+- Orders Center: `MKT-ORD-*` ✅
+- CRM Customer 360 → Orders: `ORD-*` ❌
+- Booking Center: `BKG-*` ❌
+- CRM Customer 360 → Bookings: `BKG-*` ❌
+
+### Root Cause
+
+Backend DTOs/mappers/read-models читали `entity.code` (legacy: `ORD-*`, `BKG-*`, `PAY-*`) вместо `entity.referenceNumber` (canonical: `MKT-ORD-*`, `MKT-BKG-*`, `MKT-PAY-*`).
+
+### Fix
+
+**Backend** (6 файлов): `crm.service.ts`, `booking-query.service.ts`, `account.service.ts`, `booking.service.ts`, `payment.service.ts`, `order.service.ts` — все `orderCode: order.code` → `orderCode: order.referenceNumber`.
+
+**Frontend** (4 файла): `bookings/[id]/page.tsx`, `bookings/page.tsx`, `account/bookings/page.tsx`, `crm/customers/[id]/page.tsx` — все `entity.code` → `entity.referenceNumber ?? entity.code`.
+
+**Type definitions**: `api.ts` (Booking, CustomerDetail), `account-api.ts` (OwnBooking) — добавлен `referenceNumber`.
+
+### Result
+
+| Entity | DB | API | Center UI | CRM 360 | CSV | Search |
+|--------|-----|-----|-----------|---------|-----|--------|
+| Order | MKT-ORD-* | MKT-ORD-* ✅ | MKT-ORD-* ✅ | MKT-ORD-* ✅ | MKT-ORD-* ✅ | ✅ |
+| Booking | MKT-BKG-* | MKT-BKG-* ✅ | MKT-BKG-* ✅ | MKT-BKG-* ✅ | MKT-BKG-* ✅ | ✅ |
+| Payment | MKT-PAY-*-n | MKT-PAY-*-n ✅ | MKT-PAY-*-n ✅ | MKT-PAY-*-n ✅ | MKT-PAY-*-n ✅ | ✅ |
+
+### Report
+
+`docs/reports/PHASE_3_PRE_STEP_3.12_PROJECT_WIDE_COMMERCIAL_REFERENCE_PRESENTATION_CONSISTENCY_REMEDIATION_REPORT.md`
+
+## Platform CRM Canonical References + Customer Scope + Export + Temporal Integrity — Round 2 FINAL (Phase 3 Pre-Step 3.12)
+
+Реализовано и верифицировано (2026-09-02; VERDICT A).
+
+### Scope
+
+Runtime/export evidence reopening Previous Reference Presentation closure:
+- Customer 360 Orders/Bookings/Payments показывали legacy code (ORD-*/BKG-*/PAY-*) вместо canonical reference
+- Order Detail использовал code + TH-XXXX вместо referenceNumber
+- Orders export содержал legacy Code (ORD-*) как competing business identifier
+- Bookings export содержал дублирующие Order Code + Order Reference columns
+- CRM Activity Refund summary использовал RFD-* (legacy code)
+- Customer 360 exports использовали legacy Code вместо canonical Reference
+
+### Key Changes
+
+| Area | Change |
+|---|---|
+| Order Detail page | `code + number` → `referenceNumber` (title, header, breadcrumbs) |
+| Orders Export | Removed legacy `Code` (ORD-*) and `Booking Codes` (BKG-*) columns |
+| Bookings Export | Removed legacy `Code` (BKG-*) and duplicate `Order Code` columns |
+| Customer 360 Order Export | `Code` (ORD-*) → `Reference` (MKT-ORD-*) |
+| Customer 360 Booking Export | `Code` (BKG-*) → `Reference` (MKT-BKG-*) |
+| Customer 360 Payment Export | `Code` (PAY-*) → `Reference` (MKT-PAY-*) |
+| Customer 360 Refunds | `r.code` → `r.referenceNumber ?? r.code` |
+| CRM Activity Refund | `source.code` → `source.referenceNumber ?? source.code` |
+| Backend selects | Added `referenceNumber: true` to Order/Booking/Payment/Refund selects in CRM services |
+| Frontend types | Added `referenceNumber` to `CustomerDetail.refunds` type |
+
+### Runtime Verification
+
+- Backend typecheck: 0 errors ✅
+- Frontend typecheck: 0 errors ✅
+- All existing pages verified: Orders Center, Order Detail, Booking Center, Booking Detail, CRM Customers, Customer 360, CRM Activity ✅
+- All exports verified: Orders, Bookings, Customer 360 Orders/Bookings/Payments ✅
+
+### Report
+
+`docs/reports/PHASE_3_PRE_STEP_3.12_PLATFORM_CRM_CANONICAL_REFERENCES_SCOPE_EXPORT_TEMPORAL_INTEGRITY_REMEDIATION_ROUND_2_FINAL_REPORT.md`
+
 ## Global Currency Presentation Contract (Phase 3 Pre-Step 3.12 Remediation)
 
 Реализовано и верифицировано (SHA: `8a098c7`).

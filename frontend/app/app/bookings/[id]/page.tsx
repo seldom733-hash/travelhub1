@@ -13,12 +13,13 @@ import { useCurrentUser } from "@/lib/use-user";
 interface BookingDetail {
   id: string;
   code: string;
+  referenceNumber: string;
   orderId: string;
   productId: string;
   status: string;
   amount: string;
   currency: string | null;
-  orderCode: string | null;
+  orderCode: string;
   productTitle: string | null;
   createdAt: string;
 }
@@ -64,15 +65,15 @@ export default function BookingDetailPage() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader
-        title={booking.code}
-        breadcrumbs={["TravelHub", t("bookings.title", locale), booking.code]}
+        title={booking.referenceNumber}
+        breadcrumbs={["TravelHub", t("bookings.title", locale), booking.referenceNumber]}
         actions={<Link href="/app/bookings" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">← {t("crm.back_to_list", locale)}</Link>}
       />
 
       <div className="border-b border-slate-200 bg-white px-6 py-4">
         <div className="flex items-center gap-4">
           <div>
-            <div className="font-mono text-xs text-blue-600">{booking.code}</div>
+            <div className="font-mono text-xs text-blue-600">{booking.referenceNumber}</div>
             <div className="mt-1"><StatusBadge status={booking.status} /></div>
           </div>
         </div>
@@ -87,7 +88,7 @@ export default function BookingDetailPage() {
 
           <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs">
             <div className="text-slate-400">{t("crm.col.order", locale)}</div>
-            <Link href={`/app/orders/${booking.orderId}`} className="font-medium text-blue-600 hover:underline">{booking.orderCode ?? booking.orderId}</Link>
+            <Link href={`/app/orders/${booking.orderId}`} className="font-medium text-blue-600 hover:underline">{booking.orderCode}</Link>
           </div>
 
           <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs">

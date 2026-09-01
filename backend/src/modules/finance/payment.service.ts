@@ -445,7 +445,7 @@ export class PaymentService {
         updatedAt: p.updatedAt?.toISOString() ?? '',
         paidAt: p.paidAt?.toISOString() ?? '',
         orderId: p.orderId ?? '',
-        orderCode: order?.code ?? '',
+        orderCode: order?.referenceNumber ?? '',
         orderReference: order?.referenceNumber ?? '',
         partnerId: order?.sellerPartnerId ?? '',
         partnerCode: partner?.code ?? '',

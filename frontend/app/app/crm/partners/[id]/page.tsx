@@ -337,7 +337,7 @@ export default function Partner360Page() {
                 <tbody>
                   {partner.orders.length > 0 ? partner.orders.map((o) => (
                     <tr key={o.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.code}</Link></td>
+                      <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.referenceNumber ?? o.code}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(o.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(o.amount, o.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
@@ -385,7 +385,7 @@ export default function Partner360Page() {
                 <tbody>
                   {partner.bookings.length > 0 ? partner.bookings.map((b) => (
                     <tr key={b.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.code}</Link></td>
+                      <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.referenceNumber ?? b.code}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(b.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(b.amount, b.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>

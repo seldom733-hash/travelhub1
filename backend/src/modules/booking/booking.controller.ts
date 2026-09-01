@@ -163,7 +163,6 @@ export class BookingController {
     const columns = [
       { header: 'ID', key: 'id', width: 38 },
       { header: 'Reference', key: 'referenceNumber', width: 22 },
-      { header: 'Code', key: 'code', width: 22 },
       { header: 'Status', key: 'status', width: 22 },
       { header: 'Amount', key: 'amount', width: 14 },
       { header: 'Currency', key: 'currency', width: 8 },
@@ -172,7 +171,6 @@ export class BookingController {
       { header: 'serviceDate', key: 'serviceDate', width: 22 },
       { header: 'Source', key: 'acquisitionSource', width: 16 },
       { header: 'Order ID', key: 'orderId', width: 38 },
-      { header: 'Order Code', key: 'orderCode', width: 22 },
       { header: 'Order Reference', key: 'orderReference', width: 22 },
       { header: 'Partner ID', key: 'partnerId', width: 38 },
       { header: 'Partner Code', key: 'partnerCode', width: 16 },

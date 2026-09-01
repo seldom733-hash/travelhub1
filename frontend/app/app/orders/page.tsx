@@ -28,7 +28,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   const locale = useLocale();
   const [data, setData] = useState<Page<Order> | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
-  const [bookings, setBookings] = useState<{ id: string; code: string; status: string }[]>([]);
+  const [bookings, setBookings] = useState<{ id: string; referenceNumber: string; status: string }[]>([]);
   const [search, setSearch] = useState(initialSearch || "");
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
@@ -131,7 +131,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   const openDetail = async (id: string) => {
     const [order, bk] = await Promise.all([
       api.get<Order>(`/orders/${id}`),
-      api.get<{ items: { id: string; code: string; status: string }[] }>(`/bookings?orderId=${id}`),
+      api.get<{ items: { id: string; referenceNumber: string; status: string }[] }>(`/bookings?orderId=${id}`),
     ]);
     setSelected(order);
     setBookings(bk.items);
@@ -295,7 +295,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                       }`}
                     >
                       <td className="px-4 py-2.5">
-                        <div className="font-mono text-xs text-blue-600">{o.referenceNumber ?? o.code}</div>
+                        <div className="font-mono text-xs text-blue-600">{o.referenceNumber}</div>
                         <div className="text-xs text-slate-400">{o.number}</div>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-500">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
@@ -336,7 +336,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
           <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-blue-600">{selected.referenceNumber ?? selected.code}</span>
+                <span className="font-mono text-xs text-blue-600">{selected.referenceNumber}</span>
                 <span className="font-mono text-xs text-slate-400">{selected.number}</span>
               </div>
               <div className="mt-1 flex gap-2">
@@ -388,7 +388,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               <div className="space-y-1.5">
                 {bookings.map((b) => (
                   <div key={b.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
-                    <span className="font-mono text-xs text-blue-600">{b.code}</span>
+                    <span className="font-mono text-xs text-blue-600">{b.referenceNumber}</span>
                     <StatusBadge status={b.status} />
                   </div>
                 ))}

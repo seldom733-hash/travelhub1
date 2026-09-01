@@ -72,7 +72,7 @@ export default function AccountBookingsPage() {
             {data.items.map((b) => (
               <li key={b.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="font-semibold text-slate-900">{b.code}</div>
+                  <div className="font-semibold text-slate-900">{b.referenceNumber}</div>
                   <span className="inline-flex shrink-0 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
                     {bookingStatusLabel(b.status, locale)}
                   </span>

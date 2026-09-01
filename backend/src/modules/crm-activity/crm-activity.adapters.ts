@@ -114,12 +114,14 @@ export class OrderAdapter implements SourceAdapter {
       actorUserId: null, // system-created
       actorName: null,
       title: ACTIVITY_TYPE_TITLES[CrmActivityActivityType.ORDER_CREATED],
-      summary: source.code ?? null,
+      summary: source.referenceNumber ?? source.code ?? null,
       metadata: {
+        referenceNumber: source.referenceNumber ?? null,
         code: source.code,
         status: source.status,
         amount: source.totalAmount?.toString() ?? null,
         currency: source.currency ?? null,
+        acquisitionSource: source.acquisitionSource ?? null,
       },
       deepLink: buildDeepLink(CrmActivitySourceType.ORDER, source.id),
       visibility: ACTIVITY_DEFAULT_VISIBILITY,
@@ -159,10 +161,12 @@ export class BookingAdapter implements SourceAdapter {
       actorUserId: null,
       actorName: null,
       title: ACTIVITY_TYPE_TITLES[CrmActivityActivityType.BOOKING_CREATED],
-      summary: source.code ?? null,
+      summary: source.referenceNumber ?? source.code ?? null,
       metadata: {
+        referenceNumber: source.referenceNumber ?? null,
         code: source.code,
         status: source.status,
+        acquisitionSource: source.acquisitionSource ?? source.order?.acquisitionSource ?? null,
       },
       deepLink: buildDeepLink(CrmActivitySourceType.BOOKING, source.id),
       visibility: ACTIVITY_DEFAULT_VISIBILITY,
@@ -215,12 +219,14 @@ export class PaymentAdapter implements SourceAdapter {
       actorUserId: null,
       actorName: null,
       title: ACTIVITY_TYPE_TITLES[activityType],
-      summary: source.code ?? null,
+      summary: source.referenceNumber ?? source.code ?? null,
       metadata: {
+        referenceNumber: source.referenceNumber ?? null,
         code: source.code,
         status: source.status,
         amount: source.amount?.toString() ?? null,
         currency: source.currency ?? null,
+        acquisitionSource: source.order?.acquisitionSource ?? null,
       },
       deepLink: null,
       visibility: ACTIVITY_DEFAULT_VISIBILITY,
@@ -235,7 +241,7 @@ export class PaymentAdapter implements SourceAdapter {
     const orderIds = [...new Set(payments.map((p: any) => p.orderId).filter(Boolean))];
     const orders = await prisma.order.findMany({
       where: { id: { in: orderIds } },
-      select: { id: true, customerId: true, sellerPartnerId: true },
+      select: { id: true, customerId: true, sellerPartnerId: true, acquisitionSource: true },
     });
     const orderMap = new Map(orders.map((o: any) => [o.id, o]));
     const enriched = payments.map((p: any) => ({ ...p, order: orderMap.get(p.orderId) ?? null }));
@@ -285,8 +291,9 @@ export class RefundAdapter implements SourceAdapter {
       actorUserId: null,
       actorName: null,
       title: ACTIVITY_TYPE_TITLES[activityType],
-      summary: source.code ?? null,
+      summary: source.referenceNumber ?? source.code ?? null,
       metadata: {
+        referenceNumber: source.referenceNumber ?? null,
         code: source.code,
         status: source.status,
         amount: source.amount?.toString() ?? null,

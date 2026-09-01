@@ -28,7 +28,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
   const locale = useLocale();
   const [data, setData] = useState<Page<Booking> | null>(null);
   const [selected, setSelected] = useState<Booking | null>(null);
-  const [orderRef, setOrderRef] = useState<{ code: string; number: string; status: string } | null>(null);
+  const [orderRef, setOrderRef] = useState<{ code: string; referenceNumber: string; number: string; status: string } | null>(null);
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
@@ -112,7 +112,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
     const booking = await api.get<Booking>(`/bookings/${id}`);
     setSelected(booking);
     try {
-      const order = await api.get<{ code: string; number: string; status: string }>(`/orders/${booking.orderId}`);
+      const order = await api.get<{ code: string; referenceNumber: string; number: string; status: string }>(`/orders/${booking.orderId}`);
       setOrderRef(order);
     } catch {
       setOrderRef(null);
@@ -259,9 +259,9 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
                       selected?.id === b.id ? "bg-blue-50/60" : ""
                     }`}
                   >
-                    <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{b.code}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{b.referenceNumber}</td>
                     <td className="px-4 py-2.5 text-xs text-slate-500">{b.createdAt ? new Date(b.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{b.orderId.slice(0, 8)}…</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{b.orderReference ?? b.orderId.slice(0, 8)}…</td>
                     <td className="px-4 py-2.5 font-medium text-slate-800 text-center">{formatPrice(b.amount, b.currency, locale) ?? "—"}</td>
                     <td className="px-4 py-2.5 text-slate-500">{b.passengers?.length ?? 0}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
@@ -304,7 +304,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
         <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
           <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
             <div>
-              <div className="font-mono text-xs text-blue-600">{selected.code}</div>
+              <div className="font-mono text-xs text-blue-600">{selected.referenceNumber}</div>
               <div className="mt-1">
                 <StatusBadge status={selected.status} />
               </div>
@@ -319,7 +319,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
               <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
                 <div className="text-slate-400">Связанный заказ (read-only)</div>
                 <div className="mt-0.5 flex items-center justify-between">
-                  <span className="font-mono text-blue-600">{orderRef.code}</span>
+                  <span className="font-mono text-blue-600">{orderRef.referenceNumber}</span>
                   <StatusBadge status={orderRef.status} />
                 </div>
               </div>

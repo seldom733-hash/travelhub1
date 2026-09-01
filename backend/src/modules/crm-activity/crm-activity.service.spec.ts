@@ -185,10 +185,12 @@ describe('Source Adapters', () => {
       expect(result!.partnerId).toBe('partner-1');
       expect(result!.occurredAt).toEqual(new Date('2026-08-03T09:00:00Z'));
       expect(result!.metadata).toEqual({
+        referenceNumber: null,
         code: 'ORD-00000001',
         status: 'NEW',
         amount: '1500',
         currency: 'AZN',
+        acquisitionSource: null,
       });
       expect(result!.deepLink).toBe('/app/orders/order-1');
     });

@@ -44,15 +44,15 @@ export class BookingQueryService {
 
     // ── Related-entity display name enrichment (Round 2E.2R.1) ──
     // Batch-resolve order code + product title (no N+1)
-    let orderDisplay: { id: string; code: string } | null = null;
+    let orderDisplay: { id: string; referenceNumber: string } | null = null;
     let productDisplay: { id: string; title: string } | null = null;
 
     if (booking.orderId) {
       const o = await this.prisma.order.findUnique({
         where: { id: booking.orderId },
-        select: { id: true, code: true },
+        select: { id: true, referenceNumber: true },
       });
-      if (o) orderDisplay = { id: o.id, code: o.code };
+      if (o) orderDisplay = { id: o.id, referenceNumber: o.referenceNumber };
     }
     if (booking.productId) {
       const prod = await this.prisma.product.findUnique({
@@ -66,7 +66,7 @@ export class BookingQueryService {
     return {
       ...booking,
       passengers: redactTravelersPii(booking.passengers ?? [], viewer),
-      orderCode: orderDisplay?.code ?? null,
+      orderCode: orderDisplay?.referenceNumber ?? null,
       productTitle: productDisplay?.title ?? null,
     };
   }

@@ -209,6 +209,15 @@ export class CrmActivityService {
   ): Promise<ActivityPage> {
     const where: any = { customerId };
 
+    // Platform Marketplace scope: exclude Storefront end-customer commerce events.
+    // ORDER/BOOKING/PAYMENT events with acquisitionSource=PARTNER_STOREFRONT are
+    // excluded; all other source types (notes, messages, audits, etc.) pass through.
+    where.NOT = [
+      { sourceType: 'ORDER', metadata: { path: ['acquisitionSource'], equals: 'PARTNER_STOREFRONT' } },
+      { sourceType: 'BOOKING', metadata: { path: ['acquisitionSource'], equals: 'PARTNER_STOREFRONT' } },
+      { sourceType: 'PAYMENT', metadata: { path: ['acquisitionSource'], equals: 'PARTNER_STOREFRONT' } },
+    ];
+
     if (filters.activityType) where.activityType = filters.activityType;
     if (filters.sourceType) where.sourceType = filters.sourceType;
     if (filters.dateFrom || filters.dateTo) {

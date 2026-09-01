@@ -206,7 +206,7 @@ export default function Customer360Page() {
                 <tbody>
                   {customer.orders.length > 0 ? customer.orders.map((o) => (
                     <tr key={o.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.code}</Link></td>
+                      <td className="px-4 py-2.5"><Link href={`/app/orders/${o.id}`} className="font-mono text-blue-600 hover:underline">{o.referenceNumber}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{o.number}</td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(o.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(o.amount, o.currency, locale) ?? "—"}</td>
@@ -247,7 +247,7 @@ export default function Customer360Page() {
                 <tbody>
                   {customer.bookings.length > 0 ? customer.bookings.map((b) => (
                     <tr key={b.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.code}</Link></td>
+                      <td className="px-4 py-2.5"><Link href={`/app/bookings/${b.id}`} className="font-mono text-blue-600 hover:underline">{b.referenceNumber}</Link></td>
                       <td className="px-4 py-2.5 text-slate-500">{new Date(b.createdAt).toLocaleDateString()}</td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(b.amount, b.currency, locale) ?? "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={b.status} /></td>
@@ -285,7 +285,7 @@ export default function Customer360Page() {
                 <tbody>
                   {customer.payments.length > 0 ? customer.payments.map((p) => (
                     <tr key={p.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5 font-mono text-slate-600">{p.code}</td>
+                      <td className="px-4 py-2.5 font-mono text-slate-600">{p.referenceNumber}</td>
                       <td className="px-4 py-2.5 text-slate-500">{p.paidAt ? new Date(p.paidAt).toLocaleDateString() : "—"}</td>
                       <td className="px-4 py-2.5 text-slate-500">
                         {p.orderCode ? (
@@ -360,7 +360,7 @@ export default function Customer360Page() {
                 <tbody>
                   {(refundStatusFilter ? (customer.refunds || []).filter(r => r.status === refundStatusFilter) : (customer.refunds || [])).length > 0 ? (refundStatusFilter ? (customer.refunds || []).filter(r => r.status === refundStatusFilter) : (customer.refunds || [])).map((r) => (
                     <tr key={r.id} className="border-b border-slate-50 hover:bg-blue-50/30">
-                      <td className="px-4 py-2.5 font-mono text-slate-600">{r.code}</td>
+                      <td className="px-4 py-2.5 font-mono text-slate-600">{r.referenceNumber ?? r.code}</td>
                       <td className="px-4 py-2.5 text-slate-500">{r.processedAt ? new Date(r.processedAt).toLocaleDateString() : "—"}</td>
                       <td className="px-4 py-2.5 text-slate-500">
                         {r.orderCode ? (

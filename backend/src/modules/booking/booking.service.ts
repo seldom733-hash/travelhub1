@@ -203,7 +203,14 @@ export class BookingService {
       this.prisma.booking.count({ where: { ...where, status: { in: ['CONFIRMED', 'IN_SERVICE', 'COMPLETED'] as any } } }),
       this.prisma.booking.count({ where: { ...where, status: { in: ['CANCELLED', 'SUPPLIER_REJECTED'] as any } } }),
     ]);
-    return { items, total, page, pageSize, aggregates: { awaiting: countAwaiting, confirmed: countConfirmed, cancelled: countCancelled } };
+    // Enrich bookings with order referenceNumber for canonical display
+    const orderIds = [...new Set(items.map(b => b.orderId).filter(Boolean))] as string[];
+    const orders = orderIds.length > 0
+      ? await this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, referenceNumber: true } })
+      : [];
+    const orderRefMap = new Map(orders.map(o => [o.id, o.referenceNumber]));
+    const enrichedItems = items.map(b => ({ ...b, orderReference: orderRefMap.get(b.orderId) ?? null }));
+    return { items: enrichedItems, total, page, pageSize, aggregates: { awaiting: countAwaiting, confirmed: countConfirmed, cancelled: countCancelled } };
   }
 
   /**
@@ -308,7 +315,7 @@ export class BookingService {
         serviceDate: b.serviceDate?.toISOString() ?? '',
         acquisitionSource: b.acquisitionSource ?? '',
         orderId: b.orderId ?? '',
-        orderCode: order?.code ?? '',
+        orderCode: order?.referenceNumber ?? '',
         orderReference: order?.referenceNumber ?? '',
         partnerId: order?.sellerPartnerId ?? '',
         partnerCode: partner?.code ?? '',

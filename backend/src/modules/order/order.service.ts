@@ -679,7 +679,7 @@ export class OrderService {
         customerCode: customer?.code ?? '',
         customerName: customer ? (customer.companyName ?? `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim()) : '',
         bookingIds: ob.map(b => b.id).join('; '),
-        bookingCodes: ob.map(b => b.code).join('; '),
+        bookingCodes: ob.map(b => b.referenceNumber ?? '').filter(Boolean).join('; '),
         bookingReferences: ob.map(b => b.referenceNumber ?? '').filter(Boolean).join('; '),
         bookingStatuses: ob.map(b => b.status).join('; '),
         paymentIds: op.map(p => p.id).join('; '),

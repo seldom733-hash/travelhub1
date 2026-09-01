@@ -347,8 +347,7 @@ export class CrmController {
     const { rows } = await this.crm.exportCustomerOrders(id, query.status);
     const columns = [
       { header: 'ID', key: 'id', width: 38 },
-      { header: 'Code', key: 'code', width: 16 },
-      { header: 'Number', key: 'number', width: 16 },
+      { header: 'Reference', key: 'referenceNumber', width: 22 },
       { header: 'Status', key: 'status', width: 18 },
       { header: 'Payment Status', key: 'paymentStatus', width: 18 },
       { header: 'Amount', key: 'amount', width: 14 },
@@ -381,11 +380,11 @@ export class CrmController {
     const { rows } = await this.crm.exportCustomerBookings(id, query.bookingStatus);
     const columns = [
       { header: 'ID', key: 'id', width: 38 },
-      { header: 'Code', key: 'code', width: 16 },
+      { header: 'Reference', key: 'referenceNumber', width: 22 },
       { header: 'Status', key: 'status', width: 18 },
       { header: 'Amount', key: 'amount', width: 14 },
       { header: 'Currency', key: 'currency', width: 8 },
-      { header: 'Order Code', key: 'orderCode', width: 16 },
+      { header: 'Order Reference', key: 'orderCode', width: 20 },
       { header: 'Order Number', key: 'orderNumber', width: 16 },
       { header: 'Service Date', key: 'serviceDate', width: 22 },
       { header: 'Created', key: 'createdAt', width: 22 },
@@ -414,12 +413,12 @@ export class CrmController {
     const { rows } = await this.crm.exportCustomerPayments(id, query.paymentStatus);
     const columns = [
       { header: 'ID', key: 'id', width: 38 },
-      { header: 'Code', key: 'code', width: 16 },
+      { header: 'Reference', key: 'referenceNumber', width: 22 },
       { header: 'Status', key: 'status', width: 14 },
       { header: 'Amount', key: 'amount', width: 14 },
       { header: 'Currency', key: 'currency', width: 8 },
       { header: 'Method', key: 'paymentMethod', width: 14 },
-      { header: 'Order Code', key: 'orderCode', width: 16 },
+      { header: 'Order Reference', key: 'orderCode', width: 20 },
       { header: 'Order Number', key: 'orderNumber', width: 16 },
       { header: 'Paid At', key: 'paidAt', width: 22 },
       { header: 'Created', key: 'createdAt', width: 22 },

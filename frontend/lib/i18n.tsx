@@ -1041,7 +1041,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.context.entitled_partners": { ru: "Активные партнёры (marketplace)", az: "Aktiv partnyorlar (marketpleys)", en: "Active partners (marketplace)" },
   "admin.search.placeholder_catalog": { ru: "Поиск по названию или коду…", az: "Ad və ya kod ilə axtar…", en: "Search by name or code…" },
   "admin.search.placeholder_orders": { ru: "Поиск: ORD-…, TH-…", az: "Axtar: ORD-…, TH-…", en: "Search: ORD-…, TH-…" },
-  "admin.search.placeholder_bookings": { ru: "Поиск: BKG-…, ORD-…", az: "Axtar: BKG-…, ORD-…", en: "Search: BKG-…, ORD-…" },
+  "admin.search.placeholder_bookings": { ru: "Поиск: MKT-BKG-…, MKT-ORD-…", az: "Axtar: MKT-BKG-…, MKT-ORD-…", en: "Search: MKT-BKG-…, MKT-ORD-…" },
   "admin.search.placeholder_users": { ru: "Поиск: username, email, имя…", az: "Axtar: username, e-poçt, ad…", en: "Search: username, email, name…" },
   "admin.filter.all_statuses": { ru: "Все статусы", az: "Bütün statuslar", en: "All statuses" },
   "admin.filter.all_types": { ru: "Все типы", az: "Bütün növlər", en: "All types" },

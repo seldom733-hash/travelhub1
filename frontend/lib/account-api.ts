@@ -85,6 +85,7 @@ export interface OwnOrder {
 export interface OwnBooking {
   id: string;
   code: string;
+  referenceNumber: string;
   orderId: string;
   orderCode: string;
   /** Валюта связанного Order (у Booking нет собственной) — authoritative. */

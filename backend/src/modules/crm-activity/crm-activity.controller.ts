@@ -154,6 +154,12 @@ export class CrmActivityController {
     const maxCandidates = pageSize * OVER_FETCH_FACTOR;
 
     const where: any = { customerId };
+    // Platform Marketplace scope: exclude Storefront end-customer commerce events
+    where.NOT = [
+      { sourceType: 'ORDER', metadata: { path: ['acquisitionSource'], equals: 'PARTNER_STOREFRONT' } },
+      { sourceType: 'BOOKING', metadata: { path: ['acquisitionSource'], equals: 'PARTNER_STOREFRONT' } },
+      { sourceType: 'PAYMENT', metadata: { path: ['acquisitionSource'], equals: 'PARTNER_STOREFRONT' } },
+    ];
     if (query.sourceType) where.sourceType = query.sourceType;
     if (query.activityType) where.activityType = query.activityType;
     if (dateFrom || dateTo) {

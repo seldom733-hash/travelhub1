@@ -176,10 +176,10 @@ export interface CustomerDetail extends Customer {
   contacts: { id: string; code: string; name: string; email: string | null; phone: string | null; role: string | null }[];
   history: { id: string; action: string; from: string | null; to: string | null; comment: string | null; createdAt: string }[];
   partnerRelations: PartnerCustomerRelation[];
-  orders: { id: string; code: string; number: string; status: string; paymentStatus: string; amount: string; paidAmount: string; currency: string; createdAt: string }[];
-  bookings: { id: string; code: string; status: string; amount: string; currency: string; orderId: string; productId: string; createdAt: string }[];
-  payments: { id: string; code: string; status: string; amount: string; currency: string; orderId: string; paymentMethod: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string; paidAt: string | null }[];
-  refunds: { id: string; code: string; amount: string; currency: string; status: string; reason: string | null; paymentId: string; orderId: string; paymentCode: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string; processedAt: string | null }[];
+  orders: { id: string; code: string; referenceNumber: string; number: string; status: string; paymentStatus: string; amount: string; paidAmount: string; currency: string; createdAt: string }[];
+  bookings: { id: string; code: string; referenceNumber: string; status: string; amount: string; currency: string; orderId: string; productId: string; createdAt: string }[];
+  payments: { id: string; code: string; referenceNumber: string; status: string; amount: string; currency: string; orderId: string; paymentMethod: string | null; orderCode: string; orderNumber: string | null; createdAt: string; paidAt: string | null }[];
+  refunds: { id: string; code: string; referenceNumber: string | null; amount: string; currency: string; status: string; reason: string | null; paymentId: string; orderId: string; paymentCode: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string; processedAt: string | null }[];
   summary: { totalOrders: number; totalBookings: number; totalPayments: number; totalRefunds: number };
 }
 
@@ -213,9 +213,9 @@ export interface PartnerDetail extends Partner {
   customerRelations: PartnerCustomerRelation[];
   products: { id: string; code: string; title: string; type: string; status: string; slug: string; createdAt: string }[];
   totalProducts: number;
-  orders: { id: string; code: string; number: string; status: string; paymentStatus: string; amount: string; currency: string; customerId: string | null; createdAt: string }[];
+  orders: { id: string; code: string; referenceNumber: string; number: string; status: string; paymentStatus: string; amount: string; currency: string; customerId: string | null; createdAt: string }[];
   totalOrders: number;
-  bookings: { id: string; code: string; status: string; amount: string; currency: string; orderId: string; createdAt: string }[];
+  bookings: { id: string; code: string; referenceNumber: string | null; status: string; amount: string; currency: string; orderId: string; createdAt: string }[];
   totalBookings: number;
   totalCustomers: number;
   commercialCustomers: { customerId: string; customerCode: string | null; firstName: string | null; lastName: string | null; companyName: string | null; email: string | null; customerStatus: string | null; orderCount: number; bookingCount: number; totalAmount: number; currency: string; lastActivity: string; lifecycle: string | null; leadSource: string | null; assignedTo: string | null }[];
@@ -303,6 +303,7 @@ export interface Booking {
   code: string;
   referenceNumber: string;
   orderId: string;
+  orderReference: string | null;
   productId: string;
   status: string;
   amount: string;

@@ -175,7 +175,6 @@ export class OrderController {
     const columns = [
       { header: 'ID', key: 'id', width: 38 },
       { header: 'Reference', key: 'referenceNumber', width: 22 },
-      { header: 'Code', key: 'code', width: 22 },
       { header: 'Status', key: 'status', width: 18 },
       { header: 'Payment Status', key: 'paymentStatus', width: 18 },
       { header: 'Amount', key: 'amount', width: 14 },
@@ -190,7 +189,6 @@ export class OrderController {
       { header: 'Customer Code', key: 'customerCode', width: 16 },
       { header: 'Customer Name', key: 'customerName', width: 28 },
       { header: 'Booking IDs', key: 'bookingIds', width: 40 },
-      { header: 'Booking Codes', key: 'bookingCodes', width: 28 },
       { header: 'Booking References', key: 'bookingReferences', width: 28 },
       { header: 'Booking Statuses', key: 'bookingStatuses', width: 28 },
       { header: 'Payment IDs', key: 'paymentIds', width: 40 },

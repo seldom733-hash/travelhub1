@@ -495,9 +495,9 @@ export class CrmService {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { id: true } });
     if (!customer) throw new NotFoundError(`Customer ${customerId} not found`);
 
-    // Get distinct partners from customer's orders
+    // Get distinct partners from customer's Marketplace-scoped orders
     const partnerOrders = await this.prisma.order.findMany({
-      where: { customerId },
+      where: { customerId, acquisitionSource: { not: 'PARTNER_STOREFRONT' as const } },
       select: { sellerPartnerId: true, id: true, amount: true, currency: true, createdAt: true, status: true },
     });
 
@@ -778,7 +778,7 @@ export class CrmService {
         { createdAt: 'desc' },
       ),
       take: 20,
-      select: { id: true, code: true, number: true, status: true, paymentStatus: true, amount: true, currency: true, customerId: true, createdAt: true },
+      select: { id: true, code: true, referenceNumber: true, number: true, status: true, paymentStatus: true, amount: true, currency: true, customerId: true, createdAt: true },
     });
     const totalOrders = await this.prisma.order.count({ where: orderWhere });
 
@@ -812,7 +812,7 @@ export class CrmService {
             { createdAt: 'desc' },
           ),
           take: 20,
-          select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, createdAt: true },
+          select: { id: true, code: true, referenceNumber: true, status: true, amount: true, currency: true, orderId: true, createdAt: true },
         })
       : [];
     const totalBookings = partnerProductIds.length > 0
@@ -918,8 +918,14 @@ export class CrmService {
     });
     if (!customer) throw new NotFoundError(`Customer ${id} not found`);
 
-    // Aggregate orders from direct customerId reference
-    const orderWhere: any = { customerId: id };
+    // ── Platform Marketplace business scope (Round 2) ──────────────────
+    // Exclude Storefront end-customer commerce from Platform Customer 360.
+    // A mixed Customer (MKT + SF activity) is visible thanks to Marketplace
+    // relationship, but only Marketplace-scoped customer commerce is shown.
+    const MARKETPLACE_SCOPE = { acquisitionSource: { not: 'PARTNER_STOREFRONT' as const } };
+
+    // Aggregate orders from direct customerId reference — Marketplace scope only
+    const orderWhere: any = { customerId: id, ...MARKETPLACE_SCOPE };
     if (sort?.status) orderWhere.status = sort.status;
     const orders = await this.prisma.order.findMany({
       where: orderWhere,
@@ -930,7 +936,7 @@ export class CrmService {
         { createdAt: 'desc' },
       ),
       take: 20,
-      select: { id: true, code: true, number: true, status: true, paymentStatus: true, amount: true, paidAmount: true, currency: true, createdAt: true },
+      select: { id: true, code: true, referenceNumber: true, number: true, status: true, paymentStatus: true, amount: true, paidAmount: true, currency: true, createdAt: true },
     });
 
     // ── Canonical Payment Ownership (Round 2C.2R) ─────────────────────────
@@ -942,9 +948,9 @@ export class CrmService {
     // orderIds from the paginated orders (for UI bookings tab)
     const orderIds = orders.map((o) => o.id);
 
-    // Get ALL order IDs for this customer (no limit) for payment resolution
+    // Get ALL Marketplace-scoped order IDs for this customer (no limit) for payment resolution
     const allOrderIds = (await this.prisma.order.findMany({
-      where: { customerId: id },
+      where: { customerId: id, ...MARKETPLACE_SCOPE },
       select: { id: true },
     })).map((o) => o.id);
 
@@ -962,7 +968,7 @@ export class CrmService {
               { createdAt: 'desc' },
             ),
             take: 20,
-            select: { id: true, code: true, status: true, amount: true, currency: true, orderId: true, productId: true, createdAt: true },
+            select: { id: true, code: true, referenceNumber: true, status: true, amount: true, currency: true, orderId: true, productId: true, createdAt: true },
           })
         : Promise.resolve([]),
       this.prisma.order.count({ where: orderWhere }),
@@ -974,7 +980,9 @@ export class CrmService {
     // allOrderIds = ALL order IDs (for canonical payment resolution)
 
     // Canonical payments: direct + order-derived, deduped
-    const paymentSelect = { id: true, code: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true, paidAt: true } as const;
+    const paymentSelect = { id: true, code: true, referenceNumber: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true, paidAt: true } as const;
+    // Scope direct payments: exclude those linked to Storefront orders
+    // (a direct Payment.customerId match but orderId → PARTNER_STOREFRONT is excluded)
     const directPaymentWhere: any = { customerId: id };
     if (sort?.paymentStatus) directPaymentWhere.status = sort.paymentStatus;
     const orderPaymentWhere: any = allOrderIds.length > 0 ? { orderId: { in: allOrderIds } } : { orderId: '__none__' };
@@ -996,7 +1004,14 @@ export class CrmService {
     const paymentMapById = new Map<string, typeof directPayments[number]>();
     for (const p of orderPayments) paymentMapById.set(p.id, p);
     for (const p of directPayments) paymentMapById.set(p.id, p); // direct overwrites if dual-link
-    let canonicalPayments = Array.from(paymentMapById.values());
+    // Platform Marketplace scope: exclude payments linked to Storefront orders
+    const scopedOrderIds = new Set(allOrderIds);
+    let canonicalPayments = Array.from(paymentMapById.values()).filter((p) => {
+      // Keep payments with no orderId (direct payments without order link)
+      if (!p.orderId) return true;
+      // Keep payments linked to Marketplace-scoped orders
+      return scopedOrderIds.has(p.orderId);
+    });
 
     // Deterministic sort on merged set
     const paymentSortKey = sort?.sortBy === 'paymentDate' ? 'paidAt'
@@ -1020,22 +1035,22 @@ export class CrmService {
 
     // Enrich payments with Order context (code, number, item count)
     // orderMap includes both paginated orders (full objects) and on-demand fetched ones
-    const orderMap = new Map<string, { code: string; number: string }>();
-    for (const o of orders) orderMap.set(o.id, { code: o.code, number: o.number });
-    // For orders not in the paginated set, fetch their code/number on demand
+    const orderMap = new Map<string, { referenceNumber: string; number: string }>();
+    for (const o of orders) orderMap.set(o.id, { referenceNumber: o.referenceNumber, number: o.number });
+    // For orders not in the paginated set, fetch their referenceNumber/number on demand
     const missingOrderIds = canonicalPayments
       .map(p => p.orderId)
       .filter((oid): oid is string => !!oid && !orderMap.has(oid));
     if (missingOrderIds.length > 0) {
       const missingOrders = await this.prisma.order.findMany({
         where: { id: { in: missingOrderIds } },
-        select: { id: true, code: true, number: true },
+        select: { id: true, code: true, referenceNumber: true, number: true },
       });
-      for (const o of missingOrders) orderMap.set(o.id, { code: o.code, number: o.number });
+      for (const o of missingOrders) orderMap.set(o.id, { referenceNumber: o.referenceNumber, number: o.number });
     }
     const enrichedPayments = canonicalPayments.map((p) => ({
       ...p,
-      orderCode: orderMap.get(p.orderId!)?.code ?? null,
+      orderCode: orderMap.get(p.orderId!)?.referenceNumber ?? null,
       orderNumber: orderMap.get(p.orderId!)?.number ?? null,
     }));
 
@@ -1052,7 +1067,7 @@ export class CrmService {
               { createdAt: 'desc' },
             ),
             take: 20,
-            select: { id: true, code: true, amount: true, currency: true, status: true, reason: true, paymentId: true, orderId: true, createdAt: true, processedAt: true },
+            select: { id: true, code: true, referenceNumber: true, amount: true, currency: true, status: true, reason: true, paymentId: true, orderId: true, createdAt: true, processedAt: true },
           }),
           this.prisma.refund.count({ where: { paymentId: { in: paymentIds } } }),
         ])
@@ -1063,7 +1078,7 @@ export class CrmService {
     const enrichedRefunds = refunds.map((r) => ({
       ...r,
       paymentCode: paymentLookup.get(r.paymentId)?.code ?? null,
-      orderCode: orderMap.get(r.orderId)?.code ?? null,
+      orderCode: orderMap.get(r.orderId)?.referenceNumber ?? null,
       orderNumber: orderMap.get(r.orderId)?.number ?? null,
     }));
 
@@ -1736,13 +1751,13 @@ export class CrmService {
   // ── Customer 360 scoped exports (no pagination) ──────────────────────
 
   async exportCustomerOrders(customerId: string, status?: string) {
-    const where: any = { customerId };
+    const where: any = { customerId, acquisitionSource: { not: 'PARTNER_STOREFRONT' as const } };
     if (status) where.status = status;
     const rows = await this.prisma.order.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true, code: true, number: true, status: true, paymentStatus: true,
+        id: true, referenceNumber: true, status: true, paymentStatus: true,
         amount: true, paidAmount: true, currency: true, createdAt: true, updatedAt: true,
         sellerPartnerId: true,
       },
@@ -1756,8 +1771,8 @@ export class CrmService {
   }
 
   async exportCustomerBookings(customerId: string, bookingStatus?: string) {
-    // Get all order IDs for this customer
-    const orderIds = (await this.prisma.order.findMany({ where: { customerId }, select: { id: true } })).map(o => o.id);
+    // Get all Marketplace-scoped order IDs for this customer
+    const orderIds = (await this.prisma.order.findMany({ where: { customerId, acquisitionSource: { not: 'PARTNER_STOREFRONT' as const } }, select: { id: true } })).map(o => o.id);
     if (orderIds.length === 0) return { rows: [] };
     const where: any = { orderId: { in: orderIds } };
     if (bookingStatus) where.status = bookingStatus;
@@ -1765,20 +1780,20 @@ export class CrmService {
       where,
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true, code: true, status: true, amount: true, currency: true,
+        id: true, referenceNumber: true, status: true, amount: true, currency: true,
         orderId: true, productId: true, createdAt: true, updatedAt: true, serviceDate: true,
       },
     });
     // Enrich with order code
-    const allOrders = await this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, code: true, number: true } });
-    const orderMap = new Map(allOrders.map(o => [o.id, { code: o.code, number: o.number }]));
-    return { rows: rows.map(r => ({ ...r, orderCode: orderMap.get(r.orderId)?.code ?? '', orderNumber: orderMap.get(r.orderId)?.number ?? '' })) };
+    const allOrders = await this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, code: true, referenceNumber: true, number: true } });
+    const orderMap = new Map(allOrders.map(o => [o.id, { referenceNumber: o.referenceNumber, number: o.number }]));
+    return { rows: rows.map(r => ({ ...r, orderCode: orderMap.get(r.orderId)?.referenceNumber ?? '', orderNumber: orderMap.get(r.orderId)?.number ?? '' })) };
   }
 
   async exportCustomerPayments(customerId: string, paymentStatus?: string) {
-    // Canonical payment resolution: direct + order-derived, deduped
-    const allOrderIds = (await this.prisma.order.findMany({ where: { customerId }, select: { id: true } })).map(o => o.id);
-    const paymentSelect = { id: true, code: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true, paidAt: true } as const;
+    // Canonical payment resolution: direct + order-derived, deduped — Marketplace scope only
+    const allOrderIds = (await this.prisma.order.findMany({ where: { customerId, acquisitionSource: { not: 'PARTNER_STOREFRONT' as const } }, select: { id: true } })).map(o => o.id);
+    const paymentSelect = { id: true, code: true, referenceNumber: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true, paidAt: true } as const;
     const directWhere: any = { customerId };
     if (paymentStatus) directWhere.status = paymentStatus;
     const orderWhere: any = allOrderIds.length > 0 ? { orderId: { in: allOrderIds } } : { orderId: '__none__' };
@@ -1790,14 +1805,19 @@ export class CrmService {
     const map = new Map<string, typeof direct[number]>();
     for (const p of orderDerived) map.set(p.id, p);
     for (const p of direct) map.set(p.id, p);
-    const rows = Array.from(map.values());
+    // Platform Marketplace scope: exclude payments linked to Storefront orders
+    const scopedOrderSet = new Set(allOrderIds);
+    const rows = Array.from(map.values()).filter((p) => {
+      if (!p.orderId) return true; // direct payments without order link
+      return scopedOrderSet.has(p.orderId);
+    });
     // Enrich with order code
     const enrichOrderIds = [...new Set(rows.map(r => r.orderId).filter(Boolean))];
-    const orders = enrichOrderIds.length > 0 ? await this.prisma.order.findMany({ where: { id: { in: enrichOrderIds } }, select: { id: true, code: true, number: true } }) : [];
-    const enrichOrderMap = new Map(orders.map(o => [o.id, { code: o.code, number: o.number }]));
+    const orders = enrichOrderIds.length > 0 ? await this.prisma.order.findMany({ where: { id: { in: enrichOrderIds } }, select: { id: true, code: true, referenceNumber: true, number: true } }) : [];
+    const enrichOrderMap = new Map(orders.map(o => [o.id, { referenceNumber: o.referenceNumber, number: o.number }]));
     return { rows: rows.map(r => ({
       ...r,
-      orderCode: enrichOrderMap.get(r.orderId ?? '')?.code ?? '',
+      orderCode: enrichOrderMap.get(r.orderId ?? '')?.referenceNumber ?? '',
       orderNumber: enrichOrderMap.get(r.orderId ?? '')?.number ?? '',
     })) };
   }
@@ -1810,9 +1830,9 @@ export class CrmService {
     });
     const partnerIds = relations.map(r => r.partnerId);
     if (partnerIds.length === 0) return { rows: [] };
-    // Get orders with sellerPartnerId for this customer
+    // Get Marketplace-scoped orders with sellerPartnerId for this customer
     const customerOrders: any[] = await (this.prisma.order.findMany({
-      where: { customerId } as any,
+      where: { customerId, acquisitionSource: { not: 'PARTNER_STOREFRONT' as const } } as any,
       select: { id: true, sellerPartnerId: true, amount: true },
     }) as any);
     // Compute per-partner order count and amount

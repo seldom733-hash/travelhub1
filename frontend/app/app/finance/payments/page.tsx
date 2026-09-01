@@ -24,6 +24,7 @@ import { useLocale, t, formatPrice } from "@/lib/i18n";
 interface Payment {
   id: string;
   code: string;
+  referenceNumber: string;
   orderId: string;
   customerId: string | null;
   partnerId: string | null;
@@ -266,7 +267,7 @@ function PaymentsContent({
                         href={`/app/finance/payments/${p.code}`}
                         className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline"
                       >
-                        {p.code}
+                        {p.referenceNumber}
                       </Link>
                     </td>
                     <td className="px-4 py-2.5 text-xs text-slate-500">

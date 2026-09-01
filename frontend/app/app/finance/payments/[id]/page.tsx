@@ -18,6 +18,7 @@ import { useLocale, t, formatPrice } from "@/lib/i18n";
 interface PaymentDetail {
   id: string;
   code: string;
+  referenceNumber: string;
   orderId: string;
   customerId: string | null;
   partnerId: string | null;
@@ -84,7 +85,7 @@ export default function PaymentDetailPage() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader
-        title={payment?.code ?? t("common.detail", locale)}
+        title={payment?.referenceNumber ?? t("common.detail", locale)}
         breadcrumbs={[
           "TravelHub",
           t("finance.payments.title", locale) || "Платежи",
@@ -121,7 +122,7 @@ export default function PaymentDetailPage() {
                   {fmt(payment.amount, payment.currency)}
                 </div>
                 <div className="text-xs text-slate-400">
-                  {t("common.id", locale)}: {payment.code}
+                  {t("common.id", locale)}: {payment.referenceNumber}
                 </div>
               </div>
               <StatusBadge status={payment.status} />
@@ -133,7 +134,7 @@ export default function PaymentDetailPage() {
                 {t("common.detail", locale)}
               </h3>
               <div className="divide-y divide-slate-100">
-                <DetailRow label={t("finance.col.code", locale) || "Код"} value={payment.code} />
+                <DetailRow label={t("finance.col.code", locale) || "Код"} value={payment.referenceNumber} />
                 <DetailRow label={t("finance.col.status", locale) || "Статус"} value={<StatusBadge status={payment.status} />} />
                 <DetailRow label={t("finance.col.amount", locale) || "Сумма"} value={fmt(payment.amount, payment.currency)} />
                 <DetailRow label={t("finance.col.currency", locale) || "Валюта"} value={payment.currency} />

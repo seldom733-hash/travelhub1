@@ -232,7 +232,7 @@ export class AccountService {
     // Сначала заказы покупателя (доказанная связь), затем их бронирования.
     const orders = await this.prisma.order.findMany({
       where: { customerId: user.customerId },
-      select: { id: true, code: true, currency: true },
+      select: { id: true, code: true, referenceNumber: true, currency: true },
     });
     if (orders.length === 0) return { items: [], total: 0, page, pageSize, hasMore: false };
 
@@ -251,7 +251,7 @@ export class AccountService {
         id: b.id,
         code: b.code,
         orderId: b.orderId,
-        orderCode: orderById.get(b.orderId)?.code ?? "",
+        orderCode: orderById.get(b.orderId)?.referenceNumber ?? "",
         currency: orderById.get(b.orderId)?.currency ?? "USD",
         status: b.status,
         amount: b.amount.toString(),

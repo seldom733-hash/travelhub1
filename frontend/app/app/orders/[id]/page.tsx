@@ -14,6 +14,7 @@ interface OrderDetail {
   id: string;
   code: string;
   number: string;
+  referenceNumber: string;
   status: string;
   paymentStatus: string;
   amount: string;
@@ -70,16 +71,15 @@ export default function OrderDetailPage() {
   return (
     <div className="flex h-full flex-col">
       <PageHeader
-        title={`${order.code} · ${order.number}`}
-        breadcrumbs={["TravelHub", t("orders.title", locale), order.code]}
+        title={order.referenceNumber}
+        breadcrumbs={["TravelHub", t("orders.title", locale), order.referenceNumber]}
         actions={<Link href="/app/orders" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">← {t("crm.back_to_list", locale)}</Link>}
       />
 
       <div className="border-b border-slate-200 bg-white px-6 py-4">
         <div className="flex items-center gap-4">
           <div>
-            <div className="font-mono text-xs text-blue-600">{order.code}</div>
-            <div className="text-lg font-bold text-slate-900">{order.number}</div>
+            <div className="font-mono text-xs text-blue-600">{order.referenceNumber}</div>
             <div className="mt-1 flex items-center gap-2">
               <StatusBadge status={order.status} />
               <StatusBadge status={order.paymentStatus} />
