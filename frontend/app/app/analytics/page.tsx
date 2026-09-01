@@ -188,27 +188,52 @@ function AnalyticsContent() {
         </div>
       )}
 
-      {/* ── KPI Cards with Shared Drill-down ── */}
+      {/* ── MARKETPLACE Section ── */}
       {m && (
-        <Kpi
-          period={periodContext}
-          items={[
-            { label: t("analytics.kpi.gmv", locale), value: fmt(m.gmv.current, m.gmvCurrency), icon: "\uD83D\uDCB0", drilldown: METRIC_CONFIGS["analytics.gmv"] },
-            { label: t("analytics.kpi.revenue", locale), value: fmt(m.revenue.current, m.revenueCurrency), icon: "\uD83D\uDCC8", drilldown: METRIC_CONFIGS["analytics.revenue"] },
-            { label: t("analytics.kpi.net_revenue", locale), value: fmt(m.netRevenue.current, m.revenueCurrency), icon: "\uD83D\uDCCA", drilldown: METRIC_CONFIGS["analytics.revenue"] },
-            { label: t("analytics.kpi.commission", locale), value: fmt(m.commissionAccrued.current, m.commissionCurrency), icon: "\uD83C\uDFE6", drilldown: METRIC_CONFIGS["analytics.commission"] },
-            { label: t("analytics.kpi.orders", locale), value: m.ordersCreated.current, icon: "\uD83D\uDDCE\uFE0F", drilldown: METRIC_CONFIGS["analytics.orders"] },
-            { label: t("analytics.kpi.bookings", locale), value: m.bookingsRequested.current, icon: "\uD83D\uDCD1", drilldown: METRIC_CONFIGS["analytics.bookings"] },
-            { label: t("analytics.kpi.aov", locale), value: fmt(m.averageOrderValue.current, m.gmvCurrency), icon: "\uD83C\uDFAF", drilldown: METRIC_CONFIGS["analytics.aov"] },
-            { label: t("analytics.kpi.refunds", locale), value: fmt(m.refunds.current, m.refundsCurrency), icon: "\u21A9\uFE0F", drilldown: METRIC_CONFIGS["analytics.refunds"] },
-            { label: t("analytics.kpi.sessions", locale), value: (m.marketplaceSessions.current ?? 0) + (m.storefrontSessions.current ?? 0), icon: "\uD83C\uDF10", drilldown: METRIC_CONFIGS["analytics.sessions"] },
-            { label: t("analytics.kpi.customers", locale), value: m.totalActiveCustomers?.current ?? (m.marketplaceCustomers.current ?? 0) + (m.storefrontCustomers.current ?? 0), icon: "\uD83D\uDC65", drilldown: METRIC_CONFIGS["analytics.customers"] },
-            { label: t("analytics.kpi.partners", locale), value: m.totalActivePartners?.current ?? (m.marketplacePartners.current ?? 0) + (m.storefrontPartners.current ?? 0), icon: "\uD83E\uDD1D", drilldown: METRIC_CONFIGS["analytics.partners"] },
-            { label: t("analytics.kpi.qualified_gmv", locale), value: fmt(m.qualifiedGmv.current, m.gmvCurrency), icon: "\u2705", drilldown: METRIC_CONFIGS["analytics.qualified_gmv"] },
-            { label: t("analytics.kpi.collected_gmv", locale), value: fmt(m.collectedGmv.current, m.gmvCurrency), icon: "\uD83D\uDCB5", drilldown: METRIC_CONFIGS["analytics.collected_gmv"] },
-            { label: t("analytics.kpi.outstanding_gmv", locale), value: fmt(m.outstandingGmv.current, m.gmvCurrency), icon: "\u23F3", drilldown: METRIC_CONFIGS["analytics.outstanding_gmv"] },
-          ]}
-        />
+        <>
+          <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-5 py-3">
+            <h2 className="text-base font-semibold text-blue-800">{t("analytics.section.marketplace", locale)}</h2>
+            <p className="mt-0.5 text-xs text-blue-600/70">{t("analytics.section.marketplace.desc", locale)}</p>
+          </div>
+          <Kpi
+            period={periodContext}
+            items={[
+              { label: t("analytics.kpi.gmv", locale), value: fmt(m.gmv.current, m.gmvCurrency), icon: "\uD83D\uDCB0", drilldown: METRIC_CONFIGS["analytics.gmv"] },
+              { label: t("analytics.kpi.revenue", locale), value: fmt(m.revenue.current, m.revenueCurrency), icon: "\uD83D\uDCC8", drilldown: METRIC_CONFIGS["analytics.revenue"] },
+              { label: t("analytics.kpi.net_revenue", locale), value: fmt(m.netRevenue.current, m.revenueCurrency), icon: "\uD83D\uDCCA", drilldown: METRIC_CONFIGS["analytics.revenue"] },
+              { label: t("analytics.kpi.commission", locale), value: fmt(m.commissionAccrued.current, m.commissionCurrency), icon: "\uD83C\uDFE6", drilldown: METRIC_CONFIGS["analytics.commission"] },
+              { label: t("analytics.kpi.orders", locale), value: m.ordersCreated.current, icon: "\uD83D\uDDCE\uFE0F", drilldown: METRIC_CONFIGS["analytics.orders"] },
+              { label: t("analytics.kpi.bookings", locale), value: m.bookingsRequested.current, icon: "\uD83D\uDCD1", drilldown: METRIC_CONFIGS["analytics.bookings"] },
+              { label: t("analytics.kpi.aov", locale), value: fmt(m.averageOrderValue.current, m.gmvCurrency), icon: "\uD83C\uDFAF", drilldown: METRIC_CONFIGS["analytics.aov"] },
+              { label: t("analytics.kpi.refunds", locale), value: fmt(m.refunds.current, m.refundsCurrency), icon: "\u21A9\uFE0F", drilldown: METRIC_CONFIGS["analytics.refunds"] },
+              { label: t("analytics.kpi.marketplace_visitors", locale), value: m.marketplaceVisitors?.current ?? 0, icon: "\uD83D\uDC64", drilldown: METRIC_CONFIGS["analytics.sessions"] },
+              { label: t("analytics.kpi.marketplace_visits", locale), value: m.marketplaceVisits?.current ?? 0, icon: "\uD83C\uDF10", drilldown: METRIC_CONFIGS["analytics.sessions"] },
+              { label: t("analytics.kpi.partners", locale), value: m.marketplacePartners?.current ?? 0, icon: "\uD83E\uDD1D", drilldown: METRIC_CONFIGS["analytics.partners"] },
+              { label: t("analytics.kpi.customers", locale), value: m.marketplaceCustomers?.current ?? 0, icon: "\uD83D\uDC65", drilldown: METRIC_CONFIGS["analytics.customers"] },
+              { label: t("analytics.kpi.qualified_gmv", locale), value: fmt(m.qualifiedGmv.current, m.gmvCurrency), icon: "\u2705", drilldown: METRIC_CONFIGS["analytics.qualified_gmv"] },
+              { label: t("analytics.kpi.collected_gmv", locale), value: fmt(m.collectedGmv.current, m.gmvCurrency), icon: "\uD83D\uDCB5", drilldown: METRIC_CONFIGS["analytics.collected_gmv"] },
+              { label: t("analytics.kpi.outstanding_gmv", locale), value: fmt(m.outstandingGmv.current, m.gmvCurrency), icon: "\u23F3", drilldown: METRIC_CONFIGS["analytics.outstanding_gmv"] },
+            ]}
+          />
+        </>
+      )}
+
+      {/* ── STOREFRONT SaaS Section ── */}
+      {m && (
+        <>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 px-5 py-3">
+            <h2 className="text-base font-semibold text-emerald-800">{t("analytics.section.storefrontSaaS", locale)}</h2>
+            <p className="mt-0.5 text-xs text-emerald-600/70">{t("analytics.section.storefrontSaaS.desc", locale)}</p>
+          </div>
+          <Kpi
+            period={periodContext}
+            items={[
+              { label: t("analytics.kpi.storefront_sessions", locale), value: m.storefrontSessions?.current ?? 0, icon: "\uD83D\uDCF1" },
+              { label: t("analytics.kpi.storefront_partners", locale), value: m.storefrontPartners?.current ?? 0, icon: "\uD83C\uDFEA" },
+              { label: t("analytics.kpi.storefront_customers", locale), value: m.storefrontCustomers?.current ?? 0, icon: "\uD83D\uDC65" },
+            ]}
+          />
+        </>
       )}
 
       {ordersBucketSum != null && m && ordersBucketSum !== m.ordersCreated.current && (

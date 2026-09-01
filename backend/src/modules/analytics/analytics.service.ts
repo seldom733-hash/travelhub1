@@ -190,6 +190,10 @@ export interface CompanyKpiResponse {
     refundsProcessed: ComparisonValue<number>;
     marketplaceSessions: ComparisonValue<number>;
     storefrontSessions: ComparisonValue<number>;
+    /** Phase 3 Pre-3.12: Marketplace Visitors = COUNT(DISTINCT visitorId) */
+    marketplaceVisitors: ComparisonValue<number>;
+    /** Phase 3 Pre-3.12: Marketplace Visits = COUNT(DISTINCT sessionId) from Marketplace only */
+    marketplaceVisits: ComparisonValue<number>;
     marketplacePartners: ComparisonValue<number>;
     storefrontPartners: ComparisonValue<number>;
     totalActivePartners: ComparisonValue<number>;
@@ -417,25 +421,26 @@ export class AnalyticsService {
     const { current, comparison } = this.resolveQueryPeriod(dto);
     const prev = dto.comparison !== false ? comparison : undefined;
 
+    // ── Phase 1: Independent queries (Marketplace-scoped orders/bookings) ──
+    // All commerce metrics must reflect Marketplace operational scope only.
+    // Payments/refunds/commissions require order IDs → fetched in Phase 2.
     const [
       orders,
       prevOrders,
       bookings,
       prevBookings,
-      payments,
-      prevPayments,
-      refunds,
-      commissions,
-      prevCommissions,
       marketplaceCustomers,
       storefrontCustomers,
       behavioralMarketplace,
       behavioralStorefront,
+      marketplaceVisitorsRaw,
+      marketplaceVisitsRaw,
       marketplacePartners,
       storefrontPartners,
     ] = await Promise.all([
       this.prisma.order.findMany({
         where: {
+          acquisitionSource: "MARKETPLACE",
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
         select: { id: true, amount: true, paidAmount: true, currency: true, status: true },
@@ -443,6 +448,7 @@ export class AnalyticsService {
       prev
         ? this.prisma.order.findMany({
             where: {
+              acquisitionSource: "MARKETPLACE",
               createdAt: { gte: prev.start, lt: prev.endExclusive },
             },
             select: { id: true },
@@ -450,6 +456,7 @@ export class AnalyticsService {
         : Promise.resolve([]),
       this.prisma.booking.findMany({
         where: {
+          acquisitionSource: "MARKETPLACE",
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
         select: { id: true, status: true },
@@ -457,42 +464,10 @@ export class AnalyticsService {
       prev
         ? this.prisma.booking.findMany({
             where: {
+              acquisitionSource: "MARKETPLACE",
               createdAt: { gte: prev.start, lt: prev.endExclusive },
             },
             select: { id: true },
-          })
-        : Promise.resolve([]),
-      // HIGH-1: Revenue uses Payment.paidAt
-      this.prisma.payment.findMany({
-        where: revenueWhere(current.start, current.endExclusive),
-        select: { id: true, amount: true, currency: true },
-      }),
-      prev
-        ? this.prisma.payment.findMany({
-            where: revenueWhere(prev.start, prev.endExclusive),
-            select: { id: true, amount: true, currency: true },
-          })
-        : Promise.resolve([]),
-      // Refunds: processedAt
-      this.prisma.refund.findMany({
-        where: {
-          status: "PROCESSED",
-          processedAt: { gte: current.start, lt: current.endExclusive },
-        },
-        select: { id: true, amount: true, currency: true },
-      }),
-      this.prisma.commission.findMany({
-        where: {
-          createdAt: { gte: current.start, lt: current.endExclusive },
-        },
-        select: { id: true, amount: true, currency: true },
-      }),
-      prev
-        ? this.prisma.commission.findMany({
-            where: {
-              createdAt: { gte: prev.start, lt: prev.endExclusive },
-            },
-            select: { id: true, amount: true, currency: true },
           })
         : Promise.resolve([]),
       // Marketplace customers: unique buyers who placed orders via MARKETPLACE
@@ -503,7 +478,7 @@ export class AnalyticsService {
         },
         select: { customerId: true },
       }),
-      // Storefront customers: unique buyers who placed orders via PARTNER_STOREFRONT
+      // Storefront customers: unique buyers who placed orders via PARTNER_STOREFRONT (for Storefront SaaS section)
       this.prisma.order.findMany({
         where: {
           acquisitionSource: "PARTNER_STOREFRONT",
@@ -521,6 +496,19 @@ export class AnalyticsService {
         FROM catalog."StorefrontBehavioralEvent"
         WHERE "occurredAt" >= ${current.start} AND "occurredAt" < ${current.endExclusive}
       `,
+      // Phase 3 Pre-3.12: Marketplace Visitors = COUNT(DISTINCT visitorId) from Marketplace only
+      this.prisma.$queryRaw<{ cnt: bigint }[]>`
+        SELECT COUNT(DISTINCT "visitorId") as cnt
+        FROM catalog."MarketplaceBehavioralEvent"
+        WHERE "occurredAt" >= ${current.start} AND "occurredAt" < ${current.endExclusive}
+          AND "visitorId" IS NOT NULL
+      `,
+      // Phase 3 Pre-3.12: Marketplace Visits = COUNT(DISTINCT sessionId) from Marketplace only
+      this.prisma.$queryRaw<{ cnt: bigint }[]>`
+        SELECT COUNT(DISTINCT "sessionId") as cnt
+        FROM catalog."MarketplaceBehavioralEvent"
+        WHERE "occurredAt" >= ${current.start} AND "occurredAt" < ${current.endExclusive}
+      `,
       // Marketplace partners: partners with ≥1 PUBLISHED product in MARKETPLACE channel
       this.prisma.$queryRaw<{ cnt: bigint }[]>`
         SELECT COUNT(DISTINCT p."partnerId") as cnt
@@ -534,6 +522,61 @@ export class AnalyticsService {
         FROM catalog."PartnerStorefront"
         WHERE "entitlementStatus" = 'ACTIVE' AND "partnerId" IS NOT NULL
       `,
+    ]);
+
+    // ── Phase 2: Dependent queries (filtered by marketplace order IDs) ──
+    const marketplaceOrderIds = orders.map((o) => o.id);
+    const prevMarketplaceOrderIds = prevOrders.map((o) => o.id);
+    const [payments, prevPayments, refunds, commissions, prevCommissions] = await Promise.all([
+      // Payments scoped to Marketplace orders (Payment has no acquisitionSource)
+      marketplaceOrderIds.length > 0
+        ? this.prisma.payment.findMany({
+            where: {
+              orderId: { in: marketplaceOrderIds },
+              ...revenueWhere(current.start, current.endExclusive),
+            },
+            select: { id: true, amount: true, currency: true },
+          })
+        : Promise.resolve([]),
+      prev && prevMarketplaceOrderIds.length > 0
+        ? this.prisma.payment.findMany({
+            where: {
+              orderId: { in: prevMarketplaceOrderIds },
+              ...revenueWhere(prev.start, prev.endExclusive),
+            },
+            select: { id: true, amount: true, currency: true },
+          })
+        : Promise.resolve([]),
+      // Refunds scoped to Marketplace orders
+      marketplaceOrderIds.length > 0
+        ? this.prisma.refund.findMany({
+            where: {
+              orderId: { in: marketplaceOrderIds },
+              status: "PROCESSED",
+              processedAt: { gte: current.start, lt: current.endExclusive },
+            },
+            select: { id: true, amount: true, currency: true },
+          })
+        : Promise.resolve([]),
+      // Commissions scoped to Marketplace orders
+      marketplaceOrderIds.length > 0
+        ? this.prisma.commission.findMany({
+            where: {
+              orderId: { in: marketplaceOrderIds },
+              createdAt: { gte: current.start, lt: current.endExclusive },
+            },
+            select: { id: true, amount: true, currency: true },
+          })
+        : Promise.resolve([]),
+      prev && prevMarketplaceOrderIds.length > 0
+        ? this.prisma.commission.findMany({
+            where: {
+              orderId: { in: prevMarketplaceOrderIds },
+              createdAt: { gte: prev.start, lt: prev.endExclusive },
+            },
+            select: { id: true, amount: true, currency: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     // HIGH-2: Decimal arithmetic
@@ -572,26 +615,23 @@ export class AnalyticsService {
         cnt === 0 ? "0.00" : (parseFloat(gmvStr) / cnt).toFixed(2);
     }
 
-    // Previous period GMV (for comparison)
+    // Previous period GMV (for comparison) — Marketplace-scoped
     const prevGmvData = prev
       ? await this.prisma.order.findMany({
           where: {
+            acquisitionSource: "MARKETPLACE",
             status: { in: ["FULFILLED", "CLOSED"] },
             createdAt: { gte: prev.start, lt: prev.endExclusive },
           },
           select: { amount: true, currency: true },
         })
       : [];
-    const prevRevenueData = prev
-      ? await this.prisma.payment.findMany({
-          where: revenueWhere(prev.start, prev.endExclusive),
-          select: { amount: true, currency: true },
-        })
-      : [];
-    // Previous period GMV lifecycle metrics
+    const prevRevenueData = prevPayments;
+    // Previous period GMV lifecycle metrics — Marketplace-scoped
     const prevQualifiedData = prev
       ? await this.prisma.order.findMany({
           where: {
+            acquisitionSource: "MARKETPLACE",
             status: { notIn: ["NEW", "CANCELLED"] },
             createdAt: { gte: prev.start, lt: prev.endExclusive },
           },
@@ -626,6 +666,8 @@ export class AnalyticsService {
 
     const marketplaceSessions = Number(behavioralMarketplace[0]?.cnt || 0);
     const storefrontSessions = Number(behavioralStorefront[0]?.cnt || 0);
+    const marketplaceVisitors = Number(marketplaceVisitorsRaw[0]?.cnt || 0);
+    const marketplaceVisits = Number(marketplaceVisitsRaw[0]?.cnt || 0);
     // Partners: union of marketplace + storefront to prevent double-counting
     const marketplacePartnerIdsList = await this.prisma.$queryRaw<{ partnerId: string }[]>`
       SELECT DISTINCT p."partnerId"
@@ -692,6 +734,8 @@ export class AnalyticsService {
         refundsProcessed: this.compareValues(refunds.length, null),
         marketplaceSessions: this.compareValues(marketplaceSessions, null),
         storefrontSessions: this.compareValues(storefrontSessions, null),
+        marketplaceVisitors: this.compareValues(marketplaceVisitors, null),
+        marketplaceVisits: this.compareValues(marketplaceVisits, null),
         marketplacePartners: this.compareValues(marketplacePartnersCount, null),
         storefrontPartners: this.compareValues(storefrontPartnersCount, null),
         totalActivePartners: this.compareValues(totalActivePartnersCount, null),
@@ -758,10 +802,13 @@ export class AnalyticsService {
       : { sellerPartnerId: { not: null } };
 
     // HIGH-6: Query real metrics separately (no nested relations needed)
-    const [orders, payments, commissions, bookings, productCounts] =
+    // ── Phase 1: Independent queries ──
+    // Marketplace-scoped: partner performance reflects Marketplace operational scope
+    const [orders, bookings, productCounts] =
       await Promise.all([
         this.prisma.order.findMany({
           where: {
+            acquisitionSource: "MARKETPLACE",
             createdAt: { gte: current.start, lt: current.endExclusive },
             ...partnerOrderFilter,
           },
@@ -772,29 +819,10 @@ export class AnalyticsService {
             currency: true,
           },
         }),
-        // Revenue by partner: query payments, then join via orderId
-        this.prisma.payment.findMany({
-          where: revenueWhere(current.start, current.endExclusive),
-          select: {
-            amount: true,
-            currency: true,
-            orderId: true,
-          },
-        }),
-        this.prisma.commission.findMany({
-          where: {
-            createdAt: { gte: current.start, lt: current.endExclusive },
-            ...(effectivePartnerId ? { partnerId: effectivePartnerId } : {}),
-          },
-          select: {
-            partnerId: true,
-            amount: true,
-            currency: true,
-          },
-        }),
-        // Bookings: query with product partner filter via separate approach
+        // Bookings: Marketplace-scoped
         this.prisma.booking.findMany({
           where: {
+            acquisitionSource: "MARKETPLACE",
             createdAt: { gte: current.start, lt: current.endExclusive },
           },
           select: {
@@ -834,6 +862,40 @@ export class AnalyticsService {
         }
       }
     }
+
+    // ── Phase 2: Dependent queries (filtered by marketplace order IDs) ──
+    const marketplaceOrderIds = orders.map((o) => o.id);
+    const [payments, commissions] = await Promise.all([
+      // Revenue by partner: payments scoped to marketplace orders
+      marketplaceOrderIds.length > 0
+        ? this.prisma.payment.findMany({
+            where: {
+              orderId: { in: marketplaceOrderIds },
+              ...revenueWhere(current.start, current.endExclusive),
+            },
+            select: {
+              amount: true,
+              currency: true,
+              orderId: true,
+            },
+          })
+        : Promise.resolve([]),
+      // Commissions scoped to marketplace orders
+      marketplaceOrderIds.length > 0
+        ? this.prisma.commission.findMany({
+            where: {
+              orderId: { in: marketplaceOrderIds },
+              createdAt: { gte: current.start, lt: current.endExclusive },
+              ...(effectivePartnerId ? { partnerId: effectivePartnerId } : {}),
+            },
+            select: {
+              partnerId: true,
+              amount: true,
+              currency: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
 
     // Build order → sellerPartnerId mapping for payments
     const orderPartnerMap = new Map<string, string>();
@@ -998,17 +1060,18 @@ export class AnalyticsService {
   ): Promise<ConversionFunnelResponse> {
     const { current } = this.resolveQueryPeriod(dto);
 
-    const sourceFilter = dto.acquisitionSource
+    // Platform Analytics funnel scope: Marketplace operational flow.
+    // Enforce MARKETPLACE filter when no source specified (Platform = Marketplace).
+    const funnelSourceFilter = dto.acquisitionSource
       ? { acquisitionSource: dto.acquisitionSource }
-      : {};
+      : { acquisitionSource: "MARKETPLACE" as const };
 
-    // MEDIUM-2: Unique entity counts
+    // ── Phase 1: Independent queries ──
     const [
       uniqueImpressions,
       uniqueProductViews,
       checkouts,
       orders,
-      payments,
       bookingsConfirmed,
       bookingsCompleted,
     ] = await Promise.all([
@@ -1024,6 +1087,7 @@ export class AnalyticsService {
         WHERE "eventType" = 'MARKETPLACE_PRODUCT_VIEWED'
           AND "occurredAt" >= ${current.start} AND "occurredAt" < ${current.endExclusive}
       `,
+      // Checkout intents: no acquisitionSource on model; funnel flow is Marketplace-only
       this.prisma.checkoutIntent.findMany({
         where: {
           createdAt: { gte: current.start, lt: current.endExclusive },
@@ -1033,16 +1097,13 @@ export class AnalyticsService {
       this.prisma.order.findMany({
         where: {
           createdAt: { gte: current.start, lt: current.endExclusive },
-          ...sourceFilter,
+          ...funnelSourceFilter,
         },
-        select: { id: true },
-      }),
-      this.prisma.payment.findMany({
-        where: revenueWhere(current.start, current.endExclusive),
         select: { id: true },
       }),
       this.prisma.booking.findMany({
         where: {
+          ...funnelSourceFilter,
           status: "CONFIRMED",
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
@@ -1050,12 +1111,25 @@ export class AnalyticsService {
       }),
       this.prisma.booking.findMany({
         where: {
+          ...funnelSourceFilter,
           status: "COMPLETED",
           createdAt: { gte: current.start, lt: current.endExclusive },
         },
         select: { id: true },
       }),
     ]);
+
+    // ── Phase 2: Payments scoped to marketplace orders ──
+    const funnelOrderIds = orders.map((o) => o.id);
+    const payments = funnelOrderIds.length > 0
+      ? await this.prisma.payment.findMany({
+          where: {
+            orderId: { in: funnelOrderIds },
+            ...revenueWhere(current.start, current.endExclusive),
+          },
+          select: { id: true },
+        })
+      : [];
 
     return {
       period: {
@@ -1128,37 +1202,54 @@ export class AnalyticsService {
       createdAt: { gte: bucket.start, lt: bucket.endExclusive },
     };
 
+    // Platform time series metrics: Marketplace operational scope
+    const marketplaceWhere = { ...where, acquisitionSource: "MARKETPLACE" };
     switch (metric) {
       case "orders":
-        return this.prisma.order.count({ where });
+        return this.prisma.order.count({ where: marketplaceWhere });
       case "bookings":
-        return this.prisma.booking.count({ where });
-      case "payments":
-        // HIGH-NEW-2 fix: use paidAt (canonical lifecycle timestamp)
+        return this.prisma.booking.count({ where: marketplaceWhere });
+      case "payments": {
+        // Payments have no acquisitionSource; scope via marketplace order IDs
+        const periodOrders = await this.prisma.order.findMany({
+          where: marketplaceWhere,
+          select: { id: true },
+        });
+        if (periodOrders.length === 0) return 0;
         return this.prisma.payment.count({
           where: {
+            orderId: { in: periodOrders.map(o => o.id) },
             paidAt: { gte: bucket.start, lt: bucket.endExclusive },
             status: "CAPTURED",
           },
         });
+      }
       case "customers":
         return this.prisma.customer.count({ where });
       case "marketplace-customers": {
-        const orders = await this.prisma.order.findMany({
+        const mktOrders = await this.prisma.order.findMany({
           where: { acquisitionSource: "MARKETPLACE", ...where },
           select: { customerId: true },
         });
-        return new Set(orders.map(o => o.customerId).filter(Boolean)).size;
+        return new Set(mktOrders.map(o => o.customerId).filter(Boolean)).size;
       }
       case "storefront-customers": {
-        const orders = await this.prisma.order.findMany({
+        const sfOrders = await this.prisma.order.findMany({
           where: { acquisitionSource: "PARTNER_STOREFRONT", ...where },
           select: { customerId: true },
         });
-        return new Set(orders.map(o => o.customerId).filter(Boolean)).size;
+        return new Set(sfOrders.map(o => o.customerId).filter(Boolean)).size;
       }
-      case "commissions":
-        return this.prisma.commission.count({ where });
+      case "commissions": {
+        const commOrders = await this.prisma.order.findMany({
+          where: marketplaceWhere,
+          select: { id: true },
+        });
+        if (commOrders.length === 0) return 0;
+        return this.prisma.commission.count({
+          where: { orderId: { in: commOrders.map(o => o.id) }, createdAt: { gte: bucket.start, lt: bucket.endExclusive } },
+        });
+      }
       default:
         return 0;
     }
@@ -1173,24 +1264,45 @@ export class AnalyticsService {
   ): Promise<FinancialReconciliationResponse> {
     const { current } = this.resolveQueryPeriod(dto);
 
+    // Marketplace-scoped financial reconciliation
+    const mktOrders = await this.prisma.order.findMany({
+      where: {
+        acquisitionSource: "MARKETPLACE",
+        createdAt: { gte: current.start, lt: current.endExclusive },
+      },
+      select: { id: true },
+    });
+    const mktOrderIds = mktOrders.map(o => o.id);
+
     const [payments, refunds, commissions, ledgerEntries] = await Promise.all([
-      this.prisma.payment.findMany({
-        where: revenueWhere(current.start, current.endExclusive),
-        select: { id: true, amount: true, currency: true },
-      }),
-      this.prisma.refund.findMany({
-        where: {
-          status: "PROCESSED",
-          processedAt: { gte: current.start, lt: current.endExclusive },
-        },
-        select: { id: true, amount: true, currency: true },
-      }),
-      this.prisma.commission.findMany({
-        where: {
-          createdAt: { gte: current.start, lt: current.endExclusive },
-        },
-        select: { id: true, amount: true, currency: true },
-      }),
+      mktOrderIds.length > 0
+        ? this.prisma.payment.findMany({
+            where: {
+              orderId: { in: mktOrderIds },
+              ...revenueWhere(current.start, current.endExclusive),
+            },
+            select: { id: true, amount: true, currency: true },
+          })
+        : Promise.resolve([]),
+      mktOrderIds.length > 0
+        ? this.prisma.refund.findMany({
+            where: {
+              orderId: { in: mktOrderIds },
+              status: "PROCESSED",
+              processedAt: { gte: current.start, lt: current.endExclusive },
+            },
+            select: { id: true, amount: true, currency: true },
+          })
+        : Promise.resolve([]),
+      mktOrderIds.length > 0
+        ? this.prisma.commission.findMany({
+            where: {
+              orderId: { in: mktOrderIds },
+              createdAt: { gte: current.start, lt: current.endExclusive },
+            },
+            select: { id: true, amount: true, currency: true },
+          })
+        : Promise.resolve([]),
       this.prisma.$queryRaw<{ cnt: bigint }[]>`
         SELECT COUNT(*) as cnt
         FROM finance."LedgerTransaction"

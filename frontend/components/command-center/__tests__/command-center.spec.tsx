@@ -71,11 +71,12 @@ function makeSummary(overrides: Partial<CommandCenterSummary["sections"]> = {}):
       },
       marketplace: {
         marketplaceSessions: makeKpi(12000, 11000, 1000, 9.1),
-        storefrontSessions: makeKpi(8000, 7500, 500, 6.7),
         marketplacePartners: makeKpi(27, 25, 2, 8.0),
-        storefrontPartners: makeKpi(6, 5, 1, 20.0),
         marketplaceCustomers: makeKpi(79, 70, 9, 12.9),
-        storefrontCustomers: makeKpi(50, 42, 8, 19.0),
+      },
+      storefrontSaaS: {
+        storefrontSessions: makeKpi(8000, 7500, 500, 6.7),
+        storefrontPartners: makeKpi(6, 5, 1, 20.0),
         storefrontMrr: makeKpi(1930, 1760, 170, 9.7),
         storefrontArr: makeKpi(23160, 21120, 2040, 9.7),
         storefrontCollected: makeKpi(1930, 1760, 170, 9.7),
