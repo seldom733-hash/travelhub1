@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import { ExportService } from '../shared/export/export.service';
 import { Type } from "class-transformer";
 import { IsArray, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength, ValidateNested } from "class-validator";
 import { Request } from "express";
@@ -7,6 +8,7 @@ import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
+import { Response } from 'express';
 import { assertNoForbiddenKeys } from "../../shared/field-validation";
 import { ORDER_ACTION_FORBIDDEN_KEYS, ORDER_TRAVELERS_FORBIDDEN_KEYS } from "./order.validation";
 
@@ -147,6 +149,68 @@ export class OrderController {
   @RequirePermissions("order.read")
   listOrders(@Query() query: ListOrdersQuery, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.orders.listOrders(query, actor);
+  }
+
+  @Get("orders/export")
+  @RequirePermissions("order.read")
+  async exportOrders(
+    @Query() query: ListOrdersQuery & { format?: string; sellerPartnerId?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format || 'csv';
+    const { rows, total } = await this.orders.exportOrders({
+      status: query.status,
+      customerId: query.customerId,
+      search: query.search,
+      paymentStatus: query.paymentStatus,
+      cancelledWithin: query.cancelledWithin,
+      paymentFailed: query.paymentFailed,
+      pendingRefund: query.pendingRefund,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      acquisitionSource: query.acquisitionSource,
+      sellerPartnerId: query.sellerPartnerId,
+    });
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Reference', key: 'referenceNumber', width: 22 },
+      { header: 'Code', key: 'code', width: 22 },
+      { header: 'Status', key: 'status', width: 18 },
+      { header: 'Payment Status', key: 'paymentStatus', width: 18 },
+      { header: 'Amount', key: 'amount', width: 14 },
+      { header: 'Currency', key: 'currency', width: 8 },
+      { header: 'createdAt', key: 'createdAt', width: 22 },
+      { header: 'updatedAt', key: 'updatedAt', width: 22 },
+      { header: 'Source', key: 'acquisitionSource', width: 16 },
+      { header: 'Partner ID', key: 'partnerId', width: 38 },
+      { header: 'Partner Code', key: 'partnerCode', width: 16 },
+      { header: 'Partner Name', key: 'partnerName', width: 28 },
+      { header: 'Customer ID', key: 'customerId', width: 38 },
+      { header: 'Customer Code', key: 'customerCode', width: 16 },
+      { header: 'Customer Name', key: 'customerName', width: 28 },
+      { header: 'Booking IDs', key: 'bookingIds', width: 40 },
+      { header: 'Booking Codes', key: 'bookingCodes', width: 28 },
+      { header: 'Booking References', key: 'bookingReferences', width: 28 },
+      { header: 'Booking Statuses', key: 'bookingStatuses', width: 28 },
+      { header: 'Payment IDs', key: 'paymentIds', width: 40 },
+      { header: 'Payment References', key: 'paymentReferences', width: 28 },
+      { header: 'Payment Statuses', key: 'paymentStatuses', width: 28 },
+      { header: 'Payment Amounts', key: 'paymentAmounts', width: 28 },
+      { header: 'Paid At', key: 'paidAt', width: 28 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Orders');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="orders_export.xlsx"`);
+      return res.send(buf);
+    }
+    // CSV
+    const csv = svc.toCsv(columns, rows);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="orders_export.csv"`);
+    return res.send(csv);
   }
 
   @Get("orders/:id")

@@ -206,6 +206,127 @@ export class BookingService {
     return { items, total, page, pageSize, aggregates: { awaiting: countAwaiting, confirmed: countConfirmed, cancelled: countCancelled } };
   }
 
+  /**
+   * Export all matching bookings (no pagination) for diagnostic reconciliation.
+   */
+  async exportBookings(query: { status?: string; orderId?: string; search?: string; dateFrom?: string; dateTo?: string; acquisitionSource?: string; sellerPartnerId?: string }) {
+    const effectiveSource = query.acquisitionSource || 'MARKETPLACE';
+
+    // Build partner-scoped order IDs if sellerPartnerId provided
+    let channelOrderIds: string[] | undefined;
+    if (query.sellerPartnerId) {
+      const partnerOrders = await this.prisma.order.findMany({
+        where: { acquisitionSource: effectiveSource, sellerPartnerId: query.sellerPartnerId },
+        select: { id: true },
+      });
+      channelOrderIds = partnerOrders.map(o => o.id);
+      if (channelOrderIds.length === 0) return { rows: [], total: 0 };
+    } else {
+      const channelOrders = await this.prisma.order.findMany({
+        where: { acquisitionSource: effectiveSource },
+        select: { id: true },
+      });
+      channelOrderIds = channelOrders.map(o => o.id);
+      if (channelOrderIds.length === 0) return { rows: [], total: 0 };
+    }
+
+    const where: any = { orderId: { in: channelOrderIds } };
+    if (query.status) {
+      where.status = query.status.includes(',')
+        ? { in: query.status.split(',').map(s => s.trim()) }
+        : query.status;
+    }
+    if (query.dateFrom || query.dateTo) {
+      where.createdAt = {
+        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+        ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+      };
+    }
+    if (query.orderId) where.orderId = query.orderId;
+
+    const items = await this.prisma.booking.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, code: true, referenceNumber: true, status: true,
+        amount: true, currency: true, orderId: true,
+        createdAt: true, updatedAt: true, serviceDate: true,
+        acquisitionSource: true,
+      },
+    });
+
+    const total = items.length;
+    const orderIds = [...new Set(items.map(b => b.orderId).filter(Boolean))] as string[];
+
+    // Phase 1: resolve orders first (needed for partner/customer lookup)
+    const orders = orderIds.length > 0
+      ? await this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, code: true, referenceNumber: true, sellerPartnerId: true, customerId: true } })
+      : [];
+
+    const partnerIds = [...new Set(orders.map(o => o.sellerPartnerId).filter(Boolean))] as string[];
+    const customerIds = [...new Set(orders.map(o => o.customerId).filter(Boolean))] as string[];
+
+    // Phase 2: resolve partners, customers, payments in parallel
+    const [partners, customers, payments] = await Promise.all([
+      partnerIds.length > 0
+        ? this.prisma.partner.findMany({ where: { id: { in: partnerIds } }, select: { id: true, code: true, name: true } })
+        : [],
+      customerIds.length > 0
+        ? this.prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, code: true, firstName: true, lastName: true, companyName: true } })
+        : [],
+      this.prisma.payment.findMany({
+        where: { orderId: { in: orderIds } },
+        select: { id: true, referenceNumber: true, orderId: true, status: true, amount: true, currency: true, paidAt: true },
+      }),
+    ]);
+
+    const orderMap = new Map(orders.map(o => [o.id, o]));
+    const partnerMap = new Map(partners.map(p => [p.id, p]));
+    const customerMap = new Map(customers.map(c => [c.id, c]));
+    const paymentByOrder = new Map<string, typeof payments>();
+    for (const p of payments) {
+      if (!p.orderId) continue;
+      const arr = paymentByOrder.get(p.orderId) ?? [];
+      arr.push(p);
+      paymentByOrder.set(p.orderId, arr);
+    }
+
+    const rows = items.map(b => {
+      const order = b.orderId ? orderMap.get(b.orderId) : null;
+      const partner = order?.sellerPartnerId ? partnerMap.get(order.sellerPartnerId) : null;
+      const customer = order?.customerId ? customerMap.get(order.customerId) : null;
+      const op = b.orderId ? (paymentByOrder.get(b.orderId) ?? []) : [];
+      return {
+        id: b.id,
+        referenceNumber: b.referenceNumber ?? b.code,
+        code: b.code,
+        status: b.status,
+        amount: String(b.amount ?? ''),
+        currency: b.currency ?? '',
+        createdAt: b.createdAt?.toISOString() ?? '',
+        updatedAt: b.updatedAt?.toISOString() ?? '',
+        serviceDate: b.serviceDate?.toISOString() ?? '',
+        acquisitionSource: b.acquisitionSource ?? '',
+        orderId: b.orderId ?? '',
+        orderCode: order?.code ?? '',
+        orderReference: order?.referenceNumber ?? '',
+        partnerId: order?.sellerPartnerId ?? '',
+        partnerCode: partner?.code ?? '',
+        partnerName: partner?.name ?? '',
+        customerId: order?.customerId ?? '',
+        customerCode: customer?.code ?? '',
+        customerName: customer ? (customer.companyName ?? `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim()) : '',
+        paymentIds: op.map(p => p.id).join('; '),
+        paymentReferences: op.map(p => p.referenceNumber ?? '').filter(Boolean).join('; '),
+        paymentStatuses: op.map(p => p.status).join('; '),
+        paymentAmounts: op.map(p => `${p.amount} ${p.currency}`).join('; '),
+        paidAt: op.map(p => p.paidAt?.toISOString() ?? '').filter(Boolean).join('; '),
+      };
+    });
+
+    return { rows, total };
+  }
+
   async getBooking(id: string, viewer?: import("../../shared/pii").TravelerViewer) {
     return this.query.getById(id, viewer);
   }

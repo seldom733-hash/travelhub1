@@ -557,6 +557,140 @@ export class OrderService {
     };
   }
 
+  /**
+   * Shared filter builder — same predicate as listOrders, reusable by export.
+   */
+  buildOrderWhere(query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; dateFrom?: string; dateTo?: string; acquisitionSource?: string; sellerPartnerId?: string }): Prisma.OrderWhereInput {
+    const statusFilter = query.status
+      ? query.status.includes(',')
+        ? { status: { in: query.status.split(',').map(s => s.trim()) as OrderStatus[] } }
+        : { status: query.status as OrderStatus }
+      : {};
+    const where: Prisma.OrderWhereInput = {
+      ...statusFilter,
+      ...(query.customerId ? { customerId: query.customerId } : {}),
+      ...(query.paymentStatus ? { paymentStatus: query.paymentStatus as any } : {}),
+      ...(query.search
+        ? { OR: [{ code: { contains: query.search, mode: "insensitive" } }, { number: { contains: query.search, mode: "insensitive" } }, { referenceNumber: { contains: query.search, mode: "insensitive" } }] }
+        : {}),
+      acquisitionSource: query.acquisitionSource || "MARKETPLACE",
+      ...(query.sellerPartnerId ? { sellerPartnerId: query.sellerPartnerId } : {}),
+    };
+    if (query.dateFrom || query.dateTo) {
+      const dateRange: Prisma.DateTimeFilter = {};
+      if (query.dateFrom) dateRange.gte = new Date(query.dateFrom);
+      if (query.dateTo) dateRange.lt = new Date(query.dateTo);
+      where.createdAt = dateRange;
+    }
+    return where;
+  }
+
+  /**
+   * Export all matching orders (no pagination) for diagnostic reconciliation.
+   */
+  async exportOrders(query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; dateFrom?: string; dateTo?: string; acquisitionSource?: string; sellerPartnerId?: string }) {
+    const where = this.buildOrderWhere(query);
+
+    const items = await this.prisma.order.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        code: true,
+        referenceNumber: true,
+        number: true,
+        status: true,
+        paymentStatus: true,
+        amount: true,
+        currency: true,
+        createdAt: true,
+        updatedAt: true,
+        acquisitionSource: true,
+        sellerPartnerId: true,
+        customerId: true,
+      },
+    });
+
+    const total = items.length;
+
+    // Batch-resolve partner + customer display names
+    const partnerIds = [...new Set(items.map(o => o.sellerPartnerId).filter(Boolean))] as string[];
+    const customerIds = [...new Set(items.map(o => o.customerId).filter(Boolean))] as string[];
+
+    const [partners, customers, bookings, payments] = await Promise.all([
+      partnerIds.length > 0
+        ? this.prisma.partner.findMany({ where: { id: { in: partnerIds } }, select: { id: true, code: true, name: true } })
+        : [],
+      customerIds.length > 0
+        ? this.prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, code: true, firstName: true, lastName: true, companyName: true } })
+        : [],
+      // Related bookings
+      this.prisma.booking.findMany({
+        where: { orderId: { in: items.map(o => o.id) } },
+        select: { id: true, code: true, referenceNumber: true, orderId: true, status: true, createdAt: true },
+      }),
+      // Related payments
+      this.prisma.payment.findMany({
+        where: { orderId: { in: items.map(o => o.id) } },
+        select: { id: true, referenceNumber: true, orderId: true, status: true, amount: true, currency: true, paidAt: true },
+      }),
+    ]);
+
+    const partnerMap = new Map(partners.map(p => [p.id, p]));
+    const customerMap = new Map(customers.map(c => [c.id, c]));
+    const bookingByOrder = new Map<string, typeof bookings>();
+    for (const b of bookings) {
+      if (!b.orderId) continue;
+      const arr = bookingByOrder.get(b.orderId) ?? [];
+      arr.push(b);
+      bookingByOrder.set(b.orderId, arr);
+    }
+    const paymentByOrder = new Map<string, typeof payments>();
+    for (const p of payments) {
+      if (!p.orderId) continue;
+      const arr = paymentByOrder.get(p.orderId) ?? [];
+      arr.push(p);
+      paymentByOrder.set(p.orderId, arr);
+    }
+
+    const rows = items.map(o => {
+      const partner = o.sellerPartnerId ? partnerMap.get(o.sellerPartnerId) : null;
+      const customer = o.customerId ? customerMap.get(o.customerId) : null;
+      const ob = bookingByOrder.get(o.id) ?? [];
+      const op = paymentByOrder.get(o.id) ?? [];
+      return {
+        id: o.id,
+        referenceNumber: o.referenceNumber ?? o.code,
+        code: o.code,
+        number: o.number,
+        status: o.status,
+        paymentStatus: o.paymentStatus,
+        amount: String(o.amount),
+        currency: o.currency,
+        createdAt: o.createdAt?.toISOString() ?? '',
+        updatedAt: o.updatedAt?.toISOString() ?? '',
+        acquisitionSource: o.acquisitionSource,
+        partnerId: o.sellerPartnerId ?? '',
+        partnerCode: partner?.code ?? '',
+        partnerName: partner?.name ?? '',
+        customerId: o.customerId ?? '',
+        customerCode: customer?.code ?? '',
+        customerName: customer ? (customer.companyName ?? `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim()) : '',
+        bookingIds: ob.map(b => b.id).join('; '),
+        bookingCodes: ob.map(b => b.code).join('; '),
+        bookingReferences: ob.map(b => b.referenceNumber ?? '').filter(Boolean).join('; '),
+        bookingStatuses: ob.map(b => b.status).join('; '),
+        paymentIds: op.map(p => p.id).join('; '),
+        paymentReferences: op.map(p => p.referenceNumber ?? '').filter(Boolean).join('; '),
+        paymentStatuses: op.map(p => p.status).join('; '),
+        paymentAmounts: op.map(p => `${p.amount} ${p.currency}`).join('; '),
+        paidAt: op.map(p => p.paidAt?.toISOString() ?? '').filter(Boolean).join('; '),
+      };
+    });
+
+    return { rows, total };
+  }
+
   async getOrder(id: string, viewer?: TravelerViewer) {
     const order = await this.prisma.order.findUnique({
       where: { id },

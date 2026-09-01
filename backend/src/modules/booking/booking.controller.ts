@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Query, Req, Res, UseGuards } from "@nestjs/common";
+import { ExportService } from '../shared/export/export.service';
 import { Type } from "class-transformer";
 import { IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
 import { Request } from "express";
@@ -7,6 +8,7 @@ import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
+import { Response } from 'express';
 import { assertNoForbiddenKeys } from "../../shared/field-validation";
 import { BOOKING_ACTION_FORBIDDEN_KEYS } from "./booking.validation";
 
@@ -139,6 +141,62 @@ export class BookingController {
   @RequirePermissions("booking.read")
   listBookings(@Query() query: ListBookingsQuery) {
     return this.bookings.listBookings(query);
+  }
+
+  @Get("bookings/export")
+  @RequirePermissions("booking.read")
+  async exportBookings(
+    @Query() query: ListBookingsQuery & { format?: string; dateFrom?: string; dateTo?: string; sellerPartnerId?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format || 'csv';
+    const { rows, total } = await this.bookings.exportBookings({
+      status: query.status,
+      orderId: query.orderId,
+      search: query.search,
+      acquisitionSource: query.acquisitionSource,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      sellerPartnerId: query.sellerPartnerId,
+    });
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Reference', key: 'referenceNumber', width: 22 },
+      { header: 'Code', key: 'code', width: 22 },
+      { header: 'Status', key: 'status', width: 22 },
+      { header: 'Amount', key: 'amount', width: 14 },
+      { header: 'Currency', key: 'currency', width: 8 },
+      { header: 'createdAt', key: 'createdAt', width: 22 },
+      { header: 'updatedAt', key: 'updatedAt', width: 22 },
+      { header: 'serviceDate', key: 'serviceDate', width: 22 },
+      { header: 'Source', key: 'acquisitionSource', width: 16 },
+      { header: 'Order ID', key: 'orderId', width: 38 },
+      { header: 'Order Code', key: 'orderCode', width: 22 },
+      { header: 'Order Reference', key: 'orderReference', width: 22 },
+      { header: 'Partner ID', key: 'partnerId', width: 38 },
+      { header: 'Partner Code', key: 'partnerCode', width: 16 },
+      { header: 'Partner Name', key: 'partnerName', width: 28 },
+      { header: 'Customer ID', key: 'customerId', width: 38 },
+      { header: 'Customer Code', key: 'customerCode', width: 16 },
+      { header: 'Customer Name', key: 'customerName', width: 28 },
+      { header: 'Payment IDs', key: 'paymentIds', width: 40 },
+      { header: 'Payment References', key: 'paymentReferences', width: 28 },
+      { header: 'Payment Statuses', key: 'paymentStatuses', width: 28 },
+      { header: 'Payment Amounts', key: 'paymentAmounts', width: 28 },
+      { header: 'Paid At', key: 'paidAt', width: 28 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Bookings');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="bookings_export.xlsx"`);
+      return res.send(buf);
+    }
+    const csv = svc.toCsv(columns, rows);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="bookings_export.csv"`);
+    return res.send(csv);
   }
 
   @Get("bookings/:id")
