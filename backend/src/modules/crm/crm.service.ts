@@ -655,6 +655,83 @@ export class CrmService {
     return { items, total, page, pageSize };
   }
 
+  /**
+   * Export all matching customers (no pagination).
+   */
+  async exportCustomers(query: { status?: string; customerType?: string; search?: string; dateFrom?: string; dateTo?: string }) {
+    let activeCustomerIds: string[] | undefined;
+    if (query.dateFrom || query.dateTo) {
+      const orderWhere: any = {
+        acquisitionSource: { in: ['MARKETPLACE', 'PARTNER_STOREFRONT'] as any },
+      };
+      if (query.dateFrom || query.dateTo) {
+        orderWhere.createdAt = {
+          ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+          ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+        };
+      }
+      const activeOrders = await this.prisma.order.findMany({ where: orderWhere, select: { customerId: true } });
+      activeCustomerIds = [...new Set(activeOrders.map((o) => o.customerId).filter(Boolean))] as string[];
+      if (activeCustomerIds.length === 0) return { rows: [], total: 0 };
+    }
+    const where: any = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.customerType ? { type: query.customerType } : {}),
+      ...(activeCustomerIds ? { id: { in: activeCustomerIds } } : {}),
+      ...(query.search ? { OR: [
+        { email: { contains: query.search, mode: 'insensitive' } },
+        { firstName: { contains: query.search, mode: 'insensitive' } },
+        { lastName: { contains: query.search, mode: 'insensitive' } },
+        { companyName: { contains: query.search, mode: 'insensitive' } },
+        { code: { contains: query.search, mode: 'insensitive' } },
+      ] } : {}),
+    };
+    const items = await this.prisma.customer.findMany({ where, orderBy: { createdAt: 'desc' } });
+    const rows = items.map(c => ({
+      id: c.id, code: c.code, firstName: c.firstName ?? '', lastName: c.lastName ?? '',
+      companyName: c.companyName ?? '', email: c.email ?? '', phone: c.phone ?? '',
+      status: c.status, type: c.type ?? '', createdAt: c.createdAt?.toISOString() ?? '',
+    }));
+    return { rows, total: rows.length };
+  }
+
+  /**
+   * Export all matching partners (no pagination).
+   */
+  async exportPartners(query: { status?: string; search?: string; entitled?: string; dateFrom?: string; dateTo?: string }) {
+    let activePartnerIds: string[] | undefined;
+    if (query.dateFrom || query.dateTo || query.entitled === 'true') {
+      const marketplacePartnerIds = await this.prisma.$queryRaw<{ partnerId: string }[]>`
+        SELECT DISTINCT p."partnerId" FROM catalog."Product" p
+        INNER JOIN catalog."ProductPublicationChannel" ppc ON ppc."productId" = p.id
+        WHERE p."status" = 'PUBLISHED' AND p."partnerId" IS NOT NULL AND ppc."channel" = 'MARKETPLACE'
+      `;
+      const storefrontPartnerIds = await this.prisma.$queryRaw<{ partnerId: string }[]>`
+        SELECT DISTINCT "partnerId" FROM catalog."PartnerStorefront"
+        WHERE "entitlementStatus" = 'ACTIVE' AND "partnerId" IS NOT NULL
+      `;
+      activePartnerIds = [...new Set([...marketplacePartnerIds.map(p => p.partnerId), ...storefrontPartnerIds.map(p => p.partnerId)])];
+      if (activePartnerIds.length === 0) return { rows: [], total: 0 };
+    }
+    const where: any = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(activePartnerIds ? { id: { in: activePartnerIds } } : {}),
+      ...(query.search ? { OR: [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { code: { contains: query.search, mode: 'insensitive' } },
+        { contactEmail: { contains: query.search, mode: 'insensitive' } },
+        { registrationNumber: { contains: query.search, mode: 'insensitive' } },
+      ] } : {}),
+    };
+    const items = await this.prisma.partner.findMany({ where, orderBy: { name: 'asc' }, select: { id: true, code: true, name: true, contactEmail: true, countryCode: true, registrationNumber: true, status: true } });
+    const rows = items.map(p => ({
+      id: p.id, code: p.code, name: p.name, contactEmail: p.contactEmail ?? '',
+      countryCode: p.countryCode ?? '', registrationNumber: p.registrationNumber ?? '',
+      status: p.status, createdAt: '',
+    }));
+    return { rows, total: rows.length };
+  }
+
   async getPartner(id: string, sort?: { sortBy?: string; sortDirection?: string; status?: string; bookingStatus?: string; productStatus?: string; dateFrom?: string; dateTo?: string }) {
     const partner = await this.prisma.partner.findUnique({
       where: { id },

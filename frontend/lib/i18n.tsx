@@ -1580,6 +1580,14 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "support.history.event.title": { ru: "Изменён заголовок", az: "Başlıq dəyişdirildi", en: "Title changed" },
   "support.history.event.description": { ru: "Изменено описание", az: "Təsvir dəyişdirildi", en: "Description changed" },
   "support.history.event.case_deleted": { ru: "Обращение удалено", az: "Müraciət silindi", en: "Case deleted" },
+
+  // ── Export Framework ──
+  "export.label": { ru: "Экспорт", az: "İxrac", en: "Export" },
+  "export.csv": { ru: "Экспорт в CSV", az: "CSV-ə ixrac", en: "Export to CSV" },
+  "export.xlsx": { ru: "Экспорт в XLSX", az: "XLSX-ə ixrac", en: "Export to XLSX" },
+  "export.loading": { ru: "Экспорт…", az: "İxrac…", en: "Exporting…" },
+  "export.error": { ru: "Ошибка экспорта", az: "İxrac xətası", en: "Export error" },
+  "export.empty": { ru: "Нет данных для экспорта", az: "İxrac üçün məlumat yoxdur", en: "No data to export" },
 };
 
 /** Локализованная строка по ключу (fallback — сам ключ, затем default locale). */

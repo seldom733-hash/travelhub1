@@ -13,8 +13,9 @@
  * Payment/Refund/Invoice/Commission write-endpoints НЕ существуют в Step 2.10
  * (foundation, §15/§52) — агрегатные модели в схеме, создание — 2.12–2.14.
  */
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
-import type { Request } from "express";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import type { Request, Response } from 'express';
+import { ExportService } from '../shared/export/export.service';
 import { CommissionPolicyService } from "./commission-policy.service";
 import { CommissionService } from "./commission.service";
 import { DisputeService } from "./dispute.service";
@@ -255,6 +256,55 @@ export class FinanceController {
   @RequirePermissions("finance.payment.read")
   async listPayments(@Query() query: PaymentListQueryDto) {
     return this.payments.list(query);
+  }
+
+  @Get("payments/export")
+  @RequirePermissions("finance.payment.read")
+  async exportPayments(
+    @Query() query: PaymentListQueryDto & { format?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format || 'csv';
+    const { rows } = await this.payments.exportPayments({
+      orderId: query.orderId,
+      status: query.status,
+      currency: query.currency,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      acquisitionSource: query.acquisitionSource,
+      dateField: query.dateField,
+    });
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Code', key: 'code', width: 22 },
+      { header: 'Reference', key: 'referenceNumber', width: 22 },
+      { header: 'Status', key: 'status', width: 18 },
+      { header: 'Amount', key: 'amount', width: 14 },
+      { header: 'Currency', key: 'currency', width: 8 },
+      { header: 'createdAt', key: 'createdAt', width: 22 },
+      { header: 'paidAt', key: 'paidAt', width: 22 },
+      { header: 'Order ID', key: 'orderId', width: 38 },
+      { header: 'Order Code', key: 'orderCode', width: 22 },
+      { header: 'Order Reference', key: 'orderReference', width: 22 },
+      { header: 'Partner ID', key: 'partnerId', width: 38 },
+      { header: 'Partner Code', key: 'partnerCode', width: 16 },
+      { header: 'Partner Name', key: 'partnerName', width: 28 },
+      { header: 'Customer ID', key: 'customerId', width: 38 },
+      { header: 'Customer Code', key: 'customerCode', width: 16 },
+      { header: 'Customer Name', key: 'customerName', width: 28 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Payments');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="payments_export.xlsx"`);
+      return res.send(buf);
+    }
+    const csv = svc.toCsv(columns, rows);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="payments_export.csv"`);
+    return res.send(csv);
   }
 
   @Get("payments/:code")

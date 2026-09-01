@@ -372,6 +372,80 @@ export class PaymentService {
     return { items: items.map((r) => this.paymentDto(r)), total, page, pageSize, hasMore: page * pageSize < total };
   }
 
+  /**
+   * Export all matching payments (no pagination) for diagnostic/operational use.
+   */
+  async exportPayments(query: { orderId?: string; status?: string; currency?: string; dateFrom?: string; dateTo?: string; acquisitionSource?: string; dateField?: string }) {
+    const effectiveSource = query.acquisitionSource || 'MARKETPLACE';
+    const channelOrders = await this.prisma.order.findMany({
+      where: { acquisitionSource: effectiveSource },
+      select: { id: true },
+    });
+    const channelOrderIds = channelOrders.map(o => o.id);
+    if (channelOrderIds.length === 0) return { rows: [], total: 0 };
+
+    const where: any = {
+      orderId: { in: channelOrderIds },
+      ...(query.orderId ? { orderId: query.orderId } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.currency ? { currency: query.currency } : {}),
+      ...(query.dateFrom || query.dateTo ? {
+        [query.dateField || 'createdAt']: {
+          ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+          ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+        },
+      } : {}),
+    };
+
+    const items = await this.prisma.payment.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    });
+
+    // Resolve order + partner + customer names
+    const orderIds = [...new Set(items.map(p => p.orderId).filter(Boolean))] as string[];
+    const orders = orderIds.length > 0
+      ? await this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, code: true, referenceNumber: true, sellerPartnerId: true, customerId: true } })
+      : [];
+    const partnerIds = [...new Set(orders.map(o => o.sellerPartnerId).filter(Boolean))] as string[];
+    const customerIds = [...new Set(orders.map(o => o.customerId).filter(Boolean))] as string[];
+    const [partners, customers] = await Promise.all([
+      partnerIds.length > 0 ? this.prisma.partner.findMany({ where: { id: { in: partnerIds } }, select: { id: true, code: true, name: true } }) : [],
+      customerIds.length > 0 ? this.prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, code: true, firstName: true, lastName: true, companyName: true } }) : [],
+    ]);
+    const orderMap = new Map(orders.map(o => [o.id, o]));
+    const partnerMap = new Map(partners.map(p => [p.id, p]));
+    const customerMap = new Map(customers.map(c => [c.id, c]));
+
+    const rows = items.map(p => {
+      const order = p.orderId ? orderMap.get(p.orderId) : null;
+      const partner = order?.sellerPartnerId ? partnerMap.get(order.sellerPartnerId) : null;
+      const customer = order?.customerId ? customerMap.get(order.customerId) : null;
+      return {
+        id: p.id,
+        code: p.code,
+        referenceNumber: p.referenceNumber ?? '',
+        status: p.status,
+        amount: String(p.amount),
+        currency: p.currency,
+        createdAt: p.createdAt?.toISOString() ?? '',
+        updatedAt: p.updatedAt?.toISOString() ?? '',
+        paidAt: p.paidAt?.toISOString() ?? '',
+        orderId: p.orderId ?? '',
+        orderCode: order?.code ?? '',
+        orderReference: order?.referenceNumber ?? '',
+        partnerId: order?.sellerPartnerId ?? '',
+        partnerCode: partner?.code ?? '',
+        partnerName: partner?.name ?? '',
+        customerId: order?.customerId ?? '',
+        customerCode: customer?.code ?? '',
+        customerName: customer ? (customer.companyName ?? `${customer.firstName ?? ''} ${customer.lastName ?? ''}`.trim()) : '',
+      };
+    });
+
+    return { rows, total: rows.length };
+  }
+
   async getByCode(code: string): Promise<Record<string, unknown>> {
     const row = await this.prisma.payment.findUnique({ where: { code } });
     if (!row) throw new NotFoundError(`Payment ${code} not found`);

@@ -1,4 +1,6 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from "@nestjs/common";
+import { Response } from 'express';
+import { ExportService } from '../shared/export/export.service';
 import { Type } from "class-transformer";
 import { IsEmail, IsEnum, IsNumber, IsOptional, IsString, Min, ValidateNested } from "class-validator";
 import { CustomerType, EntityStatus } from "../../generated/prisma/enums";
@@ -179,6 +181,42 @@ export class CrmController {
     return this.crm.listCustomers(query);
   }
 
+  @Get("customers/export")
+  @RequirePermissions("crm.customer.read")
+  async exportCustomers(
+    @Query() query: ListCustomersQuery & { format?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format || 'csv';
+    const { rows } = await this.crm.exportCustomers({
+      status: query.status, customerType: query.customerType,
+      search: query.search, dateFrom: query.dateFrom, dateTo: query.dateTo,
+    });
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Code', key: 'code', width: 16 },
+      { header: 'First Name', key: 'firstName', width: 20 },
+      { header: 'Last Name', key: 'lastName', width: 20 },
+      { header: 'Company', key: 'companyName', width: 28 },
+      { header: 'Email', key: 'email', width: 28 },
+      { header: 'Phone', key: 'phone', width: 18 },
+      { header: 'Status', key: 'status', width: 14 },
+      { header: 'Type', key: 'type', width: 14 },
+      { header: 'createdAt', key: 'createdAt', width: 22 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Customers');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="customers_export.xlsx"');
+      return res.send(buf);
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="customers_export.csv"');
+    return res.send(svc.toCsv(columns, rows));
+  }
+
   @Get("customers/:id")
   @RequirePermissions("crm.customer.read")
   getCustomer(@Param("id") id: string) {
@@ -239,6 +277,40 @@ export class CrmController {
   @RequirePermissions("crm.partner.read")
   listPartners(@Query() query: ListCustomersQuery) {
     return this.crm.listPartners(query);
+  }
+
+  @Get("partners/export")
+  @RequirePermissions("crm.partner.read")
+  async exportPartners(
+    @Query() query: ListCustomersQuery & { format?: string; entitled?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format || 'csv';
+    const { rows } = await this.crm.exportPartners({
+      status: query.status, search: query.search,
+      entitled: query.entitled, dateFrom: query.dateFrom, dateTo: query.dateTo,
+    });
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Code', key: 'code', width: 16 },
+      { header: 'Name', key: 'name', width: 28 },
+      { header: 'Email', key: 'contactEmail', width: 28 },
+      { header: 'Country', key: 'countryCode', width: 8 },
+      { header: 'Reg Number', key: 'registrationNumber', width: 22 },
+      { header: 'Status', key: 'status', width: 14 },
+      { header: 'createdAt', key: 'createdAt', width: 22 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Partners');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="partners_export.xlsx"');
+      return res.send(buf);
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="partners_export.csv"');
+    return res.send(svc.toCsv(columns, rows));
   }
 
   @Get("partners/:id")
