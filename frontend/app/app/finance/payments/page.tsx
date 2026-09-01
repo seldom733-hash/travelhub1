@@ -17,6 +17,7 @@ import StatusBadge from "@/components/StatusBadge";
 import Pagination from "@/components/Pagination";
 import AggregateSummary from "@/components/AggregateSummary";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
+import TableExportButton from "@/components/TableExportButton";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
 
 
@@ -203,6 +204,15 @@ function PaymentsContent({
               </button>
             )}
             {loading && <span className="text-xs text-slate-400">{t("common.loading", locale)}</span>}
+            <TableExportButton
+              exportUrl="/api/v1/finance/payments/export"
+              extraParams={{
+                ...(statusFilter ? { status: statusFilter } : {}),
+                ...(dateFrom ? { dateFrom } : {}),
+                ...(dateTo ? { dateTo } : {}),
+                ...(currency ? { currency } : {}),
+              }}
+            />
           </div>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}

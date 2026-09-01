@@ -11,6 +11,7 @@ import { useCan } from "@/lib/use-can";
 import ActionButtons from "@/components/ActionButtons";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import AggregateSummary from "@/components/AggregateSummary";
+import TableExportButton from "@/components/TableExportButton";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
 
 
@@ -204,6 +205,15 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
           )}
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
           {busy && <span className="text-xs text-slate-400">загрузка…</span>}
+          <TableExportButton
+            exportUrl="/api/v1/bookings/export"
+            extraParams={{
+              ...(statusFilter ? { status: statusFilter } : {}),
+              ...(dateFrom ? { dateFrom } : {}),
+              ...(dateTo ? { dateTo } : {}),
+              ...(search ? { search } : {}),
+            }}
+          />
           </div>
 
           <AggregateSummary

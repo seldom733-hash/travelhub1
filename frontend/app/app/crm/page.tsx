@@ -16,6 +16,7 @@ import { useLocale, t, formatPrice } from "@/lib/i18n";
 
 import CrmAnalytics from "@/components/CrmAnalytics";
 import AggregateSummary from "@/components/AggregateSummary";
+import TableExportButton from "@/components/TableExportButton";
 
 type Tab = "customers" | "partners" | "analytics";
 type CrmContext = "platform" | "basic" | "pro";
@@ -369,6 +370,17 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                   )}
                 </>
               )}
+              <TableExportButton
+                exportUrl={tab === 'customers' ? '/api/v1/customers/export' : '/api/v1/partners/export'}
+                extraParams={{
+                  ...(tab === 'customers' && customerTypeFilter ? { customerType: customerTypeFilter } : {}),
+                  ...(tab === 'customers' && customerStatusFilter ? { status: customerStatusFilter } : {}),
+                  ...(tab === 'partners' && partnerStatusFilter ? { status: partnerStatusFilter } : {}),
+                  ...((customerSearch || partnerSearch) ? { search: tab === 'customers' ? customerSearch : partnerSearch } : {}),
+                  ...(dateFrom ? { dateFrom } : {}),
+                  ...(dateTo ? { dateTo } : {}),
+                }}
+              />
             </div>
 
             {error && (
