@@ -8,6 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import SortableHeader, { type SortState, type SortDirection } from "@/components/SortableHeader";
 import OperationalNotes from "@/components/OperationalNotes";
+import TableExportButton from "@/components/TableExportButton";
 import PartnerActivity from "@/components/PartnerActivity";
 import AggregateSummary from "@/components/AggregateSummary";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
@@ -273,6 +274,7 @@ export default function Partner360Page() {
                   <option value="ARCHIVED">{t('status.product.ARCHIVED', locale)}</option>
                 </select>
                 {serviceStatusFilter && <button onClick={() => setServiceStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                <TableExportButton exportUrl="/api/v1/catalog/products/export" extraParams={{ partnerId: id, ...(serviceStatusFilter ? { status: serviceStatusFilter } : {}) }} />
               </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
@@ -321,6 +323,7 @@ export default function Partner360Page() {
                   <option value="CANCELLED">{t('status.order.CANCELLED', locale)}</option>
                 </select>
                 {orderStatusFilter && <button onClick={() => setOrderStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                <TableExportButton exportUrl="/api/v1/orders/export" extraParams={{ sellerPartnerId: id, ...(orderStatusFilter ? { status: orderStatusFilter } : {}), ...(periodFrom ? { dateFrom: periodFrom } : {}), ...(periodTo ? { dateTo: periodTo } : {}) }} />
               </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
@@ -368,6 +371,7 @@ export default function Partner360Page() {
                   <option value="CANCELLED">{t('status.booking.CANCELLED', locale)}</option>
                 </select>
                 {bookingStatusFilter && <button onClick={() => setBookingStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                <TableExportButton exportUrl="/api/v1/bookings/export" extraParams={{ sellerPartnerId: id, ...(bookingStatusFilter ? { status: bookingStatusFilter } : {}), ...(periodFrom ? { dateFrom: periodFrom } : {}), ...(periodTo ? { dateTo: periodTo } : {}) }} />
               </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">

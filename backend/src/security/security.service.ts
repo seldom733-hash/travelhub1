@@ -209,6 +209,44 @@ export class SecurityService implements OnModuleInit {
     return { items, total, page, pageSize, aggregates: { active: countActive, inactive: countInactive, locked: countLocked } };
   }
 
+  /**
+   * Export all matching users (no pagination).
+   */
+  async exportUsers(query: { search?: string; status?: string; roleCode?: string; dateFrom?: string; dateTo?: string }) {
+    const where: any = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.roleCode ? { role: { code: query.roleCode } } : {}),
+      ...(query.search ? { OR: [
+        { username: { contains: query.search, mode: 'insensitive' } },
+        { email: { contains: query.search, mode: 'insensitive' } },
+        { fullName: { contains: query.search, mode: 'insensitive' } },
+      ] } : {}),
+    };
+    if (query.dateFrom || query.dateTo) {
+      where.createdAt = {
+        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+        ...(query.dateTo ? { lte: new Date(new Date(query.dateTo).getTime() + 86400000 - 1) } : {}),
+      };
+    }
+    const items = await this.prisma.user.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, code: true, username: true, email: true, fullName: true,
+        status: true, role: { select: { code: true, title: true } },
+        partnerId: true, customerId: true, lastLoginAt: true, createdAt: true,
+      },
+    });
+    const rows = items.map(u => ({
+      id: u.id, code: u.code, username: u.username, email: u.email ?? '',
+      fullName: u.fullName ?? '', status: u.status,
+      roleCode: u.role?.code ?? '', roleTitle: u.role?.title ?? '',
+      lastLoginAt: u.lastLoginAt?.toISOString() ?? '',
+      createdAt: u.createdAt?.toISOString() ?? '',
+    }));
+    return { rows, total: rows.length };
+  }
+
   /** Смена роли пользователя (audit обязателен). */
   async assignRole(userId: string, roleCode: RoleCode, actorId: string): Promise<void> {
     const role = await this.prisma.role.findUnique({ where: { code: roleCode } });

@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
+import { ExportService } from '../shared/export/export.service';
 import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { MarketingService } from './marketing.service';
 import { JwtAuthGuard } from '../../security/auth/jwt-auth.guard';
@@ -114,6 +116,50 @@ export class MarketingController {
   @RequirePermissions('marketing.campaign.create')
   createCampaign(@Body() dto: CreateCampaignDto, @CurrentUser() actor: AuthedRequest['user']) {
     return this.marketing.createCampaign(actor, dto);
+  }
+
+  @Get('campaigns/export')
+  @RequirePermissions('marketing.campaign.read')
+  async exportCampaigns(
+    @CurrentUser() actor: AuthedRequest['user'],
+    @Query('format') format?: string,
+    @Res() res?: Response,
+  ) {
+    const result = await this.marketing.listCampaigns(actor, 1, 999999);
+    const items = (result as any).items ?? result;
+    const rows = (Array.isArray(items) ? items : []).map((c: any) => ({
+      id: c.id,
+      code: c.code,
+      name: c.name,
+      status: c.status,
+      objective: c.objective ?? '',
+      description: c.description ?? '',
+      partnerId: c.partnerId ?? '',
+      createdById: c.createdById,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }));
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Code', key: 'code', width: 16 },
+      { header: 'Name', key: 'name', width: 28 },
+      { header: 'Status', key: 'status', width: 16 },
+      { header: 'Objective', key: 'objective', width: 20 },
+      { header: 'Description', key: 'description', width: 30 },
+      { header: 'Partner ID', key: 'partnerId', width: 38 },
+      { header: 'Created At', key: 'createdAt', width: 22 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Campaigns');
+      res!.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res!.setHeader('Content-Disposition', 'attachment; filename="campaigns_export.xlsx"');
+      return res!.send(buf);
+    }
+    const csv = svc.toCsv(columns, rows);
+    res!.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res!.setHeader('Content-Disposition', 'attachment; filename="campaigns_export.csv"');
+    return res!.send(csv);
   }
 
   @Get('campaigns')

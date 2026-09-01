@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
+import { ExportService } from '../shared/export/export.service';
 import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { SupportService, CreateCaseDto, UpdateCaseDto, TransitionCaseDto, AssignCaseDto, EscalateCaseDto, CreateCommentDto } from './support.service';
 import { JwtAuthGuard } from '../../security/auth/jwt-auth.guard';
@@ -116,6 +118,57 @@ export class SupportController {
   @RequirePermissions('support.case.create')
   createCase(@Body() dto: CreateCaseBody, @CurrentUser() actor: AuthedRequest['user']) {
     return this.support.createCase(actor, dto);
+  }
+
+  @Get('cases/export')
+  @RequirePermissions('support.case.read')
+  async exportCases(
+    @CurrentUser() actor: AuthedRequest['user'],
+    @Query('format') format?: string,
+    @Query('status') status?: string,
+    @Query('priority') priority?: string,
+    @Query('caseType') caseType?: string,
+    @Query('assignedToId') assignedToId?: string,
+    @Query('customerId') customerId?: string,
+    @Res() res?: Response,
+  ) {
+    const result = await this.support.listCases(actor, 1, 999999, { status, priority, caseType, assignedToId, customerId });
+    const items = (result as any).items ?? result;
+    const rows = (Array.isArray(items) ? items : []).map((c: any) => ({
+      id: c.id,
+      code: c.code,
+      title: c.title,
+      status: c.status,
+      priority: c.priority,
+      caseType: c.caseType,
+      customerId: c.customerId ?? '',
+      assignedToId: c.assignedToId ?? '',
+      createdBy: c.createdBy?.username ?? c.createdById,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }));
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Code', key: 'code', width: 16 },
+      { header: 'Title', key: 'title', width: 32 },
+      { header: 'Status', key: 'status', width: 16 },
+      { header: 'Priority', key: 'priority', width: 12 },
+      { header: 'Type', key: 'caseType', width: 16 },
+      { header: 'Customer ID', key: 'customerId', width: 38 },
+      { header: 'Assigned To', key: 'assignedToId', width: 28 },
+      { header: 'Created At', key: 'createdAt', width: 22 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Support Cases');
+      res!.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res!.setHeader('Content-Disposition', 'attachment; filename="support_cases_export.xlsx"');
+      return res!.send(buf);
+    }
+    const csv = svc.toCsv(columns, rows);
+    res!.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res!.setHeader('Content-Disposition', 'attachment; filename="support_cases_export.csv"');
+    return res!.send(csv);
   }
 
   @Get('cases')

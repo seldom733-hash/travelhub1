@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from "@nestjs/common";
+import { Response } from 'express';
+import { ExportService } from '../modules/shared/export/export.service';
 import { Type } from "class-transformer";
 import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
 import { RoleCode, UserStatus } from "../generated/prisma/enums";
@@ -109,6 +111,42 @@ export class UsersController {
   @RequirePermissions("settings.write")
   listUsers(@Query() query: ListUsersQuery) {
     return this.security.listUsers(query);
+  }
+
+  @Get("export")
+  @RequirePermissions("settings.write")
+  async exportUsers(
+    @Query() query: ListUsersQuery & { format?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format || 'csv';
+    const { rows } = await this.security.exportUsers({
+      search: query.search, status: query.status,
+      roleCode: query.roleCode, dateFrom: query.dateFrom, dateTo: query.dateTo,
+    });
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Code', key: 'code', width: 16 },
+      { header: 'Username', key: 'username', width: 20 },
+      { header: 'Email', key: 'email', width: 28 },
+      { header: 'Full Name', key: 'fullName', width: 28 },
+      { header: 'Status', key: 'status', width: 14 },
+      { header: 'Role Code', key: 'roleCode', width: 18 },
+      { header: 'Role Title', key: 'roleTitle', width: 22 },
+      { header: 'Last Login', key: 'lastLoginAt', width: 22 },
+      { header: 'createdAt', key: 'createdAt', width: 22 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Users');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="users_export.xlsx"');
+      return res.send(buf);
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="users_export.csv"');
+    return res.send(svc.toCsv(columns, rows));
   }
 
   @Post()

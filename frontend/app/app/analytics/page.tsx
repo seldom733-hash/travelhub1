@@ -17,6 +17,7 @@ import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
 import { PeriodSelector } from "@/components/command-center/PeriodSelector";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
+import TableExportButton from "@/components/TableExportButton";
 import { METRIC_CONFIGS, type PeriodContext, resolveTableCellDrilldown, resolveDrilldownUrl } from "@/lib/metric-drilldown";
 import AggregateSummary from "@/components/AggregateSummary";
 
@@ -343,8 +344,16 @@ function AnalyticsContent() {
           ]}
         />
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3">
             <h2 className="text-sm font-semibold text-slate-700">{t("analytics.partners.title", locale)}</h2>
+            <TableExportButton
+              exportUrl="/api/v1/analytics/partner-performance/export"
+              extraParams={{
+                preset,
+                ...(preset === "CUSTOM" && customStart ? { startDate: customStart } : {}),
+                ...(preset === "CUSTOM" && customEnd ? { endDate: customEnd } : {}),
+              }}
+            />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">

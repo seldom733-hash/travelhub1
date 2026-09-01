@@ -541,6 +541,70 @@ export class CatalogService implements OnModuleInit {
   };
 
   /** Shared Table Sorting: supports sortBy/sortDirection or legacy sort param. */
+  /** Export: full filtered population without pagination. Uses same filter contract as listProducts. */
+  async exportProducts(query: ProductListQuery, actor?: AuthUser) {
+    // Reuse the same where clause as listProducts
+    const baseQuery = { ...query, page: 1, pageSize: 999999 };
+    const where: Prisma.ProductWhereInput = {
+      ...this.policy.productListScope(actor),
+      ...(baseQuery.type ? { type: baseQuery.type as ProductType } : {}),
+      ...(baseQuery.status ? { status: baseQuery.status as ProductStatus } : {}),
+      ...(baseQuery.categoryId ? { categoryId: baseQuery.categoryId } : {}),
+      ...(baseQuery.search
+        ? { OR: [{ title: { contains: baseQuery.search, mode: "insensitive" } }, { code: { contains: baseQuery.search, mode: "insensitive" } }] }
+        : {}),
+      ...(baseQuery.dateFrom || baseQuery.dateTo ? {
+        publishedAt: {
+          ...(baseQuery.dateFrom ? { gte: new Date(baseQuery.dateFrom) } : {}),
+          ...(baseQuery.dateTo ? { lte: new Date(new Date(baseQuery.dateTo).getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
+        },
+      } : {}),
+    };
+
+    if (baseQuery.filter) {
+      await this.applyLifecycleFilter(baseQuery.filter, where, actor);
+    }
+    if (baseQuery.unsold === "true") {
+      const sold = await (this.prisma as any).$queryRawUnsafe(
+        `SELECT DISTINCT "productId" FROM "order"."OrderItem"`,
+      );
+      where.id = { notIn: sold.map((r: any) => r.productId) };
+    }
+    if (baseQuery.availability === "missing") {
+      const withAvail = await (this.prisma as any).$queryRawUnsafe(
+        `SELECT DISTINCT "productId" FROM "catalog"."Availability"`,
+      );
+      where.id = {
+        ...(typeof where.id === "object" && where.id !== null ? where.id : {}),
+        notIn: withAvail.map((r: any) => r.productId),
+      };
+    }
+
+    const items = await this.prisma.product.findMany({
+      where,
+      orderBy: this.listOrderBy(baseQuery.sort, baseQuery.sortBy, baseQuery.sortDirection),
+      include: {
+        category: { select: { id: true, slug: true, title: true } },
+        tariffs: { where: { status: "ACTIVE" }, select: { name: true, price: true, currency: true } },
+      },
+    });
+
+    return items.map((p) => ({
+      id: p.id,
+      code: p.code,
+      title: p.title,
+      type: p.type,
+      status: p.status,
+      slug: p.slug,
+      category: p.category?.title ?? "",
+      tariffs: p.tariffs.map((t) => `${t.name}: ${t.price} ${t.currency}`).join("; "),
+      priceFrom: p.tariffs.length > 0 ? Math.min(...p.tariffs.map((t) => Number(t.price))) : null,
+      publishedAt: p.publishedAt?.toISOString() ?? "",
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    }));
+  }
+
   private listOrderBy(sort?: string, sortBy?: string, sortDirection?: string): Prisma.ProductOrderByWithRelationInput[] {
     if (sortBy) {
       return buildSortClause(sortBy, sortDirection, CatalogService.CATALOG_SORT_ALLOWLIST, { createdAt: 'desc' });

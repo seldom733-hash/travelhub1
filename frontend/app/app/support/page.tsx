@@ -9,6 +9,7 @@ import Pagination from "@/components/Pagination";
 import { useLocale, t } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 import { supportApi, VALID_TRANSITIONS, CASE_TYPES, PRIORITIES, type SupportCase, type SupportStats } from "@/lib/support";
+import TableExportButton from "@/components/TableExportButton";
 
 /* ── Filter Panel ──────────────────────────────────────────────────────────── */
 
@@ -115,6 +116,14 @@ function SupportListContent() {
                 {t("support.create_case", effectiveLocale)}
               </button>
             )}
+            <TableExportButton
+              exportUrl="/api/v1/support/cases/export"
+              extraParams={{
+                ...(filters.status ? { status: filters.status } : {}),
+                ...(filters.priority ? { priority: filters.priority } : {}),
+                ...(filters.caseType ? { caseType: filters.caseType } : {}),
+              }}
+            />
             <button
               onClick={() => { void loadCases(); void loadStats(); }}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"

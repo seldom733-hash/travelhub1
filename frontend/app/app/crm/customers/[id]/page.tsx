@@ -11,6 +11,7 @@ import OperationalNotes from "@/components/OperationalNotes";
 import CustomerActivity from "@/components/CustomerActivity";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
+import TableExportButton from "@/components/TableExportButton";
 
 type Tab = "overview" | "orders" | "bookings" | "payments" | "partners" | "refunds" | "notes" | "activity";
 
@@ -190,6 +191,7 @@ export default function Customer360Page() {
                   <option value="CANCELLED">{t('status.order.CANCELLED', locale)}</option>
                 </select>
                 {orderStatusFilter && <button onClick={() => setOrderStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                <div className="ml-auto"><TableExportButton exportUrl={`/api/v1/customers/${id}/orders/export`} extraParams={orderStatusFilter ? { status: orderStatusFilter } : {}} /></div>
               </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
@@ -231,6 +233,7 @@ export default function Customer360Page() {
                   <option value="CANCELLED">{t('status.booking.CANCELLED', locale)}</option>
                 </select>
                 {bookingStatusFilter && <button onClick={() => setBookingStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                <div className="ml-auto"><TableExportButton exportUrl={`/api/v1/customers/${id}/bookings/export`} extraParams={bookingStatusFilter ? { bookingStatus: bookingStatusFilter } : {}} /></div>
               </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
@@ -266,6 +269,7 @@ export default function Customer360Page() {
                   <option value="FAILED">{t('status.order.PROBLEM', locale)}</option>
                 </select>
                 {paymentStatusFilter && <button onClick={() => setPaymentStatusFilter(undefined)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>}
+                <div className="ml-auto"><TableExportButton exportUrl={`/api/v1/customers/${id}/payments/export`} extraParams={paymentStatusFilter ? { paymentStatus: paymentStatusFilter } : {}} /></div>
               </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
@@ -302,6 +306,9 @@ export default function Customer360Page() {
           {/* Partners — TABLE with commercial aggregates */}
           {tab === "partners" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center justify-end border-b border-slate-100 bg-slate-50 px-4 py-2">
+                <TableExportButton exportUrl={`/api/v1/customers/${id}/partners/export`} />
+              </div>
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
                   <tr>

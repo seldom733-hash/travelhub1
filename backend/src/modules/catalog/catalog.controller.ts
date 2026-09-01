@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FilesInterceptor } from "@nestjs/platform-express";
 import { Type } from "class-transformer";
 import { IsArray, IsEnum, IsNumber, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested } from "class-validator";
@@ -7,10 +7,12 @@ import { CatalogService } from "./catalog.service";
 import { ProductMediaService } from "./media/product-media.service";
 import { ValidationDomainError } from "../../shared/errors";
 import { buildSortClause, type SortDirection } from "../../shared/sort";
+import { Response } from "express";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, Public, RequirePermissions } from "../../security/auth/decorators";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
+import { ExportService } from "../shared/export/export.service";
 
 class TariffDto {
   @IsString()
@@ -302,6 +304,40 @@ export class CatalogController {
   @RequirePermissions(productReadScope)
   listProducts(@Query() query: ListProductsQuery, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.catalog.listProducts(query, actor);
+  }
+
+  @Get("products/export")
+  @RequirePermissions(productReadScope)
+  async exportProducts(
+    @Query() query: ListProductsQuery & { format?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format ?? "csv";
+    const rows = await this.catalog.exportProducts(query, actor);
+    const columns = [
+      { header: "ID", key: "id", width: 36 },
+      { header: "Code", key: "code", width: 14 },
+      { header: "Title", key: "title", width: 30 },
+      { header: "Type", key: "type", width: 14 },
+      { header: "Status", key: "status", width: 14 },
+      { header: "Category", key: "category", width: 18 },
+      { header: "Tariffs", key: "tariffs", width: 30 },
+      { header: "PriceFrom", key: "priceFrom", width: 12 },
+      { header: "PublishedAt", key: "publishedAt", width: 20 },
+      { header: "CreatedAt", key: "createdAt", width: 20 },
+    ];
+    const svc = new ExportService();
+    if (format === "xlsx") {
+      const buf = await svc.toXlsx(columns, rows, "Products");
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="products_export.xlsx"');
+      return res.send(buf);
+    }
+    const csv = svc.toCsv(columns, rows);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="products_export.csv"');
+    return res.send(csv);
   }
 
   @Get("products/:id")

@@ -8,7 +8,9 @@
  * Remediation: Strict Review VERDICT B findings closure.
  */
 
-import { BadRequestException, Controller, Get, Query } from "@nestjs/common";import { IsBoolean,
+import { BadRequestException, Controller, Get, Query, Res } from "@nestjs/common";
+import { Response } from "express";
+import { IsBoolean,
   IsEnum,
   IsOptional,
   IsString,
@@ -96,6 +98,51 @@ export class AnalyticsController {
     @CurrentUser() user: AnalyticsUser,
   ) {
     return this.analyticsService.getPartnerPerformance(query, user);
+  }
+
+  @Get("partner-performance/export")
+  @RequirePermissions("analytics.read")
+  async exportPartnerPerformance(
+    @Query() query: AnalyticsQueryDto & { format?: string },
+    @CurrentUser() user: AnalyticsUser,
+    @Res() res: Response,
+  ) {
+    const { ExportService } = await import("../shared/export/export.service");
+    const result = await this.analyticsService.getPartnerPerformance(query, user);
+    const format = (query as any).format ?? "csv";
+    const rows = (result.partners ?? []).map((p: any) => ({
+      partnerId: p.partnerId,
+      partnerName: p.partnerName,
+      gmv: p.gmv,
+      revenue: p.revenue,
+      commission: p.commission,
+      ordersCount: p.ordersCount,
+      bookingsCount: p.bookingsCount,
+      completionRate: p.completionRate,
+      effectiveRate: p.effectiveRate,
+    }));
+    const columns = [
+      { header: "Partner ID", key: "partnerId", width: 38 },
+      { header: "Partner Name", key: "partnerName", width: 28 },
+      { header: "GMV", key: "gmv", width: 14 },
+      { header: "Revenue", key: "revenue", width: 14 },
+      { header: "Commission", key: "commission", width: 14 },
+      { header: "Orders", key: "ordersCount", width: 10 },
+      { header: "Bookings", key: "bookingsCount", width: 10 },
+      { header: "Completion Rate", key: "completionRate", width: 14 },
+      { header: "Effective Rate", key: "effectiveRate", width: 14 },
+    ];
+    const svc = new ExportService();
+    if (format === "xlsx") {
+      const buf = await svc.toXlsx(columns, rows, "Partner Performance");
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", 'attachment; filename="partner_performance_export.xlsx"');
+      return res.send(buf);
+    }
+    const csv = svc.toCsv(columns, rows);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="partner_performance_export.csv"');
+    return res.send(csv);
   }
 
   /**

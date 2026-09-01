@@ -333,6 +333,140 @@ export class CrmController {
     return this.crm.getCustomerDetail(id, { sortBy: query.sortBy, sortDirection: query.sortDirection, status: query.status, bookingStatus: query.bookingStatus, paymentStatus: query.paymentStatus });
   }
 
+  // ── Customer 360 scoped exports (no pagination) ──────────────────────
+
+  @Get("customers/:id/orders/export")
+  @RequirePermissions("crm.customer.read")
+  async exportCustomerOrders(
+    @Param("id") id: string,
+    @Query() query: { status?: string; format?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format || 'csv';
+    const { rows } = await this.crm.exportCustomerOrders(id, query.status);
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Code', key: 'code', width: 16 },
+      { header: 'Number', key: 'number', width: 16 },
+      { header: 'Status', key: 'status', width: 18 },
+      { header: 'Payment Status', key: 'paymentStatus', width: 18 },
+      { header: 'Amount', key: 'amount', width: 14 },
+      { header: 'Paid Amount', key: 'paidAmount', width: 14 },
+      { header: 'Currency', key: 'currency', width: 8 },
+      { header: 'Partner', key: 'partnerName', width: 24 },
+      { header: 'Created', key: 'createdAt', width: 22 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Customer Orders');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="customer_${id}_orders.xlsx"`);
+      return res.send(buf);
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="customer_${id}_orders.csv"`);
+    return res.send(svc.toCsv(columns, rows));
+  }
+
+  @Get("customers/:id/bookings/export")
+  @RequirePermissions("crm.customer.read")
+  async exportCustomerBookings(
+    @Param("id") id: string,
+    @Query() query: { bookingStatus?: string; format?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format || 'csv';
+    const { rows } = await this.crm.exportCustomerBookings(id, query.bookingStatus);
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Code', key: 'code', width: 16 },
+      { header: 'Status', key: 'status', width: 18 },
+      { header: 'Amount', key: 'amount', width: 14 },
+      { header: 'Currency', key: 'currency', width: 8 },
+      { header: 'Order Code', key: 'orderCode', width: 16 },
+      { header: 'Order Number', key: 'orderNumber', width: 16 },
+      { header: 'Service Date', key: 'serviceDate', width: 22 },
+      { header: 'Created', key: 'createdAt', width: 22 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Customer Bookings');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="customer_${id}_bookings.xlsx"`);
+      return res.send(buf);
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="customer_${id}_bookings.csv"`);
+    return res.send(svc.toCsv(columns, rows));
+  }
+
+  @Get("customers/:id/payments/export")
+  @RequirePermissions("crm.customer.read")
+  async exportCustomerPayments(
+    @Param("id") id: string,
+    @Query() query: { paymentStatus?: string; format?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format || 'csv';
+    const { rows } = await this.crm.exportCustomerPayments(id, query.paymentStatus);
+    const columns = [
+      { header: 'ID', key: 'id', width: 38 },
+      { header: 'Code', key: 'code', width: 16 },
+      { header: 'Status', key: 'status', width: 14 },
+      { header: 'Amount', key: 'amount', width: 14 },
+      { header: 'Currency', key: 'currency', width: 8 },
+      { header: 'Method', key: 'paymentMethod', width: 14 },
+      { header: 'Order Code', key: 'orderCode', width: 16 },
+      { header: 'Order Number', key: 'orderNumber', width: 16 },
+      { header: 'Paid At', key: 'paidAt', width: 22 },
+      { header: 'Created', key: 'createdAt', width: 22 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Customer Payments');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="customer_${id}_payments.xlsx"`);
+      return res.send(buf);
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="customer_${id}_payments.csv"`);
+    return res.send(svc.toCsv(columns, rows));
+  }
+
+  @Get("customers/:id/partners/export")
+  @RequirePermissions("crm.customer.read")
+  async exportCustomerPartners(
+    @Param("id") id: string,
+    @Query() query: { format?: string },
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Res() res: Response,
+  ) {
+    const format = query.format || 'csv';
+    const { rows } = await this.crm.exportCustomerPartners(id);
+    const columns = [
+      { header: 'Partner ID', key: 'partnerId', width: 38 },
+      { header: 'Partner Name', key: 'partnerName', width: 28 },
+      { header: 'Status', key: 'partnerStatus', width: 14 },
+      { header: 'Orders', key: 'orderCount', width: 10 },
+      { header: 'Bookings', key: 'totalBookings', width: 10 },
+      { header: 'Amount', key: 'totalAmount', width: 14 },
+      { header: 'Currency', key: 'currency', width: 8 },
+    ];
+    const svc = new ExportService();
+    if (format === 'xlsx') {
+      const buf = await svc.toXlsx(columns, rows, 'Customer Partners');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="customer_${id}_partners.xlsx"`);
+      return res.send(buf);
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="customer_${id}_partners.csv"`);
+    return res.send(svc.toCsv(columns, rows));
+  }
+
   // ── Step 3.5 Round 5 — Customer commercial partners from transactional activity ──
 
   @Get("customers/:id/partners")

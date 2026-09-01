@@ -13,6 +13,7 @@ import TariffEditor, { newTariffDraft, tariffDraftsFrom, type TariffDraft } from
 import { useCan } from "@/lib/use-can";
 import { useLocale, formatPrice } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
+import TableExportButton from "@/components/TableExportButton";
 
 const PRODUCT_TYPES = [
   { code: "TOUR", title: "Тур" },
@@ -284,6 +285,18 @@ function CatalogContent({ initialStatus, initialUnsold, initialAvailability, ini
               </div>
             )}
             {busy && <span className="text-xs text-slate-400">{t("admin.table.loading", locale)}</span>}
+            <TableExportButton
+              exportUrl="/api/v1/catalog/products/export"
+              extraParams={{
+                ...(search ? { search } : {}),
+                ...(status ? { status } : {}),
+                ...(productType ? { type: productType } : {}),
+                ...(dateFrom ? { dateFrom } : {}),
+                ...(dateTo ? { dateTo } : {}),
+                ...(unsold ? { unsold } : {}),
+                ...(availability ? { availability } : {}),
+              }}
+            />
           </div>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}

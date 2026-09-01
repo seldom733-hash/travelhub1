@@ -9,6 +9,7 @@ import Kpi from "@/components/Kpi";
 import PanelFrame from "@/components/PanelFrame";
 import Pagination from "@/components/Pagination";
 import { useLocale, t } from "@/lib/i18n";
+import TableExportButton from "@/components/TableExportButton";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 
 const ROLES: { code: string; titleKey: string }[] = [
@@ -224,7 +225,14 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
             >
               {t("admin.table.create_user", locale)}
             </button>              {busy && <span className="text-xs text-slate-400">{t("admin.table.loading", locale)}</span>}
-          </div>
+              <TableExportButton exportUrl="/api/v1/users/export" extraParams={{
+                ...(statusFilter ? { status: statusFilter } : {}),
+                ...(roleFilter ? { role: roleFilter } : {}),
+                ...(search ? { search } : {}),
+                ...(dateFrom ? { dateFrom } : {}),
+                ...(dateTo ? { dateTo } : {}),
+              }} />
+            </div>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
 

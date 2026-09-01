@@ -1732,4 +1732,117 @@ export class CrmService {
       };
     });
   }
+
+  // ── Customer 360 scoped exports (no pagination) ──────────────────────
+
+  async exportCustomerOrders(customerId: string, status?: string) {
+    const where: any = { customerId };
+    if (status) where.status = status;
+    const rows = await this.prisma.order.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, code: true, number: true, status: true, paymentStatus: true,
+        amount: true, paidAmount: true, currency: true, createdAt: true, updatedAt: true,
+        sellerPartnerId: true,
+      },
+    });
+    // Enrich with partner name
+    const partnerIdsRaw: (string | null)[] = rows.map(r => r.sellerPartnerId);
+    const partnerIds: string[] = partnerIdsRaw.filter((p): p is string => !!p);
+    const partners = partnerIds.length > 0 ? await this.prisma.partner.findMany({ where: { id: { in: partnerIds } }, select: { id: true, name: true } }) : [];
+    const partnerMap = new Map(partners.map(p => [p.id, p.name]));
+    return { rows: rows.map(r => ({ ...r, partnerName: partnerMap.get(r.sellerPartnerId ?? '') ?? '' })) };
+  }
+
+  async exportCustomerBookings(customerId: string, bookingStatus?: string) {
+    // Get all order IDs for this customer
+    const orderIds = (await this.prisma.order.findMany({ where: { customerId }, select: { id: true } })).map(o => o.id);
+    if (orderIds.length === 0) return { rows: [] };
+    const where: any = { orderId: { in: orderIds } };
+    if (bookingStatus) where.status = bookingStatus;
+    const rows = await this.prisma.booking.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, code: true, status: true, amount: true, currency: true,
+        orderId: true, productId: true, createdAt: true, updatedAt: true, serviceDate: true,
+      },
+    });
+    // Enrich with order code
+    const allOrders = await this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, code: true, number: true } });
+    const orderMap = new Map(allOrders.map(o => [o.id, { code: o.code, number: o.number }]));
+    return { rows: rows.map(r => ({ ...r, orderCode: orderMap.get(r.orderId)?.code ?? '', orderNumber: orderMap.get(r.orderId)?.number ?? '' })) };
+  }
+
+  async exportCustomerPayments(customerId: string, paymentStatus?: string) {
+    // Canonical payment resolution: direct + order-derived, deduped
+    const allOrderIds = (await this.prisma.order.findMany({ where: { customerId }, select: { id: true } })).map(o => o.id);
+    const paymentSelect = { id: true, code: true, status: true, amount: true, currency: true, orderId: true, paymentMethod: true, createdAt: true, paidAt: true } as const;
+    const directWhere: any = { customerId };
+    if (paymentStatus) directWhere.status = paymentStatus;
+    const orderWhere: any = allOrderIds.length > 0 ? { orderId: { in: allOrderIds } } : { orderId: '__none__' };
+    if (paymentStatus) orderWhere.status = paymentStatus;
+    const [direct, orderDerived] = await Promise.all([
+      this.prisma.payment.findMany({ where: directWhere, select: paymentSelect }),
+      allOrderIds.length > 0 ? this.prisma.payment.findMany({ where: orderWhere, select: paymentSelect }) : Promise.resolve([]),
+    ]);
+    const map = new Map<string, typeof direct[number]>();
+    for (const p of orderDerived) map.set(p.id, p);
+    for (const p of direct) map.set(p.id, p);
+    const rows = Array.from(map.values());
+    // Enrich with order code
+    const enrichOrderIds = [...new Set(rows.map(r => r.orderId).filter(Boolean))];
+    const orders = enrichOrderIds.length > 0 ? await this.prisma.order.findMany({ where: { id: { in: enrichOrderIds } }, select: { id: true, code: true, number: true } }) : [];
+    const enrichOrderMap = new Map(orders.map(o => [o.id, { code: o.code, number: o.number }]));
+    return { rows: rows.map(r => ({
+      ...r,
+      orderCode: enrichOrderMap.get(r.orderId ?? '')?.code ?? '',
+      orderNumber: enrichOrderMap.get(r.orderId ?? '')?.number ?? '',
+    })) };
+  }
+
+  async exportCustomerPartners(customerId: string) {
+    const relations = await this.prisma.partnerCustomerRelation.findMany({
+      where: { customerId },
+      include: { partner: { select: { id: true, name: true, status: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const partnerIds = relations.map(r => r.partnerId);
+    if (partnerIds.length === 0) return { rows: [] };
+    // Get orders with sellerPartnerId for this customer
+    const customerOrders: any[] = await (this.prisma.order.findMany({
+      where: { customerId } as any,
+      select: { id: true, sellerPartnerId: true, amount: true },
+    }) as any);
+    // Compute per-partner order count and amount
+    const orderCountMap = new Map<string, number>();
+    const amountMap = new Map<string, number>();
+    const orderIdsByPartner = new Map<string, string[]>();
+    for (const o of customerOrders) {
+      const pid = o.sellerPartnerId ?? '';
+      if (!partnerIds.includes(pid)) continue;
+      orderCountMap.set(pid, (orderCountMap.get(pid) ?? 0) + 1);
+      amountMap.set(pid, (amountMap.get(pid) ?? 0) + (o.amount ?? 0));
+      const ids = orderIdsByPartner.get(pid) ?? [];
+      ids.push(o.id);
+      orderIdsByPartner.set(pid, ids);
+    }
+    // Compute per-partner booking counts
+    const bookingCountMap = new Map<string, number>();
+    for (const [pid, oids] of orderIdsByPartner) {
+      if (oids.length === 0) continue;
+      const count = await this.prisma.booking.count({ where: { orderId: { in: oids } } });
+      bookingCountMap.set(pid, count);
+    }
+    return { rows: relations.map(r => ({
+      partnerId: r.partnerId,
+      partnerName: r.partner.name,
+      partnerStatus: r.partner.status,
+      orderCount: orderCountMap.get(r.partnerId) ?? 0,
+      totalBookings: bookingCountMap.get(r.partnerId) ?? 0,
+      totalAmount: amountMap.get(r.partnerId) ?? 0,
+      currency: 'AZN',
+    })) };
+  }
 }

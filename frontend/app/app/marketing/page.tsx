@@ -8,6 +8,7 @@ import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
 import PanelFrame from "@/components/PanelFrame";
 import { useLocale, t } from "@/lib/i18n";
+import TableExportButton from "@/components/TableExportButton";
 
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 
@@ -212,6 +213,9 @@ function MarketingContent() {
                 >
                   ＋ {t("marketing.create_campaign", locale)}
                 </button>
+              )}
+              {tab === "campaigns" && (
+                <TableExportButton exportUrl="/api/v1/marketing/campaigns/export" />
               )}
               <button
                 onClick={() => tab === "campaigns" && void loadCampaigns()}
