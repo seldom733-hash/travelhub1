@@ -124,8 +124,10 @@ export class BookingSubscribers implements OnModuleInit {
 
         for (const item of order.items) {
           const code = await this.ids.nextCode(tx, "BKG");
-          // Step 3.12 — tenant-scoped reference number for Booking
-          const bookingRefNum = await this.generateBookingReferenceNumber(tx, order, item);
+          // Shared Commerce Sequence: derive Booking ref from Order's commerceSequence.
+          const bookingRefNum = order.commerceSequence
+            ? this.refNum.commerceBookingRef(order.commerceSequence)
+            : await this.generateBookingReferenceNumber(tx, order, item);
           // Step 2.8: canonical cardinality 1 OrderItem → 1 Booking. orderItemId
           // (DB-level @unique) — надёжная защита от logically-duplicate
           // BookingRequested (разный eventId, тот же Order) и от concurrent
@@ -164,6 +166,7 @@ export class BookingSubscribers implements OnModuleInit {
               // Step 2.5B: frozen acquisition source из Order (READ-only,
               // ADR-0001 — Booking НЕ ре-выводит source; копия canonical факта).
               referenceNumber: bookingRefNum,
+              commerceSequence: order.commerceSequence ?? null,
               acquisitionSource: order.acquisitionSource ?? null,
               version: 1,
             },

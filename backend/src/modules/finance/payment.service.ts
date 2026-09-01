@@ -125,12 +125,14 @@ export class PaymentService {
         if (existing) return this.paymentDto(existing);
 
         const code = await this.ids.nextCode(tx, "PAY");
-        // Step 3.12 — tenant-scoped reference number for Payment
-        const referenceNumber = await this.generatePaymentReferenceNumber(tx, order);
+        // Shared Commerce Sequence: derive Payment ref from Order's commerceSequence.
+        const { referenceNumber, paymentOrdinal } = await this.generateCommercePaymentRef(tx, order);
         const created = await tx.payment.create({
           data: {
             code,
             referenceNumber,
+            commerceSequence: order.commerceSequence ?? null,
+            paymentOrdinal,
             orderId: order.id,
             customerId: order.customerId ?? null,
             amount: order.amount,
@@ -195,22 +197,33 @@ export class PaymentService {
   }
 
   /**
-   * Step 3.12 — generate tenant-scoped reference number for Payment.
-   * Marketplace → MKT-PAY-{SEQ}; Storefront → {SF_CODE}-PAY-{SEQ}
+   * Shared Commerce Sequence: generate Payment reference with ordinal.
+   * MKT-PAY-{root}-{ordinal} where ordinal = count of existing payments + 1.
+   * Falls back to independent reference if Order has no commerceSequence.
    */
-  private async generatePaymentReferenceNumber(
+  private async generateCommercePaymentRef(
     tx: any,
-    order: { acquisitionSource: string | null; sellerPartnerId: string | null },
-  ): Promise<string> {
+    order: { id: string; commerceSequence: string | null; acquisitionSource: string | null; sellerPartnerId: string | null },
+  ): Promise<{ referenceNumber: string; paymentOrdinal: number }> {
+    if (order.commerceSequence) {
+      // Count existing payments for this order to determine ordinal
+      const existingCount = await tx.payment.count({ where: { orderId: order.id } });
+      const ordinal = existingCount + 1;
+      return {
+        referenceNumber: this.refNum.commercePaymentRef(order.commerceSequence, ordinal),
+        paymentOrdinal: ordinal,
+      };
+    }
+    // Fallback: independent reference for legacy orders without commerceSequence
     const source = order.acquisitionSource;
     if (source === "PARTNER_STOREFRONT" && order.sellerPartnerId) {
       const sf = await tx.partnerStorefront.findUnique({
         where: { partnerId: order.sellerPartnerId },
         select: { storefrontCode: true },
       });
-      if (sf) return this.refNum.nextStorefrontReference(tx, sf.storefrontCode, "PAY");
+      if (sf) return { referenceNumber: await this.refNum.nextStorefrontReference(tx, sf.storefrontCode, "PAY"), paymentOrdinal: 0 };
     }
-    return this.refNum.nextMarketplaceReference(tx, "PAY");
+    return { referenceNumber: await this.refNum.nextMarketplaceReference(tx, "PAY"), paymentOrdinal: 0 };
   }
 
   // ── Lifecycle transitions (единственный state-machine authority) ──────────

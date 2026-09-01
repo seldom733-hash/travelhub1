@@ -1925,6 +1925,9 @@ model Order {
   /// Tenant-scoped human-readable reference number.
   /// Marketplace: MKT-ORD-{SEQ}; Storefront: {SF_CODE}-ORD-{SEQ}; SaaS: SAAS-{SF_CODE}-ORD-{SEQ}
   referenceNumber String            @unique
+  /// Shared Commerce Sequence (8 digits): root for all entities in this commerce chain.
+  /// MKT-REQ-{commerceSequence}, MKT-ORD-{commerceSequence}, MKT-BKG-{commerceSequence}, MKT-PAY-{commerceSequence}-N
+  commerceSequence String?
   customerId    String? // ссылка на CRM, без FK; NULL — internal assisted flow
   status        OrderStatus         @default(NEW)
   paymentStatus OrderPaymentStatus  @default(UNPAID)
@@ -2024,6 +2027,7 @@ model Order {
   // Step 2.12E: frozen seller attribution (D14) — фильтр/агрегация по seller
   // (Finance/аналитика; соответствует Order_sellerPartnerId_idx в миграции).
   @@index([sellerPartnerId])
+  @@index([commerceSequence])
   @@schema("order")
 }
 
@@ -2093,6 +2097,107 @@ model OrderHistory {
   @@schema("order")
 }
 
+// ──────────────────── Request (Shared Commerce Sequence) ─────────────────
+
+/// Shared Commerce Sequence — Request lifecycle.
+/// Customer clicks [Book] → Request created → Supplier Response SLA →
+/// Supplier confirms/rejects → Customer Confirmation/Payment TTL → Order → Booking → Payment.
+enum RequestStatus {
+  NEW
+  CHECKING
+  SUPPLIER_TIMEOUT
+  PRICE_CHANGED
+  CUSTOMER_ACCEPTED
+  CONFIRMED
+  CONVERTED
+  REJECTED
+  UNAVAILABLE
+  EXPIRED
+  CUSTOMER_PAYMENT_TIMEOUT
+  CANCELLED_BY_CUSTOMER
+
+  @@schema("order")
+}
+
+/// Shared Commerce Sequence — pre-order validation entity.
+/// Orchestrates the flow from customer intent to final Order creation.
+/// All entities in one commerce chain share the same 8-digit commerceSequence.
+model Request {
+  id                 String        @id @default(uuid())
+  code               String        @unique // REQ-00000001 (IdsService)
+  /// Shared commerceSequence: 8-digit root for all entities in this chain.
+  commerceSequence   String        @unique
+  /// Tenant-scoped human-readable reference number.
+  /// Marketplace: MKT-REQ-{commerceSequence}
+  referenceNumber    String        @unique
+
+  customerId         String?       // ref crm.Customer (no FK)
+  productId          String?       // ref catalog.Product (no FK)
+  partnerId          String?       // ref crm.Partner/supplier (no FK)
+
+  status             RequestStatus @default(NEW)
+
+  // ── Service snapshot ──
+  requestedServiceDate DateTime?
+  quantity             Int         @default(1)
+
+  // ── Price snapshot ──
+  displayedPrice    Decimal?      @db.Decimal(12, 2)  // price customer saw at submission
+  displayedCurrency String?
+  confirmedPrice    Decimal?      @db.Decimal(12, 2)  // supplier-confirmed price
+  confirmedCurrency String?
+
+  // ── Supplier Response SLA ──
+  supplierResponseDeadline DateTime?
+  supplierRespondedAt      DateTime?
+  supplierDecision         String?   // CONFIRMED / REJECTED / UNAVAILABLE / PRICE_CHANGED
+  supplierPriceProposal    Decimal?  @db.Decimal(12, 2)
+  supplierNote             String?
+
+  // ── Customer Confirmation / Payment TTL ──
+  customerActionDeadline DateTime?
+  customerAcceptedAt     DateTime?
+  customerDecision       String?   // ACCEPTED / DECLINED
+
+  // ── Conversion ──
+  convertedOrderId  String?       // ref Order.id after conversion
+  convertedAt       DateTime?
+
+  // ── Rejection / timeout info ──
+  rejectedAt        DateTime?
+  rejectedBy        String?   // supplier / system / customer
+  rejectionReason   String?
+
+  // ── Lifecycle timestamps ──
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  version           Int           @default(1)
+
+  history           RequestHistory[]
+
+  @@index([status])
+  @@index([customerId])
+  @@index([partnerId])
+  @@index([commerceSequence])
+  @@schema("order")
+}
+
+model RequestHistory {
+  id        String   @id @default(uuid())
+  requestId String
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  action    String
+  from      String?
+  to        String?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([requestId])
+  @@schema("order")
+}
+
 // ─────────────────────────────── booking.* ───────────────────────────────
 
 /// Step 2.8A: тип service occurrence Booking (Roadmap 2.8A).
@@ -2149,6 +2254,8 @@ model Booking {
   /// Tenant-scoped human-readable reference number.
   /// Marketplace: MKT-BKG-{SEQ}; Storefront: {SF_CODE}-BKG-{SEQ}
   referenceNumber String     @unique
+  /// Shared Commerce Sequence: derived from parent Order.
+  commerceSequence String?
   orderId     String // ссылка на Order, без FK
   productId   String // ссылка на Catalog, без FK
   /// Step 2.8: canonical linkage OrderItem ↔ Booking (1 OrderItem → ≤1 Booking,
@@ -3707,6 +3814,10 @@ model Payment {
   /// Tenant-scoped human-readable reference number.
   /// Marketplace: MKT-PAY-{SEQ}; Storefront: {SF_CODE}-PAY-{SEQ}
   referenceNumber String      @unique
+  /// Shared Commerce Sequence: derived from parent Order.
+  commerceSequence String?
+  /// Payment ordinal within commerce chain: MKT-PAY-{root}-{ordinal}
+  paymentOrdinal Int?
   /// ref order.Order, без FK (ADR-0001).
   orderId       String
   /// ref crm.Customer, без FK. NULL — internal assisted flow.

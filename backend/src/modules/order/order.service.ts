@@ -312,8 +312,9 @@ export class OrderService {
     const code = await this.ids.nextCode(tx, "ORD");
     const number = await this.ids.nextOrderNumber(tx);
 
-    // Step 3.12 — tenant-scoped reference number
-    const referenceNumber = await this.generateOrderReferenceNumber(tx, payload);
+    // Shared Commerce Sequence: allocate 8-digit root for all entities in this chain.
+    const commerceSequence = await this.refNum.nextCommerceSequence(tx);
+    const referenceNumber = this.refNum.commerceOrderRef(commerceSequence);
     const customerId = payload.customerId ?? null;
     const serviceDate = payload.serviceDate ? new Date(`${payload.serviceDate}T00:00:00.000Z`) : null;
     // Step 2.8A: frozen local temporal факты (verbatim; UTC instant НЕ
@@ -332,6 +333,7 @@ export class OrderService {
         code,
         number,
         referenceNumber,
+        commerceSequence,
         customerId,
         status: "NEW",
         paymentStatus: "UNPAID",
@@ -369,7 +371,7 @@ export class OrderService {
         sellerPartnerId: payload.sellerPartnerId ?? null,
         commissionSnapshot: payload.commissionSnapshot ? (payload.commissionSnapshot as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
-      select: { id: true, code: true, number: true, referenceNumber: true, customerId: true },
+      select: { id: true, code: true, number: true, referenceNumber: true, customerId: true, commerceSequence: true },
     });
 
     for (const it of payload.items) {

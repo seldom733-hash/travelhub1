@@ -26,6 +26,7 @@ const NAV: NavItem[] = [
   { href: "/app/command-center", icon: "📊", labelKey: "nav.command_center", permission: "analytics.read" },
   { href: "/app/analytics", icon: "📈", labelKey: "nav.analytics", permission: "analytics.read" },
   { href: "/app/catalog", icon: "📚", labelKey: "nav.catalog", permission: "catalog.product.read" },
+  { href: "/app/requests", icon: "📋", labelKey: "nav.requests", permission: "order.read" },
   { href: "/app/orders", icon: "🧾", labelKey: "nav.orders", permission: "order.read" },
   { href: "/app/bookings", icon: "📑", labelKey: "nav.bookings", permission: "booking.read" },
   { href: "/app/crm", icon: "🤝", labelKey: "nav.crm", permission: "crm.customer.read" },

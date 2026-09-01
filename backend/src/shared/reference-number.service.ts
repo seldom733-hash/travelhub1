@@ -84,6 +84,61 @@ export class ReferenceNumberService {
     return this.nextReferenceNumber(tx, `SAAS-${storefrontCode}`, typeCode);
   }
 
+  // ── Shared Commerce Sequence (8 digits) ──────────────────────────────
+
+  /**
+   * Allocate a new 8-digit shared commerceSequence root.
+   * Used to create entity references: MKT-REQ-*, MKT-ORD-*, MKT-BKG-*, MKT-PAY-*
+   * All entities in one commerce chain share the same root number.
+   */
+  async nextCommerceSequence(
+    _tx: Prisma.TransactionClient,
+  ): Promise<string> {
+    const value = await this.allocate("REFSEQ:COMMERCE:ROOT");
+    return String(value).padStart(8, "0");
+  }
+
+  /**
+   * Marketplace Request reference: MKT-REQ-{root}
+   */
+  commerceRequestRef(commerceSequence: string): string {
+    return `MKT-REQ-${commerceSequence}`;
+  }
+
+  /**
+   * Marketplace Order reference: MKT-ORD-{root}
+   */
+  commerceOrderRef(commerceSequence: string): string {
+    return `MKT-ORD-${commerceSequence}`;
+  }
+
+  /**
+   * Marketplace Booking reference: MKT-BKG-{root}
+   */
+  commerceBookingRef(commerceSequence: string): string {
+    return `MKT-BKG-${commerceSequence}`;
+  }
+
+  /**
+   * Marketplace Payment reference: MKT-PAY-{root}-{ordinal}
+   */
+  commercePaymentRef(commerceSequence: string, ordinal: number): string {
+    return `MKT-PAY-${commerceSequence}-${ordinal}`;
+  }
+
+  // ── Backward-compatible independent references (for non-commerce-chain objects)
+
+  /**
+   * Independent Marketplace reference (legacy / non-chain).
+   * For objects that don't belong to a shared commerce chain.
+   */
+  async nextIndependentMarketplaceReference(
+    tx: Prisma.TransactionClient,
+    typeCode: string,
+  ): Promise<string> {
+    return this.nextReferenceNumber(tx, "MKT", typeCode);
+  }
+
   /**
    * Hi/Lo block allocation for sequence numbers.
    * Same concurrency-safe mechanism as IdsService.
