@@ -417,6 +417,8 @@ export interface CompanyKpiResponse {
     refundsProcessed: ComparisonValue<number>;
     marketplaceSessions: ComparisonValue<number>;
     storefrontSessions: ComparisonValue<number>;
+    marketplaceVisitors: ComparisonValue<number>;
+    marketplaceVisits: ComparisonValue<number>;
     marketplacePartners: ComparisonValue<number>;
     storefrontPartners: ComparisonValue<number>;
     totalActivePartners: ComparisonValue<number>;

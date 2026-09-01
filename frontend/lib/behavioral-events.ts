@@ -159,6 +159,7 @@ export function useStorefrontCardImpression(slug: string, productSlug: string, e
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MARKETPLACE_SESSION_KEY = "travelhub.mp.sessionId";
+const MARKETPLACE_VISITOR_KEY = "travelhub.mp.visitorId";
 
 export type MarketplaceBehavioralEventType =
   | "MARKETPLACE_VIEWED"
@@ -189,6 +190,22 @@ export function getOrCreateMarketplaceSessionId(): string {
   return sid;
 }
 
+/**
+ * Phase 3 Pre-3.12: Persistent anonymous Marketplace visitor identity.
+ * Survives across sessions (stored in localStorage, persists browser restarts).
+ * Format: vid_<32 hex chars> — opaque, non-PII, purpose-limited to analytics.
+ * Cleared only when localStorage is cleared (new browser/incognito = new visitor).
+ */
+export function getOrCreateMarketplaceVisitorId(): string {
+  if (typeof window === "undefined") return "ssr_noop_visitor";
+  let vid = window.localStorage.getItem(MARKETPLACE_VISITOR_KEY);
+  if (!vid || !SESSION_RE.test(vid)) {
+    vid = `vid_${crypto.randomUUID().replace(/-/g, "").slice(0, 32)}`;
+    window.localStorage.setItem(MARKETPLACE_VISITOR_KEY, vid);
+  }
+  return vid;
+}
+
 /** Отправка одного Marketplace behavioral event. Fire-and-forget, без Authorization. */
 export function trackMarketplaceEvent(input: TrackMarketplaceEventInput): void {
   try {
@@ -198,6 +215,7 @@ export function trackMarketplaceEvent(input: TrackMarketplaceEventInput): void {
       eventType: input.eventType,
       occurredAt: new Date().toISOString(),
       sessionId: getOrCreateMarketplaceSessionId(),
+      visitorId: getOrCreateMarketplaceVisitorId(),
       locale: window.localStorage.getItem("travelhub.locale") ?? "ru",
       path: input.path,
       productSlug: input.productSlug,

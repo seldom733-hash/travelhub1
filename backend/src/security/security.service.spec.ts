@@ -8,6 +8,7 @@
  * Real persistence behavior is tested in test/restart-persistence.e2e-spec.ts.
  */
 
+import * as bcryptjs from "bcryptjs";
 import { SecurityService } from "./security.service";
 import { RoleCode } from "../generated/prisma/enums";
 
@@ -30,6 +31,7 @@ function createMockPrisma() {
 
   // Track whether admin user exists (for P2002 re-verify tests)
   let adminExists = true;
+  const adminPasswordHash = bcryptjs.hashSync("admin123", 10);
 
   return {
     _store: store,
@@ -72,10 +74,11 @@ function createMockPrisma() {
     user: {
       count: jest.fn().mockResolvedValue(1),
       findUnique: jest.fn().mockImplementation(async ({ where }: any) => {
-        if (where?.username === "admin") return adminExists ? { id: "admin-id" } : null;
+        if (where?.username === "admin") return adminExists ? { id: "admin-id", passwordHash: adminPasswordHash } : null;
         return null;
       }),
       create: jest.fn(),
+      update: jest.fn().mockResolvedValue({ id: "admin-id" }),
     },
   };
 }

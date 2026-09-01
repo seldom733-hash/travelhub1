@@ -30,6 +30,12 @@ class MarketplaceBehavioralEventDto {
   @MaxLength(64)
   sessionId!: string;
 
+  /** Phase 3 Pre-3.12: persistent anonymous visitor identity for Visitors KPI. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  visitorId?: string;
+
   @IsIn(EVENT_LOCALES as unknown as string[])
   locale!: string;
 

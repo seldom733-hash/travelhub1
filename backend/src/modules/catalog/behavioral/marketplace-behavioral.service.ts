@@ -56,6 +56,7 @@ export class MarketplaceBehavioralService {
     eventType: string;
     occurredAt: string;
     sessionId: string;
+    visitorId?: string;
     locale: string;
     path: string;
     productSlug?: string;
@@ -109,6 +110,7 @@ export class MarketplaceBehavioralService {
           productId,
           categoryId,
           sessionId,
+          visitorId: input.visitorId || null,
           // Server-authoritative: Marketplace events возникают в Marketplace-контексте.
           acquisitionSource: "MARKETPLACE",
           locale,

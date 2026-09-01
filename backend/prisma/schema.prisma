@@ -1619,6 +1619,7 @@ model MarketplaceBehavioralEvent {
   productId       String?
   categoryId      String?
   sessionId       String
+  visitorId       String?  // Phase 3 Pre-3.12: persistent anonymous browser identity for Visitors KPI
   acquisitionSource AcquisitionSource
   locale          String
   path            String
@@ -1628,6 +1629,7 @@ model MarketplaceBehavioralEvent {
   @@index([productId, occurredAt])
   @@index([categoryId, occurredAt])
   @@index([sessionId])
+  @@index([visitorId])
   @@index([acquisitionSource, occurredAt])
   @@schema("catalog")
 }

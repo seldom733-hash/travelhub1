@@ -139,16 +139,18 @@ export const METRIC_CONFIGS = {
   },
   "analytics.gmv": {
     metricId: "analytics.gmv",
-    destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destinationType: "NONE" as DestinationType,
+    destination: "",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
-    statusFilter: ["FULFILLED", "CLOSED"],
+    // GMV = commercial value of eligible commerce ≠ Order registry.
+    // No honest financial detail view exists yet → non-clickable.
   },
   "analytics.revenue": {
     metricId: "analytics.revenue",
-    destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destinationType: "NONE" as DestinationType,
+    destination: "",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
+    // Revenue is a financial metric → non-clickable until Finance detail exists.
   },
   "analytics.refunds": {
     metricId: "analytics.refunds",
@@ -195,24 +197,24 @@ export const METRIC_CONFIGS = {
     label: "Активные партнёры (marketplace)",
   },
 
-  // GMV lifecycle (all period-bound)
+  // GMV lifecycle — all financial metrics, non-clickable until Finance detail exists
   "analytics.qualified_gmv": {
     metricId: "analytics.qualified_gmv",
-    destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destinationType: "NONE" as DestinationType,
+    destination: "",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
     statusFilter: ["NEW", "CONFIRMED", "FULFILLED", "CLOSED"],
   },
   "analytics.collected_gmv": {
     metricId: "analytics.collected_gmv",
-    destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destinationType: "NONE" as DestinationType,
+    destination: "",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
   },
   "analytics.outstanding_gmv": {
     metricId: "analytics.outstanding_gmv",
-    destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/orders",
+    destinationType: "NONE" as DestinationType,
+    destination: "",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
   },
   // Table cell drill-down configs (Financial Summary) → Payments registry

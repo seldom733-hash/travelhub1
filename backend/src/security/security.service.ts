@@ -77,9 +77,22 @@ export class SecurityService implements OnModuleInit {
   private async seedAdmin(): Promise<void> {
     const existing = await this.prisma.user.findUnique({
       where: { username: ADMIN_USERNAME },
-      select: { id: true },
+      select: { id: true, passwordHash: true },
     });
-    if (existing) return;
+    if (existing) {
+      // Синхронизация пароля: если хеш в БД не совпадает с текущим ADMIN_PASSWORD
+      // из .env — обновляем, чтобы деплой/рестарт не ломал вход.
+      const matches = await bcrypt.compare(ADMIN_PASSWORD, existing.passwordHash);
+      if (!matches) {
+        const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+        await this.prisma.user.update({
+          where: { id: existing.id },
+          data: { passwordHash },
+        });
+        this.logger.warn(`Admin user '${ADMIN_USERNAME}' password hash was out of sync — updated from ADMIN_PASSWORD env`);
+      }
+      return;
+    }
 
     const role = await this.prisma.role.findUniqueOrThrow({ where: { code: RoleCode.ADMIN } });
     const code = await this.ids.nextCode(this.prisma as unknown as Prisma.TransactionClient, "USR");
