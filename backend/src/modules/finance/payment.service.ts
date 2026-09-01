@@ -316,7 +316,7 @@ export class PaymentService {
 
   // ── Read (Finance Center) ───────────────────────────────────────────────────
 
-  async list(query: { orderId?: string; status?: string; currency?: string; dateFrom?: string; dateTo?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; acquisitionSource?: string }) {
+  async list(query: { orderId?: string; status?: string; currency?: string; dateFrom?: string; dateTo?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; acquisitionSource?: string; dateField?: string }) {
     const page = query.page ?? 1;
     const pageSize = Math.min(query.pageSize ?? 50, 100);
 
@@ -336,7 +336,7 @@ export class PaymentService {
       ...(query.status ? { status: query.status as PaymentStatus } : {}),
       ...(query.currency ? { currency: query.currency } : {}),
       ...(query.dateFrom || query.dateTo ? {
-        createdAt: {
+        [query.dateField || 'createdAt']: {
           ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
           ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
         },

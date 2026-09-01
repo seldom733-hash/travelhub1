@@ -1264,11 +1264,12 @@ export class AnalyticsService {
   ): Promise<FinancialReconciliationResponse> {
     const { current } = this.resolveQueryPeriod(dto);
 
-    // Marketplace-scoped financial reconciliation
+    // Marketplace-scoped financial reconciliation.
+    // Fetch ALL marketplace order IDs (not period-scoped) because
+    // payments with paidAt in the period may belong to orders created outside it.
     const mktOrders = await this.prisma.order.findMany({
       where: {
         acquisitionSource: "MARKETPLACE",
-        createdAt: { gte: current.start, lt: current.endExclusive },
       },
       select: { id: true },
     });

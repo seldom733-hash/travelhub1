@@ -45,6 +45,7 @@ function PaymentsContent({
   initialStatus,
   initialSortBy,
   initialSortDirection,
+  initialDateField,
 }: {
   initialCurrency?: string;
   initialDateFrom?: string;
@@ -52,6 +53,7 @@ function PaymentsContent({
   initialStatus?: string;
   initialSortBy?: string;
   initialSortDirection?: SortDirection;
+  initialDateField?: string;
 }) {
   const locale = useLocale();
   const [data, setData] = useState<Page<Payment> | null>(null);
@@ -64,6 +66,7 @@ function PaymentsContent({
   const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
+  const dateField = initialDateField;
 
 
   const updateUrl = (params: Record<string, string>) => {
@@ -90,6 +93,7 @@ function PaymentsContent({
       if (dateFrom) qs.set("dateFrom", dateFrom);
       if (dateTo) qs.set("dateTo", dateTo);
       if (statusFilter) qs.set("status", statusFilter);
+      if (dateField) qs.set("dateField", dateField);
 
       if (sortBy) qs.set("sortBy", sortBy);
       if (sortDirection) qs.set("sortDirection", sortDirection);
@@ -292,6 +296,7 @@ function PaymentsContent({
 
 function PaymentsWithParams() {
   const sp = useSearchParams();
+  const fromAnalytics = sp.get("fromAnalytics") === "true";
   return (
     <PaymentsContent
       initialCurrency={sp.get("currency") ?? undefined}
@@ -300,6 +305,7 @@ function PaymentsWithParams() {
       initialStatus={sp.get("status") ?? undefined}
       initialSortBy={sp.get("sortBy") ?? undefined}
       initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
+      initialDateField={fromAnalytics ? "paidAt" : undefined}
     />
   );
 }

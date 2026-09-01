@@ -206,7 +206,8 @@ function AnalyticsContent() {
               { label: t("analytics.kpi.bookings", locale), value: m.bookingsRequested.current, icon: "\uD83D\uDCD1", drilldown: METRIC_CONFIGS["analytics.bookings"] },
               { label: t("analytics.kpi.aov", locale), value: fmt(m.averageOrderValue.current, m.gmvCurrency), icon: "\uD83C\uDFAF", drilldown: METRIC_CONFIGS["analytics.aov"] },
               { label: t("analytics.kpi.refunds", locale), value: fmt(m.refunds.current, m.refundsCurrency), icon: "\u21A9\uFE0F", drilldown: METRIC_CONFIGS["analytics.refunds"] },
-              { label: t("analytics.kpi.marketplace_visitors", locale), value: m.marketplaceVisitors?.current ?? 0, icon: "\uD83D\uDC64", drilldown: METRIC_CONFIGS["analytics.sessions"] },
+              // Historical Visitors: if visits>0 but visitors=0, telemetry lacks visitorId (pre-cutover) → show "—"
+              { label: t("analytics.kpi.marketplace_visitors", locale), value: (m.marketplaceVisitors?.current ?? 0) > 0 ? m.marketplaceVisitors!.current : (m.marketplaceVisits?.current ?? 0) > 0 ? "\u2014" : 0, icon: "\uD83D\uDC64", drilldown: METRIC_CONFIGS["analytics.sessions"] },
               { label: t("analytics.kpi.marketplace_visits", locale), value: m.marketplaceVisits?.current ?? 0, icon: "\uD83C\uDF10", drilldown: METRIC_CONFIGS["analytics.sessions"] },
               { label: t("analytics.kpi.partners", locale), value: m.marketplacePartners?.current ?? 0, icon: "\uD83E\uDD1D", drilldown: METRIC_CONFIGS["analytics.partners"] },
               { label: t("analytics.kpi.customers", locale), value: m.marketplaceCustomers?.current ?? 0, icon: "\uD83D\uDC65", drilldown: METRIC_CONFIGS["analytics.customers"] },
@@ -230,9 +231,9 @@ function AnalyticsContent() {
             items={[
               { label: t("analytics.kpi.storefront_sessions", locale), value: m.storefrontSessions?.current ?? 0, icon: "\uD83D\uDCF1" },
               { label: t("analytics.kpi.storefront_partners", locale), value: m.storefrontPartners?.current ?? 0, icon: "\uD83C\uDFEA" },
-              { label: t("analytics.kpi.storefront_customers", locale), value: m.storefrontCustomers?.current ?? 0, icon: "\uD83D\uDC65" },
             ]}
           />
+          <p className="text-xs text-emerald-600/60 ml-1">{t("analytics.storefront.customers_note", locale)}</p>
         </>
       )}
 
@@ -422,7 +423,7 @@ function AnalyticsContent() {
       )}
 
       {/* ── Financial Summary with Payment Count ── */}
-      {finance && finance.currencies.length > 0 && !loading && (
+      {finance && !loading && (
         <>
         <AggregateSummary
           totalRecords={finance.totalLedgerEntries}

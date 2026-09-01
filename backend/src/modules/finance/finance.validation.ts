@@ -528,6 +528,12 @@ export class PaymentListQueryDto {
   @IsString()
   dateTo?: string;
 
+  /** Date field for filtering: createdAt (default) or paidAt (analytics drill-down) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  dateField?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(32)

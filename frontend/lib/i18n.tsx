@@ -1345,6 +1345,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "analytics.kpi.storefront_sessions": { ru: "Сеансы Storefront", az: "Storefront seansları", en: "Storefront Sessions" },
   "analytics.kpi.storefront_partners": { ru: "Партнёры Storefront", az: "Storefront tərəfdaşları", en: "Storefront Partners" },
   "analytics.kpi.storefront_customers": { ru: "Клиенты Storefront", az: "Storefront müştəriləri", en: "Storefront Customers" },
+  "analytics.storefront.customers_note": { ru: "Клиенты Storefront отображаются в Partner Workspace", az: "Storefront müştəriləri Partner Workspace-də göstərilir", en: "Storefront customers shown in Partner Workspace" },
   "analytics.kpi.qualified_gmv": { ru: "Квалифицированный GMV", az: "Keyfiyyətli GMV", en: "Qualified GMV" },
   "analytics.kpi.completed_gmv": { ru: "Завершённый GMV", az: "Tamamlanmış GMV", en: "Completed GMV" },
   "analytics.kpi.collected_gmv": { ru: "Собранный GMV", az: "Yığılmış GMV", en: "Collected GMV" },
