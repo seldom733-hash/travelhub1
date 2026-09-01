@@ -683,8 +683,8 @@ export class CrmService {
     });
     const totalProducts = await this.prisma.product.count({ where: productWhere });
 
-    // Aggregate: orders where this partner is seller
-    const orderWhere: any = { sellerPartnerId: id };
+    // Aggregate: orders where this partner is seller — Marketplace scope only (Platform Workspace)
+    const orderWhere: any = { sellerPartnerId: id, acquisitionSource: 'MARKETPLACE' as any };
     if (sort?.status) orderWhere.status = sort.status;
     if (sort?.dateFrom || sort?.dateTo) {
       orderWhere.createdAt = {
@@ -705,7 +705,7 @@ export class CrmService {
     });
     const totalOrders = await this.prisma.order.count({ where: orderWhere });
 
-    // Aggregate: bookings through partner's products (matching Analytics semantics)
+    // Aggregate: bookings through partner's products — Marketplace scope only (Platform Workspace)
     // Analytics attributes bookings via product.partnerId, not orderId → sellerPartnerId
     const partnerProductIds = (
       await this.prisma.product.findMany({
@@ -715,7 +715,7 @@ export class CrmService {
     ).map((p) => p.id);
 
     const bookingWhere: any = partnerProductIds.length > 0
-      ? { productId: { in: partnerProductIds } }
+      ? { productId: { in: partnerProductIds }, acquisitionSource: 'MARKETPLACE' as any }
       : { productId: '__none__' };
     if (sort?.bookingStatus) bookingWhere.status = sort.bookingStatus;
     // Apply date filter to bookings (matching Analytics semantics: booking.createdAt in period)

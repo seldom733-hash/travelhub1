@@ -229,8 +229,7 @@ function AnalyticsContent() {
           <Kpi
             period={periodContext}
             items={[
-              { label: t("analytics.kpi.storefront_sessions", locale), value: m.storefrontSessions?.current ?? 0, icon: "\uD83D\uDCF1" },
-              { label: t("analytics.kpi.storefront_partners", locale), value: m.storefrontPartners?.current ?? 0, icon: "\uD83C\uDFEA" },
+              { label: t("analytics.kpi.storefront_active", locale), value: m.storefrontPartners?.current ?? 0, icon: "\uD83C\uDFEA" },
             ]}
           />
           <p className="text-xs text-emerald-600/60 ml-1">{t("analytics.storefront.customers_note", locale)}</p>
