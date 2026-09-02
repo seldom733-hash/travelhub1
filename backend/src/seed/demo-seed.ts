@@ -482,7 +482,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
   console.log(`\n📋 Seeding ~${ORDER_TARGET} orders with seasonal distribution...`);
   const customers = await prisma.customer.findMany({ select: { id: true } });
   const orderData: Array<{
-    id: string; code: string; number: string; referenceNumber: string; customerId: string; status: string;
+    id: string; code: string; number: string; referenceNumber: string; commerceSequence: string; customerId: string; status: string;
     paymentStatus: string; currency: string; amount: Prisma.Decimal; paidAmount: Prisma.Decimal;
     refundedAmount: Prisma.Decimal; sellerPartnerId: string; createdAt: Date; updatedAt: Date;
     submittedAt: Date; confirmedAt?: Date; fulfilledAt?: Date; cancelledAt?: Date; closedAt?: Date;
@@ -495,11 +495,11 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
     serviceDate: Date;
   }> = [];
   const paymentData: Array<{
-    id: string; code: string; referenceNumber: string; orderId: string; amount: Prisma.Decimal; currency: string;
+    id: string; code: string; referenceNumber: string; paymentOrdinal: number; orderId: string; amount: Prisma.Decimal; currency: string;
     status: string; partnerId: string; createdAt: Date; updatedAt: Date; paidAt?: Date; isActivePayment: boolean; version: number;
   }> = [];
   const bookingData: Array<{
-    id: string; code: string; referenceNumber: string; orderId: string; productId: string; status: string;
+    id: string; code: string; referenceNumber: string; commerceSequence: string; orderId: string; productId: string; status: string;
     amount: Prisma.Decimal; currency: string; serviceDate: Date; createdAt: Date; updatedAt: Date; version: number;
     completedAt?: Date; cancelledAt?: Date; confirmedAt?: Date; acquisitionSource?: string;
   }> = [];
@@ -575,23 +575,23 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
     const sellerPartnerId = uuid(`partner-${partnerIdx >= 0 ? partnerIdx : 0}`);
     const commissionRate = PARTNER_TEMPLATES[partnerIdx >= 0 ? partnerIdx : 0]?.commissionRate ?? 0.10;
 
-    // Step 3.12 — deterministic reference number
+    // Step 3.12 — deterministic reference number (8-digit commerceSequence)
     const acqSrc = orderNum % 2 === 0 ? "MARKETPLACE" : "PARTNER_STOREFRONT";
+    const cs = String(orderNum).padStart(8, "0"); // shared commerceSequence root
     const orderRefNum = acqSrc === "PARTNER_STOREFRONT" && storefrontCodeMap.has(sellerPartnerId)
-      ? `${storefrontCodeMap.get(sellerPartnerId)}-ORD-${String(orderNum).padStart(6, "0")}`
-      : `MKT-ORD-${String(orderNum).padStart(6, "0")}`;
+      ? `${storefrontCodeMap.get(sellerPartnerId)}-ORD-${cs}`
+      : `MKT-ORD-${cs}`;
 
     orderData.push({
       id, code: `ORD-${String(orderNum).padStart(8, "0")}`,
       number: `TH-2026-${String(orderNum).padStart(6, "0")}`,
-      referenceNumber: orderRefNum,
+      referenceNumber: orderRefNum, commerceSequence: cs,
       customerId: customer.id, status: ps.status as any, paymentStatus: ps.paymentStatus as any,
       currency: product.currency, amount: decimal(amount), paidAmount: decimal(paidAmount),
       refundedAmount: decimal(refundedAmount), sellerPartnerId,
       createdAt: orderDate, updatedAt: orderDate,
       submittedAt: orderDate, confirmedAt, fulfilledAt, cancelledAt, closedAt,
-      serviceDate,      // Deterministic channel: even orderNum → MARKETPLACE, odd → PARTNER_STOREFRONT
-      acquisitionSource: acqSrc,
+      serviceDate, acquisitionSource: acqSrc,
       commissionSnapshot: { rate: commissionRate, currency: product.currency },
       amountNum: amount,
     });
@@ -606,20 +606,21 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
       serviceDate,
     });
 
-    // Payment (for paid/partially paid orders)
+    // Payment (for paid/partially paid orders) — currency MUST match Order currency
     if (ps.paymentStatus !== "UNPAID") {
       const payStatus = ps.paymentStatus === "REFUNDED" ? "REFUNDED" :
         ps.paymentStatus === "PARTIALLY_PAID" ? "CAPTURED" : "CAPTURED";
       const payRefNum = acqSrc === "PARTNER_STOREFRONT" && storefrontCodeMap.has(sellerPartnerId)
-        ? `${storefrontCodeMap.get(sellerPartnerId)}-PAY-${String(orderNum).padStart(6, "0")}`
-        : `MKT-PAY-${String(orderNum).padStart(6, "0")}`;
+        ? `${storefrontCodeMap.get(sellerPartnerId)}-PAY-${cs}-1`
+        : `MKT-PAY-${cs}-1`;
+      const payCreatedAt = new Date(orderDate.getTime() + randomBetween(0, 2) * 3600000); // 0-2h after order
       paymentData.push({
         id: uuid(`payment-${orderNum}`), code: `PAY-${String(orderNum).padStart(8, "0")}`,
-        referenceNumber: payRefNum,
+        referenceNumber: payRefNum, paymentOrdinal: 1,
         orderId: id, amount: decimal(paidAmount), currency: product.currency,
         status: payStatus, partnerId: sellerPartnerId,
-        createdAt: orderDate, updatedAt: orderDate,
-        paidAt: ps.paymentStatus !== "UNPAID" ? orderDate : undefined,
+        createdAt: payCreatedAt, updatedAt: payCreatedAt,
+        paidAt: ps.paymentStatus !== "UNPAID" ? payCreatedAt : undefined,
         isActivePayment: true, version: 1,
       });
     }
@@ -629,15 +630,16 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
       const bkStatus = ps.status === "CLOSED" ? "COMPLETED" :
         ps.status === "FULFILLED" ? "IN_SERVICE" : "CONFIRMED";
       const bkgRefNum = acqSrc === "PARTNER_STOREFRONT" && storefrontCodeMap.has(sellerPartnerId)
-        ? `${storefrontCodeMap.get(sellerPartnerId)}-BKG-${String(orderNum).padStart(6, "0")}`
-        : `MKT-BKG-${String(orderNum).padStart(6, "0")}`;
+        ? `${storefrontCodeMap.get(sellerPartnerId)}-BKG-${cs}`
+        : `MKT-BKG-${cs}`;
+      const bkCreatedAt = new Date(orderDate.getTime() + randomBetween(1, 5) * 3600000); // 1-5h after order
       bookingData.push({
         id: uuid(`booking-${orderNum}`), code: `BKG-${String(orderNum).padStart(8, "0")}`,
-        referenceNumber: bkgRefNum,
+        referenceNumber: bkgRefNum, commerceSequence: cs,
         orderId: id, productId: product.id, status: bkStatus as any,
         amount: decimal(amount), currency: product.currency,
-        serviceDate, createdAt: orderDate, updatedAt: orderDate, version: 1,
-        completedAt: bkStatus === "COMPLETED" ? fulfilledAt : undefined,
+        serviceDate, createdAt: bkCreatedAt, updatedAt: bkCreatedAt, version: 1,
+        completedAt: bkStatus === "COMPLETED" ? (fulfilledAt ?? new Date(serviceDate.getTime() + randomBetween(0, 1) * 86400000)) : undefined,
         confirmedAt: confirmedAt,
         acquisitionSource: orderNum % 2 === 0 ? "MARKETPLACE" : "PARTNER_STOREFRONT",
       });
@@ -667,7 +669,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
       await prisma.order.upsert({
         where: { id: o.id },
         create: {
-          id: o.id, code: o.code, number: o.number, referenceNumber: o.referenceNumber, customerId: o.customerId,
+          id: o.id, code: o.code, number: o.number, referenceNumber: o.referenceNumber, commerceSequence: o.commerceSequence, customerId: o.customerId,
           status: o.status as any, paymentStatus: o.paymentStatus as any,
           currency: o.currency, amount: o.amount, paidAmount: o.paidAmount, refundedAmount: o.refundedAmount,
           sellerPartnerId: o.sellerPartnerId, createdAt: o.createdAt, updatedAt: o.updatedAt,
@@ -709,7 +711,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
       await prisma.payment.upsert({
         where: { id: p.id },
         create: {
-          id: p.id, code: p.code, referenceNumber: p.referenceNumber, orderId: p.orderId, amount: p.amount, currency: p.currency,
+          id: p.id, code: p.code, referenceNumber: p.referenceNumber, paymentOrdinal: p.paymentOrdinal, orderId: p.orderId, amount: p.amount, currency: p.currency,
           status: p.status as any, partnerId: p.partnerId, createdAt: p.createdAt, updatedAt: p.updatedAt,
           paidAt: p.paidAt, isActivePayment: p.isActivePayment, version: p.version,
         },
@@ -729,7 +731,7 @@ async function seedOrders(products: { id: string; partnerId: string; price: numb
       await prisma.booking.upsert({
         where: { id: b.id },
         create: {
-          id: b.id, code: b.code, referenceNumber: b.referenceNumber, orderId: b.orderId, productId: b.productId, status: b.status as any,
+          id: b.id, code: b.code, referenceNumber: b.referenceNumber, commerceSequence: b.commerceSequence, orderId: b.orderId, productId: b.productId, status: b.status as any,
           amount: b.amount, currency: b.currency, serviceDate: b.serviceDate, createdAt: b.createdAt,
           updatedAt: b.updatedAt, version: b.version, completedAt: b.completedAt, confirmedAt: b.confirmedAt,
           acquisitionSource: b.acquisitionSource ?? undefined,
@@ -810,18 +812,22 @@ async function seedRefunds(paymentData: Array<{ id: string; orderId: string; amo
     const status = isPending ? "REQUESTED" : "PROCESSED";
     const createdAt = new Date(p.paidAt!.getTime() + randomBetween(1, 30) * 86400000);
 
-    // Step 3.12 — refund reference number (derive from order acquisition source)
-    const refOrder = await prisma.order.findUnique({ where: { id: p.orderId }, select: { acquisitionSource: true, sellerPartnerId: true } });
+    // Step 3.12 — refund reference number (derive from order commerceSequence)
+    const refOrder = await prisma.order.findUnique({ where: { id: p.orderId }, select: { acquisitionSource: true, sellerPartnerId: true, commerceSequence: true } });
+    const refCs = refOrder?.commerceSequence ?? String(i + 1).padStart(8, "0");
     const refAcq = refOrder?.acquisitionSource ?? "MARKETPLACE";
     const refSfCode = refAcq === "PARTNER_STOREFRONT" && refOrder?.sellerPartnerId ? storefrontCodeMap.get(refOrder.sellerPartnerId) : undefined;
-    const refundRefNum = refSfCode ? `${refSfCode}-REF-${String(i + 1).padStart(6, "0")}` : `MKT-REF-${String(i + 1).padStart(6, "0")}`;
+    const refundRefNum = refSfCode ? `${refSfCode}-REF-${refCs}` : `MKT-REF-${refCs}`;
+    // Enforce refund ceiling: refund amount <= payment amount
+    const maxRefund = Number(p.amount);
+    const cappedRefundAmount = Math.min(refundAmount, maxRefund);
 
     try {
       await prisma.refund.upsert({
         where: { id },
         create: {
           id, code, referenceNumber: refundRefNum, paymentId: p.id, orderId: p.orderId,
-          amount: decimal(refundAmount), currency: p.currency,
+          amount: decimal(cappedRefundAmount), currency: p.currency,
           status: status as any,
           reason: isFull ? "Customer request — full cancellation" : "Partial service issue",
           version: 1,
@@ -1090,6 +1096,34 @@ async function seedCatalogHealth() {
   console.log(`  ✅ Catalog: ${published} PUBLISHED, ${archivedCount} ARCHIVED`);
 }
 
+// ─── Canonical Categories ───────────────────────────────────────────────────
+
+async function seedCanonicalCategories() {
+  console.log(`\n📂 Seeding canonical categories...`);
+  const categories = [
+    { code: "CAT-001", slug: "tours", title: "Tours" },
+    { code: "CAT-002", slug: "accommodation", title: "Accommodation" },
+    { code: "CAT-003", slug: "excursions", title: "Excursions" },
+    { code: "CAT-004", slug: "transfers", title: "Transfers" },
+    { code: "CAT-005", slug: "guides", title: "Guides" },
+    { code: "CAT-006", slug: "activities-entertainment", title: "Activities & Entertainment" },
+    { code: "CAT-007", slug: "tickets-events", title: "Tickets & Events" },
+    { code: "CAT-008", slug: "food-gastronomy", title: "Food & Gastronomy" },
+    { code: "CAT-009", slug: "wellness-spa", title: "Wellness & SPA" },
+  ];
+  let created = 0;
+  for (const cat of categories) {
+    const existing = await prisma.category.findUnique({ where: { slug: cat.slug }, select: { id: true } });
+    if (!existing) {
+      await prisma.category.create({
+        data: { code: cat.code, slug: cat.slug, title: cat.title, createdAt: new Date(2026, 0, 1) },
+      });
+      created++;
+    }
+  }
+  console.log(`  ✅ ${created} canonical categories created`);
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -1102,6 +1136,9 @@ async function main() {
   const startTime = Date.now();
 
   try {
+    // 0. Canonical Categories (required for Products)
+    await seedCanonicalCategories();
+
     // 1. Partners
     const partners = await seedPartners();
 

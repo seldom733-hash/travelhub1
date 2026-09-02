@@ -39,13 +39,13 @@ export class ReferenceNumberService {
    * @param tx       - Transaction client (for compatibility with callers)
    * @param prefix   - Namespace prefix: "MKT", "SAAS", or storefront code (e.g. "SF001")
    * @param typeCode - Object type: "ORD", "BKG", "PAY", "REF", "INV", "REQ"
-   * @param digits   - Sequence digits (default 6: 000001..999999)
+   * @param digits   - Sequence digits (default 8: 00000001..99999999)
    */
   async nextReferenceNumber(
     _tx: Prisma.TransactionClient,
     prefix: string,
     typeCode: string,
-    digits = 6,
+    digits = 8,
   ): Promise<string> {
     const seqKey = `REF:${prefix}:${typeCode}`;
     const value = await this.allocate(seqKey);

@@ -37,36 +37,36 @@ describe("ReferenceNumberService — Tenant-Scoped Reference Number Contract", (
   describe("Marketplace references", () => {
     it("MKT + ORD → MKT-ORD-{SEQ}", async () => {
       const ref = await service.nextMarketplaceReference(null as any, "ORD");
-      expect(ref).toBe("MKT-ORD-000001");
+      expect(ref).toBe("MKT-ORD-00000001");
     });
 
     it("MKT + BKG → MKT-BKG-{SEQ}", async () => {
       const ref = await service.nextMarketplaceReference(null as any, "BKG");
-      expect(ref).toBe("MKT-BKG-000001");
+      expect(ref).toBe("MKT-BKG-00000001");
     });
 
     it("MKT + PAY → MKT-PAY-{SEQ}", async () => {
       const ref = await service.nextMarketplaceReference(null as any, "PAY");
-      expect(ref).toBe("MKT-PAY-000001");
+      expect(ref).toBe("MKT-PAY-00000001");
     });
 
     it("MKT + REF → MKT-REF-{SEQ}", async () => {
       const ref = await service.nextMarketplaceReference(null as any, "REF");
-      expect(ref).toBe("MKT-REF-000001");
+      expect(ref).toBe("MKT-REF-00000001");
     });
 
     it("MKT + INV → MKT-INV-{SEQ}", async () => {
       const ref = await service.nextMarketplaceReference(null as any, "INV");
-      expect(ref).toBe("MKT-INV-000001");
+      expect(ref).toBe("MKT-INV-00000001");
     });
 
     it("sequent calls increment sequence", async () => {
       const r1 = await service.nextMarketplaceReference(null as any, "ORD");
       const r2 = await service.nextMarketplaceReference(null as any, "ORD");
       const r3 = await service.nextMarketplaceReference(null as any, "ORD");
-      expect(r1).toBe("MKT-ORD-000001");
-      expect(r2).toBe("MKT-ORD-000002");
-      expect(r3).toBe("MKT-ORD-000003");
+      expect(r1).toBe("MKT-ORD-00000001");
+      expect(r2).toBe("MKT-ORD-00000002");
+      expect(r3).toBe("MKT-ORD-00000003");
     });
   });
 
@@ -75,29 +75,29 @@ describe("ReferenceNumberService — Tenant-Scoped Reference Number Contract", (
   describe("Storefront references", () => {
     it("SF001 + ORD → SF001-ORD-{SEQ}", async () => {
       const ref = await service.nextStorefrontReference(null as any, "SF001", "ORD");
-      expect(ref).toBe("SF001-ORD-000001");
+      expect(ref).toBe("SF001-ORD-00000001");
     });
 
     it("SF001 + BKG → SF001-BKG-{SEQ}", async () => {
       const ref = await service.nextStorefrontReference(null as any, "SF001", "BKG");
-      expect(ref).toBe("SF001-BKG-000001");
+      expect(ref).toBe("SF001-BKG-00000001");
     });
 
     it("SF001 + PAY → SF001-PAY-{SEQ}", async () => {
       const ref = await service.nextStorefrontReference(null as any, "SF001", "PAY");
-      expect(ref).toBe("SF001-PAY-000001");
+      expect(ref).toBe("SF001-PAY-00000001");
     });
 
     it("SF001 + REF → SF001-REF-{SEQ}", async () => {
       const ref = await service.nextStorefrontReference(null as any, "SF001", "REF");
-      expect(ref).toBe("SF001-REF-000001");
+      expect(ref).toBe("SF001-REF-00000001");
     });
 
     it("SF001 ORD and BKG have independent sequences", async () => {
       const r1 = await service.nextStorefrontReference(null as any, "SF001", "ORD");
       const r2 = await service.nextStorefrontReference(null as any, "SF001", "BKG");
-      expect(r1).toBe("SF001-ORD-000001");
-      expect(r2).toBe("SF001-BKG-000001");
+      expect(r1).toBe("SF001-ORD-00000001");
+      expect(r2).toBe("SF001-BKG-00000001");
     });
   });
 
@@ -110,17 +110,17 @@ describe("ReferenceNumberService — Tenant-Scoped Reference Number Contract", (
       const sf001_r2 = await service.nextStorefrontReference(null as any, "SF001", "ORD");
       const sf002_r2 = await service.nextStorefrontReference(null as any, "SF002", "ORD");
 
-      expect(sf001_r1).toBe("SF001-ORD-000001");
-      expect(sf002_r1).toBe("SF002-ORD-000001");
-      expect(sf001_r2).toBe("SF001-ORD-000002");
-      expect(sf002_r2).toBe("SF002-ORD-000002");
+      expect(sf001_r1).toBe("SF001-ORD-00000001");
+      expect(sf002_r1).toBe("SF002-ORD-00000001");
+      expect(sf001_r2).toBe("SF001-ORD-00000002");
+      expect(sf002_r2).toBe("SF002-ORD-00000002");
     });
 
     it("Marketplace and Storefront sequences are independent", async () => {
       const mkt = await service.nextMarketplaceReference(null as any, "ORD");
       const sf = await service.nextStorefrontReference(null as any, "SF001", "ORD");
-      expect(mkt).toBe("MKT-ORD-000001");
-      expect(sf).toBe("SF001-ORD-000001");
+      expect(mkt).toBe("MKT-ORD-00000001");
+      expect(sf).toBe("SF001-ORD-00000001");
     });
 
     it("all generated references across tenants are unique", async () => {
@@ -144,10 +144,10 @@ describe("ReferenceNumberService — Tenant-Scoped Reference Number Contract", (
         refs.push(await service.nextStorefrontReference(null as any, "SF001", type));
       }
       expect(refs).toEqual([
-        "SF001-ORD-000001",
-        "SF001-BKG-000001",
-        "SF001-PAY-000001",
-        "SF001-REF-000001",
+        "SF001-ORD-00000001",
+        "SF001-BKG-00000001",
+        "SF001-PAY-00000001",
+        "SF001-REF-00000001",
       ]);
     });
   });
@@ -157,12 +157,12 @@ describe("ReferenceNumberService — Tenant-Scoped Reference Number Contract", (
   describe("SaaS references", () => {
     it("SAAS-SF001-INV → SAAS-SF001-INV-{SEQ}", async () => {
       const ref = await service.nextSaasReference(null as any, "SF001", "INV");
-      expect(ref).toBe("SAAS-SF001-INV-000001");
+      expect(ref).toBe("SAAS-SF001-INV-00000001");
     });
 
     it("SAAS-SF001-PAY → SAAS-SF001-PAY-{SEQ}", async () => {
       const ref = await service.nextSaasReference(null as any, "SF001", "PAY");
-      expect(ref).toBe("SAAS-SF001-PAY-000001");
+      expect(ref).toBe("SAAS-SF001-PAY-00000001");
     });
   });
 
@@ -174,9 +174,9 @@ describe("ReferenceNumberService — Tenant-Scoped Reference Number Contract", (
       expect(ref).toBe("CUSTOM-ORD-0001");
     });
 
-    it("respects custom digits (8)", async () => {
-      const ref = await service.nextReferenceNumber(null as any, "MKT", "ORD", 8);
-      expect(ref).toBe("MKT-ORD-00000001");
+    it("respects custom digits (10)", async () => {
+      const ref = await service.nextReferenceNumber(null as any, "MKT", "ORD", 10);
+      expect(ref).toBe("MKT-ORD-0000000001");
     });
   });
 
@@ -186,12 +186,12 @@ describe("ReferenceNumberService — Tenant-Scoped Reference Number Contract", (
     it("allocates from block without hitting DB each time", async () => {
       // First call triggers block claim
       const r1 = await service.nextMarketplaceReference(null as any, "ORD");
-      expect(r1).toBe("MKT-ORD-000001");
+      expect(r1).toBe("MKT-ORD-00000001");
 
       // Next 99 calls should come from cache (no additional DB calls)
       for (let i = 2; i <= 100; i++) {
         const r = await service.nextMarketplaceReference(null as any, "ORD");
-        expect(r).toBe(`MKT-ORD-${String(i).padStart(6, "0")}`);
+        expect(r).toBe(`MKT-ORD-${String(i).padStart(8, "0")}`);
       }
 
       // Only 1 DB call (block size = 100)
@@ -207,7 +207,7 @@ describe("ReferenceNumberService — Tenant-Scoped Reference Number Contract", (
 
       // 101st call triggers new block
       const r = await service.nextMarketplaceReference(null as any, "ORD");
-      expect(r).toBe("MKT-ORD-000101");
+      expect(r).toBe("MKT-ORD-00000101");
       expect(prisma.seqClient.$transaction).toHaveBeenCalledTimes(2);
     });
   });
@@ -220,7 +220,7 @@ describe("ReferenceNumberService — Tenant-Scoped Reference Number Contract", (
       // to resolve the correct storefrontCode. If caller passes SF000, it emits SF000.
       // This test documents that behavior.
       const ref = await service.nextStorefrontReference(null as any, "SF000", "ORD");
-      expect(ref).toBe("SF000-ORD-000001");
+      expect(ref).toBe("SF000-ORD-00000001");
     });
   });
 });

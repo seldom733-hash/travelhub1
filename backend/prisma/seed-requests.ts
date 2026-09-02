@@ -117,12 +117,15 @@ async function main() {
           requestCreatedAt.getTime() + (1 + Math.random() * 20) * 60 * 60 * 1000
         );
         const customerDeadline = new Date(supplierRespondedAt.getTime() + 48 * 60 * 60 * 1000);
+        const customerAcceptedAt = new Date(supplierRespondedAt.getTime() + (1 + Math.random() * 10) * 60 * 60 * 1000);
+        // Ensure customerAcceptedAt < Order.createdAt (temporal invariant)
+        const finalAcceptedAt = customerAcceptedAt < orderCreatedAt ? customerAcceptedAt : new Date(orderCreatedAt.getTime() - 60 * 60 * 1000);
         data.supplierRespondedAt = supplierRespondedAt;
         data.supplierDecision = "CONFIRMED";
         data.confirmedPrice = displayedPrice;
         data.confirmedCurrency = displayedCurrency;
         data.customerActionDeadline = customerDeadline;
-        data.customerAcceptedAt = new Date(supplierRespondedAt.getTime() + (1 + Math.random() * 10) * 60 * 60 * 1000);
+        data.customerAcceptedAt = finalAcceptedAt;
         data.customerDecision = "ACCEPTED";
         data.convertedOrderId = order.id;
         data.convertedAt = orderCreatedAt;
