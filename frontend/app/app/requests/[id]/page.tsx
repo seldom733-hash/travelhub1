@@ -67,6 +67,7 @@ interface RequestDetail {
     amount: string | null;
     currency: string | null;
     createdAt: string | null;
+    paidAt: string | null;
   }>;
 }
 
@@ -261,6 +262,25 @@ export default function RequestDetailPage() {
         </div>
       )}
 
+      {/* Full Temporal Timeline */}
+      {(r as any).timeline && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900">Хронология</h2>
+          <div className="space-y-1">
+            {(r as any).timeline.map((item: { label: string; timestamp: string | null }, idx: number) => (
+              <div key={idx} className="flex items-center gap-3 text-sm">
+                <span className="w-60 text-gray-600 shrink-0">{item.label}</span>
+                <span className="text-gray-900 font-mono text-xs">
+                  {item.timestamp
+                    ? new Date(item.timestamp).toLocaleString()
+                    : "—"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Converted Commerce Chain */}
       {r.convertedOrder && (
         <div className="rounded-lg border border-purple-200 bg-purple-50 p-6 space-y-3">
@@ -273,6 +293,9 @@ export default function RequestDetailPage() {
               >
                 {r.convertedOrder.referenceNumber}
               </button>
+            } />
+            <InfoRow label="Дата конвертации" value={
+              r.convertedAt ? new Date(r.convertedAt).toLocaleString() : (r.convertedOrder.createdAt ? new Date(r.convertedOrder.createdAt).toLocaleString() : "—")
             } />
             <InfoRow label="Статус заказа" value={r.convertedOrder.status} />
             {r.convertedOrder.amount && (
@@ -300,8 +323,19 @@ export default function RequestDetailPage() {
                   <span className="font-mono text-xs text-blue-600">{p.referenceNumber}</span>
                   <span className="text-sm text-gray-700">{p.amount} {p.currency}</span>
                   <span className="text-xs text-gray-500">{p.status}</span>
+                  {p.paidAt && <span className="text-xs text-green-600">Оплачено: {new Date(p.paidAt).toLocaleDateString()}</span>}
                 </div>
               ))}
+            </div>
+          )}
+          {(r as any).convertedRefund && (
+            <div className="pt-2 border-t border-purple-200">
+              <div className="text-xs font-medium text-gray-500 uppercase mb-2">Возврат</div>
+              <div className="flex items-center gap-4 py-1">
+                <span className="font-mono text-xs text-blue-600">{(r as any).convertedRefund.referenceNumber}</span>
+                <span className="text-sm text-gray-700">{(r as any).convertedRefund.amount} {(r as any).convertedRefund.currency}</span>
+                <span className="text-xs text-gray-500">{(r as any).convertedRefund.status}</span>
+              </div>
             </div>
           )}
         </div>

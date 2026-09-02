@@ -64,6 +64,10 @@ export class RequestController {
       pageSize: 10000,
     });
 
+    // Batch-resolve Order reference numbers for converted requests
+    const convertedOrderIds = result.data.filter((r: any) => r.convertedOrderId).map((r: any) => r.convertedOrderId);
+    const orderRefMap = await this.requestService.resolveOrderReferences(convertedOrderIds);
+
     const rows = result.data.map((r: any) => ({
       referenceNumber: r.referenceNumber,
       status: r.status,
@@ -83,7 +87,8 @@ export class RequestController {
       supplierResponseDeadline: r.supplierResponseDeadline ?? "",
       customerActionDeadline: r.customerActionDeadline ?? "",
       customerDecision: r.customerDecision ?? "",
-      convertedOrderId: r.convertedOrderId ?? "",
+      convertedAt: r.convertedAt ?? "",
+      convertedOrderRef: r.convertedOrderId ? (orderRefMap.get(r.convertedOrderId) ?? r.convertedOrderId) : "",
       createdAt: r.createdAt ?? "",
     }));
 
@@ -106,7 +111,8 @@ export class RequestController {
       { header: "SLA дедлайн", key: "supplierResponseDeadline", width: 22 },
       { header: "Дедлайн клиента", key: "customerActionDeadline", width: 22 },
       { header: "Решение клиента", key: "customerDecision", width: 16 },
-      { header: "Заказ", key: "convertedOrderId", width: 22 },
+      { header: "Заказ", key: "convertedOrderRef", width: 22 },
+      { header: "Дата конвертации", key: "convertedAt", width: 22 },
       { header: "Создана", key: "createdAt", width: 22 },
     ];
 

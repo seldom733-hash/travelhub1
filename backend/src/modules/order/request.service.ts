@@ -121,7 +121,8 @@ export class RequestService {
    */
   async listRequests(query: ListRequestQuery) {
     const page = Math.max(1, query.page ?? 1);
-    const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+    const isExport = query.pageSize === 10000; // export requests all records
+    const pageSize = isExport ? 10000 : Math.min(100, Math.max(1, query.pageSize ?? 20));
 
     // Build search: first resolve names/codes to IDs, then filter
     let searchOr: any[] | undefined;
@@ -252,7 +253,7 @@ export class RequestService {
         };
         const booking = await this.prisma.booking.findFirst({
           where: { orderId: order.id },
-          select: { id: true, referenceNumber: true, status: true, createdAt: true },
+          select: { id: true, referenceNumber: true, status: true, createdAt: true, serviceDate: true, completedAt: true },
         });
         if (booking) {
           dto.convertedBooking = {
@@ -260,11 +261,13 @@ export class RequestService {
             referenceNumber: booking.referenceNumber,
             status: booking.status,
             createdAt: booking.createdAt?.toISOString() ?? null,
+            serviceDate: booking.serviceDate?.toISOString() ?? null,
+            completedAt: booking.completedAt?.toISOString() ?? null,
           };
         }
         const payments = await this.prisma.payment.findMany({
           where: { orderId: order.id },
-          select: { id: true, referenceNumber: true, status: true, amount: true, currency: true, createdAt: true },
+          select: { id: true, referenceNumber: true, status: true, amount: true, currency: true, createdAt: true, paidAt: true },
           orderBy: { createdAt: "asc" },
         });
         dto.convertedPayments = payments.map((p) => ({
@@ -274,9 +277,45 @@ export class RequestService {
           amount: p.amount?.toString() ?? null,
           currency: p.currency,
           createdAt: p.createdAt?.toISOString() ?? null,
+          paidAt: p.paidAt?.toISOString() ?? null,
         }));
+
+        // Check for refund
+        const refund = await this.prisma.refund.findFirst({
+          where: { orderId: order.id },
+          select: { id: true, referenceNumber: true, status: true, amount: true, currency: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+        });
+        if (refund) {
+          dto.convertedRefund = {
+            id: refund.id,
+            referenceNumber: refund.referenceNumber,
+            status: refund.status,
+            amount: refund.amount?.toString() ?? null,
+            currency: refund.currency,
+            createdAt: refund.createdAt?.toISOString() ?? null,
+          };
+        }
       }
     }
+
+    // ── Full temporal timeline ──
+    dto.timeline = [
+      { label: "Заявка создана", timestamp: request.createdAt?.toISOString() ?? null },
+      { label: "SLA поставщика до", timestamp: request.supplierResponseDeadline?.toISOString() ?? null },
+      { label: "Ответ поставщика", timestamp: request.supplierRespondedAt?.toISOString() ?? null },
+      { label: "Клиент должен ответить до", timestamp: request.customerActionDeadline?.toISOString() ?? null },
+      { label: "Клиент подтвердил", timestamp: request.customerAcceptedAt?.toISOString() ?? null },
+      { label: "Конвертирована в заказ", timestamp: request.convertedAt?.toISOString() ?? null },
+      { label: "Заказ создан", timestamp: dto.convertedOrder?.createdAt ?? null },
+      { label: "Бронирование создано", timestamp: dto.convertedBooking?.createdAt ?? null },
+      { label: "Оплата инициирована", timestamp: dto.convertedPayments?.[0]?.createdAt ?? null },
+      { label: "Оплачено", timestamp: dto.convertedPayments?.find((p: any) => p.paidAt)?.paidAt ?? null },
+      { label: "Дата услуги", timestamp: request.requestedServiceDate?.toISOString() ?? dto.convertedBooking?.serviceDate ?? null },
+      { label: "Завершено", timestamp: dto.convertedBooking?.completedAt ?? null },
+      { label: "Отменено/Отклонено/Timeout", timestamp: request.rejectedAt?.toISOString() ?? null },
+      { label: "Возврат", timestamp: dto.convertedRefund?.createdAt ?? null },
+    ];
 
     return dto;
   }
@@ -485,6 +524,19 @@ export class RequestService {
     });
   }
 
+  /**
+   * Resolve order IDs to their reference numbers.
+   */
+  async resolveOrderReferences(orderIds: string[]): Promise<Map<string, string>> {
+    if (!orderIds.length) return new Map();
+    const uniqueIds = [...new Set(orderIds)];
+    const orders = await this.prisma.order.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, referenceNumber: true },
+    });
+    return new Map(orders.map((o) => [o.id, o.referenceNumber]));
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────
 
   private async supplierAction(
@@ -551,13 +603,13 @@ export class RequestService {
       referenceNumber: r.referenceNumber,
       customerId: r.customerId,
       customerName,
-      customerCode: r.customer?.code ?? null,
+      customerCode: cust?.code ?? null,
       productId: r.productId,
       productName,
-      productCode: r.product?.code ?? null,
+      productCode: prod?.code ?? null,
       partnerId: r.partnerId,
       partnerName,
-      partnerCode: r.partner?.code ?? null,
+      partnerCode: part?.code ?? null,
       status: r.status,
       requestedServiceDate: r.requestedServiceDate?.toISOString() ?? null,
       quantity: r.quantity,
