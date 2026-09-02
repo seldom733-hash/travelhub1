@@ -2550,7 +2550,7 @@ D0  Reconciliation Final Git/Evidence Closure          ✅ COMPLETED (2026-09-02
  ↓
 D1  Commerce Lifecycle Contract Finalization            ✅ COMPLETED (2026-09-02)
  ↓
-D1A Platform CRM Scope Isolation Audit + Remediation   ⬜ NOT STARTED
+D1A Platform CRM Scope Isolation Audit + Remediation   ✅ COMPLETED (2026-09-02)
  ↓
 D2  Product Traveler Requirements                       ⬜ NOT STARTED
  ↓
@@ -2585,7 +2585,7 @@ STEP 3.12                                               ⬜ BLOCKED BY D14
 |---|---|---|---|---|---|
 | D0 | Reconciliation Final Git/Evidence Closure | ACCEPTANCE_DEBT | ✅ | — | D0 |
 | D1 | Commerce Lifecycle Contract Finalization | ARCHITECTURE_DEBT | ✅ | D0 | D1 |
-| D1A | Platform CRM Marketplace/Storefront Scope Isolation | IMPLEMENTATION_DEBT | ⬜ | D1 | D1A |
+| D1A | Platform CRM Marketplace/Storefront Scope Isolation | IMPLEMENTATION_DEBT | ✅ | D1 | D1A |
 | D2 | Product Traveler Requirements | ARCHITECTURE_DEBT | ⬜ | D1 | D2 |
 | D3 | Traveler Collection + Order/Booking Population | IMPLEMENTATION_DEBT | ⬜ | D2 | D3 |
 | D4 | Traveler Security + Representative Data | IMPLEMENTATION_DEBT | ⬜ | D3 | D4 |

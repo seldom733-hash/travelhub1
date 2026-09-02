@@ -155,9 +155,31 @@ export class CrmService {
     return result;
   }
 
+  /**
+   * D1A: Get customer IDs that belong to Marketplace scope.
+   * A customer is "Marketplace" if they have at least one Order with
+   * acquisitionSource = 'MARKETPLACE'. This excludes Storefront-only
+   * end-customers from Platform CRM Customers.
+   */
+  private async getMarketplaceCustomerIds(): Promise<string[]> {
+    const marketplaceOrders = await this.prisma.order.findMany({
+      where: { acquisitionSource: 'MARKETPLACE' as any },
+      select: { customerId: true },
+    });
+    return [...new Set(marketplaceOrders.map((o) => o.customerId).filter((c): c is string => c !== null))];
+  }
   async listCustomers(query: CustomerListQuery) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+
+    // D1A: Platform CRM Marketplace scope isolation.
+    // Exclude Storefront-only end-customers from Platform CRM Customers.
+    // A customer is "Marketplace" if they have at least one Marketplace Order
+    // OR at least one PartnerCustomerRelation with a Marketplace partner.
+    const marketplaceCustomerIds = await this.getMarketplaceCustomerIds();
+    if (marketplaceCustomerIds.length === 0) {
+      return { items: [], total: 0, page, pageSize };
+    }
 
     // SR-CRM-01: When period is specified, filter to customers with qualifying
     // activity — matching Analytics 'Active Customers' EXACT semantics:
@@ -189,7 +211,10 @@ export class CrmService {
     const where: Prisma.CustomerWhereInput = {
       ...(query.status ? { status: query.status as EntityStatus } : {}),
       ...(query.customerType ? { type: query.customerType as CustomerType } : {}),
-      ...(activeCustomerIds ? { id: { in: activeCustomerIds } } : {}),
+      // D1A: Scope to Marketplace customers only
+      ...(activeCustomerIds
+        ? { id: { in: marketplaceCustomerIds.filter((id) => activeCustomerIds!.includes(id)) } }
+        : { id: { in: marketplaceCustomerIds } }),
       ...(query.search
         ? {
             OR: [
@@ -229,6 +254,11 @@ export class CrmService {
       include: { contacts: { orderBy: { createdAt: "asc" } }, history: { orderBy: { createdAt: "desc" }, take: 50 } },
     });
     if (!customer) throw new NotFoundError(`Customer ${id} not found`);
+    // D1A: Deny access to Storefront-only customers via Platform CRM
+    const marketplaceIds = await this.getMarketplaceCustomerIds();
+    if (!marketplaceIds.includes(id)) {
+      throw new NotFoundError(`Customer ${id} not found`);
+    }
     return customer;
   }
 
@@ -494,6 +524,11 @@ export class CrmService {
   async getCustomerPartners(customerId: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { id: true } });
     if (!customer) throw new NotFoundError(`Customer ${customerId} not found`);
+    // D1A: Deny access to Storefront-only customers
+    const marketplaceIds = await this.getMarketplaceCustomerIds();
+    if (!marketplaceIds.includes(customerId)) {
+      throw new NotFoundError(`Customer ${customerId} not found`);
+    }
 
     // Get distinct partners from customer's Marketplace-scoped orders
     const partnerOrders = await this.prisma.order.findMany({
@@ -674,10 +709,15 @@ export class CrmService {
       activeCustomerIds = [...new Set(activeOrders.map((o) => o.customerId).filter(Boolean))] as string[];
       if (activeCustomerIds.length === 0) return { rows: [], total: 0 };
     }
+    // D1A: Scope to Marketplace customers only
+    const marketplaceCustomerIds = await this.getMarketplaceCustomerIds();
+    if (marketplaceCustomerIds.length === 0) return { rows: [], total: 0 };
     const where: any = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.customerType ? { type: query.customerType } : {}),
-      ...(activeCustomerIds ? { id: { in: activeCustomerIds } } : {}),
+      ...(activeCustomerIds
+        ? { id: { in: marketplaceCustomerIds.filter((id) => activeCustomerIds!.includes(id)) } }
+        : { id: { in: marketplaceCustomerIds } }),
       ...(query.search ? { OR: [
         { email: { contains: query.search, mode: 'insensitive' } },
         { firstName: { contains: query.search, mode: 'insensitive' } },
@@ -917,6 +957,11 @@ export class CrmService {
       },
     });
     if (!customer) throw new NotFoundError(`Customer ${id} not found`);
+    // D1A: Deny access to Storefront-only customers via Platform CRM
+    const marketplaceIds = await this.getMarketplaceCustomerIds();
+    if (!marketplaceIds.includes(id)) {
+      throw new NotFoundError(`Customer ${id} not found`);
+    }
 
     // ── Platform Marketplace business scope (Round 2) ──────────────────
     // Exclude Storefront end-customer commerce from Platform Customer 360.
