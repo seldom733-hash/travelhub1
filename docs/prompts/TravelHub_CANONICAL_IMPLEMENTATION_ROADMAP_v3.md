@@ -2518,7 +2518,7 @@ implementation → strict review → approval и остаются валидны
 44. **PHASE 3 — POST-STEP 3.9 — MARKETING PURPOSE / MARKETPLACE DEMAND / PROMOTIONS & FUNDING ARCHITECTURE AMENDMENT** ✅ DOCUMENTATION COMPLETE (2026-08-29; architecture amendment + repository gap audit + financial model design + governance authority + roadmap sync; `docs/prompts/MARKETING_PURPOSE_MARKETPLACE_DEMAND_PROMOTIONS_FUNDING_ARCHITECTURE_ROADMAP_AMENDMENT.md`; no production code changes).
 
 45. **PHASE 3 — PRE-STEP 3.12 — TRAVELER DATA REQUIREMENTS + CHECKOUT COLLECTION + BOOKING SNAPSHOT + VOUCHER SOURCE — ARCHITECTURE AUDIT** ✅ AUDIT COMPLETED (2026-09-02; VERDICT A — architecture audit for Traveler domain; 4 existing models identified (QuoteTraveler, CheckoutIntentTraveler, OrderTraveler, Passenger); Customer ≠ Payer ≠ Traveler contract fixed (5 cases); Booking → 1..N Passengers; seller-defined Traveler Requirements on Product (JSON); Booking snapshot contract; 8 implementation stages proposed (A-H); 18 gaps identified; `docs/architecture/TRAVELER_DATA_REQUIREMENTS_BOOKING_PARTICIPANTS_ARCHITECTURE.md`; no production code changes; canonical NEXT = Stage A (Product traveler requirements model)).
-46. **PHASE 3 — PRE-STEP 3.12 — CANONICAL ARCHITECTURE RECONCILIATION + ROADMAP REALIGNMENT** ✅ RECONCILIATION COMPLETED (2026-09-02; VERDICT A — architecture reconciliation across 67+ architecture documents, canonical roadmap, actual Prisma schema/backend/frontend implementation, and latest approved business decisions; canonical architecture document created: `docs/architecture/TRAVELHUB_CURRENT_CANONICAL_ARCHITECTURE.md`; decision log established; drift matrix documented; superseded decisions classified; no implementation performed; canonical NEXT = Stage A (Product traveler requirements model); `docs/reports/PHASE_3_PRE_STEP_3.12_CANONICAL_ARCHITECTURE_RECONCILIATION_ROADMAP_REALIGNMENT_REPORT.md`).
+46. **PHASE 3 — PRE-STEP 3.12 — CANONICAL ARCHITECTURE RECONCILIATION + ROADMAP REALIGNMENT** ✅ RECONCILIATION COMPLETED (2026-09-02; VERDICT A — architecture reconciliation across 67+ architecture documents, canonical roadmap, actual Prisma schema/backend/frontend implementation, and latest approved business decisions; canonical architecture document created: `docs/architecture/TRAVELHUB_CURRENT_CANONICAL_ARCHITECTURE.md`; decision log established (D-001 through D-005); drift matrix documented; superseded decisions classified; PRE-STEP sub-task statuses requalified (Export Framework → REQUIRES_REQUALIFICATION); Master Debt Register D0-D14 established; no implementation performed; canonical TRUE NEXT = D1 (Commerce Lifecycle Contract Finalization); `docs/reports/PHASE_3_PRE_STEP_3.12_CANONICAL_ARCHITECTURE_RECONCILIATION_ROADMAP_REALIGNMENT_REPORT.md`).
 
 **Platform ↔ Partner authority boundary established:**
 ```
@@ -2534,7 +2534,78 @@ Platform Refund           → CREATE/APPROVE/EXECUTE SEPARATED (Step 3.6C.1)
 Partner Product creation  → PRESERVED (actor.partnerId derived)
 Partner ownership spoof  → PREVENTED
 Product.partnerId NOT NULL → NOT READY (legacy preserved)
-```**Canonical NEXT:** `PHASE 3 — STEP 3.10 — SUPPORT DOMAIN`
+```
+
+---
+
+# MASTER DEBT REGISTER — D0 through D14
+
+**Established:** 2026-09-02 (Architecture Reconciliation, D0 closure)
+**TRUE NEXT:** D1 — Commerce Lifecycle Contract Finalization
+
+```
+D0  Reconciliation Final Git/Evidence Closure          ✅ COMPLETED (2026-09-02)
+ ↓
+D1  Commerce Lifecycle Contract Finalization            ⬜ NOT STARTED
+ ↓
+D2  Product Traveler Requirements                       ⬜ NOT STARTED
+ ↓
+D3  Traveler Collection + Order/Booking Population      ⬜ NOT STARTED
+ ↓
+D4  Traveler Security + Representative Data             ⬜ NOT STARTED
+ ↓
+D5  Orders Full-Page Detail                             ⬜ NOT STARTED
+ ↓
+D6  Bookings Full-Page Detail                           ⬜ NOT STARTED
+ ↓
+D7  Payment/Refund Semantics + Financial Presentation   ⬜ NOT STARTED
+ ↓
+D8  Global Temporal Visibility                          ⬜ NOT STARTED
+ ↓
+D9  Export Framework Requalification                    ⬜ NOT STARTED
+ ↓
+D10 Partner Performance Attribution                     ⬜ NOT STARTED
+ ↓
+D11 Booking KPI Semantics                               ⬜ NOT STARTED
+ ↓
+D12 CRM / KPI Drill-down Routing Requalification       ⬜ NOT STARTED
+ ↓
+D13 Voucher                                             ⬜ NOT STARTED
+ ↓
+D14 PRE-STEP 3.12 Final Requalification                ⬜ NOT STARTED
+ ↓
+STEP 3.12                                               ⬜ BLOCKED BY D14
+```
+
+| ID | Debt | Type | Status | Dependency | Closure |
+|---|---|---|---|---|---|
+| D0 | Reconciliation Final Git/Evidence Closure | ACCEPTANCE_DEBT | ✅ | — | D0 |
+| D1 | Commerce Lifecycle Contract Finalization | ARCHITECTURE_DEBT | ⬜ | D0 | D1 |
+| D2 | Product Traveler Requirements | ARCHITECTURE_DEBT | ⬜ | D1 | D2 |
+| D3 | Traveler Collection + Order/Booking Population | IMPLEMENTATION_DEBT | ⬜ | D2 | D3 |
+| D4 | Traveler Security + Representative Data | IMPLEMENTATION_DEBT | ⬜ | D3 | D4 |
+| D5 | Orders Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ | D0 | D5 |
+| D6 | Bookings Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ | D0 | D6 |
+| D7 | Payment/Refund Semantics + Financial Presentation | IMPLEMENTATION_DEBT | ⬜ | D0 | D7 |
+| D8 | Global Temporal Visibility | IMPLEMENTATION_DEBT | ⬜ | D0 | D8 |
+| D9 | Export Framework Requalification | REQUALIFICATION_DEBT | ⬜ | D0 | D9 |
+| D10 | Partner Performance Attribution | ARCHITECTURE_DEBT | ⬜ | D0 | D10 |
+| D11 | Booking KPI Semantics | ARCHITECTURE_DEBT | ⬜ | D0 | D11 |
+| D12 | CRM / KPI Drill-down Routing Requalification | REQUALIFICATION_DEBT | ⬜ | D0 | D12 |
+| D13 | Voucher | IMPLEMENTATION_DEBT | ⬜ | D4 | D13 |
+| D14 | PRE-STEP 3.12 Final Requalification | ACCEPTANCE_DEBT | ⬜ | D1-D13 | D14 |
+
+**Deferred / Separate Tracks (NOT in D0-D14):**
+- 2.17B Load/Performance Qualification — VERDICT B
+- 2.18 Financial Integrity Exit Gate — BLOCKED
+- Finance Center — FUTURE / DEFERRED
+- Product Freshness — FUTURE / DEFERRED
+
+---
+
+**Canonical NEXT:** `D1 — COMMERCE LIFECYCLE CONTRACT FINALIZATION`
+
+Reason: D0 reconciliation established Master Debt Register. D1 must definitively freeze commerce lifecycle semantics before any implementation (D2-D14) can proceed.
 
 Reason: Step 3.9 Marketing Center UI is now CLOSED (Strict Review Re-Qualification APPROVED). Platform Marketing Center UI is complete. The next section in the canonical roadmap ordering is Support Domain.
 

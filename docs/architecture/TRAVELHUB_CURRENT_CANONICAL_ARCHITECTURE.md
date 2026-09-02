@@ -435,15 +435,23 @@ PRE-STEP 3.12: Multiple sub-tasks completed
 
 # 21. Canonical NEXT Stage
 
-After Architecture Reconciliation, the TRUE NEXT implementation stage is:
+After Architecture Reconciliation (D0), the TRUE NEXT stage is:
 
-**Stage A: Product Traveler Requirements Model**
+**D1 — COMMERCE LIFECYCLE CONTRACT FINALIZATION**
 
-Блокер для traveler flow — без seller-defined requirements на Product невозможно:
-- checkout traveler collection
-- booking traveler population
-- voucher generation
+D1 must definitively freeze:
+- supplier confirmation semantics
+- customer acceptance semantics
+- traveler collection point
+- final confirmation
+- Request conversion semantics
+- `convertedAt` semantics
+- Order creation point
+- Booking creation point
 
-**Dependencies:** None (schema addition only).
-**What it unblocks:** Stages B-H (traveler lifecycle implementation).
-**What remains deferred:** Finance Center, Product Freshness, Orders/Bookings Detail, Step 3.12.
+After D1, the implementation sequence is:
+```
+D1 → D2 → D3 → D4 → D5/D6 (parallel) → D7 → D8 → D9 → D10 → D11 → D12 → D13 → D14 → STEP 3.12
+```
+
+**What remains deferred:** Finance Center, Product Freshness, STEP 3.12 proper.
