@@ -114,7 +114,7 @@ export default function EditProductPage() {
         title: values.title.trim(),
         description: values.description.trim() || undefined,
         categoryId: product.categoryId ?? undefined,
-        attributes: values.attributes,
+        ...(product.categoryId ? { attributes: values.attributes } : {}),
         tariffs: tariffDraftsToPayload(values.tariffs),
         travelerRequirements,
       });

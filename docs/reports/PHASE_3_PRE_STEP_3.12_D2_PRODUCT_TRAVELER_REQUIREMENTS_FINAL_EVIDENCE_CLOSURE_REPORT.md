@@ -368,8 +368,9 @@ Final Evidence Closure: VERDICT A
 | Параметр | Значение |
 |----------|----------|
 | Starting SHA | `b2d2bcb4511584189a17f9b23ed31fa810b511eb` |
-| Final SHA | (после commit) |
+| Final SHA | `45c7c2f6f8cacc599e0795b512c7abd634ae0aa1` |
 | Branch | `master` |
+| HEAD == origin/master | NO (local ahead, push pending) |
 
 ---
 
