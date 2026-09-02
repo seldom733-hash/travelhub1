@@ -2519,6 +2519,7 @@ implementation → strict review → approval и остаются валидны
 
 45. **PHASE 3 — PRE-STEP 3.12 — TRAVELER DATA REQUIREMENTS + CHECKOUT COLLECTION + BOOKING SNAPSHOT + VOUCHER SOURCE — ARCHITECTURE AUDIT** ✅ AUDIT COMPLETED (2026-09-02; VERDICT A — architecture audit for Traveler domain; 4 existing models identified (QuoteTraveler, CheckoutIntentTraveler, OrderTraveler, Passenger); Customer ≠ Payer ≠ Traveler contract fixed (5 cases); Booking → 1..N Passengers; seller-defined Traveler Requirements on Product (JSON); Booking snapshot contract; 8 implementation stages proposed (A-H); 18 gaps identified; `docs/architecture/TRAVELER_DATA_REQUIREMENTS_BOOKING_PARTICIPANTS_ARCHITECTURE.md`; no production code changes; canonical NEXT = Stage A (Product traveler requirements model)).
 46. **PHASE 3 — PRE-STEP 3.12 — CANONICAL ARCHITECTURE RECONCILIATION + ROADMAP REALIGNMENT** ✅ RECONCILIATION COMPLETED (2026-09-02; VERDICT A — architecture reconciliation across 67+ architecture documents, canonical roadmap, actual Prisma schema/backend/frontend implementation, and latest approved business decisions; canonical architecture document created: `docs/architecture/TRAVELHUB_CURRENT_CANONICAL_ARCHITECTURE.md`; decision log established (D-001 through D-005); drift matrix documented; superseded decisions classified; PRE-STEP sub-task statuses requalified (Export Framework → REQUIRES_REQUALIFICATION); Master Debt Register D0-D14 established; no implementation performed; canonical TRUE NEXT = D1 (Commerce Lifecycle Contract Finalization); `docs/reports/PHASE_3_PRE_STEP_3.12_CANONICAL_ARCHITECTURE_RECONCILIATION_ROADMAP_REALIGNMENT_REPORT.md`).
+47. **PHASE 3 — PRE-STEP 3.12 — D1 — COMMERCE LIFECYCLE CONTRACT FINALIZATION** ✅ CONTRACT COMPLETED (2026-09-02; VERDICT A — canonical lifecycle contract frozen for non-authoritative + authoritative flows; Request/Supplier/Acceptance/Traveler/Conversion/Order/Booking/Payment contracts defined; two acceptance events (termsAcceptedAt + finalConfirmedAt) frozen; traveler requirements pin/snapshot point frozen at termsAcceptedAt; convertedAt = Order.createdAt; CRM SFC scope regression registered as D1A; Master Debt Register updated (D0-D14 + D1A); `docs/architecture/COMMERCE_LIFECYCLE_CANONICAL_CONTRACT.md`; no implementation performed; canonical TRUE NEXT = D1A (Platform CRM Scope Isolation); `docs/reports/PHASE_3_PRE_STEP_3.12_D1_COMMERCE_LIFECYCLE_CONTRACT_FINALIZATION_REPORT.md`).
 
 **Platform ↔ Partner authority boundary established:**
 ```
@@ -2538,15 +2539,18 @@ Product.partnerId NOT NULL → NOT READY (legacy preserved)
 
 ---
 
-# MASTER DEBT REGISTER — D0 through D14
+# MASTER DEBT REGISTER — D0 through D14 + D1A
 
 **Established:** 2026-09-02 (Architecture Reconciliation, D0 closure)
-**TRUE NEXT:** D1 — Commerce Lifecycle Contract Finalization
+**Updated:** 2026-09-02 (D1 closure, D1A added)
+**TRUE NEXT:** D1A — Platform CRM Marketplace/Storefront Scope Isolation
 
 ```
 D0  Reconciliation Final Git/Evidence Closure          ✅ COMPLETED (2026-09-02)
  ↓
-D1  Commerce Lifecycle Contract Finalization            ⬜ NOT STARTED
+D1  Commerce Lifecycle Contract Finalization            ✅ COMPLETED (2026-09-02)
+ ↓
+D1A Platform CRM Scope Isolation Audit + Remediation   ⬜ NOT STARTED
  ↓
 D2  Product Traveler Requirements                       ⬜ NOT STARTED
  ↓
@@ -2580,7 +2584,8 @@ STEP 3.12                                               ⬜ BLOCKED BY D14
 | ID | Debt | Type | Status | Dependency | Closure |
 |---|---|---|---|---|---|
 | D0 | Reconciliation Final Git/Evidence Closure | ACCEPTANCE_DEBT | ✅ | — | D0 |
-| D1 | Commerce Lifecycle Contract Finalization | ARCHITECTURE_DEBT | ⬜ | D0 | D1 |
+| D1 | Commerce Lifecycle Contract Finalization | ARCHITECTURE_DEBT | ✅ | D0 | D1 |
+| D1A | Platform CRM Marketplace/Storefront Scope Isolation | IMPLEMENTATION_DEBT | ⬜ | D1 | D1A |
 | D2 | Product Traveler Requirements | ARCHITECTURE_DEBT | ⬜ | D1 | D2 |
 | D3 | Traveler Collection + Order/Booking Population | IMPLEMENTATION_DEBT | ⬜ | D2 | D3 |
 | D4 | Traveler Security + Representative Data | IMPLEMENTATION_DEBT | ⬜ | D3 | D4 |
@@ -2603,9 +2608,9 @@ STEP 3.12                                               ⬜ BLOCKED BY D14
 
 ---
 
-**Canonical NEXT:** `D1 — COMMERCE LIFECYCLE CONTRACT FINALIZATION`
+**Canonical NEXT:** `D1A — PLATFORM CRM MARKETPLACE/STOREFRONT SCOPE ISOLATION AUDIT + REMEDIATION`
 
-Reason: D0 reconciliation established Master Debt Register. D1 must definitively freeze commerce lifecycle semantics before any implementation (D2-D14) can proceed.
+Reason: D1 commerce lifecycle contract finalized. CRM SFC scope regression discovered during D1 audit — D1A must isolate Platform CRM Marketplace/Storefront scope before D2-D14 traveler implementation.
 
 Reason: Step 3.9 Marketing Center UI is now CLOSED (Strict Review Re-Qualification APPROVED). Platform Marketing Center UI is complete. The next section in the canonical roadmap ordering is Support Domain.
 
