@@ -45,6 +45,7 @@ export default function NewProductPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [initialNote, setInitialNote] = useState("");
+  const [travelerRequirements, setTravelerRequirements] = useState<Record<string, string> | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -88,6 +89,7 @@ export default function NewProductPage() {
         attributes: values.attributes,
         tariffs: tariffDraftsToPayload(values.tariffs),
         initialNote: initialNote.trim() || undefined,
+        travelerRequirements,
       });
       router.push(`/partner/products/${res.product.id}`);
     } catch (err) {
@@ -120,6 +122,9 @@ export default function NewProductPage() {
         submitting={submitting}
         submitLabel={pt("partner.form.save", locale)}
         mediaCount={0}
+        productType={categoryId ? (CATEGORY_TYPE[categories.find((c) => c.id === categoryId)?.slug ?? ""] ?? "TOUR") : "TOUR"}
+        travelerRequirements={travelerRequirements}
+        onTravelerRequirementsChange={setTravelerRequirements}
       />
 
       {/* Примечание */}

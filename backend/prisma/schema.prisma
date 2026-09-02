@@ -380,6 +380,12 @@ model Product {
   /// угадывания). Замораживается в CheckoutIntent при binding — Booking никогда
   /// не пере-резолвит текущий Catalog.
   serviceTimeZone String?
+  /// D2: Seller-defined Traveler Data Requirements per Product.
+  /// JSONB shape: { firstName: "REQUIRED", lastName: "REQUIRED", birthDate: "OPTIONAL", ... }.
+  /// States: NOT_REQUESTED | OPTIONAL | REQUIRED.
+  /// NULL = use ProductType defaults (deterministic resolution).
+  /// Frozen at checkout acceptance (termsAcceptedAt) for D3 snapshot.
+  travelerRequirements Json?
 
   tariffs      Tariff[]
   availability Availability[]

@@ -171,6 +171,8 @@ export interface PartnerProductDetail {
   draft: PartnerDraftView | null;
   /** Step 1.12.2 §8: каналы публикации (отделены от lifecycle). */
   publicationChannels: Array<{ channel: PublicationChannel }>;
+  /** D2: seller-defined traveler data requirements (JSON). */
+  travelerRequirements: Record<string, string> | null;
 }
 
 /* ── Media (Step 1.2 backend) ─────────────────────────────────────────────── */
@@ -270,6 +272,7 @@ export const partnerApi = {
     attributes?: Record<string, unknown>;
     tariffs?: { name: string; price: number; currency?: string }[];
     initialNote?: string;
+    travelerRequirements?: Record<string, string> | null;
   }): Promise<{ product: { id: string }; eventId?: string }> => api.post(`/products`, body),
   updateProduct: (
     id: string,
@@ -279,12 +282,21 @@ export const partnerApi = {
       categoryId?: string;
       attributes?: Record<string, unknown>;
       tariffs?: { name: string; price: number; currency?: string }[];
+      travelerRequirements?: Record<string, string> | null;
     },
   ): Promise<unknown> => api.patch(`/products/${encodeURIComponent(id)}`, body),
 
   /** Step 1.12.1 REVIEW FIX 3/4 + 1.12.2 §8: явные каналы публикации (own-scope). */
   setChannels: (id: string, channels: PublicationChannel[]): Promise<{ id: string; channels: PublicationChannel[] }> =>
     api.put(`/products/${encodeURIComponent(id)}/channels`, { channels }),
+
+  /** D2: Effective traveler requirements for a Product (read-only, resolved with ProductType defaults). */
+  getEffectiveTravelerRequirements: (id: string): Promise<{
+    productId: string;
+    productType: string;
+    hasOverride: boolean;
+    requirements: Record<string, string>;
+  }> => api.get(`/products/${encodeURIComponent(id)}/traveler-requirements`),
 
   // Moderation (Step 1.4).
   submitModeration: (id: string): Promise<PartnerModerationView> => api.post(`/products/${encodeURIComponent(id)}/submit-moderation`),

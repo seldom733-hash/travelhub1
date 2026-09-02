@@ -426,6 +426,19 @@ export const PARTNER_DICT: Record<string, Record<Locale, string>> = {
   },
   "storefront.preview_top_bar": { ru: "Предпросмотр витрины (только для вас, публично недоступен):", az: "Vitrinin ön baxışı (yalnız sizin üçün, ictimai deyil):", en: "Storefront preview (owner-only, not public):" },
   "storefront.back_management": { ru: "Назад к управлению витриной", az: "Vitrin idarəsinə qayıt", en: "Back to storefront management" },
+
+  // D2: Traveler Requirements
+  "partner.form.traveler_requirements": { ru: "Требования к данным путешественника", az: "Səyahətçi məlumatı tələbləri", en: "Traveler data requirements" },
+  "partner.form.traveler_requirements_hint": {
+    ru: "Настройте, какие данные нужно запрашивать при бронировании. По умолчанию — для типа услуги.",
+    az: "Bron zamanı hansı məlumatların tələb olunacağını tənzimləyin. Susomat – xidmət növü üçün.",
+    en: "Configure which data to collect at booking time. Default is per product type.",
+  },
+  "partner.form.traveler_requirements_group_basic": { ru: "Основные данные", az: "Əsas məlumatlar", en: "Basic information" },
+  "partner.form.traveler_requirements_group_documents": { ru: "Документы", az: "Sənədlər", en: "Documents" },
+  "partner.form.traveler_requirements_clear": { ru: "Сбросить к умолчанию", az: "Susomata qaytar", en: "Reset to defaults" },
+  "partner.form.traveler_requirements_overridden": { ru: "Настроено вручную", az: "Əl ilə tənzimlənib", en: "Custom overrides" },
+  "partner.form.traveler_requirements_default": { ru: "По умолчанию", az: "Susomat", en: "Default" },
 };
 
 /** Локализованный партнёрский ярлык: PARTNER_DICT → общий t() → сам ключ. */

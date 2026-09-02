@@ -33,6 +33,7 @@ export default function EditProductPage() {
   const [error, setError] = useState("");
   const [savedMsg, setSavedMsg] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [travelerRequirements, setTravelerRequirements] = useState<Record<string, string> | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -71,6 +72,7 @@ export default function EditProductPage() {
           attributes: attrs,
           tariffs: tariffs.length > 0 ? tariffDraftsFrom(tariffs) : [newTariffDraft()],
         });
+        setTravelerRequirements(p.travelerRequirements ?? null);
 
         if (p.category?.slug) {
           setSchemaLoading(true);
@@ -114,6 +116,7 @@ export default function EditProductPage() {
         categoryId: product.categoryId ?? undefined,
         attributes: values.attributes,
         tariffs: tariffDraftsToPayload(values.tariffs),
+        travelerRequirements,
       });
       setSavedMsg(pt("partner.form.saved_ok", locale));
       // Перезагружаем продукт (draft N+1 / обновлённые данные).
@@ -132,6 +135,7 @@ export default function EditProductPage() {
         attributes: attrs,
         tariffs: tariffs.length > 0 ? tariffDraftsFrom(tariffs) : [newTariffDraft()],
       });
+      setTravelerRequirements(p.travelerRequirements ?? null);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -189,6 +193,9 @@ export default function EditProductPage() {
         onSubmit={submit}
         submitting={submitting}
         submitLabel={pt("partner.form.save", locale)}
+        productType={product.type}
+        travelerRequirements={travelerRequirements}
+        onTravelerRequirementsChange={readOnly ? undefined : setTravelerRequirements}
       />
     </div>
   );

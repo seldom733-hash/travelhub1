@@ -16,6 +16,11 @@ import { PublicSellerProfileService } from "./seller/seller-profile.service";
 import type { AuthUser } from "../../security/auth/auth.service";
 import { RoleCode } from "../../generated/prisma/enums";
 import type { PartnerEventPayload } from "../../eventbus/domain-events";
+import {
+  validateTravelerRequirements,
+  getEffectiveTravelerRequirements,
+  type TravelerFullRequirements,
+} from "./traveler-requirements";
 
 /**
  * Immutable moderation snapshot (Step 1.4 §4/§14): копия проверяемой версии Product.
@@ -90,6 +95,8 @@ export interface CreateProductInput {
   ownershipReason?: string;
   /** Phase 3 Round 2D: optional initial OperationalNote (same transaction). */
   initialNote?: string;
+  /** D2: Seller-defined Traveler Data Requirements (JSONB). NULL = use ProductType defaults. */
+  travelerRequirements?: Record<string, unknown> | null;
 }
 
 export interface UpdateProductInput {
@@ -100,6 +107,8 @@ export interface UpdateProductInput {
   attributes?: Record<string, unknown>;
   /** Step 2.8A: commercial service timezone (IANA); undefined = не менять. */
   serviceTimeZone?: string | null;
+  /** D2: Seller-defined Traveler Data Requirements (JSONB). undefined = не менять. */
+  travelerRequirements?: Record<string, unknown> | null;
 }
 
 export interface ProductListQuery {
@@ -237,6 +246,13 @@ export class CatalogService implements OnModuleInit {
         );
       }
 
+      // D2: validate travelerRequirements (if provided) before insert.
+      let travelerReqs: Prisma.InputJsonValue | undefined;
+      if (input.travelerRequirements !== undefined && input.travelerRequirements !== null) {
+        const validated = validateTravelerRequirements(input.travelerRequirements);
+        travelerReqs = validated as unknown as Prisma.InputJsonValue;
+      }
+
       const product = await tx.product.create({
         data: {
           code,
@@ -246,6 +262,8 @@ export class CatalogService implements OnModuleInit {
           description: input.description ?? null,
           // Step 2.8A: server-validated IANA authority (NULL = date-only).
           serviceTimeZone: this.normalizeServiceTimeZone(input.serviceTimeZone),
+          // D2: seller-defined traveler requirements (NULL = use ProductType defaults).
+          ...(travelerReqs !== undefined ? { travelerRequirements: travelerReqs } : {}),
           status: "DRAFT",
           version: 1,
           createdBy: actor?.username ?? null,
@@ -253,7 +271,7 @@ export class CatalogService implements OnModuleInit {
           partnerId,
           ...categoryData,
         },
-        select: { id: true, code: true, type: true, title: true, slug: true, status: true, categoryId: true, categorySchemaId: true, attributes: true, partnerId: true },
+        select: { id: true, code: true, type: true, title: true, slug: true, status: true, categoryId: true, categorySchemaId: true, attributes: true, partnerId: true, travelerRequirements: true },
       });
 
       // Step 1.12.1 REVIEW FIX 3/4: default publication channel — MARKETPLACE
@@ -662,6 +680,28 @@ export class CatalogService implements OnModuleInit {
     return { ...product, partnerDisplayName };
   }
 
+  /**
+   * D2: Effective traveler requirements for a Product.
+   * Combines ProductType defaults with any Product-specific overrides.
+   * Read-only endpoint for frontend/checkout resolution.
+   */
+  async getEffectiveTravelerRequirements(id: string, actor?: AuthUser) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      select: { id: true, type: true, partnerId: true, travelerRequirements: true },
+    });
+    if (!product) throw new NotFoundError(`Product ${id} not found`);
+    this.policy.assertCanRead(actor, product.partnerId);
+
+    const effective = getEffectiveTravelerRequirements(product.type, product.travelerRequirements);
+    return {
+      productId: product.id,
+      productType: product.type,
+      hasOverride: product.travelerRequirements !== null && product.travelerRequirements !== undefined,
+      requirements: effective,
+    };
+  }
+
   async updateProduct(id: string, input: UpdateProductInput, actor: AuthUser) {
     const result = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.product.findUnique({ where: { id } });
@@ -708,6 +748,13 @@ export class CatalogService implements OnModuleInit {
         categoryData = await this.resolveCategoryData(tx, effectiveCategoryId, base, preferredSchemaId);
       }
 
+      // D2: validate travelerRequirements (if provided) before update.
+      let travelerReqsUpdate: Prisma.InputJsonValue | undefined;
+      if (input.travelerRequirements !== undefined && input.travelerRequirements !== null) {
+        const validated = validateTravelerRequirements(input.travelerRequirements);
+        travelerReqsUpdate = validated as unknown as Prisma.InputJsonValue;
+      }
+
       const updated = await tx.product.update({
         where: { id },
         data: {
@@ -719,11 +766,17 @@ export class CatalogService implements OnModuleInit {
             input.serviceTimeZone !== undefined
               ? this.normalizeServiceTimeZone(input.serviceTimeZone)
               : (existing.serviceTimeZone ?? null),
+          // D2: seller-defined traveler requirements (null = clear to defaults).
+          ...(travelerReqsUpdate !== undefined
+            ? { travelerRequirements: travelerReqsUpdate }
+            : input.travelerRequirements === null
+              ? { travelerRequirements: Prisma.DbNull }
+              : {}),
           version: { increment: 1 },
           updatedBy: actor.username,
           ...categoryData,
         },
-        select: { id: true, code: true, title: true, slug: true, status: true, version: true, categoryId: true, categorySchemaId: true, attributes: true, partnerId: true },
+        select: { id: true, code: true, title: true, slug: true, status: true, version: true, categoryId: true, categorySchemaId: true, attributes: true, partnerId: true, travelerRequirements: true },
       });
 
       if (input.tariffs) {

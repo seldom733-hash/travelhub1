@@ -4,6 +4,7 @@ import { useLocale } from "@/lib/i18n";
 import { pt } from "@/lib/partner-i18n";
 import DynamicSchemaForm from "./DynamicSchemaForm";
 import TariffList, { type TariffDraft } from "./TariffList";
+import TravelerRequirementsEditor from "./TravelerRequirementsEditor";
 import type { PartnerAvailabilityRow, PartnerMediaRequirements, PartnerSchemaContract } from "@/lib/partner-api";
 import type { PublicCategory } from "@/lib/public-api";
 import { formatDate } from "@/lib/i18n";
@@ -36,6 +37,12 @@ export interface ProductEditorFormProps {
   submitting?: boolean;
   submitLabel?: string;
   mediaHref?: string;
+  /** D2: Product type (for default traveler requirements resolution). */
+  productType?: string;
+  /** D2: Traveler requirements override (null = use ProductType defaults). */
+  travelerRequirements?: Record<string, string> | null;
+  /** D2: Called when traveler requirements change. */
+  onTravelerRequirementsChange?: (next: Record<string, string> | null) => void;
 }
 
 function Panel({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
@@ -73,6 +80,9 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
     submitting,
     submitLabel,
     mediaHref,
+    productType = "TOUR",
+    travelerRequirements = null,
+    onTravelerRequirementsChange,
   } = props;
 
   const set = (patch: Partial<ProductEditorValues>) => onChange({ ...values, ...patch });
@@ -242,6 +252,27 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
           <LinkButton href={mediaHref}>{pt("partner.form.media_go", locale)}</LinkButton>
         )}
       </Panel>
+
+      {/* D2: Traveler Requirements */}
+      {productType && (
+        <Panel title={pt("partner.form.traveler_requirements", locale)} hint={pt("partner.form.traveler_requirements_hint", locale)}>
+          {onTravelerRequirementsChange ? (
+            <TravelerRequirementsEditor
+              value={travelerRequirements}
+              onChange={onTravelerRequirementsChange}
+              productType={productType}
+              disabled={readOnly}
+            />
+          ) : (
+            <TravelerRequirementsEditor
+              value={travelerRequirements}
+              onChange={() => {}}
+              productType={productType}
+              disabled={true}
+            />
+          )}
+        </Panel>
+      )}
 
       {onSubmit && (
         <div className="flex items-center gap-3 pt-1">

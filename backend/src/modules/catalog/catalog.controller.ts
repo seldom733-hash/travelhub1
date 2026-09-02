@@ -76,6 +76,11 @@ class CreateProductDto {
   @IsOptional()
   @IsString()
   initialNote?: string;
+
+  // D2: Seller-defined Traveler Data Requirements (JSONB). NULL = use ProductType defaults.
+  @IsOptional()
+  @IsObject()
+  travelerRequirements?: Record<string, unknown> | null;
 }
 
 class SetChannelsDto {
@@ -112,6 +117,11 @@ class UpdateProductDto {
   @IsString()
   @MaxLength(64)
   serviceTimeZone?: string;
+
+  // D2: Seller-defined Traveler Data Requirements (JSONB). null = clear to defaults.
+  @IsOptional()
+  @IsObject()
+  travelerRequirements?: Record<string, unknown> | null;
 }
 
 class ListProductsQuery {
@@ -344,6 +354,17 @@ export class CatalogController {
   @RequirePermissions(productReadScope)
   getProduct(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.catalog.getProduct(id, actor);
+  }
+
+  /**
+   * D2: Effective traveler requirements for a Product.
+   * Read-only: combines ProductType defaults with Product-specific overrides.
+   * Used by frontend product editor and checkout flow.
+   */
+  @Get("products/:id/traveler-requirements")
+  @RequirePermissions(productReadScope)
+  getEffectiveTravelerRequirements(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.catalog.getEffectiveTravelerRequirements(id, actor);
   }
 
   @Patch("products/:id")
