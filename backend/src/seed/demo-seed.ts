@@ -927,7 +927,7 @@ async function seedStorefrontData() {
   const premiumPlanId = uuid("plan-premium");
 
   await prisma.storefrontSubscriptionPlan.upsert({
-    where: { id: freePlanId },
+    where: { code: "SUB-PLAN-001" },
     create: {
       id: freePlanId, code: "SUB-PLAN-001", name: "First Month Free",
       planType: "FREE_TRIAL", priceUsd: decimal(0), periodDays: 30,
@@ -936,7 +936,7 @@ async function seedStorefrontData() {
     update: {},
   });
   await prisma.storefrontSubscriptionPlan.upsert({
-    where: { id: premiumPlanId },
+    where: { code: "SUB-PLAN-002" },
     create: {
       id: premiumPlanId, code: "SUB-PLAN-002", name: "Premium",
       planType: "PREMIUM", priceUsd: decimal(199), periodDays: 30,
@@ -1079,6 +1079,7 @@ async function seedCatalogHealth() {
       NOW(),
       NOW()
     FROM generate_series(1, 30)
+    ON CONFLICT (code) DO NOTHING
   `;
   console.log(`  📝 Added ${newProducts} new listing products (without orders)`);
 

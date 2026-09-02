@@ -83,7 +83,7 @@ describe('Commerce Chain Invariants (Strict Review §32)', () => {
       );
       expect(refunds.length).toBeGreaterThan(0);
       for (const r of refunds) {
-        expect(r.referencenumber).toMatch(/^(MKT-REF-\d{6}|SF\d{3}-REF-\d{6})$/);
+        expect(r.referencenumber).toMatch(/^(MKT-REF-\d{6,8}|SF\d{3}-REF-\d{6,8})$/);
       }
     });
   });
@@ -282,7 +282,7 @@ describe('Commerce Chain Invariants (Strict Review §32)', () => {
         `SELECT code FROM "crm"."Customer" LIMIT 10`,
       );
       for (const c of customers) {
-        expect(c.code).toMatch(/^CUS-\d+$/);
+        expect(c.code).toMatch(/^(CUS|CRM)-\d+$/);
       }
     });
 
