@@ -123,17 +123,52 @@ export class RequestService {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
 
+    // Build search: first resolve names/codes to IDs, then filter
+    let searchOr: any[] | undefined;
+    let searchCustomerIds: string[] | undefined;
+    let searchProductIds: string[] | undefined;
+    let searchPartnerIds: string[] | undefined;
+    if (query.search) {
+      const s = query.search;
+      // Direct Request fields
+      searchOr = [
+        { referenceNumber: { contains: s, mode: "insensitive" } },
+        { code: { contains: s, mode: "insensitive" } },
+        { commerceSequence: { contains: s, mode: "insensitive" } },
+      ];
+      // Resolve customer/product/partner by name/code
+      const [matchedCustomers, matchedProducts, matchedPartners] = await Promise.all([
+        this.prisma.customer.findMany({ where: { OR: [
+          { firstName: { contains: s, mode: "insensitive" } },
+          { lastName: { contains: s, mode: "insensitive" } },
+          { code: { contains: s, mode: "insensitive" } },
+          { email: { contains: s, mode: "insensitive" } },
+        ]}, select: { id: true } }),
+        this.prisma.product.findMany({ where: { OR: [
+          { title: { contains: s, mode: "insensitive" } },
+          { code: { contains: s, mode: "insensitive" } },
+        ]}, select: { id: true } }),
+        this.prisma.partner.findMany({ where: { OR: [
+          { name: { contains: s, mode: "insensitive" } },
+          { code: { contains: s, mode: "insensitive" } },
+        ]}, select: { id: true } }),
+      ]);
+      if (matchedCustomers.length) searchCustomerIds = matchedCustomers.map((c) => c.id).filter(Boolean) as string[];
+      if (matchedProducts.length) searchProductIds = matchedProducts.map((p) => p.id).filter(Boolean) as string[];
+      if (matchedPartners.length) searchPartnerIds = matchedPartners.map((p) => p.id).filter(Boolean) as string[];
+    }
+
+    // Combine search conditions: direct OR + resolved entity IDs
+    const allSearchConditions = [...(searchOr ?? [])];
+    if (searchCustomerIds?.length) allSearchConditions.push({ customerId: { in: searchCustomerIds } });
+    if (searchProductIds?.length) allSearchConditions.push({ productId: { in: searchProductIds } });
+    if (searchPartnerIds?.length) allSearchConditions.push({ partnerId: { in: searchPartnerIds } });
+
     const where: any = {
       ...(query.status ? { status: query.status as RequestStatus } : {}),
       ...(query.customerId ? { customerId: query.customerId } : {}),
       ...(query.partnerId ? { partnerId: query.partnerId } : {}),
-      ...(query.search ? {
-        OR: [
-          { referenceNumber: { contains: query.search, mode: "insensitive" } },
-          { code: { contains: query.search, mode: "insensitive" } },
-          { commerceSequence: { contains: query.search, mode: "insensitive" } },
-        ],
-      } : {}),
+      ...(allSearchConditions.length ? { OR: allSearchConditions } : {}),
       ...(query.dateFrom || query.dateTo ? {
         createdAt: {
           ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
@@ -152,8 +187,23 @@ export class RequestService {
       this.prisma.request.count({ where }),
     ]);
 
+    // Batch-fetch related entities for human-readable names
+    const customerIds = [...new Set(items.map((r) => r.customerId).filter((id): id is string => !!id))];
+    const productIds = [...new Set(items.map((r) => r.productId).filter((id): id is string => !!id))];
+    const partnerIds = [...new Set(items.map((r) => r.partnerId).filter((id): id is string => !!id))];
+
+    const [customers, products, partners] = await Promise.all([
+      customerIds.length ? this.prisma.customer.findMany({ where: { id: { in: customerIds } }, select: { id: true, firstName: true, lastName: true, code: true } }) : [],
+      productIds.length ? this.prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, title: true, code: true } }) : [],
+      partnerIds.length ? this.prisma.partner.findMany({ where: { id: { in: partnerIds } }, select: { id: true, name: true, code: true } }) : [],
+    ]);
+
+    const customerMap = new Map(customers.map((c) => [c.id, c]));
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    const partnerMap = new Map(partners.map((p) => [p.id, p]));
+
     return {
-      data: items.map((r) => this.requestDto(r)),
+      data: items.map((r) => this.requestDto(r, customerMap, productMap, partnerMap)),
       total,
       page,
       pageSize,
@@ -167,7 +217,68 @@ export class RequestService {
   async getRequest(id: string): Promise<Record<string, unknown>> {
     const request = await this.prisma.request.findUnique({ where: { id } });
     if (!request) throw new NotFoundException(`Request ${id} not found`);
-    return this.requestDto(request);
+
+    // Fetch related entities
+    const [customer, product, partner] = await Promise.all([
+      request.customerId ? this.prisma.customer.findUnique({ where: { id: request.customerId }, select: { firstName: true, lastName: true, code: true, email: true, phone: true } }) : null,
+      request.productId ? this.prisma.product.findUnique({ where: { id: request.productId }, select: { title: true, code: true, type: true } }) : null,
+      request.partnerId ? this.prisma.partner.findUnique({ where: { id: request.partnerId }, select: { name: true, code: true, countryCode: true } }) : null,
+    ]);
+
+    const customerMap = customer ? new Map([[request.customerId!, customer]]) : new Map();
+    const productMap = product ? new Map([[request.productId!, product]]) : new Map();
+    const partnerMap = partner ? new Map([[request.partnerId!, partner]]) : new Map();
+    const dto = this.requestDto(request, customerMap, productMap, partnerMap) as any;
+
+    dto.customerEmail = customer?.email ?? null;
+    dto.customerPhone = customer?.phone ?? null;
+    dto.productType = product?.type ?? null;
+    dto.partnerCountry = partner?.countryCode ?? null;
+
+    // If converted, load the related Order → Booking → Payment chain
+    if (request.convertedOrderId) {
+      const order = await this.prisma.order.findUnique({
+        where: { id: request.convertedOrderId },
+        select: { id: true, referenceNumber: true, status: true, amount: true, currency: true, createdAt: true },
+      });
+      if (order) {
+        dto.convertedOrder = {
+          id: order.id,
+          referenceNumber: order.referenceNumber,
+          status: order.status,
+          amount: order.amount?.toString() ?? null,
+          currency: order.currency,
+          createdAt: order.createdAt?.toISOString() ?? null,
+        };
+        const booking = await this.prisma.booking.findFirst({
+          where: { orderId: order.id },
+          select: { id: true, referenceNumber: true, status: true, createdAt: true },
+        });
+        if (booking) {
+          dto.convertedBooking = {
+            id: booking.id,
+            referenceNumber: booking.referenceNumber,
+            status: booking.status,
+            createdAt: booking.createdAt?.toISOString() ?? null,
+          };
+        }
+        const payments = await this.prisma.payment.findMany({
+          where: { orderId: order.id },
+          select: { id: true, referenceNumber: true, status: true, amount: true, currency: true, createdAt: true },
+          orderBy: { createdAt: "asc" },
+        });
+        dto.convertedPayments = payments.map((p) => ({
+          id: p.id,
+          referenceNumber: p.referenceNumber,
+          status: p.status,
+          amount: p.amount?.toString() ?? null,
+          currency: p.currency,
+          createdAt: p.createdAt?.toISOString() ?? null,
+        }));
+      }
+    }
+
+    return dto;
   }
 
   /**
@@ -426,15 +537,27 @@ export class RequestService {
     return this.requestDto(updated);
   }
 
-  private requestDto(r: any): Record<string, unknown> {
+  private requestDto(r: any, customerMap?: Map<string, any>, productMap?: Map<string, any>, partnerMap?: Map<string, any>): Record<string, unknown> {
+    const cust = customerMap?.get(r.customerId);
+    const prod = productMap?.get(r.productId);
+    const part = partnerMap?.get(r.partnerId);
+    const customerName = cust ? `${cust.firstName ?? ""} ${cust.lastName ?? ""}`.trim() : null;
+    const productName = prod?.title ?? null;
+    const partnerName = part?.name ?? null;
     return {
       id: r.id,
       code: r.code,
       commerceSequence: r.commerceSequence,
       referenceNumber: r.referenceNumber,
       customerId: r.customerId,
+      customerName,
+      customerCode: r.customer?.code ?? null,
       productId: r.productId,
+      productName,
+      productCode: r.product?.code ?? null,
       partnerId: r.partnerId,
+      partnerName,
+      partnerCode: r.partner?.code ?? null,
       status: r.status,
       requestedServiceDate: r.requestedServiceDate?.toISOString() ?? null,
       quantity: r.quantity,

@@ -21,21 +21,57 @@ interface NavItem {
  * Public витрина доступна по ссылке «На витрину» (наружу), но sidebar ведёт
  * только на внутренние Work Centers (§14).
  */
-const NAV: NavItem[] = [
-  { href: "/app/dashboard", icon: "🏠", labelKey: "nav.dashboard" },
-  { href: "/app/command-center", icon: "📊", labelKey: "nav.command_center", permission: "analytics.read" },
-  { href: "/app/analytics", icon: "📈", labelKey: "nav.analytics", permission: "analytics.read" },
-  { href: "/app/catalog", icon: "📚", labelKey: "nav.catalog", permission: "catalog.product.read" },
-  { href: "/app/requests", icon: "📋", labelKey: "nav.requests", permission: "order.read" },
-  { href: "/app/orders", icon: "🧾", labelKey: "nav.orders", permission: "order.read" },
-  { href: "/app/bookings", icon: "📑", labelKey: "nav.bookings", permission: "booking.read" },
-  { href: "/app/crm", icon: "🤝", labelKey: "nav.crm", permission: "crm.customer.read" },
-  { href: "/app/marketing", icon: "📣", labelKey: "nav.marketing", permission: "marketing.campaign.read" },
-  { href: "/app/support", icon: "🎫", labelKey: "nav.support", permission: "support.case.read" },
-  { href: "/app/partners/onboarding", icon: "📋", labelKey: "nav.partner_onboarding", permission: "partner.onboarding.review" },
-  { href: "/app/seller-profiles", icon: "🛡", labelKey: "nav.seller_profiles", permission: "seller_public_profile.review" },
-  { href: "/app/users", icon: "👥", labelKey: "nav.users", permission: "settings.write" },
+interface NavGroup {
+  heading?: string; // null = top-level (no heading)
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    items: [
+      { href: "/app/dashboard", icon: "🏠", labelKey: "nav.dashboard" },
+      { href: "/app/command-center", icon: "📊", labelKey: "nav.command_center", permission: "analytics.read" },
+      { href: "/app/analytics", icon: "📈", labelKey: "nav.analytics", permission: "analytics.read" },
+    ],
+  },
+  {
+    heading: "ОПЕРАЦИИ",
+    items: [
+      { href: "/app/requests", icon: "📋", labelKey: "nav.requests", permission: "order.read" },
+      { href: "/app/orders", icon: "🧾", labelKey: "nav.orders", permission: "order.read" },
+      { href: "/app/bookings", icon: "📑", labelKey: "nav.bookings", permission: "booking.read" },
+    ],
+  },
+  {
+    heading: "КОММЕРЧЕСКОЕ УПРАВЛЕНИЕ",
+    items: [
+      { href: "/app/catalog", icon: "📚", labelKey: "nav.catalog", permission: "catalog.product.read" },
+      { href: "/app/crm", icon: "🤝", labelKey: "nav.crm", permission: "crm.customer.read" },
+      { href: "/app/marketing", icon: "📣", labelKey: "nav.marketing", permission: "marketing.campaign.read" },
+    ],
+  },
+  {
+    heading: "ПАРТНЁРСКАЯ СЕТЬ",
+    items: [
+      { href: "/app/partners/onboarding", icon: "📋", labelKey: "nav.partner_onboarding", permission: "partner.onboarding.review" },
+      { href: "/app/seller-profiles", icon: "🛡", labelKey: "nav.seller_profiles", permission: "seller_public_profile.review" },
+    ],
+  },
+  {
+    heading: "СЕРВИС",
+    items: [
+      { href: "/app/support", icon: "🎫", labelKey: "nav.support", permission: "support.case.read" },
+    ],
+  },
+  {
+    heading: "АДМИНИСТРИРОВАНИЕ",
+    items: [
+      { href: "/app/users", icon: "👥", labelKey: "nav.users", permission: "settings.write" },
+    ],
+  },
 ];
+
+const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 /** Маршрут → требуемое право (для редиректа при прямом переходе). */
 const ROUTE_PERMISSION: Record<string, string> = Object.fromEntries(
@@ -170,32 +206,44 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
         {/* Navigation */}
         <nav className="flex-1 py-3">
-          {visibleNav.map((item) => {
-            const active = isDashboardPath(item.href, pathname);
-            const label = t(item.labelKey, locale);
+          {NAV_GROUPS.map((group, gi) => {
+            const visibleItems = group.items.filter((item) => canAccess(user, item.permission));
+            if (visibleItems.length === 0) return null;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`group relative flex items-center gap-3 px-5 py-2.5 text-sm transition-colors ${
-                  collapsed ? "justify-center px-2" : "px-5"
-                } ${
-                  active
-                    ? "border-r-2 border-blue-400 bg-blue-500/15 font-medium text-white"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
-                }`}
-                title={label}
-                aria-label={label}
-              >
-                <span className="w-5 shrink-0 text-center text-base">{item.icon}</span>
-                {!collapsed && <span className="truncate">{label}</span>}
-                {/* Tooltip in collapsed mode */}
-                {collapsed && (
-                  <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                    {label}
-                  </span>
+              <div key={gi}>
+                {group.heading && !collapsed && (
+                  <div className="mt-4 mb-1 px-5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    {group.heading}
+                  </div>
                 )}
-              </Link>
+                {visibleItems.map((item) => {
+                  const active = isDashboardPath(item.href, pathname);
+                  const label = t(item.labelKey, locale);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`group relative flex items-center gap-3 text-sm transition-colors ${
+                        collapsed ? "justify-center px-2 py-2.5" : "px-5 py-2.5"
+                      } ${
+                        active
+                          ? "border-r-2 border-blue-400 bg-blue-500/15 font-medium text-white"
+                          : "text-slate-400 hover:bg-white/5 hover:text-white"
+                      }`}
+                      title={label}
+                      aria-label={label}
+                    >
+                      <span className="w-5 shrink-0 text-center text-base">{item.icon}</span>
+                      {!collapsed && <span className="truncate">{label}</span>}
+                      {collapsed && (
+                        <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                          {label}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
             );
           })}
           {!collapsed && hiddenCount > 0 && (

@@ -562,7 +562,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "nav.command_center": { ru: "Центр управления", az: "İdarəetmə Mərkəzi", en: "Command Center" },
   "nav.analytics": { ru: "Аналитика", az: "Analitika", en: "Analytics" },
   "nav.catalog": { ru: "Каталог", az: "Kataloq", en: "Catalog" },
-  "nav.requests": { ru: "Центр заявок", az: "Sorğu Mərkəzi", en: "Request Center" },
+  "nav.requests": { ru: "Заявки", az: "Sorğular", en: "Requests" },
   "nav.orders": { ru: "Заказы", az: "Sifarişlər", en: "Orders" },
   "nav.bookings": { ru: "Бронирования", az: "Bronlar", en: "Bookings" },
   "nav.crm": { ru: "CRM", az: "CRM", en: "CRM" },
