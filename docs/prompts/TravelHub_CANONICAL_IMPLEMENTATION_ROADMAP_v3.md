@@ -2453,7 +2453,7 @@ implementation → strict review → approval и остаются валидны
 | Step 3.8 — Marketing Domain | ✅ DONE — STRICT REVIEW APPROVED (closed 4135025) |
 | Step 3.9 — Marketing Center UI | ✅ DONE — STRICT REVIEW RE-QUALIFICATION APPROVED (closed cb3fef1) |
 
-**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.9 (all VERDICT A).
+**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.9 (all VERDICT A) + PRE-STEP 3.12 sub-tasks (Shared Commerce, Request Center, Database Reset, Export Framework, Traveler Audit, Architecture Reconciliation — all VERDICT A).
 
 **Canonical NEXT:** `PHASE 3 — STEP 3.10 — SUPPORT DOMAIN`
 (Marketing Center UI CLOSED. Next section in canonical roadmap ordering is Support Domain.)
@@ -2518,6 +2518,7 @@ implementation → strict review → approval и остаются валидны
 44. **PHASE 3 — POST-STEP 3.9 — MARKETING PURPOSE / MARKETPLACE DEMAND / PROMOTIONS & FUNDING ARCHITECTURE AMENDMENT** ✅ DOCUMENTATION COMPLETE (2026-08-29; architecture amendment + repository gap audit + financial model design + governance authority + roadmap sync; `docs/prompts/MARKETING_PURPOSE_MARKETPLACE_DEMAND_PROMOTIONS_FUNDING_ARCHITECTURE_ROADMAP_AMENDMENT.md`; no production code changes).
 
 45. **PHASE 3 — PRE-STEP 3.12 — TRAVELER DATA REQUIREMENTS + CHECKOUT COLLECTION + BOOKING SNAPSHOT + VOUCHER SOURCE — ARCHITECTURE AUDIT** ✅ AUDIT COMPLETED (2026-09-02; VERDICT A — architecture audit for Traveler domain; 4 existing models identified (QuoteTraveler, CheckoutIntentTraveler, OrderTraveler, Passenger); Customer ≠ Payer ≠ Traveler contract fixed (5 cases); Booking → 1..N Passengers; seller-defined Traveler Requirements on Product (JSON); Booking snapshot contract; 8 implementation stages proposed (A-H); 18 gaps identified; `docs/architecture/TRAVELER_DATA_REQUIREMENTS_BOOKING_PARTICIPANTS_ARCHITECTURE.md`; no production code changes; canonical NEXT = Stage A (Product traveler requirements model)).
+46. **PHASE 3 — PRE-STEP 3.12 — CANONICAL ARCHITECTURE RECONCILIATION + ROADMAP REALIGNMENT** ✅ RECONCILIATION COMPLETED (2026-09-02; VERDICT A — architecture reconciliation across 67+ architecture documents, canonical roadmap, actual Prisma schema/backend/frontend implementation, and latest approved business decisions; canonical architecture document created: `docs/architecture/TRAVELHUB_CURRENT_CANONICAL_ARCHITECTURE.md`; decision log established; drift matrix documented; superseded decisions classified; no implementation performed; canonical NEXT = Stage A (Product traveler requirements model); `docs/reports/PHASE_3_PRE_STEP_3.12_CANONICAL_ARCHITECTURE_RECONCILIATION_ROADMAP_REALIGNMENT_REPORT.md`).
 
 **Platform ↔ Partner authority boundary established:**
 ```
