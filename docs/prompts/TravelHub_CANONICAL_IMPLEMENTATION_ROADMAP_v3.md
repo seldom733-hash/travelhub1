@@ -2570,7 +2570,7 @@ D9  Export Framework Requalification                    ⬜ NOT STARTED
  ↓
 D10 Partner Performance Attribution                     ⬜ NOT STARTED
  ↓
-D11 Booking KPI Semantics                               ⬜ NOT STARTED
+D11 Project-Wide KPI/Status Semantics + Total Reconciliation  ⬜ NOT STARTED
  ↓
 D12 CRM / KPI Drill-down Routing Requalification       ⬜ NOT STARTED
  ↓
@@ -2595,7 +2595,7 @@ STEP 3.12                                               ⬜ BLOCKED BY D14
 | D8 | Global Temporal Visibility | IMPLEMENTATION_DEBT | ⬜ | D0 | D8 |
 | D9 | Export Framework Requalification | REQUALIFICATION_DEBT | ⬜ | D0 | D9 |
 | D10 | Partner Performance Attribution | ARCHITECTURE_DEBT | ⬜ | D0 | D10 |
-| D11 | Booking KPI Semantics | ARCHITECTURE_DEBT | ⬜ | D0 | D11 |
+| D11 | Project-Wide KPI/Status Semantics + Total Reconciliation | ARCHITECTURE_DEBT | ⬜ | D0 | D11 |
 | D12 | CRM / KPI Drill-down Routing Requalification | REQUALIFICATION_DEBT | ⬜ | D0 | D12 |
 | D13 | Voucher | IMPLEMENTATION_DEBT | ⬜ | D4 | D13 |
 | D14 | PRE-STEP 3.12 Final Requalification | ACCEPTANCE_DEBT | ⬜ | D1-D13 | D14 |
