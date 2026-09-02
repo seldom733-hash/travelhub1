@@ -49,7 +49,9 @@ export type TravelerFullRequirements = Record<TravelerField, TravelerRequirement
 
 // ── Validation ──────────────────────────────────────────────────────────────
 
-export class TravelerRequirementsValidationError extends Error {
+import { ValidationDomainError } from "../../shared/errors";
+
+export class TravelerRequirementsValidationError extends ValidationDomainError {
   constructor(message: string) {
     super(message);
     this.name = "TravelerRequirementsValidationError";
