@@ -2,8 +2,8 @@
 
 ```
 Starting SHA:    fd0f498
-Final SHA:       e29ce9a
-origin/master:   fd0f498
+Final SHA:       87ef058
+origin/master:   87ef058
 HEAD == origin:  YES ✅
 ```
 
@@ -105,6 +105,7 @@ Key scope tests pass: SFC search=0, direct-ID denied, detail denied
 |---|---|
 | `backend/src/modules/crm/crm.service.ts` | UPDATED (scope filtering) |
 | `backend/test/crm-marketplace-scope.e2e-spec.ts` | CREATED |
+| `docs/prompts/TravelHub_CANONICAL_IMPLEMENTATION_ROADMAP_v3.md` | UPDATED (D1A entry) |
 | `docs/reports/PHASE_3_PRE_STEP_3.12_D1A_PLATFORM_CRM_SCOPE_ISOLATION_REPORT.md` | CREATED |
 
 ---
