@@ -393,7 +393,8 @@ Docs/evidence:
 - Старт: `c72cd50` (HEAD == origin/master).
 - Коммиты фазы (после закрытия):
   - `33cec2f` — `feat(order): D3 — Request flow integration (F6 closure)` (реализация + тесты)
-  - `…` (docs-коммит: report §31 sync — добавляется после фиксации финального state)
+  - `0b56a4f` — `docs(order): D3 request flow report — §31 git state (pushed 33cec2f)`
+  - `6cf4426` — `chore(docs): D3 git closure — commit phase prompts/reports + storefront e2e specs, drop tmp artifacts` (Final Git Closure Recheck)
 - Финал: HEAD == origin/master (push), рабочее дерево чистое (только pre-existing untracked:
   промпты предыдущих фаз, tmp-скрипты evidence — задокументированы в §28 как disposable).
 - `tmp_d3rf_*` скрипты и `tmp_d3rf_cases.json` — disposable, не коммитятся (лежат в .gitignore-зоне
