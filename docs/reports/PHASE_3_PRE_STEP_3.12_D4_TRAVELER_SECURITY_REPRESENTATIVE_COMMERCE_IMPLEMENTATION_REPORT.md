@@ -350,14 +350,16 @@ git rev-parse origin/master   # до: ef4cafb
 Фактический результат после implementation:
 
 ```bash
-git commit   → c99ec7c feat(d4): traveler security + representative commerce chain coverage
-git push     → ef4cafb..c99ec7c master -> master
-git rev-parse HEAD          → c99ec7cd000b9b6001d809d0bf0faf9cc7d57e18
-git rev-parse origin/master → c99ec7cd000b9b6001d809d0bf0faf9cc7d57e18
-git status --short          → пусто (после финального docs-sync коммита)
+git commit (implementation) → c99ec7c feat(d4): traveler security + representative commerce chain coverage
+git push (implementation)   → ef4cafb..c99ec7c master -> master
+git commit (docs sync §27)  → 65c829b docs(d4): sync final git closure state — §27 names pushed tip c99ec7c
+git push (docs sync)        → c99ec7c..65c829b master -> master
+git rev-parse HEAD          → 65c829b5f2e1364d8ccbcc31d23001942237cef1
+git rev-parse origin/master → 65c829b5f2e1364d8ccbcc31d23001942237cef1
+git status --short          → пусто (EXACTLY EMPTY)
 ```
 
-Hard acceptance: `git status --short` = EXACTLY EMPTY; `HEAD == origin/master` (после push).
+Hard acceptance: `git status --short` = EXACTLY EMPTY; `HEAD == origin/master == 65c829b` (после push).
 
 ---
 
@@ -420,9 +422,9 @@ Hard acceptance: `git status --short` = EXACTLY EMPTY; `HEAD == origin/master` (
 | D11/D12 debts preserved | PASS | не исправлялись |
 | Roadmap synced if architecture changed | PASS | §26 |
 | Final report predominantly Russian | PASS | данный отчёт |
-| `git status --short` empty | PASS | §27 (пусто после финального docs-sync) |
-| HEAD == origin/master | PASS | §27 (c99ec7c == c99ec7c) |
-| Push successful | PASS | §27 (ef4cafb..c99ec7c) |
+| `git status --short` empty | PASS | §27 (EXACTLY EMPTY) |
+| HEAD == origin/master | PASS | §27 (65c829b == 65c829b) |
+| Push successful | PASS | §27 (ef4cafb..c99ec7c; c99ec7c..65c829b) |
 
 ---
 
