@@ -2942,3 +2942,25 @@ D5 final state: **ACCEPTED** (all Round 2 hard gates closed).
 
 TRUE NEXT: **D6 — BOOKING FULL-PAGE DETAIL** (Booking-аналог D5).
 D6 NOT STARTED.
+
+## ADDENDUM — D5 FINAL EVIDENCE CLOSURE ROUND 3 (additive sync, 2026-09-04)
+
+D5 Final Evidence Closure Round 3: **VERDICT A — D5 ACCEPTED** (см.
+`docs/reports/PHASE_3_PRE_STEP_3.12_D5_FINAL_EVIDENCE_CLOSURE_ROUND_3_REPORT.md`).
+
+Final SHA: `b84a234` | origin/master: `b84a234` | HEAD == origin: YES
+
+Round 3 закрыл remaining acceptance gates:
+
+| Gate | Resolution | Evidence |
+|---|---|---|
+| R3-1 Real browser evidence | Flows A-G via Preview accessibility tree | All PASS |
+| R3-2 Real failure-injection | `ThrowingAuditSecurityService` + `overrideProvider` | FI-1..FI-4: 5/5 PASS |
+| R3-3 Regression | 8 suites + builds | 86/86 PASS |
+| R3-4 Git closure | HEAD == origin/master | b84a234 |
+| R3-5 Acceptance matrix | Full 50+ gate matrix | Complete |
+
+D5 final state: **ACCEPTED** (all hard gates closed).
+
+TRUE NEXT: **D6 — BOOKING FULL-PAGE DETAIL** (Booking-аналог D5).
+D6 NOT STARTED.
