@@ -6,6 +6,7 @@ import { DomainEvents, type BookingEventPayload } from "../../eventbus/domain-ev
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { BookingQueryService } from "./booking-query.service";
 import { buildSortClause } from '../../shared/sort';
+import { isDeniedStorefrontScope } from "../../shared/sales-scope";
 
 export type BookingAction =
   | "prepare"
@@ -147,6 +148,12 @@ export class BookingService {
   async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; slaMinutes?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string; acquisitionSource?: string }) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+    // D4 REMEDIATION F2: client acquisitionSource filter ⊆ server-authorized
+    // scope — явный PARTNER_STOREFRONT на platform Booking Center-контракте →
+    // deny (empty result, согласовано с Orders list/export).
+    if (isDeniedStorefrontScope(query.acquisitionSource)) {
+      return { items: [], total: 0, page, pageSize, hasMore: false };
+    }
     const now = new Date();
     // R5-C1: Support comma-separated multi-status
     const bookingStatusFilter = query.status
@@ -222,6 +229,11 @@ export class BookingService {
    * Export all matching bookings (no pagination) for diagnostic reconciliation.
    */
   async exportBookings(query: { status?: string; orderId?: string; search?: string; dateFrom?: string; dateTo?: string; acquisitionSource?: string; sellerPartnerId?: string }) {
+    // D4 REMEDIATION F2 (list/export согласованы): явный Storefront-фильтр на
+    // platform export → deny (empty rows).
+    if (isDeniedStorefrontScope(query.acquisitionSource)) {
+      return { rows: [], total: 0 };
+    }
     const effectiveSource = query.acquisitionSource || 'MARKETPLACE';
 
     // Build partner-scoped order IDs if sellerPartnerId provided
@@ -254,7 +266,12 @@ export class BookingService {
         ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
       };
     }
-    if (query.orderId) where.orderId = query.orderId;
+    // D4 REMEDIATION F2 (drill-down consumer): explicit orderId НЕ заменяет
+    // channel scope (иначе platform export отдал бы Booking Storefront-заказа
+    // по его UUID). Пересечение — как в listBookings: never overwritten.
+    if (query.orderId) {
+      where.AND = [{ orderId: query.orderId }, { orderId: { in: channelOrderIds } }];
+    }
 
     const items = await this.prisma.booking.findMany({
       where,

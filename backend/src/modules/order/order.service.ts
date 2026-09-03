@@ -17,6 +17,7 @@ import { ConflictError, NotFoundError, ValidationDomainError } from "../../share
 import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
 import { isDateOnly } from "../../shared/date-only";
 import { isIanaTimeZone, isLocalTime } from "../../shared/service-time";
+import { isDeniedStorefrontScope, PARTNER_STOREFRONT_SOURCE } from "../../shared/sales-scope";
 import { PaymentPrepaymentType, PaymentScheme, QuoteDiscountType, SalesAcquisitionSource } from "../../generated/prisma/enums";
 import {
   getEffectiveTravelerRequirements,
@@ -34,7 +35,9 @@ import {
  * (enumeration protection), lifecycle/traveler-команды → 404. Внутренние
  * cross-domain вызовы (viewer отсутствует, trusted, ADR-0001) не затрагиваются.
  */
-export const PLATFORM_SCOPE_DENIED_SOURCE = "PARTNER_STOREFRONT";
+// D4 REMEDIATION F2: canonical Platform-scope константа вынесена в shared
+// (Order + Booking list/export используют единый источник истины).
+export const PLATFORM_SCOPE_DENIED_SOURCE = PARTNER_STOREFRONT_SOURCE;
 
 export interface TravelerUpdateInput {
   firstName?: string;
@@ -743,6 +746,13 @@ export class OrderService {
   ) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+    // D4 REMEDIATION F2: client acquisitionSource filter ⊆ server-authorized
+    // scope — явный PARTNER_STOREFRONT на platform Marketplace-контракте →
+    // deny (empty result; Storefront-коммерция не существует для этого scope,
+    // invisibility-семантика как у прямых 404-ридов).
+    if (isDeniedStorefrontScope(query.acquisitionSource)) {
+      return { items: [], total: 0, page, pageSize, aggregates: { active: 0, ready: 0, closed: 0 } };
+    }
     // R5-C1: Support comma-separated multi-status (e.g., "FULFILLED,CLOSED")
     const statusFilter = query.status
       ? query.status.includes(',')
@@ -865,6 +875,11 @@ export class OrderService {
    * Export all matching orders (no pagination) for diagnostic reconciliation.
    */
   async exportOrders(query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; dateFrom?: string; dateTo?: string; acquisitionSource?: string; sellerPartnerId?: string }) {
+    // D4 REMEDIATION F2 (list/export согласованы): явный Storefront-фильтр на
+    // platform export → deny (empty rows).
+    if (isDeniedStorefrontScope(query.acquisitionSource)) {
+      return { rows: [], total: 0 };
+    }
     const where = this.buildOrderWhere(query);
 
     const items = await this.prisma.order.findMany({
@@ -1025,11 +1040,59 @@ export class OrderService {
     };
   }
 
+  /**
+   * D4 REMEDIATION F1 — DB-level serialization boundary для traveler mutation
+   * ↔ final-confirm (TOCTOU, D4SR-F1).
+   *
+   * Обе стороны (traveler PATCH single/bulk и finalConfirm) захватывают
+   * row-lock (SELECT ... FOR UPDATE) на строке Order ДО проверки/записи:
+   *  - finalConfirm закоммитился первым → traveler mutation после получения
+   *    lock видит finalConfirmedAt != NULL → ConflictError (R1);
+   *  - traveler mutation удерживает lock первой → finalConfirm ждёт и затем
+   *    наблюдает закоммиченное состояние туристов (R2).
+   * Никакая traveler mutation не может закоммититься ПОСЛЕ успешного
+   * finalConfirm (PostgreSQL: row lock живёт до конца транзакции).
+   */
+  private async lockOrderRowForMutation(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<{ finalConfirmedAt: Date | null }> {
+    const rows = await tx
+      .$queryRaw<Array<{ finalConfirmedAt: Date | null }>>`SELECT "finalConfirmedAt" FROM "order"."Order" WHERE "id" = ${orderId} FOR UPDATE`;
+    if (!rows || rows.length === 0) throw new NotFoundError(`Order ${orderId} not found`);
+    return rows[0];
+  }
+
+  /**
+   * D4 REMEDIATION F6 — canonical dataCompleteness (общая для single и bulk
+   * traveler mutation). Pinned snapshot — единственный источник REQUIRED:
+   *  - pinned есть (D3/D4): COMPLETE ⇔ все REQUIRED-поля непусты;
+   *    OPTIONAL/NOT_REQUESTED не становятся REQUIRED искусственно;
+   *  - pinned нет (legacy pre-D3, bulk-контракт): полнота по passportNumber
+   *    (историческое правило bulk PATCH — заказы вне D3-потока).
+   */
+  private computeTravelerCompleteness(
+    pinned: TravelerFullRequirements | null,
+    values: Partial<Record<TravelerField, string | Date | null | undefined>>,
+  ): "COMPLETE" | "INCOMPLETE" {
+    if (!pinned) {
+      const pn = values.passportNumber;
+      return pn !== null && pn !== undefined && String(pn).trim().length > 0 ? "COMPLETE" : "INCOMPLETE";
+    }
+    const required = (Object.keys(pinned) as TravelerField[]).filter((f) => pinned[f] === "REQUIRED");
+    const missing = required.some((f) => {
+      const v = values[f];
+      return v === null || v === undefined || String(v).trim().length === 0;
+    });
+    return missing ? "INCOMPLETE" : "COMPLETE";
+  }
+
   async updateTravelers(orderId: string, travelers: TravelerUpdateInput[], actor?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: {
-        id: true, code: true, termsAcceptedAt: true, finalConfirmedAt: true, acquisitionSource: true,
+        id: true, code: true, termsAcceptedAt: true, finalConfirmedAt: true,
+        acquisitionSource: true, pinnedRequirements: true,
       },
     });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
@@ -1042,29 +1105,54 @@ export class OrderService {
 
     // D4 §13 (mutability): подтверждённые данные туристов immutable — PATCH
     // после final confirmation → server-side denial (D3-поток). Legacy-заказы
-    // без finalConfirmedAt сохраняют прежний bulk-edit.
+    // без finalConfirmedAt сохраняют прежний bulk-edit. Fast-path проверка;
+    // authoritative граница — row-lock внутри tx (D4 REMEDIATION F1).
     if (order.finalConfirmedAt) {
       throw new ConflictError(`Order ${order.code} is already final-confirmed; traveler data is immutable`);
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.orderTraveler.findMany({ where: { orderId } });
+      // D4 REMEDIATION F1: DB row-lock (SELECT ... FOR UPDATE) до любой записи —
+      // commit traveler mutation ПОСЛЕ успешного finalConfirm невозможен
+      // (гонка D4SR-F1 закрыта на DB transaction/concurrency boundary).
+      const locked = await this.lockOrderRowForMutation(tx, orderId);
+      if (locked.finalConfirmedAt) {
+        throw new ConflictError(`Order ${order.code} is already final-confirmed; traveler data is immutable`);
+      }
+
+      const existing = await tx.orderTraveler.findMany({ where: { orderId }, orderBy: { position: "asc" } });
       if (existing.length !== travelers.length) {
         throw new ValidationDomainError(`Expected ${existing.length} travelers, got ${travelers.length}`);
       }
 
+      // D4 REMEDIATION F6: pinned snapshot — canonical источник полноты данных.
+      // Legacy-Order без pinned (pre-D3) сохраняет исторический bulk-контракт
+      // (полнота по passportNumber); D3/D4-заказы считают полноту по REQUIRED-
+      // полям pinned — та же canonical логика, что у single PATCH travelers/:id.
+      const pinned = order.pinnedRequirements as TravelerFullRequirements | null;
+
       for (let i = 0; i < existing.length; i++) {
         const t = travelers[i];
+        const values: Partial<Record<TravelerField, string | Date | null>> = {
+          firstName: t.firstName ?? existing[i].firstName,
+          lastName: t.lastName ?? existing[i].lastName,
+          birthDate: t.birthDate ? new Date(t.birthDate) : existing[i].birthDate,
+          citizenship: t.citizenship ?? existing[i].citizenship,
+          gender: t.gender ?? existing[i].gender,
+          passportNumber: t.passportNumber ?? existing[i].passportNumber,
+          passportExpiry: t.passportExpiry ? new Date(t.passportExpiry) : existing[i].passportExpiry,
+        };
         await tx.orderTraveler.update({
           where: { id: existing[i].id },
           data: {
-            firstName: t.firstName ?? existing[i].firstName,
-            lastName: t.lastName ?? existing[i].lastName,
-            birthDate: t.birthDate ? new Date(t.birthDate) : existing[i].birthDate,
-            citizenship: t.citizenship ?? existing[i].citizenship,
-            gender: t.gender ?? existing[i].gender,
-            passportNumber: t.passportNumber ?? existing[i].passportNumber,
-            dataCompleteness: t.passportNumber || existing[i].passportNumber ? "COMPLETE" : "INCOMPLETE",
+            firstName: values.firstName as string,
+            lastName: values.lastName as string,
+            birthDate: values.birthDate as Date | null,
+            citizenship: values.citizenship as string | null,
+            gender: values.gender as string | null,
+            passportNumber: values.passportNumber as string | null,
+            passportExpiry: values.passportExpiry as Date | null,
+            dataCompleteness: this.computeTravelerCompleteness(pinned, values),
             version: { increment: 1 },
           },
         });
@@ -1079,7 +1167,7 @@ export class OrderService {
           comment: "Обновлены данные туристов заказа",
         },
       });
-      return tx.orderTraveler.findMany({ where: { orderId } });
+      return tx.orderTraveler.findMany({ where: { orderId }, orderBy: { position: "asc" } });
     });
 
     await this.eventBus.publishPending();
@@ -1397,16 +1485,19 @@ export class OrderService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // D4 REMEDIATION F1: DB row-lock (SELECT ... FOR UPDATE) — authoritative
+      // serialization с finalConfirm. D3 §19 повторная проверка внутри tx
+      // заменена на блокировку строки Order: commit traveler save ПОСЛЕ
+      // успешного final-confirm невозможен.
+      const locked = await this.lockOrderRowForMutation(tx, orderId);
+      if (locked.finalConfirmedAt) {
+        throw new ConflictError(`Order ${order.code} is already final-confirmed; traveler data is immutable`);
+      }
+
       const existing = await tx.orderTraveler.findFirst({
         where: { id: travelerId, orderId },
       });
       if (!existing) throw new NotFoundError(`Traveler ${travelerId} not found in Order ${order.code}`);
-
-      // D3 §19: повторная проверка внутри tx (гонка final-confirm vs save).
-      const freshOrder = await tx.order.findUnique({ where: { id: orderId }, select: { finalConfirmedAt: true } });
-      if (freshOrder?.finalConfirmedAt) {
-        throw new ConflictError(`Order ${order.code} is already final-confirmed; traveler data is immutable`);
-      }
 
       // Мерж (existing + new): dataCompleteness по REQUIRED-полям pinned.
       const merged = (field: TravelerField): string | Date | null => {
@@ -1416,12 +1507,17 @@ export class OrderService {
         if (field === "birthDate" || field === "passportExpiry") return new Date(v);
         return v;
       };
-      const hasAllRequired = (Object.keys(pinned) as TravelerField[])
-        .filter((f) => pinned[f] === "REQUIRED")
-        .every((f) => {
-          const v = merged(f);
-          return v !== null && v !== undefined && String(v).trim().length > 0;
-        });
+      // D4 REMEDIATION F6: canonical полнота — ОБЩАЯ логика с bulk update
+      // (computeTravelerCompleteness по REQUIRED-полям pinned snapshot).
+      const finalValues: Partial<Record<TravelerField, string | Date | null | undefined>> = {
+        firstName: merged("firstName"),
+        lastName: merged("lastName"),
+        birthDate: merged("birthDate"),
+        citizenship: merged("citizenship"),
+        gender: merged("gender"),
+        passportNumber: merged("passportNumber"),
+        passportExpiry: merged("passportExpiry"),
+      };
 
       const updated = await tx.orderTraveler.update({
         where: { id: travelerId },
@@ -1433,7 +1529,7 @@ export class OrderService {
           gender: merged("gender") as string | null,
           passportNumber: merged("passportNumber") as string | null,
           passportExpiry: merged("passportExpiry") as Date | null,
-          dataCompleteness: hasAllRequired ? "COMPLETE" : "INCOMPLETE",
+          dataCompleteness: this.computeTravelerCompleteness(pinned, finalValues),
           version: { increment: 1 },
         },
       });
@@ -1594,8 +1690,18 @@ export class OrderService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // D4 REMEDIATION F1: DB row-lock до CAS — сериализация с traveler
+      // mutation (single/bulk). Если traveler PATCH уже удерживает lock —
+      // finalConfirm ждёт и наблюдает его закоммиченное состояние (R2); если
+      // confirm коммитится первым — последующая traveler mutation под тем же
+      // lock видит finalConfirmedAt != NULL и отклоняется (R1).
+      const locked = await this.lockOrderRowForMutation(tx, orderId);
+      if (locked.finalConfirmedAt) {
+        throw new ConflictError(`Order ${order.code} is already final-confirmed`);
+      }
+
       const now = new Date();
-      // CAS: только если ещё не подтверждён (double-click / concurrent retry).
+      // CAS (defense in depth; row-lock уже исключает конкурентного писателя).
       const updatedRows = await tx.order.updateMany({
         where: { id: orderId, finalConfirmedAt: null },
         data: { finalConfirmedAt: now },
