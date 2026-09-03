@@ -72,9 +72,15 @@ export class BookingSubscribers implements OnModuleInit {
         if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: CONSUMER_ID, eventId: ev.id } } })) return;
 
         // Чтение состава заказа (READ-only, таблицы order.*).
+        // D3: детерминированный порядок — travelers по OrderTraveler.position
+        // (1..N), items по id: Passenger-население повторяет канонический
+        // порядок подтверждённого списка туристов (не DB-произвольный).
         const order = await tx.order.findUnique({
           where: { id: p.orderId },
-          include: { items: true, travelers: true },
+          include: {
+            items: { orderBy: { id: "asc" } },
+            travelers: { orderBy: [{ position: "asc" }, { id: "asc" }] },
+          },
         });
         if (!order || order.items.length === 0) {
           await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });

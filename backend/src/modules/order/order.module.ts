@@ -9,5 +9,6 @@ import { BookingModule } from "../booking/booking.module";
   imports: [BookingModule],
   controllers: [OrderController],
   providers: [OrderService, OrderSubscribers, OrderRequestedConsumer],
+  exports: [OrderService],
 })
 export class OrderModule {}

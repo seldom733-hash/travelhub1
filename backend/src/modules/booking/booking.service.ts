@@ -156,7 +156,6 @@ export class BookingService {
       : {};
     const where: Prisma.BookingWhereInput = {
       ...bookingStatusFilter,
-      ...(query.orderId ? { orderId: query.orderId } : {}),
       ...(query.search ? { id: { in: await this.resolveBookingSearchIds(query.search) } } : {}),
       // ROUND 5: upcoming=true → detector: status IN (CONFIRMED, NEW) AND serviceDate >= now
       ...(query.upcoming === "true" ? {
@@ -179,7 +178,13 @@ export class BookingService {
     if (channelOrderIds.length === 0) {
       return { items: [], total: 0, page, pageSize, hasMore: false };
     }
-    where.orderId = { in: channelOrderIds };
+    // Explicit orderId (if given) must be intersected with the channel scope —
+    // never overwritten by it (otherwise the Order detail panel lists random bookings).
+    if (query.orderId) {
+      where.AND = [{ orderId: query.orderId }, { orderId: { in: channelOrderIds } }];
+    } else {
+      where.orderId = { in: channelOrderIds };
+    }
     // R5-04: Date range filtering on createdAt (exclusive end — consistent with Analytics half-open [from, to))
     if (query.dateFrom || query.dateTo) {
       where.createdAt = {

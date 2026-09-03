@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useLocale, t } from "@/lib/i18n";
+import { useCan } from "@/lib/use-can";
 
 interface RequestDetail {
   id: string;
@@ -26,6 +27,7 @@ interface RequestDetail {
   status: string;
   requestedServiceDate: string | null;
   quantity: number;
+  travelerCount: number | null;
   displayedPrice: string | null;
   displayedCurrency: string | null;
   confirmedPrice: string | null;
@@ -53,6 +55,9 @@ interface RequestDetail {
     amount: string | null;
     currency: string | null;
     createdAt: string | null;
+    travelerCount: number | null;
+    travelerProgress: "AWAITING_TRAVELERS" | "DATA_FILLED" | "FINAL_CONFIRMED" | null;
+    finalConfirmedAt: string | null;
   };
   convertedBooking?: {
     id: string;
@@ -77,6 +82,7 @@ function statusColor(s: string) {
     case "CHECKING": return "bg-yellow-100 text-yellow-700";
     case "PRICE_CHANGED": return "bg-orange-100 text-orange-700";
     case "CONFIRMED": return "bg-green-100 text-green-700";
+    case "CUSTOMER_ACCEPTED": return "bg-teal-100 text-teal-700";
     case "CONVERTED": return "bg-purple-100 text-purple-700";
     case "REJECTED": return "bg-red-100 text-red-700";
     case "UNAVAILABLE": return "bg-gray-100 text-gray-600";
@@ -101,6 +107,28 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+function ProgressBadge({ progress, locale }: { progress: "AWAITING_TRAVELERS" | "DATA_FILLED" | "FINAL_CONFIRMED" | null; locale: "ru" | "az" | "en" }) {
+  if (!progress) return null;
+  const key = progress === "FINAL_CONFIRMED" ? "reqflow.progress.final" : progress === "DATA_FILLED" ? "reqflow.progress.filled" : "reqflow.progress.awaiting";
+  const cls = progress === "FINAL_CONFIRMED"
+    ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+    : progress === "DATA_FILLED"
+      ? "bg-sky-100 text-sky-700 border-sky-200"
+      : "bg-amber-100 text-amber-700 border-amber-200";
+  return <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${cls}`}>{t(key, locale)}</span>;
+}
+
+function btn(base: string, tone: string) {
+  return `rounded-lg px-3 py-1.5 text-xs font-medium ${base} ${tone}`;
+}
+
+const TONES = {
+  primary: "bg-blue-600 text-white hover:bg-blue-700",
+  success: "bg-emerald-600 text-white hover:bg-emerald-700",
+  danger: "bg-red-600 text-white hover:bg-red-700",
+  neutral: "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50",
+};
+
 export default function RequestDetailPage() {
   const locale = useLocale();
   const router = useRouter();
@@ -109,12 +137,14 @@ export default function RequestDetailPage() {
   const [request, setRequest] = useState<RequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [proposeOpen, setProposeOpen] = useState(false);
+  const [proposePrice, setProposePrice] = useState("");
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (id) loadRequest();
-  }, [id]);
+  const canEdit = useCan("order.edit_noncritical");
 
-  async function loadRequest() {
+  const loadRequest = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -125,6 +155,32 @@ export default function RequestDetailPage() {
     } finally {
       setLoading(false);
     }
+  }, [id]);
+
+  useEffect(() => { void loadRequest(); }, [loadRequest]);
+
+  async function runPost(path: string, body?: Record<string, unknown>) {
+    setBusy(path);
+    setActionMsg(null);
+    try {
+      await api.post(path, body ?? {});
+      await loadRequest();
+    } catch (err: any) {
+      setActionMsg(err.message || "Ошибка выполнения действия");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function propose() {
+    const price = Number(proposePrice);
+    if (!proposePrice || !Number.isFinite(price) || price <= 0) {
+      setActionMsg("Укажите корректную цену");
+      return;
+    }
+    await runPost(`/requests/${id}/propose-price`, { price });
+    setProposeOpen(false);
+    setProposePrice("");
   }
 
   if (loading) {
@@ -154,6 +210,10 @@ export default function RequestDetailPage() {
   }
 
   const r = request;
+  const showSupplier = canEdit && ["NEW", "CHECKING", "PRICE_CHANGED"].includes(r.status);
+  const showCustomer = canEdit && ["CONFIRMED", "PRICE_CHANGED"].includes(r.status);
+  const showConvert = canEdit && r.status === "CUSTOMER_ACCEPTED" && !r.convertedOrderId;
+  const progress = r.convertedOrder?.travelerProgress ?? null;
 
   return (
     <div className="p-6 space-y-6 max-w-5xl">
@@ -163,7 +223,7 @@ export default function RequestDetailPage() {
           onClick={() => router.push("/app/requests")}
           className="text-blue-600 hover:text-blue-800 text-sm"
         >
-          ← Назад к списку
+          ← {t("crm.back_to_list", locale) || "Назад к списку"}
         </button>
       </div>
 
@@ -176,42 +236,167 @@ export default function RequestDetailPage() {
 
       {/* Main Info Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 rounded-lg border border-gray-200 bg-white p-6">
-        <InfoRow label="Клиент" value={
+        <InfoRow label={t("requests.customer", locale)} value={
           <>
             <span className="font-medium">{r.customerName || "—"}</span>
             {r.customerCode && <span className="ml-2 text-xs text-gray-500">{r.customerCode}</span>}
           </>
         } />
-        <InfoRow label="Услуга" value={
+        <InfoRow label={t("requests.product", locale)} value={
           <>
             <span className="font-medium">{r.productName || "—"}</span>
             {r.productCode && <span className="ml-2 text-xs text-gray-500">{r.productCode}</span>}
           </>
         } />
-        <InfoRow label="Поставщик" value={
+        <InfoRow label={t("requests.supplier", locale)} value={
           <>
             <span className="font-medium">{r.partnerName || "—"}</span>
             {r.partnerCode && <span className="ml-2 text-xs text-gray-500">{r.partnerCode}</span>}
           </>
         } />
 
-        <InfoRow label="Цена витрины" value={
+        <InfoRow label={t("requests.displayed_price", locale)} value={
           r.displayedPrice ? `${r.displayedPrice} ${r.displayedCurrency ?? ""}` : "—"
         } />
-        <InfoRow label="Подтверждённая цена" value={
+        <InfoRow label={t("requests.confirmed_price", locale)} value={
           r.confirmedPrice ? `${r.confirmedPrice} ${r.confirmedCurrency ?? ""}` : "—"
         } />
         <InfoRow label="Количество" value={r.quantity} />
 
-        <InfoRow label="Дата услуги" value={
+        <InfoRow label={t("reqflow.party_size", locale)} value={r.travelerCount ?? "—"} />
+        <InfoRow label={t("requests.service_date", locale)} value={
           r.requestedServiceDate ? new Date(r.requestedServiceDate).toLocaleDateString() : "—"
         } />
         <InfoRow label="Дата подтверждения" value={
           r.supplierRespondedAt ? new Date(r.supplierRespondedAt).toLocaleDateString() : "—"
         } />
-        <InfoRow label="Создана" value={
-          r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"
-        } />
+      </div>
+
+      {/* D3: Actions (platform staff — order.edit_noncritical) */}
+      {(showSupplier || showCustomer || showConvert) && (
+        <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
+          <div className="text-sm font-semibold text-gray-900">Действия</div>
+          {actionMsg && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">{actionMsg}</div>
+          )}
+          {showSupplier && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-gray-500 uppercase">{t("reqflow.supplier_actions", locale)}</div>
+              <div className="flex flex-wrap gap-2">
+                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/confirm-price`)} className={btn("", TONES.success)}>{busy === `/requests/${id}/confirm-price` ? t("reqflow.busy", locale) : t("reqflow.confirm_price", locale)}</button>
+                {!proposeOpen ? (
+                  <button disabled={busy !== null} onClick={() => setProposeOpen(true)} className={btn("", TONES.primary)}>{t("reqflow.propose_price", locale)}</button>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <input
+                      value={proposePrice}
+                      onChange={(e) => setProposePrice(e.target.value)}
+                      placeholder="Цена"
+                      className="w-32 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400"
+                    />
+                    <button onClick={() => void propose()} className={btn("", TONES.primary)}>OK</button>
+                    <button onClick={() => { setProposeOpen(false); setProposePrice(""); }} className={btn("", TONES.neutral)}>✕</button>
+                  </span>
+                )}
+                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/reject`, { reason: "rejected" })} className={btn("", TONES.danger)}>{t("reqflow.reject", locale)}</button>
+                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/unavailable`, { reason: "unavailable" })} className={btn("", TONES.neutral)}>{t("reqflow.unavailable", locale)}</button>
+              </div>
+            </div>
+          )}
+          {showCustomer && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-gray-500 uppercase">{t("reqflow.customer_actions", locale)}</div>
+              <div className="flex flex-wrap gap-2">
+                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-accept`)} className={btn("", TONES.success)}>{t("reqflow.customer_accept", locale)}</button>
+                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-decline`)} className={btn("", TONES.danger)}>{t("reqflow.customer_decline", locale)}</button>
+              </div>
+            </div>
+          )}
+          {showConvert && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-gray-500 uppercase">{t("reqflow.converted_hint", locale)}</div>
+              <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/convert`)} className={btn("", TONES.primary)}>
+                {busy === `/requests/${id}/convert` ? t("reqflow.busy", locale) : t("reqflow.convert_action", locale)}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* D3: Linked Order + traveler progress (relation §13/§14) */}
+      <div className="rounded-lg border border-purple-200 bg-purple-50 p-6 space-y-3">
+        <h2 className="text-lg font-semibold text-gray-900">{t("reqflow.linked_order", locale)}</h2>
+        {r.convertedOrder ? (
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => router.push(`/app/orders/${r.convertedOrder!.id}`)}
+                className="font-mono text-sm font-semibold text-blue-700 hover:underline"
+              >
+                {r.convertedOrder.referenceNumber}
+              </button>
+              <ProgressBadge progress={r.convertedOrder.travelerProgress ?? null} locale={locale} />
+              {r.convertedOrder.travelerCount != null && (
+                <span className="text-xs text-gray-500">{r.convertedOrder.travelerCount} {t("reqflow.travelers", locale).toLowerCase()}</span>
+              )}
+            </div>
+            {r.convertedOrder.travelerProgress !== "FINAL_CONFIRMED" && (
+              <button
+                onClick={() => router.push(`/app/orders/${r.convertedOrder!.id}`)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${TONES.primary}`}
+              >
+                {t("reqflow.continue_order", locale)} →
+              </button>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-purple-200">
+              <InfoRow label={t("crm.col.created", locale)} value={
+                r.convertedOrder.createdAt ? new Date(r.convertedOrder.createdAt).toLocaleString() : "—"
+              } />
+              <InfoRow label="Статус заказа" value={r.convertedOrder.status} />
+              {r.convertedOrder.amount && (
+                <InfoRow label="Сумма" value={`${r.convertedOrder.amount} ${r.convertedOrder.currency ?? ""}`} />
+              )}
+            </div>
+            {r.convertedBooking && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-purple-200">
+                <InfoRow label="Бронирование" value={
+                  <button
+                    onClick={() => router.push(`/app/bookings`)}
+                    className="font-mono text-sm text-blue-600 hover:underline"
+                  >
+                    {r.convertedBooking.referenceNumber}
+                  </button>
+                } />
+                <InfoRow label="Статус бронирования" value={r.convertedBooking.status} />
+              </div>
+            )}
+            {r.convertedPayments && r.convertedPayments.length > 0 && (
+              <div className="pt-2 border-t border-purple-200">
+                <div className="text-xs font-medium text-gray-500 uppercase mb-2">Платежи</div>
+                {r.convertedPayments.map((p) => (
+                  <div key={p.id} className="flex items-center gap-4 py-1">
+                    <span className="font-mono text-xs text-blue-600">{p.referenceNumber}</span>
+                    <span className="text-sm text-gray-700">{p.amount} {p.currency}</span>
+                    <span className="text-xs text-gray-500">{p.status}</span>
+                    {p.paidAt && <span className="text-xs text-green-600">Оплачено: {new Date(p.paidAt).toLocaleDateString()}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {(r as any).convertedRefund && (
+              <div className="pt-2 border-t border-purple-200">
+                <div className="text-xs font-medium text-gray-500 uppercase mb-2">Возврат</div>
+                <div className="flex items-center gap-4 py-1">
+                  <span className="font-mono text-xs text-blue-600">{(r as any).convertedRefund.referenceNumber}</span>
+                  <span className="text-sm text-gray-700">{(r as any).convertedRefund.amount} {(r as any).convertedRefund.currency}</span>
+                  <span className="text-xs text-gray-500">{(r as any).convertedRefund.status}</span>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-sm text-gray-500">{t("reqflow.no_linked_order", locale)}</div>
+        )}
       </div>
 
       {/* Supplier SLA */}
@@ -241,7 +426,7 @@ export default function RequestDetailPage() {
           <InfoRow label="Дедлайн клиента" value={
             r.customerActionDeadline ? new Date(r.customerActionDeadline).toLocaleString() : "—"
           } />
-          <InfoRow label="Принял" value={
+          <InfoRow label={t("reqflow.accepted_at", locale)} value={
             r.customerAcceptedAt ? new Date(r.customerAcceptedAt).toLocaleString() : "—"
           } />
           <InfoRow label="Решение" value={r.customerDecision || "—"} />
@@ -278,66 +463,6 @@ export default function RequestDetailPage() {
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Converted Commerce Chain */}
-      {r.convertedOrder && (
-        <div className="rounded-lg border border-purple-200 bg-purple-50 p-6 space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900">Конвертировано в</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InfoRow label="Заказ" value={
-              <button
-                onClick={() => router.push(`/app/orders`)}
-                className="font-mono text-sm text-blue-600 hover:underline"
-              >
-                {r.convertedOrder.referenceNumber}
-              </button>
-            } />
-            <InfoRow label="Дата конвертации" value={
-              r.convertedAt ? new Date(r.convertedAt).toLocaleString() : (r.convertedOrder.createdAt ? new Date(r.convertedOrder.createdAt).toLocaleString() : "—")
-            } />
-            <InfoRow label="Статус заказа" value={r.convertedOrder.status} />
-            {r.convertedOrder.amount && (
-              <InfoRow label="Сумма" value={`${r.convertedOrder.amount} ${r.convertedOrder.currency ?? ""}`} />
-            )}
-          </div>
-          {r.convertedBooking && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-purple-200">
-              <InfoRow label="Бронирование" value={
-                <button
-                  onClick={() => router.push(`/app/bookings`)}
-                  className="font-mono text-sm text-blue-600 hover:underline"
-                >
-                  {r.convertedBooking.referenceNumber}
-                </button>
-              } />
-              <InfoRow label="Статус бронирования" value={r.convertedBooking.status} />
-            </div>
-          )}
-          {r.convertedPayments && r.convertedPayments.length > 0 && (
-            <div className="pt-2 border-t border-purple-200">
-              <div className="text-xs font-medium text-gray-500 uppercase mb-2">Платежи</div>
-              {r.convertedPayments.map((p) => (
-                <div key={p.id} className="flex items-center gap-4 py-1">
-                  <span className="font-mono text-xs text-blue-600">{p.referenceNumber}</span>
-                  <span className="text-sm text-gray-700">{p.amount} {p.currency}</span>
-                  <span className="text-xs text-gray-500">{p.status}</span>
-                  {p.paidAt && <span className="text-xs text-green-600">Оплачено: {new Date(p.paidAt).toLocaleDateString()}</span>}
-                </div>
-              ))}
-            </div>
-          )}
-          {(r as any).convertedRefund && (
-            <div className="pt-2 border-t border-purple-200">
-              <div className="text-xs font-medium text-gray-500 uppercase mb-2">Возврат</div>
-              <div className="flex items-center gap-4 py-1">
-                <span className="font-mono text-xs text-blue-600">{(r as any).convertedRefund.referenceNumber}</span>
-                <span className="text-sm text-gray-700">{(r as any).convertedRefund.amount} {(r as any).convertedRefund.currency}</span>
-                <span className="text-xs text-gray-500">{(r as any).convertedRefund.status}</span>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

@@ -1661,6 +1661,29 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "requests.sla_deadline": { ru: "SLA дедлайн", az: "SLA son tarix", en: "SLA deadline" },
   "requests.created": { ru: "Создана", az: "Yaradıldı", en: "Created" },
   "requests.no_data": { ru: "Заявок пока нет", az: "Hələ sorğu yoxdur", en: "No requests yet" },
+
+  // ── D3 Request Flow (Request Center continuation + linked Order relation) ──
+  "reqflow.travelers": { ru: "Туристы", az: "Sərnişinlər", en: "Travelers" },
+  "reqflow.party_size": { ru: "Состав (кол-во туристов)", az: "Heyət (sərnişin sayı)", en: "Party (traveler count)" },
+  "reqflow.supplier_actions": { ru: "Поставщик — решение по цене/условиям", az: "Təchizatçı — qiymət/şərtlər qərarı", en: "Supplier — price/terms decision" },
+  "reqflow.confirm_price": { ru: "Подтвердить цену", az: "Qiyməti təsdiqlə", en: "Confirm price" },
+  "reqflow.propose_price": { ru: "Предложить цену", az: "Qiymət təklif et", en: "Propose price" },
+  "reqflow.reject": { ru: "Отклонить", az: "Rədd et", en: "Reject" },
+  "reqflow.unavailable": { ru: "Недоступно", az: "Mövcud deyil", en: "Unavailable" },
+  "reqflow.customer_actions": { ru: "Клиент — решение", az: "Müştəri — qərar", en: "Customer — decision" },
+  "reqflow.customer_accept": { ru: "Клиент принял условия", az: "Müştəri şərtləri qəbul etdi", en: "Customer accepted terms" },
+  "reqflow.customer_decline": { ru: "Клиент отказался", az: "Müştəri imtina etdi", en: "Customer declined" },
+  "reqflow.convert_action": { ru: "Создать заказ", az: "Sifariş yaradın", en: "Create order" },
+  "reqflow.converted_hint": { ru: "Заявка принята — создайте канонический заказ для сбора данных туристов", az: "Sorğu qəbul edildi — sərnişin məlumatlarının toplanması üçün sifariş yaradın", en: "Request accepted — create the canonical order to collect traveler data" },
+  "reqflow.linked_order": { ru: "Связанный заказ", az: "Əlaqəli sifariş", en: "Linked order" },
+  "reqflow.continue_order": { ru: "Продолжить оформление", az: "Rəsmiləşdirməyə davam et", en: "Continue to order" },
+  "reqflow.progress.awaiting": { ru: "Ожидаются данные туристов", az: "Sərnişin məlumatları gözlənilir", en: "Awaiting traveler data" },
+  "reqflow.progress.filled": { ru: "Данные заполнены", az: "Məlumatlar doldurulub", en: "Traveler data filled" },
+  "reqflow.progress.final": { ru: "Финально подтверждено", az: "Son təsdiqlənib", en: "Final confirmation done" },
+  "reqflow.accepted_at": { ru: "Принято клиентом", az: "Müştəri tərəfindən qəbul edildi", en: "Accepted by customer" },
+  "reqflow.pinned_reqs": { ru: "Закреплённые требования", az: "Sabitlənmiş tələblər", en: "Pinned requirements" },
+  "reqflow.no_linked_order": { ru: "Связанного заказа нет", az: "Əlaqəli sifariş yoxdur", en: "No linked order yet" },
+  "reqflow.busy": { ru: "Выполняется…", az: "Yerinə yetirilir…", en: "Working…" },
 };
 
 /** Локализованная строка по ключу (fallback — сам ключ, затем default locale). */

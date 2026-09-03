@@ -410,10 +410,11 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     expect(order.travelerCount).toBe(2);
 
     const op = await createStaff("d3_mtop", RoleCode.OPERATOR);
-    const travelers = await prisma.orderTraveler.findMany({ where: { orderId: order.id }, orderBy: { id: "asc" } });
+    const travelers = await prisma.orderTraveler.findMany({ where: { orderId: order.id }, orderBy: [{ position: "asc" }, { id: "asc" }] });
     expect(travelers).toHaveLength(2);
-    const t1 = travelers[0];
-    const t2 = travelers[1];
+    // Идентификация по имени (OrderTraveler.id — uuid, порядок по id не значим).
+    const t1 = travelers.find((t) => t.firstName === "Иван")!;
+    const t2 = travelers.find((t) => t.firstName === "Пётр")!;
 
     // Traveler1: все REQUIRED заполнены → COMPLETE.
     await patchTraveler(op.accessToken, order.id, t1.id, {
@@ -667,5 +668,64 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     await finalConfirm(op.accessToken, order.id).expect(409);
     expect(await prisma.order.count({ where: { id: order.id } })).toBe(1);
     expect(await prisma.orderHistory.count({ where: { orderId: order.id, action: "final_confirm" } })).toBe(1);
+  });
+
+  // ── Booking list API: explicit orderId должен ИНТЕРСЕКТИТЬСЯ с channel scope ──
+
+  it("11. /bookings?orderId= возвращает ТОЛЬКО брони этого заказа (не перезаписывается channel scope)", async () => {
+    const seller = await createApprovedSeller("bflt");
+    const sm = await createStaff("d3_bflt", RoleCode.SALES_MANAGER);
+    const op = await createStaff("d3_bfltop", RoleCode.OPERATOR);
+
+    // Два заказа → по одной брони на каждый.
+    const mkOrderWithBooking = async (tag: string) => {
+      const fx = await createProduct(seller, `bflt_${tag}`); // TOUR
+      const ctx = await makeReadySale(sm.accessToken, fx, {
+        travelers: [{ firstName: "Иван", lastName: tag.toUpperCase() }],
+      });
+      await complete(sm.accessToken, ctx.sale.code, 1).expect(201);
+      const order = await orderFor(ctx.sale.id);
+      const traveler = await prisma.orderTraveler.findFirstOrThrow({ where: { orderId: order.id } });
+      await patchTraveler(op.accessToken, order.id, traveler.id, { birthDate: PAST() }).expect(200);
+      await validateCompletion(op.accessToken, order.id).expect(201);
+      await finalConfirm(op.accessToken, order.id).expect(201);
+      await orderAction(op.accessToken, order.id, "process").expect(200);
+      await orderAction(op.accessToken, order.id, "confirm").expect(200);
+      await orderAction(op.accessToken, order.id, "send").expect(200);
+      return order;
+    };
+    const orderA = await mkOrderWithBooking("aa");
+    const orderB = await mkOrderWithBooking("bb");
+    expect(await prisma.booking.count({ where: { orderId: orderA.id } })).toBe(1);
+    expect(await prisma.booking.count({ where: { orderId: orderB.id } })).toBe(1);
+    // Channel-провенанс fixture-цепи (sales-manager quote → DIRECT по умолчанию).
+    const orderARow = await prisma.order.findUniqueOrThrow({ where: { id: orderA.id } });
+    const orderBRow = await prisma.order.findUniqueOrThrow({ where: { id: orderB.id } });
+    expect(orderARow.acquisitionSource).toBe(orderBRow.acquisitionSource);
+    const source = (orderARow.acquisitionSource ?? "DIRECT") as string;
+
+    // Весь channel (обе брони) — baseline.
+    const channelAll = (await agent(op.accessToken).get(`/api/v1/bookings?acquisitionSource=${source}`).expect(200)).body as {
+      items: Array<{ id: string; orderId: string }>;
+      total: number;
+    };
+    expect(channelAll.items.some((b) => b.orderId === orderA.id)).toBe(true);
+    expect(channelAll.items.some((b) => b.orderId === orderB.id)).toBe(true);
+
+    // orderId-фильтр возвращает строго брони указанного заказа (не все channel-брони).
+    const resA = (await agent(op.accessToken).get(`/api/v1/bookings?orderId=${orderA.id}&acquisitionSource=${source}`).expect(200)).body as {
+      items: Array<{ id: string; orderId: string }>;
+      total: number;
+    };
+    expect(resA.total).toBe(1);
+    expect(resA.items).toHaveLength(1);
+    expect(resA.items[0].orderId).toBe(orderA.id);
+
+    const resB = (await agent(op.accessToken).get(`/api/v1/bookings?orderId=${orderB.id}&acquisitionSource=${source}`).expect(200)).body as {
+      items: Array<{ id: string; orderId: string }>;
+      total: number;
+    };
+    expect(resB.total).toBe(1);
+    expect(resB.items[0].orderId).toBe(orderB.id);
   });
 });

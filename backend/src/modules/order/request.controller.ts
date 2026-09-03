@@ -3,9 +3,18 @@ import { Response } from "express";
 import { RequestService } from "./request.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
-import { CurrentUser } from "../../security/auth/decorators";
+import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import { ExportService } from "../shared/export/export.service";
 
+/**
+ * Request Center (order.Request) — платформенный центр.
+ *
+ * D3 Request Flow (F6 closure): RBAC-контракт — чтение = order.read;
+ * lifecycle/действия (create, supplier response, customer decision,
+ * conversion) = order.edit_noncritical (тот же контракт, что Order Center
+ * commands). PARTNER/BUYER (нет order.*) → 403 — foreign-tenant доступ
+ * невозможен (§18); acquisitionSource — provenance, не авторизация.
+ */
 @Controller("requests")
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RequestController {
@@ -15,6 +24,7 @@ export class RequestController {
   ) {}
 
   @Get()
+  @RequirePermissions("order.read")
   list(
     @Query("status") status?: string,
     @Query("customerId") customerId?: string,
@@ -38,11 +48,13 @@ export class RequestController {
   }
 
   @Get("kpi")
+  @RequirePermissions("order.read")
   kpi() {
     return this.requestService.getRequestKpi();
   }
 
   @Get("export")
+  @RequirePermissions("order.read")
   async export(
     @Res() res: Response,
     @Query("format") format: string,
@@ -130,16 +142,19 @@ export class RequestController {
   }
 
   @Get(":id")
+  @RequirePermissions("order.read")
   detail(@Param("id") id: string) {
     return this.requestService.getRequest(id);
   }
 
   @Get(":id/history")
+  @RequirePermissions("order.read")
   history(@Param("id") id: string) {
     return this.requestService.getRequestHistory(id);
   }
 
   @Post()
+  @RequirePermissions("order.edit_noncritical")
   create(
     @CurrentUser() user: any,
     @Body() body: {
@@ -148,6 +163,8 @@ export class RequestController {
       partnerId?: string;
       requestedServiceDate?: string;
       quantity?: number;
+      /** D3: explicit party composition (travelers) — canonical count source. */
+      travelerCount?: number;
       displayedPrice?: number;
       displayedCurrency?: string;
     },
@@ -156,6 +173,7 @@ export class RequestController {
   }
 
   @Post(":id/confirm-price")
+  @RequirePermissions("order.edit_noncritical")
   confirmPrice(
     @CurrentUser() user: any,
     @Param("id") id: string,
@@ -165,6 +183,7 @@ export class RequestController {
   }
 
   @Post(":id/propose-price")
+  @RequirePermissions("order.edit_noncritical")
   proposePrice(
     @CurrentUser() user: any,
     @Param("id") id: string,
@@ -174,6 +193,7 @@ export class RequestController {
   }
 
   @Post(":id/reject")
+  @RequirePermissions("order.edit_noncritical")
   reject(
     @CurrentUser() user: any,
     @Param("id") id: string,
@@ -183,6 +203,7 @@ export class RequestController {
   }
 
   @Post(":id/unavailable")
+  @RequirePermissions("order.edit_noncritical")
   unavailable(
     @CurrentUser() user: any,
     @Param("id") id: string,
@@ -192,6 +213,7 @@ export class RequestController {
   }
 
   @Post(":id/customer-accept")
+  @RequirePermissions("order.edit_noncritical")
   customerAccept(
     @CurrentUser() user: any,
     @Param("id") id: string,
@@ -200,10 +222,28 @@ export class RequestController {
   }
 
   @Post(":id/customer-decline")
+  @RequirePermissions("order.edit_noncritical")
   customerDecline(
     @CurrentUser() user: any,
     @Param("id") id: string,
   ) {
     return this.requestService.customerDecline(id, { id: user.id, username: user.username });
+  }
+
+  /**
+   * D3 Request Flow (F6): единственный application-вызов convertToOrder —
+   * создаёт canonical Order из принятой заявки (idempotent; §10/§11/§12/§13).
+   */
+  @Post(":id/convert")
+  @RequirePermissions("order.edit_noncritical")
+  async convert(
+    @CurrentUser() user: any,
+    @Param("id") id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.requestService.convertRequestToOrder(id, { id: user.id, username: user.username });
+    // 201 = Order создан этой командой; 200 = idempotent replay (Order уже существовал).
+    res.status((result as { idempotent?: boolean } | null)?.idempotent ? 200 : 201);
+    return result;
   }
 }

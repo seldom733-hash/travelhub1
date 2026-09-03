@@ -2192,6 +2192,22 @@ model Request {
   customerAcceptedAt     DateTime?
   customerDecision       String?   // ACCEPTED / DECLINED
 
+  // ── D3 — Request → Order (Request Flow Integration, F6 closure) ──
+  /// D3: явный размер партии (количество туристов/гостей) на момент создания
+  /// заявки. Canonical source для Order.travelerCount при конвертации. NULL =
+  /// legacy заявка (до D3): при customerAccept замораживается из quantity
+  /// (единственное прежнее count-представление; DB default 1 = 1 гость).
+  travelerCount Int?
+  /// D3: frozen effective traveler requirements, ЗАМОРОЖЕННЫЕ на customerAccept
+  /// (acceptance boundary; та же транзакция). Consumer/конвертация НЕ читает
+  /// mutable Product позже — acceptance→pin race невозможен (§7). NULL = legacy.
+  pinnedRequirements Json?
+  /// D3: frozen product identity snapshot (productId/productCode/productTitle/
+  /// productType), зафиксированный при создании заявки (продукт как подан).
+  /// Используется конвертацией для OrderItem без повторного чтения mutable
+  /// Catalog. NULL = legacy заявка без product-контекста.
+  productSnapshot Json?
+
   // ── Conversion ──
   convertedOrderId  String?       // ref Order.id after conversion
   convertedAt       DateTime?

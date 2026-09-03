@@ -487,6 +487,227 @@ export class OrderService {
   }
 
   /**
+   * D3 Request Flow Integration (F6 closure) — canonical Order root creation
+   * from an ACCEPTED Request (Request → Order conversion, application adapter).
+   *
+   * Reuses canonical Order primitives (code/number/referenceNumber/sequence,
+   * OrderItem, OrderTraveler, Fulfillment, history, OrderCreated emit) instead
+   * of building a second incompatible commerce engine. НЕ создаёт fake
+   * CheckoutIntent/Sale/Quote и НЕ проходит через OrderRequested consumer
+   * (payload контракт OrderRequested жёстко требует sale/checkout/quote —
+   * fabrication запрещена §19; конверсия — синхронная команда в одной tx).
+   *
+   * Frozen facts (все из Request, mutable Catalog НЕ читается):
+   *   - termsAcceptedAt = Request.customerAcceptedAt (реальный acceptance instant §6);
+   *   - pinnedRequirements = snapshot, замороженный при customerAccept (§7);
+   *   - travelerCount = frozen party size (заявка) — OrderTraveler placeholders
+   *     position 1..N (имена собираются в D3 collection после создания Order);
+   *   - product identity = Request.productSnapshot (продукт как подан);
+   *   - money = accepted commercial price (confirmed ?? displayed).
+   *
+   * Order.referenceNumber = MKT-ORD-{Request.commerceSequence} — та же shared
+   * commerce root, что REQ (MKT-REQ-{SEQ} → MKT-ORD-{SEQ} → MKT-BKG-{SEQ}).
+   *
+   * Caller (RequestService.convertRequestToOrder) выполняет CAS-claim
+   * CUSTOMER_ACCEPTED → CONVERTED в той же транзакции (idempotency §11).
+   */
+  async createOrderFromRequest(
+    tx: Prisma.TransactionClient,
+    input: {
+      request: {
+        id: string;
+        commerceSequence: string;
+        customerId: string | null;
+        productId: string | null;
+        productSnapshot: {
+          productId: string;
+          productCode: string;
+          productTitle: string;
+          productType: string;
+        } | null;
+        requestedServiceDate: Date | null;
+        quantity: number;
+        confirmedPrice: string | null;
+        confirmedCurrency: string | null;
+        displayedPrice: string | null;
+        displayedCurrency: string | null;
+        customerAcceptedAt: Date | null;
+        pinnedRequirements: Record<string, string> | null;
+        travelerCount: number | null;
+      };
+      actor: { id: string; username: string } | null;
+      orderRequestedEventId?: string | null;
+      correlationId?: string | null;
+      causationId?: string | null;
+    },
+  ): Promise<{
+    order: {
+      id: string;
+      code: string;
+      number: string;
+      referenceNumber: string;
+      commerceSequence: string | null;
+      customerId: string | null;
+      createdAt: Date;
+    };
+    eventId: string;
+  }> {
+    const r = input.request;
+    // Валидация доменных инвариантов ДО создания (неполный Request не может
+    // стать Order): принятый коммерческий факт (customerAcceptedAt), pinned
+    // snapshot, party size, продукт и деньги обязательны.
+    if (!r.customerAcceptedAt) {
+      throw new ValidationDomainError(`Request ${r.id} has no customerAcceptedAt; conversion requires customer acceptance`);
+    }
+    if (!r.pinnedRequirements) {
+      throw new ValidationDomainError(`Request ${r.id} has no pinned traveler requirements; conversion requires D3 acceptance snapshot`);
+    }
+    if (!r.travelerCount || r.travelerCount < 1) {
+      throw new ValidationDomainError(`Request ${r.id} has no frozen travelerCount; conversion requires explicit party composition`);
+    }
+    if (!r.productSnapshot) {
+      throw new ValidationDomainError(`Request ${r.id} has no product snapshot; conversion requires a product`);
+    }
+    const money = r.confirmedPrice ?? r.displayedPrice;
+    const currency = r.confirmedCurrency ?? r.displayedCurrency;
+    if (!money || !currency) {
+      throw new ValidationDomainError(`Request ${r.id} has no accepted price/currency; conversion requires commercial terms`);
+    }
+    assertOrderMoney(money, "confirmed/displayed price");
+
+    const code = await this.ids.nextCode(tx, "ORD");
+    const number = await this.ids.nextOrderNumber(tx);
+
+    // Request → Order: переиспользуем shared commerce root заявки (НЕ новая
+    // последовательность): MKT-REQ-{SEQ} → MKT-ORD-{SEQ} (один chain root §26).
+    const commerceSequence = r.commerceSequence;
+    const referenceNumber = this.refNum.commerceOrderRef(commerceSequence);
+    const serviceDate = r.requestedServiceDate
+      ? new Date(`${r.requestedServiceDate.toISOString().slice(0, 10)}T00:00:00.000Z`)
+      : null;
+    const currencyCode = currency;
+    const amount = new Prisma.Decimal(money);
+    const submittedAt = new Date();
+
+    const order = await tx.order.create({
+      data: {
+        code,
+        number,
+        referenceNumber,
+        commerceSequence,
+        customerId: r.customerId,
+        status: "NEW",
+        paymentStatus: "UNPAID",
+        currency: currencyCode,
+        amount,
+        paidAmount: new Prisma.Decimal(0),
+        serviceDate,
+        version: 1,
+        submittedAt,
+        // D3 §6: Order.termsAcceptedAt = реальный Request acceptance instant
+        // (customerAcceptedAt), НЕ Order.createdAt / processing time.
+        termsAcceptedAt: r.customerAcceptedAt,
+        // D3 §7: pinned snapshot, замороженный при customerAccept (immutable).
+        pinnedRequirements: r.pinnedRequirements as Prisma.InputJsonValue,
+        // D3 §8: frozen traveler count (party size) → OrderTraveler placeholders.
+        travelerCount: r.travelerCount,
+        acquisitionSource: "MARKETPLACE",
+        subtotal: amount,
+        discountType: null,
+        // Upstream refs: Request-derived Order НЕ имеет Sale/Checkout/Quote.
+        saleId: null,
+        saleCode: null,
+        quoteId: null,
+        checkoutId: null,
+        reservationId: null,
+        reservationIds: Prisma.JsonNull,
+        orderRequestedEventId: input.orderRequestedEventId ?? null,
+        sellerPartnerId: null,
+        commissionSnapshot: Prisma.JsonNull,
+      },
+      select: {
+        id: true, code: true, number: true, referenceNumber: true,
+        commerceSequence: true, customerId: true, createdAt: true,
+      },
+    });
+
+    // OrderItem — одна продуктовая линия whole-request frozen money snapshot
+    // (displayed/confirmed цена заявки = цена всей заявки, без деривации unit
+    // price из party size — деньги не фабрикуются).
+    await tx.orderItem.create({
+      data: {
+        orderId: order.id,
+        productId: r.productSnapshot.productId,
+        productCode: r.productSnapshot.productCode,
+        title: r.productSnapshot.productTitle,
+        type: r.productSnapshot.productType,
+        quantity: 1,
+        price: amount,
+        currency: currencyCode,
+        amount,
+        serviceDate,
+      },
+    });
+
+    // D3 OrderTraveler placeholders: frozen count строк (position 1..N),
+    // имена пустые — D3 collection (Order Traveler UI/API) заполняет их после
+    // создания Order (Request party names не собираются pre-Order; count frozen).
+    for (let pos = 1; pos <= r.travelerCount; pos++) {
+      await tx.orderTraveler.create({
+        data: {
+          orderId: order.id,
+          customerId: r.customerId,
+          position: pos,
+          firstName: "",
+          lastName: "",
+          birthDate: null,
+          dataCompleteness: "INCOMPLETE",
+          version: 1,
+        },
+      });
+    }
+
+    await tx.fulfillment.create({ data: { orderId: order.id, status: "NOT_STARTED", notes: null } });
+
+    await tx.orderHistory.create({
+      data: {
+        orderId: order.id,
+        action: "created",
+        to: "NEW",
+        actorId: input.actor?.id ?? null,
+        actorName: input.actor?.username ?? "Система",
+        comment: "Заказ создан из принятой заявки (Request conversion, D3 Request Flow)",
+        fields: {
+          requestId: r.id,
+          termsAcceptedAt: r.customerAcceptedAt?.toISOString() ?? null,
+          travelerCount: r.travelerCount,
+          referenceNumber,
+        },
+      },
+    });
+
+    // OrderCreated — canonical факт, атомарен с Order (emit PENDING в той же
+    // транзакции); доставка подписчикам — после коммита (caller publishEvent).
+    const eventId = await this.eventBus.emit(tx, {
+      aggregateType: "Order",
+      aggregateId: order.id,
+      eventType: DomainEvents.OrderCreated,
+      payload: {
+        orderId: order.id,
+        code: order.code,
+        number: order.number,
+        customerId: order.customerId,
+        amount: String(amount),
+        currency: currencyCode,
+      } as OrderEventPayload,
+      correlationId: input.correlationId ?? null,
+      causationId: input.causationId ?? null,
+    });
+
+    return { order, eventId };
+  }
+
+  /**
    * Step 3.12 — generate tenant-scoped reference number for Order.
    * Marketplace → MKT-ORD-{SEQ}; Storefront → {SF_CODE}-ORD-{SEQ}
    */
