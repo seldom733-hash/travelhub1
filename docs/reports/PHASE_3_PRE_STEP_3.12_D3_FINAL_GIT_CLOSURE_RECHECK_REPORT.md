@@ -122,7 +122,7 @@ CASE A/B не задеты cleanup-ом (dev DB не трогались; скр�
 - Заменён фактическими SHA: `0b56a4f` (docs sync) и `6cf4426` (git closure recheck).
 - Никаких `…`, `TBD`, `pending`, `will be committed` в финальном state отчётов не осталось.
 - Self-referential SHA loop не создавался: §31 документирует implementation SHA (`33cec2f`),
-  evidence/docs SHA (`0b56a4f`) и final repository HEAD (`6cf4426` → после push HEAD == origin/master).
+  evidence/docs SHA (`0b56a4f`) и final repository HEAD (`bdfb481` → после push HEAD == origin/master).
 
 ## 10. ROADMAP STATE
 
@@ -166,21 +166,21 @@ Drawer допустим только как отдельный Quick Preview; о
 - Root `tmp_*` / `login_tmp.json` / `tmp_admin*` / `tmp_token*` — **удалены** (51 файл, disposable).
 - `docs/prompts/TravelHub_CANONICAL_IMPLEMENTATION_ROADMAP_v3.md` — D3/D3-SR → ✅ ACCEPTED, TRUE NEXT = D4.
 - `docs/reports/PHASE_3_PRE_STEP_3.12_D3_REQUEST_FLOW_INTEGRATION_FINAL_EVIDENCE_CLOSURE_REPORT.md` — §31 SHA sync (placeholder → фактические SHA).
-- `docs/reports/PHASE_3_PRE_STEP_3.12_D3_FINAL_GIT_CLOSURE_RECHECK_REPORT.md` — этот отчёт.
+- `docs/reports/PHASE_3_PRE_STEP_3.12_D3_FINAL_GIT_CLOSURE_RECHECK_REPORT.md` — этот отчёт (commit `bdfb481`).
 
 ## 13. FINAL GIT STATE
 
 ```text
 git status --short          → (ПУСТО)
 git status --porcelain=v1   → (ПУСТО, 0 строк)
-git rev-parse HEAD          → <6cf4426>
-git rev-parse origin/master → <6cf4426> (после push)
+git rev-parse HEAD          → bdfb481 (после docs-коммита recheck-отчёта)
+git rev-parse origin/master → bdfb481 (после push)
 git log -5:
+  bdfb481 docs: D3 final git closure recheck report + roadmap D3 ACCEPTED
   6cf4426 chore(docs): D3 git closure — commit phase prompts/reports + storefront e2e specs, drop tmp artifacts
   0b56a4f docs(order): D3 request flow report — §31 git state (pushed 33cec2f)
   33cec2f feat(order): D3 — Request flow integration (F6 closure)
   c72cd50 docs(order): D3 strict review report — §27 sync to pushed tip 4d0e7cd
-  4d0e7cd docs(order): D3 strict review report — final git state (pushed f1ad2bf)
 ```
 
 Hard acceptance: `git status --short` = EXACTLY EMPTY; `--porcelain=v1` = EXACTLY EMPTY; HEAD == origin/master. ✅
