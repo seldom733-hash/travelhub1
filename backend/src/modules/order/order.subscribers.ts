@@ -108,6 +108,7 @@ export class OrderSubscribers implements OnModuleInit {
             data: {
               orderId: order.id,
               action: "booking_rejected",
+              source: "SYSTEM",
               from: order.status,
               to: "PROBLEM",
               actorId: null,
@@ -179,6 +180,7 @@ export class OrderSubscribers implements OnModuleInit {
         data: {
           orderId,
           action: "booking_confirmed",
+          source: "SYSTEM",
           from: order.status,
           to: target,
           actorId: null,
@@ -267,6 +269,7 @@ export class OrderSubscribers implements OnModuleInit {
             data: {
               orderId: order.id,
               action: "payment_captured",
+              source: "SYSTEM",
               from: "UNPAID",
               to: "PAID",
               actorId: null,
@@ -347,6 +350,7 @@ export class OrderSubscribers implements OnModuleInit {
             data: {
               orderId: order.id,
               action: "refund_processed",
+              source: "SYSTEM",
               from: fromStatus,
               to: targetStatus,
               actorId: null,

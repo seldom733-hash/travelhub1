@@ -11,6 +11,7 @@ import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 import { Response } from 'express';
 import { assertNoForbiddenKeys } from "../../shared/field-validation";
 import { ORDER_ACTION_FORBIDDEN_KEYS, ORDER_TRAVELERS_FORBIDDEN_KEYS } from "./order.validation";
+import { validateClientSource } from "../../shared/audit";
 
 class TravelerDto {
   @IsString()
@@ -265,7 +266,9 @@ export class OrderController {
     // assertNoForbiddenKeys, как в Sales/Reverse/Catalog), а не silent-strip
     // через whitelist. Команда принимает ТОЛЬКО `action`.
     assertNoForbiddenKeys(req.body, ORDER_ACTION_FORBIDDEN_KEYS);
-    return this.orders.orderAction(id, dto.action, actor.username, dto.reason ?? null);
+    // D5-R1: extract trusted audit source from client header (spoofing-protected).
+    const auditSource = validateClientSource(req.headers["x-audit-source"] as string | undefined);
+    return this.orders.orderAction(id, dto.action, actor.username, dto.reason ?? null, auditSource ?? undefined);
   }
 
   // ── D3: Traveler Collection + Order/Booking Population ──
@@ -290,7 +293,8 @@ export class OrderController {
     // включая pinnedRequirements/travelerCount на верхнем уровне) → 422
     // (тот же контракт, что updateTravelers — anti-mass-assignment).
     assertNoForbiddenKeys(req.body, ORDER_TRAVELERS_FORBIDDEN_KEYS);
-    return this.orders.updateTravelerD3(id, travelerId, dto, actor.username);
+    const auditSource = validateClientSource(req.headers["x-audit-source"] as string | undefined);
+    return this.orders.updateTravelerD3(id, travelerId, dto, actor.username, auditSource ?? undefined);
   }
 
   @Post("orders/:id/validate-completion")
@@ -304,8 +308,10 @@ export class OrderController {
   finalConfirm(
     @Param("id") id: string,
     @CurrentUser() actor: AuthedRequest["user"],
+    @Req() req: Request,
   ) {
-    return this.orders.finalConfirm(id, actor.username);
+    const auditSource = validateClientSource(req.headers["x-audit-source"] as string | undefined);
+    return this.orders.finalConfirm(id, actor.username, auditSource ?? undefined);
   }
 
   @Patch("orders/:id/travelers")
@@ -323,6 +329,7 @@ export class OrderController {
     if (raw) {
       for (const t of raw) assertNoForbiddenKeys(t, ORDER_TRAVELERS_FORBIDDEN_KEYS);
     }
-    return this.orders.updateTravelers(id, dto.travelers, actor.username);
+    const auditSource = validateClientSource(req.headers["x-audit-source"] as string | undefined);
+    return this.orders.updateTravelers(id, dto.travelers, actor.username, auditSource ?? undefined);
   }
 }

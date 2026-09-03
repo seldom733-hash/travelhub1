@@ -309,4 +309,189 @@ describe("Phase 3 Pre-Step 3.12 D5 — Order Full-Page Actions/Editing/Audit (e2
     const db = await prisma.order.findUnique({ where: { id: sfOrder.id }, select: { id: true } });
     expect(db).not.toBeNull(); // Storefront-строка существует в DB
   });
+
+  // ── D5-R1: Structured Audit Source tests ──
+
+  it("9. D5-R1 source persistence: lifecycle action from full-page → source=ORDER_FULL_PAGE", async () => {
+    const order = await seedMarketplaceOrder(seller);
+    await agent(op.accessToken)
+      .patch(`/api/v1/orders/${order.id}`)
+      .set("X-Audit-Source", "ORDER_FULL_PAGE")
+      .send({ action: "process" })
+      .expect(200);
+    const latest = await prisma.orderHistory.findFirst({
+      where: { orderId: order.id, action: "process" },
+      orderBy: { createdAt: "desc" },
+      select: { source: true },
+    });
+    expect(latest).not.toBeNull();
+    expect(latest!.source).toBe("ORDER_FULL_PAGE");
+  });
+
+  it("10. D5-R1 source persistence: lifecycle action without header → source=API (default)", async () => {
+    const order = await seedMarketplaceOrder(seller);
+    await agent(op.accessToken)
+      .patch(`/api/v1/orders/${order.id}`)
+      .send({ action: "process" })
+      .expect(200);
+    const latest = await prisma.orderHistory.findFirst({
+      where: { orderId: order.id, action: "process" },
+      orderBy: { createdAt: "desc" },
+      select: { source: true },
+    });
+    expect(latest).not.toBeNull();
+    expect(latest!.source).toBe("API");
+  });
+
+  it("11. D5-R1 source spoofing: client sending source=SYSTEM → rejected, source defaults to API", async () => {
+    const order = await seedMarketplaceOrder(seller);
+    await agent(op.accessToken)
+      .patch(`/api/v1/orders/${order.id}`)
+      .set("X-Audit-Source", "SYSTEM")
+      .send({ action: "process" })
+      .expect(200);
+    const latest = await prisma.orderHistory.findFirst({
+      where: { orderId: order.id, action: "process" },
+      orderBy: { createdAt: "desc" },
+      select: { source: true },
+    });
+    expect(latest).not.toBeNull();
+    // SYSTEM is server-only; client spoofing rejected → defaults to API
+    expect(latest!.source).toBe("API");
+  });
+
+  it("12. D5-R1 source spoofing: client sending source=INTEGRATION → rejected", async () => {
+    const order = await seedMarketplaceOrder(seller);
+    await agent(op.accessToken)
+      .patch(`/api/v1/orders/${order.id}`)
+      .set("X-Audit-Source", "INTEGRATION")
+      .send({ action: "process" })
+      .expect(200);
+    const latest = await prisma.orderHistory.findFirst({
+      where: { orderId: order.id, action: "process" },
+      orderBy: { createdAt: "desc" },
+      select: { source: true },
+    });
+    expect(latest!.source).toBe("API");
+  });
+
+  it("13. D5-R1 source spoofing: malformed source → rejected", async () => {
+    const order = await seedMarketplaceOrder(seller);
+    await agent(op.accessToken)
+      .patch(`/api/v1/orders/${order.id}`)
+      .set("X-Audit-Source", "TOTALLY_FAKE_SOURCE")
+      .send({ action: "process" })
+      .expect(200);
+    const latest = await prisma.orderHistory.findFirst({
+      where: { orderId: order.id, action: "process" },
+      orderBy: { createdAt: "desc" },
+      select: { source: true },
+    });
+    expect(latest!.source).toBe("API");
+  });
+
+  it("14. D5-R1 source persistence: traveler edit from quick preview → source=ORDER_QUICK_PREVIEW", async () => {
+    const order = await seedMarketplaceOrder(seller, { complete: false });
+    await agent(op.accessToken)
+      .patch(`/api/v1/orders/${order.id}/travelers/${order.travelerId}`)
+      .set("X-Audit-Source", "ORDER_QUICK_PREVIEW")
+      .send({ passportNumber: "XX987654" })
+      .expect(200);
+    const latest = await prisma.orderHistory.findFirst({
+      where: { orderId: order.id, action: "update_traveler_d3" },
+      orderBy: { createdAt: "desc" },
+      select: { source: true },
+    });
+    expect(latest).not.toBeNull();
+    expect(latest!.source).toBe("ORDER_QUICK_PREVIEW");
+  });
+
+  it("15. D5-R1 legacy history readable: old rows without explicit source → source=API (default)", async () => {
+    // Seed an order, manually insert a legacy history row without specifying source
+    // Migration DEFAULT 'API' ensures backward compatibility — no NULL, no crash
+    const order = await seedMarketplaceOrder(seller);
+    await prisma.orderHistory.create({
+      data: {
+        orderId: order.id,
+        action: "created",
+        to: "NEW",
+        comment: "Legacy creation record",
+      },
+    });
+    const history = await agent(op.accessToken)
+      .get(`/api/v1/orders/${order.id}/history?pageSize=100`)
+      .expect(200);
+    const legacyRow = (history.body.items as { action: string; source: string | null; comment: string | null }[])
+      .find((h) => h.action === "created" && h.comment === "Legacy creation record");
+    expect(legacyRow).toBeDefined();
+    // Migration DEFAULT 'API' fills legacy rows without explicit source
+    expect(legacyRow!.source).toBe("API");
+  });
+
+  it("16. D5-R1 source in history API response: source field present on new entries", async () => {
+    const order = await seedMarketplaceOrder(seller);
+    await agent(op.accessToken)
+      .patch(`/api/v1/orders/${order.id}`)
+      .set("X-Audit-Source", "ORDER_FULL_PAGE")
+      .send({ action: "process" })
+      .expect(200);
+    const history = await agent(op.accessToken)
+      .get(`/api/v1/orders/${order.id}/history?pageSize=10`)
+      .expect(200);
+    const processRow = (history.body.items as { action: string; source: string | null }[])
+      .find((h) => h.action === "process");
+    expect(processRow).toBeDefined();
+    expect(processRow!.source).toBe("ORDER_FULL_PAGE");
+  });
+
+  // ── D5-R3: Real D4 Concurrency / TOCTOU Regression ──
+
+  it("17. D4 post-final lock: traveler mutation AFTER final-confirm → 409", async () => {
+    // Seed an order with COMPLETE travelers, then final-confirm it
+    const order = await seedMarketplaceOrder(seller, { complete: true, finalConfirmed: false });
+    await agent(op.accessToken).post(`/api/v1/orders/${order.id}/final-confirm`).expect(201);
+
+    // Now try to mutate traveler AFTER final-confirm — must be rejected
+    const res = await agent(op.accessToken)
+      .patch(`/api/v1/orders/${order.id}/travelers/${order.travelerId}`)
+      .send({ passportNumber: "POSTFINAL123" });
+    expect(res.status).toBe(409);
+
+    // Verify no successful audit event was created
+    const auditAfter = await prisma.orderHistory.count({
+      where: { orderId: order.id, action: "update_traveler_d3" },
+    });
+    expect(auditAfter).toBe(0);
+
+    // DB traveler data must be unchanged
+    const traveler = await prisma.orderTraveler.findUnique({
+      where: { id: order.travelerId },
+      select: { passportNumber: true },
+    });
+    expect(traveler!.passportNumber).not.toBe("POSTFINAL123");
+  });
+
+  it("18. D4 idempotency: double final-confirm → exactly one succeeds", async () => {
+    const order = await seedMarketplaceOrder(seller, { complete: true, finalConfirmed: false });
+
+    // First final-confirm succeeds (201 Created)
+    await agent(op.accessToken).post(`/api/v1/orders/${order.id}/final-confirm`).expect(201);
+
+    // Second final-confirm must be rejected (409 — already final-confirmed)
+    const res2 = await agent(op.accessToken).post(`/api/v1/orders/${order.id}/final-confirm`);
+    expect(res2.status).toBe(409);
+
+    // DB: exactly one final_confirm audit event
+    const finalEvents = await prisma.orderHistory.count({
+      where: { orderId: order.id, action: "final_confirm" },
+    });
+    expect(finalEvents).toBe(1);
+
+    // Order is final-confirmed
+    const finalOrder = await prisma.order.findUnique({
+      where: { id: order.id },
+      select: { finalConfirmedAt: true },
+    });
+    expect(finalOrder!.finalConfirmedAt).not.toBeNull();
+  });
 });

@@ -13,6 +13,40 @@
  * сохраняются только в redacted форме. Secrets никогда не аудируются.
  */
 
+// ══════════════════════════════════════════════════════════════════════════
+// D5-R1: Structured Audit Source — trusted authority model
+// ══════════════════════════════════════════════════════════════════════════
+// Source represents the entry point that initiated a business mutation.
+// AUTHORITY:
+//   SYSTEM / INTEGRATION → server-derived ONLY (OrderRequested consumer, EventBus, etc.)
+//   API                  → default fallback for direct API/controller calls
+//   ORDER_FULL_PAGE / ORDER_QUICK_PREVIEW → validated client context (X-Audit-Source header)
+// The client CANNOT write SYSTEM or INTEGRATION — these are server-only.
+/** All recognized audit source values (D5-R1 structured source). */
+export const AUDIT_SOURCES = {
+  API: "API",
+  SYSTEM: "SYSTEM",
+  INTEGRATION: "INTEGRATION",
+  ORDER_FULL_PAGE: "ORDER_FULL_PAGE",
+  ORDER_QUICK_PREVIEW: "ORDER_QUICK_PREVIEW",
+} as const;
+export type AuditSource = (typeof AUDIT_SOURCES)[keyof typeof AUDIT_SOURCES];
+
+/** Client-spoofable sources — allowed only via validated X-Audit-Source header. */
+const CLIENT_SOURCES: ReadonlySet<string> = new Set(["ORDER_FULL_PAGE", "ORDER_QUICK_PREVIEW"]); /**
+ * Validate and normalize an audit source from client-provided X-Audit-Source header.
+ * Returns null (use server default) for null/empty/invalid/untrusted values.
+ * Client cannot write SYSTEM/INTEGRATION — these are server-only.
+ */
+export function validateClientSource(raw: string | null | undefined): AuditSource | null {
+  if (!raw || raw.trim().length === 0) return null;
+  const v = raw.trim() as AuditSource;
+  if (CLIENT_SOURCES.has(v)) return v; // trusted client context
+  // If client sends SYSTEM/INTEGRATION — reject (server-only).
+  // If client sends unrecognized value — reject.
+  return null;
+}
+
 /** События бизнес-аудита (min: FIELD_CHANGE / LIFECYCLE_ACTION / SYSTEM_ACTION). */
 export const AUDIT_EVENT_TYPES = {
   /** Изменение значения поля бизнес-сущности (field/oldValue/newValue). */
@@ -24,15 +58,6 @@ export const AUDIT_EVENT_TYPES = {
 } as const;
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[keyof typeof AUDIT_EVENT_TYPES];
 
-/** Источник/контекст изменения (structured source). */
-export const AUDIT_SOURCES = {
-  ORDER_FULL_PAGE: "ORDER_FULL_PAGE",
-  ORDER_QUICK_PREVIEW: "ORDER_QUICK_PREVIEW",
-  API: "API",
-  SYSTEM: "SYSTEM",
-  INTEGRATION: "INTEGRATION",
-} as const;
-export type AuditSource = (typeof AUDIT_SOURCES)[keyof typeof AUDIT_SOURCES];
 
 /** Одно полевое изменение в структурированной записи аудита. */
 export interface AuditFieldChange {

@@ -2562,7 +2562,7 @@ D4  Traveler Security + Representative Data             ✅ ACCEPTED (impl + SR 
  ↓
 D4-REM  D4 Strict Review Remediation Closure (F1–F6)    ✅ CLOSED (2026-09-03)
  ↓
-D5  Orders Full-Page Detail                             ✅ ACCEPTED (impl + SR VERDICT A, 2026-09-03)
+D5  Orders Full-Page Detail                             ✅ ACCEPTED (impl + SR VERDICT A + Final Remediation VERDICT A, 2026-09-03)
  ↓
 D6  Bookings Full-Page Detail                           ⬜ NOT STARTED
  ↓
@@ -2839,9 +2839,10 @@ Pricing & Availability):**
 
 ## ADDENDUM — D5 ORDER FULL-PAGE ACTIONS/EDITING/AUDIT (additive sync, 2026-09-03)
 
-D5 implementation status: **IMPLEMENTATION COMPLETED + STRICT REVIEW PASSED — `VERDICT A`** (см.
+D5 implementation status: **IMPLEMENTATION + STRICT REVIEW + FINAL REMEDIATION — ALL `VERDICT A`** (см.
 `docs/reports/PHASE_3_PRE_STEP_3.12_D5_ORDER_FULL_PAGE_ACTIONS_EDITING_AUDIT_IMPLEMENTATION_REPORT.md`;
-Strict Review: `docs/reports/PHASE_3_PRE_STEP_3.12_D5_ORDER_FULL_PAGE_STRICT_REVIEW_REPORT.md` — VERDICT A, D5 ACCEPTED).
+Strict Review: `docs/reports/PHASE_3_PRE_STEP_3.12_D5_ORDER_FULL_PAGE_STRICT_REVIEW_REPORT.md` — VERDICT A;
+Final Remediation: `docs/reports/PHASE_3_PRE_STEP_3.12_D5_FINAL_REMEDIATION_EVIDENCE_CLOSURE_REPORT.md` — VERDICT A, D5 ACCEPTED).
 
 Что добавил D5 (канонические дополнения; история выше не переписана):
 

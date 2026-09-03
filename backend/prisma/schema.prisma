@@ -2120,6 +2120,11 @@ model OrderHistory {
   action    String
   from      String?
   to        String?
+  /// D5-R1: structured audit source — who/what initiated the change.
+  /// Deterministic, queryable, NOT spoofable from client.
+  /// Legacy rows: NULL = unknown origin.
+  /// Values: API (default), SYSTEM, INTEGRATION, ORDER_FULL_PAGE, ORDER_QUICK_PREVIEW.
+  source    String?  @default("API")
   fields    Json?
   actorId   String?
   actorName String?

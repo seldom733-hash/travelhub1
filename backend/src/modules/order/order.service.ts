@@ -18,7 +18,7 @@ import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
 import { isDateOnly } from "../../shared/date-only";
 import { isIanaTimeZone, isLocalTime } from "../../shared/service-time";
 import { isDeniedStorefrontScope, PARTNER_STOREFRONT_SOURCE } from "../../shared/sales-scope";
-import { diffAuditFields, type AuditFieldChange } from "../../shared/audit";
+import { diffAuditFields, type AuditFieldChange, type AuditSource } from "../../shared/audit";
 import { PaymentPrepaymentType, PaymentScheme, QuoteDiscountType, SalesAcquisitionSource } from "../../generated/prisma/enums";
 import {
   getEffectiveTravelerRequirements,
@@ -529,6 +529,7 @@ export class OrderService {
         orderId: order.id,
         action: "created",
         to: "NEW",
+        source: "SYSTEM",
         actorId: null,
         actorName: "Система",
         comment: "Заказ создан из OrderRequested (Step 2.5)",
@@ -749,6 +750,7 @@ export class OrderService {
         orderId: order.id,
         action: "created",
         to: "NEW",
+        source: "SYSTEM",
         actorId: input.actor?.id ?? null,
         actorName: input.actor?.username ?? "Система",
         comment: "Заказ создан из принятой заявки (Request conversion, D3 Request Flow)",
@@ -1202,7 +1204,7 @@ export class OrderService {
     return missing ? "INCOMPLETE" : "COMPLETE";
   }
 
-  async updateTravelers(orderId: string, travelers: TravelerUpdateInput[], actor?: string) {
+  async updateTravelers(orderId: string, travelers: TravelerUpdateInput[], actor?: string, source?: AuditSource) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       select: {
@@ -1286,6 +1288,7 @@ export class OrderService {
         data: {
           orderId,
           action: "update_travelers",
+          source: source ?? "API",
           actorId: actor ?? null,
           actorName: actor ?? null,
           comment: "Обновлены данные туристов заказа",
@@ -1300,7 +1303,7 @@ export class OrderService {
   }
 
   /** Команда жизненного цикла (переход статуса). */
-  async orderAction(orderId: string, action: OrderAction, actor?: string, reason?: string | null) {
+  async orderAction(orderId: string, action: OrderAction, actor?: string, reason?: string | null, source?: AuditSource) {
     const transition = TRANSITIONS[action];
     if (!transition) throw new ValidationDomainError(`Unknown action: ${action}`);
 
@@ -1385,6 +1388,7 @@ export class OrderService {
           action,
           from: order.status,
           to: transition.to,
+          source: source ?? "API",
           actorId: actor ?? null,
           actorName: actor ?? null,
           comment: reason ? `${ACTION_LABELS[action]}: ${reason}` : ACTION_LABELS[action],
@@ -1551,6 +1555,7 @@ export class OrderService {
     travelerId: string,
     input: TravelerCollectInput,
     actor?: string,
+    source?: AuditSource,
   ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -1671,6 +1676,7 @@ export class OrderService {
         data: {
           orderId,
           action: "update_traveler_d3",
+          source: source ?? "API",
           actorId: actor ?? null,
           actorName: actor ?? null,
           comment: `Traveler ${travelerId} data updated (D3 collection)`,
@@ -1780,7 +1786,7 @@ export class OrderService {
    * double-click / concurrent retry → ровно ОДИН победитель; повторный вызов
    * после успеха → ConflictError (duplicate final confirm → нет дубля Order).
    */
-  async finalConfirm(orderId: string, actor?: string) {
+  async finalConfirm(orderId: string, actor?: string, source?: AuditSource) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { travelers: true },
@@ -1850,6 +1856,7 @@ export class OrderService {
           action: "final_confirm",
           from: null,
           to: "final_confirmed",
+          source: source ?? "API",
           actorId: actor ?? null,
           actorName: actor ?? null,
           comment: "Финальное подтверждение заказа (D3)",

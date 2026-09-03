@@ -19,6 +19,9 @@
   createdAt/changedAt (когда);
 - **source/context** — каждая запись идентифицирует точку входа
   (полная страница / quick preview / API / система / интеграция);
+  **Persisted** в отдельной колонке `source` OrderHistory (D5-R1);
+  spoofing-protected: клиент НЕ может записать SYSTEM/INTEGRATION;
+  legacy rows: DEFAULT 'API' (ADD COLUMN ... DEFAULT 'API').
 - **server authority** — чтение истории сервер-авторизовано (permission + scope);
   никакой клиентский контракт не выбирает, что видеть.
 
@@ -92,9 +95,9 @@ prisma.$transaction(async (tx) => {
 Клиент не может подделать автора: значения берутся из authenticated actor
 (guard/passport), не из body.
 
-## 7. Source / context
+## 7. Source / context (D5-R1: STRUCTURED + PERSISTED)
 
-Shared core определяет источники:
+Shared core определяет источники (D5-R1: persisted в OrderHistory.source):
 
 ```text
 ORDER_FULL_PAGE     — действие с полной страницы Order Detail;
@@ -104,9 +107,15 @@ SYSTEM              — системный/автоматический;
 INTEGRATION         — внешняя интеграция.
 ```
 
-Источник — декларативная атрибуция в integration layer (comment/контекст);
-сам по себе источник не меняет факт события, но позволяет отличать UI-пути
-от системных при расследованиях.
+**Authority model (D5-R1):**
+- SYSTEM / INTEGRATION — server-derived ONLY (OrderRequested consumer, EventBus);
+- API — default fallback for direct API/controller calls;
+- ORDER_FULL_PAGE / ORDER_QUICK_PREVIEW — validated client context via
+  `X-Audit-Source` header (spoofing-protected: клиент НЕ может записать
+  SYSTEM/INTEGRATION — validateClientSource() возвращает null → default API).
+
+Legacy rows: `ADD COLUMN source TEXT DEFAULT 'API'` — no NULL, no crash.
+Source queryable и deterministic.
 
 ## 8. Field diff
 

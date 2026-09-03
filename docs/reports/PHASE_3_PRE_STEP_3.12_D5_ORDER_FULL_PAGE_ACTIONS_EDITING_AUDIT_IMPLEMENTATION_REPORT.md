@@ -76,17 +76,17 @@ field-diff/redaction-core и единый capability-проектор).
 
 - Orders registry (frontend `/app/orders`): клик по business reference НЕ вёл на
   отдельную страницу заказа — открывался inline-«drawer» (панель) с actions;
-- полной страницы детали заказа не существовало (была legacy страница, не
-  подключённая к registry);
+- полная страница `/app/orders/{id}` уже существовала (legacy), но НЕ была
+  подключена как canonical operational detail; registry открывал drawer;
 - переходы Request → Order и Order → Booking в UI отсутствовали/неполны.
 
 ## 6. Existing Drawer vs Full-Page Root Cause
 
 Root cause: в registry единственным способом «открыть» заказ была inline-панель;
 действия в ней формировались **клиентским** маппингом статус→кнопки, дублирующим
-(и расходящимся с) серверную state machine. Полная страница отсутствовала —
-значит, детальный контекст (связанные Request/Booking, milestones, история)
-был недоступен, а действия могли «устаревать» относительно серверных гейтов.
+(и расходящимся с) серверную state machine. Legacy full-page существовала, но не
+была canonical operational detail — детальный контекст (milestones, Request/Booking
+связи, server-authoritative actions, audit history) был недоступен.
 
 ## 7. Canonical Full-Page Contract
 
