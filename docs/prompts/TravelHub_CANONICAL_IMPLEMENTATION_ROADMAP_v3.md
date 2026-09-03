@@ -2562,7 +2562,7 @@ D4  Traveler Security + Representative Data             ✅ ACCEPTED (impl + SR 
  ↓
 D4-REM  D4 Strict Review Remediation Closure (F1–F6)    ✅ CLOSED (2026-09-03)
  ↓
-D5  Orders Full-Page Detail                             ⬜ TRUE NEXT (после ROADMAP/ARCHITECTURE SYNC CHECK)
+D5  Orders Full-Page Detail                             ✅ ACCEPTED (impl + SR VERDICT A, 2026-09-03)
  ↓
 D6  Bookings Full-Page Detail                           ⬜ NOT STARTED
  ↓
@@ -2595,7 +2595,7 @@ STEP 3.12                                               ⬜ BLOCKED BY D14
 | D3-SR | D3 Strict Review (SR B: termsAcceptedAt real, pin-at-acceptance, Booking gate, Option B reconcile) | ARCHITECTURE_DEBT | ✅ | D3 | D3 REMEDIATION |
 | D4 | Traveler Security + Representative Data | IMPLEMENTATION_DEBT | ✅ | D3 | D4-REM |
 | D4-REM | D4 Strict Review Remediation Closure (F1 traveler/final-confirm serialization, F2 list/export scope, F3 S12 natural chain, F4 S5 reclassification, F5 manifest CASE A, F6 bulk traveler) | REMEDIATION_DEBT | ✅ | D4 | D4-REM |
-| D5 | Orders Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ TRUE NEXT | D4-REM | D5 |
+| D5 | Orders Full-Page Detail | IMPLEMENTATION_DEBT | ✅ | D4-REM | D5 |
 | D6 | Bookings Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ | D0 | D6 |
 | D7 | Payment/Refund Semantics + Financial Presentation | IMPLEMENTATION_DEBT | ⬜ | D0 | D7 |
 | D8 | Global Temporal Visibility | IMPLEMENTATION_DEBT | ⬜ | D0 | D8 |
@@ -2634,7 +2634,7 @@ PD-5            S5B auto-EXPIRED transition                    NOT IMPLEMENTED (
                 (customer action deadline scheduler)            customerActionDeadline существуют; scheduler не реализован
 ```
 
-TRUE NEXT после sync check: **D5 — ORDERS FULL-PAGE DETAIL (+ NAVIGATION CONSISTENCY + ACTION/STATE-MACHINE CONSISTENCY + EDITING/MUTABILITY CONTRACT + ENTITY CHANGE AUDIT FRAMEWORK INTEGRATION)**, далее D6 (Booking аналог).
+TRUE NEXT: **D6 — BOOKING FULL-PAGE DETAIL (+ NAVIGATION CONSISTENCY + ACTION/STATE-MACHINE CONSISTENCY + EDITING/MUTABILITY CONTRACT + ENTITY CHANGE AUDIT FRAMEWORK INTEGRATION)** (Booking-аналог D5), далее D7/D8/D9.
 
 ---
 
@@ -2839,9 +2839,9 @@ Pricing & Availability):**
 
 ## ADDENDUM — D5 ORDER FULL-PAGE ACTIONS/EDITING/AUDIT (additive sync, 2026-09-03)
 
-D5 implementation status: **IMPLEMENTATION COMPLETED — `VERDICT A`** (см.
+D5 implementation status: **IMPLEMENTATION COMPLETED + STRICT REVIEW PASSED — `VERDICT A`** (см.
 `docs/reports/PHASE_3_PRE_STEP_3.12_D5_ORDER_FULL_PAGE_ACTIONS_EDITING_AUDIT_IMPLEMENTATION_REPORT.md`;
-STRICT REVIEW NOT STARTED).
+Strict Review: `docs/reports/PHASE_3_PRE_STEP_3.12_D5_ORDER_FULL_PAGE_STRICT_REVIEW_REPORT.md` — VERDICT A, D5 ACCEPTED).
 
 Что добавил D5 (канонические дополнения; история выше не переписана):
 
