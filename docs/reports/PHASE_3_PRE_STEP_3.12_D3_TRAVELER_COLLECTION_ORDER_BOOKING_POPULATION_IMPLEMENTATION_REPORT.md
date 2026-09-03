@@ -398,9 +398,9 @@ D4..D14, STEP 3.12 — NOT STARTED
 branch:             master
 Starting SHA:       c05af07f5827ae15ae06d497d6cc68159f7dbf81
 Final SHA (D3 feat): 7b73732ddb413120c69c743ce19a242900db3292
-HEAD:               ca777fc012c14d8d0e233922b18d80de3e5ce0e3
-origin/master:      ca777fc012c14d8d0e233922b18d80de3e5ce0e3
-HEAD == origin/master: true (push: c05af07..ca777fc master -> master)
+HEAD:               9f7e66888dda2da5613b667aadbb1b4a1165fd98
+origin/master:      9f7e66888dda2da5613b667aadbb1b4a1165fd98
+HEAD == origin/master: true (push: c05af07..9f7e668 master -> master)
 Working tree:       только untracked evidence (tmp_d3_*.png/.mjs) и незакоммиченные
                     артефакты предыдущих фаз (1 tracked deletion D2-отчёта при rename —
                     pre-existing, не D3)
