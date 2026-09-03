@@ -62,6 +62,30 @@ export class OperationalNotesController {
   constructor(private readonly notesService: OperationalNotesService) {}
 
   /**
+   * D5-R2: Immutable audit/revision history for a specific note.
+   * Permission: operational-notes.read
+   * AuditLog is append-only — history events cannot be modified or deleted.
+   * Must be declared BEFORE :entityType/:entityId to avoid route conflicts.
+   */
+  @Get(':noteId/history')
+  @RequirePermissions('operational-notes.read')
+  getNoteHistory(
+    @Param('noteId') noteId: string,
+    @CurrentUser() actor: AuthedRequest['user'],
+  ) {
+    const notesActor: NotesActor = {
+      userId: actor.id,
+      username: actor.username,
+      fullName: actor.fullName,
+      role: actor.role,
+      permissions: actor.permissions,
+      partnerId: actor.partnerId,
+      customerId: actor.customerId,
+    };
+    return this.notesService.getNoteHistory(noteId, notesActor);
+  }
+
+  /**
    * List notes for an entity with server-side pagination.
    * Permission: operational-notes.read
    */

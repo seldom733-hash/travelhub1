@@ -502,4 +502,49 @@ export class OperationalNotesService {
       where: { entityType, entityId, deletedAt: null },
     });
   }
+
+  /**
+   * D5-R2: Immutable audit/revision history for a specific note.
+   * Queries the security.AuditLog for all events related to this note.
+   * AuditLog is append-only (no update/delete) — this IS the immutable history.
+   * Authorization: inherited from note parent entity scope + operational-notes.read.
+   */
+  async getNoteHistory(
+    noteId: string,
+    actor: NotesActor,
+  ) {
+    this.requirePermission(actor, 'operational-notes.read');
+
+    // Verify note exists and actor has access to parent entity
+    const note = await this.prisma.operationalNote.findUnique({
+      where: { id: noteId },
+    });
+
+    if (!note) {
+      throw new NotFoundException('Note not found');
+    }
+
+    // Resolve parent to verify scope
+    const parent = await resolveNoteParent(this.prisma, note.entityType, note.entityId);
+    if (!parent.exists) {
+      throw new NotFoundException(`${note.entityType} not found`);
+    }
+
+    // Query immutable AuditLog for this note's events
+    const events = await this.prisma.auditLog.findMany({
+      where: {
+        resource: 'OperationalNote',
+        resourceId: noteId,
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return {
+      noteId,
+      entityType: note.entityType,
+      entityId: note.entityId,
+      events,
+      total: events.length,
+    };
+  }
 }

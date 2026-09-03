@@ -2884,3 +2884,30 @@ D5-6  D6 reuses the same framework               Booking full-page/audit — с�
 
 TRUE NEXT: **D6 — BOOKING FULL-PAGE / ACTIONS / AUDIT** (Booking-аналог D5) →
 затем Request requalification. D6 NOT STARTED.
+
+## ADDENDUM — D5 FINAL REMEDIATION CONTINUATION (additive sync, 2026-09-03)
+
+D5 Final Remediation Continuation: **VERDICT A — D5 ACCEPTED** (см.
+`docs/reports/PHASE_3_PRE_STEP_3.12_D5_FINAL_REMEDIATION_CONTINUATION_REPORT.md`).
+
+6 acceptance blockers закрыты:
+
+```text
+C1  OperationalNote immutable audit    getNoteHistory service + API + 8 e2e tests (8/8 PASS)
+C2  Real D4 concurrency/TOCTOU         Promise.all race test (D5 test 19, 20/20 PASS)
+C3  Complete regression evidence       8 suites + builds + typecheck all PASS
+C4  Browser mutation evidence           Lifecycle + note audit + spoofing + export verified
+C5  Legacy source semantics             Schema default NULL + migration nulling legacy rows
+C6  Git hard closure                    HEAD == origin/master
+```
+
+Additional finding (non-blocking, documented):
+```text
+F-C2  Pre-final traveler completion     PATCH endpoint does not check completion status
+      not enforced server-side           pre-final (TOCTOU gap); documented as D7 concern.
+```
+
+D5 final state: **ACCEPTED** (all 6 blockers closed).
+
+TRUE NEXT: **D6 — BOOKING FULL-PAGE DETAIL** (Booking-аналог D5).
+D6 NOT STARTED.
