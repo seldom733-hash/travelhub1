@@ -2554,7 +2554,7 @@ D1A Platform CRM Scope Isolation Audit + Remediation   ✅ COMPLETED (2026-09-02
  ↓
 D2  Product Traveler Requirements                       ⬜ NOT STARTED
  ↓
-D3  Traveler Collection + Order/Booking Population      ⬜ NOT STARTED
+D3  Traveler Collection + Order/Booking Population      ◐ IMPLEMENTED — SR B: remediation (R1–R4) applied; Request-flow E2E open
  ↓
 D4  Traveler Security + Representative Data             ⬜ NOT STARTED
  ↓
@@ -2587,7 +2587,8 @@ STEP 3.12                                               ⬜ BLOCKED BY D14
 | D1 | Commerce Lifecycle Contract Finalization | ARCHITECTURE_DEBT | ✅ | D0 | D1 |
 | D1A | Platform CRM Marketplace/Storefront Scope Isolation | IMPLEMENTATION_DEBT | ✅ | D1 | D1A |
 | D2 | Product Traveler Requirements | ARCHITECTURE_DEBT | ⬜ | D1 | D2 |
-| D3 | Traveler Collection + Order/Booking Population | IMPLEMENTATION_DEBT | ⬜ | D2 | D3 |
+| D3 | Traveler Collection + Order/Booking Population | IMPLEMENTATION_DEBT | ◐ | D2 | D3 |
+| D3-SR | D3 Strict Review (SR B: termsAcceptedAt real, pin-at-acceptance, Booking gate, Option B reconcile) | ARCHITECTURE_DEBT | ◐ | D3 | D3 REMEDIATION |
 | D4 | Traveler Security + Representative Data | IMPLEMENTATION_DEBT | ⬜ | D3 | D4 |
 | D5 | Orders Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ | D0 | D5 |
 | D6 | Bookings Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ | D0 | D6 |

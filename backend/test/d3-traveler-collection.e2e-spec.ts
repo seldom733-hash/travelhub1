@@ -589,6 +589,64 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     await finalConfirm(op.accessToken, legacy.id).expect(422);
   });
 
+  // ── SR §16: BOOKING ELIGIBILITY — hard gate ──────────────────────────────
+
+  it("9. Booking НЕ может начаться до final confirmation (confirm/send на traveler-bearing Order → отклонено)", async () => {
+    const seller = await createApprovedSeller("sr_elig");
+    const sm = await createStaff("d3_srelig", RoleCode.SALES_MANAGER);
+    const fx = await createProduct(seller, "d3_srelig"); // TOUR, count=1
+    const ctx = await makeReadySale(sm.accessToken, fx, {
+      travelers: [{ firstName: "Иван", lastName: "Иванов", birthDate: PAST() }],
+    });
+    await complete(sm.accessToken, ctx.sale.code, 1).expect(201);
+    const order = await orderFor(ctx.sale.id);
+    expect(order.travelerCount).toBe(1);
+
+    const op = await createStaff("d3_sreligop", RoleCode.OPERATOR);
+    // Данные собраны (COMPLETE), НО final confirmation ещё не выполнена.
+    const traveler = await prisma.orderTraveler.findFirstOrThrow({ where: { orderId: order.id } });
+    await patchTraveler(op.accessToken, order.id, traveler.id, { birthDate: PAST() }).expect(200);
+
+    // process — операционная обработка возможна (Order существует как commerce root).
+    await orderAction(op.accessToken, order.id, "process").expect(200);
+    // confirm (READY_FOR_BOOKING) ДО final confirmation → 422 (hard gate SR §16).
+    await orderAction(op.accessToken, order.id, "confirm").expect(422);
+    // send (BookingRequested) ДО final confirmation: READY_FOR_BOOKING недостижим,
+    // прямой send из IN_PROCESSING → 409 (status machine) — Booking невозможен.
+    await orderAction(op.accessToken, order.id, "send").expect(409);
+    expect(await prisma.booking.count({ where: { orderId: order.id } })).toBe(0);
+    expect(await prisma.outboxEvent.count({ where: { aggregateId: order.id, eventType: "BookingRequested" } })).toBe(0);
+
+    // После final confirmation (данные уже COMPLETE) → confirm/send разрешены.
+    await finalConfirm(op.accessToken, order.id).expect(201);
+    await orderAction(op.accessToken, order.id, "confirm").expect(200);
+    await orderAction(op.accessToken, order.id, "send").expect(200);
+    expect(await prisma.booking.count({ where: { orderId: order.id } })).toBe(1);
+  });
+
+  // ── SR §4: termsAcceptedAt = РЕАЛЬНЫЙ acceptance instant (не processing time) ─
+
+  it("10. termsAcceptedAt == Sale.completedAt (acceptance), frozen через OrderRequested payload", async () => {
+    const seller = await createApprovedSeller("sr_acc");
+    const sm = await createStaff("d3_sracc", RoleCode.SALES_MANAGER);
+    const fx = await createProduct(seller, "d3_sracc", {
+      travelerRequirements: { birthDate: "REQUIRED", citizenship: "NOT_REQUESTED" },
+    });
+    const ctx = await makeReadySale(sm.accessToken, fx, {
+      travelers: [{ firstName: "Анна", lastName: "Петрова", birthDate: PAST() }],
+    });
+    const completed = (await complete(sm.accessToken, ctx.sale.code, 1).expect(201)).body as { completedAt: string };
+    const order = await orderFor(ctx.sale.id);
+    const saleRow = await prisma.sale.findUniqueOrThrow({ where: { id: ctx.sale.id } });
+
+    // Order.termsAcceptedAt = реальный acceptance instant (Sale.completedAt), НЕ now consumer-а.
+    expect(order.termsAcceptedAt!.getTime()).toBe(saleRow.completedAt!.getTime());
+    expect(new Date(completed.completedAt).getTime()).toBe(order.termsAcceptedAt!.getTime());
+    // Snapshot заморожен в payload (acceptance) → Order.pinned совпадает с override.
+    expect((order.pinnedRequirements as Record<string, string>).birthDate).toBe("REQUIRED");
+    expect((order.pinnedRequirements as Record<string, string>).citizenship).toBe("NOT_REQUESTED");
+  });
+
   // ── §17: Idempotency через реальный API (duplicate final confirm) ────────
 
   it("8. повторный final-confirm после успеха → 409 (no duplicate commerce root)", async () => {

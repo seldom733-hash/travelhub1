@@ -3,6 +3,14 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService, type OutboxEnvelope } from "../../eventbus/eventbus.service";
 import { DomainEvents, type OrderRequestedPayload } from "../../eventbus/domain-events";
 import { OrderService, assertValidOrderRequestedPayload } from "./order.service";
+import { isTravelerRequirementState, TRAVELER_FIELDS } from "../catalog/traveler-requirements";
+
+/** SR R2: полная карта из 7 полей с каноническими состояниями. */
+function isFullRequirementsMap(v: unknown): v is Record<string, string> {
+  if (typeof v !== "object" || v === null) return false;
+  const m = v as Record<string, unknown>;
+  return TRAVELER_FIELDS.every((f) => isTravelerRequirementState(m[f]));
+}
 import { getEffectiveTravelerRequirements } from "../../modules/catalog/traveler-requirements";
 
 const CONSUMER_ID = "order-requested-consumer";
@@ -73,20 +81,35 @@ export class OrderRequestedConsumer implements OnModuleInit {
         });
 
         // D3 §3 — PIN traveler requirements at termsAcceptedAt.
-        // Read product type from payload items to resolve effective requirements.
-        // Frozen snapshot: immutable after Order creation.
-        const productTypes = payload.items.map(i => i.productType);
-        const primaryProductType = productTypes[0] ?? "TOUR";
-        // READ-only cross-context: read product travelerRequirements from catalog.
-        // First item's product is authoritative for the Order's pinned requirements.
-        const firstProduct = await tx.product.findUnique({
-          where: { id: payload.items[0]?.productId ?? "" },
-          select: { type: true, travelerRequirements: true },
-        }).catch(() => null);
-        const pinnedRequirements = getEffectiveTravelerRequirements(
-          firstProduct?.type ?? primaryProductType,
-          firstProduct?.travelerRequirements ?? null,
-        );
+        // SR R2: snapshot уже ЗАМОРОЖЕН в payload в момент acceptance (Sale
+        // completion, sales-completion.service). Consumer НЕ читает mutable
+        // Product на T3 — acceptance→pin race невозможен, replay детерминирован.
+        // Legacy payload (до R1/R2, без pinnedRequirements): transitional
+        // fallback — вычисляем effective requirements как раньше (по Product).
+        const payloadPinned = payload.pinnedRequirements;
+        // Canonical path (SR R2): snapshot заморожен в payload в момент acceptance
+        // → consumer НЕ читает mutable Product на T3 (race невозможен).
+        let pinnedRequirements: Record<string, string>;
+        if (isFullRequirementsMap(payloadPinned)) {
+          pinnedRequirements = payloadPinned;
+        } else {
+          // Legacy payload (до R1/R2, без frozen snapshot): transitional fallback —
+          // effective requirements по Product (как до SR). Канонический путь
+          // (снапшот в payload) Product на T3 НЕ читает.
+          const productTypes = payload.items.map(i => i.productType);
+          const primaryProductType = productTypes[0] ?? "TOUR";
+          const firstProduct = await tx.product.findUnique({
+            where: { id: payload.items[0]?.productId ?? "" },
+            select: { type: true, travelerRequirements: true },
+          }).catch(() => null);
+          pinnedRequirements = getEffectiveTravelerRequirements(
+            firstProduct?.type ?? primaryProductType,
+            firstProduct?.travelerRequirements ?? null,
+          );
+        }
+        // SR R1: реальный acceptance instant (Sale.completedAt), не processing time.
+        // Legacy payload без acceptedAt → fallback now() (до R1 события).
+        const acceptedAt = payload.acceptedAt ? new Date(payload.acceptedAt) : new Date();
 
         // Доменная логика создания (OrderService — owner) в той же транзакции.
         // Step 2.17B remediation (Workstream B): OrderCreated эмитится атомарно
@@ -96,6 +119,7 @@ export class OrderRequestedConsumer implements OnModuleInit {
           payload,
           travelers,
           pinnedRequirements,
+          acceptedAt,
           orderRequestedEventId: ev.id,
           correlationId: ev.correlationId,
           causationId: ev.id,

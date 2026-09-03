@@ -321,6 +321,9 @@ export class OrderService {
       travelers: Array<{ firstName: string; lastName: string; birthDate: Date | null }>;
       /** D3 §3: pinned traveler requirements snapshot (immutable after Order creation). */
       pinnedRequirements?: Record<string, string> | null;
+      /** D3 SR R1: реальный acceptance instant (Sale.completedAt). NULL = legacy
+       *  (processing time fallback). Business event timestamp ≠ processing time. */
+      acceptedAt?: Date | null;
       orderRequestedEventId: string;
       correlationId: string | null;
       causationId: string | null;
@@ -366,13 +369,14 @@ export class OrderService {
         serviceTimeZone,
         version: 1,
         submittedAt,
-        // D3 §3 — PIN traveler requirements at termsAcceptedAt (Order creation
-        // = durable acceptance of current price/terms in this architecture;
-        // отчёт D3 §7 — snapshot копируется в Order domain, т.к. pre-Order
-        // сущности (CheckoutIntent/Sale) не хранят traveler requirements).
-        // Immutable: последующие Product-изменения НЕ влияют на принятый
-        // checkout (hard gate §3). Server-owned — клиент не может заменить.
-        termsAcceptedAt: new Date(),
+        // D3 §3 — PIN traveler requirements at termsAcceptedAt.
+        // SR R1: termsAcceptedAt = РЕАЛЬНЫЙ acceptance instant (Sale.completedAt,
+        // frozen в OrderRequested payload как acceptedAt) — НЕ processing time
+        // consumer-а (business event timestamp ≠ processing timestamp). Legacy
+        // события (до SR, без acceptedAt) → fallback now(). Immutable:
+        // последующие Product-изменения НЕ влияют на принятый checkout (hard
+        // gate §3). Server-owned — клиент не может заменить.
+        termsAcceptedAt: input.acceptedAt ?? new Date(),
         pinnedRequirements: input.pinnedRequirements
           ? (input.pinnedRequirements as Prisma.InputJsonValue)
           : Prisma.JsonNull,
@@ -834,11 +838,29 @@ export class OrderService {
       // читаются здесь (payload BookingRequested минимизирован — STRICT REVIEW FIX).
       const order = await tx.order.findUnique({
         where: { id: orderId },
-        include: { travelers: true },
+        select: {
+          id: true, code: true, customerId: true, status: true, version: true,
+          termsAcceptedAt: true, finalConfirmedAt: true, travelerCount: true,
+          travelers: { select: { id: true, dataCompleteness: true } },
+        },
       });
       if (!order) throw new NotFoundError(`Order ${orderId} not found`);
       if (!transition.from.includes(order.status)) {
         throw new ConflictError(`Cannot ${action} order ${order.code} from status ${order.status}`);
+      }
+
+      // D3 SR R3 (Booking eligibility, hard §16): traveler-bearing D3 Order
+      // (принятый checkout c traveler party list) НЕ может перейти в
+      // READY_FOR_BOOKING / Booking до финального подтверждения собранных
+      // данных туристов (finalConfirmedAt). D1: final confirmation → Booking.
+      // Legacy Orders (до D3: termsAcceptedAt = null) и orders без travelers
+      // (travelerCount 0) сохраняют прежний lifecycle.
+      const d3TravelerScope = (order.travelerCount ?? 0) > 0 && order.termsAcceptedAt !== null;
+      if (d3TravelerScope && !order.finalConfirmedAt && (action === "confirm" || action === "send")) {
+        throw new ValidationDomainError(
+          `Order ${order.code} requires final traveler confirmation (final-confirm) before ${action}; ` +
+            `traveler data must be finalized first`,
+        );
       }
 
       // «Готов к бронированию» требует полные данные туристов (DoD Phase 1).

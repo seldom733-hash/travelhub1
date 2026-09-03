@@ -23,6 +23,7 @@ import { isoUtc } from "../../shared/temporal";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type OrderRequestedPayload } from "../../eventbus/domain-events";
 import { CatalogService } from "../catalog/catalog.service";
+import { getEffectiveTravelerRequirements } from "../catalog/traveler-requirements";
 import { Prisma } from "../../generated/prisma/client";
 import {
   CheckoutStatus,
@@ -182,14 +183,27 @@ export class SalesCompletionService {
         data: { reservationId: firstReservation },
       });
 
-      const productTypeById = new Map(
+      const productsById = new Map(
         (
           await tx.product.findMany({
             where: { id: { in: quote.items.map((it) => it.productId) } },
-            select: { id: true, type: true },
+            select: { id: true, type: true, travelerRequirements: true },
           })
-        ).map((p) => [p.id, p.type]),
+        ).map((p) => [p.id, p]),
       );
+      // D3 SR R2: PIN эффективных traveler requirements В МОМЕНТ acceptance
+      // (та же транзакция, что Sale → CLOSED + completedAt). Frozen snapshot
+      // кладётся в OrderRequested payload — consumer НЕ читает mutable Product
+      // на T3 (race acceptance→pin невозможен, replay детерминирован).
+      const firstItem = quote.items[0];
+      const firstProduct = productsById.get(firstItem.productId);
+      const pinnedRequirements = getEffectiveTravelerRequirements(
+        firstProduct?.type ?? "TOUR",
+        firstProduct?.travelerRequirements ?? null,
+      );
+      const travelerCount = await tx.checkoutIntentTraveler.count({
+        where: { checkoutIntentId: checkout.id },
+      });
       const eventId = await this.eventBus.emit(tx, {
         aggregateType: "Sale",
         aggregateId: sale.id,
@@ -209,7 +223,7 @@ export class SalesCompletionService {
             productId: it.productId,
             productCode: it.productCode,
             productTitle: it.productTitle,
-            productType: productTypeById.get(it.productId) ?? "",
+            productType: productsById.get(it.productId)?.type ?? "",
             tariffId: it.tariffId,
             tariffCode: it.tariffCode,
             quantity: it.quantity,
@@ -224,6 +238,9 @@ export class SalesCompletionService {
           sellerPartnerId: (checkout.commissionSnapshot as Record<string, unknown> | null)?.sellerPartnerId
             ? String((checkout.commissionSnapshot as Record<string, unknown>).sellerPartnerId)
             : null,
+          // D3 SR R1/R2: реальный acceptance instant + frozen requirements snapshot.
+          acceptedAt: now.toISOString(),
+          pinnedRequirements,
         } as OrderRequestedPayload,
       });
       await tx.sale.update({

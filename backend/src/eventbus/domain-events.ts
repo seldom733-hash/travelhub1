@@ -282,6 +282,15 @@ export interface OrderRequestedPayload {
   /** Step 2.12E (ADR-0013 D14): frozen seller attribution (snapshot-at-event,
    *  НЕ live lookup). NULL = multi-seller/нет seller → 0 commission-фактов. */
   sellerPartnerId: string | null;
+  /** D3 SR R1: реальный acceptance instant (Sale.completedAt, тот же бизнес-момент,
+   *  что и эмиссия OrderRequested). Consumer использует ЕГО как termsAcceptedAt
+   *  (business event timestamp ≠ processing timestamp). NULL = legacy payload до R1. */
+  acceptedAt?: string | null;
+  /** D3 SR R2: effective traveler requirements, ЗАМОРОЖЕННЫЕ в момент acceptance
+   *  (Sale completion, та же транзакция). Consumer НЕ читает mutable Product на
+   *  T3 — race acceptance→pin невозможен. NULL = legacy payload до R1/R2
+   *  (transitional fallback: consumer вычисляет как раньше). */
+  pinnedRequirements?: Record<string, string> | null;
 }
 
 export interface OrderEventPayload {

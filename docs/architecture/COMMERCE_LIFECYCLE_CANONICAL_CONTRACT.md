@@ -480,6 +480,42 @@ Order = customer-committed commercial transaction
 
 **No separate Draft Order.** The existing Order lifecycle (NEW → SUBMITTED → ...) serves this purpose. Order is created only when committed.
 
+## 14.3A Platform-assisted assisted flow — D3 Strict Review reconciliation (Option B)
+
+D3 Strict Review (SR) зафиксировал противоречие между §14.2/§14.3 (Order только после
+final confirmation) и принятой Step 2.5/2.6 архитектурой (OrderRequested →
+OrderRequestedConsumer создаёт Order при accepted checkout). SR разрешает это
+ФОРМАЛЬНО (Option B), без silent D1 drift:
+
+**Order = durable commerce root принятого коммерческого кейса.** В
+platform-assisted flow (Quote → CheckoutIntent → Sale → OrderRequested → Order):
+
+```
+Sale completion (acceptance: termsAcceptedAt = Sale.completedAt, frozen в payload)
+  → requirements PINNED at acceptance (frozen в payload, НЕ читаются из Product на T3)
+  → Order created (NEW) — commerce root, snapshot зафиксирован
+  → Traveler collection (OrderTraveler, поля по pinned snapshot)
+  → validate completion → travelerDataCompletedAt
+  → FINAL CONFIRMATION (finalConfirmedAt)
+  → confirm (READY_FOR_BOOKING) / send (BookingRequested) — HARD GATE: Booking
+    невозможен до finalConfirmedAt для traveler-bearing Order
+  → Booking → Passenger
+```
+
+**Семантика pre-final-confirmation Order (не Draft):**
+- коммерческий snapshot (amount/currency/paymentTerms/items/pinned requirements)
+  frozen при создании — это committed accepted case, а не черновик;
+- Order НЕ booking-eligible и НЕ fulfillable до finalConfirmedAt (SR R3 gates на
+  confirm/send при travelerCount > 0);
+- `termsAcceptedAt` = реальный acceptance instant (business event timestamp, НЕ
+  processing time consumer-а);
+- final confirmation = commitment к price + traveler set + complete data; без него
+  BookingRequested/Booking невозможны.
+
+§14.2/§14.3 остаются каноном для buyer-direct flows (traveler collection до Order);
+данный раздел уточняет platform-assisted flow, где Order существует до
+final confirmation как commerce root с явными booking-гейтами.
+
 ## 14.5 Price/terms snapshot on Order
 
 ```
@@ -497,8 +533,16 @@ Immutable after creation. No reprice from Catalog.
 ## 15.1 Purpose
 
 ```
-OrderTraveler = immutable commercial snapshot of traveler data at Order creation
+OrderTraveler = traveler snapshot of the Order
+  - created at Order creation (draft-level: checkout party list, position, minimal data)
+  - final confirmation (finalConfirmedAt) → confirmed/immutable snapshot
+  - после final confirmation мутации запрещены (409)
+  - Passenger читает ТОЛЬКО confirmed snapshot
 ```
+
+(Платформа-assisted flow, D3 SR §14.3A: до final confirmation OrderTraveler —
+собираемая draft-данные под pinned snapshot; после — immutable confirmed snapshot.
+Buyer-direct flow: snapshot при создании Order после final confirmation.)
 
 ## 15.2 Data flow
 
