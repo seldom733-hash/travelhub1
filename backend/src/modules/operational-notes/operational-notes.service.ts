@@ -182,33 +182,39 @@ export class OperationalNotesService {
       throw new NotFoundException(`${input.entityType} with id ${input.entityId} not found`);
     }
 
-    // Create note with server-authoritative fields
-    const note = await this.prisma.operationalNote.create({
-      data: {
-        entityType: input.entityType,
-        entityId: input.entityId,
-        text: validatedText,
-        visibility,
-        authorUserId: actor.userId,
-        authorName: actor.fullName ?? actor.username,
-      },
-    });
+    // D5-R2: NOTE CREATION + AUDIT ATOMIC — note mutation and immutable audit
+    // event MUST be in the same DB transaction. If audit fails, note must not exist.
+    const note = await this.prisma.$transaction(async (tx) => {
+      // Create note with server-authoritative fields
+      const created = await tx.operationalNote.create({
+        data: {
+          entityType: input.entityType,
+          entityId: input.entityId,
+          text: validatedText,
+          visibility,
+          authorUserId: actor.userId,
+          authorName: actor.fullName ?? actor.username,
+        },
+      });
 
-    // Audit: note.created
-    await this.security.audit(undefined, {
-      userId: actor.userId,
-      username: actor.username,
-      action: 'operational_note.created',
-      resource: 'OperationalNote',
-      resourceId: note.id,
-      details: {
-        entityType: note.entityType,
-        entityId: note.entityId,
-        visibility: note.visibility,
-        parentType: note.entityType,
-        parentId: note.entityId,
-      },
-    });
+      // Audit: note.created (inside same transaction)
+      await this.security.audit(tx, {
+        userId: actor.userId,
+        username: actor.username,
+        action: 'operational_note.created',
+        resource: 'OperationalNote',
+        resourceId: created.id,
+        details: {
+          entityType: created.entityType,
+          entityId: created.entityId,
+          visibility: created.visibility,
+          parentType: created.entityType,
+          parentId: created.entityId,
+        },
+      });
+
+      return created;
+    }); // end $transaction
 
     // Live projection into CrmActivity (fire-and-forget, non-blocking)
     this.projectToActivity(note).catch((err) => {
@@ -411,30 +417,34 @@ export class OperationalNotesService {
     }
 
     const beforeText = note.text;
-    const updated = await this.prisma.operationalNote.update({
-      where: { id: noteId },
-      data: {
-        text: validatedText,
-        editedAt: new Date(),
-      },
-    });
+    // D5-R2: NOTE UPDATE + AUDIT ATOMIC — must be in same transaction
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.operationalNote.update({
+        where: { id: noteId },
+        data: {
+          text: validatedText,
+          editedAt: new Date(),
+        },
+      });
 
-    // Audit: note.updated
-    await this.security.audit(undefined, {
-      userId: actor.userId,
-      username: actor.username,
-      action: 'operational_note.updated',
-      resource: 'OperationalNote',
-      resourceId: noteId,
-      details: {
-        entityType: note.entityType,
-        entityId: note.entityId,
-        parentType: note.entityType,
-        parentId: note.entityId,
-        beforeText: beforeText.length > 200 ? beforeText.substring(0, 200) + '...' : beforeText,
-        afterText: validatedText.length > 200 ? validatedText.substring(0, 200) + '...' : validatedText,
-      },
-    });
+      // Audit: note.updated (inside same transaction)
+      await this.security.audit(tx, {
+        userId: actor.userId,
+        username: actor.username,
+        action: 'operational_note.updated',
+        resource: 'OperationalNote',
+        resourceId: noteId,
+        details: {
+          entityType: note.entityType,
+          entityId: note.entityId,
+          parentType: note.entityType,
+          parentId: note.entityId,
+          beforeText: beforeText.length > 200 ? beforeText.substring(0, 200) + '...' : beforeText,
+          afterText: validatedText.length > 200 ? validatedText.substring(0, 200) + '...' : validatedText,
+        },
+      });
+      return result;
+    }); // end $transaction
 
     return updated;
   }
@@ -465,30 +475,35 @@ export class OperationalNotesService {
       throw new ForbiddenException('Not authorized to delete this note');
     }
 
-    const deleted = await this.prisma.operationalNote.update({
-      where: { id: noteId },
-      data: {
-        deletedAt: new Date(),
-        deletedBy: actor.userId,
-      },
-    });
+    // D5-R2: NOTE DELETE + AUDIT ATOMIC — must be in same transaction
+    const deleted = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.operationalNote.update({
+        where: { id: noteId },
+        data: {
+          deletedAt: new Date(),
+          deletedBy: actor.userId,
+        },
+      });
 
-    // Audit: note.deleted
-    await this.security.audit(undefined, {
-      userId: actor.userId,
-      username: actor.username,
-      action: 'operational_note.deleted',
-      resource: 'OperationalNote',
-      resourceId: noteId,
-      details: {
-        entityType: note.entityType,
-        entityId: note.entityId,
-        parentType: note.entityType,
-        parentId: note.entityId,
-        authorUserId: note.authorUserId,
-        authorName: note.authorName,
-      },
-    });
+      // Audit: note.deleted (inside same transaction)
+      await this.security.audit(tx, {
+        userId: actor.userId,
+        username: actor.username,
+        action: 'operational_note.deleted',
+        resource: 'OperationalNote',
+        resourceId: noteId,
+        details: {
+          entityType: note.entityType,
+          entityId: note.entityId,
+          parentType: note.entityType,
+          parentId: note.entityId,
+          authorUserId: note.authorUserId,
+          authorName: note.authorName,
+        },
+      });
+
+      return result;
+    }); // end $transaction
 
     return deleted;
   }

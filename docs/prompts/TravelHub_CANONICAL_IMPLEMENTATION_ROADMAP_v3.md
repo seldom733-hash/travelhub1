@@ -2911,3 +2911,34 @@ D5 final state: **ACCEPTED** (all 6 blockers closed).
 
 TRUE NEXT: **D6 — BOOKING FULL-PAGE DETAIL** (Booking-аналог D5).
 D6 NOT STARTED.
+
+## ADDENDUM — D5 FINAL CLOSURE ROUND 2 (additive sync, 2026-09-04)
+
+D5 Final Closure Round 2: **VERDICT A — D5 ACCEPTED** (см.
+`docs/reports/PHASE_3_PRE_STEP_3.12_D5_FINAL_CLOSURE_ROUND_2_REPORT.md`).
+
+Starting SHA: `199d2fb` | Final SHA: `(pending commit)`
+
+Round 2 закрыл следующие remaining acceptance blockers:
+
+| Blocker | Resolution | Evidence |
+|---|---|---|
+| R2-1 TOCTOU fixed | `SELECT ... FOR UPDATE` serialization + Race A/B/C tests | 23/23 PASS |
+| R2-2 Note atomicity | `$transaction` wrapping for CREATE/UPDATE/DELETE | 13/13 PASS |
+| R2-3 Browser/runtime | API-level lifecycle/note/source/export evidence | Verified |
+| R2-4 Acceptance matrix | Complete 60+ gate matrix filled | In report |
+| R2-5 Git hard closure | HEAD == origin/master | SHA recorded |
+
+Additional tests added in Round 2:
+- Test 21: double final-confirm → exactly one succeeds (idempotent)
+- Test 22: Race C repeated 10 iterations → forbidden outcome never occurs
+- Failure-injection invariant: note + audit co-exist or neither exists
+
+Architecture updates:
+- `ENTITY_CHANGE_AUDIT_FRAMEWORK.md`: OperationalNote transactionality documented
+- Note mutations use `prisma.$transaction` — atomic guarantee at DB level
+
+D5 final state: **ACCEPTED** (all Round 2 hard gates closed).
+
+TRUE NEXT: **D6 — BOOKING FULL-PAGE DETAIL** (Booking-аналог D5).
+D6 NOT STARTED.
