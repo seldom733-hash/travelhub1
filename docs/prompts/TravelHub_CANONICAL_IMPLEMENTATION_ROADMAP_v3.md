@@ -597,7 +597,7 @@ Capability matrix по country/currency/rail.
 · **Step 2.12H --- External API Idempotency Contract** ✅ STRICT REVIEW COMPLETED — APPROVED WITH REVIEW FIXES (2026-08-15; независимый adversarial-аудит — отчёт `docs/prompts/PHASE_2_STEP_2.12H_EXTERNAL_API_IDEMPOTENCY_CONTRACT_STRICT_REVIEW_REPORT.md` (57 секций); HARD GATES PASS: критический вопрос «retried payment.create → второй committed Payment?» — доказан ответом НЕТ исполняемо (двойная гарантия: HTTP-слот `ExternalIdempotencyRecord.slotKey` UNIQUE + Payment business invariant `Payment_one_active_per_order` partial unique + findFirst-check; fault-injection T20 crash-window C — Payment закоммичен, complete пропущен, stale recovery → ТОТ ЖЕ Payment, 0 дубликатов факта/события/истории, 0 raw 500), principal isolation (T10/T11/T12), auth/RBAC ordering (guards ДО interceptor-а, fingerprint на validated DTO), детерминированный fingerprint, raw key 0 в персистенции (digest slotKey, T23), DB uniqueness backstop (P2002 → classify), concurrent identical/divergent (T7/T8/T19), restart replay (T9 второй Nest instance), stale-CAS recovery (COMPLETED unreclaimable, active non-stale не крадётся, concurrent reclaim T22), Payment lifecycle authority (0 прямых Payment writes из idempotency; T17), provider-operation boundary 2.12A не тронута, inbox/outbox разделены, 0 domain events, 0 PSP/webhook/SPLIT/cross-domain (T18 route-graph + source audit), 57/57 migrate drift 0; REVIEW FIX 1 (LOW, pathological): complete-P2025 race — слот удалён конкурентным rollback-ом между business commit и complete → raw 500 заменён на возврат закоммиченного результата (unit #10, 0 raw 500 в T20/T22); REVIEW FIX 2/3 (тесты): +13 adversarial unit (duplicate-header, non-P2002 rethrow, generic-error, completed-unreclaimable, non-stale-not-stolen) + 5 fault-injection e2e T20–T24 (crash C, divergent hijack, concurrent stale reclaim, raw-key, no-duplicate event/history); OBS: app-clock staleness (skew>30s non-guarantee), duplicate-header Node join `,` → charset 400, deferred retention/cleanup (Step 2.17), status derivation (@Post 201 после interceptors); регрессия воспроизведена: unit 655/655 (51 suites, +13), idempotency e2e 24/24, targeted 8/8 suites, serial e2e 1177/1177 (67 suites, +5), frontend tsc + vitest 135/135 + build (0 файлов изменено), backend tsc + build, migrate 57/57 drift 0, artifact integrity PASS=<N> WARN=0 FAIL=0; арх-док `docs/architecture/external-api-idempotency-contract.md` (crash-window §12 обновлён P2025-поведением); NEXT = PHASE 2 — STEP 2.12B — BUYER CARD / WALLET PAYMENT (2.12B НЕ начат; dependency chain `2.12A APPROVED → 2.12H APPROVED → 2.12B`); external HTTP idempotency contract: V1 protected set = минимальный PSP-readiness set — payment-initiation boundary `POST /api/v1/finance/payments` (`payment.create`, explicit registry `IDEMPOTENT_OPERATIONS`, fail-closed); header `Idempotency-Key` required (opaque, ≤128, `[A-Za-z0-9._~-]`, missing/malformed → 400); principal/tenant scope из authenticated server context (`scopeType=USER` + `request.user.id`, никогда body/query — одинаковый literal key разных principals изолирован, T10); operation identity — стабильная server-derived metadata (не host/request-id/raw URL); fingerprint `sha256(canonical({params, validatedBody}))` — validated DTO тем же ValidationPipe, property-order independent, arrays order-preserved, path params включены, query вне входа (документировано), omitted≠null fail-loud, decimal/currency строки не нормализуются (2.12A canonical representation), volatile transport metadata excluded by construction; persistence `events.ExternalIdempotencyRecord` (digest storage `slotKey=sha256(scope+operation+key)` — raw key никогда не хранится; PostgreSQL = correctness authority, DB unique backstop, multi-instance); lifecycle IN_PROGRESS → COMPLETED, бизнес-ошибка/rollback → claim удалён (ключ не poisoning, T13); crash-окна явно проанализированы (5 окон, arch doc §12) — stale IN_PROGRESS → CAS takeover (30s technical bound), повторное выполнение безопасно (payment.create business-idempotent, 0 duplicate committed-side-effect; не exactly-once delivery — документировано); identical retry → DB-backed replay (status+body, T4/T9 — второй Nest instance, тот же DB); divergent reuse → controlled 409 (T5/T6); in-progress duplicate → bounded wait 2s → replay или 409 (T7/T8/T19 genuine DB concurrency); auth/RBAC не обходятся replay-ом (guards до interceptor-а: T11 401/T12 403); replay НЕ включает Set-Cookie/Authorization/tracing (T15); PaymentService остаётся единственным lifecycle authority (T16/T17: transitions без ключа работают, replay не транзишит Payment); границы: 0 PSP/network/webhook/SPLIT/cross-domain writes/domain events (T18 route-graph + source audit), provider-operation identity 2.12A не тронута (mapping `external request → canonical business fact → server-derived provider operation` сохранён); retention V1 no-auto-expiry/deferred cleanup (без выдуманных чисел); регрессия: unit 642/642 (+23 fingerprint/slot-key/service), serial e2e 1172/1172 (67 suites, +19 T1–T19), targeted finance/payment/RBAC e2e 80/80, frontend tsc + vitest 135/135 + build (0 файлов изменено), backend tsc + build, migrate 57/57 drift 0, artifact integrity PASS=100 WARN=0 FAIL=0; арх-док `docs/architecture/external-api-idempotency-contract.md`; отчёт `docs/prompts/PHASE_2_STEP_2.12H_EXTERNAL_API_IDEMPOTENCY_CONTRACT_IMPLEMENTATION_REPORT.md`; NEXT = PHASE 2 — STEP 2.12H — STRICT REVIEW (2.12B НЕ начат; dependency chain `2.12A APPROVED → 2.12H impl → 2.12H SR → 2.12B` сохранена)
 Внешний клиентский `Idempotency-Key` header-контракт для money-changing POST (checkout, future payment create, refund, dispute): key format/length, principal/route scope, request fingerprint, storage authority, response snapshot/replay semantics, identical vs divergent replay, concurrent same-key, failed/in-progress, retention/TTL, provider idempotency-key mapping, PII/security. **HARD PREREQUISITE of Step 2.12B** (реальные деньги). Создан reconciliation-ом 2026-08-15 (доказательство отсутствия: 0 `Idempotency-Key` в backend/src; money-changing POST полагаются на business codes).
 
-· **Step 2.12B --- Buyer Card / Wallet Payment** ⛔ BLOCKED — COMMERCIAL CONFIRMATION REQUIRED (2026-08-15 selection pass; evidence — `docs/adr/ADR-0015-payment-provider-selection.md`; AZN settlement → local CBA-licensed AZ acquiring (Millikart / Kapital Bank / Azericard / Goldenpay / Pashabank / Birbank / Payme.az — candidate set, NOT approved); global PSPs DISQUALIFIED for canonical V1: Stripe — нет onboarding в AZ; Adyen — AZN отсутствует в settlement currencies, AZ не acquiring region; Rapyd — AZN отсутствует в Collect presentment/payout, AZ → USD; Checkout.com — нет acquiring в AZ; Mangopay — EU; отчёт — `docs/prompts/PHASE_2_STEP_2.12B_PAYMENT_PROVIDER_SELECTION_DECISION_REPORT.md`; RFI-инструмент готов: sendable questionnaire — `docs/commercial/az-payment-provider-rfi.md`, internal scoring workbook — `docs/commercial/az-payment-provider-rfi-internal-workbook.md`, отчёт — `docs/prompts/TRAVELHUB_AZ_PAYMENT_PROVIDER_RFI_TECHNICAL_COMMERCIAL_QUESTIONNAIRE_REPORT.md`; получение ответов + evidence-reconciliation — единственный оставшийся blocker; 0 production-кода/schema/миграций/webhook/PSP — docs-only)\ 
+· **Step 2.12B --- Buyer Card / Wallet Payment** ⛔ BLOCKED — COMMERCIAL CONFIRMATION REQUIRED (2026-08-15 selection pass; evidence — `docs/adr/ADR-0015-payment-provider-selection.md`; AZN settlement → local CBA-licensed AZ acquiring (Millikart / Kapital Bank / Azericard / Goldenpay / Pashabank / Birbank / Payme.az — candidate set, NOT approved); global PSPs DISQUALIFIED for canonical V1: Stripe — нет onboarding в AZ; Adyen — AZN отсутствует в settlement currencies, AZ не acquiring region; Rapyd — AZN отсутствует в Collect presentment/payout, AZ → USD; Checkout.com — нет acquiring в AZ; Mangopay — EU; отчёт — `docs/prompts/PHASE_2_STEP_2.12B_PAYMENT_PROVIDER_SELECTION_DECISION_REPORT.md`; RFI-инструмент готов: sendable questionnaire — `docs/commercial/az-payment-provider-rfi.md`, internal scoring workbook — `docs/commercial/az-payment-provider-rfi-internal-workbook.md`, отчёт — `docs/prompts/TRAVELHUB_AZ_PAYMENT_PROVIDER_RFI_TECHNICAL_COMMERCIAL_QUESTIONNAIRE_REPORT.md`; получение ответов + evidence-reconciliation — единственный оставшийся blocker; 0 production-кода/schema/миграций/webhook/PSP — docs-only)\
 Card, Apple Pay, Google Pay где поддерживается;
 authorize/capture/fail/cancel, webhook signature, idempotency.
 **RECONCILIATION 2026-08-15:** HARD prerequisites = Step 2.12A (provider abstraction) + Step 2.12H (external Idempotency-Key). PSP-local multi-instance гарантии проектируются в 2.12A и реализуются здесь: webhook dedup через DB unique на provider-event key, create-payment race, webhook-до-API-response, callback reorder, duplicate webhook storm. Webhook burst-robustness e2e обязателен (subset Load gate Step 2.17B).
@@ -1170,7 +1170,8 @@ Entitlement ≠ Business Capability ≠ Permission invariant preserved.\
 
 · **Step 3.29K --- Storefront Settings — Capability Management UI** ⏳ PLANNED\
 `/partner/storefront/settings` → "Услуги бизнеса" / Business Services section;\
-view available capabilities; see currently active; enable new; disable active (with warnings);\\
+view available capabilities; see currently active; enable new; disable active (with warnings);\
+\
 server-side enforcement (not frontend hiding).\
 Зависимости: 3.29J.
 
@@ -2543,6 +2544,7 @@ Product.partnerId NOT NULL → NOT READY (legacy preserved)
 
 **Established:** 2026-09-02 (Architecture Reconciliation, D0 closure)
 **Updated:** 2026-09-02 (D1 closure, D1A added)
+**Updated:** 2026-09-03 (additive sync: D2/D3/D4 status corrections, D4-REM closure, post-D4 confirmed deferred debts — см. addendum ниже)
 **TRUE NEXT:** D1A — Platform CRM Marketplace/Storefront Scope Isolation
 
 ```
@@ -2552,13 +2554,15 @@ D1  Commerce Lifecycle Contract Finalization            ✅ COMPLETED (2026-09-0
  ↓
 D1A Platform CRM Scope Isolation Audit + Remediation   ✅ COMPLETED (2026-09-02)
  ↓
-D2  Product Traveler Requirements                       ⬜ NOT STARTED
+D2  Product Traveler Requirements                       ✅ ACCEPTED (impl + SR, 2026-09-03)
  ↓
 D3  Traveler Collection + Order/Booking Population      ✅ ACCEPTED (impl + SR B R1–R4 + Request-flow integration, 2026-09-03)
  ↓
-D4  Traveler Security + Representative Data             ⬜ NOT STARTED
+D4  Traveler Security + Representative Data             ✅ ACCEPTED (impl + SR VERDICT A + REMEDIATION CLOSED F1–F6, 2026-09-03)
  ↓
-D5  Orders Full-Page Detail                             ⬜ NOT STARTED
+D4-REM  D4 Strict Review Remediation Closure (F1–F6)    ✅ CLOSED (2026-09-03)
+ ↓
+D5  Orders Full-Page Detail                             ⬜ TRUE NEXT (после ROADMAP/ARCHITECTURE SYNC CHECK)
  ↓
 D6  Bookings Full-Page Detail                           ⬜ NOT STARTED
  ↓
@@ -2586,11 +2590,12 @@ STEP 3.12                                               ⬜ BLOCKED BY D14
 | D0 | Reconciliation Final Git/Evidence Closure | ACCEPTANCE_DEBT | ✅ | — | D0 |
 | D1 | Commerce Lifecycle Contract Finalization | ARCHITECTURE_DEBT | ✅ | D0 | D1 |
 | D1A | Platform CRM Marketplace/Storefront Scope Isolation | IMPLEMENTATION_DEBT | ✅ | D1 | D1A |
-| D2 | Product Traveler Requirements | ARCHITECTURE_DEBT | ⬜ | D1 | D2 |
+| D2 | Product Traveler Requirements | ARCHITECTURE_DEBT | ✅ | D1 | D2 |
 | D3 | Traveler Collection + Order/Booking Population | IMPLEMENTATION_DEBT | ✅ | D2 | D3 |
 | D3-SR | D3 Strict Review (SR B: termsAcceptedAt real, pin-at-acceptance, Booking gate, Option B reconcile) | ARCHITECTURE_DEBT | ✅ | D3 | D3 REMEDIATION |
-| D4 | Traveler Security + Representative Data | IMPLEMENTATION_DEBT | ⬜ | D3 | D4 |
-| D5 | Orders Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ | D0 | D5 |
+| D4 | Traveler Security + Representative Data | IMPLEMENTATION_DEBT | ✅ | D3 | D4-REM |
+| D4-REM | D4 Strict Review Remediation Closure (F1 traveler/final-confirm serialization, F2 list/export scope, F3 S12 natural chain, F4 S5 reclassification, F5 manifest CASE A, F6 bulk traveler) | REMEDIATION_DEBT | ✅ | D4 | D4-REM |
+| D5 | Orders Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ TRUE NEXT | D4-REM | D5 |
 | D6 | Bookings Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ | D0 | D6 |
 | D7 | Payment/Refund Semantics + Financial Presentation | IMPLEMENTATION_DEBT | ⬜ | D0 | D7 |
 | D8 | Global Temporal Visibility | IMPLEMENTATION_DEBT | ⬜ | D0 | D8 |
@@ -2606,6 +2611,30 @@ STEP 3.12                                               ⬜ BLOCKED BY D14
 - 2.18 Financial Integrity Exit Gate — BLOCKED
 - Finance Center — FUTURE / DEFERRED
 - Product Freshness — FUTURE / DEFERRED
+
+---
+
+## ADDENDUM — D4 STRICT REVIEW REMEDIATION CLOSURE (additive sync, 2026-09-03)
+
+Статус-коррекции (аддитивные; история выше не переписана): D2/D3/D4 → ACCEPTED; добавлен D4-REM (closure). D4 закрыт: implementation (`VERDICT A`), независимый STRICT REVIEW (`VERDICT A`, findings D4SR-F1…F8), REMEDIATION CLOSURE (F1–F6, `VERDICT A` — см. `docs/reports/PHASE_3_PRE_STEP_3.12_D4_STRICT_REVIEW_REMEDIATION_CLOSURE_REPORT.md`).
+
+Новые confirmed deferred debts (post-D4, canonical additions):
+
+```text
+D4-REM-F8/PD-1  Partner own-scope commerce contract           DEFERRED — Partner Workspace Order/Booking
+                (S19 owning-partner positive path)             Center; future contract: own sellerPartnerId / tenant
+                                                                scope (platform Marketplace contract → MARKETPLACE only)
+PD-2            RBAC parity reconciliation                     DEFERRED — RolePermission (DB) ↔ ROLE_PERMISSIONS
+                (pre-existing drift, не исправлялся в D4)      (constants) reconciliation; D4 finance keys/grants unchanged
+PD-3            Traveler PII retention/purge/anonymization     DEFERRED — legal/business policy; «жизнь объекта» ≠ retention
+PD-4            Entity Change Audit Framework                  DEFERRED — integration starts D5/D6 + Request requalification
+                (Request/Order/Booking immutable audit events) (mutation → validation → permission/scope → mutability →
+                                                                successful mutation → audit event; PII old/new NO plaintext)
+PD-5            S5B auto-EXPIRED transition                    NOT IMPLEMENTED (honest gap) — enum EXPIRED +
+                (customer action deadline scheduler)            customerActionDeadline существуют; scheduler не реализован
+```
+
+TRUE NEXT после sync check: **D5 — ORDERS FULL-PAGE DETAIL (+ NAVIGATION CONSISTENCY + ACTION/STATE-MACHINE CONSISTENCY + EDITING/MUTABILITY CONTRACT + ENTITY CHANGE AUDIT FRAMEWORK INTEGRATION)**, далее D6 (Booking аналог).
 
 ---
 

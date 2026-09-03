@@ -16,11 +16,11 @@ PHASE 3 — PRE-STEP 3.12 — D4 — TRAVELER SECURITY + REPRESENTATIVE DATA + R
 | Business meaning | D3 CASE A — редактируемый заказ, 2 traveler'а, данные неполные/редактируемые |
 | Workspace / Acquisition | Platform Marketplace (`MARKETPLACE`) |
 | Product | PRD-00000121 «Baku Night Photography Tour» |
-| Request | MKT-REQ-09000547 (`09965373-83cd-46da-a0d8-9b1c08baa37d` — shared C1) |
+| Request | MKT-REQ-09000547 (`006e94b4-62e7-447a-9cab-84ca62d74758`), status `CONVERTED` |
 | Order | MKT-ORD-09000547 (ORD-00001501, `83eb7738-01ac-4506-9af8-3504b989bfc6`), status `NEW`, `finalConfirmedAt NULL`, 2 travelers |
 | Booking / Payment / Refund | NONE |
 | Traveler count / state | 2 / editable (`finalConfirmedAt == NULL`) |
-| Direct URLs | `/app/orders/83eb7738-01ac-4506-9af8-3504b989bfc6`, `/app/requests/09965373-83cd-46da-a0d8-9b1c08baa37d` |
+| Direct URLs | `/app/orders/83eb7738-01ac-4506-9af8-3504b989bfc6`, `/app/requests/006e94b4-62e7-447a-9cab-84ca62d74758` |
 | Evidence | `docs/evidence/d4/tmp_d4_browser_01_d3_caseA_order.png` (browser PASS) |
 
 ## CASE B — D3 permanent (preserved, D4 §24)
@@ -115,21 +115,22 @@ PHASE 3 — PRE-STEP 3.12 — D4 — TRAVELER SECURITY + REPRESENTATIVE DATA + R
 | S2 Supplier confirmed, customer pending | SUPPORTED | C2 (MKT-REQ-09000848 CONFIRMED) | — |
 | S3 Price changed → accepted | SUPPORTED (через accept) | (не выделен отдельный dev case; covered D3RF историческими) | — |
 | S4 Supplier rejection/unavailable | SUPPORTED | C4 (MKT-REQ-09000850 UNAVAILABLE) | — |
-| S5 Customer declined/expired | NOT SUPPORTED как отдельная terminal-команда (нет TTL-EXPIRED enum в state machine; задокументировано как gap, §16/§37) | — | — |
+| S5A Customer declined | SUPPORTED — реальная команда `/requests/:id/customer-decline` → `CANCELLED_BY_CUSTOMER`, Order не создаётся | — (permanent не выделен) | d4-remediation-closure (S5 decline test) |
+| S5B Customer action expired | `auto-EXPIRED` НЕ IMPLEMENTED — enum `EXPIRED` существует, `customerActionDeadline` есть, но scheduler/auto-transition отсутствует (честно задокументировано) | — | — |
 | S6 Order travelers incomplete | SUPPORTED | D3 CASE A (MKT-ORD-09000547 NEW, editable) | — |
 | S7 Ready for Booking | SUPPORTED | C1 (MKT-ORD-09000847 READY_FOR_BOOKING) | test 1 |
 | S8 Sent to Booking | SUPPORTED | D3 CASE B (MKT-ORD-09000548 SENT_TO_BOOKING) | test 1 (переход) |
 | S9 Booking confirmed unpaid | SUPPORTED | C5 (MKT-BKG-09000861 CONFIRMED) | test 1 |
 | S10 Partial payment | NOT SUPPORTED (финансовая модель = единый capture; partial payment отсутствует как архитектурный gap) | — | — |
 | S11 Fully paid | SUPPORTED | C6 (MKT-PAY-09000949-1 CAPTURED) | test 2 |
-| S12 Booking completed | SUPPORTED (исторические COMPLETED Booking в dev DB) | — | — |
+| S12 Booking completed | SUPPORTED — natural chain доказана isolated e2e (Booking COMPLETED → Order FULFILLED → Order CLOSED, реальные команды, без прямой инъекции статусов) | — | d4-remediation-closure (S12 natural completion) |
 | S13 Cancellation before payment | SUPPORTED | — | test 4 |
 | S14 Cancellation after payment | SUPPORTED | C6 (order cancel → Booking CANCELLED) | — |
 | S15 Partial refund | SUPPORTED | — | test 3 (⅓ refund) |
 | S16 Full refund | SUPPORTED | C6 (MKT-REF-00000001 PROCESSED) | test 3 (remainder → REFUNDED) |
 | S17 Authoritative no-Request flow | SUPPORTED (legacy Marketplace Orders без Request) | D3 legacy | — |
 | S18 Marketplace flow | SUPPORTED | C1/C5/C6 (`MARKETPLACE`) | — |
-| S19 Storefront Partner flow | SUPPORTED (существует, tenant партнёра) | SF001-ORD-00000001 / SF001-BKG-00000001 (fixtures в e2e) | d4-traveler-security suite |
+| S19 Storefront Partner flow | negative isolation PROVEN (platform scope = 0 exposure: list/export filter deny, direct reads 404, DB rows сохранены); owning-partner positive commerce path NOT IMPLEMENTED / DEFERRED | SF001-ORD-00000001 / SF001-BKG-00000001 (fixtures в e2e) | d4-traveler-security + d4-remediation-closure (F2 negatives) |
 
 ## Browser runtime evidence
 

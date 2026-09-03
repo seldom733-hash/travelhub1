@@ -152,7 +152,13 @@ E2e (репрезентативные цепочки) используют то�
 - C5 → S9 Booking CONFIRMED unpaid (MKT-BKG-09000861)
 - C6 → S11 paid (MKT-PAY-09000949-1 CAPTURED) → S14 order cancel → Booking CANCELLED → S16 full refund (MKT-REF-00000001 PROCESSED)
 
-S13 (cancel before payment), S15 (partial refund), S17 (authoritative flow), S19 (Storefront) — доказаны e2e-цепочками (см. §18). S5 (customer declined/expired terminal) и S10 (partial payment) — `NOT SUPPORTED — ARCHITECTURE GAP` (нет TTL-EXPIRED enum; финансовая модель = единый capture), не выдумывались (§16, §37).
+S13 (cancel before payment), S15 (partial refund), S17 (authoritative flow), S19 (Storefront) — доказаны e2e-цепочками (см. §18). S10 (partial payment) — `NOT SUPPORTED — ARCHITECTURE GAP` (финансовая модель = единый capture), не выдумывался (§16, §37).
+
+**S5 reclassification (STRICT REVIEW REMEDIATION, D4SR-F4):** customer decline — `SUPPORTED` (реальная команда `/requests/:id/customer-decline` → `CANCELLED_BY_CUSTOMER`, Order не создаётся; natural e2e — d4-remediation-closure). `auto-EXPIRED` — `NOT IMPLEMENTED` (enum `EXPIRED` и `customerActionDeadline` существуют, scheduler/auto-transition отсутствует — честно задокументировано; не реализовано).
+
+**S12 natural completion (D4SR-F3):** добавлен isolated e2e natural chain — Booking `COMPLETED` → Order `FULFILLED` (reconcile) → Order `CLOSED` через реальные команды, без прямой инъекции статусов (d4-remediation-closure, temporal assertions по canonical timestamps).
+
+**S19 (D4SR-F8):** negative isolation `PROVEN`; owning-partner positive commerce path — `NOT IMPLEMENTED / DEFERRED` (Partner Workspace вне scope, см. closure report §Deferred).
 
 ---
 
@@ -162,6 +168,7 @@ S13 (cancel before payment), S15 (partial refund), S17 (authoritative flow), S19
 
 - **DB:** dev DB содержит `MARKETPLACE` (507 orders / 365 bookings) и `PARTNER_STOREFRONT` (500 orders / 354 bookings) — обе цепи существуют и не смешаны по `acquisitionSource`.
 - **API (e2e):** Storefront Order/Booking Partner A не читаются Partner B (403); не читаются/не мутируются platform-ролями через Marketplace контракт (404); исключены из Platform list/registry (0 результатов).
+- **D4 REMEDIATION (F2, D4SR-F2):** явный фильтр `?acquisitionSource=PARTNER_STOREFRONT` на `GET /orders`, `GET /orders/export`, `GET /bookings`, `GET /bookings/export` и drill-down (`export?orderId=<Storefront order>`) закрыт — server-authorized scope (MARKETPLACE) не заменяется client-фильтром; результат — пусто (invisibility-семантика), Storefront-строки сохранены в DB. Negative e2e: d4-remediation-closure (F2).
 - **UI (browser):** `/app/orders|bookings` Platform registries показывают Marketplace-цепочки (C1/C5) и НЕ показывают Storefront (SF001-*). Прямые URL Storefront-объектов → 404 UI.
 
 Platform Marketplace scope не смешивает Storefront customer commerce. Storefront = tenant партнёра (Partner Workspace), доступен партнёру, вне Platform Marketplace контракта.
@@ -276,21 +283,22 @@ DB == API == UI для заявляемых фактов (status/reference/trave
 | S2 Supplier confirmed, customer pending | SUPPORTED | C2 | ✅ | — | ✅ | — | ✅ | — | PASS |
 | S3 Price changed → accepted | SUPPORTED | (D3RF исторические) | ✅ | ✅ | — | — | ✅ | — | PASS (covered) |
 | S4 Supplier rejection/unavailable | SUPPORTED | C4 | ✅ | ✅ | ✅ | — | ✅ | — | PASS |
-| S5 Customer declined/expired | NOT SUPPORTED — ARCHITECTURE GAP | — | — | — | — | — | — | — | GAP (no TTL/EXPIRED enum) |
+| S5A Customer declined | SUPPORTED (real command → CANCELLED_BY_CUSTOMER, no Order) | — | ✅ | ✅ | — | — | ✅ | — | PASS (e2e d4-remediation-closure S5) |
+| S5B Customer action expired | auto-EXPIRED NOT IMPLEMENTED (enum/`customerActionDeadline` существуют; scheduler отсутствует) | — | — | — | — | — | — | — | HONEST GAP (не реализовано) |
 | S6 Order travelers incomplete | SUPPORTED | D3 CASE A | ✅ | ✅ | ✅ | — | ✅ | — | PASS |
 | S7 Ready for Booking | SUPPORTED | C1 | ✅ | ✅ | ✅ | — | ✅ | — | PASS |
 | S8 Sent to Booking | SUPPORTED | D3 CASE B | ✅ | ✅ | — | — | ✅ | — | PASS |
 | S9 Booking confirmed unpaid | SUPPORTED | C5 | ✅ | ✅ | ✅ | — | ✅ | ✅ | PASS |
 | S10 Partial payment | NOT SUPPORTED — ARCHITECTURE GAP | — | — | — | — | — | — | — | GAP (single capture model) |
 | S11 Fully paid | SUPPORTED | C6 | ✅ | ✅ | ✅ | — | ✅ | ✅ | PASS |
-| S12 Booking completed | SUPPORTED | (исторические COMPLETED) | ✅ | — | — | — | — | — | PASS (covered) |
+| S12 Booking completed | SUPPORTED | — | ✅ | ✅ | — | — | ✅ | — | PASS (natural chain e2e d4-remediation-closure) |
 | S13 Cancellation before payment | SUPPORTED | — | ✅ | ✅ | — | — | ✅ | ✅ | PASS (e2e test 4) |
 | S14 Cancellation after payment | SUPPORTED | C6 | ✅ | ✅ | ✅ | — | ✅ | ✅ | PASS |
 | S15 Partial refund | SUPPORTED | — | ✅ | ✅ | — | — | ✅ | ✅ | PASS (e2e test 3) |
 | S16 Full refund | SUPPORTED | C6 | ✅ | ✅ | ✅ | — | ✅ | ✅ | PASS |
 | S17 Authoritative no-Request flow | SUPPORTED | legacy Orders | ✅ | ✅ | — | — | ✅ | — | PASS |
 | S18 Marketplace flow | SUPPORTED | C1/C5/C6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | PASS |
-| S19 Storefront Partner flow | SUPPORTED | SF fixtures (e2e) + dev | ✅ | ✅ | ✅ (404 в Platform; партнёрский UI вне scope D4) | ✅ | ✅ | — | PASS (isolation proven) |
+| S19 Storefront Partner flow | SUPPORTED (negative isolation) | SF fixtures (e2e) + dev | ✅ | ✅ | ✅ (404 в Platform; список/export deny; партнёрский UI вне scope D4) | ✅ | ✅ | — | PASS (negative isolation PROVEN; owning-partner positive path DEFERRED) |
 
 ---
 
