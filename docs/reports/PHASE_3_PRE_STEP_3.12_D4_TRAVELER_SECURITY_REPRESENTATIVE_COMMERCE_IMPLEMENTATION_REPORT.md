@@ -347,7 +347,17 @@ git rev-parse HEAD            # до: ef4cafb (D3 closure)
 git rev-parse origin/master   # до: ef4cafb
 ```
 
-После implementation: commit + push (см. ниже фактический вывод после закрытия). Ожидание: `git status --short` пуст, `HEAD == origin/master`.
+Фактический результат после implementation:
+
+```bash
+git commit   → c99ec7c feat(d4): traveler security + representative commerce chain coverage
+git push     → ef4cafb..c99ec7c master -> master
+git rev-parse HEAD          → c99ec7cd000b9b6001d809d0bf0faf9cc7d57e18
+git rev-parse origin/master → c99ec7cd000b9b6001d809d0bf0faf9cc7d57e18
+git status --short          → пусто (после финального docs-sync коммита)
+```
+
+Hard acceptance: `git status --short` = EXACTLY EMPTY; `HEAD == origin/master` (после push).
 
 ---
 
@@ -410,9 +420,9 @@ git rev-parse origin/master   # до: ef4cafb
 | D11/D12 debts preserved | PASS | не исправлялись |
 | Roadmap synced if architecture changed | PASS | §26 |
 | Final report predominantly Russian | PASS | данный отчёт |
-| `git status --short` empty | (после §27) | — |
-| HEAD == origin/master | (после §27) | — |
-| Push successful | (после §27) | — |
+| `git status --short` empty | PASS | §27 (пусто после финального docs-sync) |
+| HEAD == origin/master | PASS | §27 (c99ec7c == c99ec7c) |
+| Push successful | PASS | §27 (ef4cafb..c99ec7c) |
 
 ---
 
