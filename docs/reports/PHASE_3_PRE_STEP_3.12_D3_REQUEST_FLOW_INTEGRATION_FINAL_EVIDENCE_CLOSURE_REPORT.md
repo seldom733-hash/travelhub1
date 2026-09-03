@@ -392,8 +392,8 @@ Docs/evidence:
 
 - Старт: `c72cd50` (HEAD == origin/master).
 - Коммиты фазы (после закрытия):
-  - `…` (будет добавлен при commit: `feat(order): D3 request flow integration …`)
-  - `…` (docs/evidence + report)
+  - `33cec2f` — `feat(order): D3 — Request flow integration (F6 closure)` (реализация + тесты)
+  - `…` (docs-коммит: report §31 sync — добавляется после фиксации финального state)
 - Финал: HEAD == origin/master (push), рабочее дерево чистое (только pre-existing untracked:
   промпты предыдущих фаз, tmp-скрипты evidence — задокументированы в §28 как disposable).
 - `tmp_d3rf_*` скрипты и `tmp_d3rf_cases.json` — disposable, не коммитятся (лежат в .gitignore-зоне
