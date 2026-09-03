@@ -983,6 +983,42 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "catalog.col.published": { ru: "Опубликован", az: "Dərc edilib", en: "Published" },
   "orders.title": { ru: "Заказы", az: "Sifarişlər", en: "Orders" },
   "bookings.title": { ru: "Бронирования", az: "Bronlar", en: "Bookings" },
+  // ── D3 — Traveler Collection (сбор данных туристов из pinned snapshot) ──
+  "d3.travelers_title": { ru: "Данные туристов", az: "Səyahətçi məlumatları", en: "Traveler data" },
+  "d3.traveler_of": { ru: "Турист {n} из {total}", az: "Səyahətçi {n} / {total}", en: "Traveler {n} of {total}" },
+  "d3.required_fields_note": { ru: "Поля со звёздочкой обязательны", az: "Ulduzlu sahələr mütləqdir", en: "Fields marked with * are required" },
+  "d3.save": { ru: "Сохранить", az: "Yadda saxla", en: "Save" },
+  "d3.saving": { ru: "Сохранение…", az: "Saxlanılır…", en: "Saving…" },
+  "d3.saved": { ru: "Сохранено", az: "Saxlanıldı", en: "Saved" },
+  "d3.saved_hint": { ru: "Данные сохранены на сервере — можно вернуться позже", az: "Məlumatlar serverdə saxlanılıb — sonra davam edə bilərsiniz", en: "Saved on the server — you can resume later" },
+  "d3.complete_badge": { ru: "Заполнено", az: "Tamamlandı", en: "Complete" },
+  "d3.incomplete_badge": { ru: "Не заполнено", az: "Tamamlanmayıb", en: "Incomplete" },
+  "d3.required": { ru: "Обязательно", az: "Mütləq", en: "Required" },
+  "d3.optional": { ru: "Опционально", az: "Seçim", en: "Optional" },
+  "d3.not_requested": { ru: "Не запрашивается", az: "Tələb olunmur", en: "Not requested" },
+  "d3.field.firstName": { ru: "Имя", az: "Ad", en: "First name" },
+  "d3.field.lastName": { ru: "Фамилия", az: "Soyad", en: "Last name" },
+  "d3.field.birthDate": { ru: "Дата рождения", az: "Doğum tarixi", en: "Date of birth" },
+  "d3.field.citizenship": { ru: "Гражданство", az: "Vətəndaşlıq", en: "Citizenship" },
+  "d3.field.gender": { ru: "Пол", az: "Cins", en: "Gender" },
+  "d3.field.passportNumber": { ru: "Номер паспорта", az: "Passport nömrəsi", en: "Passport number" },
+  "d3.field.passportExpiry": { ru: "Срок действия паспорта", az: "Passport müddəti", en: "Passport expiry" },
+  "d3.collection_status": { ru: "Статус сбора данных", az: "Məlumat toplama statusu", en: "Collection status" },
+  "d3.terms_accepted_at": { ru: "Условия приняты", az: "Şərtlər qəbul edilib", en: "Terms accepted" },
+  "d3.data_completed_at": { ru: "Данные собраны", az: "Məlumatlar tamamlanıb", en: "Traveler data complete" },
+  "d3.final_confirmed_at": { ru: "Подтверждено финально", az: "Son təsdiq", en: "Final confirmation" },
+  "d3.final_confirm": { ru: "Финальное подтверждение", az: "Son təsdiq", en: "Final confirmation" },
+  "d3.final_confirm_hint": { ru: "Проверка полноты и подтверждение перед бронированием", az: "Bronlaşdırmadan əvvəl tamlıq yoxlanışı və təsdiq", en: "Validate completeness and confirm before booking" },
+  "d3.confirming": { ru: "Проверка и подтверждение…", az: "Yoxlanır və təsdiqlənir…", en: "Validating and confirming…" },
+  "d3.confirmed_ok": { ru: "Данные полны — финальное подтверждение выполнено", az: "Məlumatlar tamdır — son təsdiq edildi", en: "Data complete — final confirmation done" },
+  "d3.confirm_error": { ru: "Финальное подтверждение отклонено", az: "Son təsdiq rədd edildi", en: "Final confirmation rejected" },
+  "d3.locked": { ru: "Данные зафиксированы после финального подтверждения", az: "Son təsdiqdən sonra məlumatlar sabitlənib", en: "Data is locked after final confirmation" },
+  "d3.legacy_no_pinned": { ru: "Заказ вне D3-потока: требования не закреплены", az: "Sifariş D3 axınından kənardır: tələblər sabitlənməyib", en: "Order outside D3 flow: requirements not pinned" },
+  "d3.need_edit_permission": { ru: "Недостаточно прав для изменения данных туристов", az: "Səyahətçi məlumatlarını dəyişmək üçün icazə yoxdur", en: "Insufficient permissions to edit traveler data" },
+  "d3.load_failed": { ru: "Не удалось загрузить данные туристов", az: "Səyahətçi məlumatları yüklənə bilmədi", en: "Failed to load traveler data" },
+  "d3.save_failed": { ru: "Ошибка сохранения: {msg}", az: "Saxlama xətası: {msg}", en: "Save failed: {msg}" },
+  "d3.no_travelers": { ru: "Туристы отсутствуют", az: "Səyahətçi yoxdur", en: "No travelers" },
+  "d3.expected_count": { ru: "Ожидается туристов: {n}", az: "Gözlənilən səyahətçi: {n}", en: "Expected travelers: {n}" },
   // ── Admin list pages localization ──
   "admin.catalog.header": { ru: "Catalog Center", az: "Kataloq Mərkəzi", en: "Catalog Center" },
   "admin.catalog.breadcrumb": { ru: "Catalog Center", az: "Kataloq Mərkəzi", en: "Catalog Center" },
@@ -1632,6 +1668,15 @@ export function t(key: string, locale: Locale): string {
   const entry = DICT[key];
   if (!entry) return key;
   return entry[locale] ?? entry[DEFAULT_LOCALE] ?? key;
+}
+
+/** Локализованная строка с простой интерполяцией {name} из params. */
+export function ti(key: string, locale: Locale, params: Record<string, string | number>): string {
+  let s = t(key, locale);
+  for (const [name, value] of Object.entries(params)) {
+    s = s.split(`{${name}}`).join(String(value));
+  }
+  return s;
 }
 
 /* ── Locale-aware formatting (Intl) ────────────────────────────────────────── */

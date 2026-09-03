@@ -18,6 +18,12 @@ import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
 import { isDateOnly } from "../../shared/date-only";
 import { isIanaTimeZone, isLocalTime } from "../../shared/service-time";
 import { PaymentPrepaymentType, PaymentScheme, QuoteDiscountType, SalesAcquisitionSource } from "../../generated/prisma/enums";
+import {
+  getEffectiveTravelerRequirements,
+  isTravelerField,
+  type TravelerField,
+  type TravelerFullRequirements,
+} from "../catalog/traveler-requirements";
 
 export interface TravelerUpdateInput {
   firstName?: string;
@@ -26,6 +32,18 @@ export interface TravelerUpdateInput {
   citizenship?: string;
   gender?: string;
   passportNumber?: string;
+  passportExpiry?: string;
+}
+
+/** D3: individual traveler update (collector-driven, validated against pinned snapshot). */
+export interface TravelerCollectInput {
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  citizenship?: string;
+  gender?: string;
+  passportNumber?: string;
+  passportExpiry?: string;
 }
 
 export type OrderAction =
@@ -301,6 +319,8 @@ export class OrderService {
       /** Canonical traveler контекст из Sales CheckoutIntent (READ-only,
        *  immutable после Sale completion — Step 2.4 assertCheckoutNotCompleted). */
       travelers: Array<{ firstName: string; lastName: string; birthDate: Date | null }>;
+      /** D3 §3: pinned traveler requirements snapshot (immutable after Order creation). */
+      pinnedRequirements?: Record<string, string> | null;
       orderRequestedEventId: string;
       correlationId: string | null;
       causationId: string | null;
@@ -346,6 +366,20 @@ export class OrderService {
         serviceTimeZone,
         version: 1,
         submittedAt,
+        // D3 §3 — PIN traveler requirements at termsAcceptedAt (Order creation
+        // = durable acceptance of current price/terms in this architecture;
+        // отчёт D3 §7 — snapshot копируется в Order domain, т.к. pre-Order
+        // сущности (CheckoutIntent/Sale) не хранят traveler requirements).
+        // Immutable: последующие Product-изменения НЕ влияют на принятый
+        // checkout (hard gate §3). Server-owned — клиент не может заменить.
+        termsAcceptedAt: new Date(),
+        pinnedRequirements: input.pinnedRequirements
+          ? (input.pinnedRequirements as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
+        // D3 §6 — canonical traveler count: actual selected party contract
+        // (CheckoutIntentTraveler rows, READ-only), NOT derived retroactively
+        // из Passenger/форм.
+        travelerCount: travelers.length,
         // Step 2.5: upstream refs + frozen snapshot (из OrderRequested).
         saleId: payload.saleId,
         saleCode: payload.saleCode,
@@ -391,11 +425,15 @@ export class OrderService {
       });
     }
 
-    for (const t of travelers) {
+    // D3 §13: position = 1-based индекс в checkout party list — детерминированный
+    // порядок туристов (OrderTraveler не имеет createdAt; UI-порядок обязан быть
+    // стабильным для save/resume в multi-traveler collection).
+    for (const [tIdx, t] of travelers.entries()) {
       await tx.orderTraveler.create({
         data: {
           orderId: order.id,
           customerId,
+          position: tIdx + 1,
           firstName: t.firstName,
           lastName: t.lastName,
           birthDate: t.birthDate,
@@ -927,6 +965,350 @@ export class OrderService {
     });
 
     await this.eventBus.publishPending();
+    return result;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // D3 — Traveler Collection + Order/Booking Population
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * D3 §3 — Read pinned traveler requirements for an Order.
+   * Immutable after termsAcceptedAt. Client cannot replace.
+   */
+  async getPinnedRequirements(orderId: string, viewer?: TravelerViewer): Promise<{
+    pinnedRequirements: TravelerFullRequirements | null;
+    termsAcceptedAt: Date | null;
+    travelerDataCompletedAt: Date | null;
+    finalConfirmedAt: Date | null;
+    travelerCount: number | null;
+    travelers: Array<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      birthDate: Date | null;
+      citizenship: string | null;
+      gender: string | null;
+      passportNumber: string | null;
+      passportExpiry: Date | null;
+      dataCompleteness: string;
+    }>;
+  }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        pinnedRequirements: true,
+        termsAcceptedAt: true,
+        travelerDataCompletedAt: true,
+        finalConfirmedAt: true,
+        travelerCount: true,
+        travelers: {
+          orderBy: [{ position: "asc" }, { id: "asc" }],
+          select: {
+            id: true, firstName: true, lastName: true, birthDate: true,
+            citizenship: true, gender: true, passportNumber: true, passportExpiry: true,
+            dataCompleteness: true,
+          },
+        },
+      },
+    });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+    return {
+      // D3 §3: pinned snapshot — immutable, server-owned (read-only for client).
+      pinnedRequirements: order.pinnedRequirements as TravelerFullRequirements | null,
+      termsAcceptedAt: order.termsAcceptedAt,
+      travelerDataCompletedAt: order.travelerDataCompletedAt,
+      finalConfirmedAt: order.finalConfirmedAt,
+      travelerCount: order.travelerCount,
+      // Step 1.17: field-level PII redaction — passport/birthDate виден только
+      // OPERATOR/ADMIN (тот же контракт, что listOrders/getOrder; D3 §16).
+      travelers: redactTravelersPii(order.travelers ?? [], viewer),
+    };
+  }
+
+  /**
+   * D3 §9 — Update individual traveler data (collector-driven, incremental save).
+   * Validates against the PINNED requirements snapshot (immutable since
+   * termsAcceptedAt — НЕ mutable Product policy, hard gate §3):
+   *  - NOT_REQUESTED: поле отбрасывается — никогда не запрашивается/не хранится
+   *    (минимизация §9);
+   *  - REQUIRED: обязательность проверяется сервером при ЗАВЕРШЕНИИ
+   *    (validateTravelerCompletion / finalConfirm). Здесь разрешён частичный
+   *    save (save → refresh → resume, D3 §13). Пустое значение для REQUIRED
+   *    поля → отклоняется (нельзя «стереть» обязательное поле);
+   *  - OPTIONAL: валидируется формат при передаче; пустая строка = сброс (null);
+   *  - birthDate/passportExpiry — строго YYYY-MM-DD (isDateOnly), иначе 422;
+   *  - dataCompleteness вычисляется сервером из МЕРЖА (existing + new) значений.
+   */
+  async updateTravelerD3(
+    orderId: string,
+    travelerId: string,
+    input: TravelerCollectInput,
+    actor?: string,
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true, code: true, termsAcceptedAt: true, pinnedRequirements: true,
+        travelerCount: true, travelerDataCompletedAt: true, finalConfirmedAt: true,
+      },
+    });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+
+    // D3 §19: traveler submission before acceptance — запрещено.
+    if (!order.termsAcceptedAt) {
+      throw new ValidationDomainError(`Order ${order.code} has no termsAcceptedAt; traveler submission before acceptance is not allowed`);
+    }
+
+    // D3 §19: mutation after final confirmation — запрещено (immutable).
+    if (order.finalConfirmedAt) {
+      throw new ConflictError(`Order ${order.code} is already final-confirmed; traveler data is immutable`);
+    }
+
+    // D3 §3: pinned snapshot — единственный источник требований.
+    // Legacy Order без snapshot (до D3) — вне D3-потока сбора данных.
+    const pinned = order.pinnedRequirements as TravelerFullRequirements | null;
+    if (!pinned) {
+      throw new ValidationDomainError(`Order ${order.code} has no pinned traveler requirements; traveler collection requires pinned snapshot (D3)`);
+    }
+
+    // D3 §9: strip NOT_REQUESTED + форматная валидация переданных значений.
+    // undefined = поле не передано (сохранить existing); null = явный сброс.
+    const filteredInput: Partial<Record<TravelerField, string | null>> = {};
+    for (const [field, value] of Object.entries(input)) {
+      if (!isTravelerField(field)) continue; // DTO ограничен; defensive skip
+      const state = pinned[field as TravelerField];
+      if (state === "NOT_REQUESTED") continue; // не храним чувствительные «на всякий случай»
+      if (value === undefined || value === null) continue;
+      const s = String(value);
+      if (s.trim().length === 0) {
+        if (state === "REQUIRED") {
+          throw new ValidationDomainError(`Traveler field "${field}" is REQUIRED per pinned requirements and cannot be cleared`);
+        }
+        filteredInput[field as TravelerField] = null; // сброс optional
+        continue;
+      }
+      if (field === "birthDate" || field === "passportExpiry") {
+        if (!isDateOnly(s)) {
+          throw new ValidationDomainError(`Traveler field "${field}" must be a valid date (YYYY-MM-DD)`);
+        }
+      }
+      filteredInput[field as TravelerField] = s;
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.orderTraveler.findFirst({
+        where: { id: travelerId, orderId },
+      });
+      if (!existing) throw new NotFoundError(`Traveler ${travelerId} not found in Order ${order.code}`);
+
+      // D3 §19: повторная проверка внутри tx (гонка final-confirm vs save).
+      const freshOrder = await tx.order.findUnique({ where: { id: orderId }, select: { finalConfirmedAt: true } });
+      if (freshOrder?.finalConfirmedAt) {
+        throw new ConflictError(`Order ${order.code} is already final-confirmed; traveler data is immutable`);
+      }
+
+      // Мерж (existing + new): dataCompleteness по REQUIRED-полям pinned.
+      const merged = (field: TravelerField): string | Date | null => {
+        const v = filteredInput[field];
+        if (v === undefined) return (existing as unknown as Record<string, unknown>)[field] as string | Date | null;
+        if (v === null) return null;
+        if (field === "birthDate" || field === "passportExpiry") return new Date(v);
+        return v;
+      };
+      const hasAllRequired = (Object.keys(pinned) as TravelerField[])
+        .filter((f) => pinned[f] === "REQUIRED")
+        .every((f) => {
+          const v = merged(f);
+          return v !== null && v !== undefined && String(v).trim().length > 0;
+        });
+
+      const updated = await tx.orderTraveler.update({
+        where: { id: travelerId },
+        data: {
+          firstName: (merged("firstName") as string | null) ?? existing.firstName,
+          lastName: (merged("lastName") as string | null) ?? existing.lastName,
+          birthDate: merged("birthDate") as Date | null,
+          citizenship: merged("citizenship") as string | null,
+          gender: merged("gender") as string | null,
+          passportNumber: merged("passportNumber") as string | null,
+          passportExpiry: merged("passportExpiry") as Date | null,
+          dataCompleteness: hasAllRequired ? "COMPLETE" : "INCOMPLETE",
+          version: { increment: 1 },
+        },
+      });
+
+      await tx.orderHistory.create({
+        data: {
+          orderId,
+          action: "update_traveler_d3",
+          actorId: actor ?? null,
+          actorName: actor ?? null,
+          comment: `Traveler ${travelerId} data updated (D3 collection)`,
+        },
+      });
+
+      return updated;
+    });
+
+    return result;
+  }
+
+  /**
+   * D3 §10 — Validate traveler completion (server-side gate).
+   * complete = true ТОЛЬКО когда:
+   *  - termsAcceptedAt установлен;
+   *  - pinned requirements существуют (legacy Order без snapshot — вне D3);
+   *  - traveler count удовлетворён (canonical count, §6);
+   *  - все Travelers присутствуют и все их REQUIRED поля (по pinned) валидны.
+   * При complete=true устанавливается travelerDataCompletedAt (server-owned;
+   * однажды установлен — не перезаписывается; updatedAt НЕ используется).
+   */
+  async validateTravelerCompletion(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { travelers: true },
+    });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+
+    if (!order.termsAcceptedAt) {
+      throw new ValidationDomainError(`Order ${order.code} has no termsAcceptedAt`);
+    }
+
+    const pinned = order.pinnedRequirements as TravelerFullRequirements | null;
+    if (!pinned) {
+      return {
+        complete: false,
+        reason: "pinned traveler requirements missing (legacy order outside D3 flow)",
+        travelerDataCompletedAt: null,
+      };
+    }
+
+    // D3 §6: traveler count satisfied (canonical count source — server-owned).
+    if (order.travelerCount && order.travelers.length < order.travelerCount) {
+      return {
+        complete: false,
+        reason: `Expected ${order.travelerCount} travelers, have ${order.travelers.length}`,
+        travelerDataCompletedAt: null,
+      };
+    }
+
+    // D3 §10: все REQUIRED поля (по pinned snapshot) для каждого Traveler.
+    const requiredFields = (Object.keys(pinned) as TravelerField[]).filter((f) => pinned[f] === "REQUIRED");
+    const missing: string[] = [];
+    for (const t of order.travelers) {
+      for (const f of requiredFields) {
+        const val = (t as unknown as Record<string, unknown>)[f];
+        if (val === null || val === undefined || String(val).trim().length === 0) {
+          missing.push(`${f} (${t.firstName} ${t.lastName})`);
+        }
+      }
+    }
+    if (missing.length > 0) {
+      return {
+        complete: false,
+        reason: `${missing.length} required field(s) missing: ${missing.slice(0, 5).join("; ")}`,
+        travelerDataCompletedAt: null,
+      };
+    }
+
+    // dataCompleteness invariant (defense in depth — флаг хранится сервером).
+    const flagIncomplete = order.travelers.filter((t) => t.dataCompleteness !== "COMPLETE");
+    if (flagIncomplete.length > 0) {
+      return {
+        complete: false,
+        reason: `${flagIncomplete.length} traveler(s) have incomplete data`,
+        travelerDataCompletedAt: null,
+      };
+    }
+
+    // D3 §10: travelerDataCompletedAt — один server-owned instant.
+    if (!order.travelerDataCompletedAt) {
+      const now = new Date();
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: { travelerDataCompletedAt: now },
+      });
+      return { complete: true, reason: null, travelerDataCompletedAt: now };
+    }
+
+    return { complete: true, reason: null, travelerDataCompletedAt: order.travelerDataCompletedAt };
+  }
+
+  /**
+   * D3 §10/§13 — Final confirmation gate.
+   * Требует: termsAcceptedAt + pinned requirements + traveler count satisfied +
+   * все REQUIRED fields valid + travelerDataCompletedAt + явное подтверждение.
+   * Устанавливает finalConfirmedAt — ОТДЕЛЬНЫЙ от termsAcceptedAt момент
+   * (принятие условий ≠ подтверждение после сбора данных).
+   * Идемпотентность (§17): CAS updateMany (finalConfirmedAt IS NULL) —
+   * double-click / concurrent retry → ровно ОДИН победитель; повторный вызов
+   * после успеха → ConflictError (duplicate final confirm → нет дубля Order).
+   */
+  async finalConfirm(orderId: string, actor?: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { travelers: true },
+    });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+
+    // D3 §10: termsAcceptedAt required (terms acceptance ≠ final confirmation).
+    if (!order.termsAcceptedAt) {
+      throw new ValidationDomainError(`Order ${order.code}: final confirmation requires termsAcceptedAt`);
+    }
+
+    // D3 §10: pinned requirements must exist.
+    if (!order.pinnedRequirements) {
+      throw new ValidationDomainError(`Order ${order.code}: final confirmation requires pinned requirements`);
+    }
+
+    // D3 §10: traveler count satisfied.
+    if (order.travelerCount && order.travelers.length < order.travelerCount) {
+      throw new ValidationDomainError(
+        `Order ${order.code}: traveler count not satisfied (expected ${order.travelerCount}, have ${order.travelers.length})`,
+      );
+    }
+
+    // D3 §10: all REQUIRED fields valid (travelerDataCompletedAt).
+    if (!order.travelerDataCompletedAt) {
+      const completion = await this.validateTravelerCompletion(orderId);
+      if (!completion.complete) {
+        throw new ValidationDomainError(`Order ${order.code}: traveler data not complete — ${completion.reason}`);
+      }
+    }
+
+    // D3 §19: duplicate final confirm → reject (не создаёт дубль Order).
+    if (order.finalConfirmedAt) {
+      throw new ConflictError(`Order ${order.code} is already final-confirmed`);
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      // CAS: только если ещё не подтверждён (double-click / concurrent retry).
+      const updatedRows = await tx.order.updateMany({
+        where: { id: orderId, finalConfirmedAt: null },
+        data: { finalConfirmedAt: now },
+      });
+      if (updatedRows.count !== 1) {
+        throw new ConflictError(`Order ${order.code} was concurrently final-confirmed`);
+      }
+
+      await tx.orderHistory.create({
+        data: {
+          orderId,
+          action: "final_confirm",
+          from: null,
+          to: "final_confirmed",
+          actorId: actor ?? null,
+          actorName: actor ?? null,
+          comment: "Финальное подтверждение заказа (D3)",
+        },
+      });
+
+      return { orderId, finalConfirmedAt: now };
+    });
+
     return result;
   }
 }

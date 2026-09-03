@@ -2023,6 +2023,29 @@ model Order {
   /// Момент перехода close → CLOSED (OrderClosed). Server-owned; immutable.
   closedAt DateTime?
 
+  // ── D3 — Traveler Collection + Order/Booking Population ──
+  /// D3: момент принятия условий/цен (terms acceptance). Server-owned;
+  /// immutable. При создании Order из OrderRequested — момент acceptance.
+  /// NULL = legacy Order (до D3, без backfill).
+  termsAcceptedAt DateTime?
+  /// D3: момент завершения сбора данных всех обязательных туристов.
+  /// Server-owned; immutable (однажды установлен — не перезаписывается).
+  /// NULL = данные ещё не собраны / legacy Order.
+  travelerDataCompletedAt DateTime?
+  /// D3: момент явного финального подтверждения перед созданием Booking.
+  /// Отличается от termsAcceptedAt (принятие цен/условий).
+  /// Server-owned; immutable. NULL = не подтверждено.
+  finalConfirmedAt DateTime?
+  /// D3: pinned traveler requirements snapshot (immutable JSONB).
+  /// Server-owned: getEffectiveTravelerRequirements(Product.type, Product.travelerRequirements)
+  /// на момент termsAcceptedAt. Клиент НЕ может произвольно заменить.
+  /// {firstName: "REQUIRED", lastName: "REQUIRED", birthDate: "OPTIONAL", ...}
+  /// NULL = legacy Order (до D3;requirements не закреплены).
+  pinnedRequirements Json?
+  /// D3: ожидаемое количество туристов (canonical traveler count).
+  /// Server-owned; immutable. 1 = minimum. NULL = legacy Order.
+  travelerCount Int?
+
   items      OrderItem[]
   travelers  OrderTraveler[]
   fulfillments Fulfillment[]
@@ -2060,6 +2083,10 @@ model OrderTraveler {
   orderId           String
   order             Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customerId        String?
+  /// D3 §13: позиция в списке туристов (1-based, порядок checkout party list).
+  /// Детерминированный порядок для UI collection и save/resume (OrderTraveler
+  /// не имеет createdAt; без position порядок выборки нестабилен).
+  position          Int                     @default(0)
   firstName         String
   lastName          String
   birthDate         DateTime?

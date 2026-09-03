@@ -186,6 +186,10 @@ export class BookingSubscribers implements OnModuleInit {
             },
           });
 
+          // D3 §11 — Passenger получает данные из confirmed OrderTraveler
+          // (НЕ из Customer, НЕ из mutable Product requirements); никакие
+          // поля не фабрикуются. passportExpiry переносится из OrderTraveler
+          // (полный snapshot подтверждённых данных, D3).
           for (const t of readyTravelers) {
             await tx.passenger.create({
               data: {
@@ -196,6 +200,7 @@ export class BookingSubscribers implements OnModuleInit {
                 citizenship: t.citizenship,
                 gender: t.gender,
                 passportNumber: t.passportNumber,
+                passportExpiry: t.passportExpiry,
               },
             });
           }

@@ -3,6 +3,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService, type OutboxEnvelope } from "../../eventbus/eventbus.service";
 import { DomainEvents, type OrderRequestedPayload } from "../../eventbus/domain-events";
 import { OrderService, assertValidOrderRequestedPayload } from "./order.service";
+import { getEffectiveTravelerRequirements } from "../../modules/catalog/traveler-requirements";
 
 const CONSUMER_ID = "order-requested-consumer";
 
@@ -71,6 +72,22 @@ export class OrderRequestedConsumer implements OnModuleInit {
           select: { firstName: true, lastName: true, birthDate: true },
         });
 
+        // D3 §3 — PIN traveler requirements at termsAcceptedAt.
+        // Read product type from payload items to resolve effective requirements.
+        // Frozen snapshot: immutable after Order creation.
+        const productTypes = payload.items.map(i => i.productType);
+        const primaryProductType = productTypes[0] ?? "TOUR";
+        // READ-only cross-context: read product travelerRequirements from catalog.
+        // First item's product is authoritative for the Order's pinned requirements.
+        const firstProduct = await tx.product.findUnique({
+          where: { id: payload.items[0]?.productId ?? "" },
+          select: { type: true, travelerRequirements: true },
+        }).catch(() => null);
+        const pinnedRequirements = getEffectiveTravelerRequirements(
+          firstProduct?.type ?? primaryProductType,
+          firstProduct?.travelerRequirements ?? null,
+        );
+
         // Доменная логика создания (OrderService — owner) в той же транзакции.
         // Step 2.17B remediation (Workstream B): OrderCreated эмитится атомарно
         // с Order — сохраняем его id для точечной доставки ниже (publishEvent
@@ -78,6 +95,7 @@ export class OrderRequestedConsumer implements OnModuleInit {
         const { eventId: orderCreatedEventId } = await this.orders.createOrderFromRequested(tx, {
           payload,
           travelers,
+          pinnedRequirements,
           orderRequestedEventId: ev.id,
           correlationId: ev.correlationId,
           causationId: ev.id,

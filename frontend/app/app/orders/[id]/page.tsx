@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import OperationalNotes from "@/components/OperationalNotes";
+import TravelerCollectionPanel from "@/components/order/TravelerCollectionPanel";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 
@@ -131,6 +132,12 @@ export default function OrderDetailPage() {
               </div>
             </div>
           )}
+
+          {/* D3 — Traveler Collection (pinned requirements + save/resume + final confirmation) */}
+          <div>
+            <div className="mb-2 font-medium text-slate-700">{t("d3.travelers_title", locale)}</div>
+            <TravelerCollectionPanel orderId={id} />
+          </div>
 
           {/* Notes — Operational Notes */}
           {user && (

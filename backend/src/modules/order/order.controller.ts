@@ -34,6 +34,41 @@ class TravelerDto {
   @IsOptional()
   @IsString()
   passportNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  passportExpiry?: string;
+}
+
+/** D3: traveler collection input (validated against pinned requirements). */
+class TravelerCollectDto {
+  @IsOptional()
+  @IsString()
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @IsOptional()
+  @IsString()
+  birthDate?: string;
+
+  @IsOptional()
+  @IsString()
+  citizenship?: string;
+
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @IsOptional()
+  @IsString()
+  passportNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  passportExpiry?: string;
 }
 
 class OrderActionDto {
@@ -230,6 +265,41 @@ export class OrderController {
     // через whitelist. Команда принимает ТОЛЬКО `action`.
     assertNoForbiddenKeys(req.body, ORDER_ACTION_FORBIDDEN_KEYS);
     return this.orders.orderAction(id, dto.action, actor.username, dto.reason ?? null);
+  }
+
+  // ── D3: Traveler Collection + Order/Booking Population ──
+
+  @Get("orders/:id/travelers")
+  @RequirePermissions("order.read")
+  getPinnedRequirements(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    // D3 §16: PII redaction по viewer (тот же контракт, что listOrders/getOrder).
+    return this.orders.getPinnedRequirements(id, actor);
+  }
+
+  @Patch("orders/:id/travelers/:travelerId")
+  @RequirePermissions("order.edit_noncritical")
+  updateTravelerD3(
+    @Param("id") id: string,
+    @Param("travelerId") travelerId: string,
+    @Body() dto: TravelerCollectDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.orders.updateTravelerD3(id, travelerId, dto, actor.username);
+  }
+
+  @Post("orders/:id/validate-completion")
+  @RequirePermissions("order.read")
+  validateCompletion(@Param("id") id: string) {
+    return this.orders.validateTravelerCompletion(id);
+  }
+
+  @Post("orders/:id/final-confirm")
+  @RequirePermissions("order.edit_noncritical")
+  finalConfirm(
+    @Param("id") id: string,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.orders.finalConfirm(id, actor.username);
   }
 
   @Patch("orders/:id/travelers")
