@@ -518,11 +518,15 @@ disposition; PD-2 roadmap debt).
 ## 36. Git Closure
 
 ```text
-(значения фиксируются после push в разделе финальной проверки)
+Implementation commit : 0ec4255 — feat(d5): order full-page detail +
+                         server-authoritative actions + entity change
+                         audit framework
+Starting HEAD          : 8c4fa4d4a8e8cba5bbe11da403afb062ec762173
+                         (== origin/master, D4 REMEDIATION CLOSURE tip)
+Final HEAD             : 0ec425517267aea8354f3b1a4d89019ff431bf45
+origin/master          : 0ec425517267aea8354f3b1a4d89019ff431bf45
+Final worktree         : EXACTLY EMPTY (git status --short = 0 строк)
 ```
-
-Будут указаны реальные SHA после коммита и пуша (см. финальную секцию
-«Git Closure» после §38 — дополняется фактическими значениями).
 
 ## 37. Final Verdict
 
