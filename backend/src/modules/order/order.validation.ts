@@ -70,6 +70,14 @@ export const ORDER_ACTION_FORBIDDEN_KEYS = [
   // version / CAS
   "version",
   "expectedVersion",
+  // D3 server-owned keys (D4 §13): traveler collection contract — pinned
+  // snapshot, traveler count, acceptance/collection milestones — клиент НЕ
+  // может их подменить → 422.
+  "travelerCount",
+  "pinnedRequirements",
+  "termsAcceptedAt",
+  "travelerDataCompletedAt",
+  "finalConfirmedAt",
   // actor / correlation / audit
   "actor",
   "actorId",
@@ -114,4 +122,11 @@ export const ORDER_TRAVELERS_FORBIDDEN_KEYS = [
   "correlationId",
   "causationId",
   "history",
+  // D3/D4 §13: server-owned Order-level keys на traveler command → 422
+  // (pinned snapshot / traveler count / collection milestones immutable).
+  "travelerCount",
+  "pinnedRequirements",
+  "termsAcceptedAt",
+  "travelerDataCompletedAt",
+  "finalConfirmedAt",
 ] as const;

@@ -42,6 +42,13 @@ export class BookingQueryService {
     });
     if (!booking) throw new NotFoundError(`Booking ${id} not found`);
 
+    // D4 §10/§21: Storefront-tenant Booking не читается через platform
+    // marketplace read-контракт (HTTP viewer присутствует → 404, direct UUID
+    // enumeration denied). Внутренние вызовы без viewer (trusted) остаются.
+    if (viewer && booking.acquisitionSource === "PARTNER_STOREFRONT") {
+      throw new NotFoundError(`Booking ${id} not found`);
+    }
+
     // ── Related-entity display name enrichment (Round 2E.2R.1) ──
     // Batch-resolve order code + product title (no N+1)
     let orderDisplay: { id: string; referenceNumber: string } | null = null;

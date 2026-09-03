@@ -25,6 +25,17 @@ import {
   type TravelerFullRequirements,
 } from "../catalog/traveler-requirements";
 
+/**
+ * D4 §10/§21 — Platform Marketplace read/command scope.
+ * Platform staff-роли работают с Marketplace commerce (Order Center default
+ * scope — MARKETPLACE; Storefront = tenant партнёра, Partner Workspace).
+ * Объекты PARTNER_STOREFRONT не читаются/не изменяются через platform
+ * marketplace-контракты: прямой GET по UUID / business reference → 404
+ * (enumeration protection), lifecycle/traveler-команды → 404. Внутренние
+ * cross-domain вызовы (viewer отсутствует, trusted, ADR-0001) не затрагиваются.
+ */
+export const PLATFORM_SCOPE_DENIED_SOURCE = "PARTNER_STOREFRONT";
+
 export interface TravelerUpdateInput {
   firstName?: string;
   lastName?: string;
@@ -968,6 +979,14 @@ export class OrderService {
     });
     if (!order) throw new NotFoundError(`Order ${id} not found`);
 
+    // D4 §10/§21: Storefront-tenant объект не читается через platform
+    // marketplace read-контракт (HTTP viewer присутствует; прямой GET по UUID /
+    // business reference → 404, enumeration protection). Внутренние вызовы без
+    // viewer (trusted) остаются доступными.
+    if (viewer && order.acquisitionSource === PLATFORM_SCOPE_DENIED_SOURCE) {
+      throw new NotFoundError(`Order ${id} not found`);
+    }
+
     // ── Related-entity display name enrichment (Round 2E.2R.1) ──
     // Batch-resolve customer + partner display names (no N+1)
     const relatedIds: string[] = [];
@@ -1007,8 +1026,26 @@ export class OrderService {
   }
 
   async updateTravelers(orderId: string, travelers: TravelerUpdateInput[], actor?: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true, code: true } });
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true, code: true, termsAcceptedAt: true, finalConfirmedAt: true, acquisitionSource: true,
+      },
+    });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+
+    // D4 §10/§21: Storefront-tenant объекты не изменяются через platform
+    // marketplace-контракты (UUID-directed команда → 404, enumeration protection).
+    if (order.acquisitionSource === PLATFORM_SCOPE_DENIED_SOURCE) {
+      throw new NotFoundError(`Order ${orderId} not found`);
+    }
+
+    // D4 §13 (mutability): подтверждённые данные туристов immutable — PATCH
+    // после final confirmation → server-side denial (D3-поток). Legacy-заказы
+    // без finalConfirmedAt сохраняют прежний bulk-edit.
+    if (order.finalConfirmedAt) {
+      throw new ConflictError(`Order ${order.code} is already final-confirmed; traveler data is immutable`);
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.orderTraveler.findMany({ where: { orderId } });
@@ -1062,10 +1099,16 @@ export class OrderService {
         select: {
           id: true, code: true, customerId: true, status: true, version: true,
           termsAcceptedAt: true, finalConfirmedAt: true, travelerCount: true,
+          acquisitionSource: true,
           travelers: { select: { id: true, dataCompleteness: true } },
         },
       });
       if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+      // D4 §10/§21: lifecycle-команды по Storefront-tenant объекту через platform
+      // marketplace-контракт → 404 (UUID-directed action, enumeration protection).
+      if (order.acquisitionSource === PLATFORM_SCOPE_DENIED_SOURCE) {
+        throw new NotFoundError(`Order ${orderId} not found`);
+      }
       if (!transition.from.includes(order.status)) {
         throw new ConflictError(`Cannot ${action} order ${order.code} from status ${order.status}`);
       }
@@ -1241,6 +1284,7 @@ export class OrderService {
       where: { id: orderId },
       select: {
         id: true,
+        acquisitionSource: true,
         pinnedRequirements: true,
         termsAcceptedAt: true,
         travelerDataCompletedAt: true,
@@ -1257,6 +1301,11 @@ export class OrderService {
       },
     });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+    // D4 §10/§21: Storefront-tenant traveler projection не читается через
+    // platform marketplace-контракт (HTTP viewer → 404, enumeration protection).
+    if (viewer && order.acquisitionSource === PLATFORM_SCOPE_DENIED_SOURCE) {
+      throw new NotFoundError(`Order ${orderId} not found`);
+    }
     return {
       // D3 §3: pinned snapshot — immutable, server-owned (read-only for client).
       pinnedRequirements: order.pinnedRequirements as TravelerFullRequirements | null,
@@ -1295,9 +1344,16 @@ export class OrderService {
       select: {
         id: true, code: true, termsAcceptedAt: true, pinnedRequirements: true,
         travelerCount: true, travelerDataCompletedAt: true, finalConfirmedAt: true,
+        acquisitionSource: true,
       },
     });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+
+    // D4 §10/§21: traveler-команда по Storefront-tenant объекту через platform
+    // marketplace-контракт → 404 (UUID-directed mutation, enumeration protection).
+    if (order.acquisitionSource === PLATFORM_SCOPE_DENIED_SOURCE) {
+      throw new NotFoundError(`Order ${orderId} not found`);
+    }
 
     // D3 §19: traveler submission before acceptance — запрещено.
     if (!order.termsAcceptedAt) {
@@ -1415,6 +1471,11 @@ export class OrderService {
     });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
 
+    // D4 §10/§21: Storefront-tenant объект вне platform marketplace-контракта.
+    if (order.acquisitionSource === PLATFORM_SCOPE_DENIED_SOURCE) {
+      throw new NotFoundError(`Order ${orderId} not found`);
+    }
+
     if (!order.termsAcceptedAt) {
       throw new ValidationDomainError(`Order ${order.code} has no termsAcceptedAt`);
     }
@@ -1495,6 +1556,12 @@ export class OrderService {
       include: { travelers: true },
     });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+
+    // D4 §10/§21: финальное подтверждение Storefront-tenant объекта через
+    // platform marketplace-контракт → 404 (Storefront = tenant партнёра).
+    if (order.acquisitionSource === PLATFORM_SCOPE_DENIED_SOURCE) {
+      throw new NotFoundError(`Order ${orderId} not found`);
+    }
 
     // D3 §10: termsAcceptedAt required (terms acceptance ≠ final confirmation).
     if (!order.termsAcceptedAt) {

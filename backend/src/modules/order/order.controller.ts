@@ -283,7 +283,12 @@ export class OrderController {
     @Param("travelerId") travelerId: string,
     @Body() dto: TravelerCollectDto,
     @CurrentUser() actor: AuthedRequest["user"],
+    @Req() req: Request,
   ) {
+    // D4 §13: forged server-owned ключи (id/dataCompleteness/version/…,
+    // включая pinnedRequirements/travelerCount на верхнем уровне) → 422
+    // (тот же контракт, что updateTravelers — anti-mass-assignment).
+    assertNoForbiddenKeys(req.body, ORDER_TRAVELERS_FORBIDDEN_KEYS);
     return this.orders.updateTravelerD3(id, travelerId, dto, actor.username);
   }
 

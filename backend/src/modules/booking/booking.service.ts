@@ -351,6 +351,13 @@ export class BookingService {
     const result = await this.prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findUnique({ where: { id: bookingId } });
       if (!booking) throw new NotFoundError(`Booking ${bookingId} not found`);
+      // D4 §10/§21: Storefront-tenant Booking (frozen PARTNER_STOREFRONT source)
+      // не изменяется через platform marketplace lifecycle-команду → 404
+      // (UUID-directed action, enumeration protection). Storefront = tenant
+      // партнёра (Partner Workspace), вне Platform Marketplace контракта.
+      if (booking.acquisitionSource === "PARTNER_STOREFRONT") {
+        throw new NotFoundError(`Booking ${bookingId} not found`);
+      }
       if (!transition.from.includes(booking.status)) {
         throw new ConflictError(`Cannot ${action} booking ${booking.code} from status ${booking.status}`);
       }

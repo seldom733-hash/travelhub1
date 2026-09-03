@@ -101,12 +101,21 @@ export const PERMISSIONS = {
   // ── Finance (Phase 2, каталог прав зарезервирован) ───────────────────
   "finance.payment.read": "Чтение платежей",
   "finance.payment.write": "Управление платежами",
+  // D4 F3 fix: payment lifecycle endpoints (Step 2.12/2.12H) требуют granular
+  // create/manage — эти ключи отсутствовали в каталоге и НЕ выдавались ни одной
+  // роли (403 для всех, включая ADMIN): payment initiation/confirm/fail/cancel
+  // были недостижимы через API. Добавлены в каталог и выданы FINANCE.
+  "finance.payment.create": "Создание платежа (инициация, Step 2.12H)",
+  "finance.payment.manage": "Управление платежом (confirm/fail/cancel)",
   "finance.refund.read": "Чтение возвратов",
   // Step 2.13: Refund runtime — create/process/fail (lifecycle execution).
   // approve (согласование REQUESTED → APPROVED) — отдельное право
   // finance.refund.approve (шаг approval workflow, как в каталоге 2.10).
-  "finance.refund.write": "Управление возвратами (создание/исполнение)",
+  "finance.refund.write": "Управление возвратами (создание)",
   "finance.refund.approve": "Согласование возвратов",
+  // D4 F3 fix: refund process/fail endpoint требует finance.refund.execute —
+  // ключ отсутствовал (403 для всех); добавлен в каталог и выдан FINANCE.
+  "finance.refund.execute": "Исполнение возврата (process/fail)",
   "finance.dispute.read": "Чтение споров",
   "finance.dispute.write": "Управление спорами (открытие/закрытие)",
   "finance.invoice.read": "Чтение счетов",
@@ -324,9 +333,12 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "sales.sale.read",
     "finance.payment.read",
     "finance.payment.write",
+    "finance.payment.create",
+    "finance.payment.manage",
     "finance.refund.read",
     "finance.refund.write",
     "finance.refund.approve",
+    "finance.refund.execute",
     "finance.dispute.read",
     "finance.dispute.write",
     "finance.invoice.read",

@@ -1,0 +1,96 @@
+{
+  "passed": 18,
+  "total": 18,
+  "results": [
+    {
+      "name": "login (admin → platform app)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/dashboard"
+    },
+    {
+      "name": "D3 CASE A order visible (no error)",
+      "ok": true,
+      "detail": "ref=MKT-ORD-09000547 error=False"
+    },
+    {
+      "name": "C1 order READY_FOR_BOOKING + ref",
+      "ok": true,
+      "detail": "found MKT-ORD-09000847"
+    },
+    {
+      "name": "C1 order shows traveler section",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "c2_request (MKT-REQ-09000848) visible in Request Center",
+      "ok": true,
+      "detail": "rows with ref: True"
+    },
+    {
+      "name": "c3_request (MKT-REQ-09000849) visible in Request Center",
+      "ok": true,
+      "detail": "rows with ref: True"
+    },
+    {
+      "name": "c4_request (MKT-REQ-09000850) visible in Request Center",
+      "ok": true,
+      "detail": "rows with ref: True"
+    },
+    {
+      "name": "C4 request detail opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C5 booking detail CONFIRMED",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C6 booking CANCELLED visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C6 order CANCELLED visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C6 payment detail CAPTURED",
+      "ok": true,
+      "detail": "ref=MKT-PAY-09000949-1 in text=True"
+    },
+    {
+      "name": "Marketplace order visible in Platform /orders",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Marketplace booking visible in Platform /bookings",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "Storefront order direct GET denied (404 UI)",
+      "ok": true,
+      "detail": "sf code absent=True error marker=True"
+    },
+    {
+      "name": "Storefront booking direct GET denied (404 UI)",
+      "ok": true,
+      "detail": "sf code absent=True error marker=True"
+    },
+    {
+      "name": "Storefront order excluded from Platform /orders list",
+      "ok": true,
+      "detail": "code absent=True"
+    },
+    {
+      "name": "Storefront booking excluded from Platform /bookings list",
+      "ok": true,
+      "detail": "code absent=True"
+    }
+  ]
+}
