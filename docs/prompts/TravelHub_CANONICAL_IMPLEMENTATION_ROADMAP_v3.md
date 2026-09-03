@@ -2834,3 +2834,52 @@ Pricing & Availability):**
 | Finance | Finance | canonical pipeline |
 
 Никакие два bounded context не владеют одним mutable fact.
+
+---
+
+## ADDENDUM — D5 ORDER FULL-PAGE ACTIONS/EDITING/AUDIT (additive sync, 2026-09-03)
+
+D5 implementation status: **IMPLEMENTATION COMPLETED — `VERDICT A`** (см.
+`docs/reports/PHASE_3_PRE_STEP_3.12_D5_ORDER_FULL_PAGE_ACTIONS_EDITING_AUDIT_IMPLEMENTATION_REPORT.md`;
+STRICT REVIEW NOT STARTED).
+
+Что добавил D5 (канонические дополнения; история выше не переписана):
+
+```text
+D5-1  Server-authoritative availableActions     Order Detail: GET /orders/:id возвращает
+      (action capability projection)            availableActions = status + TRANSITIONS +
+                                                D3 gates (finalConfirmedAt/COMPLETENESS) +
+                                                granular permissions (ACTION_PERMISSIONS).
+                                                Frontend рендерит ТОЛЬКО server-список
+                                                (OrderActionBar — единый источник для
+                                                full page и Quick Preview/drawer).
+D5-2  Navigation consistency                    business reference в Orders registry →
+                                                /app/orders/{id} (полная страница);
+                                                Quick Preview (drawer) — явный отдельный
+                                                слой «быстрый просмотр»; Request → Order и
+                                                Order → Booking CTA-связи в detail.
+D5-3  Mutability contract                        полная страница показывает travelers +
+                                                lifecycle milestones + linked Request/Booking;
+                                                traveler-edit вне D3-panel запрещён;
+                                                frozen snapshot (finalConfirmedAt) и
+                                                anti-mass-assignment (D3/D4) сохранены.
+D5-4  Entity Change Audit Framework              FOUNDATION (shared core
+                                                backend/src/shared/audit.ts: event types,
+                                                sources, PII-redaction, field-diff) +
+                                                Order integration: lifecycle actions и
+                                                traveler field-changes пишут immutable
+                                                записи в order.OrderHistory в ТОЙ ЖЕ
+                                                транзакции (actor, createdAt, old/new,
+                                                sensitive masked). API
+                                                GET /orders/:id/history (paginated,
+                                                server-authorized, scope-aware).
+D5-5  PD-4 (Entity Change Audit) → EXECUTED       ранее deferred debt PD-4 — фундамент
+      (foundation + Order)                       реализован; Booking (booking.BookingHistory)
+                                                — future integration (D6), Request —
+                                                requalification pending.
+D5-6  D6 reuses the same framework               Booking full-page/audit — следующий шаг
+                                                (D6) поверх общего core.
+```
+
+TRUE NEXT: **D6 — BOOKING FULL-PAGE / ACTIONS / AUDIT** (Booking-аналог D5) →
+затем Request requalification. D6 NOT STARTED.

@@ -18,6 +18,7 @@ import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
 import { isDateOnly } from "../../shared/date-only";
 import { isIanaTimeZone, isLocalTime } from "../../shared/service-time";
 import { isDeniedStorefrontScope, PARTNER_STOREFRONT_SOURCE } from "../../shared/sales-scope";
+import { diffAuditFields, type AuditFieldChange } from "../../shared/audit";
 import { PaymentPrepaymentType, PaymentScheme, QuoteDiscountType, SalesAcquisitionSource } from "../../generated/prisma/enums";
 import {
   getEffectiveTravelerRequirements,
@@ -38,6 +39,17 @@ import {
 // D4 REMEDIATION F2: canonical Platform-scope константа вынесена в shared
 // (Order + Booking list/export используют единый источник истины).
 export const PLATFORM_SCOPE_DENIED_SOURCE = PARTNER_STOREFRONT_SOURCE;
+
+/** Allowlist traveler-полей для field-level audit diff (D5 Entity Change Audit). */
+const TRAVELER_AUDIT_FIELDS = [
+  "firstName",
+  "lastName",
+  "birthDate",
+  "citizenship",
+  "gender",
+  "passportNumber",
+  "passportExpiry",
+] as const;
 
 export interface TravelerUpdateInput {
   firstName?: string;
@@ -119,6 +131,55 @@ const ACTION_LABELS: Record<OrderAction, string> = {
   problem: "Заказ помечен проблемным",
   suspend: "Заказ приостановлен",
 };
+
+/** Права, необходимые для каждой команды жизненного цикла Order (RBAC Matrix §4). */
+export const ACTION_PERMISSIONS: Record<OrderAction, string> = {
+  process: "order.accept",
+  markWaitingData: "order.edit_noncritical",
+  resumeProcessing: "order.edit_noncritical",
+  confirm: "order.edit_noncritical",
+  send: "order.request_booking",
+  complete: "order.edit_noncritical",
+  close: "order.close",
+  cancel: "order.cancel",
+  problem: "order.edit_noncritical",
+  suspend: "order.suspend",
+};
+
+/**
+ * D5 §6/§8 — server-authoritative projection доступных actions.
+ *
+ * Action availability = Current Status + Lifecycle Gates + Permissions +
+ * Workspace Scope + Business Invariants. Та же логика, что у orderAction
+ * (TRANSITIONS + D3 traveler gate + completeness для confirm); permission —
+ * granular RBAC keys (ACTION_PERMISSIONS). Workspace scope (Storefront → 404)
+ * применяется уровнем выше (getOrder/history endpoint).
+ * Frontend не изобретает state-machine mapping: только этот список рендерится.
+ */
+export function computeAvailableOrderActions(
+  order: {
+    status: OrderStatus;
+    travelerCount: number | null;
+    termsAcceptedAt: Date | null;
+    finalConfirmedAt: Date | null;
+    travelers?: Array<{ dataCompleteness: string }>;
+  },
+  granted: readonly string[],
+): OrderAction[] {
+  const d3Scope = (order.travelerCount ?? 0) > 0 && order.termsAcceptedAt !== null;
+  const actions: OrderAction[] = [];
+  for (const action of Object.keys(TRANSITIONS) as OrderAction[]) {
+    const t = TRANSITIONS[action];
+    if (!t.from.includes(order.status)) continue;
+    if (!granted.includes(ACTION_PERMISSIONS[action])) continue;
+    // D3 traveler gate (как в orderAction): confirm/send требуют finalConfirmedAt.
+    if (d3Scope && !order.finalConfirmedAt && (action === "confirm" || action === "send")) continue;
+    // confirm требует полные данные всех туристов (как в orderAction).
+    if (action === "confirm" && (order.travelers ?? []).some((x) => x.dataCompleteness !== "COMPLETE")) continue;
+    actions.push(action);
+  }
+  return actions;
+}
 
 /**
  * Step 2.5 — строгая валидация OrderRequested payload (PURE).
@@ -982,7 +1043,7 @@ export class OrderService {
     return { rows, total };
   }
 
-  async getOrder(id: string, viewer?: TravelerViewer) {
+  async getOrder(id: string, viewer?: TravelerViewer, grantedPermissions: string[] = []) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -1031,13 +1092,67 @@ export class OrderService {
       }
     }
 
+    // D5 §6/§8: server-authoritative available actions (state machine + gates +
+    // granular permissions). Frontend рендерит ТОЛЬКО этот список.
+    const availableActions = computeAvailableOrderActions(order, grantedPermissions);
+
+    // D5 §11: Request→Order canonical relation (Request.convertedOrderId).
+    const linkedRequest = await this.prisma.request.findFirst({
+      where: { convertedOrderId: order.id },
+      select: { id: true, referenceNumber: true, status: true, code: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // D5 §12: связанная бронь — exactly linked Booking для этого Order (V1: 1:1).
+    const linkedBooking = await this.prisma.booking.findFirst({
+      where: { orderId: order.id },
+      select: { id: true, referenceNumber: true, status: true, code: true },
+      orderBy: { createdAt: "asc" },
+    });
+
     // Step 1.17: field-level redaction — traveler PII виден только OPERATOR/ADMIN.
     return {
       ...order,
       travelers: redactTravelersPii(order.travelers ?? [], viewer),
       customerDisplayName: customerDisplay?.displayName ?? null,
       partnerDisplayName: partnerDisplay?.displayName ?? null,
+      availableActions,
+      linkedRequest: linkedRequest ?? null,
+      linkedBooking: linkedBooking ?? null,
     };
+  }
+
+  /**
+   * D5 §35 — Order History API (paginated, stable ordering, server-authorized,
+   * tenant/workspace-aware). Storefront Order history через platform контракт —
+   * 404 (не обход D4 isolation).
+   */
+  async listOrderHistory(
+    id: string,
+    viewer: TravelerViewer,
+    page = 1,
+    pageSize = 20,
+  ): Promise<{ items: unknown[]; total: number; page: number; pageSize: number }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      select: { id: true, acquisitionSource: true },
+    });
+    if (!order) throw new NotFoundError(`Order ${id} not found`);
+    if (viewer && order.acquisitionSource === PLATFORM_SCOPE_DENIED_SOURCE) {
+      throw new NotFoundError(`Order ${id} not found`);
+    }
+    const p = Math.max(1, page);
+    const ps = Math.min(100, Math.max(1, pageSize));
+    const [items, total] = await Promise.all([
+      this.prisma.orderHistory.findMany({
+        where: { orderId: id },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (p - 1) * ps,
+        take: ps,
+      }),
+      this.prisma.orderHistory.count({ where: { orderId: id } }),
+    ]);
+    return { items, total, page: p, pageSize: ps };
   }
 
   /**
@@ -1131,6 +1246,7 @@ export class OrderService {
       // полям pinned — та же canonical логика, что у single PATCH travelers/:id.
       const pinned = order.pinnedRequirements as TravelerFullRequirements | null;
 
+      const fieldChanges: AuditFieldChange[] = [];
       for (let i = 0; i < existing.length; i++) {
         const t = travelers[i];
         const values: Partial<Record<TravelerField, string | Date | null>> = {
@@ -1142,6 +1258,14 @@ export class OrderService {
           passportNumber: t.passportNumber ?? existing[i].passportNumber,
           passportExpiry: t.passportExpiry ? new Date(t.passportExpiry) : existing[i].passportExpiry,
         };
+        const prev: Record<string, unknown> = { ...existing[i] };
+        const next: Record<string, unknown> = { ...existing[i], ...values };
+        // D5 Entity Change Audit: field-level diff в структурированной (PII-safe)
+        // форме; sensitive-поля маскируются shared-ядром аудита.
+        const changes = diffAuditFields(TRAVELER_AUDIT_FIELDS, prev, next);
+        for (const c of changes) {
+          fieldChanges.push({ ...c, field: `traveler[${existing[i].position}].${c.field}` });
+        }
         await tx.orderTraveler.update({
           where: { id: existing[i].id },
           data: {
@@ -1165,6 +1289,7 @@ export class OrderService {
           actorId: actor ?? null,
           actorName: actor ?? null,
           comment: "Обновлены данные туристов заказа",
+          fields: fieldChanges.length > 0 ? (fieldChanges as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
         },
       });
       return tx.orderTraveler.findMany({ where: { orderId }, orderBy: { position: "asc" } });
@@ -1534,6 +1659,14 @@ export class OrderService {
         },
       });
 
+      // D5 Entity Change Audit: field-level diff (PII-safe) — same shared core,
+      // что и bulk-путь. Sensitive значения (passport/birthDate) — masked.
+      const fieldChanges = diffAuditFields(
+        TRAVELER_AUDIT_FIELDS,
+        existing as unknown as Record<string, unknown>,
+        updated as unknown as Record<string, unknown>,
+      );
+
       await tx.orderHistory.create({
         data: {
           orderId,
@@ -1541,6 +1674,7 @@ export class OrderService {
           actorId: actor ?? null,
           actorName: actor ?? null,
           comment: `Traveler ${travelerId} data updated (D3 collection)`,
+          fields: fieldChanges.length > 0 ? (fieldChanges as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
         },
       });
 

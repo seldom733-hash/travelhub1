@@ -1,0 +1,91 @@
+{
+  "total": 17,
+  "passed": 17,
+  "results": [
+    {
+      "name": "1. login (admin → platform app)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/dashboard"
+    },
+    {
+      "name": "2. business ref click → /app/orders/{id}",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders/12c5dde5-0ed7-4241-88c6-e7e02a724704"
+    },
+    {
+      "name": "3. full-page actions from server (NEW → process/cancel)",
+      "ok": true,
+      "detail": "process=True cancel=True confirm(unexpected)=False"
+    },
+    {
+      "name": "3b. D3 gate: confirm НЕ показан до final confirm",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "4. quick preview drawer uses server actions (parity)",
+      "ok": true,
+      "detail": "process=True cancel=True"
+    },
+    {
+      "name": "5a. process executed → IN_PROCESSING badge",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "5b. lifecycle history entry visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "5c. hard refresh → status persists",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "6a. traveler edit saved (server notice)",
+      "ok": true,
+      "detail": "saved=True input='AZ'"
+    },
+    {
+      "name": "6b. hard refresh → value persists + audit FIELD_CHANGE",
+      "ok": true,
+      "detail": "input='AZ' auditRow=True"
+    },
+    {
+      "name": "7a. C1 direct URL loads",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "7b. C1 actions from server (READY_FOR_BOOKING → send)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "7c. C1 travelers locked (post-final-confirm)",
+      "ok": true,
+      "detail": "locked marker present"
+    },
+    {
+      "name": "8a. C6 loads (CANCELLED)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "8b. C6 no available actions",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "8c. C6 lifecycle history visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "9. Storefront Order direct → 404 (D4 isolation)",
+      "ok": true,
+      "detail": "err=True sfAbsent=True"
+    }
+  ]
+}

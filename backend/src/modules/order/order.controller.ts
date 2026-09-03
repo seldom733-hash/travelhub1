@@ -3,7 +3,7 @@ import { ExportService } from '../shared/export/export.service';
 import { Type } from "class-transformer";
 import { IsArray, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength, ValidateNested } from "class-validator";
 import { Request } from "express";
-import { OrderService, type OrderAction } from "./order.service";
+import { OrderService, ACTION_PERMISSIONS, type OrderAction } from "./order.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
@@ -154,19 +154,6 @@ class ListOrdersQuery {
   pageSize?: number;
 }
 
-/** Права, необходимые для каждой команды жизненного цикла Order (RBAC Matrix §4). */
-const ACTION_PERMISSIONS: Record<OrderAction, string> = {
-  process: "order.accept",
-  markWaitingData: "order.edit_noncritical",
-  resumeProcessing: "order.edit_noncritical",
-  confirm: "order.edit_noncritical",
-  send: "order.request_booking",
-  complete: "order.edit_noncritical",
-  close: "order.close",
-  cancel: "order.cancel",
-  problem: "order.edit_noncritical",
-  suspend: "order.suspend",
-};
 
 /**
  * REST API: /api/v1/orders → Order Center.
@@ -249,7 +236,21 @@ export class OrderController {
   @Get("orders/:id")
   @RequirePermissions("order.read")
   getOrder(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
-    return this.orders.getOrder(id, actor);
+    // D5: actor.permissions → server-authoritative availableActions в detail.
+    return this.orders.getOrder(id, actor, actor.permissions ?? []);
+  }
+
+  @Get("orders/:id/history")
+  @RequirePermissions("order.read")
+  orderHistory(
+    @Param("id") id: string,
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    const p = Number.parseInt(page ?? "", 10);
+    const ps = Number.parseInt(pageSize ?? "", 10);
+    return this.orders.listOrderHistory(id, actor, Number.isFinite(p) && p > 0 ? p : 1, Number.isFinite(ps) && ps > 0 ? ps : 20);
   }
 
   @Patch("orders/:id")

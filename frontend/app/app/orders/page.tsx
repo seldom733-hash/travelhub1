@@ -1,31 +1,24 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { api, type Order, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import Kpi from "@/components/Kpi";
 import Pagination from "@/components/Pagination";
-import { useCan } from "@/lib/use-can";
-import ActionButtons from "@/components/ActionButtons";
+import OrderActionBar from "@/components/order/OrderActionBar";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import AggregateSummary from "@/components/AggregateSummary";
 import TableExportButton from "@/components/TableExportButton";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
 
 
-const ACTIONS = [
-  { action: "process", label: "Принять в работу", cls: "bg-sky-600 hover:bg-sky-700", only: ["NEW"] },
-  { action: "confirm", label: "Готов к бронированию", cls: "bg-violet-600 hover:bg-violet-700", only: ["IN_PROCESSING", "WAITING_FOR_DATA"] },
-  { action: "send", label: "Передать в Booking", cls: "bg-blue-600 hover:bg-blue-700", only: ["READY_FOR_BOOKING"] },
-  { action: "complete", label: "Исполнен", cls: "bg-emerald-600 hover:bg-emerald-700", only: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"] },
-  { action: "close", label: "Закрыть", cls: "bg-slate-700 hover:bg-slate-800", only: ["FULFILLED", "READY_TO_CLOSE"] },
-  { action: "cancel", label: "Отменить", cls: "bg-red-600 hover:bg-red-700", only: ["NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING", "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "PROBLEM", "SUSPENDED"] },
-] satisfies { action: string; label: string; cls: string; only: string[] }[];
 
 function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, initialCancelledWithin, initialPaymentFailed, initialPendingRefund, initialSortBy, initialSortDirection, initialDateFrom, initialDateTo }: { initialStatus: string; initialSearch?: string; initialPaymentStatus?: string; initialCancelledWithin?: string; initialPaymentFailed?: string; initialPendingRefund?: string; initialSortBy?: string; initialSortDirection?: SortDirection; initialDateFrom?: string; initialDateTo?: string }) {
   const locale = useLocale();
+  const router = useRouter();
   const [data, setData] = useState<Page<Order> | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
   const [bookings, setBookings] = useState<{ id: string; referenceNumber: string; status: string }[]>([]);
@@ -82,20 +75,6 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   if (pendingRefund === "true") activeFilters.push("Возврат: Ожидает обработки");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // Ролевой UI: доступные команды определяются granular permissions (RBAC Matrix §4).
-  const canAccept = useCan("order.accept");
-  const canEdit = useCan("order.edit_noncritical");
-  const canSendBooking = useCan("order.request_booking");
-  const canClose = useCan("order.close");
-  const canCancel = useCan("order.cancel");
-  const permOf: Record<string, boolean> = {
-    process: canAccept,
-    confirm: canEdit,
-    send: canSendBooking,
-    complete: canEdit,
-    close: canClose,
-    cancel: canCancel,
-  };
 
   const load = async () => {
     setBusy(true);
@@ -289,13 +268,20 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                 {(data?.items ?? []).map((o) => (
                   <tr
                       key={o.id}
-                      onClick={() => void openDetail(o.id)}
+                      onClick={() => { setSelected(null); router.push(`/app/orders/${o.id}`); }}
                       className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${
                         selected?.id === o.id ? "bg-blue-50/60" : ""
                       }`}
                     >
                       <td className="px-4 py-2.5">
-                        <div className="font-mono text-xs text-blue-600">{o.referenceNumber}</div>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/app/orders/${o.id}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-blue-600 hover:underline">{o.referenceNumber}</Link>
+                          <button
+                            title="Быстрый просмотр"
+                            onClick={(e) => { e.stopPropagation(); void openDetail(o.id); }}
+                            className="rounded p-0.5 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                          >👁</button>
+                        </div>
                         <div className="text-xs text-slate-400">{o.number}</div>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-500">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
@@ -397,7 +383,13 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
 
             <div>
               <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Команды (actions)</div>
-              <ActionButtons actions={ACTIONS} status={selected.status} permOf={permOf} onRun={(a) => void runAction(a)} />
+              {/* D5: actions приходят из server-authoritative projection (GET /orders/:id → availableActions).
+                  Никакого client-side state-machine mapping в drawer. */}
+              <OrderActionBar
+                actions={(selected as Order & { availableActions?: string[] }).availableActions ?? []}
+                onRun={(a) => void runAction(a)}
+                busyAction={null}
+              />
             </div>
 
             <div>
