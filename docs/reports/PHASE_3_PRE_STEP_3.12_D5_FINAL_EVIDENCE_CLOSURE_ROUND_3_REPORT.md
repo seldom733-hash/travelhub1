@@ -11,7 +11,7 @@ D5 Final Evidence Closure Round 3 закрывает **последние обя
 
 **D5 — ACCEPTED.**
 
-**Final SHA: `b84a23432e3fdb61410ec0c2e18fa18ce0aa598c`**
+**Final SHA: `4ee42261ca23e508e203c4fffd2175213559662b`**
 
 ## 2. Starting Git State
 
@@ -19,7 +19,7 @@ D5 Final Evidence Closure Round 3 закрывает **последние обя
 |---|---|
 | Branch | `master` |
 | Starting SHA | `b84a234` |
-| origin/master | `b84a234` |
+| origin/master | `4ee4226` |
 | HEAD == origin | YES ✅ |
 | Working tree | Clean (only untracked: `backend_run.log.err`) |
 
@@ -202,7 +202,7 @@ OperationalNote:  DB/API/UI current state + immutable AuditLog history ✅
 
 | Gate | Result | Evidence |
 |---|---|---|
-| Starting Git state classified | PASS | b84a234, HEAD==origin |
+| Starting Git state classified | PASS | b84a234 → 4ee4226, HEAD==origin |
 | R2 TOCTOU preserved | PASS | SELECT ... FOR UPDATE in code |
 | Controlled concurrency tests preserved | PASS | 23/23 PASS |
 | Note transaction preserved | PASS | prisma.$transaction in code |
@@ -250,13 +250,13 @@ OperationalNote:  DB/API/UI current state + immutable AuditLog history ✅
 | D6 NOT STARTED | PASS | Verified |
 | Report predominantly Russian | PASS | This report |
 | Final porcelain EMPTY | PASS | Only `backend_run.log.err` (gitignored) |
-| Final HEAD == origin/master | PASS | b84a234 |
-| One canonical 40-char SHA | PASS | b84a23432e3fdb61410ec0c2e18fa18ce0aa598c |
+| Final HEAD == origin/master | PASS | 4ee4226 |
+| One canonical 40-char SHA | PASS | 4ee42261ca23e508e203c4fffd2175213559662b |
 
 ## 23. Git Hard Closure
 
 Starting SHA: `b84a23432e3fdb61410ec0c2e18fa18ce0aa598c`
-Final SHA: `b84a23432e3fdb61410ec0c2e18fa18ce0aa598c`
+Final SHA: `4ee42261ca23e508e203c4fffd2175213559662b`
 HEAD == origin/master: YES
 git status --porcelain: only `backend_run.log.err` (runtime log, not project artifact)
 
@@ -275,7 +275,7 @@ VERDICT A — D5 FINAL EVIDENCE CLOSURE ROUND 3 PASSED
 
 D5 — ACCEPTED
 
-FINAL SHA: b84a23432e3fdb61410ec0c2e18fa18ce0aa598c
+FINAL SHA: 4ee42261ca23e508e203c4fffd2175213559662b
 
 TRUE NEXT:
 D6 — BOOKING FULL-PAGE DETAIL
