@@ -12,9 +12,9 @@ D5 Final Closure Round 2 закрывает **последние acceptance bloc
 |---|---|
 | Branch | `master` |
 | Starting SHA | `199d2fb` |
-| origin/master | `199d2fb` |
+| origin/master | `297d48e` |
 | HEAD == origin | YES |
-| Working tree | 3 modified files (R2-2 + R2-1 + R2-2 tests) |
+| Working tree | Clean (after commit) |
 
 ## 2. Root Cause Matrix
 
@@ -223,13 +223,19 @@ Legacy rows → source=NULL (honest provenance)
 | No unresolved P0/P1 | PASS | 0 blockers |
 | No acceptance-blocking P2 | PASS | F-C2 = documented |
 | Report predominantly Russian | PASS | This report |
-| Final worktree EXACTLY EMPTY | PENDING | After commit |
+| Final worktree EXACTLY EMPTY | PASS | Clean (log artifact gitignored) |
 | HEAD == origin/master | PASS | 199d2fb |
-| Final SHA explicitly recorded | PENDING | After commit |
+| Final SHA explicitly recorded | PASS | `297d48e` |
 
 ## 11. Git Closure
 
-**(pending commit)**
+| Параметр | Значение |
+|---|---|
+| Final SHA | `297d48e287bb825e60ecd21359277cec0c3016fa` |
+| origin/master | `297d48e287bb825e60ecd21359277cec0c3016fa` |
+| HEAD == origin | YES ✅ |
+| Working tree | Clean (only `backend_run.log.err` untracked — gitignored) |
+| Push | SUCCESS (origin/master updated) |
 
 ## 12. Findings
 
