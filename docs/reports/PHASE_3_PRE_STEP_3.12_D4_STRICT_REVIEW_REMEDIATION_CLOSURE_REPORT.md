@@ -286,16 +286,20 @@ Dev-стек (backend :4000 перезапущен с remediation-кодом, fr
 
 ## 25. Git Closure
 
-Финальные команды и реальные SHA — см. финальный коммит (раздел обновлён после push):
+Финальные команды и реальные SHA:
 
 ```bash
 git status --short          → EXACTLY EMPTY
-git rev-parse HEAD          → <final SHA>
-git rev-parse origin/master → <final SHA> (== HEAD)
-git log -1 --oneline        → fix(d4): close strict review findings (F1–F6)
+HEAD == origin/master == 635f9310cfd18201a493fab05c4f1d90fe36bc7c
+
+git log -2 --oneline
+635f931 docs(d4): remediation closure evidence + roadmap sync
+ccf0604 fix(d4): close strict review findings F1-F6
 ```
 
-Изменённые/добавленные файлы closure: `backend/src/shared/sales-scope.ts`, `backend/src/modules/order/order.service.ts`, `backend/src/modules/booking/booking.service.ts`, `backend/test/d4-remediation-closure.e2e-spec.ts`, `docs/evidence/d4/D4_REPRESENTATIVE_COMMERCE_CASES.md`, `docs/reports/…D4…IMPLEMENTATION_REPORT.md`, `docs/prompts/TravelHub_CANONICAL_IMPLEMENTATION_ROADMAP_v3.md`, `docs/reports/…D4…REMEDIATION_CLOSURE_REPORT.md` + prompt-файл перемещён в `docs/prompts/`.
+Starting SHA (до изменений): `5690f94` (== origin/master). Push успешен: `5690f94..635f931 master -> master`.
+
+Изменённые/добавленные файлы closure: `backend/src/shared/sales-scope.ts`, `backend/src/modules/order/order.service.ts`, `backend/src/modules/booking/booking.service.ts`, `backend/test/d4-remediation-closure.e2e-spec.ts`, `docs/evidence/d4/D4_REPRESENTATIVE_COMMERCE_CASES.md`, `docs/reports/…D4…IMPLEMENTATION_REPORT.md`, `docs/prompts/TravelHub_CANONICAL_IMPLEMENTATION_ROADMAP_v3.md`, `docs/reports/…D4…REMEDIATION_CLOSURE_REPORT.md` + prompt-файл в `docs/prompts/`.
 
 ## 26. Final Verdict
 
