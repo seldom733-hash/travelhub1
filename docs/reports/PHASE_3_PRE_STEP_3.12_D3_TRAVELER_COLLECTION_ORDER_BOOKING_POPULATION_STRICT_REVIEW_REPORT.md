@@ -327,9 +327,9 @@ BookingRequested/Booking — только после finalConfirmedAt (e2e test 
 - Итоговый Git state (после commit/push):
 
 ```text
-Final SHA (SR commit):  <заполняется после push>
-origin/master:          <заполняется после push>
-HEAD == origin/master:  <заполняется после push>
+Final SHA (SR commit):  f1ad2bf96f96438d87ce91a54bf3dea16bc6797b
+origin/master:          f1ad2bf96f96438d87ce91a54bf3dea16bc6797b
+HEAD == origin/master:  YES ✅ (push SUCCESS)
 ```
 
 ---
