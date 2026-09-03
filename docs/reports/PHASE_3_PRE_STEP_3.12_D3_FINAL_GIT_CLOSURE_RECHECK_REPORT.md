@@ -173,14 +173,14 @@ Drawer допустим только как отдельный Quick Preview; о
 ```text
 git status --short          → (ПУСТО)
 git status --porcelain=v1   → (ПУСТО, 0 строк)
-git rev-parse HEAD          → e4f64bb (после финального §13 sync)
-git rev-parse origin/master → e4f64bb (после push)
+git rev-parse HEAD          → 9bba405 (после финального §13 sync)
+git rev-parse origin/master → 9bba405 (после push)
 git log -5:
-  e4f64bb docs: D3 closure recheck — sync §13 final git state to pushed tip e4f64bb
+  9bba405 docs: D3 closure recheck — final §13 sync to pushed tip
+  e4f64bb docs: D3 closure recheck — sync §13 final git state (промежуточный sync)
   bdfb481 docs: D3 final git closure recheck report + roadmap D3 ACCEPTED
   6cf4426 chore(docs): D3 git closure — commit phase prompts/reports + storefront e2e specs, drop tmp artifacts
   0b56a4f docs(order): D3 request flow report — §31 git state (pushed 33cec2f)
-  33cec2f feat(order): D3 — Request flow integration (F6 closure)
 ```
 
 Hard acceptance: `git status --short` = EXACTLY EMPTY; `--porcelain=v1` = EXACTLY EMPTY; HEAD == origin/master. ✅
