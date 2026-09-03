@@ -429,12 +429,13 @@ docs/prompts/PHASE_3_PRE_STEP_3.12_D4_TRAVELER_SECURITY_REPRESENTATIVE_COMMERCE_
 docs/reports/PHASE_3_PRE_STEP_3.12_D4_TRAVELER_SECURITY_REPRESENTATIVE_COMMERCE_STRICT_REVIEW_REPORT.md  (данный отчёт)
 ```
 
-Фактический результат после review (заполняется после push):
+Фактический результат после review:
 
 ```bash
-git rev-parse HEAD            → <FINAL_HEAD>
-git rev-parse origin/master   → <FINAL_ORIGIN>
+git rev-parse HEAD            → cc999d221aae3d6d234f294ca737f2df50bf131f
+git rev-parse origin/master   → cc999d221aae3d6d234f294ca737f2df50bf131f
 git status --short            → EXACTLY EMPTY
+git log -1 --oneline          → cc999d2 docs(d4): strict review report — D4 ACCEPTED (VERDICT A)
 ```
 
 ---
