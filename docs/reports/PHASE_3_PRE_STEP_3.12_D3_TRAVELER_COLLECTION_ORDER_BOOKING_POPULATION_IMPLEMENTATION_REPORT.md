@@ -397,7 +397,7 @@ D4..D14, STEP 3.12 — NOT STARTED
 ```text
 branch:             master
 Starting SHA:       c05af07f5827ae15ae06d497d6cc68159f7dbf81
-Final SHA:          a8ceb2a63c7fc9ef8057f64be8f435aed88567c6
+Final SHA:          7b73732ddb413120c69c743ce19a242900db3292
 origin/master:      <обновляется после push>
 HEAD == origin/master: <обновляется после push>
 Working tree:       только untracked evidence/прочие незакоммиченные артефакты
