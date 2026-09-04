@@ -1126,6 +1126,11 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "admin.kpi.payment_statuses": { ru: "Статусы оплаты", az: "Ödəniş vəziyyətləri", en: "Payment statuses" },
   "admin.kpi.booking_statuses": { ru: "Статусы бронирований", az: "Bron vəziyyətləri", en: "Booking statuses" },
   "admin.kpi.request_statuses": { ru: "Статусы заявок", az: "Sorğu vəziyyətləri", en: "Request statuses" },
+  // UI-C1.2C — Orders semantic KPI group titles
+  "orders.group.lifecycle": { ru: "Жизненный цикл", az: "Həyat dövrü", en: "Lifecycle" },
+  "orders.group.rework": { ru: "Альтернативные / rework", az: "Alternativ / yenidən işləmə", en: "Alternative / rework" },
+  "orders.group.exceptions": { ru: "Исключения", az: "İstisnalar", en: "Exceptions" },
+  "orders.group.payment": { ru: "Статус оплаты", az: "Ödəniş vəziyyəti", en: "Payment status" },
   // SR-TABLE-01: Aggregate summary keys
   "aggregate.title": { ru: "Итого по текущей выборке", az: "Cari seçim üzrə cəmi", en: "Total for current selection" },
   "aggregate.records": { ru: "записей", az: "qeyd", en: "records" },

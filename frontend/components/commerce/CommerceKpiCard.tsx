@@ -17,19 +17,21 @@ export default function CommerceKpiCard({
   active,
   onClick,
   variant = "default",
+  className = "",
 }: {
   value: number | string;
   label: string;
   active?: boolean;
   onClick?: () => void;
   variant?: "default" | "total";
+  className?: string;
 }) {
   const total = variant === "total";
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-start rounded-xl border text-left transition-colors ${
+      className={`flex flex-col items-start rounded-xl border text-left transition-colors ${className} ${
         total ? "px-5 py-4" : "px-4 py-3"
       } ${
         active

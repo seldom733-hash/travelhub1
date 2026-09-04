@@ -1,0 +1,176 @@
+{
+  "total": 34,
+  "passed": 34,
+  "results": [
+    {
+      "name": "login (admin → platform app)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/dashboard"
+    },
+    {
+      "name": "shell title + Orders active tab",
+      "ok": true,
+      "detail": "active=Заказы"
+    },
+    {
+      "name": "Total KPI «Всего заказов» present",
+      "ok": true,
+      "detail": "Всего заказов508"
+    },
+    {
+      "name": "4 semantic group headings present (lifecycle / rework / exceptions / payment)",
+      "ok": true,
+      "detail": "[\"Жизненный цикл\", \"Альтернативные / rework\", \"Исключения\", \"Статус оплаты\"]"
+    },
+    {
+      "name": "card sequence 6+3+3+4 canonical (12 lifecycle-ish + 4 payment)",
+      "ok": true,
+      "detail": "[\"Новый\", \"В обработке\", \"Готов к бронированию\", \"Отправлен в бронирование\", \"Выполнен\", \"Закрыт\", \"Ожидание данных\", \"Частично выполнен\", \"Готов к закрытию\", \"Проблема\", \"Приостановлен\", \"Отменён\", \"Не оплачен\", \"Частично оплачен\", \"Оплачен\", \"Возврат\"]"
+    },
+    {
+      "name": "no raw enum text on cards",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "5 decorative lifecycle connectors rendered at desktop",
+      "ok": true,
+      "detail": "total=5 visible=5"
+    },
+    {
+      "name": "period controls exposed (From/To date inputs)",
+      "ok": true,
+      "detail": "date inputs=2"
+    },
+    {
+      "name": "Reset button present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "lifecycle card click writes ?status=IN_PROCESSING",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders?status=IN_PROCESSING"
+    },
+    {
+      "name": "selected lifecycle card aria-pressed=true",
+      "ok": true,
+      "detail": "В обработке46"
+    },
+    {
+      "name": "table refetched under server scope (single /orders request = KPI+table)",
+      "ok": true,
+      "detail": "table chars=1560"
+    },
+    {
+      "name": "payment card click writes ?paymentStatus=PAID (no status param)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders?paymentStatus=PAID"
+    },
+    {
+      "name": "Total click clears status+paymentStatus (URL normalized)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders"
+    },
+    {
+      "name": "direct URL ?status=READY_FOR_BOOKING restores selection",
+      "ok": true,
+      "detail": "selected=Готов к бронированию3"
+    },
+    {
+      "name": "browser Back restores /app/orders?status=NEW",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders?status=NEW"
+    },
+    {
+      "name": "debounced search writes ?search= to URL",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders?status=CLOSED&search=ORD-"
+    },
+    {
+      "name": "Reset clears search/status and normalizes URL",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders"
+    },
+    {
+      "name": "direct URL dateFrom/dateTo restores From/To inputs",
+      "ok": true,
+      "detail": "[\"2026-08-01\", \"2026-09-01\"]"
+    },
+    {
+      "name": "locale ru: shell + headings + total localized (Всего заказов)",
+      "ok": true,
+      "detail": "h1=Центр операций"
+    },
+    {
+      "name": "locale ru: no raw translation keys in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "locale en: shell + headings + total localized (Total orders)",
+      "ok": true,
+      "detail": "h1=Operations Center"
+    },
+    {
+      "name": "locale en: no raw translation keys in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "locale az: shell + headings + total localized (Cəmi sifariş)",
+      "ok": true,
+      "detail": "h1=Əməliyyat Mərkəzi"
+    },
+    {
+      "name": "locale az: no raw translation keys in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "responsive @ 390px: no page-level horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive @ 390px: connectors visible only in the xl one-row flow",
+      "ok": true,
+      "detail": "visible connectors=0"
+    },
+    {
+      "name": "responsive @ 390px: 16 status/payment KPI cards remain",
+      "ok": true,
+      "detail": "cards=16"
+    },
+    {
+      "name": "responsive @ 768px: no page-level horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive @ 768px: connectors visible only in the xl one-row flow",
+      "ok": true,
+      "detail": "visible connectors=0"
+    },
+    {
+      "name": "responsive @ 768px: 16 status/payment KPI cards remain",
+      "ok": true,
+      "detail": "cards=16"
+    },
+    {
+      "name": "responsive @ 1680px: no page-level horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive @ 1680px: connectors visible only in the xl one-row flow",
+      "ok": true,
+      "detail": "visible connectors=5"
+    },
+    {
+      "name": "responsive @ 1680px: 16 status/payment KPI cards remain",
+      "ok": true,
+      "detail": "cards=16"
+    }
+  ]
+}
