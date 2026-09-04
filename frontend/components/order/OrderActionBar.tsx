@@ -33,7 +33,8 @@ export default function OrderActionBar({
   busyAction: string | null;
 }) {
   if (actions.length === 0) {
-    return <div className="text-xs text-slate-400">Для текущего статуса команд нет</div>;
+    // R2 — omit empty action area (no technical placeholder text).
+    return null;
   }
   return (
     <div className="flex flex-wrap items-center gap-2">

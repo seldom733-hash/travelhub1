@@ -4,14 +4,21 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import EntityDetailShell from "@/components/EntityDetailShell";
+import EntityDetailHeader from "@/components/EntityDetailHeader";
 import EntitySectionCard from "@/components/commerce/EntitySectionCard";
+import EntityField from "@/components/commerce/EntityField";
+import EntityFieldGrid from "@/components/commerce/EntityFieldGrid";
+import EntityLink from "@/components/commerce/EntityLink";
+import EntityRow from "@/components/commerce/EntityRow";
+import EntityFinanceCell from "@/components/commerce/EntityFinanceCell";
+import EntityTimeline from "@/components/commerce/EntityTimeline";
 import OperationalNotes from "@/components/OperationalNotes";
 import TravelerCollectionPanel from "@/components/order/TravelerCollectionPanel";
 import OrderActionBar from "@/components/order/OrderActionBar";
-import { useLocale, t, formatPrice } from "@/lib/i18n";
+import { useLocale, t, ti, formatPrice, LOCALE_TAGS, type Locale } from "@/lib/i18n";
+import { orderActionLabel } from "@/lib/commerce-history-labels";
 import { useCurrentUser } from "@/lib/use-user";
 
 interface OrderDetail {
@@ -64,42 +71,9 @@ interface HistoryPage {
   pageSize: number;
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  firstName: "Имя",
-  lastName: "Фамилия",
-  birthDate: "Дата рождения",
-  citizenship: "Гражданство",
-  gender: "Пол",
-  passportNumber: "Номер паспорта",
-  passportExpiry: "Срок действия паспорта",
-};
-
-/** История жизненного цикла: action → человеко-читаемая запись. */
-function describeAction(a: string): string {
-  const map: Record<string, string> = {
-    process: "Принят в работу",
-    markWaitingData: "Ожидание данных",
-    resumeProcessing: "Обработка возобновлена",
-    confirm: "Готов к бронированию",
-    send: "Передан в Booking",
-    complete: "Исполнен",
-    close: "Закрыт",
-    cancel: "Отменён",
-    problem: "Проблема",
-    suspend: "Приостановлен",
-    final_confirm: "Финальное подтверждение данных туристов",
-    update_traveler_d3: "Изменение данных туриста (сбор данных)",
-    update_travelers: "Изменение данных туристов",
-    booking_confirmed: "Согласовано с Booking Center",
-    booking_rejected: "Отклонено Booking Center",
-    update_order_fields: "Изменение полей заказа",
-  };
-  return map[a] ?? a;
-}
-
-function formatTs(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("ru-RU");
+function formatTs(iso: string | null, locale: Locale): string | null {
+  if (!iso) return null;
+  return new Date(iso).toLocaleString(LOCALE_TAGS[locale]);
 }
 
 function renderFieldValue(field: string, value: string | null): string {
@@ -109,6 +83,13 @@ function renderFieldValue(field: string, value: string | null): string {
     return Number.isNaN(d.getTime()) ? value : d.toISOString().slice(0, 10);
   }
   return value;
+}
+
+/** Traveler field label via canonical d3.field.* i18n keys. */
+function fieldLabel(field: string, locale: Locale): string {
+  const key = `d3.field.${field}`;
+  const localized = t(key, locale);
+  return localized !== key ? localized : field;
 }
 
 export default function OrderDetailPage() {
@@ -205,143 +186,142 @@ export default function OrderDetailPage() {
 
   const immutableTravelers = order.finalConfirmedAt != null;
 
+  // Business lifecycle milestones — NOT audit history (who changed what when).
+  const milestones: Array<{ key: string; label: string; timestamp: string | null }> = [
+    { key: "created", label: t("crm.col.created", locale), timestamp: order.createdAt },
+    { key: "termsAccepted", label: t("detail.dates.terms_accepted", locale), timestamp: order.termsAcceptedAt },
+    { key: "finalConfirmed", label: t("detail.dates.final_confirmed", locale), timestamp: order.finalConfirmedAt },
+    { key: "fulfilled", label: t("detail.dates.fulfilled", locale), timestamp: order.fulfilledAt },
+    { key: "closed", label: t("detail.dates.closed", locale), timestamp: order.closedAt },
+    { key: "cancelled", label: t("detail.dates.cancelled", locale), timestamp: order.cancelledAt },
+  ];
+
   return (
     <EntityDetailShell
       header={
-        <>
-          <PageHeader
-            title={order.referenceNumber}
-            breadcrumbs={["TravelHub", t("orders.title", locale), order.referenceNumber]}
-            actions={<Link href="/app/orders" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">← {t("crm.back_to_list", locale)}</Link>}
-          />
-          <div className="border-b border-slate-200 bg-white px-6 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <div className="font-mono text-xs text-blue-600">{order.referenceNumber} <span className="ml-1 font-sans text-slate-400">{order.number}</span></div>
-                <div className="mt-1 flex items-center gap-2">
-                  <StatusBadge status={order.status} />
-                  <StatusBadge status={order.paymentStatus} />
-                </div>
-              </div>
-              {user && (
-                <OrderActionBar
-                  actions={order.availableActions ?? []}
-                  onRun={(a) => void runAction(a)}
-                  busyAction={busyAction}
-                />
-              )}
-            </div>
-            {error && <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</div>}
-          </div>
-        </>
+        <EntityDetailHeader
+          breadcrumbs={["TravelHub", t("orders.title", locale), order.referenceNumber]}
+          reference={order.referenceNumber}
+          secondary={order.number}
+          backHref="/app/orders"
+          lifecycleStatus={<StatusBadge status={order.status} />}
+          paymentStatus={<StatusBadge status={order.paymentStatus} />}
+          actions={
+            user ? (
+              <OrderActionBar
+                actions={order.availableActions ?? []}
+                onRun={(a) => void runAction(a)}
+                busyAction={busyAction}
+              />
+            ) : null
+          }
+        >
+          {error && <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</div>}
+        </EntityDetailHeader>
       }
     >
+      <div className="space-y-4">
+        {/* Finance — D7 backend-authoritative */}
+        <EntitySectionCard title={t("bookings.financial", locale)}>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <EntityFinanceCell label={t("crm.detail.total_amount", locale)} value={formatPrice(order.amount, order.currency, locale)} tone="neutral" />
+            <EntityFinanceCell label={t("crm.detail.paid_amount", locale)} value={formatPrice(order.paidAmount, order.currency, locale)} tone="positive" />
+            <EntityFinanceCell label={t("crm.detail.refunded_amount", locale)} value={formatPrice(order.refundedAmount, order.currency, locale)} tone="negative" />
+            <EntityFinanceCell label={t("finance.due_amount", locale)} value={formatPrice(order.dueAmount, order.currency, locale)} tone="warning" />
+            <EntityFinanceCell label={t("finance.refundable_amount", locale)} value={formatPrice(order.refundableAmount, order.currency, locale)} tone="info" />
+            <EntityFinanceCell label={t("crm.detail.payment_status", locale) || "Статус оплаты"} value={<StatusBadge status={order.paymentStatus} />} tone="neutral" />
+          </div>
+        </EntitySectionCard>
 
-      <div className="space-y-4 text-sm">
-          <EntitySectionCard title={t("bookings.financial", locale)}>
-            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-6">
-              <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.total_amount", locale)}</div><div className="font-bold text-slate-700">{formatPrice(order.amount, order.currency, locale) ?? "—"}</div></div>
-              <div className="rounded-lg bg-green-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.paid_amount", locale)}</div><div className="font-medium text-green-700">{formatPrice(order.paidAmount, order.currency, locale) ?? "—"}</div></div>
-              <div className="rounded-lg bg-red-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.refunded_amount", locale)}</div><div className="font-medium text-red-700">{formatPrice(order.refundedAmount, order.currency, locale) ?? "—"}</div></div>
-              <div className="rounded-lg bg-amber-50 px-4 py-3"><div className="text-slate-400">{t("finance.due_amount", locale)}</div><div className="font-medium text-amber-700">{formatPrice(order.dueAmount, order.currency, locale) ?? "—"}</div></div>
-              <div className="rounded-lg bg-blue-50 px-4 py-3"><div className="text-slate-400">{t("finance.refundable_amount", locale)}</div><div className="font-medium text-blue-700">{formatPrice(order.refundableAmount, order.currency, locale) ?? "—"}</div></div>
-              <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.payment_status", locale) || "Статус оплаты"}</div><div className="font-medium text-slate-700"><StatusBadge status={order.paymentStatus} /></div></div>
-            </div>
-          </EntitySectionCard>
-
-          <div className="grid grid-cols-2 gap-3 text-xs">
+        {/* Relations */}
+        <EntitySectionCard title={t("detail.sections.relations", locale)}>
+          <EntityFieldGrid>
             {order.customerId && (
-              <div className="rounded-lg bg-slate-50 px-4 py-3">
-                <div className="text-slate-400">Клиент</div>
-                <Link href={`/app/crm/customers/${order.customerId}`} className="font-medium text-blue-600 hover:underline">{order.customerDisplayName ?? order.customerId}</Link>
-              </div>
+              <EntityField label={t("crm.col.customer", locale)} value={
+                <EntityLink href={`/app/crm/customers/${order.customerId}`}>{order.customerDisplayName ?? order.customerId}</EntityLink>
+              } />
             )}
             {order.sellerPartnerId && (
-              <div className="rounded-lg bg-slate-50 px-4 py-3">
-                <div className="text-slate-400">Продавец / партнёр</div>
-                <Link href={`/app/crm/partners/${order.sellerPartnerId}`} className="font-medium text-blue-600 hover:underline">{order.partnerDisplayName ?? order.sellerPartnerId}</Link>
-              </div>
+              <EntityField label={t("crm.col.seller_partner", locale)} value={
+                <EntityLink href={`/app/crm/partners/${order.sellerPartnerId}`}>{order.partnerDisplayName ?? order.sellerPartnerId}</EntityLink>
+              } />
             )}
             {order.linkedRequest && (
-              <div className="rounded-lg bg-slate-50 px-4 py-3">
-                <div className="text-slate-400">Заявка (Request)</div>
-                <Link href={`/app/requests/${order.linkedRequest.id}`} className="font-medium text-blue-600 hover:underline">{order.linkedRequest.referenceNumber} · {order.linkedRequest.status}</Link>
-              </div>
+              <EntityField label={t("detail.relation.request", locale)} value={
+                <EntityStatusBadgesCell
+                  link={<EntityLink href={`/app/requests/${order.linkedRequest.id}`} className="font-mono text-xs">{order.linkedRequest.referenceNumber}</EntityLink>}
+                  badge={<StatusBadge status={order.linkedRequest.status} />}
+                />
+              } />
             )}
             {order.linkedBooking && (
-              <div className="rounded-lg bg-slate-50 px-4 py-3">
-                <div className="text-slate-400">Связанная бронь</div>
-                <Link href={`/app/bookings/${order.linkedBooking.id}`} className="font-medium text-blue-600 hover:underline">{order.linkedBooking.referenceNumber} · {order.linkedBooking.status}</Link>
-              </div>
+              <EntityField label={t("detail.relation.booking", locale)} value={
+                <EntityStatusBadgesCell
+                  link={<EntityLink href={`/app/bookings/${order.linkedBooking.id}`} className="font-mono text-xs">{order.linkedBooking.referenceNumber}</EntityLink>}
+                  badge={<StatusBadge status={order.linkedBooking.status} />}
+                />
+              } />
             )}
             {!order.linkedBooking && (
-              <div className="rounded-lg bg-slate-50 px-4 py-3">
-                <div className="text-slate-400">Связанная бронь</div>
-                <div className="text-slate-500">Бронирование ещё не создано</div>
-              </div>
+              <EntityField label={t("detail.relation.booking", locale)} value={<span className="text-sm text-slate-400">{t("detail.relation.no_booking", locale)}</span>} />
             )}
-          </div>
+          </EntityFieldGrid>
+        </EntitySectionCard>
 
-          <div className="grid grid-cols-3 gap-3 text-xs">
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">Создан</div><div className="font-medium text-slate-700">{formatTs(order.createdAt)}</div></div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">Приняты условия</div><div className="font-medium text-slate-700">{formatTs(order.termsAcceptedAt)}</div></div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">Финальное подтверждение туристов</div><div className="font-medium text-slate-700">{formatTs(order.finalConfirmedAt)}</div></div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">Исполнен</div><div className="font-medium text-slate-700">{formatTs(order.fulfilledAt)}</div></div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">Закрыт</div><div className="font-medium text-slate-700">{formatTs(order.closedAt)}</div></div>
-            <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">Отменён</div><div className="font-medium text-slate-700">{formatTs(order.cancelledAt)}</div></div>
-          </div>
+        {/* Business lifecycle timeline — milestones, not audit */}
+        <EntitySectionCard title={t("detail.sections.timeline", locale)}>
+          <EntityTimeline items={milestones} />
+        </EntitySectionCard>
 
-          {order.items && order.items.length > 0 && (
-            <div>
-              <div className="mb-2 font-medium text-slate-700">{t("order.items", locale)}</div>
-              <div className="space-y-2">
-                {order.items.map((item) => (
-                  <div key={item.id} className="rounded-lg border border-slate-100 px-4 py-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <Link href={`/app/catalog/${item.id}`} className="font-medium text-blue-600 hover:underline">{item.title}</Link>
-                      <span className="text-slate-500">{formatPrice(item.amount, item.currency, locale) ?? "—"}</span>
-                    </div>
-                    <div className="mt-1 text-slate-400">{item.type} · ×{item.quantity}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Туристы: до final-confirm — редактируемо (permissions); после — read-only */}
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <div className="font-medium text-slate-700">{t("d3.travelers_title", locale)}</div>
-              {immutableTravelers && <span className="text-xs text-slate-400">зафиксировано после финального подтверждения</span>}
-            </div>
-            <TravelerCollectionPanel orderId={id} />
-          </div>
-
-          {/* Примечания */}
-          {user && (
-            <OperationalNotes
-              entityType="Order"
-              entityId={id}
-              permissions={user.permissions}
-              currentUserId={user.id}
-              currentRole={user.role}
-            />
-          )}
-
-          {/* История изменений (Entity Change Audit view) */}
-          <div>
-            <div className="mb-2 font-medium text-slate-700">История изменений</div>
-            {history.total === 0 && !historyLoading && (
-              <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-400">
-                История ведётся с момента включения audit-фреймворка; для старых заказов более ранние изменения не реконструируются.
-              </div>
-            )}
+        {order.items && order.items.length > 0 && (
+          <EntitySectionCard title={t("order.items", locale)}>
             <div className="space-y-2">
-              {history.items.map((h) => (
-                <div key={h.id} className="rounded-lg border border-slate-100 bg-white px-4 py-3 text-xs">
+              {order.items.map((item) => (
+                <EntityRow key={item.id} className="justify-between">
+                  <div>
+                    <EntityLink href={`/app/catalog/${item.id}`}>{item.title}</EntityLink>
+                    <div className="mt-0.5 text-slate-400">{item.type} · ×{item.quantity}</div>
+                  </div>
+                  <span className="text-slate-500">{formatPrice(item.amount, item.currency, locale) ?? "—"}</span>
+                </EntityRow>
+              ))}
+            </div>
+          </EntitySectionCard>
+        )}
+
+        {/* Туристы: до final-confirm — редактируемо (permissions); после — read-only */}
+        <EntitySectionCard title={t("d3.travelers_title", locale)}>
+          {immutableTravelers && (
+            <div className="mb-3 text-xs text-slate-400">{t("d3.locked", locale)}</div>
+          )}
+          <TravelerCollectionPanel orderId={id} />
+        </EntitySectionCard>
+
+        {/* Примечания */}
+        {user && (
+          <OperationalNotes
+            entityType="Order"
+            entityId={id}
+            permissions={user.permissions}
+            currentUserId={user.id}
+            currentRole={user.role}
+          />
+        )}
+
+        {/* История изменений (Entity Change Audit view) */}
+        <EntitySectionCard title={t("bookings.change_history", locale)}>
+          {history.total === 0 && !historyLoading && (
+            <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-400">
+              {t("bookings.history_disclaimer", locale)}
+            </div>
+          )}
+          <div className="space-y-2">
+            {history.items.map((h) => (
+              <EntityRow key={h.id} className="items-start">
+                <div className="w-full">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-700">{describeAction(h.action)}</span>
-                    <span className="shrink-0 text-slate-400">{formatTs(h.createdAt)}</span>
+                    <span className="font-semibold text-slate-700">{orderActionLabel(h.action, locale)}</span>
+                    <span className="shrink-0 text-slate-400">{formatTs(h.createdAt, locale)}</span>
                   </div>
                   {(h.from || h.to) && (
                     <div className="mt-0.5 text-slate-500">
@@ -357,63 +337,73 @@ export default function OrderDetailPage() {
                         const labelBase = f.field.includes("traveler[") ? f.field.replace(/^traveler\[\d+\]\./, "") : f.field;
                         return (
                           <li key={idx} className="flex flex-wrap items-center gap-1 text-[11px] text-slate-600">
-                            <span className="font-medium">{FIELD_LABELS[labelBase] ?? f.field}:</span>
+                            <span className="font-medium">{fieldLabel(labelBase, locale)}:</span>
                             <span className="text-slate-400 line-through">{renderFieldValue(labelBase, f.oldValue)}</span>
                             <span>→</span>
                             <span>{renderFieldValue(labelBase, f.newValue)}</span>
-                            {f.redacted && <span className="text-amber-600">(маскировано)</span>}
+                            {f.redacted && <span className="text-amber-600">{t("order.history.redacted", locale)}</span>}
                           </li>
                         );
                       })}
                     </ul>
                   )}
-                  {h.actorName && <div className="mt-1 text-slate-400">Автор: {h.actorName}</div>}
+                  {h.actorName && <div className="mt-1 text-slate-400">{ti("order.history.author", locale, { name: h.actorName })}</div>}
                 </div>
-              ))}
-            </div>
-            {history.items.length < history.total && (
-              <button
-                disabled={historyLoading}
-                onClick={() => void loadHistory(history.page + 1)}
-                className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-              >
-                {historyLoading ? "…" : `Показать ещё (${history.total - history.items.length})`}
-              </button>
-            )}
+              </EntityRow>
+            ))}
           </div>
+          {history.items.length < history.total && (
+            <button
+              disabled={historyLoading}
+              onClick={() => void loadHistory(history.page + 1)}
+              className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {historyLoading ? "…" : ti("order.history.show_more", locale, { n: history.total - history.items.length })}
+            </button>
+          )}
+        </EntitySectionCard>
 
-          {/* D7 — Financial History: payment + refund events */}
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("finance.history", locale) || "Финансовая история"}</h3>
-            {finHistoryLoading && <div className="text-xs text-slate-400">{t("crm.loading", locale)}</div>}
-            {!finHistoryLoading && finHistory.payments.length === 0 && finHistory.refunds.length === 0 && (
-              <div className="text-xs text-slate-400">{t("finance.no_history", locale) || "Нет финансовых событий"}</div>
-            )}
-            <div className="space-y-2">
-              {finHistory.payments.map((p) => (
-                <div key={p.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-4 py-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-slate-400">{p.code}</span>
-                    <StatusBadge status={p.status} />
-                    <span className="text-slate-600">{formatPrice(p.amount, p.currency, locale)}</span>
-                  </div>
-                  <span className="text-slate-400">{formatTs(p.paidAt ?? p.failedAt ?? p.cancelledAt ?? p.createdAt)}</span>
+        {/* D7 — Financial History: payment + refund events */}
+        <EntitySectionCard title={t("finance.history", locale) || "Финансовая история"}>
+          {finHistoryLoading && <div className="text-xs text-slate-400">{t("crm.loading", locale)}</div>}
+          {!finHistoryLoading && finHistory.payments.length === 0 && finHistory.refunds.length === 0 && (
+            <div className="text-xs text-slate-400">{t("finance.no_history", locale) || "Нет финансовых событий"}</div>
+          )}
+          <div className="space-y-2">
+            {finHistory.payments.map((p) => (
+              <EntityRow key={p.id} className="justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] text-slate-400">{p.code}</span>
+                  <StatusBadge status={p.status} />
+                  <span className="text-slate-600">{formatPrice(p.amount, p.currency, locale)}</span>
                 </div>
-              ))}
-              {finHistory.refunds.map((r) => (
-                <div key={r.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-4 py-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-slate-400">{r.code}</span>
-                    <StatusBadge status={r.status} />
-                    <span className="text-red-600">{formatPrice(r.amount, r.currency, locale)}</span>
-                    {r.reason && <span className="text-slate-400">({r.reason})</span>}
-                  </div>
-                  <span className="text-slate-400">{formatTs(r.processedAt ?? r.approvedAt ?? r.requestedAt ?? r.createdAt)}</span>
+                <span className="text-slate-400">{formatTs(p.paidAt ?? p.failedAt ?? p.cancelledAt ?? p.createdAt, locale)}</span>
+              </EntityRow>
+            ))}
+            {finHistory.refunds.map((r) => (
+              <EntityRow key={r.id} className="justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] text-slate-400">{r.code}</span>
+                  <StatusBadge status={r.status} />
+                  <span className="text-red-600">{formatPrice(r.amount, r.currency, locale)}</span>
+                  {r.reason && <span className="text-slate-400">({r.reason})</span>}
                 </div>
-              ))}
-            </div>
+                <span className="text-slate-400">{formatTs(r.processedAt ?? r.approvedAt ?? r.requestedAt ?? r.createdAt, locale)}</span>
+              </EntityRow>
+            ))}
           </div>
-        </div>
+        </EntitySectionCard>
+      </div>
     </EntityDetailShell>
+  );
+}
+
+/** Relation value: mono link + status badge on the same line. */
+function EntityStatusBadgesCell({ link, badge }: { link: React.ReactNode; badge: React.ReactNode }) {
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {link}
+      {badge}
+    </span>
   );
 }

@@ -51,7 +51,13 @@ const STATUS_I18N_KEY: Record<string, string> = {
   PENDING: "status.entity.PENDING",
   CAPTURED: "status.entity.CAPTURED",
   AUTHORIZED: "status.entity.AUTHORIZED",
-  // Note: FAILED and CANCELLED are shared with Order statuses above
+  FAILED: "status.entity.FAILED",
+  // Refund entity statuses
+  REQUESTED: "status.entity.REQUESTED",
+  PROCESSED: "status.entity.PROCESSED",
+  // Request decision statuses
+  ACCEPTED: "status.decision.ACCEPTED",
+  DECLINED: "status.decision.DECLINED",
   // Common (users, CRM, etc.)
   ACTIVE: "status.common.ACTIVE",
   INACTIVE: "status.common.INACTIVE",
@@ -135,6 +141,13 @@ const STATUS_CLS: Record<string, string> = {
   PENDING: "bg-amber-50 text-amber-700 border-amber-200",
   CAPTURED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   AUTHORIZED: "bg-blue-50 text-blue-700 border-blue-200",
+  FAILED: "bg-red-50 text-red-600 border-red-200",
+  // Refund entity statuses
+  REQUESTED: "bg-amber-50 text-amber-700 border-amber-200",
+  PROCESSED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  // Request decision statuses
+  ACCEPTED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  DECLINED: "bg-red-50 text-red-600 border-red-200",
   // Request
   CHECKING: "bg-yellow-50 text-yellow-700 border-yellow-200",
   SUPPLIER_TIMEOUT: "bg-red-50 text-red-600 border-red-200",

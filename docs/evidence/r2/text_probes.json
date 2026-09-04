@@ -1,0 +1,16 @@
+{
+  "requests": {
+    "timeline_section": false,
+    "raw_enum_leak": []
+  },
+  "orders": {
+    "timeline_section": false,
+    "raw_enum_leak": []
+  },
+  "bookings": {
+    "timeline_section": false,
+    "raw_enum_leak": [],
+    "service_date_in_finance": false,
+    "service_date_in_service": false
+  }
+}

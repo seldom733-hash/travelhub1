@@ -160,11 +160,12 @@ export default function RequestsPage() {
         <h1 className="text-2xl font-bold text-slate-900">{t("requests.title", locale)}</h1>
       </div>
 
-      {/* TOTAL KPI */}
+      {/* TOTAL KPI — canonical naming, ~15-20% larger, NOT full-width */}
       {kpi && (
-        <div className="grid grid-cols-1">
+        <div className="w-fit max-w-full">
           <CommerceKpiCard
-            label={t("requests.kpi.all", locale)}
+            variant="total"
+            label={t("requests.kpi.total", locale)}
             value={kpi.total ?? 0}
             active={!selectedStatus}
             onClick={() => { setStatusFilter(""); setPage(1); }}
@@ -196,7 +197,7 @@ export default function RequestsPage() {
           value={searchDraft}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={onSearchKeyDown}
-          placeholder="Поиск: MKT-REQ-*, имя клиента, CRM-*, название услуги, поставщик..."
+          placeholder={t("requests.search_placeholder", locale)}
           className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
         />
 
@@ -205,7 +206,7 @@ export default function RequestsPage() {
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
         >
-          <option value="">Все статусы</option>
+          <option value="">{t("admin.filter.all_statuses", locale)}</option>
           {REQUEST_LIFECYCLE_STATUSES.map((s) => (
             <option key={s} value={s}>{requestStatusLabel(s, locale)}</option>
           ))}

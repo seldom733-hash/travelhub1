@@ -1,0 +1,56 @@
+{
+  "total": 10,
+  "passed": 10,
+  "results": [
+    {
+      "name": "login (admin → platform app)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/dashboard"
+    },
+    {
+      "name": "registry requests: TOTAL label present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "registry requests: first detail link found",
+      "ok": true,
+      "detail": "/app/requests/4e581890-7444-424e-858a-b93e0e35af67"
+    },
+    {
+      "name": "registry orders: TOTAL label present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "registry orders: first detail link found",
+      "ok": true,
+      "detail": "/app/orders/d150359e-a068-4ef5-913-d56c511d9a29"
+    },
+    {
+      "name": "registry bookings: TOTAL label present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "registry bookings: first detail link found",
+      "ok": true,
+      "detail": "/app/bookings/21591b5f-7a29-4d7d-10fa-c4a6b98e1feb"
+    },
+    {
+      "name": "detail requests: loaded (/app/requests/4e581890-7444-424e-858a-b93e0e35af67)",
+      "ok": true,
+      "detail": "chars=1327"
+    },
+    {
+      "name": "detail orders: loaded (/app/orders/d150359e-a068-4ef5-913-d56c511d9a29)",
+      "ok": true,
+      "detail": "chars=2073"
+    },
+    {
+      "name": "detail bookings: loaded (/app/bookings/21591b5f-7a29-4d7d-10fa-c4a6b98e1feb)",
+      "ok": true,
+      "detail": "chars=969"
+    }
+  ]
+}

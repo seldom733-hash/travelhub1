@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { api } from "@/lib/api";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, ti, LOCALE_TAGS } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 import StatusBadge from "@/components/StatusBadge";
 import EntityDetailShell from "@/components/EntityDetailShell";
 import EntityDetailHeader from "@/components/EntityDetailHeader";
 import EntitySectionCard from "@/components/commerce/EntitySectionCard";
 import EntityField from "@/components/commerce/EntityField";
+import EntityFieldGrid from "@/components/commerce/EntityFieldGrid";
+import EntityLink from "@/components/commerce/EntityLink";
+import EntityRow from "@/components/commerce/EntityRow";
+import EntityTimeline from "@/components/commerce/EntityTimeline";
 
 interface RequestDetail {
   id: string;
@@ -82,10 +85,8 @@ interface RequestDetail {
   }>;
 }
 
-
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return <EntityField label={label} value={value || "—"} />;
+function InfoRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return <EntityField label={label} value={value} mono={mono} />;
 }
 
 function ProgressBadge({ progress, locale }: { progress: "AWAITING_TRAVELERS" | "DATA_FILLED" | "FINAL_CONFIRMED" | null; locale: "ru" | "az" | "en" }) {
@@ -147,7 +148,7 @@ export default function RequestDetailPage() {
       await api.post(path, body ?? {});
       await loadRequest();
     } catch (err: any) {
-      setActionMsg(err.message || "Ошибка выполнения действия");
+      setActionMsg(err.message || t("requests.action_error", locale));
     } finally {
       setBusy(null);
     }
@@ -156,7 +157,7 @@ export default function RequestDetailPage() {
   async function propose() {
     const price = Number(proposePrice);
     if (!proposePrice || !Number.isFinite(price) || price <= 0) {
-      setActionMsg("Укажите корректную цену");
+      setActionMsg(t("requests.price_invalid", locale));
       return;
     }
     await runPost(`/requests/${id}/propose-price`, { price });
@@ -185,7 +186,7 @@ export default function RequestDetailPage() {
   if (!request) {
     return (
       <div className="p-6">
-        <div className="text-gray-500">Заявка не найдена</div>
+        <div className="text-gray-500">{t("crm.not_found", locale)}</div>
       </div>
     );
   }
@@ -195,6 +196,9 @@ export default function RequestDetailPage() {
   const showCustomer = canEdit && ["CONFIRMED", "PRICE_CHANGED"].includes(r.status);
   const showConvert = canEdit && r.status === "CUSTOMER_ACCEPTED" && !r.convertedOrderId;
   const progress = r.convertedOrder?.travelerProgress ?? null;
+  const timeline = (r as any).timeline as Array<{ label: string; timestamp: string | null }> | undefined;
+  const fmtDate = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateString(LOCALE_TAGS[locale]) : null);
+  const fmtTs = (v: string | null | undefined) => (v ? new Date(v).toLocaleString(LOCALE_TAGS[locale]) : null);
 
   return (
     <EntityDetailShell
@@ -202,237 +206,253 @@ export default function RequestDetailPage() {
         <EntityDetailHeader
           breadcrumbs={["TravelHub", t("requests.title", locale) || "Заявки", r.referenceNumber]}
           reference={r.referenceNumber}
+          secondary={r.code}
+          backHref="/app/requests"
           lifecycleStatus={<StatusBadge status={r.status} />}
-          actions={
-            <Link href="/app/requests" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
-              ← {t("crm.back_to_list", locale)}
-            </Link>
-          }
         />
       }
     >
+      <div className="space-y-4">
+        {/* Overview */}
+        <EntitySectionCard title={t("detail.sections.overview", locale)}>
+          <EntityFieldGrid>
+            <InfoRow label={t("requests.customer", locale)} value={
+              r.customerName ? (
+                <>
+                  <span className="font-medium">{r.customerName}</span>
+                  {r.customerCode && <span className="ml-2 text-xs text-gray-500">{r.customerCode}</span>}
+                </>
+              ) : r.customerCode ? (
+                <span className="font-mono text-xs">{r.customerCode}</span>
+              ) : null
+            } />
+            <InfoRow label={t("requests.product", locale)} value={
+              r.productName ? (
+                <>
+                  <span className="font-medium">{r.productName}</span>
+                  {r.productCode && <span className="ml-2 text-xs text-gray-500">{r.productCode}</span>}
+                </>
+              ) : r.productCode ? (
+                <span className="font-mono text-xs">{r.productCode}</span>
+              ) : null
+            } />
+            <InfoRow label={t("requests.supplier", locale)} value={
+              r.partnerName ? (
+                <>
+                  <span className="font-medium">{r.partnerName}</span>
+                  {r.partnerCode && <span className="ml-2 text-xs text-gray-500">{r.partnerCode}</span>}
+                </>
+              ) : r.partnerCode ? (
+                <span className="font-mono text-xs">{r.partnerCode}</span>
+              ) : null
+            } />
 
-      {/* Main Info Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <InfoRow label={t("requests.customer", locale)} value={
-          <>
-            <span className="font-medium">{r.customerName || "—"}</span>
-            {r.customerCode && <span className="ml-2 text-xs text-gray-500">{r.customerCode}</span>}
-          </>
-        } />
-        <InfoRow label={t("requests.product", locale)} value={
-          <>
-            <span className="font-medium">{r.productName || "—"}</span>
-            {r.productCode && <span className="ml-2 text-xs text-gray-500">{r.productCode}</span>}
-          </>
-        } />
-        <InfoRow label={t("requests.supplier", locale)} value={
-          <>
-            <span className="font-medium">{r.partnerName || "—"}</span>
-            {r.partnerCode && <span className="ml-2 text-xs text-gray-500">{r.partnerCode}</span>}
-          </>
-        } />
+            <InfoRow label={t("requests.displayed_price", locale)} value={
+              r.displayedPrice ? `${r.displayedPrice} ${r.displayedCurrency ?? ""}` : null
+            } />
+            <InfoRow label={t("requests.confirmed_price", locale)} value={
+              r.confirmedPrice ? `${r.confirmedPrice} ${r.confirmedCurrency ?? ""}` : null
+            } />
+            <InfoRow label={t("requests.quantity", locale)} value={r.quantity} />
 
-        <InfoRow label={t("requests.displayed_price", locale)} value={
-          r.displayedPrice ? `${r.displayedPrice} ${r.displayedCurrency ?? ""}` : "—"
-        } />
-        <InfoRow label={t("requests.confirmed_price", locale)} value={
-          r.confirmedPrice ? `${r.confirmedPrice} ${r.confirmedCurrency ?? ""}` : "—"
-        } />
-        <InfoRow label="Количество" value={r.quantity} />
-
-        <InfoRow label={t("reqflow.party_size", locale)} value={r.travelerCount ?? "—"} />
-        <InfoRow label={t("requests.service_date", locale)} value={
-          r.requestedServiceDate ? new Date(r.requestedServiceDate).toLocaleDateString() : "—"
-        } />
-        <InfoRow label="Дата подтверждения" value={
-          r.supplierRespondedAt ? new Date(r.supplierRespondedAt).toLocaleDateString() : "—"
-        } />
-      </div>
-
-      {(showSupplier || showCustomer || showConvert) && (
-        <EntitySectionCard title="Действия">
-          {actionMsg && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">{actionMsg}</div>
-          )}
-          {showSupplier && (
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-gray-500 uppercase">{t("reqflow.supplier_actions", locale)}</div>
-              <div className="flex flex-wrap gap-2">
-                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/confirm-price`)} className={btn("", TONES.success)}>{busy === `/requests/${id}/confirm-price` ? t("reqflow.busy", locale) : t("reqflow.confirm_price", locale)}</button>
-                {!proposeOpen ? (
-                  <button disabled={busy !== null} onClick={() => setProposeOpen(true)} className={btn("", TONES.primary)}>{t("reqflow.propose_price", locale)}</button>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <input
-                      value={proposePrice}
-                      onChange={(e) => setProposePrice(e.target.value)}
-                      placeholder="Цена"
-                      className="w-32 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400"
-                    />
-                    <button onClick={() => void propose()} className={btn("", TONES.primary)}>OK</button>
-                    <button onClick={() => { setProposeOpen(false); setProposePrice(""); }} className={btn("", TONES.neutral)}>✕</button>
-                  </span>
-                )}
-                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/reject`, { reason: "rejected" })} className={btn("", TONES.danger)}>{t("reqflow.reject", locale)}</button>
-                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/unavailable`, { reason: "unavailable" })} className={btn("", TONES.neutral)}>{t("reqflow.unavailable", locale)}</button>
-              </div>
-            </div>
-          )}
-          {showCustomer && (
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-gray-500 uppercase">{t("reqflow.customer_actions", locale)}</div>
-              <div className="flex flex-wrap gap-2">
-                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-accept`)} className={btn("", TONES.success)}>{t("reqflow.customer_accept", locale)}</button>
-                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-decline`)} className={btn("", TONES.danger)}>{t("reqflow.customer_decline", locale)}</button>
-              </div>
-            </div>
-          )}
-          {showConvert && (
-            <div className="space-y-2">
-              <div className="text-xs font-medium text-slate-400 uppercase">{t("reqflow.converted_hint", locale)}</div>
-              <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/convert`)} className={btn("", TONES.primary)}>
-                {busy === `/requests/${id}/convert` ? t("reqflow.busy", locale) : t("reqflow.convert_action", locale)}
-              </button>
-            </div>
-          )}
+            <InfoRow label={t("reqflow.party_size", locale)} value={r.travelerCount ?? null} />
+            <InfoRow label={t("requests.service_date", locale)} value={
+              r.requestedServiceDate ? fmtDate(r.requestedServiceDate) : null
+            } />
+            <InfoRow label={t("requests.supplier_responded_date", locale)} value={
+              r.supplierRespondedAt ? fmtDate(r.supplierRespondedAt) : null
+            } />
+          </EntityFieldGrid>
         </EntitySectionCard>
-      )}
 
-      <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-3">
-        <h2 className="text-lg font-semibold text-gray-900">{t("reqflow.linked_order", locale)}</h2>
-        {r.convertedOrder ? (
-          <>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => router.push(`/app/orders/${r.convertedOrder!.id}`)}
-                className="font-mono text-sm font-semibold text-blue-700 hover:underline"
-              >
-                {r.convertedOrder.referenceNumber}
-              </button>
-              <ProgressBadge progress={r.convertedOrder.travelerProgress ?? null} locale={locale} />
-              {r.convertedOrder.travelerCount != null && (
-                <span className="text-xs text-gray-500">{r.convertedOrder.travelerCount} {t("reqflow.travelers", locale).toLowerCase()}</span>
-              )}
-            </div>
-            {r.convertedOrder.travelerProgress !== "FINAL_CONFIRMED" && (
-              <button
-                onClick={() => router.push(`/app/orders/${r.convertedOrder!.id}`)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${TONES.primary}`}
-              >
-                {t("reqflow.continue_order", locale)} →
-              </button>
+        {(showSupplier || showCustomer || showConvert) && (
+          <EntitySectionCard title={t("detail.sections.actions", locale)}>
+            {actionMsg && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">{actionMsg}</div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-purple-200">
-              <InfoRow label={t("crm.col.created", locale)} value={
-                r.convertedOrder.createdAt ? new Date(r.convertedOrder.createdAt).toLocaleString() : "—"
-              } />
-              <InfoRow label="Статус заказа" value={r.convertedOrder.status} />
-              {r.convertedOrder.amount && (
-                <InfoRow label="Сумма" value={`${r.convertedOrder.amount} ${r.convertedOrder.currency ?? ""}`} />
-              )}
-            </div>
-            {r.convertedBooking && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-purple-200">
-                <InfoRow label="Бронирование" value={
-                  <button
-                    onClick={() => router.push(`/app/bookings`)}
-                    className="font-mono text-sm text-blue-600 hover:underline"
-                  >
-                    {r.convertedBooking.referenceNumber}
-                  </button>
-                } />
-                <InfoRow label="Статус бронирования" value={r.convertedBooking.status} />
-              </div>
-            )}
-            {r.convertedPayments && r.convertedPayments.length > 0 && (
-              <div className="pt-2 border-t border-purple-200">
-                <div className="text-xs font-medium text-gray-500 uppercase mb-2">Платежи</div>
-                {r.convertedPayments.map((p) => (
-                  <div key={p.id} className="flex items-center gap-4 py-1">
-                    <span className="font-mono text-xs text-blue-600">{p.referenceNumber}</span>
-                    <span className="text-sm text-gray-700">{p.amount} {p.currency}</span>
-                    <span className="text-xs text-gray-500">{p.status}</span>
-                    {p.paidAt && <span className="text-xs text-green-600">Оплачено: {new Date(p.paidAt).toLocaleDateString()}</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-            {(r as any).convertedRefund && (
-              <div className="pt-2 border-t border-purple-200">
-                <div className="text-xs font-medium text-gray-500 uppercase mb-2">Возврат</div>
-                <div className="flex items-center gap-4 py-1">
-                  <span className="font-mono text-xs text-blue-600">{(r as any).convertedRefund.referenceNumber}</span>
-                  <span className="text-sm text-gray-700">{(r as any).convertedRefund.amount} {(r as any).convertedRefund.currency}</span>
-                  <span className="text-xs text-gray-500">{(r as any).convertedRefund.status}</span>
+            {showSupplier && (
+              <div className="space-y-2">
+                <div className="text-xs font-medium uppercase text-gray-500">{t("reqflow.supplier_actions", locale)}</div>
+                <div className="flex flex-wrap gap-2">
+                  <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/confirm-price`)} className={btn("", TONES.success)}>{busy === `/requests/${id}/confirm-price` ? t("reqflow.busy", locale) : t("reqflow.confirm_price", locale)}</button>
+                  {!proposeOpen ? (
+                    <button disabled={busy !== null} onClick={() => setProposeOpen(true)} className={btn("", TONES.primary)}>{t("reqflow.propose_price", locale)}</button>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <input
+                        value={proposePrice}
+                        onChange={(e) => setProposePrice(e.target.value)}
+                        placeholder={t("requests.price_proposal_placeholder", locale)}
+                        className="w-32 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400"
+                      />
+                      <button onClick={() => void propose()} className={btn("", TONES.primary)}>OK</button>
+                      <button onClick={() => { setProposeOpen(false); setProposePrice(""); }} className={btn("", TONES.neutral)}>✕</button>
+                    </span>
+                  )}
+                  <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/reject`, { reason: "rejected" })} className={btn("", TONES.danger)}>{t("reqflow.reject", locale)}</button>
+                  <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/unavailable`, { reason: "unavailable" })} className={btn("", TONES.neutral)}>{t("reqflow.unavailable", locale)}</button>
                 </div>
               </div>
             )}
-          </>
-        ) : (
-          <div className="text-sm text-gray-500">{t("reqflow.no_linked_order", locale)}</div>
+            {showCustomer && (
+              <div className="space-y-2">
+                <div className="text-xs font-medium uppercase text-gray-500">{t("reqflow.customer_actions", locale)}</div>
+                <div className="flex flex-wrap gap-2">
+                  <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-accept`)} className={btn("", TONES.success)}>{t("reqflow.customer_accept", locale)}</button>
+                  <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-decline`)} className={btn("", TONES.danger)}>{t("reqflow.customer_decline", locale)}</button>
+                </div>
+              </div>
+            )}
+            {showConvert && (
+              <div className="space-y-2">
+                <div className="text-xs font-medium uppercase text-slate-400">{t("reqflow.converted_hint", locale)}</div>
+                <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/convert`)} className={btn("", TONES.primary)}>
+                  {busy === `/requests/${id}/convert` ? t("reqflow.busy", locale) : t("reqflow.convert_action", locale)}
+                </button>
+              </div>
+            )}
+          </EntitySectionCard>
+        )}
+
+        {/* Relations */}
+        <EntitySectionCard title={t("detail.sections.relations", locale)}>
+          {r.convertedOrder ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <EntityLink
+                  href={`/app/orders/${r.convertedOrder!.id}`}
+                  className="font-mono text-xs font-semibold"
+                >
+                  {r.convertedOrder.referenceNumber}
+                </EntityLink>
+                <ProgressBadge progress={r.convertedOrder.travelerProgress ?? null} locale={locale} />
+                {r.convertedOrder.travelerCount != null && (
+                  <span className="text-xs text-gray-500">{r.convertedOrder.travelerCount} {t("reqflow.travelers", locale).toLowerCase()}</span>
+                )}
+              </div>
+              {r.convertedOrder.travelerProgress !== "FINAL_CONFIRMED" && (
+                <button
+                  onClick={() => router.push(`/app/orders/${r.convertedOrder!.id}`)}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${TONES.primary}`}
+                >
+                  {t("reqflow.continue_order", locale)} →
+                </button>
+              )}
+              <div className="border-t border-slate-100 pt-4">
+                <EntityFieldGrid>
+                  <InfoRow label={t("crm.col.created", locale)} value={
+                    r.convertedOrder.createdAt ? fmtTs(r.convertedOrder.createdAt) : null
+                  } />
+                  <InfoRow label={t("detail.relation.order_status", locale)} value={<StatusBadge status={r.convertedOrder.status} />} />
+                  {r.convertedOrder.amount && (
+                    <InfoRow label={t("crm.col.amount", locale)} value={`${r.convertedOrder.amount} ${r.convertedOrder.currency ?? ""}`} />
+                  )}
+                </EntityFieldGrid>
+              </div>
+              {r.convertedBooking && (
+                <div className="border-t border-slate-100 pt-4">
+                  <EntityFieldGrid>
+                    <InfoRow label={t("detail.relation.booking", locale)} value={
+                      <EntityLink
+                        href={`/app/bookings/${r.convertedBooking.id}`}
+                        className="font-mono text-xs"
+                      >
+                        {r.convertedBooking.referenceNumber}
+                      </EntityLink>
+                    } />
+                    <InfoRow label={t("detail.relation.booking_status", locale)} value={<StatusBadge status={r.convertedBooking.status} />} />
+                  </EntityFieldGrid>
+                </div>
+              )}
+              {r.convertedPayments && r.convertedPayments.length > 0 && (
+                <div className="border-t border-slate-100 pt-4">
+                  <div className="mb-2 text-xs font-medium uppercase text-slate-400">{t("crm.detail.payments", locale)}</div>
+                  <div className="space-y-2">
+                    {r.convertedPayments.map((p) => (
+                      <EntityRow key={p.id}>
+                        <span className="font-mono text-[10px] text-slate-400">{p.referenceNumber}</span>
+                        <StatusBadge status={p.status} />
+                        <span className="text-sm text-gray-700">{p.amount} {p.currency}</span>
+                        {p.paidAt && <span className="text-xs text-green-600">{ti("requests.paid_at", locale, { date: fmtDate(p.paidAt) ?? "" })}</span>}
+                      </EntityRow>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(r as any).convertedRefund && (
+                <div className="border-t border-slate-100 pt-4">
+                  <div className="mb-2 text-xs font-medium uppercase text-slate-400">{t("crm.detail.refunds", locale)}</div>
+                  <EntityRow>
+                    <span className="font-mono text-[10px] text-slate-400">{(r as any).convertedRefund.referenceNumber}</span>
+                    <StatusBadge status={(r as any).convertedRefund.status} />
+                    <span className="text-sm text-gray-700">{(r as any).convertedRefund.amount} {(r as any).convertedRefund.currency}</span>
+                  </EntityRow>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-slate-400">{t("reqflow.no_linked_order", locale)}</div>
+          )}
+        </EntitySectionCard>
+
+        <EntitySectionCard title={t("requests.supplier", locale)}>
+          <EntityFieldGrid>
+            <InfoRow label={t("requests.supplier_deadline", locale)} value={
+              r.supplierResponseDeadline ? fmtTs(r.supplierResponseDeadline) : null
+            } />
+            <InfoRow label={t("requests.supplier_responded", locale)} value={
+              r.supplierRespondedAt ? fmtTs(r.supplierRespondedAt) : null
+            } />
+            <InfoRow label={t("requests.decision", locale)} value={
+              r.supplierDecision ? <StatusBadge status={r.supplierDecision} /> : null
+            } />
+          </EntityFieldGrid>
+          {(r.supplierPriceProposal || r.supplierNote) && (
+            <div className="mt-4 border-t border-slate-100 pt-4 space-y-2">
+              {r.supplierPriceProposal && (
+                <InfoRow label={t("requests.proposed_price", locale)} value={`${r.supplierPriceProposal} ${r.displayedCurrency ?? ""}`} />
+              )}
+              {r.supplierNote && (
+                <InfoRow label={t("requests.supplier_note", locale)} value={r.supplierNote} />
+              )}
+            </div>
+          )}
+        </EntitySectionCard>
+
+        <EntitySectionCard title={t("requests.customer", locale)}>
+          <EntityFieldGrid>
+            <InfoRow label={t("requests.customer_deadline", locale)} value={
+              r.customerActionDeadline ? fmtTs(r.customerActionDeadline) : null
+            } />
+            <InfoRow label={t("reqflow.accepted_at", locale)} value={
+              r.customerAcceptedAt ? fmtTs(r.customerAcceptedAt) : null
+            } />
+            <InfoRow label={t("requests.decision", locale)} value={
+              r.customerDecision ? <StatusBadge status={r.customerDecision} /> : null
+            } />
+          </EntityFieldGrid>
+        </EntitySectionCard>
+
+        {(r.rejectedAt || r.rejectionReason) && (
+          <EntitySectionCard title={t("requests.rejection", locale)}>
+            <EntityFieldGrid>
+              <InfoRow label={t("requests.rejection_date", locale)} value={
+                r.rejectedAt ? fmtTs(r.rejectedAt) : null
+              } />
+              <InfoRow label={t("requests.rejected_by", locale)} value={r.rejectedBy || null} />
+              <InfoRow label={t("crm.col.reason", locale)} value={r.rejectionReason || null} />
+            </EntityFieldGrid>
+          </EntitySectionCard>
+        )}
+
+        {timeline && timeline.length > 0 && (
+          <EntitySectionCard title={t("detail.sections.timeline", locale)}>
+            <EntityTimeline
+              items={timeline.map((item, idx) => ({ key: String(idx), label: item.label, timestamp: item.timestamp }))}
+            />
+          </EntitySectionCard>
         )}
       </div>
-
-      <EntitySectionCard title="Поставщик">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <InfoRow label="Дедлайн ответа" value={
-            r.supplierResponseDeadline ? new Date(r.supplierResponseDeadline).toLocaleString() : "—"
-          } />
-          <InfoRow label="Ответил" value={
-            r.supplierRespondedAt ? new Date(r.supplierRespondedAt).toLocaleString() : "—"
-          } />
-          <InfoRow label="Решение" value={r.supplierDecision || "—"} />
-        </div>
-        {r.supplierPriceProposal && (
-          <InfoRow label="Предложенная цена" value={`${r.supplierPriceProposal} ${r.displayedCurrency ?? ""}`} />
-        )}
-        {r.supplierNote && (
-          <InfoRow label="Примечание поставщика" value={r.supplierNote} />
-        )}
-      </EntitySectionCard>
-
-      <EntitySectionCard title="Клиент">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <InfoRow label="Дедлайн клиента" value={
-            r.customerActionDeadline ? new Date(r.customerActionDeadline).toLocaleString() : "—"
-          } />
-          <InfoRow label={t("reqflow.accepted_at", locale)} value={
-            r.customerAcceptedAt ? new Date(r.customerAcceptedAt).toLocaleString() : "—"
-          } />
-          <InfoRow label="Решение" value={r.customerDecision || "—"} />
-        </div>
-      </EntitySectionCard>
-
-      {(r.rejectedAt || r.rejectionReason) && (
-        <EntitySectionCard title="Отклонение">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <InfoRow label="Дата" value={
-              r.rejectedAt ? new Date(r.rejectedAt).toLocaleString() : "—"
-            } />
-            <InfoRow label="Кем" value={r.rejectedBy || "—"} />
-            <InfoRow label="Причина" value={r.rejectionReason || "—"} />
-          </div>
-        </EntitySectionCard>
-      )}
-
-      {(r as any).timeline && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900">Хронология</h2>
-          <div className="space-y-1">
-            {(r as any).timeline.map((item: { label: string; timestamp: string | null }, idx: number) => (
-              <div key={idx} className="flex items-center gap-3 text-sm">
-                <span className="w-60 text-gray-600 shrink-0">{item.label}</span>
-                <span className="text-gray-900 font-mono text-xs">
-                  {item.timestamp
-                    ? new Date(item.timestamp).toLocaleString()
-                    : "—"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </EntityDetailShell>
   );
 }

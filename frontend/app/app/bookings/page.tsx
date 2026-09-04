@@ -117,9 +117,10 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
         />
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-4">
-            {/* TOTAL KPI */}
-            <div className="grid grid-cols-1">
+            {/* TOTAL KPI — canonical naming, ~15-20% larger, NOT full-width */}
+            <div className="w-fit max-w-full">
               <CommerceKpiCard
+                variant="total"
                 label={t("admin.kpi.total_bookings", locale)}
                 value={total}
                 active={!selectedStatus}
@@ -163,9 +164,9 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
                   <option key={s} value={s}>{bookingStatusLabel(s, locale)}</option>
                 ))}
               </select>
-              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm" placeholder="С" />
-              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm" placeholder="По" />
-              {busy && <span className="text-xs text-slate-400">загрузка…</span>}
+              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm" placeholder={t("common.date_from", locale)} />
+              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm" placeholder={t("common.date_to", locale)} />
+              {busy && <span className="text-xs text-slate-400">{t("common.loading_short", locale)}</span>}
               <TableExportButton
                 exportUrl="/api/v1/bookings/export"
                 extraParams={{
@@ -237,7 +238,7 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
                   {(data?.items ?? []).length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">
-                        Бронирований пока нет — передайте заказ из Order Center
+                        {t("bookings.empty", locale)}
                       </td>
                     </tr>
                   )}

@@ -1,0 +1,110 @@
+[
+  {
+    "page": "requests_detail",
+    "width": 390,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "requests_detail",
+    "width": 768,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "requests_detail",
+    "width": 1280,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "orders_detail",
+    "width": 390,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "orders_detail",
+    "width": 768,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "orders_detail",
+    "width": 1280,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "bookings_detail",
+    "width": 390,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "bookings_detail",
+    "width": 768,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "bookings_detail",
+    "width": 1280,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "requests_registry",
+    "width": 390,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "requests_registry",
+    "width": 768,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "requests_registry",
+    "width": 1280,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "orders_registry",
+    "width": 390,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "orders_registry",
+    "width": 768,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "orders_registry",
+    "width": 1280,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "bookings_registry",
+    "width": 390,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "bookings_registry",
+    "width": 768,
+    "overflow_px": 0,
+    "ok": true
+  },
+  {
+    "page": "bookings_registry",
+    "width": 1280,
+    "overflow_px": 0,
+    "ok": true
+  }
+]

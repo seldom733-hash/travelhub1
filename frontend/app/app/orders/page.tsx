@@ -12,6 +12,7 @@ import OrderActionBar from "@/components/order/OrderActionBar";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
 import TableExportButton from "@/components/TableExportButton";
 import { useLocale, t, type Locale } from "@/lib/i18n";
+import { orderActionLabel } from "@/lib/commerce-history-labels";
 
 const ORDER_LIFECYCLE_STATUSES = [
   "NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING",
@@ -170,9 +171,10 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
         />
 
         <div className="space-y-4 p-6">
-          {/* TOTAL KPI */}
-          <div className="grid grid-cols-1">
+          {/* TOTAL KPI — canonical naming, ~15-20% larger, NOT full-width */}
+          <div className="w-fit max-w-full">
             <CommerceKpiCard
+              variant="total"
               label={t("admin.kpi.total_orders", locale)}
               value={total}
               active={!selectedLifecycle && !selectedPayment}
@@ -242,12 +244,12 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               ))}
             </select>
             <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">С</span>
+              <span className="text-xs text-slate-400">{t("common.date_from", locale)}</span>
               <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
-              <span className="text-xs text-slate-400">По</span>
+              <span className="text-xs text-slate-400">{t("common.date_to", locale)}</span>
               <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
             </div>
-            {busy && <span className="text-xs text-slate-400">загрузка…</span>}
+            {busy && <span className="text-xs text-slate-400">{t("common.loading_short", locale)}</span>}
             <TableExportButton
               exportUrl="/api/v1/orders/export"
               extraParams={{
@@ -311,15 +313,15 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                     <td className="px-4 py-2.5 text-slate-500">{o.items?.length ?? 0}</td>
                     <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
                     <td className="px-4 py-2.5"><StatusBadge status={o.paymentStatus} /></td>
-                    {paymentFailed === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-medium text-red-700">Неуспешный</span></td>}
-                    {pendingRefund === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">Ожидает обработки</span></td>}
+                    {paymentFailed === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-medium text-red-700">{t("orders.quick.payment_failed", locale)}</span></td>}
+                    {pendingRefund === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">{t("orders.quick.pending_refund", locale)}</span></td>}
                     {cancelledWithin && <td className="px-4 py-2.5 text-xs text-slate-600">{o.cancelledAt ? new Date(o.cancelledAt).toLocaleDateString("ru-RU") : "—"}</td>}
                   </tr>
                 ))}
                 {(data?.items ?? []).length === 0 && (
                   <tr>
                     <td colSpan={5 + (paymentFailed === "true" ? 1 : 0) + (pendingRefund === "true" ? 1 : 0) + (cancelledWithin ? 1 : 0)} className="px-4 py-8 text-center text-sm text-slate-400">
-                      Заказов пока нет
+                      {t("orders.empty", locale)}
                     </td>
                   </tr>
                 )}
@@ -355,7 +357,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
 
           <div className="space-y-5 p-5 text-sm">
             <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Позиции заказа</div>
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{t("order.items", locale)}</div>
               <div className="space-y-1.5">
                 {(selected.items ?? []).map((i) => (
                   <div key={i.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
@@ -375,7 +377,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
             </div>
 
             <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Туристы</div>
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{t("reqflow.travelers", locale)}</div>
               {(selected.travelers ?? []).map((tr) => (
                 <div key={tr.id} className="mb-1.5 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
                   <span className="font-medium text-slate-700">{tr.firstName} {tr.lastName}</span>
@@ -385,8 +387,8 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
             </div>
 
             <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Связанные брони</div>
-              {bookings.length === 0 && <div className="text-slate-400">Бронирований нет</div>}
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{t("orders.quick.bookings", locale)}</div>
+              {bookings.length === 0 && <div className="text-slate-400">{t("orders.quick.no_bookings", locale)}</div>}
               <div className="space-y-1.5">
                 {bookings.map((b) => (
                   <div key={b.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">
@@ -397,24 +399,26 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               </div>
             </div>
 
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Команды (actions)</div>
-              <OrderActionBar
-                actions={(selected as Order & { availableActions?: string[] }).availableActions ?? []}
-                onRun={(a) => void runAction(a)}
-                busyAction={null}
-              />
-            </div>
+            {(selected as Order & { availableActions?: string[] }).availableActions?.length ? (
+              <div>
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{t("detail.sections.actions", locale)}</div>
+                <OrderActionBar
+                  actions={(selected as Order & { availableActions?: string[] }).availableActions ?? []}
+                  onRun={(a) => void runAction(a)}
+                  busyAction={null}
+                />
+              </div>
+            ) : null}
 
             <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">История (audit)</div>
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{t("crm.detail.history", locale)}</div>
               <div className="space-y-1.5">
                 {(selected.history ?? []).slice(0, 8).map((h) => (
                   <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
                     <div className="font-medium text-slate-600">
-                      {h.action}
-                      {h.from && <span className="text-slate-400"> {h.from} → </span>}
-                      {h.to && <span className="text-slate-700">{h.to}</span>}
+                      {orderActionLabel(h.action, locale)}
+                      {h.from && <span className="text-slate-400"> <StatusBadge status={h.from} /> → </span>}
+                      {h.to && <span className="text-slate-700"><StatusBadge status={h.to} /></span>}
                     </div>
                     <div className="text-slate-400">{h.comment}</div>
                   </div>

@@ -1,0 +1,68 @@
+{
+  "requests": {
+    "counts": {
+      "section_card": 5,
+      "section_title": 5,
+      "field_label": 18,
+      "field_value": 18,
+      "field_value_mono": 0,
+      "empty_value": 19,
+      "link": 1,
+      "row": 0,
+      "finance_cell": 0,
+      "timeline_dot": 8,
+      "badge": 4
+    },
+    "samples": {
+      "section_card_class": "rounded-xl border border-slate-200 bg-white p-4 ",
+      "section_title_class": "mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500",
+      "field_label_class": "text-xs font-medium uppercase text-slate-400",
+      "field_value_class": "text-sm font-medium text-slate-700",
+      "link_class": "font-medium text-blue-600 hover:underline font-mono text-xs font-semibold"
+    }
+  },
+  "orders": {
+    "counts": {
+      "section_card": 7,
+      "section_title": 7,
+      "field_label": 4,
+      "field_value": 4,
+      "field_value_mono": 0,
+      "empty_value": 16,
+      "link": 4,
+      "row": 5,
+      "finance_cell": 6,
+      "timeline_dot": 3,
+      "badge": 9
+    },
+    "samples": {
+      "section_card_class": "rounded-xl border border-slate-200 bg-white p-4 ",
+      "section_title_class": "mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500",
+      "field_label_class": "text-xs font-medium uppercase text-slate-400",
+      "field_value_class": "text-sm font-medium text-slate-700",
+      "link_class": "font-medium text-blue-600 hover:underline "
+    }
+  },
+  "bookings": {
+    "counts": {
+      "section_card": 4,
+      "section_title": 4,
+      "field_label": 8,
+      "field_value": 6,
+      "field_value_mono": 2,
+      "empty_value": 9,
+      "link": 2,
+      "row": 0,
+      "finance_cell": 6,
+      "timeline_dot": 3,
+      "badge": 3
+    },
+    "samples": {
+      "section_card_class": "rounded-xl border border-slate-200 bg-white p-4 ",
+      "section_title_class": "mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500",
+      "field_label_class": "text-xs font-medium uppercase text-slate-400",
+      "field_value_class": "text-sm font-medium text-slate-700",
+      "link_class": "font-medium text-blue-600 hover:underline font-mono text-xs"
+    }
+  }
+}
