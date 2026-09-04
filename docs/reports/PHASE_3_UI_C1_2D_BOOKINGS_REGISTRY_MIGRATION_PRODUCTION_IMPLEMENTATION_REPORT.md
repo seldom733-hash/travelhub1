@@ -32,7 +32,7 @@ UI-C1.2C — ACCEPTED AFTER REMEDIATION R1
 BASELINE SHA: 3b12d16def817bf4c91124d3ff14adf692d7aa6c
 ```
 
-Implementation commit: `8aa3773…`; report/evidence commit: `19f6d63…` (final HEAD). Baseline `3b12d16…` (UI-C1.2C accepted) and pre-stage `435cdc5…` both remain traceable.
+Accepted final SHA: `8aa3773…` (implementation commit containing all verified code; later commits touch only this report). Baseline `3b12d16…` (UI-C1.2C accepted) and pre-stage `435cdc5…` remain traceable.
 
 ---
 
@@ -421,9 +421,13 @@ Requests and Orders modules: `git diff` empty. Pre-existing failures documented 
 ## 35. Git Hard Closure
 
 ```bash
-git status --porcelain=v1   # → empty (final)
-git rev-parse HEAD          # → 19f6d63c16a023ae14fa3ef7615b70eac5ac60a9
-git rev-parse origin/master # → 19f6d63c16a023ae14fa3ef7615b70eac5ac60a9
+git status --porcelain=v1   # → empty at closure
+git rev-parse HEAD          # → 090a594de2f20eb813dfbbbf4af1531d74e5cbf9 (doc head @ closure)
+git rev-parse origin/master # → 090a594de2f20eb813dfbbbf4af1531d74e5cbf9
+
+# Accepted final implementation SHA (contains ALL verified code — the stable
+# 40-char SHA to which this acceptance is pinned, unaffected by later doc edits):
+# 8aa37739499aa2978c89219666e23ff13b2de4c8
 ```
 
 Baseline `3b12d16…` remains traceable as the accepted UI-C1.2C (R1) baseline, distinct from the new UI-C1.2D final SHA.
@@ -446,7 +450,7 @@ UI-C1.2B — ACCEPTED
 UI-C1.2C — ACCEPTED AFTER REMEDIATION R1
 UI-C1.2D — ACCEPTED
 
-FINAL SHA: 19f6d63c16a023ae14fa3ef7615b70eac5ac60a9
+FINAL SHA: 8aa37739499aa2978c89219666e23ff13b2de4c8
 
 BOOKING STATUS KPI COVERAGE — 13/13 PASS
 REQUESTS KPI BEHAVIOR PARITY — PASS
