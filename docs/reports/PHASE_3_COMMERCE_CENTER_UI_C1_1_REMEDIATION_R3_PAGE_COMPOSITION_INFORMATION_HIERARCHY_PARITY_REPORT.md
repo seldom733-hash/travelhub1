@@ -368,9 +368,9 @@ probes — not by class lists alone.
 ## 27. Git Hard Closure
 
 ```bash
-git status --porcelain=v1   → empty (after commit)
-git rev-parse HEAD          → <final SHA>
-git rev-parse origin/master → <same SHA>
+git status --porcelain=v1   → empty (verified after push)
+git rev-parse HEAD          → 7a722bd2c5e6c54033b6e1bccd3b57d5c76cbe35
+git rev-parse origin/master → 7a722bd2c5e6c54033b6e1bccd3b57d5c76cbe35
 HEAD == origin/master       → YES
 ```
 
@@ -386,7 +386,7 @@ D7 — ACCEPTED
 UI-C1 — ACCEPTED
 UI-C1.1 — ACCEPTED AFTER R3
 
-FINAL SHA: <filled at closure>
+FINAL SHA: 7a722bd2c5e6c54033b6e1bccd3b57d5c76cbe35
 
 TRUE NEXT:
 UI-C1.2 — OPERATIONS CENTER
