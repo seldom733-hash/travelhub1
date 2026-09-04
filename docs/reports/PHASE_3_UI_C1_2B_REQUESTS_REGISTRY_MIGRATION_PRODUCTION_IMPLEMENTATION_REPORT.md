@@ -705,7 +705,7 @@ git rev-parse origin/master
 ```text
 porcelain = empty
 HEAD == origin/master
-canonical SHA = <FINAL_SHA>
+canonical SHA = ec85deb963d1ba9943ecb1ef890a66b45cda2460
 ```
 
 Implementation, tests, evidence and this report are committed; the
@@ -733,7 +733,7 @@ UI-C1.2A — ACCEPTED
 UI-C1.2B — ACCEPTED
 
 FINAL SHA:
-<FINAL_SHA>
+ec85deb963d1ba9943ecb1ef890a66b45cda2460
 
 REQUESTS TOTAL KPI — CONFIRMED
 REQUESTS STATUS KPI COVERAGE — 12/12
