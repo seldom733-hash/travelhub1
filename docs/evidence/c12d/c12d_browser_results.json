@@ -1,0 +1,231 @@
+{
+  "total": 45,
+  "passed": 45,
+  "results": [
+    {
+      "name": "login (admin → platform app)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/dashboard"
+    },
+    {
+      "name": "shell title «Центр операций» + Bookings tab active",
+      "ok": true,
+      "detail": "active=Бронирования"
+    },
+    {
+      "name": "Total KPI «Всего бронирований» present + default-pressed",
+      "ok": true,
+      "detail": "Всего бронирований365"
+    },
+    {
+      "name": "13/13 BookingStatus KPI cards visible",
+      "ok": true,
+      "detail": "count=13"
+    },
+    {
+      "name": "all 13 canonical RU labels present, none invented",
+      "ok": true,
+      "detail": "missing=[]"
+    },
+    {
+      "name": "no raw enum labels / i18n keys in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "semantic group headings rendered (5 heading slots, incl. two lifecycle rows)",
+      "ok": true,
+      "detail": "[\"Основной процесс\", \"Основной процесс\", \"Ожидание подтверждения\", \"Операционные статусы\", \"Конечные исходы\"]"
+    },
+    {
+      "name": "AWAITING_CONFIRMATION («Ожидает подтверждения») has a visible card",
+      "ok": true,
+      "detail": "[\"Ожидает подтверждения\"]"
+    },
+    {
+      "name": "AWAITING_CONFIRMATION group carries NO connector/arrow",
+      "ok": true,
+      "detail": "False"
+    },
+    {
+      "name": "exactly 4 decorative connectors (2+2 truthful flows)",
+      "ok": true,
+      "detail": "connectors=4"
+    },
+    {
+      "name": "click CONFIRMED writes ?status=CONFIRMED",
+      "ok": true,
+      "detail": "http://localhost:3000/app/bookings?status=CONFIRMED"
+    },
+    {
+      "name": "CONFIRMED card is selected (aria-pressed, one card only)",
+      "ok": true,
+      "detail": "Подтверждено"
+    },
+    {
+      "name": "all 13 KPI counts byte-identical after CONFIRMED click",
+      "ok": true,
+      "detail": "{}"
+    },
+    {
+      "name": "Total unchanged after CONFIRMED click",
+      "ok": true,
+      "detail": "Всего бронирований365 → Всего бронирований365"
+    },
+    {
+      "name": "table is now server-scoped (CONFIRMED rows only or empty)",
+      "ok": true,
+      "detail": "[\"Подтверждено\", \"Подтверждено\", \"Подтверждено\", \"Подтверждено\", \"Подтверждено\"]"
+    },
+    {
+      "name": "switch to PROBLEM: deselected CONFIRMED, selected PROBLEM",
+      "ok": true,
+      "detail": "Проблема"
+    },
+    {
+      "name": "?status=PROBLEM in URL",
+      "ok": true,
+      "detail": "http://localhost:3000/app/bookings?status=PROBLEM"
+    },
+    {
+      "name": "KPI counts unchanged after switching to PROBLEM",
+      "ok": true,
+      "detail": "{}"
+    },
+    {
+      "name": "table rows now PROBLEM-scoped",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "AWAITING_CONFIRMATION clickable + filters table",
+      "ok": true,
+      "detail": "http://localhost:3000/app/bookings?status=AWAITING_CONFIRMATION sel=Ожидает подтверждения"
+    },
+    {
+      "name": "KPI counts unchanged after AWAITING_CONFIRMATION click",
+      "ok": true,
+      "detail": "{}"
+    },
+    {
+      "name": "Total click removes ?status= and returns to default",
+      "ok": true,
+      "detail": "http://localhost:3000/app/bookings"
+    },
+    {
+      "name": "Total reset: KPI counts stable (overview)",
+      "ok": true,
+      "detail": "Всего бронирований365"
+    },
+    {
+      "name": "KPI stability summary preserved in evidence",
+      "ok": true,
+      "detail": "{\"baseline_total\": \"Всего бронирований365\", \"baseline_cards\": {\"Новое\": \"1\", \"Подготовка заявки\": \"0\", \"Отправлен поставщику\": \"0\", \"Подтверждено\": \"82\", \"В обслуживании\": \"67\", \"Завершено\": \"213\", \"Ожидает подтверждения\": \"0\", \"Требует уточнения\": \"0\", \"Запрос на изменение\": \"0\", \"Запрос на отмену\": \"0\", \"Проблема\": \"0\", \"Отклонено поставщиком\": \"0\", \"Отменено\": \"2\"}}"
+    },
+    {
+      "name": "reload restores ?status=CONFIRMED selection",
+      "ok": true,
+      "detail": "Подтверждено"
+    },
+    {
+      "name": "browser Back restores /app/bookings?status=CONFIRMED",
+      "ok": true,
+      "detail": "http://localhost:3000/app/bookings?status=CONFIRMED"
+    },
+    {
+      "name": "Back restores selected KPI card (CONFIRMED)",
+      "ok": true,
+      "detail": "Подтверждено"
+    },
+    {
+      "name": "debounced search writes ?search=",
+      "ok": true,
+      "detail": "http://localhost:3000/app/bookings?search=MKT-BKG"
+    },
+    {
+      "name": "Reset clears search/status + normalizes URL",
+      "ok": true,
+      "detail": "http://localhost:3000/app/bookings"
+    },
+    {
+      "name": "upcomingOnly=true renders detector table (serviceDate column)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/bookings?upcomingOnly=true"
+    },
+    {
+      "name": "upcoming + CONFIRMED: KPI overview stable (no collapse)",
+      "ok": true,
+      "detail": "{}"
+    },
+    {
+      "name": "upcoming + CONFIRMED: detector scope retained in URL",
+      "ok": true,
+      "detail": "http://localhost:3000/app/bookings?upcomingOnly=true&status=CONFIRMED"
+    },
+    {
+      "name": "overdueOnly=true renders detector table",
+      "ok": true,
+      "detail": "cards=13"
+    },
+    {
+      "name": "locale ru: Total renders «Всего бронирований»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "locale ru: no raw i18n keys",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "locale en: Total renders «Total bookings»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "locale en: no raw i18n keys",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "locale az: Total renders «Cəmi bronlar»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "locale az: no raw i18n keys",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "responsive @ 390px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive @ 390px: 13 status cards remain",
+      "ok": true,
+      "detail": "cards=13"
+    },
+    {
+      "name": "responsive @ 768px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive @ 768px: 13 status cards remain",
+      "ok": true,
+      "detail": "cards=13"
+    },
+    {
+      "name": "responsive @ 1680px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive @ 1680px: 13 status cards remain",
+      "ok": true,
+      "detail": "cards=13"
+    }
+  ]
+}
