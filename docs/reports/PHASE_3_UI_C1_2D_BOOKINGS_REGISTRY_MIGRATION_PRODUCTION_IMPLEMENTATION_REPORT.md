@@ -32,7 +32,7 @@ UI-C1.2C — ACCEPTED AFTER REMEDIATION R1
 BASELINE SHA: 3b12d16def817bf4c91124d3ff14adf692d7aa6c
 ```
 
-Implementation commit: `8aa3773…`; report/evidence commit: `2c413b4…` (final HEAD). Baseline `3b12d16…` (UI-C1.2C accepted) and pre-stage `435cdc5…` both remain traceable.
+Implementation commit: `8aa3773…`; report/evidence commit: `19f6d63…` (final HEAD). Baseline `3b12d16…` (UI-C1.2C accepted) and pre-stage `435cdc5…` both remain traceable.
 
 ---
 
@@ -422,8 +422,8 @@ Requests and Orders modules: `git diff` empty. Pre-existing failures documented 
 
 ```bash
 git status --porcelain=v1   # → empty (final)
-git rev-parse HEAD          # → 2c413b4e6eefe31c6ca60b69d87a03f9c08bb016
-git rev-parse origin/master # → 2c413b4e6eefe31c6ca60b69d87a03f9c08bb016
+git rev-parse HEAD          # → 19f6d63c16a023ae14fa3ef7615b70eac5ac60a9
+git rev-parse origin/master # → 19f6d63c16a023ae14fa3ef7615b70eac5ac60a9
 ```
 
 Baseline `3b12d16…` remains traceable as the accepted UI-C1.2C (R1) baseline, distinct from the new UI-C1.2D final SHA.
@@ -446,7 +446,7 @@ UI-C1.2B — ACCEPTED
 UI-C1.2C — ACCEPTED AFTER REMEDIATION R1
 UI-C1.2D — ACCEPTED
 
-FINAL SHA: 2c413b4e6eefe31c6ca60b69d87a03f9c08bb016
+FINAL SHA: 19f6d63c16a023ae14fa3ef7615b70eac5ac60a9
 
 BOOKING STATUS KPI COVERAGE — 13/13 PASS
 REQUESTS KPI BEHAVIOR PARITY — PASS
