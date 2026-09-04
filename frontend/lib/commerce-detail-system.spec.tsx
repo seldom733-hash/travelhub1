@@ -199,6 +199,63 @@ describe("R2 TOTAL KPI micro-closure — canonical labels + size variant", () =>
   });
 });
 
+describe("R3 Page Composition & Information Hierarchy Parity — shared two-zone layout", () => {
+  it("all three details consume the shared EntityDetailLayout/Main/Aside/Wide primitives", () => {
+    for (const rel of DETAIL_PAGES) {
+      const src = read(rel);
+      expect(src).toContain("EntityDetailLayout");
+      expect(src).toContain("EntityDetailMain");
+      expect(src).toContain("EntityDetailAside");
+      expect(src).toContain("EntityDetailWide");
+    }
+  });
+
+  it("all three pages use the shared Details/meta aside slot (same section title key)", () => {
+    for (const rel of DETAIL_PAGES) {
+      const src = read(rel);
+      expect(src).toContain('t("detail.sections.details", locale)');
+    }
+    const req = read("app/app/requests/[id]/page.tsx");
+    const bkg = read("app/app/bookings/[id]/page.tsx");
+    // Request/Booking meta cards use the shared commerce-sequence label (field exists);
+    // Order meta card uses its own code/number fields (no commerceSequence in DTO).
+    expect(req).toContain('t("detail.details.sequence", locale)');
+    expect(bkg).toContain('t("detail.details.sequence", locale)');
+  });
+
+  it("Order and Booking Finance cards share identical grid breakpoint behavior", () => {
+    const ord = read("app/app/orders/[id]/page.tsx");
+    const bkg = read("app/app/bookings/[id]/page.tsx");
+    const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4";
+    expect(ord).toContain(GRID);
+    expect(bkg).toContain(GRID);
+  });
+
+  it("the shared layout primitive owns the page composition grid (no page-level wrapper)", () => {
+    const req = read("app/app/requests/[id]/page.tsx");
+    const ord = read("app/app/orders/[id]/page.tsx");
+    const bkg = read("app/app/bookings/[id]/page.tsx");
+    for (const src of [req, ord, bkg]) {
+      // composition root is the shared primitive, not a page-defined grid div
+      expect(src).toContain("<EntityDetailLayout>");
+      expect(src).not.toContain('className="grid grid-cols-1 gap-4 lg:grid-cols-3"');
+    }
+  });
+
+  it("Booking audit history lives in the shared lower (Wide) slot, not the context aside", () => {
+    const bkg = read("app/app/bookings/[id]/page.tsx");
+    // Change history section is inside an EntityDetailWide block
+    const wideIdx = bkg.indexOf("<EntityDetailWide");
+    const historyIdx = bkg.indexOf('t("bookings.change_history", locale)');
+    expect(wideIdx).toBeGreaterThan(-1);
+    expect(historyIdx).toBeGreaterThan(wideIdx);
+    // Timeline stays in the aside context column
+    const asideIdx = bkg.indexOf("<EntityDetailAside");
+    const timelineIdx = bkg.indexOf("<EntityTimeline items={milestones} />");
+    expect(timelineIdx).toBeGreaterThan(asideIdx);
+  });
+});
+
 describe("R2 Detail Visual System Parity — action authority not moved client-side", () => {
   it("Order action availability stays server-authoritative (availableActions from API)", () => {
     const ord = read("app/app/orders/[id]/page.tsx");

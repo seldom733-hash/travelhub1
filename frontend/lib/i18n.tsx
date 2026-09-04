@@ -1793,6 +1793,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   },
   // ── R2 Detail Visual System — shared timeline / relation labels ──
   "detail.sections.timeline": { ru: "Хронология", az: "Xronologiya", en: "Timeline" },
+  "detail.sections.details": { ru: "Детали", az: "Təfərrüatlar", en: "Details" },
+  "detail.details.sequence": { ru: "Последовательность", az: "Sıra", en: "Sequence" },
   "detail.relation.order_status": { ru: "Статус заказа", az: "Sifariş statusu", en: "Order status" },
   "detail.relation.booking_status": { ru: "Статус бронирования", az: "Bron statusu", en: "Booking status" },
   // ── R2 Detail Visual System — Order audit action labels ──

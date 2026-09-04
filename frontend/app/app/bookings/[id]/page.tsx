@@ -7,6 +7,11 @@ import { api } from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
 import EntityDetailShell from "@/components/EntityDetailShell";
 import EntityDetailHeader from "@/components/EntityDetailHeader";
+import EntityDetailLayout, {
+  EntityDetailMain,
+  EntityDetailAside,
+  EntityDetailWide,
+} from "@/components/commerce/EntityDetailLayout";
 import EntitySectionCard from "@/components/commerce/EntitySectionCard";
 import EntityField from "@/components/commerce/EntityField";
 import EntityFieldGrid from "@/components/commerce/EntityFieldGrid";
@@ -196,10 +201,31 @@ export default function BookingDetailPage() {
         />
       }
     >
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Main content */}
-        <div className="space-y-4 lg:col-span-2">
-          {/* Finance — D7 linked Order finance authority; money/payment cells only */}
+      <EntityDetailLayout>
+        {/* MAIN — primary + secondary business content */}
+        <EntityDetailMain>
+          {/* PRIMARY: Услуга / Обзор бронирования */}
+          <EntitySectionCard title={t("bookings.service", locale) || "Услуга"}>
+            <EntityFieldGrid>
+              <EntityField label={t("crm.col.order", locale)} value={
+                <EntityLink href={`/app/orders/${booking.orderId}`} className="font-mono text-xs">
+                  {booking.orderReference ?? booking.orderCode ?? booking.orderId.slice(0, 8)}
+                </EntityLink>
+              } />
+              <EntityField label={t("crm.col.service", locale)} value={
+                <EntityLink href={`/app/catalog/${booking.productId}`} className="font-mono text-xs">
+                  {booking.productTitle ?? booking.productId.slice(0, 8)}
+                </EntityLink>
+              } />
+              {/* Service date is a service attribute — lives in Service, not Finance */}
+              <EntityField label={t("crm.detail.service_date", locale)} value={fmtTs(booking.serviceDate)} />
+              {booking.acquisitionSource && (
+                <EntityField label={t("bookings.acquisition_source", locale)} value={booking.acquisitionSource} />
+              )}
+            </EntityFieldGrid>
+          </EntitySectionCard>
+
+          {/* SECONDARY: Finance — D7 linked Order finance authority; money/payment cells only */}
           <EntitySectionCard title={t("bookings.financial", locale)}>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               <EntityFinanceCell label={t("crm.detail.total_amount", locale)} value={formatPrice(booking.amount, booking.currency, locale)} tone="neutral" />
@@ -219,26 +245,6 @@ export default function BookingDetailPage() {
                 <span>{t("crm.detail.payment_status", locale)}: <StatusBadge status={(booking.activePayment as any).status} /></span>
               </div>
             )}
-          </EntitySectionCard>
-
-          <EntitySectionCard title={t("bookings.service", locale) || "Услуга"}>
-            <EntityFieldGrid>
-              <EntityField label={t("crm.col.order", locale)} value={
-                <EntityLink href={`/app/orders/${booking.orderId}`} className="font-mono text-xs">
-                  {booking.orderReference ?? booking.orderCode ?? booking.orderId.slice(0, 8)}
-                </EntityLink>
-              } />
-              <EntityField label={t("crm.col.service", locale)} value={
-                <EntityLink href={`/app/catalog/${booking.productId}`} className="font-mono text-xs">
-                  {booking.productTitle ?? booking.productId.slice(0, 8)}
-                </EntityLink>
-              } />
-              {/* Service date is a service attribute — lives in Service, not Finance */}
-              <EntityField label={t("crm.detail.service_date", locale)} value={fmtTs(booking.serviceDate)} />
-              {booking.acquisitionSource && (
-                <EntityField label={t("bookings.acquisition_source", locale)} value={booking.acquisitionSource} />
-              )}
-            </EntityFieldGrid>
           </EntitySectionCard>
 
           {booking.passengers && booking.passengers.length > 0 && (
@@ -268,8 +274,28 @@ export default function BookingDetailPage() {
               </div>
             </EntitySectionCard>
           )}
+        </EntityDetailMain>
 
-          {/* Notes */}
+        {/* ASIDE — context column: lifecycle timeline + compact details */}
+        <EntityDetailAside>
+          <EntitySectionCard title={t("detail.sections.timeline", locale) || "Хронология"}>
+            <EntityTimeline items={milestones} />
+          </EntitySectionCard>
+
+          <EntitySectionCard title={t("detail.sections.details", locale) || "Детали"}>
+            <div className="grid grid-cols-1 gap-4">
+              <EntityField label={t("admin.table.col.code", locale)} value={booking.code} mono />
+              <EntityField label={t("crm.col.created", locale)} value={fmtTs(booking.createdAt)} />
+              <EntityField label={t("crm.col.updated", locale)} value={fmtTs(booking.updatedAt)} />
+              {booking.commerceSequence && (
+                <EntityField label={t("detail.details.sequence", locale)} value={booking.commerceSequence} mono />
+              )}
+            </div>
+          </EntitySectionCard>
+        </EntityDetailAside>
+
+        {/* WIDE — notes */}
+        <EntityDetailWide>
           {user && (
             <OperationalNotes
               entityType="Booking"
@@ -279,25 +305,10 @@ export default function BookingDetailPage() {
               currentRole={user.role}
             />
           )}
-        </div>
+        </EntityDetailWide>
 
-        {/* Sidebar: timeline + details + audit */}
-        <div className="space-y-4">
-          <EntitySectionCard title={t("detail.sections.timeline", locale) || "Хронология"}>
-            <EntityTimeline items={milestones} />
-          </EntitySectionCard>
-
-          <EntitySectionCard title={t("bookings.details", locale) || "Детали"}>
-            <div className="grid grid-cols-1 gap-4">
-              <EntityField label={t("admin.table.col.code", locale)} value={booking.code} mono />
-              <EntityField label={t("crm.col.created", locale)} value={fmtTs(booking.createdAt)} />
-              <EntityField label={t("crm.col.updated", locale)} value={fmtTs(booking.updatedAt)} />
-              {booking.commerceSequence && (
-                <EntityField label="Sequence" value={booking.commerceSequence} mono />
-              )}
-            </div>
-          </EntitySectionCard>
-
+        {/* WIDE — audit: immutable change history */}
+        <EntityDetailWide>
           {history.length > 0 && (
             <EntitySectionCard title={t("bookings.change_history", locale) || "История изменений"}>
               <div className="space-y-3">
@@ -318,8 +329,8 @@ export default function BookingDetailPage() {
               </div>
             </EntitySectionCard>
           )}
-        </div>
-      </div>
+        </EntityDetailWide>
+      </EntityDetailLayout>
     </EntityDetailShell>
   );
 }

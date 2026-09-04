@@ -1,0 +1,111 @@
+{
+  "total": 21,
+  "passed": 21,
+  "results": [
+    {
+      "name": "login (admin → platform app)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/dashboard"
+    },
+    {
+      "name": "geometry requests: main/aside ratio",
+      "ok": true,
+      "detail": "ratio=2.038"
+    },
+    {
+      "name": "geometry orders: main/aside ratio",
+      "ok": true,
+      "detail": "ratio=2.038"
+    },
+    {
+      "name": "geometry bookings: main/aside ratio",
+      "ok": true,
+      "detail": "ratio=2.038"
+    },
+    {
+      "name": "geometry: main/aside ratio identical across pages",
+      "ok": true,
+      "detail": "{\"requests\": 2.038, \"orders\": 2.038, \"bookings\": 2.038}"
+    },
+    {
+      "name": "geometry: column gap identical across pages",
+      "ok": true,
+      "detail": "{\"requests\": 16, \"orders\": 16, \"bookings\": 16}"
+    },
+    {
+      "name": "geometry: content max-width identical across pages",
+      "ok": true,
+      "detail": "{\"requests\": 1440, \"orders\": 1440, \"bookings\": 1440}"
+    },
+    {
+      "name": "geometry: wide lower-slot width identical across pages",
+      "ok": true,
+      "detail": "{\"requests\": 1392, \"orders\": 1392, \"bookings\": 1392}"
+    },
+    {
+      "name": "side-by-side composite captured",
+      "ok": true,
+      "detail": "requests|orders|bookings"
+    },
+    {
+      "name": "responsive requests @ 390px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive orders @ 390px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive bookings @ 390px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "mobile order requests: timeline→details after main cards",
+      "ok": true,
+      "detail": "ОБЗОР → ПОСТАВЩИК → КЛИЕНТ → ХРОНОЛОГИЯ → ДЕТАЛИ → СВЯЗАННЫЕ СУЩНОСТИ"
+    },
+    {
+      "name": "mobile order orders: timeline→details after main cards",
+      "ok": true,
+      "detail": "ОБЗОР → ФИНАНСЫ → ПОЗИЦИИ ЗАКАЗА → ДАННЫЕ ТУРИСТОВ → ХРОНОЛОГИЯ → ДЕТАЛИ → СВЯЗАННЫЕ СУЩНОСТИ → ПРИМЕЧАНИЯ → ИСТОРИЯ ИЗМЕНЕНИЙ → ФИНАНСОВАЯ ИСТОРИЯ"
+    },
+    {
+      "name": "mobile order bookings: timeline→details after main cards",
+      "ok": true,
+      "detail": "УСЛУГА → ФИНАНСЫ → ХРОНОЛОГИЯ → ДЕТАЛИ → ПРИМЕЧАНИЯ"
+    },
+    {
+      "name": "responsive requests @ 768px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive orders @ 768px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive bookings @ 768px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive requests @ 1680px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive orders @ 1680px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive bookings @ 1680px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    }
+  ]
+}
