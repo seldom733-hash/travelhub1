@@ -167,8 +167,8 @@ Backend computes → API transports → Order/Booking UI formats only → fronte
 | D8 NOT STARTED | ✅ | — |
 | Report formula: due = total - paid | ✅ | max(0, totalAmount - paidAmount) |
 | Final porcelain EMPTY | ✅ | `<NO OUTPUT>` |
-| Final HEAD == origin/master | ✅ | `0be9178a46019131952a5d3e03e4c3330c6ceb68` |
-| One canonical 40-char Final SHA | ✅ | `0be9178a46019131952a5d3e03e4c3330c6ceb68` |
+| Final HEAD == origin/master | ✅ | `0c8cea2a00788c49a24ee6f2d967347485102546` |
+| One canonical 40-char Final SHA | ✅ | `0c8cea2a00788c49a24ee6f2d967347485102546` |
 
 ## Git Hard Closure
 
@@ -177,10 +177,10 @@ $ git status --porcelain=v1
 <NO OUTPUT>
 
 $ git rev-parse HEAD
-0be9178a46019131952a5d3e03e4c3330c6ceb68
+0c8cea2a00788c49a24ee6f2d967347485102546
 
 $ git rev-parse origin/master
-0be9178a46019131952a5d3e03e4c3330c6ceb68
+0c8cea2a00788c49a24ee6f2d967347485102546
 
 HEAD == origin/master: YES
 ```
@@ -192,7 +192,7 @@ VERDICT A — D7 FINAL MICRO-CLOSURE PASSED
 
 D7 — ACCEPTED
 
-FINAL SHA: 0be9178a46019131952a5d3e03e4c3330c6ceb68
+FINAL SHA: 0c8cea2a00788c49a24ee6f2d967347485102546
 
 TRUE NEXT:
 D8 — GLOBAL TEMPORAL VISIBILITY
