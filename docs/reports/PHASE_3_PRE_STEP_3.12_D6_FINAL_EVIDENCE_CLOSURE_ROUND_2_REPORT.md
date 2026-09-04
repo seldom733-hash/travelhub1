@@ -174,7 +174,7 @@ Actor is server-authoritative (set by `actor.username` from JWT). Timestamps are
 | D7 NOT STARTED | ✅ | — |
 | Final `git status --porcelain=v1` literally no output | ✅ | <NO OUTPUT> |
 | Final HEAD == origin/master | ✅ | 380427ae |
-| One canonical 40-char Final SHA | ✅ | 380427aecbfbb56380130fae2e991c33fdc4c1c5 |
+| One canonical 40-char Final SHA | ✅ | 9d7fb9e75ecf1530383c03d85776fa9946a39a93 |
 
 ## Git Hard Closure
 
@@ -183,10 +183,10 @@ $ git status --porcelain=v1
 <NO OUTPUT>
 
 $ git rev-parse HEAD
-380427aecbfbb56380130fae2e991c33fdc4c1c5
+9d7fb9e75ecf1530383c03d85776fa9946a39a93
 
 $ git rev-parse origin/master
-380427aecbfbb56380130fae2e991c33fdc4c1c5
+9d7fb9e75ecf1530383c03d85776fa9946a39a93
 ```
 
 HEAD == origin/master: YES
@@ -198,7 +198,7 @@ VERDICT A — PHASE 3 PRE-STEP 3.12 D6 FINAL EVIDENCE CLOSURE ROUND 2 PASSED
 
 D6 — ACCEPTED
 
-FINAL SHA: `380427aecbfbb56380130fae2e991c33fdc4c1c5`
+FINAL SHA: `9d7fb9e75ecf1530383c03d85776fa9946a39a93`
 
 TRUE NEXT:
 D7 — PAYMENT/REFUND SEMANTICS + FINANCIAL PRESENTATION
