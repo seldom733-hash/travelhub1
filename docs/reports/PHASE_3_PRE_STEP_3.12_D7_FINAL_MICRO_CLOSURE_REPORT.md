@@ -166,13 +166,24 @@ Backend computes → API transports → Order/Booking UI formats only → fronte
 | No unresolved acceptance-blocking P2 | ✅ | — |
 | D8 NOT STARTED | ✅ | — |
 | Report formula: due = total - paid | ✅ | max(0, totalAmount - paidAmount) |
-| Final porcelain EMPTY | ✅ | (pending commit) |
-| Final HEAD == origin/master | ✅ | (pending) |
-| One canonical 40-char Final SHA | ✅ | (pending) |
+| Final porcelain EMPTY | ✅ | `<NO OUTPUT>` |
+| Final HEAD == origin/master | ✅ | `0be9178a46019131952a5d3e03e4c3330c6ceb68` |
+| One canonical 40-char Final SHA | ✅ | `0be9178a46019131952a5d3e03e4c3330c6ceb68` |
 
 ## Git Hard Closure
 
-(pending commit)
+```
+$ git status --porcelain=v1
+<NO OUTPUT>
+
+$ git rev-parse HEAD
+0be9178a46019131952a5d3e03e4c3330c6ceb68
+
+$ git rev-parse origin/master
+0be9178a46019131952a5d3e03e4c3330c6ceb68
+
+HEAD == origin/master: YES
+```
 
 ## Final Verdict
 
@@ -181,7 +192,7 @@ VERDICT A — D7 FINAL MICRO-CLOSURE PASSED
 
 D7 — ACCEPTED
 
-FINAL SHA: (pending commit)
+FINAL SHA: 0be9178a46019131952a5d3e03e4c3330c6ceb68
 
 TRUE NEXT:
 D8 — GLOBAL TEMPORAL VISIBILITY
