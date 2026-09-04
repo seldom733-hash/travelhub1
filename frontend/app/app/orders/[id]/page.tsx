@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
+import EntityDetailShell from "@/components/EntityDetailShell";
 import OperationalNotes from "@/components/OperationalNotes";
 import TravelerCollectionPanel from "@/components/order/TravelerCollectionPanel";
 import OrderActionBar from "@/components/order/OrderActionBar";
@@ -204,35 +205,38 @@ export default function OrderDetailPage() {
   const immutableTravelers = order.finalConfirmedAt != null;
 
   return (
-    <div className="flex h-full flex-col">
-      <PageHeader
-        title={order.referenceNumber}
-        breadcrumbs={["TravelHub", t("orders.title", locale), order.referenceNumber]}
-        actions={<Link href="/app/orders" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">← {t("crm.back_to_list", locale)}</Link>}
-      />
-
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="font-mono text-xs text-blue-600">{order.referenceNumber} <span className="ml-1 font-sans text-slate-400">{order.number}</span></div>
-            <div className="mt-1 flex items-center gap-2">
-              <StatusBadge status={order.status} />
-              <StatusBadge status={order.paymentStatus} />
+    <EntityDetailShell
+      header={
+        <>
+          <PageHeader
+            title={order.referenceNumber}
+            breadcrumbs={["TravelHub", t("orders.title", locale), order.referenceNumber]}
+            actions={<Link href="/app/orders" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">← {t("crm.back_to_list", locale)}</Link>}
+          />
+          <div className="border-b border-slate-200 bg-white px-6 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="font-mono text-xs text-blue-600">{order.referenceNumber} <span className="ml-1 font-sans text-slate-400">{order.number}</span></div>
+                <div className="mt-1 flex items-center gap-2">
+                  <StatusBadge status={order.status} />
+                  <StatusBadge status={order.paymentStatus} />
+                </div>
+              </div>
+              {user && (
+                <OrderActionBar
+                  actions={order.availableActions ?? []}
+                  onRun={(a) => void runAction(a)}
+                  busyAction={busyAction}
+                />
+              )}
             </div>
+            {error && <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</div>}
           </div>
-          {user && (
-            <OrderActionBar
-              actions={order.availableActions ?? []}
-              onRun={(a) => void runAction(a)}
-              busyAction={busyAction}
-            />
-          )}
-        </div>
-        {error && <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</div>}
-      </div>
+        </>
+      }
+    >
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="space-y-4 text-sm">
+      <div className="space-y-4 text-sm">
           {/* D7 — Financial section: authoritative projection with computed fields */}
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("bookings.financial", locale)}</h3>
@@ -411,7 +415,6 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </EntityDetailShell>
   );
 }

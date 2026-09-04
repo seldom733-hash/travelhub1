@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { useLocale, t } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
+import StatusBadge from "@/components/StatusBadge";
+import EntityDetailShell from "@/components/EntityDetailShell";
+import EntityDetailHeader from "@/components/EntityDetailHeader";
 
 interface RequestDetail {
   id: string;
@@ -76,27 +80,7 @@ interface RequestDetail {
   }>;
 }
 
-function statusColor(s: string) {
-  switch (s) {
-    case "NEW": return "bg-blue-100 text-blue-700";
-    case "CHECKING": return "bg-yellow-100 text-yellow-700";
-    case "PRICE_CHANGED": return "bg-orange-100 text-orange-700";
-    case "CONFIRMED": return "bg-green-100 text-green-700";
-    case "CUSTOMER_ACCEPTED": return "bg-teal-100 text-teal-700";
-    case "CONVERTED": return "bg-purple-100 text-purple-700";
-    case "REJECTED": return "bg-red-100 text-red-700";
-    case "UNAVAILABLE": return "bg-gray-100 text-gray-600";
-    case "EXPIRED": return "bg-gray-100 text-gray-500";
-    case "SUPPLIER_TIMEOUT": return "bg-red-50 text-red-600";
-    case "CUSTOMER_PAYMENT_TIMEOUT": return "bg-red-50 text-red-600";
-    case "CANCELLED_BY_CUSTOMER": return "bg-slate-100 text-slate-600";
-    default: return "bg-gray-100 text-gray-600";
-  }
-}
 
-function statusKey(s: string) {
-  return `requests.status.${s.toLowerCase()}`;
-}
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -216,23 +200,20 @@ export default function RequestDetailPage() {
   const progress = r.convertedOrder?.travelerProgress ?? null;
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => router.push("/app/requests")}
-          className="text-blue-600 hover:text-blue-800 text-sm"
-        >
-          ← {t("crm.back_to_list", locale) || "Назад к списку"}
-        </button>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold text-gray-900 font-mono">{r.referenceNumber}</h1>
-        <span className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${statusColor(r.status)}`}>
-          {t(statusKey(r.status), locale)}
-        </span>
-      </div>
+    <EntityDetailShell
+      header={
+        <EntityDetailHeader
+          breadcrumbs={["TravelHub", t("requests.title", locale) || "Заявки", r.referenceNumber]}
+          reference={r.referenceNumber}
+          lifecycleStatus={<StatusBadge status={r.status} />}
+          actions={
+            <Link href="/app/requests" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+              ← {t("crm.back_to_list", locale)}
+            </Link>
+          }
+        />
+      }
+    >
 
       {/* Main Info Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 rounded-lg border border-gray-200 bg-white p-6">
@@ -465,6 +446,6 @@ export default function RequestDetailPage() {
           </div>
         </div>
       )}
-    </div>
+    </EntityDetailShell>
   );
 }

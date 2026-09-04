@@ -62,6 +62,16 @@ const STATUS_I18N_KEY: Record<string, string> = {
   APPROVED: "status.crm.APPROVED",
   REJECTED: "status.crm.REJECTED",
   CHANGES_REQUESTED: "status.crm.CHANGES_REQUESTED",
+  // Request
+  CHECKING: "status.request.CHECKING",
+  SUPPLIER_TIMEOUT: "status.request.SUPPLIER_TIMEOUT",
+  PRICE_CHANGED: "status.request.PRICE_CHANGED",
+  CUSTOMER_ACCEPTED: "status.request.CUSTOMER_ACCEPTED",
+  CONVERTED: "status.request.CONVERTED",
+  UNAVAILABLE: "status.request.UNAVAILABLE",
+  EXPIRED: "status.request.EXPIRED",
+  CUSTOMER_PAYMENT_TIMEOUT: "status.request.CUSTOMER_PAYMENT_TIMEOUT",
+  CANCELLED_BY_CUSTOMER: "status.request.CANCELLED_BY_CUSTOMER",
   // Marketing
   SCHEDULED: "marketing.status.scheduled",
   PAUSED: "marketing.status.paused",
@@ -125,6 +135,16 @@ const STATUS_CLS: Record<string, string> = {
   PENDING: "bg-amber-50 text-amber-700 border-amber-200",
   CAPTURED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   AUTHORIZED: "bg-blue-50 text-blue-700 border-blue-200",
+  // Request
+  CHECKING: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  SUPPLIER_TIMEOUT: "bg-red-50 text-red-600 border-red-200",
+  PRICE_CHANGED: "bg-orange-50 text-orange-700 border-orange-200",
+  CUSTOMER_ACCEPTED: "bg-teal-50 text-teal-700 border-teal-200",
+  CONVERTED: "bg-purple-50 text-purple-700 border-purple-200",
+  UNAVAILABLE: "bg-slate-100 text-slate-500 border-slate-200",
+  EXPIRED: "bg-slate-100 text-slate-500 border-slate-200",
+  CUSTOMER_PAYMENT_TIMEOUT: "bg-red-50 text-red-600 border-red-200",
+  CANCELLED_BY_CUSTOMER: "bg-slate-100 text-slate-600 border-slate-200",
   // Marketing
   SCHEDULED: "bg-violet-50 text-violet-700 border-violet-200",
   PAUSED: "bg-amber-50 text-amber-700 border-amber-200",

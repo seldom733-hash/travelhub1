@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
+import EntityDetailShell from "@/components/EntityDetailShell";
 import OperationalNotes from "@/components/OperationalNotes";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
@@ -192,44 +193,47 @@ export default function BookingDetailPage() {
   }));
 
   return (
-    <div className="flex h-full flex-col">
-      <PageHeader
-        title={booking.referenceNumber}
-        breadcrumbs={["TravelHub", t("bookings.title", locale), booking.referenceNumber]}
-        actions={
-          <Link href="/app/bookings" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
-            ← {t("crm.back_to_list", locale)}
-          </Link>
-        }
-      />
-
-      {/* Status + Actions bar */}
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div>
-              <div className="font-mono text-xs text-blue-600">{booking.referenceNumber}</div>
-              <div className="mt-1"><StatusBadge status={booking.status} /></div>
+    <EntityDetailShell
+      header={
+        <>
+          <PageHeader
+            title={booking.referenceNumber}
+            breadcrumbs={["TravelHub", t("bookings.title", locale), booking.referenceNumber]}
+            actions={
+              <Link href="/app/bookings" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                ← {t("crm.back_to_list", locale)}
+              </Link>
+            }
+          />
+          {/* Status + Actions bar */}
+          <div className="border-b border-slate-200 bg-white px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div>
+                  <div className="font-mono text-xs text-blue-600">{booking.referenceNumber}</div>
+                  <div className="mt-1"><StatusBadge status={booking.status} /></div>
+                </div>
+              </div>
+              {/* Available Actions */}
+              <div className="flex flex-wrap gap-2">
+                {(booking.availableActions ?? []).map(action => (
+                  <button
+                    key={action}
+                    onClick={() => executeAction(action)}
+                    disabled={executing !== null}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${ACTION_CSS[action] ?? "bg-slate-100 text-slate-700 hover:bg-slate-200"} ${executing !== null ? "opacity-50" : ""}`}
+                  >
+                    {executing === action ? "…" : (ACTION_LABELS_SHORT[action] ?? action)}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          {/* Available Actions */}
-          <div className="flex flex-wrap gap-2">
-            {(booking.availableActions ?? []).map(action => (
-              <button
-                key={action}
-                onClick={() => executeAction(action)}
-                disabled={executing !== null}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${ACTION_CSS[action] ?? "bg-slate-100 text-slate-700 hover:bg-slate-200"} ${executing !== null ? "opacity-50" : ""}`}
-              >
-                {executing === action ? "…" : (ACTION_LABELS_SHORT[action] ?? action)}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+        </>
+      }
+    >
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Main content */}
           <div className="lg:col-span-2 space-y-4">
             {/* D7 — Financial section: Booking amount + linked Order payment context */}
@@ -417,7 +421,6 @@ export default function BookingDetailPage() {
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </EntityDetailShell>
   );
 }
