@@ -182,21 +182,22 @@ DEFERRED — Future phase, awaiting prerequisites
 
 ---
 
-### UI-08 — Bookings KPI Restoration/Reconciliation
+### UI-08 — Bookings KPI Final Semantics
 
 | Field | Value |
 |---|---|
 | ID | UI-08 |
-| Title | Bookings KPI groups semantically different stages |
+| Title | Bookings KPI must be reconciled with canonical 13-status Booking state machine |
 | Category | DATA/SEMANTIC |
 | Severity | P2 |
-| Origin | Commerce UI Design Reconciliation (2026-09-04) |
-| Description | CONFIRMED + IN_SERVICE + COMPLETED grouped as "Подтверждено". Different lifecycle stages with different operational meaning. |
+| Origin | Commerce UI Design Reconciliation (2026-09-04), Micro-Closure (2026-09-04) |
+| Description | Canonical BookingStatus enum has 13 statuses: NEW, PREPARING_REQUEST, SENT_TO_SUPPLIER, AWAITING_CONFIRMATION, CONFIRMED, IN_SERVICE, COMPLETED, NEEDS_CLARIFICATION, SUPPLIER_REJECTED, CHANGE_REQUESTED, CANCELLATION_REQUESTED, CANCELLED, PROBLEM. Current code groups CONFIRMED+IN_SERVICE+COMPLETED as "Подтверждено". Final KPI contract: Ожидают подтверждения (SENT_TO_SUPPLIER, AWAITING_CONFIRMATION) / Подтверждены (CONFIRMED) / В оказании (IN_SERVICE) / Завершены (COMPLETED) / Отменены (CANCELLED, SUPPLIER_REJECTED) / На обслуживании (NEEDS_CLARIFICATION, CHANGE_REQUESTED, CANCELLATION_REQUESTED, PROBLEM). Terminal: COMPLETED, CANCELLED, SUPPLIER_REJECTED. |
 | Dependencies | None |
 | Planned closure stage | UI-C11 |
 | Status | OPEN |
-| Acceptance condition | KPI grouping reconciled with actual lifecycle semantics |
+| Acceptance condition | Each KPI maps to exclusive status set with server-side drill-down; no ambiguous grouping |
 | Closure SHA | — |
+| Notes | PARTIALLY_CONFIRMED does not exist in canonical enum — removed from scope |
 
 ---
 
@@ -290,21 +291,22 @@ DEFERRED — Future phase, awaiting prerequisites
 
 ---
 
-### HELP-05 — Formula Drift Prevention
+### HELP-05 — Formula Drift Mandatory Automated Gate
 
 | Field | Value |
 |---|---|
 | ID | HELP-05 |
-| Title | Help formulas may drift from backend calculations |
+| Title | Formula drift prevention requires mandatory automated contract test for critical metrics |
 | Category | DOCUMENTATION/HELP |
-| Severity | P3 |
-| Origin | Help Architecture Addendum (2026-09-04) |
-| Description | If Help text documents formulas independently from backend code, they can diverge over time. No reconciliation mechanism exists. |
-| Dependencies | HELP-02 |
-| Planned closure stage | UI-C12 |
+| Severity | P2 |
+| Origin | Help Architecture Addendum (2026-09-04), Micro-Closure (2026-09-04) |
+| Description | Manual-only review gate is insufficient for critical financial/KPI metrics. Mandatory automated contract test must verify: stable metric ID exists in typed registry, Help topic exists, formula metadata present, status mapping matches backend, drill-down filter maps to same scope. Critical classes: financial derived values (dueAmount, refundableAmount), Command Center KPI, Orders KPI counts, Bookings KPI counts, Analytics metrics reused in UI. |
+| Dependencies | HELP-02, D7 dueAmount/refundableAmount authority |
+| Planned closure stage | UI-C3 (gate implemented alongside metric registry) |
 | Status | OPEN |
-| Acceptance condition | Stable metric IDs link Help definitions to backend calculations; automated contract test or review gate |
+| Acceptance condition | Automated test fails if any critical metric ID lacks Help metadata or status mapping |
 | Closure SHA | — |
+| Notes | Manual review only for non-critical metrics |
 
 ---
 
@@ -505,5 +507,132 @@ DEFERRED — Future phase, awaiting prerequisites
 | Acceptance condition | Burst 20 chains/s completes ≥95% at concurrency 50 |
 | Closure SHA | — |
 | Notes | 0 production query/index/pool tuning |
+
+---
+
+### HELP-07 — Workspace/Entitlement-Aware Help Content
+
+| Field | Value |
+|---|---|
+| ID | HELP-07 |
+| Title | Help content not differentiated by workspace/entitlement context |
+| Category | DOCUMENTATION/HELP |
+| Severity | P2 |
+| Origin | Micro-Closure (2026-09-04) |
+| Description | Platform-only operational docs could be visible to Partners. Entitlement-specific features (Storefront Pro) shown as if universally available. Help navigation must reflect available capabilities per workspace + plan. |
+| Dependencies | HELP-02, SUB-01 |
+| Planned closure stage | UI-C12 |
+| Status | OPEN |
+| Acceptance condition | Help navigation filters content by workspace type and entitlement tier |
+| Closure SHA | — |
+
+---
+
+### HELP-08 — RU/AZ/EN Help Localization
+
+| Field | Value |
+|---|---|
+| ID | HELP-08 |
+| Title | Help content requires RU/AZ/EN localization contract + content |
+| Category | DOCUMENTATION/HELP |
+| Severity | P2 |
+| Origin | Micro-Closure (2026-09-04) |
+| Description | Help topics, status definitions, formula explanations, KPI descriptions must be available in RU/AZ/EN. Stable topic IDs must be non-localized. Formula semantics identical across languages. Display labels never used as stable IDs. |
+| Dependencies | HELP-02, HELP-04 |
+| Planned closure stage | UI-C12 |
+| Status | OPEN |
+| Acceptance condition | All implemented Help topics have RU/AZ/EN content; stable ID convention verified |
+| Closure SHA | — |
+
+---
+
+### DATA-02 — Marketplace vs Storefront Financial Metric Separation
+
+| Field | Value |
+|---|---|
+| ID | DATA-02 |
+| Title | Marketplace and Storefront financial metrics not explicitly separated |
+| Category | DATA/SEMANTIC |
+| Severity | P3 |
+| Origin | Design Reconciliation (2026-09-04) |
+| Description | Financial metrics (GMV, Revenue, Refund rate) may aggregate across Marketplace and Storefront orders without explicit separation. When Finance Center is implemented, metric scope must distinguish acquisition sources. |
+| Dependencies | FIN-01 |
+| Planned closure stage | DEFERRED |
+| Status | DEFERRED |
+| Acceptance condition | Financial metrics explicitly scope by acquisitionSource where relevant |
+| Closure SHA | — |
+
+---
+
+### AGR-01 — Booking Commercial Terms & Agreement Foundation
+
+| Field | Value |
+|---|---|
+| ID | AGR-01 |
+| Title | Booking commercial terms and agreement foundation not implemented |
+| Category | DEFERRED PRODUCT |
+| Severity | P2 |
+| Origin | Roadmap (2026-09-04) |
+| Description | No commercial terms/agreement infrastructure for Booking domain. Depends on Booking lifecycle stability (D6 accepted) and potentially Storefront subscription model. |
+| Dependencies | D6 accepted, SUB-01 |
+| Planned closure stage | DEFERRED |
+| Status | DEFERRED |
+| Acceptance condition | Booking commercial terms/agreement infrastructure operational |
+| Closure SHA | — |
+
+---
+
+### SUB-04 — Storefront Partner Onboarding/Subscription Page
+
+| Field | Value |
+|---|---|
+| ID | SUB-04 |
+| Title | Partner subscription selection and onboarding page not implemented |
+| Category | DEFERRED PRODUCT |
+| Severity | P2 |
+| Origin | Roadmap (2026-09-04) |
+| Description | Partners cannot select or subscribe to a Storefront plan. Onboarding flow for Storefront partners missing. |
+| Dependencies | SUB-01, FIN-02 |
+| Planned closure stage | DEFERRED |
+| Status | DEFERRED |
+| Acceptance condition | Partner can complete subscription selection + onboarding |
+| Closure SHA | — |
+
+---
+
+### SUB-05 — Partner Company Legal/Physical Data Collection
+
+| Field | Value |
+|---|---|
+| ID | SUB-05 |
+| Title | Partner company data collection not implemented |
+| Category | DEFERRED PRODUCT |
+| Severity | P3 |
+| Origin | Roadmap (2026-09-04) |
+| Description | Partner onboarding requires: company physical address, company legal address, director full name, accountant (if required). Director personal home address is explicitly NOT required. |
+| Dependencies | SUB-04 |
+| Planned closure stage | DEFERRED |
+| Status | DEFERRED |
+| Acceptance condition | Partner can submit required company data; director home address excluded |
+| Closure SHA | — |
+| Notes | Do NOT require director personal home address |
+
+---
+
+### SUB-06 — Electronic Partner Contract
+
+| Field | Value |
+|---|---|
+| ID | SUB-06 |
+| Title | Electronic partner contract generation/execution not implemented |
+| Category | DEFERRED PRODUCT |
+| Severity | P3 |
+| Origin | Roadmap (2026-09-04) |
+| Description | No electronic contract flow for Storefront partners. Depends on partner data collection (SUB-05) and subscription selection (SUB-04). |
+| Dependencies | SUB-04, SUB-05 |
+| Planned closure stage | DEFERRED |
+| Status | DEFERRED |
+| Acceptance condition | Partner can review + sign electronic contract |
+| Closure SHA | — |
 
 ---
