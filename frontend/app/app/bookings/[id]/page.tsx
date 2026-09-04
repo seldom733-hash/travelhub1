@@ -35,6 +35,8 @@ interface BookingDetail {
   createdAt: string;
   updatedAt: string;
   availableActions?: string[];
+  financialSummary?: Record<string, unknown> | null;
+  activePayment?: Record<string, unknown> | null;
   passengers?: Array<{
     id: string;
     firstName: string;
@@ -230,19 +232,55 @@ export default function BookingDetailPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Main content */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Financial */}
+            {/* D7 — Financial section: Booking amount + linked Order payment context */}
             <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("bookings.financial", locale) || "Финансы"}</h3>
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("bookings.financial", locale)}</h3>
+              <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-4">
                 <div className="rounded-lg bg-slate-50 px-4 py-3">
                   <div className="text-slate-400">{t("crm.detail.total_amount", locale)}</div>
                   <div className="font-bold text-slate-700">{formatPrice(booking.amount, booking.currency, locale) ?? "—"}</div>
                 </div>
                 <div className="rounded-lg bg-slate-50 px-4 py-3">
-                  <div className="text-slate-400">{t("crm.detail.service_date", locale) || "Дата услуги"}</div>
+                  <div className="text-slate-400">{t("crm.detail.service_date", locale)}</div>
                   <div className="font-medium text-slate-700">{fmtDate(booking.serviceDate)}</div>
                 </div>
+                {booking.financialSummary && (
+                  <>
+                    <div className="rounded-lg bg-green-50 px-4 py-3">
+                      <div className="text-slate-400">{t("crm.detail.paid_amount", locale)}</div>
+                      <div className="font-medium text-green-700">{formatPrice((booking.financialSummary as any).paidAmount, (booking.financialSummary as any).currency, locale) ?? "—"}</div>
+                    </div>
+                    <div className="rounded-lg bg-amber-50 px-4 py-3">
+                      <div className="text-slate-400">{t("finance.due_amount", locale)}</div>
+                      <div className="font-medium text-amber-700">{formatPrice((booking.financialSummary as any).dueAmount, (booking.financialSummary as any).currency, locale) ?? "—"}</div>
+                    </div>
+                  </>
+                )}
+                {booking.financialSummary && (
+                  <>
+                    <div className="rounded-lg bg-red-50 px-4 py-3">
+                      <div className="text-slate-400">{t("crm.detail.refunded_amount", locale)}</div>
+                      <div className="font-medium text-red-700">{formatPrice((booking.financialSummary as any).refundedAmount, (booking.financialSummary as any).currency, locale) ?? "—"}</div>
+                    </div>
+                    <div className="rounded-lg bg-blue-50 px-4 py-3">
+                      <div className="text-slate-400">{t("finance.refundable_amount", locale)}</div>
+                      <div className="font-medium text-blue-700">{formatPrice((booking.financialSummary as any).refundableAmount, (booking.financialSummary as any).currency, locale) ?? "—"}</div>
+                    </div>
+                  </>
+                )}
+                {booking.financialSummary && (
+                  <div className="rounded-lg bg-slate-50 px-4 py-3">
+                    <div className="text-slate-400">{t("crm.detail.payment_status", locale) || "Статус оплаты"}</div>
+                    <div className="font-medium text-slate-700"><StatusBadge status={(booking.financialSummary as any).paymentStatus} /></div>
+                  </div>
+                )}
               </div>
+              {booking.activePayment && (
+                <div className="mt-3 flex flex-wrap gap-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                  <span>{t("finance.payment_method", locale)}: {(booking.activePayment as any).paymentMethod || "—"}</span>
+                  <span>{t("crm.detail.payment_status", locale)}: <StatusBadge status={(booking.activePayment as any).status} /></span>
+                </div>
+              )}
             </div>
 
             {/* Service details */}

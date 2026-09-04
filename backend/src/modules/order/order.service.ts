@@ -1157,6 +1157,46 @@ export class OrderService {
     return { items, total, page: p, pageSize: ps };
   }
 
+  /** D7: Payment history for a specific Order — used by Order/Booking financial sections. */
+  async getPaymentHistoryForOrder(orderId: string) {
+    const payments = await this.prisma.payment.findMany({
+      where: { orderId },
+      select: {
+        id: true, code: true, referenceNumber: true, status: true,
+        amount: true, currency: true, paymentMethod: true, providerRef: true,
+        paidAt: true, failedAt: true, cancelledAt: true, createdAt: true,
+        isActivePayment: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const history = await this.prisma.paymentHistory.findMany({
+      where: { payment: { orderId } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    return { payments, history };
+  }
+
+  /** D7: Refund history for a specific Order — used by Order/Booking financial sections. */
+  async getRefundHistoryForOrder(orderId: string) {
+    const refunds = await this.prisma.refund.findMany({
+      where: { orderId },
+      select: {
+        id: true, code: true, referenceNumber: true, status: true,
+        amount: true, currency: true, reason: true,
+        requestedAt: true, approvedAt: true, processedAt: true, failedAt: true,
+        createdAt: true, isActiveRefund: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const history = await this.prisma.refundHistory.findMany({
+      where: { refund: { orderId } },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    return { refunds, history };
+  }
+
   /**
    * D4 REMEDIATION F1 — DB-level serialization boundary для traveler mutation
    * ↔ final-confirm (TOCTOU, D4SR-F1).

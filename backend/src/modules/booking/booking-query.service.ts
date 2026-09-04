@@ -69,12 +69,65 @@ export class BookingQueryService {
       if (prod) productDisplay = { id: prod.id, title: prod.title };
     }
 
+    // D7: fetch linked Order financial summary for Booking detail
+    let financialSummary: Record<string, unknown> | null = null;
+    if (booking.orderId) {
+      const order = await this.prisma.order.findUnique({
+        where: { id: booking.orderId },
+        select: {
+          id: true, amount: true, currency: true, paidAmount: true,
+          refundedAmount: true, paymentStatus: true, status: true,
+        },
+      });
+      if (order) {
+        const paid = Number(order.paidAmount);
+        const refunded = Number(order.refundedAmount);
+        const total = Number(order.amount);
+        financialSummary = {
+          totalAmount: order.amount,
+          paidAmount: order.paidAmount,
+          refundedAmount: order.refundedAmount,
+          dueAmount: Math.max(0, total - paid).toFixed(2),
+          refundableAmount: Math.max(0, paid - refunded).toFixed(2),
+          netCollected: Math.max(0, paid - refunded).toFixed(2),
+          currency: order.currency,
+          paymentStatus: order.paymentStatus,
+          orderStatus: order.status,
+        };
+      }
+    }
+
+    // D7: fetch active Payment reference if exists
+    let activePayment: Record<string, unknown> | null = null;
+    if (booking.orderId) {
+      const payment = await this.prisma.payment.findFirst({
+        where: { orderId: booking.orderId, isActivePayment: true },
+        select: {
+          id: true, code: true, referenceNumber: true, status: true,
+          amount: true, currency: true, paymentMethod: true, providerRef: true,
+        },
+      });
+      if (payment) {
+        activePayment = {
+          id: payment.id,
+          code: payment.code,
+          referenceNumber: payment.referenceNumber,
+          status: payment.status,
+          amount: payment.amount,
+          currency: payment.currency,
+          paymentMethod: payment.paymentMethod,
+        };
+      }
+    }
+
     // Step 1.17: field-level redaction — passenger PII виден только OPERATOR/ADMIN.
     return {
       ...booking,
       passengers: redactTravelersPii(booking.passengers ?? [], viewer),
       orderCode: orderDisplay?.referenceNumber ?? null,
       productTitle: productDisplay?.title ?? null,
+      financialSummary,
+      activePayment,
     };
   }
 }

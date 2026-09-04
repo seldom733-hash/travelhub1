@@ -254,6 +254,21 @@ export class OrderController {
     return this.orders.listOrderHistory(id, actor, Number.isFinite(p) && p > 0 ? p : 1, Number.isFinite(ps) && ps > 0 ? ps : 20);
   }
 
+  @Get("orders/:id/financial-history")
+  @RequirePermissions("order.read")
+  async financialHistory(
+    @Param("id") id: string,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    // D7: payment + refund history for this Order — used by Order/Booking detail pages.
+    const order = await this.orders.getOrder(id, actor);
+    if (!order) return { payments: [], refunds: [] };
+
+    const payments = await this.orders.getPaymentHistoryForOrder(id);
+    const refunds = await this.orders.getRefundHistoryForOrder(id);
+    return { payments, refunds };
+  }
+
   @Patch("orders/:id")
   @RequirePermissions((req) => [ACTION_PERMISSIONS[req.body?.action as OrderAction] ?? "order.edit_noncritical"])
   orderAction(
