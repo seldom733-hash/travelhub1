@@ -1,0 +1,156 @@
+{
+  "total": 30,
+  "passed": 30,
+  "results": [
+    {
+      "name": "login",
+      "ok": true,
+      "detail": "http://localhost:3000/app/dashboard"
+    },
+    {
+      "name": "orders baseline captured",
+      "ok": true,
+      "detail": "17 cards"
+    },
+    {
+      "name": "baseline has Total/Проблема/Закрыт/Оплачен",
+      "ok": true,
+      "detail": "total=508 problem=10 closed=213 paid=346"
+    },
+    {
+      "name": "click Проблема → selected",
+      "ok": true,
+      "detail": "selected=Проблема"
+    },
+    {
+      "name": "click Проблема → table only (URL status=PROBLEM)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders?status=PROBLEM"
+    },
+    {
+      "name": "click Проблема → all other lifecycle + payment values identical",
+      "ok": true,
+      "detail": "problem=10"
+    },
+    {
+      "name": "click Проблема → table rows are Проблема-only",
+      "ok": true,
+      "detail": "rows=10 count=10"
+    },
+    {
+      "name": "switch → Закрыт selected (Проблема deselected)",
+      "ok": true,
+      "detail": "selected=Закрыт"
+    },
+    {
+      "name": "switch → table only (URL status=CLOSED)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders?status=CLOSED"
+    },
+    {
+      "name": "switch → all other lifecycle + payment values identical",
+      "ok": true,
+      "detail": "closed=213"
+    },
+    {
+      "name": "switch → table rows are Закрыт-only (page 1 of 213)",
+      "ok": true,
+      "detail": "rows=20 count=213"
+    },
+    {
+      "name": "click Оплачен → PAID selected, lifecycle cleared",
+      "ok": true,
+      "detail": "selected=Оплачен url=http://localhost:3000/app/orders?paymentStatus=PAID"
+    },
+    {
+      "name": "click Оплачен → URL paymentStatus=PAID",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders?paymentStatus=PAID"
+    },
+    {
+      "name": "click Оплачен → lifecycle + other payment values identical",
+      "ok": true,
+      "detail": "paid=346"
+    },
+    {
+      "name": "click Всего заказов → Total selected/default, filters cleared",
+      "ok": true,
+      "detail": "selected=Всего заказов url=http://localhost:3000/app/orders"
+    },
+    {
+      "name": "Total click → URL has no status/paymentStatus",
+      "ok": true,
+      "detail": "http://localhost:3000/app/orders"
+    },
+    {
+      "name": "Total click → overview values identical",
+      "ok": true,
+      "detail": "total=508"
+    },
+    {
+      "name": "Total click → table returns to KPI-unfiltered scope (mixed statuses)",
+      "ok": true,
+      "detail": "rows=20 distinct=6"
+    },
+    {
+      "name": "direct ?status=PROBLEM → selected + table filtered",
+      "ok": true,
+      "detail": "selected=Проблема"
+    },
+    {
+      "name": "direct ?status=PROBLEM → other KPI values stay overview (no collapse)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "reload keeps ?status=PROBLEM selected",
+      "ok": true,
+      "detail": "selected=Проблема"
+    },
+    {
+      "name": "Back restores ?status=PROBLEM selected card + stable counts",
+      "ok": true,
+      "detail": "selected=Проблема"
+    },
+    {
+      "name": "period overview baseline captured",
+      "ok": true,
+      "detail": "period problem=2"
+    },
+    {
+      "name": "within period scope → click Проблема keeps OTHER cards = full date scope (not date+problem)",
+      "ok": true,
+      "detail": "period problem=2"
+    },
+    {
+      "name": "within period scope → table is date+Проблема only",
+      "ok": true,
+      "detail": "rows=2 count=2"
+    },
+    {
+      "name": "requests baseline captured",
+      "ok": true,
+      "detail": "13 cards, 9 clickable"
+    },
+    {
+      "name": "requests: click «Новые» → other KPI values identical (reference behavior)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "orders @ 390px: no page-level horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "orders @ 768px: no page-level horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "orders @ 1680px: no page-level horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    }
+  ]
+}

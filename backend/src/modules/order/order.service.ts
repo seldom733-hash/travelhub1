@@ -11,6 +11,7 @@ import {
   type OrderRequestedPayload,
 } from "../../eventbus/domain-events";
 import { buildSortClause, type SortDirection } from '../../shared/sort';
+import { overviewOrderWhere } from "./order-kpi-scope";
 import { IdsService } from "../../shared/ids.service";
 import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
@@ -889,24 +890,29 @@ export class OrderService {
       }),
       this.prisma.order.count({ where }),
     ]);
-    // KPI aggregates: count by every canonical lifecycle status + payment status
-    const [statusCounts, paymentCounts] = await Promise.all([
+    // UI-C1.2C REMEDIATION R1 — KPI overview vs table scope split.
+    // The KPI aggregates describe the OVERVIEW scope (global registry scope
+    // WITHOUT the active KPI-card dimensions status/paymentStatus), so clicking
+    // one KPI card selects it and filters the TABLE only — the other cards
+    // retain their overview counts (Requests-style KPI interaction contract).
+    const overviewWhere = overviewOrderWhere(where);
+    const [statusCounts, paymentCounts, overviewTotal] = await Promise.all([
       this.prisma.order.groupBy({
         by: ['status'],
-        where: where as any,
+        where: overviewWhere as any,
         _count: { status: true },
       }),
       this.prisma.order.groupBy({
         by: ['paymentStatus'],
-        where: where as any,
+        where: overviewWhere as any,
         _count: { paymentStatus: true },
       }),
+      this.prisma.order.count({ where: overviewWhere }),
     ]);
 
-    const lifecycleAgg: Record<string, number> = { total: 0 };
+    const lifecycleAgg: Record<string, number> = { total: overviewTotal };
     for (const c of statusCounts) {
       lifecycleAgg[c.status] = c._count.status;
-      lifecycleAgg.total += c._count.status;
     }
     const paymentAgg: Record<string, number> = {};
     for (const c of paymentCounts) {

@@ -253,9 +253,15 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
     }
   };
 
-  // KPI data from backend aggregates (server-authoritative, same scope as table)
+  // KPI data from server aggregates. UI-C1.2C REMEDIATION R1: the aggregates are
+  // computed by the backend on the OVERVIEW scope (global registry scope WITHOUT
+  // the active KPI-card dimensions status/paymentStatus), so selecting a card
+  // filters the TABLE only and the other cards keep their overview counts.
   const lifecycleCounts = (data?.aggregates?.lifecycle ?? {}) as Record<string, number>;
   const paymentCounts = (data?.aggregates?.payment ?? {}) as Record<string, number>;
+  // Total card = overview total (stable across KPI-card selection); the table's
+  // own `total` (data.total) stays the pagination scope.
+  const overviewTotal = (data?.aggregates?.lifecycle as Record<string, number> | undefined)?.total ?? data?.total ?? 0;
   const total = data?.total ?? 0;
 
   // Selected KPI state
@@ -281,7 +287,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
             <CommerceKpiCard
               variant="total"
               label={t("admin.kpi.total_orders", locale)}
-              value={total}
+              value={overviewTotal}
               active={!selectedLifecycle && !selectedPayment}
               onClick={handleTotalClick}
             />

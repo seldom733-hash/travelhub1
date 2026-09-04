@@ -287,6 +287,40 @@ describe("UI-C1.2C §14/§32 — KPI/table same server scope, no client counting
   });
 });
 
+describe("UI-C1.2C REMEDIATION R1 — stable KPI overview vs table-only filter", () => {
+  it("KPI cards render overview counts from server aggregates, not the table scope", () => {
+    expect(PAGE).toContain("REMEDIATION R1");
+    expect(PAGE).toContain("lifecycleCounts[code] ?? 0");
+    expect(PAGE).toContain("paymentCounts[code] ?? 0");
+    // single server aggregate source — no second endpoint, no local re-scope state
+    expect((PAGE.match(/api\.get</g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(PAGE).not.toContain("/orders/kpi");
+    expect(PAGE).not.toContain(".filter((o) =>");
+    expect(PAGE).not.toContain(".reduce(");
+  });
+
+  it("Total card value is the server OVERVIEW total (stable across KPI-card selection)", () => {
+    expect(PAGE).toContain("const overviewTotal = (data?.aggregates?.lifecycle as Record<string, number> | undefined)?.total ?? data?.total ?? 0;");
+    expect(PAGE).toContain("value={overviewTotal}");
+    // Total never binds to the table-scope `total`
+    const totalCardRegion = PAGE.slice(PAGE.indexOf("TOTAL KPI — canonical naming"), PAGE.indexOf("LIFECYCLE — truthful happy-path"));
+    expect(totalCardRegion).not.toContain("value={total}");
+  });
+
+  it("table pagination still uses the TABLE scope total (items under active KPI filter)", () => {
+    expect(PAGE).toContain("const total = data?.total ?? 0;");
+    expect(PAGE).toContain("total={data.total}");
+  });
+
+  it("the active KPI selection is conveyed to the table query while overview is excluded server-side", () => {
+    // status/paymentStatus stay table-scope params (server excludes them from the
+    // overview aggregates — see backend order-kpi-scope), never client-recomputed
+    expect(PAGE).toContain('qs.set("status", statusFilter)');
+    expect(PAGE).toContain('qs.set("paymentStatus", paymentStatusFilter)');
+    expect(PAGE).not.toContain("statusFilter.toLowerCase()");
+  });
+});
+
 describe("UI-C1.2C §18/§23 — URL state, direct URL, Back/Forward, Reset", () => {
   it("canonical params read from URL on mount: search/status/paymentStatus/dateFrom/dateTo/page", () => {
     expect(PAGE).toContain("useSearchParams");
