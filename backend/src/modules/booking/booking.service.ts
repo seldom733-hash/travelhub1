@@ -5,6 +5,7 @@ import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type BookingEventPayload } from "../../eventbus/domain-events";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { BookingQueryService } from "./booking-query.service";
+import { overviewBookingWhere } from "./booking-kpi-scope";
 import { buildSortClause } from '../../shared/sort';
 import { isDeniedStorefrontScope } from "../../shared/sales-scope";
 
@@ -182,29 +183,52 @@ export class BookingService {
     // scope — явный PARTNER_STOREFRONT на platform Booking Center-контракте →
     // deny (empty result, согласовано с Orders list/export).
     if (isDeniedStorefrontScope(query.acquisitionSource)) {
-      return { items: [], total: 0, page, pageSize, hasMore: false };
+      return { items: [], total: 0, page, pageSize, aggregates: { lifecycle: { total: 0 } } };
     }
     const now = new Date();
-    // R5-C1: Support comma-separated multi-status
-    const bookingStatusFilter = query.status
-      ? query.status.includes(',')
-        ? { status: { in: query.status.split(',').map(s => s.trim()) as BookingStatus[] } }
-        : { status: query.status as BookingStatus }
-      : {};
-    const where: Prisma.BookingWhereInput = {
-      ...bookingStatusFilter,
-      ...(query.search ? { id: { in: await this.resolveBookingSearchIds(query.search) } } : {}),
-      // ROUND 5: upcoming=true → detector: status IN (CONFIRMED, NEW) AND serviceDate >= now
-      ...(query.upcoming === "true" ? {
-        status: { in: ["CONFIRMED", "NEW"] as BookingStatus[] },
-        serviceDate: { gte: now },
-      } : {}),
-      // ROUND 5: overdue=true → detector: status = AWAITING_CONFIRMATION AND createdAt < (now - SLA)
-      ...(query.overdue === "true" ? {
-        status: "AWAITING_CONFIRMATION" as BookingStatus,
-        createdAt: { lt: new Date(Date.now() - (parseInt(query.slaMinutes ?? "240", 10)) * 60 * 1000) },
-      } : {}),
-    };
+    // ── UI-C1.2D — KPI-card dimension vs global registry scope ──────────────
+    // The BookingStatus dimension is split from the GLOBAL registry scope so the
+    // KPI overview stays stable when a card is clicked (Requests-style contract):
+    //   TABLE scope    = global scope + active status predicate (detectors + card)
+    //   OVERVIEW scope = global scope only (status dimension excluded) — used for
+    //                    the 13 KPI counts + overview total.
+    //
+    // Detector semantics: upcoming/overdue act as GLOBAL scopes. Their temporal
+    // predicates (serviceDate / createdAt thresholds) live as top-level keys that
+    // scope BOTH overview and table; their STATUS predicates (upcoming →
+    // CONFIRMED/NEW; overdue → AWAITING_CONFIRMATION) compose with any explicit
+    // KPI-card status into the status layer that ONLY the table applies. This way
+    // a KPI-card click never corrupts or deletes the detector scope, and the
+    // detector never injects its status into the overview (no collapse).
+    const statusPredicates: Prisma.BookingWhereInput[] = [];
+    // R5-C1: comma-separated multi-status (KPI-card / filter dimension)
+    if (query.status) {
+      statusPredicates.push(
+        query.status.includes(',')
+          ? { status: { in: query.status.split(',').map(s => s.trim()) as BookingStatus[] } }
+          : { status: query.status as BookingStatus },
+      );
+    }
+    // ROUND 5: upcoming=true → detector: status IN (CONFIRMED, NEW) AND serviceDate >= now
+    if (query.upcoming === "true") {
+      statusPredicates.push({ status: { in: ["CONFIRMED", "NEW"] as BookingStatus[] } });
+    }
+    // ROUND 5: overdue=true → detector: status = AWAITING_CONFIRMATION AND createdAt < (now - SLA)
+    if (query.overdue === "true") {
+      statusPredicates.push({ status: "AWAITING_CONFIRMATION" as BookingStatus });
+    }
+    // Global temporal predicates (overview + table): compose with the date range
+    // below via AND semantics — Prisma field-level constraints always AND together,
+    // so the overdue createdAt cutoff is never overwritten by the From/To window.
+    const createdAtFilter: Record<string, Date> = {};
+    if (query.overdue === "true") {
+      createdAtFilter.lt = new Date(Date.now() - (parseInt(query.slaMinutes ?? "240", 10)) * 60 * 1000);
+    }
+    // R5-04: Date range filtering on createdAt (exclusive end — consistent with
+    // Analytics half-open [from, to))
+    if (query.dateFrom) createdAtFilter.gte = new Date(query.dateFrom);
+    if (query.dateTo) createdAtFilter.lt = new Date(query.dateTo);
+
     // Platform operational scope: default to MARKETPLACE via Order.acquisitionSource
     const effectiveSource = query.acquisitionSource || "MARKETPLACE";
     const channelOrders = await this.prisma.order.findMany({
@@ -213,23 +237,30 @@ export class BookingService {
     });
     const channelOrderIds = channelOrders.map(o => o.id);
     if (channelOrderIds.length === 0) {
-      return { items: [], total: 0, page, pageSize, hasMore: false };
+      return { items: [], total: 0, page, pageSize, aggregates: { lifecycle: { total: 0 } } };
     }
     // Explicit orderId (if given) must be intersected with the channel scope —
     // never overwritten by it (otherwise the Order detail panel lists random bookings).
-    if (query.orderId) {
-      where.AND = [{ orderId: query.orderId }, { orderId: { in: channelOrderIds } }];
-    } else {
-      where.orderId = { in: channelOrderIds };
-    }
-    // R5-04: Date range filtering on createdAt (exclusive end — consistent with Analytics half-open [from, to))
-    if (query.dateFrom || query.dateTo) {
-      where.createdAt = {
-        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-        ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
-      };
-    }
-    const [items, total] = await Promise.all([
+    const channelScope: Prisma.BookingWhereInput = query.orderId
+      ? { AND: [{ orderId: query.orderId }, { orderId: { in: channelOrderIds } }] }
+      : { orderId: { in: channelOrderIds } };
+    // Global registry scope (NO status dimension) — shared by table and overview.
+    const globalScope: Prisma.BookingWhereInput = {
+      ...(query.search ? { id: { in: await this.resolveBookingSearchIds(query.search) } } : {}),
+      ...(query.upcoming === "true" ? { serviceDate: { gte: now } } : {}),
+      ...(Object.keys(createdAtFilter).length > 0 ? { createdAt: createdAtFilter } : {}),
+      ...channelScope,
+    };
+    // TABLE scope: global scope + the composed BookingStatus dimension.
+    const where: Prisma.BookingWhereInput =
+      statusPredicates.length === 0
+        ? { ...globalScope }
+        : statusPredicates.length === 1
+          ? { ...globalScope, ...statusPredicates[0] }
+          : { ...globalScope, AND: statusPredicates };
+    // OVERVIEW scope: exactly the table `where` minus the BookingStatus dimension.
+    const overviewWhere = overviewBookingWhere(where);
+    const [items, total, statusCounts, overviewTotal] = await Promise.all([
       this.prisma.booking.findMany({
         where,
         orderBy: buildSortClause(query.sortBy, query.sortDirection, BOOKING_SORT_ALLOWLIST, { createdAt: 'desc' }),
@@ -238,17 +269,19 @@ export class BookingService {
         include: { passengers: { select: { id: true, firstName: true, lastName: true } } },
       }),
       this.prisma.booking.count({ where }),
+      this.prisma.booking.groupBy({
+        by: ['status'],
+        where: overviewWhere as any,
+        _count: { status: true },
+      }),
+      this.prisma.booking.count({ where: overviewWhere }),
     ]);
-    // KPI aggregates: count by every canonical booking status
-    const statusCounts = await this.prisma.booking.groupBy({
-      by: ['status'],
-      where: where as any,
-      _count: { status: true },
-    });
-    const lifecycleAgg: Record<string, number> = { total: 0 };
+    // KPI aggregates: counts by every canonical booking status over the OVERVIEW
+    // scope. Total = overview total (stable across KPI-card selection); the table
+    // pagination `total` above stays table-scoped.
+    const lifecycleAgg: Record<string, number> = { total: overviewTotal };
     for (const c of statusCounts) {
       lifecycleAgg[c.status] = c._count.status;
-      lifecycleAgg.total += c._count.status;
     }
     // Enrich bookings with order referenceNumber for canonical display
     const orderIds = [...new Set(items.map(b => b.orderId).filter(Boolean))] as string[];

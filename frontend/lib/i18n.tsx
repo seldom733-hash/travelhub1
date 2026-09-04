@@ -1024,6 +1024,11 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "bookings.change_history": { ru: "История изменений", az: "Dəyişiklik tarixçəsi", en: "Change history" },
   "bookings.history_disclaimer": { ru: "История ведётся с момента включения audit-фреймворка; для старых заказов более ранние изменения не реконструируются.", az: "Tarixçə audit çərçivəsi aktivləşdirildikdən sonra aparılır; köhnə sifarişlər üçün daha erkən dəyişikliklər bərpa olunmur.", en: "History is tracked from the time the audit framework was enabled; earlier changes for old orders are not reconstructed." },
   "bookings.acquisition_source": { ru: "Канал", az: "Kanal", en: "Channel" },
+  // UI-C1.2D — semantic KPI group headings (canonical statuses share booking.status.*)
+  "bookings.group.lifecycle": { ru: "Основной процесс", az: "Əsas proses", en: "Main process" },
+  "bookings.group.awaiting": { ru: "Ожидание подтверждения", az: "Təsdiq gözləyən", en: "Awaiting confirmation" },
+  "bookings.group.decisions": { ru: "Операционные статусы", az: "Operativ vəziyyətlər", en: "Operational statuses" },
+  "bookings.group.terminal": { ru: "Конечные исходы", az: "Son nəticələr", en: "Terminal outcomes" },
   // ── R2 Detail Visual System — shared section/field labels ──
   "detail.sections.overview": { ru: "Обзор", az: "İcmal", en: "Overview" },
   "detail.sections.actions": { ru: "Действия", az: "Əməliyyatlar", en: "Actions" },
