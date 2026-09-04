@@ -20,9 +20,13 @@ backend/src/generated/
 *.db
 *.db.bak
 *.log
+*.log.err
 backend/backend-dev.log
 backend/backend-dev.err.log
+backend_run.log.err
 frontend/frontend-dev.log
+frontend_run.log.err
+frontend/frontend_run.log.err
 
 # OS / editor
 .DS_Store
