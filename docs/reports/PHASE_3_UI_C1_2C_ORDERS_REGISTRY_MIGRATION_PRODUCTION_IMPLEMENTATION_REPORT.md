@@ -1,5 +1,11 @@
 # PHASE 3 — COMMERCE CENTER UI-C1.2C — ORDERS REGISTRY MIGRATION — PRODUCTION IMPLEMENTATION — REPORT
 
+> **SUPERSEDED (interaction contract)** — the same-filtered `where` KPI aggregate
+> model described in §14/§18 was rejected by product decision and replaced by
+> the Requests-style stable-overview contract. See
+> `PHASE_3_UI_C1_2C_REMEDIATION_R1_KPI_INTERACTION_PARITY_WITH_REQUESTS_REPORT.md`
+> for the accepted final UI-C1.2C state and final SHA.
+
 ---
 
 ## 1. Executive Summary
