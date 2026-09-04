@@ -2,6 +2,14 @@
 
 **Stage:** Design / architecture reconciliation only. **No production implementation in this step.**
 
+> **BINDING ADDENDUM:** this contract is amended and made binding by
+> `PHASE_3_UI_C1_2_VISUAL_COMPOSITION_STATUS_KPI_CONTRACT_MICRO_CLOSURE_REPORT.md`
+> (ADR-OPS-014 canonical visual composition; ADR-OPS-015 all actual canonical
+> statuses → visible KPI cards). Where this document conflicts with the
+> micro-closure, the micro-closure prevails and the conflicting language here is
+> marked `SUPERSEDED FOR OPERATIONS CENTER VISUAL PRESENTATION` (§26 of the
+> micro-closure).
+
 ---
 
 ## 1. Executive Summary
@@ -214,6 +222,14 @@ Owned by the shell: page max-width, page-header geometry, tabs, KPI zone geometr
 
 **Not owned by the shell:** business semantics — KPI sets, filters, columns, actions (per-domain configs, §41/§47).
 
+**Vertical section order is binding (ADR-OPS-014):**
+
+```text
+TOTAL → STATUS/LIFECYCLE GROUPS → EXCEPTIONS/PAYMENT/REFUND GROUPS → ATTENTION → TOOLBAR → TABLE → PAGINATION
+```
+
+Responsive wrapping is allowed; arbitrary reordering, merging, flattening or omitting of semantic zones requires a new approved design decision. A zone genuinely not applicable to a domain may be absent; no empty decorative zones for symmetry.
+
 ---
 
 ## 8. Tab Navigation Contract
@@ -382,12 +398,12 @@ TOTAL
 Design answers (prompt §34):
 
 1. **Linear forward lifecycle:** NEW, IN_PROCESSING, READY_FOR_BOOKING, SENT_TO_BOOKING, FULFILLED, CLOSED.
-2. **Terminal:** CLOSED, CANCELLED. (`READY_TO_CLOSE` terminal-adjacent; no entry transition today — excluded from the flow, listed in filter only.)
+2. **Terminal:** CLOSED, CANCELLED. `READY_TO_CLOSE` is terminal-adjacent with no entry transition today — it still gets a **visible status card** (placed adjacent to CLOSED, no arrow; ADR-OPS-015). *SUPERSEDED FOR OPERATIONS CENTER VISUAL PRESENTATION:* the earlier "listed in filter only" treatment of READY_TO_CLOSE is void.
 3. **Exception/problem:** PROBLEM, SUSPENDED (reversible), CANCELLED (terminal exception), WAITING_FOR_DATA (rework loop, not "problem").
 4. **Can transition back:** WAITING_FOR_DATA → IN_PROCESSING (`resumeProcessing`); PROBLEM/SUSPENDED → any ACTIVE via the relevant forward action (guards return to normal flow); PARTIALLY_FULFILLED → FULFILLED (`complete`).
 5. **Strict left-to-right arrows:** truthful only for the happy path; the flow renders the happy path with arrows and the rework loop as a reversible loop glyph; exceptions are a separate group, never chained into the arrows.
 6. **Happy-path-only arrows:** yes — primary happy path only; branches do not get arrowed chains (avoids implying impossible transitions).
-7. **Counts:** each flow card shows a count from `aggregates.lifecycle` (server-side, same scope as table). PARTIALLY_FULFILLED count is shown inside the FULFILLED stage card as a sub-count or as a small adjacent badge (both are fulfillment outcomes; sum = SENT_TO_BOOKING outflow).
+7. **Counts:** each flow card shows a count from `aggregates.lifecycle` (server-side, same scope as table). PARTIALLY_FULFILLED is a **visible status card** of its own (alternate fulfillment; placed next to FULFILLED without an arrow; ADR-OPS-015). *SUPERSEDED FOR OPERATIONS CENTER VISUAL PRESENTATION:* the earlier folding of PARTIALLY_FULFILLED into the FULFILLED card as a sub-count is void.
 8. **Narrow screens:** flow cards wrap to a compact horizontal-scroll row; arrows become vertical chevrons between stacked cards (no page overflow, §38).
 9. **Selected filter state:** clicking a flow card applies `status=<state>` (server filter + URL + `active` card styling, §20); clicking «Всего заказов» clears lifecycle and payment filters.
 10. **Help:** each flow state has a Help topic via the typed metric/help registry (`orders.kpi.{state}`), explaining the state, its transitions, and its meaning (ADR-HELP-001).
@@ -497,10 +513,10 @@ TOTAL
 
 Design answers (prompt §35): option **C — hybrid**: main happy-path flow + exception groups + terminal-exception group.
 
-- Arrows appear only along the happy path; `SENT_TO_SUPPLIER`/`AWAITING_CONFIRMATION` render as one stage pair (both are "awaiting supplier"; combined count = both statuses, matching the accepted C1 `bookings.awaitingConfirmation` metric) — no arrow implies a transition between them.
+- Arrows appear only along the happy path. `SENT_TO_SUPPLIER` and `AWAITING_CONFIRMATION` are **separate visible cards** (ADR-OPS-015) rendered adjacent **without an arrow**: the actual machine has no transition into `AWAITING_CONFIRMATION` (source comment: "резервный код без producer-а (legacy-источник для confirm/reject; как READY_TO_CLOSE в Order)" — `booking.service.ts` L33), so `SENT_TO_SUPPLIER → AWAITING_CONFIRMATION` would be a false implication. The C1 aggregate `bookings.awaitingConfirmation` remains valid as an aggregate metric (Help/summary/analytics), never as a replacement for the two status cards.
 - **No arrow** anywhere into/out of NEEDS_CLARIFICATION / CHANGE_REQUESTED / CANCELLATION_REQUESTED / PROBLEM / SUPPLIER_REJECTED / CANCELLED — these are grouped cards only, preventing implied impossible transitions.
 - **CANCELLED is terminal and does not imply action** — it is placed in «Терминальные исключения», **not** in «Внимание» (prompt §14).
-- Reconciliation with the accepted C1 contract: the 6 exclusive KPI metrics (`bookings.total / awaitingConfirmation / confirmed / inService / completed / cancelled`) remain valid as filter/drill-down semantics; the Operations Center additionally renders them inside semantic groups (flow/attention/terminal) without changing the metric definitions or their status mappings. `bookings.awaitingConfirmation` covers `{SENT_TO_SUPPLIER, AWAITING_CONFIRMATION}`; `bookings.confirmed` covers `{CONFIRMED}`; `bookings.inService` covers `{IN_SERVICE}`; `bookings.completed` covers `{COMPLETED}`; `bookings.cancelled` covers `{CANCELLED, SUPPLIER_REJECTED}`; the remaining statuses (NEW, PREPARING_REQUEST, NEEDS_CLARIFICATION, CHANGE_REQUESTED, CANCELLATION_REQUESTED, PROBLEM) remain filter-only statuses in C1 terms, but in the Operations Center they get **visual group placement** (flow/attention) while their metric semantics stay filter-only. No metric definition is changed.
+- Reconciliation with the accepted C1 contract — *SUPERSEDED FOR OPERATIONS CENTER VISUAL PRESENTATION* (ADR-OPS-015): the 6 exclusive aggregate metrics (`bookings.total / awaitingConfirmation / confirmed / inService / completed / cancelled`) remain valid as **metric IDs, Help topics, aggregate calculations, compatibility/read-model metrics and analytics summaries**, but they are **no longer a limit on visible status cards**. **All 13 canonical Booking statuses have visible KPI cards**: NEW, PREPARING_REQUEST, NEEDS_CLARIFICATION, CHANGE_REQUESTED, CANCELLATION_REQUESTED and PROBLEM are **not** filter-only in the Operations Center. Aggregate overlaps with individual status cards are documented in the aggregate-overlap matrix (micro-closure §25/§16). No metric definition is changed — only the presentation rule is bound.
 - All counts come from `aggregates.lifecycle` (server-side, same scope as table ✅).
 
 ---
@@ -594,11 +610,12 @@ Payments KPI cards are derived **only** from actual backend semantics (prompt §
 TOTAL
 [ Всего платежей ]
 
-СТАТУСЫ ПЛАТЕЖЕЙ  (PaymentStatus — runtime-reachable only)
-[ PENDING ] [ CAPTURED ] [ FAILED ] [ CANCELLED ]
-(AUTHORIZED/REFUNDED — reserved vocabulary: shown in the status *filter* for
-journal completeness, but NOT as KPI cards, because the runtime cannot produce
-them today; this is an explicit, documented choice, not an omission)
+СТАТУСЫ ПЛАТЕЖЕЙ  (PaymentStatus — every actual enum value gets a visible card; ADR-OPS-015)
+[ PENDING ] [ AUTHORIZED ] [ CAPTURED ] [ FAILED ] [ CANCELLED ] [ REFUNDED ]
+(AUTHORIZED/REFUNDED are reserved vocabulary — the runtime cannot produce them
+today; their cards truthfully display 0 with Help explaining the reserved
+semantics. *SUPERSEDED FOR OPERATIONS CENTER VISUAL PRESENTATION:* the earlier
+"filter-only, NOT as KPI cards" treatment is void per ADR-OPS-015.)
 
 СТАТУСЫ ВОЗВРАТОВ  (RefundStatus)
 [ REQUESTED ] [ APPROVED ] [ PROCESSED ] [ FAILED ]
@@ -1052,6 +1069,8 @@ All primitives reuse the accepted UI-C1.1 token system (card grammar, badges, de
 | ADR-OPS-011 | Permission-aware tabs derived from `order.read`/`booking.read`/`finance.payment.read`; hidden ≠ security | ROLE_PERMISSIONS matrix |
 | ADR-OPS-012 | URL filter state adopted (search/status/dateType/from/to/page/sort); replaceState for filters, route for tabs; Requests gains it | current Orders/Bookings/Payments pattern |
 | ADR-OPS-013 | Mobile registry = horizontal-scroll table + sticky ref column; no card layout for registries | table semantics vs cards; §38 |
+| ADR-OPS-014 | Canonical Operations Center visual composition: vertical section order TOTAL → STATUS/LIFECYCLE GROUPS → EXCEPTIONS/PAYMENT/REFUND GROUPS → ATTENTION → TOOLBAR → TABLE → PAGINATION is **binding**; responsive wrapping allowed, arbitrary reorder/merge/flatten/omit requires a new approved decision | micro-closure P0-1; micro-closure §3/§4 |
+| ADR-OPS-015 | Every actual canonical status → **one visible status KPI card** (Requests 12, Orders lifecycle 12, OrderPayment 4, Bookings 13, Payment 6, Refund 4); aggregate KPIs never replace status cards; supersedes "filter-only" classifications for Operations Center presentation (incl. the C1 Booking 6-KPI presentation limit and reserved-vocabulary Payment statuses) | micro-closure P0 rule §5–§6/§12; acceptance P0-6..P0-11 |
 
 Plus the attention/drill-down decisions captured in §22 and §21 (hybrid detail architecture).
 
