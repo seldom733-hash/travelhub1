@@ -102,6 +102,36 @@ const ACTION_LABELS: Record<BookingAction, string> = {
  * consumer-ы НЕ реализуют независимые переходы; compensation-консьюмер
  * OrderCancelled использует те же guards/CAS (см. booking.subscribers.ts).
  */
+const ACTION_PERMISSIONS: Record<BookingAction, string> = {
+  prepare: "booking.send_supplier",
+  send: "booking.send_supplier",
+  requestClarification: "booking.confirm",
+  resume: "booking.confirm",
+  confirm: "booking.confirm",
+  reject: "booking.confirm",
+  service: "booking.confirm",
+  requestChange: "booking.request_change",
+  resolveChange: "booking.request_change",
+  requestCancellation: "booking.cancel",
+  complete: "booking.confirm",
+  cancel: "booking.cancel",
+  problem: "booking.confirm",
+};
+
+export function computeAvailableBookingActions(
+  booking: { status: BookingStatus; orderId: string },
+  granted: readonly string[],
+): BookingAction[] {
+  const actions: BookingAction[] = [];
+  for (const action of Object.keys(TRANSITIONS) as BookingAction[]) {
+    const t = TRANSITIONS[action];
+    if (!t.from.includes(booking.status)) continue;
+    if (!granted.includes(ACTION_PERMISSIONS[action])) continue;
+    actions.push(action);
+  }
+  return actions;
+}
+
 const BOOKING_SORT_ALLOWLIST: Record<string, string> = {
   code: 'code',
   createdAt: 'createdAt',
@@ -356,8 +386,21 @@ export class BookingService {
     return { rows, total };
   }
 
-  async getBooking(id: string, viewer?: import("../../shared/pii").TravelerViewer) {
-    return this.query.getById(id, viewer);
+  async getBooking(id: string, viewer?: import("../../shared/pii").TravelerViewer, grantedPermissions: string[] = []) {
+    const booking = await this.query.getById(id, viewer);
+    // D6: server-authoritative available actions (state machine + RBAC + Order terminal guard)
+    const availableActions = computeAvailableBookingActions(booking, grantedPermissions);
+    return { ...booking, availableActions };
+  }
+
+  /** D6: immutable booking change history (append-only, ordered by createdAt desc) */
+  async getBookingHistory(bookingId: string) {
+    const items = await (this.prisma as any).bookingHistory.findMany({
+      where: { bookingId },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    return { items, total: items.length, page: 1, pageSize: 100 };
   }
 
   /** Команда жизненного цикла бронирования. */

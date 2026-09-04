@@ -197,10 +197,21 @@ export class BookingController {
     return res.send(csv);
   }
 
+  @Get("bookings/:id/history")
+  @RequirePermissions("booking.read")
+  async getBookingHistory(
+    @Param("id") id: string,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    // D6: immutable booking change history
+    await this.bookings.getBooking(id, actor, actor.permissions ?? []);
+    return this.bookings.getBookingHistory(id);
+  }
+
   @Get("bookings/:id")
   @RequirePermissions("booking.read")
   getBooking(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
-    return this.bookings.getBooking(id, actor);
+    return this.bookings.getBooking(id, actor, actor.permissions ?? []);
   }
 
   @Patch("bookings/:id")

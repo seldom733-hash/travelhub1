@@ -2564,7 +2564,7 @@ D4-REM  D4 Strict Review Remediation Closure (F1–F6)    ✅ CLOSED (2026-09-03
  ↓
 D5  Orders Full-Page Detail                             ✅ ACCEPTED (impl + SR VERDICT A + Final Remediation VERDICT A, 2026-09-03)
  ↓
-D6  Bookings Full-Page Detail                           ⬜ NOT STARTED
+D6  Bookings Full-Page Detail                           ✅ ACCEPTED (impl VERDICT A, 2026-09-04)
  ↓
 D7  Payment/Refund Semantics + Financial Presentation   ⬜ NOT STARTED
  ↓
@@ -2961,6 +2961,7 @@ Round 3 закрыл remaining acceptance gates:
 | R3-5 Acceptance matrix | Full 50+ gate matrix | Complete |
 
 D5 final state: **ACCEPTED** (all hard gates closed).
+D6 final state: **ACCEPTED** (impl + 65/65 e2e + browser A-F + Storefront isolation + availableActions + Order nav).
 
-TRUE NEXT: **D6 — BOOKING FULL-PAGE DETAIL** (Booking-аналог D5).
-D6 NOT STARTED.
+TRUE NEXT: **D7 — PAYMENT/REFUND SEMANTICS + FINANCIAL PRESENTATION**.
+D7 NOT STARTED.

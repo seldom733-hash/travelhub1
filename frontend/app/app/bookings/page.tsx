@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { api, type Booking, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -26,9 +27,8 @@ const ACTIONS = [
 
 function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, initialSortBy, initialSortDirection, initialSearch, initialDateFrom, initialDateTo }: { upcomingOnly: boolean; statusFilter?: string; overdueOnly?: boolean; slaMinutes?: string; initialSortBy?: string; initialSortDirection?: SortDirection; initialSearch?: string; initialDateFrom?: string; initialDateTo?: string }) {
   const locale = useLocale();
+  const router = useRouter();
   const [data, setData] = useState<Page<Booking> | null>(null);
-  const [selected, setSelected] = useState<Booking | null>(null);
-  const [orderRef, setOrderRef] = useState<{ code: string; referenceNumber: string; number: string; status: string } | null>(null);
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
@@ -39,29 +39,12 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
   const [dateTo, setDateTo] = useState(initialDateTo || "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // Derived filter labels for display
-  const activeFilters: string[] = [];
-  if (upcomingOnly) activeFilters.push("Предстоящие");
-  if (overdueOnly) activeFilters.push(`Подтверждение: SLA нарушен (${slaMinutes ?? 240} мин)`);
-  if (bookingStatusFilter) {
-    const statusLabels: Record<string, string> = {
-      AWAITING_CONFIRMATION: "Ожидает подтверждения",
-      CONFIRMED: "Подтверждено",
-      CANCELLED: "Отменено",
-    };
-    activeFilters.push(statusLabels[bookingStatusFilter] ?? `Статус: ${bookingStatusFilter}`);
-  }
-  // Ролевой UI: права на команды Booking (RBAC Matrix §4).
-  const canSend = useCan("booking.send_supplier");
-  const canConfirm = useCan("booking.confirm");
-  const canCancel = useCan("booking.cancel");
-  const permOf: Record<string, boolean> = {
-    send: canSend,
-    confirm: canConfirm,
-    reject: canConfirm,
-    service: canConfirm,
-    complete: canConfirm,
-    cancel: canCancel,
+
+  const counts = {
+    total: data?.total ?? 0,
+    awaiting: data?.aggregates?.awaiting ?? 0,
+    confirmed: data?.aggregates?.confirmed ?? 0,
+    cancelled: data?.aggregates?.cancelled ?? 0,
   };
 
   const updateUrl = (params: Record<string, string>) => {
@@ -80,21 +63,17 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
 
   const load = async () => {
     setBusy(true);
+    setError("");
     try {
-      const qs = new URLSearchParams();
-      qs.set('pageSize', '20');
-      if (search) qs.set('search', search);
-      qs.set('page', String(page));
-      if (upcomingOnly) qs.set('upcoming', 'true');
-      if (overdueOnly) qs.set('overdue', 'true');
-      if (slaMinutes) qs.set('slaMinutes', slaMinutes);
-      if (bookingStatusFilter) qs.set('status', bookingStatusFilter);
-
-      if (sortBy) qs.set('sortBy', sortBy);
-      if (sortDirection) qs.set('sortDirection', sortDirection);
-      if (dateFrom) qs.set('dateFrom', dateFrom);
-      if (dateTo) qs.set('dateTo', dateTo);
-      const res = await api.get<Page<Booking>>(`/bookings?${qs.toString()}`);
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("pageSize", "20");
+      if (sortBy) { params.set("sortBy", sortBy); params.set("sortDirection", sortDirection ?? "desc"); }
+      if (search) params.set("search", search);
+      if (bookingStatusFilter) params.set("status", bookingStatusFilter);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      const res = await api.get<Page<Booking>>(`/bookings?${params.toString()}`);
       setData(res);
     } catch (e) {
       setError((e as Error).message);
@@ -108,112 +87,47 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upcomingOnly, bookingStatusFilter, overdueOnly, slaMinutes, sortBy, sortDirection, page, search, dateFrom, dateTo]);
 
-  const openDetail = async (id: string) => {
-    const booking = await api.get<Booking>(`/bookings/${id}`);
-    setSelected(booking);
-    try {
-      const order = await api.get<{ code: string; referenceNumber: string; number: string; status: string }>(`/orders/${booking.orderId}`);
-      setOrderRef(order);
-    } catch {
-      setOrderRef(null);
-    }
-  };
-
-  const runAction = async (action: string) => {
-    if (!selected) return;
-    setError("");
-    try {
-      await api.patch(`/bookings/${selected.id}`, { action });
-      await openDetail(selected.id);
-      await load();
-    } catch (e) {
-      // 403 возможен при смене роли на лету или дрейфе маппинга прав → показываем баннер
-      setError((e as Error).message);
-    }
-  };
-
-  const counts = {
-    total: data?.total ?? 0,
-    awaiting: data?.aggregates?.awaiting ?? 0,
-    confirmed: data?.aggregates?.confirmed ?? 0,
-    cancelled: data?.aggregates?.cancelled ?? 0,
-  };
-
   return (
     <div className="flex h-full">
       <div className="flex min-w-0 flex-1 flex-col">
         <PageHeader
           title="Booking Center"
           breadcrumbs={["TravelHub", "Booking Center"]}
-          actions={
-            <button
-              onClick={() => void load()}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-            >
-              {t("admin.table.refresh", locale)}
-            </button>
-          }
         />
-
-        <div className="space-y-4 p-6">
-          <Kpi
-            items={[
-              { label: t("admin.kpi.total_bookings", locale), value: counts.total, icon: "📑" },
-              { label: t("admin.kpi.awaiting", locale), value: counts.awaiting, icon: "📨", accent: "#06b6d4" },
-              { label: t("admin.kpi.confirmed", locale), value: counts.confirmed, icon: "✅", accent: "#059669" },
-              { label: t("admin.kpi.cancelled", locale), value: counts.cancelled, icon: "🚫", accent: "#dc2626" },
-            ]}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
             <input
+              type="text"
+              placeholder={t("admin.search.placeholder_bookings", locale)}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') void load(); }}
-              placeholder={t("admin.search.placeholder_bookings", locale)}
-              className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              className="w-64 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
             />
             <select
               value={bookingStatusFilter}
-              onChange={(e) => { setBookingStatusFilter(e.target.value); setPage(1); updateUrl({ status: e.target.value }); }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              onChange={(e) => { setBookingStatusFilter(e.target.value); setPage(1); }}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
             >
               <option value="">{t("admin.filter.all_statuses", locale)}</option>
-              <option value="SENT_TO_SUPPLIER">Отправлен поставщику</option>
-              <option value="AWAITING_CONFIRMATION">Ожидает подтверждения</option>
-              <option value="CONFIRMED">Подтверждено</option>
-              <option value="IN_SERVICE">В обслуживании</option>
-              <option value="COMPLETED">Завершено</option>
-              <option value="CANCELLED">Отменено</option>
-              <option value="SUPPLIER_REJECTED">Отклонено поставщиком</option>
+              <option value="SENT_TO_SUPPLIER">{t("booking.status.sent_to_supplier", locale)}</option>
+              <option value="AWAITING_CONFIRMATION">{t("booking.status.awaiting", locale)}</option>
+              <option value="CONFIRMED">{t("booking.status.confirmed", locale)}</option>
+              <option value="IN_SERVICE">{t("booking.status.in_service", locale)}</option>
+              <option value="COMPLETED">{t("booking.status.completed", locale)}</option>
+              <option value="CANCELLED">{t("booking.status.cancelled", locale)}</option>
+              <option value="REJECTED">{t("booking.status.rejected", locale)}</option>
             </select>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">С</span>
-              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
-              <span className="text-xs text-slate-400">По</span>
-              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
-            </div>
-
-          {activeFilters.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {activeFilters.map((f, i) => (
-                <span key={i} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                  {f}
-                </span>
-              ))}
-            </div>
-          )}
-          {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
-          {busy && <span className="text-xs text-slate-400">загрузка…</span>}
-          <TableExportButton
-            exportUrl="/api/v1/bookings/export"
-            extraParams={{
-              ...(statusFilter ? { status: statusFilter } : {}),
-              ...(dateFrom ? { dateFrom } : {}),
-              ...(dateTo ? { dateTo } : {}),
-              ...(search ? { search } : {}),
-            }}
-          />
+            <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="С" />
+            <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="По" />
+            <TableExportButton
+              exportUrl="/api/v1/bookings/export"
+              extraParams={{
+                ...(bookingStatusFilter ? { status: bookingStatusFilter } : {}),
+                ...(dateFrom ? { dateFrom } : {}),
+                ...(dateTo ? { dateTo } : {}),
+                ...(search ? { search } : {}),
+              }}
+            />
           </div>
 
           <AggregateSummary
@@ -254,12 +168,14 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
                 {(data?.items ?? []).map((b) => (
                   <tr
                     key={b.id}
-                    onClick={() => void openDetail(b.id)}
-                    className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${
-                      selected?.id === b.id ? "bg-blue-50/60" : ""
-                    }`}
+                    onClick={() => router.push(`/app/bookings/${b.id}`)}
+                    className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50"
                   >
-                    <td className="px-4 py-2.5 font-mono text-xs text-blue-600">{b.referenceNumber}</td>
+                    <td className="px-4 py-2.5">
+                      <Link href={`/app/bookings/${b.id}`} className="font-mono text-xs text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {b.referenceNumber}
+                      </Link>
+                    </td>
                     <td className="px-4 py-2.5 text-xs text-slate-500">{b.createdAt ? new Date(b.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{b.orderReference ?? b.orderId.slice(0, 8)}…</td>
                     <td className="px-4 py-2.5 font-medium text-slate-800 text-center">{formatPrice(b.amount, b.currency, locale) ?? "—"}</td>
@@ -293,101 +209,36 @@ function BookingsContent({ upcomingOnly, statusFilter, overdueOnly, slaMinutes, 
                 page={page}
                 pageSize={20}
                 total={data.total}
-                onPageChange={(p) => { setPage(p); setSelected(null); }}
+                onPageChange={(p) => { setPage(p); }}
               />
             )}
           </div>
         </div>
       </div>
-
-      {selected && (
-        <aside className="thin-scroll fade-in-up w-96 shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
-          <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
-            <div>
-              <div className="font-mono text-xs text-blue-600">{selected.referenceNumber}</div>
-              <div className="mt-1">
-                <StatusBadge status={selected.status} />
-              </div>
-            </div>
-            <button onClick={() => setSelected(null)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100">
-              ✕
-            </button>
-          </div>
-
-          <div className="space-y-5 p-5 text-sm">
-            {orderRef && (
-              <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
-                <div className="text-slate-400">Связанный заказ (read-only)</div>
-                <div className="mt-0.5 flex items-center justify-between">
-                  <span className="font-mono text-blue-600">{orderRef.referenceNumber}</span>
-                  <StatusBadge status={orderRef.status} />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Пассажиры</div>
-              {(selected.passengers ?? []).length === 0 && <div className="text-slate-400">Пассажиров нет</div>}
-              <div className="space-y-1.5">
-                {(selected.passengers ?? []).map((p) => (
-                  <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2">
-                    <div className="font-medium text-slate-700">
-                      {p.firstName} {p.lastName}
-                    </div>
-                    <div className="font-mono text-[11px] text-slate-400">{p.passportNumber ?? "без паспорта"}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Команды (actions)</div>
-              <ActionButtons actions={ACTIONS} status={selected.status} permOf={permOf} onRun={(a) => void runAction(a)} />
-            </div>
-
-            <div>
-              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">История (audit)</div>
-              <div className="space-y-1.5">
-                {(selected.history ?? []).slice(0, 8).map((h) => (
-                  <div key={h.id} className="rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                    <div className="font-medium text-slate-600">
-                      {h.action}
-                      {h.from && <span className="text-slate-400"> {h.from} → </span>}
-                      {h.to && <span className="text-slate-700">{h.to}</span>}
-                    </div>
-                    <div className="text-slate-400">{h.comment}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </aside>
-      )}
     </div>
   );
 }
 
-function BookingsWithParams() {
-  const sp = useSearchParams();
-  return (
-    <BookingsContent
-      upcomingOnly={sp.get("upcoming") === "true"}
-      statusFilter={sp.get("status") || undefined}
-      overdueOnly={sp.get("overdue") === "true"}
-      slaMinutes={sp.get("slaMinutes") || undefined}
-      initialSortBy={sp.get("sortBy") ?? undefined}
-      initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
-      initialSearch={sp.get("search") ?? ""}
-      initialDateFrom={sp.get("from") ?? sp.get("dateFrom") ?? ""}
-      initialDateTo={sp.get("to") ?? sp.get("dateTo") ?? ""}
-    />
-  );
-}
-
 export default function BookingsPage() {
+  const sp = useSearchParams();
+  const upcomingOnly = sp.get("upcomingOnly") === "true";
+  const statusFilter = sp.get("status") ?? undefined;
+  const overdueOnly = sp.get("overdueOnly") === "true";
+  const slaMinutes = sp.get("slaMinutes") ?? undefined;
+
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
-      <BookingsWithParams />
+    <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-slate-400">Загрузка…</div>}>
+      <BookingsContent
+        upcomingOnly={upcomingOnly}
+        statusFilter={statusFilter}
+        overdueOnly={overdueOnly}
+        slaMinutes={slaMinutes}
+        initialSortBy={sp.get("sortBy") ?? undefined}
+        initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
+        initialSearch={sp.get("search") ?? undefined}
+        initialDateFrom={sp.get("dateFrom") ?? undefined}
+        initialDateTo={sp.get("dateTo") ?? undefined}
+      />
     </Suspense>
   );
 }
