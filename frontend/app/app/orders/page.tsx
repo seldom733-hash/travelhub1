@@ -1,20 +1,39 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api, type Order, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
-import Kpi from "@/components/Kpi";
+import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
 import Pagination from "@/components/Pagination";
 import OrderActionBar from "@/components/order/OrderActionBar";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
-import AggregateSummary from "@/components/AggregateSummary";
 import TableExportButton from "@/components/TableExportButton";
-import { useLocale, t, formatPrice } from "@/lib/i18n";
+import { useLocale, t, type Locale } from "@/lib/i18n";
 
+const ORDER_LIFECYCLE_STATUSES = [
+  "NEW", "IN_PROCESSING", "WAITING_FOR_DATA", "READY_FOR_BOOKING",
+  "SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "FULFILLED", "READY_TO_CLOSE",
+  "CLOSED", "CANCELLED", "PROBLEM", "SUSPENDED",
+] as const;
 
+const ORDER_PAYMENT_STATUSES = [
+  "UNPAID", "PARTIALLY_PAID", "PAID", "REFUNDED",
+] as const;
+
+function lifecycleLabel(code: string, locale: Locale): string {
+  const key = `order.status.${code}`;
+  const localized = t(key, locale);
+  return localized !== key ? localized : code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function paymentLabel(code: string, locale: Locale): string {
+  const key = `order.payment.${code}`;
+  const localized = t(key, locale);
+  return localized !== key ? localized : code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
 
 function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, initialCancelledWithin, initialPaymentFailed, initialPendingRefund, initialSortBy, initialSortDirection, initialDateFrom, initialDateTo }: { initialStatus: string; initialSearch?: string; initialPaymentStatus?: string; initialCancelledWithin?: string; initialPaymentFailed?: string; initialPendingRefund?: string; initialSortBy?: string; initialSortDirection?: SortDirection; initialDateFrom?: string; initialDateTo?: string }) {
   const locale = useLocale();
@@ -22,7 +41,9 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   const [data, setData] = useState<Page<Order> | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
   const [bookings, setBookings] = useState<{ id: string; referenceNumber: string; status: string }[]>([]);
+  const [searchDraft, setSearchDraft] = useState(initialSearch || "");
   const [search, setSearch] = useState(initialSearch || "");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [paymentStatusFilter, setPaymentStatusFilter] = useState(initialPaymentStatus);
@@ -33,7 +54,26 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   const [pendingRefund] = useState(initialPendingRefund);
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
+  // Live search with debounce
+  const onSearchChange = useCallback((value: string) => {
+    setSearchDraft(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearch(value);
+      setPage(1);
+    }, 350);
+  }, []);
+
+  const onSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      setSearch(searchDraft);
+      setPage(1);
+    }
+  }, [searchDraft]);
 
   const updateUrl = (params: Record<string, string>) => {
     const sp = new URLSearchParams(window.location.search);
@@ -49,33 +89,6 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
     updateUrl({ sortBy: field, sortDirection: direction });
   };
 
-  // Derived filter labels for display
-  const statusLabels: Record<string, string> = {
-    NEW: "Новый", IN_PROCESSING: "В обработке", WAITING_FOR_DATA: "Ожидание данных",
-    READY_FOR_BOOKING: "Готов к бронированию", SENT_TO_BOOKING: "Отправлен в бронирование",
-    PARTIALLY_FULFILLED: "Частично исполнен", FULFILLED: "Исполнен",
-    READY_TO_CLOSE: "Готов к закрытию", CLOSED: "Закрыт", CANCELLED: "Отменён",
-    PROBLEM: "Проблема", SUSPENDED: "Приостановлен",
-  };
-  const activeFilters: string[] = [];
-  if (statusFilter) {
-    const statuses = statusFilter.split(',').map(s => s.trim());
-    if (statuses.length === 1) {
-      activeFilters.push(`Статус: ${statusLabels[statuses[0]] ?? statuses[0]}`);
-    } else {
-      activeFilters.push(`Статус: ${statuses.map(s => statusLabels[s] ?? s).join(', ')}`);
-    }
-  }
-  if (paymentStatusFilter) {
-    const psLabels: Record<string, string> = { UNPAID: "Оплата: Не оплачен" };
-    activeFilters.push(psLabels[paymentStatusFilter] ?? `Оплата: ${paymentStatusFilter}`);
-  }
-  if (cancelledWithin) activeFilters.push(`Период: последние ${cancelledWithin} дн.`);
-  if (paymentFailed === "true") activeFilters.push("Платёж: Неуспешный");
-  if (pendingRefund === "true") activeFilters.push("Возврат: Ожидает обработки");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
   const load = async () => {
     setBusy(true);
     try {
@@ -86,7 +99,6 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
       if (cancelledWithin) qs.set("cancelledWithin", cancelledWithin);
       if (paymentFailed) qs.set("paymentFailed", paymentFailed);
       if (pendingRefund) qs.set("pendingRefund", pendingRefund);
-
       if (sortBy) qs.set("sortBy", sortBy);
       if (sortDirection) qs.set("sortDirection", sortDirection);
       if (dateFrom) qs.set("dateFrom", dateFrom);
@@ -107,6 +119,10 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, statusFilter, paymentStatusFilter, cancelledWithin, paymentFailed, pendingRefund, sortBy, sortDirection, page, dateFrom, dateTo]);
 
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
+
   const openDetail = async (id: string) => {
     const [order, bk] = await Promise.all([
       api.get<Order>(`/orders/${id}`),
@@ -124,17 +140,18 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
       await openDetail(selected.id);
       await load();
     } catch (e) {
-      // 403 возможен при смене роли на лету или дрейфе маппинга прав → показываем баннер
       setError((e as Error).message);
     }
   };
 
-  const counts = {
-    total: data?.total ?? 0,
-    active: data?.aggregates?.active ?? 0,
-    ready: data?.aggregates?.ready ?? 0,
-    closed: data?.aggregates?.closed ?? 0,
-  };
+  // KPI data from backend aggregates
+  const lifecycleCounts = (data?.aggregates?.lifecycle ?? {}) as Record<string, number>;
+  const paymentCounts = (data?.aggregates?.payment ?? {}) as Record<string, number>;
+  const total = data?.total ?? 0;
+
+  // Selected KPI state
+  const selectedLifecycle = statusFilter || "";
+  const selectedPayment = paymentStatusFilter || "";
 
   return (
     <div className="flex h-full">
@@ -153,20 +170,54 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
         />
 
         <div className="space-y-4 p-6">
-          <Kpi
-            items={[
-              { label: t("admin.kpi.total_orders", locale), value: counts.total, icon: "🧾" },
-              { label: t("admin.kpi.active", locale), value: counts.active, icon: "⚙️", accent: "#2563eb" },
-              { label: t("admin.kpi.ready_booking", locale), value: counts.ready, icon: "✅", accent: "#7c3aed" },
-              { label: t("admin.kpi.closed", locale), value: counts.closed, icon: "🔒", accent: "#64748b" },
-            ]}
-          />
+          {/* TOTAL KPI */}
+          <div className="grid grid-cols-1">
+            <CommerceKpiCard
+              label={t("admin.kpi.total_orders", locale)}
+              value={total}
+              active={!selectedLifecycle && !selectedPayment}
+              onClick={() => { setStatusFilter(""); setPaymentStatusFilter(""); setPage(1); updateUrl({ status: "", paymentStatus: "" }); }}
+            />
+          </div>
 
+          {/* LIFECYCLE STATUS KPI */}
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t("admin.kpi.lifecycle_statuses", locale) || "Статусы заказов"}</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              {ORDER_LIFECYCLE_STATUSES.map((code) => (
+                <CommerceKpiCard
+                  key={code}
+                  label={lifecycleLabel(code, locale)}
+                  value={lifecycleCounts[code] ?? 0}
+                  active={selectedLifecycle === code}
+                  onClick={() => { setStatusFilter(code); setPaymentStatusFilter(""); setPage(1); updateUrl({ status: code, paymentStatus: "" }); }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* PAYMENT STATUS KPI */}
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t("admin.kpi.payment_statuses", locale) || "Статусы оплаты"}</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {ORDER_PAYMENT_STATUSES.map((code) => (
+                <CommerceKpiCard
+                  key={code}
+                  label={paymentLabel(code, locale)}
+                  value={paymentCounts[code] ?? 0}
+                  active={selectedPayment === code}
+                  onClick={() => { setPaymentStatusFilter(code); setStatusFilter(""); setPage(1); updateUrl({ paymentStatus: code, status: "" }); }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Toolbar: search first, then filters */}
           <div className="flex flex-wrap items-center gap-2">
-
             <input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              value={searchDraft}
+              onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={onSearchKeyDown}
               placeholder={t("admin.search.placeholder_orders", locale)}
               className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
@@ -176,18 +227,9 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             >
               <option value="">{t("admin.filter.all_statuses", locale)}</option>
-              <option value="NEW">Новый</option>
-              <option value="IN_PROCESSING">В обработке</option>
-              <option value="WAITING_FOR_DATA">Ожидание данных</option>
-              <option value="READY_FOR_BOOKING">Готов к бронированию</option>
-              <option value="SENT_TO_BOOKING">Отправлен в бронирование</option>
-              <option value="PARTIALLY_FULFILLED">Частично исполнен</option>
-              <option value="FULFILLED">Исполнен</option>
-              <option value="READY_TO_CLOSE">Готов к закрытию</option>
-              <option value="CLOSED">Закрыт</option>
-              <option value="CANCELLED">Отменён</option>
-              <option value="PROBLEM">Проблема</option>
-              <option value="SUSPENDED">Приостановлен</option>
+              {ORDER_LIFECYCLE_STATUSES.map((s) => (
+                <option key={s} value={s}>{lifecycleLabel(s, locale)}</option>
+              ))}
             </select>
             <select
               value={paymentStatusFilter}
@@ -195,10 +237,9 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             >
               <option value="">{t("admin.filter.all_payments", locale)}</option>
-              <option value="UNPAID">Не оплачен</option>
-              <option value="PARTIALLY_PAID">Частично оплачен</option>
-              <option value="PAID">Оплачен</option>
-              <option value="REFUNDED">Возврат</option>
+              {ORDER_PAYMENT_STATUSES.map((s) => (
+                <option key={s} value={s}>{paymentLabel(s, locale)}</option>
+              ))}
             </select>
             <div className="flex items-center gap-1">
               <span className="text-xs text-slate-400">С</span>
@@ -206,15 +247,6 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               <span className="text-xs text-slate-400">По</span>
               <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
             </div>
-            {activeFilters.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {activeFilters.map((f, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                    {f}
-                  </span>
-                ))}
-              </div>
-            )}
             {busy && <span className="text-xs text-slate-400">загрузка…</span>}
             <TableExportButton
               exportUrl="/api/v1/orders/export"
@@ -228,16 +260,6 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
           </div>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
-
-          <AggregateSummary
-            totalRecords={counts.total}
-            fields={[
-              { label: t("admin.kpi.active", locale), value: counts.active },
-              { label: t("admin.kpi.ready_booking", locale), value: counts.ready },
-              { label: t("admin.kpi.closed", locale), value: counts.closed },
-            ]}
-            loading={busy}
-          />
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
@@ -255,46 +277,44 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                 <tr>
                   <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.code", locale)}</SortableHeader>
                   <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.date", locale)}</SortableHeader>
-                  <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort} >{t("admin.table.col.amount", locale)}</SortableHeader>
+                  <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.amount", locale)}</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">{t("admin.table.col.items", locale)}</th>
                   <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.status", locale)}</SortableHeader>
                   <SortableHeader field="paymentStatus" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.payment", locale)}</SortableHeader>
                   {paymentFailed === "true" && <th className="px-4 py-2.5 font-medium text-red-600">{t("admin.table.col.payment", locale)}</th>}
                   {pendingRefund === "true" && <th className="px-4 py-2.5 font-medium text-amber-600">{t("admin.table.col.refund", locale)}</th>}
-                  {cancelledWithin && <SortableHeader field="cancelledAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}> {t("admin.table.col.cancel_date", locale)} </SortableHeader>}
+                  {cancelledWithin && <SortableHeader field="cancelledAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.cancel_date", locale)}</SortableHeader>}
                 </tr>
               </thead>
               <tbody>
                 {(data?.items ?? []).map((o) => (
                   <tr
-                      key={o.id}
-                      onClick={() => { setSelected(null); router.push(`/app/orders/${o.id}`); }}
-                      className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${
-                        selected?.id === o.id ? "bg-blue-50/60" : ""
-                      }`}
-                    >
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <Link href={`/app/orders/${o.id}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-blue-600 hover:underline">{o.referenceNumber}</Link>
-                          <button
-                            title="Быстрый просмотр"
-                            onClick={(e) => { e.stopPropagation(); void openDetail(o.id); }}
-                            className="rounded p-0.5 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                          >👁</button>
-                        </div>
-                        <div className="text-xs text-slate-400">{o.number}</div>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-500">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
-                      <td className="px-4 py-2.5 font-medium text-slate-800 text-center">
-                        {formatPrice(o.amount, o.currency, locale) ?? "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-500">{o.items?.length ?? 0}</td>
-                      <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
-                      <td className="px-4 py-2.5"><StatusBadge status={o.paymentStatus} /></td>
-                      {paymentFailed === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-medium text-red-700">Неуспешный</span></td>}
-                      {pendingRefund === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">Ожидает обработки</span></td>}
-                      {cancelledWithin && <td className="px-4 py-2.5 text-xs text-slate-600">{o.cancelledAt ? new Date(o.cancelledAt).toLocaleDateString("ru-RU") : "—"}</td>}
-                    </tr>
+                    key={o.id}
+                    onClick={() => { setSelected(null); router.push(`/app/orders/${o.id}`); }}
+                    className={`cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50 ${selected?.id === o.id ? "bg-blue-50/60" : ""}`}
+                  >
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <Link href={`/app/orders/${o.id}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-blue-600 hover:underline">{o.referenceNumber}</Link>
+                        <button
+                          title="Быстрый просмотр"
+                          onClick={(e) => { e.stopPropagation(); void openDetail(o.id); }}
+                          className="rounded p-0.5 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        >👁</button>
+                      </div>
+                      <div className="text-xs text-slate-400">{o.number}</div>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("ru-RU") : "—"}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-800 text-center">
+                      {o.amount ? `${Number(o.amount).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${o.currency ?? ""}` : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-500">{o.items?.length ?? 0}</td>
+                    <td className="px-4 py-2.5"><StatusBadge status={o.status} /></td>
+                    <td className="px-4 py-2.5"><StatusBadge status={o.paymentStatus} /></td>
+                    {paymentFailed === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-medium text-red-700">Неуспешный</span></td>}
+                    {pendingRefund === "true" && <td className="px-4 py-2.5"><span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">Ожидает обработки</span></td>}
+                    {cancelledWithin && <td className="px-4 py-2.5 text-xs text-slate-600">{o.cancelledAt ? new Date(o.cancelledAt).toLocaleDateString("ru-RU") : "—"}</td>}
+                  </tr>
                 ))}
                 {(data?.items ?? []).length === 0 && (
                   <tr>
@@ -330,9 +350,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                 <StatusBadge status={selected.paymentStatus} />
               </div>
             </div>
-            <button onClick={() => setSelected(null)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100">
-              ✕
-            </button>
+            <button onClick={() => setSelected(null)} className="rounded-md p-1 text-slate-400 hover:bg-slate-100">✕</button>
           </div>
 
           <div className="space-y-5 p-5 text-sm">
@@ -347,9 +365,9 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                     </div>
                     <div className="text-right">
                       <div className="font-medium text-slate-700">
-                        {i.quantity} × {formatPrice(i.price, selected?.currency, locale) ?? "—"}
+                        {i.quantity} × {i.price ? `${Number(i.price).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${selected?.currency ?? ""}` : "—"}
                       </div>
-                      <div className="text-xs text-slate-400">{formatPrice(i.amount, selected?.currency, locale) ?? "—"}</div>
+                      <div className="text-xs text-slate-400">{i.amount ? `${Number(i.amount).toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${selected?.currency ?? ""}` : "—"}</div>
                     </div>
                   </div>
                 ))}
@@ -358,12 +376,10 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
 
             <div>
               <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Туристы</div>
-              {(selected.travelers ?? []).map((t) => (
-                <div key={t.id} className="mb-1.5 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span className="font-medium text-slate-700">
-                    {t.firstName} {t.lastName}
-                  </span>
-                  <StatusBadge status={t.dataCompleteness === "COMPLETE" ? "CONFIRMED" : "WAITING_FOR_DATA"} />
+              {(selected.travelers ?? []).map((tr) => (
+                <div key={tr.id} className="mb-1.5 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                  <span className="font-medium text-slate-700">{tr.firstName} {tr.lastName}</span>
+                  <StatusBadge status={tr.dataCompleteness === "COMPLETE" ? "CONFIRMED" : "WAITING_FOR_DATA"} />
                 </div>
               ))}
             </div>
@@ -383,8 +399,6 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
 
             <div>
               <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">Команды (actions)</div>
-              {/* D5: actions приходят из server-authoritative projection (GET /orders/:id → availableActions).
-                  Никакого client-side state-machine mapping в drawer. */}
               <OrderActionBar
                 actions={(selected as Order & { availableActions?: string[] }).availableActions ?? []}
                 onRun={(a) => void runAction(a)}

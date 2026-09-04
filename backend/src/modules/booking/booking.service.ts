@@ -239,12 +239,17 @@ export class BookingService {
       }),
       this.prisma.booking.count({ where }),
     ]);
-    // KPI aggregates
-    const [countAwaiting, countConfirmed, countCancelled] = await Promise.all([
-      this.prisma.booking.count({ where: { ...where, status: { in: ['SENT_TO_SUPPLIER', 'AWAITING_CONFIRMATION'] as any } } }),
-      this.prisma.booking.count({ where: { ...where, status: { in: ['CONFIRMED', 'IN_SERVICE', 'COMPLETED'] as any } } }),
-      this.prisma.booking.count({ where: { ...where, status: { in: ['CANCELLED', 'SUPPLIER_REJECTED'] as any } } }),
-    ]);
+    // KPI aggregates: count by every canonical booking status
+    const statusCounts = await this.prisma.booking.groupBy({
+      by: ['status'],
+      where: where as any,
+      _count: { status: true },
+    });
+    const lifecycleAgg: Record<string, number> = { total: 0 };
+    for (const c of statusCounts) {
+      lifecycleAgg[c.status] = c._count.status;
+      lifecycleAgg.total += c._count.status;
+    }
     // Enrich bookings with order referenceNumber for canonical display
     const orderIds = [...new Set(items.map(b => b.orderId).filter(Boolean))] as string[];
     const orders = orderIds.length > 0
@@ -252,7 +257,7 @@ export class BookingService {
       : [];
     const orderRefMap = new Map(orders.map(o => [o.id, o.referenceNumber]));
     const enrichedItems = items.map(b => ({ ...b, orderReference: orderRefMap.get(b.orderId) ?? null }));
-    return { items: enrichedItems, total, page, pageSize, aggregates: { awaiting: countAwaiting, confirmed: countConfirmed, cancelled: countCancelled } };
+    return { items: enrichedItems, total, page, pageSize, aggregates: { lifecycle: lifecycleAgg } };
   }
 
   /**

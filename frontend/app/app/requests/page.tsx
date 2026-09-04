@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { useLocale, t, formatPrice } from "@/lib/i18n";
+import { useLocale, t, type Locale } from "@/lib/i18n";
 import Pagination from "@/components/Pagination";
 import TableExportButton from "@/components/TableExportButton";
 import StatusBadge from "@/components/StatusBadge";
+import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
 
 interface RequestItem {
   id: string;
@@ -55,23 +56,16 @@ interface KpiData {
   cancelled_by_customer: number;
 }
 
-const STATUS_OPTIONS = [
-  "",
-  "NEW",
-  "CHECKING",
-  "PRICE_CHANGED",
-  "CONFIRMED",
-  "CONVERTED",
-  "REJECTED",
-  "UNAVAILABLE",
-  "EXPIRED",
-  "SUPPLIER_TIMEOUT",
-  "CUSTOMER_PAYMENT_TIMEOUT",
-  "CANCELLED_BY_CUSTOMER",
-];
+const REQUEST_LIFECYCLE_STATUSES = [
+  "NEW", "CHECKING", "SUPPLIER_TIMEOUT", "PRICE_CHANGED",
+  "CUSTOMER_ACCEPTED", "CONFIRMED", "CONVERTED", "REJECTED",
+  "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER",
+] as const;
 
-function statusKey(s: string) {
-  return `requests.status.${s.toLowerCase()}`;
+function requestStatusLabel(code: string, locale: Locale): string {
+  const key = `requests.kpi.${code.toLowerCase()}`;
+  const localized = t(key, locale);
+  return localized !== key ? localized : code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 }
 
 export default function RequestsPage() {
@@ -86,11 +80,35 @@ export default function RequestsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
+  const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Live search with debounce
+  const onSearchChange = useCallback((value: string) => {
+    setSearchDraft(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearch(value);
+      setPage(1);
+    }, 350);
+  }, []);
+
+  const onSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      setSearch(searchDraft);
+      setPage(1);
+    }
+  }, [searchDraft]);
+
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, statusFilter, search]);
 
   useEffect(() => {
@@ -124,14 +142,7 @@ export default function RequestsPage() {
     } catch { /* noop */ }
   }
 
-  function handleSearch() {
-    setSearch(searchInput);
-    setPage(1);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") handleSearch();
-  }
+  const selectedStatus = statusFilter || "";
 
   // Build export URL with current filters
   const exportParams = new URLSearchParams();
@@ -149,64 +160,56 @@ export default function RequestsPage() {
         <h1 className="text-2xl font-bold text-slate-900">{t("requests.title", locale)}</h1>
       </div>
 
-      {/* KPI Cards */}
+      {/* TOTAL KPI */}
       {kpi && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {([
-            ["total", "requests.kpi.all"],
-            ["new", "requests.kpi.new"],
-            ["checking", "requests.kpi.checking"],
-            ["price_changed", "requests.kpi.price_changed"],
-            ["confirmed", "requests.kpi.confirmed"],
-            ["converted", "requests.kpi.converted"],
-            ["rejected", "requests.kpi.rejected"],
-            ["unavailable", "requests.kpi.unavailable"],
-            ["expired", "requests.kpi.expired"],
-            ["supplier_timeout", "requests.kpi.supplier_timeout"],
-            ["customer_payment_timeout", "requests.kpi.customer_timeout"],
-            ["cancelled_by_customer", "requests.kpi.cancelled"],
-          ] as [string, string][]).map(([key, labelKey]) => (
-            <div
-              key={key}
-              className={`rounded-xl border px-4 py-3 text-center transition-colors ${
-                key === "total"
-                  ? "border-blue-300 bg-blue-50"
-                  : "border-slate-200 bg-white hover:border-slate-300"
-              }`}
-            >
-              <div className="text-xl font-bold text-slate-900">{kpi[key] ?? 0}</div>
-              <div className="text-xs text-slate-500">{t(labelKey, locale)}</div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1">
+          <CommerceKpiCard
+            label={t("requests.kpi.all", locale)}
+            value={kpi.total ?? 0}
+            active={!selectedStatus}
+            onClick={() => { setStatusFilter(""); setPage(1); }}
+          />
         </div>
       )}
 
-      {/* Filters */}
+      {/* STATUS KPI CARDS — one per canonical status */}
+      {kpi && (
+        <div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t("admin.kpi.request_statuses", locale) || "Статусы заявок"}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+            {REQUEST_LIFECYCLE_STATUSES.map((code) => (
+              <CommerceKpiCard
+                key={code}
+                label={requestStatusLabel(code, locale)}
+                value={kpi[code.toLowerCase()] ?? 0}
+                active={selectedStatus === code}
+                onClick={() => { setStatusFilter(code); setPage(1); }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filters: search first, no Search button */}
       <div className="flex flex-wrap items-center gap-3">
+        <input
+          value={searchDraft}
+          onChange={(e) => onSearchChange(e.target.value)}
+          onKeyDown={onSearchKeyDown}
+          placeholder="Поиск: MKT-REQ-*, имя клиента, CRM-*, название услуги, поставщик..."
+          className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        />
+
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
         >
           <option value="">Все статусы</option>
-          {STATUS_OPTIONS.filter(Boolean).map((s) => (
-            <option key={s} value={s}>{t(statusKey(s), locale)}</option>
+          {REQUEST_LIFECYCLE_STATUSES.map((s) => (
+            <option key={s} value={s}>{requestStatusLabel(s, locale)}</option>
           ))}
         </select>
-
-        <input
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Поиск: MKT-REQ-*, имя клиента, CRM-*, название услуги, поставщик..."
-          className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-        />
-        <button
-          onClick={handleSearch}
-          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-        >
-          Поиск
-        </button>
 
         <TableExportButton
           exportUrl={exportUrl}
@@ -234,7 +237,6 @@ export default function RequestsPage() {
               <th className="px-4 py-2.5 font-medium">{t("requests.supplier", locale)}</th>
               <th className="px-4 py-2.5 font-medium">{t("requests.displayed_price", locale)}</th>
               <th className="px-4 py-2.5 font-medium">{t("requests.confirmed_price", locale)}</th>
-              <th className="px-4 py-2.5 font-medium">Дата подтверждения</th>
               <th className="px-4 py-2.5 font-medium">{t("requests.service_date", locale)}</th>
               <th className="px-4 py-2.5 font-medium">Статус</th>
               <th className="px-4 py-2.5 font-medium">{t("requests.created", locale)}</th>
@@ -244,7 +246,7 @@ export default function RequestsPage() {
           <tbody>
             {requests.length === 0 && !loading && (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-400">
+                <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-400">
                   {t("requests.no_data", locale)}
                 </td>
               </tr>
@@ -277,11 +279,6 @@ export default function RequestsPage() {
                 </td>
                 <td className="px-4 py-2.5 text-slate-900">
                   {r.confirmedPrice ? `${r.confirmedPrice} ${r.confirmedCurrency ?? ""}` : "—"}
-                </td>
-                <td className="px-4 py-2.5 text-xs text-slate-500">
-                  {r.supplierRespondedAt
-                    ? new Date(r.supplierRespondedAt).toLocaleDateString()
-                    : "—"}
                 </td>
                 <td className="px-4 py-2.5 text-slate-900">
                   {r.requestedServiceDate ? new Date(r.requestedServiceDate).toLocaleDateString() : "—"}

@@ -814,7 +814,7 @@ export class OrderService {
     // deny (empty result; Storefront-коммерция не существует для этого scope,
     // invisibility-семантика как у прямых 404-ридов).
     if (isDeniedStorefrontScope(query.acquisitionSource)) {
-      return { items: [], total: 0, page, pageSize, aggregates: { active: 0, ready: 0, closed: 0 } };
+      return { items: [], total: 0, page, pageSize, aggregates: { lifecycle: {}, payment: {} } };
     }
     // R5-C1: Support comma-separated multi-status (e.g., "FULFILLED,CLOSED")
     const statusFilter = query.status
@@ -863,7 +863,7 @@ export class OrderService {
       );
       const ids = (failedPayments as any[]).map((r) => r.orderId as string);
       if (ids.length === 0) {
-        return { items: [], total: 0, page, pageSize, aggregates: { active: 0, ready: 0, closed: 0 } };
+        return { items: [], total: 0, page, pageSize, aggregates: { lifecycle: {}, payment: {} } };
       }
       where.id = { in: ids };
     }
@@ -875,7 +875,7 @@ export class OrderService {
       );
       const ids = (pendingRefunds as any[]).map((r) => r.orderId as string);
       if (ids.length === 0) {
-        return { items: [], total: 0, page, pageSize, aggregates: { active: 0, ready: 0, closed: 0 } };
+        return { items: [], total: 0, page, pageSize, aggregates: { lifecycle: {}, payment: {} } };
       }
       where.id = { in: ids };
     }
@@ -889,12 +889,29 @@ export class OrderService {
       }),
       this.prisma.order.count({ where }),
     ]);
-    // KPI aggregates: count by status across full matching dataset
-    const [countActive, countReady, countClosed] = await Promise.all([
-      this.prisma.order.count({ where: { ...where, status: { in: ['NEW', 'IN_PROCESSING', 'WAITING_FOR_DATA', 'READY_FOR_BOOKING', 'SENT_TO_BOOKING'] as any } } }),
-      this.prisma.order.count({ where: { ...where, status: 'READY_FOR_BOOKING' as any } }),
-      this.prisma.order.count({ where: { ...where, status: { in: ['CLOSED', 'CANCELLED'] as any } } }),
+    // KPI aggregates: count by every canonical lifecycle status + payment status
+    const [statusCounts, paymentCounts] = await Promise.all([
+      this.prisma.order.groupBy({
+        by: ['status'],
+        where: where as any,
+        _count: { status: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ['paymentStatus'],
+        where: where as any,
+        _count: { paymentStatus: true },
+      }),
     ]);
+
+    const lifecycleAgg: Record<string, number> = { total: 0 };
+    for (const c of statusCounts) {
+      lifecycleAgg[c.status] = c._count.status;
+      lifecycleAgg.total += c._count.status;
+    }
+    const paymentAgg: Record<string, number> = {};
+    for (const c of paymentCounts) {
+      paymentAgg[c.paymentStatus] = c._count.paymentStatus;
+    }
 
     // Step 1.17: field-level redaction — traveler PII виден только OPERATOR/ADMIN.
     return {
@@ -902,7 +919,7 @@ export class OrderService {
       total,
       page,
       pageSize,
-      aggregates: { active: countActive, ready: countReady, closed: countClosed },
+      aggregates: { lifecycle: lifecycleAgg, payment: paymentAgg },
     };
   }
 
