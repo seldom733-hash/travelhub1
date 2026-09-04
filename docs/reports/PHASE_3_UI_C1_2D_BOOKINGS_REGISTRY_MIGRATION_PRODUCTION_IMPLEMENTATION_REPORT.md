@@ -32,9 +32,9 @@ UI-C1.2C — ACCEPTED AFTER REMEDIATION R1
 BASELINE SHA: 3b12d16def817bf4c91124d3ff14adf692d7aa6c
 ```
 
-> **Corrected by the UI-C1.2D Final Git Closure micro-remediation** (release-closure only, no production change): the earlier framing of an "accepted final SHA = implementation commit" while a later clean closure HEAD exists violated the one-stage-one-canonical-SHA rule. Roles are now separated below and in §35/§36.
+> **Corrected by the UI-C1.2D Final Git Closure stages (R1, then R2)** (release-closure only, no production change): the original framing of an "accepted final SHA = implementation commit" while a later clean closure HEAD exists violated the one-stage-one-canonical-SHA rule. Roles are separated in §35/§36, and the canonical FINAL SHA is fixed by the **Final Git Closure R2** stage at the actual clean closure HEAD == origin/master.
 
-Functional implementation commit (contains **all** verified code): `8aa37739499aa2978c89219666e23ff13b2de4c8`. Canonical FINAL SHA for UI-C1.2D: the clean closure HEAD == origin/master established in §35/§36 (`c0d74da…`, verified by the Final Git Closure micro-remediation). Baseline `3b12d16…` (UI-C1.2C accepted) and pre-stage `435cdc5…` remain traceable.
+Functional implementation commit (contains **all** verified code): `8aa37739499aa2978c89219666e23ff13b2de4c8`. The canonical FINAL SHA for UI-C1.2D is the actual clean closure HEAD == origin/master recorded by the Final Git Closure R2 stage (see `PHASE_3_UI_C1_2D_FINAL_GIT_CLOSURE_R2_REPORT.md` and the R2 execution verdict); no implementation-era or intermediate documentation commit occupies that role. Baseline `3b12d16…` (UI-C1.2C accepted) and pre-stage `435cdc5…` remain traceable.
 
 ---
 
@@ -422,17 +422,13 @@ Requests and Orders modules: `git diff` empty. Pre-existing failures documented 
 
 ## 35. Git Hard Closure
 
-> Corrected by the UI-C1.2D Final Git Closure micro-remediation. The prior text claimed `HEAD == origin/master == 090a594…` while also designating the implementation commit `8aa3773…` as the accepted final SHA — two competing values, and neither equaled the actual closure HEAD. Proof re-run at remediation time:
+> Corrected by the UI-C1.2D Final Git Closure stages (R1, then R2). The original text claimed `HEAD == origin/master == 090a594…` while also designating the implementation commit `8aa3773…` as the accepted final SHA — two competing values, and neither equaled the actual closure HEAD. R1 re-ran the proof and separated the roles; the **Final Git Closure R2** stage then removed the last contradictions (the R1 proof-time listing of an untracked stage prompt and the intermediate `c0d74da…` designation, which a later documentation commit displaced). R2's closure proof is the authoritative one: literally empty porcelain, HEAD == origin/master, one FINAL SHA.
 
 ```bash
-git status --porcelain=v1      # → empty (only the user-provided stage prompt)
-git rev-parse HEAD             # → c0d74da282b3f8b5f06aac5d02afe720384fbc5a
-git rev-parse origin/master    # → c0d74da282b3f8b5f06aac5d02afe720384fbc5a
-git merge-base --is-ancestor 8aa37739499aa2978c89219666e23ff13b2de4c8 HEAD  # → exit 0
-git diff 8aa37739499aa2978c89219666e23ff13b2de4c8..HEAD --stat
+git diff --name-status 8aa37739499aa2978c89219666e23ff13b2de4c8..HEAD
 # → 10 files, all documentation/evidence (stage prompt, this report, c12d browser
 #   evidence). No production source, API, UI, spec, or test differs from the
-#   qualified implementation commit.
+#   qualified implementation commit (see Final Git Closure R2 report §7).
 ```
 
 ```text
@@ -442,9 +438,10 @@ UI-C1.2D FUNCTIONAL IMPLEMENTATION COMMIT:
 verified code; later commits touch only documentation/evidence)
 
 UI-C1.2D CANONICAL FINAL SHA:
-c0d74da282b3f8b5f06aac5d02afe720384fbc5a
-== HEAD == origin/master (clean closure state verified by the Final Git Closure
-micro-remediation; see PHASE_3_UI_C1_2D_FINAL_GIT_CLOSURE_MICRO_REMEDIATION_REPORT.md)
+= the actual clean closure HEAD == origin/master established by the Final Git
+  Closure R2 stage (see PHASE_3_UI_C1_2D_FINAL_GIT_CLOSURE_R2_REPORT.md and the
+  R2 execution verdict). Intermediate doc-only states (090a594…, 19f6d63…,
+  c0d74da…, 71d50c9…) are history and do not occupy the FINAL SHA role.
 ```
 
 Baseline `3b12d16…` remains traceable as the accepted UI-C1.2C (R1) baseline, distinct from the UI-C1.2D implementation commit and canonical FINAL SHA.
@@ -465,14 +462,14 @@ UI-C1.2 — ACCEPTED
 UI-C1.2A — ACCEPTED
 UI-C1.2B — ACCEPTED
 UI-C1.2C — ACCEPTED AFTER REMEDIATION R1
-UI-C1.2D — ACCEPTED AFTER FINAL GIT CLOSURE
+UI-C1.2D — ACCEPTED AFTER FINAL GIT CLOSURE R2
 
 UI-C1.2D IMPLEMENTATION COMMIT:
 8aa37739499aa2978c89219666e23ff13b2de4c8
 
 UI-C1.2D FINAL SHA:
-c0d74da282b3f8b5f06aac5d02afe720384fbc5a
-== HEAD == origin/master (verified by the Final Git Closure micro-remediation)
+= actual clean closure HEAD == origin/master
+(established by the Final Git Closure R2 stage — see its report and verdict)
 
 BOOKING STATUS KPI COVERAGE — 13/13 PASS
 REQUESTS KPI BEHAVIOR PARITY — PASS

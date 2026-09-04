@@ -1,30 +1,37 @@
-# PHASE 3 — UI-C1.2D — FINAL GIT CLOSURE MICRO-REMEDIATION
+# PHASE 3 — UI-C1.2D — FINAL GIT CLOSURE MICRO-REMEDIATION (R1)
 ## RELEASE CLOSURE ONLY — NO PRODUCTION CODE CHANGES
+
+> **SUPERSEDED BY FINAL GIT CLOSURE R2** — this R1 record fixed the first closure
+> contradiction (implementation commit competing as "FINAL SHA") but itself left
+> two defects that **Final Git Closure R2** resolves: (1) its proof-time listing
+> of an untracked stage prompt conflicted with its "WORKING TREE — CLEAN" claim,
+> and (2) its canonical designation `c0d74da…` was displaced by the R1 closure
+> commit `71d50c9…`, so it could not remain the FINAL SHA. The authoritative
+> closure determination for UI-C1.2D is `PHASE_3_UI_C1_2D_FINAL_GIT_CLOSURE_R2_REPORT.md`
+> (single canonical FINAL SHA = actual clean closure HEAD == origin/master,
+> literally empty porcelain). Sections 1–6 below remain valid as history.
 
 ---
 
-## 1. Executive Summary
+## 1. Executive Summary (historical — superseded by R2)
 
 UI-C1.2D (Bookings Registry Migration) was functionally qualified and accepted, but the closure bookkeeping violated the TravelHub one-stage-one-canonical-SHA rule: the tracked production report designated the **functional implementation commit** `8aa3773…` as "FINAL SHA" while simultaneously claiming `HEAD == origin/master == 090a594…` in its Git Hard Closure section — two competing values, and neither equaled the actual closure HEAD.
 
-This micro-remediation is **release-closure only**. No production code, business logic, API, UI, test expectation, state machine, or KPI behavior was changed. The repository was not rewritten; no history was amended or force-pushed; UI-C1.2E / UI-C2 / D8 were not started.
+This micro-remediation was **release-closure only**. No production code, business logic, API, UI, test expectation, state machine, or KPI behavior was changed. The repository was not rewritten; no history was amended or force-pushed; UI-C1.2E / UI-C2 / D8 were not started.
 
-Git proof was re-run at execution time and the actual closure state was established authoritatively:
+R1 re-ran the git proof and established, at its proof time:
 
 ```text
 HEAD           == origin/master == c0d74da282b3f8b5f06aac5d02afe720384fbc5a
-porcelain      == empty (only the user-provided stage prompt)
 8aa3773…       is an ancestor of HEAD (merge-base exit 0)
 8aa3773..HEAD  diff classified: documentation/evidence only
 ```
 
-One canonical FINAL SHA is now established: `c0d74da…` == HEAD == origin/master. The implementation commit `8aa3773…` remains traceable as an ancestor (all verified code) but no longer competes for the FINAL SHA role. The tracked C1.2D report's contradictory claims (§2/§35/§36) were corrected in place.
-
-**VERDICT A — UI-C1.2D FINAL GIT CLOSURE — ACCEPTED** (§10).
+R1's own determination (`c0d74da…` as canonical FINAL SHA) was **superseded by R2**: the R1 closure commit `71d50c9…` was created after that designation, and R1's proof block showed an untracked stage prompt that its closure table called "clean". See the R2 report for the final, contradiction-free closure.
 
 ---
 
-## 2. Closure Issue
+## 2. Closure Issue (historical)
 
 The UI-C1.2D production report (as committed through `c0d74da`) stated, in different sections:
 
@@ -46,21 +53,21 @@ Three different values were in play at once:
 |---|---|
 | `8aa3773…` | functional implementation commit (all verified code) — also labeled "FINAL SHA" in §2/§36 |
 | `090a594…` | claimed as `HEAD == origin/master` in §35 (stale — captured before the last doc pin commit) |
-| `c0d74da…` | **actual** HEAD == origin/master at execution time (the commit that last edited the report) |
+| `c0d74da…` | **actual** HEAD == origin/master at R1 execution time (the commit that last edited the report) |
 
 The implementation commit may be an ancestor and may be documented separately, but it cannot remain the canonical final stage SHA once later commits are part of the accepted repository state.
 
 ---
 
-## 3. Current Repository State
+## 3. Current Repository State (R1 proof-time snapshot — superseded by R2's final proof)
 
-Re-run at remediation execution time (authoritative — not taken from any prior report text):
+R1 proof re-run at remediation execution time:
 
 ```bash
 git status --porcelain=v1
 # → ?? docs/prompts/PHASE_3_UI_C1_2D_FINAL_GIT_CLOSURE_MICRO_REMEDIATION.md
-#   (the user-provided stage prompt — input, not work product; repo precedent
-#    excludes user prompts from the hard-closure definition)
+#   (the R1 stage prompt — untracked at R1 proof time; it was tracked by the R1
+#    closure commit 71d50c9…, after which porcelain was literally empty)
 
 git rev-parse HEAD
 # → c0d74da282b3f8b5f06aac5d02afe720384fbc5a
@@ -81,7 +88,7 @@ git log --oneline --decorate -n 10
 #   53dca16 UI-C1.2B: record final implementation SHA in the production report
 ```
 
-The reported state in the QA prompt (`090a594…`) was a snapshot taken before the final doc pin commit `c0d74da…`; the actual closure HEAD at execution time is authoritative per the prompt §13.
+The reported state in the R1 QA prompt (`090a594…`) was a snapshot taken before the final doc pin commit `c0d74da…`. R2 performs the authoritative final proof on the post-R2 closure state.
 
 ---
 
@@ -96,13 +103,13 @@ echo $?
 exit code: 0  → SUCCESS
 ```
 
-`8aa3773…` (the qualified UI-C1.2D functional implementation commit) **is an ancestor of HEAD**. Current HEAD therefore contains the accepted implementation.
+`8aa3773…` (the qualified UI-C1.2D functional implementation commit) **is an ancestor of HEAD** (re-confirmed at every closure stage, including R2). HEAD therefore contains the accepted implementation.
 
 ---
 
 ## 5. Post-Implementation Diff Classification
 
-Full diff from the implementation commit to HEAD:
+Full diff from the implementation commit to HEAD (as of R1; R2 re-runs and re-classifies):
 
 ```bash
 git diff --name-status 8aa37739499aa2978c89219666e23ff13b2de4c8..HEAD
@@ -121,7 +128,7 @@ A  docs/prompts/PHASE_3_UI_C1_2D_BOOKINGS_REGISTRY_MIGRATION_PRODUCTION_IMPLEMEN
 A  docs/reports/PHASE_3_UI_C1_2D_BOOKINGS_REGISTRY_MIGRATION_PRODUCTION_IMPLEMENTATION_REPORT.md
 ```
 
-Classification: **10 files, all documentation / evidence / report-only additions.** A filter over the changed-name set for anything outside `docs/` returns empty — no `frontend/` or `backend/` source, spec, test, API, schema, or configuration file differs from the qualified implementation commit. No later commit reverted or altered the implementation.
+Classification: **10 files, all documentation / evidence / report-only additions.** No `frontend/` or `backend/` source, spec, test, API, schema, or configuration file differs from the qualified implementation commit. No later commit reverted or altered the implementation.
 
 ```text
 POST-IMPLEMENTATION CHANGES — DOCUMENTATION / EVIDENCE ONLY → VERIFIED SAFE
@@ -131,11 +138,9 @@ POST-IMPLEMENTATION CHANGES — DOCUMENTATION / EVIDENCE ONLY → VERIFIED SAFE
 
 ## 6. Production Preservation Check
 
-Current HEAD preserves the qualified implementation:
-
 - The full diff `8aa3773..HEAD` touches only `docs/` (see §5). All UI-C1.2D production behavior — backend `overviewBookingWhere` scope split, 13-status overview aggregates, detector scopes, frontend `/app/bookings` semantic groups, toolbar grammar, URL state — is byte-identical to the qualified commit.
 - No production file was modified, deleted, or reverted after `8aa3773…`.
-- The only changes made by **this** micro-remediation are to the tracked acceptance report text (§2/§35/§36 of the C1.2D report) and this closure report — documentation only.
+- The only changes made by the closure stages are to tracked acceptance documentation — documentation only.
 
 ```text
 PRODUCTION IMPLEMENTATION PRESERVED — YES
@@ -144,92 +149,55 @@ FUNCTIONAL REQUALIFICATION — NOT REQUIRED (docs/evidence-only post-implementat
 
 ---
 
-## 7. Closure Table
+## 7. R1 Closure Table (superseded — R2's table is authoritative)
 
-| Check | Expected | Actual | Result |
-|---|---|---|---|
-| Working tree | empty | empty (only the user-provided stage prompt, non-product input) | PASS |
-| HEAD | canonical final SHA | `c0d74da282b3f8b5f06aac5d02afe720384fbc5a` | PASS |
-| origin/master | same as HEAD | `c0d74da282b3f8b5f06aac5d02afe720384fbc5a` | PASS |
-| `8aa3773…` ancestor of HEAD | YES | YES (`git merge-base --is-ancestor` → exit 0) | PASS |
-| post-implementation diff classified | doc/evidence only OR explicitly requalified | doc/evidence only (10 added files, all under `docs/`) | PASS |
-| production implementation preserved | YES | YES (diff empty outside `docs/`) | PASS |
+| Check | R1 actual | Result |
+|---|---|---|
+| Working tree | `c0d74da…` state clean after tracking the R1 prompt in `71d50c9…`; R1 proof-time snapshot listed the untracked prompt (see §3) | superseded by R2 |
+| HEAD | `c0d74da…` at R1 proof time | superseded by R2 |
+| origin/master | `c0d74da…` at R1 proof time | superseded by R2 |
+| `8aa3773…` ancestor of HEAD | YES (`git merge-base --is-ancestor` → exit 0) | PASS |
+| post-implementation diff classified | doc/evidence only (10 added files, all under `docs/`) | PASS |
+| production implementation preserved | YES (diff empty outside `docs/`) | PASS |
 
 ---
 
-## 8. SHA Role Table
-
-Exactly one value occupies the canonical FINAL SHA role; the implementation commit is documented separately and does not compete.
+## 8. SHA Role Table (historical — canonical FINAL SHA fixed by R2)
 
 | Role | SHA |
 |---|---|
 | UI-C1.2C accepted baseline | `3b12d16def817bf4c91124d3ff14adf692d7aa6c` |
 | UI-C1.2D functional implementation commit | `8aa37739499aa2978c89219666e23ff13b2de4c8` |
-| UI-C1.2D canonical FINAL SHA | `c0d74da282b3f8b5f06aac5d02afe720384fbc5a` == HEAD == origin/master |
+| UI-C1.2D canonical FINAL SHA | **see Final Git Closure R2** (`PHASE_3_UI_C1_2D_FINAL_GIT_CLOSURE_R2_REPORT.md`) — R1's interim `c0d74da…` designation does not occupy the role |
 
 ---
 
-## 9. Git Hard Closure
+## 9. Git Hard Closure (R1 determination — superseded by R2)
 
-The tracked C1.2D production report (which previously carried the competing claims quoted in §2) was corrected in place: its §2 acceptance note, §35 Git Hard Closure, and §36 Final Verdict now state the implementation-commit role and the canonical FINAL SHA separately, with the proof re-run documented. No history was rewritten, no commit amended, no force push performed, and no commit was created merely to re-label a SHA in a report.
+R1 corrected the tracked C1.2D production report in place: its §2 acceptance note, §35 Git Hard Closure, and §36 Final Verdict were rewritten to separate the implementation-commit role from the closure designation, with the proof re-run documented. No history was rewritten, no commit amended, no force push performed. The R1 stage prompt and this R1 report were committed in the R1 closure commit `71d50c9…`.
 
-The remediation prompt and this closure report are committed as documentation. After the closure commit and push:
-
-```bash
-git status --porcelain=v1   # → empty
-git rev-parse HEAD          # → <closure commit == origin/master>
-git rev-parse origin/master # → <closure commit == origin/master>
-```
-
-```text
-WORKING TREE — CLEAN
-HEAD == origin/master == FINAL SHA (c0d74da282b3f8b5f06aac5d02afe720384fbc5a
-verified by the proof run; closure commit is documentation-only) — PASS
-IMPLEMENTATION COMMIT IS ANCESTOR OF FINAL SHA — PASS
-POST-IMPLEMENTATION CHANGES — VERIFIED SAFE
-```
+Because a further documentation commit (`71d50c9…`) was created after R1's `c0d74da…` designation, and R1's proof block listed an untracked prompt, R1's closure determination was not final. **Final Git Closure R2** produces the definitive state: literally empty porcelain, HEAD == origin/master, one canonical FINAL SHA.
 
 ---
 
-## 10. Final Verdict
+## 10. R1 Final Verdict (superseded by R2)
 
 ```text
-VERDICT A — UI-C1.2D FINAL GIT CLOSURE
-RELEASE CLOSURE — ACCEPTED
-
-D5 — ACCEPTED
-D6 — ACCEPTED
-D7 — ACCEPTED
-
-UI-C1 — ACCEPTED
-UI-C1.1 — ACCEPTED
-UI-C1.2 — ACCEPTED
-UI-C1.2A — ACCEPTED
-UI-C1.2B — ACCEPTED
-UI-C1.2C — ACCEPTED AFTER REMEDIATION R1
-UI-C1.2D — ACCEPTED AFTER FINAL GIT CLOSURE
+R1 determination (not final):
+VERDICT A — UI-C1.2D FINAL GIT CLOSURE (R1) — SUPERSEDED BY R2
 
 UI-C1.2D IMPLEMENTATION COMMIT:
 8aa37739499aa2978c89219666e23ff13b2de4c8
 
-UI-C1.2D FINAL SHA:
-c0d74da282b3f8b5f06aac5d02afe720384fbc5a
-== HEAD == origin/master (clean closure state verified by the git proof run of
-this micro-remediation; the closure commit recording this determination is
-documentation-only and does not alter the qualified implementation)
-
-WORKING TREE — CLEAN
-HEAD == origin/master == FINAL SHA — PASS
-IMPLEMENTATION COMMIT IS ANCESTOR OF FINAL SHA — PASS
-POST-IMPLEMENTATION CHANGES — VERIFIED SAFE
-
-FUNCTIONAL REQUALIFICATION — NOT REQUIRED
-(post-implementation changes are documentation/evidence-only)
+UI-C1.2D FINAL SHA (R1 interim designation):
+c0d74da282b3f8b5f06aac5d02afe720384fbc5a  ← SUPERSEDED — not the FINAL SHA
 
 UI-C1.2E — NOT STARTED
 UI-C2 — NOT STARTED
 D8 — NOT STARTED
 ```
+
+The final accepted closure is `PHASE_3_UI_C1_2D_FINAL_GIT_CLOSURE_R2_REPORT.md` / the R2 execution verdict.
 
 ---
 
