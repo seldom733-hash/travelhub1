@@ -6,9 +6,9 @@ Round 4 обнаружил, что Storefront Order доступен через 
 
 ```
 Starting SHA:    c5b15726d1e6e2e03aa8f5f28d77b02f503e8e40
-Final SHA:       <to be filled after commit>
-origin/master:   c5b15726d1e6e2e03aa8f5f28d77b02f503e8e40
-HEAD == origin:  YES
+Final SHA:       571fd790b11569d3e92c4e11b3a9d7de70dd3e40
+origin/master:   571fd790b11569d3e92c4e11b3a9d7de70dd3e40
+HEAD == origin:  YES ✅
 ```
 
 ---
@@ -231,10 +231,10 @@ $ git status --porcelain=v1
 <NO OUTPUT>
 
 $ git rev-parse HEAD
-<40-char SHA>
+571fd790b11569d3e92c4e11b3a9d7de70dd3e40
 
 $ git rev-parse origin/master
-<same 40-char SHA>
+571fd790b11569d3e92c4e11b3a9d7de70dd3e40
 ```
 
 ---
@@ -246,7 +246,7 @@ VERDICT A — D5 STOREFRONT DIRECT-ID SECURITY REMEDIATION & FINAL CLOSURE PASSE
 
 D5 — ACCEPTED
 
-FINAL SHA: <to be filled after commit>
+FINAL SHA: 571fd790b11569d3e92c4e11b3a9d7de70dd3e40
 
 TRUE NEXT:
 D6 — BOOKING FULL-PAGE DETAIL
