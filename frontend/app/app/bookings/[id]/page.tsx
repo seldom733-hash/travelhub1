@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import EntityDetailShell from "@/components/EntityDetailShell";
+import EntitySectionCard from "@/components/commerce/EntitySectionCard";
 import OperationalNotes from "@/components/OperationalNotes";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
@@ -236,9 +237,7 @@ export default function BookingDetailPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Main content */}
           <div className="lg:col-span-2 space-y-4">
-            {/* D7 — Financial section: Booking amount + linked Order payment context */}
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("bookings.financial", locale)}</h3>
+            <EntitySectionCard title={t("bookings.financial", locale)}>
               <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-4">
                 <div className="rounded-lg bg-slate-50 px-4 py-3">
                   <div className="text-slate-400">{t("crm.detail.total_amount", locale)}</div>
@@ -285,11 +284,9 @@ export default function BookingDetailPage() {
                   <span>{t("crm.detail.payment_status", locale)}: <StatusBadge status={(booking.activePayment as any).status} /></span>
                 </div>
               )}
-            </div>
+            </EntitySectionCard>
 
-            {/* Service details */}
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("bookings.service", locale) || "Услуга"}</h3>
+            <EntitySectionCard title={t("bookings.service", locale) || "Услуга"}>
               <div className="space-y-2 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400">{t("crm.col.order", locale)}:</span>
@@ -310,12 +307,10 @@ export default function BookingDetailPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </EntitySectionCard>
 
-            {/* Passengers */}
             {booking.passengers && booking.passengers.length > 0 && (
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
-                <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("bookings.passengers", locale) || "Пассажиры"}</h3>
+              <EntitySectionCard title={t("bookings.passengers", locale) || "Пассажиры"}>
                 <div className="space-y-2">
                   {booking.passengers.map((p, i) => (
                     <div key={p.id} className="flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-2 text-xs">
@@ -326,13 +321,11 @@ export default function BookingDetailPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </EntitySectionCard>
             )}
 
-            {/* Supplier confirmations */}
             {booking.supplierConfirmations && booking.supplierConfirmations.length > 0 && (
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
-                <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">Подтверждения поставщика</h3>
+              <EntitySectionCard title="Подтверждения поставщика">
                 <div className="space-y-2">
                   {booking.supplierConfirmations.map(sc => (
                     <div key={sc.id} className="rounded-lg bg-slate-50 px-4 py-2 text-xs">
@@ -341,7 +334,7 @@ export default function BookingDetailPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </EntitySectionCard>
             )}
 
             {/* Notes */}
@@ -358,9 +351,7 @@ export default function BookingDetailPage() {
 
           {/* Sidebar: timeline + metadata */}
           <div className="space-y-4">
-            {/* Lifecycle Timeline */}
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("bookings.timeline", locale) || "Хронология"}</h3>
+            <EntitySectionCard title={t("bookings.timeline", locale) || "Хронология"}>
               <div className="space-y-3">
                 {milestones.filter(m => m.timestamp).map(m => (
                   <div key={m.key} className="flex items-start gap-3">
@@ -372,11 +363,9 @@ export default function BookingDetailPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </EntitySectionCard>
 
-            {/* Metadata */}
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("bookings.details", locale) || "Детали"}</h3>
+            <EntitySectionCard title={t("bookings.details", locale) || "Детали"}>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Код</span>
@@ -397,12 +386,10 @@ export default function BookingDetailPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </EntitySectionCard>
 
-            {/* Change History */}
             {history.length > 0 && (
-              <div className="rounded-lg border border-slate-200 bg-white p-4">
-                <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("bookings.change_history", locale) || "История изменений"}</h3>
+              <EntitySectionCard title={t("bookings.change_history", locale) || "История изменений"}>
                 <div className="space-y-3">
                   {history.map(h => (
                     <div key={h.id} className="text-xs">
@@ -417,7 +404,7 @@ export default function BookingDetailPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </EntitySectionCard>
             )}
           </div>
         </div>

@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { useLocale, t, formatPrice } from "@/lib/i18n";
 import Pagination from "@/components/Pagination";
 import TableExportButton from "@/components/TableExportButton";
+import StatusBadge from "@/components/StatusBadge";
 
 interface RequestItem {
   id: string;
@@ -67,23 +69,6 @@ const STATUS_OPTIONS = [
   "CUSTOMER_PAYMENT_TIMEOUT",
   "CANCELLED_BY_CUSTOMER",
 ];
-
-function statusColor(s: string) {
-  switch (s) {
-    case "NEW": return "bg-blue-100 text-blue-700";
-    case "CHECKING": return "bg-yellow-100 text-yellow-700";
-    case "PRICE_CHANGED": return "bg-orange-100 text-orange-700";
-    case "CONFIRMED": return "bg-green-100 text-green-700";
-    case "CONVERTED": return "bg-purple-100 text-purple-700";
-    case "REJECTED": return "bg-red-100 text-red-700";
-    case "UNAVAILABLE": return "bg-gray-100 text-gray-600";
-    case "EXPIRED": return "bg-gray-100 text-gray-500";
-    case "SUPPLIER_TIMEOUT": return "bg-red-50 text-red-600";
-    case "CUSTOMER_PAYMENT_TIMEOUT": return "bg-red-50 text-red-600";
-    case "CANCELLED_BY_CUSTOMER": return "bg-slate-100 text-slate-600";
-    default: return "bg-gray-100 text-gray-600";
-  }
-}
 
 function statusKey(s: string) {
   return `requests.status.${s.toLowerCase()}`;
@@ -155,10 +140,13 @@ export default function RequestsPage() {
   const exportUrl = `/api/v1/requests/export?${exportParams.toString()}`;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="flex h-full flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">{t("requests.title", locale)}</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t("requests.title", locale)}</h1>
       </div>
 
       {/* KPI Cards */}
@@ -180,14 +168,14 @@ export default function RequestsPage() {
           ] as [string, string][]).map(([key, labelKey]) => (
             <div
               key={key}
-              className={`rounded-lg border px-3 py-2 text-center ${
+              className={`rounded-xl border px-4 py-3 text-center transition-colors ${
                 key === "total"
-                  ? "border-blue-500/30 bg-blue-50"
-                  : "border-gray-200 bg-white"
+                  ? "border-blue-300 bg-blue-50"
+                  : "border-slate-200 bg-white hover:border-slate-300"
               }`}
             >
-              <div className="text-xl font-bold text-gray-900">{kpi[key] ?? 0}</div>
-              <div className="text-xs text-gray-500">{t(labelKey, locale)}</div>
+              <div className="text-xl font-bold text-slate-900">{kpi[key] ?? 0}</div>
+              <div className="text-xs text-slate-500">{t(labelKey, locale)}</div>
             </div>
           ))}
         </div>
@@ -198,7 +186,7 @@ export default function RequestsPage() {
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
         >
           <option value="">Все статусы</option>
           {STATUS_OPTIONS.filter(Boolean).map((s) => (
@@ -211,11 +199,11 @@ export default function RequestsPage() {
           onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Поиск: MKT-REQ-*, имя клиента, CRM-*, название услуги, поставщик..."
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400"
+          className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
         />
         <button
           onClick={handleSearch}
-          className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
+          className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
         >
           Поиск
         </button>
@@ -225,38 +213,38 @@ export default function RequestsPage() {
           label={t("export.label", locale)}
         />
 
-        {loading && <span className="text-xs text-gray-500">{t("common.loading", locale)}</span>}
+        {loading && <span className="text-xs text-slate-400">{t("common.loading", locale)}</span>}
       </div>
 
       {/* Error */}
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
           {error}
         </div>
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="w-full text-sm" style={{ minWidth: "1100px" }}>
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase text-gray-500">
-              <th className="px-4 py-3">{t("requests.ref", locale)}</th>
-              <th className="px-4 py-3">{t("requests.customer", locale)}</th>
-              <th className="px-4 py-3">{t("requests.product", locale)}</th>
-              <th className="px-4 py-3">{t("requests.supplier", locale)}</th>
-              <th className="px-4 py-3">{t("requests.displayed_price", locale)}</th>
-              <th className="px-4 py-3">{t("requests.confirmed_price", locale)}</th>
-              <th className="px-4 py-3">Дата подтверждения</th>
-              <th className="px-4 py-3">{t("requests.service_date", locale)}</th>
-              <th className="px-4 py-3">Статус</th>
-              <th className="px-4 py-3">{t("requests.created", locale)}</th>
-              <th className="px-4 py-3">{t("requests.sla_deadline", locale)}</th>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
+          <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+            <tr>
+              <th className="px-4 py-2.5 font-medium">{t("requests.ref", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">{t("requests.customer", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">{t("requests.product", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">{t("requests.supplier", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">{t("requests.displayed_price", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">{t("requests.confirmed_price", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">Дата подтверждения</th>
+              <th className="px-4 py-2.5 font-medium">{t("requests.service_date", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">Статус</th>
+              <th className="px-4 py-2.5 font-medium">{t("requests.created", locale)}</th>
+              <th className="px-4 py-2.5 font-medium">{t("requests.sla_deadline", locale)}</th>
             </tr>
           </thead>
           <tbody>
             {requests.length === 0 && !loading && (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-400">
                   {t("requests.no_data", locale)}
                 </td>
               </tr>
@@ -264,51 +252,47 @@ export default function RequestsPage() {
             {requests.map((r) => (
               <tr
                 key={r.id}
-                className="border-b border-gray-100 hover:bg-gray-50"
+                className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50"
+                onClick={() => router.push(`/app/requests/${r.id}`)}
               >
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => router.push(`/app/requests/${r.id}`)}
-                    className="font-mono text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                  >
+                <td className="px-4 py-2.5">
+                  <Link href={`/app/requests/${r.id}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-blue-600 hover:underline">
                     {r.referenceNumber}
-                  </button>
+                  </Link>
                 </td>
-                <td className="px-4 py-3 text-gray-900">
+                <td className="px-4 py-2.5 text-slate-900">
                   <div>{r.customerName || "—"}</div>
-                  {r.customerCode && <div className="text-xs text-gray-500">{r.customerCode}</div>}
+                  {r.customerCode && <div className="text-xs text-slate-400">{r.customerCode}</div>}
                 </td>
-                <td className="px-4 py-3 text-gray-900">
+                <td className="px-4 py-2.5 text-slate-900">
                   <div>{r.productName || "—"}</div>
-                  {r.productCode && <div className="text-xs text-gray-500">{r.productCode}</div>}
+                  {r.productCode && <div className="text-xs text-slate-400">{r.productCode}</div>}
                 </td>
-                <td className="px-4 py-3 text-gray-900">
+                <td className="px-4 py-2.5 text-slate-900">
                   <div>{r.partnerName || "—"}</div>
-                  {r.partnerCode && <div className="text-xs text-gray-500">{r.partnerCode}</div>}
+                  {r.partnerCode && <div className="text-xs text-slate-400">{r.partnerCode}</div>}
                 </td>
-                <td className="px-4 py-3 text-gray-900">
+                <td className="px-4 py-2.5 text-slate-900">
                   {r.displayedPrice ? `${r.displayedPrice} ${r.displayedCurrency ?? ""}` : "—"}
                 </td>
-                <td className="px-4 py-3 text-gray-900">
+                <td className="px-4 py-2.5 text-slate-900">
                   {r.confirmedPrice ? `${r.confirmedPrice} ${r.confirmedCurrency ?? ""}` : "—"}
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-500">
+                <td className="px-4 py-2.5 text-xs text-slate-500">
                   {r.supplierRespondedAt
                     ? new Date(r.supplierRespondedAt).toLocaleDateString()
                     : "—"}
                 </td>
-                <td className="px-4 py-3 text-gray-900">
+                <td className="px-4 py-2.5 text-slate-900">
                   {r.requestedServiceDate ? new Date(r.requestedServiceDate).toLocaleDateString() : "—"}
                 </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${statusColor(r.status)}`}>
-                    {t(statusKey(r.status), locale)}
-                  </span>
+                <td className="px-4 py-2.5">
+                  <StatusBadge status={r.status} />
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-500">
+                <td className="px-4 py-2.5 text-xs text-slate-500">
                   {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-500">
+                <td className="px-4 py-2.5 text-xs text-slate-500">
                   {r.supplierResponseDeadline
                     ? new Date(r.supplierResponseDeadline).toLocaleString()
                     : "—"}
@@ -327,6 +311,9 @@ export default function RequestsPage() {
         locale={locale}
         onPageChange={setPage}
       />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

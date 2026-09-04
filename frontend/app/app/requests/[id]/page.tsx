@@ -9,6 +9,8 @@ import { useCan } from "@/lib/use-can";
 import StatusBadge from "@/components/StatusBadge";
 import EntityDetailShell from "@/components/EntityDetailShell";
 import EntityDetailHeader from "@/components/EntityDetailHeader";
+import EntitySectionCard from "@/components/commerce/EntitySectionCard";
+import EntityField from "@/components/commerce/EntityField";
 
 interface RequestDetail {
   id: string;
@@ -83,12 +85,7 @@ interface RequestDetail {
 
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-xs font-medium text-gray-500 uppercase">{label}</span>
-      <span className="text-sm text-gray-900">{value || "—"}</span>
-    </div>
-  );
+  return <EntityField label={label} value={value || "—"} />;
 }
 
 function ProgressBadge({ progress, locale }: { progress: "AWAITING_TRAVELERS" | "DATA_FILLED" | "FINAL_CONFIRMED" | null; locale: "ru" | "az" | "en" }) {
@@ -216,7 +213,7 @@ export default function RequestDetailPage() {
     >
 
       {/* Main Info Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 rounded-lg border border-gray-200 bg-white p-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <InfoRow label={t("requests.customer", locale)} value={
           <>
             <span className="font-medium">{r.customerName || "—"}</span>
@@ -253,10 +250,8 @@ export default function RequestDetailPage() {
         } />
       </div>
 
-      {/* D3: Actions (platform staff — order.edit_noncritical) */}
       {(showSupplier || showCustomer || showConvert) && (
-        <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-4">
-          <div className="text-sm font-semibold text-gray-900">Действия</div>
+        <EntitySectionCard title="Действия">
           {actionMsg && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">{actionMsg}</div>
           )}
@@ -295,17 +290,16 @@ export default function RequestDetailPage() {
           )}
           {showConvert && (
             <div className="space-y-2">
-              <div className="text-xs font-medium text-gray-500 uppercase">{t("reqflow.converted_hint", locale)}</div>
+              <div className="text-xs font-medium text-slate-400 uppercase">{t("reqflow.converted_hint", locale)}</div>
               <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/convert`)} className={btn("", TONES.primary)}>
                 {busy === `/requests/${id}/convert` ? t("reqflow.busy", locale) : t("reqflow.convert_action", locale)}
               </button>
             </div>
           )}
-        </div>
+        </EntitySectionCard>
       )}
 
-      {/* D3: Linked Order + traveler progress (relation §13/§14) */}
-      <div className="rounded-lg border border-purple-200 bg-purple-50 p-6 space-y-3">
+      <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">{t("reqflow.linked_order", locale)}</h2>
         {r.convertedOrder ? (
           <>
@@ -380,9 +374,7 @@ export default function RequestDetailPage() {
         )}
       </div>
 
-      {/* Supplier SLA */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-3">
-        <h2 className="text-lg font-semibold text-gray-900">Поставщик</h2>
+      <EntitySectionCard title="Поставщик">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <InfoRow label="Дедлайн ответа" value={
             r.supplierResponseDeadline ? new Date(r.supplierResponseDeadline).toLocaleString() : "—"
@@ -398,11 +390,9 @@ export default function RequestDetailPage() {
         {r.supplierNote && (
           <InfoRow label="Примечание поставщика" value={r.supplierNote} />
         )}
-      </div>
+      </EntitySectionCard>
 
-      {/* Customer TTL */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-3">
-        <h2 className="text-lg font-semibold text-gray-900">Клиент</h2>
+      <EntitySectionCard title="Клиент">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <InfoRow label="Дедлайн клиента" value={
             r.customerActionDeadline ? new Date(r.customerActionDeadline).toLocaleString() : "—"
@@ -412,12 +402,10 @@ export default function RequestDetailPage() {
           } />
           <InfoRow label="Решение" value={r.customerDecision || "—"} />
         </div>
-      </div>
+      </EntitySectionCard>
 
-      {/* Price Change Info */}
       {(r.rejectedAt || r.rejectionReason) && (
-        <div className="rounded-lg border border-gray-200 bg-white p-6 space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900">Отклонение</h2>
+        <EntitySectionCard title="Отклонение">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <InfoRow label="Дата" value={
               r.rejectedAt ? new Date(r.rejectedAt).toLocaleString() : "—"
@@ -425,12 +413,11 @@ export default function RequestDetailPage() {
             <InfoRow label="Кем" value={r.rejectedBy || "—"} />
             <InfoRow label="Причина" value={r.rejectionReason || "—"} />
           </div>
-        </div>
+        </EntitySectionCard>
       )}
 
-      {/* Full Temporal Timeline */}
       {(r as any).timeline && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 space-y-3">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
           <h2 className="text-lg font-semibold text-gray-900">Хронология</h2>
           <div className="space-y-1">
             {(r as any).timeline.map((item: { label: string; timestamp: string | null }, idx: number) => (

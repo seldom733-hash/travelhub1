@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import EntityDetailShell from "@/components/EntityDetailShell";
+import EntitySectionCard from "@/components/commerce/EntitySectionCard";
 import OperationalNotes from "@/components/OperationalNotes";
 import TravelerCollectionPanel from "@/components/order/TravelerCollectionPanel";
 import OrderActionBar from "@/components/order/OrderActionBar";
@@ -237,9 +238,7 @@ export default function OrderDetailPage() {
     >
 
       <div className="space-y-4 text-sm">
-          {/* D7 — Financial section: authoritative projection with computed fields */}
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("bookings.financial", locale)}</h3>
+          <EntitySectionCard title={t("bookings.financial", locale)}>
             <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3 lg:grid-cols-6">
               <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.total_amount", locale)}</div><div className="font-bold text-slate-700">{formatPrice(order.amount, order.currency, locale) ?? "—"}</div></div>
               <div className="rounded-lg bg-green-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.paid_amount", locale)}</div><div className="font-medium text-green-700">{formatPrice(order.paidAmount, order.currency, locale) ?? "—"}</div></div>
@@ -248,7 +247,7 @@ export default function OrderDetailPage() {
               <div className="rounded-lg bg-blue-50 px-4 py-3"><div className="text-slate-400">{t("finance.refundable_amount", locale)}</div><div className="font-medium text-blue-700">{formatPrice(order.refundableAmount, order.currency, locale) ?? "—"}</div></div>
               <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.payment_status", locale) || "Статус оплаты"}</div><div className="font-medium text-slate-700"><StatusBadge status={order.paymentStatus} /></div></div>
             </div>
-          </div>
+          </EntitySectionCard>
 
           <div className="grid grid-cols-2 gap-3 text-xs">
             {order.customerId && (
