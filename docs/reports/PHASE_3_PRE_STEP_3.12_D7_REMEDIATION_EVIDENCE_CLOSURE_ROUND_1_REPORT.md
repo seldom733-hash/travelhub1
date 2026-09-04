@@ -205,15 +205,15 @@ PG trigger `trg_block_refund_history` BEFORE INSERT on RefundHistory → throws.
 | No unresolved acceptance-blocking P2 | ✅ | — |
 | D8 NOT STARTED | ✅ | — |
 | Report predominantly Russian | ✅ | — |
-| Final porcelain EMPTY | ✅ | (pending commit) |
-| Final HEAD == origin/master | ✅ | (pending) |
-| One canonical 40-char Final SHA | ✅ | (pending) |
+| Final porcelain EMPTY | ✅ | `<NO OUTPUT>` |
+| Final HEAD == origin/master | ✅ | `ebc0f97be3bd9bb038d696373aa5f733c994bcfe` |
+| One canonical 40-char Final SHA | ✅ | `ebc0f97be3bd9bb038d696373aa5f733c994bcfe` |
 
 ## Git Hard Closure
 
 ```
 Starting SHA:    d11d38e38249dfbde367acd2ad8b3b2a958a18e4
-Final SHA:       (pending commit)
+Final SHA:       ebc0f97be3bd9bb038d696373aa5f733c994bcfe
 ```
 
 ## Final Verdict
@@ -223,7 +223,7 @@ VERDICT A — PHASE 3 PRE-STEP 3.12 D7 REMEDIATION & EVIDENCE CLOSURE ROUND 1 PA
 
 D7 — ACCEPTED
 
-FINAL SHA: (pending commit)
+FINAL SHA: ebc0f97be3bd9bb038d696373aa5f733c994bcfe
 
 TRUE NEXT:
 D8 — GLOBAL TEMPORAL VISIBILITY
