@@ -22,6 +22,8 @@ interface OrderDetail {
   amount: string;
   paidAmount: string;
   refundedAmount: string;
+  dueAmount: string;
+  refundableAmount: string;
   currency: string;
   customerId: string | null;
   sellerPartnerId: string | null;
@@ -238,8 +240,8 @@ export default function OrderDetailPage() {
               <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.total_amount", locale)}</div><div className="font-bold text-slate-700">{formatPrice(order.amount, order.currency, locale) ?? "—"}</div></div>
               <div className="rounded-lg bg-green-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.paid_amount", locale)}</div><div className="font-medium text-green-700">{formatPrice(order.paidAmount, order.currency, locale) ?? "—"}</div></div>
               <div className="rounded-lg bg-red-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.refunded_amount", locale)}</div><div className="font-medium text-red-700">{formatPrice(order.refundedAmount, order.currency, locale) ?? "—"}</div></div>
-              <div className="rounded-lg bg-amber-50 px-4 py-3"><div className="text-slate-400">{t("finance.due_amount", locale)}</div><div className="font-medium text-amber-700">{formatPrice(Math.max(0, Number(order.amount) - Number(order.paidAmount)).toFixed(2), order.currency, locale) ?? "—"}</div></div>
-              <div className="rounded-lg bg-blue-50 px-4 py-3"><div className="text-slate-400">{t("finance.refundable_amount", locale)}</div><div className="font-medium text-blue-700">{formatPrice(Math.max(0, Number(order.paidAmount) - Number(order.refundedAmount)).toFixed(2), order.currency, locale) ?? "—"}</div></div>
+              <div className="rounded-lg bg-amber-50 px-4 py-3"><div className="text-slate-400">{t("finance.due_amount", locale)}</div><div className="font-medium text-amber-700">{formatPrice(order.dueAmount, order.currency, locale) ?? "—"}</div></div>
+              <div className="rounded-lg bg-blue-50 px-4 py-3"><div className="text-slate-400">{t("finance.refundable_amount", locale)}</div><div className="font-medium text-blue-700">{formatPrice(order.refundableAmount, order.currency, locale) ?? "—"}</div></div>
               <div className="rounded-lg bg-slate-50 px-4 py-3"><div className="text-slate-400">{t("crm.detail.payment_status", locale) || "Статус оплаты"}</div><div className="font-medium text-slate-700"><StatusBadge status={order.paymentStatus} /></div></div>
             </div>
           </div>

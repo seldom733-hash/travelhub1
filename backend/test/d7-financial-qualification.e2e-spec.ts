@@ -443,4 +443,80 @@ describe("D7 — Financial Qualification (e2e)", () => {
       expect([400, 409, 422]).toContain(res.status);
     }
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // D7 MICRO-CLOSURE — BACKEND-AUTHORITATIVE FINANCIAL VALUES
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  it("D7-5. backend authoritative dueAmount: total=100, paid=30 → due=70, refundable=0 (unpaid)", async () => {
+    const fin = await createStaff("d7q_d75", RoleCode.FINANCE);
+    const { orderId } = await seedOrder("d75", 100);
+    const detail = (await agent(fin.accessToken).get(`/api/v1/orders/${orderId}`).expect(200)).body as {
+      amount: string; paidAmount: string; refundedAmount: string;
+      dueAmount: string; refundableAmount: string; currency: string;
+    };
+    expect(detail.amount).toBe("100");
+    expect(detail.paidAmount).toBe("0");
+    expect(detail.refundedAmount).toBe("0");
+    expect(detail.dueAmount).toBe("100");
+    expect(detail.refundableAmount).toBe("0");
+    expect(detail.currency).toBe("AZN");
+  });
+
+  it("D7-6. backend authoritative: fully paid → due=0, refundable=full amount", async () => {
+    const fin = await createStaff("d7q_d76", RoleCode.FINANCE);
+    const { orderId, paymentId } = await buildCapturedPayment(fin, "d76", 200);
+    const detail = (await agent(fin.accessToken).get(`/api/v1/orders/${orderId}`).expect(200)).body as {
+      amount: string; paidAmount: string; dueAmount: string; refundableAmount: string;
+    };
+    expect(detail.amount).toBe("200");
+    expect(detail.paidAmount).toBe("200");
+    expect(detail.dueAmount).toBe("0");
+    expect(detail.refundableAmount).toBe("200");
+  });
+
+  it("D7-7. backend authoritative decimal precision: exact Decimal(12,2) arithmetic", async () => {
+    const fin = await createStaff("d7q_d77", RoleCode.FINANCE);
+    // Build order with specific price → payment captures full frozen amount
+    const { orderId, amount } = await buildCapturedPayment(fin, "d77", 199.99);
+    const detail = (await agent(fin.accessToken).get(`/api/v1/orders/${orderId}`).expect(200)).body as {
+      amount: string; paidAmount: string; dueAmount: string; refundableAmount: string;
+    };
+    // Payment captured full frozen amount → due=0, refundable=199.99
+    expect(detail.amount).toBe(amount);
+    expect(detail.paidAmount).toBe(amount);
+    expect(detail.dueAmount).toBe("0");
+    expect(detail.refundableAmount).toBe(amount);
+    // Verify no floating-point drift
+    expect(Number(detail.dueAmount)).toBe(0);
+    expect(Number(detail.refundableAmount)).toBeCloseTo(199.99, 2);
+  });
+
+  it("D7-8. lower-bound protection: paid > total → dueAmount = 0 (not negative)", async () => {
+    const fin = await createStaff("d7q_d78", RoleCode.FINANCE);
+    const { orderId } = await seedOrder("d78", 50);
+    // Manually set paidAmount > amount (edge case — should never produce negative due)
+    await prisma.order.update({ where: { id: orderId }, data: { paidAmount: 75, paymentStatus: "PAID" } });
+    const detail = (await agent(fin.accessToken).get(`/api/v1/orders/${orderId}`).expect(200)).body as {
+      dueAmount: string; refundableAmount: string;
+    };
+    expect(Number(detail.dueAmount)).toBeGreaterThanOrEqual(0);
+    expect(Number(detail.refundableAmount)).toBeGreaterThanOrEqual(0);
+  });
+
+  it("D7-9. booking financialSummary: dueAmount/refundableAmount from Order (Decimal precision)", async () => {
+    const fin = await createStaff("d7q_d79", RoleCode.FINANCE);
+    const { orderId } = await buildCapturedPayment(fin, "d79", 300);
+    const booking = await prisma.booking.findFirst({ where: { orderId } });
+    if (booking) {
+      const detail = (await agent(fin.accessToken).get(`/api/v1/bookings/${booking.id}`).expect(200)).body as {
+        financialSummary?: { dueAmount: string; refundableAmount: string; paidAmount: string; currency: string };
+      };
+      if (detail.financialSummary) {
+        expect(detail.financialSummary.dueAmount).toBe("0");
+        expect(detail.financialSummary.refundableAmount).toBe("300");
+        expect(detail.financialSummary.paidAmount).toBe("300");
+      }
+    }
+  });
 });

@@ -1113,12 +1113,20 @@ export class OrderService {
     });
 
     // Step 1.17: field-level redaction — traveler PII виден только OPERATOR/ADMIN.
+    // D7 micro-closure: backend-authoritative derived financial values (Decimal precision)
+    const totalAmt = new Prisma.Decimal(order.amount ?? 0);
+    const paidAmt = new Prisma.Decimal(order.paidAmount ?? 0);
+    const refundedAmt = new Prisma.Decimal(order.refundedAmount ?? 0);
+    const dueAmount = Prisma.Decimal.max(new Prisma.Decimal(0), totalAmt.minus(paidAmt));
+    const refundableAmount = Prisma.Decimal.max(new Prisma.Decimal(0), paidAmt.minus(refundedAmt));
     return {
       ...order,
       travelers: redactTravelersPii(order.travelers ?? [], viewer),
       customerDisplayName: customerDisplay?.displayName ?? null,
       partnerDisplayName: partnerDisplay?.displayName ?? null,
       availableActions,
+      dueAmount: dueAmount.toString(),
+      refundableAmount: refundableAmount.toString(),
       linkedRequest: linkedRequest ?? null,
       linkedBooking: linkedBooking ?? null,
     };

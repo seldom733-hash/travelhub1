@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { Prisma } from "../../generated/prisma/client";
+import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { NotFoundError } from "../../shared/errors";
 import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
@@ -80,16 +80,18 @@ export class BookingQueryService {
         },
       });
       if (order) {
-        const paid = Number(order.paidAmount);
-        const refunded = Number(order.refundedAmount);
-        const total = Number(order.amount);
+        const totalAmt = new Prisma.Decimal(order.amount ?? 0);
+        const paidAmt = new Prisma.Decimal(order.paidAmount ?? 0);
+        const refundedAmt = new Prisma.Decimal(order.refundedAmount ?? 0);
+        const dueAmount = Prisma.Decimal.max(new Prisma.Decimal(0), totalAmt.minus(paidAmt));
+        const refundableAmount = Prisma.Decimal.max(new Prisma.Decimal(0), paidAmt.minus(refundedAmt));
         financialSummary = {
           totalAmount: order.amount,
           paidAmount: order.paidAmount,
           refundedAmount: order.refundedAmount,
-          dueAmount: Math.max(0, total - paid).toFixed(2),
-          refundableAmount: Math.max(0, paid - refunded).toFixed(2),
-          netCollected: Math.max(0, paid - refunded).toFixed(2),
+          dueAmount: dueAmount.toString(),
+          refundableAmount: refundableAmount.toString(),
+          netCollected: refundableAmount.toString(),
           currency: order.currency,
           paymentStatus: order.paymentStatus,
           orderStatus: order.status,
