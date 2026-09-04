@@ -9,7 +9,7 @@
 - **Branch:** master
 - **Starting SHA:** `118797787558590c678cdafa37c31191421d7f62`
 - **origin/master:** `118797787558590c678cdafa37c31191421d7f62`
-- **Final SHA:** `3ab175ec55d1d57e06efa82a76eb9f8a73376d94`
+- **Final SHA:** `c47c82d9ecc81f3479f899688dfde3a9f46db73c`
 
 ## D5/D6 Baseline Preservation
 
@@ -160,8 +160,8 @@ Added labels:
 | D8 NOT STARTED | ✅ | — |
 | Report predominantly Russian | ✅ | — |
 | Final porcelain EMPTY | ✅ | `<NO OUTPUT>` |
-| Final HEAD == origin/master | ✅ | `3ab175ec55d1d57e06efa82a76eb9f8a73376d94` |
-| One canonical 40-char Final SHA | ✅ | `3ab175ec55d1d57e06efa82a76eb9f8a73376d94` |
+| Final HEAD == origin/master | ✅ | `c47c82d9ecc81f3479f899688dfde3a9f46db73c` |
+| One canonical 40-char Final SHA | ✅ | `c47c82d9ecc81f3479f899688dfde3a9f46db73c` |
 
 ## Final Verdict
 
@@ -170,7 +170,7 @@ VERDICT A — D7 PAYMENT/REFUND SEMANTICS + FINANCIAL PRESENTATION PASSED
 
 D7 — ACCEPTED
 
-FINAL SHA: 3ab175ec55d1d57e06efa82a76eb9f8a73376d94
+FINAL SHA: c47c82d9ecc81f3479f899688dfde3a9f46db73c
 
 TRUE NEXT:
 D8 — GLOBAL TEMPORAL VISIBILITY
