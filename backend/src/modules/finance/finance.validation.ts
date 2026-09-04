@@ -515,6 +515,26 @@ export class PaymentListQueryDto {
   @MaxLength(32)
   status?: string;
 
+  /** UI-C1.2E — canonical PaymentStatus KPI-card dimension (table-only filter). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  paymentStatus?: string;
+
+  /** UI-C1.2E — RefundStatus KPI-card dimension (table-only filter; refunds of
+   *  payments in scope via the canonical Refund.paymentId relation). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  refundStatus?: string;
+
+  /** UI-C1.2E — operational search (payment code/referenceNumber/providerRef +
+   *  matching order code/referenceNumber); scopes table AND overview. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  search?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(8)

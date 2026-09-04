@@ -269,6 +269,9 @@ export class FinanceController {
     const { rows } = await this.payments.exportPayments({
       orderId: query.orderId,
       status: query.status,
+      paymentStatus: query.paymentStatus,
+      refundStatus: query.refundStatus,
+      search: query.search,
       currency: query.currency,
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
