@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useRef, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { useLocale, t, type Locale } from "@/lib/i18n";
+import { useLocale, t, LOCALE_TAGS, type Locale } from "@/lib/i18n";
 import Pagination from "@/components/Pagination";
 import TableExportButton from "@/components/TableExportButton";
 import StatusBadge from "@/components/StatusBadge";
@@ -63,56 +63,164 @@ interface KpiData {
   cancelled_by_customer: number;
 }
 
+/**
+ * UI-C1.2B — canonical Requests status overview (ADR-OPS-015).
+ *
+ * All 12 ACTUAL RequestStatus enum values are visible as KPI cards
+ * (RequestStatus source of truth, UI-C1.2 §7/§13). Order = enum declaration
+ * order from the C1.2 audit — NOT alphabetical, NOT a lifecycle flow
+ * (Requests registry cards, not Orders lifecycle chain cards).
+ */
 const REQUEST_LIFECYCLE_STATUSES = [
-  "NEW", "CHECKING", "SUPPLIER_TIMEOUT", "PRICE_CHANGED",
-  "CUSTOMER_ACCEPTED", "CONFIRMED", "CONVERTED", "REJECTED",
-  "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER",
+  "NEW",
+  "CHECKING",
+  "SUPPLIER_TIMEOUT",
+  "PRICE_CHANGED",
+  "CUSTOMER_ACCEPTED",
+  "CONFIRMED",
+  "CONVERTED",
+  "REJECTED",
+  "UNAVAILABLE",
+  "EXPIRED",
+  "CUSTOMER_PAYMENT_TIMEOUT",
+  "CANCELLED_BY_CUSTOMER",
 ] as const;
 
+/**
+ * One canonical localized label per Request status (UI-C1.2B §19):
+ * KPI card label = filter option = table badge = Help label all resolve
+ * through requests.kpi.<status> — the exact label source bound in the
+ * UI-C1.2 visual-composition micro-closure coverage matrix.
+ */
 function requestStatusLabel(code: string, locale: Locale): string {
   const key = `requests.kpi.${code.toLowerCase()}`;
   const localized = t(key, locale);
-  return localized !== key ? localized : code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  return localized !== key ? localized : code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export default function RequestsPage() {
+/** Locale-aware table cell formatting (RU/AZ/EN via BCP-47 tags). */
+function fmtDate(iso: string | null, locale: Locale): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(LOCALE_TAGS[locale]);
+}
+
+function fmtDateTime(iso: string | null, locale: Locale): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString(LOCALE_TAGS[locale]);
+}
+
+/**
+ * UI-C1.2B — Requests registry with URL-state synchronization.
+ *
+ * Canonical query params (ADR-OPS-012 subset actually implemented — the
+ * Requests list endpoint has NO sort allowlist and KPI parity for period is
+ * absent, so no sort/date params exist):
+ *
+ *   ?search=&status=&page=
+ *
+ * - status cards / select set ?status= (server-side registry fetch, page → 1);
+ * - Total card click clears ?status= (page → 1);
+ * - debounced search syncs ?search=;
+ * - Reset clears search+status+page and normalizes the URL;
+ * - reload / direct URL / browser Back-Forward restore state from the URL;
+ * - no date/period params: KPI endpoint stays global (UI-C1.2 §26 option A —
+ *   the Requests date filter is intentionally hidden until KPI scope parity,
+ *   which is staged to UI-C1.2E). UI-C1.2B §11.
+ */
+function RequestsContent({
+  initialStatus,
+  initialSearch,
+  initialPage,
+}: {
+  initialStatus: string;
+  initialSearch: string;
+  initialPage: number;
+}) {
   const locale = useLocale();
   const router = useRouter();
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(initialPage || 1);
   const [pageSize] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [searchDraft, setSearchDraft] = useState("");
-  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState(initialStatus || "");
+  const [searchDraft, setSearchDraft] = useState(initialSearch || "");
+  const [search, setSearch] = useState(initialSearch || "");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Live search with debounce
-  const onSearchChange = useCallback((value: string) => {
-    setSearchDraft(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setSearch(value);
-      setPage(1);
-    }, 350);
-  }, []);
+  // ── URL-state writes (replaceState — ADR-OPS-012: filter changes rewrite the
+  // current history entry; Back/Forward stays for route navigation) ──────────
+  const updateUrl = useCallback(
+    (params: { search?: string; status?: string; page?: string }) => {
+      const sp = new URLSearchParams(window.location.search);
+      const apply = (key: string, value: string | undefined) => {
+        if (value) sp.set(key, value);
+        else sp.delete(key);
+      };
+      apply("search", params.search);
+      apply("status", params.status);
+      apply("page", params.page);
+      const qs = sp.toString();
+      window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+    },
+    [],
+  );
 
-  const onSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && debounceRef.current) {
-      clearTimeout(debounceRef.current);
-      setSearch(searchDraft);
-      setPage(1);
-    }
-  }, [searchDraft]);
+  // Live search with debounce — search reflected in URL after commit.
+  const onSearchChange = useCallback(
+    (value: string) => {
+      setSearchDraft(value);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        setSearch(value);
+        setPage(1);
+        updateUrl({ search: value || undefined, page: undefined });
+      }, 350);
+    },
+    [updateUrl],
+  );
+
+  const onSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        setSearch(searchDraft);
+        setPage(1);
+        updateUrl({ search: searchDraft || undefined, page: undefined });
+      }
+    },
+    [searchDraft, updateUrl],
+  );
 
   useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, []);
 
+  // Apply a canonical status (KPI card click or filter select). Server-side.
+  const applyStatus = useCallback(
+    (code: string) => {
+      setStatusFilter(code);
+      setPage(1);
+      updateUrl({ status: code || undefined, page: undefined });
+    },
+    [updateUrl],
+  );
+
+  // Reset — clears search + status, page → 1, URL normalized.
+  const handleReset = useCallback(() => {
+    setSearchDraft("");
+    setSearch("");
+    setStatusFilter("");
+    setPage(1);
+    updateUrl({ search: undefined, status: undefined, page: undefined });
+  }, [updateUrl]);
+
+  // Server-side registry fetch under the active query scope (status + search).
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -131,7 +239,7 @@ export default function RequestsPage() {
       params.set("pageSize", String(pageSize));
       if (statusFilter) params.set("status", statusFilter);
       if (search) params.set("search", search);
-      const d = await api.get(`/requests?${params.toString()}`) as any;
+      const d = (await api.get(`/requests?${params.toString()}`)) as any;
       setRequests(d.data);
       setTotal(d.total);
       setTotalPages(d.totalPages);
@@ -146,12 +254,19 @@ export default function RequestsPage() {
     try {
       const d: any = await api.get("/requests/kpi");
       setKpi(d);
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }
 
   const selectedStatus = statusFilter || "";
+  const filtersActive = Boolean(statusFilter || search);
+  const pageChange = (p: number) => {
+    setPage(p);
+    updateUrl({ page: p > 1 ? String(p) : undefined });
+  };
 
-  // Build export URL with current filters
+  // Build export URL with current filters (search/status server-side scope)
   const exportParams = new URLSearchParams();
   if (statusFilter) exportParams.set("status", statusFilter);
   if (search) exportParams.set("search", search);
@@ -168,56 +283,73 @@ export default function RequestsPage() {
               label={t("requests.kpi.total", locale)}
               value={kpi.total ?? 0}
               active={!selectedStatus}
-              onClick={() => { setStatusFilter(""); setPage(1); }}
+              onClick={() => {
+                setStatusFilter("");
+                setPage(1);
+                updateUrl({ status: undefined, page: undefined });
+              }}
             />
           </div>
         )}
 
-        {/* STATUS KPI CARDS — one per canonical status */}
+        {/* STATUS KPI CARDS — one visible card per canonical status (12/12) */}
         {kpi && (
           <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t("admin.kpi.request_statuses", locale) || "Статусы заявок"}</div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t("admin.kpi.request_statuses", locale) || "Статусы заявок"}
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
               {REQUEST_LIFECYCLE_STATUSES.map((code) => (
                 <CommerceKpiCard
                   key={code}
                   label={requestStatusLabel(code, locale)}
                   value={kpi[code.toLowerCase()] ?? 0}
                   active={selectedStatus === code}
-                  onClick={() => { setStatusFilter(code); setPage(1); }}
+                  onClick={() => applyStatus(code)}
                 />
               ))}
             </div>
           </div>
         )}
 
-        {/* Toolbar: search first, no Search button */}
+        {/* Toolbar — canonical visible order: [Search][Status][Reset][CSV][XLSX].
+            No date/period control: Requests KPI stays global (UI-C1.2B §11/§12). */}
         <OperationsToolbarSlot>
           <input
             value={searchDraft}
             onChange={(e) => onSearchChange(e.target.value)}
             onKeyDown={onSearchKeyDown}
             placeholder={t("requests.search_placeholder", locale)}
+            aria-label={t("requests.search_placeholder", locale)}
             className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
 
           <select
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            onChange={(e) => applyStatus(e.target.value)}
+            aria-label={t("admin.filter.all_statuses", locale)}
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           >
             <option value="">{t("admin.filter.all_statuses", locale)}</option>
             {REQUEST_LIFECYCLE_STATUSES.map((s) => (
-              <option key={s} value={s}>{requestStatusLabel(s, locale)}</option>
+              <option key={s} value={s}>
+                {requestStatusLabel(s, locale)}
+              </option>
             ))}
           </select>
 
-          <TableExportButton
-            exportUrl={exportUrl}
-            label={t("export.label", locale)}
-          />
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={!filtersActive}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {t("filters.reset", locale)}
+          </button>
 
           {loading && <span className="text-xs text-slate-400">{t("common.loading", locale)}</span>}
+
+          <TableExportButton exportUrl={exportUrl} label={t("export.label", locale)} />
         </OperationsToolbarSlot>
 
         {/* Error */}
@@ -238,14 +370,17 @@ export default function RequestsPage() {
                   <th className="px-4 py-2.5 font-medium">{t("requests.displayed_price", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("requests.confirmed_price", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("requests.service_date", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">Статус</th>
+                  <th className="px-4 py-2.5 font-medium">{t("admin.table.col.status", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("requests.created", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("requests.sla_deadline", locale)}</th>
                 </tr>
               </thead>
               <tbody>
                 {requests.length === 0 && !loading && (
-                  <OperationsEmptyState colSpan={10} message={t("requests.no_data", locale)} />
+                  <OperationsEmptyState
+                    colSpan={10}
+                    message={filtersActive ? t("ops.empty_no_results", locale) : t("requests.no_data", locale)}
+                  />
                 )}
                 {requests.map((r) => (
                   <tr
@@ -254,7 +389,11 @@ export default function RequestsPage() {
                     onClick={() => router.push(`/app/requests/${r.id}`)}
                   >
                     <td className="px-4 py-2.5">
-                      <Link href={`/app/requests/${r.id}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-blue-600 hover:underline">
+                      <Link
+                        href={`/app/requests/${r.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-mono text-xs text-blue-600 hover:underline"
+                      >
                         {r.referenceNumber}
                       </Link>
                     </td>
@@ -276,36 +415,48 @@ export default function RequestsPage() {
                     <td className="px-4 py-2.5 text-slate-900">
                       {r.confirmedPrice ? `${r.confirmedPrice} ${r.confirmedCurrency ?? ""}` : "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-900">
-                      {r.requestedServiceDate ? new Date(r.requestedServiceDate).toLocaleDateString() : "—"}
-                    </td>
+                    <td className="px-4 py-2.5 text-slate-900">{fmtDate(r.requestedServiceDate, locale)}</td>
                     <td className="px-4 py-2.5">
-                      <StatusBadge status={r.status} />
+                      <StatusBadge status={r.status} label={requestStatusLabel(r.status, locale)} />
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">
-                      {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">
-                      {r.supplierResponseDeadline
-                        ? new Date(r.supplierResponseDeadline).toLocaleString()
-                        : "—"}
-                    </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500">{fmtDate(r.createdAt, locale)}</td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500">{fmtDateTime(r.supplierResponseDeadline, locale)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
+          {total > 0 && (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              locale={locale}
+              onPageChange={pageChange}
+            />
+          )}
         </OperationsRegistrySlot>
-
-        {/* Pagination */}
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          locale={locale}
-          onPageChange={setPage}
-        />
       </div>
     </OperationsCenterShell>
+  );
+}
+
+function RequestsWithParams() {
+  const sp = useSearchParams();
+  const rawPage = parseInt(sp.get("page") ?? "", 10);
+  return (
+    <RequestsContent
+      initialStatus={sp.get("status") ?? ""}
+      initialSearch={sp.get("search") ?? ""}
+      initialPage={Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1}
+    />
+  );
+}
+
+export default function RequestsPage() {
+  return (
+    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+      <RequestsWithParams />
+    </Suspense>
   );
 }

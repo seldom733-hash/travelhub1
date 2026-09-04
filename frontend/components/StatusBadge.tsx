@@ -174,10 +174,13 @@ const SUPPORT_STATUS_CLS: Record<string, string> = {
   CLOSED: "bg-slate-100 text-slate-500 border-slate-200",
 };
 
-export default function StatusBadge({ status }: { status: string }) {
+export default function StatusBadge({ status, label: labelOverride }: { status: string; label?: string }) {
   const locale = useLocale();
   const i18nKey = STATUS_I18N_KEY[status] ?? SUPPORT_STATUS_I18N[status];
-  const label = i18nKey ? t(i18nKey, locale) : status;
+  // Optional label override: lets a registry bind the badge text to its own
+  // canonical label source (UI-C1.2B §19 — Requests registry unifies the table
+  // badge with the KPI card / filter label on requests.kpi.*).
+  const label = labelOverride ?? (i18nKey ? t(i18nKey, locale) : status);
   const cls = STATUS_CLS[status] ?? SUPPORT_STATUS_CLS[status] ?? "bg-slate-100 text-slate-600 border-slate-200";
 
   return (

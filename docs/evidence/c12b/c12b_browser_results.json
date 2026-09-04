@@ -1,0 +1,182 @@
+{
+  "total": 29,
+  "passed": 29,
+  "results": [
+    {
+      "name": "login (admin → platform app)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/dashboard"
+    },
+    {
+      "name": "shell title «Центр операций» + Requests active tab",
+      "ok": true,
+      "detail": "active=Заявки tabs=4"
+    },
+    {
+      "name": "Total KPI card «Всего заявок» present",
+      "ok": true,
+      "detail": "Всего заявок646"
+    },
+    {
+      "name": "all 12 status KPI cards visible",
+      "ok": true,
+      "detail": "count=12"
+    },
+    {
+      "name": "no raw enum labels on KPI cards",
+      "ok": true,
+      "detail": "[\"Новые\", \"На проверке\", \"Таймаут поставщика\", \"Ожидают решения\", \"Принята клиентом\", \"Подтверждены\", \"Конвертированы\", \"Отклонены\", \"Недоступны\", \"Истекли\", \"Таймаут оплаты клиента\", \"Отменена клиентом\"]"
+    },
+    {
+      "name": "no period/date control (KPI parity absent → hidden)",
+      "ok": true,
+      "detail": "date inputs=0"
+    },
+    {
+      "name": "Reset button present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "table badges are localized (no raw enum)",
+      "ok": true,
+      "detail": "[\"Конвертированы\", \"\", \"Конвертированы\", \"\", \"Конвертированы\"]"
+    },
+    {
+      "name": "card click writes ?status=CHECKING",
+      "ok": true,
+      "detail": "http://localhost:3000/app/requests?status=CHECKING"
+    },
+    {
+      "name": "selected KPI card is communicated (aria-pressed)",
+      "ok": true,
+      "detail": "На проверке22"
+    },
+    {
+      "name": "table refetched under server scope after click",
+      "ok": true,
+      "detail": "table chars=1702"
+    },
+    {
+      "name": "reload restores ?status=CHECKING selection",
+      "ok": true,
+      "detail": "selected=На проверке22"
+    },
+    {
+      "name": "debounced search writes ?search= to URL",
+      "ok": true,
+      "detail": "http://localhost:3000/app/requests?search=REQ-"
+    },
+    {
+      "name": "Reset clears search/status and normalizes URL",
+      "ok": true,
+      "detail": "http://localhost:3000/app/requests"
+    },
+    {
+      "name": "Reset returns to unselected Total overview",
+      "ok": true,
+      "detail": "Всего заявок646"
+    },
+    {
+      "name": "browser Back restores /app/requests?status=NEW",
+      "ok": true,
+      "detail": "http://localhost:3000/app/requests?status=NEW"
+    },
+    {
+      "name": "Back restores the selected KPI card (NEW)",
+      "ok": true,
+      "detail": "selected=Новые26"
+    },
+    {
+      "name": "locale ru: shell + total render localized (Всего заявок)",
+      "ok": true,
+      "detail": "h1=Центр операций total=True"
+    },
+    {
+      "name": "locale ru: no raw translation keys in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "locale en: shell + total render localized (Total requests)",
+      "ok": true,
+      "detail": "h1=Operations Center total=True"
+    },
+    {
+      "name": "locale en: no raw translation keys in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "locale az: shell + total render localized (Cəmi sorğular)",
+      "ok": true,
+      "detail": "h1=Əməliyyat Mərkəzi total=True"
+    },
+    {
+      "name": "locale az: no raw translation keys in DOM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "responsive @ 390px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive @ 390px: 12 status cards remain in grid",
+      "ok": true,
+      "detail": "cards=12"
+    },
+    {
+      "name": "responsive @ 768px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive @ 768px: 12 status cards remain in grid",
+      "ok": true,
+      "detail": "cards=12"
+    },
+    {
+      "name": "responsive @ 1680px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive @ 1680px: 12 status cards remain in grid",
+      "ok": true,
+      "detail": "cards=12"
+    }
+  ],
+  "dom": {
+    "h1": "Центр операций",
+    "active": "Заявки",
+    "tabCount": 4,
+    "totalCardText": "Всего заявок646",
+    "statusCount": 12,
+    "statusLabels": [
+      "Новые",
+      "На проверке",
+      "Таймаут поставщика",
+      "Ожидают решения",
+      "Принята клиентом",
+      "Подтверждены",
+      "Конвертированы",
+      "Отклонены",
+      "Недоступны",
+      "Истекли",
+      "Таймаут оплаты клиента",
+      "Отменена клиентом"
+    ],
+    "hasRawEnum": false,
+    "dateInputCount": 0,
+    "hasReset": true,
+    "badgeTexts": [
+      "Конвертированы",
+      "",
+      "Конвертированы",
+      "",
+      "Конвертированы"
+    ]
+  }
+}
