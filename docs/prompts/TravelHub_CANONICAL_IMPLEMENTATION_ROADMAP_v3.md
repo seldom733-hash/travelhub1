@@ -2566,7 +2566,7 @@ D5  Orders Full-Page Detail                             ✅ ACCEPTED (impl + SR 
  ↓
 D6  Bookings Full-Page Detail                           ✅ ACCEPTED (impl VERDICT A, 2026-09-04)
  ↓
-D7  Payment/Refund Semantics + Financial Presentation   ⬜ NOT STARTED
+D7  Payment/Refund Semantics + Financial Presentation   ✅ ACCEPTED (impl VERDICT A, 2026-09-04)
  ↓
 D8  Global Temporal Visibility                          ⬜ NOT STARTED
  ↓
@@ -2963,5 +2963,5 @@ Round 3 закрыл remaining acceptance gates:
 D5 final state: **ACCEPTED** (all hard gates closed).
 D6 final state: **ACCEPTED** (impl + 65/65 e2e + browser A-F + Storefront isolation + availableActions + Order nav).
 
-TRUE NEXT: **D7 — PAYMENT/REFUND SEMANTICS + FINANCIAL PRESENTATION**.
-D7 NOT STARTED.
+TRUE NEXT: **D8 — GLOBAL TEMPORAL VISIBILITY**.
+D8 NOT STARTED.
