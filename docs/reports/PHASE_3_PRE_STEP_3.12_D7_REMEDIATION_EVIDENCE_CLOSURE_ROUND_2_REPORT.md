@@ -195,13 +195,24 @@ Architecture projects final refund as `OrderPaymentStatus = REFUNDED` → UI bad
 | No unresolved acceptance-blocking P2 | ✅ | — |
 | D8 NOT STARTED | ✅ | — |
 | Report predominantly Russian | ✅ | — |
-| Final porcelain EMPTY | ✅ | (pending commit) |
-| Final HEAD == origin/master | ✅ | (pending) |
-| One canonical 40-char Final SHA | ✅ | (pending) |
+| Final porcelain EMPTY | ✅ | `<NO OUTPUT>` |
+| Final HEAD == origin/master | ✅ | `23590ba82da31fb16f0d74df4d7b4411c18fe944` |
+| One canonical 40-char Final SHA | ✅ | `23590ba82da31fb16f0d74df4d7b4411c18fe944` |
 
 ## Git Hard Closure
 
-(To be filled after commit)
+```
+$ git status --porcelain=v1
+<NO OUTPUT>
+
+$ git rev-parse HEAD
+23590ba82da31fb16f0d74df4d7b4411c18fe944
+
+$ git rev-parse origin/master
+23590ba82da31fb16f0d74df4d7b4411c18fe944
+
+HEAD == origin/master: YES
+```
 
 ## Final Verdict
 
@@ -210,7 +221,7 @@ VERDICT A — PHASE 3 PRE-STEP 3.12 D7 REMEDIATION & EVIDENCE CLOSURE ROUND 2 PA
 
 D7 — ACCEPTED
 
-FINAL SHA: (pending commit)
+FINAL SHA: 23590ba82da31fb16f0d74df4d7b4411c18fe944
 
 TRUE NEXT:
 D8 — GLOBAL TEMPORAL VISIBILITY
