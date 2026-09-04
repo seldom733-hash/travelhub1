@@ -692,7 +692,7 @@ git rev-parse origin/master
 ```text
 porcelain = empty
 HEAD == origin/master
-canonical SHA = <FINAL_SHA>
+canonical SHA = 485436a55912d77e58a37e8c87132762a08caa27
 ```
 
 All implementation, test, i18n, shell and evidence files are committed; the
@@ -719,7 +719,7 @@ UI-C1.2 DESIGN CONTRACT — ACCEPTED
 UI-C1.2A — ACCEPTED
 
 FINAL SHA:
-<FINAL_SHA>
+485436a55912d77e58a37e8c87132762a08caa27
 
 VISIBLE UI CHANGE — CONFIRMED
 SHARED OPERATIONS CENTER SHELL — CONFIRMED
