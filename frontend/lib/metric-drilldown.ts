@@ -218,10 +218,12 @@ export const METRIC_CONFIGS = {
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
   },
   // Table cell drill-down configs (Financial Summary) → Payments registry
+  // UI-C1.2A: canonical Payments Operations Center route is /app/payments
+  // (ADR-OPS-001); /app/finance/payments redirects for legacy bookmarks.
   "analytics.finance.payment_count": {
     metricId: "analytics.finance.payment_count",
     destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/finance/payments",
+    destination: "/app/payments",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
     statusFilter: ["CAPTURED"],
     label: "Успешные платежи",
@@ -229,7 +231,7 @@ export const METRIC_CONFIGS = {
   "analytics.finance.payments": {
     metricId: "analytics.finance.payments",
     destinationType: "DOMAIN_ROUTE" as DestinationType,
-    destination: "/app/finance/payments",
+    destination: "/app/payments",
     periodPolicy: "PERIOD_BOUND" as PeriodPolicy,
     statusFilter: ["CAPTURED"],
     label: "Успешные платежи",

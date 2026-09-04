@@ -9,6 +9,13 @@ import Pagination from "@/components/Pagination";
 import TableExportButton from "@/components/TableExportButton";
 import StatusBadge from "@/components/StatusBadge";
 import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
+import OperationsCenterShell, {
+  OperationsToolbarSlot,
+  OperationsRegistrySlot,
+  OperationsErrorState,
+  OperationsLoadingState,
+  OperationsEmptyState,
+} from "@/components/OperationsCenterShell";
 
 interface RequestItem {
   id: string;
@@ -151,167 +158,154 @@ export default function RequestsPage() {
   const exportUrl = `/api/v1/requests/export?${exportParams.toString()}`;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">{t("requests.title", locale)}</h1>
-      </div>
+    <OperationsCenterShell activeDomain="requests">
+      <div className="space-y-4">
+        {/* TOTAL KPI — canonical naming, ~15-20% larger, NOT full-width */}
+        {kpi && (
+          <div className="w-fit max-w-full">
+            <CommerceKpiCard
+              variant="total"
+              label={t("requests.kpi.total", locale)}
+              value={kpi.total ?? 0}
+              active={!selectedStatus}
+              onClick={() => { setStatusFilter(""); setPage(1); }}
+            />
+          </div>
+        )}
 
-      {/* TOTAL KPI — canonical naming, ~15-20% larger, NOT full-width */}
-      {kpi && (
-        <div className="w-fit max-w-full">
-          <CommerceKpiCard
-            variant="total"
-            label={t("requests.kpi.total", locale)}
-            value={kpi.total ?? 0}
-            active={!selectedStatus}
-            onClick={() => { setStatusFilter(""); setPage(1); }}
+        {/* STATUS KPI CARDS — one per canonical status */}
+        {kpi && (
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t("admin.kpi.request_statuses", locale) || "Статусы заявок"}</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              {REQUEST_LIFECYCLE_STATUSES.map((code) => (
+                <CommerceKpiCard
+                  key={code}
+                  label={requestStatusLabel(code, locale)}
+                  value={kpi[code.toLowerCase()] ?? 0}
+                  active={selectedStatus === code}
+                  onClick={() => { setStatusFilter(code); setPage(1); }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Toolbar: search first, no Search button */}
+        <OperationsToolbarSlot>
+          <input
+            value={searchDraft}
+            onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={onSearchKeyDown}
+            placeholder={t("requests.search_placeholder", locale)}
+            className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
-        </div>
-      )}
 
-      {/* STATUS KPI CARDS — one per canonical status */}
-      {kpi && (
-        <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t("admin.kpi.request_statuses", locale) || "Статусы заявок"}</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-            {REQUEST_LIFECYCLE_STATUSES.map((code) => (
-              <CommerceKpiCard
-                key={code}
-                label={requestStatusLabel(code, locale)}
-                value={kpi[code.toLowerCase()] ?? 0}
-                active={selectedStatus === code}
-                onClick={() => { setStatusFilter(code); setPage(1); }}
-              />
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          >
+            <option value="">{t("admin.filter.all_statuses", locale)}</option>
+            {REQUEST_LIFECYCLE_STATUSES.map((s) => (
+              <option key={s} value={s}>{requestStatusLabel(s, locale)}</option>
             ))}
-          </div>
-        </div>
-      )}
+          </select>
 
-      {/* Filters: search first, no Search button */}
-      <div className="flex flex-wrap items-center gap-3">
-        <input
-          value={searchDraft}
-          onChange={(e) => onSearchChange(e.target.value)}
-          onKeyDown={onSearchKeyDown}
-          placeholder={t("requests.search_placeholder", locale)}
-          className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          <TableExportButton
+            exportUrl={exportUrl}
+            label={t("export.label", locale)}
+          />
+
+          {loading && <span className="text-xs text-slate-400">{t("common.loading", locale)}</span>}
+        </OperationsToolbarSlot>
+
+        {/* Error */}
+        {error && <OperationsErrorState message={error} onRetry={() => void loadData()} />}
+
+        {/* Table */}
+        <OperationsRegistrySlot>
+          {loading && requests.length === 0 ? (
+            <OperationsLoadingState />
+          ) : (
+            <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
+              <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">{t("requests.ref", locale)}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("requests.customer", locale)}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("requests.product", locale)}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("requests.supplier", locale)}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("requests.displayed_price", locale)}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("requests.confirmed_price", locale)}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("requests.service_date", locale)}</th>
+                  <th className="px-4 py-2.5 font-medium">Статус</th>
+                  <th className="px-4 py-2.5 font-medium">{t("requests.created", locale)}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("requests.sla_deadline", locale)}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.length === 0 && !loading && (
+                  <OperationsEmptyState colSpan={10} message={t("requests.no_data", locale)} />
+                )}
+                {requests.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50"
+                    onClick={() => router.push(`/app/requests/${r.id}`)}
+                  >
+                    <td className="px-4 py-2.5">
+                      <Link href={`/app/requests/${r.id}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-blue-600 hover:underline">
+                        {r.referenceNumber}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-900">
+                      <div>{r.customerName || "—"}</div>
+                      {r.customerCode && <div className="text-xs text-slate-400">{r.customerCode}</div>}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-900">
+                      <div>{r.productName || "—"}</div>
+                      {r.productCode && <div className="text-xs text-slate-400">{r.productCode}</div>}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-900">
+                      <div>{r.partnerName || "—"}</div>
+                      {r.partnerCode && <div className="text-xs text-slate-400">{r.partnerCode}</div>}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-900">
+                      {r.displayedPrice ? `${r.displayedPrice} ${r.displayedCurrency ?? ""}` : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-900">
+                      {r.confirmedPrice ? `${r.confirmedPrice} ${r.confirmedCurrency ?? ""}` : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-900">
+                      {r.requestedServiceDate ? new Date(r.requestedServiceDate).toLocaleDateString() : "—"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <StatusBadge status={r.status} />
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500">
+                      {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500">
+                      {r.supplierResponseDeadline
+                        ? new Date(r.supplierResponseDeadline).toLocaleString()
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </OperationsRegistrySlot>
+
+        {/* Pagination */}
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          locale={locale}
+          onPageChange={setPage}
         />
-
-        <select
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-        >
-          <option value="">{t("admin.filter.all_statuses", locale)}</option>
-          {REQUEST_LIFECYCLE_STATUSES.map((s) => (
-            <option key={s} value={s}>{requestStatusLabel(s, locale)}</option>
-          ))}
-        </select>
-
-        <TableExportButton
-          exportUrl={exportUrl}
-          label={t("export.label", locale)}
-        />
-
-        {loading && <span className="text-xs text-slate-400">{t("common.loading", locale)}</span>}
       </div>
-
-      {/* Error */}
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
-          {error}
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
-          <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
-            <tr>
-              <th className="px-4 py-2.5 font-medium">{t("requests.ref", locale)}</th>
-              <th className="px-4 py-2.5 font-medium">{t("requests.customer", locale)}</th>
-              <th className="px-4 py-2.5 font-medium">{t("requests.product", locale)}</th>
-              <th className="px-4 py-2.5 font-medium">{t("requests.supplier", locale)}</th>
-              <th className="px-4 py-2.5 font-medium">{t("requests.displayed_price", locale)}</th>
-              <th className="px-4 py-2.5 font-medium">{t("requests.confirmed_price", locale)}</th>
-              <th className="px-4 py-2.5 font-medium">{t("requests.service_date", locale)}</th>
-              <th className="px-4 py-2.5 font-medium">Статус</th>
-              <th className="px-4 py-2.5 font-medium">{t("requests.created", locale)}</th>
-              <th className="px-4 py-2.5 font-medium">{t("requests.sla_deadline", locale)}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {requests.length === 0 && !loading && (
-              <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-sm text-slate-400">
-                  {t("requests.no_data", locale)}
-                </td>
-              </tr>
-            )}
-            {requests.map((r) => (
-              <tr
-                key={r.id}
-                className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50"
-                onClick={() => router.push(`/app/requests/${r.id}`)}
-              >
-                <td className="px-4 py-2.5">
-                  <Link href={`/app/requests/${r.id}`} onClick={(e) => e.stopPropagation()} className="font-mono text-xs text-blue-600 hover:underline">
-                    {r.referenceNumber}
-                  </Link>
-                </td>
-                <td className="px-4 py-2.5 text-slate-900">
-                  <div>{r.customerName || "—"}</div>
-                  {r.customerCode && <div className="text-xs text-slate-400">{r.customerCode}</div>}
-                </td>
-                <td className="px-4 py-2.5 text-slate-900">
-                  <div>{r.productName || "—"}</div>
-                  {r.productCode && <div className="text-xs text-slate-400">{r.productCode}</div>}
-                </td>
-                <td className="px-4 py-2.5 text-slate-900">
-                  <div>{r.partnerName || "—"}</div>
-                  {r.partnerCode && <div className="text-xs text-slate-400">{r.partnerCode}</div>}
-                </td>
-                <td className="px-4 py-2.5 text-slate-900">
-                  {r.displayedPrice ? `${r.displayedPrice} ${r.displayedCurrency ?? ""}` : "—"}
-                </td>
-                <td className="px-4 py-2.5 text-slate-900">
-                  {r.confirmedPrice ? `${r.confirmedPrice} ${r.confirmedCurrency ?? ""}` : "—"}
-                </td>
-                <td className="px-4 py-2.5 text-slate-900">
-                  {r.requestedServiceDate ? new Date(r.requestedServiceDate).toLocaleDateString() : "—"}
-                </td>
-                <td className="px-4 py-2.5">
-                  <StatusBadge status={r.status} />
-                </td>
-                <td className="px-4 py-2.5 text-xs text-slate-500">
-                  {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
-                </td>
-                <td className="px-4 py-2.5 text-xs text-slate-500">
-                  {r.supplierResponseDeadline
-                    ? new Date(r.supplierResponseDeadline).toLocaleString()
-                    : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      <Pagination
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        locale={locale}
-        onPageChange={setPage}
-      />
-          </div>
-        </div>
-      </div>
-    </div>
+    </OperationsCenterShell>
   );
 }

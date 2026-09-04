@@ -22,11 +22,18 @@ interface NavItem {
  * только на внутренние Work Centers (§14).
  */
 interface NavGroup {
-  heading?: string; // null = top-level (no heading)
+  /** i18n key for the group heading (localized RU/AZ/EN); absent = top-level. */
+  headingKey?: string;
   items: NavItem[];
 }
 
-const NAV_GROUPS: NavGroup[] = [
+/**
+ * UI-C1.2A: canonical sidebar ownership (UI-C1.2 contract §5/§7):
+ * ОПЕРАЦИИ → Заявки/Заказы/Бронирования; ФИНАНСЫ → Платежи (Operations
+ * Center tab, domain ownership stays Finance). No invented "Центр операций"
+ * sidebar item — the Operations Center is a workflow shell, not a domain.
+ */
+export const NAV_GROUPS: NavGroup[] = [
   {
     items: [
       { href: "/app/dashboard", icon: "🏠", labelKey: "nav.dashboard" },
@@ -35,7 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    heading: "ОПЕРАЦИИ",
+    headingKey: "nav.group.operations",
     items: [
       { href: "/app/requests", icon: "📋", labelKey: "nav.requests", permission: "order.read" },
       { href: "/app/orders", icon: "🧾", labelKey: "nav.orders", permission: "order.read" },
@@ -43,7 +50,13 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    heading: "КОММЕРЧЕСКОЕ УПРАВЛЕНИЕ",
+    headingKey: "nav.group.finance",
+    items: [
+      { href: "/app/payments", icon: "💳", labelKey: "nav.payments", permission: "finance.payment.read" },
+    ],
+  },
+  {
+    headingKey: "nav.group.commercial",
     items: [
       { href: "/app/catalog", icon: "📚", labelKey: "nav.catalog", permission: "catalog.product.read" },
       { href: "/app/crm", icon: "🤝", labelKey: "nav.crm", permission: "crm.customer.read" },
@@ -51,20 +64,20 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    heading: "ПАРТНЁРСКАЯ СЕТЬ",
+    headingKey: "nav.group.partner_network",
     items: [
       { href: "/app/partners/onboarding", icon: "📋", labelKey: "nav.partner_onboarding", permission: "partner.onboarding.review" },
       { href: "/app/seller-profiles", icon: "🛡", labelKey: "nav.seller_profiles", permission: "seller_public_profile.review" },
     ],
   },
   {
-    heading: "СЕРВИС",
+    headingKey: "nav.group.service",
     items: [
       { href: "/app/support", icon: "🎫", labelKey: "nav.support", permission: "support.case.read" },
     ],
   },
   {
-    heading: "АДМИНИСТРИРОВАНИЕ",
+    headingKey: "nav.group.admin",
     items: [
       { href: "/app/users", icon: "👥", labelKey: "nav.users", permission: "settings.write" },
     ],
@@ -211,9 +224,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             if (visibleItems.length === 0) return null;
             return (
               <div key={gi}>
-                {group.heading && !collapsed && (
+                {group.headingKey && !collapsed && (
                   <div className="mt-4 mb-1 px-5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                    {group.heading}
+                    {t(group.headingKey, locale)}
                   </div>
                 )}
                 {visibleItems.map((item) => {

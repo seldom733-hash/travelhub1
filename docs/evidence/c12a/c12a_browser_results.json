@@ -1,0 +1,348 @@
+{
+  "total": 40,
+  "passed": 40,
+  "results": [
+    {
+      "name": "login (admin → platform app)",
+      "ok": true,
+      "detail": "http://localhost:3000/app/dashboard"
+    },
+    {
+      "name": "shell requests: h1 «Центр операций»",
+      "ok": true,
+      "detail": "Центр операций"
+    },
+    {
+      "name": "shell requests: 4 tabs rendered",
+      "ok": true,
+      "detail": "[{\"text\": \"Заявки\", \"selected\": \"true\"}, {\"text\": \"Заказы\", \"selected\": \"false\"}, {\"text\": \"Бронирования\", \"selected\": \"false\"}, {\"text\": \"Платежи\", \"selected\": \"false\"}]"
+    },
+    {
+      "name": "shell requests: correct active tab",
+      "ok": true,
+      "detail": "active=Заявки"
+    },
+    {
+      "name": "shell requests: tabpanel has content table",
+      "ok": true,
+      "detail": "chars=4027"
+    },
+    {
+      "name": "shell requests: ФИНАНСЫ sidebar group",
+      "ok": true,
+      "detail": "[\"T\", \"ОПЕРАЦИИ\", \"ФИНАНСЫ\", \"КОММЕРЧЕСКОЕ УПРАВЛЕНИЕ\", \"ПАРТНЁРСКАЯ СЕТЬ\", \"СЕРВИС\", \"АДМИНИСТРИРОВАНИЕ\", \"ADMIN\"]"
+    },
+    {
+      "name": "shell requests: Платежи sidebar → /app/payments",
+      "ok": true,
+      "detail": "/app/payments"
+    },
+    {
+      "name": "shell orders: h1 «Центр операций»",
+      "ok": true,
+      "detail": "Центр операций"
+    },
+    {
+      "name": "shell orders: 4 tabs rendered",
+      "ok": true,
+      "detail": "[{\"text\": \"Заявки\", \"selected\": \"false\"}, {\"text\": \"Заказы\", \"selected\": \"true\"}, {\"text\": \"Бронирования\", \"selected\": \"false\"}, {\"text\": \"Платежи\", \"selected\": \"false\"}]"
+    },
+    {
+      "name": "shell orders: correct active tab",
+      "ok": true,
+      "detail": "active=Заказы"
+    },
+    {
+      "name": "shell orders: tabpanel has content table",
+      "ok": true,
+      "detail": "chars=1979"
+    },
+    {
+      "name": "shell orders: ФИНАНСЫ sidebar group",
+      "ok": true,
+      "detail": "[\"T\", \"ОПЕРАЦИИ\", \"ФИНАНСЫ\", \"КОММЕРЧЕСКОЕ УПРАВЛЕНИЕ\", \"ПАРТНЁРСКАЯ СЕТЬ\", \"СЕРВИС\", \"АДМИНИСТРИРОВАНИЕ\", \"ADMIN\"]"
+    },
+    {
+      "name": "shell orders: Платежи sidebar → /app/payments",
+      "ok": true,
+      "detail": "/app/payments"
+    },
+    {
+      "name": "shell bookings: h1 «Центр операций»",
+      "ok": true,
+      "detail": "Центр операций"
+    },
+    {
+      "name": "shell bookings: 4 tabs rendered",
+      "ok": true,
+      "detail": "[{\"text\": \"Заявки\", \"selected\": \"false\"}, {\"text\": \"Заказы\", \"selected\": \"false\"}, {\"text\": \"Бронирования\", \"selected\": \"true\"}, {\"text\": \"Платежи\", \"selected\": \"false\"}]"
+    },
+    {
+      "name": "shell bookings: correct active tab",
+      "ok": true,
+      "detail": "active=Бронирования"
+    },
+    {
+      "name": "shell bookings: tabpanel has content table",
+      "ok": true,
+      "detail": "chars=1734"
+    },
+    {
+      "name": "shell bookings: ФИНАНСЫ sidebar group",
+      "ok": true,
+      "detail": "[\"T\", \"ОПЕРАЦИИ\", \"ФИНАНСЫ\", \"КОММЕРЧЕСКОЕ УПРАВЛЕНИЕ\", \"ПАРТНЁРСКАЯ СЕТЬ\", \"СЕРВИС\", \"АДМИНИСТРИРОВАНИЕ\", \"ADMIN\"]"
+    },
+    {
+      "name": "shell bookings: Платежи sidebar → /app/payments",
+      "ok": true,
+      "detail": "/app/payments"
+    },
+    {
+      "name": "shell payments: h1 «Центр операций»",
+      "ok": true,
+      "detail": "Центр операций"
+    },
+    {
+      "name": "shell payments: 4 tabs rendered",
+      "ok": true,
+      "detail": "[{\"text\": \"Заявки\", \"selected\": \"false\"}, {\"text\": \"Заказы\", \"selected\": \"false\"}, {\"text\": \"Бронирования\", \"selected\": \"false\"}, {\"text\": \"Платежи\", \"selected\": \"true\"}]"
+    },
+    {
+      "name": "shell payments: correct active tab",
+      "ok": true,
+      "detail": "active=Платежи"
+    },
+    {
+      "name": "shell payments: tabpanel has content table",
+      "ok": true,
+      "detail": "chars=1269"
+    },
+    {
+      "name": "shell payments: ФИНАНСЫ sidebar group",
+      "ok": true,
+      "detail": "[\"T\", \"ОПЕРАЦИИ\", \"ФИНАНСЫ\", \"КОММЕРЧЕСКОЕ УПРАВЛЕНИЕ\", \"ПАРТНЁРСКАЯ СЕТЬ\", \"СЕРВИС\", \"АДМИНИСТРИРОВАНИЕ\", \"ADMIN\"]"
+    },
+    {
+      "name": "shell payments: Платежи sidebar → /app/payments",
+      "ok": true,
+      "detail": "/app/payments"
+    },
+    {
+      "name": "legacy /app/finance/payments → /app/payments",
+      "ok": true,
+      "detail": "http://localhost:3000/app/payments"
+    },
+    {
+      "name": "drill-down query params preserved through redirect",
+      "ok": true,
+      "detail": "http://localhost:3000/app/payments?status=CAPTURED&currency=USD"
+    },
+    {
+      "name": "side-by-side composite captured",
+      "ok": true,
+      "detail": "requests|orders|bookings|payments"
+    },
+    {
+      "name": "responsive requests @ 390px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive orders @ 390px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive bookings @ 390px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive payments @ 390px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive requests @ 768px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive orders @ 768px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive bookings @ 768px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive payments @ 768px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive requests @ 1680px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive orders @ 1680px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive bookings @ 1680px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "responsive payments @ 1680px: no horizontal overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    }
+  ],
+  "shell_evidence": {
+    "requests": {
+      "h1": "Центр операций",
+      "tabs": [
+        {
+          "text": "Заявки",
+          "selected": "true"
+        },
+        {
+          "text": "Заказы",
+          "selected": "false"
+        },
+        {
+          "text": "Бронирования",
+          "selected": "false"
+        },
+        {
+          "text": "Платежи",
+          "selected": "false"
+        }
+      ],
+      "active": "Заявки",
+      "panelHasTable": true,
+      "panelChars": 4027,
+      "groups": [
+        "T",
+        "ОПЕРАЦИИ",
+        "ФИНАНСЫ",
+        "КОММЕРЧЕСКОЕ УПРАВЛЕНИЕ",
+        "ПАРТНЁРСКАЯ СЕТЬ",
+        "СЕРВИС",
+        "АДМИНИСТРИРОВАНИЕ",
+        "ADMIN"
+      ],
+      "paymentsSidebarHref": "/app/payments"
+    },
+    "orders": {
+      "h1": "Центр операций",
+      "tabs": [
+        {
+          "text": "Заявки",
+          "selected": "false"
+        },
+        {
+          "text": "Заказы",
+          "selected": "true"
+        },
+        {
+          "text": "Бронирования",
+          "selected": "false"
+        },
+        {
+          "text": "Платежи",
+          "selected": "false"
+        }
+      ],
+      "active": "Заказы",
+      "panelHasTable": true,
+      "panelChars": 1979,
+      "groups": [
+        "T",
+        "ОПЕРАЦИИ",
+        "ФИНАНСЫ",
+        "КОММЕРЧЕСКОЕ УПРАВЛЕНИЕ",
+        "ПАРТНЁРСКАЯ СЕТЬ",
+        "СЕРВИС",
+        "АДМИНИСТРИРОВАНИЕ",
+        "ADMIN"
+      ],
+      "paymentsSidebarHref": "/app/payments"
+    },
+    "bookings": {
+      "h1": "Центр операций",
+      "tabs": [
+        {
+          "text": "Заявки",
+          "selected": "false"
+        },
+        {
+          "text": "Заказы",
+          "selected": "false"
+        },
+        {
+          "text": "Бронирования",
+          "selected": "true"
+        },
+        {
+          "text": "Платежи",
+          "selected": "false"
+        }
+      ],
+      "active": "Бронирования",
+      "panelHasTable": true,
+      "panelChars": 1734,
+      "groups": [
+        "T",
+        "ОПЕРАЦИИ",
+        "ФИНАНСЫ",
+        "КОММЕРЧЕСКОЕ УПРАВЛЕНИЕ",
+        "ПАРТНЁРСКАЯ СЕТЬ",
+        "СЕРВИС",
+        "АДМИНИСТРИРОВАНИЕ",
+        "ADMIN"
+      ],
+      "paymentsSidebarHref": "/app/payments"
+    },
+    "payments": {
+      "h1": "Центр операций",
+      "tabs": [
+        {
+          "text": "Заявки",
+          "selected": "false"
+        },
+        {
+          "text": "Заказы",
+          "selected": "false"
+        },
+        {
+          "text": "Бронирования",
+          "selected": "false"
+        },
+        {
+          "text": "Платежи",
+          "selected": "true"
+        }
+      ],
+      "active": "Платежи",
+      "panelHasTable": true,
+      "panelChars": 1269,
+      "groups": [
+        "T",
+        "ОПЕРАЦИИ",
+        "ФИНАНСЫ",
+        "КОММЕРЧЕСКОЕ УПРАВЛЕНИЕ",
+        "ПАРТНЁРСКАЯ СЕТЬ",
+        "СЕРВИС",
+        "АДМИНИСТРИРОВАНИЕ",
+        "ADMIN"
+      ],
+      "paymentsSidebarHref": "/app/payments"
+    }
+  }
+}
