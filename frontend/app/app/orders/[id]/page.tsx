@@ -119,6 +119,9 @@ export default function OrderDetailPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryPage>({ items: [], total: 0, page: 0, pageSize: 20 });
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [finHistory, setFinHistory] = useState<{ payments: Array<{ id: string; code: string; status: string; amount: string; currency: string; paidAt: string | null; failedAt: string | null; cancelledAt: string | null; createdAt: string }>; refunds: Array<{ id: string; code: string; status: string; amount: string; currency: string; reason: string | null; requestedAt: string | null; approvedAt: string | null; processedAt: string | null; failedAt: string | null; createdAt: string }> }>({ payments: [], refunds: [] });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [finHistoryLoading, setFinHistoryLoading] = useState(false);
 
   const loadOrder = useCallback(async () => {
     try {
@@ -150,9 +153,22 @@ export default function OrderDetailPage() {
     }
   }, [id, history.pageSize]);
 
+  const loadFinHistory = useCallback(async () => {
+    setFinHistoryLoading(true);
+    try {
+      const res = await api.get<{ payments: { payments: typeof finHistory.payments; history: unknown[] }; refunds: { refunds: typeof finHistory.refunds; history: unknown[] } }>(`/orders/${id}/financial-history`);
+      setFinHistory({ payments: res.payments.payments ?? [], refunds: res.refunds.refunds ?? [] });
+    } catch {
+      // financial history does not block the page
+    } finally {
+      setFinHistoryLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     void loadOrder();
     void loadHistory(1);
+    void loadFinHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadOrder, id]);
 
@@ -359,6 +375,38 @@ export default function OrderDetailPage() {
                 {historyLoading ? "…" : `Показать ещё (${history.total - history.items.length})`}
               </button>
             )}
+          </div>
+
+          {/* D7 — Financial History: payment + refund events */}
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <h3 className="mb-3 text-xs font-semibold uppercase text-slate-500">{t("finance.history", locale) || "Финансовая история"}</h3>
+            {finHistoryLoading && <div className="text-xs text-slate-400">{t("crm.loading", locale)}</div>}
+            {!finHistoryLoading && finHistory.payments.length === 0 && finHistory.refunds.length === 0 && (
+              <div className="text-xs text-slate-400">{t("finance.no_history", locale) || "Нет финансовых событий"}</div>
+            )}
+            <div className="space-y-2">
+              {finHistory.payments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-4 py-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-slate-400">{p.code}</span>
+                    <StatusBadge status={p.status} />
+                    <span className="text-slate-600">{formatPrice(p.amount, p.currency, locale)}</span>
+                  </div>
+                  <span className="text-slate-400">{formatTs(p.paidAt ?? p.failedAt ?? p.cancelledAt ?? p.createdAt)}</span>
+                </div>
+              ))}
+              {finHistory.refunds.map((r) => (
+                <div key={r.id} className="flex items-center justify-between rounded-lg border border-slate-100 px-4 py-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-slate-400">{r.code}</span>
+                    <StatusBadge status={r.status} />
+                    <span className="text-red-600">{formatPrice(r.amount, r.currency, locale)}</span>
+                    {r.reason && <span className="text-slate-400">({r.reason})</span>}
+                  </div>
+                  <span className="text-slate-400">{formatTs(r.processedAt ?? r.approvedAt ?? r.requestedAt ?? r.createdAt)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

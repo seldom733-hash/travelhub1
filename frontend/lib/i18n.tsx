@@ -1003,6 +1003,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   // D7 — Payment/Refund Semantics + Financial Presentation
   "finance.due_amount": { ru: "К оплате", az: "Ödəniləcək", en: "Due" },
   "finance.refundable_amount": { ru: "К возврату", az: "Geri qaytarılacaq", en: "Refundable" },
+  "finance.history": { ru: "Финансовая история", az: "Maliyyə tarixçəsi", en: "Financial History" },
+  "finance.no_history": { ru: "Нет финансовых событий", az: "Maliyyə hadisələri yoxdur", en: "No financial events" },
   "finance.net_collected": { ru: "К поступлению", az: "Daxilolma", en: "Net collected" },
   "finance.payment_history": { ru: "История платежей", az: "Ödəniş tarixçəsi", en: "Payment history" },
   "finance.refund_history": { ru: "История возвратов", az: "Geri qaytarma tarixçəsi", en: "Refund history" },
