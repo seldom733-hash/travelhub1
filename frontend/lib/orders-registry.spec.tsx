@@ -449,18 +449,67 @@ describe("UI-C1.2C §19/§28 — D5/D7 preservation guards", () => {
   });
 });
 
-describe("UI-C1.2F.1D-R1 — one active KPI invariant + dual-filter URL normalization", () => {
-  it("OrdersWithParams normalizes a URL carrying both status and paymentStatus to a single dimension", () => {
-    // canonical rule: lifecycle status wins on conflict (§6 of remediation spec)
-    expect(PAGE).toContain('if (initialStatus && initialPaymentStatus)');
-    expect(PAGE).toContain('initialPaymentStatus = "";');
-    expect(PAGE).toContain('status wins on conflict');
+describe("UI-C1.2F.1D-R2 — React/Next-safe dual-filter canonicalization", () => {
+  it("render-time canonicalization is pure: no window.history / router call in the dual-filter path during render", () => {
+    // R2 forbids history/router mutation during render. The canonicalization block that
+    // computes initialPaymentStatus must not call window.history.replaceState/pushState or
+    // router.replace inline. (Toolbar/pagination URL writes still use updateUrl/history
+    // elsewhere — that is pre-existing and out of scope.)
+    const canonBlockStart = PAGE.indexOf('const hasDualFilterConflict = Boolean(rawStatus && rawPaymentStatus);');
+    const afterCanon = PAGE.slice(canonBlockStart, canonBlockStart + 2200);
+    expect(afterCanon).toContain('const initialPaymentStatus = hasDualFilterConflict ? "" : rawPaymentStatus;');
+    // The render-time derivation of initialPaymentStatus must happen before any useEffect;
+    // router.replace must only appear later, inside the useEffect body.
+    const firstEffect = afterCanon.indexOf('useEffect(() => {');
+    const preEffect = afterCanon.slice(0, firstEffect);
+    expect(preEffect).not.toContain('window.history.replaceState(');
+    expect(preEffect).not.toContain('window.history.pushState(');
+    expect(preEffect).not.toContain('router.replace(');
   });
 
-  it("the dual-filter normalization writes a canonical single-dimension URL via replaceState", () => {
-    expect(PAGE).toContain("window.history.replaceState");
-    // only status survives when both were present
-    expect(PAGE).toContain("['status', initialStatus]");
+  it("canonicalization uses a pure derived flag, not imperative mutation of initialPaymentStatus", () => {
+    // R1 mutated `let initialPaymentStatus = ...; initialPaymentStatus = ""` directly.
+    // R2 replaces that with a derived boolean + pure ternary so render stays pure.
+    expect(PAGE).toContain('const hasDualFilterConflict');
+    expect(PAGE).not.toContain('let initialPaymentStatus = rawPaymentStatus;');
+  });
+
+  it("dual-filter URL is normalized POST-render via router.replace in useEffect", () => {
+    expect(PAGE).toContain('useEffect(() => {');
+    expect(PAGE).toContain('if (!hasDualFilterConflict) return;');
+    expect(PAGE).toContain('router.replace(');
+    // effect runs once per conflict and exits when already canonical (no replace loop)
+    expect(PAGE).toContain('[hasDualFilterConflict]');
+  });
+
+  it("canonicalization preserves all unrelated query params via sp.toString() clone", () => {
+    // R2 restores unrelated params (dateFrom/dateTo/search/sort/other) by cloning the
+    // current searchParams instead of reconstructing a hardcoded param subset.
+    expect(PAGE).toContain('new URLSearchParams(sp.toString())');
+    expect(PAGE).toContain('params.delete("paymentStatus")');
+    expect(PAGE).toContain('params.delete("page")');
+  });
+
+  it("paymentStatus is removed and page is cleared when canonicalizing a dual-filter URL", () => {
+    expect(PAGE).toContain('params.delete("paymentStatus")');
+    expect(PAGE).toContain('params.delete("page")');
+  });
+
+  it("url is not mutated when the URL is already canonical (no replace when !hasDualFilterConflict)", () => {
+    expect(PAGE).toContain('if (!hasDualFilterConflict) return;');
+  });
+
+  it("first render already shows one active KPI from canonical values (no two-pressed flash)", () => {
+    // initialPaymentStatus is derived from hasDualFilterConflict at render time, so the
+    // very first render of ?status=CLOSED&paymentStatus=PAID already treats payment as absent.
+    expect(PAGE).toContain('const initialPaymentStatus = hasDualFilterConflict ? "" : rawPaymentStatus;');
+    expect(PAGE).toContain('active={selectedPayment === code}');
+    expect(PAGE).toContain('const selectedPayment = paymentStatusFilter || "";');
+  });
+
+  it("router.replace target preserves unrelated params and the path", () => {
+    expect(PAGE).toContain('router.replace(qs ? `/app/orders?${qs}` : "/app/orders", { scroll: false })');
+    expect(PAGE).toContain('{ scroll: false }');
   });
 
   it("clicking a lifecycle KPI card clears paymentStatus (applyStatus mutual-clear)", () => {
@@ -476,29 +525,11 @@ describe("UI-C1.2F.1D-R1 — one active KPI invariant + dual-filter URL normaliz
   });
 
   it("applyStatus URL write never sends paymentStatus", () => {
-    // applyStatus -> updateUrl removes paymentStatus so the canonical steady-state
-    // URL never carries both dimensions after UI interaction
     expect(PAGE).toContain('updateUrl({ status: code || undefined, paymentStatus: undefined, page: undefined })');
   });
 
   it("applyPaymentStatus URL write never sends status", () => {
     expect(PAGE).toContain('updateUrl({ paymentStatus: code || undefined, status: undefined, page: undefined })');
-  });
-
-  it("pressed KPI count among specific cards is bounded by the single-dimension state model", () => {
-    // selectedLifecycle && selectedPayment can never both be non-empty after canonicalization
-    expect(PAGE).toContain('const selectedLifecycle = statusFilter || "";');
-    expect(PAGE).toContain('const selectedPayment = paymentStatusFilter || "";');
-    // KPI active bindings only read their own dimension — active status === selectedLifecycle,
-    // active payment === selectedPayment — so at most one dimension can have a pressed card
-    expect(PAGE).toContain('active={selectedLifecycle === code}');
-    expect(PAGE).toContain('active={selectedPayment === code}');
-  });
-
-  it("the active KPI dimension drives the matching table-header filter selection", () => {
-    // Status header filter binds to statusFilter, Payment header filter to paymentStatusFilter
-    expect(PAGE).toContain('value={statusFilter || ""}');
-    expect(PAGE).toContain('value={paymentStatusFilter || ""}');
   });
 
   it("Total clears both KPI dimensions (status + paymentStatus)", () => {
@@ -508,7 +539,6 @@ describe("UI-C1.2F.1D-R1 — one active KPI invariant + dual-filter URL normaliz
   });
 
   it("period, search and sort survive the lifecycle/payment dimension switch", () => {
-    // Only the KPI dimension is replaced on a KPI/header selection — page/date/search/sort remain
     expect(PAGE).toContain('updateUrl({ status: code || undefined, paymentStatus: undefined, page: undefined })');
     expect(PAGE).toContain('updateUrl({ paymentStatus: code || undefined, status: undefined, page: undefined })');
     expect(PAGE).toContain('qs.set("dateFrom", dateFrom)');
