@@ -49,8 +49,11 @@ export class RequestController {
 
   @Get("kpi")
   @RequirePermissions("order.read")
-  kpi() {
-    return this.requestService.getRequestKpi();
+  kpi(
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+  ) {
+    return this.requestService.getRequestKpi({ dateFrom, dateTo });
   }
 
   @Get("export")

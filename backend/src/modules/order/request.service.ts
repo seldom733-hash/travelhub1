@@ -764,9 +764,21 @@ export class RequestService {
   /**
    * Get Request KPI counts by status.
    */
-  async getRequestKpi(): Promise<Record<string, number>> {
+  async getRequestKpi(query?: { dateFrom?: string; dateTo?: string }): Promise<Record<string, number>> {
+    // UI-C1.2F.1A: period-aware KPI. Uses the same createdAt [from, to)
+    // boundary semantics as listRequests for scope parity with the future
+    // shared Operations Center Header Period (global scope → KPI + table).
+    const where: any = {};
+    if (query?.dateFrom || query?.dateTo) {
+      where.createdAt = {
+        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+        ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+      };
+    }
+
     const counts = await this.prisma.request.groupBy({
       by: ["status"],
+      where,
       _count: { status: true },
     });
 
