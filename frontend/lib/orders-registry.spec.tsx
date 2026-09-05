@@ -448,3 +448,72 @@ describe("UI-C1.2C §19/§28 — D5/D7 preservation guards", () => {
     expect(PAGE).not.toContain("commission");
   });
 });
+
+describe("UI-C1.2F.1D-R1 — one active KPI invariant + dual-filter URL normalization", () => {
+  it("OrdersWithParams normalizes a URL carrying both status and paymentStatus to a single dimension", () => {
+    // canonical rule: lifecycle status wins on conflict (§6 of remediation spec)
+    expect(PAGE).toContain('if (initialStatus && initialPaymentStatus)');
+    expect(PAGE).toContain('initialPaymentStatus = "";');
+    expect(PAGE).toContain('status wins on conflict');
+  });
+
+  it("the dual-filter normalization writes a canonical single-dimension URL via replaceState", () => {
+    expect(PAGE).toContain("window.history.replaceState");
+    // only status survives when both were present
+    expect(PAGE).toContain("['status', initialStatus]");
+  });
+
+  it("clicking a lifecycle KPI card clears paymentStatus (applyStatus mutual-clear)", () => {
+    expect(PAGE).toContain('const applyStatus = useCallback((code: string) => {');
+    expect(PAGE).toContain('setStatusFilter(code);');
+    expect(PAGE).toContain('setPaymentStatusFilter("");');
+  });
+
+  it("clicking a payment KPI card clears status (applyPaymentStatus mutual-clear)", () => {
+    expect(PAGE).toContain('const applyPaymentStatus = useCallback((code: string) => {');
+    expect(PAGE).toContain('setPaymentStatusFilter(code);');
+    expect(PAGE).toContain('setStatusFilter("");');
+  });
+
+  it("applyStatus URL write never sends paymentStatus", () => {
+    // applyStatus -> updateUrl removes paymentStatus so the canonical steady-state
+    // URL never carries both dimensions after UI interaction
+    expect(PAGE).toContain('updateUrl({ status: code || undefined, paymentStatus: undefined, page: undefined })');
+  });
+
+  it("applyPaymentStatus URL write never sends status", () => {
+    expect(PAGE).toContain('updateUrl({ paymentStatus: code || undefined, status: undefined, page: undefined })');
+  });
+
+  it("pressed KPI count among specific cards is bounded by the single-dimension state model", () => {
+    // selectedLifecycle && selectedPayment can never both be non-empty after canonicalization
+    expect(PAGE).toContain('const selectedLifecycle = statusFilter || "";');
+    expect(PAGE).toContain('const selectedPayment = paymentStatusFilter || "";');
+    // KPI active bindings only read their own dimension — active status === selectedLifecycle,
+    // active payment === selectedPayment — so at most one dimension can have a pressed card
+    expect(PAGE).toContain('active={selectedLifecycle === code}');
+    expect(PAGE).toContain('active={selectedPayment === code}');
+  });
+
+  it("the active KPI dimension drives the matching table-header filter selection", () => {
+    // Status header filter binds to statusFilter, Payment header filter to paymentStatusFilter
+    expect(PAGE).toContain('value={statusFilter || ""}');
+    expect(PAGE).toContain('value={paymentStatusFilter || ""}');
+  });
+
+  it("Total clears both KPI dimensions (status + paymentStatus)", () => {
+    expect(PAGE).toContain('const handleTotalClick = useCallback(() => {');
+    expect(PAGE).toContain('setStatusFilter("");');
+    expect(PAGE).toContain('setPaymentStatusFilter("");');
+  });
+
+  it("period, search and sort survive the lifecycle/payment dimension switch", () => {
+    // Only the KPI dimension is replaced on a KPI/header selection — page/date/search/sort remain
+    expect(PAGE).toContain('updateUrl({ status: code || undefined, paymentStatus: undefined, page: undefined })');
+    expect(PAGE).toContain('updateUrl({ paymentStatus: code || undefined, status: undefined, page: undefined })');
+    expect(PAGE).toContain('qs.set("dateFrom", dateFrom)');
+    expect(PAGE).toContain('qs.set("dateTo", dateTo)');
+    expect(PAGE).toContain('qs.set("search", search)');
+    expect(PAGE).toContain('qs.set("sortBy", sortBy)');
+  });
+});

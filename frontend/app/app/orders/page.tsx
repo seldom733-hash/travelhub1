@@ -621,11 +621,39 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
 function OrdersWithParams() {
   const sp = useSearchParams();
   const rawPage = parseInt(sp.get("page") ?? "", 10);
+
+  // UI-C1.2F.1D-R1: canonicalize dual-filter URLs. Orders KPI contract permits
+  // at most ONE active KPI dimension (status xor paymentStatus). If a deep link,
+  // reload, or Back/Forward restores both, normalize deterministically to a single
+  // dimension so the UI never renders two pressed KPI cards.
+  // Canonical precedence: lifecycle status wins over payment status.
+  const rawStatus = sp.get("status") ?? "";
+  const rawPaymentStatus = sp.get("paymentStatus") ?? "";
+  let initialStatus = rawStatus;
+  let initialPaymentStatus = rawPaymentStatus;
+  if (initialStatus && initialPaymentStatus) {
+    // status wins on conflict — deterministic, documented rule (§6).
+    initialPaymentStatus = "";
+    window.history.replaceState(null, "", `?${new URLSearchParams([
+      ['status', initialStatus],
+      ...(rawPaymentStatus ? [] : []),
+      ['search', sp.get('search') ?? ''],
+      ['sortBy', sp.get('sortBy') ?? ''],
+      ['sortDirection', sp.get('sortDirection') ?? ''],
+      ['from', sp.get('from') ?? sp.get('dateFrom') ?? ''],
+      ['to', sp.get('to') ?? sp.get('dateTo') ?? ''],
+      ['page', sp.get('page') ?? ''],
+      ['cancelledWithin', sp.get('cancelledWithin') ?? ''],
+      ['paymentFailed', sp.get('paymentFailed') ?? ''],
+      ['pendingRefund', sp.get('pendingRefund') ?? ''],
+    ].filter(([, v]) => v !== undefined && v !== '')).toString()}`);
+  }
+
   return (
     <OrdersContent
-      initialStatus={sp.get("status") ?? ""}
+      initialStatus={initialStatus}
       initialSearch={sp.get("search") ?? ""}
-      initialPaymentStatus={sp.get("paymentStatus") ?? ""}
+      initialPaymentStatus={initialPaymentStatus}
       initialCancelledWithin={sp.get("cancelledWithin") ?? ""}
       initialPaymentFailed={sp.get("paymentFailed") ?? ""}
       initialPendingRefund={sp.get("pendingRefund") ?? ""}
