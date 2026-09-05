@@ -353,6 +353,7 @@ export class PaymentService {
     refundStatus?: string;
     search?: string;
     currency?: string;
+    currencyCard?: string;
     dateFrom?: string;
     dateTo?: string;
     dateField?: string;
@@ -380,6 +381,7 @@ export class PaymentService {
       channelOrderIds,
       orderId: n.orderId,
       currency: n.currency,
+      currencyCard: n.currencyCard,
       searchText: n.search,
       searchOrderIds,
       dateFrom: n.range?.from,
@@ -478,6 +480,7 @@ export class PaymentService {
       channelOrderIds,
       orderId: n.orderId,
       currency: n.currency,
+      currencyCard: n.currencyCard,
       searchText: n.search,
       searchOrderIds,
       dateFrom: n.range?.from,
@@ -579,6 +582,7 @@ export class PaymentService {
     refundStatus?: string;
     search?: string;
     currency?: string;
+    currencyCard?: string;
     dateFrom?: string;
     dateTo?: string;
     dateField?: string;
@@ -591,6 +595,7 @@ export class PaymentService {
     refundStatus?: RefundStatus;
     search?: string;
     currency?: string;
+    currencyCard?: string;
     dateField: "createdAt" | "paidAt";
     range?: { from: Date; to: Date };
   } {
@@ -656,7 +661,18 @@ export class PaymentService {
       orderId = rawOrderId;
     }
 
-    return { denied, source, orderId, paymentStatus, refundStatus, search, currency, dateField, range };
+    // UI-C1.2F currency-card KPI: table-only currency filter, validated
+    // independently of the global `currency` param (both can coexist).
+    let currencyCard: string | undefined;
+    const rawCurrencyCard = query.currencyCard?.trim() ?? "";
+    if (rawCurrencyCard) {
+      if (!/^[A-Z]{3}$/.test(rawCurrencyCard)) {
+        throw new ValidationDomainError(`invalid currencyCard ${rawCurrencyCard}`);
+      }
+      currencyCard = rawCurrencyCard;
+    }
+
+    return { denied, source, orderId, paymentStatus, refundStatus, search, currency, currencyCard, dateField, range };
   }
 
   private parseDateParam(value: string | undefined, label: string): Date | undefined {

@@ -540,6 +540,12 @@ export class PaymentListQueryDto {
   @MaxLength(8)
   currency?: string;
 
+  /** UI-C1.2F — currency-card KPI table-only filter (overview aggregates unaffected). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  currencyCard?: string;
+
   @IsOptional()
   @IsString()
   dateFrom?: string;

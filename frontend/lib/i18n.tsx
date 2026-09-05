@@ -1156,6 +1156,23 @@ export const DICT: Record<string, Record<Locale, string>> = {
   // Finance payments page
   "finance.payments.title": { ru: "Платежи", az: "Ödənişlər", en: "Payments" },
   "finance.payments.empty": { ru: "Платежей пока нет", az: "Hələ ödəniş yoxdur", en: "No payments yet" },
+
+  // ── UI-C1.2F Payments registry (Operations Center) ─────────────────────
+  "payments.kpi.total": { ru: "Всего платежей", az: "Cəmi ödənişlər", en: "Total payments" },
+  "payments.group.payment_statuses": { ru: "Статусы платежей", az: "Ödəniş statusları", en: "Payment statuses" },
+  "payments.group.currencies": { ru: "Валюты", az: "Valyutalar", en: "Currencies" },
+  "payments.group.refund_statuses": { ru: "Статусы возвратов", az: "Geri qaytarma statusları", en: "Refund statuses" },
+  "payments.search.placeholder": { ru: "Поиск по коду, референсу, заказу…", az: "Kod, referens, sifariş axtarışı…", en: "Search by code, reference, order…" },
+  "payments.col.code": { ru: "Код", az: "Kod", en: "Code" },
+  "payments.col.created": { ru: "Создан", az: "Yaradılıb", en: "Created" },
+  "payments.col.amount": { ru: "Сумма", az: "Məbləğ", en: "Amount" },
+  "payments.col.currency": { ru: "Валюта", az: "Valyuta", en: "Currency" },
+  "payments.col.status": { ru: "Статус", az: "Status", en: "Status" },
+  "payments.col.method": { ru: "Метод", az: "Metod", en: "Method" },
+  "payments.col.order": { ru: "Заказ", az: "Sifariş", en: "Order" },
+  "payments.col.paid_at": { ru: "Оплачен", az: "Ödənilib", en: "Paid at" },
+  "payments.col.provider_ref": { ru: "Провайдер", az: "Provayder", en: "Provider" },
+  "payments.table.empty": { ru: "Платежей не найдено", az: "Ödəniş tapılmadı", en: "No payments found" },
   "finance.filter.all_currencies": { ru: "Все валюты", az: "Bütün valyutalar", en: "All currencies" },
   "finance.filter.all_statuses": { ru: "Все статусы", az: "Bütün statuslar", en: "All statuses" },
   "finance.filter.clear_status": { ru: "Статус", az: "Status", en: "Status" },
@@ -1257,6 +1274,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "status.entity.CANCELLED": { ru: "Отменён", az: "Ləğv edilib", en: "Cancelled" },
   "status.entity.REFUNDED": { ru: "Возврат", az: "Geri qaytarılıb", en: "Refunded" },
   "status.entity.REQUESTED": { ru: "Запрошен", az: "İstənilib", en: "Requested" },
+  "status.entity.APPROVED": { ru: "Одобрено", az: "Təsdiqlənib", en: "Approved" },
   "status.entity.PROCESSED": { ru: "Обработан", az: "Emal edilib", en: "Processed" },
   // Request decision statuses (supplierDecision / customerDecision)
   "status.decision.ACCEPTED": { ru: "Принято", az: "Qəbul edildi", en: "Accepted" },

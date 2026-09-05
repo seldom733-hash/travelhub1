@@ -106,6 +106,8 @@ export interface PaymentsScopeInput {
   refundStatus?: RefundStatus;
   /** Payment ids having a refund with the active refundStatus (TABLE ONLY). */
   refundPaymentIds?: string[];
+  /** ACTIVE KPI — TABLE ONLY: currency card click filters table only, not overview. */
+  currencyCard?: string;
 }
 
 export interface PaymentsScopes {
@@ -194,6 +196,10 @@ export function buildPaymentsScopes(input: PaymentsScopeInput): PaymentsScopes {
       tableClauses.push({ id: "" });
     }
   }
+  // UI-C1.2F currency-card KPI: table-only currency filter that never
+  // affects overview aggregates (paymentService.list builds overview on
+  // the baseWhere which does NOT include this clause).
+  if (input.currencyCard) tableClauses.push({ currency: input.currencyCard });
 
   return {
     baseWhere,

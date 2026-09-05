@@ -52,7 +52,7 @@ const STATUS_I18N_KEY: Record<string, string> = {
   CAPTURED: "status.entity.CAPTURED",
   AUTHORIZED: "status.entity.AUTHORIZED",
   FAILED: "status.entity.FAILED",
-  // Refund entity statuses
+  // Refund entity statuses (APPROVED maps to status.entity.APPROVED via CRM section)
   REQUESTED: "status.entity.REQUESTED",
   PROCESSED: "status.entity.PROCESSED",
   // Request decision statuses
@@ -144,7 +144,7 @@ const STATUS_CLS: Record<string, string> = {
   FAILED: "bg-red-50 text-red-600 border-red-200",
   // Refund entity statuses
   REQUESTED: "bg-amber-50 text-amber-700 border-amber-200",
-  PROCESSED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  PROCESSED: "bg-emerald-100 text-emerald-800 border-emerald-300",
   // Request decision statuses
   ACCEPTED: "bg-emerald-50 text-emerald-700 border-emerald-200",
   DECLINED: "bg-red-50 text-red-600 border-red-200",
