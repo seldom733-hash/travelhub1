@@ -10,6 +10,20 @@ import { getEffectiveTravelerRequirements } from "../catalog/traveler-requiremen
 import { OrderService } from "./order.service";
 import { Prisma } from "../../generated/prisma/client";
 
+/**
+ * Validate date string for API boundary (422 on malformed input).
+ * Returns a valid Date or throws BadRequestException.
+ * Shared by list and KPI to ensure validation parity.
+ */
+function validateDateParam(value: string | undefined, paramName: string): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    throw new BadRequestException(`${paramName} must be a valid date`);
+  }
+  return d;
+}
+
 /** Default SLA: 24 hours for supplier response */
 const DEFAULT_SUPPLIER_SLA_HOURS = 24;
 /** Default customer TTL: 48 hours after supplier confirmation */
@@ -210,8 +224,8 @@ export class RequestService {
       ...(allSearchConditions.length ? { OR: allSearchConditions } : {}),
       ...(query.dateFrom || query.dateTo ? {
         createdAt: {
-          ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-          ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+          ...(query.dateFrom ? { gte: validateDateParam(query.dateFrom, "dateFrom") } : {}),
+          ...(query.dateTo ? { lt: validateDateParam(query.dateTo, "dateTo") } : {}),
         },
       } : {}),
     };
@@ -771,8 +785,8 @@ export class RequestService {
     const where: any = {};
     if (query?.dateFrom || query?.dateTo) {
       where.createdAt = {
-        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-        ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+        ...(query.dateFrom ? { gte: validateDateParam(query.dateFrom, "dateFrom") } : {}),
+        ...(query.dateTo ? { lt: validateDateParam(query.dateTo, "dateTo") } : {}),
       };
     }
 
@@ -782,7 +796,15 @@ export class RequestService {
       _count: { status: true },
     });
 
+    // UI-C1.2F.1A R1: zero-fill all 12 canonical Request statuses so
+    // every status is always present in the response (zero-count included).
+    const ALL_STATUSES = [
+      "NEW", "CHECKING", "SUPPLIER_TIMEOUT", "PRICE_CHANGED",
+      "CUSTOMER_ACCEPTED", "CONFIRMED", "CONVERTED", "REJECTED",
+      "UNAVAILABLE", "EXPIRED", "CUSTOMER_PAYMENT_TIMEOUT", "CANCELLED_BY_CUSTOMER",
+    ] as const;
     const kpi: Record<string, number> = { total: 0 };
+    for (const s of ALL_STATUSES) kpi[s.toLowerCase()] = 0;
     for (const c of counts) {
       kpi[c.status.toLowerCase()] = c._count.status;
       kpi.total += c._count.status;
