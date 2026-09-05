@@ -22,6 +22,8 @@ interface SortableHeaderProps {
   alignRight?: boolean;
   /** Optional: additional CSS classes */
   className?: string;
+  /** Optional: filter control rendered next to sort button */
+  filterSlot?: React.ReactNode;
 }
 
 /**
@@ -43,6 +45,7 @@ export default function SortableHeader({
   onSort,
   alignRight = false,
   className = "",
+  filterSlot,
 }: SortableHeaderProps) {
   const isActive = currentSort?.sortBy === field;
   const direction: SortDirection | null = isActive ? currentSort.sortDirection : null;
@@ -58,18 +61,21 @@ export default function SortableHeader({
     <th
       className={`px-4 py-2.5 font-medium ${alignRight ? 'text-right' : ''} ${className}`}
     >
-      <button
-        type="button"
-        onClick={handleClick}
-        className={`inline-flex items-center gap-1 text-left text-xs font-medium uppercase tracking-wide text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ${alignRight ? 'flex-row-reverse text-right' : ''}`}
-        aria-sort={isActive ? (direction === "asc" ? "ascending" : "descending") : "none"}
-        title={isActive ? `Sorted ${direction === "asc" ? "ascending" : "descending"}` : "Click to sort"}
-      >
-        {children}
-        <span className="text-slate-400" aria-hidden="true">
-          {isActive ? (direction === "asc" ? "↑" : "↓") : ""}
-        </span>
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={handleClick}
+          className={`inline-flex items-center gap-1 text-left text-xs font-medium uppercase tracking-wide text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 ${alignRight ? 'flex-row-reverse text-right' : ''}`}
+          aria-sort={isActive ? (direction === "asc" ? "ascending" : "descending") : "none"}
+          title={isActive ? `Sorted ${direction === "asc" ? "ascending" : "descending"}` : "Click to sort"}
+        >
+          {children}
+          <span className="text-slate-400" aria-hidden="true">
+            {isActive ? (direction === "asc" ? "↑" : "↓") : ""}
+          </span>
+        </button>
+        {filterSlot}
+      </div>
     </th>
   );
 }

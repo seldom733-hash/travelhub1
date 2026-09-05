@@ -9,6 +9,7 @@ import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
 import Pagination from "@/components/Pagination";
 import OrderActionBar from "@/components/order/OrderActionBar";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
+import TableHeaderFilter, { type FilterOption } from "@/components/TableHeaderFilter";
 import TableExportButton from "@/components/TableExportButton";
 import OperationsCenterShell, {
   OperationsToolbarSlot,
@@ -66,6 +67,14 @@ const ORDER_EXCEPTION_STATES = [
 const ORDER_PAYMENT_STATUSES = [
   "UNPAID", "PARTIALLY_PAID", "PAID", "REFUNDED",
 ] as const;
+
+/** Build filter options for TableHeaderFilter from canonical status arrays. */
+function buildStatusFilterOptions(locale: Locale): FilterOption[] {
+  return ORDER_LIFECYCLE_STATUSES.map((s) => ({ value: s, label: lifecycleLabel(s, locale) }));
+}
+function buildPaymentFilterOptions(locale: Locale): FilterOption[] {
+  return ORDER_PAYMENT_STATUSES.map((s) => ({ value: s, label: paymentLabel(s, locale) }));
+}
 
 function lifecycleLabel(code: string, locale: Locale): string {
   const key = `order.status.${code}`;
@@ -184,15 +193,17 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   // UI-C1.2F.1B: Local date controls removed — period is Header-owned (GLOBAL scope).
   // dateFrom/dateTo state is read from URL and passed to API; Header manages them.
 
-  const filtersActive = Boolean(statusFilter || paymentStatusFilter || search);
+  const filtersActive = Boolean(statusFilter || paymentStatusFilter || search || sortBy);
   // Reset clears registry-specific filters but PRESERVES Header Period.
   const handleReset = useCallback(() => {
     setSearchDraft("");
     setSearch("");
     setStatusFilter("");
     setPaymentStatusFilter("");
+    setSortBy(undefined);
+    setSortDirection(undefined);
     setPage(1);
-    updateUrl({ search: undefined, status: undefined, paymentStatus: undefined, page: undefined });
+    updateUrl({ search: undefined, status: undefined, paymentStatus: undefined, sortBy: undefined, sortDirection: undefined, page: undefined });
   }, [updateUrl]);
 
   const load = async () => {
@@ -383,29 +394,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               aria-label={t("admin.search.placeholder_orders", locale)}
               className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
-            <select
-              value={statusFilter}
-              onChange={(e) => applyStatus(e.target.value)}
-              aria-label={t("admin.filter.all_statuses", locale)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="">{t("admin.filter.all_statuses", locale)}</option>
-              {ORDER_LIFECYCLE_STATUSES.map((s) => (
-                <option key={s} value={s}>{lifecycleLabel(s, locale)}</option>
-              ))}
-            </select>
-            <select
-              value={paymentStatusFilter}
-              onChange={(e) => applyPaymentStatus(e.target.value)}
-              aria-label={t("admin.filter.all_payments", locale)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="">{t("admin.filter.all_payments", locale)}</option>
-              {ORDER_PAYMENT_STATUSES.map((s) => (
-                <option key={s} value={s}>{paymentLabel(s, locale)}</option>
-              ))}
-            </select>
-            {/* UI-C1.2F.1B: Local date controls removed — period is Header-owned. */}
+            {/* UI-C1.2F.1D: Status + Payment filters moved to table header */}
             <button
               type="button"
               onClick={handleReset}
@@ -453,8 +442,36 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                     <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.date", locale)}</SortableHeader>
                     <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.amount", locale)}</SortableHeader>
                     <th className="px-4 py-2.5 font-medium">{t("admin.table.col.items", locale)}</th>
-                    <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.status", locale)}</SortableHeader>
-                    <SortableHeader field="paymentStatus" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.payment", locale)}</SortableHeader>
+                    <SortableHeader
+                      field="status"
+                      currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null}
+                      onSort={handleSort}
+                      filterSlot={
+                        <TableHeaderFilter
+                          id="orders-filter-status"
+                          label=""
+                          options={buildStatusFilterOptions(locale)}
+                          value={statusFilter || ""}
+                          onChange={applyStatus}
+                          ariaLabel={t("admin.filter.all_statuses", locale)}
+                        />
+                      }
+                    >{t("admin.table.col.status", locale)}</SortableHeader>
+                    <SortableHeader
+                      field="paymentStatus"
+                      currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null}
+                      onSort={handleSort}
+                      filterSlot={
+                        <TableHeaderFilter
+                          id="orders-filter-payment"
+                          label=""
+                          options={buildPaymentFilterOptions(locale)}
+                          value={paymentStatusFilter || ""}
+                          onChange={applyPaymentStatus}
+                          ariaLabel={t("admin.filter.all_payments", locale)}
+                        />
+                      }
+                    >{t("admin.table.col.payment", locale)}</SortableHeader>
                     {paymentFailed === "true" && <th className="px-4 py-2.5 font-medium text-red-600">{t("admin.table.col.payment", locale)}</th>}
                     {pendingRefund === "true" && <th className="px-4 py-2.5 font-medium text-amber-600">{t("admin.table.col.refund", locale)}</th>}
                     {cancelledWithin && <SortableHeader field="cancelledAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.cancel_date", locale)}</SortableHeader>}

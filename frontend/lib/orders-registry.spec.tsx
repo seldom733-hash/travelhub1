@@ -93,9 +93,9 @@ describe("UI-C1.2C §4/§6/§30 — all 12 OrderStatus values have a visible KPI
     expect(cardLoops).toBeGreaterThanOrEqual(4);
   });
 
-  it("filter dropdown offers all 12 canonical statuses (nothing is filter-only — all have cards too)", () => {
-    expect(PAGE).toContain("ORDER_LIFECYCLE_STATUSES.map((s) =>");
-    expect(PAGE).toContain('<option value="">{t("admin.filter.all_statuses", locale)}</option>');
+  it("filter options cover all 12 canonical statuses via buildStatusFilterOptions", () => {
+    expect(PAGE).toContain("ORDER_LIFECYCLE_STATUSES.map");
+    expect(PAGE).toContain("buildStatusFilterOptions");
   });
 });
 
@@ -134,10 +134,11 @@ describe("UI-C1.2C §7/§5/§12 — semantic grouping + no false transitions", (
 
   it("payment status dimension is rendered in its own group, never mixed into lifecycle", () => {
     expect(PAGE).toContain("orders.group.payment");
-    const paymentStart = PAGE.indexOf("ORDER_PAYMENT_STATUSES.map");
-    const paymentSection = PAGE.slice(paymentStart, paymentStart + 1000);
-    expect(paymentSection).toContain('label={paymentLabel(code, locale)}');
-    expect(paymentSection).toContain('active={selectedPayment === code}');
+    // KPI cards render payment status with paymentLabel + selectedPayment
+    expect(PAGE).toContain('label={paymentLabel(code, locale)}');
+    expect(PAGE).toContain('active={selectedPayment === code}');
+    // Table header filter also covers payment status
+    expect(PAGE).toContain("buildPaymentFilterOptions");
   });
 });
 
@@ -349,31 +350,30 @@ describe("UI-C1.2C §18/§23 — URL state, direct URL, Back/Forward, Reset", ()
     expect(PAGE).toContain("<OrdersWithParams />");
   });
 
-  it("Reset clears search/status/paymentStatus, page → 1, URL normalized — Header Period preserved", () => {
+  it("Reset clears search/status/paymentStatus/sort, page → 1, URL normalized — Header Period preserved", () => {
     expect(PAGE).toContain("const handleReset = useCallback(");
     expect(PAGE).toContain('setSearch("")');
     expect(PAGE).toContain('setStatusFilter("")');
     expect(PAGE).toContain('setPaymentStatusFilter("")');
-    // UI-C1.2F.1B: Reset preserves Header Period (dateFrom/dateTo NOT cleared)
-    expect(PAGE).toContain('updateUrl({ search: undefined, status: undefined, paymentStatus: undefined, page: undefined })');
+    expect(PAGE).toContain('setSortBy(undefined)');
+    expect(PAGE).toContain('setSortDirection(undefined)');
+    // UI-C1.2F.1D: Reset also clears sort params
+    expect(PAGE).toContain('sortBy: undefined, sortDirection: undefined');
     expect(PAGE).toContain('t("filters.reset", locale)');
   });
 });
 
 describe("UI-C1.2C §16 — canonical toolbar order", () => {
-  it("order is [Search][Lifecycle status][Payment status][Reset][CSV][XLSX] — period is Header-owned", () => {
+  it("toolbar is [Search][Reset][CSV][XLSX] — Status/Payment filters moved to table header", () => {
     const searchIdx = PAGE.indexOf('placeholder={t("admin.search.placeholder_orders"');
-    const statusIdx = PAGE.indexOf('aria-label={t("admin.filter.all_statuses"');
-    const paymentIdx = PAGE.indexOf('aria-label={t("admin.filter.all_payments"');
     const resetIdx = PAGE.indexOf('t("filters.reset", locale)');
     const exportIdx = PAGE.indexOf("<TableExportButton");
     expect(searchIdx).toBeGreaterThan(-1);
-    expect(statusIdx).toBeGreaterThan(searchIdx);
-    expect(paymentIdx).toBeGreaterThan(statusIdx);
-    expect(resetIdx).toBeGreaterThan(paymentIdx);
+    expect(resetIdx).toBeGreaterThan(searchIdx);
     expect(exportIdx).toBeGreaterThan(resetIdx);
-    // UI-C1.2F.1B: local date controls removed — period is Header-owned
-    expect(PAGE).toContain('UI-C1.2F.1B: Local date controls removed');
+    // UI-C1.2F.1D: Status/Payment filters are now in table header via TableHeaderFilter
+    expect(PAGE).toContain('UI-C1.2F.1D: Status + Payment filters moved to table header');
+    expect(PAGE).toContain('TableHeaderFilter');
   });
 
   it("export carries the same active server filters (status/paymentStatus/dates/search)", () => {
