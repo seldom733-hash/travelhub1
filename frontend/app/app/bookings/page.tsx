@@ -161,6 +161,12 @@ function BookingsContent({ initialUpcoming, initialOverdue, initialSlaMinutes, i
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // UI-C1.2F.1B-R1: Sync dateFrom/dateTo when Header Period changes the URL.
+  useEffect(() => {
+    setDateFrom(initialDateFrom || "");
+    setDateTo(initialDateTo || "");
+  }, [initialDateFrom, initialDateTo]);
+
   // ── URL-state writes (replaceState — ADR-OPS-012). Detector params that
   // arrive via deep links are preserved unless explicitly reset. ─────────────
   const updateUrl = useCallback((params: Record<string, string | undefined>) => {

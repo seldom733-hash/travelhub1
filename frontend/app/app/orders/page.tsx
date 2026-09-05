@@ -115,6 +115,12 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // UI-C1.2F.1B-R1: Sync dateFrom/dateTo when Header Period changes the URL.
+  useEffect(() => {
+    setDateFrom(initialDateFrom || "");
+    setDateTo(initialDateTo || "");
+  }, [initialDateFrom, initialDateTo]);
+
   // ── URL-state writes (replaceState — ADR-OPS-012). Detector/sort params that
   // arrive via deep links are preserved unless explicitly reset. ─────────────
   const updateUrl = useCallback((params: Record<string, string | undefined>) => {
@@ -262,14 +268,6 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
   return (
     <OperationsCenterShell
       activeDomain="orders"
-      headerActions={
-        <button
-          onClick={() => void load()}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-        >
-          {t("admin.table.refresh", locale)}
-        </button>
-      }
     >
       <div className="flex min-w-0 flex-1 items-start gap-4">
         <div className="min-w-0 flex-1 space-y-4">

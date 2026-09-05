@@ -215,9 +215,14 @@ function RequestsContent({
     [updateUrl],
   );
 
-  // UI-C1.2F.1B: Period state from shared Header.
-  const [dateFrom] = useState(initialDateFrom);
-  const [dateTo] = useState(initialDateTo);
+  // UI-C1.2F.1B: Period state from shared Header — synced from URL via initial* props.
+  const [dateFrom, setDateFrom] = useState(initialDateFrom || "");
+  const [dateTo, setDateTo] = useState(initialDateTo || "");
+  // Sync when Header Period changes the URL (parent re-renders with new initial*).
+  useEffect(() => {
+    setDateFrom(initialDateFrom || "");
+    setDateTo(initialDateTo || "");
+  }, [initialDateFrom, initialDateTo]);
 
   // Reset — clears search + status, page → 1, but PRESERVES Header Period.
   const handleReset = useCallback(() => {

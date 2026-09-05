@@ -164,6 +164,12 @@ function PaymentsContent({
   const [dateFrom, setDateFrom] = useState(initialDateFrom || "");
   const [dateTo, setDateTo] = useState(initialDateTo || "");
 
+  // UI-C1.2F.1B-R1: Sync dateFrom/dateTo when Header Period changes the URL.
+  useEffect(() => {
+    setDateFrom(initialDateFrom || "");
+    setDateTo(initialDateTo || "");
+  }, [initialDateFrom, initialDateTo]);
+
   // Sort
   const [sortBy, setSortBy] = useState<string | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<SortDirection | undefined>(initialSortDirection);
