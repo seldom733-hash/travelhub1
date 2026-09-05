@@ -1,0 +1,422 @@
+{
+ "total": 83,
+ "passed": 83,
+ "failed": 0,
+ "results": [
+  {
+   "name": "login (admin -> /app)",
+   "ok": true,
+   "detail": "http://localhost:3000/app/dashboard"
+  },
+  {
+   "name": "baseline url clean",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests"
+  },
+  {
+   "name": "Total KPI present + default pressed",
+   "ok": true,
+   "detail": "total=646"
+  },
+  {
+   "name": "CHECKING KPI count present",
+   "ok": true,
+   "detail": "22"
+  },
+  {
+   "name": "baseline table shows mixed statuses",
+   "ok": true,
+   "detail": "['Конвертированы', 'Недоступны', 'Отклонены', 'Таймаут оплаты клиента', 'Таймаут поставщика']"
+  },
+  {
+   "name": "baseline list request has NO status/sort",
+   "ok": true,
+   "detail": "['http://localhost:3000/api/v1/requests?page=1&pageSize=20', 'http://localhost:3000/api/v1/requests?page=1&pageSize=20']"
+  },
+  {
+   "name": "Status header filter exists + closed",
+   "ok": true,
+   "detail": "id present"
+  },
+  {
+   "name": "filter opens listbox (aria-expanded true)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "dropdown lists canonical status option «На проверке»",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A: URL has status=CHECKING (page cleared)",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?status=CHECKING"
+  },
+  {
+   "name": "A: KPI CHECKING selected",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A: header filter active state",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A: table only CHECKING rows",
+   "ok": true,
+   "detail": "{'На проверке'}"
+  },
+  {
+   "name": "A: KPI overview counts STATIC under status filter",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "A: server list request carries status=CHECKING only (no sort)",
+   "ok": true,
+   "detail": "['http://localhost:3000/api/v1/requests?page=1&pageSize=20&status=CHECKING']"
+  },
+  {
+   "name": "B: URL updates to status=NEW",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?status=NEW"
+  },
+  {
+   "name": "B: previous CHECKING deselected",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B: NEW selected",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B: header filter follows KPI (active for NEW)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "B: table only NEW rows",
+   "ok": true,
+   "detail": "{'Новые'}"
+  },
+  {
+   "name": "C: URL status cleared",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests"
+  },
+  {
+   "name": "C: header filter back to inactive",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "C: Total pressed again",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "C: table returns full scope",
+   "ok": true,
+   "detail": "['Конвертированы', 'Недоступны', 'Отклонены', 'Таймаут оплаты клиента', 'Таймаут поставщика']"
+  },
+  {
+   "name": "D createdAt asc: URL sortBy=createdAt&sortDirection=asc",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?sortBy=createdAt&sortDirection=asc"
+  },
+  {
+   "name": "D createdAt asc rows ordered",
+   "ok": true,
+   "detail": "['02.01.2026', '02.01.2026', '02.01.2026']"
+  },
+  {
+   "name": "D createdAt desc: second click toggles direction",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?sortBy=createdAt&sortDirection=desc"
+  },
+  {
+   "name": "D createdAt desc rows reversed",
+   "ok": true,
+   "detail": "['31.12.2026', '30.12.2026', '26.12.2026']"
+  },
+  {
+   "name": "D toggle changes actual row order",
+   "ok": true,
+   "detail": "['02.01.2026', '02.01.2026', '02.01.2026'] vs ['31.12.2026', '30.12.2026', '26.12.2026']"
+  },
+  {
+   "name": "D price asc URL",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?sortBy=displayedPrice&sortDirection=asc"
+  },
+  {
+   "name": "D price asc sorted numerically",
+   "ok": true,
+   "detail": "['12.61 AZN', '12.84 AZN', '13.08 AZN']"
+  },
+  {
+   "name": "D price desc sorted",
+   "ok": true,
+   "detail": "['1374.25 USD', '1183.05 USD', '1010.22 USD']"
+  },
+  {
+   "name": "D serviceDate asc URL",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?sortBy=serviceDate&sortDirection=asc"
+  },
+  {
+   "name": "D serviceDate asc rows ordered",
+   "ok": true,
+   "detail": "['05.01.2026', '07.01.2026', '10.01.2026']"
+  },
+  {
+   "name": "D status asc URL",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?sortBy=status&sortDirection=asc"
+  },
+  {
+   "name": "D status desc URL",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?sortBy=status&sortDirection=desc"
+  },
+  {
+   "name": "D status asc/desc produce different orderings",
+   "ok": true,
+   "detail": "['Новые', 'Новые', 'Новые'] vs ['Таймаут оплаты клиента', 'Таймаут оплаты клиента', 'Таймаут оплаты клиента']"
+  },
+  {
+   "name": "on page 2 (URL page=2)",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?page=2"
+  },
+  {
+   "name": "sort change drops page param",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?sortBy=createdAt&sortDirection=asc"
+  },
+  {
+   "name": "sort change returns to first page rows",
+   "ok": true,
+   "detail": "MKT-REQ-00000496 -> MKT-REQ-00000752"
+  },
+  {
+   "name": "E: URL status+sort combined",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?status=CHECKING&sortBy=serviceDate&sortDirection=asc"
+  },
+  {
+   "name": "E: rows all CHECKING + sorted by serviceDate asc",
+   "ok": true,
+   "detail": "{'На проверке'} | ['17.08.2026', '21.08.2026', '21.08.2026']"
+  },
+  {
+   "name": "E: server request has status + sort params",
+   "ok": true,
+   "detail": "['http://localhost:3000/api/v1/requests?page=1&pageSize=20&status=CHECKING&sortBy=serviceDate&sortDirection=asc']"
+  },
+  {
+   "name": "F: search input present in toolbar",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "F: URL keeps period+search+status+sort",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?dateFrom=2026-01-01&dateTo=2026-12-31&search=MKT-REQ-09000014&status=CHECKING&sortBy=serviceDate&sortDirection=asc"
+  },
+  {
+   "name": "F: server request carries all five params",
+   "ok": true,
+   "detail": "['http://localhost:3000/api/v1/requests?page=1&pageSize=20&status=CHECKING&search=MKT-REQ-09000014&dateFrom=2026-01-01&dateTo=2026-12-31&sortBy=serviceDate&sortDirection=asc']"
+  },
+  {
+   "name": "F: non-empty table result for combined scope",
+   "ok": true,
+   "detail": "['MKT-REQ-09000014']"
+  },
+  {
+   "name": "Search alone -> URL search present",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?search=CRM-00000167"
+  },
+  {
+   "name": "Search+Status+Sort coexist in URL",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?search=CRM-00000167&status=CONVERTED&sortBy=referenceNumber&sortDirection=asc"
+  },
+  {
+   "name": "rows all Конвертированы for combined scope",
+   "ok": true,
+   "detail": "{'Конвертированы'}"
+  },
+  {
+   "name": "Reload: URL unchanged",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?status=CHECKING&sortBy=createdAt&sortDirection=asc"
+  },
+  {
+   "name": "Reload: KPI CHECKING still selected",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Reload: header filter still active",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Reload: table still CHECKING-only",
+   "ok": true,
+   "detail": "{'На проверке'}"
+  },
+  {
+   "name": "Orders tab: requests params not leaked",
+   "ok": true,
+   "detail": "http://localhost:3000/app/orders"
+  },
+  {
+   "name": "Back: requests filter+sort restored",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?status=CHECKING&sortBy=createdAt&sortDirection=asc"
+  },
+  {
+   "name": "Back: KPI + header state restored",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Forward: orders restored",
+   "ok": true,
+   "detail": "http://localhost:3000/app/orders"
+  },
+  {
+   "name": "Tab-switch precondition: requests URL carries period+status+search+sort",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?dateFrom=2026-01-01&dateTo=2026-12-31&search=CRM-00000167&status=CONVERTED&sortBy=referenceNumber&sortDirection=asc"
+  },
+  {
+   "name": "Tab switch keeps period only",
+   "ok": true,
+   "detail": "http://localhost:3000/app/orders?dateFrom=2026-01-01&dateTo=2026-12-31"
+  },
+  {
+   "name": "Tab switch resets search/status/sort/page",
+   "ok": true,
+   "detail": "http://localhost:3000/app/orders?dateFrom=2026-01-01&dateTo=2026-12-31"
+  },
+  {
+   "name": "Reset precondition: params present",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?dateFrom=2026-01-01&dateTo=2026-12-31&search=CRM-00000167&status=CONVERTED&sortBy=referenceNumber&sortDirection=asc"
+  },
+  {
+   "name": "Reset button present in toolbar",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Reset clears status/search/sort/page",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?dateFrom=2026-01-01&dateTo=2026-12-31"
+  },
+  {
+   "name": "Reset preserves Header Period",
+   "ok": true,
+   "detail": "http://localhost:3000/app/requests?dateFrom=2026-01-01&dateTo=2026-12-31"
+  },
+  {
+   "name": "Reset: Total selected again",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Export fires server-side endpoint",
+   "ok": true,
+   "detail": "http://localhost:3000/api/v1/requests/export?status=CHECKING&search=MKT-REQ-09000014&format=csv"
+  },
+  {
+   "name": "Export carries status/search scope",
+   "ok": true,
+   "detail": "http://localhost:3000/api/v1/requests/export?status=CHECKING&search=MKT-REQ-09000014&format=csv"
+  },
+  {
+   "name": "Export does NOT carry sort (existing behavior kept)",
+   "ok": true,
+   "detail": "http://localhost:3000/api/v1/requests/export?status=CHECKING&search=MKT-REQ-09000014&format=csv"
+  },
+  {
+   "name": "a11y: listbox open with role=option count 12+1",
+   "ok": true,
+   "detail": "13"
+  },
+  {
+   "name": "a11y: Escape closes and focus returns to filter",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "a11y: status sort button aria-sort ascending",
+   "ok": true,
+   "detail": "ascending"
+  },
+  {
+   "name": "responsive 1680: no page-level horizontal overflow",
+   "ok": true,
+   "detail": "overflow=0px"
+  },
+  {
+   "name": "responsive 1680: 12 status KPI cards + Total rendered",
+   "ok": true,
+   "detail": "13"
+  },
+  {
+   "name": "responsive 1680: toolbar search + Status header filter present",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "responsive 768: no page-level horizontal overflow",
+   "ok": true,
+   "detail": "overflow=0px"
+  },
+  {
+   "name": "responsive 768: 12 status KPI cards + Total rendered",
+   "ok": true,
+   "detail": "13"
+  },
+  {
+   "name": "responsive 768: toolbar search + Status header filter present",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "responsive 390: no page-level horizontal overflow",
+   "ok": true,
+   "detail": "overflow=0px"
+  },
+  {
+   "name": "responsive 390: 12 status KPI cards + Total rendered",
+   "ok": true,
+   "detail": "13"
+  },
+  {
+   "name": "responsive 390: toolbar search + Status header filter present",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "popover usable: dropdown inside viewport (1680)",
+   "ok": true,
+   "detail": "{\"x\": 1305.28125, \"y\": 515.5, \"width\": 160, \"height\": 486}"
+  },
+  {
+   "name": "popover usable: 13 options selectable",
+   "ok": true,
+   "detail": ""
+  }
+ ]
+}

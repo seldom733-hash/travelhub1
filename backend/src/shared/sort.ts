@@ -31,7 +31,9 @@ export function buildSortClause(
   allowlist: Record<string, string>,
   defaultSort: Record<string, SortDirection>,
 ): Record<string, SortDirection>[] {
-  if (!sortBy || !(sortBy in allowlist)) {
+  // Own-property check only: `in` also matches inherited Object.prototype keys
+  // (__proto__, constructor), which would otherwise reach the query builder.
+  if (!sortBy || !Object.prototype.hasOwnProperty.call(allowlist, sortBy)) {
     return [
       ...Object.entries(defaultSort).map(([k, v]) => ({ [k]: v })),
       TIE_BREAKER,

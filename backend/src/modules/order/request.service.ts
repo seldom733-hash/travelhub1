@@ -9,6 +9,7 @@ import { ConflictError, ValidationDomainError } from "../../shared/errors";
 import { getEffectiveTravelerRequirements } from "../catalog/traveler-requirements";
 import { OrderService } from "./order.service";
 import { Prisma } from "../../generated/prisma/client";
+import { assertValidRequestSort, buildRequestOrderBy } from "./request-sort";
 
 /**
  * Validate date string for API boundary (422 on malformed input).
@@ -55,6 +56,8 @@ interface ListRequestQuery {
   pageSize?: number;
   dateFrom?: string;
   dateTo?: string;
+  sortBy?: string;
+  sortDirection?: string;
 }
 
 @Injectable()
@@ -176,6 +179,10 @@ export class RequestService {
     const isExport = query.pageSize === 10000; // export requests all records
     const pageSize = isExport ? 10000 : Math.min(100, Math.max(1, query.pageSize ?? 20));
 
+    // UI-C1.2F.1G: canonical sort boundary validation (HTTP 400 on an explicitly
+    // disallowed sortBy / malformed sortDirection) — same convention as dates.
+    assertValidRequestSort(query.sortBy, query.sortDirection);
+
     // Build search: first resolve names/codes to IDs, then filter
     let searchOr: any[] | undefined;
     let searchCustomerIds: string[] | undefined;
@@ -233,7 +240,7 @@ export class RequestService {
     const [items, total] = await Promise.all([
       this.prisma.request.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: buildRequestOrderBy(query.sortBy, query.sortDirection),
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

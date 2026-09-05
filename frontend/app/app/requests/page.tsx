@@ -9,6 +9,8 @@ import Pagination from "@/components/Pagination";
 import TableExportButton from "@/components/TableExportButton";
 import StatusBadge from "@/components/StatusBadge";
 import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
+import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
+import TableHeaderFilter from "@/components/TableHeaderFilter";
 import OperationsCenterShell, {
   OperationsToolbarSlot,
   OperationsRegistrySlot,
@@ -110,22 +112,24 @@ function fmtDateTime(iso: string | null, locale: Locale): string {
 }
 
 /**
- * UI-C1.2B — Requests registry with URL-state synchronization.
+ * UI-C1.2B/UI-C1.2F.1G — Requests registry with URL-state synchronization.
  *
- * Canonical query params (ADR-OPS-012 subset actually implemented — the
- * Requests list endpoint has NO sort allowlist and KPI parity for period is
- * absent, so no sort/date params exist):
+ * Canonical query params (ADR-OPS-012 subset; Header Period is global scope
+ * and server-side sorting is allowlisted on the Requests list endpoint):
  *
- *   ?search=&status=&page=
+ *   ?search=&status=&dateFrom=&dateTo=&sortBy=&sortDirection=&page=
  *
- * - status cards / select set ?status= (server-side registry fetch, page → 1);
- * - Total card click clears ?status= (page → 1);
+ * - status KPI cards AND the Status table-header filter share ONE state and
+ *   both set ?status= (server-side fetch, page → 1);
+ * - Total card click / "All" header option clears ?status= (page → 1);
+ * - sortable column headers (SortableHeader) set ?sortBy=&sortDirection=
+ *   (server-side fetch, page → 1);
  * - debounced search syncs ?search=;
- * - Reset clears search+status+page and normalizes the URL;
+ * - Reset clears search+status+sort+page but PRESERVES Header Period;
  * - reload / direct URL / browser Back-Forward restore state from the URL;
- * - no date/period params: KPI endpoint stays global (UI-C1.2 §26 option A —
- *   the Requests date filter is intentionally hidden until KPI scope parity,
- *   which is staged to UI-C1.2E). UI-C1.2B §11.
+ * - Header Period (?dateFrom=/dateTo=) is GLOBAL scope: KPI overview AND table
+ *   recompute together, while status/sort stay table-only (KPI counts static
+ *   under status filtering, UI-C1.2F.1G §9).
  */
 function RequestsContent({
   initialStatus,
@@ -133,12 +137,16 @@ function RequestsContent({
   initialPage,
   initialDateFrom,
   initialDateTo,
+  initialSortBy,
+  initialSortDirection,
 }: {
   initialStatus: string;
   initialSearch: string;
   initialPage: number;
   initialDateFrom: string;
   initialDateTo: string;
+  initialSortBy: string;
+  initialSortDirection: string;
 }) {
   const locale = useLocale();
   const router = useRouter();
@@ -153,20 +161,23 @@ function RequestsContent({
   const [statusFilter, setStatusFilter] = useState(initialStatus || "");
   const [searchDraft, setSearchDraft] = useState(initialSearch || "");
   const [search, setSearch] = useState(initialSearch || "");
+  const [sortBy, setSortBy] = useState(initialSortBy || "");
+  const [sortDirection, setSortDirection] = useState<SortDirection>((initialSortDirection as SortDirection) || "desc");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── URL-state writes (replaceState — ADR-OPS-012: filter changes rewrite the
   // current history entry; Back/Forward stays for route navigation) ──────────
+  // UI-C1.2F.1G: updateUrl touches ONLY the keys the caller passes (undefined =
+  // delete that key). Unrelated params — Header Period (dateFrom/dateTo), search,
+  // status, sort — are preserved across every write (URL authority §16/§18): a
+  // sort change never drops the active status/search filter, and vice versa.
   const updateUrl = useCallback(
-    (params: { search?: string; status?: string; page?: string }) => {
+    (params: { search?: string; status?: string; page?: string; sortBy?: string; sortDirection?: string }) => {
       const sp = new URLSearchParams(window.location.search);
-      const apply = (key: string, value: string | undefined) => {
+      for (const [key, value] of Object.entries(params)) {
         if (value) sp.set(key, value);
         else sp.delete(key);
-      };
-      apply("search", params.search);
-      apply("status", params.status);
-      apply("page", params.page);
+      }
       const qs = sp.toString();
       window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
     },
@@ -205,7 +216,9 @@ function RequestsContent({
     };
   }, []);
 
-  // Apply a canonical status (KPI card click or filter select). Server-side.
+  // Apply a canonical status — shared by the KPI card click and the Status
+  // table-header filter (TableHeaderFilter onChange). One state, one URL param.
+  // UI-C1.2F.1G §7: header filter ↔ KPI card stay in sync. Server-side.
   const applyStatus = useCallback(
     (code: string) => {
       setStatusFilter(code);
@@ -214,6 +227,20 @@ function RequestsContent({
     },
     [updateUrl],
   );
+
+  // Sort handler for SortableHeader (shared sort UX — UI-C1.2F.1G §14).
+  // Sort change resets page → 1 (URL authority, §16) and is server-side.
+  const handleSort = useCallback(
+    (field: string, direction: SortDirection) => {
+      setSortBy(field);
+      setSortDirection(direction);
+      setPage(1);
+      updateUrl({ sortBy: field, sortDirection: direction, page: undefined });
+    },
+    [updateUrl],
+  );
+
+  const currentSort = sortBy ? { sortBy, sortDirection } : null;
 
   // UI-C1.2F.1B: Period state from shared Header — synced from URL via initial* props.
   const [dateFrom, setDateFrom] = useState(initialDateFrom || "");
@@ -224,20 +251,22 @@ function RequestsContent({
     setDateTo(initialDateTo || "");
   }, [initialDateFrom, initialDateTo]);
 
-  // Reset — clears search + status, page → 1, but PRESERVES Header Period.
+  // Reset — clears search + status + sort, page → 1, but PRESERVES Header Period.
   const handleReset = useCallback(() => {
     setSearchDraft("");
     setSearch("");
     setStatusFilter("");
+    setSortBy("");
+    setSortDirection("desc");
     setPage(1);
-    updateUrl({ search: undefined, status: undefined, page: undefined });
+    updateUrl({ search: undefined, status: undefined, sortBy: undefined, sortDirection: undefined, page: undefined });
   }, [updateUrl]);
 
-  // Server-side registry fetch under the active query scope (status + search + period).
+  // Server-side registry fetch under the active query scope (status + search + period + sort).
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, statusFilter, search, dateFrom, dateTo]);
+  }, [page, statusFilter, search, dateFrom, dateTo, sortBy, sortDirection]);
 
   // UI-C1.2F.1B: KPI re-fetches when period changes (GLOBAL scope → KPI + table).
   useEffect(() => {
@@ -256,6 +285,8 @@ function RequestsContent({
       if (search) params.set("search", search);
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
+      if (sortBy) params.set("sortBy", sortBy);
+      if (sortBy) params.set("sortDirection", sortDirection);
       const d = (await api.get(`/requests?${params.toString()}`)) as any;
       setRequests(d.data);
       setTotal(d.total);
@@ -282,19 +313,27 @@ function RequestsContent({
   }
 
   const selectedStatus = statusFilter || "";
-  const filtersActive = Boolean(statusFilter || search);
+  const filtersActive = Boolean(statusFilter || search || sortBy);
   const pageChange = (p: number) => {
     setPage(p);
     updateUrl({ page: p > 1 ? String(p) : undefined });
   };
 
-  // Build export URL with current filters (search/status/period server-side scope)
+  // Build export URL with the current server-side table scope (UI-C1.2F.1G §21:
+  // period + search + status). Sorting is intentionally NOT forwarded — the
+  // Requests export endpoint keeps its existing default createdAt desc order.
   const exportParams = new URLSearchParams();
   if (statusFilter) exportParams.set("status", statusFilter);
   if (search) exportParams.set("search", search);
   if (dateFrom) exportParams.set("dateFrom", dateFrom);
   if (dateTo) exportParams.set("dateTo", dateTo);
   const exportUrl = `/api/v1/requests/export?${exportParams.toString()}`;
+
+  // TableHeaderFilter options for Status column
+  const statusFilterOptions = REQUEST_LIFECYCLE_STATUSES.map((code) => ({
+    value: code,
+    label: requestStatusLabel(code, locale),
+  }));
 
   return (
     <OperationsCenterShell activeDomain="requests">
@@ -336,8 +375,10 @@ function RequestsContent({
           </div>
         )}
 
-        {/* Toolbar — canonical visible order: [Search][Status][Reset][CSV][XLSX].
-            No date/period control: Requests KPI stays global (UI-C1.2B §11/§12). */}
+        {/* Toolbar — canonical visible order: [Search][Reset][CSV][XLSX].
+            UI-C1.2F.1G: Status filter lives in the Status table header (shared
+            TableHeaderFilter), never duplicated in the toolbar. Period is
+            Header-owned (GLOBAL scope, UI-C1.2F.1B). */}
         <OperationsToolbarSlot>
           <input
             value={searchDraft}
@@ -347,20 +388,6 @@ function RequestsContent({
             aria-label={t("requests.search_placeholder", locale)}
             className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
-
-          <select
-            value={statusFilter}
-            onChange={(e) => applyStatus(e.target.value)}
-            aria-label={t("admin.filter.all_statuses", locale)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="">{t("admin.filter.all_statuses", locale)}</option>
-            {REQUEST_LIFECYCLE_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {requestStatusLabel(s, locale)}
-              </option>
-            ))}
-          </select>
 
           <button
             type="button"
@@ -387,16 +414,16 @@ function RequestsContent({
             <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
               <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">{t("requests.ref", locale)}</th>
+                  <SortableHeader field="referenceNumber" currentSort={currentSort} onSort={handleSort}>{t("requests.ref", locale)}</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">{t("requests.customer", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("requests.product", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("requests.supplier", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("requests.displayed_price", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("requests.confirmed_price", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("requests.service_date", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("admin.table.col.status", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("requests.created", locale)}</th>
-                  <th className="px-4 py-2.5 font-medium">{t("requests.sla_deadline", locale)}</th>
+                  <SortableHeader field="displayedPrice" currentSort={currentSort} onSort={handleSort}>{t("requests.displayed_price", locale)}</SortableHeader>
+                  <SortableHeader field="confirmedPrice" currentSort={currentSort} onSort={handleSort}>{t("requests.confirmed_price", locale)}</SortableHeader>
+                  <SortableHeader field="serviceDate" currentSort={currentSort} onSort={handleSort}>{t("requests.service_date", locale)}</SortableHeader>
+                  <SortableHeader field="status" currentSort={currentSort} onSort={handleSort} filterSlot={<TableHeaderFilter id="requests-status-filter" label="" options={statusFilterOptions} value={statusFilter} onChange={applyStatus} ariaLabel={t("admin.filter.all_statuses", locale)} />}>{t("admin.table.col.status", locale)}</SortableHeader>
+                  <SortableHeader field="createdAt" currentSort={currentSort} onSort={handleSort}>{t("requests.created", locale)}</SortableHeader>
+                  <SortableHeader field="slaDeadline" currentSort={currentSort} onSort={handleSort}>{t("requests.sla_deadline", locale)}</SortableHeader>
                 </tr>
               </thead>
               <tbody>
@@ -468,6 +495,7 @@ function RequestsContent({
 function RequestsWithParams() {
   const sp = useSearchParams();
   const rawPage = parseInt(sp.get("page") ?? "", 10);
+  const rawSortDirection = sp.get("sortDirection");
   return (
     <RequestsContent
       initialStatus={sp.get("status") ?? ""}
@@ -475,6 +503,10 @@ function RequestsWithParams() {
       initialPage={Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1}
       initialDateFrom={sp.get("dateFrom") ?? ""}
       initialDateTo={sp.get("dateTo") ?? ""}
+      initialSortBy={sp.get("sortBy") ?? ""}
+      initialSortDirection={
+        rawSortDirection === "asc" || rawSortDirection === "desc" ? rawSortDirection : ""
+      }
     />
   );
 }

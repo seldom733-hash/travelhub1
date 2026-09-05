@@ -12,6 +12,9 @@ function read(rel: string): string {
 }
 
 const PAGE = read("app/app/requests/page.tsx");
+// Shared sorting primitive that Requests columns delegate to (UI-C1.2F.1G §14 —
+// no Requests-only sorting component may be invented).
+const SORTABLE_HEADER = read("components/SortableHeader.tsx");
 const LOCALES = ["ru", "az", "en"] as const;
 
 /** The 12 ACTUAL canonical RequestStatus values (source of truth §3). */
@@ -176,22 +179,20 @@ describe("UI-C1.2B §15/§17 — URL state + Reset", () => {
     expect(PAGE).toContain("<RequestsWithParams />");
   });
 
-  it("Reset clears search + status, page → 1, URL normalized, server refresh", () => {
+  it("Reset clears search + status + sort, page → 1, URL normalized, server refresh", () => {
     expect(PAGE).toContain("const handleReset = useCallback(");
     expect(PAGE).toContain('setSearch("")');
     expect(PAGE).toContain('setStatusFilter("")');
-    expect(PAGE).toContain('updateUrl({ search: undefined, status: undefined, page: undefined })');
+    expect(PAGE).toContain('updateUrl({ search: undefined, status: undefined, sortBy: undefined, sortDirection: undefined, page: undefined })');
     expect(PAGE).toContain('t("filters.reset", locale)');
   });
 
-  it("toolbar order is canonical: Search first, then Status, then Reset, then CSV/XLSX", () => {
+  it("toolbar order is canonical: Search, then Reset, then CSV/XLSX (Status moved to table header)", () => {
     const searchIdx = PAGE.indexOf('placeholder={t("requests.search_placeholder"');
-    const statusIdx = PAGE.indexOf('aria-label={t("admin.filter.all_statuses"');
     const resetIdx = PAGE.indexOf('t("filters.reset", locale)');
     const exportIdx = PAGE.indexOf("<TableExportButton");
     expect(searchIdx).toBeGreaterThan(-1);
-    expect(statusIdx).toBeGreaterThan(searchIdx);
-    expect(resetIdx).toBeGreaterThan(statusIdx);
+    expect(resetIdx).toBeGreaterThan(searchIdx);
     expect(exportIdx).toBeGreaterThan(resetIdx);
   });
 });
@@ -261,5 +262,215 @@ describe("UI-C1.2B §26 — responsive-safe composition contract (testable class
   it("locale-aware dates in the table (RU/AZ/EN BCP-47, no hardcoded ru-RU)", () => {
     expect(PAGE).toContain("LOCALE_TAGS[locale]");
     expect(PAGE).not.toContain('toLocaleDateString("ru-RU")');
+  });
+});
+
+describe("UI-C1.2F.1G §5/§6 — Status removed from toolbar; Status header filter exists", () => {
+  it("no native select (Status dropdown) remains in the Requests page toolbar", () => {
+    expect(PAGE).not.toContain("<select");
+  });
+
+  it("Status filter renders inside the Status table header via the shared TableHeaderFilter", () => {
+    expect(PAGE).toContain('import TableHeaderFilter from "@/components/TableHeaderFilter";');
+    expect(PAGE).toContain('<TableHeaderFilter id="requests-status-filter"');
+    expect(PAGE).toContain('options={statusFilterOptions} value={statusFilter} onChange={applyStatus}');
+    expect(PAGE).toContain('ariaLabel={t("admin.filter.all_statuses", locale)}');
+  });
+
+  it("Status header filter options derive from the 12 canonical RequestStatus values", () => {
+    expect(PAGE).toContain("const statusFilterOptions = REQUEST_LIFECYCLE_STATUSES.map((code) => ({");
+    const blockIdx = PAGE.indexOf("const statusFilterOptions = REQUEST_LIFECYCLE_STATUSES.map");
+    const block = PAGE.slice(blockIdx, blockIdx + 300);
+    expect(block).toContain("value: code,");
+    expect(block).toContain("label: requestStatusLabel(code, locale),");
+    // no invented / legacy statuses — same source of truth as the KPI cards
+    expect(block).not.toContain("CANCELLED");
+    expect(block).not.toContain("PAID");
+  });
+
+  it("no duplication: exactly one Status filter control exists, and it lives in the header", () => {
+    expect((PAGE.match(/requests-status-filter/g) ?? []).length).toBe(1);
+    expect((PAGE.match(/<TableHeaderFilter/g) ?? []).length).toBe(1);
+  });
+});
+
+describe("UI-C1.2F.1G §7/§8/§9 — KPI ↔ header filter share one state; one active KPI; static overview", () => {
+  it("KPI card click and Status header filter route through the same applyStatus → one statusFilter state", () => {
+    expect(PAGE).toContain("const applyStatus = useCallback(");
+    expect(PAGE).toContain("onClick={() => applyStatus(code)}");
+    expect(PAGE).toContain("onChange={applyStatus}");
+    // no second, independent Status filter state was introduced
+    expect(PAGE).not.toContain("statusHeaderFilter");
+  });
+
+  it("statusFilter is the single selected-KPI source: exactly one card can be active at a time", () => {
+    expect(PAGE).toContain('const selectedStatus = statusFilter || "";');
+    expect(PAGE).toContain("active={selectedStatus === code}");
+    expect(PAGE).toContain("active={!selectedStatus}");
+  });
+
+  it("clearing status (Total card / header «Все») clears the URL param and deactivates status cards", () => {
+    expect(PAGE).toContain('setStatusFilter("");');
+    expect(PAGE).toContain("updateUrl({ status: undefined, page: undefined })");
+  });
+
+  it("KPI overview is STATIC under status filtering — the KPI fetch never carries status/search/sort", () => {
+    const kpiStart = PAGE.indexOf("async function loadKpi()");
+    const kpiEnd = PAGE.indexOf("const selectedStatus = statusFilter || \"\";");
+    const kpiBody = PAGE.slice(kpiStart, kpiEnd);
+    expect(kpiBody).toContain("/requests/kpi");
+    expect(kpiBody).toContain('params.set("dateFrom", dateFrom)');
+    expect(kpiBody).toContain('params.set("dateTo", dateTo)');
+    expect(kpiBody).not.toContain('params.set("status"');
+    expect(kpiBody).not.toContain('params.set("search"');
+    expect(kpiBody).not.toContain('params.set("sortBy"');
+    // only two Requests data fetches exist: scoped list + global-overview KPI
+  });
+});
+
+describe("UI-C1.2F.1G §14/§15 — sortable headers use shared SortableHeader; Status sort + filter coexist", () => {
+  const SORTABLE_FIELDS = [
+    "referenceNumber",
+    "displayedPrice",
+    "confirmedPrice",
+    "serviceDate",
+    "status",
+    "createdAt",
+    "slaDeadline",
+  ];
+
+  it(`all ${SORTABLE_FIELDS.length} eligible columns use the shared SortableHeader`, () => {
+    expect(PAGE).toContain('import SortableHeader, { type SortDirection } from "@/components/SortableHeader";');
+    for (const field of SORTABLE_FIELDS) {
+      expect(PAGE).toContain(`SortableHeader field="${field}"`);
+    }
+  });
+
+  it("customer/product/supplier are NOT sortable and stay plain <th> (no backend-safe mapping)", () => {
+    for (const field of ["customer", "product", "supplier"]) {
+      expect(PAGE).not.toContain(`SortableHeader field="${field}"`);
+    }
+    const plainTh = PAGE.match(/<th className="px-4 py-2.5 font-medium">\{t\("requests\.(customer|product|supplier)"/g) ?? [];
+    expect(plainTh.length).toBe(3);
+  });
+
+  it("Status column supports sort AND filter as two independent controls in the same header", () => {
+    // sort target = the Status column label (sort button); filter target = the
+    // dedicated filter button with its own accessible name (all_statuses).
+    expect(PAGE).toContain('field="status" currentSort={currentSort} onSort={handleSort} filterSlot={<TableHeaderFilter');
+    expect(PAGE).toContain('id="requests-status-filter"');
+  });
+
+  it("shared SortableHeader provides the canonical sort UX (toggle, aria-sort, button semantics)", () => {
+    expect(SORTABLE_HEADER).toContain("type=\"button\"");
+    expect(SORTABLE_HEADER).toContain('isActive && direction === "asc" ? "desc" : "asc"'); // click cycle asc↔desc
+    expect(SORTABLE_HEADER).toContain("onSort(field, newDirection)");
+    expect(SORTABLE_HEADER).toContain("aria-sort");
+  });
+});
+
+describe("UI-C1.2F.1G §16/§22 — URL authority + server-side sorting", () => {
+  it("sortBy/sortDirection are canonical Requests URL params (documented on the page)", () => {
+    expect(PAGE).toContain("sortBy=&sortDirection=&page=");
+    expect(PAGE).toContain('rawSortDirection = sp.get("sortDirection")');
+  });
+
+  it("sort click writes URL and resets page → 1; server list request carries the sort", () => {
+    const hsStart = PAGE.indexOf("const handleSort = useCallback(");
+    const hsEnd = PAGE.indexOf("const currentSort = sortBy");
+    const hs = PAGE.slice(hsStart, hsEnd);
+    expect(hs).toContain("setSortBy(field);");
+    expect(hs).toContain("setSortDirection(direction);");
+    expect(hs).toContain("setPage(1);");
+    expect(hs).toContain("updateUrl({ sortBy: field, sortDirection: direction, page: undefined })");
+  });
+
+  it("status filter change resets page → 1 through the same server-scope path", () => {
+    const asStart = PAGE.indexOf("const applyStatus = useCallback(");
+    const asEnd = PAGE.indexOf("// Sort handler");
+    const as = PAGE.slice(asStart, asEnd);
+    expect(as).toContain("setStatusFilter(code);");
+    expect(as).toContain("setPage(1);");
+    expect(as).toContain("updateUrl({ status: code || undefined, page: undefined })");
+  });
+
+  it("sort is a server query param — no client-side row reordering exists", () => {
+    expect(PAGE).toContain('if (sortBy) params.set("sortBy", sortBy);');
+    expect(PAGE).toContain('if (sortBy) params.set("sortDirection", sortDirection);');
+    expect(PAGE).not.toContain("requests.sort(");
+    expect(PAGE).not.toContain(".filter((r) =>");
+  });
+
+  it("updateUrl touches only the keys passed — period and unrelated params are never cleared", () => {
+    const uStart = PAGE.indexOf("const updateUrl = useCallback(");
+    const uEnd = PAGE.indexOf("// Live search with debounce");
+    const u = PAGE.slice(uStart, uEnd);
+    expect(u).not.toContain('apply("dateFrom"');
+    expect(u).not.toContain('apply("dateTo"');
+    expect(u).not.toContain("dateFrom: undefined");
+    expect(u).not.toContain("dateTo: undefined");
+  });
+});
+
+describe("UI-C1.2F.1G §17/§28 — reload state derivation (URL → state on mount)", () => {
+  it("status + sort state initialize from the URL (no useState(initialX) desync on reload/deep-link)", () => {
+    expect(PAGE).toContain('initialStatus={sp.get("status") ?? ""}');
+    expect(PAGE).toContain('initialSortBy={sp.get("sortBy") ?? ""}');
+    expect(PAGE).toContain("initialSortDirection={");
+    expect(PAGE).toContain('const [statusFilter, setStatusFilter] = useState(initialStatus || "");');
+    expect(PAGE).toContain('const [sortBy, setSortBy] = useState(initialSortBy || "");');
+    expect(PAGE).toContain('const [sortDirection, setSortDirection] = useState<SortDirection>((initialSortDirection as SortDirection) || "desc");');
+  });
+
+  it("only asc|desc is accepted as a deep-link sortDirection value", () => {
+    expect(PAGE).toContain('rawSortDirection === "asc" || rawSortDirection === "desc" ? rawSortDirection : ""');
+  });
+
+  it("period state stays URL-synced when the Header Period changes the URL", () => {
+    expect(PAGE).toContain("initialDateFrom={sp.get(\"dateFrom\") ?? \"\"}");
+    expect(PAGE).toContain("initialDateTo={sp.get(\"dateTo\") ?? \"\"}");
+    expect(PAGE).toContain("setDateFrom(initialDateFrom || \"\");");
+    expect(PAGE).toContain("setDateTo(initialDateTo || \"\");");
+  });
+});
+
+describe("UI-C1.2F.1G §18/§19 — Search/Status/Sort coexistence + Reset semantics", () => {
+  it("Search + Status + Sort + Period are composed into ONE server list request", () => {
+    const loadStart = PAGE.indexOf("async function loadData()");
+    const loadEnd = PAGE.indexOf("// UI-C1.2F.1B: KPI with shared Header Period scope.");
+    const body = PAGE.slice(loadStart, loadEnd);
+    expect(body).toContain('params.set("status", statusFilter)');
+    expect(body).toContain('params.set("search", search)');
+    expect(body).toContain('if (sortBy) params.set("sortBy", sortBy);');
+    expect(body).toContain('if (sortBy) params.set("sortDirection", sortDirection);');
+    expect(body).toContain('if (dateFrom) params.set("dateFrom", dateFrom);');
+    expect(body).toContain("api.get(`/requests?${params.toString()}`)");
+  });
+
+  it("Reset clears search + status + sort + page but PRESERVES Header Period", () => {
+    const resetIdx = PAGE.indexOf("const handleReset = useCallback(");
+    const resetBody = PAGE.slice(resetIdx, resetIdx + 700);
+    expect(resetBody).toContain('setSearch("")');
+    expect(resetBody).toContain('setStatusFilter("")');
+    expect(resetBody).toContain('setSortBy("")');
+    expect(resetBody).toContain('setSortDirection("desc")');
+    expect(resetBody).toContain("setPage(1);");
+    expect(resetBody).toContain("updateUrl({ search: undefined, status: undefined, sortBy: undefined, sortDirection: undefined, page: undefined })");
+    expect(resetBody).not.toContain("setDateFrom(");
+    expect(resetBody).not.toContain("setDateTo(");
+  });
+});
+
+describe("UI-C1.2F.1G §21 — export scope (server-side, period+search+status, existing order kept)", () => {
+  it("export forwards the active table scope but intentionally keeps existing sort behavior", () => {
+    const expIdx = PAGE.indexOf("const exportParams = new URLSearchParams();");
+    const expBody = PAGE.slice(expIdx, expIdx + 500);
+    expect(expBody).toContain('exportParams.set("status", statusFilter)');
+    expect(expBody).toContain('exportParams.set("search", search)');
+    expect(expBody).toContain('exportParams.set("dateFrom", dateFrom)');
+    expect(expBody).toContain('exportParams.set("dateTo", dateTo)');
+    expect(expBody).not.toContain('exportParams.set("sortBy"');
+    expect(expBody).not.toContain('exportParams.set("sortDirection"');
+    expect(PAGE).toContain("const exportUrl = `/api/v1/requests/export?${exportParams.toString()}`;");
   });
 });

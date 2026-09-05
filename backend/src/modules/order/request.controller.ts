@@ -34,6 +34,8 @@ export class RequestController {
     @Query("pageSize") pageSize?: string,
     @Query("dateFrom") dateFrom?: string,
     @Query("dateTo") dateTo?: string,
+    @Query("sortBy") sortBy?: string,
+    @Query("sortDirection") sortDirection?: string,
   ) {
     return this.requestService.listRequests({
       status,
@@ -44,6 +46,8 @@ export class RequestController {
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
       dateFrom,
       dateTo,
+      sortBy,
+      sortDirection,
     });
   }
 
