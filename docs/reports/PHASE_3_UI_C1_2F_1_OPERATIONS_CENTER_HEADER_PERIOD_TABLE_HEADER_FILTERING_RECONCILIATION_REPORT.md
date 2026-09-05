@@ -2,9 +2,11 @@
 
 ## A. Executive Summary
 
-Unified architecture **IS FEASIBLE**. All 4 registries have backend dateFrom/dateTo support on `createdAt`. Three registries (Orders, Bookings, Payments) already expose date filters in the toolbar with KPI scope parity. Requests has backend support but frontend does NOT expose it, and the Requests KPI endpoint is a separate global endpoint that does NOT accept date params — this is the **only architectural gap requiring a business decision**.
+Unified architecture **IS FEASIBLE**. All 4 registries have backend `dateFrom`/`dateTo` support on `createdAt`. Three registries (Orders, Bookings, Payments) already expose date filters in the toolbar with KPI scope parity. Requests has backend support but frontend does NOT expose it, and the Requests KPI endpoint is a separate global endpoint that does NOT accept date params — this is the **only architectural gap requiring a backend change before Header Period can be implemented**.
 
-Moving period to the shared Operations Center Header is feasible for Orders/Bookings/Payments immediately. Requests period requires a KPI backend change to scope counts by date. Table-header filtering for status/payment/currency dimensions is feasible as a UI migration of existing toolbar controls to table-header dropdowns, preserving the existing server-side contract.
+**Critical architectural rule (R2 correction):** The shared Operations Center Header Period is a **GLOBAL SCOPE**. It MUST synchronously re-scope both KPI overview values and the table. It is NOT merely a table filter. Static KPI overview means static against **table-only filters**, not against Header Period.
+
+Requests will NOT gain toolbar date controls. Instead, Requests will consume the shared Header Period directly (once its KPI endpoint gains date scope). Table-header filtering for status/payment/currency dimensions is feasible as a UI migration of existing toolbar controls to table-header dropdowns, preserving the existing server-side contract.
 
 ## B. Current-State Evidence
 
@@ -78,11 +80,13 @@ Moving period to the shared Operations Center Header is feasible for Orders/Book
 
 **Requests gap detail**: The backend controller accepts `dateFrom`/`dateTo` and the service filters `createdAt`. But the frontend never sends these params. Furthermore, the KPI endpoint (`/requests/kpi`) uses `prisma.request.groupBy` with NO where clause — it always returns global counts regardless of date. Moving period to the Header while Requests KPI remains global would create a visible inconsistency: the table filters by date but the KPI cards show global counts.
 
+**R2 correction**: Requests will NOT gain toolbar date controls. Instead, Requests will consume the shared Header Period directly — the Header's `dateFrom`/`dateTo` will be passed to both the Requests list query and the Requests KPI query (once the KPI backend gains date scope). No local date inputs.
+
 ## D. Filter Ownership Matrix
 
 | Filter | Header | Toolbar | KPI | Table Header | Global vs Table-only | Persist Across Tabs |
 |---|---|---|---|---|---|---:|
-| Period (dateFrom/dateTo) | **TARGET** | CURRENT (Orders/Bookings/Payments) | affected (Orders/Bookings/Payments) | NO | GLOBAL (affects KPI + table) | **YES** (target) |
+| Period (dateFrom/dateTo) | **TARGET** | CURRENT (Orders/Bookings/Payments) — to be removed | affected (all 4 after G1) | NO | **GLOBAL** (affects KPI + table) | **YES** (target) |
 | Search | NO | YES (all 4) | NO | NO | GLOBAL registry scope | NO |
 | Status | NO | YES (all 4) | YES (all 4) | **TARGET** | TABLE-ONLY | NO |
 | Payment Status | NO | YES (Orders) | YES (Orders) | **TARGET** | TABLE-ONLY | NO |
@@ -117,14 +121,79 @@ All tabs are `<Link href="/app/requests">` etc. — plain anchor navigation. The
 
 **Tab-switch target**: To preserve period across tabs, the period params (`dateFrom`/`dateTo`) must be included in each tab's `<Link href>`. This requires the shell or a shared context to hold the current period state and construct tab links with period params.
 
-## F. Tab-Switch Contract
+## F. Period Change vs Tab Switch — MANDATORY DISTINCTION (R2)
 
-### Current behavior
-- Tab switch → full route change → each registry reads initial state from URL
-- No state is preserved (each registry starts fresh from its URL params)
+These are fundamentally different operations and MUST NOT be conflated.
 
-### Target behavior
+### Period change within same registry
+
+```text
+KEEP:
+  compatible selected KPI / table-only filter
+
+CHANGE:
+  KPI overview values → recompute under new period (server-authoritative)
+  table → refetch under new period + existing table-only filter
+  page → 1
 ```
+
+Example:
+```text
+September, selected KPI = IN_PROCESSING, KPI count = 35, table = September + IN_PROCESSING
+
+→ change Header Period to October
+
+selected KPI remains IN_PROCESSING
+KPI count recomputes, e.g. 42 (server-authoritative)
+table = October + IN_PROCESSING
+page = 1
+```
+
+### Switch to another registry
+
+```text
+KEEP:
+  Header Period (dateFrom/dateTo)
+
+RESET:
+  selected KPI → Total / default
+  table-only filters (status, paymentStatus, refundStatus, currencyCard)
+  search
+  page → 1
+  registry-specific state (sort unless explicitly justified later)
+```
+
+### Static KPI contract — clarified (R2)
+
+"Static KPI overview" means:
+
+```text
+static relative to TABLE-ONLY filters
+```
+
+It does **NOT** mean:
+
+```text
+static relative to GLOBAL period
+```
+
+Canonical behavior:
+
+```text`
+STATUS / PAYMENT / REFUND / CURRENCY-CARD CHANGE (table-only)
+→ table changes
+→ KPI overview values stay unchanged
+
+HEADER PERIOD CHANGE (global scope)
+→ table changes
+→ KPI overview values RECOMPUTE (server-authoritative)
+```
+
+This distinction is mandatory and must appear explicitly in all architecture documentation.
+
+### Tab-Switch Target Behavior
+
+```text
 Period → persists across tabs (via URL params in tab links)
 Status/PaymentStatus/RefundStatus/CurrencyCard → reset on tab switch
 Search → reset on tab switch
@@ -132,14 +201,15 @@ Page → reset to 1 on tab switch
 KPI selection → reset to Total on tab switch
 ```
 
-### Implementation mechanism
+### Implementation Mechanism
+
 The `OperationsCenterShell` currently receives `activeDomain` and renders tab links as plain `<Link href>`. To preserve period:
 
-**Option A**: Shell receives `currentSearchParams` (or the period subset) and appends them to each tab's `href`. The shell would need to read `useSearchParams()` and construct tab links like `/app/orders?dateFrom=2026-09-01&dateTo=2026-10-01`.
+**Option A** (recommended): Shell reads `useSearchParams()`, extracts only period params (`dateFrom`/`dateTo`), and appends them to each tab `href`. E.g., `/app/orders?dateFrom=2026-09-01&dateTo=2026-10-01`.
 
 **Option B**: A shared URL-state context/provider wraps the Operations Center and manages period state.
 
-Option A is simpler and consistent with the URL-authoritative model. Option B is more flexible but adds state management overhead. **Recommendation: Option A** — the shell reads current search params, extracts only period params (`dateFrom`/`dateTo`), and appends them to tab `href`s.
+Option A is simpler and consistent with the URL-authoritative model.
 
 ## G. KPI / Table-Header Synchronization Contract
 
@@ -156,17 +226,43 @@ Both entry points write to the same URL param and trigger the same server query.
 
 For Payments, `paymentStatus`, `refundStatus`, and `currencyCard` are three independent dimensions. The current "one active card" rule applies: selecting one clears the other two. Table-header filters should follow the same rule.
 
+**Global scope interaction**: Header Period change is a GLOBAL scope change. It recomputes ALL KPI overview values and refetches the table. The selected table-only filter (e.g., `status=IN_PROCESSING`) is preserved across period changes — the KPI count for that status recomputes under the new period, and the table filters by the new period + the preserved status.
+
 ## H. Reset Semantics
 
-### Current behavior
-- Reset clears ALL registry-specific filters (search, status, paymentStatus, dateFrom, dateTo, page)
-- Each registry's Reset is a local operation
+### Registry Reset
 
-### Target behavior
-- **Registry Reset**: clears search, status/paymentStatus/refundStatus/currencyCard, page → 1. Does NOT clear Header Period.
-- **Header Period clear**: separate control (e.g., "×" button on the period display in the header). Clears dateFrom/dateTo across all tabs.
+```text
+clears:
+  search
+  status
+  paymentStatus
+  refundStatus
+  currencyCard
+  page → 1
+  other registry-specific table filters
 
-This separation prevents a registry Reset from unexpectedly changing the shared Operations Center context.
+preserves:
+  dateFrom
+  dateTo
+```
+
+### Header Period clear
+
+```text
+clears:
+  dateFrom
+  dateTo
+
+preserves:
+  compatible selected KPI / table-only filter
+
+page → 1
+KPI overview → recompute for default/unbounded period
+table → refetch for default/unbounded period + selected table-only filter
+```
+
+If the product has a defined default period instead of unbounded scope, document the actual behavior from code/contract.
 
 **Implementation**: The Reset button handler should explicitly exclude `dateFrom`/`dateTo` from its `updateUrl` clear list. A separate period-clear handler in the header should clear those params.
 
@@ -194,66 +290,67 @@ This separation prevents a registry Reset from unexpectedly changing the shared 
 
 ## K. Gap Register
 
-| # | Gap | Classification | Severity | Required action |
-|---|---|---|---|---|
-| G1 | Requests KPI endpoint has no date scope | BACKEND REQUIRED | HIGH | Add dateFrom/dateTo to `getRequestKpi()` + KPI controller |
-| G2 | Requests frontend does not expose dateFrom/dateTo | FRONTEND REQUIRED | MEDIUM | Add date inputs to Requests toolbar (after G1) |
-| G3 | OperationsCenterShell has no period slot | DESIGN + FRONTEND REQUIRED | HIGH | Add period display/control to header; pass period to tab links |
-| G4 | Tab links are plain `<Link href>` — no shared state | FRONTEND REQUIRED | HIGH | Shell reads URL params, appends dateFrom/dateTo to tab hrefs |
-| G5 | Status/PaymentStatus/RefundStatus in toolbar should move to table header | DESIGN + FRONTEND REQUIRED | MEDIUM | Migrate toolbar dropdowns to table-header filter dropdowns |
-| G6 | Requests has no sortable headers | FRONTEND REQUIRED | LOW | Add SortableHeader to Requests table |
-| G7 | Orders accepts `from`/`to` as aliases for `dateFrom`/`dateTo` | COMPATIBILITY REQUIRED | LOW | Preserve aliases during any param normalization |
-| G8 | Payments has `dateField` param (createdAt/paidAt) | COMPATIBILITY REQUIRED | LOW | Header period should default to createdAt; paidAt remains analytics-only |
-| G9 | No table-header filter component exists yet | DESIGN + FRONTEND REQUIRED | HIGH | Create shared TableHeaderFilter component |
-| G10 | Reset must not clear shared period | FRONTEND REQUIRED | MEDIUM | Exclude dateFrom/dateTo from registry Reset handler |
+| # | Gap | Classification | Required action |
+|---|---|---|---|
+| G1 | Requests KPI endpoint has no date scope | BACKEND REQUIRED | Extend Requests KPI query/controller/service/validation so KPI counts use the same `createdAt` date scope as Requests list |
+| G2 | Requests frontend is not wired to shared Header Period | FRONTEND REQUIRED | Consume Header/URL `dateFrom`/`dateTo` in Requests table and KPI calls. Do NOT add registry-toolbar date inputs |
+| G3 | OperationsCenterShell has no period slot | DESIGN + FRONTEND REQUIRED | Add period display/control to header; pass period to tab links |
+| G4 | Tab links are plain `<Link href>` — no shared state | FRONTEND REQUIRED | Shell reads URL params, appends `dateFrom`/`dateTo` to tab hrefs |
+| G5 | Status/PaymentStatus/RefundStatus in toolbar should move to table header | DESIGN + FRONTEND REQUIRED | Migrate toolbar dropdowns to table-header filter dropdowns |
+| G6 | Requests has no sortable headers | FRONTEND REQUIRED | Add SortableHeader to Requests table |
+| G7 | Orders accepts `from`/`to` as aliases for `dateFrom`/`dateTo` | COMPATIBILITY REQUIRED | Preserve aliases during any param normalization |
+| G8 | Payments has `dateField` param (createdAt/paidAt) | COMPATIBILITY REQUIRED | Header period should default to createdAt; paidAt remains analytics-only |
+| G9 | No table-header filter component exists yet | DESIGN + FRONTEND REQUIRED | Create shared TableHeaderFilter component |
+| G10 | Reset must not clear shared period | FRONTEND REQUIRED | Exclude `dateFrom`/`dateTo` from registry Reset handler |
 
 ## L. Implementation Plan
 
 ### Recommended Sequence
 
 ```
-UI-C1.2F.1A — Requests KPI date scope (backend)
-  Add dateFrom/dateTo to getRequestKpi() endpoint
-  Verify KPI counts scope by date
-  ~1 backend file change
+UI-C1.2F.1A — Requests KPI Date Scope
+  → make /requests/kpi period-aware
+  → same createdAt semantics as list
+  Affected: Requests KPI controller/service/query validation as required
 
-UI-C1.2F.1B — Shared Operations Center Header Period (shell + all registries)
-  Add period display/control to OperationsCenterShell header
-  Shell reads URL dateFrom/dateTo, appends to tab links
-  Remove dateFrom/dateTo from Orders/Bookings/Payments toolbar
-  Add dateFrom/dateTo to Requests toolbar (now KPI-scoped)
-  Period clear = separate from Reset
-  ~5 files: shell + 4 registry pages
+UI-C1.2F.1B — Shared Operations Center Header Period
+  → Header owns date UI
+  → URL owns period state
+  → tab links preserve only period
+  → Orders/Bookings/Payments local date controls removed
+  → Requests consumes Header period directly
+  → NO Requests toolbar date controls
+  → global period recomputes KPI + table
+  → registry Reset preserves period
+  Affected: OperationsCenterShell, Requests/Orders/Bookings/Payments registries,
+            shared URL/query helpers where applicable, i18n, tests
 
-UI-C1.2F.1C — Table-Header Filter Component (shared)
-  Create shared TableHeaderFilter dropdown component
-  ARIA: aria-haspopup, aria-expanded, keyboard navigation
-  Responsive: compact on mobile
+UI-C1.2F.1C — Shared TableHeaderFilter Component
+  Affected: shared component, i18n, tests
 
-UI-C1.2F.1D — Orders table-header filtering
-  Move status + paymentStatus from toolbar to table-header dropdowns
-  KPI ↔ table-header sync via shared URL state
-  ~1 file: orders/page.tsx
+UI-C1.2F.1D — Orders Table-Header Filtering
+  → Move status + paymentStatus from toolbar to table-header dropdowns
+  → KPI ↔ table-header sync via shared URL state
+  Affected: Orders registry
 
-UI-C1.2F.1E — Bookings table-header filtering
-  Move status from toolbar to table-header dropdown
-  ~1 file: bookings/page.tsx
+UI-C1.2F.1E — Bookings Table-Header Filtering
+  → Move status from toolbar to table-header dropdown
+  Affected: Bookings registry
 
-UI-C1.2F.1F — Payments table-header filtering
-  Move paymentStatus/refundStatus/currencyCard from KPI-only to table-header dropdowns
-  Preserve currency global scope vs currencyCard table-only distinction
-  ~1 file: payments/page.tsx
+UI-C1.2F.1F — Payments Table-Header Filtering
+  → Move paymentStatus/refundStatus/currencyCard from KPI-only to table-header dropdowns
+  → Preserve currency global scope vs currencyCard table-only distinction
+  Affected: Payments registry
 
-UI-C1.2F.1G — Requests table-header filtering
-  Move status from toolbar to table-header dropdown
-  ~1 file: requests/page.tsx
+UI-C1.2F.1G — Requests Table-Header Filtering
+  → Move status from toolbar to table-header dropdown
+  Affected: Requests registry
 
-UI-C1.2F.1H — Cross-registry regression + accessibility + responsive
-  Browser qualification at 1680/768/390
-  Keyboard/screen-reader testing
-  Regression: all 4 registries + D5/D6/D7
+UI-C1.2F.1H — Cross-Registry Regression
+  → Browser/accessibility/responsive/security regression at 1680/768/390
+  → Regression: all 4 registries + D5/D6/D7
 
-UI-C1.2F.1I — Git hard closure
+UI-C1.2F.1I — Git Hard Closure
 ```
 
 ### Dependencies
@@ -262,51 +359,49 @@ UI-C1.2F.1I — Git hard closure
 - G9 (shared TableHeaderFilter component) must complete before G5
 - G10 (Reset exclusion) is part of G3
 
-### Estimated scope
-- Backend: 2-3 files (request controller, request service, possibly validation)
-- Frontend: 6-8 files (shell, 4 registry pages, 1 shared component, i18n)
-- No Prisma migration needed
-- No D5/D6/D7 production changes
-
 ## M. Final Verdict
 
 ```
 VERDICT A — UI-C1.2F.1
 OPERATIONS CENTER HEADER PERIOD & TABLE HEADER FILTERING
-ARCHITECTURE RECONCILIATION — ACCEPTED
+ARCHITECTURE RECONCILIATION — ACCEPTED AFTER CORRECTION R2
 
-BASELINE SHA:
-cbbdedba5589f4d036ac97a4fe8f00c5dc2da8a9
-
-FINAL SHA:
+BASELINE RECONCILIATION SHA:
 3c2fdc394c6a24aada885e80c624800dd0af50ae
 
-REQUESTS PERIOD SEMANTICS — CONFIRMED (backend supports, KPI gap identified)
+FINAL SHA:
+<to be filled after commit>
+
+HEADER PERIOD = GLOBAL SCOPE — CONFIRMED
+HEADER PERIOD → KPI + TABLE — CONFIRMED
+STATIC KPI VS TABLE-ONLY FILTERS — CONFIRMED
+PERIOD CHANGE PRESERVES SELECTED KPI — CONFIRMED
+TAB SWITCH PRESERVES PERIOD ONLY — CONFIRMED
+
+REQUESTS PERIOD SEMANTICS — CONFIRMED
+(createdAt; list support exists; KPI date scope requires UI-C1.2F.1A)
+
+REQUESTS TOOLBAR DATE CONTROLS — NOT ALLOWED
+REQUESTS HEADER PERIOD CONSUMPTION — REQUIRED
+
 ORDERS PERIOD SEMANTICS — CONFIRMED
 BOOKINGS PERIOD SEMANTICS — CONFIRMED
 PAYMENTS PERIOD SEMANTICS — CONFIRMED
 
-HEADER PERIOD CONTRACT — PASS (design defined, implementation-ready)
-TAB-SWITCH PERSISTENCE CONTRACT — PASS (Option A: shell appends period to tab hrefs)
 FILTER OWNERSHIP MATRIX — PASS
-KPI / TABLE-HEADER SYNC — PASS (one state, two entry points)
+KPI / TABLE-HEADER SYNC — PASS
+RESET SEMANTICS — PASS
 SERVER AUTHORITY — PASS
 URL / HISTORY — PASS
-RESET SEMANTICS — PASS (registry Reset ≠ Header Period clear)
-ACCESSIBILITY — PASS (design defined)
-RESPONSIVE — PASS (design defined)
+ACCESSIBILITY CONTRACT — PASS
+RESPONSIVE CONTRACT — PASS
 SECURITY — PASS
 GIT HARD CLOSURE — PASS
-
-GAPS IDENTIFIED:
-  G1: Requests KPI date scope (backend) — REQUIRED before Header Period
-  G2: Requests frontend date exposure — REQUIRED after G1
-  G9: Shared TableHeaderFilter component — REQUIRED before table-header migration
 
 UI-C1.2G — NOT STARTED
 UI-C2 — NOT STARTED
 D8 — NOT STARTED
 
 TRUE NEXT:
-UI-C1.2F.1A — Requests KPI date scope (backend)
+UI-C1.2F.1A — Requests KPI Date Scope
 ```
