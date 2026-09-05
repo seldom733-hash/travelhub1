@@ -272,12 +272,12 @@ describe("UI-C1.2C §14/§32 — KPI/table same server scope, no client counting
     expect(PAGE).toContain('qs.set("page", String(page))');
   });
 
-  it("period IS exposed for Orders (aggregates + table share createdAt [from,to) scope parity)", () => {
-    expect(PAGE).toContain('type="date"');
-    expect(PAGE).toContain('t("common.date_from", locale)');
-    expect(PAGE).toContain('t("common.date_to", locale)');
-    expect(PAGE).toContain("applyDateFrom(e.target.value)");
-    expect(PAGE).toContain("applyDateTo(e.target.value)");
+  it("period is Header-owned for Orders (aggregates + table share createdAt [from,to) scope parity)", () => {
+    // UI-C1.2F.1B: local date controls removed — period is OperationsCenterShell Header-owned
+    expect(PAGE).toContain('UI-C1.2F.1B: Local date controls removed');
+    // dateFrom/dateTo still read from URL and sent to API
+    expect(PAGE).toContain('qs.set("dateFrom", dateFrom)');
+    expect(PAGE).toContain('qs.set("dateTo", dateTo)');
   });
 
   it("no separate client-side KPI endpoint duplication — list is the only registry data source", () => {
@@ -333,8 +333,9 @@ describe("UI-C1.2C §18/§23 — URL state, direct URL, Back/Forward, Reset", ()
 
   it("filter/KPI interactions write the URL (replaceState — ADR-OPS-012)", () => {
     expect(PAGE).toContain('updateUrl({ search: value || undefined, page: undefined })');
-    expect(PAGE).toContain('updateUrl({ dateFrom: value || undefined, page: undefined })');
-    expect(PAGE).toContain('updateUrl({ dateTo: value || undefined, page: undefined })');
+    // UI-C1.2F.1B: date controls are Header-owned — registry only sends dateFrom/dateTo to API
+    expect(PAGE).toContain('qs.set("dateFrom", dateFrom)');
+    expect(PAGE).toContain('qs.set("dateTo", dateTo)');
     expect(PAGE).toContain("handleTotalClick");
   });
 
@@ -348,32 +349,31 @@ describe("UI-C1.2C §18/§23 — URL state, direct URL, Back/Forward, Reset", ()
     expect(PAGE).toContain("<OrdersWithParams />");
   });
 
-  it("Reset clears search/status/paymentStatus/dates, page → 1, URL normalized", () => {
+  it("Reset clears search/status/paymentStatus, page → 1, URL normalized — Header Period preserved", () => {
     expect(PAGE).toContain("const handleReset = useCallback(");
     expect(PAGE).toContain('setSearch("")');
     expect(PAGE).toContain('setStatusFilter("")');
     expect(PAGE).toContain('setPaymentStatusFilter("")');
-    expect(PAGE).toContain('setDateFrom("")');
-    expect(PAGE).toContain('setDateTo("")');
-    expect(PAGE).toContain('updateUrl({ search: undefined, status: undefined, paymentStatus: undefined, dateFrom: undefined, dateTo: undefined, page: undefined })');
+    // UI-C1.2F.1B: Reset preserves Header Period (dateFrom/dateTo NOT cleared)
+    expect(PAGE).toContain('updateUrl({ search: undefined, status: undefined, paymentStatus: undefined, page: undefined })');
     expect(PAGE).toContain('t("filters.reset", locale)');
   });
 });
 
 describe("UI-C1.2C §16 — canonical toolbar order", () => {
-  it("order is [Search][Lifecycle status][Payment status][From][To][Reset][CSV][XLSX]", () => {
+  it("order is [Search][Lifecycle status][Payment status][Reset][CSV][XLSX] — period is Header-owned", () => {
     const searchIdx = PAGE.indexOf('placeholder={t("admin.search.placeholder_orders"');
     const statusIdx = PAGE.indexOf('aria-label={t("admin.filter.all_statuses"');
     const paymentIdx = PAGE.indexOf('aria-label={t("admin.filter.all_payments"');
-    const fromIdx = PAGE.indexOf('t("common.date_from", locale)');
     const resetIdx = PAGE.indexOf('t("filters.reset", locale)');
     const exportIdx = PAGE.indexOf("<TableExportButton");
     expect(searchIdx).toBeGreaterThan(-1);
     expect(statusIdx).toBeGreaterThan(searchIdx);
     expect(paymentIdx).toBeGreaterThan(statusIdx);
-    expect(fromIdx).toBeGreaterThan(paymentIdx);
-    expect(resetIdx).toBeGreaterThan(fromIdx);
+    expect(resetIdx).toBeGreaterThan(paymentIdx);
     expect(exportIdx).toBeGreaterThan(resetIdx);
+    // UI-C1.2F.1B: local date controls removed — period is Header-owned
+    expect(PAGE).toContain('UI-C1.2F.1B: Local date controls removed');
   });
 
   it("export carries the same active server filters (status/paymentStatus/dates/search)", () => {

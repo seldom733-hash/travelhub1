@@ -48,6 +48,13 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+const mockReplace = vi.fn();
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => ({ get: (_key: string) => null }),
+  useRouter: () => ({ replace: mockReplace, push: vi.fn() }),
+  usePathname: () => "/app/requests",
+}));
+
 vi.mock("@/lib/use-user", () => ({
   useCurrentUser: () => mockUserRef.current,
 }));

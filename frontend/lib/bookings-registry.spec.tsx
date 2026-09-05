@@ -264,17 +264,17 @@ describe("UI-C1.2D §5/§14/§31/§32 — server-authoritative overview, no clie
 });
 
 describe("UI-C1.2D §15/§18/§33 — toolbar grammar + detector deep-links", () => {
-  it("canonical toolbar order is [Search][Status][From][To][Reset][CSV][XLSX]", () => {
+  it("canonical toolbar order is [Search][Status][Reset][CSV][XLSX] — period is Header-owned", () => {
     const searchIdx = PAGE.indexOf('placeholder={t("admin.search.placeholder_bookings"');
     const statusIdx = PAGE.indexOf('aria-label={t("admin.filter.all_statuses"');
-    const fromIdx = PAGE.indexOf('t("common.date_from", locale)');
     const resetIdx = PAGE.indexOf('t("filters.reset", locale)');
     const exportIdx = PAGE.indexOf("<TableExportButton");
     expect(searchIdx).toBeGreaterThan(-1);
     expect(statusIdx).toBeGreaterThan(searchIdx);
-    expect(fromIdx).toBeGreaterThan(statusIdx);
-    expect(resetIdx).toBeGreaterThan(fromIdx);
+    expect(resetIdx).toBeGreaterThan(statusIdx);
     expect(exportIdx).toBeGreaterThan(resetIdx);
+    // UI-C1.2F.1B: local date controls removed — period is Header-owned
+    expect(PAGE).toContain('UI-C1.2F.1B: Local date controls removed');
   });
 
   it("upcoming/overdue detector deep-link params are read from the URL", () => {
@@ -303,8 +303,9 @@ describe("UI-C1.2D §14/§17/§16/§12 — URL state, direct URL, Back/Forward, 
 
   it("filter/KPI interactions write the URL (replaceState — ADR-OPS-012)", () => {
     expect(PAGE).toContain('updateUrl({ search: value || undefined, page: undefined })');
-    expect(PAGE).toContain('updateUrl({ dateFrom: value || undefined, page: undefined })');
-    expect(PAGE).toContain('updateUrl({ dateTo: value || undefined, page: undefined })');
+    // UI-C1.2F.1B: date controls are Header-owned — registry only reads dateFrom/dateTo from URL
+    expect(PAGE).toContain('qs.set("dateFrom", dateFrom)');
+    expect(PAGE).toContain('qs.set("dateTo", dateTo)');
     expect(PAGE).toContain("handleTotalClick");
   });
 
@@ -313,13 +314,12 @@ describe("UI-C1.2D §14/§17/§16/§12 — URL state, direct URL, Back/Forward, 
     expect(PAGE).toContain("initialPage={Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1}");
   });
 
-  it("Reset clears search/status/dates, page → 1, URL normalized (detectors preserved)", () => {
+  it("Reset clears search/status, page → 1, URL normalized — Header Period preserved (detectors preserved)", () => {
     expect(PAGE).toContain("const handleReset = useCallback(");
     expect(PAGE).toContain('setSearch("")');
     expect(PAGE).toContain('setStatusFilter("")');
-    expect(PAGE).toContain('setDateFrom("")');
-    expect(PAGE).toContain('setDateTo("")');
-    expect(PAGE).toContain('updateUrl({ search: undefined, status: undefined, dateFrom: undefined, dateTo: undefined, page: undefined })');
+    // UI-C1.2F.1B: Reset preserves Header Period (dateFrom/dateTo)
+    expect(PAGE).toContain('updateUrl({ search: undefined, status: undefined, page: undefined })');
     expect(PAGE).toContain('t("filters.reset", locale)');
   });
 });

@@ -131,10 +131,14 @@ function RequestsContent({
   initialStatus,
   initialSearch,
   initialPage,
+  initialDateFrom,
+  initialDateTo,
 }: {
   initialStatus: string;
   initialSearch: string;
   initialPage: number;
+  initialDateFrom: string;
+  initialDateTo: string;
 }) {
   const locale = useLocale();
   const router = useRouter();
@@ -211,7 +215,11 @@ function RequestsContent({
     [updateUrl],
   );
 
-  // Reset — clears search + status, page → 1, URL normalized.
+  // UI-C1.2F.1B: Period state from shared Header.
+  const [dateFrom] = useState(initialDateFrom);
+  const [dateTo] = useState(initialDateTo);
+
+  // Reset — clears search + status, page → 1, but PRESERVES Header Period.
   const handleReset = useCallback(() => {
     setSearchDraft("");
     setSearch("");
@@ -220,15 +228,17 @@ function RequestsContent({
     updateUrl({ search: undefined, status: undefined, page: undefined });
   }, [updateUrl]);
 
-  // Server-side registry fetch under the active query scope (status + search).
+  // Server-side registry fetch under the active query scope (status + search + period).
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, statusFilter, search]);
+  }, [page, statusFilter, search, dateFrom, dateTo]);
 
+  // UI-C1.2F.1B: KPI re-fetches when period changes (GLOBAL scope → KPI + table).
   useEffect(() => {
     loadKpi();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo]);
 
   async function loadData() {
     setLoading(true);
@@ -239,6 +249,8 @@ function RequestsContent({
       params.set("pageSize", String(pageSize));
       if (statusFilter) params.set("status", statusFilter);
       if (search) params.set("search", search);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
       const d = (await api.get(`/requests?${params.toString()}`)) as any;
       setRequests(d.data);
       setTotal(d.total);
@@ -250,9 +262,14 @@ function RequestsContent({
     }
   }
 
+  // UI-C1.2F.1B: KPI with shared Header Period scope.
   async function loadKpi() {
     try {
-      const d: any = await api.get("/requests/kpi");
+      const params = new URLSearchParams();
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      const qs = params.toString();
+      const d: any = await api.get(`/requests/kpi${qs ? `?${qs}` : ""}`);
       setKpi(d);
     } catch {
       /* noop */
@@ -266,10 +283,12 @@ function RequestsContent({
     updateUrl({ page: p > 1 ? String(p) : undefined });
   };
 
-  // Build export URL with current filters (search/status server-side scope)
+  // Build export URL with current filters (search/status/period server-side scope)
   const exportParams = new URLSearchParams();
   if (statusFilter) exportParams.set("status", statusFilter);
   if (search) exportParams.set("search", search);
+  if (dateFrom) exportParams.set("dateFrom", dateFrom);
+  if (dateTo) exportParams.set("dateTo", dateTo);
   const exportUrl = `/api/v1/requests/export?${exportParams.toString()}`;
 
   return (
@@ -449,6 +468,8 @@ function RequestsWithParams() {
       initialStatus={sp.get("status") ?? ""}
       initialSearch={sp.get("search") ?? ""}
       initialPage={Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1}
+      initialDateFrom={sp.get("dateFrom") ?? ""}
+      initialDateTo={sp.get("dateTo") ?? ""}
     />
   );
 }

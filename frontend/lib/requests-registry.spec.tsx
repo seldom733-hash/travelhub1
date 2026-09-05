@@ -197,16 +197,16 @@ describe("UI-C1.2B §15/§17 — URL state + Reset", () => {
 });
 
 describe("UI-C1.2B §11/§12/§35 — KPI/table scope honesty", () => {
-  it("period/date control is NOT exposed (KPI endpoint stays global — parity NO)", () => {
+  it("period/date control is NOT exposed as local toolbar input — period is Header-owned (UI-C1.2F.1B)", () => {
+    // No local date input controls in the Requests toolbar
     expect(PAGE).not.toContain('type="date"');
-    expect(PAGE).not.toContain("dateFrom");
-    expect(PAGE).not.toContain("dateTo");
-    expect(PAGE).not.toContain('sp.get("from")');
-    expect(PAGE).not.toContain('sp.get("to")');
+    // dateFrom/dateTo ARE consumed from URL and sent to API (Header-owned)
+    expect(PAGE).toContain('dateFrom');
+    expect(PAGE).toContain('dateTo');
   });
 
   it("KPI values come from the server KPI endpoint, never from page rows", () => {
-    expect(PAGE).toContain('api.get("/requests/kpi")');
+    expect(PAGE).toContain('/requests/kpi');
     // no aggregation over the current page rows to fabricate KPI counts
     expect(PAGE).not.toContain(".reduce(");
     expect(PAGE).not.toContain('kpi[statusFilter');

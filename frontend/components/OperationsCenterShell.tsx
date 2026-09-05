@@ -1,27 +1,32 @@
 "use client";
 
 /**
- * UI-C1.2A — Operations Center Shared Shell (ADR-OPS-014 canonical composition).
+ * UI-C1.2F.1B — Operations Center Shared Shell with Shared Header Period.
  *
- * One shared registry frame rendered by /app/requests, /app/orders,
- * /app/bookings and /app/payments:
+ * Canonical vertical composition:
  *
  *   BREADCRUMBS
- *   ЦЕНТР ОПЕРАЦИЙ                        PERIOD / ACTIONS
+ *   ЦЕНТР ОПЕРАЦИЙ                       Период: [ С ] [ По ] [×]
+ *   ─────────────────────────────────────────────────────────────
  *   [ Заявки ] [ Заказы ] [ Бронирования ] [ Платежи ]
- *   ──────────────────────────────────────────────────
+ *   ─────────────────────────────────────────────────────────────
  *   ACTIVE DOMAIN CONTENT (slots provided by the domain page)
  *
- * The shell owns page geometry, header, tabs, scroll container and the
- * loading/empty/error/table slot grammar. Business content stays in the
- * domain page (shared shell ≠ identical business semantics).
+ * The Header Period is a GLOBAL SCOPE:
+ *   → affects KPI overview
+ *   → affects table
+ *   → persists across tab switches
+ *
+ * Registry-specific filters (status, paymentStatus, etc.) are TABLE-ONLY
+ * and do NOT persist across tab switches.
  *
  * Security: tab visibility is derived from the session user's permissions,
  * but a hidden tab is NOT a security boundary — backend authorization
  * remains authoritative (route guard in Shell + @RequirePermissions).
  */
 import Link from "next/link";
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useLocale, t } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 
@@ -42,16 +47,21 @@ export const OPS_TABS: OperationsTabConfig[] = [
   { id: "payments", href: "/app/payments", labelKey: "nav.payments", permission: "finance.payment.read" },
 ];
 
+/** Shared period params that persist across tab switches. */
+const SHARED_PERIOD_KEYS = ["dateFrom", "dateTo"] as const;
+
 function OperationsCenterTabs({
   activeDomain,
   permissions,
   tabId,
   panelId,
+  periodSearchParams,
 }: {
   activeDomain: OperationsDomain;
   permissions: string[];
   tabId: string;
   panelId: string;
+  periodSearchParams: string;
 }) {
   const locale = useLocale();
   const listRef = useRef<HTMLDivElement>(null);
@@ -71,8 +81,6 @@ function OperationsCenterTabs({
     if (e.key === "Home") next = 0;
     if (e.key === "End") next = anchors.length - 1;
     e.preventDefault();
-    // Manual-activation tab pattern: arrows move focus, Enter/Space activates
-    // the (native anchor) navigation.
     anchors[next]?.focus();
   };
 
@@ -87,6 +95,8 @@ function OperationsCenterTabs({
       {tabs.map((tab) => {
         const active = tab.id === activeDomain;
         const label = t(tab.labelKey, locale);
+        // Preserve shared period params across tab switches.
+        const href = periodSearchParams ? `${tab.href}?${periodSearchParams}` : tab.href;
         return (
           <Link
             key={tab.id}
@@ -94,7 +104,7 @@ function OperationsCenterTabs({
             role="tab"
             aria-selected={active}
             aria-controls={panelId}
-            href={tab.href}
+            href={href}
             className={`shrink-0 rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-400 ${
               active
                 ? "border-blue-600 bg-blue-50/60 text-blue-700"
@@ -105,6 +115,86 @@ function OperationsCenterTabs({
           </Link>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Shared Header Period control.
+ * Reads dateFrom/dateTo from current URL, writes changes via replaceState.
+ * Period is a GLOBAL SCOPE: affects KPI + table for the active registry.
+ */
+function HeaderPeriodControl() {
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const dateFrom = searchParams.get("dateFrom") ?? "";
+  const dateTo = searchParams.get("dateTo") ?? "";
+
+  const updatePeriod = useCallback(
+    (key: "dateFrom" | "dateTo", value: string) => {
+      const sp = new URLSearchParams(window.location.search);
+      if (value) sp.set(key, value); else sp.delete(key);
+      // Preserve page=1 on period change (global scope change resets pagination).
+      sp.delete("page");
+      const qs = sp.toString();
+      const newUrl = qs ? `${pathname}?${qs}` : pathname;
+      window.history.replaceState(null, "", newUrl);
+      // Trigger a shallow navigation to re-read params and refetch data.
+      router.replace(newUrl, { scroll: false });
+    },
+    [pathname, router],
+  );
+
+  const clearPeriod = useCallback(() => {
+    const sp = new URLSearchParams(window.location.search);
+    sp.delete("dateFrom");
+    sp.delete("dateTo");
+    sp.delete("page");
+    const qs = sp.toString();
+    const newUrl = qs ? `${pathname}?${qs}` : pathname;
+    window.history.replaceState(null, "", newUrl);
+    router.replace(newUrl, { scroll: false });
+  }, [pathname, router]);
+
+  const hasPeriod = Boolean(dateFrom || dateTo);
+
+  return (
+    <div className="flex items-center gap-2 text-sm" role="group" aria-label={t("ops.period_aria", locale)}>
+      <span className="text-xs font-medium text-slate-500">{t("ops.period", locale)}</span>
+      <div className="flex items-center gap-1">
+        <label className="sr-only" htmlFor="ops-period-from">{t("ops.period_from", locale)}</label>
+        <input
+          id="ops-period-from"
+          type="date"
+          value={dateFrom}
+          onChange={(e) => updatePeriod("dateFrom", e.target.value)}
+          aria-label={t("ops.period_from", locale)}
+          className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        />
+        <span className="text-xs text-slate-400">—</span>
+        <label className="sr-only" htmlFor="ops-period-to">{t("ops.period_to", locale)}</label>
+        <input
+          id="ops-period-to"
+          type="date"
+          value={dateTo}
+          onChange={(e) => updatePeriod("dateTo", e.target.value)}
+          aria-label={t("ops.period_to", locale)}
+          className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        />
+      </div>
+      {hasPeriod && (
+        <button
+          type="button"
+          onClick={clearPeriod}
+          aria-label={t("ops.period_clear", locale)}
+          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }
@@ -121,10 +211,19 @@ export default function OperationsCenterShell({
   const locale = useLocale();
   const user = useCurrentUser();
   const permissions = user?.permissions ?? [];
+  const searchParams = useSearchParams();
   const activeTab = OPS_TABS.find((tab) => tab.id === activeDomain);
   const activeLabel = activeTab ? t(activeTab.labelKey, locale) : activeDomain;
   const tabId = `ops-tab-${activeDomain}`;
   const panelId = `ops-panel-${activeDomain}`;
+
+  // Extract only shared period params for tab link persistence.
+  const periodSp = new URLSearchParams();
+  for (const key of SHARED_PERIOD_KEYS) {
+    const v = searchParams.get(key);
+    if (v) periodSp.set(key, v);
+  }
+  const periodSearchParams = periodSp.toString();
 
   return (
     <div className="flex h-full flex-col">
@@ -145,9 +244,18 @@ export default function OperationsCenterShell({
           </nav>
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("ops.title", locale)}</h1>
-            {headerActions}
+            <div className="flex items-center gap-4">
+              <HeaderPeriodControl />
+              {headerActions}
+            </div>
           </div>
-          <OperationsCenterTabs activeDomain={activeDomain} permissions={permissions} tabId={tabId} panelId={panelId} />
+          <OperationsCenterTabs
+            activeDomain={activeDomain}
+            permissions={permissions}
+            tabId={tabId}
+            panelId={panelId}
+            periodSearchParams={periodSearchParams}
+          />
         </div>
       </header>
       <main id={panelId} role="tabpanel" aria-labelledby={tabId} className="thin-scroll flex-1 overflow-y-auto">
@@ -160,7 +268,7 @@ export default function OperationsCenterShell({
 /* ── Shared content-slot grammar (ADR-OPS-014: shared outer geometry,
       domain-provided business content) ───────────────────────────────────── */
 
-/** Toolbar frame — canonical placement [Search][filters][date][Reset][Export]. */
+/** Toolbar frame — canonical placement [Search][filters][Reset][Export]. */
 export function OperationsToolbarSlot({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-wrap items-center gap-2">{children}</div>;
 }

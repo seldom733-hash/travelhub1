@@ -175,27 +175,18 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
     updateUrl({ status: undefined, paymentStatus: undefined, page: undefined });
   }, [updateUrl]);
 
-  const applyDateFrom = (value: string) => {
-    setDateFrom(value);
-    setPage(1);
-    updateUrl({ dateFrom: value || undefined, page: undefined });
-  };
-  const applyDateTo = (value: string) => {
-    setDateTo(value);
-    setPage(1);
-    updateUrl({ dateTo: value || undefined, page: undefined });
-  };
+  // UI-C1.2F.1B: Local date controls removed — period is Header-owned (GLOBAL scope).
+  // dateFrom/dateTo state is read from URL and passed to API; Header manages them.
 
-  const filtersActive = Boolean(statusFilter || paymentStatusFilter || search || dateFrom || dateTo);
+  const filtersActive = Boolean(statusFilter || paymentStatusFilter || search);
+  // Reset clears registry-specific filters but PRESERVES Header Period.
   const handleReset = useCallback(() => {
     setSearchDraft("");
     setSearch("");
     setStatusFilter("");
     setPaymentStatusFilter("");
-    setDateFrom("");
-    setDateTo("");
     setPage(1);
-    updateUrl({ search: undefined, status: undefined, paymentStatus: undefined, dateFrom: undefined, dateTo: undefined, page: undefined });
+    updateUrl({ search: undefined, status: undefined, paymentStatus: undefined, page: undefined });
   }, [updateUrl]);
 
   const load = async () => {
@@ -416,12 +407,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                 <option key={s} value={s}>{paymentLabel(s, locale)}</option>
               ))}
             </select>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-slate-400">{t("common.date_from", locale)}</span>
-              <input type="date" value={dateFrom} onChange={(e) => applyDateFrom(e.target.value)} aria-label={t("common.date_from", locale)} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
-              <span className="text-xs text-slate-400">{t("common.date_to", locale)}</span>
-              <input type="date" value={dateTo} onChange={(e) => applyDateTo(e.target.value)} aria-label={t("common.date_to", locale)} className="w-32 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-400" />
-            </div>
+            {/* UI-C1.2F.1B: Local date controls removed — period is Header-owned. */}
             <button
               type="button"
               onClick={handleReset}
