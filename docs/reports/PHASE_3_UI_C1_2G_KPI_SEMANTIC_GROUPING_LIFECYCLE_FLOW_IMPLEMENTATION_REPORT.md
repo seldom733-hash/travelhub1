@@ -50,7 +50,7 @@ Result: only the new prompt file was untracked:
 
 ```text
 FINAL SHA:
-4740066e39e0bf8bb44a41754f9fdf3e8433a9ad
+30777ce7f70a3455705ccfff8629e8712b997299
 ```
 
 This placeholder is filled after commit/push in the Git hard closure step. Implementation evidence below is from the working-tree implementation before commit.
