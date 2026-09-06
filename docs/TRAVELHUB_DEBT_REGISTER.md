@@ -1,7 +1,7 @@
 # TRAVELHUB — CANONICAL DEBT REGISTER
 
 Established: 2026-09-04
-Last updated: 2026-09-04
+Last updated: 2026-09-06
 
 ---
 
@@ -634,5 +634,270 @@ DEFERRED — Future phase, awaiting prerequisites
 | Status | DEFERRED |
 | Acceptance condition | Partner can review + sign electronic contract |
 | Closure SHA | — |
+
+---
+
+### PROD-01 — Seller Service Cards / Product Model / Service Category Reporting
+
+| Field | Value |
+|---|---|
+| ID | PROD-01 |
+| Title | Seller Service Cards / Product Model / Service Category Reporting |
+| Category | DEFERRED PRODUCT |
+| Severity | P2 |
+| Origin | Architecture Debt Register Micro-Update PROD-01 (2026-09-06) |
+| Description | The TravelHub seller-facing service/product model has not yet been fully designed. Consequently, final Service Category Reporting cannot yet be considered architecturally defined. This debt is deliberately deferred until Seller Service Cards / Product Model design. |
+| Why it matters | Service Category Reporting dimensions, category attribution, and the commercial snapshot semantics all depend on an accepted Seller Service/Product domain model. Designing reporting dimensions independently and imposing them on commerce data would force rework across pricing, commission, ordering, booking, payment, and analytics. |
+| Dependencies | DATA-02, FIN-01, HELP-05 |
+| Planned closure stage | DEFERRED — Seller Service Cards / Product Model architecture stage |
+| Status | OPEN |
+| Acceptance condition | Accepted Seller Service/Product domain model and finalized Service Category Reporting contract (see Resolution Gate) |
+| Closure SHA | — |
+| Notes | Documentation-only registration. No Product/Service model, seller cards, or category analytics are implemented by this entry. |
+
+#### Problem Statement
+
+The following remain unresolved and must be decided by the future Seller Service Cards / Product Model architecture:
+
+```text
+full supported service-category catalog
+common Seller Service Card fields
+category-specific Seller Service Card fields
+required vs optional attributes
+service variants/options
+capacity / occupancy
+availability / inventory
+pricing / tariffs
+cancellation conditions
+media
+localization
+package/composite services
+multi-supplier package ownership
+commercial snapshots
+service-category attribution through commerce lifecycle
+service-category analytics/reporting contract
+```
+
+This debt concerns the canonical architecture/model not yet being finalized — it does not claim these capabilities are absent from the codebase (not audited).
+
+#### Domain Examples (architectural, not implementation schema)
+
+**Accommodation** — potential domain attributes:
+
+```text
+property / accommodation type
+category / star rating
+location
+amenities
+
+room types
+room capacity
+adults
+children
+bed configuration
+room size
+room amenities
+media
+
+meal plan
+rate / tariff
+cancellation policy
+refundable / non-refundable
+availability / inventory
+```
+
+**Tour with Accommodation** — potential attributes:
+
+```text
+destination / itinerary
+dates
+duration
+traveler count
+traveler composition / age categories
+program
+
+hotel / accommodation option
+hotel category
+room type
+occupancy
+meal plan
+
+transport
+transfer
+excursions
+additional services
+included services
+excluded services
+pricing
+```
+
+#### Major Open Architecture Question — Composite Services
+
+Is a tour/package with accommodation represented as:
+
+```text
+A) one sellable service/product of category Tour/Package
+
+or
+
+B) a composite product containing multiple service components?
+```
+
+Example:
+
+```text
+TOUR PACKAGE
+├── Accommodation
+├── Transfer
+├── Excursion
+├── Guide
+├── Meal
+└── Insurance
+```
+
+Individual components may potentially belong to different suppliers. The canonical ownership/booking/pricing/refund model for that case is not yet finalized.
+
+#### Downstream Dependencies
+
+Resolution can affect:
+
+```text
+Seller Service Cards
+Product / Service Catalog
+Search / Filters
+Inventory
+Availability
+Capacity / Occupancy
+Pricing
+Tariffs
+Commission
+Request
+Order / OrderItem
+Booking
+Payment attribution
+Refund attribution
+Supplier attribution
+Localization
+Analytics
+Service Category Reporting
+```
+
+This dependency list is not authorization to modify those domains now.
+
+#### Commerce Attribution
+
+The future architecture must determine how service/category identity propagates:
+
+```text
+Product / Service
+        ↓
+Request
+        ↓
+Order / OrderItem
+        ↓
+Booking
+        ↓
+Payment / Refund attribution
+        ↓
+Analytics
+```
+
+No frontend-derived category inference. Future reporting must use server-authoritative domain data.
+
+#### Historical Snapshot Requirement
+
+Future historical commerce reporting must not silently change merely because the seller later edits/reclassifies the current service/product. The eventual design therefore needs explicit snapshot/version semantics for the commercial transaction. No specific database implementation is prescribed by this registration.
+
+#### Service Category Reporting — DEFERRED
+
+```text
+SERVICE CATEGORY REPORTING — DEFERRED
+```
+
+Reason: final reporting dimensions must be derived from the accepted Seller Service / Product domain model, not designed independently and then imposed on commerce data.
+
+Future reporting is expected to evaluate, where applicable:
+
+```text
+GMV / Commerce Volume by Service Category
+TravelHub Revenue by Service Category
+Orders by Service Category
+Bookings by Service Category
+AOV by Service Category
+Conversion by Service Category
+Refund / Cancellation Rate by Service Category
+trend by Service Category
+```
+
+Potential drill-down:
+
+```text
+All Services
+→ Service Category
+→ Service Type / Subcategory
+→ Supplier
+→ Product / Service
+→ Order / Booking
+```
+
+These are future reporting requirements/targets, not current implemented claims.
+
+#### Platform vs Partner Financial Semantics
+
+Future category reporting must not collapse:
+
+```text
+Marketplace GMV
+Storefront Commerce Volume
+TravelHub Revenue
+```
+
+into one ambiguous metric. The exact reporting contract remains deferred until the underlying Product/Service model is accepted.
+
+#### Resolution Gate
+
+PROD-01 remains OPEN until the architecture has resolved at least:
+
+```text
+1. supported TravelHub service-category catalog
+2. common Seller Service Card contract
+3. category-specific card contracts
+4. required/optional attribute rules
+5. variants/options model
+6. package/composite-service model
+7. multi-supplier component ownership
+8. inventory / availability / capacity semantics
+9. pricing / tariff semantics
+10. commission attribution implications
+11. historical snapshot/version semantics
+12. Product → Request → OrderItem → Booking → Payment/Refund attribution
+13. analytics dimensions
+14. Service Category Reporting contract
+```
+
+Do not mark the debt resolved merely because it has been documented.
+
+#### Current Decision
+
+```text
+STATUS: OPEN
+
+DECISION:
+DEFERRED until Seller Service Cards / Product Model architecture stage.
+
+DO NOT:
+finalize Service Category Reporting before the underlying Product/Service
+domain model is accepted.
+```
+
+#### Cross-References
+
+Conceptual links to existing register entries (only real IDs, no invented dependencies):
+
+```text
+DATA-02 — Marketplace vs Storefront financial metric separation (Platform/Partner semantics)
+FIN-01  — Finance Center reporting
+HELP-05 — formula-drift automated gate / analytics metric registry
+```
 
 ---
