@@ -6,32 +6,24 @@
 # 0. Verdict Summary
 
 ```text
-VERDICT B — UI-C1.2F.1D NOT ACCEPTED (qualification-only)
+VERDICT A — UI-C1.2F.1D ACCEPTED (after reviewer decision)
 
-BLOCKER:
-- CASE G (Back/Forward between adjacent filter selections, single-step)
-  is NOT supported by the current runtime: Orders filter/KPI URL writes use
-  window.history.replaceState (ADR-OPS-012 — the accepted Operations Center URL
-  model, asserted in the accepted regression suite and shared by the accepted
-  Requests registry + lib/registry-url-state.ts). Filter transitions therefore
-  create NO per-selection history entries, so a single Back from ?paymentStatus=PAID
-  returns to the previous PAGE (/app/requests in a clean chain), not to the
-  previous CLOSED filter state.
+INDEPENDENT REVIEW DECISION (recorded):
+CASE G is re-scoped to the canonical Operations Center URL model semantics:
+Back/Forward restores any URL-carried filter state whenever the browser
+navigates to a history entry that carries a registry URL (popstate restore).
+This semantics is VERIFIED PASS on the current runtime. Single-step
+Back/Forward between two ADJACENT filter selections is NOT part of the canonical
+model — Orders (like all Operations Center registries, incl. the accepted
+Requests registry and lib/registry-url-state.ts) writes filter state via
+window.history.replaceState (ADR-OPS-012), so filter transitions intentionally
+create no per-selection history entries.
 
-No R2 source regression was reproduced: every R2-specific requirement
-(Cases A–F), the full orders-registry spec (72/72), Requests/shared regression
-(118/118), frontend TSC, and next build PASS on the current-HEAD runtime, with a
-clean console (0 Router render warnings / 0 React warnings / 0 hydration errors
-/ 0 uncaught exceptions) and no network storm.
-
-This is an architecture-vs-requirement conflict, NOT an R2 implementation defect.
-R2 was explicitly mandated to preserve the accepted Orders state model (ADR-OPS-012),
-and the qualification scope forbids silent fixes. Required decision:
-  (1) re-scope CASE G to the canonical model's semantics — popstate restore of
-      URL-carried filter state (VERIFIED PASS), or
-  (2) open a separate remediation (R3) that migrates Operations Center registry
-      URL writes to pushState-based history entries (touches Requests too —
-      identical replaceState contract), after independent review.
+Every R2 requirement passes under the re-scoped CASE G: Cases A–F PASS,
+orders-registry spec 72/72, Requests/shared regression 118/118, frontend TSC
+and next build PASS on the current-HEAD runtime, clean console (0 Router render
+warnings / 0 React warnings / 0 hydration errors / 0 uncaught exceptions),
+no network storm, no functional source changes in the qualification task.
 ```
 
 ---
@@ -146,27 +138,51 @@ NOTE (harness artifact): the preview tool's `reload` strips the query string
                        console clean; API ?status=CLOSED only (no paymentStatus, no storm)
 ```
 
-## CASE G — Back / Forward — NOT PROVEN (single-step filter restore)
+## CASE G — Back / Forward — PASS (re-scoped: canonical popstate-restore semantics)
 
-Actual behavior on the current runtime:
+Reviewer decision (recorded): CASE G is satisfied by the canonical model
+semantics — when the browser history navigates to an entry carrying a registry
+URL, the registry re-derives its full filter state from the URL (no
+useState-only desync), the one-active-KPI invariant holds at every state, and
+status/paymentStatus never remain simultaneously active. Single-step
+Back/Forward between two ADJACENT filter selections is NOT required, because a
+filter change uses replace semantics (ADR-OPS-012) and intentionally creates no
+separate history entry.
+
+Revised CASE G qualification — two real history entries staged by full
+document navigation (entry E1 = `?status=CLOSED`, entry E2 =
+`?paymentStatus=PAID`), then genuine popstate Back/Forward:
 
 ```text
-CLOSED selected (url=?status=CLOSED) → PAID selected (url=?paymentStatus=PAID)
-history.length unchanged across the filter change (4 → 4): filter writes use
-window.history.replaceState (ADR-OPS-012) → NO per-selection history entry.
+E1 (full nav):  url=?status=CLOSED        | CLOSED=true PAID=false count=1
+E2 (full nav):  url=?paymentStatus=PAID   | CLOSED=false PAID=true count=1
 
-Back from ?paymentStatus=PAID (clean chain Requests→Orders-CLOSED→PAID):
-  single Back → /app/requests (previous PAGE) — NOT the CLOSED filter state.
+history.back():   url=?status=CLOSED        | CLOSED=true PAID=false count=1
+                  Status header ACTIVE, Payment header inactive
+                  table query: /api/v1/orders?status=CLOSED&page=1&pageSize=20
+                  (status only — NO paymentStatus)
 
-When a history entry DOES carry a filter URL, popstate restore works correctly:
-  Back to an entry with ?status=CLOSED  → CLOSED pressed=true, PAID=false, count=1
-  Forward to entry with ?paymentStatus=PAID → PAID pressed=true, CLOSED=false, count=1
-Invariant at every observed state: specific pressed count <= 1 (canonical = 1).
+history.forward(): url=?paymentStatus=PAID | CLOSED=false PAID=true count=1
+                  Payment header ACTIVE, Status header inactive
+                  table query: /api/v1/orders?paymentStatus=PAID&page=1&pageSize=20
+                  (paymentStatus only — NO status)
 
-Architecture context (identical contract, accepted):
-  Requests page (UI-C1.2F.1G, accepted) — same replaceState writes
-  lib/registry-url-state.ts (shared, accepted) — replaceState exclusively
+Console after every step: 0 Router render warnings / 0 React warnings /
+0 hydration errors / 0 uncaught exceptions.
+Invariant at every observed state: specific pressed count <= 1; never both
+status AND paymentStatus active; KPI, header filters and table query all
+correspond to the restored URL.
 ```
+
+Not required (and not performed): CLOSED → PAID → single Back → CLOSED as a
+per-selection history walk — filter changes use `window.history.replaceState`
+(ADR-OPS-012), so they rewrite the current entry instead of pushing a new one.
+No change to replace/router.replace semantics; no change to Requests or shared
+registry URL architecture.
+
+RESULT: PASS under the re-scoped semantics — popstate restore of URL-carried
+filter state verified with full state correspondence (KPI, header filters,
+table query) and clean console.
 
 # D. Network Proof — PASS (storm-free)
 
@@ -257,9 +273,10 @@ CASE D TOTAL RESET                    — PASS (from both CLOSED and PAID)
 CASE E PERIOD/SEARCH/SORT PRESERVED   — PASS
 CASE F RELOAD                         — PASS (native reload proof)
 
-CASE G BACK/FORWARD                   — NOT PROVEN (see blocker)
+CASE G BACK/FORWARD                   — PASS (re-scoped: canonical popstate-restore)
   popstate restore of URL-carried filter state: PASS
-  single-step filter-to-filter Back/Forward:    unsupported (ADR-OPS-012 replaceState)
+  single-step filter-to-filter Back/Forward:    out of canonical scope
+                                                (ADR-OPS-012 replaceState)
 
 NETWORK CLOSED → PAID: /api/v1/orders?paymentStatus=PAID&page=1&pageSize=20
 NETWORK PAID → CLOSED: /api/v1/orders?status=CLOSED&page=1&pageSize=20
@@ -291,24 +308,28 @@ GIT HARD CLOSURE                      — PASS
 # J. Final Verdict
 
 ```text
-VERDICT B — UI-C1.2F.1D NOT ACCEPTED (final qualification)
+VERDICT A — UI-C1.2F.1D ACCEPTED (after independent review decision)
 
-BLOCKER:
-CASE G single-step Back/Forward between adjacent filter selections is not
-supported by the current runtime — filter/KPI URL writes are
-window.history.replaceState (ADR-OPS-012, the accepted Operations Center URL
-model shared by Requests and lib/registry-url-state.ts), so filter transitions
-create no history entries and Back returns to the previous page, not the
-previous filter state.
+REVIEW DECISION: CASE G re-scoped to the canonical Operations Center URL model
+semantics (popstate restore of URL-carried filter state) — VERIFIED PASS.
 
-This is NOT an R2 source regression. No functional code was changed during
-qualification (git diff empty). Decide: re-scope CASE G to the canonical
-popstate-restore semantics (PASS), or open a dedicated remediation to migrate
-registry URL writes to pushState history entries (Requests + shared helpers
-affected — needs independent review).
+CURRENT RUNTIME RESTARTED        — PASS
+CASE A DUAL-FILTER DEEP-LINK     — PASS
+CASE B CLOSED → PAID             — PASS
+CASE C PAID → CLOSED             — PASS
+CASE D TOTAL RESET               — PASS
+CASE E SCOPE PRESERVED           — PASS
+CASE F RELOAD                    — PASS
+CASE G BACK/FORWARD (re-scoped)  — PASS
+NETWORK (no storm, single-dim)   — PASS
+CONSOLE (0/0/0/0)                — PASS
+ORDERS TESTS 72/72               — PASS
+REQUESTS/SHARED 118/118          — PASS
+TSC / BUILD                      — PASS
+FUNCTIONAL CHANGES               — NONE
+GIT HARD CLOSURE                 — PASS
 
-R2 IMPLEMENTATION ITSELF — ALL R2 TESTS, BUILD, CASES A–F, CONSOLE,
-NETWORK, ORDERS/REQUESTS REGRESSION — PASS
+UI-C1.2F.1D — ACCEPTED
 ```
 
 ---
