@@ -207,9 +207,19 @@ carries status; invalid status no silent fallback; export scope; a11y markers.
 ## Git Hard Closure
 
 ```
+IMPLEMENTATION SHA: 2db72e6c8e6e419b6c93df20d6ead5217b5cc6db
+FINAL SHA:           2db72e6c8e6e419b6c93df20d6ead5217b5cc6db
+
 git status --porcelain=v1        → <NO OUTPUT>
-HEAD == origin/master            → <FINAL_SHA>
+HEAD == origin/master            → 2db72e6c8e6e419b6c93df20d6ead5217b5cc6db
 22d1653 (baseline) ancestor      → PASS (exit 0)
+
+git log -5 --oneline --decorate
+2db72e6 (HEAD -> master, origin/master, origin/HEAD) feat: align Bookings status filter with table header (UI-C1.2F.1E)
+22d1653 docs: add final SHA to UI-C1.2F.1B qualification report
+fd53a89 docs: finalize UI-C1.2F.1B qualification (shared Header Period)
+9c36cab docs: record UI-C1.2F.1D R2 CASE G re-scope decision and accepted verdict
+e8d9aa5 docs: finalize UI-C1.2F.1D R2 final qualification
 ```
 
 ```
