@@ -50,7 +50,7 @@ Result: only the new prompt file was untracked:
 
 ```text
 FINAL SHA:
-d5d6360eb742f962c1288862bb4e53593e8fecdf
+fde6e2c85f1d4e5abca8327600c95cff2c2d2eee
 ```
 
 This placeholder is filled after commit/push in the Git hard closure step. Implementation evidence below is from the working-tree implementation before commit.
@@ -618,12 +618,12 @@ baseline ancestry = 0
 Git log:
 
 ```text
-d5d6360 (HEAD -> master, origin/master, origin/HEAD) docs: fill final SHA and post-push acceptance evidence for UI-C1.2G
+fde6e2c (HEAD -> master, origin/master, origin/HEAD) docs: refresh UI-C1.2G report with final pushed HEAD SHA
+d5d6360 docs: fill final SHA and post-push acceptance evidence for UI-C1.2G
 5203c9f feat: group Operations Center KPIs by lifecycle semantics
 0f4903a docs: add final SHA to PROD-01 debt register report
 a481048 docs: register PROD-01 seller service product model debt
 b84a0c9 docs: add final SHA to UI-C1.2F.1I closure report
 b98a31d docs: close UI-C1.2F.1 filtering alignment sequence
 5258ed7 docs: add final SHA to UI-C1.2F.1H qualification report
-4655ec6 docs: finalize UI-C1.2F.1H cross-registry qualification
 ```
