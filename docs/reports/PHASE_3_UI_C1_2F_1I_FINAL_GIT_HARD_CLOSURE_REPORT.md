@@ -190,10 +190,10 @@ $ git status --porcelain=v1
 <NO OUTPUT>
 
 $ git rev-parse HEAD
-<FINAL HEAD>
+b98a31dc6f27d1c93e9c7d4cf356480c28409d54
 
 $ git rev-parse origin/master
-<FINAL HEAD>
+b98a31dc6f27d1c93e9c7d4cf356480c28409d54
 
 $ git branch --show-current
 master
@@ -202,7 +202,14 @@ $ git status -sb
 ## master...origin/master
 
 $ git log -8 --oneline --decorate
-<FINAL LOG>
+b98a31d (HEAD -> master, origin/master, origin/HEAD) docs: close UI-C1.2F.1 filtering alignment sequence
+5258ed7 docs: add final SHA to UI-C1.2F.1H qualification report
+4655ec6 docs: finalize UI-C1.2F.1H cross-registry qualification
+0f51ace docs: add final SHA to UI-C1.2F.1F implementation report
+17ea8b6 feat: align Payments filters with table headers (UI-C1.2F.1F)
+3b6fba0 docs: add final SHA to UI-C1.2F.1E implementation report
+2db72e6 feat: align Bookings status filter with table header (UI-C1.2F.1E)
+22d1653 docs: add final SHA to UI-C1.2F.1B qualification report
 ```
 
 Final ancestry rerun against final HEAD:
@@ -212,6 +219,8 @@ $ git merge-base --is-ancestor 2db72e6c8e6e419b6c93df20d6ead5217b5cc6db HEAD; ec
 $ git merge-base --is-ancestor 17ea8b601ba0cd2171b7d2b7c8c3553389af962e HEAD; echo $?   → 0
 $ git merge-base --is-ancestor 5258ed728aed0a122bdff7e1285c583f41729779 HEAD; echo $?   → 0
 ```
+
+All required conditions met: `git status --porcelain=v1` → NO OUTPUT (clean tree), HEAD == origin/master == `b98a31dc6f27d1c93e9c7d4cf356480c28409d54`, branch = master, final ancestry exit codes 0/0/0.
 
 ## 9. Final Acceptance Matrix
 
@@ -223,7 +232,7 @@ BASELINE SHA:
 5258ed728aed0a122bdff7e1285c583f41729779
 
 FINAL SHA:
-<FINAL SHA>
+b98a31dc6f27d1c93e9c7d4cf356480c28409d54
 
 1A ACCEPTED ANCESTRY                 — PASS
 1B ACCEPTED ANCESTRY                 — PASS
