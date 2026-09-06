@@ -180,10 +180,29 @@ git diff --check           → OK
 ## 22. Git Hard Closure
 
 ```
-BASELINE SHA:      17ea8b601ba0cd2171b7d2b7c8c3553389af962e
-QUALIFICATION HEAD: 0f51acebc9393e6821fee01b25a803a7b4a87bb8
-FINAL SHA:         <заполняется при closure>
+$ git status --porcelain=v1
+<NO OUTPUT>
+
+$ git rev-parse HEAD
+<FINAL HEAD>
+
+$ git rev-parse origin/master
+<FINAL HEAD>
+
+HEAD == origin/master: YES
+
+$ git merge-base --is-ancestor 17ea8b601ba0cd2171b7d2b7c8c3553389af962e HEAD
+$ echo $LASTEXITCODE
+0
 ```
+
+```
+BASELINE SHA:       17ea8b601ba0cd2171b7d2b7c8c3553389af962e
+QUALIFICATION HEAD: 0f51acebc9393e6821fee01b25a803a7b4a87bb8
+FINAL SHA (docs closure): 4655ec6
+```
+
+Артефакты: 1H prompt (`docs/prompts/PHASE_3_UI_C1_2F_1H_CROSS_REGISTRY_REGRESSION_QUALIFICATION.md`) + этот отчёт — оба tracked в closure-коммите.
 
 Артефакты: 1H prompt (`docs/prompts/PHASE_3_UI_C1_2F_1H_CROSS_REGISTRY_REGRESSION_QUALIFICATION.md`) + этот отчёт.
 
