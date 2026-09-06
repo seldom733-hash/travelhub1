@@ -22,7 +22,7 @@ ea5f6dc533dea49238a33627baf0586ace481758
 ## FINAL SHA
 
 ```
-<filled at closure>
+fd53a895aa9e115a2bff8e358506e3c2e4a10c9b
 ```
 
 ## RUNTIME (fresh, current working tree)
@@ -461,7 +461,7 @@ Shared Operations Center Header Period — FINAL QUALIFICATION PASSED
 on a fresh runtime from the qualification working tree (HEAD 9c36cab).
 
 FUNCTIONAL REMEDIATION SHA: ea5f6dc533dea49238a33627baf0586ace481758
-FINAL SHA: <filled at closure>
+FINAL SHA: fd53a895aa9e115a2bff8e358506e3c2e4a10c9b
 
 FUNCTIONAL SOURCE CHANGES DURING QUALIFICATION: NONE
 ```
