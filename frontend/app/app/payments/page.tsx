@@ -11,7 +11,7 @@
  *   ВАЛЮТЫ                                 — dynamic currency cards (server-authoritative)
  *   СТАТУСЫ ВОЗВРАТОВ                      — 4/4 canonical RefundStatus cards
  *   ─────────────────────────────────────────────────────────────
- *   TOOLBAR: [Search][Date From][To][Reset][CSV][XLSX]
+ *   TOOLBAR: [Search][Reset][CSV][XLSX]
  *   TABLE
  *   PAGINATION
  *
@@ -20,6 +20,17 @@
  *   - Clicked card filters TABLE ONLY — all other cards remain static overview values
  *   - Total resets card-level filter
  *   - URL state survives reload / Back / Forward
+ *
+ * UI-C1.2F.1F — table-header filtering:
+ *   - Payment Status column header filter ↔ paymentStatus (KPI same state)
+ *   - Currency column header filter ↔ currencyCard (KPI same state)
+ *   - Refund Status: NO refund column exists in the actual table (row DTO has no
+ *     refundStatus field) → per audit-first rule NO invented header filter;
+ *     refundStatus remains a full KPI-card + URL + server-query dimension.
+ *   - Multi-dimension deep links (?paymentStatus+refundStatus / +currencyCard) are
+ *     canonicalized deterministically (paymentStatus > refundStatus > currencyCard)
+ *     with PURE render-time derivation + post-render router.replace — never a
+ *     render-phase router/history mutation (same contract as UI-C1.2F.1D-R2).
  *
  * Backend contract (UI-C1.2E):
  *   GET /finance/payments → { items, total, page, pageSize, hasMore, aggregates }
@@ -31,13 +42,14 @@
  */
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
 import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
 import Pagination from "@/components/Pagination";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
+import TableHeaderFilter, { type FilterOption } from "@/components/TableHeaderFilter";
 import TableExportButton from "@/components/TableExportButton";
 import OperationsCenterShell, {
   OperationsToolbarSlot,
@@ -65,6 +77,16 @@ function refundStatusLabel(code: string, locale: Locale): string {
   const key = `status.entity.${code}`;
   const localized = t(key, locale);
   return localized !== key ? localized : code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Build PaymentStatus filter options for TableHeaderFilter from the canonical 6-value array. */
+function buildPaymentFilterOptions(locale: Locale): FilterOption[] {
+  return PAYMENT_STATUSES.map((s) => ({ value: s, label: paymentStatusLabel(s, locale) }));
+}
+
+/** Currency filter options — server-authoritative dynamic currency list (aggregates overview). */
+function currencyFilterOptions(agg?: PaymentAggregates): FilterOption[] {
+  return (agg?.currency ?? []).map((c) => ({ value: c.currency, label: c.currency }));
 }
 
 function fmtDate(iso: string | null, locale: Locale): string {
@@ -462,8 +484,34 @@ function PaymentsContent({
                       <SortableHeader field="amount" currentSort={sortState} onSort={handleSort} alignRight>
                         {t("payments.col.amount", locale)}
                       </SortableHeader>
-                      <th className="px-4 py-2.5 font-medium">{t("payments.col.currency", locale)}</th>
-                      <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>
+                      <th className="px-4 py-2.5 font-medium">
+                        <div className="flex items-center gap-1">
+                          <span>{t("payments.col.currency", locale)}</span>
+                          <TableHeaderFilter
+                            id="payments-filter-currency"
+                            label=""
+                            options={currencyFilterOptions(agg)}
+                            value={currencyCardFilter || ""}
+                            onChange={applyCurrencyCard}
+                            ariaLabel={t("finance.filter.all_currencies", locale)}
+                          />
+                        </div>
+                      </th>
+                      <SortableHeader
+                        field="status"
+                        currentSort={sortState}
+                        onSort={handleSort}
+                        filterSlot={
+                          <TableHeaderFilter
+                            id="payments-filter-status"
+                            label=""
+                            options={buildPaymentFilterOptions(locale)}
+                            value={paymentStatusFilter || ""}
+                            onChange={applyPaymentStatus}
+                            ariaLabel={t("finance.filter.all_statuses", locale)}
+                          />
+                        }
+                      >
                         {t("payments.col.status", locale)}
                       </SortableHeader>
                       <th className="px-4 py-2.5 font-medium">{t("payments.col.method", locale)}</th>
@@ -534,13 +582,56 @@ function PaymentsContent({
 
 function PaymentsWithParams() {
   const sp = useSearchParams();
+  const router = useRouter();
   const rawPage = parseInt(sp.get("page") ?? "", 10);
+
+  // UI-C1.2F.1F — deterministic canonicalization of multi-dimension deep links.
+  // The Payments KPI contract permits at most ONE active table-only dimension
+  // (paymentStatus XOR refundStatus XOR currencyCard). Render phase is PURE:
+  // when 2+ dimensions arrive together the UI immediately renders from the
+  // canonical values with deterministic precedence paymentStatus > refundStatus
+  // > currencyCard (mirrors the KPI group order) — no setState/router/history
+  // mutation during render. The URL is normalized ONCE post-render via
+  // router.replace (same contract as UI-C1.2F.1D-R2).
+  const rawPaymentStatus = sp.get("paymentStatus") ?? "";
+  const rawRefundStatus = sp.get("refundStatus") ?? "";
+  const rawCurrencyCard = sp.get("currencyCard") ?? "";
+  const multiDimensionConflict =
+    (rawPaymentStatus ? 1 : 0) + (rawRefundStatus ? 1 : 0) + (rawCurrencyCard ? 1 : 0) > 1;
+
+  const initialPaymentStatus = rawPaymentStatus;
+  const initialRefundStatus = multiDimensionConflict
+    ? (rawPaymentStatus ? "" : rawRefundStatus)
+    : rawRefundStatus;
+  const initialCurrencyCard = multiDimensionConflict
+    ? (rawPaymentStatus || rawRefundStatus ? "" : rawCurrencyCard)
+    : rawCurrencyCard;
+
+  // Post-render: normalize the URL once via the Next router so the browser URL,
+  // Next Router state, useSearchParams(), and Back/Forward stay synchronized.
+  useEffect(() => {
+    if (!multiDimensionConflict) return;
+
+    // Preserve ALL unrelated query params; clear only the losing KPI dims + page.
+    const params = new URLSearchParams(sp.toString());
+    params.delete("paymentStatus");
+    params.delete("refundStatus");
+    params.delete("currencyCard");
+    params.delete("page");
+    if (rawPaymentStatus) params.set("paymentStatus", rawPaymentStatus);
+    else if (rawRefundStatus) params.set("refundStatus", rawRefundStatus);
+    else if (rawCurrencyCard) params.set("currencyCard", rawCurrencyCard);
+    const qs = params.toString();
+    router.replace(qs ? `/app/payments?${qs}` : "/app/payments", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [multiDimensionConflict]);
+
   return (
     <PaymentsContent
       initialSearch={sp.get("search") ?? ""}
-      initialPaymentStatus={sp.get("paymentStatus") ?? ""}
-      initialRefundStatus={sp.get("refundStatus") ?? ""}
-      initialCurrencyCard={sp.get("currencyCard") ?? ""}
+      initialPaymentStatus={initialPaymentStatus}
+      initialRefundStatus={initialRefundStatus}
+      initialCurrencyCard={initialCurrencyCard}
       initialDateFrom={sp.get("dateFrom") ?? ""}
       initialDateTo={sp.get("dateTo") ?? ""}
       initialSortBy={sp.get("sortBy") ?? undefined}
