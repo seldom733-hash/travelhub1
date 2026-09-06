@@ -8,6 +8,7 @@ import StatusBadge from "@/components/StatusBadge";
 import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
 import Pagination from "@/components/Pagination";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
+import TableHeaderFilter, { type FilterOption } from "@/components/TableHeaderFilter";
 import TableExportButton from "@/components/TableExportButton";
 import OperationsCenterShell, {
   OperationsToolbarSlot,
@@ -74,6 +75,11 @@ function bookingStatusLabel(code: string, locale: Locale): string {
   const key = `booking.status.${code}`;
   const localized = t(key, locale);
   return localized !== key ? localized : code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/** Build filter options for TableHeaderFilter from the canonical BookingStatus array. */
+function buildStatusFilterOptions(locale: Locale): FilterOption[] {
+  return BOOKING_STATUSES.map((s) => ({ value: s, label: bookingStatusLabel(s, locale) }));
 }
 
 /** Locale-aware date cell (RU/AZ/EN via BCP-47 tags). */
@@ -362,7 +368,8 @@ function BookingsContent({ initialUpcoming, initialOverdue, initialSlaMinutes, i
           </div>
         </div>
 
-        {/* Toolbar: canonical order [Search][Status][From][To][Reset][CSV][XLSX].
+        {/* Toolbar: canonical order [Search][Reset][CSV][XLSX].
+            UI-C1.2F.1E: Status filter moved to the Status table header.
             Period is exposed: /bookings filters createdAt [from,to) server-side
             and the overview aggregates share that same global scope. */}
         <OperationsToolbarSlot>
@@ -375,17 +382,6 @@ function BookingsContent({ initialUpcoming, initialOverdue, initialSlaMinutes, i
             aria-label={t("admin.search.placeholder_bookings", locale)}
             className="w-64 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
-          <select
-            value={statusFilter}
-            onChange={(e) => applyStatus(e.target.value)}
-            aria-label={t("admin.filter.all_statuses", locale)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="">{t("admin.filter.all_statuses", locale)}</option>
-            {BOOKING_STATUSES.map((s) => (
-              <option key={s} value={s}>{bookingStatusLabel(s, locale)}</option>
-            ))}
-          </select>
           {/* UI-C1.2F.1B: Local date controls removed — period is Header-owned. */}
           <button
             type="button"
@@ -431,7 +427,21 @@ function BookingsContent({ initialUpcoming, initialOverdue, initialSlaMinutes, i
                   <th className="px-4 py-2.5 font-medium">{t("admin.table.col.code", locale)}</th>
                   <SortableHeader field="amount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.amount", locale)}</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">{t("admin.table.col.passengers", locale)}</th>
-                  <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.status", locale)}</SortableHeader>
+                  <SortableHeader
+                    field="status"
+                    currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null}
+                    onSort={handleSort}
+                    filterSlot={
+                      <TableHeaderFilter
+                        id="bookings-filter-status"
+                        label=""
+                        options={buildStatusFilterOptions(locale)}
+                        value={statusFilter || ""}
+                        onChange={applyStatus}
+                        ariaLabel={t("admin.filter.all_statuses", locale)}
+                      />
+                    }
+                  >{t("admin.table.col.status", locale)}</SortableHeader>
                   {showServiceDate && <SortableHeader field="serviceDate" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? 'desc' } : null} onSort={handleSort}>{t("admin.table.col.service_date", locale)}</SortableHeader>}
                   {showWaiting && <th className="px-4 py-2.5 font-medium text-red-600">{t("admin.table.col.waiting", locale)}</th>}
                 </tr>

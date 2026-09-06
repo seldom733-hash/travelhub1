@@ -90,14 +90,15 @@ describe("UI-C1.2D §6/§30 — 13/13 canonical BookingStatus coverage", () => {
     // each semantic group loop renders its cards
     const cardLoops = (PAGE.match(/BOOKING_FLOW_PREP|BOOKING_FLOW_SERVICE|BOOKING_AWAITING\.map|BOOKING_OPERATIONAL\.map|BOOKING_TERMINAL\.map/g) ?? []).length;
     expect(cardLoops).toBeGreaterThanOrEqual(5);
-    expect(PAGE).toContain("BOOKING_STATUSES.map((s) =>");
   });
 
-  it("filter dropdown offers all 13 canonical statuses (no raw enums as visible labels)", () => {
-    expect(PAGE).toContain('<option value="">{t("admin.filter.all_statuses", locale)}</option>');
-    expect(PAGE).toContain('{bookingStatusLabel(s, locale)}');
-    // labels resolve through i18n, never raw enum text
-    expect(PAGE).not.toContain('>CANCELLED</option>');
+  it("UI-C1.2F.1E — header filter options cover all 13 canonical statuses via buildStatusFilterOptions (labels through i18n, never raw enums)", () => {
+    expect(PAGE).toContain("function buildStatusFilterOptions(locale: Locale): FilterOption[]");
+    expect(PAGE).toContain("BOOKING_STATUSES.map((s) => ({ value: s, label: bookingStatusLabel(s, locale) }))");
+    // toolbar <select> is gone — no option markup anywhere
+    expect(PAGE).not.toContain('<option value="">');
+    expect(PAGE).not.toContain(">CANCELLED</option>");
+    expect(PAGE).not.toContain("<select");
   });
 });
 
@@ -264,17 +265,19 @@ describe("UI-C1.2D §5/§14/§31/§32 — server-authoritative overview, no clie
 });
 
 describe("UI-C1.2D §15/§18/§33 — toolbar grammar + detector deep-links", () => {
-  it("canonical toolbar order is [Search][Status][Reset][CSV][XLSX] — period is Header-owned", () => {
+  it("UI-C1.2F.1E — canonical toolbar is [Search][Reset][CSV][XLSX]; Status lives in the Status table header", () => {
     const searchIdx = PAGE.indexOf('placeholder={t("admin.search.placeholder_bookings"');
-    const statusIdx = PAGE.indexOf('aria-label={t("admin.filter.all_statuses"');
     const resetIdx = PAGE.indexOf('t("filters.reset", locale)');
     const exportIdx = PAGE.indexOf("<TableExportButton");
     expect(searchIdx).toBeGreaterThan(-1);
-    expect(statusIdx).toBeGreaterThan(searchIdx);
-    expect(resetIdx).toBeGreaterThan(statusIdx);
+    expect(resetIdx).toBeGreaterThan(searchIdx);
     expect(exportIdx).toBeGreaterThan(resetIdx);
+    // no toolbar Status dropdown remains
+    expect(PAGE).not.toContain("<select");
+    expect(PAGE).not.toContain('aria-label={t("admin.filter.all_statuses", locale)}');
+    expect(PAGE).toContain("UI-C1.2F.1E: Status filter moved to the Status table header");
     // UI-C1.2F.1B: local date controls removed — period is Header-owned
-    expect(PAGE).toContain('UI-C1.2F.1B: Local date controls removed');
+    expect(PAGE).toContain("UI-C1.2F.1B: Local date controls removed");
   });
 
   it("upcoming/overdue detector deep-link params are read from the URL", () => {
@@ -379,5 +382,144 @@ describe("UI-C1.2D §3/§24/§33 — shell + responsive-safe composition", () =>
   it("detector columns are preserved for deep-link scoped tables", () => {
     expect(PAGE).toContain("showServiceDate");
     expect(PAGE).toContain("showWaiting");
+  });
+});
+
+describe("UI-C1.2F.1E — Bookings Status filter moved to Status table header (shared foundation)", () => {
+  it("1/2. shared SortableHeader + TableHeaderFilter compose in the Status column; toolbar has no Status dropdown", () => {
+    expect(PAGE).toContain('import TableHeaderFilter, { type FilterOption } from "@/components/TableHeaderFilter";');
+    expect(PAGE).toContain("<SortableHeader");
+    expect(PAGE).toContain("<TableHeaderFilter");
+    expect(PAGE).toContain('id="bookings-filter-status"');
+    expect(PAGE).not.toContain("<select");
+  });
+
+  it("3/4. header Status filter and KPI click drive ONE state through applyStatus (sets URL status, resets page)", () => {
+    // TableHeaderFilter in the Status column is bound to applyStatus
+    const headerRegion = PAGE.slice(PAGE.indexOf('id="bookings-filter-status"'), PAGE.indexOf('id="bookings-filter-status"') + 500);
+    expect(headerRegion).toContain("onChange={applyStatus}");
+    expect(headerRegion).toContain("value={statusFilter || \"\"}");
+    expect(headerRegion).toContain('ariaLabel={t("admin.filter.all_statuses", locale)}');
+    // KPI cards use the same applyStatus entry point
+    expect(PAGE).toContain("onClick={() => applyStatus(code)}");
+    // single authority — no separate headerStatus/kpiStatus state exists
+    expect(PAGE).not.toContain("headerStatus");
+    expect(PAGE).not.toContain("kpiStatus");
+    // applyStatus resets page and writes the canonical URL param
+    expect(PAGE).toContain('setStatusFilter(code);');
+    expect(PAGE).toContain('setPage(1);');
+    expect(PAGE).toContain('updateUrl({ status: code || undefined, page: undefined })');
+  });
+
+  it("5/6/7. KPI aria-pressed + header filter read the SAME selectedStatus = statusFilter (URL-derived)", () => {
+    expect(PAGE).toContain("const selectedStatus = statusFilter || \"\";");
+    expect(PAGE).toContain("active={selectedStatus === code}");
+    // header filter value and KPI active both derive from statusFilter
+    expect(PAGE).toContain("value={statusFilter || \"\"}");
+    // reload/deep-link derives the selection from the URL param
+    expect(PAGE).toContain('initialStatus={sp.get("status") ?? ""}');
+    expect(PAGE).toContain('const [statusFilter, setStatusFilter] = useState(initialStatus);');
+  });
+
+  it("8/9. clear paths converge on the same Total/default state — header All and Total KPI both clear status + page", () => {
+    expect(PAGE).toContain("handleTotalClick");
+    expect(PAGE).toContain('setStatusFilter("");');
+    expect(PAGE).toContain('updateUrl({ status: undefined, page: undefined })');
+    // TableHeaderFilter's own "All" option calls onChange("") → same applyStatus("") path
+    expect(PAGE).toContain("onChange={applyStatus}");
+  });
+
+  it("10/11/12/13. status change never drops search/period/sort and vice-versa (independent URL keys)", () => {
+    // applyStatus writes ONLY status + page — search/dateFrom/dateTo/sort untouched
+    expect(PAGE).toContain('updateUrl({ status: code || undefined, page: undefined })');
+    // search commit writes ONLY search + page
+    expect(PAGE).toContain('updateUrl({ search: value || undefined, page: undefined })');
+    // sort writes ONLY sortBy/sortDirection (status preserved in URL + state)
+    expect(PAGE).toContain('updateUrl({ sortBy: field, sortDirection: direction })');
+    expect(PAGE).toContain("const handleSort = (field: string, direction: SortDirection) => {");
+    // handleSort does NOT touch statusFilter and applyStatus does NOT touch sortBy
+    const sortRegion = PAGE.slice(PAGE.indexOf("const handleSort"), PAGE.indexOf("const handleSort") + 260);
+    expect(sortRegion).not.toContain("setStatusFilter");
+    const statusRegion = PAGE.slice(PAGE.indexOf("const applyStatus"), PAGE.indexOf("const applyStatus") + 320);
+    expect(statusRegion).not.toContain("setSortBy");
+    // load() sends all four scopes together
+    expect(PAGE).toContain('qs.set("sortBy", sortBy); qs.set("sortDirection", sortDirection ?? "desc");');
+    expect(PAGE).toContain('if (statusFilter) qs.set("status", statusFilter);');
+    expect(PAGE).toContain('qs.set("search", search)');
+    expect(PAGE).toContain('qs.set("dateFrom", dateFrom)');
+  });
+
+  it("14. sort and filter are independent click targets (separate controls inside the Status header)", () => {
+    // SortableHeader renders its own sort <button>; TableHeaderFilter is passed via filterSlot
+    expect(PAGE).toContain("filterSlot={");
+    // sort button + filter button are distinct elements — filter has its own id
+    expect(PAGE).toContain('id="bookings-filter-status"');
+    expect(PAGE).toContain("field=\"status\"");
+    const statusCol = PAGE.slice(PAGE.indexOf('field="status"'), PAGE.indexOf('field="status"') + 700);
+    expect(statusCol).toContain("onSort={handleSort}");
+    expect(statusCol).toContain("filterSlot={");
+    expect(statusCol).toContain("<TableHeaderFilter");
+  });
+
+  it("15. reload derives selected KPI + header state from URL (no component-only authority)", () => {
+    expect(PAGE).toContain('initialStatus={sp.get("status") ?? ""}');
+    expect(PAGE).toContain("const [statusFilter, setStatusFilter] = useState(initialStatus);");
+    expect(PAGE).toContain("const selectedStatus = statusFilter || \"\";");
+    expect(PAGE).toContain("value={statusFilter || \"\"}");
+  });
+
+  it("16. registry Reset clears status but PRESERVES Header Period (dateFrom/dateTo untouched)", () => {
+    expect(PAGE).toContain("const handleReset = useCallback(");
+    expect(PAGE).toContain('updateUrl({ search: undefined, status: undefined, page: undefined })');
+    // Reset never deletes period params — dateFrom/dateTo survive because updateUrl only touches listed keys
+    expect(PAGE).not.toContain("status: undefined, dateFrom: undefined");
+    // period params still flow to the query after reset
+    expect(PAGE).toContain('qs.set("dateFrom", dateFrom)');
+  });
+
+  it("17. tab switch carries period only — Booking status is registry-local (shell-owned tabs)", () => {
+    expect(PAGE).toContain('<OperationsCenterShell activeDomain="bookings">');
+    // registry writes no cross-tab state; dateFrom/dateTo are synced from the URL (Header-owned)
+    expect(PAGE).toContain("Sync dateFrom/dateTo when Header Period changes the URL");
+  });
+
+  it("18. static KPI overview — status filter must not trigger client recount or re-scope aggregates", () => {
+    expect(PAGE).toContain("data?.aggregates?.lifecycle");
+    expect(PAGE).not.toContain(".filter((b) =>");
+    expect(PAGE).not.toContain(".reduce(");
+    // overviewTotal reads the aggregates total — not the filtered table total
+    expect(PAGE).toContain("overviewTotal = (data?.aggregates?.lifecycle as Record<string, number> | undefined)?.total");
+  });
+
+  it("19. status is server-authoritative — the /bookings query carries status verbatim", () => {
+    expect(PAGE).toContain('if (statusFilter) qs.set("status", statusFilter);');
+    expect(PAGE).toContain("api.get<Page<Booking>>(`/bookings?${qs.toString()}`)");
+  });
+
+  it("20. invalid status does not silently fall back — status passes through URL/query with no client-side drop", () => {
+    // there is no client-side allowlist that would strip an unknown status before the server sees it
+    expect(PAGE).toContain('if (statusFilter) qs.set("status", statusFilter);');
+    const statusFilterDecl = PAGE.slice(PAGE.indexOf("const [statusFilter"), PAGE.indexOf("const [statusFilter") + 120);
+    expect(statusFilterDecl).toContain("useState(initialStatus)");
+    expect(PAGE).not.toContain("BOOKING_STATUSES.includes(statusFilter)");
+    expect(PAGE).not.toContain("statusFilter in BOOKING_STATUSES");
+  });
+
+  it("export keeps server-side table scope — TableExportButton carries status + period + search", () => {
+    expect(PAGE).toContain('...(statusFilter ? { status: statusFilter } : {})');
+    expect(PAGE).toContain('...(dateFrom ? { dateFrom } : {})');
+    expect(PAGE).toContain('...(search ? { search } : {})');
+  });
+
+  it("a11y — filter control has an accessible name; aria-pressed KPI state retained; filter state not color-only", () => {
+    expect(PAGE).toContain('ariaLabel={t("admin.filter.all_statuses", locale)}');
+    expect(PAGE).toContain('id="bookings-filter-status"');
+    // shared TableHeaderFilter exposes aria-expanded/haspopup and active class + KPI uses aria-pressed
+    const shared = read("components/TableHeaderFilter.tsx");
+    expect(shared).toContain("aria-expanded={open}");
+    expect(shared).toContain("aria-haspopup=\"listbox\"");
+    expect(shared).toContain("bg-blue-100 text-blue-600");
+    const kpi = read("components/commerce/CommerceKpiCard.tsx");
+    expect(kpi).toContain("aria-pressed");
   });
 });
