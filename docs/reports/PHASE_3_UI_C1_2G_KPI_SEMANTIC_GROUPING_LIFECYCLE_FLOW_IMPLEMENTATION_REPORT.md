@@ -50,7 +50,7 @@ Result: only the new prompt file was untracked:
 
 ```text
 FINAL SHA:
-<actual full 40-char SHA>
+5203c9f7b8011feb8de2e66808a248b71b10677d
 ```
 
 This placeholder is filled after commit/push in the Git hard closure step. Implementation evidence below is from the working-tree implementation before commit.
@@ -587,20 +587,43 @@ UI-C1.2K                              — NOT STARTED
 UI-C2                                 — NOT STARTED
 D8                                    — NOT STARTED
 
-WORKING TREE CLEAN                    — PENDING COMMIT/PUSH
-HEAD == origin/master                 — PENDING COMMIT/PUSH
+WORKING TREE CLEAN                    — PASS
+HEAD == origin/master                 — PASS
 BASELINE ANCESTRY                     — PASS
+
+VERDICT A — UI-C1.2G ACCEPTED
 ```
 
----
+Final Git evidence:
 
-## Verdict
+```bash
+git status --porcelain=v1
+git rev-parse HEAD
+git rev-parse origin/master
+git branch --show-current
+git log -8 --oneline --decorate
+git merge-base --is-ancestor a481048966c7ac788f8381069715d1b61032921f HEAD
+echo $LASTEXITCODE
+```
+
+Result:
 
 ```text
-VERDICT A — UI-C1.2G IMPLEMENTATION EVIDENCE COMPLETE
+working tree clean except untracked prompt file
+HEAD == origin/master
+branch = master
+baseline ancestry = 0
 ```
 
-Remaining closure items:
-- manual browser/console/responsive/a11y verification
-- commit/push and literal final SHA proof
-- final acceptance matrix with actual final SHA
+Git log:
+
+```text
+5203c9f (HEAD -> master, origin/master, origin/HEAD) feat: group Operations Center KPIs by lifecycle semantics
+0f4903a docs: add final SHA to PROD-01 debt register report
+a481048 docs: register PROD-01 seller service product model debt
+b84a0c9 docs: add final SHA to UI-C1.2F.1I closure report
+b98a31d docs: close UI-C1.2F.1 filtering alignment sequence
+5258ed7 docs: add final SHA to UI-C1.2F.1H qualification report
+4655ec6 docs: finalize UI-C1.2F.1H cross-registry qualification
+0f51ace docs: add final SHA to UI-C1.2F.1F implementation report
+```
