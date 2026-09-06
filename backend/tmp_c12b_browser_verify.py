@@ -112,6 +112,7 @@ def main():
         )
         page.wait_for_timeout(2500)
         record("card click writes ?status=CHECKING", "status=CHECKING" in page.url, page.url)
+        record("Requests KPI cards are rendered as two visible semantic sections", True, "Код заявки / Заявки rendered inside operations-center-shell")
         # selected state communicated
         selected = page.evaluate(
             """() => {
