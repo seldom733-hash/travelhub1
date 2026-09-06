@@ -228,12 +228,19 @@ export scope; verbatim pass-through of table-only dims; a11y markers.
 ## Git Hard Closure
 
 ```
-IMPLEMENTATION SHA: <filled at closure>
-FINAL SHA:          <filled at closure>
+IMPLEMENTATION SHA: 17ea8b601ba0cd2171b7d2b7c8c3553389af962e
+FINAL SHA:           17ea8b601ba0cd2171b7d2b7c8c3553389af962e
 
 git status --porcelain=v1        → <NO OUTPUT>
-HEAD == origin/master            → <FINAL_SHA>
+HEAD == origin/master            → 17ea8b601ba0cd2171b7d2b7c8c3553389af962e
 2db72e6 (baseline) ancestor      → PASS (exit 0)
+
+git log -5 --oneline --decorate
+17ea8b6 (HEAD -> master, origin/master, origin/HEAD) feat: align Payments filters with table headers (UI-C1.2F.1F)
+3b6fba0 docs: add final SHA to UI-C1.2F.1E implementation report
+2db72e6 feat: align Bookings status filter with table header (UI-C1.2F.1E)
+22d1653 docs: add final SHA to UI-C1.2F.1B qualification report
+fd53a89 docs: finalize UI-C1.2F.1B qualification (shared Header Period)
 ```
 
 ```
