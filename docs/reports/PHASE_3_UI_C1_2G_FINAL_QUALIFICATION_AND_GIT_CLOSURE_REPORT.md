@@ -55,7 +55,7 @@ IMPLEMENTATION SHA:
 
 ```text
 CLOSURE SHA / FINAL HEAD:
-cca711a228ab2d71f035830cf35fb1dbea343866
+42d479f9d5f6f3d2ce2950ce5bee458157afab63
 ```
 
 This is the literal final HEAD at the time of this report.
@@ -358,7 +358,7 @@ baseline ancestry = 0
 
 Final HEAD:
 ```text
-cca711a228ab2d71f035830cf35fb1dbea343866
+42d479f9d5f6f3d2ce2950ce5bee458157afab63
 ```
 
 Implementation commit ancestry:
