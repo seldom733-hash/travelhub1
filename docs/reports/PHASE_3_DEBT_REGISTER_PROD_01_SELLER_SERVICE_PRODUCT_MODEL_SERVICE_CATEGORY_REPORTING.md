@@ -141,21 +141,27 @@ $ git status --porcelain=v1
 <NO OUTPUT>
 
 $ git rev-parse HEAD
-<FINAL HEAD>
+a481048966c7ac788f8381069715d1b61032921f
 
 $ git rev-parse origin/master
-<FINAL HEAD>
+a481048966c7ac788f8381069715d1b61032921f
 
 $ git branch --show-current
 master
 
 $ git log -5 --oneline --decorate
-<FINAL LOG>
+a481048 (HEAD -> master, origin/master, origin/HEAD) docs: register PROD-01 seller service product model debt
+b84a0c9 docs: add final SHA to UI-C1.2F.1I closure report
+b98a31d docs: close UI-C1.2F.1 filtering alignment sequence
+5258ed7 docs: add final SHA to UI-C1.2F.1H qualification report
+4655ec6 docs: finalize UI-C1.2F.1H cross-registry qualification
 
 $ git merge-base --is-ancestor b98a31dc6f27d1c93e9c7d4cf356480c28409d54 HEAD
 $ echo $LASTEXITCODE
 0
 ```
+
+All required conditions met: working tree clean, HEAD == origin/master == `a481048966c7ac788f8381069715d1b61032921f`, branch = master, baseline ancestry exit code 0.
 
 ## 7. Final Report Matrix
 
@@ -167,7 +173,7 @@ BASELINE SHA:
 b98a31dc6f27d1c93e9c7d4cf356480c28409d54
 
 FINAL SHA:
-<FINAL SHA>
+a481048966c7ac788f8381069715d1b61032921f
 
 DEBT REGISTER AUDITED                 — PASS
 ID COLLISION                          — NONE
