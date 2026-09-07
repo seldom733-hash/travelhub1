@@ -49,18 +49,39 @@ const EXPECTED_RU: Record<string, string> = {
   CANCELLED_BY_CUSTOMER: "Отменена клиентом",
 };
 
+/** Semantic grouping derived from canonical RequestStatus (UI-C1.2G). */
+const REQUEST_LIFECYCLE_STATUSES = [
+  "NEW",
+  "CHECKING",
+  "PRICE_CHANGED",
+  "CUSTOMER_ACCEPTED",
+  "CONFIRMED",
+  "CONVERTED",
+] as const;
+
+const REQUEST_EXCEPTION_STATUSES = [
+  "SUPPLIER_TIMEOUT",
+  "CUSTOMER_PAYMENT_TIMEOUT",
+  "REJECTED",
+  "UNAVAILABLE",
+  "EXPIRED",
+  "CANCELLED_BY_CUSTOMER",
+] as const;
+
 describe("UI-C1.2B §4/§6/§34 — all 12 Request statuses have a visible KPI card", () => {
   it("page enumerates all 12 canonical RequestStatus values (no invented statuses)", () => {
     for (const code of REQUEST_STATUSES) {
       expect(PAGE).toContain(code);
     }
     // count the mapped card loop keys — 12 cards, one per canonical status
-    const mapped = (PAGE.match(/REQUEST_LIFECYCLE_STATUSES\.map/g) ?? []).length;
-    expect(mapped).toBeGreaterThanOrEqual(1);
+    const mapped = (PAGE.match(/REQUEST_LIFECYCLE_STATUSES\.map/g) ?? []).length +
+                  (PAGE.match(/REQUEST_EXCEPTION_STATUSES\.map/g) ?? []).length;
+    expect(mapped).toBeGreaterThanOrEqual(2); // two groups, both present
   });
 
-  it("each canonical status renders a CommerceKpiCard in the same card loop", () => {
+  it("each canonical status renders a CommerceKpiCard in the card loops", () => {
     expect(PAGE).toContain("REQUEST_LIFECYCLE_STATUSES.map((code) =>");
+    expect(PAGE).toContain("REQUEST_EXCEPTION_STATUSES.map((code) =>");
     expect(PAGE).toContain("<CommerceKpiCard");
     expect(PAGE).toContain('active={selectedStatus === code}');
   });
@@ -141,12 +162,23 @@ describe("UI-C1.2B §8/§9 — KPI click contract (server-side filter, page rese
     expect(btn.getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("card order follows the canonical enum order (not alphabetical)", () => {
-    const arrIdx = PAGE.indexOf("REQUEST_LIFECYCLE_STATUSES = [");
-    const arr = PAGE.slice(arrIdx, arrIdx + 1200);
+  it("card order follows the canonical enum order within each group (not alphabetical)", () => {
+    // Lifecycle group: check order matches REQUEST_LIFECYCLE_STATUSES
+    const lifecycleIdx = PAGE.indexOf("REQUEST_LIFECYCLE_STATUSES = [");
+    const lifecycleArr = PAGE.slice(lifecycleIdx, lifecycleIdx + 800);
     let prev = -1;
-    for (const code of REQUEST_STATUSES) {
-      const at = arr.indexOf(`"${code}"`);
+    for (const code of REQUEST_LIFECYCLE_STATUSES) {
+      const at = lifecycleArr.indexOf(`"${code}"`);
+      expect(at).toBeGreaterThan(prev);
+      prev = at;
+    }
+
+    // Exception group: check order matches REQUEST_EXCEPTION_STATUSES
+    const exceptionIdx = PAGE.indexOf("REQUEST_EXCEPTION_STATUSES = [");
+    const exceptionArr = PAGE.slice(exceptionIdx, exceptionIdx + 800);
+    prev = -1;
+    for (const code of REQUEST_EXCEPTION_STATUSES) {
+      const at = exceptionArr.indexOf(`"${code}"`);
       expect(at).toBeGreaterThan(prev);
       prev = at;
     }
@@ -277,9 +309,10 @@ describe("UI-C1.2F.1G §5/§6 — Status removed from toolbar; Status header fil
     expect(PAGE).toContain('ariaLabel={t("admin.filter.all_statuses", locale)}');
   });
 
-  it("Status header filter options derive from the 12 canonical RequestStatus values", () => {
-    expect(PAGE).toContain("const statusFilterOptions = REQUEST_LIFECYCLE_STATUSES.map((code) => ({");
-    const blockIdx = PAGE.indexOf("const statusFilterOptions = REQUEST_LIFECYCLE_STATUSES.map");
+  it("Status header filter options cover exactly all 12 canonical RequestStatus values", () => {
+    // The filter options come from the combined status arrays
+    expect(PAGE).toContain("const statusFilterOptions = allRequestStatuses.map((code) => ({");
+    const blockIdx = PAGE.indexOf("const statusFilterOptions = allRequestStatuses.map");
     const block = PAGE.slice(blockIdx, blockIdx + 300);
     expect(block).toContain("value: code,");
     expect(block).toContain("label: requestStatusLabel(code, locale),");
