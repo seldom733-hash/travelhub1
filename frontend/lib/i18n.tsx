@@ -606,6 +606,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "nav.seller_profiles": { ru: "Продавцы", az: "Satıcılar", en: "Sellers" },
   "nav.users": { ru: "Пользователи", az: "İstifadəçilər", en: "Users" },
   "nav.support": { ru: "Поддержка", az: "Dəstək", en: "Support" },
+  "nav.help": { ru: "Справка", az: "Kömək", en: "Help" },
   "cc_utc": { ru: "UTC", az: "UTC", en: "UTC" },
   // section names
   "cc.section.executive": { ru: "Сводные показатели", az: "İdarəetmə Xülasəsi", en: "Executive Summary" },

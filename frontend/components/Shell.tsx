@@ -74,6 +74,7 @@ export const NAV_GROUPS: NavGroup[] = [
     headingKey: "nav.group.service",
     items: [
       { href: "/app/support", icon: "🎫", labelKey: "nav.support", permission: "support.case.read" },
+      { href: "/app/help", icon: "❓", labelKey: "nav.help" },
     ],
   },
   {

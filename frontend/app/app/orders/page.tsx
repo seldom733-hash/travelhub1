@@ -289,6 +289,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               label={t("admin.kpi.total_orders", locale)}
               value={overviewTotal}
               active={!selectedLifecycle && !selectedPayment}
+              helpId="orders.kpi.total"
               onClick={handleTotalClick}
             />
           </div>
@@ -313,6 +314,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                     label={lifecycleLabel(code, locale)}
                     value={lifecycleCounts[code] ?? 0}
                     active={selectedLifecycle === code}
+                    helpId={`orders.status.${code.toLowerCase()}`}
                     onClick={() => applyStatus(code)}
                   />
                 </li>,
@@ -344,6 +346,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                   label={lifecycleLabel(code, locale)}
                   value={lifecycleCounts[code] ?? 0}
                   active={selectedLifecycle === code}
+                  helpId={`orders.status.${code.toLowerCase()}`}
                   onClick={() => applyStatus(code)}
                 />
               ))}
@@ -360,6 +363,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                   label={lifecycleLabel(code, locale)}
                   value={lifecycleCounts[code] ?? 0}
                   active={selectedLifecycle === code}
+                  helpId={`orders.status.${code.toLowerCase()}`}
                   onClick={() => applyStatus(code)}
                 />
               ))}
@@ -376,6 +380,7 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
                   label={paymentLabel(code, locale)}
                   value={paymentCounts[code] ?? 0}
                   active={selectedPayment === code}
+                  helpId={`orders.payment.${code.toLowerCase()}`}
                   onClick={() => applyPaymentStatus(code)}
                 />
               ))}

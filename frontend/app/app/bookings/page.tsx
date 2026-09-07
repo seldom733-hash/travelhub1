@@ -113,6 +113,7 @@ function FlowRow({ codes, counts, selected, onSelect, label, locale }: {
             label={bookingStatusLabel(code, locale)}
             value={counts[code] ?? 0}
             active={selected === code}
+            helpId={`bookings.status.${code.toLowerCase()}`}
             onClick={() => onSelect(code)}
           />
         </li>,
@@ -290,6 +291,7 @@ function BookingsContent({ initialUpcoming, initialOverdue, initialSlaMinutes, i
             label={t("admin.kpi.total_bookings", locale)}
             value={overviewTotal}
             active={!selectedStatus}
+            helpId="bookings.kpi.total"
             onClick={handleTotalClick}
           />
         </div>
@@ -330,6 +332,7 @@ function BookingsContent({ initialUpcoming, initialOverdue, initialSlaMinutes, i
                 label={bookingStatusLabel(code, locale)}
                 value={lifecycleCounts[code] ?? 0}
                 active={selectedStatus === code}
+                helpId={`bookings.status.${code.toLowerCase()}`}
                 onClick={() => applyStatus(code)}
               />
             ))}
@@ -346,6 +349,7 @@ function BookingsContent({ initialUpcoming, initialOverdue, initialSlaMinutes, i
                 label={bookingStatusLabel(code, locale)}
                 value={lifecycleCounts[code] ?? 0}
                 active={selectedStatus === code}
+                helpId={`bookings.status.${code.toLowerCase()}`}
                 onClick={() => applyStatus(code)}
               />
             ))}
@@ -362,6 +366,7 @@ function BookingsContent({ initialUpcoming, initialOverdue, initialSlaMinutes, i
                 label={bookingStatusLabel(code, locale)}
                 value={lifecycleCounts[code] ?? 0}
                 active={selectedStatus === code}
+                helpId={`bookings.status.${code.toLowerCase()}`}
                 onClick={() => applyStatus(code)}
               />
             ))}

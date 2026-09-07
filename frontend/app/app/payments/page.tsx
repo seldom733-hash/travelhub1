@@ -360,6 +360,7 @@ function PaymentsContent({
               label={t("payments.kpi.total", locale)}
               value={overviewTotal}
               active={!hasCardFilter}
+              helpId="payments.kpi.total"
               onClick={handleTotalClick}
             />
           </div>
@@ -376,6 +377,7 @@ function PaymentsContent({
                   label={paymentStatusLabel(code, locale)}
                   value={agg?.paymentStatus?.[code] ?? 0}
                   active={paymentStatusFilter === code}
+                  helpId={`payments.status.${code.toLowerCase()}`}
                   onClick={() => applyPaymentStatus(code)}
                 />
               ))}
@@ -414,6 +416,7 @@ function PaymentsContent({
                   label={refundStatusLabel(code, locale)}
                   value={agg?.refundStatus?.[code] ?? 0}
                   active={refundStatusFilter === code}
+                  helpId={`payments.refund.status.${code.toLowerCase()}`}
                   onClick={() => applyRefundStatus(code)}
                 />
               ))}

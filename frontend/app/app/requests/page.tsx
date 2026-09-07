@@ -350,6 +350,7 @@ function RequestsContent({
               label={t("requests.kpi.total", locale)}
               value={kpi.total ?? 0}
               active={!selectedStatus}
+              helpId="requests.kpi.total"
               onClick={() => {
                 setStatusFilter("");
                 setPage(1);
@@ -363,7 +364,7 @@ function RequestsContent({
         {kpi && (
           <div>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {t("requests.group.lifecycle", locale) || "Жизненный цикл"}
+              {t("requests.group.lifecycle", locale)}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
               {REQUEST_LIFECYCLE_STATUSES.map((code) => (
@@ -372,6 +373,7 @@ function RequestsContent({
                   label={requestStatusLabel(code, locale)}
                   value={kpi[code.toLowerCase()] ?? 0}
                   active={selectedStatus === code}
+                  helpId={`requests.status.${code.toLowerCase()}`}
                   onClick={() => applyStatus(code)}
                 />
               ))}
@@ -382,7 +384,7 @@ function RequestsContent({
         {kpi && (
           <div>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {t("requests.group.exceptions", locale) || "Проблемы и завершения"}
+              {t("requests.group.exceptions", locale)}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
               {REQUEST_EXCEPTION_STATUSES.map((code) => (
@@ -391,6 +393,7 @@ function RequestsContent({
                   label={requestStatusLabel(code, locale)}
                   value={kpi[code.toLowerCase()] ?? 0}
                   active={selectedStatus === code}
+                  helpId={`requests.status.${code.toLowerCase()}`}
                   onClick={() => applyStatus(code)}
                 />
               ))}
