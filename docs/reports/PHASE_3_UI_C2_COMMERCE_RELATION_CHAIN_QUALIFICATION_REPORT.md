@@ -316,6 +316,66 @@ frontend vitest: lib/i18n.spec.ts › formatPrice … — 1 pre-existing failure
 единственный failure на обоих базилах (код i18n.tsx не изменялся в C2).
 ```
 
+## 20A. Cardinality Evidence (Review Addendum — VERDICT A held pending)
+
+**Зафиксированный факт:** `Order → Booking` в schema — `0..N` (item-granular), а UI-C2
+использует V1 = `0..1` (один узел). Это **сознательное canonical V1 presentation contract**, а
+не потеря relation truth.
+
+1. **Schema (0..N, item-granular):** `prisma/schema.prisma` L2306+ (`model Booking`):
+   `orderId String` (ссылка без FK), `orderItemId String? @unique` (≤1 бронь на OrderItem),
+   `@@index([orderId])`. Order с N OrderItems физически может иметь N Booking — это
+   подтверждает 0..N на уровне данных.
+2. **Где выбирается ОДИН Booking (literal code):** `backend/src/modules/order/order.service.ts`
+   L1132–1138:
+   ```ts
+   // D5 §12: связанная бронь — exactly linked Booking для этого Order (V1: 1:1).
+   const linkedBooking = await this.prisma.booking.findFirst({
+     where: { orderId: order.id },
+     select: { id: true, referenceNumber: true, status: true, code: true },
+     orderBy: { createdAt: "asc" },
+   });
+   ```
+3. **Deterministic ordering:** `orderBy: { createdAt: "asc" }` — всегда выбирается самая ранняя
+   бронь. Симметрично, Request→Order (`L1125–1131`) использует `createdAt: "desc"` (самый
+   свежий Request) — та же детерминированная V1-конвенция одиночного узла.
+4. **Canonical V1 contract (docs):** `docs/architecture/TRAVELHUB_CURRENT_CANONICAL_ARCHITECTURE.md`
+   L221: `1 Order = 1 Booking (V1)`; код ссылается на D5 §12. Это документированный presentation
+   contract, принятый в D5 и не изменённый UI-C2.
+5. **Что происходит при Order с 2+ Bookings:** `findFirst` возвращает только самую раннюю;
+   остальные не попадают в `linkedBooking` (UI-цепочка показывает один узел). Relation truth при
+   этом НЕ теряется: каждая бронь остаётся самостоятельной сущностью и видна в реестре
+   Бронирований (каждая строка несёт order-reference; `bookings/page.tsx` L467).
+6. **Текущий датасет:** в `travelhub1` нет ни одного Order с 2+ Booking
+   (`GROUP BY … HAVING count(*) > 1` → пусто) — сценарий 0..N сегодня латентный, не
+   exercised.
+
+Вывод: single-node V1 — сознательное V1 limitation (детерминированный выбор earliest), никакой
+relation truth не потерян; расширение до N-узлов — отдельный future stage, не дефект UI-C2.
+
+## 20B. Security Runtime Evidence Matrix (Review Addendum)
+
+Проверено runtime против живого backend (:4000, `travelhub1`) через реальные HTTP-запросы
+(same-origin authenticated fetch администратора + Bearer-токены ролей):
+
+| Case | Probe | Result | Evidence |
+|---|---|---|---|
+| Same tenant / workspace (admin) | `GET /api/v1/orders/5585dc46…` (MKT-ORD-84) | **200** | `linkedRequest: CONVERTED`, `linkedBooking: COMPLETED` (полная цепочка) |
+| Same tenant / workspace (admin) | `GET /api/v1/bookings/21591b5f…` (MKT-BKG-84) | **200** | `linkedOrder: CLOSED`, `linkedRequest: CONVERTED` (новые DTO-поля) |
+| Same tenant, role-limited (OPERATOR) | `GET /api/v1/orders/5585dc46…` | **200** | цепочка доступна не-админу с правом `order.read` |
+| Same tenant, role-limited (OPERATOR) | `GET /api/v1/bookings/21591b5f…` | **200** | `booking.read` — цепочка рендерится |
+| Missing permission (MARKETER) | `GET /api/v1/orders/5585dc46…` | **403** | `Missing permission(s): order.read` |
+| Missing permission (MARKETER) | `GET /api/v1/bookings/21591b5f…` | **403** | `Missing permission(s): booking.read` |
+| Missing permission (MARKETER) | `GET /api/v1/orders/5585dc46…/history` | **403** | `order.read` на подресурсе |
+| Wrong tenant/workspace (cross-context) | `GET /api/v1/orders/6e7f85a9…` (Storefront ORD SF001-ORD-00000001) | **404** | `Order … not found` (generic, без данных) |
+| Wrong tenant/workspace (cross-context) | `GET /api/v1/bookings/40fc0bf8…` (Storefront BKG SF001-BKG-00000001) | **404** | `Booking … not found` — ни linkedOrder, ни linkedRequest не утекают |
+| Direct URL | все случаи выше через прямой URL/API-path | 200/403/404 | детерминированно по контексту |
+| Linked entity unavailable (NOT_CREATED) | `GET /api/v1/orders/12c5dde5…` (MKT-ORD-D5FIX-0001, sale path) | **200** | `linkedRequest: null`, `linkedBooking: null` — UI показывает muted absent-состояние, не ошибку |
+
+Вывод: RBAC/tenant-изоляция серверная и authoritative; UI-видимость не является security
+boundary; new DTO-поля не создают нового attack surface (доступны только в контексте
+разрешённого родительского объекта); cross-context → 404 без existence leakage.
+
 ## 21. Git Hard Closure
 
 ```bash
