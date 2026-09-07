@@ -19,6 +19,7 @@ import EntityLink from "@/components/commerce/EntityLink";
 import EntityRow from "@/components/commerce/EntityRow";
 import EntityFinanceCell from "@/components/commerce/EntityFinanceCell";
 import EntityTimeline from "@/components/commerce/EntityTimeline";
+import CommerceRelationChain from "@/components/commerce/CommerceRelationChain";
 import OperationalNotes from "@/components/OperationalNotes";
 import { useLocale, t, formatPrice, LOCALE_TAGS, type Locale } from "@/lib/i18n";
 import { bookingActionLabel, bookingActionShort } from "@/lib/commerce-history-labels";
@@ -70,6 +71,8 @@ interface BookingDetail {
     confirmedAt?: string;
   }>;
   orderReference?: string | null;
+  linkedOrder?: { id: string; referenceNumber: string; status: string } | null;
+  linkedRequest?: { id: string; referenceNumber: string; status: string } | null;
 }
 
 interface HistoryRow {
@@ -293,6 +296,19 @@ export default function BookingDetailPage() {
             </div>
           </EntitySectionCard>
         </EntityDetailAside>
+
+        {/* WIDE — relations: canonical Commerce Relation Chain (UI-C2) */}
+        <EntityDetailWide>
+          <EntitySectionCard title={t("detail.sections.relations", locale)}>
+            <CommerceRelationChain
+              locale={locale}
+              current="booking"
+              request={booking.linkedRequest ?? null}
+              order={booking.linkedOrder ?? null}
+              booking={booking}
+            />
+          </EntitySectionCard>
+        </EntityDetailWide>
 
         {/* WIDE — notes */}
         <EntityDetailWide>

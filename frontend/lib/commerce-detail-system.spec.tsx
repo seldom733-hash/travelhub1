@@ -56,7 +56,7 @@ describe("R2 Detail Visual System Parity — shared primitives consumed by all 3
     expect(ord).toContain("<EntityTimeline items={milestones} />");
     expect(ord).toContain("EntityFinanceCell");
     expect(bkg).toContain("EntityFinanceCell");
-    expect(req).toContain("EntityLink");
+    expect(req).toContain("CommerceRelationChain"); // UI-C2: relation linking moved to the shared chain
     expect(ord).toContain("EntityLink");
     expect(bkg).toContain("EntityLink");
   });
@@ -111,17 +111,20 @@ describe("R2 Detail Visual System Parity — raw enum leakage removed on touched
   const ord = read("app/app/orders/[id]/page.tsx");
   const bkg = read("app/app/bookings/[id]/page.tsx");
 
-  it("Request: linked Order/Booking/payment/refund statuses render only via StatusBadge", () => {
-    // Each status token appears exactly once and only inside a StatusBadge usage.
+  it("Request: relation identity/status is delegated to the shared CommerceRelationChain (UI-C2); payments/refund/decisions stay local StatusBadge", () => {
     const count = (s: string) => req.split(s).length - 1;
-    expect(count("r.convertedOrder.status")).toBe(1);
-    expect(count("r.convertedBooking.status")).toBe(1);
+    // UI-C2: linked Order/Booking nodes are fed whole (server-authoritative objects) into ONE shared chain —
+    // the page itself no longer touches linked-entity status enums (raw-enum guarantee lives in the shared component).
+    expect(count("<CommerceRelationChain")).toBe(1);
+    expect(req).toContain('current="request"');
+    expect(req).toContain('order={r.convertedOrder}');
+    expect(req).toContain('booking={r.convertedBooking ?? null}');
+    expect(count("r.convertedOrder.status")).toBe(0);
+    expect(count("r.convertedBooking.status")).toBe(0);
     // supplier/customer decision appear twice: once in the render condition, once inside StatusBadge
     expect(count("r.supplierDecision")).toBe(2);
     expect(count("r.customerDecision")).toBe(2);
     expect(count("(r as any).convertedRefund.status")).toBe(1);
-    expect(req).toContain("<StatusBadge status={r.convertedOrder.status} />");
-    expect(req).toContain("<StatusBadge status={r.convertedBooking.status} />");
     expect(req).toContain("<StatusBadge status={r.supplierDecision} />");
     expect(req).toContain("<StatusBadge status={r.customerDecision} />");
     expect(req).toContain("<StatusBadge status={(r as any).convertedRefund.status} />");
@@ -130,12 +133,14 @@ describe("R2 Detail Visual System Parity — raw enum leakage removed on touched
     expect(t("status.decision.DECLINED", "ru")).toBe("Отклонено");
   });
 
-  it("Order: linked Request/Booking statuses render only via StatusBadge", () => {
+  it("Order: linked Request/Booking are fed whole into the shared CommerceRelationChain (UI-C2)", () => {
     const count = (s: string) => ord.split(s).length - 1;
-    expect(count("order.linkedRequest.status")).toBe(1);
-    expect(count("order.linkedBooking.status")).toBe(1);
-    expect(ord).toContain("<StatusBadge status={order.linkedRequest.status} />");
-    expect(ord).toContain("<StatusBadge status={order.linkedBooking.status} />");
+    expect(count("<CommerceRelationChain")).toBe(1);
+    expect(ord).toContain('current="order"');
+    expect(ord).toContain('request={order.linkedRequest ?? null}');
+    expect(ord).toContain('booking={order.linkedBooking ?? null}');
+    expect(count("order.linkedRequest.status")).toBe(0);
+    expect(count("order.linkedBooking.status")).toBe(0);
   });
 
   it("Booking: audit transition statuses render only via StatusBadge (no raw from → to)", () => {

@@ -71,15 +71,29 @@ export class BookingQueryService {
 
     // D7: fetch linked Order financial summary for Booking detail
     let financialSummary: Record<string, unknown> | null = null;
+    // UI-C2: server-authoritative relation chain context (mirrors Order detail
+    // linkedRequest/linkedBooking). No new endpoint; same tenancy/404 semantics as
+    // the Booking itself — relations are resolved through same-chain IDs only.
+    let linkedOrder: { id: string; referenceNumber: string; status: string } | null = null;
+    let linkedRequest: { id: string; referenceNumber: string; status: string } | null = null;
     if (booking.orderId) {
       const order = await this.prisma.order.findUnique({
         where: { id: booking.orderId },
         select: {
-          id: true, amount: true, currency: true, paidAmount: true,
-          refundedAmount: true, paymentStatus: true, status: true,
+          id: true, referenceNumber: true, amount: true, currency: true,
+          paidAmount: true, refundedAmount: true, paymentStatus: true, status: true,
         },
       });
       if (order) {
+        linkedOrder = { id: order.id, referenceNumber: order.referenceNumber, status: order.status };
+        const req = await this.prisma.request.findFirst({
+          where: { convertedOrderId: order.id },
+          select: { id: true, referenceNumber: true, status: true },
+          orderBy: { createdAt: "desc" },
+        });
+        if (req) {
+          linkedRequest = { id: req.id, referenceNumber: req.referenceNumber, status: req.status };
+        }
         const totalAmt = new Prisma.Decimal(order.amount ?? 0);
         const paidAmt = new Prisma.Decimal(order.paidAmount ?? 0);
         const refundedAmt = new Prisma.Decimal(order.refundedAmount ?? 0);
@@ -130,6 +144,8 @@ export class BookingQueryService {
       productTitle: productDisplay?.title ?? null,
       financialSummary,
       activePayment,
+      linkedOrder,
+      linkedRequest,
     };
   }
 }

@@ -16,9 +16,9 @@ import EntityDetailLayout, {
 import EntitySectionCard from "@/components/commerce/EntitySectionCard";
 import EntityField from "@/components/commerce/EntityField";
 import EntityFieldGrid from "@/components/commerce/EntityFieldGrid";
-import EntityLink from "@/components/commerce/EntityLink";
 import EntityRow from "@/components/commerce/EntityRow";
 import EntityTimeline from "@/components/commerce/EntityTimeline";
+import CommerceRelationChain from "@/components/commerce/CommerceRelationChain";
 
 interface RequestDetail {
   id: string;
@@ -394,18 +394,20 @@ export default function RequestDetailPage() {
           </EntitySectionCard>
         </EntityDetailAside>
 
-        {/* WIDE — relations lower slot (UI-C2 not started) */}
+        {/* WIDE — relations lower slot: canonical Commerce Relation Chain (UI-C2) */}
         <EntityDetailWide>
           <EntitySectionCard title={t("detail.sections.relations", locale)}>
             {r.convertedOrder ? (
               <div className="space-y-4">
+                {/* UI-C2: entity identity + statuses live in the shared chain; below — D5 conversion flow context */}
+                <CommerceRelationChain
+                  locale={locale}
+                  current="request"
+                  request={r}
+                  order={r.convertedOrder}
+                  booking={r.convertedBooking ?? null}
+                />
                 <div className="flex flex-wrap items-center gap-3">
-                  <EntityLink
-                    href={`/app/orders/${r.convertedOrder!.id}`}
-                    className="font-mono text-xs font-semibold"
-                  >
-                    {r.convertedOrder.referenceNumber}
-                  </EntityLink>
                   <ProgressBadge progress={r.convertedOrder.travelerProgress ?? null} locale={locale} />
                   {r.convertedOrder.travelerCount != null && (
                     <span className="text-xs text-gray-500">{r.convertedOrder.travelerCount} {t("reqflow.travelers", locale).toLowerCase()}</span>
@@ -424,27 +426,11 @@ export default function RequestDetailPage() {
                     <InfoRow label={t("crm.col.created", locale)} value={
                       r.convertedOrder.createdAt ? fmtTs(r.convertedOrder.createdAt) : null
                     } />
-                    <InfoRow label={t("detail.relation.order_status", locale)} value={<StatusBadge status={r.convertedOrder.status} />} />
                     {r.convertedOrder.amount && (
                       <InfoRow label={t("crm.col.amount", locale)} value={`${r.convertedOrder.amount} ${r.convertedOrder.currency ?? ""}`} />
                     )}
                   </EntityFieldGrid>
                 </div>
-                {r.convertedBooking && (
-                  <div className="border-t border-slate-100 pt-4">
-                    <EntityFieldGrid>
-                      <InfoRow label={t("detail.relation.booking", locale)} value={
-                        <EntityLink
-                          href={`/app/bookings/${r.convertedBooking.id}`}
-                          className="font-mono text-xs"
-                        >
-                          {r.convertedBooking.referenceNumber}
-                        </EntityLink>
-                      } />
-                      <InfoRow label={t("detail.relation.booking_status", locale)} value={<StatusBadge status={r.convertedBooking.status} />} />
-                    </EntityFieldGrid>
-                  </div>
-                )}
                 {r.convertedPayments && r.convertedPayments.length > 0 && (
                   <div className="border-t border-slate-100 pt-4">
                     <div className="mb-2 text-xs font-medium uppercase text-slate-400">{t("crm.detail.payments", locale)}</div>

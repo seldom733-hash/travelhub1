@@ -19,6 +19,7 @@ import EntityLink from "@/components/commerce/EntityLink";
 import EntityRow from "@/components/commerce/EntityRow";
 import EntityFinanceCell from "@/components/commerce/EntityFinanceCell";
 import EntityTimeline from "@/components/commerce/EntityTimeline";
+import CommerceRelationChain from "@/components/commerce/CommerceRelationChain";
 import OperationalNotes from "@/components/OperationalNotes";
 import TravelerCollectionPanel from "@/components/order/TravelerCollectionPanel";
 import OrderActionBar from "@/components/order/OrderActionBar";
@@ -299,30 +300,16 @@ export default function OrderDetailPage() {
           </EntitySectionCard>
         </EntityDetailAside>
 
-        {/* WIDE — relations lower slot (UI-C2 not started) */}
+        {/* WIDE — relations lower slot: canonical Commerce Relation Chain (UI-C2) */}
         <EntityDetailWide>
           <EntitySectionCard title={t("detail.sections.relations", locale)}>
-            <EntityFieldGrid>
-              {order.linkedRequest && (
-                <EntityField label={t("detail.relation.request", locale)} value={
-                  <EntityStatusBadgesCell
-                    link={<EntityLink href={`/app/requests/${order.linkedRequest.id}`} className="font-mono text-xs">{order.linkedRequest.referenceNumber}</EntityLink>}
-                    badge={<StatusBadge status={order.linkedRequest.status} />}
-                  />
-                } />
-              )}
-              {order.linkedBooking && (
-                <EntityField label={t("detail.relation.booking", locale)} value={
-                  <EntityStatusBadgesCell
-                    link={<EntityLink href={`/app/bookings/${order.linkedBooking.id}`} className="font-mono text-xs">{order.linkedBooking.referenceNumber}</EntityLink>}
-                    badge={<StatusBadge status={order.linkedBooking.status} />}
-                  />
-                } />
-              )}
-              {!order.linkedBooking && (
-                <EntityField label={t("detail.relation.booking", locale)} value={<span className="text-sm text-slate-400">{t("detail.relation.no_booking", locale)}</span>} />
-              )}
-            </EntityFieldGrid>
+            <CommerceRelationChain
+              locale={locale}
+              current="order"
+              request={order.linkedRequest ?? null}
+              order={order}
+              booking={order.linkedBooking ?? null}
+            />
           </EntitySectionCard>
         </EntityDetailWide>
 
@@ -428,16 +415,5 @@ export default function OrderDetailPage() {
           </EntitySectionCard>
         </EntityDetailWide>
       </EntityDetailLayout>
-    </EntityDetailShell>
-  );
-}
-
-/** Relation value: mono link + status badge on the same line. */
-function EntityStatusBadgesCell({ link, badge }: { link: React.ReactNode; badge: React.ReactNode }) {
-  return (
-    <span className="flex flex-wrap items-center gap-2">
-      {link}
-      {badge}
-    </span>
-  );
+    </EntityDetailShell>  );
 }
