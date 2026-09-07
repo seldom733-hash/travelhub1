@@ -135,7 +135,8 @@ Payments UI/API:          UNCHANGED
 
 ```bash
 git status --porcelain=v1   → <NO OUTPUT> (после closure)
-git rev-parse HEAD          → 5d2bbdc → docs-commit (корректировка) → SHA-аннотация
+git rev-parse HEAD          → 5d2bbdc → dc5de85 (docs-корректировка); SHA-аннотация ниже
+                            (см. git log)
 git rev-parse origin/master → == HEAD (после push)
 BASELINE 9345645 является ancestor финального HEAD → PASS
 ```
@@ -150,7 +151,7 @@ VERDICT A — DOCUMENTATION CORRECTION ACCEPTED
 
 ```text
 BASELINE SHA: 93456452dcd4dec69b76d4d487d75fd67eabc63c
-CORRECTION SHA: <CORRECTION-commit>
-FINAL SHA: <FINAL-commit>
+CORRECTION SHA: dc5de85d7f7d30a9d92b2bf3decac258872fce9f
+FINAL SHA: dc5de85d7f7d30a9d92b2bf3decac258872fce9f
 WORKTREE: CLEAN
 ```
