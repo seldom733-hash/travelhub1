@@ -91,12 +91,20 @@ describe("R2 Detail Visual System Parity — shared primitives consumed by all 3
     expect(req).toContain('t("crm.col.reason", locale)');
   });
 
-  it("Order detail audit labels + traveler fields are localized via i18n keys", () => {
+  it("Order detail audit labels + traveler fields are localized via i18n keys (shared EntityAuditHistory)", () => {
     const ord = read("app/app/orders/[id]/page.tsx");
-    expect(ord).toContain('orderActionLabel(h.action, locale)');
-    expect(ord).toContain('fieldLabel(labelBase, locale)');
-    expect(ord).toContain('ti("order.history.show_more", locale');
-    expect(ord).toContain('ti("order.history.author", locale');
+    const audit = read("components/commerce/EntityAuditHistory.tsx");
+    // Page supplies the localized mappers + Order-specific field renderers.
+    expect(ord).toContain("actionLabel={orderActionLabel}");
+    expect(ord).toContain("fieldLabel={fieldLabel}");
+    expect(ord).toContain("renderFieldValue={renderFieldValue}");
+    expect(ord).toContain('emptyText={t("bookings.history_disclaimer", locale)}');
+    // Shared grammar keeps the localized audit strings (never raw RU).
+    expect(audit).toContain('ti("order.history.show_more", locale');
+    expect(audit).toContain('ti("order.history.author", locale');
+    expect(audit).toContain('t("order.history.redacted", locale)');
+    expect(audit).toContain('t("bookings.change_history", locale)');
+    expect(audit).not.toContain('toLocaleString("ru-RU")');
   });
 
   it("Booking detail hides the header action area when no actions are available (no technical placeholder text)", () => {
@@ -143,13 +151,13 @@ describe("R2 Detail Visual System Parity — raw enum leakage removed on touched
     expect(count("order.linkedBooking.status")).toBe(0);
   });
 
-  it("Booking: audit transition statuses render only via StatusBadge (no raw from → to)", () => {
-    const count = (s: string) => bkg.split(s).length - 1;
-    // h.from/h.to appear twice: once in the render condition, once inside StatusBadge
-    expect(count("h.from")).toBe(2);
-    expect(count("h.to")).toBe(2);
-    expect(bkg).toContain("<StatusBadge status={h.from} />");
-    expect(bkg).toContain("<StatusBadge status={h.to} />");
+  it("Booking: audit transition statuses render only via StatusBadge (shared EntityAuditHistory)", () => {
+    const audit = read("components/commerce/EntityAuditHistory.tsx");
+    // The page no longer touches raw from/to — the shared component renders transitions only through StatusBadge.
+    expect(bkg).not.toContain("h.from");
+    expect(bkg).not.toContain("h.to");
+    expect(audit).toContain("<StatusBadge status={h.from} />");
+    expect(audit).toContain("<StatusBadge status={h.to} />");
   });
 
   it("Payment/refund entity statuses and Booking passenger completeness are localized", () => {
@@ -249,9 +257,9 @@ describe("R3 Page Composition & Information Hierarchy Parity — shared two-zone
 
   it("Booking audit history lives in the shared lower (Wide) slot, not the context aside", () => {
     const bkg = read("app/app/bookings/[id]/page.tsx");
-    // Change history section is inside an EntityDetailWide block
+    // Shared audit section is inside an EntityDetailWide block
     const wideIdx = bkg.indexOf("<EntityDetailWide");
-    const historyIdx = bkg.indexOf('t("bookings.change_history", locale)');
+    const historyIdx = bkg.indexOf("<EntityAuditHistory");
     expect(wideIdx).toBeGreaterThan(-1);
     expect(historyIdx).toBeGreaterThan(wideIdx);
     // Timeline stays in the aside context column

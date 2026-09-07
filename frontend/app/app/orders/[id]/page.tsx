@@ -19,11 +19,12 @@ import EntityLink from "@/components/commerce/EntityLink";
 import EntityRow from "@/components/commerce/EntityRow";
 import EntityFinanceCell from "@/components/commerce/EntityFinanceCell";
 import EntityTimeline from "@/components/commerce/EntityTimeline";
+import EntityAuditHistory from "@/components/commerce/EntityAuditHistory";
 import CommerceRelationChain from "@/components/commerce/CommerceRelationChain";
 import OperationalNotes from "@/components/OperationalNotes";
 import TravelerCollectionPanel from "@/components/order/TravelerCollectionPanel";
 import OrderActionBar from "@/components/order/OrderActionBar";
-import { useLocale, t, ti, formatPrice, LOCALE_TAGS, type Locale } from "@/lib/i18n";
+import { useLocale, t, formatPrice, LOCALE_TAGS, type Locale } from "@/lib/i18n";
 import { orderActionLabel } from "@/lib/commerce-history-labels";
 import { useCurrentUser } from "@/lib/use-user";
 
@@ -110,6 +111,7 @@ export default function OrderDetailPage() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryPage>({ items: [], total: 0, page: 0, pageSize: 20 });
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [finHistory, setFinHistory] = useState<{ payments: Array<{ id: string; code: string; status: string; amount: string; currency: string; paidAt: string | null; failedAt: string | null; cancelledAt: string | null; createdAt: string }>; refunds: Array<{ id: string; code: string; status: string; amount: string; currency: string; reason: string | null; requestedAt: string | null; approvedAt: string | null; processedAt: string | null; failedAt: string | null; createdAt: string }> }>({ payments: [], refunds: [] });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [finHistoryLoading, setFinHistoryLoading] = useState(false);
@@ -129,6 +131,7 @@ export default function OrderDetailPage() {
 
   const loadHistory = useCallback(async (page: number) => {
     setHistoryLoading(true);
+    setHistoryError(null);
     try {
       const res = await api.get<HistoryPage>(`/orders/${id}/history?page=${page}&pageSize=${history.pageSize}`);
       setHistory((prev) => ({
@@ -137,8 +140,9 @@ export default function OrderDetailPage() {
         page: res.page,
         pageSize: res.pageSize,
       }));
-    } catch {
+    } catch (e) {
       // история не блокирует страницу
+      setHistoryError((e as Error).message ?? null);
     } finally {
       setHistoryLoading(false);
     }
@@ -326,61 +330,19 @@ export default function OrderDetailPage() {
           )}
         </EntityDetailWide>
 
-        {/* WIDE — audit: change history + D7 financial history */}
+        {/* WIDE — audit: shared change history (UI-C4) + D7 financial history */}
         <EntityDetailWide>
-          <EntitySectionCard title={t("bookings.change_history", locale)}>
-            {history.total === 0 && !historyLoading && (
-              <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-400">
-                {t("bookings.history_disclaimer", locale)}
-              </div>
-            )}
-            <div className="space-y-2">
-              {history.items.map((h) => (
-                <EntityRow key={h.id} className="items-start">
-                  <div className="w-full">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-slate-700">{orderActionLabel(h.action, locale)}</span>
-                      <span className="shrink-0 text-slate-400">{formatTs(h.createdAt, locale)}</span>
-                    </div>
-                    {(h.from || h.to) && (
-                      <div className="mt-0.5 text-slate-500">
-                        {h.from ? <StatusBadge status={h.from} /> : null}
-                        {h.from && h.to ? <span className="mx-1 text-slate-400">→</span> : null}
-                        {h.to ? <StatusBadge status={h.to} /> : null}
-                      </div>
-                    )}
-                    {h.comment && <div className="mt-1 text-slate-500">{h.comment}</div>}
-                    {Array.isArray(h.fields) && h.fields.length > 0 && (
-                      <ul className="mt-2 space-y-1 rounded-lg bg-slate-50 p-2">
-                        {h.fields.map((f, idx) => {
-                          const labelBase = f.field.includes("traveler[") ? f.field.replace(/^traveler\[\d+\]\./, "") : f.field;
-                          return (
-                            <li key={idx} className="flex flex-wrap items-center gap-1 text-[11px] text-slate-600">
-                              <span className="font-medium">{fieldLabel(labelBase, locale)}:</span>
-                              <span className="text-slate-400 line-through">{renderFieldValue(labelBase, f.oldValue)}</span>
-                              <span>→</span>
-                              <span>{renderFieldValue(labelBase, f.newValue)}</span>
-                              {f.redacted && <span className="text-amber-600">{t("order.history.redacted", locale)}</span>}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                    {h.actorName && <div className="mt-1 text-slate-400">{ti("order.history.author", locale, { name: h.actorName })}</div>}
-                  </div>
-                </EntityRow>
-              ))}
-            </div>
-            {history.items.length < history.total && (
-              <button
-                disabled={historyLoading}
-                onClick={() => void loadHistory(history.page + 1)}
-                className="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-              >
-                {historyLoading ? "…" : ti("order.history.show_more", locale, { n: history.total - history.items.length })}
-              </button>
-            )}
-          </EntitySectionCard>
+          <EntityAuditHistory
+            items={history.items}
+            total={history.total}
+            loading={historyLoading}
+            error={historyError}
+            onLoadMore={() => void loadHistory(history.page + 1)}
+            actionLabel={orderActionLabel}
+            fieldLabel={fieldLabel}
+            renderFieldValue={renderFieldValue}
+            emptyText={t("bookings.history_disclaimer", locale)}
+          />
         </EntityDetailWide>
 
         <EntityDetailWide>

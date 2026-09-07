@@ -19,6 +19,7 @@ import EntityLink from "@/components/commerce/EntityLink";
 import EntityRow from "@/components/commerce/EntityRow";
 import EntityFinanceCell from "@/components/commerce/EntityFinanceCell";
 import EntityTimeline from "@/components/commerce/EntityTimeline";
+import EntityAuditHistory from "@/components/commerce/EntityAuditHistory";
 import CommerceRelationChain from "@/components/commerce/CommerceRelationChain";
 import OperationalNotes from "@/components/OperationalNotes";
 import { useLocale, t, formatPrice, LOCALE_TAGS, type Locale } from "@/lib/i18n";
@@ -123,6 +124,8 @@ export default function BookingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [executing, setExecuting] = useState<string | null>(null);
 
   const loadBooking = useCallback(async () => {
@@ -131,12 +134,16 @@ export default function BookingDetailPage() {
       setError("");
       const detail = await api.get<BookingDetail>(`/bookings/${id}`);
       setBooking(detail);
-      // Load history
+      // Load history (non-blocking — audit must not break the page)
+      setHistoryLoading(true);
+      setHistoryError(null);
       try {
         const hist = await api.get<{ items: HistoryRow[] }>(`/bookings/${id}/history`);
         setHistory(hist.items ?? []);
-      } catch {
-        // History endpoint may not exist yet — non-blocking
+      } catch (e) {
+        setHistoryError((e as Error).message ?? null);
+      } finally {
+        setHistoryLoading(false);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -323,28 +330,14 @@ export default function BookingDetailPage() {
           )}
         </EntityDetailWide>
 
-        {/* WIDE — audit: immutable change history */}
+        {/* WIDE — audit: immutable change history (UI-C4 shared presentation) */}
         <EntityDetailWide>
-          {history.length > 0 && (
-            <EntitySectionCard title={t("bookings.change_history", locale) || "История изменений"}>
-              <div className="space-y-3">
-                {history.map(h => (
-                  <div key={h.id} className="text-xs">
-                    <div className="font-medium text-slate-700">
-                      {bookingActionLabel(h.action, locale)}
-                    </div>
-                    {h.from && h.to && (
-                      <div className="flex items-center gap-1 text-slate-400">
-                        <StatusBadge status={h.from} /> <span>→</span> <StatusBadge status={h.to} />
-                      </div>
-                    )}
-                    {h.comment && <div className="text-slate-400">{h.comment}</div>}
-                    <div className="text-[11px] text-slate-300">{fmtTs(h.createdAt)} · {h.actorName ?? "—"}</div>
-                  </div>
-                ))}
-              </div>
-            </EntitySectionCard>
-          )}
+          <EntityAuditHistory
+            items={history}
+            loading={historyLoading}
+            error={historyError}
+            actionLabel={bookingActionLabel}
+          />
         </EntityDetailWide>
       </EntityDetailLayout>
     </EntityDetailShell>

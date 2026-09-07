@@ -18,7 +18,19 @@ import EntityField from "@/components/commerce/EntityField";
 import EntityFieldGrid from "@/components/commerce/EntityFieldGrid";
 import EntityRow from "@/components/commerce/EntityRow";
 import EntityTimeline from "@/components/commerce/EntityTimeline";
+import EntityAuditHistory from "@/components/commerce/EntityAuditHistory";
 import CommerceRelationChain from "@/components/commerce/CommerceRelationChain";
+import { requestActionLabel } from "@/lib/commerce-history-labels";
+
+interface RequestHistoryRow {
+  id: string;
+  action: string;
+  from: string | null;
+  to: string | null;
+  actorName: string | null;
+  comment: string | null;
+  createdAt: string;
+}
 
 interface RequestDetail {
   id: string;
@@ -128,8 +140,28 @@ export default function RequestDetailPage() {
   const [proposeOpen, setProposeOpen] = useState(false);
   const [proposePrice, setProposePrice] = useState("");
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [history, setHistory] = useState<RequestHistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const canEdit = useCan("order.edit_noncritical");
+
+  // UI-C4: immutable change history (server-authoritative /requests/:id/history).
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const rows = await api.get<RequestHistoryRow[]>(`/requests/${id}/history`);
+      setHistory(rows ?? []);
+    } catch (err: any) {
+      // история не блокирует страницу
+      setHistoryError(err.message || null);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => { void loadHistory(); }, [loadHistory]);
 
   const loadRequest = useCallback(async () => {
     setLoading(true);
@@ -461,6 +493,16 @@ export default function RequestDetailPage() {
               <div className="text-sm text-slate-400">{t("reqflow.no_linked_order", locale)}</div>
             )}
           </EntitySectionCard>
+        </EntityDetailWide>
+
+        {/* WIDE — audit: immutable change history (UI-C4, server-authoritative) */}
+        <EntityDetailWide>
+          <EntityAuditHistory
+            items={history}
+            loading={historyLoading}
+            error={historyError}
+            actionLabel={requestActionLabel}
+          />
         </EntityDetailWide>
       </EntityDetailLayout>
     </EntityDetailShell>

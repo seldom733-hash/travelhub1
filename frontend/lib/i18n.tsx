@@ -1874,6 +1874,17 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "order.history.author": { ru: "Автор: {name}", az: "Müəllif: {name}", en: "Author: {name}" },
   "order.history.show_more": { ru: "Показать ещё ({n})", az: "Daha çox göstər ({n})", en: "Show more ({n})" },
   "order.history.redacted": { ru: "(маскировано)", az: "(maskalanıb)", en: "(masked)" },
+  // ── UI-C4 — Audit History unification (shared states + Request actions) ──
+  "detail.history.empty": { ru: "Нет записей истории", az: "Tarixçə qeydləri yoxdur", en: "No history entries" },
+  "detail.history.error": { ru: "Не удалось загрузить историю изменений", az: "Dəyişiklik tarixçəsi yüklənmədi", en: "Failed to load change history" },
+  "request.action.created": { ru: "Заявка создана", az: "Sorğu yaradıldı", en: "Request created" },
+  "request.action.supplier_confirmed": { ru: "Поставщик подтвердил цену", az: "Təchizatçı qiyməti təsdiqlədi", en: "Supplier confirmed price" },
+  "request.action.supplier_rejected": { ru: "Поставщик отклонил заявку", az: "Təchizatçı sorğunu rədd etdi", en: "Supplier rejected request" },
+  "request.action.supplier_unavailable": { ru: "Услуга недоступна", az: "Xidmət mövcud deyil", en: "Service unavailable" },
+  "request.action.supplier_proposed_price": { ru: "Предложена новая цена", az: "Yeni qiymət təklif edildi", en: "New price proposed" },
+  "request.action.customer_accepted": { ru: "Клиент принял условия", az: "Müştəri şərtləri qəbul etdi", en: "Customer accepted terms" },
+  "request.action.customer_declined": { ru: "Клиент отклонил условия", az: "Müştəri şərtləri rədd etdi", en: "Customer declined terms" },
+  "request.action.converted": { ru: "Конвертирована в заказ", az: "Sifarişə keçirildi", en: "Converted to order" },
   // ── R2 Detail Visual System — Booking milestones + action labels ──
   "booking.milestone.created": { ru: "Создано", az: "Yaradılıb", en: "Created" },
   "booking.milestone.requested": { ru: "Запрос поставщику", az: "Təchizatçıya sorğu", en: "Request to supplier" },
