@@ -65,8 +65,12 @@ TRAVELHUB HELP / BUSINESS DICTIONARY
 │   ├── Requests   [CURRENT]
 │   ├── Orders     [CURRENT]
 │   ├── Bookings   [CURRENT]
-│   └── Payments   [CURRENT, finance ownership]
-├── Finance                              (payments [CURRENT]; ledger/commission/settlement → FUTURE)
+│   └── Payments   [CURRENT capability / Operations Center tab — finance ownership,
+│                    но НЕ Finance Center]
+├── Finance                              (NOT STARTED — полноценный раздел/центр «Финансы»
+│                                         не реализован; будущий состав: Payments / Refunds /
+│                                         Commissions / Settlements / Payouts /
+│                                         Reconciliation / Finance Analytics)
 ├── Sales / Partner Network              (onboarding, seller profiles, reverse flow → FUTURE)
 ├── Catalog                              (products/services — BLOCKED, PROD-01)
 ├── CRM                                  (→ FUTURE)
@@ -102,7 +106,7 @@ Level 3 — Business Dictionary  → concept/purpose/relationships/lifecycle/rec
 | command-center | `/app/command-center` (`analytics.read`), секции Executive/Operational/Financial/Marketplace, dashboard-command-center-backend-3.1 | FUTURE |
 | analytics | `/app/analytics`, `frontend/lib/metric-drilldown.ts` (METRIC_CONFIGS), analytics-foundation docs | FUTURE |
 | operations | Shell group «Операции»: requests/orders/bookings; COMMERCE_LIFECYCLE_CANONICAL_CONTRACT | **CURRENT** |
-| finance | Shell group «Финансы»: payments; finance-domain-foundation, refund-flow, ledger/commission docs | **CURRENT** (payments); FUTURE (шире finance) |
+| finance | Shell group «Финансы»: payments; finance-domain-foundation, refund-flow, ledger/commission docs | **NOT STARTED** (центр «Финансы»); Payments — CURRENT capability с finance ownership, но НЕ Finance Center |
 | sales | Shell group «Partner Network»: partners/onboarding, seller-profiles; sales-domain-foundation, sales-center-backend, reverse-* docs | FUTURE |
 | catalog | `/app/catalog` (products/services); **PROD-01 OPEN** (debt register L640) | **BLOCKED** |
 | crm | `/app/crm` (three-context CRM), ADR-0007 | FUTURE |
@@ -114,6 +118,23 @@ Level 3 — Business Dictionary  → concept/purpose/relationships/lifecycle/rec
 
 Hard invariant: Marketplace GMV ≠ Storefront Commerce Volume ≠ TravelHub Revenue
 (H.1 §14) — финансовые definitions только с каноническим источником.
+
+Каноническое различие (Finance Status Correction):
+
+```text
+Payment        = финансовая транзакция
+Payments tab   = реализованный UI/read model для просмотра/управления платежами
+Finance        = полноценный бизнес-центр финансов (Payments / Refunds / Commissions /
+                 Settlements / Payouts / Reconciliation / Finance Analytics)
+
+Payments tab ≠ Finance Center
+Payments ownership ≠ Finance Center implementation
+Finance — NOT STARTED
+```
+
+Реализованная вкладка Payments в Operations Center не означает, что начат полноценный
+раздел Finance: существующие Payments UI/endpoint — это текущая финансовая capability
+с зоной ответственности Finance, а не реализация Finance Center.
 
 ---
 
@@ -137,7 +158,7 @@ Hard invariant: Marketplace GMV ≠ Storefront Commerce Volume ≠ TravelHub Rev
 | command-center / analytics | Метрики + presets (backend), METRIC_CONFIGS | Контент только после подтверждения канонических metric sources (типы kpi/formula) |
 | support | UI-статусы + VALID_TRANSITIONS есть, но не канонизированы в Help | status-entries после аудита |
 | crm / marketing | UI-статусы есть | После канонизации + i18n-аудита (сейчас часть лейблов hardcoded) |
-| finance (шире payments) | Docs-foundations есть; UI-метрик нет | NOT YET CANONICAL для UI-метрик |
+| finance (Refunds/Commissions/Settlements/Payouts/Reconciliation/Finance Analytics) | Docs-foundations есть; UI/endpoint-ов нет | **NOT STARTED / NOT YET CANONICAL** — контент только после реализации Finance Center и authority audit |
 | sales | Docs есть; UI-канон неполон (seller-profiles лейблы hardcoded English) | После канонизации |
 | platform | ADR/docs | policy/workflow-entries (RBAC, workspace) — после аудита |
 | catalog | PROD-01 OPEN | **BLOCKED** — definitions/formulas запрещены до resolution |
@@ -318,7 +339,7 @@ Registry НЕ источник KPI values; Help UI НЕ источник busines
 [ ] crm / marketing → status entries после канонизации лейблов
 [ ] command-center / analytics → kpi/formula entries (metric sources подтвердить)
 [ ] platform     → policy/workflow (workspace/RBAC) entries
-[ ] finance (ledger/commission/settlement) → после появления канонических UI-метрик
+[ ] finance (Finance Center: Refunds/Commissions/Settlements/Payouts/Reconciliation/Analytics) → после реализации Finance Center + authority audit
 [ ] sales        → после канонизации (сейчас часть лейблов hardcoded)
 [ ] catalog      → ПОСЛЕ resolution PROD-01
 [ ] marketplace  → только с каноническим GMV/Revenue источником

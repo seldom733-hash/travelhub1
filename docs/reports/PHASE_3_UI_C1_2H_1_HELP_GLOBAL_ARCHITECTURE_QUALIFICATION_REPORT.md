@@ -52,7 +52,9 @@ TRAVELHUB HELP / BUSINESS DICTIONARY
 ├── Platform / General Concepts       (workspaces, RBAC/entitlement)
 ├── Command Center / Analytics        (KPI-платформа)
 ├── Operations / Commerce             (Requests/Orders/Bookings/… )  [CURRENT]
-├── Finance                           (Payments [CURRENT]; ledger/commission → FUTURE)
+├── Finance                           (NOT STARTED — центр «Финансы» не реализован;
+│                                      Payments — CURRENT capability / finance ownership,
+│                                      но НЕ Finance Center)
 ├── Sales / Partner Network           (FUTURE)
 ├── Catalog                           (BLOCKED — PROD-01)
 ├── CRM / Marketing / Support / Admin (FUTURE)
@@ -73,9 +75,16 @@ catalog, crm, marketing, support, admin, marketplace, shared.
 Маппинг текущих доменов: requests/orders/bookings → `operations`; payments → `finance`
 (канонический ownership: Operations → Requests/Orders/Bookings; Finance → Payments).
 
+**Payments ≠ Finance Center.** Payments — реализованная capability/вкладка Operations Center
+с зоной ответственности Finance; полноценный раздел/центр «Финансы» (Payments / Refunds /
+Commissions / Settlements / Payouts / Reconciliation / Finance Analytics) — **NOT STARTED**.
+Существующие Payments UI/endpoint не являются реализацией Finance Center.
+
 ## 6. Current Coverage
 
-- Content-области: только `operations` + `finance` (`HELP_CONTENT_AREAS`).
+- Content-области: только `operations` + `finance` (`HELP_CONTENT_AREAS`); в области
+  finance контент принадлежит только домену `payments` — Payments ≠ Finance Center,
+  центр «Финансы» NOT STARTED.
 - 68 entries, RU/AZ/EN; `/app/help` список 15/21/18/14; deep links; поповеры.
 - FUTURE-области: 0 entries (guard «no invented content» в тестах).
 
@@ -83,8 +92,9 @@ catalog, crm, marketing, support, admin, marketplace, shared.
 
 Карта в Map §6: каждая область со статусом authority и правилом контента —
 command-center/analytics (после подтверждения metric sources, типы kpi/formula),
-support/crm/marketing (после канонизации статусов и i18n-аудита), finance-шире-payments
-(NOT YET CANONICAL для UI-метрик), sales (после канонизации; часть лейблов hardcoded),
+support/crm/marketing (после канонизации статусов и i18n-аудита), finance за пределами
+payments (Finance Center: Refunds/Commissions/Settlements/Payouts/Reconciliation/Analytics —
+NOT STARTED / NOT YET CANONICAL), sales (после канонизации; часть лейблов hardcoded),
 platform (policy/workflow), marketplace (только с каноническим источником GMV/Revenue),
 shared (concept). Контент будущих доменов в этой стадии НЕ создавался.
 
