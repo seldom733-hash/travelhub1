@@ -320,8 +320,8 @@ frontend vitest: lib/i18n.spec.ts › formatPrice … — 1 pre-existing failure
 
 ```bash
 git status --porcelain=v1   → NO OUTPUT (после closure)
-git rev-parse HEAD          → <FINAL_SHA>
-git rev-parse origin/master → <FINAL_SHA>
+git rev-parse HEAD          → 5458331db0eb2779a4d26e2cdc5f1dc0372bba44
+git rev-parse origin/master → 5458331db0eb2779a4d26e2cdc5f1dc0372bba44
 BASELINE db83c44 является ancestor финального HEAD → PASS
 ```
 
@@ -343,7 +343,7 @@ UI-C1.2H.2 — ACCEPTED
 UI-C2 — ACCEPTED
 
 FINAL SHA:
-<FINAL_SHA>
+5458331db0eb2779a4d26e2cdc5f1dc0372bba44
 
 TRUE NEXT:
 UI-C3+ — по утверждённому roadmap (Commerce Center evolution)
