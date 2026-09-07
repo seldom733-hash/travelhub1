@@ -289,9 +289,8 @@ artifacts, лежавшие на baseline 16dfd72 — только markdown, б�
 
 ```bash
 git status --porcelain=v1   → NO OUTPUT (после closure)
-git rev-parse HEAD          → a0112f0a2cf953c3dfdea154ad0ab0b0a0fdb8ae
-                            (после SHA-аннотации: <annotation>)
-git rev-parse origin/master → a0112f0a2cf953c3dfdea154ad0ab0b0a0fdb8ae (на момент аннотации)
+git rev-parse HEAD          → f20850d807ac1687302863082511d2834276e835 (final, после SHA-аннотации)
+git rev-parse origin/master → f20850d807ac1687302863082511d2834276e835
 BASELINE 16dfd72 является ancestor финального HEAD → PASS
 ```
 
@@ -306,6 +305,6 @@ VERDICT A — ACCEPTED
 ```text
 BASELINE SHA: 16dfd722382d1a677c74a45b81115f9cd75340ba
 IMPLEMENTATION SHA: ebbc7a27e32d8cc3316ff49638bbd62fe0bb2cff
-FINAL SHA: a0112f0a2cf953c3dfdea154ad0ab0b0a0fdb8ae
+FINAL SHA: f20850d807ac1687302863082511d2834276e835
 WORKTREE: CLEAN
 ```
