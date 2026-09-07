@@ -19,9 +19,9 @@ BASELINE: 586ffe739855b4e29514126abfe5e95e74b398a3
 ## 3. Implementation SHA
 
 ```text
-IMPLEMENTATION: uncommitted working tree (git closure — следующий gate)
-FINAL SHA:      pending GIT HARD CLOSURE
-HEAD:           586ffe739855b4e29514126abfe5e95e74b398a3
+IMPLEMENTATION: 4dda0ca feat(ui): unify audit history presentation for Request/Order/Booking (UI-C4)
+FINAL SHA:      ae5b55f docs: add UI-C4 audit + qualification reports with runtime evidence
+HEAD:           ae5b55ff1f16c6f046cf60b24fd70a64132ed119
 ```
 
 ## 4. Files Changed
@@ -164,13 +164,14 @@ frontend/lib/i18n.spec.ts › formatPrice: '120,00 ₼' vs '120,00\u00A0₼' (NB
 ## 16. Git Closure
 
 ```text
-git status --porcelain=v1 → 6 modified (frontend) + 6 untracked
-                            (4 audit docs + EntityAuditHistory.tsx + commerce-audit-history.spec.tsx)
+git status --porcelain=v1 → CLEAN
 git diff --check → PASS
-HEAD / origin/master: 586ffe739855b4e29514126abfe5e95e74b398a3 (без коммитов UI-C4)
-WORKTREE: содержит только изменения UI-C4 + audit docs (источник drift отсутствует)
-
-CLOSURE: PENDING — ждёт approval на commit(ы) (implementation / tests+docs).
+HEAD:    ae5b55ff1f16c6f046cf60b24fd70a64132ed119
+Commits:
+  4dda0ca feat(ui): unify audit history presentation for Request/Order/Booking (UI-C4)
+  ae5b55f docs: add UI-C4 audit + qualification reports with runtime evidence
+origin/master: 586ffe739855b4e29514126abfe5e95e74b398a3 (push — отдельный approval)
+WORKTREE: CLEAN, source drift отсутствует
 ```
 
 ## 17. Final Verdict
@@ -189,6 +190,6 @@ a11y                           ✅ h3-заголовок, кнопки, StatusBa
 responsive                     ✅ EntityRow flex-wrap, WIDE-слот
 runtime PASS                   ✅ 26/26 hydrated DOM checks, 0 console errors
 regression PASS                ✅ D5/D6/D7/C1/C2 spec'ы + runtime
-Git clean                      ⏳ HEAD == origin/master, diff --check PASS (коммиты pending)
-HEAD == origin/master          ✅ (586ffe7)
+Git clean                      ✅ worktree CLEAN, diff --check PASS (2 коммита UI-C4)
+HEAD == origin/master          ⏳ push pending (586ffe7 → ae5b55f, отдельный approval)
 ```
