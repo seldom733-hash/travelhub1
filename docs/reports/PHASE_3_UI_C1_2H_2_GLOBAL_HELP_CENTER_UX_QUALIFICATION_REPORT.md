@@ -7,11 +7,25 @@ Stage:        PHASE 3 — UI-C1.2H.2 (Global Help Center UX / Business Dictionar
 Mode:         Audit First → Architecture Reconciliation → Approval → Implementation →
               Tests → Static Verification → Runtime → Regression → Report → Git Hard Closure
 Language:     Russian (report)
-BASELINE SHA: dc5de85d7f7d30a9d92b2bf3decac258872fce9f (промпт; ancestor HEAD)
-Start HEAD:   d8c29635f1b3613eb7da66a7cf2d923162285d70
+BASELINE SHA (prompt): dc5de85d7f7d30a9d92b2bf3decac258872fce9f — ancestor HEAD (exit 0)
+ACTUAL START HEAD:     d8c29635f1b3613eb7da66a7cf2d923162285d70
+
+BASELINE-CONTRACT NOTE (STOP-condition §1 промпта):
+Prompt требовал HEAD == dc5de85; фактический старт H.2 = d8c2963. Разница
+`dc5de85..d8c2963` = ОДИН docs-only commit «docs: add final SHA to UI-C1.2H.1
+finance status correction report»: изменён ровно один файл
+docs/reports/PHASE_3_UI_C1_2H_1_FINANCE_STATUS_CORRECTION_REPORT.md (+4/−3);
+production source / tests / business logic между dc5de85 и d8c2963 НЕ изменялись
+(git diff --name-status dc5de85..d8c2963 = 1 docs file). d8c2963 — закрывающая
+SHA-аннотация предыдущего принятого этапа (Finance Status Correction). Mismatch
+зафиксирован при Audit First; провенанс подтверждён reviewer'ом (literal git
+evidence: log/stat/name-status/show), closure возобновлён по решению пользователя
+(«Accept + resume closure»). Никакого reset/restore/rewrite истории не выполнялось.
 ```
 
-Стартовое состояние проверено: porcelain — только untracked H.2 prompt; `git diff --check` PASS.
+Стартовое состояние проверено: porcelain — только untracked H.2 prompt; `git diff --check` PASS;
+`dc5de85` является ancestor `d8c2963` и HEAD; H.2 implementation commit (`7dc65b6`) начинался
+от чистого `d8c2963` (parent == origin/master на тот момент).
 Approval: пользователь выбрал **full UX incl. search** (Audit First → ask_questions → approve).
 
 ## 2. Audit Findings
@@ -222,6 +236,8 @@ git rev-parse HEAD          → 7dc65b6 (implementation) → 06f76fc (docs) → 
                             (финальный HEAD см. в git log: docs: add final SHA to …H.2)
 git rev-parse origin/master → == HEAD
 BASELINE dc5de85 является ancestor финального HEAD → PASS
+Baseline-contract provenance (STOP §1): см. §1 — docs-only mismatch dc5de85..d8c2963,
+подтверждён literal evidence и принят решением пользователя.
 ```
 
 ## 21. Final Verdict
