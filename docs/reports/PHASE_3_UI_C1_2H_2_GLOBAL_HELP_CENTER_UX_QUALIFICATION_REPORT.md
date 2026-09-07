@@ -218,7 +218,8 @@ docs/reports/PHASE_3_UI_C1_2H_2_GLOBAL_HELP_CENTER_UX_QUALIFICATION_REPORT.md (t
 
 ```bash
 git status --porcelain=v1   → <NO OUTPUT> (после closure)
-git rev-parse HEAD          → 7dc65b6 (implementation) → docs-commit → SHA-аннотация
+git rev-parse HEAD          → 7dc65b6 (implementation) → 06f76fc (docs) → SHA-аннотация
+                            (финальный HEAD см. в git log: docs: add final SHA to …H.2)
 git rev-parse origin/master → == HEAD
 BASELINE dc5de85 является ancestor финального HEAD → PASS
 ```
