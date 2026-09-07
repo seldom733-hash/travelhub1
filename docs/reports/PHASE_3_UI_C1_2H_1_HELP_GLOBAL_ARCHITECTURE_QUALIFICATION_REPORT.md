@@ -189,8 +189,8 @@ docs/prompts/PHASE_3_UI_C1_2H_1_HELP_GLOBAL_ARCHITECTURE_EXPANSION_PROMPT.md (tr
 
 ```bash
 git status --porcelain=v1   → <NO OUTPUT> (после closure)
-git rev-parse HEAD          → 885d904 (implementation) → docs-commit → SHA-аннотация
-git rev-parse origin/master → == HEAD
+git rev-parse HEAD          → 885d904 (implementation) → 9345645 (docs closure), далее SHA-аннотация
+git rev-parse origin/master → == HEAD (после push)
 BASELINE 5a3395a является ancestor финального HEAD → PASS
 ```
 
@@ -209,7 +209,8 @@ coverage корректно разграничены; constraints (canonical uni
 
 ```text
 BASELINE SHA: 5a3395aa13fc2477566363ed6a71c7cbd75deb20
-IMPLEMENTATION SHA: 885d904 (см. §18)
-FINAL SHA: <FINAL-commit> (SHA-аннотация)
+IMPLEMENTATION SHA: 885d904b8f159454b86cdebac9b271e5d7b367cf
+FINAL SHA: 93456452dcd4dec69b76d4d487d75fd67eabc63c
+WORKTREE: CLEAN
 WORKTREE: CLEAN
 ```
