@@ -5,6 +5,21 @@ import path from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
 import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
 import { LocaleProvider } from "./i18n";
+import {
+  getHelpEntry as getRegistryEntry,
+  HELP_AREAS,
+  HELP_CONTENT_AREAS,
+  HELP_REGISTRY,
+  helpEntriesByArea,
+} from "./help-registry";
+import {
+  buildHelpQueryString,
+  countByType,
+  filterHelpEntries,
+  HELP_FILTERABLE_AREAS,
+  HELP_TYPE_FILTERS,
+  parseHelpQuery,
+} from "./help-search";
 
 const ROOT = process.cwd();
 function read(rel: string): string {
@@ -116,12 +131,20 @@ describe("UI-C1.2H §12 — Help Center page contract", () => {
     expect(HELP_PAGE).toContain("DOMAIN_LABEL_KEY");
   });
 
-  it("Help page lists all four Commerce Center domains grouped", () => {
-    expect(HELP_PAGE).toContain("HELP_DOMAINS.map");
+  it("Help page lists the current content grouped under canonical Registry areas", () => {
+    expect(HELP_PAGE).toContain("HELP_CONTENT_AREAS.map");
+    expect(HELP_PAGE).toContain("HELP_DOMAINS.filter");
     expect(HELP_PAGE).toContain("nav.requests");
     expect(HELP_PAGE).toContain("nav.orders");
     expect(HELP_PAGE).toContain("nav.bookings");
     expect(HELP_PAGE).toContain("nav.payments");
+  });
+
+  it("search + type/section filters are URL-driven through the pure help-search model", () => {
+    expect(HELP_PAGE).toContain('from "@/lib/help-search"');
+    expect(HELP_PAGE).toContain("parseHelpQuery(");
+    expect(HELP_PAGE).toContain('aria-label={helpT("help.search_aria", locale)}');
+    expect(HELP_PAGE).toContain('aria-pressed={');
   });
 
   it("sidebar exposes the Help entry (nav.help → /app/help) with a main-DICT label", () => {
@@ -188,5 +211,101 @@ describe("UI-C1.2H §13/§16 — popover runtime behavior", () => {
     renderCard("not.a.real.id");
     expect(screen.queryByRole("button", { name: /Справка:/ })).toBeNull();
     expect(screen.getByRole("button", { name: "Новые3" })).toBeTruthy();
+  });
+});
+
+describe("UI-C1.2H.2 — Global Help Center navigation: URL query model (lib/help-search)", () => {
+  it("parseHelpQuery canonicalizes type/area/q deterministically", () => {
+    expect(parseHelpQuery({ type: "kpi", area: "operations", q: "  paid  " })).toEqual({
+      type: "kpi",
+      area: "operations",
+      q: "paid",
+    });
+    expect(parseHelpQuery({ type: "formula", area: "crm", q: "" })).toEqual({ type: undefined, area: undefined, q: undefined });
+    expect(parseHelpQuery({ type: "bogus", area: "future", q: null })).toEqual({ type: undefined, area: undefined, q: undefined });
+    const long = "x".repeat(200);
+    expect(parseHelpQuery({ type: null, area: null, q: long }).q?.length).toBe(120);
+  });
+
+  it("area filters accept ONLY content areas; type filters accept ONLY kpi/status", () => {
+    expect(HELP_TYPE_FILTERS).toEqual(["kpi", "status"]);
+    expect([...HELP_FILTERABLE_AREAS].sort()).toEqual([...HELP_CONTENT_AREAS].sort());
+    expect(HELP_FILTERABLE_AREAS).not.toContain("crm");
+    expect(HELP_FILTERABLE_AREAS).not.toContain("marketplace");
+  });
+
+  it("buildHelpQueryString round-trips state and preserves ?topic", () => {
+    expect(
+      buildHelpQueryString({ type: "status", area: "finance", q: "refund" }, "payments.status.refunded"),
+    ).toBe("?topic=payments.status.refunded&type=status&area=finance&q=refund");
+    expect(buildHelpQueryString({})).toBe("");
+  });
+
+  it("type/area filtering matches Registry totals (68 / operations 54 / finance 14 / kpi 4 / status 51)", () => {
+    expect(HELP_REGISTRY.length).toBe(68);
+    expect(helpEntriesByArea("operations").length).toBe(54);
+    expect(helpEntriesByArea("finance").length).toBe(14);
+    expect(filterHelpEntries(HELP_REGISTRY, { type: "kpi" }, "ru").length).toBe(4);
+    expect(filterHelpEntries(HELP_REGISTRY, { type: "status" }, "ru").length).toBe(51);
+    expect(filterHelpEntries(HELP_REGISTRY, { area: "finance", type: "status" }, "ru").length).toBe(10);
+    expect(filterHelpEntries(HELP_REGISTRY, { area: "finance", type: "kpi" }, "ru").length).toBe(1);
+  });
+
+  it("search matches stable IDs and localized metadata only (never business data)", () => {
+    expect(filterHelpEntries(HELP_REGISTRY, { q: "bookings.status.confirmed" }, "ru").length).toBe(1);
+    expect(filterHelpEntries(HELP_REGISTRY, { q: "kpi.total" }, "ru").length).toBe(4);
+    expect(filterHelpEntries(HELP_REGISTRY, { q: "zzz-no-such-topic" }, "ru").length).toBe(0);
+    expect(getRegistryEntry("requests.status.new") && parseHelpQuery({ q: "Новые" }).q).toBe("Новые");
+  });
+
+  it("counts are derived from the Registry, never hardcoded", () => {
+    expect(countByType(helpEntriesByArea("finance"))).toEqual({ kpi: 1, status: 10, group: 3 });
+    expect(countByType(HELP_REGISTRY)).toEqual({ kpi: 4, status: 51, group: 13 });
+    const total = HELP_AREAS.reduce((sum, a) => sum + helpEntriesByArea(a).length, 0);
+    expect(total).toBe(HELP_REGISTRY.length);
+  });
+
+  it("concept/formula/workflow/policy carry no content today (type filters are honest)", () => {
+    const counts = countByType(HELP_REGISTRY);
+    expect(counts.concept).toBeUndefined();
+    expect(counts.formula).toBeUndefined();
+    expect(counts.workflow).toBeUndefined();
+    expect(counts.policy).toBeUndefined();
+  });
+});
+
+describe("UI-C1.2H.2 — page uses canonical taxonomy + Finance distinction (source markers)", () => {
+  it("navigation derives areas from the canonical Registry (no second taxonomy)", () => {
+    expect(HELP_PAGE).toContain("HELP_AREAS.filter");
+    expect(HELP_PAGE).toContain("HELP_CONTENT_AREAS.map");
+    expect(HELP_PAGE).toContain("HELP_DOMAINS.filter");
+    expect(HELP_PAGE).toContain("parseHelpQuery(");
+  });
+
+  it("Finance is never presented as an implemented Finance Center", () => {
+    expect(HELP_PAGE).toContain('area === "finance"');
+    expect(HELP_PAGE).toContain('helpT("help.finance_center_status", locale)');
+    expect(HELP_PAGE).toContain('helpT("help.payments_finance_ownership", locale)');
+    expect(HELP_PAGE).not.toContain("Финансовый центр — реализован");
+    expect(HELP_PAGE).not.toContain("Платежи");
+  });
+
+  it("future areas are explicit NOT STARTED states without fake counts", () => {
+    expect(HELP_PAGE).toContain('helpT("help.future_sections", locale)');
+    expect(HELP_PAGE).toContain('helpT("help.future_area_note", locale)');
+    expect(HELP_PAGE).toContain("helpEntriesByArea(area).length");
+  });
+
+  it("Help i18n carries RU/AZ/EN for every area label and the H.2 UX strings", () => {
+    for (const area of HELP_AREAS) {
+      expect(HELP_I18N).toContain(`"help.area.${area}": {`);
+    }
+    expect(HELP_I18N).toContain('"help.search_aria": {');
+    expect(HELP_I18N).toContain('"help.search_no_results": {');
+    expect(HELP_I18N).toContain('"help.filter_metrics": {');
+    expect(HELP_I18N).toContain('"help.filter_statuses": {');
+    expect(HELP_I18N).toContain('"help.finance_center_status": {');
+    expect(HELP_I18N).toContain('"help.payments_finance_ownership": {');
+    expect(HELP_I18N).toContain('"help.future_area_note": {');
   });
 });

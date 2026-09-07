@@ -56,6 +56,53 @@ export const HELP_DICT: Record<string, Record<Locale, string>> = {
   "help.type.group": { ru: "Группа", az: "Qrup", en: "Group" },
   "help.entry_count": { ru: "{n} тем", az: "{n} mövzu", en: "{n} topics" },
 
+  // ── UI-C1.2H.2 — Global Help Center UX / Business Dictionary navigation ──
+  "help.search_placeholder": { ru: "Поиск по справке…", az: "Kömək axtarışı…", en: "Search help…" },
+  "help.search_aria": { ru: "Поиск по справке", az: "Kömək axtarışı", en: "Search help" },
+  "help.search_clear": { ru: "Очистить поиск", az: "Axtarışı təmizlə", en: "Clear search" },
+  "help.search_no_results": { ru: "Ничего не найдено", az: "Heç nə tapılmadı", en: "No results found" },
+  "help.search_no_results_hint": {
+    ru: "Попробуйте изменить запрос или сбросить фильтры.",
+    az: "Sorğunu dəyişməyə və ya filtrləri sıfırlamağa çalışın.",
+    en: "Try a different query or clear the filters.",
+  },
+  "help.filter_all_topics": { ru: "Все темы", az: "Bütün mövzular", en: "All topics" },
+  "help.filter_metrics": { ru: "Метрики", az: "Metriklər", en: "Metrics" },
+  "help.filter_statuses": { ru: "Статусы", az: "Statuslar", en: "Statuses" },
+  "help.filter_type_aria": { ru: "Фильтр по типу темы", az: "Mövzu növünə görə filtr", en: "Filter by topic type" },
+  "help.filter_all_sections": { ru: "Все разделы", az: "Bütün bölmələr", en: "All sections" },
+  "help.filter_section_aria": { ru: "Фильтр по разделу", az: "Bölməyə görə filtr", en: "Filter by section" },
+  "help.future_sections": { ru: "Будущие разделы", az: "Gələcək bölmələr", en: "Future sections" },
+  "help.future_area_note": {
+    ru: "Контент появится после запуска соответствующего раздела.",
+    az: "Məzmun müvafiq bölmə işə salındıqdan sonra görünəcək.",
+    en: "Content will appear once the corresponding section is launched.",
+  },
+  "help.finance_center_status": {
+    ru: "Финансовый центр — NOT STARTED; реализован только раздел «Платежи».",
+    az: "Maliyyə mərkəzi — NOT STARTED; yalnız «Ödənişlər» bölməsi mövcuddur.",
+    en: "Finance Center — NOT STARTED; only the Payments section is implemented.",
+  },
+  "help.payments_finance_ownership": {
+    ru: "Платежи — текущая финансовая capability с зоной ответственности Finance (не Finance Center).",
+    az: "Ödənişlər — Finance məsuliyyəti olan cari maliyyə imkanı (Finance Center deyil).",
+    en: "Payments — current financial capability with Finance ownership (not a Finance Center).",
+  },
+  // area labels (canonical HelpArea taxonomy, UI-C1.2H.1 / H.2)
+  "help.area.platform": { ru: "Платформа", az: "Platforma", en: "Platform" },
+  "help.area.command-center": { ru: "Command Center", az: "Command Center", en: "Command Center" },
+  "help.area.analytics": { ru: "Аналитика", az: "Analitika", en: "Analytics" },
+  "help.area.operations": { ru: "Операции", az: "Əməliyyatlar", en: "Operations" },
+  "help.area.finance": { ru: "Финансы", az: "Maliyyə", en: "Finance" },
+  "help.area.sales": { ru: "Продажи", az: "Satış", en: "Sales" },
+  "help.area.catalog": { ru: "Каталог", az: "Kataloq", en: "Catalog" },
+  "help.area.crm": { ru: "CRM", az: "CRM", en: "CRM" },
+  "help.area.marketing": { ru: "Маркетинг", az: "Marketinq", en: "Marketing" },
+  "help.area.support": { ru: "Поддержка", az: "Dəstək", en: "Support" },
+  "help.area.admin": { ru: "Администрирование", az: "Administrasiya", en: "Administration" },
+  "help.area.marketplace": { ru: "Marketplace", az: "Marketplace", en: "Marketplace" },
+  "help.area.shared": { ru: "Общие понятия", az: "Ümumi anlayışlar", en: "Shared concepts" },
+
   /* ═══════════════════ REQUESTS ═══════════════════ */
   "help.requests.kpi.total.short": {
     ru: "Общее количество заявок в текущем глобальном scope (рабочая область + период).",
