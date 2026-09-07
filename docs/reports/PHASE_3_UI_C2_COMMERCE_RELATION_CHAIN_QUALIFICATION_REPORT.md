@@ -380,8 +380,8 @@ boundary; new DTO-поля не создают нового attack surface (до
 
 ```bash
 git status --porcelain=v1   → NO OUTPUT (после closure)
-git rev-parse HEAD          → 5458331db0eb2779a4d26e2cdc5f1dc0372bba44
-git rev-parse origin/master → 5458331db0eb2779a4d26e2cdc5f1dc0372bba44
+git rev-parse HEAD          → 581d8f8e33f0a152c245b3be8cedcdb6548a4a1a
+git rev-parse origin/master → 581d8f8e33f0a152c245b3be8cedcdb6548a4a1a
 BASELINE db83c44 является ancestor финального HEAD → PASS
 ```
 
@@ -403,7 +403,7 @@ UI-C1.2H.2 — ACCEPTED
 UI-C2 — ACCEPTED
 
 FINAL SHA:
-5458331db0eb2779a4d26e2cdc5f1dc0372bba44
+581d8f8e33f0a152c245b3be8cedcdb6548a4a1a
 
 TRUE NEXT:
 UI-C3+ — по утверждённому roadmap (Commerce Center evolution)
