@@ -3,10 +3,17 @@ import { describe, it, expect } from "vitest";
 import {
   ALL_HELP_IDS,
   getHelpEntry,
+  helpAreaOf,
   helpDescription,
+  helpEntriesByArea,
   helpEntriesByDomain,
   helpShort,
   helpTitle,
+  helpWorkspaceOf,
+  HELP_AREAS,
+  HELP_AREA_BY_DOMAIN,
+  HELP_CONTENT_AREAS,
+  HELP_ENTRY_TYPES,
   HELP_REGISTRY,
   HELP_STATUS_ENTRIES,
 } from "./help-registry";
@@ -255,5 +262,87 @@ describe("UI-C1.2H — cross-entry semantics", () => {
     expect(helpT("help.no.such.key", "ru")).toBe("help.no.such.key");
     const entry = getHelpEntry("orders.status.closed")!;
     expect(helpTitle(entry, "ru")).toBe(helpT(entry.localizationKeys.title, "ru"));
+  });
+});
+
+describe("UI-C1.2H.1 §4/§8/§14 — global taxonomy model extension (zero content change)", () => {
+  it("HELP_AREAS exposes the full evidence-grounded platform taxonomy (future areas included)", () => {
+    expect(HELP_AREAS).toEqual([
+      "platform",
+      "command-center",
+      "analytics",
+      "operations",
+      "finance",
+      "sales",
+      "catalog",
+      "crm",
+      "marketing",
+      "support",
+      "admin",
+      "marketplace",
+      "shared",
+    ]);
+    for (const area of HELP_AREAS) expect(area).toMatch(/^[a-z-]+$/);
+  });
+
+  it("domain→area mapping matches canonical shell ownership (operations: requests/orders/bookings; finance: payments)", () => {
+    expect(HELP_AREA_BY_DOMAIN).toEqual({
+      requests: "operations",
+      orders: "operations",
+      bookings: "operations",
+      payments: "finance",
+    });
+    expect(helpAreaOf({ domain: "requests" })).toBe("operations");
+    expect(helpAreaOf({ domain: "payments" })).toBe("finance");
+  });
+
+  it("every entry resolves to an area; areas partition the registry; content areas = operations + finance only", () => {
+    for (const e of HELP_REGISTRY) {
+      const area = helpAreaOf(e);
+      expect(["operations", "finance"]).toContain(area);
+    }
+    expect([...HELP_CONTENT_AREAS].sort()).toEqual(["finance", "operations"]);
+    const byArea = HELP_AREAS.reduce((sum, a) => sum + helpEntriesByArea(a).length, 0);
+    expect(byArea).toBe(HELP_REGISTRY.length);
+  });
+
+  it("no invented content: every FUTURE area has exactly zero entries", () => {
+    const future = HELP_AREAS.filter((a) => !HELP_CONTENT_AREAS.includes(a));
+    for (const area of future) expect(helpEntriesByArea(area), `future area ${area}`).toHaveLength(0);
+  });
+
+  it("entry-type model supports concept/formula/workflow/policy, but the 68 current entries use only kpi/status/group", () => {
+    expect(HELP_ENTRY_TYPES).toEqual(["kpi", "status", "group", "concept", "formula", "workflow", "policy"]);
+    const counts: Record<string, number> = {};
+    for (const e of HELP_REGISTRY) {
+      expect(["kpi", "status", "group"]).toContain(e.type);
+      counts[e.type] = (counts[e.type] ?? 0) + 1;
+    }
+    expect(counts).toEqual({ kpi: 4, status: 51, group: 13 });
+  });
+
+  it("relationship fields (relatedMetrics/relatedStatuses/relatedConcepts) reference existing stable IDs only", () => {
+    for (const e of HELP_REGISTRY) {
+      for (const ids of [e.relatedMetrics, e.relatedStatuses, e.relatedConcepts] as const) {
+        if (!ids) continue;
+        expect(new Set(ids).size, `${e.id} no duplicate refs`).toBe(ids.length);
+        for (const id of ids) {
+          expect(ALL_HELP_IDS, `${e.id} → ${id}`).toContain(id);
+          expect(id, `${e.id} no self-reference`).not.toBe(e.id);
+        }
+      }
+    }
+  });
+
+  it("context metadata: workspace resolves to default 'both'; aliases/entitlement/relationships unset on all 68 entries (zero-content guard)", () => {
+    for (const e of HELP_REGISTRY) {
+      expect(helpWorkspaceOf(e)).toBe("both");
+      expect(e.workspace).toBeUndefined();
+      expect(e.entitlement).toBeUndefined();
+      expect(e.aliases).toBeUndefined();
+      expect(e.relatedMetrics).toBeUndefined();
+      expect(e.relatedStatuses).toBeUndefined();
+      expect(e.relatedConcepts).toBeUndefined();
+    }
   });
 });

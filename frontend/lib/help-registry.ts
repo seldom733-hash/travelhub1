@@ -26,13 +26,63 @@
  *
  * Forbidden statuses: PARTIALLY_CONFIRMED (Bookings), CASH (PaymentStatus),
  * any mixing of PaymentStatus with RefundStatus.
+ *
+ * UI-C1.2H.1 — model extension ONLY (zero content change):
+ *   - HelpArea taxonomy (HELP_AREAS / HELP_AREA_BY_DOMAIN / helpAreaOf /
+ *     helpEntriesByArea) positions the current commerce domains inside the
+ *     global TravelHub Help / Business Dictionary (operations, finance) and
+ *     reserves the remaining areas (platform, command-center, analytics,
+ *     sales, catalog, crm, marketing, support, admin, marketplace, shared)
+ *     for future content — no invented entries are added by this stage.
+ *   - HelpEntryType extended: kpi | status | group | concept | formula |
+ *     workflow | policy. Only kpi/status/group are in use today.
+ *   - L3 dictionary relationships: relatedMetrics / relatedStatuses /
+ *     relatedConcepts reference stable IDs only.
+ *   - Context metadata: workspace (platform | partner | both, default both)
+ *     and entitlement (documentation-only capability label; Entitlement is
+ *     never a Permission), plus aliases for a future Help search.
  */
 
 import { helpT } from "./help-i18n";
 import type { Locale } from "./i18n";
 
 export type HelpDomain = "requests" | "orders" | "bookings" | "payments";
-export type HelpEntryType = "kpi" | "status" | "group";
+
+/**
+ * UI-C1.2H.1 — platform-level Help areas (global Business Dictionary taxonomy).
+ *
+ * Grounded in the actual platform architecture: Shell nav groups + RBAC,
+ * /app routes, docs/architecture and ADRs (see the H.1 Architecture Map §4).
+ * Areas with zero entries today are FUTURE — they exist so that adding a
+ * domain/content later is a localized, typed change. No invented content.
+ */
+export type HelpArea =
+  | "platform"
+  | "command-center"
+  | "analytics"
+  | "operations"
+  | "finance"
+  | "sales"
+  | "catalog"
+  | "crm"
+  | "marketing"
+  | "support"
+  | "admin"
+  | "marketplace"
+  | "shared";
+
+export type HelpEntryType = "kpi" | "status" | "group" | "concept" | "formula" | "workflow" | "policy";
+
+/** All entry types the registry model supports (kpi/status/group are the only ones in use today). */
+export const HELP_ENTRY_TYPES: readonly HelpEntryType[] = [
+  "kpi",
+  "status",
+  "group",
+  "concept",
+  "formula",
+  "workflow",
+  "policy",
+] as const;
 
 /** Explicit i18n mapping for every user-facing string of an entry (UI-C1.2H §14). */
 export interface HelpLocalizationKeys {
@@ -72,7 +122,16 @@ export interface HelpEntry {
   comparisonPeriod?: boolean;
   currencyUnit?: string;
   relatedMetrics?: string[];
-  workspace?: string;
+  /** L3 dictionary relationship — status entries (stable IDs only). */
+  relatedStatuses?: string[];
+  /** L3 dictionary relationship — concept entries (stable IDs only). */
+  relatedConcepts?: string[];
+  /** Platform workspace scope of the topic: platform, partner, or both (default). */
+  workspace?: "platform" | "partner" | "both";
+  /** Documentation-only capability/plan label (Entitlement ≠ Permission; never a permission). */
+  entitlement?: string;
+  /** Language-neutral search hints for a future Help search (registry entries only). */
+  aliases?: string[];
   localizationKeys: HelpLocalizationKeys;
   contractVersion: string;
   changeNote?: string;
@@ -1276,3 +1335,51 @@ export const ALL_HELP_IDS: readonly string[] = REGISTRY.map((e) => e.id);
 
 /** Status entries only (type === "status"), for canonical-universe tests. */
 export const HELP_STATUS_ENTRIES: readonly HelpEntry[] = REGISTRY.filter((e) => e.type === "status");
+
+/* ── UI-C1.2H.1 — platform-level Help taxonomy (model extension, zero content) ── */
+
+/** All Help areas in stable dictionary order (future areas included). */
+export const HELP_AREAS: readonly HelpArea[] = [
+  "platform",
+  "command-center",
+  "analytics",
+  "operations",
+  "finance",
+  "sales",
+  "catalog",
+  "crm",
+  "marketing",
+  "support",
+  "admin",
+  "marketplace",
+  "shared",
+] as const;
+
+/**
+ * Area of each current production domain (canonical shell ownership:
+ * Operations → Requests/Orders/Bookings; Finance → Payments).
+ */
+export const HELP_AREA_BY_DOMAIN: Record<HelpDomain, HelpArea> = {
+  requests: "operations",
+  orders: "operations",
+  bookings: "operations",
+  payments: "finance",
+} as const;
+
+/** Area of any registry entry. */
+export function helpAreaOf(entry: Pick<HelpEntry, "domain">): HelpArea {
+  return HELP_AREA_BY_DOMAIN[entry.domain];
+}
+
+/** Entries under an area — empty for every FUTURE area (no invented content). */
+export function helpEntriesByArea(area: HelpArea): readonly HelpEntry[] {
+  return REGISTRY.filter((e) => HELP_AREA_BY_DOMAIN[e.domain] === area);
+}
+
+/** Areas that own registry entries today (content areas). */
+export const HELP_CONTENT_AREAS: readonly HelpArea[] = [...new Set(HELP_REGISTRY.map((e) => helpAreaOf(e)))] as const;
+
+/** Resolved workspace scope (default: both platform and partner workspaces). */
+export function helpWorkspaceOf(entry: HelpEntry): "platform" | "partner" | "both" {
+  return entry.workspace ?? "both";
+}
