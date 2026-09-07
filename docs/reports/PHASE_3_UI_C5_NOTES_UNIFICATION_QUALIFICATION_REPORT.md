@@ -21,8 +21,8 @@ BASELINE: 49c1d9b5a80b4daa6c0731aeea2ad3a85ba1e996
 ## 3. Implementation SHA
 
 ```text
-IMPLEMENTATION: (заполняется после GIT HARD CLOSURE)
-FINAL SHA:      (заполняется после GIT HARD CLOSURE)
+IMPLEMENTATION: 395b01d feat(ui): integrate operational notes into Request detail (UI-C5)
+FINAL SHA:      5fcfa8a docs: add UI-C5 notes unification audit + qualification reports
 ```
 
 ## 4. Files Changed
