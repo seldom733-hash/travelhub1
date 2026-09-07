@@ -1851,7 +1851,7 @@ model PartnerCustomerRelationHistory {
 ///  - Soft delete: deletedAt/deletedBy preserve audit trail
 model OperationalNote {
   id           String   @id @default(uuid())
-  entityType   String   // Customer|Partner|Order|Booking|Payment|Refund|Product|Fulfillment|Reservation|BuyerRequest|PartnerApplication
+  entityType   String   // Customer|Partner|Order|Booking|Request|Payment|Refund|Product|Fulfillment|Reservation|BuyerRequest|PartnerApplication
   entityId     String
   text         String   @db.Text // 1-5000 chars, plain text
   visibility   String   @default("INTERNAL") // INTERNAL|PARTNER_VISIBLE|CUSTOMER_VISIBLE

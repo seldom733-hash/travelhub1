@@ -63,6 +63,13 @@ async function resolveNoteParent(
       exists = row !== null;
       break;
     }
+    // UI-C5: Request (shared commerce sequence pre-order entity) — platform-only,
+    // parent existence checked the same way as Order/Booking.
+    case 'Request': {
+      const row = await prisma.request.findUnique({ where: { id: entityId }, select: { id: true } });
+      exists = row !== null;
+      break;
+    }
     case 'Payment': {
       const row = await prisma.payment.findUnique({ where: { id: entityId }, select: { id: true } });
       exists = row !== null;

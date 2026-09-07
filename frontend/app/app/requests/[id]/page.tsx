@@ -20,7 +20,9 @@ import EntityRow from "@/components/commerce/EntityRow";
 import EntityTimeline from "@/components/commerce/EntityTimeline";
 import EntityAuditHistory from "@/components/commerce/EntityAuditHistory";
 import CommerceRelationChain from "@/components/commerce/CommerceRelationChain";
+import OperationalNotes from "@/components/OperationalNotes";
 import { requestActionLabel } from "@/lib/commerce-history-labels";
+import { useCurrentUser } from "@/lib/use-user";
 
 interface RequestHistoryRow {
   id: string;
@@ -133,6 +135,7 @@ export default function RequestDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = params?.id as string;
+  const user = useCurrentUser();
   const [request, setRequest] = useState<RequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -493,6 +496,19 @@ export default function RequestDetailPage() {
               <div className="text-sm text-slate-400">{t("reqflow.no_linked_order", locale)}</div>
             )}
           </EntitySectionCard>
+        </EntityDetailWide>
+
+        {/* WIDE — notes (UI-C5): operational notes, below main content, above audit */}
+        <EntityDetailWide>
+          {user && (
+            <OperationalNotes
+              entityType="Request"
+              entityId={id}
+              permissions={user.permissions}
+              currentUserId={user.id}
+              currentRole={user.role}
+            />
+          )}
         </EntityDetailWide>
 
         {/* WIDE — audit: immutable change history (UI-C4, server-authoritative) */}

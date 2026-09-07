@@ -373,3 +373,126 @@ describe('D5 C1 — OperationalNote Audit Trail (e2e)', () => {
     });
   });
 });
+
+describe('UI-C5 — OperationalNote Request entity (e2e)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  let adminToken: string;
+  let requestId: string;
+  const createdNoteIds: string[] = [];
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));
+    app.useGlobalFilters(new AppExceptionFilter());
+    await app.init();
+    prisma = app.get(PrismaService);
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ username: 'admin', password: 'admin123' });
+    adminToken = loginRes.body.accessToken;
+
+    // Create a Request directly via Prisma for deterministic test entity.
+    const req = await prisma.request.create({
+      data: {
+        code: 'REQ-UIC5-TEST-01',
+        commerceSequence: '90000001',
+        referenceNumber: 'MKT-REQ-UIC5-00000001',
+        status: 'NEW',
+      },
+    });
+    requestId = req.id;
+  });
+
+  afterAll(async () => {
+    await prisma.operationalNote.deleteMany({ where: { entityType: 'Request', entityId: requestId } });
+    await prisma.request.deleteMany({ where: { id: requestId } });
+    await app?.close();
+  });
+
+  it('create note on Request → 201 + audit event (operational_note.created)', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/operational-notes/Request/${requestId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ text: 'Request operational note', visibility: 'INTERNAL' });
+    expect(res.status).toBe(201);
+    const noteId = res.body.id;
+    createdNoteIds.push(noteId);
+
+    const historyRes = await request(app.getHttpServer())
+      .get(`/api/v1/operational-notes/${noteId}/history`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(historyRes.status).toBe(200);
+    const createEvent = historyRes.body.events.find((e: any) => e.action === 'operational_note.created');
+    expect(createEvent).toBeTruthy();
+    expect(createEvent.resourceId).toBe(noteId);
+  });
+
+  it('list notes for Request → 200 with the created note', async () => {
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/operational-notes/Request/${requestId}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.notes.length).toBeGreaterThanOrEqual(1);
+    expect(res.body.notes[0].entityType).toBe('Request');
+    expect(res.body.notes[0].entityId).toBe(requestId);
+  });
+
+  it('update Request note → 200, editedAt set, audit event operational_note.updated', async () => {
+    const noteId = createdNoteIds[0];
+    const updateRes = await request(app.getHttpServer())
+      .patch(`/api/v1/operational-notes/${noteId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ text: 'Updated request note' });
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.editedAt).toBeTruthy();
+
+    const historyRes = await request(app.getHttpServer())
+      .get(`/api/v1/operational-notes/${noteId}/history`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    const updateEvent = historyRes.body.events.find((e: any) => e.action === 'operational_note.updated');
+    expect(updateEvent).toBeTruthy();
+  });
+
+  it('soft-delete Request note → removed from list, audit event operational_note.deleted', async () => {
+    const noteId = createdNoteIds[0];
+    const delRes = await request(app.getHttpServer())
+      .delete(`/api/v1/operational-notes/${noteId}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(delRes.status).toBe(200);
+    expect(delRes.body.deletedAt).toBeTruthy();
+
+    const listRes = await request(app.getHttpServer())
+      .get(`/api/v1/operational-notes/Request/${requestId}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(listRes.body.notes.find((n: any) => n.id === noteId)).toBeUndefined();
+
+    const historyRes = await request(app.getHttpServer())
+      .get(`/api/v1/operational-notes/${noteId}/history`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    const deleteEvent = historyRes.body.events.find((e: any) => e.action === 'operational_note.deleted');
+    expect(deleteEvent).toBeTruthy();
+  });
+
+  it('missing Request parent → 404 (no orphan notes)', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/operational-notes/Request/00000000-0000-4000-8000-000000000000')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ text: 'orphan note attempt' });
+    expect(res.status).toBe(404);
+  });
+
+  it('invalid entity type still rejected → 400 (allowlist enforced)', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/operational-notes/OrderNote/whatever')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ text: 'invalid type' });
+    expect(res.status).toBe(400);
+  });
+});

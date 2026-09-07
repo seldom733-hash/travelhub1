@@ -9,6 +9,7 @@ export const VALID_ENTITY_TYPES = [
   'Partner',
   'Order',
   'Booking',
+  'Request',
   'Payment',
   'Refund',
   'Product',
@@ -54,6 +55,7 @@ export interface OperationalNoteRecord {
 
 /**
  * Validate entityType against canonical allowed values.
+ * UI-C5: 'Request' включён (shared commerce sequence pre-order entity).
  */
 export function isValidEntityType(value: string): value is OperationalEntityType {
   return (VALID_ENTITY_TYPES as readonly string[]).includes(value);

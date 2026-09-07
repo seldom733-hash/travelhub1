@@ -96,6 +96,8 @@ describe('OperationalNotes - Entity Type Validation', () => {
     expect(VALID_ENTITY_TYPES).toContain('BuyerRequest');
     expect(VALID_ENTITY_TYPES).toContain('PartnerApplication');
     expect(VALID_ENTITY_TYPES).toContain('Booking');
+    // UI-C5: Request included (shared commerce sequence pre-order entity)
+    expect(VALID_ENTITY_TYPES).toContain('Request');
     expect(VALID_ENTITY_TYPES).toContain('Payment');
     expect(VALID_ENTITY_TYPES).toContain('Refund');
     expect(VALID_ENTITY_TYPES).toContain('Fulfillment');
