@@ -76,15 +76,18 @@ interface KpiData {
 const REQUEST_LIFECYCLE_STATUSES = [
   "NEW",
   "CHECKING",
-  "SUPPLIER_TIMEOUT",
   "PRICE_CHANGED",
   "CUSTOMER_ACCEPTED",
   "CONFIRMED",
   "CONVERTED",
+] as const;
+
+const REQUEST_EXCEPTION_STATUSES = [
+  "SUPPLIER_TIMEOUT",
+  "CUSTOMER_PAYMENT_TIMEOUT",
   "REJECTED",
   "UNAVAILABLE",
   "EXPIRED",
-  "CUSTOMER_PAYMENT_TIMEOUT",
   "CANCELLED_BY_CUSTOMER",
 ] as const;
 
@@ -330,7 +333,8 @@ function RequestsContent({
   const exportUrl = `/api/v1/requests/export?${exportParams.toString()}`;
 
   // TableHeaderFilter options for Status column
-  const statusFilterOptions = REQUEST_LIFECYCLE_STATUSES.map((code) => ({
+  const allRequestStatuses = [...REQUEST_LIFECYCLE_STATUSES, ...REQUEST_EXCEPTION_STATUSES];
+  const statusFilterOptions = allRequestStatuses.map((code) => ({
     value: code,
     label: requestStatusLabel(code, locale),
   }));
@@ -359,10 +363,29 @@ function RequestsContent({
         {kpi && (
           <div>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {t("admin.kpi.request_statuses", locale) || "Статусы заявок"}
+              {t("requests.group.lifecycle", locale) || "Жизненный цикл"}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
               {REQUEST_LIFECYCLE_STATUSES.map((code) => (
+                <CommerceKpiCard
+                  key={code}
+                  label={requestStatusLabel(code, locale)}
+                  value={kpi[code.toLowerCase()] ?? 0}
+                  active={selectedStatus === code}
+                  onClick={() => applyStatus(code)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {kpi && (
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t("requests.group.exceptions", locale) || "Проблемы и завершения"}
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+              {REQUEST_EXCEPTION_STATUSES.map((code) => (
                 <CommerceKpiCard
                   key={code}
                   label={requestStatusLabel(code, locale)}
