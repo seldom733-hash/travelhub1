@@ -46,7 +46,7 @@ DEFERRED — Future phase, awaiting prerequisites
 | Why it matters | Security: frontend hiding ≠ authorization. A malicious user could invoke forbidden Request actions via direct API calls. |
 | Canonical authority affected | D5/D6 pattern (server-authoritative actions) |
 | Dependencies | Request controller must expose `availableActions` |
-| Planned closure stage | UI-C7 (Request migration) |
+| Planned closure stage | UI-C6 (Request Server-Authority Remediation) |
 | Status | OPEN |
 | Acceptance condition | Request API returns `availableActions`; frontend consumes only this list |
 | Closure SHA | — |
