@@ -273,11 +273,18 @@ frontend/lib/i18n.spec.ts › formatPrice NBSP — 1 pre-existing failure
 # 20. Git State
 
 ```text
-Изменённые файлы (tracked): ровно 3 production/test файла + 1 отчёт (§4)
+BASELINE SHA:                    76c69e94491bc96c3f6366c9178ceca34db435b1
+IMPLEMENTATION SHA:              3e705af  (ui-c7: migrate Request detail actions to
+                                          canonical header bar; 3 файла, +483/−155)
+REPORT/DOCS SHA:                 b7fa96e  (docs(ui-c7): qualification report VERDICT A)
+FINAL SYNC SHA:                  фиксируется commit'ом настоящей аннотации (HEAD после push)
 Historical untracked docs/prompts/PHASE_3_*: не тронуты, не закоммичены
-HEAD == origin/master — финальное состояние фиксируется в commit-аннотации (§ Git evidence below)
 git diff --check: PASS
 ```
+
+Проверка closure (после push): HEAD == origin/master; tracked working tree clean;
+untracked — только исторические/процессные PHASE_3 prompt-артефакты, сознательно
+исключённые из implementation closure.
 
 # 21. Scope Compliance
 
