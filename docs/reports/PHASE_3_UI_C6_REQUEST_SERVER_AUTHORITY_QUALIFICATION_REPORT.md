@@ -343,10 +343,12 @@ Live runtime verdict: matrix PASS.
 - Request Detail buttons render only according to `availableActions`, PASS
 - no frontend lifecycle/status array authority observed for Request actions, PASS
 - direct canonical URL load + refresh preserves server authority, PASS
-- checking browser logs for this Request Detail surface: not verified with an
-  automated browser tool in this environment; server-side logs showed no new
-  UI-C6 runtime errors, and source review confirms Request Detail buttons render
-  only from `availableActions` with no own lifecycle matrix, OUTSTANDING
+- browser console for the live Request Detail surface: verified with an automated
+  browser tool against the running instance on 2026-09-08 (repository SHA
+  `0b379c94cd1880e8f8e0c9933b0fd432ce3cb97e`); no new UI-C6 console errors;
+  buttons render only from `availableActions`; unauthorized actor (SALES_MANAGER
+  without `order.edit_noncritical`) renders no actions section — full record in
+  `docs/reports/PHASE_3_UI_C6_LIVE_BROWSER_VERIFICATION_EVIDENCE.md`, PASS
 
 ### 14.6 Runtime conclusion
 
@@ -537,8 +539,14 @@ Implementation SHA:
 Qualification/Report SHA:
 61ee58adeb3ad3e335444b810ad6732251c493e3
 
-Final SHA:
-61ee58adeb3ad3e335444b810ad6732251c493e3
+Intermediate documentation proof SHA:
+b6aa5da349326e27d3586307ad06018f826952be
+
+Final documentation/repository synchronization SHA:
+<annotated-after-closure>
+
+Tested runtime SHA (live browser verification):
+0b379c94cd1880e8f8e0c9933b0fd432ce3cb97e
 
 HEAD == origin/master:
 true
@@ -584,6 +592,7 @@ PASS (backend + frontend)
 Console:
 live browser console verified: no new UI-C6 console errors on Request Detail;
 buttons render only from availableActions with no own lifecycle matrix
+(detailed record: docs/reports/PHASE_3_UI_C6_LIVE_BROWSER_VERIFICATION_EVIDENCE.md)
 
 Automated e2e matrix PASS:
 test/ui-c6-request-server-authority.e2e-spec.ts — 22/22
