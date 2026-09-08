@@ -102,6 +102,15 @@ interface RequestDetail {
     createdAt: string | null;
     paidAt: string | null;
   }>;
+  availableActions?: {
+    confirmPrice: boolean;
+    proposePrice: boolean;
+    reject: boolean;
+    unavailable: boolean;
+    customerAccept: boolean;
+    customerDecline: boolean;
+    convert: boolean;
+  };
 }
 
 function InfoRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
@@ -232,9 +241,21 @@ export default function RequestDetailPage() {
   }
 
   const r = request;
-  const showSupplier = canEdit && ["NEW", "CHECKING", "PRICE_CHANGED"].includes(r.status);
-  const showCustomer = canEdit && ["CONFIRMED", "PRICE_CHANGED"].includes(r.status);
-  const showConvert = canEdit && r.status === "CUSTOMER_ACCEPTED" && !r.convertedOrderId;
+  const actions = r.availableActions ?? {
+    confirmPrice: false,
+    proposePrice: false,
+    reject: false,
+    unavailable: false,
+    customerAccept: false,
+    customerDecline: false,
+    convert: false,
+  };
+
+  // UI-C6: frontend may render only what the server projected.
+  // Status arrays are no longer the authority.
+  const showSupplier = actions.confirmPrice || actions.proposePrice || actions.reject || actions.unavailable;
+  const showCustomer = actions.customerAccept || actions.customerDecline;
+  const showConvert = actions.convert;
   const progress = r.convertedOrder?.travelerProgress ?? null;
   const timeline = (r as any).timeline as Array<{ label: string; timestamp: string | null }> | undefined;
   const fmtDate = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateString(LOCALE_TAGS[locale]) : null);
@@ -307,7 +328,7 @@ export default function RequestDetailPage() {
             </EntityFieldGrid>
           </EntitySectionCard>
 
-          {/* Actions — business-specific flow */}
+          {/* Actions — business-specific flow (server-authoritative) */}
           {(showSupplier || showCustomer || showConvert) && (
             <EntitySectionCard title={t("detail.sections.actions", locale)}>
               {actionMsg && (
@@ -317,10 +338,17 @@ export default function RequestDetailPage() {
                 <div className="space-y-2">
                   <div className="text-xs font-medium uppercase text-gray-500">{t("reqflow.supplier_actions", locale)}</div>
                   <div className="flex flex-wrap gap-2">
-                    <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/confirm-price`)} className={btn("", TONES.success)}>{busy === `/requests/${id}/confirm-price` ? t("reqflow.busy", locale) : t("reqflow.confirm_price", locale)}</button>
-                    {!proposeOpen ? (
-                      <button disabled={busy !== null} onClick={() => setProposeOpen(true)} className={btn("", TONES.primary)}>{t("reqflow.propose_price", locale)}</button>
-                    ) : (
+                    {actions.confirmPrice && (
+                      <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/confirm-price`)} className={btn("", TONES.success)}>
+                        {busy === `/requests/${id}/confirm-price` ? t("reqflow.busy", locale) : t("reqflow.confirm_price", locale)}
+                      </button>
+                    )}
+                    {actions.proposePrice && !proposeOpen && (
+                      <button disabled={busy !== null} onClick={() => setProposeOpen(true)} className={btn("", TONES.primary)}>
+                        {t("reqflow.propose_price", locale)}
+                      </button>
+                    )}
+                    {actions.proposePrice && proposeOpen && (
                       <span className="flex items-center gap-2">
                         <input
                           value={proposePrice}
@@ -328,12 +356,20 @@ export default function RequestDetailPage() {
                           placeholder={t("requests.price_proposal_placeholder", locale)}
                           className="w-32 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400"
                         />
-                        <button onClick={() => void propose()} className={btn("", TONES.primary)}>OK</button>
-                        <button onClick={() => { setProposeOpen(false); setProposePrice(""); }} className={btn("", TONES.neutral)}>✕</button>
+                        <button disabled={busy !== null} onClick={() => void propose()} className={btn("", TONES.primary)}>OK</button>
+                        <button disabled={busy !== null} onClick={() => { setProposeOpen(false); setProposePrice(""); }} className={btn("", TONES.neutral)}>✕</button>
                       </span>
                     )}
-                    <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/reject`, { reason: "rejected" })} className={btn("", TONES.danger)}>{t("reqflow.reject", locale)}</button>
-                    <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/unavailable`, { reason: "unavailable" })} className={btn("", TONES.neutral)}>{t("reqflow.unavailable", locale)}</button>
+                    {actions.reject && (
+                      <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/reject`, { reason: "rejected" })} className={btn("", TONES.danger)}>
+                        {t("reqflow.reject", locale)}
+                      </button>
+                    )}
+                    {actions.unavailable && (
+                      <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/unavailable`, { reason: "unavailable" })} className={btn("", TONES.neutral)}>
+                        {t("reqflow.unavailable", locale)}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -341,8 +377,16 @@ export default function RequestDetailPage() {
                 <div className="space-y-2">
                   <div className="text-xs font-medium uppercase text-gray-500">{t("reqflow.customer_actions", locale)}</div>
                   <div className="flex flex-wrap gap-2">
-                    <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-accept`)} className={btn("", TONES.success)}>{t("reqflow.customer_accept", locale)}</button>
-                    <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-decline`)} className={btn("", TONES.danger)}>{t("reqflow.customer_decline", locale)}</button>
+                    {actions.customerAccept && (
+                      <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-accept`)} className={btn("", TONES.success)}>
+                        {t("reqflow.customer_accept", locale)}
+                      </button>
+                    )}
+                    {actions.customerDecline && (
+                      <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-decline`)} className={btn("", TONES.danger)}>
+                        {t("reqflow.customer_decline", locale)}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

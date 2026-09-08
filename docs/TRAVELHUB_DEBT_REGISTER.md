@@ -47,9 +47,9 @@ DEFERRED — Future phase, awaiting prerequisites
 | Canonical authority affected | D5/D6 pattern (server-authoritative actions) |
 | Dependencies | Request controller must expose `availableActions` |
 | Planned closure stage | UI-C6 (Request Server-Authority Remediation) |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | Request API returns `availableActions`; frontend consumes only this list |
-| Closure SHA | — |
+| Closure SHA | see Git closure (docs/reports/PHASE_3_UI_C6_REQUEST_SERVER_AUTHORITY_QUALIFICATION_REPORT.md) |
 | Notes | Do not simply wrap frontend-derived actions in `<EntityActionBar />` |
 
 ---

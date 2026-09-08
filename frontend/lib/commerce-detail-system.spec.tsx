@@ -282,10 +282,18 @@ describe("R2 Detail Visual System Parity — action authority not moved client-s
     expect(bkg).toContain("api.patch(`/bookings/${booking.id}`");
   });
 
-  it("Request actions remain frontend-gated (SEC-UI-01 still OPEN, not expanded)", () => {
+  it("Request actions are server-authoritative after UI-C6 (SEC-UI-01 closed by Request availableActions)", () => {
     const req = read("app/app/requests/[id]/page.tsx");
-    expect(req).toContain('const canEdit = useCan("order.edit_noncritical")');
-    // Every action still round-trips to the server — no new client-side business rules
+    // Frontend must consume server-provided availableActions, not recompute from status arrays.
+    expect(req).toContain("const actions = r.availableActions ?? {");
+    expect(req).toContain("confirmPrice: false");
+    expect(req).toContain("customerDecline: false");
+    expect(req).toContain("convert: false");
+    // Legacy status-array authority must be removed.
+    expect(req).not.toContain('["NEW", "CHECKING", "PRICE_CHANGED"].includes(r.status)');
+    expect(req).not.toContain('["CONFIRMED", "PRICE_CHANGED"].includes(r.status)');
+    expect(req).not.toContain('r.status === "CUSTOMER_ACCEPTED" && !r.convertedOrderId');
+    // Every action still round-trips to the server — no new client-side business rules.
     expect(req).toContain("runPost(`/requests/${id}/");
     expect(req).toContain("api.post(path, body ?? {})");
   });

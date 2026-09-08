@@ -150,8 +150,12 @@ export class RequestController {
 
   @Get(":id")
   @RequirePermissions("order.read")
-  detail(@Param("id") id: string) {
-    return this.requestService.getRequest(id);
+  detail(
+    @Param("id") id: string,
+    @CurrentUser() user: any,
+  ) {
+    const granted = (user?.permissions as readonly string[] | undefined) ?? [];
+    return this.requestService.getRequest(id, granted);
   }
 
   @Get(":id/history")

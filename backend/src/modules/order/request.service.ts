@@ -1,5 +1,52 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from "@nestjs/common";
 import type { RequestStatus } from "../../generated/prisma/client";
+
+/**
+ * UI-C6: server-authoritative Request action availability projection.
+ *
+ * Request semantics are actor-flavored (supplier actions vs customer actions),
+ * so Request uses its own typed projection rather than the Order/Booking
+ * string-array convention. Frontend must render only this projection.
+ */
+export interface RequestAvailableActions {
+  confirmPrice: boolean;
+  proposePrice: boolean;
+  reject: boolean;
+  unavailable: boolean;
+  customerAccept: boolean;
+  customerDecline: boolean;
+  convert: boolean;
+}
+
+const REQUEST_EDIT_PERMISSION = "order.edit_noncritical";
+
+/**
+ * Request action availability = current status + existing service business gates
+ * + actor permission. This is a read projection, not the only security gate.
+ */
+export function computeRequestAvailableActions(
+  request: {
+    status: RequestStatus;
+    convertedOrderId: string | null;
+  },
+  granted: readonly string[],
+): RequestAvailableActions {
+  const canEdit = granted.includes(REQUEST_EDIT_PERMISSION);
+
+  return {
+    confirmPrice: canEdit && (request.status === "NEW" || request.status === "CHECKING"),
+    proposePrice: canEdit && (request.status === "NEW" || request.status === "CHECKING"),
+    reject: canEdit && (request.status === "NEW" || request.status === "CHECKING"),
+    unavailable: canEdit && (request.status === "NEW" || request.status === "CHECKING"),
+    customerAccept:
+      canEdit &&
+      (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED") &&
+      request.convertedOrderId === null,
+    customerDecline: canEdit && (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED") && request.convertedOrderId === null,
+    convert: canEdit && request.status === "CUSTOMER_ACCEPTED" && request.convertedOrderId === null,
+  };
+}
+
 import { PrismaService } from "../../prisma/prisma.service";
 import { IdsService } from "../../shared/ids.service";
 import { ReferenceNumberService } from "../../shared/reference-number.service";
@@ -274,7 +321,7 @@ export class RequestService {
   /**
    * Get Request detail.
    */
-  async getRequest(id: string): Promise<Record<string, unknown>> {
+  async getRequest(id: string, grantedPermissions: readonly string[] = []): Promise<Record<string, unknown>> {
     const request = await this.prisma.request.findUnique({ where: { id } });
     if (!request) throw new NotFoundException(`Request ${id} not found`);
 
@@ -294,6 +341,10 @@ export class RequestService {
     dto.customerPhone = customer?.phone ?? null;
     dto.productType = product?.type ?? null;
     dto.partnerCountry = partner?.countryCode ?? null;
+
+    // UI-C6: server-authoritative action availability projection.
+    // Controller passes the actor's granted permissions explicitly.
+    dto.availableActions = computeRequestAvailableActions(request, grantedPermissions);
 
     // If converted, load the related Order → Booking → Payment chain
     if (request.convertedOrderId) {
@@ -566,10 +617,20 @@ export class RequestService {
 
   /**
    * Customer action: decline price change.
+   *
+   * UI-C6: deterministic status validation. This endpoint must reject invalid
+   * current Request statuses with a 4xx and perform no state/history mutation.
+   * Valid source states are derived from existing Request flow evidence.
    */
   async customerDecline(requestId: string, actor: Actor): Promise<Record<string, unknown>> {
     const request = await this.prisma.request.findUnique({ where: { id: requestId } });
     if (!request) throw new NotFoundException(`Request ${requestId} not found`);
+
+    if (request.status !== "PRICE_CHANGED" && request.status !== "CONFIRMED") {
+      throw new BadRequestException(
+        `Cannot decline in status ${request.status}; customerDecline requires PRICE_CHANGED or CONFIRMED`,
+      );
+    }
 
     const updated = await this.prisma.request.update({
       where: { id: requestId },
