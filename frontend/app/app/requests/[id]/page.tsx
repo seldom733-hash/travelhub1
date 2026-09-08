@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { useLocale, t, ti, LOCALE_TAGS } from "@/lib/i18n";
-import { useCan } from "@/lib/use-can";
 import StatusBadge from "@/components/StatusBadge";
 import EntityDetailShell from "@/components/EntityDetailShell";
 import EntityDetailHeader from "@/components/EntityDetailHeader";
@@ -21,6 +21,9 @@ import EntityTimeline from "@/components/commerce/EntityTimeline";
 import EntityAuditHistory from "@/components/commerce/EntityAuditHistory";
 import CommerceRelationChain from "@/components/commerce/CommerceRelationChain";
 import OperationalNotes from "@/components/OperationalNotes";
+import RequestActionBar, {
+  type RequestAvailableActions,
+} from "@/components/request/RequestActionBar";
 import { requestActionLabel } from "@/lib/commerce-history-labels";
 import { useCurrentUser } from "@/lib/use-user";
 
@@ -113,10 +116,6 @@ interface RequestDetail {
   };
 }
 
-function InfoRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return <EntityField label={label} value={value} mono={mono} />;
-}
-
 function ProgressBadge({ progress, locale }: { progress: "AWAITING_TRAVELERS" | "DATA_FILLED" | "FINAL_CONFIRMED" | null; locale: "ru" | "az" | "en" }) {
   if (!progress) return null;
   const key = progress === "FINAL_CONFIRMED" ? "reqflow.progress.final" : progress === "DATA_FILLED" ? "reqflow.progress.filled" : "reqflow.progress.awaiting";
@@ -128,17 +127,6 @@ function ProgressBadge({ progress, locale }: { progress: "AWAITING_TRAVELERS" | 
   return <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium ${cls}`}>{t(key, locale)}</span>;
 }
 
-function btn(base: string, tone: string) {
-  return `rounded-lg px-3 py-1.5 text-xs font-medium ${base} ${tone}`;
-}
-
-const TONES = {
-  primary: "bg-blue-600 text-white hover:bg-blue-700",
-  success: "bg-emerald-600 text-white hover:bg-emerald-700",
-  danger: "bg-red-600 text-white hover:bg-red-700",
-  neutral: "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50",
-};
-
 export default function RequestDetailPage() {
   const locale = useLocale();
   const router = useRouter();
@@ -149,14 +137,10 @@ export default function RequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [proposeOpen, setProposeOpen] = useState(false);
-  const [proposePrice, setProposePrice] = useState("");
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [history, setHistory] = useState<RequestHistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-
-  const canEdit = useCan("order.edit_noncritical");
 
   // UI-C4: immutable change history (server-authoritative /requests/:id/history).
   const loadHistory = useCallback(async () => {
@@ -190,58 +174,54 @@ export default function RequestDetailPage() {
 
   useEffect(() => { void loadRequest(); }, [loadRequest]);
 
-  async function runPost(path: string, body?: Record<string, unknown>) {
+  async function runPost(path: string, body?: Record<string, unknown>): Promise<boolean> {
     setBusy(path);
     setActionMsg(null);
     try {
       await api.post(path, body ?? {});
       await loadRequest();
+      return true;
     } catch (err: any) {
       setActionMsg(err.message || t("requests.action_error", locale));
+      return false;
     } finally {
       setBusy(null);
     }
   }
 
-  async function propose() {
-    const price = Number(proposePrice);
-    if (!proposePrice || !Number.isFinite(price) || price <= 0) {
-      setActionMsg(t("requests.price_invalid", locale));
-      return;
-    }
-    await runPost(`/requests/${id}/propose-price`, { price });
-    setProposeOpen(false);
-    setProposePrice("");
+  async function propose(price: number): Promise<boolean> {
+    return runPost(`/requests/${id}/propose-price`, { price });
   }
+
+  /** Canonical action path segment → full API path (existing UI-C6 contract). */
+  const runAction = (action: string) => {
+    void runPost(`/requests/${id}/${action}`);
+  };
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="text-gray-500">{t("common.loading", locale)}</div>
+      <div className="flex h-full items-center justify-center">
+        <div className="text-sm text-slate-400">{t("crm.loading", locale)}</div>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !request) {
     return (
-      <div className="p-6">
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      </div>
-    );
-  }
-
-  if (!request) {
-    return (
-      <div className="p-6">
-        <div className="text-gray-500">{t("crm.not_found", locale)}</div>
+      <div className="flex h-full flex-col items-center justify-center gap-4">
+        <div className="text-sm text-red-500">{error || t("crm.not_found", locale)}</div>
+        <Link
+          href="/app/requests"
+          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+        >
+          ← {t("crm.back_to_list", locale)}
+        </Link>
       </div>
     );
   }
 
   const r = request;
-  const actions = r.availableActions ?? {
+  const actions: RequestAvailableActions = r.availableActions ?? {
     confirmPrice: false,
     proposePrice: false,
     reject: false,
@@ -253,9 +233,6 @@ export default function RequestDetailPage() {
 
   // UI-C6: frontend may render only what the server projected.
   // Status arrays are no longer the authority.
-  const showSupplier = actions.confirmPrice || actions.proposePrice || actions.reject || actions.unavailable;
-  const showCustomer = actions.customerAccept || actions.customerDecline;
-  const showConvert = actions.convert;
   const progress = r.convertedOrder?.travelerProgress ?? null;
   const timeline = (r as any).timeline as Array<{ label: string; timestamp: string | null }> | undefined;
   const fmtDate = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateString(LOCALE_TAGS[locale]) : null);
@@ -265,12 +242,28 @@ export default function RequestDetailPage() {
     <EntityDetailShell
       header={
         <EntityDetailHeader
-          breadcrumbs={["TravelHub", t("requests.title", locale) || "Заявки", r.referenceNumber]}
+          breadcrumbs={["TravelHub", t("requests.title", locale), r.referenceNumber]}
           reference={r.referenceNumber}
           secondary={r.code}
           backHref="/app/requests"
           lifecycleStatus={<StatusBadge status={r.status} />}
-        />
+          actions={
+            user ? (
+              <RequestActionBar
+                locale={locale}
+                availableActions={actions}
+                busyAction={busy === null ? null : (busy.split("/").pop() ?? null)}
+                onRun={runAction}
+                onPropose={propose}
+                onValidationMessage={(m) => setActionMsg(m)}
+              />
+            ) : null
+          }
+        >
+          {actionMsg && (
+            <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{actionMsg}</div>
+          )}
+        </EntityDetailHeader>
       }
     >
       <EntityDetailLayout>
@@ -279,7 +272,7 @@ export default function RequestDetailPage() {
           {/* PRIMARY: Обзор заявки */}
           <EntitySectionCard title={t("detail.sections.overview", locale)}>
             <EntityFieldGrid>
-              <InfoRow label={t("requests.customer", locale)} value={
+              <EntityField label={t("requests.customer", locale)} value={
                 r.customerName ? (
                   <>
                     <span className="font-medium">{r.customerName}</span>
@@ -289,7 +282,7 @@ export default function RequestDetailPage() {
                   <span className="font-mono text-xs">{r.customerCode}</span>
                 ) : null
               } />
-              <InfoRow label={t("requests.product", locale)} value={
+              <EntityField label={t("requests.product", locale)} value={
                 r.productName ? (
                   <>
                     <span className="font-medium">{r.productName}</span>
@@ -299,7 +292,7 @@ export default function RequestDetailPage() {
                   <span className="font-mono text-xs">{r.productCode}</span>
                 ) : null
               } />
-              <InfoRow label={t("requests.supplier", locale)} value={
+              <EntityField label={t("requests.supplier", locale)} value={
                 r.partnerName ? (
                   <>
                     <span className="font-medium">{r.partnerName}</span>
@@ -310,117 +303,44 @@ export default function RequestDetailPage() {
                 ) : null
               } />
 
-              <InfoRow label={t("requests.displayed_price", locale)} value={
+              <EntityField label={t("requests.displayed_price", locale)} value={
                 r.displayedPrice ? `${r.displayedPrice} ${r.displayedCurrency ?? ""}` : null
               } />
-              <InfoRow label={t("requests.confirmed_price", locale)} value={
+              <EntityField label={t("requests.confirmed_price", locale)} value={
                 r.confirmedPrice ? `${r.confirmedPrice} ${r.confirmedCurrency ?? ""}` : null
               } />
-              <InfoRow label={t("requests.quantity", locale)} value={r.quantity} />
+              <EntityField label={t("requests.quantity", locale)} value={r.quantity} />
 
-              <InfoRow label={t("reqflow.party_size", locale)} value={r.travelerCount ?? null} />
-              <InfoRow label={t("requests.service_date", locale)} value={
+              <EntityField label={t("reqflow.party_size", locale)} value={r.travelerCount ?? null} />
+              <EntityField label={t("requests.service_date", locale)} value={
                 r.requestedServiceDate ? fmtDate(r.requestedServiceDate) : null
               } />
-              <InfoRow label={t("requests.supplier_responded_date", locale)} value={
+              <EntityField label={t("requests.supplier_responded_date", locale)} value={
                 r.supplierRespondedAt ? fmtDate(r.supplierRespondedAt) : null
               } />
             </EntityFieldGrid>
-          </EntitySectionCard>
-
-          {/* Actions — business-specific flow (server-authoritative) */}
-          {(showSupplier || showCustomer || showConvert) && (
-            <EntitySectionCard title={t("detail.sections.actions", locale)}>
-              {actionMsg && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">{actionMsg}</div>
-              )}
-              {showSupplier && (
-                <div className="space-y-2">
-                  <div className="text-xs font-medium uppercase text-gray-500">{t("reqflow.supplier_actions", locale)}</div>
-                  <div className="flex flex-wrap gap-2">
-                    {actions.confirmPrice && (
-                      <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/confirm-price`)} className={btn("", TONES.success)}>
-                        {busy === `/requests/${id}/confirm-price` ? t("reqflow.busy", locale) : t("reqflow.confirm_price", locale)}
-                      </button>
-                    )}
-                    {actions.proposePrice && !proposeOpen && (
-                      <button disabled={busy !== null} onClick={() => setProposeOpen(true)} className={btn("", TONES.primary)}>
-                        {t("reqflow.propose_price", locale)}
-                      </button>
-                    )}
-                    {actions.proposePrice && proposeOpen && (
-                      <span className="flex items-center gap-2">
-                        <input
-                          value={proposePrice}
-                          onChange={(e) => setProposePrice(e.target.value)}
-                          placeholder={t("requests.price_proposal_placeholder", locale)}
-                          className="w-32 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400"
-                        />
-                        <button disabled={busy !== null} onClick={() => void propose()} className={btn("", TONES.primary)}>OK</button>
-                        <button disabled={busy !== null} onClick={() => { setProposeOpen(false); setProposePrice(""); }} className={btn("", TONES.neutral)}>✕</button>
-                      </span>
-                    )}
-                    {actions.reject && (
-                      <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/reject`, { reason: "rejected" })} className={btn("", TONES.danger)}>
-                        {t("reqflow.reject", locale)}
-                      </button>
-                    )}
-                    {actions.unavailable && (
-                      <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/unavailable`, { reason: "unavailable" })} className={btn("", TONES.neutral)}>
-                        {t("reqflow.unavailable", locale)}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-              {showCustomer && (
-                <div className="space-y-2">
-                  <div className="text-xs font-medium uppercase text-gray-500">{t("reqflow.customer_actions", locale)}</div>
-                  <div className="flex flex-wrap gap-2">
-                    {actions.customerAccept && (
-                      <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-accept`)} className={btn("", TONES.success)}>
-                        {t("reqflow.customer_accept", locale)}
-                      </button>
-                    )}
-                    {actions.customerDecline && (
-                      <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/customer-decline`)} className={btn("", TONES.danger)}>
-                        {t("reqflow.customer_decline", locale)}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-              {showConvert && (
-                <div className="space-y-2">
-                  <div className="text-xs font-medium uppercase text-slate-400">{t("reqflow.converted_hint", locale)}</div>
-                  <button disabled={busy !== null} onClick={() => runPost(`/requests/${id}/convert`)} className={btn("", TONES.primary)}>
-                    {busy === `/requests/${id}/convert` ? t("reqflow.busy", locale) : t("reqflow.convert_action", locale)}
-                  </button>
-                </div>
-              )}
-            </EntitySectionCard>
-          )}
+          </EntitySectionCard>          {/* Actions moved to the canonical header actions slot (UI-C7 / RequestActionBar). */}
 
           {/* SECONDARY: supplier / proposal / decision */}
           <EntitySectionCard title={t("requests.supplier", locale)}>
             <EntityFieldGrid>
-              <InfoRow label={t("requests.supplier_deadline", locale)} value={
+              <EntityField label={t("requests.supplier_deadline", locale)} value={
                 r.supplierResponseDeadline ? fmtTs(r.supplierResponseDeadline) : null
               } />
-              <InfoRow label={t("requests.supplier_responded", locale)} value={
+              <EntityField label={t("requests.supplier_responded", locale)} value={
                 r.supplierRespondedAt ? fmtTs(r.supplierRespondedAt) : null
               } />
-              <InfoRow label={t("requests.decision", locale)} value={
+              <EntityField label={t("requests.decision", locale)} value={
                 r.supplierDecision ? <StatusBadge status={r.supplierDecision} /> : null
               } />
             </EntityFieldGrid>
             {(r.supplierPriceProposal || r.supplierNote) && (
               <div className="mt-4 border-t border-slate-100 pt-4 space-y-2">
                 {r.supplierPriceProposal && (
-                  <InfoRow label={t("requests.proposed_price", locale)} value={`${r.supplierPriceProposal} ${r.displayedCurrency ?? ""}`} />
+                  <EntityField label={t("requests.proposed_price", locale)} value={`${r.supplierPriceProposal} ${r.displayedCurrency ?? ""}`} />
                 )}
                 {r.supplierNote && (
-                  <InfoRow label={t("requests.supplier_note", locale)} value={r.supplierNote} />
+                  <EntityField label={t("requests.supplier_note", locale)} value={r.supplierNote} />
                 )}
               </div>
             )}
@@ -428,13 +348,13 @@ export default function RequestDetailPage() {
 
           <EntitySectionCard title={t("requests.customer", locale)}>
             <EntityFieldGrid>
-              <InfoRow label={t("requests.customer_deadline", locale)} value={
+              <EntityField label={t("requests.customer_deadline", locale)} value={
                 r.customerActionDeadline ? fmtTs(r.customerActionDeadline) : null
               } />
-              <InfoRow label={t("reqflow.accepted_at", locale)} value={
+              <EntityField label={t("reqflow.accepted_at", locale)} value={
                 r.customerAcceptedAt ? fmtTs(r.customerAcceptedAt) : null
               } />
-              <InfoRow label={t("requests.decision", locale)} value={
+              <EntityField label={t("requests.decision", locale)} value={
                 r.customerDecision ? <StatusBadge status={r.customerDecision} /> : null
               } />
             </EntityFieldGrid>
@@ -443,11 +363,11 @@ export default function RequestDetailPage() {
           {(r.rejectedAt || r.rejectionReason) && (
             <EntitySectionCard title={t("requests.rejection", locale)}>
               <EntityFieldGrid>
-                <InfoRow label={t("requests.rejection_date", locale)} value={
+                <EntityField label={t("requests.rejection_date", locale)} value={
                   r.rejectedAt ? fmtTs(r.rejectedAt) : null
                 } />
-                <InfoRow label={t("requests.rejected_by", locale)} value={r.rejectedBy || null} />
-                <InfoRow label={t("crm.col.reason", locale)} value={r.rejectionReason || null} />
+                <EntityField label={t("requests.rejected_by", locale)} value={r.rejectedBy || null} />
+                <EntityField label={t("crm.col.reason", locale)} value={r.rejectionReason || null} />
               </EntityFieldGrid>
             </EntitySectionCard>
           )}
@@ -465,10 +385,10 @@ export default function RequestDetailPage() {
 
           <EntitySectionCard title={t("detail.sections.details", locale)}>
             <div className="grid grid-cols-1 gap-4">
-              <InfoRow label={t("admin.table.col.code", locale)} value={r.code} mono />
-              <InfoRow label={t("detail.details.sequence", locale)} value={r.commerceSequence} mono />
-              <InfoRow label={t("crm.col.created", locale)} value={fmtTs(r.createdAt)} />
-              <InfoRow label={t("crm.col.updated", locale)} value={fmtTs(r.updatedAt)} />
+              <EntityField label={t("admin.table.col.code", locale)} value={r.code} mono />
+              <EntityField label={t("detail.details.sequence", locale)} value={r.commerceSequence} mono />
+              <EntityField label={t("crm.col.created", locale)} value={fmtTs(r.createdAt)} />
+              <EntityField label={t("crm.col.updated", locale)} value={fmtTs(r.updatedAt)} />
             </div>
           </EntitySectionCard>
         </EntityDetailAside>
@@ -495,18 +415,18 @@ export default function RequestDetailPage() {
                 {r.convertedOrder.travelerProgress !== "FINAL_CONFIRMED" && (
                   <button
                     onClick={() => router.push(`/app/orders/${r.convertedOrder!.id}`)}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${TONES.primary}`}
+                    className="rounded-lg px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
                   >
                     {t("reqflow.continue_order", locale)} →
                   </button>
                 )}
                 <div className="border-t border-slate-100 pt-4">
                   <EntityFieldGrid>
-                    <InfoRow label={t("crm.col.created", locale)} value={
+                    <EntityField label={t("crm.col.created", locale)} value={
                       r.convertedOrder.createdAt ? fmtTs(r.convertedOrder.createdAt) : null
                     } />
                     {r.convertedOrder.amount && (
-                      <InfoRow label={t("crm.col.amount", locale)} value={`${r.convertedOrder.amount} ${r.convertedOrder.currency ?? ""}`} />
+                      <EntityField label={t("crm.col.amount", locale)} value={`${r.convertedOrder.amount} ${r.convertedOrder.currency ?? ""}`} />
                     )}
                   </EntityFieldGrid>
                 </div>

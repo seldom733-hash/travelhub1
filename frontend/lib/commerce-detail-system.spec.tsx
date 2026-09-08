@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
+import RequestActionBar from "@/components/request/RequestActionBar";
 import { t } from "./i18n";
 
 const ROOT = process.cwd();
@@ -285,7 +286,8 @@ describe("R2 Detail Visual System Parity — action authority not moved client-s
   it("Request actions are server-authoritative after UI-C6 (SEC-UI-01 closed by Request availableActions)", () => {
     const req = read("app/app/requests/[id]/page.tsx");
     // Frontend must consume server-provided availableActions, not recompute from status arrays.
-    expect(req).toContain("const actions = r.availableActions ?? {");
+    // UI-C7: typed contract via RequestAvailableActions — the safe-default literal is preserved.
+    expect(req).toContain("const actions: RequestAvailableActions = r.availableActions ?? {");
     expect(req).toContain("confirmPrice: false");
     expect(req).toContain("customerDecline: false");
     expect(req).toContain("convert: false");
@@ -296,5 +298,183 @@ describe("R2 Detail Visual System Parity — action authority not moved client-s
     // Every action still round-trips to the server — no new client-side business rules.
     expect(req).toContain("runPost(`/requests/${id}/");
     expect(req).toContain("api.post(path, body ?? {})");
+  });
+});
+
+describe("UI-C7 — Request UI Migration — header actions + presentation cleanup", () => {
+  it("Request actions render in the canonical header actions slot via RequestActionBar", () => {
+    const req = read("app/app/requests/[id]/page.tsx");
+    expect(req).toContain("import RequestActionBar");
+    // CRLF-agnostic: actions={ user ? (<RequestActionBar ...>) : null } in the header slot.
+    expect(req).toMatch(/actions=\{\s*user \? \(/);
+    expect(req).toContain("<RequestActionBar");
+    expect(req).toContain("availableActions={actions}");
+    // The legacy inline MAIN actions card is gone.
+    expect(req).not.toContain('title={t("detail.sections.actions", locale)}');
+    // btn/TONES local primitives are removed from the page.
+    expect(req).not.toContain("function btn(");
+    expect(req).not.toContain("const TONES");
+    // InfoRow alias is removed — EntityField is used directly.
+    expect(req).not.toContain("function InfoRow");
+    expect(req).toContain("<EntityField");
+    // Dead client-permission artifact removed (no client-side permission computation).
+    expect(req).not.toContain('useCan("order.edit_noncritical")');
+    expect(req).not.toContain("const canEdit");
+  });
+
+  it("RequestActionBar consumes only availableActions (no status/permission authority)", () => {
+    const bar = read("components/request/RequestActionBar.tsx");
+    // Visibility strictly follows the server projection booleans.
+    expect(bar).toContain("availableActions.confirmPrice");
+    expect(bar).toContain("availableActions.proposePrice");
+    expect(bar).toContain("availableActions.reject");
+    expect(bar).toContain("availableActions.unavailable");
+    expect(bar).toContain("availableActions.customerAccept");
+    expect(bar).toContain("availableActions.customerDecline");
+    expect(bar).toContain("availableActions.convert");
+    // No client-side lifecycle/permission authority.
+    expect(bar).not.toContain("RequestStatus");
+    expect(bar).not.toContain("r.status");
+    expect(bar).not.toContain("useCan");
+    expect(bar).not.toContain("granted");
+  });
+
+  it("RequestActionBar preserves all seven actions with existing API paths and busy semantics", () => {
+    const bar = read("components/request/RequestActionBar.tsx");
+    expect(bar).toContain('onRun("confirm-price")');
+    expect(bar).toContain("onPropose");
+    expect(bar).toContain('onRun("reject")');
+    expect(bar).toContain('onRun("unavailable")');
+    expect(bar).toContain('onRun("customer-accept")');
+    expect(bar).toContain('onRun("customer-decline")');
+    expect(bar).toContain('onRun("convert")');
+    // Busy gating preserved (no parallel actions while one executes).
+    expect(bar).toContain("busyAction !== null");
+    // Existing localized labels are reused.
+    for (const key of [
+      "reqflow.confirm_price",
+      "reqflow.propose_price",
+      "reqflow.reject",
+      "reqflow.unavailable",
+      "reqflow.customer_accept",
+      "reqflow.customer_decline",
+      "reqflow.convert_action",
+      "reqflow.busy",
+    ]) {
+      expect(bar).toContain(`"${key}"`);
+    }
+  });
+
+  it("RequestActionBar keeps the propose-price inline toggle UX (no modal/drawer) with an accessible name", () => {
+    const bar = read("components/request/RequestActionBar.tsx");
+    expect(bar).toContain('<input');
+    expect(bar).toContain("aria-label=");
+    expect(bar).not.toContain("<dialog");
+    expect(bar).not.toContain("Drawer");
+    expect(bar).not.toContain("Modal");
+  });
+
+  it("Request detail loading/error/not-found use the canonical centered pattern with back-to-list", () => {
+    const req = read("app/app/requests/[id]/page.tsx");
+    expect(req).toContain('flex h-full items-center justify-center');
+    expect(req).toContain('flex h-full flex-col items-center justify-center gap-4');
+    expect(req).toContain('href="/app/requests"');
+    expect(req).toContain("crm.loading");
+    expect(req).toContain("crm.not_found");
+    expect(req).toContain("crm.back_to_list");
+    // Dead breadcrumb fallback literal removed.
+    expect(req).not.toContain('|| "Заявки"');
+  });
+
+  it("RequestActionBar renders nothing without actionable actions (empty-area omission)", () => {
+    // jsdom render — server projection all-false must produce no action UI.
+    const { container } = render(
+      <RequestActionBar
+        locale="ru"
+        availableActions={{
+          confirmPrice: false,
+          proposePrice: false,
+          reject: false,
+          unavailable: false,
+          customerAccept: false,
+          customerDecline: false,
+          convert: false,
+        }}
+        busyAction={null}
+        onRun={() => {}}
+        onPropose={async () => true}
+        onValidationMessage={() => {}}
+      />,
+    );
+    expect(container.querySelector("button")).toBeNull();
+  });
+
+  it("RequestActionBar renders exactly the projected actions (customer actions for PRICE_CHANGED)", () => {
+    const onRun = vi.fn();
+    render(
+      <RequestActionBar
+        locale="ru"
+        availableActions={{
+          confirmPrice: false,
+          proposePrice: false,
+          reject: false,
+          unavailable: false,
+          customerAccept: true,
+          customerDecline: true,
+          convert: false,
+        }}
+        busyAction={null}
+        onRun={onRun}
+        onPropose={async () => true}
+        onValidationMessage={() => {}}
+      />,
+    );
+    const accept = screen.getByRole("button", { name: t("reqflow.customer_accept", "ru") });
+    const decline = screen.getByRole("button", { name: t("reqflow.customer_decline", "ru") });
+    expect(screen.queryByText(t("reqflow.confirm_price", "ru"))).toBeNull();
+    expect(screen.queryByText(t("reqflow.convert_action", "ru"))).toBeNull();
+    fireEvent.click(accept);
+    expect(onRun).toHaveBeenCalledWith("customer-accept");
+    fireEvent.click(decline);
+    expect(onRun).toHaveBeenCalledWith("customer-decline");
+  });
+
+  it("RequestActionBar propose toggle: validation error path + successful post closes the input", async () => {
+    const onValidationMessage = vi.fn();
+    let proposed: number | null = null;
+    const { unmount } = render(
+      <RequestActionBar
+        locale="ru"
+        availableActions={{
+          confirmPrice: false,
+          proposePrice: true,
+          reject: false,
+          unavailable: false,
+          customerAccept: false,
+          customerDecline: false,
+          convert: false,
+        }}
+        busyAction={null}
+        onRun={() => {}}
+        onPropose={async (price) => {
+          proposed = price;
+          return true;
+        }}
+        onValidationMessage={onValidationMessage}
+      />,
+    );
+    // Open the inline toggle.
+    fireEvent.click(screen.getByRole("button", { name: t("reqflow.propose_price", "ru") }));
+    const input = screen.getByRole("textbox");
+    // Empty submit → validation message, input stays open.
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    expect(onValidationMessage).toHaveBeenCalledWith(t("requests.price_invalid", "ru"));
+    expect(screen.getByRole("textbox")).toBeTruthy();
+    // Valid submit → onPropose called with the numeric price, input closes.
+    fireEvent.change(input, { target: { value: "150" } });
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    await waitFor(() => expect(proposed).toBe(150));
+    expect(screen.queryByRole("textbox")).toBeNull();
+    unmount();
   });
 });
