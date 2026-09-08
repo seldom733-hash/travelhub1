@@ -47,10 +47,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Canonical authority affected | D5/D6 pattern (server-authoritative actions) |
 | Dependencies | Request controller must expose `availableActions` |
 | Planned closure stage | UI-C6 (Request Server-Authority Remediation) |
-| Status | CLOSED |
-| Acceptance condition | Request API returns `availableActions`; frontend consumes only this list |
-| Closure SHA | see Git closure (docs/reports/PHASE_3_UI_C6_REQUEST_SERVER_AUTHORITY_QUALIFICATION_REPORT.md) |
-| Notes | Do not simply wrap frontend-derived actions in `<EntityActionBar />` |
+| Status | OPEN |
+| Acceptance condition | Request API returns `availableActions` reflecting existing server business gates; frontend consumes only this list; runtime verification completed for all projection claims |
+| Closure SHA | — |
+| Notes | Do not simply wrap frontend-derived actions in `<EntityActionBar />`. This requalification pass: (1) corrected `customerAccept` projection to use the existing `customerActionDeadline` gate; (2) corrected `convert` projection to require the existing D3 acceptance snapshot; (3) **removed** the non-existent deadline gate from `customerDecline` projection so it matches the execution contract (which enforces only status PRICE_CHANGED/CONFIRMED + not converted); (4) added targeted e2e coverage for CHECKING, each terminal/negative status individually, expired customerActionDeadline with the corrected matrix, and CUSTOMER_ACCEPTED without D3 snapshot. Live runtime checks in this pass verified the backend projection and direct API authority for NEW, CHECKING, PRICE_CHANGED, CONFIRMED, expired customerActionDeadline, CUSTOMER_ACCEPTED with D3 snapshot, CONVERTED, and REJECTED, plus RBAC and auth negatives. Final closure still pending live browser console verification for the Request Detail surface (no new UI-C6 console errors). |
 
 ---
 

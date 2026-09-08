@@ -1,5 +1,18 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from "@nestjs/common";
-import type { RequestStatus } from "../../generated/prisma/client";
+import type { RequestStatus, ProductType } from "../../generated/prisma/client";
+
+/**
+ * Narrow the Product shape that the availability projection reads so the type
+ * of `buildRequestProjectionProductSnapshot(...)` is stable across the module.
+ */
+type RequestProjectionProductShape = {
+  id: string;
+  code: string;
+  title: string;
+  type: ProductType;
+  travelerRequirements: Record<string, string> | null;
+};
+
 
 /**
  * UI-C6: server-authoritative Request action availability projection.
@@ -28,10 +41,28 @@ export function computeRequestAvailableActions(
   request: {
     status: RequestStatus;
     convertedOrderId: string | null;
+    customerActionDeadline: Date | null;
+    customerAcceptedAt: Date | null;
+    pinnedRequirements: unknown;
+    travelerCount: number | null;
+    productSnapshot: unknown;
   },
   granted: readonly string[],
 ): RequestAvailableActions {
   const canEdit = granted.includes(REQUEST_EDIT_PERMISSION);
+  const now = new Date();
+
+  // customerAccept execution path enforces customerActionDeadline (if set);
+  // customerDecline execution path does NOT. Projection mirrors that contract.
+  const withinCustomerAcceptWindow =
+    request.customerActionDeadline == null ||
+    now <= request.customerActionDeadline;
+
+  const hasD3AcceptSnapshot =
+    request.customerAcceptedAt != null &&
+    request.pinnedRequirements != null &&
+    request.travelerCount != null &&
+    request.productSnapshot != null;
 
   return {
     confirmPrice: canEdit && (request.status === "NEW" || request.status === "CHECKING"),
@@ -40,10 +71,35 @@ export function computeRequestAvailableActions(
     unavailable: canEdit && (request.status === "NEW" || request.status === "CHECKING"),
     customerAccept:
       canEdit &&
+      withinCustomerAcceptWindow &&
       (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED") &&
       request.convertedOrderId === null,
-    customerDecline: canEdit && (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED") && request.convertedOrderId === null,
-    convert: canEdit && request.status === "CUSTOMER_ACCEPTED" && request.convertedOrderId === null,
+    customerDecline: canEdit &&
+      (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED") &&
+      request.convertedOrderId === null,
+    convert: canEdit && hasD3AcceptSnapshot && request.convertedOrderId === null,
+  };
+}
+
+/**
+ * Sync helper for the availability projection: mirrors the same Product data
+ * shape that getRequest() reads so the projection has the same Db-read context
+ * as the execution path.
+ */
+export function buildRequestProjectionProductSnapshot(product: RequestProjectionProductShape | null): {
+  productId: string;
+  productCode: string;
+  productTitle: string;
+  productType: string;
+  travelerRequirements: Record<string, string> | null;
+} | null {
+  if (!product) return null;
+  return {
+    productId: product.id,
+    productCode: product.code,
+    productTitle: product.title,
+    productType: product.type as string,
+    travelerRequirements: product.travelerRequirements,
   };
 }
 
@@ -54,6 +110,33 @@ import { SecurityService } from "../../security/security.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { ConflictError, ValidationDomainError } from "../../shared/errors";
 import { getEffectiveTravelerRequirements } from "../catalog/traveler-requirements";
+
+/**
+ * Helper used only by the availability projection so the projection mirrors the
+ * existing execution authority shape used by getRequest().
+ */
+export function pinEffectiveTravelerRequirements(productType: string, travelerRequirements: Record<string, string> | null): ReturnType<typeof getEffectiveTravelerRequirements> {
+  return getEffectiveTravelerRequirements(productType, travelerRequirements ?? null);
+}
+
+/**
+ * Helper used only by the availability projection so the projection mirrors the
+ * existing acceptance snapshot shape used by customerAccept()/convertRequestToOrder().
+ */
+export function hasD3AcceptSnapshot(request: {
+  customerAcceptedAt: Date | null;
+  pinnedRequirements: unknown;
+  travelerCount: number | null;
+  productSnapshot: unknown;
+}): boolean {
+  return (
+    request.customerAcceptedAt != null &&
+    request.pinnedRequirements != null &&
+    request.travelerCount != null &&
+    request.productSnapshot != null
+  );
+}
+
 import { OrderService } from "./order.service";
 import { Prisma } from "../../generated/prisma/client";
 import { assertValidRequestSort, buildRequestOrderBy } from "./request-sort";
@@ -344,7 +427,20 @@ export class RequestService {
 
     // UI-C6: server-authoritative action availability projection.
     // Controller passes the actor's granted permissions explicitly.
-    dto.availableActions = computeRequestAvailableActions(request, grantedPermissions);
+    dto.availableActions = computeRequestAvailableActions(
+      {
+        status: request.status,
+        convertedOrderId: request.convertedOrderId,
+        customerActionDeadline: request.customerActionDeadline,
+        customerAcceptedAt: request.customerAcceptedAt,
+        pinnedRequirements: request.pinnedRequirements,
+        travelerCount: request.travelerCount ?? null,
+        productSnapshot: buildRequestProjectionProductSnapshot(
+          product as RequestProjectionProductShape | null,
+        ),
+      },
+      grantedPermissions,
+    );
 
     // If converted, load the related Order → Booking → Payment chain
     if (request.convertedOrderId) {
@@ -549,7 +645,9 @@ export class RequestService {
         })
       : null;
     if (!product) {
-      throw new BadRequestException("Cannot accept: Request has no resolvable Product for pinned traveler requirements (D3 §7)");
+      throw new BadRequestException(
+        "Cannot accept: Request has no resolvable Product for pinned traveler requirements (D3 §7)",
+      );
     }
     const pinnedRequirements = getEffectiveTravelerRequirements(
       product.type as string,
