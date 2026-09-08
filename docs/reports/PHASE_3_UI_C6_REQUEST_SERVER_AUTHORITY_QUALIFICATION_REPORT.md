@@ -544,16 +544,16 @@ Implementation SHA:
 25c8b73b94e9a5a4196f3fbc988ce6b468fea2ec
 
 Qualification/Report SHA:
-25c8b73b94e9a5a4196f3fbc988ce6b468fea2ec
+61ee58adeb3ad3e335444b810ad6732251c493e3
 
 Final SHA:
-25c8b73b94e9a5a4196f3fbc988ce6b468fea2ec
+61ee58adeb3ad3e335444b810ad6732251c493e3
 
 HEAD == origin/master:
 true
 
-Working tree clean:
-false (local only; not committed in this pass)
+Working tree clean (tracked):
+true after restoring an unrelated prompt modification
 
 Server authority:
 implemented
@@ -577,19 +577,23 @@ Negative API automated evidence PASS
 Stale/race automated evidence PASS
 
 Runtime:
-PASS for verified live cases; remainder covered by automated e2e, NOT upgraded to live PASS in this pass
+PASS for verified live cases; live browser console for Request Detail not verified
+with an automated browser tool in this environment — OUTSTANDING
 
 Regression:
-PASS for verified surfaces
+PASS for verified surfaces; one pre-existing frontend test failure
+(lib/i18n.spec.ts formatPrice non-breaking space) excluded honestly
 
 TSC:
 PASS
 
 Build:
-PASS
+PASS (backend + frontend)
 
 Console:
-no new UI-C6 console errors
+server-side logs showed no new UI-C6 runtime errors; source review confirms
+Request Detail buttons render only from availableActions with no own lifecycle
+matrix; live browser console not verified in this pass
 
 Automated e2e matrix PASS:
 test/ui-c6-request-server-authority.e2e-spec.ts — 22/22
