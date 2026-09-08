@@ -159,7 +159,8 @@ Addendum simultaneously stated:
 | **CURRENT IMPLEMENTATION** | Workspace/entitlement-aware Help (UI-C14) | Must exist with Help |
 | **CURRENT IMPLEMENTATION** | RU/AZ/EN qualification (UI-C15) | Must exist with Help |
 | **CURRENT IMPLEMENTATION** | Security/regression/browser qualification (UI-C16) | Gate |
-| **CURRENT IMPLEMENTATION** | Git hard closure (UI-C17) | Final |
+| **CURRENT IMPLEMENTATION** | Final RBAC full-matrix re-qualification (UI-C17) | Final security gate |
+| **CURRENT IMPLEMENTATION** | Git hard closure (UI-C18) | Final |
 | **LATER** | Advanced fuzzy search | Non-blocking polish |
 | **LATER** | Rich related-topic recommendations | Non-blocking polish |
 | **LATER** | Extended tutorials | Non-blocking polish |
@@ -410,7 +411,7 @@ DEFERRED items correctly categorized as "DEFERRED PRODUCT" not technical debt. �
 NOW (blocker):
   SEC-UI-01 Request server-authoritative actions
 
-CURRENT COMMERCE IMPLEMENTATION (UI-C1 through UI-C17):
+CURRENT COMMERCE IMPLEMENTATION (UI-C1 through UI-C18):
   UI-01..UI-09: Commerce UI consistency
   HELP-01..HELP-08: Help metadata, dictionary, localization
   HELP-05: Formula drift automated gate
@@ -447,10 +448,23 @@ UI-C13  Workspace/entitlement-aware Help
 UI-C14  RU/AZ/EN qualification
 UI-C15  Card/spacing/responsive/loading/error polish
 UI-C16  Security/regression/browser qualification
-UI-C17  Git hard closure
+UI-C17  Final RBAC full-matrix re-qualification
+UI-C18  Git hard closure
 ```
 
 **SEC-UI-01 closes at UI-C6, before Request migration at UI-C7.** ✅
+
+### Final RBAC Gate
+
+Before final repository closure, TravelHub requires an independent
+full-matrix RBAC re-qualification covering all current roles × all current
+permissions and validating effective server authorization, relevant
+server-authoritative action projections, UI authorization consistency and
+tenant/workspace isolation.
+
+This is a qualification gate, not an RBAC implementation stage.
+Any future role/permission change does not reduce the required final
+verification scope: the complete current matrix must be re-qualified.
 
 ## Security Preservation
 
@@ -516,7 +530,7 @@ No production code changes in this micro-closure. Only documentation + debt qual
 | Future scope not mislabeled as debt | ✅ | DEFERRED PRODUCT category used |
 | Missing agreed items added | ✅ | 7 items added (HELP-07/08, DATA-02, AGR-01, SUB-04/05/06) |
 | Debt priority corrected | ✅ | NOW / CURRENT IMPLEMENTATION / LATER / DEFERRED |
-| Final implementation phasing derived | ✅ | UI-C1 through UI-C17 |
+| Final implementation phasing derived | ✅ | UI-C1 through UI-C18 (range reconciled by RBAC final-gate governance: UI-C17 = Final RBAC full-matrix re-qualification, UI-C18 = Git hard closure) |
 | SEC-UI-01 precedes Request migration acceptance | ✅ | UI-C6 before UI-C7 |
 | No production implementation started | ✅ | Documentation only |
 | D8 not started | ✅ | — |

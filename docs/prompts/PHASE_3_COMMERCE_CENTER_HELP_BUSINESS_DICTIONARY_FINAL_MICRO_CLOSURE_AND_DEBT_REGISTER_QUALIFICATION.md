@@ -633,7 +633,8 @@ UI-C14 RU/AZ/EN qualification
 UI-C15 Card/spacing/responsive/loading/error polish
 
 UI-C16 Security/regression/browser qualification
-UI-C17 Git hard closure
+UI-C17 Final RBAC full-matrix re-qualification
+UI-C18 Git hard closure
 ```
 
 Refine only when actual dependencies justify it.
