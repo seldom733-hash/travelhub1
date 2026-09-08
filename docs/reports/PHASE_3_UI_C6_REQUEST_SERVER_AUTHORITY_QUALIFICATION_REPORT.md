@@ -543,7 +543,7 @@ Intermediate documentation proof SHA:
 b6aa5da349326e27d3586307ad06018f826952be
 
 Final documentation/repository synchronization SHA:
-<annotated-after-closure>
+642f8adf7b8fbc925fb4ecc7a873e0145fffe87a
 
 Tested runtime SHA (live browser verification):
 0b379c94cd1880e8f8e0c9933b0fd432ce3cb97e
