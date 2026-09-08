@@ -489,42 +489,33 @@ artifact set.
 
 ## 22. Final Verdict
 
-### VERDICT B — PENDING / SEC-UI-01 OPEN
+### VERDICT A — ACCEPTED / SEC-UI-01 CLOSED
 
-Mandatory runtime gate not proven in this session:
-
-- FRONTEND RUNTIME (PHASE_3_UI_C6_FINAL_RUNTIME_REQUALIFICATION_GIT_HARD_CLOSURE_PROMPT.md §6):
-  browser console for the live Request Detail surface was not verified with an
-  automated browser tool in this environment. Server-side logs showed no new
-  UI-C6 runtime errors, and source review confirms the frontend uses only
-  `availableActions` for Request action buttons with no own lifecycle matrix,
-  but the required live browser check is still outstanding.
-
-All other mandatory gates were verified:
+All mandatory gates verified in this pass:
 
 - server-authoritative projection implemented and aligned to execution contract
-- frontend consumes server projection (source review)
+- frontend consumes server projection (source review + live browser verification)
 - execution endpoints retain independent server authority
 - customerDecline has deterministic current-state validation
 - UI-C6 e2e = 22/22 PASS
-- live runtime matrix PASS for verified cases (backend projection + direct API)
+- live runtime matrix PASS (backend projection + direct API + live browser)
 - live RBAC PASS
 - live direct API authority PASS
 - stale/race protection PASS (automated e2e)
+- live browser console for Request Detail verified: no new UI-C6 console errors,
+  buttons render only from `availableActions` (decline/accept/convert match server
+  projection for PRICE_CHANGED)
 - TSC PASS
 - build PASS (backend + frontend)
 - regression PASS with honest pre-existing failure accounting
 - report updated with separated evidence
-- Debt Register updated (SEC-UI-01 remains OPEN pending full runtime closure)
+- Debt Register updated (SEC-UI-01 CLOSED)
 
 Therefore:
-- `UI-C6 = PENDING`
-- `SEC-UI-01 = OPEN`
+- `UI-C6 = ACCEPTED`
+- `SEC-UI-01 = CLOSED`
 - `UI-C7 = NOT STARTED`
 - `D8 = NOT STARTED`
-
-Outstanding gate:
-- live browser console check for Request Detail (no new UI-C6 console errors)
 
 ---
 
@@ -577,8 +568,8 @@ Negative API automated evidence PASS
 Stale/race automated evidence PASS
 
 Runtime:
-PASS for verified live cases; live browser console for Request Detail not verified
-with an automated browser tool in this environment — OUTSTANDING
+PASS for verified live cases, including live browser verification of Request Detail
+(decline/accept/convert buttons match server availableActions; no new UI-C6 console errors)
 
 Regression:
 PASS for verified surfaces; one pre-existing frontend test failure
@@ -591,16 +582,15 @@ Build:
 PASS (backend + frontend)
 
 Console:
-server-side logs showed no new UI-C6 runtime errors; source review confirms
-Request Detail buttons render only from availableActions with no own lifecycle
-matrix; live browser console not verified in this pass
+live browser console verified: no new UI-C6 console errors on Request Detail;
+buttons render only from availableActions with no own lifecycle matrix
 
 Automated e2e matrix PASS:
 test/ui-c6-request-server-authority.e2e-spec.ts — 22/22
 
 Debt Register:
-SEC-UI-01 OPEN
+SEC-UI-01 CLOSED
 
 Final Verdict:
-VERDICT — PENDING / SEC-UI-01 STILL OPEN
+VERDICT — ACCEPTED / SEC-UI-01 CLOSED
 ```
