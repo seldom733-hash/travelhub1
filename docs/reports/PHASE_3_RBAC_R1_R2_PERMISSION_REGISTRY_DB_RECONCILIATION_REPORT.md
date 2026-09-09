@@ -211,8 +211,8 @@ VERDICT A — RECONCILIATION ACCEPTED
 
 ```text
 BASELINE:              4f4bf1aaac5ec70cc0c9187e24b47aa8cab99a31
-RECONCILIATION COMMIT: <SHACOMMIT>
-FINAL SHA:             <SHAFINAL> (HEAD == origin/master)
+RECONCILIATION COMMIT: e646f7c0feb947ca9311521da18d94b83930f6df
+FINAL SHA:             b24a863adf6d001f5606d2417e07ce444aee3694 (HEAD == origin/master)
 C8 PUBLICATION SET:    сохранён и изолирован (не входил в коммит)
 DIFF --CHECK:          PASS
 ```
