@@ -261,8 +261,8 @@ no unintended changes .................. VERIFIED (production diff = 0)
 ```text
 HEAD:            a72ed19f56e4b6844733b0c60edef605d2611484
 origin/master:   a72ed19f56e4b6844733b0c60edef605d2611484
-UI-C17 COMMIT:   <C17SHA> (report + CSV evidence only)
-FINAL SHA:       <C17FINAL>
+UI-C17 COMMIT:   88d9c01ae858c81bfc3cd9ecb6acfe7cc26ee7be (report + CSV evidence only)
+FINAL SHA:       7dd9b4de45af969990d544405b5beb4f1c29daae (HEAD == origin/master)
 git diff --check: PASS
 UI-C8 publication set: intact, isolated, pending
 Untracked historical artifacts: присутствуют, известны (репозиторий НЕ заявлен глобально чистым)
