@@ -1,7 +1,7 @@
 # TRAVELHUB — CANONICAL DEBT REGISTER
 
 Established: 2026-09-04
-Last updated: 2026-09-06
+Last updated: 2026-09-09 (Documentation Governance Cleanup: status-line reconciliation per accepted closure evidence — see reconciliation notes per item; no debt reclassification beyond documented evidence)
 
 ---
 
@@ -67,9 +67,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Why it matters | User confusion when switching between entity types. Inconsistent spacing, typography, card styling. |
 | Dependencies | None |
 | Planned closure stage | UI-C1 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | All 3 detail pages use same canonical shell layout |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by accepted stages: C1.1 (detail visual system) + UI-C7 (Request migration) + UI-C8 (Order) + UI-C9 (Booking). Evidence: `docs/reports/PHASE_3_TRUE_NEXT_REQUALIFICATION_AFTER_UI_C18_REPORT.md` §7a (VERDICT A). Status line only — no content change. |
 | Notes | Request is the outlier — needs PageHeader, StatusBadge, breadcrumbs |
 
 ---
@@ -86,9 +87,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Request uses raw `h1` + manual back button. Order/Booking use `<PageHeader>` with 3-level breadcrumbs. |
 | Dependencies | UI-01 |
 | Planned closure stage | UI-C1 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | All 3 pages use PageHeader with TravelHub / Registry / Reference breadcrumbs |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by C1.1 + C7/C8/C9 migrations. Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -104,9 +106,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Request has hardcoded Tailwind status classes in `statusColor()`. Order/Booking use `<StatusBadge>` component. |
 | Dependencies | None |
 | Planned closure stage | UI-C1 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | All entities use StatusBadge with consistent visual contract |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by C1.1 (incl. R2 visual parity) + C7/C8/C9. Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -122,9 +125,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Order merges milestones into lifecycle audit history. Booking correctly separates ХРОНОЛОГИЯ from ИСТОРИЯ ИЗМЕНЕНИЙ. Request has optional timeline. |
 | Dependencies | None |
 | Planned closure stage | UI-C3 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | All 3 pages have separate Business Timeline + Audit History |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by canonical capabilities `EntityTimeline` + `EntityAuditHistory` (shared components, Master Roadmap §6) + C4/C5 semantics reconciliation. Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -140,9 +144,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Request has no audit/change history. Order/Booking have lifecycle audit sections. |
 | Dependencies | None |
 | Planned closure stage | UI-C4 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | All 3 pages display immutable audit history |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by canonical capability `EntityAuditHistory` (shared, Master Roadmap §6) + C7/C8/C9 migrations. Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -158,9 +163,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Request has inline purple card. Order has inline links. Booking has order link. No unified `<CommerceRelationChain />` component. |
 | Dependencies | None |
 | Planned closure stage | UI-C2 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | All 3 pages show server-authoritative Request→Order→Booking chain |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by UI-C2 (Commerce Relation Chain, VERDICT A + addenda). Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -176,9 +182,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | "Активные" (5 states) includes "Готовы к бронированию" (1 state) — overlap. PARTIALLY_FULFILLED, FULFILLED, READY_FOR_CLOSURE, PROBLEM, SUSPENDED not represented in KPI cards. |
 | Dependencies | None |
 | Planned closure stage | UI-C10 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | KPI overlap documented, missing states classified (separate KPI / filter-only / excluded) |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content absorbed/closed by UI-C1.2C + UI-C1.2G (12 lifecycle + 4 payment statuses, all-from-enum, no-invented-states). Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -194,10 +201,11 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Canonical BookingStatus enum has 13 statuses: NEW, PREPARING_REQUEST, SENT_TO_SUPPLIER, AWAITING_CONFIRMATION, CONFIRMED, IN_SERVICE, COMPLETED, NEEDS_CLARIFICATION, SUPPLIER_REJECTED, CHANGE_REQUESTED, CANCELLATION_REQUESTED, CANCELLED, PROBLEM. Current code groups CONFIRMED+IN_SERVICE+COMPLETED as "Подтверждено". Final KPI contract: Ожидают подтверждения (SENT_TO_SUPPLIER, AWAITING_CONFIRMATION) / Подтверждены (CONFIRMED) / В оказании (IN_SERVICE) / Завершены (COMPLETED) / Отменены (CANCELLED, SUPPLIER_REJECTED) / На обслуживании (NEEDS_CLARIFICATION, CHANGE_REQUESTED, CANCELLATION_REQUESTED, PROBLEM). Terminal: COMPLETED, CANCELLED, SUPPLIER_REJECTED. |
 | Dependencies | None |
 | Planned closure stage | UI-C11 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | Each KPI maps to exclusive status set with server-side drill-down; no ambiguous grouping |
 | Closure SHA | — |
 | Notes | PARTIALLY_CONFIRMED does not exist in canonical enum — removed from scope |
+| Reconciliation (2026-09-09) | Content closed by C1.2D implementation + micro-closure (final KPI groups match this debt description). Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -213,9 +221,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Request uses text-sm/text-xs mix. Order/Booking use text-xs. Card borders/padding inconsistent. |
 | Dependencies | UI-01 |
 | Planned closure stage | UI-C13 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | Unified card/spacing/typography system across all 3 pages |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content absorbed by C1.1 (incl. R2 visual parity) + polish stages. Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -231,9 +240,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Left menu has Поддержка but no Помощь (Help) entry. Users cannot discover business dictionary or contextual help. |
 | Dependencies | HELP-02 |
 | Planned closure stage | UI-C12 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | `/app/help` route accessible from left navigation under СЕРВИС |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by C1.2H/H.1/H.2 (VERDICT A ×3): production `/app/help` live, nav.help, sidebar. Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -249,9 +259,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | No `/app/help` page exists. No business dictionary, status definitions, KPI explanations, or formula documentation. |
 | Dependencies | None |
 | Planned closure stage | UI-C12 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | `/app/help` renders with categorized business dictionary entries |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by C1.2H/H.1/H.2: production `/app/help` (68 typed registry entries, RU/AZ/EN — `frontend/lib/help-registry.ts`). Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -267,9 +278,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | KPI cards on Orders/Bookings/Command Center have no ⓘ tooltip explaining meaning, formula, or period semantics. |
 | Dependencies | HELP-02 |
 | Planned closure stage | UI-C3 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | Every KPI card has contextual tooltip with definition + formula + link to full help |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by C1.2H: KPI ⓘ tooltips with definition/formula/full-help link implemented. Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -285,9 +297,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Users cannot look up what each status means, when it's entered, what actions are available, or what the financial implications are. |
 | Dependencies | HELP-02 |
 | Planned closure stage | UI-C12 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | All Lifecycle/Payment/Refund statuses documented with transitions and financial implications |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by C1.2H: status dictionary for Lifecycle/Payment/Refund live in `/app/help`. Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -303,10 +316,11 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Manual-only review gate is insufficient for critical financial/KPI metrics. Mandatory automated contract test must verify: stable metric ID exists in typed registry, Help topic exists, formula metadata present, status mapping matches backend, drill-down filter maps to same scope. Critical classes: financial derived values (dueAmount, refundableAmount), Command Center KPI, Orders KPI counts, Bookings KPI counts, Analytics metrics reused in UI. |
 | Dependencies | HELP-02, D7 dueAmount/refundableAmount authority |
 | Planned closure stage | UI-C3 (gate implemented alongside metric registry) |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | Automated test fails if any critical metric ID lacks Help metadata or status mapping |
 | Closure SHA | — |
 | Notes | Manual review only for non-critical metrics |
+| Reconciliation (2026-09-09) | Content closed: formula-drift gate live (`help-registry.spec`, 20 tests). Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -322,9 +336,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Platform-only operational docs could be visible to Partners. Entitlement-specific features shown as if universally available. |
 | Dependencies | HELP-02 |
 | Planned closure stage | UI-C12 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | Help navigation reflects available capabilities per workspace/entitlement |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by C1.2H: workspace-aware help navigation implemented. Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -340,9 +355,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | KPI aggregate counts must use the same canonical server-side filters as the registry. Currently unverified that clickable KPI → deterministic filter produces identical count. |
 | Dependencies | UI-07, UI-08 |
 | Planned closure stage | UI-C10, UI-C11 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | Every KPI count reconciles with the same filter applied to the registry |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Contract-mechanism KPI↔filter consistency implemented (reconciliationRule/drillDown in registries + popover contracts; KPI/table scope parity spec-proven at D8 reconciliation). Residual full read-model verification assigned to D11. Evidence: C18 requalification report §7a (VERDICT A) + D8 evidence/scope reconciliation report (VERDICT A). Status line only. |
 
 ---
 
@@ -522,9 +538,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Platform-only operational docs could be visible to Partners. Entitlement-specific features (Storefront Pro) shown as if universally available. Help navigation must reflect available capabilities per workspace + plan. |
 | Dependencies | HELP-02, SUB-01 |
 | Planned closure stage | UI-C12 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | Help navigation filters content by workspace type and entitlement tier |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by C1.2H: workspace/entitlement-aware help content implemented. Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 
@@ -540,9 +557,10 @@ DEFERRED — Future phase, awaiting prerequisites
 | Description | Help topics, status definitions, formula explanations, KPI descriptions must be available in RU/AZ/EN. Stable topic IDs must be non-localized. Formula semantics identical across languages. Display labels never used as stable IDs. |
 | Dependencies | HELP-02, HELP-04 |
 | Planned closure stage | UI-C12 |
-| Status | OPEN |
+| Status | CLOSED |
 | Acceptance condition | All implemented Help topics have RU/AZ/EN content; stable ID convention verified |
 | Closure SHA | — |
+| Reconciliation (2026-09-09) | Content closed by C1.2H: RU/AZ/EN help content + stable-ID convention live (68 typed entries). Evidence: C18 requalification report §7a (VERDICT A). Status line only. |
 
 ---
 

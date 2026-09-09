@@ -1,6 +1,7 @@
 # TravelHub — Архитектура (Phase 1 + Phase 2 Auth/RBAC)
 
-Реализация по `docs/prompts/TravelHub_Implementation_Prompt.md`:
+Реализация по `docs/prompts/TravelHub_Implementation_Prompt_Phase1_Baseline_1.6_PAYMENTS_FINAL.md`
+(исторический Phase-1 implementation prompt; см. также Phase-2/Phase-3 prompts в `docs/prompts/`):
 сквозной процесс **Product → Order → Booking** на модульном монолите с
 отдельными схемами PostgreSQL на домен. Phase 2 добавляет аутентификацию
 (JWT) и RBAC (10 канонических ролей + granular permissions).

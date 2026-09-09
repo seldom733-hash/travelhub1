@@ -1,6 +1,7 @@
 # TravelHub --- CANONICAL MASTER IMPLEMENTATION PLAN v3
 
 **Статус документа:** канонический Master Plan на хранение\
+**Governance (2026-09-09, Documentation Governance Cleanup):** единственный canonical roadmap проекта — authority для stage sequence, D-track и TRUE NEXT. Consolidation current-state документ: `docs/prompts/TRAVELHUB_MASTER_ROADMAP.md` (ссылается сюда для последовательности стадий). Cleanup report: `docs/reports/PHASE_3_DOCUMENTATION_GOVERNANCE_CLEANUP_REPORT.md`.\
 **Дата актуализации:** 2026-08-30 (Step 3.6 ✅ COMPLETE; Step 3.6A ✅ COMPLETE; Step 3.6B ✅ COMPLETE; Step 3.6C ✅ COMPLETE; Step 3.6C.1 ✅ COMPLETE; Step 3.6D ✅ COMPLETE; Step 3.6D.1 ✅ COMPLETE; Step 3.7A ✅ COMPLETE; Step 3.7A.1 ✅ COMPLETE; Step 3.7A.2 ✅ COMPLETE; Step 3.7B ✅ COMPLETE — STRICT REVIEW APPROVED; Phase 3 Command Center C→J — COMPLETE; Step 3.0 ✅; Stages A–J ✅ COMPLETE; Step 3.29D ✅ COMPLETE — Billing Foundation; Post-H ✅; Post-I V2 ✅; Stage J VERDICT A — FINAL CLOSURE; Post-Phase-3 Roadmap Reconciliation COMPLETED 2026-08-25; Step 3.2 ✅ DEPLOYED; Step 3.1 ✅ APPROVED; Step 3.3 ✅ APPROVED; Step 3.3E ✅ APPROVED; Step 2.17C ✅ APPROVED; Step 2.7 ✅ APPROVED; Step 2.8 ✅ APPROVED; Step 2.8A ✅ APPROVED; Step 2.9 ✅ APPROVED; Platform CRM Shared Table Controls ✅ CLOSED; Platform CRM Operational Notes ✅ FULLY CLOSED; Step 3.5.3 Activity Timeline R2A ✅ CLOSED; Step 3.5.3 Activity Timeline R2B ✅ CLOSED; Step 3.5.3 Activity Timeline R2C ✅ CLOSED; Step 3.5.3 Activity Timeline R2C.2R ✅ CLOSED; Step 3.5.3 Activity Timeline R2D ✅ CLOSED; Step 3.5.3 Activity Timeline R2E ✅ CLOSED; Step 3.5.3 R2E.2R ✅ SUPERSEDED; Step 3.5.3 R2E.2R.1 ✅ SUPERSEDED; Step 3.5.3 R2E.2R.2A ✅ CLOSED; Step 3.5.3 RE-CLOSED; Step 3.5A ✅ COMPLETE; Step 3.5B ✅ COMPLETE; Step 3.5C ✅ COMPLETE; Step 3.5D ✅ COMPLETE; Step 3.5E ✅ COMPLETE; Step 3.5E.1 ✅ COMPLETE; Storefront Business Capability Model Architecture Amendment COMPLETED 2026-08-29; Step 3.8 ✅ COMPLETE — STRICT REVIEW APPROVED; Step 3.8.1 ✅ COMPLETE; Step 3.8.2 ✅ COMPLETE; Step 3.9 ✅ COMPLETE — STRICT REVIEW RE-QUALIFICATION APPROVED; Step 3.10 ✅ COMPLETE — STRICT REVIEW RE-QUALIFICATION APPROVED; Schema Drift & Auth Login Remediation ✅ COMPLETE; Fresh DB Evidence Closure ✅ COMPLETE; Reference Number Contract Final Strict Review ✅ VERDICT A)\
 **Принцип:** существующие шаги не удаляются и не перенумеровываются.
 Новые решения добавляются подшагами `A/B/C...` либо
@@ -2626,6 +2627,9 @@ D4-REM-F8/PD-1  Partner own-scope commerce contract           DEFERRED — Partn
                                                                 scope (platform Marketplace contract → MARKETPLACE only)
 PD-2            RBAC parity reconciliation                     DEFERRED — RolePermission (DB) ↔ ROLE_PERMISSIONS
                 (pre-existing drift, не исправлялся в D4)      (constants) reconciliation; D4 finance keys/grants unchanged
+                → RECONCILED (2026-09-09, Documentation Governance Cleanup): parity closure исполнен стадией R1/R2
+                  (commit e646f7c, rbac-parity 11/11 PASS — доказательство в §4.3 отчёта
+                  docs/reports/PHASE_3_TRUE_NEXT_REQUALIFICATION_AFTER_UI_C18_REPORT.md, VERDICT A).
 PD-3            Traveler PII retention/purge/anonymization     DEFERRED — legal/business policy; «жизнь объекта» ≠ retention
 PD-4            Entity Change Audit Framework                  DEFERRED — integration starts D5/D6 + Request requalification
                 (Request/Order/Booking immutable audit events) (mutation → validation → permission/scope → mutability →
