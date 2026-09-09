@@ -252,19 +252,24 @@ Operator model correct ................. VERIFIED
 Partner/Buyer scope correct ............ VERIFIED
 full-access-by-default disproven ....... VERIFIED
 UI/server authority consistent ......... VERIFIED (commerce-detail 56/56 + projections)
-required tests/TSC/build pass .......... VERIFIED
+required tests/TSC/build pass .......... VERIFIED (relevant RBAC suites PASS;
+                                          fixture non-blockers explicitly documented in §27 —
+                                          авторизация в них не тестировалась: падение до assertions)
 no unintended changes .................. VERIFIED (production diff = 0)
 ```
 
 ## 32. Git State
 
 ```text
-HEAD:            a72ed19f56e4b6844733b0c60edef605d2611484
-origin/master:   a72ed19f56e4b6844733b0c60edef605d2611484
-UI-C17 COMMIT:   88d9c01ae858c81bfc3cd9ecb6acfe7cc26ee7be (evidence: report + CSV; content-final)
-FINAL SHA:       88d9c01ae858c81bfc3cd9ecb6acfe7cc26ee7be; SHA-аннотация коммиты следуют за evidence-коммитом
-                  (self-reference: текущий HEAD == origin/master проверяется командой git rev-parse;
-                   аннотации не меняют содержание evidence)
+BASELINE (UI-C17 старт):        a72ed19f56e4b6844733b0c60edef605d2611484
+UI-C17 EVIDENCE COMMIT:         88d9c01ae858c81bfc3cd9ecb6acfe7cc26ee7be
+                                (report + CSV; content-final evidence)
+UI-C17 DOC/CLOSURE COMMITS:     04c515e6931abcb5ff899e15791852b73321973c,
+                                d416026916af491e0099e3bc399a6a4c67069ca7 (SHA-аннотации)
+FINAL VERIFIED HEAD:            d416026916af491e0099e3bc399a6a4c67069ca7
+                                (проверено Evidence/Git Reconciliation; docs-only после evidence)
+FINAL VERIFIED ORIGIN/MASTER:   d416026916af491e0099e3bc399a6a4c67069ca7
+                                (HEAD == origin/master; merge-base подтверждён)
 git diff --check: PASS
 UI-C8 publication set: intact, isolated, pending
 Untracked historical artifacts: присутствуют, известны (репозиторий НЕ заявлен глобально чистым)
