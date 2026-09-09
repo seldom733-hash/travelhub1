@@ -95,7 +95,7 @@ Commit 1:  fc727d1 ui-c8: publish accepted Order UI migration (localization, bus
            3 files changed, 65 insertions(+), 14 deletions(-) — exactly the C8 set (git show --stat verified)
 Commit 1b: 54fa5df docs(phase-3): track pending stage prompts and qualification reports
            35 files changed, 20845 insertions(+) — docs-only; after it: untracked = 0
-Commit 2:  <see §18>
+Commit 2:  ab6fd5a docs(ui-c18): git hard closure report — VERDICT A (PHASE 3 GIT CLOSED)
 ```
 
 For each commit `git show --name-only` inspected: commit 1 contains no docs and no unrelated production files; commit 1b contains no production code; commit 2 contains only this report.
@@ -119,10 +119,18 @@ PASS / NON-BLOCKING KNOWN FAILURE / NOT RUN are distinguished as required; no NO
 ## 10. Final HEAD / origin/master
 
 ```text
-FINAL VERIFIED HEAD:          <filled at closure>
-FINAL VERIFIED origin/master: <filled at closure>
-merge-base: same → HEAD == origin/master TRUE
+UI-C17 FINAL (EVIDENCE) SHA:      88d9c01ae858c81bfc3cd9ecb6acfe7cc26ee7be
+UI-C17 RECONCILIATION SHA:        69cdaa6b47f8f6039ec90f6d8fc0ba184ef33efb
+UI-C8 PUBLICATION SHA:            fc727d1
+PHASE-3 DOCS COMMIT:              54fa5df (35 class-A artifacts)
+UI-C18 CLOSURE REPORT SHA:        ab6fd5a4064f90df454a4a3af28dd25ee98c5c73 (content-final closure)
+FINAL VERIFIED HEAD:              ab6fd5a4064f90df454a4a3af28dd25ee98c5c73
+FINAL VERIFIED origin/master:     ab6fd5a4064f90df454a4a3af28dd25ee98c5c73 (== HEAD; merge-base equal)
 ```
+
+Chronological documentation commits after the content-final closure report: the
+SHA-annotation commit follows (docs-only; recorded in `git log` — a report cannot
+contain its own commit SHA). Annotation commits do not alter evidence content.
 
 ## 11. Tracked Working Tree
 
