@@ -167,14 +167,14 @@ Untracked:       33 historical process artifacts (class B) — repository NOT gl
 UI-C8 set:       intact, isolated, uncommitted
 ```
 
-Post-closure: reconciliation commit (docs-only) pushed; final SHA recorded below in §16a.
+Post-closure: reconciliation commit `69cdaa6` (docs-only) pushed; `HEAD == origin/master == 69cdaa6` verified; `diff --check` PASS; C8 set still isolated/uncommitted.
 
 ## 16a. Final SHA
 
 ```text
 UI-C17 EVIDENCE COMMIT:  88d9c01ae858c81bfc3cd9ecb6acfe7cc26ee7be
-RECONCILIATION COMMIT:   <filled at closure>
-FINAL VERIFIED HEAD:     <filled at closure>
+RECONCILIATION COMMIT:   69cdaa6b47f8f6039ec90f6d8fc0ba184ef33efb
+FINAL VERIFIED HEAD:     69cdaa6b47f8f6039ec90f6d8fc0ba184ef33efb (== origin/master)
 ```
 
 ## 19. Final Verdict
