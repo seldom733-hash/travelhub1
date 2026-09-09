@@ -4,8 +4,26 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
+import BookingActionBar from "@/components/booking/BookingActionBar";
 import RequestActionBar from "@/components/request/RequestActionBar";
 import { t } from "./i18n";
+
+// UI-C9: canonical 13 BookingAction identifiers (backend booking.service.ts).
+const ALL_BOOKING_ACTIONS: string[] = [
+  "prepare",
+  "send",
+  "requestClarification",
+  "resume",
+  "confirm",
+  "reject",
+  "service",
+  "requestChange",
+  "resolveChange",
+  "requestCancellation",
+  "complete",
+  "cancel",
+  "problem",
+];
 
 const ROOT = process.cwd();
 
@@ -110,7 +128,10 @@ describe("R2 Detail Visual System Parity — shared primitives consumed by all 3
 
   it("Booking detail hides the header action area when no actions are available (no technical placeholder text)", () => {
     const bkg = read("app/app/bookings/[id]/page.tsx");
-    expect(bkg).toContain('(booking.availableActions ?? []).length > 0 ? (');
+    // UI-C9: empty-projection omission lives in BookingActionBar (returns null when actions.length === 0).
+    const bar = read("components/booking/BookingActionBar.tsx");
+    expect(bar).toContain("if (actions.length === 0)");
+    expect(bar).toContain("return null;");
     expect(bkg).not.toContain("Для текущего статуса команд нет");
   });
 });
@@ -279,8 +300,66 @@ describe("R2 Detail Visual System Parity — action authority not moved client-s
 
   it("Booking action availability stays server-authoritative (availableActions from API)", () => {
     const bkg = read("app/app/bookings/[id]/page.tsx");
-    expect(bkg).toContain("(booking.availableActions ?? [])");
+    // UI-C9: the projection is passed verbatim to BookingActionBar — no local recompute.
+    expect(bkg).toContain("actions={booking.availableActions ?? []}");
+    expect(bkg).toContain("<BookingActionBar");
     expect(bkg).toContain("api.patch(`/bookings/${booking.id}`");
+  });
+
+  it("BookingActionBar consumes only the server projection (UI-C9): all 13 actions, stable ordering, accessible busy state", () => {
+    const bar = read("components/booking/BookingActionBar.tsx");
+    expect(bar).toContain("actions: string[]");
+    expect(bar).not.toContain("booking.status");
+    expect(bar).not.toContain("useCan");
+    expect(bar).toContain("aria-busy={busy}");
+    expect(bar).not.toContain('"…"');
+
+    for (const key of [
+      ...ALL_BOOKING_ACTIONS.map((a) => `booking.action_short.${a}`),
+      "booking.action.busy",
+    ]) {
+      for (const locale of ["ru", "az", "en"] as const) {
+        expect(t(key, locale)).not.toBe(key);
+      }
+    }
+
+    const onRun = vi.fn();
+    render(<BookingActionBar actions={ALL_BOOKING_ACTIONS} busyAction={null} onRun={onRun} />);
+    const buttons = screen.getAllByRole("button");
+    // All 13 identifiers render, in projection order (ordering stability).
+    expect(buttons.map((b) => b.textContent)).toEqual(
+      ALL_BOOKING_ACTIONS.map((a) => t(`booking.action_short.${a}`, "ru")),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Отправить" }));
+    expect(onRun).toHaveBeenCalledWith("send");
+
+    // Empty projection → the action area is omitted (no placeholder).
+    const empty = render(<BookingActionBar actions={[]} busyAction={null} onRun={onRun} />);
+    expect(empty.container.querySelector("button")).toBeNull();
+
+    // Busy: localized readable label + aria-busy + disabled mutual exclusion.
+    render(<BookingActionBar actions={["send"]} busyAction="send" onRun={onRun} />);
+    const busyButton = screen.getByRole("button", { name: "Выполняется…" }) as HTMLButtonElement;
+    expect(busyButton.disabled).toBe(true);
+    expect(busyButton.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("Booking action errors render in an inline header banner while load/not-found errors stay centered (UI-C9)", () => {
+    const bkg = read("app/app/bookings/[id]/page.tsx");
+    expect(bkg).toContain("setActionError");
+    expect(bkg).toContain("{actionError && <div");
+    // Centered load/not-found state unchanged.
+    expect(bkg).toContain('{error || t("crm.not_found", locale)}');
+    // Action failure no longer swaps the page: executeAction writes actionError, not error.
+    const execIdx = bkg.indexOf("const executeAction");
+    const body = bkg.slice(execIdx, bkg.indexOf("}, [booking, loadBooking]);", execIdx));
+    expect(body).toContain("setActionError((e as Error).message)");
+    expect(body).not.toContain("setError((e as Error).message)");
+  });
+
+  it("Booking detail has no dead RU fallback literals (UI-C9 i18n cleanup)", () => {
+    const bkg = read("app/app/bookings/[id]/page.tsx");
+    expect(bkg).not.toMatch(/\|\| "/);
   });
 
   it("Request actions are server-authoritative after UI-C6 (SEC-UI-01 closed by Request availableActions)", () => {

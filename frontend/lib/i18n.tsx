@@ -1886,6 +1886,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "request.action.customer_declined": { ru: "Клиент отклонил условия", az: "Müştəri şərtləri rədd etdi", en: "Customer declined terms" },
   "request.action.converted": { ru: "Конвертирована в заказ", az: "Sifarişə keçirildi", en: "Converted to order" },
   // ── R2 Detail Visual System — Booking milestones + action labels ──
+  // UI-C9 — BookingActionBar busy state (mark overwritten by the pending UI-C8 "order.action.busy" line below).
+  "booking.action.busy": { ru: "Выполняется…", az: "Yerinə yetirilir…", en: "Working…" },
   "booking.milestone.created": { ru: "Создано", az: "Yaradılıb", en: "Created" },
   "booking.milestone.requested": { ru: "Запрос поставщику", az: "Təchizatçıya sorğu", en: "Request to supplier" },
   "booking.milestone.confirmed": { ru: "Подтверждено поставщиком", az: "Təchizatçı tərəfindən təsdiqlənib", en: "Confirmed by supplier" },
