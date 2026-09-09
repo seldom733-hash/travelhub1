@@ -124,13 +124,16 @@ UI-C17 RECONCILIATION SHA:        69cdaa6b47f8f6039ec90f6d8fc0ba184ef33efb
 UI-C8 PUBLICATION SHA:            fc727d1
 PHASE-3 DOCS COMMIT:              54fa5df (35 class-A artifacts)
 UI-C18 CLOSURE REPORT SHA:        ab6fd5a4064f90df454a4a3af28dd25ee98c5c73 (content-final closure)
-FINAL VERIFIED HEAD:              ab6fd5a4064f90df454a4a3af28dd25ee98c5c73
-FINAL VERIFIED origin/master:     ab6fd5a4064f90df454a4a3af28dd25ee98c5c73 (== HEAD; merge-base equal)
+UI-C18 FINAL ANNOTATION SHA:      bffa61d2647b57945ed47a465ce875acf7b9188c
+                                  (docs-only SHA-annotation commit following the content-final report)
+FINAL VERIFIED HEAD:              bffa61d2647b57945ed47a465ce875acf7b9188c
+                                  (verified by UI-C18 Evidence/Git Reconciliation; HEAD == origin/master)
+FINAL VERIFIED origin/master:     bffa61d2647b57945ed47a465ce875acf7b9188c (merge-base equal)
 ```
 
-Chronological documentation commits after the content-final closure report: the
-SHA-annotation commit follows (docs-only; recorded in `git log` — a report cannot
-contain its own commit SHA). Annotation commits do not alter evidence content.
+Chronology: `ab6fd5a` (content-final report) → `bffa61d` (annotation of the same
+report's SHA section). Annotation commits are docs-only and never alter evidence
+content; no commit is claimed to contain its own commit SHA.
 
 ## 11. Tracked Working Tree
 
