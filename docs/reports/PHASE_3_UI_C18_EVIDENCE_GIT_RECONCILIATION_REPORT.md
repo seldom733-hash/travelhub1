@@ -61,7 +61,7 @@ No RBAC/backend/schema/unrelated changes. Matches the accepted UI-C8 publication
 
 Per §6 of the prompt (post-report commit is docs-only → later SHA becomes FINAL VERIFIED HEAD): at verification time the lineage terminal was `bffa61d2647b57945ed47a465ce875acf7b9188c`, with `HEAD == origin/master` and a clean tree — verified in §2.
 
-This reconciliation adds one further docs-only correction commit (carrier of this report plus the §7-of-prompt minimum correction to the C18 closure report's SHA section). Per §11 of the prompt, that new commit becomes the actual final HEAD upon commit/push and is explicitly recorded: **UI-C18 reconciliation SHA = `dae2508703ebaa6854e4e282a1b36ceb14eca577`** (docs-only; recorded by annotation edit — a commit cannot contain its own SHA; no history rewrite).
+This reconciliation adds one further docs-only correction commit (carrier of this report plus the §7-of-prompt minimum correction to the C18 closure report's SHA section): **UI-C18 reconciliation SHA = `dae2508703ebaa6854e4e282a1b36ceb14eca577`**, followed by its docs-only SHA annotation `f3955ecd4f75221ec511d384b94ea7ed845d81b5` (recorded by annotation edit — a commit cannot contain its own SHA; no history rewrite). Per §11 of the prompt, docs-only annotations after `dae2508` are the actual final HEAD lineage and do not alter evidence content.
 
 ## 10. Working Tree Verification
 
@@ -95,7 +95,8 @@ PHASE 3 = GIT CLOSED
 | UI-C18 content-final | `ab6fd5a4064f90df454a4a3af28dd25ee98c5c73` | docs | 1 (closure report) | PASS |
 | UI-C18 annotation | `bffa61d2647b57945ed47a465ce875acf7b9188c` | docs | 1 (closure report §18 correction) | PASS |
 | UI-C18 reconciliation (this report) | `dae2508703ebaa6854e4e282a1b36ceb14eca577` | docs | 2 (this report + closure report SHA-section correction) | PASS |
-| Final HEAD | `dae2508703ebaa6854e4e282a1b36ceb14eca577` | repository state | — | PASS |
+| UI-C18 reconciliation annotation | `f3955ecd4f75221ec511d384b94ea7ed845d81b5` | docs | 1 (this report §9/§14/§17) | PASS |
+| Final HEAD | terminal docs-only annotation commit (live value via `git rev-parse HEAD` == origin/master) | repository state | — | PASS |
 
 ## 17. Final Response Format
 
@@ -113,7 +114,10 @@ Phase-3 docs SHA: 54fa5dfecc76066dbda0755a8c805f9d7d844775
 UI-C18 content-final SHA: ab6fd5a4064f90df454a4a3af28dd25ee98c5c73
 UI-C18 final annotation SHA: bffa61d2647b57945ed47a465ce875acf7b9188c
 UI-C18 reconciliation SHA: dae2508703ebaa6854e4e282a1b36ceb14eca577
-FINAL HEAD: dae2508703ebaa6854e4e282a1b36ceb14eca577 (annotation commit of this report; docs-only)
+UI-C18 reconciliation annotation: f3955ecd4f75221ec511d384b94ea7ed845d81b5 (docs-only commit following dae2508)
+FINAL HEAD: terminal docs-only annotation commit of this report — exact live value via git rev-parse HEAD
+            (== origin/master, verified in the final closure response; per §11 any such docs-only
+             annotation becomes the actual final HEAD without altering evidence content)
 origin/master: same as FINAL HEAD at closure verification
 
 HEAD == origin/master: PASS
