@@ -1,5 +1,7 @@
 "use client";
 
+import { t, useLocale } from "@/lib/i18n";
+
 /**
  * D5 — единый action area для Order (full-page и Quick Preview).
  *
@@ -10,17 +12,17 @@
  * никаких drawer/fullPage business-правил.
  */
 
-const ACTION_UI: Record<string, { label: string; cls: string; confirm?: string }> = {
-  process: { label: "Принять в работу", cls: "bg-sky-600 hover:bg-sky-700" },
-  markWaitingData: { label: "Ожидание данных", cls: "bg-amber-500 hover:bg-amber-600" },
-  resumeProcessing: { label: "Возобновить обработку", cls: "bg-teal-600 hover:bg-teal-700" },
-  confirm: { label: "Готов к бронированию", cls: "bg-violet-600 hover:bg-violet-700" },
-  send: { label: "Передать в Booking", cls: "bg-blue-600 hover:bg-blue-700" },
-  complete: { label: "Исполнен", cls: "bg-emerald-600 hover:bg-emerald-700" },
-  close: { label: "Закрыть", cls: "bg-slate-700 hover:bg-slate-800", confirm: "Закрыть заказ? Это терминальное действие." },
-  cancel: { label: "Отменить", cls: "bg-red-600 hover:bg-red-700", confirm: "Отменить заказ? Действие терминально." },
-  problem: { label: "Проблема", cls: "bg-orange-600 hover:bg-orange-700" },
-  suspend: { label: "Приостановить", cls: "bg-slate-500 hover:bg-slate-600" },
+const ACTION_UI: Record<string, { labelKey: string; cls: string; confirmKey?: string }> = {
+  process: { labelKey: "order.action_short.process", cls: "bg-sky-700 hover:bg-sky-800" },
+  markWaitingData: { labelKey: "order.action_short.markWaitingData", cls: "bg-amber-700 hover:bg-amber-800" },
+  resumeProcessing: { labelKey: "order.action_short.resumeProcessing", cls: "bg-teal-700 hover:bg-teal-800" },
+  confirm: { labelKey: "order.action_short.confirm", cls: "bg-violet-700 hover:bg-violet-800" },
+  send: { labelKey: "order.action_short.send", cls: "bg-blue-700 hover:bg-blue-800" },
+  complete: { labelKey: "order.action_short.complete", cls: "bg-emerald-700 hover:bg-emerald-800" },
+  close: { labelKey: "order.action_short.close", cls: "bg-slate-700 hover:bg-slate-800", confirmKey: "order.action_confirm.close" },
+  cancel: { labelKey: "order.action_short.cancel", cls: "bg-red-600 hover:bg-red-700", confirmKey: "order.action_confirm.cancel" },
+  problem: { labelKey: "order.action_short.problem", cls: "bg-orange-700 hover:bg-orange-800" },
+  suspend: { labelKey: "order.action_short.suspend", cls: "bg-slate-700 hover:bg-slate-800" },
 };
 
 export default function OrderActionBar({
@@ -32,6 +34,8 @@ export default function OrderActionBar({
   onRun: (action: string) => void;
   busyAction: string | null;
 }) {
+  const locale = useLocale();
+
   if (actions.length === 0) {
     // R2 — omit empty action area (no technical placeholder text).
     return null;
@@ -39,18 +43,20 @@ export default function OrderActionBar({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {actions.map((action) => {
-        const ui = ACTION_UI[action] ?? { label: action, cls: "bg-slate-600 hover:bg-slate-700" };
+        const ui = ACTION_UI[action] ?? { labelKey: action, cls: "bg-slate-600 hover:bg-slate-700" };
+        const busy = busyAction === action;
         return (
           <button
             key={action}
             disabled={busyAction !== null}
+            aria-busy={busy}
             onClick={() => {
-              if (ui.confirm && !window.confirm(ui.confirm)) return;
+              if (ui.confirmKey && !window.confirm(t(ui.confirmKey, locale))) return;
               onRun(action);
             }}
             className={`rounded-lg px-3 py-2 text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${ui.cls}`}
           >
-            {busyAction === action ? "…" : ui.label}
+            {busy ? t("order.action.busy", locale) : t(ui.labelKey, locale)}
           </button>
         );
       })}

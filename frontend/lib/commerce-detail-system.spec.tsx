@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
+import OrderActionBar from "@/components/order/OrderActionBar";
 import BookingActionBar from "@/components/booking/BookingActionBar";
 import RequestActionBar from "@/components/request/RequestActionBar";
 import { t } from "./i18n";
@@ -296,6 +297,37 @@ describe("R2 Detail Visual System Parity — action authority not moved client-s
     const ord = read("app/app/orders/[id]/page.tsx");
     expect(ord).toContain("actions={order.availableActions ?? []}");
     expect(ord).toContain("api.patch(`/orders/${order.id}`");
+  });
+
+  it("OrderActionBar consumes only the server projection and has localized accessible busy feedback", () => {
+    const bar = read("components/order/OrderActionBar.tsx");
+    expect(bar).toContain("actions: string[]");
+    expect(bar).not.toContain("order.status");
+    expect(bar).not.toContain("useCan");
+    expect(bar).toContain('t("order.action.busy", locale)');
+    expect(bar).toContain("aria-busy={busy}");
+    expect(bar).not.toContain('"…"');
+
+    for (const key of [
+      "order.action_short.process",
+      "order.action_short.cancel",
+      "order.action_confirm.cancel",
+      "order.action.busy",
+    ]) {
+      for (const locale of ["ru", "az", "en"] as const) {
+        expect(t(key, locale)).not.toBe(key);
+      }
+    }
+
+    const onRun = vi.fn();
+    render(<OrderActionBar actions={["process"]} busyAction={null} onRun={onRun} />);
+    fireEvent.click(screen.getByRole("button", { name: "Принять в работу" }));
+    expect(onRun).toHaveBeenCalledWith("process");
+
+    render(<OrderActionBar actions={["process"]} busyAction="process" onRun={onRun} />);
+    const busyButton = screen.getAllByRole("button", { name: "Выполняется…" }).at(-1) as HTMLButtonElement;
+    expect(busyButton.disabled).toBe(true);
+    expect(busyButton.getAttribute("aria-busy")).toBe("true");
   });
 
   it("Booking action availability stays server-authoritative (availableActions from API)", () => {
