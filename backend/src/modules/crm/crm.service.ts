@@ -5,6 +5,7 @@ import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type CustomerEventPayload, type PartnerEventPayload } from "../../eventbus/domain-events";
 import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError } from "../../shared/errors";
+import { parseDateParam } from "../../shared/date-param";
 import { normalizeEmail } from "../../shared/field-validation";
 import { normalizeInitialNote } from "../operational-notes/operational-notes.types";
 
@@ -172,6 +173,11 @@ export class CrmService {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
 
+    // D8 (B-06): malformed query dates → canonical 400 BEFORE any DB read
+    // (fail-fast boundary validation; period params validated independently).
+    const dateFrom = parseDateParam(query.dateFrom, "dateFrom");
+    const dateTo = parseDateParam(query.dateTo, "dateTo");
+
     // D1A: Platform CRM Marketplace scope isolation.
     // Exclude Storefront-only end-customers from Platform CRM Customers.
     // A customer is "Marketplace" if they have at least one Marketplace Order
@@ -192,9 +198,10 @@ export class CrmService {
         acquisitionSource: { in: ['MARKETPLACE', 'PARTNER_STOREFRONT'] as any },
       };
       if (query.dateFrom || query.dateTo) {
+        // D8 (B-06): malformed query dates → canonical 400 BadRequestException.
         orderWhere.createdAt = {
-          ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-          ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+          ...(dateFrom ? { gte: dateFrom } : {}),
+          ...(dateTo ? { lt: dateTo } : {}),
         };
       }
       const activeOrders = await this.prisma.order.findMany({
@@ -694,15 +701,21 @@ export class CrmService {
    * Export all matching customers (no pagination).
    */
   async exportCustomers(query: { status?: string; customerType?: string; search?: string; dateFrom?: string; dateTo?: string }) {
+    // D8 (B-06): malformed query dates → canonical 400 BEFORE any DB read
+    // (fail-fast boundary validation; parity with listCustomers).
+    const dateFrom = parseDateParam(query.dateFrom, "dateFrom");
+    const dateTo = parseDateParam(query.dateTo, "dateTo");
+
     let activeCustomerIds: string[] | undefined;
     if (query.dateFrom || query.dateTo) {
       const orderWhere: any = {
         acquisitionSource: { in: ['MARKETPLACE', 'PARTNER_STOREFRONT'] as any },
       };
       if (query.dateFrom || query.dateTo) {
+        // D8 (B-06): malformed query dates → canonical 400 BadRequestException.
         orderWhere.createdAt = {
-          ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-          ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+          ...(dateFrom ? { gte: dateFrom } : {}),
+          ...(dateTo ? { lt: dateTo } : {}),
         };
       }
       const activeOrders = await this.prisma.order.findMany({ where: orderWhere, select: { customerId: true } });

@@ -59,6 +59,7 @@ import OperationsCenterShell, {
   OperationsEmptyState,
 } from "@/components/OperationsCenterShell";
 import { useLocale, t, LOCALE_TAGS, type Locale } from "@/lib/i18n";
+import { fmtDate } from "@/lib/temporal-display"; // D8 SHOULD #1 — shared TemporalDisplay
 
 // ── Canonical enum arrays (source: backend payments-registry.ts) ────────────
 
@@ -87,11 +88,6 @@ function buildPaymentFilterOptions(locale: Locale): FilterOption[] {
 /** Currency filter options — server-authoritative dynamic currency list (aggregates overview). */
 function currencyFilterOptions(agg?: PaymentAggregates): FilterOption[] {
   return (agg?.currency ?? []).map((c) => ({ value: c.currency, label: c.currency }));
-}
-
-function fmtDate(iso: string | null, locale: Locale): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString(LOCALE_TAGS[locale]);
 }
 
 function fmtMoney(amount: string | number | null | undefined, currency: string | null | undefined, locale: Locale): string {

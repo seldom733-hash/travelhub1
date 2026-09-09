@@ -18,6 +18,7 @@ import OperationsCenterShell, {
   OperationsEmptyState,
 } from "@/components/OperationsCenterShell";
 import { useLocale, t, LOCALE_TAGS, type Locale } from "@/lib/i18n";
+import { fmtDate } from "@/lib/temporal-display"; // D8 SHOULD #1 — shared TemporalDisplay
 
 /**
  * UI-C1.2D — canonical Bookings registry composition (ADR-OPS-015).
@@ -80,12 +81,6 @@ function bookingStatusLabel(code: string, locale: Locale): string {
 /** Build filter options for TableHeaderFilter from the canonical BookingStatus array. */
 function buildStatusFilterOptions(locale: Locale): FilterOption[] {
   return BOOKING_STATUSES.map((s) => ({ value: s, label: bookingStatusLabel(s, locale) }));
-}
-
-/** Locale-aware date cell (RU/AZ/EN via BCP-47 tags). */
-function fmtDate(iso: string | null, locale: Locale): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString(LOCALE_TAGS[locale]);
 }
 
 /** Locale-aware money cell — D7 stays server authority (raw server amount string). */

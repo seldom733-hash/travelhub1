@@ -4,6 +4,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type BookingEventPayload } from "../../eventbus/domain-events";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
+import { parseDateParam } from "../../shared/date-param";
 import { BookingQueryService } from "./booking-query.service";
 import { overviewBookingWhere } from "./booking-kpi-scope";
 import { buildSortClause } from '../../shared/sort';
@@ -177,6 +178,9 @@ export class BookingService {
   }
 
   async listBookings(query: { status?: string; orderId?: string; search?: string; upcoming?: string; overdue?: string; slaMinutes?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string; acquisitionSource?: string }) {
+    // D8 (B-06): validate before constructing a Prisma filter.
+    const dateFrom = parseDateParam(query.dateFrom, "dateFrom");
+    const dateTo = parseDateParam(query.dateTo, "dateTo");
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     // D4 REMEDIATION F2: client acquisitionSource filter ⊆ server-authorized
@@ -226,8 +230,9 @@ export class BookingService {
     }
     // R5-04: Date range filtering on createdAt (exclusive end — consistent with
     // Analytics half-open [from, to))
-    if (query.dateFrom) createdAtFilter.gte = new Date(query.dateFrom);
-    if (query.dateTo) createdAtFilter.lt = new Date(query.dateTo);
+    // D8 (B-06): malformed query dates → canonical 400 BadRequestException (shared date-param contract).
+    if (dateFrom) createdAtFilter.gte = dateFrom;
+    if (dateTo) createdAtFilter.lt = dateTo;
 
     // Platform operational scope: default to MARKETPLACE via Order.acquisitionSource
     const effectiveSource = query.acquisitionSource || "MARKETPLACE";
@@ -304,6 +309,11 @@ export class BookingService {
     }
     const effectiveSource = query.acquisitionSource || 'MARKETPLACE';
 
+    // D8 (B-06): malformed query dates → canonical 400 BEFORE any DB read
+    // (fail-fast boundary validation, parity with listBookings).
+    const exportDateFrom = parseDateParam(query.dateFrom, "dateFrom");
+    const exportDateTo = parseDateParam(query.dateTo, "dateTo");
+
     // Build partner-scoped order IDs if sellerPartnerId provided
     let channelOrderIds: string[] | undefined;
     if (query.sellerPartnerId) {
@@ -328,10 +338,10 @@ export class BookingService {
         ? { in: query.status.split(',').map(s => s.trim()) }
         : query.status;
     }
-    if (query.dateFrom || query.dateTo) {
+    if (exportDateFrom || exportDateTo) {
       where.createdAt = {
-        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-        ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+        ...(exportDateFrom ? { gte: exportDateFrom } : {}),
+        ...(exportDateTo ? { lt: exportDateTo } : {}),
       };
     }
     // D4 REMEDIATION F2 (drill-down consumer): explicit orderId НЕ заменяет

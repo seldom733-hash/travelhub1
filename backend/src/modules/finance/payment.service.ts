@@ -47,6 +47,7 @@ import { IdsService } from "../../shared/ids.service";
 import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { SecurityService } from "../../security/security.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
+import { parseDateParam as parseRegistryDateParam } from "../../shared/date-param";
 import { uniqueConstraintNames } from "../../shared/prisma-errors";
 import { getRequestContext } from "../../shared/request-context";
 import { EventBusService } from "../../eventbus/eventbus.service";
@@ -675,13 +676,14 @@ export class PaymentService {
     return { denied, source, orderId, paymentStatus, refundStatus, search, currency, currencyCard, dateField, range };
   }
 
+  /**
+   * D8 (B-06, §7): registry QUERY-PARAM date filters use the canonical 400
+   * BadRequestException contract (shared date-param helper). The Finance
+   * ValidationDomainError (422) contract for SUBMITTED financial payloads
+   * (e.g. LedgerTransaction.occurredAt) is intentionally unchanged.
+   */
   private parseDateParam(value: string | undefined, label: string): Date | undefined {
-    if (!value) return undefined;
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) {
-      throw new ValidationDomainError(`${label} must be a valid date`);
-    }
-    return d;
+    return parseRegistryDateParam(value, label);
   }
 
   private async resolveChannelOrderIds(source: string): Promise<string[]> {

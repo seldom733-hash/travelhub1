@@ -15,6 +15,7 @@ import { overviewOrderWhere } from "./order-kpi-scope";
 import { IdsService } from "../../shared/ids.service";
 import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
+import { parseDateParam } from "../../shared/date-param";
 import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
 import { isDateOnly } from "../../shared/date-only";
 import { isIanaTimeZone, isLocalTime } from "../../shared/service-time";
@@ -808,6 +809,10 @@ export class OrderService {
     query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; sortBy?: string; sortDirection?: string; page?: number; pageSize?: number; dateFrom?: string; dateTo?: string; acquisitionSource?: string },
     viewer?: TravelerViewer,
   ) {
+    // D8 (B-06): validate the independent registry parameters before any
+    // authorization short-circuit or Prisma where construction.
+    const dateFrom = parseDateParam(query.dateFrom, "dateFrom");
+    const dateTo = parseDateParam(query.dateTo, "dateTo");
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     // D4 REMEDIATION F2: client acquisitionSource filter ⊆ server-authorized
@@ -835,10 +840,11 @@ export class OrderService {
     };
 
     // R5-03: Date range filtering on createdAt (exclusive end — consistent with Analytics half-open [from, to))
+    // D8 (B-06): malformed query dates → canonical 400 BadRequestException (shared date-param contract).
     if (query.dateFrom || query.dateTo) {
       const dateRange: Prisma.DateTimeFilter = {};
-      if (query.dateFrom) dateRange.gte = new Date(query.dateFrom);
-      if (query.dateTo) dateRange.lt = new Date(query.dateTo);
+      if (dateFrom) dateRange.gte = dateFrom;
+      if (dateTo) dateRange.lt = dateTo;
       if (where.createdAt && typeof where.createdAt === 'object' && !Array.isArray(where.createdAt)) {
         Object.assign(where.createdAt, dateRange);
       } else {
@@ -933,6 +939,8 @@ export class OrderService {
    * Shared filter builder — same predicate as listOrders, reusable by export.
    */
   buildOrderWhere(query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; dateFrom?: string; dateTo?: string; acquisitionSource?: string; sellerPartnerId?: string }): Prisma.OrderWhereInput {
+    const dateFrom = parseDateParam(query.dateFrom, "dateFrom");
+    const dateTo = parseDateParam(query.dateTo, "dateTo");
     const statusFilter = query.status
       ? query.status.includes(',')
         ? { status: { in: query.status.split(',').map(s => s.trim()) as OrderStatus[] } }
@@ -948,10 +956,10 @@ export class OrderService {
       acquisitionSource: query.acquisitionSource || "MARKETPLACE",
       ...(query.sellerPartnerId ? { sellerPartnerId: query.sellerPartnerId } : {}),
     };
-    if (query.dateFrom || query.dateTo) {
+    if (dateFrom || dateTo) {
       const dateRange: Prisma.DateTimeFilter = {};
-      if (query.dateFrom) dateRange.gte = new Date(query.dateFrom);
-      if (query.dateTo) dateRange.lt = new Date(query.dateTo);
+      if (dateFrom) dateRange.gte = dateFrom;
+      if (dateTo) dateRange.lt = dateTo;
       where.createdAt = dateRange;
     }
     return where;
@@ -961,6 +969,10 @@ export class OrderService {
    * Export all matching orders (no pagination) for diagnostic reconciliation.
    */
   async exportOrders(query: { status?: string; customerId?: string; search?: string; paymentStatus?: string; cancelledWithin?: string; paymentFailed?: string; pendingRefund?: string; dateFrom?: string; dateTo?: string; acquisitionSource?: string; sellerPartnerId?: string }) {
+    // Keep malformed registry dates canonical even if this caller would later
+    // receive an authorized empty scope.
+    parseDateParam(query.dateFrom, "dateFrom");
+    parseDateParam(query.dateTo, "dateTo");
     // D4 REMEDIATION F2 (list/export согласованы): явный Storefront-фильтр на
     // platform export → deny (empty rows).
     if (isDeniedStorefrontScope(query.acquisitionSource)) {

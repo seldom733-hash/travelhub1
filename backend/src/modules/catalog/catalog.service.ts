@@ -5,6 +5,7 @@ import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type ProductEventPayload } from "../../eventbus/domain-events";
 import { IdsService } from "../../shared/ids.service";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationDomainError } from "../../shared/errors";
+import { parseDateParam } from "../../shared/date-param";
 import { normalizeInitialNote } from "../operational-notes/operational-notes.types";
 import { buildSortClause } from "../../shared/sort";
 import { uniqueConstraintNames } from "../../shared/prisma-errors";
@@ -361,6 +362,10 @@ export class CatalogService implements OnModuleInit {
   async listProducts(query: ProductListQuery, actor?: AuthUser) {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
+    // D8 (B-06): malformed query dates → canonical 400 BEFORE any DB read or
+    // policy evaluation (fail-fast boundary validation).
+    const dateFrom = parseDateParam(query.dateFrom, "dateFrom");
+    const dateTo = parseDateParam(query.dateTo, "dateTo");
     const where: Prisma.ProductWhereInput = {
       ...this.policy.productListScope(actor),
       ...(query.type ? { type: query.type as ProductType } : {}),
@@ -370,12 +375,17 @@ export class CatalogService implements OnModuleInit {
         ? { OR: [{ title: { contains: query.search, mode: "insensitive" } }, { code: { contains: query.search, mode: "insensitive" } }] }
         : {}),
       // Date range filtering on publishedAt (canonical publication date)
-      ...(query.dateFrom || query.dateTo ? {
-        publishedAt: {
-          ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-          ...(query.dateTo ? { lte: new Date(new Date(query.dateTo).getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
-        },
-      } : {}),
+      // D8 (B-06): validation above; parsed params consumed here.
+      // Boundary variance (intentional, documented): publishedAt uses inclusive
+      // end-of-day [from, to] — NOT the Operations half-open [from, to).
+      ...(dateFrom || dateTo
+        ? {
+            publishedAt: {
+              ...(dateFrom ? { gte: dateFrom } : {}),
+              ...(dateTo ? { lte: new Date(dateTo.getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
+            },
+          }
+        : {}),
     };
 
     if (query.filter) {
@@ -563,6 +573,8 @@ export class CatalogService implements OnModuleInit {
   async exportProducts(query: ProductListQuery, actor?: AuthUser) {
     // Reuse the same where clause as listProducts
     const baseQuery = { ...query, page: 1, pageSize: 999999 };
+    const dateFrom = parseDateParam(baseQuery.dateFrom, "dateFrom");
+    const dateTo = parseDateParam(baseQuery.dateTo, "dateTo");
     const where: Prisma.ProductWhereInput = {
       ...this.policy.productListScope(actor),
       ...(baseQuery.type ? { type: baseQuery.type as ProductType } : {}),
@@ -571,10 +583,10 @@ export class CatalogService implements OnModuleInit {
       ...(baseQuery.search
         ? { OR: [{ title: { contains: baseQuery.search, mode: "insensitive" } }, { code: { contains: baseQuery.search, mode: "insensitive" } }] }
         : {}),
-      ...(baseQuery.dateFrom || baseQuery.dateTo ? {
+      ...(dateFrom || dateTo ? {
         publishedAt: {
-          ...(baseQuery.dateFrom ? { gte: new Date(baseQuery.dateFrom) } : {}),
-          ...(baseQuery.dateTo ? { lte: new Date(new Date(baseQuery.dateTo).getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
+          ...(dateFrom ? { gte: dateFrom } : {}),
+          ...(dateTo ? { lte: new Date(dateTo.getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
         },
       } : {}),
     };

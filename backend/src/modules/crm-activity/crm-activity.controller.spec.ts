@@ -6,7 +6,7 @@
  * Pure unit tests (no supertest) — tests call controller methods directly.
  */
 
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CrmActivityController } from './crm-activity.controller';
 import { CrmActivityService } from './crm-activity.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -282,13 +282,13 @@ describe('CrmActivityController — Round 2B', () => {
       (mockPrisma.crmActivity.findMany as any).mockResolvedValue([]);
 
       await controller.listCustomerActivity('cus-1', {
-        dateFrom: '2026-08-01T00:00:00Z',
-        dateTo: '2026-08-31T23:59:59Z',
+        dateFrom: '2026-08-01',
+        dateTo: '2026-08-31',
       }, makeActor());
 
       const whereArg = (mockPrisma.crmActivity.findMany as any).mock.calls[0][0].where;
       expect(whereArg.occurredAt.gte).toEqual(new Date('2026-08-01T00:00:00Z'));
-      expect(whereArg.occurredAt.lte).toEqual(new Date('2026-08-31T23:59:59Z'));
+      expect(whereArg.occurredAt.lte).toEqual(new Date('2026-08-31T00:00:00Z'));
     });
 
     it('rejects invalid sourceType', async () => {
@@ -303,16 +303,37 @@ describe('CrmActivityController — Round 2B', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('rejects invalid dateFrom', async () => {
+    it('rejects invalid dateFrom with the canonical 400 (D8 B-06)', async () => {
+      // D8 B-06: malformed query dates → BadRequestException (HTTP 400),
+      // replacing the pre-D8 404 variant. Valid date params still reach the
+      // occurredAt filter (see 'filters by dateFrom and dateTo').
       await expect(
         controller.listCustomerActivity('cus-1', { dateFrom: 'not-a-date' }, makeActor()),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        controller.listCustomerActivity('cus-1', { dateFrom: 'not-a-date' }, makeActor()),
+      ).rejects.toThrow(/dateFrom must be a valid date/);
     });
 
-    it('rejects invalid dateTo', async () => {
+    it('rejects invalid dateTo with the canonical 400 (D8 B-06)', async () => {
       await expect(
         controller.listCustomerActivity('cus-1', { dateTo: 'not-a-date' }, makeActor()),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        controller.listCustomerActivity('cus-1', { dateTo: 'not-a-date' }, makeActor()),
+      ).rejects.toThrow(/dateTo must be a valid date/);
+    });
+
+    it('rejects invalid dateFrom before dateTo is evaluated (independent validation, D8 B-06)', async () => {
+      await expect(
+        controller.listCustomerActivity('cus-1', { dateFrom: 'not-a-date', dateTo: '2026-08-31T23:59:59Z' }, makeActor()),
+      ).rejects.toThrow(/dateFrom must be a valid date/);
+    });
+
+    it('applies the same canonical 400 contract on the partner activity endpoint (D8 B-06)', async () => {
+      await expect(
+        controller.listPartnerActivity('par-1', { dateFrom: 'not-a-date' }, makeActor()),
+      ).rejects.toThrow(/dateFrom must be a valid date/);
     });
   });
 

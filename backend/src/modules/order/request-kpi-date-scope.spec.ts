@@ -7,19 +7,29 @@
  *
  * Boundary: [from, to) — inclusive lower, exclusive upper.
  * Canonical date field: createdAt.
+ *
+ * D8 (B-06): date-param validation is CANONICAL — shared parseDateParam
+ * (backend/src/shared/date-param.ts): malformed dateFrom/dateTo →
+ * BadRequestException (HTTP 400, "<paramName> must be a valid date") before
+ * any where-clause construction. T7/T8 mirror the canonical 400 contract;
+ * the pre-D8 behavior (silent Invalid Date in the where clause) is gone.
  */
+
+import { parseDateParam } from "../../shared/date-param";
 
 describe("UI-C1.2F.1A — Requests KPI date scope", () => {
   /**
    * Simulates the where-clause construction logic from request.service.getRequestKpi.
    * This mirrors the exact code path without requiring a Prisma connection.
+   * Uses the canonical parseDateParam so the mirror cannot drift from the
+   * service's validation behavior (D8 MUST: one validation mechanism).
    */
   function buildKpiWhere(query?: { dateFrom?: string; dateTo?: string }) {
     const where: Record<string, unknown> = {};
     if (query?.dateFrom || query?.dateTo) {
       where.createdAt = {
-        ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-        ...(query.dateTo ? { lt: new Date(query.dateTo) } : {}),
+        ...(query.dateFrom ? { gte: parseDateParam(query.dateFrom, "dateFrom") } : {}),
+        ...(query.dateTo ? { lt: parseDateParam(query.dateTo, "dateTo") } : {}),
       };
     }
     return where;
@@ -67,16 +77,24 @@ describe("UI-C1.2F.1A — Requests KPI date scope", () => {
     expect(recordBefore < range.lt).toBe(true);
   });
 
-  it("T7 — invalid dateFrom produces Invalid Date in the where clause", () => {
-    const where = buildKpiWhere({ dateFrom: "not-a-date" });
-    const range = where.createdAt as { gte: Date };
-    expect(Number.isNaN(range.gte.getTime())).toBe(true);
+  it("T7 — invalid dateFrom is rejected with the canonical 400 (BadRequestException)", () => {
+    // D8 B-06 canonical contract: malformed query date → 400, never a silent
+    // Invalid Date leaking into a Prisma where clause.
+    expect(() => buildKpiWhere({ dateFrom: "not-a-date" })).toThrowError(/dateFrom must be a valid date/);
   });
 
-  it("T8 — invalid dateTo produces Invalid Date in the where clause", () => {
-    const where = buildKpiWhere({ dateTo: "not-a-date" });
-    const range = where.createdAt as { lt: Date };
-    expect(Number.isNaN(range.lt.getTime())).toBe(true);
+  it("T8 — invalid dateTo is rejected with the canonical 400 (BadRequestException)", () => {
+    expect(() => buildKpiWhere({ dateTo: "not-a-date" })).toThrowError(/dateTo must be a valid date/);
+  });
+
+  it("T8a — invalid dateFrom fails before dateTo is evaluated (independent validation)", () => {
+    // dateFrom and dateTo are validated independently; dateFrom throws first.
+    expect(() => buildKpiWhere({ dateFrom: "not-a-date", dateTo: "2026-10-01" })).toThrowError(/dateFrom must be a valid date/);
+  });
+
+  it("T8b — empty-string params are treated as absent (no filter, no error)", () => {
+    const where = buildKpiWhere({ dateFrom: "", dateTo: "" });
+    expect(where).toEqual({});
   });
 
   it("T9 — boundary semantics match the Requests list endpoint [from, to)", () => {

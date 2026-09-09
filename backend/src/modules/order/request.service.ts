@@ -140,20 +140,7 @@ export function hasD3AcceptSnapshot(request: {
 import { OrderService } from "./order.service";
 import { Prisma } from "../../generated/prisma/client";
 import { assertValidRequestSort, buildRequestOrderBy } from "./request-sort";
-
-/**
- * Validate date string for API boundary (422 on malformed input).
- * Returns a valid Date or throws BadRequestException.
- * Shared by list and KPI to ensure validation parity.
- */
-function validateDateParam(value: string | undefined, paramName: string): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) {
-    throw new BadRequestException(`${paramName} must be a valid date`);
-  }
-  return d;
-}
+import { parseDateParam } from "../../shared/date-param";
 
 /** Default SLA: 24 hours for supplier response */
 const DEFAULT_SUPPLIER_SLA_HOURS = 24;
@@ -312,6 +299,9 @@ export class RequestService {
     // UI-C1.2F.1G: canonical sort boundary validation (HTTP 400 on an explicitly
     // disallowed sortBy / malformed sortDirection) — same convention as dates.
     assertValidRequestSort(query.sortBy, query.sortDirection);
+    // Validate both independently before any search read or Prisma where build.
+    const dateFrom = parseDateParam(query.dateFrom, "dateFrom");
+    const dateTo = parseDateParam(query.dateTo, "dateTo");
 
     // Build search: first resolve names/codes to IDs, then filter
     let searchOr: any[] | undefined;
@@ -361,8 +351,8 @@ export class RequestService {
       ...(allSearchConditions.length ? { OR: allSearchConditions } : {}),
       ...(query.dateFrom || query.dateTo ? {
         createdAt: {
-          ...(query.dateFrom ? { gte: validateDateParam(query.dateFrom, "dateFrom") } : {}),
-          ...(query.dateTo ? { lt: validateDateParam(query.dateTo, "dateTo") } : {}),
+          ...(dateFrom ? { gte: dateFrom } : {}),
+          ...(dateTo ? { lt: dateTo } : {}),
         },
       } : {}),
     };
@@ -948,11 +938,13 @@ export class RequestService {
     // UI-C1.2F.1A: period-aware KPI. Uses the same createdAt [from, to)
     // boundary semantics as listRequests for scope parity with the future
     // shared Operations Center Header Period (global scope → KPI + table).
+    const dateFrom = parseDateParam(query?.dateFrom, "dateFrom");
+    const dateTo = parseDateParam(query?.dateTo, "dateTo");
     const where: any = {};
     if (query?.dateFrom || query?.dateTo) {
       where.createdAt = {
-        ...(query.dateFrom ? { gte: validateDateParam(query.dateFrom, "dateFrom") } : {}),
-        ...(query.dateTo ? { lt: validateDateParam(query.dateTo, "dateTo") } : {}),
+        ...(dateFrom ? { gte: dateFrom } : {}),
+        ...(dateTo ? { lt: dateTo } : {}),
       };
     }
 

@@ -19,6 +19,7 @@ import OperationsCenterShell, {
   OperationsEmptyState,
 } from "@/components/OperationsCenterShell";
 import { useLocale, t, LOCALE_TAGS, type Locale } from "@/lib/i18n";
+import { fmtDate } from "@/lib/temporal-display"; // D8 SHOULD #1 — shared TemporalDisplay
 import { orderActionLabel } from "@/lib/commerce-history-labels";
 
 /**
@@ -86,12 +87,6 @@ function paymentLabel(code: string, locale: Locale): string {
   const key = `order.payment.${code}`;
   const localized = t(key, locale);
   return localized !== key ? localized : code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-}
-
-/** Locale-aware date cell (RU/AZ/EN via BCP-47 tags). */
-function fmtDate(iso: string | null, locale: Locale): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString(LOCALE_TAGS[locale]);
 }
 
 /** Locale-aware money cell — canonical amount formatting, D7 stays server authority. */

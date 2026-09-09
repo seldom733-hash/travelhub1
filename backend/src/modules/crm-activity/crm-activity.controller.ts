@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, UseGuards, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { IsEnum, IsInt, IsOptional, IsString, Max, Min, IsDateString } from 'class-validator';
 import { CrmActivitySourceType, CrmActivityActivityType } from '../../generated/prisma/enums';
@@ -9,6 +9,7 @@ import { CurrentUser, RequirePermissions } from '../../security/auth/decorators'
 import type { AuthUser } from '../../security/auth/auth.service';
 import { SOURCE_READ_PERMISSIONS } from './crm-activity.constants';
 import { PrismaService } from '../../prisma/prisma.service';
+import { parseDateParam } from '../../shared/date-param';
 
 // ─── DTOs ────────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,12 @@ export class CrmActivityController {
     @CurrentUser() actor: AuthUser,
   ) {
     // ── Subject existence ──────────────────────────────────────────────────
+    // D8 (B-06): malformed query dates → canonical 400 BadRequestException
+    // BEFORE any DB read (previously 404 — semantically wrong status for
+    // malformed input; now fail-fast, parity with all registries).
+    const dateFrom = parseDateParam(query.dateFrom, 'dateFrom');
+    const dateTo = parseDateParam(query.dateTo, 'dateTo');
+
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       select: { id: true },
@@ -126,18 +133,6 @@ export class CrmActivityController {
       } catch {
         throw new NotFoundException('Invalid cursor');
       }
-    }
-
-    // ── Date validation ────────────────────────────────────────────────────
-    let dateFrom: Date | undefined;
-    let dateTo: Date | undefined;
-    if (query.dateFrom) {
-      dateFrom = new Date(query.dateFrom);
-      if (isNaN(dateFrom.getTime())) throw new NotFoundException('Invalid dateFrom');
-    }
-    if (query.dateTo) {
-      dateTo = new Date(query.dateTo);
-      if (isNaN(dateTo.getTime())) throw new NotFoundException('Invalid dateTo');
     }
 
     // ── Enum validation ────────────────────────────────────────────────────
@@ -241,6 +236,11 @@ export class CrmActivityController {
     @CurrentUser() actor: AuthUser,
   ) {
     // ── Subject existence ──────────────────────────────────────────────────
+    // D8 (B-06): canonical 400 BEFORE any DB read (fail-fast boundary
+    // validation, parity with the customer-activity endpoint).
+    const dateFrom = parseDateParam(query.dateFrom, 'dateFrom');
+    const dateTo = parseDateParam(query.dateTo, 'dateTo');
+
     const partner = await this.prisma.partner.findUnique({
       where: { id: partnerId },
       select: { id: true },
@@ -257,18 +257,6 @@ export class CrmActivityController {
       } catch {
         throw new NotFoundException('Invalid cursor');
       }
-    }
-
-    // ── Date validation ────────────────────────────────────────────────────
-    let dateFrom: Date | undefined;
-    let dateTo: Date | undefined;
-    if (query.dateFrom) {
-      dateFrom = new Date(query.dateFrom);
-      if (isNaN(dateFrom.getTime())) throw new NotFoundException('Invalid dateFrom');
-    }
-    if (query.dateTo) {
-      dateTo = new Date(query.dateTo);
-      if (isNaN(dateTo.getTime())) throw new NotFoundException('Invalid dateTo');
     }
 
     // ── Enum validation ────────────────────────────────────────────────────

@@ -13,6 +13,7 @@
  */
 import { Prisma } from "../../generated/prisma/client";
 import { PaymentStatus, RefundStatus } from "../../generated/prisma/enums";
+import { BadRequestException } from "@nestjs/common";
 import { NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { PaymentService } from "./payment.service";
 import {
@@ -240,10 +241,23 @@ describe("UI-C1.2E — PaymentService payments registry list()", () => {
     await expect(service.list({ paymentStatus: "VOID" } as never)).rejects.toThrow(ValidationDomainError);
     await expect(service.list({ refundStatus: "VOID" } as never)).rejects.toThrow(ValidationDomainError);
     await expect(service.list({ currency: "usd" } as never)).rejects.toThrow(ValidationDomainError);
-    await expect(service.list({ dateFrom: "not-a-date" } as never)).rejects.toThrow(ValidationDomainError);
     await expect(service.list({ status: "CAPTURED", paymentStatus: "FAILED" } as never)).rejects.toThrow(ValidationDomainError);
     // Legacy alias is accepted.
     await expect(service.list({ status: "CAPTURED" } as never)).resolves.toBeDefined();
+  });
+
+  it("D8 B-06 — malformed registry date params reject with the canonical 400 (BadRequestException)", async () => {
+    // D8 canonical contract: registry QUERY-PARAM date filters (dateFrom/dateTo)
+    // → BadRequestException (HTTP 400, "<paramName> must be a valid date").
+    // The Finance ValidationDomainError (422) contract for KPI dimension params
+    // and submitted financial payloads is intentionally unchanged.
+    const { service } = makeRegistryService({});
+    await expect(service.list({ dateFrom: "not-a-date" } as never)).rejects.toThrow(BadRequestException);
+    await expect(service.list({ dateFrom: "not-a-date" } as never)).rejects.toThrow(/dateFrom must be a valid date/);
+    await expect(service.list({ dateTo: "also-not-a-date" } as never)).rejects.toThrow(/dateTo must be a valid date/);
+    await expect(service.list({ dateFrom: "not-a-date", dateTo: "2026-09-01" } as never)).rejects.toThrow(/dateFrom must be a valid date/);
+    // Valid dates still parse (no rejection from the date params themselves).
+    await expect(service.list({ dateFrom: "2026-08-01", dateTo: "2026-09-01" } as never)).resolves.toBeDefined();
   });
 
   it("exposes every canonical PaymentStatus (6/6) and RefundStatus (4/4) with zero-count coverage", async () => {

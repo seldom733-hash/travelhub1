@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useLocale, t, LOCALE_TAGS, type Locale } from "@/lib/i18n";
+import { fmtDate } from "@/lib/temporal-display"; // D8 SHOULD #1 — shared TemporalDisplay
 import Pagination from "@/components/Pagination";
 import TableExportButton from "@/components/TableExportButton";
 import StatusBadge from "@/components/StatusBadge";
@@ -104,11 +105,6 @@ function requestStatusLabel(code: string, locale: Locale): string {
 }
 
 /** Locale-aware table cell formatting (RU/AZ/EN via BCP-47 tags). */
-function fmtDate(iso: string | null, locale: Locale): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString(LOCALE_TAGS[locale]);
-}
-
 function fmtDateTime(iso: string | null, locale: Locale): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString(LOCALE_TAGS[locale]);
