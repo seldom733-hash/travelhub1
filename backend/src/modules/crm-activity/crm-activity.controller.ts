@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Param, Query, UseGuards, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min, IsDateString } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { CrmActivitySourceType, CrmActivityActivityType } from '../../generated/prisma/enums';
 import { CrmActivityService } from './crm-activity.service';
 import { JwtAuthGuard } from '../../security/auth/jwt-auth.guard';
@@ -23,11 +23,14 @@ class ActivityQueryDto {
   activityType?: CrmActivityActivityType;
 
   @IsOptional()
-  @IsDateString()
+  // D8: format/calendar validation belongs exclusively to parseDateParam.
+  // A DTO-level date validator would run first and produce a competing error
+  // shape/message instead of the canonical registry query-param contract.
+  @IsString()
   dateFrom?: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsString()
   dateTo?: string;
 
   @IsOptional()

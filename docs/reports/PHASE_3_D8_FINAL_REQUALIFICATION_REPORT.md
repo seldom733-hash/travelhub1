@@ -58,6 +58,23 @@ Current runtime confirms UTC date-only query handling and URL-authoritative Oper
 
 The initial working tree had only the user-provided final requalification prompt. This report is the sole new qualification artifact. No production diff is included.
 
+## Scoped Remediation and Fresh Runtime Proof
+
+The defect was remediated without scope expansion. `ActivityQueryDto` no longer
+uses `@IsDateString()` for `dateFrom`/`dateTo`; those values remain strings until
+the sole canonical `parseDateParam` validates real `YYYY-MM-DD` dates. This
+removes the competing pre-controller error response and does not alter schema,
+authorization, lifecycle, or temporal authority.
+
+Focused post-remediation tests passed: **3 suites / 85 tests** (including CRM
+Activity and the cross-registry matrix), followed by backend typecheck and
+production build. After a fresh backend restart, authenticated runtime evidence
+for the same CRM Activity URL was HTTP 400 with `X-Request-Id` and the exact
+canonical response: `{ statusCode: 400, message: "dateFrom must be a valid date", requestId }`.
+
 ## Final Verdict
 
-**VERDICT C — IMPLEMENTATION DEFECT.** CRM Activity invalid-date runtime response violates the canonical D8 error-message/shape contract. Do not declare D8 closed or select a next stage until a scoped D8 remediation and fresh requalification resolve this defect.
+**VERDICT B — VALID SYSTEM FAIL.** The discovered D8 validation defect is fixed
+and re-proven at runtime. D8 cannot be declared closed yet because this pass did
+not execute the complete required multi-role tenant-isolation and negative-RBAC
+matrix. No next stage is selected.
