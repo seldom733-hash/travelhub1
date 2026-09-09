@@ -345,7 +345,8 @@ Determination (per §32 — re-computed from the FINAL canonical state, not inhe
 
 ```text
 baseline: f41bd6a57f15a71969b6aabd3e7c14196a327f71
-commit: (this commit — documentation cleanup only)
+commit: 3ba150f4caf5de6d657d60ff851308314063f2a6 (documentation cleanup, 14 files: 6404 insertions, 2706 deletions)
+final SHA (after this annotation): see git log — annotation commit immediately follows the cleanup commit
 push: origin/master
 HEAD == origin/master: verified after push
 tracked clean: verified after push
