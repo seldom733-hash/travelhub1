@@ -250,6 +250,21 @@ export const PERMISSIONS = {
   "dashboard.attention.read": "Чтение Needs Attention (Pending Confirmations, Failed Payments, Cancellations, Refunds)",
   "dashboard.insights.read": "Чтение AI Decision Feed (Risks, Opportunities, Catalog Insights)",
   "dashboard.customize": "Настройка layout Command Center (save/reset) — не расширяет доступ к данным",
+
+  // ── Marketing (Step 3.8.1, Marketing Center) ─────────────────────────
+  // R1/R2 back-port: канонические codes Marketing Center — контроллер гейтит
+  // @RequirePermissions этими кодами (marketing.controller.ts), UI (Shell nav,
+  // Marketing Center) требует marketing.campaign.read. Живые DB grants
+  // документированы Step 3.8.1 closure report (ADMIN/OPERATOR/MARKETER/DIRECTOR).
+  "marketing.read": "Чтение маркетинговых данных (агрегированный Marketing read model)",
+  "marketing.campaign.read": "Чтение маркетинговых кампаний (Marketing Center page gate)",
+  "marketing.campaign.create": "Создание маркетинговых кампаний",
+  "marketing.campaign.update": "Обновление маркетинговых кампаний",
+  "marketing.campaign.delete": "Удаление маркетинговых кампаний",
+  "marketing.audience.read": "Чтение маркетинговых аудиторий",
+  "marketing.audience.manage": "Управление маркетинговыми аудиториями",
+  "marketing.attribution.read": "Чтение маркетинговых атрибуций",
+  "marketing.attribution.manage": "Управление маркетинговыми атрибуциями",
 } as const;
 
 export type PermissionCode = keyof typeof PERMISSIONS;
@@ -314,6 +329,16 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "operational-notes.read",
     // Phase 3 Step 3.5.3 Round 2B: DIRECTOR — CRM Activity Timeline read.
     "crm.activity.read",
+    // R1/R2 back-port: Step 3.8.1 marketing grants (DB truth, additive-only seed).
+    "marketing.read",
+    "marketing.campaign.read",
+    "marketing.campaign.create",
+    "marketing.campaign.update",
+    "marketing.campaign.delete",
+    "marketing.audience.read",
+    "marketing.audience.manage",
+    "marketing.attribution.read",
+    "marketing.attribution.manage",
   ],
 
   FINANCE: [
@@ -361,6 +386,12 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "dashboard.executive.read",
     "dashboard.financial.read",
     "dashboard.attention.read",
+    // R1/R2 back-port: analytics.read (Command Center page gate) — migration
+    // 20260823150000 grants it to FINANCE; additive-only startup seed pins it.
+    "analytics.read",
+    // R1/R2 back-port: support.case.read — remediation migration 20260830000000
+    // (Step 3.10) grants it explicitly (read-only financial oversight pattern).
+    "support.case.read",
     // Phase 3 Step 3.5 Round 2B: FINANCE — read-only operational notes.
     "operational-notes.read",
     // Phase 3 Step 3.5.3 Round 2B: FINANCE — CRM Activity Timeline read.
@@ -392,6 +423,16 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "operational-notes.read",
     // Phase 3 Step 3.5.3 Round 2B: MARKETER — CRM Activity Timeline read.
     "crm.activity.read",
+    // R1/R2 back-port: Step 3.8.1 marketing grants (DB truth, additive-only seed).
+    "marketing.read",
+    "marketing.campaign.read",
+    "marketing.campaign.create",
+    "marketing.campaign.update",
+    "marketing.campaign.delete",
+    "marketing.audience.read",
+    "marketing.audience.manage",
+    "marketing.attribution.read",
+    "marketing.attribution.manage",
   ],
 
   ANALYST: [
@@ -434,6 +475,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "operational-notes.read",
     // Phase 3 Step 3.5.3 Round 2B: ANALYST — CRM Activity Timeline read.
     "crm.activity.read",
+    // R1/R2 back-port: support.case.read — remediation migration 20260830000000
+    // (Step 3.10) grants it explicitly (read-only data-analysis pattern).
+    "support.case.read",
   ],
 
   // Step 1.3 review fix: MODERATOR имеет ТОЛЬКО moderation-права — review/approve/
@@ -496,6 +540,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // Step 1.16: SALES_MANAGER фиксирует/читает коммуникации по клиентам.
     "communication.read",
     "communication.create",
+    // Phase 3 Step 3.5 Round 2B: R1/R2 back-port — SALES_MANAGER support.case.read
+    // (migration 20260830000000, read-only customer-context pattern).
+    "support.case.read",
     // Phase 3 Step 3.5 Round 2B: SALES_MANAGER — read + create operational notes.
     "operational-notes.read",
     "operational-notes.create",
@@ -530,6 +577,16 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "support.case.read",
     "support.case.update",
     "support.case.assign",
+    // R1/R2 back-port: Step 3.8.1 marketing grants (DB truth, additive-only seed).
+    "marketing.read",
+    "marketing.campaign.read",
+    "marketing.campaign.create",
+    "marketing.campaign.update",
+    "marketing.campaign.delete",
+    "marketing.audience.read",
+    "marketing.audience.manage",
+    "marketing.attribution.read",
+    "marketing.attribution.manage",
     "documents.read",
     "documents.write",
     // Step 1.16: OPERATOR фиксирует коммуникации по Order/Booking/Customer.

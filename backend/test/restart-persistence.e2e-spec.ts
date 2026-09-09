@@ -124,21 +124,29 @@ describe("Step 3.2 — DB-Backed Restart Persistence (Round 3)", () => {
     ).toBe(true);
   });
 
-  // ─── Test B: extra grant FINANCE → analytics.read survives ────────
+  // ─── Test B: extra grant FINANCE → marketing.campaign.read survives ──
 
-  it("Test B: FINANCE → analytics.read extra grant survives onModuleInit()", async () => {
+  // R1/R2 note: the original specimen (FINANCE → analytics.read) became a
+  // canonical migration-seeded grant after the R1/R2 registry reconciliation
+  // (20260909120000), so it can no longer represent an "extra" grant.
+  // marketing.campaign.read is canonical but deliberately NOT granted to
+  // FINANCE — it tests both halves of the additive-only seed contract:
+  // (1) onModuleInit() must NOT delete an extra RolePermission row, and
+  // (2) onModuleInit() must NOT auto-grant canonical codes to roles that do
+  //     not hold them (default assignments come only from migrations).
+  it("Test B: FINANCE → marketing.campaign.read extra grant survives onModuleInit()", async () => {
     const role = await prisma.role.findUnique({
       where: { code: RoleCode.FINANCE },
     });
     const perm = await prisma.permission.findUnique({
-      where: { code: "analytics.read" },
+      where: { code: "marketing.campaign.read" },
     });
     const compositeKey = { roleId: role!.id, permissionId: perm!.id };
 
-    // Ensure baseline: link does NOT exist
+    // Ensure baseline: link does NOT exist (canonical: FINANCE lacks marketing.*)
     const existedBefore = await findRolePermission(
       RoleCode.FINANCE,
-      "analytics.read",
+      "marketing.campaign.read",
     );
     expect(existedBefore).toBe(false);
 
@@ -148,7 +156,7 @@ describe("Step 3.2 — DB-Backed Restart Persistence (Round 3)", () => {
 
       // Verify created
       expect(
-        await findRolePermission(RoleCode.FINANCE, "analytics.read"),
+        await findRolePermission(RoleCode.FINANCE, "marketing.campaign.read"),
       ).toBe(true);
 
       // Run startup seed
@@ -156,13 +164,13 @@ describe("Step 3.2 — DB-Backed Restart Persistence (Round 3)", () => {
 
       // Verify still present — seed must NOT delete it
       expect(
-        await findRolePermission(RoleCode.FINANCE, "analytics.read"),
+        await findRolePermission(RoleCode.FINANCE, "marketing.campaign.read"),
       ).toBe(true);
     } finally {
       // Cleanup: remove the extra grant if it still exists
       const stillPresent = await findRolePermission(
         RoleCode.FINANCE,
-        "analytics.read",
+        "marketing.campaign.read",
       );
       if (stillPresent) {
         await prisma.rolePermission
@@ -173,7 +181,7 @@ describe("Step 3.2 — DB-Backed Restart Persistence (Round 3)", () => {
 
     // Assert baseline restored after finally
     expect(
-      await findRolePermission(RoleCode.FINANCE, "analytics.read"),
+      await findRolePermission(RoleCode.FINANCE, "marketing.campaign.read"),
     ).toBe(false);
   });
 
