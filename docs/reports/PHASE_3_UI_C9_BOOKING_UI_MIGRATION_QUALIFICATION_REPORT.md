@@ -285,13 +285,25 @@ accepted C6–C8 gate sets for these surfaces; no backend change exists to attri
 
 ## 18. Git Closure
 
-Final state after C9 closure (see final summary for exact SHAs):
+Final state after C9 closure:
 
-- C9 implementation commit contains: `bookings/[id]/page.tsx`,
-  `BookingActionBar.tsx` (new), C9-only hunks of
-  `commerce-detail-system.spec.tsx` and `i18n.tsx`, and this report.
-- **C8 publication set remains pending and isolated** (its three files' C8 hunks
-  deliberately not staged — publication belongs to the governing C8 step).
+```text
+IMPLEMENTATION SHA:  f9e7c41eefc9e797605cf2f720012df6f82ff12b
+                     (ui-c9: migrate Booking detail actions to canonical header bar)
+BASELINE:            ff3d2894b501be1abccfdf48cbbb23006ec93ac5
+HEAD == origin/master == f9e7c41eefc9e797605cf2f720012df6f82ff12b (at report commit time)
+```
+
+Commit contents (staged via C9-only blob versions of the two shared files, so the
+C8 hunks were never in the index): `bookings/[id]/page.tsx`,
+`BookingActionBar.tsx` (new), C9-only hunks of `commerce-detail-system.spec.tsx`
+and `i18n.tsx` (i18n delta vs baseline = exactly +2 lines: comment +
+`booking.action.busy`), and this report.
+
+- **C8 publication set remains pending and isolated** — after the C9 commit the
+  working tree still carries exactly the three C8 files as modifications vs HEAD
+  (OrderActionBar.tsx + the C8 deltas of spec/i18n; same +66/−15 content), ready
+  for the governing C8 publication step. Never reset, stashed, or discarded.
 - Historical untracked `docs/prompts/PHASE_3_*` artifacts remain untracked/untouched.
 - Working tree is therefore **not claimed clean**: tracked C8 modifications
   intentionally remain, untracked historical artifacts remain. No false
