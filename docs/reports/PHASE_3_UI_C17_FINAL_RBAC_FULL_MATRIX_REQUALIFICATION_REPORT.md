@@ -261,8 +261,10 @@ no unintended changes .................. VERIFIED (production diff = 0)
 ```text
 HEAD:            a72ed19f56e4b6844733b0c60edef605d2611484
 origin/master:   a72ed19f56e4b6844733b0c60edef605d2611484
-UI-C17 COMMIT:   88d9c01ae858c81bfc3cd9ecb6acfe7cc26ee7be (report + CSV evidence only)
-FINAL SHA:       7dd9b4de45af969990d544405b5beb4f1c29daae (HEAD == origin/master)
+UI-C17 COMMIT:   88d9c01ae858c81bfc3cd9ecb6acfe7cc26ee7be (evidence: report + CSV; content-final)
+FINAL SHA:       88d9c01ae858c81bfc3cd9ecb6acfe7cc26ee7be; SHA-аннотация коммиты следуют за evidence-коммитом
+                  (self-reference: текущий HEAD == origin/master проверяется командой git rev-parse;
+                   аннотации не меняют содержание evidence)
 git diff --check: PASS
 UI-C8 publication set: intact, isolated, pending
 Untracked historical artifacts: присутствуют, известны (репозиторий НЕ заявлен глобально чистым)
