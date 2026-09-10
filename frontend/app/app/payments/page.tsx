@@ -526,7 +526,7 @@ function PaymentsContent({
                       <tr key={p.id} className="border-b border-slate-50 transition-colors hover:bg-blue-50/30">
                         <td className="px-4 py-2.5">
                           <Link
-                            href={`/app/finance/payments/${p.code}`}
+                            href={`/app/payments/${p.code}`}
                             className="font-mono text-xs text-blue-600 hover:underline"
                           >
                             {p.referenceNumber ?? p.code}
