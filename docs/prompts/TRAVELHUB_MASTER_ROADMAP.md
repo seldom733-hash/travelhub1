@@ -893,9 +893,9 @@ No new stage may be invented during this requalification.
 │ UI-C18 Git = CLOSED                                 │
 │ Finance Center = NOT STARTED / DEFERRED             │
 │ D8 = CLOSED / APPROVED (2026-09-10, VERDICT A)      │
-│ D9 = NOT STARTED / TRUE NEXT                        │
+│ D9 = CLOSED / APPROVED (2026-09-10, VERDICT A)      │
 │ PROD-01 = OPEN / DEFERRED                           │
-│ TRUE NEXT = D9 (after D8 closure 2026-09-10)        │
+│ TRUE NEXT = D10 (after D9 closure 2026-09-10)       │
 └─────────────────────────────────────────────────────┘
 ```
 
