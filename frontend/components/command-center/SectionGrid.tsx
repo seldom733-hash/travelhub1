@@ -78,6 +78,28 @@ const TREND_WIDGETS: Record<string, string> = {
   "bookings-trend": "bookings",
 };
 
+/** D12 AD-1: KPI → operational/CRM drill-down destinations.
+ *  Financial KPIs without honest target remain absent (NONE). */
+const WIDGET_ROUTES: Record<string, string> = {
+  // Executive → operational centers
+  "orders":   "/app/orders",
+  "bookings": "/app/bookings",
+  // Operational → filtered operational centers
+  "orders-fulfilled":     "/app/orders?status=FULFILLED",
+  "bookings-confirmed":   "/app/bookings?status=CONFIRMED",
+  "bookings-completed":   "/app/bookings?status=COMPLETED",
+  "payments-captured":    "/app/payments?paymentStatus=CAPTURED",
+  "refunds-processed":    "/app/payments?refundStatus=PROCESSED",
+  // Marketplace → CRM
+  "marketplace-partners": "/app/crm?tab=partners&entitled=true",
+  "marketplace-customers": "/app/crm?tab=customers",
+  "partners":  "/app/crm?tab=partners&entitled=true",
+  "customers": "/app/crm?tab=customers",
+  // Channels → operational
+  "marketplace-orders": "/app/orders",
+  "storefront-orders":  "/app/orders",
+};
+
 /** IDs rendered as trend charts (not KPI cards). */
 const CHART_IDS = new Set(["orders-trend", "bookings-trend", "revenue-trend"]);
 
@@ -195,6 +217,7 @@ export function SectionGrid({
             format={mapping.format as "currency" | "percent" | undefined}
             subtitle={subtitle}
             locale={locale}
+            href={WIDGET_ROUTES[wp.widgetId]}
           />
         );
       });

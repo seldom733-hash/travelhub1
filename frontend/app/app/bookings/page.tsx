@@ -511,8 +511,8 @@ function BookingsWithParams() {
       initialSearch={sp.get("search") ?? ""}
       initialSortBy={sp.get("sortBy") ?? undefined}
       initialSortDirection={(sp.get("sortDirection") as SortDirection) ?? undefined}
-      initialDateFrom={sp.get("dateFrom") ?? ""}
-      initialDateTo={sp.get("dateTo") ?? ""}
+      initialDateFrom={sp.get("from") ?? sp.get("dateFrom") ?? ""}
+      initialDateTo={sp.get("to") ?? sp.get("dateTo") ?? ""}
       initialPage={Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1}
     />
   );

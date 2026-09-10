@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { type KpiValue } from "@/lib/dashboard-api";
 import { formatPrice } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n";
@@ -15,6 +16,8 @@ interface Props {
   subtitle?: string;
   /** Locale for currency formatting. */
   locale?: Locale;
+  /** Optional navigation target — renders card as a clickable Link. */
+  href?: string;
 }
 
 function formatValue(v: number | null, format: string, currency: string, locale: Locale): string {
@@ -34,7 +37,7 @@ function formatValue(v: number | null, format: string, currency: string, locale:
   return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US").format(v);
 }
 
-export function KpiCard({ title, value, format = "number", currency = "AZN", positiveIsUp = true, subtitle, locale = "ru" }: Props) {
+export function KpiCard({ title, value, format = "number", currency = "AZN", positiveIsUp = true, subtitle, locale = "ru", href }: Props) {
   // B.2: prefer currency from KpiValue (backend-reported) over prop default
   const effectiveCurrency = value.currency || currency;
   // Use displayCurrent for reconciled integer presentation when available
@@ -53,8 +56,8 @@ export function KpiCard({ title, value, format = "number", currency = "AZN", pos
     }
   }
 
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" title={subtitle}>
+  const inner = (
+    <>
       <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</div>
       <div className="mt-2 text-2xl font-bold text-slate-900">{formatted}</div>
       {hasDelta && (
@@ -63,6 +66,24 @@ export function KpiCard({ title, value, format = "number", currency = "AZN", pos
           {Math.abs(value.deltaPercent!).toFixed(1)}%
         </div>
       )}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-blue-300 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer block"
+        title={subtitle}
+      >
+        {inner}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" title={subtitle}>
+      {inner}
     </div>
   );
 }

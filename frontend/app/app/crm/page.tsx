@@ -27,7 +27,7 @@ type CrmContext = "platform" | "basic" | "pro";
  * 2. MARKETPLACE BASIC — limited customer management for marketplace partners
  * 3. STOREFRONT PRO — full CRM for partners with active Storefront
  */
-function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCustomerSearch, initialCustomerStatus, initialCustomerType, initialCustomerPage, initialPartnerSearch, initialPartnerStatus, initialPartnerPage, initialDateFrom, initialDateTo, initialEntitled }: { initialTab?: string; initialSortBy?: string; initialSortDirection?: string; initialCustomerSearch?: string; initialCustomerStatus?: string; initialCustomerType?: string; initialCustomerPage?: number; initialPartnerSearch?: string; initialPartnerStatus?: string; initialPartnerPage?: number; initialDateFrom?: string; initialDateTo?: string; initialEntitled?: string }) {
+function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCustomerSearch, initialCustomerStatus, initialCustomerType, initialCustomerPage, initialPartnerSearch, initialPartnerStatus, initialPartnerPage, initialDateFrom, initialDateTo, initialPreset, initialEntitled }: { initialTab?: string; initialSortBy?: string; initialSortDirection?: string; initialCustomerSearch?: string; initialCustomerStatus?: string; initialCustomerType?: string; initialCustomerPage?: number; initialPartnerSearch?: string; initialPartnerStatus?: string; initialPartnerPage?: number; initialDateFrom?: string; initialDateTo?: string; initialPreset?: string; initialEntitled?: string }) {
   const locale = useLocale();
   const currentUser = useCurrentUser();
   const [crmContext, setCrmContext] = useState<CrmContext>("platform");
@@ -75,6 +75,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
   const [dateFrom, setDateFrom] = useState(initialDateFrom ?? "");
   const [dateTo, setDateTo] = useState(initialDateTo ?? "");
   const [entitled, setEntitled] = useState(initialEntitled ?? "");
+  const [preset, setPreset] = useState(initialPreset ?? "");
 
   // ── Platform CRM state ──
   const [customerData, setCustomerData] = useState<Page<Customer> | null>(null);
@@ -280,7 +281,7 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
             </span>
             {dateFrom && dateTo && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                📊 {dateFrom} → {dateTo}
+                📊 {preset ? `${preset} (${dateFrom} → ${dateTo})` : `${dateFrom} → ${dateTo}`}
               </span>
             )}
             {entitled === 'true' && !dateFrom && (
@@ -776,6 +777,7 @@ function CrmWithParams() {
       initialPartnerPage={sp.get("pPage") ? parseInt(sp.get("pPage")!, 10) : undefined}
       initialDateFrom={sp.get("from") ?? undefined}
       initialDateTo={sp.get("to") ?? undefined}
+      initialPreset={sp.get("preset") ?? undefined}
       initialEntitled={sp.get("entitled") ?? undefined}
     />
   );
