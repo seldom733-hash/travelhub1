@@ -92,7 +92,22 @@ $ git commit -m "docs(d9): finalize export framework closure"
 $ git push origin master
 ```
 
-Full closure SHA recorded below in the Final SHA block (this is a documentation-only closure commit on top of evidence baseline `fea240cd20e6edeee537e86a2568167e0eac0ead`).
+Closure commit SHA:
+
+```text
+7f61d56edc93a301a8f356dd09650f78c28029ec
+```
+
+Post-push verification:
+
+```text
+HEAD           = 7f61d56edc93a301a8f356dd09650f78c28029ec
+origin/master  = 7f61d56edc93a301a8f356dd09650f78c28029ec
+HEAD == origin/master: YES
+Working tree:  CLEAN
+```
+
+Note: the only subsequent commit on top of this SHA is the report-only SHA-recording amendment (no production code), matching the repo convention for closure reports. Evidence baseline remains `fea240cd20e6edeee537e86a2568167e0eac0ead`.
 
 ---
 
