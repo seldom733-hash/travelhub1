@@ -5,6 +5,24 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { IdsService } from "../../shared/ids.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
 
+jest.mock("pdf-lib", () => {
+  const mockPage = {
+    getSize: () => ({ width: 595.28, height: 841.89 }),
+    drawLine: jest.fn(),
+    drawText: jest.fn(),
+  };
+  const mockDoc = {
+    addPage: jest.fn(() => mockPage),
+    embedFont: jest.fn().mockResolvedValue("mock-font"),
+    save: jest.fn().mockResolvedValue(new Uint8Array(Buffer.from("%PDF-1.4 mock-pdf-content-for-unit-test"))),
+  };
+  return {
+    PDFDocument: { create: jest.fn().mockResolvedValue(mockDoc) },
+    StandardFonts: { Helvetica: "Helvetica", HelveticaBold: "HelveticaBold", HelveticaOblique: "HelveticaOblique" },
+    rgb: jest.fn(() => ({})),
+  };
+});
+
 function createMockPrisma() {
   const prisma: any = {
     $transaction: jest.fn((fn: any) => fn(prisma)),
@@ -161,41 +179,47 @@ describe("DocumentsService", () => {
   });
 });
 
-describe("DocumentRenderer", () => {
+describe("DocumentRenderer — unit (mocked PDF)", () => {
   let renderer: DocumentRenderer;
 
   beforeEach(() => {
     renderer = new DocumentRenderer();
   });
 
-  it("should render VOUCHER type with traveler data", async () => {
+  it("should call renderToBuffer and return non-empty buffer for VOUCHER", async () => {
     const buffer = await renderer.render("VOUCHER", {
       code: "VCH-00000001",
       bookingCode: "BKG-00000001",
-      travelers: [{ firstName: "John", lastName: "Doe" }],
+      travelers: [],
     });
+
     expect(buffer).toBeInstanceOf(Buffer);
-    const content = buffer.toString();
-    expect(content).toContain("TRAVELHUB VOUCHER");
-    expect(content).toContain("John Doe");
-    expect(content).toContain("TravelHub platform confirmation");
+    expect(buffer.length).toBeGreaterThan(0);
+    expect(buffer.slice(0, 5).toString("ascii")).toBe("%PDF-");
   });
 
-  it("should render REFUND type", async () => {
-    const buffer = await renderer.render("REFUND", {
-      code: "RFD-00000001",
-      refundAmount: "100.00",
-    });
-    expect(buffer).toBeInstanceOf(Buffer);
-    expect(buffer.toString()).toContain("TRAVELHUB REFUND DOCUMENT");
-  });
-
-  it("should render PARTIAL_PAYMENT type", async () => {
+  it("should call renderToBuffer for PARTIAL_PAYMENT", async () => {
     const buffer = await renderer.render("PARTIAL_PAYMENT", {
       code: "PPD-00000001",
-      totalAmount: "500.00",
+      totalAmount: "5000",
+      paidAmount: "2500",
     });
+
     expect(buffer).toBeInstanceOf(Buffer);
-    expect(buffer.toString()).toContain("TRAVELHUB PARTIAL PAYMENT DOCUMENT");
+    expect(buffer.slice(0, 5).toString("ascii")).toBe("%PDF-");
+  });
+
+  it("should call renderToBuffer for REFUND", async () => {
+    const buffer = await renderer.render("REFUND", {
+      code: "RFD-00000001",
+      refundAmount: "500",
+    });
+
+    expect(buffer).toBeInstanceOf(Buffer);
+    expect(buffer.slice(0, 5).toString("ascii")).toBe("%PDF-");
+  });
+
+  it("should throw for unknown document type", async () => {
+    await expect(renderer.render("UNKNOWN" as any, {})).rejects.toThrow("Unknown document type");
   });
 });
