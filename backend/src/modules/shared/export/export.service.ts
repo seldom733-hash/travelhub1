@@ -7,6 +7,26 @@ export interface ExportColumn {
   width?: number;
 }
 
+/**
+ * D9-F1 (CSV formula injection): a string cell is protected when its FIRST
+ * character (raw, untrimmed) is a spreadsheet formula trigger, or when it
+ * begins with a tab/CR/LF control character (spreadsheet apps skip these
+ * before formula evaluation). Leading *space* is intentionally not treated as
+ * a trigger: Excel does not evaluate " =1+1" as a formula, and trimming/
+ * normalizing user text here would alter cell content.
+ */
+const FORMULA_TRIGGER = /^[=+\-@]/;
+const LEADING_CONTROL = /^[\t\r\n]/;
+
+/**
+ * D9-F1: strict machine-number grammar for STRING cells. Exporters serialize
+ * Prisma Decimal money via String(value) (e.g. amount: String(o.amount)), so
+ * numeric machine data legitimately arrives as strings like "-12.50". Such
+ * strings cannot execute as spreadsheet formulas (no function reference) and
+ * MUST stay verbatim — prefixing them would corrupt numeric semantics.
+ */
+const MACHINE_NUMBER = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+
 @Injectable()
 export class ExportService {
   /**
@@ -56,8 +76,23 @@ export class ExportService {
 
   private csvEscape(val: any): string {
     if (val === null || val === undefined) return '';
-    const str = String(val);
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    let str = String(val);
+    // D9-F1 formula-injection guard applies to string-typed (text) cells
+    // only. Runtime machine scalars (number | boolean | Date) and strict
+    // machine-number strings (Decimal String() contract, e.g. "-12.50",
+    // "+1") are machine data, not formula payloads, and pass through
+    // verbatim. Every other string whose first character is a formula
+    // trigger (or that begins with a tab/CR/LF control character) is
+    // escaped to text with a leading apostrophe; the cell content itself
+    // is preserved unchanged after the apostrophe.
+    if (
+      typeof val === 'string' &&
+      (FORMULA_TRIGGER.test(str) || LEADING_CONTROL.test(str)) &&
+      !MACHINE_NUMBER.test(str)
+    ) {
+      str = "'" + str;
+    }
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
       return '"' + str.replace(/"/g, '""') + '"';
     }
     return str;
