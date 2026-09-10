@@ -561,9 +561,11 @@ Do not promote Payments into Finance Center.
 
 ## D8 — Global Temporal Visibility
 
-**Status:** NOT STARTED / **TRUE NEXT** (per accepted requalification; audit-first evidence exists, implementation NOT STARTED).
+**Status:** ✅ ACCEPTED / CLOSED (implementation VERDICT A; final closure 2026-09-10, see `docs/reports/PHASE_3_D8_FINAL_CLOSURE_REPORT.md`).
 
-**Reconciliation (2026-09-09, Documentation Governance Cleanup):** независимая TRUE NEXT requalification, требуемая этим разделом, выполнена и принята: `docs/reports/PHASE_3_TRUE_NEXT_REQUALIFICATION_AFTER_UI_C18_REPORT.md` (VERDICT A, commit f41bd6a) — TRUE NEXT = D8. Причина «deferred from immediate C-track execution» устарела: C-track закрыт (UI-C9 → UI-C17 → UI-C18). Состояние D8-ветки: audit-first mapping report + evidence/scope reconciliation выполнены (docs/reports/PHASE_3_D8_*, VERDICT A); implementation prompt = NOT APPROVED до завершения documentation governance cleanup.
+**Reconciliation (2026-09-10, D8 Final Closure / Roadmap Reconciliation):** D8 implementation closed via commit chain `73cd732` (implementation + focused suites) → `a52c476`/`882adf4` (requalification + scoped CRM Activity validation fix) → `48471cb`/`af5b075`/`272b0fe` (security/tenant requalification: VERDICT B → positive tenant-isolation evidence EVIDENCE READY → full matrix VERDICT A, 57/57 runtime API cases + authenticated browser evidence). No schema/migration/RBAC changes; D11 boundary preserved. TRUE NEXT moves to **D9 — Export Framework Requalification** (do not start D9 inside D8 closure; select it in a separate TRUE NEXT requalification pass).
+
+**Reconciliation (2026-09-09, Documentation Governance Cleanup):** независимая TRUE NEXT requalification, требуемая этим разделом, выполнена и принята: `docs/reports/PHASE_3_TRUE_NEXT_REQUALIFICATION_AFTER_UI_C18_REPORT.md` (VERDICT A, commit f41bd6a) — TRUE NEXT = D8. Причина «deferred from immediate C-track execution» устарела: C-track закрыт (UI-C9 → UI-C17 → UI-C18). Состояние D8-ветки: audit-first mapping report + evidence/scope reconciliation выполнены (docs/reports/PHASE_3_D8_*, VERDICT A); implementation prompt = NOT APPROVED до завершения documentation governance cleanup. *(Historical — superseded by the 2026-09-10 closure above.)*
 
 Purpose:
 
@@ -890,9 +892,10 @@ No new stage may be invented during this requalification.
 │ UI-C17 RBAC = CLOSED                                │
 │ UI-C18 Git = CLOSED                                 │
 │ Finance Center = NOT STARTED / DEFERRED             │
-│ D8 = NOT STARTED                                    │
+│ D8 = CLOSED / APPROVED (2026-09-10, VERDICT A)      │
+│ D9 = NOT STARTED / TRUE NEXT                        │
 │ PROD-01 = OPEN / DEFERRED                           │
-│ TRUE NEXT = D8 (requalified 2026-09-09, VERDICT A)  │
+│ TRUE NEXT = D9 (after D8 closure 2026-09-10)        │
 └─────────────────────────────────────────────────────┘
 ```
 

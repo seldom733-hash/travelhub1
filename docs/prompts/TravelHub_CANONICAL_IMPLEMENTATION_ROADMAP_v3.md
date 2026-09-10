@@ -2569,9 +2569,9 @@ D6  Bookings Full-Page Detail                           ✅ ACCEPTED (impl VERDI
  ↓
 D7  Payment/Refund Semantics + Financial Presentation   ✅ ACCEPTED (impl VERDICT A, 2026-09-04)
  ↓
-D8  Global Temporal Visibility                          ⬜ NOT STARTED
+D8  Global Temporal Visibility                          ✅ ACCEPTED (security/tenant closure VERDICT A, 2026-09-10)
  ↓
-D9  Export Framework Requalification                    ⬜ NOT STARTED
+D9  Export Framework Requalification                    ⬜ NOT STARTED / TRUE NEXT
  ↓
 D10 Partner Performance Attribution                     ⬜ NOT STARTED
  ↓
@@ -2600,7 +2600,7 @@ STEP 3.12                                               ⬜ BLOCKED BY D14
 | D6 | Bookings Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ | D0 | D6 |
 | D7 | Payment/Refund Semantics + Financial Presentation | IMPLEMENTATION_DEBT | ⬜ | D0 | D7 |
 | D8 | Global Temporal Visibility | IMPLEMENTATION_DEBT | ⬜ | D0 | D8 |
-| D9 | Export Framework Requalification | REQUALIFICATION_DEBT | ⬜ | D0 | D9 |
+| D9 | Export Framework Requalification | REQUALIFICATION_DEBT | ⬜ (TRUE NEXT) | D0 | D9 |
 | D10 | Partner Performance Attribution | ARCHITECTURE_DEBT | ⬜ | D0 | D10 |
 | D11 | Project-Wide KPI/Status Semantics + Total Reconciliation | ARCHITECTURE_DEBT | ⬜ | D0 | D11 |
 | D12 | CRM / KPI Drill-down Routing Requalification | REQUALIFICATION_DEBT | ⬜ | D0 | D12 |
