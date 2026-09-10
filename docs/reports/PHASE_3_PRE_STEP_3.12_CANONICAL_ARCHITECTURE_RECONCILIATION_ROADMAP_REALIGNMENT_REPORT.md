@@ -280,21 +280,23 @@ HEAD == origin:  YES ✅
 
 | ID | Debt | Type | Current Status | Dependency | Closure Stage |
 |---|---|---|---|---|---|
-| D0 | Reconciliation Final Git/Evidence Closure | ACCEPTANCE_DEBT | THIS STAGE | — | D0 |
-| D1 | Commerce Lifecycle Contract Finalization | ARCHITECTURE_DEBT | NOT STARTED | D0 | D1 |
-| D2 | Product Traveler Requirements | ARCHITECTURE_DEBT | NOT STARTED | D1 | D2 |
-| D3 | Traveler Collection + Order/Booking Population | IMPLEMENTATION_DEBT | NOT STARTED | D2 | D3 |
-| D4 | Traveler Security + Representative Data | IMPLEMENTATION_DEBT | NOT STARTED | D3 | D4 |
-| D5 | Orders Full-Page Detail | IMPLEMENTATION_DEBT | NOT STARTED | D0 | D5 |
-| D6 | Bookings Full-Page Detail | IMPLEMENTATION_DEBT | NOT STARTED | D0 | D6 |
-| D7 | Payment/Refund Semantics + Financial Presentation | IMPLEMENTATION_DEBT | NOT STARTED | D0 | D7 |
-| D8 | Global Temporal Visibility | IMPLEMENTATION_DEBT | NOT STARTED | D0 | D8 |
-| D9 | Export Framework Requalification | REQUALIFICATION_DEBT | NOT STARTED | D0 | D9 |
-| D10 | Partner Performance Attribution | ARCHITECTURE_DEBT | NOT STARTED | D0 | D10 |
-| D11 | Booking KPI Semantics | ARCHITECTURE_DEBT | NOT STARTED | D0 | D11 |
-| D12 | CRM / KPI Drill-down Routing Requalification | REQUALIFICATION_DEBT | NOT STARTED | D0 | D12 |
-| D13 | Voucher | IMPLEMENTATION_DEBT | NOT STARTED | D4 | D13 |
-| D14 | PRE-STEP 3.12 Final Requalification | ACCEPTANCE_DEBT | NOT STARTED | D1-D13 | D14 |
+| D0 | Reconciliation Final Git/Evidence Closure | ACCEPTANCE_DEBT | CLOSED | — | D0 |
+| D1 | Commerce Lifecycle Contract Finalization | ARCHITECTURE_DEBT | CLOSED | D0 | D1 |
+| D2 | Product Traveler Requirements | ARCHITECTURE_DEBT | CLOSED | D1 | D2 |
+| D3 | Traveler Collection + Order/Booking Population | IMPLEMENTATION_DEBT | CLOSED | D2 | D3 |
+| D4 | Traveler Security + Representative Data | IMPLEMENTATION_DEBT | CLOSED | D3 | D4 |
+| D5 | Orders Full-Page Detail | IMPLEMENTATION_DEBT | CLOSED | D0 | D5 |
+| D6 | Bookings Full-Page Detail | IMPLEMENTATION_DEBT | CLOSED | D0 | D6 |
+| D7 | Payment/Refund Semantics + Financial Presentation | IMPLEMENTATION_DEBT | CLOSED | D0 | D7 |
+| D8 | Global Temporal Visibility | IMPLEMENTATION_DEBT | CLOSED (2026-09-10, VERDICT A) | D0 | D8 |
+| D9 | Export Framework Requalification | REQUALIFICATION_DEBT | CLOSED (2026-09-10, VERDICT A) | D0 | D9 |
+| D10 | Partner Performance Attribution | ARCHITECTURE_DEBT | CLOSED (79ef1fc, 2026-09-10) | D0 | D10 |
+| D11 | Booking KPI Semantics | ARCHITECTURE_DEBT | CLOSED (0172fb4, 2026-09-10) | D0 | D11 |
+| D12 | CRM / KPI Drill-down Routing Requalification | REQUALIFICATION_DEBT | CLOSED (40e2f5b, 2026-09-10) | D0 | D12 |
+| D13 | Voucher | IMPLEMENTATION_DEBT | CLOSED (2616cc6, D13_VOUCHER tag, 2026-09-10) | D4 | D13 |
+| D14 | PRE-STEP 3.12 Final Requalification | ACCEPTANCE_DEBT | NOT STARTED / TRUE NEXT | D1-D13 | D14 |
+
+> **Reconciliation note (2026-09-11):** Statuses updated from original D0-era NOT STARTED to reflect actual accepted closures. D0-D7 closed during Phase 3 implementation (2026-09-02 through 2026-09-04). D8-D9 closed 2026-09-10. D10-D13 closed 2026-09-10. D14 = TRUE NEXT.
 
 ---
 

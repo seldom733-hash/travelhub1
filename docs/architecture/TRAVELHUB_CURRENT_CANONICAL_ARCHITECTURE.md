@@ -435,23 +435,15 @@ PRE-STEP 3.12: Multiple sub-tasks completed
 
 # 21. Canonical NEXT Stage
 
-After Architecture Reconciliation (D0), the TRUE NEXT stage is:
+After D13 closure (2026-09-10), the TRUE NEXT stage is:
 
-**D1 — COMMERCE LIFECYCLE CONTRACT FINALIZATION**
+**D14 — PRE-STEP 3.12 Final Requalification**
 
-D1 must definitively freeze:
-- supplier confirmation semantics
-- customer acceptance semantics
-- traveler collection point
-- final confirmation
-- Request conversion semantics
-- `convertedAt` semantics
-- Order creation point
-- Booking creation point
+D14 is a requalification pass over all D0-D13 work before STEP 3.12.
 
-After D1, the implementation sequence is:
+The implementation sequence (all prior stages CLOSED):
 ```
 D1 → D2 → D3 → D4 → D5/D6 (parallel) → D7 → D8 → D9 → D10 → D11 → D12 → D13 → D14 → STEP 3.12
 ```
 
-**What remains deferred:** Finance Center, Product Freshness, STEP 3.12 proper.
+**What remains deferred:** Finance Center, Product Freshness, STEP 3.12 proper (blocked by D14).

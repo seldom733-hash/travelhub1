@@ -1,7 +1,7 @@
 # TRAVELHUB — CANONICAL DEBT REGISTER
 
 Established: 2026-09-04
-Last updated: 2026-09-09 (Documentation Governance Cleanup: status-line reconciliation per accepted closure evidence — see reconciliation notes per item; no debt reclassification beyond documented evidence)
+Last updated: 2026-09-11 (Pre-D14 reconciliation: UI-DOC-ADMIN added, status verification)
 
 ---
 
@@ -916,6 +916,34 @@ Conceptual links to existing register entries (only real IDs, no invented depend
 DATA-02 — Marketplace vs Storefront financial metric separation (Platform/Partner semantics)
 FIN-01  — Finance Center reporting
 HELP-05 — formula-drift automated gate / analytics metric registry
+```
+
+---
+
+### UI-DOC-ADMIN — Admin / Operator Documents UI
+
+| Field | Value |
+|---|---|
+| ID | UI-DOC-ADMIN |
+| Title | Admin / Operator Documents UI |
+| Category | UX CONSISTENCY |
+| Severity | P2 |
+| Origin | D13 Qualification Gate (2026-09-11) |
+| Description | Admin/Operator platform lacks a Documents section in the navigation. Backend API (`documents.read`, `documents.write`) is complete. Buyer Documents UI (`/account/documents`) is complete. Admin/Operator have no frontend surface to list, view, download, or invalidate documents. |
+| Why it matters | Platform staff with `documents.read`/`write` permissions cannot access documents through the UI. They must use API tools. This is inconsistent with other admin entities (Orders, Bookings, Payments) which all have admin UI surfaces. |
+| Dependencies | D13 CLOSED (backend API available) |
+| Planned closure stage | TO BE DETERMINED (pending IA review + governance decision) |
+| Status | PLANNED |
+| Acceptance condition | `/app/documents` exists; Admin navigation contains Documents in approved IA location; ADMIN/OPERATOR can list documents; authorized roles can view permitted details; PII redaction correct; Buyer isolated to `/account/documents`; Partner denied; download uses signed URL; invalidation only for authorized roles; invalidated documents cannot be downloaded; no new document backend; D13 API contracts unchanged; D8-D13 regression clean |
+| Closure SHA | — |
+| Notes | Placement decision: E (target stage TBD). Requires: (1) IA review for navigation placement (OPERATIONS vs FINANCE vs new group), (2) governance decision on new stage vs existing stage, (3) product ownership assignment. Do NOT implement until placement is resolved. |
+
+#### Cross-References
+
+```text
+D13     — Voucher (backend API source)
+D14     — PRE-STEP 3.12 Final Requalification (depends on D13, not UI-DOC-ADMIN)
+STEP 3.12 — Final Phase 3 gate
 ```
 
 ---

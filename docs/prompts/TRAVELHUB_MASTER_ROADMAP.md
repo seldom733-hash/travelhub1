@@ -885,18 +885,25 @@ No new stage may be invented during this requalification.
 # 25. MASTER ROADMAP STATUS
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│ TRAVELHUB MASTER ROADMAP                            │
-├─────────────────────────────────────────────────────┤
-│ Phase 3 accepted implementation = CLOSED            │
-│ UI-C17 RBAC = CLOSED                                │
-│ UI-C18 Git = CLOSED                                 │
-│ Finance Center = NOT STARTED / DEFERRED             │
-│ D8 = CLOSED / APPROVED (2026-09-10, VERDICT A)      │
-│ D9 = CLOSED / APPROVED (2026-09-10, VERDICT A)      │
-│ PROD-01 = OPEN / DEFERRED                           │
-│ TRUE NEXT = D10 (after D9 closure 2026-09-10)       │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│ TRAVELHUB MASTER ROADMAP                                    │
+├─────────────────────────────────────────────────────────────┤
+│ Phase 3 accepted implementation = CLOSED                    │
+│ UI-C17 RBAC = CLOSED                                        │
+│ UI-C18 Git = CLOSED                                         │
+│ Finance Center = NOT STARTED / DEFERRED                     │
+│ D8  = CLOSED / APPROVED (2026-09-10, VERDICT A)             │
+│ D9  = CLOSED / APPROVED (2026-09-10, VERDICT A)             │
+│ D10 = CLOSED / APPROVED (79ef1fc, 2026-09-10)               │
+│ D11 = CLOSED / APPROVED (0172fb4, 2026-09-10)               │
+│ D12 = CLOSED / APPROVED (40e2f5b, 2026-09-10)               │
+│ D13 = CLOSED / APPROVED (2616cc6, D13_VOUCHER tag)          │
+│ D14 = NOT STARTED / TRUE NEXT                               │
+│ STEP 3.12 = BLOCKED (by D14)                                │
+│ PROD-01 = OPEN / DEFERRED                                   │
+│ UI-DOC-ADMIN = PLANNED / TARGET TBD                         │
+│ TRUE NEXT = D14                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -942,3 +949,26 @@ MASTER ROADMAP UPDATE
 ```
 
 This is the canonical project workflow going forward.
+
+---
+
+# 28. CLOSURE SYNC RULE (MANDATORY)
+
+**Closure Sync Rule:** A governed stage is not governance-complete until its accepted closure is reflected in the Master Roadmap. Every accepted closure MUST update, at minimum:
+
+- stage status (CLOSED / APPROVED / VERDICT);
+- closure evidence / SHA;
+- current state / result;
+- TRUE NEXT;
+- blockers / dependencies;
+- any newly registered debt items.
+
+```text
+closure evidence
+    ≠
+roadmap synchronization
+```
+
+Both are required. A stage is not fully closed until the canonical Master Roadmap has been synchronized with the accepted evidence.
+
+This rule is mandatory for D14 and all subsequent governed stages.

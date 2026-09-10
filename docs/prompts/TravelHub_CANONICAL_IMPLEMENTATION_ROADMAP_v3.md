@@ -2545,8 +2545,8 @@ Product.partnerId NOT NULL → NOT READY (legacy preserved)
 
 **Established:** 2026-09-02 (Architecture Reconciliation, D0 closure)
 **Updated:** 2026-09-02 (D1 closure, D1A added)
-**Updated:** 2026-09-03 (additive sync: D2/D3/D4 status corrections, D4-REM closure, post-D4 confirmed deferred debts — см. addendum ниже)
-**TRUE NEXT:** D1A — Platform CRM Marketplace/Storefront Scope Isolation
+**Updated:** 2026-09-11 (Pre-D14 reconciliation: D10-D13 statuses corrected)
+**TRUE NEXT:** D14 — PRE-STEP 3.12 Final Requalification
 
 ```
 D0  Reconciliation Final Git/Evidence Closure          ✅ COMPLETED (2026-09-02)
@@ -2573,15 +2573,15 @@ D8  Global Temporal Visibility                          ✅ ACCEPTED (security/t
  ↓
 D9  Export Framework Requalification                    ✅ CLOSED (F1 remediation VERDICT A; F2–F5 ACCEPTED; final closure gate 2026-09-10)
  ↓
-D10 Partner Performance Attribution                     ⬜ NOT STARTED / TRUE NEXT
+D10 Partner Performance Attribution                     ✅ CLOSED (79ef1fc, 2026-09-10)
  ↓
-D11 Project-Wide KPI/Status Semantics + Total Reconciliation  ⬜ NOT STARTED
+D11 Project-Wide KPI/Status Semantics + Total Reconciliation  ✅ CLOSED (0172fb4, 2026-09-10)
  ↓
-D12 CRM / KPI Drill-down Routing Requalification       ⬜ NOT STARTED
+D12 CRM / KPI Drill-down Routing Requalification       ✅ CLOSED (40e2f5b, 2026-09-10)
  ↓
-D13 Voucher                                             ⬜ NOT STARTED
+D13 Voucher                                             ✅ CLOSED (2616cc6, D13_VOUCHER tag, 2026-09-10)
  ↓
-D14 PRE-STEP 3.12 Final Requalification                ⬜ NOT STARTED
+D14 PRE-STEP 3.12 Final Requalification                ⬜ NOT STARTED / TRUE NEXT
  ↓
 STEP 3.12                                               ⬜ BLOCKED BY D14
 ```
@@ -2597,14 +2597,14 @@ STEP 3.12                                               ⬜ BLOCKED BY D14
 | D4 | Traveler Security + Representative Data | IMPLEMENTATION_DEBT | ✅ | D3 | D4-REM |
 | D4-REM | D4 Strict Review Remediation Closure (F1 traveler/final-confirm serialization, F2 list/export scope, F3 S12 natural chain, F4 S5 reclassification, F5 manifest CASE A, F6 bulk traveler) | REMEDIATION_DEBT | ✅ | D4 | D4-REM |
 | D5 | Orders Full-Page Detail | IMPLEMENTATION_DEBT | ✅ | D4-REM | D5 |
-| D6 | Bookings Full-Page Detail | IMPLEMENTATION_DEBT | ⬜ | D0 | D6 |
-| D7 | Payment/Refund Semantics + Financial Presentation | IMPLEMENTATION_DEBT | ⬜ | D0 | D7 |
-| D8 | Global Temporal Visibility | IMPLEMENTATION_DEBT | ⬜ | D0 | D8 |
+| D6 | Bookings Full-Page Detail | IMPLEMENTATION_DEBT | ✅ | D0 | D6 |
+| D7 | Payment/Refund Semantics + Financial Presentation | IMPLEMENTATION_DEBT | ✅ | D0 | D7 |
+| D8 | Global Temporal Visibility | IMPLEMENTATION_DEBT | ✅ | D0 | D8 |
 | D9 | Export Framework Requalification | REQUALIFICATION_DEBT | ✅ | D0 | D9 |
-| D10 | Partner Performance Attribution | ARCHITECTURE_DEBT | ⬜ | D0 | D10 |
-| D11 | Project-Wide KPI/Status Semantics + Total Reconciliation | ARCHITECTURE_DEBT | ⬜ | D0 | D11 |
-| D12 | CRM / KPI Drill-down Routing Requalification | REQUALIFICATION_DEBT | ⬜ | D0 | D12 |
-| D13 | Voucher | IMPLEMENTATION_DEBT | ⬜ | D4 | D13 |
+| D10 | Partner Performance Attribution | ARCHITECTURE_DEBT | ✅ | D0 | D10 |
+| D11 | Project-Wide KPI/Status Semantics + Total Reconciliation | ARCHITECTURE_DEBT | ✅ | D0 | D11 |
+| D12 | CRM / KPI Drill-down Routing Requalification | REQUALIFICATION_DEBT | ✅ | D0 | D12 |
+| D13 | Voucher | IMPLEMENTATION_DEBT | ✅ | D4 | D13 |
 | D14 | PRE-STEP 3.12 Final Requalification | ACCEPTANCE_DEBT | ⬜ | D1-D13 | D14 |
 
 **Deferred / Separate Tracks (NOT in D0-D14):**
