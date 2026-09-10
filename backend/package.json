@@ -33,7 +33,6 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
-    "pdf-lib": "^1.17.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.35.3"
@@ -61,12 +60,13 @@
     "moduleFileExtensions": [
       "js",
       "json",
-      "ts"
+      "ts",
+      "tsx"
     ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
-      "^.+\\.(t|j)s$": [
+      "^.+\\.tsx?$": [
         "ts-jest",
         {
           "tsconfig": "<rootDir>/../tsconfig.json"
@@ -74,7 +74,8 @@
       ]
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "**/*.tsx"
     ],
     "coverageDirectory": "../coverage"
   },

@@ -5,23 +5,25 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { IdsService } from "../../shared/ids.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
 
-jest.mock("pdf-lib", () => {
-  const mockPage = {
-    getSize: () => ({ width: 595.28, height: 841.89 }),
-    drawLine: jest.fn(),
-    drawText: jest.fn(),
-  };
-  const mockDoc = {
-    addPage: jest.fn(() => mockPage),
-    embedFont: jest.fn().mockResolvedValue("mock-font"),
-    save: jest.fn().mockResolvedValue(new Uint8Array(Buffer.from("%PDF-1.4 mock-pdf-content-for-unit-test"))),
+jest.mock("@react-pdf/renderer", () => {
+  const mockPdfInstance = {
+    toBlob: jest.fn().mockResolvedValue({
+      arrayBuffer: jest.fn().mockResolvedValue(Buffer.from("%PDF-1.4 mock-pdf-content-for-unit-test")),
+    }),
   };
   return {
-    PDFDocument: { create: jest.fn().mockResolvedValue(mockDoc) },
-    StandardFonts: { Helvetica: "Helvetica", HelveticaBold: "HelveticaBold", HelveticaOblique: "HelveticaOblique" },
-    rgb: jest.fn(() => ({})),
+    pdf: jest.fn().mockReturnValue(mockPdfInstance),
+    Document: "Document",
+    Page: "Page",
+    Text: "Text",
+    View: "View",
+    StyleSheet: { create: jest.fn((s: any) => s) },
   };
 });
+
+jest.mock("react", () => ({
+  createElement: jest.fn((type: any, props: any, ...children: any) => ({ type, props, children })),
+}));
 
 function createMockPrisma() {
   const prisma: any = {
@@ -179,14 +181,14 @@ describe("DocumentsService", () => {
   });
 });
 
-describe("DocumentRenderer — unit (mocked PDF)", () => {
+describe("DocumentRenderer — mocked @react-pdf/renderer", () => {
   let renderer: DocumentRenderer;
 
   beforeEach(() => {
     renderer = new DocumentRenderer();
   });
 
-  it("should call renderToBuffer and return non-empty buffer for VOUCHER", async () => {
+  it("should render VOUCHER to valid PDF buffer", async () => {
     const buffer = await renderer.render("VOUCHER", {
       code: "VCH-00000001",
       bookingCode: "BKG-00000001",
@@ -198,7 +200,7 @@ describe("DocumentRenderer — unit (mocked PDF)", () => {
     expect(buffer.slice(0, 5).toString("ascii")).toBe("%PDF-");
   });
 
-  it("should call renderToBuffer for PARTIAL_PAYMENT", async () => {
+  it("should render PARTIAL_PAYMENT to valid PDF buffer", async () => {
     const buffer = await renderer.render("PARTIAL_PAYMENT", {
       code: "PPD-00000001",
       totalAmount: "5000",
@@ -209,7 +211,7 @@ describe("DocumentRenderer — unit (mocked PDF)", () => {
     expect(buffer.slice(0, 5).toString("ascii")).toBe("%PDF-");
   });
 
-  it("should call renderToBuffer for REFUND", async () => {
+  it("should render REFUND to valid PDF buffer", async () => {
     const buffer = await renderer.render("REFUND", {
       code: "RFD-00000001",
       refundAmount: "500",

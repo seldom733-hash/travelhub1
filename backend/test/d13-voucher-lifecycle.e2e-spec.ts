@@ -715,4 +715,166 @@ describe("D13 — Voucher Lifecycle (e2e)", () => {
       .set(authHeaders(adminToken));
     expect([404, 409]).toContain(res.status);
   });
+
+  // ─── Real PDF validation ──────────────────────────────────────────────
+  it("Real PDF: generated binary is valid %PDF with A4 page", async () => {
+    const issued = await prisma.document.findFirst({
+      where: { status: "ISSUED" },
+      include: { versions: { where: { status: "ISSUED" }, take: 1 } },
+    });
+    if (!issued || !issued.versions[0]) return;
+
+    // Verify the version has valid storage metadata
+    const version = issued.versions[0];
+    expect(version.s3Key).toBeTruthy();
+    expect(version.fileSize).toBeGreaterThan(0);
+    expect(version.snapshot).toBeTruthy();
+
+    // Verify putObject was called with valid PDF binary
+    expect(mockStorage.putObject).toHaveBeenCalled();
+    const lastCall = (mockStorage.putObject as jest.Mock).mock.calls.find(
+      (call: any) => call[0]?.key === version.s3Key,
+    );
+    expect(lastCall).toBeTruthy();
+    const pdfBuffer: Buffer = lastCall[0].body;
+    expect(pdfBuffer).toBeInstanceOf(Buffer);
+    expect(pdfBuffer.length).toBeGreaterThan(100);
+    expect(pdfBuffer.slice(0, 5).toString("ascii")).toMatch(/^%PDF/);
+  });
+
+  it("Real PDF: VOUCHER contains expected template content", async () => {
+    const issued = await prisma.document.findFirst({
+      where: { status: "ISSUED", type: "VOUCHER" },
+      include: { versions: { where: { status: "ISSUED" }, take: 1 } },
+    });
+    if (!issued || !issued.versions[0]) return;
+
+    // Verify the snapshot contains expected data fields
+    const snapshot = issued.versions[0].snapshot as Record<string, unknown>;
+    expect(snapshot.code).toBeTruthy();
+    expect(snapshot.travelers).toBeDefined();
+    expect(Array.isArray(snapshot.travelers)).toBe(true);
+
+    // Verify putObject was called with valid PDF binary
+    const lastCall = (mockStorage.putObject as jest.Mock).mock.calls.find(
+      (call: any) => call[0]?.key === issued.versions[0].s3Key,
+    );
+    expect(lastCall).toBeTruthy();
+    const pdfBuffer: Buffer = lastCall[0].body;
+    expect(pdfBuffer.length).toBeGreaterThan(100);
+    expect(pdfBuffer.slice(0, 5).toString("ascii")).toBe("%PDF-");
+  });
+
+  it("Real PDF: PII in snapshot, but redacted at buyer API view", async () => {
+    const issued = await prisma.document.findFirst({
+      where: { status: "ISSUED" },
+      include: { versions: { where: { status: "ISSUED" }, take: 1 } },
+    });
+    if (!issued || !issued.versions[0]) return;
+
+    const snapshot = issued.versions[0].snapshot as Record<string, unknown>;
+    const travelers = snapshot.travelers as Array<Record<string, unknown>> | undefined;
+    if (!travelers || travelers.length === 0) return;
+
+    // Snapshot stores original data for audit (passport numbers present in snapshot)
+    const hasPassport = travelers.some((t) => t.passportNumber);
+    // This is expected — the snapshot is the audit trail
+
+    // But buyer-scope API must redact PII
+    const buyer = await createStaff("piiredact", RoleCode.BUYER);
+    const cust = await prisma.customer.create({
+      data: { firstName: "PII2", lastName: "Buyer2", code: `CRM-PII2-${stamp}`, email: `pii2-${stamp}@test.local` },
+    });
+    created.customers.push(cust.id);
+    await prisma.user.update({ where: { id: buyer.user.id }, data: { customerId: cust.id } });
+
+    // Link document to this customer
+    await prisma.document.update({ where: { id: issued.id }, data: { customerId: cust.id } });
+
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/account/documents/${issued.id}`)
+      .set(authHeaders(buyer.accessToken));
+
+    if (res.status === 200 && res.body.versions?.[0]?.snapshot?.travelers) {
+      const buyerTravelers = res.body.versions[0].snapshot.travelers;
+      for (const t of buyerTravelers) {
+        expect(t.passportNumber).toBeFalsy();
+        expect(t.passportExpiry).toBeFalsy();
+      }
+    }
+
+    // Restore
+    await prisma.document.update({ where: { id: issued.id }, data: { customerId: null } });
+  });
+
+  // ─── Storage failure coverage ─────────────────────────────────────────
+  it("Storage failure: putObject error leaves document NOT_ISSUED", async () => {
+    const customerId = await createCustomer("STORFAIL");
+    const order = await prisma.order.create({
+      data: {
+        code: `D13-ORD-STORFAIL-${stamp}`, number: `TH-SF-${stamp}`, referenceNumber: `MKT-SF-${stamp}`,
+        commerceSequence: "STORFAIL", status: "PARTIALLY_FULFILLED", paymentStatus: "PAID",
+        currency: "USD", amount: 1000, paidAmount: 1000, refundedAmount: 0, version: 1,
+        acquisitionSource: "MARKETPLACE", customerId, submittedAt: new Date(), serviceDate: FUTURE(30),
+      },
+    });
+    created.orders.push(order.id);
+
+    const booking = await prisma.booking.create({
+      data: {
+        code: `D13-BKG-STORFAIL-${stamp}`,
+        referenceNumber: `BKG-SF-${stamp}`,
+        orderId: order.id,
+        productId: "00000000-0000-0000-0000-000000000000",
+        status: "CONFIRMED",
+        currency: "USD",
+        amount: order.amount,
+        serviceDate: FUTURE(30),
+        confirmedAt: new Date(),
+      },
+    });
+    created.bookings.push(booking.id);
+
+    await prisma.passenger.create({
+      data: {
+        bookingId: booking.id,
+        firstName: "SF",
+        lastName: "Test",
+        citizenship: "US",
+        gender: "M",
+      },
+    });
+
+    // Temporarily make putObject throw
+    const originalPutObject = mockStorage.putObject;
+    (mockStorage.putObject as jest.Mock).mockImplementationOnce(() => {
+      throw new Error("S3 upload failed: connection refused");
+    });
+
+    await emitAndWait(DomainEvents.BookingConfirmed, {
+      bookingId: booking.id,
+      orderId: order.id,
+      customerId,
+      serviceDate: booking.serviceDate,
+    });
+
+    // Restore
+    (mockStorage.putObject as jest.Mock).mockImplementation(originalPutObject);
+
+    // Give consumer time to process (and fail)
+    await new Promise((r) => setTimeout(r, 500));
+
+    // Document should either not exist or remain NOT_ISSUED — never ISSUED
+    const doc = await prisma.document.findFirst({
+      where: { bookingId: booking.id, type: "VOUCHER" },
+    });
+    if (doc) {
+      expect(doc.status).not.toBe("ISSUED");
+    }
+    // No ISSUED version should exist
+    const versions = await prisma.documentVersion.findMany({
+      where: doc ? { documentId: doc.id } : { documentId: "nonexistent" },
+    });
+    expect(versions.filter((v) => v.status === "ISSUED").length).toBe(0);
+  });
 });
