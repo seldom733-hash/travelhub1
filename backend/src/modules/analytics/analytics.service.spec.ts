@@ -434,19 +434,23 @@ describe("AnalyticsService — Partner Performance (HIGH-6)", () => {
     expect(result.partners[0].partnerName).toBe("Test Partner");
   });
 
-  it("returns booking completion rate", async () => {
+  it("returns booking completion rate via Order.sellerPartnerId (D10)", async () => {
     const prisma = createMockPrisma();
     prisma.order.findMany.mockResolvedValue([]);
     prisma.payment.findMany.mockResolvedValue([]);
     prisma.commission.findMany.mockResolvedValue([]);
+    // D10: bookings now use orderId for attribution via Order.sellerPartnerId
     prisma.booking.findMany.mockResolvedValue([
-      { id: "b1", status: "CONFIRMED", productId: "prod1" },
-      { id: "b2", status: "COMPLETED", productId: "prod1" },
-      { id: "b3", status: "COMPLETED", productId: "prod1" },
+      { id: "b1", status: "CONFIRMED", orderId: "ord-1" },
+      { id: "b2", status: "COMPLETED", orderId: "ord-1" },
+      { id: "b3", status: "COMPLETED", orderId: "ord-1" },
     ]);
-    prisma.partner.findMany.mockResolvedValue([]);
-    prisma.product.findMany.mockResolvedValue([
-      { id: "prod1", partnerId: "p1" },
+    // D10: second order.findMany call resolves booking → order sellerPartnerId
+    prisma.order.findMany
+      .mockResolvedValueOnce([]) // first call: period orders (empty)
+      .mockResolvedValueOnce([{ id: "ord-1", sellerPartnerId: "p1" }]); // booking order attribution
+    prisma.partner.findMany.mockResolvedValue([
+      { id: "p1", name: "Test Partner" },
     ]);
     prisma.$queryRaw.mockResolvedValue([]);
 
@@ -456,12 +460,68 @@ describe("AnalyticsService — Partner Performance (HIGH-6)", () => {
       { id: "u1", role: "ADMIN", partnerId: null } as any,
     );
 
-    // RT13: New formula: completedBookings / totalBookings (all statuses)
-    // 3 bookings total: 1 CONFIRMED + 2 COMPLETED
-    // rate = 2/3 = 66.67%
+    // RT13: completedBookings / totalBookings = 2/3 = 66.67%
     const partner = result.partners.find((p) => p.partnerId === "p1");
     expect(partner).toBeDefined();
     expect(partner!.bookingCompletionRate).toBe(66.67);
+    expect(partner!.bookingsCount).toBe(3);
+  });
+
+  it("D10: Booking attribution uses Order.sellerPartnerId, not Product.partnerId", async () => {
+    const prisma = createMockPrisma();
+    // Order with sellerPartnerId = p1
+    prisma.order.findMany
+      .mockResolvedValueOnce([
+        { id: "o1", sellerPartnerId: "p1", amount: "100.00", currency: "USD" },
+      ])
+      // Booking order attribution: ord-1 → p1
+      .mockResolvedValueOnce([{ id: "ord-1", sellerPartnerId: "p1" }]);
+    prisma.payment.findMany.mockResolvedValue([]);
+    prisma.commission.findMany.mockResolvedValue([]);
+    // Booking linked to ord-1, but productId belongs to p2 (D10: should use order attribution)
+    prisma.booking.findMany.mockResolvedValue([
+      { id: "b1", status: "COMPLETED", orderId: "ord-1" },
+    ]);
+    prisma.partner.findMany.mockResolvedValue([
+      { id: "p1", name: "Partner A" },
+    ]);
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    const service = new AnalyticsService(prisma);
+    const result = await service.getPartnerPerformance(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u1", role: "ADMIN", partnerId: null } as any,
+    );
+
+    // D10: booking attributed to p1 via Order.sellerPartnerId
+    const partner = result.partners.find((p) => p.partnerId === "p1");
+    expect(partner).toBeDefined();
+    expect(partner!.bookingsCount).toBe(1);
+    // completedBookings is internal; completion rate = 1/1 = 100%
+    expect(partner!.bookingCompletionRate).toBe(100);
+  });
+
+  it("D10: Booking without resolvable Order.sellerPartnerId is unattributed", async () => {
+    const prisma = createMockPrisma();
+    prisma.order.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "ord-2", sellerPartnerId: null }]);
+    prisma.payment.findMany.mockResolvedValue([]);
+    prisma.commission.findMany.mockResolvedValue([]);
+    prisma.booking.findMany.mockResolvedValue([
+      { id: "b1", status: "COMPLETED", orderId: "ord-2" },
+    ]);
+    prisma.partner.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    const service = new AnalyticsService(prisma);
+    const result = await service.getPartnerPerformance(
+      { preset: AnalyticsPeriodPreset.MONTH },
+      { id: "u1", role: "ADMIN", partnerId: null } as any,
+    );
+
+    // D10: no partner should appear (booking unattributed)
+    expect(result.partners.length).toBe(0);
   });
 });
 

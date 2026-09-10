@@ -820,6 +820,7 @@ export class AnalyticsService {
           },
         }),
         // Bookings: Marketplace-scoped
+        // D10: select orderId for historical seller attribution via Order.sellerPartnerId
         this.prisma.booking.findMany({
           where: {
             acquisitionSource: "MARKETPLACE",
@@ -828,7 +829,7 @@ export class AnalyticsService {
           select: {
             id: true,
             status: true,
-            productId: true,
+            orderId: true,
           },
         }),
         effectivePartnerId
@@ -846,20 +847,19 @@ export class AnalyticsService {
             `,
       ]);
 
-    // Build partner → product mapping for bookings
-    const productPartnerMap = new Map<string, string>();
-    if (bookings.length > 0) {
-      const productIds = [
-        ...new Set(bookings.map((b) => b.productId).filter(Boolean)),
-      ] as string[];
-      if (productIds.length > 0) {
-        const products = await this.prisma.product.findMany({
-          where: { id: { in: productIds } },
-          select: { id: true, partnerId: true },
-        });
-        for (const p of products) {
-          if (p.partnerId) productPartnerMap.set(p.id, p.partnerId);
-        }
+    // D10: Build order → sellerPartnerId mapping for bookings
+    // Historical seller attribution: Booking.orderId → Order.sellerPartnerId
+    // This is the SAME frozen attribution used for Orders/GMV/Revenue,
+    // ensuring consistent Partner Performance attribution across all metrics.
+    const bookingOrderIds = [...new Set(bookings.map((b) => b.orderId).filter(Boolean))] as string[];
+    const bookingOrderSellerMap = new Map<string, string>();
+    if (bookingOrderIds.length > 0) {
+      const bookingOrders = await this.prisma.order.findMany({
+        where: { id: { in: bookingOrderIds } },
+        select: { id: true, sellerPartnerId: true },
+      });
+      for (const o of bookingOrders) {
+        if (o.sellerPartnerId) bookingOrderSellerMap.set(o.id, o.sellerPartnerId);
       }
     }
 
@@ -969,9 +969,11 @@ export class AnalyticsService {
         (data.commissionByCurrency[cur] || 0) + cents;
     }
 
-    // Merge bookings (via product → partner)
+    // D10: Merge bookings (via Order.sellerPartnerId — historical seller attribution)
+    // Consistent with Orders/GMV/Revenue attribution path.
+    // Bookings without resolvable Order.sellerPartnerId are unattributed (fail-closed).
     for (const b of bookings) {
-      const pid = productPartnerMap.get(b.productId);
+      const pid = bookingOrderSellerMap.get(b.orderId);
       if (!pid) continue;
       if (effectivePartnerId && pid !== effectivePartnerId) continue;
       ensurePartner(pid);
