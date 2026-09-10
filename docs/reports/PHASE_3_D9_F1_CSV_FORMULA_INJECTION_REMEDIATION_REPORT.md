@@ -160,17 +160,42 @@ All §17 VERDICT A gates satisfied: mitigation works (unit + readback), raw CSV 
 
 ## 13. Git Closure
 
-Commit: scoped to D9-F1 remediation (serializer + tests + prompt + report).
+Commit: scoped to D9-F1 remediation only — `fix(export): guard CSV text cells against formula injection (D9-F1)` (serializer + tests + prompt + this report).
 
-```bash
-git status --short
-git diff --check
-git diff --name-only
-git rev-parse HEAD
-git rev-parse origin/master
+```text
+$ git status --short
+<NO OUTPUT>            # working tree clean
+
+$ git diff --check
+<NO OUTPUT>            # no whitespace/conflict-marker errors
+
+$ git diff --name-only (pre-commit scope)
+backend/src/modules/shared/export/export.service.ts
+backend/src/modules/shared/export/export-formula-guard.spec.ts  (new)
+backend/test/d9-f1-csv-formula-guard.e2e-spec.ts                (new)
+docs/prompts/PHASE_3_D9_F1_CSV_FORMULA_INJECTION_TARGETED_REMEDIATION_PROMPT.md (new)
+docs/reports/PHASE_3_D9_F1_CSV_FORMULA_INJECTION_REMEDIATION_REPORT.md          (new)
+
+$ git push origin master
+0181639..903dd37  master -> master
 ```
 
-Final SHA / origin/master / working-tree status: recorded in the final response after commit and push.
+Implementation commit (full SHA):
+
+```text
+903dd37891fca98fb8ec90e6246dfd41eb6c8fd4
+```
+
+Post-push verification:
+
+```text
+HEAD           = 903dd37891fca98fb8ec90e6246dfd41eb6c8fd4
+origin/master  = 903dd37891fca98fb8ec90e6246dfd41eb6c8fd4
+HEAD == origin/master: YES
+Working tree:  CLEAN
+```
+
+Note: the only subsequent commit on top of this SHA is the report-only Git Closure evidence amendment (no production code), matching the repo convention for closure reports.
 
 ---
 
