@@ -124,6 +124,21 @@ export interface BuyerEmptySection {
   available: false;
 }
 
+export interface DocumentItem {
+  id: string;
+  code: string;
+  type: "PARTIAL_PAYMENT" | "VOUCHER" | "REFUND";
+  status: "NOT_ISSUED" | "ISSUED" | "SUPERSEDED" | "INVALIDATED";
+  bookingCode: string | null;
+  serviceDate: string | null;
+  totalAmount: string | null;
+  paidAmount: string | null;
+  currency: string | null;
+  paymentStatus: string | null;
+  version: number;
+  createdAt: string;
+}
+
 export const accountApi = {
   /** Публичная регистрация BUYER (создаёт User + CRM Customer + link). */
   register(input: RegisterInput): Promise<RegisterResult> {
@@ -167,9 +182,13 @@ export const accountApi = {
     return api.get("/account/payments");
   },
 
-  /** Own-scope документы: controlled empty до Phase 2 (documents domain). */
-  getDocuments(): Promise<BuyerEmptySection> {
-    return api.get("/account/documents");
+  /** Own-scope документы: D13 Documents domain. */
+  getDocuments(q: { page?: number; pageSize?: number } = {}): Promise<{ items: DocumentItem[]; total: number }> {
+    const sp = new URLSearchParams();
+    if (q.page) sp.set("page", String(q.page));
+    if (q.pageSize) sp.set("pageSize", String(q.pageSize));
+    const qs = sp.toString();
+    return api.get(`/account/documents${qs ? `?${qs}` : ""}`);
   },
 
   /** Own-scope поддержка: controlled empty до Phase 3 (support domain). */

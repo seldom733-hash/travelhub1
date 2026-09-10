@@ -2,6 +2,7 @@ import { Body, Controller, ForbiddenException, Get, HttpCode, HttpStatus, Patch,
 import { IsEmail, IsInt, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
 import { Type } from "class-transformer";
 import { AccountService, type OwnProfileResult, type UpdateOwnProfileInput } from "./account.service";
+import { DocumentsService } from "../../modules/documents/documents.service";
 import { CurrentUser, RequirePermissions } from "../auth/decorators";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { assertNoForbiddenKeys, PROFILE_FORBIDDEN_KEYS } from "../../shared/field-validation";
@@ -64,7 +65,10 @@ class UpdateProfileDto implements UpdateOwnProfileInput {
 @UseGuards(JwtAuthGuard)
 @Controller("account")
 export class AccountController {
-  constructor(private readonly account: AccountService) {}
+  constructor(
+    private readonly account: AccountService,
+    private readonly documents: DocumentsService,
+  ) {}
 
   /** Строгий role-gate: кабинет доступен ТОЛЬКО роли BUYER (§5, §3). */
   private assertBuyerActor(user: AuthedRequest["user"]): void {
@@ -107,9 +111,12 @@ export class AccountController {
 
   @RequirePermissions("account.document.read_own")
   @Get("documents")
-  getOwnDocuments(@CurrentUser() user: AuthedRequest["user"]) {
+  async getOwnDocuments(
+    @CurrentUser() user: AuthedRequest["user"],
+    @Query() query: OwnCabinetQuery,
+  ) {
     this.assertBuyerActor(user);
-    return this.account.getOwnDocuments();
+    return this.documents.listBuyerDocuments(user.id, query.page, query.pageSize);
   }
 
   @RequirePermissions("account.support.read_own")
