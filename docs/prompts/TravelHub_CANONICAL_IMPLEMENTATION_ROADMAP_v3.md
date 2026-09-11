@@ -2583,7 +2583,7 @@ D13 Voucher                                             ✅ CLOSED (2616cc6, D13
  ↓
 D14 PRE-STEP 3.12 Final Requalification                ✅ CLOSED (D14 requalification, 2026-09-11)
  ↓
-STEP 3.12                                               ✅ CONDITIONAL PASS (Phase 2 exit blocked 2.17B, 2026-09-11)
+STEP 3.12                                               ❌ BLOCKED (Phase 2 exit not satisfied, 2026-09-11)
 ```
 
 | ID | Debt | Type | Status | Dependency | Closure |

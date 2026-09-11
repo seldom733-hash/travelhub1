@@ -435,11 +435,11 @@ PRE-STEP 3.12: Multiple sub-tasks completed
 
 # 21. Canonical NEXT Stage
 
-After STEP 3.12 completion (2026-09-11), the TRUE NEXT stage is:
+After STEP 3.12 execution (2026-09-11), the gate is:
 
-**TBD — pending Phase 2 exit resolution**
+**STEP 3.12 = BLOCKED — Phase 2 exit not satisfied**
 
-STEP 3.12 verdict: CONDITIONAL PASS — Phase 3 implementation is complete, but Phase 2 exit (Step 2.17B — qualification environment) remains an external blocker.
+STEP 3.12 verdict: BLOCKED — Phase 3 implementation is complete/verified, but Phase 2 exit (Step 2.17B — qualification environment) remains an unsatisfied prerequisite. Phase 3 is NOT declared final complete. TRUE NEXT is NOT set. No next stage is authorized.
 
 The completed implementation sequence:
 ```
