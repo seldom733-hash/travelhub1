@@ -1,7 +1,7 @@
 # TRAVELHUB — CANONICAL DEBT REGISTER
 
 Established: 2026-09-04
-Last updated: 2026-09-11 (Pre-D14 reconciliation: UI-DOC-ADMIN added, status verification)
+Last updated: 2026-09-11 (UI-DOC-ADMIN authorized for implementation, status updated)
 
 ---
 
@@ -932,19 +932,19 @@ HELP-05 — formula-drift automated gate / analytics metric registry
 | Description | Admin/Operator platform lacks a Documents section in the navigation. Backend API (`documents.read`, `documents.write`) is complete. Buyer Documents UI (`/account/documents`) is complete. Admin/Operator have no frontend surface to list, view, download, or invalidate documents. |
 | Why it matters | Platform staff with `documents.read`/`write` permissions cannot access documents through the UI. They must use API tools. This is inconsistent with other admin entities (Orders, Bookings, Payments) which all have admin UI surfaces. |
 | Dependencies | D13 CLOSED (backend API available) |
-| Planned closure stage | TBD (confirmed IA + owner; target stage pending governance decision) |
-| Status | PLANNED |
+| Planned closure stage | Phase 3 C-track Operations UI continuation (authorized 2026-09-11) |
+| Status | AUTHORIZED |
 | Access scope | `documents.read` → ADMIN, DIRECTOR, FINANCE, ANALYST, SALES_MANAGER, OPERATOR; `documents.write` → ADMIN, OPERATOR; `account.document.read_own` → BUYER |
 | IA location | OPERATIONS group in Admin sidebar (confirmed 2026-09-11) |
 | Domain owner | Operations (confirmed 2026-09-11) |
-| Formal product/roadmap owner | TBD (no named product owner evidenced in governance) |
+| Formal product/roadmap owner | TravelHub Product / Roadmap Governance (assigned 2026-09-11) |
 | PII model | ADMIN/OPERATOR = full traveler PII; all other roles = redacted (passportNumber, passportExpiry, birthDate → null) |
 | Invalidation | ADMIN/OPERATOR only (`documents.write`) |
 | Document types | VOUCHER, PARTIAL_PAYMENT, REFUND (all visible to all authorized roles) |
 | Finance boundary | UI ≠ Finance Center (explicitly preserved) |
 | Acceptance condition | `/app/documents` exists; Admin navigation contains Documents in OPERATIONS group; all 6 `documents.read` staff roles can list/view; PII redaction correct per role; Buyer isolated to `/account/documents`; Partner denied; download uses signed URL; invalidation only for ADMIN/OPERATOR; invalidated documents cannot be downloaded; no new document backend; D13 API contracts unchanged; D8-D13 regression clean |
 | Closure SHA | — |
-| Notes | Placement decision: PLANNED — TARGET TBD. Domain owner = Operations (confirmed). Formal product/roadmap owner = TBD (no named owner evidenced). Confirmed: IA = OPERATIONS, access matrix = 6 roles read + 2 roles write. Requires: (1) governance decision on new stage vs existing stage, (2) formal product/roadmap owner assignment. Do NOT implement until target stage is resolved. Report: `docs/reports/evidence/PHASE_3_UI_DOC_ADMIN_IA_RBAC_PLACEMENT_REPORT.md` |
+| Notes | AUTHORIZED for implementation (2026-09-11). Target: Phase 3 C-track Operations UI continuation. Domain owner = Operations. Formal owner = TravelHub Product / Roadmap Governance. IA = OPERATIONS, access matrix = 6 roles read + 2 roles write. Implementation authorization: `docs/reports/evidence/PHASE_3_UI_DOC_ADMIN_TARGET_STAGE_AND_IMPLEMENTATION_AUTHORIZATION.md`. Do NOT mark CLOSED before implementation + strict review finish. |
 
 #### Cross-References
 

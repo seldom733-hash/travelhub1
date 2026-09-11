@@ -439,11 +439,11 @@ After STEP 3.12 execution (2026-09-11), the gate is:
 
 **STEP 3.12 = BLOCKED — Phase 2 exit not satisfied**
 
-STEP 3.12 verdict: BLOCKED — Phase 3 implementation is complete/verified, but Phase 2 exit (Step 2.17B — qualification environment) remains an unsatisfied prerequisite. Phase 3 is NOT declared final complete. TRUE NEXT is NOT set. No next stage is authorized.
+STEP 3.12 verdict: BLOCKED — Phase 3 implementation is complete/verified, but Phase 2 exit (Step 2.17B — qualification environment) remains an unsatisfied prerequisite. Phase 3 is NOT declared final complete. TRUE NEXT is UI-DOC-ADMIN IMPLEMENTATION (independent of Phase 2 exit).
 
 The completed implementation sequence:
 ```
 D1 → D2 → D3 → D4 → D5/D6 (parallel) → D7 → D8 → D9 → D10 → D11 → D12 → D13 → D14 → STEP 3.12
 ```
 
-**What remains deferred:** Finance Center, Product Freshness, UI-DOC-ADMIN (PLANNED/TBD), Phase 2 exit (2.17B).
+**What remains deferred:** Finance Center, Product Freshness, Phase 2 exit (2.17B). UI-DOC-ADMIN is AUTHORIZED / IN IMPLEMENTATION (independent of Phase 2 exit).

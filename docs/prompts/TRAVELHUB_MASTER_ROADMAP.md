@@ -903,8 +903,8 @@ No new stage may be invented during this requalification.
 │ STEP 3.12 = BLOCKED (Phase 2 exit not satisfied)            │
 │ Phase 2 exit = BLOCKED (2.17B — qualification environment)  │
 │ PROD-01 = OPEN / DEFERRED                                   │
-│ UI-DOC-ADMIN = PLANNED / TARGET TBD                         │
-│ TRUE NEXT = TBD (NOT SET — no next stage authorized)        │
+│ UI-DOC-ADMIN = AUTHORIZED / IN IMPLEMENTATION (C-track)     │
+│ TRUE NEXT = UI-DOC-ADMIN IMPLEMENTATION                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
