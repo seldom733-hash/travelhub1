@@ -571,14 +571,17 @@ Debt Register is accurate (35 IDs, 0 duplicates, all statuses verified). Histori
 ## 34. Repository Evidence Footer
 
 ```
-review_base_sha:    33f44d21452d77cc68a51a0a1e47a56eca7479b3
-reconciliation_sha: (this commit)
-worktree_clean:     YES
-debt_register:      docs/TRAVELHUB_DEBT_REGISTER.md — 35 IDs, 0 duplicates
-historical_32:      STALE — Micro-Closure miscounted (33 actual), 2 items added after (PROD-01, UI-DOC-ADMIN)
-true_next:          NOT SET / TBD
-phase_2_exit:       BLOCKED
-step_3_12:          BLOCKED
+review_base_sha:          33f44d21452d77cc68a51a0a1e47a56eca7479b3
+reconciliation_commit_sha: 812b1febb135835386e6aa4edc0d75162c73c687
+final_head_sha:           812b1febb135835386e6aa4edc0d75162c73c687
+upstream_sha:             812b1febb135835386e6aa4edc0d75162c73c687
+push_status:              PUSHED
+worktree_clean:           YES
+debt_register:            docs/TRAVELHUB_DEBT_REGISTER.md — 35 IDs, 0 duplicates
+historical_32:            STALE — Micro-Closure miscounted (33 actual), 2 items added after (PROD-01, UI-DOC-ADMIN)
+true_next:                NOT SET / TBD
+phase_2_exit:             BLOCKED
+step_3_12:                BLOCKED
 ```
 
 ---
