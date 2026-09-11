@@ -261,9 +261,9 @@ Tests:       1 failed | 881 passed (882)
 | Параметр | Значение |
 |---|---|
 | Files changed | 10 (5 modified, 5 new) |
-| Commit SHA | (pending) |
-| origin/master | (pending) |
-| HEAD == origin/master | (pending — после push) |
+| Commit SHA | `912e10300ccc824dc44ca51adb476c56914cfc7c` |
+| origin/master | `912e10300ccc824dc44ca51adb476c56914cfc7c` |
+| HEAD == origin/master | YES |
 
 ---
 
