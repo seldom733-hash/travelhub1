@@ -33,6 +33,7 @@ function createMockPrisma() {
       findFirst: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
+      groupBy: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       update: jest.fn(),
     },
@@ -293,6 +294,122 @@ describe("DocumentsService", () => {
       });
 
       await expect(service.getDownloadUrl("doc-6b", "user-1", "ADMIN")).rejects.toThrow("not been issued");
+    });
+  });
+
+  // ── D-3 REGRESSION: KPI type aggregation ──
+
+  describe("D-3: listAllDocuments — type aggregation", () => {
+    it("D3-TEST-01: returns exact counts for all three types (basic)", async () => {
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.document.count.mockResolvedValue(3);
+      prisma.document.groupBy.mockResolvedValue([
+        { type: "VOUCHER", _count: { type: 3 } },
+      ]);
+
+      const result = await service.listAllDocuments(1, 20);
+
+      expect(result.total).toBe(3);
+      expect(result.aggregates.type).toEqual({
+        VOUCHER: 3,
+        PARTIAL_PAYMENT: 0,
+        REFUND: 0,
+      });
+    });
+
+    it("D3-TEST-02: mixed type counts", async () => {
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.document.count.mockResolvedValue(6);
+      prisma.document.groupBy.mockResolvedValue([
+        { type: "VOUCHER", _count: { type: 2 } },
+        { type: "PARTIAL_PAYMENT", _count: { type: 1 } },
+        { type: "REFUND", _count: { type: 3 } },
+      ]);
+
+      const result = await service.listAllDocuments(1, 20);
+
+      expect(result.aggregates.type).toEqual({
+        VOUCHER: 2,
+        PARTIAL_PAYMENT: 1,
+        REFUND: 3,
+      });
+    });
+
+    it("D3-TEST-03: aggregates independent of pagination", async () => {
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.document.count.mockResolvedValue(30);
+      prisma.document.groupBy.mockResolvedValue([
+        { type: "VOUCHER", _count: { type: 30 } },
+      ]);
+
+      const result = await service.listAllDocuments(1, 20);
+
+      // pageSize=20 but aggregates should reflect ALL documents
+      expect(result.items).toHaveLength(0); // mock returns empty
+      expect(result.aggregates.type.VOUCHER).toBe(30);
+    });
+
+    it("D3-TEST-04: aggregates use unfiltered counts (not page-filtered)", async () => {
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.document.count.mockResolvedValue(10);
+      prisma.document.groupBy.mockResolvedValue([
+        { type: "VOUCHER", _count: { type: 8 } },
+        { type: "REFUND", _count: { type: 2 } },
+      ]);
+
+      const result = await service.listAllDocuments(1, 20, "VOUCHER");
+
+      // groupBy uses same `where` filter as items — correct behavior
+      expect(result.aggregates.type).toEqual({
+        VOUCHER: 8,
+        PARTIAL_PAYMENT: 0,
+        REFUND: 2,
+      });
+    });
+
+    it("D3-TEST-05: type filter passed to groupBy", async () => {
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.document.count.mockResolvedValue(5);
+      prisma.document.groupBy.mockResolvedValue([
+        { type: "VOUCHER", _count: { type: 5 } },
+      ]);
+
+      await service.listAllDocuments(1, 20, "VOUCHER");
+
+      expect(prisma.document.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ["type"],
+          where: expect.objectContaining({ type: "VOUCHER" }),
+        }),
+      );
+    });
+
+    it("D3-TEST-06: empty dataset returns all zeros", async () => {
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.document.count.mockResolvedValue(0);
+      prisma.document.groupBy.mockResolvedValue([]);
+
+      const result = await service.listAllDocuments(1, 20);
+
+      expect(result.total).toBe(0);
+      expect(result.aggregates.type).toEqual({
+        VOUCHER: 0,
+        PARTIAL_PAYMENT: 0,
+        REFUND: 0,
+      });
+    });
+
+    it("D3-TEST-07: response includes aggregates field", async () => {
+      prisma.document.findMany.mockResolvedValue([]);
+      prisma.document.count.mockResolvedValue(0);
+      prisma.document.groupBy.mockResolvedValue([]);
+
+      const result = await service.listAllDocuments(1, 20);
+
+      expect(result).toHaveProperty("aggregates");
+      expect(result).toHaveProperty("aggregates.type");
+      expect(result).toHaveProperty("items");
+      expect(result).toHaveProperty("total");
     });
   });
 });

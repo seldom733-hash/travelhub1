@@ -309,12 +309,16 @@ export class DocumentsService {
     pageSize = 20,
     type?: DocumentType,
     status?: DocumentStatus,
-  ): Promise<{ items: DocumentListItem[]; total: number }> {
+  ): Promise<{
+    items: DocumentListItem[];
+    total: number;
+    aggregates: { type: { VOUCHER: number; PARTIAL_PAYMENT: number; REFUND: number } };
+  }> {
     const where: Prisma.DocumentWhereInput = {};
     if (type) where.type = type;
     if (status) where.status = status;
 
-    const [items, total] = await Promise.all([
+    const [items, total, typeAgg] = await Promise.all([
       this.prisma.document.findMany({
         where,
         orderBy: { createdAt: "desc" },
@@ -322,7 +326,18 @@ export class DocumentsService {
         take: pageSize,
       }),
       this.prisma.document.count({ where }),
+      this.prisma.document.groupBy({
+        by: ["type"],
+        _count: { type: true },
+        where,
+      }),
     ]);
+
+    // Build aggregates — all three types must be present even if 0
+    const typeCounts: Record<string, number> = { VOUCHER: 0, PARTIAL_PAYMENT: 0, REFUND: 0 };
+    for (const row of typeAgg) {
+      typeCounts[row.type] = row._count.type;
+    }
 
     return {
       items: items.map((d) => ({
@@ -340,6 +355,7 @@ export class DocumentsService {
         createdAt: d.createdAt,
       })),
       total,
+      aggregates: { type: typeCounts as { VOUCHER: number; PARTIAL_PAYMENT: number; REFUND: number } },
     };
   }
 

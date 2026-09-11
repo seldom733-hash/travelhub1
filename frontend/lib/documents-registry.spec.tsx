@@ -595,3 +595,33 @@ describe("UI-DOC-19: Documents success renders valid table header/body", () => {
     }
   });
 });
+
+// ── D-3 REGRESSION: KPI type aggregation ──
+
+describe("D-3: KPI type aggregation from API aggregates", () => {
+  it("D3-UI-01: reads typeCounts from data.aggregates.type (not items)", () => {
+    expect(PAGE).toContain("data?.aggregates?.type");
+  });
+
+  it("D3-UI-01b: KPI displays per-type counts via typeCounts", () => {
+    expect(PAGE).toContain("typeCounts[dt]");
+  });
+
+  it("D3-UI-02: KPI does NOT compute from items.length", () => {
+    // Must not use items.length for type counts
+    expect(PAGE).not.toMatch(/typeCounts.*items\.length|items\.filter.*\.length.*typeCounts/);
+  });
+
+  it("D3-UI-03: zero/missing values default to 0", () => {
+    expect(PAGE).toContain("?? 0");
+  });
+
+  it("D3-UI-04: KPI cards iterate DOCUMENT_TYPES for type breakdown", () => {
+    expect(PAGE).toContain("DOCUMENT_TYPES.map");
+    expect(PAGE).toContain("documentTypeLabel");
+  });
+
+  it("D3-UI-05: total KPI uses total from API (not items.length)", () => {
+    expect(PAGE).toContain("data?.total ?? 0");
+  });
+});
