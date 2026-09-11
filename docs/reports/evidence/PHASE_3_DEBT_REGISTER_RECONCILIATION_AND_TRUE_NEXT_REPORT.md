@@ -327,8 +327,8 @@ STEP 3.12:         BLOCKED (Phase 2 exit prerequisite unsatisfied)
 
 ```
 Application Debt P0:                    NONE
-Application Debt P1:                    SEC-TENANT-01 (severity P1 in SECURITY class, but execution-blocked by SUB-01)
-Application Debt P2:                    PERF-01, PERF-02, PROD-01, UI-DOC-ADMIN
+Application Debt P1:                    NONE
+Application Debt P2:                    SEC-TENANT-01, PERF-01, PERF-02, PROD-01, UI-DOC-ADMIN
 Application Debt P3:                    DATA-02, FIN-01..03, SUB-01..06, AGR-01
 
 External Phase-Level Blocker:           2.17B / BLOCKER-ENV
