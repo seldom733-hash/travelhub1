@@ -8,7 +8,7 @@ export default function HeroSection() {
   const locale = useLocale();
 
   return (
-    <section className="relative min-h-[600px] overflow-hidden bg-dark lg:min-h-[700px]">
+    <section className="relative min-h-[620px] overflow-hidden bg-dark lg:min-h-[700px]">
       {/* Background image */}
       <div className="absolute inset-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -22,28 +22,39 @@ export default function HeroSection() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 mx-auto max-w-7xl px-4 pb-12 pt-20 sm:pt-24 lg:pt-28">
-        <div className="mx-auto max-w-3xl text-center">
-          {/* Headline */}
-          <h1 className="font-serif text-4xl font-bold leading-tight text-white sm:text-5xl lg:text-6xl">
-            {t("marketplace.hero_title_1", locale)}
-            <br />
-            <span className="text-gold-gradient">{t("marketplace.hero_title_2", locale)}</span>
-          </h1>
+      <div className="relative z-10 mx-auto max-w-[1400px] px-6 pb-14 pt-20 sm:pt-24 lg:pt-28">
+        <div className="flex items-end justify-between gap-8">
+          {/* Left: Headline + Description */}
+          <div className="max-w-3xl">
+            <h1 className="font-serif text-4xl font-bold leading-[1.1] text-white sm:text-5xl lg:text-6xl">
+              {t("marketplace.hero_title_1", locale)}
+              <br />
+              <span className="text-gold-gradient">{t("marketplace.hero_title_2", locale)}</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-neutral-300 sm:text-base">
+              {t("marketplace.hero_description", locale)}
+            </p>
+          </div>
 
-          {/* Description */}
-          <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-neutral-300 sm:text-lg">
-            {t("marketplace.hero_description", locale)}
-          </p>
+          {/* Right: Cursive tagline */}
+          <div className="hidden shrink-0 pb-4 lg:block">
+            <p className="font-serif text-lg italic leading-snug text-gold/60">
+              Больше,
+              <br />
+              чем просто
+              <br />
+              путешествия
+            </p>
+          </div>
         </div>
 
         {/* Search panel */}
-        <div className="mx-auto mt-10 max-w-4xl">
+        <div className="mx-auto mt-10 max-w-5xl">
           <GlobalSearch />
         </div>
 
         {/* Quick categories */}
-        <div className="mx-auto mt-8 max-w-4xl">
+        <div className="mx-auto mt-8 max-w-5xl">
           <QuickCategories />
         </div>
       </div>
