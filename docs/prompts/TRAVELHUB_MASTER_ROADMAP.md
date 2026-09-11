@@ -899,10 +899,11 @@ No new stage may be invented during this requalification.
 │ D12 = CLOSED / APPROVED (40e2f5b, 2026-09-10)               │
 │ D13 = CLOSED / APPROVED (2616cc6, D13_VOUCHER tag)          │
 │ D14 = CLOSED / APPROVED (D14 requalification, 2026-09-11)   │
-│ STEP 3.12 = READY                                           │
+│ STEP 3.12 = CONDITIONAL PASS (Phase 2 exit blocked 2.17B)   │
+│ Phase 2 exit = BLOCKED (2.17B — qualification environment)  │
 │ PROD-01 = OPEN / DEFERRED                                   │
 │ UI-DOC-ADMIN = PLANNED / TARGET TBD                         │
-│ TRUE NEXT = STEP 3.12                                       │
+│ TRUE NEXT = TBD (pending Phase 2 exit resolution)           │
 └─────────────────────────────────────────────────────────────┘
 ```
 

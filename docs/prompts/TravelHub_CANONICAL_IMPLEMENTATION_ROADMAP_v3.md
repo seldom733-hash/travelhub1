@@ -2455,7 +2455,7 @@ implementation → strict review → approval и остаются валидны
 | Step 3.8 — Marketing Domain | ✅ DONE — STRICT REVIEW APPROVED (closed 4135025) |
 | Step 3.9 — Marketing Center UI | ✅ DONE — STRICT REVIEW RE-QUALIFICATION APPROVED (closed cb3fef1) |
 
-**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.9 (all VERDICT A) + PRE-STEP 3.12 sub-tasks (Shared Commerce, Request Center, Database Reset, Export Framework, Traveler Audit, Architecture Reconciliation — all VERDICT A).
+**Current completed boundary:** Steps 2.5–2.18 (except 2.17B NOT APPROVED, 2.18 BLOCKED) + Phase 3.0–3.12 (all VERDICT A, STEP 3.12 CONDITIONAL PASS) + D0–D14 (all CLOSED).
 
 **Canonical NEXT:** `PHASE 3 — STEP 3.10 — SUPPORT DOMAIN`
 (Marketing Center UI CLOSED. Next section in canonical roadmap ordering is Support Domain.)
@@ -2545,8 +2545,8 @@ Product.partnerId NOT NULL → NOT READY (legacy preserved)
 
 **Established:** 2026-09-02 (Architecture Reconciliation, D0 closure)
 **Updated:** 2026-09-02 (D1 closure, D1A added)
-**Updated:** 2026-09-11 (D14 requalification completed)
-**TRUE NEXT:** STEP 3.12 — Phase 3 Final Completion Gate
+**Updated:** 2026-09-11 (STEP 3.12 completed, Phase 2 exit blocked)
+**TRUE NEXT:** TBD (pending Phase 2 exit resolution — Step 2.17B)
 
 ```
 D0  Reconciliation Final Git/Evidence Closure          ✅ COMPLETED (2026-09-02)
@@ -2583,7 +2583,7 @@ D13 Voucher                                             ✅ CLOSED (2616cc6, D13
  ↓
 D14 PRE-STEP 3.12 Final Requalification                ✅ CLOSED (D14 requalification, 2026-09-11)
  ↓
-STEP 3.12                                               ⬜ READY
+STEP 3.12                                               ✅ CONDITIONAL PASS (Phase 2 exit blocked 2.17B, 2026-09-11)
 ```
 
 | ID | Debt | Type | Status | Dependency | Closure |

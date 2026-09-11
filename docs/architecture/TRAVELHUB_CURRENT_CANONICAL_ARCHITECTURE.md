@@ -330,8 +330,8 @@ Frontend hiding ≠ security control.
 
 ```
 MKT-REQ-* → /app/requests/{id}    ✅ IMPLEMENTED
-MKT-ORD-* → /app/orders/{id}      ⬜ NOT YET IMPLEMENTED
-MKT-BKG-* → /app/bookings/{id}    ⬜ NOT YET IMPLEMENTED
+MKT-ORD-* → /app/orders/{id}      ✅ IMPLEMENTED (D5 CLOSED)
+MKT-BKG-* → /app/bookings/{id}    ✅ IMPLEMENTED (D6 CLOSED)
 ```
 
 Primary detail = full-page (не drawer/modal).
@@ -389,13 +389,13 @@ Storefront end-customer commerce ≠ Platform Marketplace analytics.
 | Order Center UI | Full-page table with export | ✅ | CANONICAL + IMPLEMENTED |
 | Booking Center UI | Full-page table with export | ✅ | CANONICAL + IMPLEMENTED |
 | Request Detail | /app/requests/{id} with full timeline | ✅ | CANONICAL + IMPLEMENTED |
-| Order Detail | /app/orders/{id} dedicated page | ❌ | CANONICAL + NOT YET IMPLEMENTED |
-| Booking Detail | /app/bookings/{id} dedicated page | ❌ | CANONICAL + NOT YET IMPLEMENTED |
-| Traveler data requirements | Seller-defined per Product | ❌ | CANONICAL + NOT YET IMPLEMENTED |
-| Booking traveler population | Booking → 1..N Passengers | ❌ | CANONICAL + NOT YET IMPLEMENTED |
-| Checkout traveler collection | Traveler form in checkout | ❌ | CANONICAL + NOT YET IMPLEMENTED |
+| Order Detail | /app/orders/{id} dedicated page | ✅ | CANONICAL + IMPLEMENTED (D5 CLOSED) |
+| Booking Detail | /app/bookings/{id} dedicated page | ✅ | CANONICAL + IMPLEMENTED (D6 CLOSED) |
+| Traveler data requirements | Seller-defined per Product | ✅ | CANONICAL + IMPLEMENTED (D2 CLOSED) |
+| Booking traveler population | Booking → 1..N Passengers | ✅ | CANONICAL + IMPLEMENTED (D4 CLOSED) |
+| Checkout traveler collection | Traveler form in checkout | ✅ | CANONICAL + IMPLEMENTED (D3 CLOSED) |
 | Payer model | Separate Payer entity | ❌ | PROPOSED (V1 = Order.customerId) |
-| Voucher source | Booking → Passengers | ❌ | CANONICAL + NOT YET IMPLEMENTED |
+| Voucher source | Booking → Passengers | ✅ | CANONICAL + IMPLEMENTED (D13 CLOSED) |
 | Finance Center | Full financial management | ❌ | FUTURE / DEFERRED |
 | Product Freshness | Product data freshness | ❌ | FUTURE / DEFERRED |
 
@@ -405,13 +405,13 @@ Storefront end-customer commerce ≠ Platform Marketplace analytics.
 
 | Area | Canonical Architecture | Actual Implementation | Drift | Severity |
 |---|---|---|---|---|
-| Order Detail page | Full-page dedicated | Not implemented | Missing | MEDIUM |
-| Booking Detail page | Full-page dedicated | Not implemented | Missing | MEDIUM |
-| Traveler requirements | Seller-defined per Product | Not implemented | Missing | HIGH (architecture blocker for traveler flow) |
-| Booking travelers | Booking → 1..N Passengers | Schema exists, 0 records | Missing | HIGH |
+| Order Detail page | Full-page dedicated | Implemented (D5 CLOSED) | None | — |
+| Booking Detail page | Full-page dedicated | Implemented (D6 CLOSED) | None | — |
+| Traveler requirements | Seller-defined per Product | Implemented (D2 CLOSED) | None | — |
+| Booking travelers | Booking → 1..N Passengers | Implemented (D4 CLOSED) | None | — |
 | Payer entity | Separate Payer model | Collapsed to Order.customerId | V1 simplification | LOW (deferred) |
-| Voucher source | Booking → Passengers | Not implemented | Missing | MEDIUM (future) |
-| Request→Order flow | Canonical conversion pipeline | Manual link via seed | Partial | LOW (seed-only) |
+| Voucher source | Booking → Passengers | Implemented (D13 CLOSED) | None | — |
+| Request→Order flow | Canonical conversion pipeline | Implemented (D3 CLOSED) | None | — |
 
 ---
 
@@ -435,15 +435,15 @@ PRE-STEP 3.12: Multiple sub-tasks completed
 
 # 21. Canonical NEXT Stage
 
-After D14 closure (2026-09-11), the TRUE NEXT stage is:
+After STEP 3.12 completion (2026-09-11), the TRUE NEXT stage is:
 
-**STEP 3.12 — Phase 3 Final Completion Gate**
+**TBD — pending Phase 2 exit resolution**
 
-All D-track stages (D0–D14) are now CLOSED. STEP 3.12 is the final Phase 3 gate.
+STEP 3.12 verdict: CONDITIONAL PASS — Phase 3 implementation is complete, but Phase 2 exit (Step 2.17B — qualification environment) remains an external blocker.
 
 The completed implementation sequence:
 ```
 D1 → D2 → D3 → D4 → D5/D6 (parallel) → D7 → D8 → D9 → D10 → D11 → D12 → D13 → D14 → STEP 3.12
 ```
 
-**What remains deferred:** Finance Center, Product Freshness, UI-DOC-ADMIN (PLANNED/TBD).
+**What remains deferred:** Finance Center, Product Freshness, UI-DOC-ADMIN (PLANNED/TBD), Phase 2 exit (2.17B).
