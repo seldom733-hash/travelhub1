@@ -311,7 +311,7 @@ TRUE NEXT = TBD (pending Phase 2 exit resolution + governance decision)
 ## 19. Final Git SHA
 
 ```text
-Corrective commit SHA: (pending commit)
+Corrective commit SHA: `d96130f` (this report is part of this commit)
 Previous commit SHA:   93f4f86 (initial CONDITIONAL PASS — superseded)
 GitHub master SHA:     aee7334 (prior to corrective commit)
 ```
