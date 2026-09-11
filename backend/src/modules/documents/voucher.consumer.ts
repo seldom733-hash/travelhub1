@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { Prisma } from "../../generated/prisma/client";
+import { Prisma } from "../../generated/prisma/client";
 import type { OutboxEnvelope } from "../../eventbus/eventbus.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type BookingEventPayload, type PaymentEventPayload } from "../../eventbus/domain-events";
@@ -46,7 +46,7 @@ export class VoucherConsumer {
     try {
       await this.prisma.$transaction(async (tx) => {
         if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: CONSUMER_ID, eventId: ev.id } } })) return;
-        await this.tryGenerateVoucher(tx, p.orderId, p.bookingId, `BookingConfirmed (${p.code})`);
+        await this.tryGenerateVoucher(tx, p.orderId, p.bookingId, `BookingConfirmed (${p.code})`, false);
         await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
       });
     } catch (err) {
@@ -64,17 +64,22 @@ export class VoucherConsumer {
     try {
       await this.prisma.$transaction(async (tx) => {
         if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: CONSUMER_ID, eventId: ev.id } } })) return;
-        // Find the booking for this order
+        // PaymentCaptured IS the canonical proof of payment — trust the event
+        // payload rather than reading the Order projection, which may not yet
+        // be updated by OrderSubscribers (handler registration order dependency).
         const bookings = await tx.booking.findMany({ where: { orderId: p.orderId } });
         for (const booking of bookings) {
-          await this.tryGenerateVoucher(tx, p.orderId, booking.id, `PaymentCaptured (${p.code})`);
+          await this.tryGenerateVoucher(tx, p.orderId, booking.id, `PaymentCaptured (${p.code})`, true, {
+            amount: p.amount,
+            currency: p.currency,
+          });
         }
 
         await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
       });
     } catch (err) {
       if (this.isUniqueViolation(err)) return;
-      this.logger.error(`VoucherConsumer PaymentCaptured error: ${err}`);
+      this.logger.error(`VoucherConsumer PaymentCaptured error: ${err}`, (err as Error)?.stack);
       throw err;
     }
   }
@@ -82,22 +87,47 @@ export class VoucherConsumer {
   /**
    * Try to generate a voucher if both gates are satisfied.
    * Called inside a transaction.
+   *
+   * @param paymentConfirmed - When true (PaymentCaptured path), the event payload
+   *   itself is the canonical proof of payment. We trust it rather than reading
+   *   Order.paymentStatus which may not yet be updated by OrderSubscribers
+   *   (handler registration order dependency).
+   * @param paymentPayload - Event payload from PaymentCaptured (amount/currency).
    */
   private async tryGenerateVoucher(
     tx: Prisma.TransactionClient,
     orderId: string,
     bookingId: string,
     triggeringEvent: string,
+    paymentConfirmed: boolean,
+    paymentPayload?: { amount: string; currency: string },
   ): Promise<void> {
-    // Check Booking status
+    // Gate 1: Check Booking status
     const booking = await tx.booking.findUnique({ where: { id: bookingId } });
     if (!booking || booking.status !== "CONFIRMED") return;
 
-    // Check Order payment status
+    // Gate 2: Check Order payment status
     const order = await tx.order.findUnique({ where: { id: orderId } });
     if (!order) return;
-    if (order.paymentStatus !== "PAID") return;
-    if (order.paidAmount.lessThan(order.amount)) return;
+
+    let paidAmount: Prisma.Decimal;
+    let currency: string;
+    let paymentStatus: string;
+
+    if (paymentConfirmed && paymentPayload) {
+      // PaymentCaptured event IS the canonical fact — trust the payload.
+      // OrderSubscribers may not have updated Order.paymentStatus yet.
+      paidAmount = new Prisma.Decimal(paymentPayload.amount);
+      currency = paymentPayload.currency;
+      paymentStatus = "PAID";
+    } else {
+      // BookingConfirmed path — must read from Order projection
+      if (order.paymentStatus !== "PAID") return;
+      if (order.paidAmount.lessThan(order.amount)) return;
+      paidAmount = order.paidAmount;
+      currency = booking.currency ?? order.currency;
+      paymentStatus = order.paymentStatus;
+    }
 
     // Check if voucher already exists for this booking
     const existing = await tx.document.findFirst({
@@ -119,9 +149,9 @@ export class VoucherConsumer {
       serviceTime: booking.serviceTime,
       serviceTimeZone: booking.serviceTimeZone,
       totalAmount: booking.amount,
-      paidAmount: order.paidAmount,
-      currency: booking.currency,
-      paymentStatus: order.paymentStatus,
+      paidAmount,
+      currency,
+      paymentStatus,
     });
 
     // Build snapshot
@@ -134,9 +164,9 @@ export class VoucherConsumer {
       serviceTime: booking.serviceTime,
       serviceTimeZone: booking.serviceTimeZone,
       totalAmount: booking.amount?.toString() ?? null,
-      paidAmount: order.paidAmount?.toString() ?? null,
-      currency: booking.currency,
-      paymentStatus: order.paymentStatus,
+      paidAmount: paidAmount?.toString() ?? null,
+      currency,
+      paymentStatus,
       travelers: passengers.map((passenger) => ({
         firstName: passenger.firstName,
         lastName: passenger.lastName,

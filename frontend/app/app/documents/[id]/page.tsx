@@ -80,6 +80,8 @@ export default function DocumentDetailPage() {
 
   const snapshot = doc?.versions?.[0]?.snapshot as Record<string, unknown> | undefined;
   const travelers = (snapshot?.travelers as Array<Record<string, unknown>> | undefined) ?? [];
+  const bookingCode = (snapshot?.bookingCode as string) ?? null;
+  const orderCode = (snapshot?.orderCode as string) ?? null;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
@@ -130,7 +132,9 @@ export default function DocumentDetailPage() {
 
           {/* Info card */}
           <div className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3">
-            <InfoItem label={t("documents.detail.booking", locale)} value={doc.code.split("-")[0] === "PPD" ? "—" : doc.code} />
+            <InfoItem label={t("documents.detail.booking", locale)} value={bookingCode ?? "—"} />
+            <InfoItem label={t("documents.detail.order", locale)} value={orderCode ?? "—"} />
+            <InfoItem label={t("documents.detail.payment", locale)} value={doc.paymentStatus ?? "—"} />
             <InfoItem label={t("documents.detail.service_date", locale)} value={doc.serviceDate ? fmtDate(doc.serviceDate, locale) : "—"} />
             <InfoItem label={t("documents.detail.total_amount", locale)} value={fmtMoney(doc.totalAmount, doc.currency, locale)} />
             <InfoItem label={t("documents.detail.paid_amount", locale)} value={fmtMoney(doc.paidAmount, doc.currency, locale)} />

@@ -1980,6 +1980,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "documents.empty_filtered": { ru: "По заданным фильтрам результатов нет", az: "Seçilmiş filtrlər üzrə nəticə yoxdur", en: "No results for the active filters" },
   "documents.detail.title": { ru: "Документ", az: "Sənəd", en: "Document" },
   "documents.detail.booking": { ru: "Бронь", az: "Bron", en: "Booking" },
+  "documents.detail.order": { ru: "Заказ", az: "Sifariş", en: "Order" },
+  "documents.detail.payment": { ru: "Платёж", az: "Ödəniş", en: "Payment" },
   "documents.detail.service_date": { ru: "Дата услуги", az: "Xidmət tarixi", en: "Service date" },
   "documents.detail.total_amount": { ru: "Сумма", az: "Məbləğ", en: "Total amount" },
   "documents.detail.paid_amount": { ru: "Оплачено", az: "Ödənilib", en: "Paid amount" },

@@ -88,8 +88,12 @@ export class DocumentsService {
   }
 
   /**
-   * Issue a document: create DocumentVersion, render PDF, store in S3,
+   * Issue a document: render PDF, store in S3, create DocumentVersion,
    * transition Document status to ISSUED.
+   *
+   * INVARIANT: storage MUST succeed before any ISSUED state is written.
+   * On storage failure, throws (transaction rolls back, consumer retries).
+   * Document stays NOT_ISSUED — no false downloadable state is exposed.
    */
   async issueDocument(
     tx: Prisma.TransactionClient,
@@ -109,7 +113,8 @@ export class DocumentsService {
     // Render PDF
     const pdfBuffer = await this.renderer.render(doc.type, snapshot);
 
-    // Store in S3
+    // Storage MUST succeed before creating version or ISSUED state.
+    // On failure, throw — transaction rolls back, consumer retries later.
     const s3Key = `documents/${documentId}/v${nextVersion}.pdf`;
     const stored = await this.storage.putObject({
       key: s3Key,
@@ -117,7 +122,7 @@ export class DocumentsService {
       contentType: "application/pdf",
     });
 
-    // Create version record
+    // Create version record — only reachable after storage succeeds
     const version = await tx.documentVersion.create({
       data: {
         documentId,
@@ -129,28 +134,17 @@ export class DocumentsService {
         triggeringEvent,
         snapshot: snapshot as unknown as JsonValue,
       },
-      select: { versionNumber: true, s3Key: true },
+      select: { versionNumber: true, s3Key: true, id: true },
     });
 
-    // Update document: status → ISSUED, currentVersionId → version
+    // Update document: status → ISSUED, currentVersionId → version.id
     await tx.document.update({
       where: { id: documentId },
       data: {
         status: "ISSUED",
-        currentVersionId: version.s3Key, // will be set to version.id below
+        currentVersionId: version.id,
       },
     });
-
-    // Fix: use version ID not s3Key for currentVersionId
-    const createdVersion = await tx.documentVersion.findFirst({
-      where: { documentId, versionNumber: nextVersion },
-    });
-    if (createdVersion) {
-      await tx.document.update({
-        where: { id: documentId },
-        data: { currentVersionId: createdVersion.id },
-      });
-    }
 
     // Create history entry
     await tx.documentHistory.create({
@@ -260,8 +254,13 @@ export class DocumentsService {
     }
 
     const s3Key = version.s3Key as string;
-    const url = await this.storage.getSignedReadUrl(s3Key, SIGNED_URL_TTL_SECONDS);
-    return { url, code: doc.code };
+    try {
+      const url = await this.storage.getSignedReadUrl(s3Key, SIGNED_URL_TTL_SECONDS);
+      return { url, code: doc.code };
+    } catch (err) {
+      this.logger.error(`Storage unavailable for download of ${doc.code} (${s3Key}): ${(err as Error)?.message}`);
+      throw new ConflictError("Document storage is temporarily unavailable");
+    }
   }
 
   /**

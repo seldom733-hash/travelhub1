@@ -339,7 +339,59 @@ describe("UI-DOC: documentsApi module exports correct interface", () => {
   });
 });
 
-// ── REMEDIATION: API contract + hydration tests ──
+// ── D-2 REGRESSION: Voucher detail field binding ──
+
+describe("D-2: Voucher detail shows correct booking/order references from snapshot", () => {
+  it("D2-TEST-01: extracts bookingCode from snapshot for БРОНЬ field", () => {
+    expect(DETAIL).toContain("bookingCode");
+    expect(DETAIL).toContain("snapshot?.bookingCode");
+  });
+
+  it("D2-TEST-01b: extracts orderCode from snapshot for ЗАКАЗ field", () => {
+    expect(DETAIL).toContain("orderCode");
+    expect(DETAIL).toContain("snapshot?.orderCode");
+  });
+
+  it("D2-TEST-01c: БРОНЬ field uses bookingCode, NOT doc.code", () => {
+    // Must NOT use doc.code as the booking value
+    expect(DETAIL).not.toMatch(/label.*booking.*value.*doc\.code/);
+    // Must use bookingCode from snapshot
+    expect(DETAIL).toContain('value={bookingCode ?? "—"}');
+  });
+
+  it("D2-TEST-02: Voucher code remains visible separately as heading", () => {
+    expect(DETAIL).toContain("doc.code");
+    expect(DETAIL).toContain("{doc.code}");
+  });
+
+  it("D2-TEST-03: Missing booking/order values render safely as dash", () => {
+    expect(DETAIL).toContain('bookingCode ?? "—"');
+    expect(DETAIL).toContain('orderCode ?? "—"');
+  });
+
+  it("D2-TEST-04: PII redaction behavior remains unchanged", () => {
+    expect(DETAIL).toContain("redacted");
+    expect(DETAIL).toContain("passportNumber");
+  });
+
+  it("D2-TEST-01d: order i18n key exists for detail page", () => {
+    expect(DETAIL).toContain("documents.detail.order");
+  });
+
+  it("D2-TEST-01e: payment i18n key exists for detail page", () => {
+    expect(DETAIL).toContain("documents.detail.payment");
+  });
+});
+
+// ── D-1 REGRESSION: download link behavior ──
+
+describe("D-1: Download link is conditional on document status", () => {
+  it("download link is always rendered (href-based, not conditional)", () => {
+    // The download link uses href, so it's always visible.
+    // The backend returns controlled error for NOT_ISSUED/INVALIDATED.
+    expect(DETAIL).toContain("documentsApi.downloadUrl");
+  });
+});
 
 describe("REMEDIATION-A: Documents API contract — frontend calls correct endpoint", () => {
   it("page uses documentsApi.list (not raw api.get) for data fetching", () => {

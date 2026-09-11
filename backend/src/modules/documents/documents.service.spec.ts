@@ -179,6 +179,122 @@ describe("DocumentsService", () => {
       expect(result).toEqual({ items: [], total: 0 });
     });
   });
+
+  // ── D-1 REGRESSION: storage failure must NOT produce ISSUED state ──
+
+  describe("D-1: issueDocument — storage success", () => {
+    it("D1-TEST-01: creates ISSUED DocumentVersion when storage succeeds", async () => {
+      prisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: "doc-1", code: "VCH-00000001", type: "VOUCHER", status: "NOT_ISSUED",
+      });
+      prisma.documentVersion.findFirst.mockResolvedValue(null);
+      prisma.documentVersion.create.mockResolvedValue({
+        id: "ver-1", versionNumber: 1, s3Key: "documents/doc-1/v1.pdf",
+      });
+      storage.putObject.mockResolvedValue({ key: "documents/doc-1/v1.pdf", size: 512 });
+
+      const result = await (service as any).issueDocument(prisma, "doc-1", "PaymentCaptured (PAY-00000001)", { code: "VCH-00000001" });
+
+      expect(result).toEqual({ versionNumber: 1, s3Key: "documents/doc-1/v1.pdf" });
+      expect(prisma.documentVersion.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "ISSUED", documentId: "doc-1" }),
+        }),
+      );
+      expect(prisma.document.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "doc-1" },
+          data: expect.objectContaining({ status: "ISSUED" }),
+        }),
+      );
+    });
+  });
+
+  describe("D-1: issueDocument — storage failure", () => {
+    it("D1-TEST-02: throws on storage failure — no DocumentVersion created", async () => {
+      prisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: "doc-2", code: "VCH-00000002", type: "VOUCHER", status: "NOT_ISSUED",
+      });
+      prisma.documentVersion.findFirst.mockResolvedValue(null);
+      storage.putObject.mockRejectedValue(new Error("ECONNREFUSED localhost:9000"));
+
+      await expect(
+        (service as any).issueDocument(prisma, "doc-2", "PaymentCaptured (PAY-00000002)", { code: "VCH-00000002" }),
+      ).rejects.toThrow("ECONNREFUSED");
+
+      expect(prisma.documentVersion.create).not.toHaveBeenCalled();
+      expect(prisma.document.update).not.toHaveBeenCalled();
+      expect(prisma.documentHistory.create).not.toHaveBeenCalled();
+    });
+
+    it("D1-TEST-03: Document stays NOT_ISSUED after storage failure", async () => {
+      prisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: "doc-3", code: "VCH-00000003", type: "VOUCHER", status: "NOT_ISSUED",
+      });
+      prisma.documentVersion.findFirst.mockResolvedValue(null);
+      storage.putObject.mockRejectedValue(new Error("S3 unavailable"));
+
+      await expect(
+        (service as any).issueDocument(prisma, "doc-3", "BookingConfirmed (BKG-00000003)", { code: "VCH-00000003" }),
+      ).rejects.toThrow("S3 unavailable");
+
+      // Document.update should never be called — no ISSUED transition
+      expect(prisma.document.update).not.toHaveBeenCalled();
+      // No version created
+      expect(prisma.documentVersion.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("D-1: issueDocument — retry after storage recovery", () => {
+    it("D1-TEST-04: retry succeeds after storage recovers — single document, single version", async () => {
+      prisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: "doc-4", code: "VCH-00000004", type: "VOUCHER", status: "NOT_ISSUED",
+      });
+      prisma.documentVersion.findFirst.mockResolvedValue(null);
+      storage.putObject.mockResolvedValue({ key: "documents/doc-4/v1.pdf", size: 1024 });
+      prisma.documentVersion.create.mockResolvedValue({
+        id: "ver-4", versionNumber: 1, s3Key: "documents/doc-4/v1.pdf",
+      });
+
+      const result = await (service as any).issueDocument(prisma, "doc-4", "PaymentCaptured (PAY-00000004)", { code: "VCH-00000004" });
+
+      expect(result.versionNumber).toBe(1);
+      expect(prisma.documentVersion.create).toHaveBeenCalledTimes(1);
+      expect(prisma.document.update).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("D-1: getDownloadUrl — storage unavailable", () => {
+    it("D1-TEST-05: download for genuinely stored PDF succeeds", async () => {
+      prisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: "doc-5", code: "VCH-00000005", status: "ISSUED",
+        versions: [{ id: "ver-5", status: "ISSUED", s3Key: "documents/doc-5/v1.pdf" }],
+      });
+      storage.getSignedReadUrl.mockResolvedValue("https://s3.example.com/doc.pdf");
+
+      const result = await service.getDownloadUrl("doc-5", "user-1", "ADMIN");
+      expect(result).toEqual({ url: "https://s3.example.com/doc.pdf", code: "VCH-00000005" });
+    });
+
+    it("D1-TEST-06: download for missing/unavailable storage returns controlled error", async () => {
+      prisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: "doc-6", code: "VCH-00000006", status: "ISSUED",
+        versions: [{ id: "ver-6", status: "ISSUED", s3Key: "documents/doc-6/v1.pdf" }],
+      });
+      storage.getSignedReadUrl.mockRejectedValue(new Error("ECONNREFUSED localhost:9000"));
+
+      await expect(service.getDownloadUrl("doc-6", "user-1", "ADMIN")).rejects.toThrow("temporarily unavailable");
+    });
+
+    it("D1-TEST-06b: download for NOT_ISSUED document returns controlled error", async () => {
+      prisma.document.findUniqueOrThrow.mockResolvedValue({
+        id: "doc-6b", code: "VCH-00000006", status: "NOT_ISSUED",
+        versions: [],
+      });
+
+      await expect(service.getDownloadUrl("doc-6b", "user-1", "ADMIN")).rejects.toThrow("not been issued");
+    });
+  });
 });
 
 describe("DocumentRenderer — mocked @react-pdf/renderer", () => {
