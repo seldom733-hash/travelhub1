@@ -81,6 +81,11 @@ const STATUS_I18N_KEY: Record<string, string> = {
   // Marketing
   SCHEDULED: "marketing.status.scheduled",
   PAUSED: "marketing.status.paused",
+  // Document statuses (UI-DOC-ADMIN)
+  NOT_ISSUED: "documents.status.NOT_ISSUED",
+  ISSUED: "documents.status.ISSUED",
+  SUPERSEDED: "documents.status.SUPERSEDED",
+  INVALIDATED: "documents.status.INVALIDATED",
 };
 
 // Support statuses are mapped inline in StatusBadge component (support.status.* keys)
@@ -161,6 +166,11 @@ const STATUS_CLS: Record<string, string> = {
   // Marketing
   SCHEDULED: "bg-violet-50 text-violet-700 border-violet-200",
   PAUSED: "bg-amber-50 text-amber-700 border-amber-200",
+  // Document statuses
+  NOT_ISSUED: "bg-slate-100 text-slate-600 border-slate-200",
+  ISSUED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  SUPERSEDED: "bg-amber-50 text-amber-700 border-amber-200",
+  INVALIDATED: "bg-red-50 text-red-600 border-red-200",
 };
 
 const SUPPORT_STATUS_CLS: Record<string, string> = {

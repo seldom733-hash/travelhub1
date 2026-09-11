@@ -47,6 +47,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/app/requests", icon: "📋", labelKey: "nav.requests", permission: "order.read" },
       { href: "/app/orders", icon: "🧾", labelKey: "nav.orders", permission: "order.read" },
       { href: "/app/bookings", icon: "📑", labelKey: "nav.bookings", permission: "booking.read" },
+      { href: "/app/documents", icon: "📄", labelKey: "nav.documents", permission: "documents.read" },
     ],
   },
   {

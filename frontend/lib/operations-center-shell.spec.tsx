@@ -116,6 +116,7 @@ describe("UI-C1.2A — shared OperationsCenterShell is the canonical registry fr
       orders: "/app/orders",
       bookings: "/app/bookings",
       payments: "/app/payments",
+      documents: "/app/documents",
     });
   });
 
@@ -263,7 +264,7 @@ describe("UI-C1.2A — sidebar ownership (§5): ФИНАНСЫ → Платеж�
     expect(payments?.permission).toBe("finance.payment.read");
     // ОПЕРАЦИИ group holds the three commerce domains (Платежи NOT under ОПЕРАЦИИ)
     const operations = NAV_GROUPS.find((g) => g.headingKey === "nav.group.operations");
-    expect(operations?.items.map((i) => i.href)).toEqual(["/app/requests", "/app/orders", "/app/bookings"]);
+    expect(operations?.items.map((i) => i.href)).toEqual(["/app/requests", "/app/orders", "/app/bookings", "/app/documents"]);
   });
 
   it("no invented sidebar item for the Operations Center shell itself", () => {

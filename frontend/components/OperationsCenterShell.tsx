@@ -30,7 +30,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useLocale, t } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 
-export type OperationsDomain = "requests" | "orders" | "bookings" | "payments";
+export type OperationsDomain = "requests" | "orders" | "bookings" | "payments" | "documents";
 
 export interface OperationsTabConfig {
   id: OperationsDomain;
@@ -45,6 +45,7 @@ export const OPS_TABS: OperationsTabConfig[] = [
   { id: "orders", href: "/app/orders", labelKey: "nav.orders", permission: "order.read" },
   { id: "bookings", href: "/app/bookings", labelKey: "nav.bookings", permission: "booking.read" },
   { id: "payments", href: "/app/payments", labelKey: "nav.payments", permission: "finance.payment.read" },
+  { id: "documents", href: "/app/documents", labelKey: "nav.documents", permission: "documents.read" },
 ];
 
 /** Shared period params that persist across tab switches. */
