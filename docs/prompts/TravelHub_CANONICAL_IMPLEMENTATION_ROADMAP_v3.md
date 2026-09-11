@@ -1111,6 +1111,13 @@ Health, queues, jobs, events, errors, audit, diagnostics.
 Organization/localization/business policies/references. Currency/Tax
 остаются Finance-owned.
 
+**Boundary (Roadmap Amendment — Settings & Reference/Master Data):**
+Settings Center = **configuration/configuration management**. Settings MUST NOT
+duplicate master/reference data owned by another domain (Finance owns
+Currency/Tax/FX; Catalog owns normalized dictionaries per DD-028). Settings
+may store configuration/reference selections or read domain-owned values but
+does NOT become authority for Finance or Catalog master data.
+
 ## Marketplace / Storefront completion
 
 · **Step 3.29 --- Partner Cabinet Full**\
@@ -2969,3 +2976,184 @@ D6 final state: **ACCEPTED** (impl + 65/65 e2e + browser A-F + Storefront isolat
 
 TRUE NEXT: **D8 — GLOBAL TEMPORAL VISIBILITY**.
 D8 NOT STARTED.
+
+---
+
+# POST-PHASE 3 — PLANNED CAPABILITIES (Roadmap Amendment: Settings & Reference/Master Data)
+
+**Status:** PLANNED / GOVERNANCE-DEFINED (NOT IMPLEMENTED)
+**Amendment Date:** 2026-09-12
+**Phase 4:** NOT DEFINED — these capabilities are recorded for future governance decisions.
+
+> NEITHER Settings Center NOR Reference & Master Data Center is the current
+> TRUE NEXT. Implementation requires separate governance authorization.
+
+## Settings Center (extending Step 3.28)
+
+**Scope:** configuration/configuration management — NOT master/reference data.
+
+| Area | Examples |
+|---|---|
+| Organization settings | company name, legal entity, logo, contacts |
+| User settings | profile, notification preferences, UI preferences |
+| Localization | locale, timezone, region, display formats |
+| Feature flags | feature toggles, A/B test flags |
+| Business policies | default policies, workflow parameters |
+| Delegated settings | RBAC-controlled configuration per role |
+
+**Invariant:** Settings Center MUST NOT duplicate master/reference data owned
+by another domain. Finance owns Currency/Tax/FX. Catalog owns normalized
+dictionaries (DD-028). Settings may store configuration/reference selections
+or read domain-owned values but does NOT become authority for Finance or
+Catalog master data.
+
+## Reference & Master Data / Dictionaries Center ("Справочники")
+
+**Scope:** centralized administrative CRUD over normalized reference/master
+data. NOT Help, NOT Business Dictionary, NOT Settings, NOT Catalog Product.
+
+### UI Information Architecture
+
+```text
+Справочники
+├── География
+│   ├── Страны
+│   ├── Регионы / области / штаты
+│   ├── Города
+│   ├── Аэропорты
+│   └── Локации
+│
+├── Размещение
+│   ├── Отели
+│   ├── Типы отелей
+│   ├── Типы номеров
+│   ├── Категории номеров
+│   └── Типы питания
+│
+├── Транспорт
+│   ├── Авиакомпании
+│   ├── Рейсы
+│   ├── Направления
+│   └── Типы транспорта
+│
+├── Туристические услуги
+│   ├── Типы туров
+│   ├── Типы экскурсий
+│   ├── Типы трансферов
+│   ├── Типы аренды авто
+│   └── Дополнительные услуги
+│
+├── Коммерческие классификаторы
+│   ├── Валюты
+│   ├── Типы тарифов
+│   ├── Типы отмен
+│   └── другие reference values
+│
+└── Системные классификаторы
+    ├── Статусы
+    ├── Причины отмен
+    ├── Источники
+    └── прочие системные значения
+```
+
+### Reference Data vs Master Data
+
+| Type | Description | Examples |
+|---|---|---|
+| Reference Data | Simple normalized classifiers | Country, Region, City, MealType, RoomType, ServiceType, Status, CancellationReason, Source |
+| Master Data | Complex editable objects with lifecycle | Hotel, Flight, potentially Airport/Location if lifecycle requires independent model |
+
+**Invariant:** Each entity MUST have canonical domain ownership. No universal
+"Dictionary" entity for all objects.
+
+### Domain Ownership Matrix
+
+| Domain | Owned Entities |
+|---|---|
+| Finance | Currency, Tax, TaxRule, ExchangeRate, CommissionPolicy |
+| Catalog | Product, Category, CategorySchema, ServiceUnit, Tariff, Normalized dictionaries (meal plan, bed type, view, amenities — DD-028) |
+| CRM | Customer, Partner, Contact |
+| Security | User, Role, Permission, AuditLog |
+| Dictionaries Center | Centralized administrative surface for approved Reference/Master Data — NOT a second domain authority |
+
+### Hotel / Room / RatePlan Hierarchy (preserved)
+
+```text
+Product
+  └── ServiceUnit (Room)
+        └── Tariff / Rate Plan
+              └── CommercialPeriod
+                    └── Price
+                          └── Availability
+```
+
+**Invariant:** Room ≠ RatePlan. One room can have multiple rate plans
+(Room Only, Breakfast, Half Board, All Inclusive, Refundable, Non-refundable).
+Meal plan/refundability are commercial variables, not Room identity.
+
+### Lifecycle
+
+| State | Description |
+|---|---|
+| ACTIVE | Normal operational state |
+| INACTIVE | Disabled but visible for historical references |
+| ARCHIVED | Soft-deleted, preserving audit trail |
+
+No destructive delete for entities with historical data. Audit: who/when/what.
+
+### RBAC / Security
+
+- Permission-aware visibility
+- Backend authorization (not UI-hiding as security)
+- Audit trail for mutations
+- Tenant/organization scope where applicable
+- Explicit manage/read permissions per entity
+
+### Boundary with Catalog
+
+```text
+Dictionaries / Master Data = normalized reference/master data
+Catalog Product = commercial offer sold/distributed by TravelHub
+```
+
+Example: "Hilton Baku, Deluxe Room" is Master Data. "3 nights Hilton Baku —
+Deluxe Room — Breakfast" is a Catalog Product. Reference/Master Data does NOT
+automatically become a sellable Product. Catalog does NOT duplicate
+master-data authority.
+
+### Dependencies (before implementation)
+
+1. Confirm canonical domain owner per entity
+2. Verify existing Prisma/API models
+3. Verify Category/CategorySchema foundation
+4. Verify Catalog/Hotel/Room/Pricing architecture
+5. Verify Finance-owned master/reference data
+6. Determine tenant/organization scope
+7. Determine RBAC matrix
+8. Determine audit requirements
+9. Determine lifecycle rules
+10. Determine API contracts
+11. Determine UI information architecture
+12. Determine seed/reference-data strategy
+13. Decide which entities are global platform vs organization/partner scoped
+
+### Acceptance Criteria (future implementation)
+
+- Canonical ownership matrix
+- Architecture update
+- Prisma/storage reconciliation
+- API contract
+- RBAC matrix
+- Tenant-scope rules
+- CRUD
+- Lifecycle
+- Audit/history
+- Search/filter
+- Seed/reference data strategy
+- Frontend/admin UI
+- Integration with consuming domains
+- Tests
+- Migration safety
+- No duplicate authorities
+- Documentation update
+- Reference/master data changes MUST NOT retroactively alter frozen transactional snapshots
