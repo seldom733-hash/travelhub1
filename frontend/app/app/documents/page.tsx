@@ -262,13 +262,11 @@ function DocumentsContent({
           </OperationsToolbarSlot>
 
           {/* Table */}
+          {error && <OperationsErrorState message={error} onRetry={load} />}
+
           <OperationsRegistrySlot>
             {busy && !data ? (
               <OperationsLoadingState />
-            ) : error ? (
-              <OperationsErrorState message={error} onRetry={load} />
-            ) : sortedItems.length === 0 ? (
-              <OperationsEmptyState colSpan={9} message={filtersActive ? t("documents.empty_filtered", locale) : t("documents.empty", locale)} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -319,6 +317,9 @@ function DocumentsContent({
                         <td className="px-3 py-2 text-xs text-slate-500">{fmtDate(doc.createdAt, locale)}</td>
                       </tr>
                     ))}
+                    {sortedItems.length === 0 && (
+                      <OperationsEmptyState colSpan={9} message={filtersActive ? t("documents.empty_filtered", locale) : t("documents.empty", locale)} />
+                    )}
                   </tbody>
                 </table>
               </div>

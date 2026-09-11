@@ -337,3 +337,102 @@ describe("UI-DOC: documentsApi module exports correct interface", () => {
     expect(api).toContain("/documents/${id}/invalidate");
   });
 });
+
+// ── REMEDIATION: API contract + hydration tests ──
+
+describe("REMEDIATION-A: Documents API contract — frontend calls correct endpoint", () => {
+  it("page uses documentsApi.list (not raw api.get) for data fetching", () => {
+    expect(PAGE).toContain("documentsApi.list(");
+  });
+
+  it("documentsApi.list calls /documents endpoint (not /account/documents)", () => {
+    const api = read("lib/documents-api.ts");
+    expect(api).toContain("`/documents${");
+    expect(api).not.toContain("`/account/documents");
+  });
+
+  it("documentsApi passes page and pageSize parameters", () => {
+    const api = read("lib/documents-api.ts");
+    expect(api).toContain('sp.set("page"');
+    expect(api).toContain('sp.set("pageSize"');
+  });
+
+  it("documentsApi passes type and status filter parameters", () => {
+    const api = read("lib/documents-api.ts");
+    expect(api).toContain('sp.set("type"');
+    expect(api).toContain('sp.set("status"');
+  });
+
+  it("documentsApi.get calls /documents/:id endpoint", () => {
+    const api = read("lib/documents-api.ts");
+    expect(api).toContain("api.get<DocumentDetail>(`/documents/${id}`)");
+  });
+
+  it("documentsApi.invalidate calls POST /documents/:id/invalidate", () => {
+    const api = read("lib/documents-api.ts");
+    expect(api).toContain("api.post<{ success: boolean }>(`/documents/${id}/invalidate`");
+  });
+
+  it("downloadUrl uses /api/v1/documents/:id/download (full path)", () => {
+    const api = read("lib/documents-api.ts");
+    expect(api).toContain("/api/v1/documents/${id}/download");
+  });
+});
+
+describe("REMEDIATION-B: Hydration fix — table always renders, empty state inside tbody", () => {
+  it("error state is rendered OUTSIDE OperationsRegistrySlot (not inside the ternary)", () => {
+    const errorIdx = PAGE.indexOf("{error && <OperationsErrorState");
+    const registryIdx = PAGE.indexOf("<OperationsRegistrySlot>");
+    expect(errorIdx).toBeGreaterThan(-1);
+    expect(errorIdx).toBeLessThan(registryIdx);
+  });
+
+  it("table is always rendered in non-loading branch (no 4-way ternary)", () => {
+    const registryIdx = PAGE.indexOf("<OperationsRegistrySlot>");
+    const tableIdx = PAGE.indexOf("<table", registryIdx);
+    expect(tableIdx).toBeGreaterThan(registryIdx);
+  });
+
+  it("OperationsEmptyState is inside <tbody>, not directly in <div>", () => {
+    const tbodyIdx = PAGE.indexOf("<tbody>");
+    const emptyStateIdx = PAGE.indexOf("OperationsEmptyState colSpan", tbodyIdx);
+    const tbodyCloseIdx = PAGE.indexOf("</tbody>", tbodyIdx);
+    expect(emptyStateIdx).toBeGreaterThan(tbodyIdx);
+    expect(emptyStateIdx).toBeLessThan(tbodyCloseIdx);
+  });
+
+  it("empty state is a sibling of data rows (inside same <tbody>)", () => {
+    const tbodyIdx = PAGE.indexOf("<tbody>");
+    const emptyStateIdx = PAGE.indexOf("OperationsEmptyState colSpan", tbodyIdx);
+    const tbodyCloseIdx = PAGE.indexOf("</tbody>", tbodyIdx);
+    expect(emptyStateIdx).toBeLessThan(tbodyCloseIdx);
+  });
+
+  it("OperationsEmptyState colSpan=9 matches 9-column table", () => {
+    expect(PAGE).toContain("OperationsEmptyState colSpan={9}");
+  });
+
+  it("page uses loading ternary only in registry slot (error state is outside)", () => {
+    const registryIdx = PAGE.indexOf("<OperationsRegistrySlot>");
+    const registryEndIdx = PAGE.indexOf("</OperationsRegistrySlot>");
+    const registryContent = PAGE.substring(registryIdx, registryEndIdx);
+    expect(registryContent).toContain("busy && !data");
+    expect(registryContent).toContain("OperationsEmptyState");
+    expect(registryContent).toContain("sortedItems.length === 0");
+  });
+});
+
+describe("REMEDIATION: API error vs empty state distinction", () => {
+  it("error state has onRetry callback", () => {
+    expect(PAGE).toContain("onRetry={load}");
+  });
+
+  it("empty state differentiates filtered vs unfiltered empty", () => {
+    expect(PAGE).toContain("documents.empty_filtered");
+    expect(PAGE).toContain("documents.empty");
+  });
+
+  it("empty state only shows when items array is empty", () => {
+    expect(PAGE).toContain("sortedItems.length === 0");
+  });
+});
