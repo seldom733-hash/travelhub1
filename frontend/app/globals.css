@@ -6,6 +6,13 @@
   --color-ink: #0f172a;
   --color-panel: #f8fafc;
   --color-line: #e2e8f0;
+  --color-gold: #c9a96e;
+  --color-gold-light: #d4b97a;
+  --color-gold-dark: #b8944f;
+  --color-dark: #0d0d0d;
+  --color-dark-surface: #1a1a1a;
+  --color-dark-card: #242424;
+  --color-dark-border: #333333;
 }
 
 :root {
@@ -40,4 +47,89 @@ body {
 }
 .fade-in-up {
   animation: fadeInUp 0.25s ease-out;
+}
+
+/* Premium serif headings */
+.font-serif {
+  font-family: "Georgia", "Times New Roman", serif;
+}
+
+/* Marketplace dark theme overrides */
+.marketplace-dark {
+  background: #0d0d0d;
+  color: #e8e8e8;
+}
+
+.marketplace-dark a {
+  color: inherit;
+}
+
+/* Gold gradient text */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #c9a96e 0%, #d4b97a 50%, #c9a96e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Hero image overlay */
+.hero-overlay {
+  background: linear-gradient(
+    180deg,
+    rgba(13, 13, 13, 0.3) 0%,
+    rgba(13, 13, 13, 0.5) 40%,
+    rgba(13, 13, 13, 0.85) 100%
+  );
+}
+
+/* Search panel glass effect */
+.search-glass {
+  background: rgba(26, 26, 26, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(201, 169, 110, 0.2);
+}
+
+/* Premium card hover */
+.card-premium {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-premium:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Gold button */
+.btn-gold {
+  background: linear-gradient(135deg, #c9a96e 0%, #b8944f 100%);
+  color: #0d0d0d;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+.btn-gold:hover {
+  background: linear-gradient(135deg, #d4b97a 0%, #c9a96e 100%);
+  box-shadow: 0 4px 20px rgba(201, 169, 110, 0.4);
+}
+
+/* Category chip */
+.category-chip {
+  transition: all 0.2s ease;
+  border: 1px solid rgba(201, 169, 110, 0.3);
+}
+.category-chip:hover {
+  border-color: #c9a96e;
+  background: rgba(201, 169, 110, 0.1);
+}
+.category-chip:focus-visible {
+  outline: 2px solid #c9a96e;
+  outline-offset: 2px;
+}
+
+/* Destination card image overlay */
+.destination-overlay {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(13, 13, 13, 0.6) 60%,
+    rgba(13, 13, 13, 0.9) 100%
+  );
 }
