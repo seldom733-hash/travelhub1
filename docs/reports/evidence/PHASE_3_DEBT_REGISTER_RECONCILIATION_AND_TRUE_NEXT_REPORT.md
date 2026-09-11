@@ -4,6 +4,7 @@
 **Mode:** GOVERNANCE / REPOSITORY-FIRST / DOCUMENTATION ONLY  
 **Production implementation:** FORBIDDEN  
 **Release/deploy:** FORBIDDEN
+**Correction pass:** DOCUMENTATION-ONLY CORRECTION of initial reconciliation report
 
 ---
 
@@ -12,11 +13,11 @@
 Canonical Debt Register reconciliation performed against repository baseline `33f44d2`.
 
 - **Current unique debt ID count:** 35
-- **Historical claim ("32 items"):** stale — 3 items added after Micro-Closure report (PROD-01, UI-DOC-ADMIN, and 1 pre-existing item reconciled into current inventory)
+- **Historical claim ("32 items"):** stale — the Micro-Closure report (2026-09-09) miscounted its own register (actual count at that time was 33), and 2 items were added afterward (PROD-01, UI-DOC-ADMIN)
 - **Duplicate IDs:** 0
 - **Status distribution:** CLOSED 19, OPEN 4, PLANNED 1, DEFERRED 11
-- **Phase 2 exit:** BLOCKED (2.17B qualification environment)
-- **STEP 3.12:** BLOCKED
+- **Application Debt P0:** NONE
+- **External Phase-Level Blocker:** 2.17B / BLOCKER-ENV — dedicated Linux x86_64 qualification environment unavailable
 - **TRUE NEXT:** TBD — no candidate satisfies all 10 applicability conditions
 
 **VERDICT B — DEBT REGISTER RECONCILED BUT TRUE NEXT REMAINS TBD**
@@ -58,9 +59,9 @@ production_changes_before_pass: 0
 ## 5. Canonical Sources Inspected
 
 ```text
-docs/TRAVELHUB_DEBT_REGISTER.md                          ✅ 957 lines, 35 IDs
+docs/TRAVELHUB_DEBT_REGISTER.md                          ✅ 957 lines, 35 ### headings
 docs/prompts/TRAVELHUB_MASTER_ROADMAP.md                 ✅ §20, §25, §28 verified
-docs/prompts/TravelHub_CANONICAL_IMPLEMENTATION_ROADMAP_v3.md  ✅ D-track table, §25 debt register
+docs/prompts/TravelHub_CANONICAL_IMPLEMENTATION_ROADMAP_v3.md  ✅ D-track table
 docs/architecture/TRAVELHUB_CURRENT_CANONICAL_ARCHITECTURE.md  ✅ §21 TRUE NEXT = TBD
 docs/reports/evidence/PHASE_2_STEP_2.17B_CURRENT_STATE_BLOCKER_AUDIT_REPORT.md  ✅ BLOCKER-ENV
 docs/reports/evidence/PHASE_3_UI_DOC_ADMIN_IA_RBAC_PLACEMENT_REPORT.md  ✅ PLANNED / TBD
@@ -77,33 +78,63 @@ unique_id_count:       35
 duplicate_id_count:    0
 ```
 
+Verified by: `rg -c "^### " docs/TRAVELHUB_DEBT_REGISTER.md` = 35, each `###` line is a unique debt ID.
+
 ---
 
-## 7. Historical Count Reconciliation
+## 7. Historical Count Reconciliation — Named Reconciled Items
 
-The Micro-Closure report (`PHASE_3_COMMERCE_CENTER_HELP_BUSINESS_DICTIONARY_FINAL_MICRO_CLOSURE_REPORT.md`, 2026-09-09) states:
+The Micro-Closure report (`PHASE_3_COMMERCE_CENTER_HELP_BUSINESS_DICTIONARY_FINAL_MICRO_CLOSURE_REPORT.md`, 2026-09-09, SHA `0cec25a`) states:
 
 > **32 items total.** All mandatory items present.
 
-The current canonical Debt Register contains **35** unique IDs. The historical count of 32 is stale because:
+This count is stale for **two reasons**:
 
-1. **PROD-01** — added 2026-09-06 (`PHASE_3_DEBT_REGISTER_PROD_01_SELLER_SERVICE_PRODUCT_MODEL_SERVICE_CATEGORY_REPORTING.md`)
-2. **UI-DOC-ADMIN** — added 2026-09-11 (`PHASE_3_UI_DOC_ADMIN_IA_RBAC_PLACEMENT_REPORT.md`)
-3. One additional item was added or reconciled between the Micro-Closure snapshot and the current register
+### 7.1 The Micro-Closure report miscounted its own register
+
+Git verification of the Debt Register at the Micro-Closure commit (`a2b5e01`):
+
+```bash
+git show a2b5e01:docs/TRAVELHUB_DEBT_REGISTER.md | rg -c "^### "
+```
+
+Result: **33** `###` headings (unique debt IDs). The report's own table lists only 30 rows. The report's claim of "32" was a miscount — the actual register at that time contained 33 items.
+
+### 7.2 Two items were added after the Micro-Closure snapshot
+
+| # | ID | Title | Added at commit | Date | Evidence |
+|---|---|---|---|---|---|
+| 1 | **PROD-01** | Seller Service Cards / Product Model / Service Category Reporting | `a481048` | 2026-09-06 | `docs/reports/PHASE_3_DEBT_REGISTER_PROD_01_SELLER_SERVICE_PRODUCT_MODEL_SERVICE_CATEGORY_REPORTING.md` |
+| 2 | **UI-DOC-ADMIN** | Admin / Operator Documents UI | `b0ebe38` | 2026-09-11 | `docs/reports/evidence/PHASE_3_UI_DOC_ADMIN_IA_RBAC_PLACEMENT_REPORT.md` |
+
+### 7.3 Full progression
 
 ```text
-historical_count:              32
-current_unique_id_count:       35
-new_items_since_historical:    3 (PROD-01, UI-DOC-ADMIN, +1)
-removed_items:                 0
-count_reconciliation_verdict:  STALE — 32 replaced by 35
+456f2ab (original register, 2026-09-04):   26 items
+a2b5e01 (Micro-Closure, 2026-09-09):      33 items  ← report claims "32" (miscount)
+a481048 (+ PROD-01, 2026-09-06):          34 items
+b0ebe38 (+ UI-DOC-ADMIN, 2026-09-11):     35 items  ← current HEAD
+```
+
+### 7.4 Reconciliation verdict
+
+```text
+historical_count_claimed:       32 (from Micro-Closure report)
+historical_count_actual:        33 (at Micro-Closure commit a2b5e01)
+current_unique_id_count:        35
+named_reconciled_item_1:        PROD-01 (added after Micro-Closure)
+named_reconciled_item_2:        UI-DOC-ADMIN (added after Micro-Closure)
+miscount_in_historical_report:  YES (report said 32, register had 33)
+new_items_since_historical:     2 (PROD-01, UI-DOC-ADMIN)
+removed_items:                  0
+count_reconciliation_verdict:   STALE — 32 replaced by 35
 ```
 
 ---
 
 ## 8. Duplicate / Collision Check
 
-All 35 IDs verified unique. No duplicates.
+All 35 `###` headings verified unique. No duplicates.
 
 ```text
 duplicate_id_count: 0
@@ -111,96 +142,74 @@ duplicate_id_count: 0
 
 ---
 
-## 9. Complete Debt Inventory
+## 9. Complete Debt Inventory — With Status / Severity / Execution Class / Execution Priority
 
-| # | ID | Title | Category | Severity | Status | Planned Closure | Closed? |
-|---|---|---|---|---|---|---|---|
-| 1 | SEC-UI-01 | Request Actions Server-Authority Gap | SECURITY | P1 | CLOSED | UI-C6 | ✅ |
-| 2 | UI-01 | Unified Request/Order/Booking Detail Shell | UX CONSISTENCY | P2 | CLOSED | UI-C1 | ✅ |
-| 3 | UI-02 | Unified Header with Breadcrumbs | UX CONSISTENCY | P2 | CLOSED | UI-C1 | ✅ |
-| 4 | UI-03 | Unified Status/Payment/Refund Visual Language | UX CONSISTENCY | P2 | CLOSED | UI-C1 | ✅ |
-| 5 | UI-04 | Unified Business Timeline | UX CONSISTENCY | P2 | CLOSED | UI-C3 | ✅ |
-| 6 | UI-05 | Unified Audit History | UX CONSISTENCY | P3 | CLOSED | UI-C4 | ✅ |
-| 7 | UI-06 | Commerce Relation Chain | UX CONSISTENCY | P2 | CLOSED | UI-C2 | ✅ |
-| 8 | UI-07 | Orders KPI Semantic Reconciliation | DATA/SEMANTIC | P2 | CLOSED | UI-C10 | ✅ |
-| 9 | UI-08 | Bookings KPI Final Semantics | DATA/SEMANTIC | P2 | CLOSED | UI-C11 | ✅ |
-| 10 | UI-09 | Unified Cards/Spacing/Typography/Responsive | UX CONSISTENCY | P3 | CLOSED | UI-C13 | ✅ |
-| 11 | HELP-01 | Left Menu Help Entry | DOCUMENTATION/HELP | P2 | CLOSED | UI-C12 | ✅ |
-| 12 | HELP-02 | /app/help Business Dictionary | DOCUMENTATION/HELP | P2 | CLOSED | UI-C12 | ✅ |
-| 13 | HELP-03 | KPI Contextual Help (ⓘ) | DOCUMENTATION/HELP | P3 | CLOSED | UI-C3 | ✅ |
-| 14 | HELP-04 | Status Dictionary | DOCUMENTATION/HELP | P3 | CLOSED | UI-C12 | ✅ |
-| 15 | HELP-05 | Formula Drift Mandatory Automated Gate | DOCUMENTATION/HELP | P2 | CLOSED | UI-C3 | ✅ |
-| 16 | HELP-06 | Workspace-Aware Help | DOCUMENTATION/HELP | P3 | CLOSED | UI-C12 | ✅ |
-| 17 | HELP-07 | Workspace/Entitlement-Aware Help Content | DOCUMENTATION/HELP | P2 | CLOSED | UI-C12 | ✅ |
-| 18 | HELP-08 | RU/AZ/EN Help Localization | DOCUMENTATION/HELP | P2 | CLOSED | UI-C12 | ✅ |
-| 19 | DATA-01 | Canonical KPI Read-Model Consistency | DATA/SEMANTIC | P2 | CLOSED | UI-C10/C11 | ✅ |
-| 19 | **TOTAL CLOSED** | | | | | | **19** |
-| 20 | SEC-TENANT-01 | Platform/Partner Context-Aware UI | SECURITY | P2 | OPEN | LATER | ❌ |
-| 21 | PERF-01 | EventBus Backlog Gate | PERFORMANCE | P2 | OPEN | LATER | ❌ |
-| 22 | PERF-02 | Booking Burst 20 Chains/s Incomplete | PERFORMANCE | P2 | OPEN | LATER | ❌ |
-| 23 | PROD-01 | Seller Service Cards / Product Model / Service Category Reporting | DEFERRED PRODUCT | P2 | OPEN | DEFERRED | ❌ |
-| 23 | **TOTAL OPEN** | | | | | | **4** |
-| 24 | UI-DOC-ADMIN | Admin / Operator Documents UI | UX CONSISTENCY | P2 | PLANNED | TBD | ❌ |
-| 24 | **TOTAL PLANNED** | | | | | | **1** |
-| 25 | DATA-02 | Marketplace vs Storefront Financial Metric Separation | DATA/SEMANTIC | P3 | DEFERRED | DEFERRED | ❌ |
-| 26 | FIN-01 | Full Finance Center | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED | ❌ |
-| 27 | FIN-02 | Payment Provider/Webhook Integration | DEFERRED PRODUCT | P1 | DEFERRED | DEFERRED | ❌ |
-| 28 | FIN-03 | Payout Implementation | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED | ❌ |
-| 29 | SUB-01 | Storefront Subscription Implementation | DEFERRED PRODUCT | P2 | DEFERRED | DEFERRED | ❌ |
-| 30 | SUB-02 | Host-Count Subscription Variants | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED | ❌ |
-| 31 | SUB-03 | Single Simultaneous Host Login | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED | ❌ |
-| 32 | SUB-04 | Storefront Partner Onboarding/Subscription Page | DEFERRED PRODUCT | P2 | DEFERRED | DEFERRED | ❌ |
-| 33 | SUB-05 | Partner Company Legal/Physical Data Collection | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED | ❌ |
-| 34 | SUB-06 | Electronic Partner Contract | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED | ❌ |
-| 35 | AGR-01 | Booking Commercial Terms & Agreement Foundation | DEFERRED PRODUCT | P2 | DEFERRED | DEFERRED | ❌ |
-| 35 | **TOTAL DEFERRED** | | | | | | **11** |
+| # | ID | Title | Category | Severity | Register Status | Execution Class | Execution Priority | Planned Closure | Blocker |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | SEC-UI-01 | Request Actions Server-Authority Gap | SECURITY | P1 | CLOSED | — | — | UI-C6 | — |
+| 2 | UI-01 | Unified Request/Order/Booking Detail Shell | UX CONSISTENCY | P2 | CLOSED | — | — | UI-C1 | — |
+| 3 | UI-02 | Unified Header with Breadcrumbs | UX CONSISTENCY | P2 | CLOSED | — | — | UI-C1 | — |
+| 4 | UI-03 | Unified Status/Payment/Refund Visual Language | UX CONSISTENCY | P2 | CLOSED | — | — | UI-C1 | — |
+| 5 | UI-04 | Unified Business Timeline | UX CONSISTENCY | P2 | CLOSED | — | — | UI-C3 | — |
+| 6 | UI-05 | Unified Audit History | UX CONSISTENCY | P3 | CLOSED | — | — | UI-C4 | — |
+| 7 | UI-06 | Commerce Relation Chain | UX CONSISTENCY | P2 | CLOSED | — | — | UI-C2 | — |
+| 8 | UI-07 | Orders KPI Semantic Reconciliation | DATA/SEMANTIC | P2 | CLOSED | — | — | UI-C10 | — |
+| 9 | UI-08 | Bookings KPI Final Semantics | DATA/SEMANTIC | P2 | CLOSED | — | — | UI-C11 | — |
+| 10 | UI-09 | Unified Cards/Spacing/Typography/Responsive | UX CONSISTENCY | P3 | CLOSED | — | — | UI-C13 | — |
+| 11 | HELP-01 | Left Menu Help Entry | DOCUMENTATION/HELP | P2 | CLOSED | — | — | UI-C12 | — |
+| 12 | HELP-02 | /app/help Business Dictionary | DOCUMENTATION/HELP | P2 | CLOSED | — | — | UI-C12 | — |
+| 13 | HELP-03 | KPI Contextual Help | DOCUMENTATION/HELP | P3 | CLOSED | — | — | UI-C3 | — |
+| 14 | HELP-04 | Status Dictionary | DOCUMENTATION/HELP | P3 | CLOSED | — | — | UI-C12 | — |
+| 15 | HELP-05 | Formula Drift Mandatory Automated Gate | DOCUMENTATION/HELP | P2 | CLOSED | — | — | UI-C3 | — |
+| 16 | HELP-06 | Workspace-Aware Help | DOCUMENTATION/HELP | P3 | CLOSED | — | — | UI-C12 | — |
+| 17 | HELP-07 | Workspace/Entitlement-Aware Help Content | DOCUMENTATION/HELP | P2 | CLOSED | — | — | UI-C12 | — |
+| 18 | HELP-08 | RU/AZ/EN Help Localization | DOCUMENTATION/HELP | P2 | CLOSED | — | — | UI-C12 | — |
+| 19 | DATA-01 | Canonical KPI Read-Model Consistency | DATA/SEMANTIC | P2 | CLOSED | — | — | UI-C10/C11 | — |
+| 20 | SEC-TENANT-01 | Platform/Partner Context-Aware UI | SECURITY | P2 | OPEN | LATER | blocked | LATER | SUB-01 |
+| 21 | PERF-01 | EventBus Backlog Gate | PERFORMANCE | P2 | OPEN | LATER | blocked | LATER | BLOCKER-ENV |
+| 22 | PERF-02 | Booking Burst 20 Chains/s Incomplete | PERFORMANCE | P2 | OPEN | LATER | blocked | LATER | BLOCKER-ENV |
+| 23 | PROD-01 | Seller Service Cards / Product Model | DEFERRED PRODUCT | P2 | OPEN | DEFERRED | deferred | DEFERRED | architecture deferred |
+| 24 | UI-DOC-ADMIN | Admin / Operator Documents UI | UX CONSISTENCY | P2 | PLANNED | PLANNED | blocked | TBD | target stage TBD |
+| 25 | DATA-02 | Marketplace vs Storefront Financial Metric Separation | DATA/SEMANTIC | P3 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | FIN-01 |
+| 26 | FIN-01 | Full Finance Center | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | FIN-02 |
+| 27 | FIN-02 | Payment Provider/Webhook Integration | DEFERRED PRODUCT | P1 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | ADR-0015 |
+| 28 | FIN-03 | Payout Implementation | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | FIN-02 |
+| 29 | SUB-01 | Storefront Subscription Implementation | DEFERRED PRODUCT | P2 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | FIN-02, SUB-04 |
+| 30 | SUB-02 | Host-Count Subscription Variants | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | SUB-01 |
+| 31 | SUB-03 | Single Simultaneous Host Login | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | SUB-01 |
+| 32 | SUB-04 | Storefront Partner Onboarding/Subscription Page | DEFERRED PRODUCT | P2 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | SUB-01, FIN-02 |
+| 33 | SUB-05 | Partner Company Legal/Physical Data Collection | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | SUB-04 |
+| 34 | SUB-06 | Electronic Partner Contract | DEFERRED PRODUCT | P3 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | SUB-04, SUB-05 |
+| 35 | AGR-01 | Booking Commercial Terms & Agreement Foundation | DEFERRED PRODUCT | P2 | DEFERRED | DEFERRED PRODUCT | deferred | DEFERRED | D6 accepted, SUB-01 |
 
 ---
 
-## 10. CLOSED Inventory Audit
+## 10. CLOSED Inventory
 
-All 19 CLOSED items verified:
+19 items. All verified: closure SHA or accepted evidence exists, no later report re-opened them, current register status is consistent.
 
-| ID | Closure Evidence | Acceptance Condition | Re-opened? | Status Consistent? |
-|---|---|---|---|---|
-| SEC-UI-01 | SHA b6aa5da | Request API returns availableActions; frontend consumes; runtime verified | No | ✅ |
-| UI-01 | C1.1+C7+C8+C9 (VERDICT A) | All 3 detail pages use same canonical shell layout | No | ✅ |
-| UI-02 | C1.1+C7/C8/C9 | All 3 pages use PageHeader with breadcrumbs | No | ✅ |
-| UI-03 | C1.1+C7/C8/C9 | All entities use StatusBadge | No | ✅ |
-| UI-04 | EntityTimeline+EntityAuditHistory | All 3 pages have separate Business Timeline + Audit History | No | ✅ |
-| UI-05 | EntityAuditHistory+C7/C8/C9 | All 3 pages display immutable audit history | No | ✅ |
-| UI-06 | UI-C2 (VERDICT A) | All 3 pages show server-authoritative chain | No | ✅ |
-| UI-07 | C1.2C+C1.2G | KPI overlap documented, missing states classified | No | ✅ |
-| UI-08 | C1.2D+micro-closure | Each KPI maps to exclusive status set | No | ✅ |
-| UI-09 | C1.1+polish | Unified card/spacing/typography system | No | ✅ |
-| HELP-01 | C1.2H/H.1/H.2 (VERDICT A) | /app/help route accessible from left navigation | No | ✅ |
-| HELP-02 | C1.2H/H.1/H.2 | /app/help renders with categorized entries | No | ✅ |
-| HELP-03 | C1.2H | Every KPI card has contextual tooltip | No | ✅ |
-| HELP-04 | C1.2H | All statuses documented with transitions | No | ✅ |
-| HELP-05 | help-registry.spec (20 tests) | Automated test fails if critical metric lacks metadata | No | ✅ |
-| HELP-06 | C1.2H | Help navigation reflects available capabilities | No | ✅ |
-| HELP-07 | C1.2H | Help navigation filters by workspace+entitlement | No | ✅ |
-| HELP-08 | C1.2H | All topics have RU/AZ/EN content | No | ✅ |
-| DATA-01 | D8 evidence (VERDICT A) | KPI count reconciles with same filter | No | ✅ |
+```
+SEC-UI-01, UI-01..UI-09, HELP-01..HELP-08, DATA-01
+```
 
 ---
 
 ## 11. OPEN Inventory
 
-| ID | Risk | Impact | Dependencies | Blocking? | Executable Now? |
-|---|---|---|---|---|---|
-| SEC-TENANT-01 | Context-aware UI not differentiated | Partners see Platform-only modules | SUB-01 | No | No — blocked by SUB-01 |
-| PERF-01 | EventBus backlog >100 under steady load | Performance degradation | None | No | No — BLOCKER-ENV (no Linux x86_64 host) |
-| PERF-02 | Booking burst 34% complete at 20 chains/s | Throughput under load | None | No | No — BLOCKER-ENV |
-| PROD-01 | Product model undefined | Service Category Reporting deferred | DATA-02, FIN-01, HELP-05 | No | No — architecture decision deferred |
+| ID | Severity | Register Status | Execution Class | Execution Priority | Risk | Blocking? | Executable Now? | Blocker |
+|---|---|---|---|---|---|---|---|---|
+| SEC-TENANT-01 | P2 | OPEN | LATER | blocked | Context-aware UI not differentiated | No | No | SUB-01 not implemented |
+| PERF-01 | P2 | OPEN | LATER | blocked | EventBus backlog >100 under steady load | No | No | BLOCKER-ENV (no Linux x86_64 host) |
+| PERF-02 | P2 | OPEN | LATER | blocked | Booking burst 34% complete at 20 chains/s | No | No | BLOCKER-ENV (no Linux x86_64 host) |
+| PROD-01 | P2 | OPEN | DEFERRED | deferred | Product model undefined | No | No | Architecture scope deferred |
 
 ---
 
 ## 12. PLANNED Inventory
 
-| ID | Reason | IA/Domain Owner | Target Stage | Executable Now? |
-|---|---|---|---|---|
-| UI-DOC-ADMIN | Admin/Operator lacks Documents UI surface | IA=OPERATIONS; Domain=Operations; Formal owner=TBD | TBD | No — target stage unresolved |
+| ID | Severity | Register Status | Execution Class | Execution Priority | IA/Domain Owner | Target Stage | Executable Now? | Blocker |
+|---|---|---|---|---|---|---|---|---|
+| UI-DOC-ADMIN | P2 | PLANNED | PLANNED | blocked | IA=OPERATIONS; Domain=Operations; Formal owner=TBD | TBD | No | Target stage unresolved |
 
 ---
 
@@ -208,9 +217,9 @@ All 19 CLOSED items verified:
 
 | ID | Why Later | Environment Prerequisite | Phase 2 Impact |
 |---|---|---|---|
-| SEC-TENANT-01 | Depends on SUB-01 (Storefront subscription model) | None | No |
-| PERF-01 | Requires dedicated Linux x86_64 host for qualification | Linux VM ~$20-50/month | Yes — 2.17B blocker |
-| PERF-02 | Requires dedicated Linux x86_64 host for qualification | Linux VM ~$20-50/month | Yes — 2.17B blocker |
+| SEC-TENANT-01 | Depends on SUB-01 | None | No |
+| PERF-01 | Requires Linux qualification host | Linux VM ~$20-50/month | Yes — 2.17B blocker |
+| PERF-02 | Requires Linux qualification host | Linux VM ~$20-50/month | Yes — 2.17B blocker |
 
 ---
 
@@ -219,8 +228,8 @@ All 19 CLOSED items verified:
 | ID | Future Product Scope | Dependencies | Why Deferred |
 |---|---|---|---|
 | DATA-02 | Financial metric scope by acquisitionSource | FIN-01 | Finance Center not implemented |
-| FIN-01 | Finance Center with aggregation/reconciliation | FIN-02 (PSP) | PSP integration not implemented |
-| FIN-02 | Real PSP webhook/production payment | ADR-0015, merchant onboarding | External commercial dependency |
+| FIN-01 | Finance Center with aggregation/reconciliation | FIN-02 | PSP integration not implemented |
+| FIN-02 | Real PSP webhook/production payment | ADR-0015 | External commercial dependency |
 | FIN-03 | Partner payout execution | FIN-02 | Depends on PSP |
 | SUB-01 | Storefront subscription/plan selection | FIN-02, SUB-04 | Payment + onboarding prerequisites |
 | SUB-02 | Host-count subscription pricing | SUB-01 | Pricing model undefined |
@@ -235,9 +244,11 @@ All 19 CLOSED items verified:
 ## 15. UI-DOC-ADMIN Reconciliation
 
 ```text
-Status:              PLANNED (confirmed)
+Status:              PLANNED
 Category:            UX CONSISTENCY
 Severity:            P2
+Register Status:     PLANNED
+Execution Class:     PLANNED
 IA location:         OPERATIONS group in Admin sidebar
 Domain owner:        Operations (confirmed)
 Formal product owner: TBD
@@ -254,15 +265,17 @@ Debt Register is consistent with placement report. No contradictions found.
 ## 16. PROD-01 Reconciliation
 
 ```text
-Status:              OPEN (register says OPEN; also DEFERRED in practice)
+Status:              OPEN
 Category:            DEFERRED PRODUCT
 Severity:            P2
+Register Status:     OPEN
+Execution Class:     DEFERRED
 Dependencies:        DATA-02, FIN-01, HELP-05
 Architecture gate:   14-point Resolution Gate documented
 Current decision:    DEFERRED until Seller Service Cards / Product Model architecture stage
 ```
 
-Debt Register preserves architecture gate and dependencies. Consistent with intent.
+PROD-01 is OPEN in the register because the architecture model is not finalized. It is DEFERRED in execution because no implementation can begin until the architecture is accepted. These are consistent: OPEN = debt exists, DEFERRED = not actionable now.
 
 ---
 
@@ -272,6 +285,8 @@ Debt Register preserves architecture gate and dependencies. Consistent with inte
 Status:              OPEN
 Category:            SECURITY
 Severity:            P2
+Register Status:     OPEN
+Execution Class:     LATER
 Dependencies:        SUB-01
 Planned closure:     LATER
 ```
@@ -283,29 +298,52 @@ Context-aware PLATFORM/PARTNER UI scope confirmed. Blocked by SUB-01 dependency.
 ## 18. PERF-01 / PERF-02 Boundary
 
 ```text
-PERF-01: OPEN / LATER — BLOCKER-ENV (no dedicated Linux x86_64 host)
-PERF-02: OPEN / LATER — BLOCKER-ENV (no dedicated Linux x86_64 host)
+PERF-01: Register Status = OPEN, Execution Class = LATER, Blocker = BLOCKER-ENV
+PERF-02: Register Status = OPEN, Execution Class = LATER, Blocker = BLOCKER-ENV
 ```
 
-Both require dedicated Linux qualification environment. Harness fully remediated (H1-H11). SLO authority approved. Environment is the blocker, not the application.
+Both require dedicated Linux x86_64 qualification environment. Harness fully remediated (H1-H11). SLO authority approved. Environment is the blocker, not the application.
 
 ---
 
 ## 19. Phase 2 / 2.17B Boundary
 
 ```text
-2.17B:             BLOCKED (BLOCKER-ENV — no dedicated Linux x86_64 host)
+2.17B:             BLOCKED (BLOCKER-ENV — dedicated Linux x86_64 qualification environment unavailable)
 Phase 2 Exit:      BLOCKED (2.17B prerequisite unsatisfied)
 STEP 3.12:         BLOCKED (Phase 2 exit prerequisite unsatisfied)
 ```
 
-Environment blocker is NOT application debt. This reconciliation does NOT convert environment blocker into application debt.
+**This is an External Phase-Level Blocker, NOT Application Debt.**
+
+- It is NOT an application defect
+- It is NOT a Debt Register P0 item
+- It is NOT resolved by code changes
+- It requires infrastructure provisioning (Linux VM ~$20-50/month)
 
 ---
 
-## 20. Dependency Graph
+## 20. Application Debt P0 vs External Phase Blocker — Explicit Separation
 
-```text
+```
+Application Debt P0:                    NONE
+Application Debt P1:                    SEC-TENANT-01 (severity P1 in SECURITY class, but execution-blocked by SUB-01)
+Application Debt P2:                    PERF-01, PERF-02, PROD-01, UI-DOC-ADMIN
+Application Debt P3:                    DATA-02, FIN-01..03, SUB-01..06, AGR-01
+
+External Phase-Level Blocker:           2.17B / BLOCKER-ENV
+Description:                            Dedicated Linux x86_64 qualification environment unavailable
+Impact:                                 Phase 2 Exit = BLOCKED, STEP 3.12 = BLOCKED
+Nature:                                 Infrastructure gap, not application defect
+Resolution:                             Provision Linux VM (~$20-50/month)
+Debt Register P0:                       NOT APPLICABLE — this is not registered debt
+```
+
+---
+
+## 21. Dependency Graph
+
+```
 FIN-02 ← FIN-01 ← DATA-02
 FIN-02 ← FIN-03
 FIN-02 ← SUB-01 ← SUB-02, SUB-03, SUB-04, SEC-TENANT-01
@@ -321,30 +359,41 @@ PERF-01/02 ← BLOCKER-ENV (independent of above chain)
 
 ---
 
-## 21. Priority Model
+## 22. Priority Model — Severity vs Execution Priority (Separated)
 
-```text
-P0 — blocks release / phase gate:       NONE (2.17B is environment, not application)
-P1 — security/integrity requiring action: SEC-TENANT-01 (OPEN, blocked by SUB-01)
-P2 — material quality/architecture debt:  PERF-01, PERF-02, PROD-01, UI-DOC-ADMIN
-P3 — lower-risk/deferred polish:         DATA-02, FIN-01..03, SUB-01..06, AGR-01
-```
+| ID | Severity (from Register) | Execution Priority | Execution Class | Reason |
+|---|---|---|---|---|
+| SEC-UI-01 | P1 | — | CLOSED | Resolved |
+| UI-01..UI-09 | P2/P3 | — | CLOSED | Resolved |
+| HELP-01..HELP-08 | P2/P3 | — | CLOSED | Resolved |
+| DATA-01 | P2 | — | CLOSED | Resolved |
+| SEC-TENANT-01 | P2 | blocked | LATER | SUB-01 prerequisite missing |
+| PERF-01 | P2 | blocked | LATER | BLOCKER-ENV |
+| PERF-02 | P2 | blocked | LATER | BLOCKER-ENV |
+| PROD-01 | P2 | deferred | DEFERRED | Architecture scope deferred |
+| UI-DOC-ADMIN | P2 | blocked | PLANNED | Target stage TBD |
+| FIN-02 | P1 | deferred | DEFERRED PRODUCT | ADR-0015 external dependency |
+| SUB-01..06 | P2/P3 | deferred | DEFERRED PRODUCT | Chained prerequisites |
+| AGR-01 | P2 | deferred | DEFERRED PRODUCT | SUB-01 prerequisite |
+| DATA-02 | P3 | deferred | DEFERRED PRODUCT | FIN-01 prerequisite |
+
+**Severity ≠ Execution Priority.** P1 severity (FIN-02) is deferred because its execution blocker is external (ADR-0015 commercial confirmation). P2 severity items with blocked execution take precedence over P1 items with deferred execution only if unblocked.
 
 ---
 
-## 22. Candidate NEXT Matrix
+## 23. Candidate NEXT Matrix
 
-| Candidate | Canonical? | Prerequisites | Blocked? | Deferred? | Risk | Executable Now? | Verdict |
-|---|---|---|---|---|---|---|---|
-| SEC-TENANT-01 | ✅ | SUB-01 not implemented | ✅ | ❌ | P1 | ❌ | REJECTED — prerequisite missing |
-| UI-DOC-ADMIN | ✅ | D13 available | ✅ | ❌ | P2 | ❌ | REJECTED — target stage TBD, formal owner TBD |
-| PROD-01 | ✅ | Architecture stage deferred | ✅ | ✅ | P2 | ❌ | REJECTED — architecture scope deferred |
-| PERF-01 | ✅ | Linux x86_64 host | ✅ | ❌ | P2 | ❌ | REJECTED — BLOCKER-ENV |
-| PERF-02 | ✅ | Linux x86_64 host | ✅ | ❌ | P2 | ❌ | REJECTED — BLOCKER-ENV |
+| Candidate | Canonical? | Register Status | Execution Class | Blocked? | Deferred? | Risk | Executable Now? | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| SEC-TENANT-01 | ✅ | OPEN | LATER | ✅ | ❌ | P2 | ❌ | REJECTED — prerequisite missing (SUB-01) |
+| UI-DOC-ADMIN | ✅ | PLANNED | PLANNED | ✅ | ❌ | P2 | ❌ | REJECTED — target stage TBD, formal owner TBD |
+| PROD-01 | ✅ | OPEN | DEFERRED | ✅ | ✅ | P2 | ❌ | REJECTED — architecture scope deferred |
+| PERF-01 | ✅ | OPEN | LATER | ✅ | ❌ | P2 | ❌ | REJECTED — BLOCKER-ENV |
+| PERF-02 | ✅ | OPEN | LATER | ✅ | ❌ | P2 | ❌ | REJECTED — BLOCKER-ENV |
 
 ---
 
-## 23. Candidate Rejections
+## 24. Candidate Rejections
 
 **SEC-TENANT-01:** Blocked by SUB-01 dependency. Storefront subscription model not implemented. Cannot execute context-aware UI without knowing which modules exist per workspace/entitlement.
 
@@ -356,9 +405,9 @@ P3 — lower-risk/deferred polish:         DATA-02, FIN-01..03, SUB-01..06, AGR-
 
 ---
 
-## 24. TRUE NEXT Decision
+## 25. TRUE NEXT Decision
 
-```text
+```
 PHASE CONTINUATION BLOCKED
 ```
 
@@ -371,9 +420,9 @@ No candidate satisfies all 10 applicability conditions from §13. Every remainin
 
 ---
 
-## 25. Hard Stop Conditions
+## 26. Hard Stop Conditions
 
-```text
+```
 TRUE NEXT = NOT SET / TBD
 No next stage authorized
 Phase 2 exit = BLOCKED (2.17B)
@@ -390,21 +439,21 @@ Do NOT create new stage via this reconciliation
 
 ---
 
-## 26. Debt Register Changes
+## 27. Debt Register Changes
 
 **NONE.** Current Debt Register is accurate. No status, count, or metadata changes required.
 
 ---
 
-## 27. Master Roadmap Impact
+## 28. Master Roadmap Impact
 
 **NONE.** TRUE NEXT remains TBD. No roadmap update required. §25 and §28 remain consistent.
 
 ---
 
-## 28. Negative Checks
+## 29. Negative Checks
 
-```text
+```
 production_code_changes:        0
 frontend_changes:               0
 backend_changes:                0
@@ -432,18 +481,18 @@ invented_roadmap_stages:        0
 
 ---
 
-## 29. Artifact Integrity
+## 30. Artifact Integrity
 
 No canonical documentation/artifact checker defined in repository. Manual verification: WARN=0, FAIL=0.
 
 ---
 
-## 30. Persistence
+## 31. Persistence
 
 After report creation, the following files are staged:
 
-```text
-docs/reports/evidence/PHASE_3_DEBT_REGISTER_RECONCILIATION_AND_TRUE_NEXT_REPORT.md  (new)
+```
+docs/reports/evidence/PHASE_3_DEBT_REGISTER_RECONCILIATION_AND_TRUE_NEXT_REPORT.md  (corrected)
 ```
 
 No changes to:
@@ -453,9 +502,9 @@ No changes to:
 
 ---
 
-## 31. Final State Matrix
+## 32. Final State Matrix
 
-```text
+```
 repository:                  D:\travelhub_v1
 branch:                      master
 review_base_sha:             33f44d21452d77cc68a51a0a1e47a56eca7479b3
@@ -468,21 +517,19 @@ worktree_clean:              YES (after commit)
 current_debt_count:          35
 unique_id_count:             35
 duplicate_id_count:          0
-historical_count:            32
+historical_count:            32 (claimed) / 33 (actual at Micro-Closure)
 count_reconciled:            YES (32 stale, 35 current)
 
 closed_count:                19
 open_count:                  4
 planned_count:               1
-later_count:                 0 (PERF-01/02 classified as OPEN/LATER within OPEN)
 deferred_product_count:      11
-blocked_count:               0 (application-level)
 
-SEC-TENANT-01:               OPEN (blocked by SUB-01)
-UI-DOC-ADMIN:                PLANNED (target stage TBD)
-PROD-01:                     OPEN (architecture deferred)
-PERF-01:                     OPEN (BLOCKER-ENV)
-PERF-02:                     OPEN (BLOCKER-ENV)
+SEC-TENANT-01:               OPEN / LATER / blocked (by SUB-01)
+UI-DOC-ADMIN:                PLANNED / PLANNED / blocked (target stage TBD)
+PROD-01:                     OPEN / DEFERRED / deferred (architecture scope)
+PERF-01:                     OPEN / LATER / blocked (BLOCKER-ENV)
+PERF-02:                     OPEN / LATER / blocked (BLOCKER-ENV)
 
 D13:                         CLOSED
 D14:                         CLOSED
@@ -490,10 +537,13 @@ STEP_3_12:                   BLOCKED
 PHASE_2_EXIT:                BLOCKED
 2.17B:                       BLOCKED
 
+application_debt_p0:         NONE
+external_phase_blocker:      2.17B / BLOCKER-ENV (Linux x86_64 host unavailable)
+
 canonical_true_next:         NOT SET / TBD
 next_status:                 PHASE CONTINUATION BLOCKED
-next_prerequisites:          Resolve at least one of: SUB-01 (for SEC-TENANT-01), UI-DOC-ADMIN target stage + owner, Seller Service model (for PROD-01), Linux host (for PERF-01/02)
-hard_stop:                   YES — Phase 2 exit unsatisfied, STEP 3.12 blocked, no executable candidate
+next_prerequisites:          Resolve at least one of: SUB-01, UI-DOC-ADMIN target+owner, Seller Service model, Linux host
+hard_stop:                   YES
 
 production_code_changes:     0
 frontend_changes:            0
@@ -508,24 +558,24 @@ storefront_changes:          0
 
 ---
 
-## 32. Final Verdict
+## 33. Final Verdict
 
 ```
 VERDICT B — DEBT REGISTER RECONCILED BUT TRUE NEXT REMAINS TBD
 ```
 
-Debt Register is accurate (35 IDs, 0 duplicates, all statuses verified). No changes required. TRUE NEXT cannot be set because every remaining candidate is blocked by a missing prerequisite, governance decision, architecture scope, or environment.
+Debt Register is accurate (35 IDs, 0 duplicates, all statuses verified). Historical "32 items" is stale: the Micro-Closure report miscounted its own register (actual was 33), and 2 items were added afterward (PROD-01, UI-DOC-ADMIN). No changes required to Debt Register. TRUE NEXT cannot be set because every remaining candidate is blocked by a missing prerequisite, governance decision, architecture scope, or environment.
 
 ---
 
-## 33. Repository Evidence Footer
+## 34. Repository Evidence Footer
 
-```text
+```
 review_base_sha:    33f44d21452d77cc68a51a0a1e47a56eca7479b3
 reconciliation_sha: (this commit)
 worktree_clean:     YES
 debt_register:      docs/TRAVELHUB_DEBT_REGISTER.md — 35 IDs, 0 duplicates
-historical_32:      STALE — replaced by 35
+historical_32:      STALE — Micro-Closure miscounted (33 actual), 2 items added after (PROD-01, UI-DOC-ADMIN)
 true_next:          NOT SET / TBD
 phase_2_exit:       BLOCKED
 step_3_12:          BLOCKED
@@ -533,7 +583,7 @@ step_3_12:          BLOCKED
 
 ---
 
-## 34. HARD STOP
+## 35. HARD STOP
 
 Reconciliation complete. No TRUE NEXT selected. No next stage authorized. No implementation begins. No debt register changes. No roadmap changes.
 
