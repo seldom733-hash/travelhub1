@@ -932,11 +932,18 @@ HELP-05 — formula-drift automated gate / analytics metric registry
 | Description | Admin/Operator platform lacks a Documents section in the navigation. Backend API (`documents.read`, `documents.write`) is complete. Buyer Documents UI (`/account/documents`) is complete. Admin/Operator have no frontend surface to list, view, download, or invalidate documents. |
 | Why it matters | Platform staff with `documents.read`/`write` permissions cannot access documents through the UI. They must use API tools. This is inconsistent with other admin entities (Orders, Bookings, Payments) which all have admin UI surfaces. |
 | Dependencies | D13 CLOSED (backend API available) |
-| Planned closure stage | TO BE DETERMINED (pending IA review + governance decision) |
+| Planned closure stage | TBD (confirmed IA + owner; target stage pending governance decision) |
 | Status | PLANNED |
-| Acceptance condition | `/app/documents` exists; Admin navigation contains Documents in approved IA location; ADMIN/OPERATOR can list documents; authorized roles can view permitted details; PII redaction correct; Buyer isolated to `/account/documents`; Partner denied; download uses signed URL; invalidation only for authorized roles; invalidated documents cannot be downloaded; no new document backend; D13 API contracts unchanged; D8-D13 regression clean |
+| Access scope | `documents.read` → ADMIN, DIRECTOR, FINANCE, ANALYST, SALES_MANAGER, OPERATOR; `documents.write` → ADMIN, OPERATOR; `account.document.read_own` → BUYER |
+| IA location | OPERATIONS group in Admin sidebar (confirmed 2026-09-11) |
+| Domain owner | Operations (confirmed 2026-09-11) |
+| PII model | ADMIN/OPERATOR = full traveler PII; all other roles = redacted (passportNumber, passportExpiry, birthDate → null) |
+| Invalidation | ADMIN/OPERATOR only (`documents.write`) |
+| Document types | VOUCHER, PARTIAL_PAYMENT, REFUND (all visible to all authorized roles) |
+| Finance boundary | UI ≠ Finance Center (explicitly preserved) |
+| Acceptance condition | `/app/documents` exists; Admin navigation contains Documents in OPERATIONS group; all 6 `documents.read` staff roles can list/view; PII redaction correct per role; Buyer isolated to `/account/documents`; Partner denied; download uses signed URL; invalidation only for ADMIN/OPERATOR; invalidated documents cannot be downloaded; no new document backend; D13 API contracts unchanged; D8-D13 regression clean |
 | Closure SHA | — |
-| Notes | Placement decision: E (target stage TBD). Requires: (1) IA review for navigation placement (OPERATIONS vs FINANCE vs new group), (2) governance decision on new stage vs existing stage, (3) product ownership assignment. Do NOT implement until placement is resolved. |
+| Notes | Placement decision: PLANNED — TARGET TBD (confirmed IA = OPERATIONS, confirmed owner = Operations, confirmed access matrix = 6 roles read + 2 roles write). Requires: (1) governance decision on new stage vs existing stage, (2) product ownership assignment. Do NOT implement until target stage is resolved. Report: `docs/reports/evidence/PHASE_3_UI_DOC_ADMIN_IA_RBAC_PLACEMENT_REPORT.md` |
 
 #### Cross-References
 
