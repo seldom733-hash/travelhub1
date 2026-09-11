@@ -933,7 +933,7 @@ HELP-05 — formula-drift automated gate / analytics metric registry
 | Why it matters | Platform staff with `documents.read`/`write` permissions cannot access documents through the UI. They must use API tools. This is inconsistent with other admin entities (Orders, Bookings, Payments) which all have admin UI surfaces. |
 | Dependencies | D13 CLOSED (backend API available) |
 | Planned closure stage | Phase 3 C-track Operations UI continuation (authorized 2026-09-11) |
-| Status | AUTHORIZED |
+| Status | CLOSED |
 | Access scope | `documents.read` → ADMIN, DIRECTOR, FINANCE, ANALYST, SALES_MANAGER, OPERATOR; `documents.write` → ADMIN, OPERATOR; `account.document.read_own` → BUYER |
 | IA location | OPERATIONS group in Admin sidebar (confirmed 2026-09-11) |
 | Domain owner | Operations (confirmed 2026-09-11) |
@@ -943,8 +943,8 @@ HELP-05 — formula-drift automated gate / analytics metric registry
 | Document types | VOUCHER, PARTIAL_PAYMENT, REFUND (all visible to all authorized roles) |
 | Finance boundary | UI ≠ Finance Center (explicitly preserved) |
 | Acceptance condition | `/app/documents` exists; Admin navigation contains Documents in OPERATIONS group; all 6 `documents.read` staff roles can list/view; PII redaction correct per role; Buyer isolated to `/account/documents`; Partner denied; download uses signed URL; invalidation only for ADMIN/OPERATOR; invalidated documents cannot be downloaded; no new document backend; D13 API contracts unchanged; D8-D13 regression clean |
-| Closure SHA | — |
-| Notes | AUTHORIZED for implementation (2026-09-11). Target: Phase 3 C-track Operations UI continuation. Domain owner = Operations. Formal owner = TravelHub Product / Roadmap Governance. IA = OPERATIONS, access matrix = 6 roles read + 2 roles write. Implementation authorization: `docs/reports/evidence/PHASE_3_UI_DOC_ADMIN_TARGET_STAGE_AND_IMPLEMENTATION_AUTHORIZATION.md`. Do NOT mark CLOSED before implementation + strict review finish. |
+| Closure SHA | `1acc2dfcfb528e46e7e6c71b8a0f9986f5229b7f` |
+| Notes | CLOSED (2026-09-12). Implementation: `95d37b57` (feat), `b0438c43` (API contract), `f9567284` (header hydration), `d06fdd0b` (storage/detail), `1acc2dfc` (KPI aggregation). Remediation + strict review complete. VERDICT A — ACCEPTED / CLOSED. All acceptance criteria met. Backend: 25/25 tests pass. Frontend: 99/99 tests pass. TypeScript: 0 errors. Storage semantics verified (D-1). Detail bindings verified (D-2). KPI aggregation verified (D-3). |
 
 #### Cross-References
 
