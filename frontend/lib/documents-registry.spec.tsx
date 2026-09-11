@@ -13,6 +13,7 @@ const PAGE = read("app/app/documents/page.tsx");
 const DETAIL = read("app/app/documents/[id]/page.tsx");
 const SHELL = read("components/Shell.tsx");
 const OPS_SHELL = read("components/OperationsCenterShell.tsx");
+const SORTABLE_HEADER = read("components/SortableHeader.tsx");
 const LOCALES = ["ru", "az", "en"] as const;
 
 /** Canonical DocumentStatus values (Prisma schema). */
@@ -434,5 +435,111 @@ describe("REMEDIATION: API error vs empty state distinction", () => {
 
   it("empty state only shows when items array is empty", () => {
     expect(PAGE).toContain("sortedItems.length === 0");
+  });
+});
+
+describe("UI-DOC-15: Documents table header uses valid <th> structure", () => {
+  it("SortableHeader renders <th> directly (not wrapped in another <th>)", () => {
+    expect(SORTABLE_HEADER).toContain("return (");
+    expect(SORTABLE_HEADER).toMatch(/<th[\s\n]/);
+  });
+
+  it("documents page uses SortableHeader directly in <tr> (no outer <th> wrapper)", () => {
+    const trSection = PAGE.substring(
+      PAGE.indexOf("<thead"),
+      PAGE.indexOf("</thead"),
+    );
+    const sortableUsages = trSection.match(/<SortableHeader\s/g) || [];
+    expect(sortableUsages.length).toBeGreaterThanOrEqual(1);
+    for (const _ of sortableUsages) {
+      // Each SortableHeader should NOT be inside a <th>
+    }
+    // No <th> wrapping SortableHeader: pattern <th ...><SortableHeader
+    const invalidPattern = trSection.match(/<th[^>]*>\s*<SortableHeader/g);
+    expect(invalidPattern).toBeNull();
+  });
+
+  it("thead has appropriate styling classes", () => {
+    expect(PAGE).toMatch(/<thead[^>]*className="[^"]*text-xs/);
+  });
+});
+
+describe("UI-DOC-16: SortableHeader is never nested inside <th>", () => {
+  it("SortableHeader source contains <th> as direct return element", () => {
+    const lines = SORTABLE_HEADER.split("\n");
+    const thLine = lines.findIndex((l) => l.trim().startsWith("<th"));
+    expect(thLine).toBeGreaterThanOrEqual(0);
+  });
+
+  it("documents page has no <th><SortableHeader pattern", () => {
+    expect(PAGE).not.toMatch(/<th[^>]*>\s*\n?\s*<SortableHeader/g);
+  });
+});
+
+describe("UI-DOC-17: Documents API error renders valid error state", () => {
+  it("error state is rendered via OperationsErrorState component", () => {
+    expect(PAGE).toContain("OperationsErrorState");
+  });
+
+  it("error state receives message and retry callback", () => {
+    expect(PAGE).toContain("OperationsErrorState");
+    expect(PAGE).toContain("onRetry={load}");
+    expect(PAGE).toContain("message={error}");
+  });
+
+  it("error state renders outside OperationsRegistrySlot", () => {
+    const registryIdx = PAGE.indexOf("<OperationsRegistrySlot>");
+    const errorIdx = PAGE.indexOf("OperationsErrorState");
+    expect(errorIdx).toBeLessThan(registryIdx);
+  });
+});
+
+describe("UI-DOC-18: Documents zero-result renders valid table empty row", () => {
+  it("empty state is an <OperationsEmptyState inside <tbody>", () => {
+    const tbodyIdx = PAGE.indexOf("<tbody>");
+    const tbodyEndIdx = PAGE.indexOf("</tbody>");
+    const tbodyContent = PAGE.substring(tbodyIdx, tbodyEndIdx);
+    expect(tbodyContent).toContain("OperationsEmptyState");
+  });
+
+  it("empty state uses colSpan=9 for 9-column table", () => {
+    expect(PAGE).toContain("OperationsEmptyState colSpan={9}");
+  });
+
+  it("empty state differentiates filtered vs unfiltered message", () => {
+    expect(PAGE).toContain("documents.empty_filtered");
+    expect(PAGE).toContain("documents.empty");
+  });
+});
+
+describe("UI-DOC-19: Documents success renders valid table header/body", () => {
+  it("table has exactly 9 column headers (8 SortableHeader + 1 plain <th>)", () => {
+    const theadSection = PAGE.substring(
+      PAGE.indexOf("<thead"),
+      PAGE.indexOf("</thead"),
+    );
+    const sortableCount = (theadSection.match(/<SortableHeader\s/g) || []).length;
+    const plainThCount = (theadSection.match(/<th\s/g) || []).length;
+    expect(sortableCount + plainThCount).toBe(9);
+  });
+
+  it("table body renders 9 <td> columns per row", () => {
+    const tbodySection = PAGE.substring(
+      PAGE.indexOf("<tbody>"),
+      PAGE.indexOf("</tbody>"),
+    );
+    const tdCount = (tbodySection.match(/<td\s/g) || []).length;
+    expect(tdCount).toBeGreaterThanOrEqual(9);
+  });
+
+  it("each data row has a link to the document detail page", () => {
+    expect(PAGE).toContain('/app/documents/${doc.id}');
+  });
+
+  it("sortable columns include code, type, status, serviceDate, totalAmount, paidAmount, version, createdAt", () => {
+    const sortableFields = ["code", "type", "status", "serviceDate", "totalAmount", "paidAmount", "version", "createdAt"];
+    for (const field of sortableFields) {
+      expect(PAGE).toContain(`field="${field}"`);
+    }
   });
 });

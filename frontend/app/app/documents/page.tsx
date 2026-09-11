@@ -270,33 +270,17 @@ function DocumentsContent({
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-xs font-medium uppercase tracking-wide text-slate-500">
-                      <th className="px-3 py-2">
-                        <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.code", locale)}</SortableHeader>
-                      </th>
-                      <th className="px-3 py-2">
-                        <SortableHeader field="type" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.type", locale)}</SortableHeader>
-                      </th>
-                      <th className="px-3 py-2">
-                        <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.status", locale)}</SortableHeader>
-                      </th>
-                      <th className="px-3 py-2">{t("documents.table.booking", locale)}</th>
-                      <th className="px-3 py-2">
-                        <SortableHeader field="serviceDate" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.service_date", locale)}</SortableHeader>
-                      </th>
-                      <th className="px-3 py-2 text-right">
-                        <SortableHeader field="totalAmount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort} alignRight>{t("documents.table.amount", locale)}</SortableHeader>
-                      </th>
-                      <th className="px-3 py-2 text-right">
-                        <SortableHeader field="paidAmount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort} alignRight>{t("documents.table.paid", locale)}</SortableHeader>
-                      </th>
-                      <th className="px-3 py-2 text-center">
-                        <SortableHeader field="version" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.version", locale)}</SortableHeader>
-                      </th>
-                      <th className="px-3 py-2">
-                        <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.created", locale)}</SortableHeader>
-                      </th>
+                  <thead className="border-b border-slate-200 text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <SortableHeader field="code" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.code", locale)}</SortableHeader>
+                      <SortableHeader field="type" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.type", locale)}</SortableHeader>
+                      <SortableHeader field="status" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.status", locale)}</SortableHeader>
+                      <th className="px-4 py-2.5 font-medium">{t("documents.table.booking", locale)}</th>
+                      <SortableHeader field="serviceDate" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.service_date", locale)}</SortableHeader>
+                      <SortableHeader field="totalAmount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort} alignRight>{t("documents.table.amount", locale)}</SortableHeader>
+                      <SortableHeader field="paidAmount" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort} alignRight>{t("documents.table.paid", locale)}</SortableHeader>
+                      <SortableHeader field="version" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.version", locale)}</SortableHeader>
+                      <SortableHeader field="createdAt" currentSort={sortBy ? { sortBy, sortDirection: sortDirection ?? "asc" } : null} onSort={handleSort}>{t("documents.table.created", locale)}</SortableHeader>
                     </tr>
                   </thead>
                   <tbody>
