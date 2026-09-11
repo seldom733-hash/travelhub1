@@ -23,8 +23,8 @@ POST-PHASE 3 GOVERNANCE HARD CLOSURE = CLOSED
 | Repository | `seldom733-hash/travelhub1` |
 | Branch | `master` |
 | Baseline SHA | `7daafb097b67083642c2fb5953a4b90647a8e374` |
-| Final HEAD SHA | `a6fe4b3dfbbde04323140ccd7f73b7c2dae0e7f0` |
-| Final origin/master SHA | `a6fe4b3dfbbde04323140ccd7f73b7c2dae0e7f0` |
+| Final HEAD SHA | `9596fb273f52cb9b45573a92d9608e18bada4e4e` |
+| Final origin/master SHA | `9596fb273f52cb9b45573a92d9608e18bada4e4e` |
 | HEAD == origin/master | **YES** |
 | Working tree | **CLEAN** (only untracked legacy files) |
 | Divergence | **NONE** |
@@ -42,7 +42,8 @@ a6fe4b3 docs(governance): post-phase 3 governance hard closure
 Baseline `7daafb09` — STEP 3.12 final completion gate report.
 `bfbcf828` — Post-Phase 3 roadmap reconciliation (Phase 4 not defined).
 `8c02879` — Canonical documentation synchronization before STEP 3.12.
-`a6fe4b3` — Post-Phase 3 governance hard closure (this report — FINAL SHA).
+`a6fe4b3` — Post-Phase 3 governance hard closure (this report — first version).
+`9596fb2` — Post-Phase 3 governance hard closure (final verified SHA).
 
 Both are ancestor текущего HEAD. Both are in `origin/master`.
 
@@ -147,8 +148,8 @@ Both are ancestor текущего HEAD. Both are in `origin/master`.
 
 | Параметр | Значение |
 |---|---|
-| Commit SHA | `a6fe4b3dfbbde04323140ccd7f73b7c2dae0e7f0` |
-| Commit message | `docs(governance): post-phase 3 governance hard closure` |
+| Commit SHA | `9596fb273f52cb9b45573a92d9608e18bada4e4e` |
+| Commit message | `docs(governance): finalize hard closure report with verified SHA and push evidence` |
 | Push result | **SUCCESS** |
 | Files changed | 1 (`docs/reports/evidence/POST_PHASE_3_GOVERNANCE_HARD_CLOSURE_FINAL_REPORT.md`) |
 | Production changes | 0 |
@@ -156,8 +157,8 @@ Both are ancestor текущего HEAD. Both are in `origin/master`.
 ### Post-Push Verification
 
 ```
-Final HEAD:     a6fe4b3dfbbde04323140ccd7f73b7c2dae0e7f0
-Final origin:   a6fe4b3dfbbde04323140ccd7f73b7c2dae0e7f0
+Final HEAD:     9596fb273f52cb9b45573a92d9608e18bada4e4e
+Final origin:   9596fb273f52cb9b45573a92d9608e18bada4e4e
 HEAD == origin: YES
 Working tree:   CLEAN (only untracked legacy files)
 ```
