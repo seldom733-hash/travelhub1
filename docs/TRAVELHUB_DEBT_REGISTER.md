@@ -937,13 +937,14 @@ HELP-05 — formula-drift automated gate / analytics metric registry
 | Access scope | `documents.read` → ADMIN, DIRECTOR, FINANCE, ANALYST, SALES_MANAGER, OPERATOR; `documents.write` → ADMIN, OPERATOR; `account.document.read_own` → BUYER |
 | IA location | OPERATIONS group in Admin sidebar (confirmed 2026-09-11) |
 | Domain owner | Operations (confirmed 2026-09-11) |
+| Formal product/roadmap owner | TBD (no named product owner evidenced in governance) |
 | PII model | ADMIN/OPERATOR = full traveler PII; all other roles = redacted (passportNumber, passportExpiry, birthDate → null) |
 | Invalidation | ADMIN/OPERATOR only (`documents.write`) |
 | Document types | VOUCHER, PARTIAL_PAYMENT, REFUND (all visible to all authorized roles) |
 | Finance boundary | UI ≠ Finance Center (explicitly preserved) |
 | Acceptance condition | `/app/documents` exists; Admin navigation contains Documents in OPERATIONS group; all 6 `documents.read` staff roles can list/view; PII redaction correct per role; Buyer isolated to `/account/documents`; Partner denied; download uses signed URL; invalidation only for ADMIN/OPERATOR; invalidated documents cannot be downloaded; no new document backend; D13 API contracts unchanged; D8-D13 regression clean |
 | Closure SHA | — |
-| Notes | Placement decision: PLANNED — TARGET TBD (confirmed IA = OPERATIONS, confirmed owner = Operations, confirmed access matrix = 6 roles read + 2 roles write). Requires: (1) governance decision on new stage vs existing stage, (2) product ownership assignment. Do NOT implement until target stage is resolved. Report: `docs/reports/evidence/PHASE_3_UI_DOC_ADMIN_IA_RBAC_PLACEMENT_REPORT.md` |
+| Notes | Placement decision: PLANNED — TARGET TBD. Domain owner = Operations (confirmed). Formal product/roadmap owner = TBD (no named owner evidenced). Confirmed: IA = OPERATIONS, access matrix = 6 roles read + 2 roles write. Requires: (1) governance decision on new stage vs existing stage, (2) formal product/roadmap owner assignment. Do NOT implement until target stage is resolved. Report: `docs/reports/evidence/PHASE_3_UI_DOC_ADMIN_IA_RBAC_PLACEMENT_REPORT.md` |
 
 #### Cross-References
 

@@ -346,14 +346,16 @@ DocumentsModule:
 
 The module consumes events from multiple domains (Orders, Bookings, Finance) but is not owned by any of them.
 
-### 11.2 Recommended Ownership
+### 11.2 Ownership Model
 
 ```text
-Domain: Operations (Admin Platform)
-Owner: Operations team / ADMIN role
+Domain owner: Operations (Admin Platform)
+Formal product/roadmap owner: TBD (no named product owner evidenced in governance)
 What it owns: Document list, detail, download, invalidation UI
 What it does NOT own: Document creation (event-driven), Finance reconciliation, PSP integration
 ```
+
+The Operations domain is confirmed as the functional/domain owner of the Admin Documents UI surface because the feature is an operational interface over lifecycle documents and consumes the existing Documents backend. No formal product/roadmap ownership assignment is currently evidenced; therefore product ownership remains TBD. This does not block IA placement but prevents assigning a final implementation stage without further governance.
 
 The Operations domain owns the UI surface because:
 - OPERATOR is the primary operational user with full access
@@ -469,7 +471,7 @@ PLANNED — TARGET STAGE STILL NOT DETERMINED
 - However, the target implementation stage cannot be determined until:
   1. The governance decision on whether to create a new stage or attach to an existing one
   2. The Phase 2 exit resolution (which may affect staging priorities)
-  3. Product ownership assignment
+  3. Formal product/roadmap owner assignment (TBD — no named product owner evidenced)
 
 The placement is **evidence-backed but not yet scheduled**. The debt remains in the register with updated metadata.
 
@@ -514,7 +516,8 @@ The placement is **evidence-backed but not yet scheduled**. The debt remains in 
 
 ### F. Who owns the feature?
 
-**Operations domain / ADMIN role.** The UI consumes the existing Documents backend. No new domain needed.
+**Domain owner: Operations.** The UI consumes the existing Documents backend. No new domain needed.
+**Formal product/roadmap owner: TBD.** No named product owner has been assigned in accepted governance.
 
 ### G. When will it be implemented?
 
@@ -570,7 +573,7 @@ PLANNED — TARGET STAGE STILL NOT DETERMINED
 
 **What is NOT confirmed:**
 - Target implementation stage (TBD)
-- Product ownership assignment
+- Formal product/roadmap owner (TBD — no named product owner evidenced in governance)
 - Governance decision on stage creation
 
 ---
