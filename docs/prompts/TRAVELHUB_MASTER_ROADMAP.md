@@ -898,11 +898,11 @@ No new stage may be invented during this requalification.
 │ D11 = CLOSED / APPROVED (0172fb4, 2026-09-10)               │
 │ D12 = CLOSED / APPROVED (40e2f5b, 2026-09-10)               │
 │ D13 = CLOSED / APPROVED (2616cc6, D13_VOUCHER tag)          │
-│ D14 = NOT STARTED / TRUE NEXT                               │
-│ STEP 3.12 = BLOCKED (by D14)                                │
+│ D14 = CLOSED / APPROVED (D14 requalification, 2026-09-11)   │
+│ STEP 3.12 = READY                                           │
 │ PROD-01 = OPEN / DEFERRED                                   │
 │ UI-DOC-ADMIN = PLANNED / TARGET TBD                         │
-│ TRUE NEXT = D14                                             │
+│ TRUE NEXT = STEP 3.12                                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 

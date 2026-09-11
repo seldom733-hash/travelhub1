@@ -435,15 +435,15 @@ PRE-STEP 3.12: Multiple sub-tasks completed
 
 # 21. Canonical NEXT Stage
 
-After D13 closure (2026-09-10), the TRUE NEXT stage is:
+After D14 closure (2026-09-11), the TRUE NEXT stage is:
 
-**D14 — PRE-STEP 3.12 Final Requalification**
+**STEP 3.12 — Phase 3 Final Completion Gate**
 
-D14 is a requalification pass over all D0-D13 work before STEP 3.12.
+All D-track stages (D0–D14) are now CLOSED. STEP 3.12 is the final Phase 3 gate.
 
-The implementation sequence (all prior stages CLOSED):
+The completed implementation sequence:
 ```
 D1 → D2 → D3 → D4 → D5/D6 (parallel) → D7 → D8 → D9 → D10 → D11 → D12 → D13 → D14 → STEP 3.12
 ```
 
-**What remains deferred:** Finance Center, Product Freshness, STEP 3.12 proper (blocked by D14).
+**What remains deferred:** Finance Center, Product Freshness, UI-DOC-ADMIN (PLANNED/TBD).
