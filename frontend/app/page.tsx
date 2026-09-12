@@ -4,6 +4,7 @@ import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader";
 import HeroSection from "@/components/marketplace/HeroSection";
 import SearchBlock from "@/components/marketplace/SearchBlock";
 import PopularDestinations from "@/components/marketplace/PopularDestinations";
+import HotTours from "@/components/marketplace/HotTours";
 import { useMarketplaceViewed } from "@/lib/behavioral-events";
 
 export default function MarketplacePage() {
@@ -16,6 +17,7 @@ export default function MarketplacePage() {
         <HeroSection />
         <SearchBlock />
         <PopularDestinations />
+        <HotTours />
       </main>
 
       <footer className="border-t border-dark-border bg-dark py-8">
