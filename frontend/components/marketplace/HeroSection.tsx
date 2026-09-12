@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import GlobalSearch from "./GlobalSearch";
-import QuickCategories from "./QuickCategories";
 
 interface Slide {
   image: string;
@@ -82,7 +81,9 @@ export default function HeroSection() {
           <img
             src={s.image}
             alt=""
-            className="h-full w-full object-cover object-center"
+            className={`h-full w-full object-cover object-center ${
+              s.image === "/hero2.png" ? "scale-x-[-1]" : ""
+            }`}
             fetchPriority={i === 0 ? "high" : "low"}
           />
         </div>
@@ -107,7 +108,7 @@ export default function HeroSection() {
       </button>
 
       {/* Indicators */}
-      <div className="absolute bottom-20 left-1/2 z-20 flex -translate-x-1/2 gap-2.5 sm:bottom-24">
+      <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2.5 sm:bottom-8">
         {SLIDES.map((_, i) => (
           <button
             key={i}
@@ -122,11 +123,11 @@ export default function HeroSection() {
         ))}
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 mx-auto max-w-[1400px] px-6 pb-8 pt-16 sm:pt-20 lg:pt-24">
-        <div className="flex items-end justify-between gap-8">
-          {/* Left: Headline + Description */}
-          <div className="max-w-3xl">
+      {/* Content - flex column with Search pushed to bottom */}
+      <div className="relative z-10 mx-auto flex min-h-[540px] flex-col justify-end px-6 pb-10 pt-16 sm:min-h-[620px] sm:pb-12 sm:pt-20 lg:pt-24">
+        <div className="mx-auto w-full max-w-[1400px]">
+          {/* Headline + Description */}
+          <div className="mb-auto max-w-3xl pb-4">
             <h1 className="font-serif text-4xl font-bold leading-[1.1] text-white sm:text-5xl lg:text-6xl">
               {t(slide.titleKey1, locale)}
               <br />
@@ -137,22 +138,10 @@ export default function HeroSection() {
             </p>
           </div>
 
-          {/* Right: Cursive tagline */}
-          <div className="hidden shrink-0 pb-2 lg:block">
-            <p className="whitespace-pre-line font-serif text-lg italic leading-snug text-gold/60">
-              {slide.tagline}
-            </p>
+          {/* Search panel - positioned at bottom */}
+          <div className="mx-auto max-w-5xl">
+            <GlobalSearch />
           </div>
-        </div>
-
-        {/* Search panel */}
-        <div className="mx-auto mt-6 max-w-5xl">
-          <GlobalSearch />
-        </div>
-
-        {/* Quick categories */}
-        <div className="mx-auto mt-4 max-w-5xl">
-          <QuickCategories />
         </div>
       </div>
     </section>

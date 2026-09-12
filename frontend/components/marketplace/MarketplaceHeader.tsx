@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   List,
@@ -16,10 +16,32 @@ import {
   X,
   Globe,
   CaretDown,
+  HouseSimple,
+  Compass,
+  Van,
+  Star,
+  Sun,
+  ForkKnife,
 } from "@phosphor-icons/react";
 import { t, useLocale, useSetLocale, LOCALES } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 import { isInternalRole } from "@/lib/routes";
+
+interface ServiceItem {
+  icon: React.ReactNode;
+  labelKey: string;
+  href: string;
+}
+
+const SERVICES: ServiceItem[] = [
+  { icon: <HouseSimple size={18} weight="light" />, labelKey: "marketplace.category_accommodation", href: "/search?category=accommodation" },
+  { icon: <MapPin size={18} weight="light" />, labelKey: "marketplace.category_tours", href: "/search?category=tours" },
+  { icon: <Compass size={18} weight="light" />, labelKey: "marketplace.category_excursions", href: "/search?category=excursions" },
+  { icon: <Van size={18} weight="light" />, labelKey: "marketplace.category_transfers", href: "/search?category=transfers" },
+  { icon: <Star size={18} weight="light" />, labelKey: "marketplace.category_experiences", href: "/search?category=experiences" },
+  { icon: <Sun size={18} weight="light" />, labelKey: "marketplace.category_wellness", href: "/search?category=wellness" },
+  { icon: <ForkKnife size={18} weight="light" />, labelKey: "marketplace.category_gastronomy", href: "/search?category=gastronomy" },
+];
 
 export default function MarketplaceHeader() {
   const user = useCurrentUser();
@@ -28,12 +50,38 @@ export default function MarketplaceHeader() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [servicesOpen, setServicesOpen] = useState(false);
+  const servicesRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchQuery.trim();
     if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
   };
+
+  // Close services dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (servicesRef.current && !servicesRef.current.contains(e.target as Node)) {
+        setServicesOpen(false);
+      }
+    };
+    if (servicesOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [servicesOpen]);
+
+  // Close on Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setServicesOpen(false);
+    };
+    if (servicesOpen) {
+      document.addEventListener("keydown", handleEscape);
+      return () => document.removeEventListener("keydown", handleEscape);
+    }
+  }, [servicesOpen]);
 
   return (
     <header className="sticky top-0 z-50">
@@ -111,10 +159,37 @@ export default function MarketplaceHeader() {
             <Link href="/search?category=destinations" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
               {t("nav.destinations", locale)}
             </Link>
-            <Link href="/search" className="flex items-center gap-0.5 rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
-              {t("nav.services", locale)}
-              <CaretDown size={12} weight="light" className="text-neutral-500" />
-            </Link>
+
+            {/* Услуги - click dropdown */}
+            <div className="relative" ref={servicesRef}>
+              <button
+                onClick={() => setServicesOpen(!servicesOpen)}
+                aria-expanded={servicesOpen}
+                aria-haspopup="true"
+                className="flex items-center gap-0.5 rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white"
+              >
+                {t("nav.services", locale)}
+                <CaretDown size={12} weight="light" className={`text-neutral-500 transition-transform duration-200 ${servicesOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {/* Dropdown */}
+              {servicesOpen && (
+                <div className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-dark-border bg-dark-surface/95 shadow-xl backdrop-blur-md">
+                  {SERVICES.map((svc) => (
+                    <Link
+                      key={svc.href}
+                      href={svc.href}
+                      onClick={() => setServicesOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white"
+                    >
+                      <span className="text-gold">{svc.icon}</span>
+                      <span>{t(svc.labelKey, locale)}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <Link href="/search?sort=popular" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
               {t("nav.offers", locale)}
             </Link>
