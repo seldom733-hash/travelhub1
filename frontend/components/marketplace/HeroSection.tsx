@@ -107,7 +107,7 @@ export default function HeroSection() {
       </button>
 
       {/* Indicators */}
-      <div className="absolute bottom-24 left-1/2 z-20 flex -translate-x-1/2 gap-2.5 sm:bottom-28">
+      <div className="absolute bottom-20 left-1/2 z-20 flex -translate-x-1/2 gap-2.5 sm:bottom-24">
         {SLIDES.map((_, i) => (
           <button
             key={i}
@@ -123,7 +123,7 @@ export default function HeroSection() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 mx-auto max-w-[1400px] px-6 pb-10 pt-16 sm:pt-20 lg:pt-24">
+      <div className="relative z-10 mx-auto max-w-[1400px] px-6 pb-8 pt-16 sm:pt-20 lg:pt-24">
         <div className="flex items-end justify-between gap-8">
           {/* Left: Headline + Description */}
           <div className="max-w-3xl">
@@ -146,12 +146,12 @@ export default function HeroSection() {
         </div>
 
         {/* Search panel */}
-        <div className="mx-auto mt-8 max-w-5xl">
+        <div className="mx-auto mt-6 max-w-5xl">
           <GlobalSearch />
         </div>
 
         {/* Quick categories */}
-        <div className="mx-auto mt-6 max-w-5xl">
+        <div className="mx-auto mt-4 max-w-5xl">
           <QuickCategories />
         </div>
       </div>

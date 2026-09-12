@@ -26,17 +26,17 @@ export default function GlobalSearch() {
     <form
       onSubmit={handleSubmit}
       role="search"
-      className="search-glass rounded-2xl p-2.5 sm:p-3"
+      className="search-glass rounded-2xl p-2 sm:p-2.5"
     >
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-1.5 sm:flex-row">
         {/* Destination */}
         <div className="relative flex-1">
-          <label htmlFor="hero-destination" className="mb-1 block text-xs font-medium text-neutral-400">
+          <label htmlFor="hero-destination" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
             {t("marketplace.search_destination_label", locale)}
           </label>
           <div className="relative">
             <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-              <MapPin size={18} weight="light" />
+              <MapPin size={16} weight="light" />
             </div>
             <input
               id="hero-destination"
@@ -44,19 +44,19 @@ export default function GlobalSearch() {
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               placeholder={t("marketplace.search_destination_placeholder", locale)}
-              className="w-full rounded-xl border border-dark-border bg-dark-card py-3 pl-10 pr-4 text-sm text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/50"
+              className="w-full rounded-xl border border-dark-border bg-dark-card py-2 pl-9 pr-3 text-[13px] text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/50"
             />
           </div>
         </div>
 
         {/* What */}
         <div className="relative flex-1">
-          <label htmlFor="hero-what" className="mb-1 block text-xs font-medium text-neutral-400">
+          <label htmlFor="hero-what" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
             {t("marketplace.search_what_label", locale)}
           </label>
           <div className="relative">
             <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-              <MagnifyingGlass size={18} weight="light" />
+              <MagnifyingGlass size={16} weight="light" />
             </div>
             <input
               id="hero-what"
@@ -64,19 +64,19 @@ export default function GlobalSearch() {
               value={what}
               onChange={(e) => setWhat(e.target.value)}
               placeholder={t("marketplace.search_what_placeholder", locale)}
-              className="w-full rounded-xl border border-dark-border bg-dark-card py-3 pl-10 pr-4 text-sm text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/50"
+              className="w-full rounded-xl border border-dark-border bg-dark-card py-2 pl-9 pr-3 text-[13px] text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/50"
             />
           </div>
         </div>
 
         {/* Dates */}
         <div className="relative flex-1">
-          <label htmlFor="hero-dates" className="mb-1 block text-xs font-medium text-neutral-400">
+          <label htmlFor="hero-dates" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
             {t("marketplace.search_dates_label", locale)}
           </label>
           <div className="relative">
             <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-              <CalendarBlank size={18} weight="light" />
+              <CalendarBlank size={16} weight="light" />
             </div>
             <input
               id="hero-dates"
@@ -84,7 +84,7 @@ export default function GlobalSearch() {
               value={dates}
               onChange={(e) => setDates(e.target.value)}
               placeholder={t("marketplace.search_dates_placeholder", locale)}
-              className="w-full rounded-xl border border-dark-border bg-dark-card py-3 pl-10 pr-4 text-sm text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/50"
+              className="w-full rounded-xl border border-dark-border bg-dark-card py-2 pl-9 pr-3 text-[13px] text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/50"
             />
           </div>
         </div>
@@ -93,10 +93,10 @@ export default function GlobalSearch() {
         <div className="flex items-end">
           <button
             type="submit"
-            className="btn-gold flex w-full items-center justify-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold sm:w-auto"
+            className="btn-gold flex w-full items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-[13px] font-semibold sm:w-auto"
           >
             <span>{t("marketplace.search_submit", locale)}</span>
-            <ArrowRight size={18} weight="bold" />
+            <ArrowRight size={16} weight="bold" />
           </button>
         </div>
       </div>
