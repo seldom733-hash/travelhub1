@@ -22,6 +22,7 @@ export function useConstructor(slug: string) {
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
 

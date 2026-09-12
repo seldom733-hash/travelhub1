@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Проксирование REST API модульного монолита: /api/v1 → backend (port 4000)
+  devIndicators: false,
   async rewrites() {
     return [
       {

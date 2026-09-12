@@ -87,7 +87,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     headingKey: "nav.group.settings",
     items: [
-      { href: "/app/constructor", icon: "🔧", labelKey: "nav.constructor", permission: "settings.write" },
+      { href: "/app/page-builder", icon: "🔧", labelKey: "nav.constructor", permission: "settings.write" },
     ],
   },
 ];
