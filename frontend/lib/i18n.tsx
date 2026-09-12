@@ -717,6 +717,88 @@ export const DICT: Record<string, Record<Locale, string>> = {
     en: "Baku, Azerbaijan",
   },
 
+  // ── Constructor ─────────────────────────────────────────────────────────
+  "nav.group.settings": {
+    ru: "Настройки",
+    az: "Tənzimləmələr",
+    en: "Settings",
+  },
+  "nav.constructor": {
+    ru: "Конструктор витрины",
+    az: "Vitrin konstruktoru",
+    en: "Storefront Constructor",
+  },
+  "constructor.page_title": {
+    ru: "Конструктор витрины",
+    az: "Vitrin konstruktoru",
+    en: "Storefront Constructor",
+  },
+  "constructor.home_title": {
+    ru: "Главная",
+    az: "Əsas səhifə",
+    en: "Home",
+  },
+  "constructor.home_description": {
+    ru: "Настройте структуру публичной главной страницы TravelHub",
+    az: "TravelHub-un ictimai əsas səhifəsinin strukturunu tənzimləyin",
+    en: "Configure the public TravelHub homepage structure",
+  },
+  "constructor.save_draft": {
+    ru: "Сохранить черновик",
+    az: "Qaralamağı Saxla",
+    en: "Save Draft",
+  },
+  "constructor.saving": {
+    ru: "Сохранение…",
+    az: "Saxlanılır…",
+    en: "Saving…",
+  },
+  "constructor.available_blocks": {
+    ru: "Доступные блоки",
+    az: "Mövcud bloklar",
+    en: "Available Blocks",
+  },
+  "constructor.canvas_title": {
+    ru: "Canvas",
+    az: "Səth",
+    en: "Canvas",
+  },
+  "constructor.empty_canvas": {
+    ru: "Canvas пуст. Добавьте блоки из панели слева.",
+    az: "Səth boşdur. Sol paneldən blok əlavə edin.",
+    en: "Canvas is empty. Add blocks from the panel on the left.",
+  },
+  "constructor.drag_handle": {
+    ru: "Перетащить",
+    az: "Daşı",
+    en: "Drag",
+  },
+  "constructor.system_badge": {
+    ru: "Системный",
+    az: "Sistem",
+    en: "System",
+  },
+  "constructor.disabled_badge": {
+    ru: "Выключен",
+    az: "Deaktiv",
+    en: "Disabled",
+  },
+  "constructor.enable": {
+    ru: "Включить",
+    az: "Aktivləşdir",
+    en: "Enable",
+  },
+  "constructor.disable": {
+    ru: "Выключить",
+    az: "Deaktiv et",
+    en: "Disable",
+  },
+  "constructor.remove": {
+    ru: "Удалить",
+    az: "Sil",
+    en: "Remove",
+  },
+
   // ── Step 1.12.2 — Public Storefront site labels (Storefront-контекст) ─────
   "storefront.products": { ru: "Услуги", az: "Xidmətlər", en: "Services" },
   "storefront.contacts": { ru: "Контакты", az: "Əlaqə", en: "Contacts" },

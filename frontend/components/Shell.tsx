@@ -84,6 +84,12 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/app/users", icon: "👥", labelKey: "nav.users", permission: "settings.write" },
     ],
   },
+  {
+    headingKey: "nav.group.settings",
+    items: [
+      { href: "/app/constructor", icon: "🔧", labelKey: "nav.constructor", permission: "settings.write" },
+    ],
+  },
 ];
 
 const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);

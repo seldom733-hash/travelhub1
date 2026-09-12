@@ -21,6 +21,7 @@ import { CrmActivityModule } from "./modules/crm-activity/crm-activity.module";
 import { MarketingModule } from "./modules/marketing/marketing.module";
 import { SupportModule } from "./modules/support/support.module";
 import { DocumentsModule } from "./modules/documents/documents.module";
+import { ConstructorModule } from "./modules/constructor/constructor.module";
 import { IdempotencyInterceptor } from "./shared/idempotency/idempotency.interceptor";
 import { SecurityModule } from "./security/security.module";
 import { JwtAuthGuard } from "./security/auth/jwt-auth.guard";
@@ -34,7 +35,7 @@ import { PermissionsGuard } from "./security/auth/permissions.guard";
  * открывает эндпоинты), PermissionsGuard глобально (проверка @RequirePermissions).
  */
 @Module({
-  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, CrmActivityModule, OrderModule, RequestModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, AnalyticsModule, DashboardModule, WorkspaceModule, IdempotencyModule, OperationalNotesModule, MarketingModule, SupportModule, DocumentsModule],
+  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, CrmActivityModule, OrderModule, RequestModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, AnalyticsModule, DashboardModule, WorkspaceModule, ConstructorModule, IdempotencyModule, OperationalNotesModule, MarketingModule, SupportModule, DocumentsModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

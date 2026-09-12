@@ -26,7 +26,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision", "marketing", "support", "documents"]
+  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision", "marketing", "support", "documents", "constructor"]
 }
 
 // ─────────────────────────────── events.* ────────────────────────────────
@@ -5131,4 +5131,94 @@ model DocumentTemplate {
 
   @@index([type])
   @@schema("documents")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSTRUCTOR — Page Builder Configuration
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Page-level configuration for Constructor-managed pages.
+model ConstructorPage {
+  id              String   @id @default(uuid())
+  slug            String   @unique
+  context         String   // "marketplace" | "storefront"
+  tenantId        String?  // NULL for marketplace, partnerId for storefront
+  status          String   @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  currentVersion  Int?
+  draftVersion    Int?
+  themeId         String?
+  templateId      String?
+  seo             Json?    // SeoConfig { title, description, canonical, robots, ogImage }
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  publishedAt     DateTime?
+
+  sections        ConstructorPageSection[]
+  versions        ConstructorPageVersion[]
+  auditLog        ConstructorPageAuditLog[]
+
+  @@index([slug])
+  @@index([context])
+  @@index([tenantId])
+  @@schema("constructor")
+}
+
+/// Individual block sections within a page version.
+model ConstructorPageSection {
+  id              String   @id @default(uuid())
+  pageId          String
+  page            ConstructorPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  version         Int
+  blockType       String
+  blockInstanceId String
+  sortOrder       Int
+  enabled         Boolean  @default(true)
+  settings        Json     @default("{}")
+  style           Json     @default("{}")
+  responsive      Json     @default("{}")
+  dataSource      Json     @default("{}")
+  visibility      Json?
+  localeContent   Json     @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([pageId, version, blockInstanceId])
+  @@index([pageId])
+  @@index([version])
+  @@schema("constructor")
+}
+
+/// Version snapshots for publish/rollback.
+model ConstructorPageVersion {
+  id          String   @id @default(uuid())
+  pageId      String
+  page        ConstructorPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  version     Int
+  status      String   // "draft" | "published" | "archived"
+  snapshot    Json     // Full page configuration snapshot
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  publishedAt DateTime?
+
+  @@unique([pageId, version])
+  @@index([pageId])
+  @@schema("constructor")
+}
+
+/// Audit trail for Constructor actions.
+model ConstructorPageAuditLog {
+  id          String   @id @default(uuid())
+  pageId      String
+  page        ConstructorPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  version     Int?
+  action      String   // "create" | "update_section" | "reorder" | "enable" | "disable" | "save_draft" | "publish" | "rollback"
+  actorId     String
+  actorName   String?
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now())
+
+  @@index([pageId])
+  @@index([createdAt])
+  @@schema("constructor")
 }
