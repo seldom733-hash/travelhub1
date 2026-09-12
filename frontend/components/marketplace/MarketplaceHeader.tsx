@@ -26,6 +26,7 @@ import {
 import { t, useLocale, useSetLocale, LOCALES } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
 import { isInternalRole } from "@/lib/routes";
+import GlobalSearchAutocomplete from "./GlobalSearchAutocomplete";
 
 interface ServiceItem {
   icon: React.ReactNode;
@@ -49,15 +50,8 @@ export default function MarketplaceHeader() {
   const setLocale = useSetLocale();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [servicesOpen, setServicesOpen] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = searchQuery.trim();
-    if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
-  };
 
   // Close services dropdown on outside click
   useEffect(() => {
@@ -138,21 +132,8 @@ export default function MarketplaceHeader() {
             </div>
           </Link>
 
-          {/* Header search bar - wider */}
-          <form onSubmit={handleSearch} className="hidden w-full max-w-lg md:block">
-            <div className="relative">
-              <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-                <MagnifyingGlass size={16} weight="light" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск отелей, туров, экскурсий и услуг..."
-                className="w-full rounded-lg border border-dark-border bg-dark-card py-2 pl-9 pr-4 text-sm text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/40"
-              />
-            </div>
-          </form>
+          {/* Header search bar with autocomplete */}
+          <GlobalSearchAutocomplete />
 
           {/* Desktop nav links */}
           <div className="hidden items-center gap-0.5 xl:flex">
@@ -252,19 +233,7 @@ export default function MarketplaceHeader() {
         {mobileOpen && (
           <div className="border-t border-dark-border bg-dark-surface/95 backdrop-blur-md xl:hidden">
             <div className="mx-auto max-w-[1400px] px-6 py-4">
-              <form onSubmit={handleSearch} className="mb-4 flex gap-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t("nav.search_placeholder", locale)}
-                  className="flex-1 rounded-lg border border-dark-border bg-dark-card px-4 py-2.5 text-sm text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/50"
-                  autoFocus
-                />
-                <button type="submit" className="btn-gold rounded-lg px-6 py-2.5 text-sm">
-                  {t("nav.find", locale)}
-                </button>
-              </form>
+              <MobileSearch onClose={() => setMobileOpen(false)} />
               <div className="flex flex-col gap-1">
                 <Link href="/search?category=destinations" onClick={() => setMobileOpen(false)} className="rounded-lg px-4 py-3 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white">
                   {t("nav.destinations", locale)}
@@ -284,5 +253,35 @@ export default function MarketplaceHeader() {
         )}
       </nav>
     </header>
+  );
+}
+
+function MobileSearch({ onClose }: { onClose: () => void }) {
+  const locale = useLocale();
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (query.trim()) {
+      router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+      onClose();
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mb-4 flex gap-2">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t("nav.search_placeholder", locale)}
+        className="flex-1 rounded-lg border border-dark-border bg-dark-card px-4 py-2.5 text-sm text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/50"
+        autoFocus
+      />
+      <button type="submit" className="btn-gold rounded-lg px-6 py-2.5 text-sm">
+        {t("nav.find", locale)}
+      </button>
+    </form>
   );
 }

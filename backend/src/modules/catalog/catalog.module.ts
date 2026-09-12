@@ -9,6 +9,8 @@ import { ModerationController } from "./moderation/moderation.controller";
 import { ModerationService } from "./moderation/moderation.service";
 import { PublicCatalogController } from "./public/public-catalog.controller";
 import { PublicCatalogService } from "./public/public-catalog.service";
+import { PublicSuggestController } from "./public/public-suggest.controller";
+import { PublicSuggestService } from "./public/public-suggest.service";
 import { PartnerCatalogController } from "./partner/partner-catalog.controller";
 import { AntiDisintermediationService } from "./anti-disintermediation/anti-disintermediation.service";
 import { SellerProfileController } from "./seller/seller-profile.controller";
@@ -68,7 +70,7 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
  * soft lifecycle; валюта наследуется из Tariff; POR без числовых периодов.
  */
 @Module({
-  controllers: [CatalogController, ModerationController, PublicCatalogController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController, CommercialRestrictionsController],
+  controllers: [CatalogController, ModerationController, PublicCatalogController, PublicSuggestController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController, CommercialRestrictionsController],
   providers: [
     CatalogService,
     CatalogAccessPolicy,
@@ -76,6 +78,7 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
     MediaProcessor,
     ModerationService,
     PublicCatalogService,
+    PublicSuggestService,
     AntiDisintermediationService,
     PublicSellerProfileService,
     SellerProfileRepairService,

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
-import GlobalSearch from "./GlobalSearch";
+import HeroSearch from "./HeroSearch";
 
 interface Slide {
   image: string;
@@ -140,7 +140,7 @@ export default function HeroSection() {
 
           {/* Search panel - positioned at bottom */}
           <div className="mx-auto max-w-5xl">
-            <GlobalSearch />
+            <HeroSearch />
           </div>
         </div>
       </div>
