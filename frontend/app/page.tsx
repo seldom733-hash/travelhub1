@@ -2,6 +2,7 @@
 
 import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader";
 import HeroSection from "@/components/marketplace/HeroSection";
+import SearchBlock from "@/components/marketplace/SearchBlock";
 import PopularDestinations from "@/components/marketplace/PopularDestinations";
 import { useMarketplaceViewed } from "@/lib/behavioral-events";
 
@@ -13,6 +14,7 @@ export default function MarketplacePage() {
       <MarketplaceHeader />
       <main>
         <HeroSection />
+        <SearchBlock />
         <PopularDestinations />
       </main>
 

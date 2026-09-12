@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
-import HeroSearch from "./HeroSearch";
 
 interface Slide {
   image: string;
@@ -123,11 +122,10 @@ export default function HeroSection() {
         ))}
       </div>
 
-      {/* Content - flex column with Search pushed to bottom */}
+      {/* Content — cinematic text only, NO search */}
       <div className="relative z-10 mx-auto flex min-h-[540px] flex-col justify-end px-6 pb-10 pt-16 sm:min-h-[620px] sm:pb-12 sm:pt-20 lg:pt-24">
         <div className="mx-auto w-full max-w-[1400px]">
-          {/* Headline + Description */}
-          <div className="mb-auto max-w-3xl pb-4">
+          <div className="max-w-3xl pb-4">
             <h1 className="font-serif text-4xl font-bold leading-[1.1] text-white sm:text-5xl lg:text-6xl">
               {t(slide.titleKey1, locale)}
               <br />
@@ -136,11 +134,6 @@ export default function HeroSection() {
             <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-neutral-300 sm:text-base">
               {t(slide.descKey, locale)}
             </p>
-          </div>
-
-          {/* Search panel - positioned at bottom */}
-          <div className="mx-auto max-w-5xl">
-            <HeroSearch />
           </div>
         </div>
       </div>
