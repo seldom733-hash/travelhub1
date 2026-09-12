@@ -15,6 +15,7 @@ import {
   MagnifyingGlass,
   X,
   Globe,
+  CaretDown,
 } from "@phosphor-icons/react";
 import { t, useLocale, useSetLocale, LOCALES } from "@/lib/i18n";
 import { useCurrentUser } from "@/lib/use-user";
@@ -74,20 +75,23 @@ export default function MarketplaceHeader() {
 
       {/* Main navigation */}
       <nav className="border-b border-dark-border/60 bg-dark/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-[1400px] items-center gap-6 px-6 py-3">
+        <div className="mx-auto flex max-w-[1400px] items-center gap-5 px-6 py-3">
           {/* Logo */}
           <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="TravelHub">
             <div className="flex size-9 items-center justify-center rounded-lg bg-gold/15 font-serif text-base font-bold text-gold">
               T
             </div>
             <div className="hidden sm:block">
-              <div className="text-[15px] font-bold leading-tight text-white">TravelHub</div>
+              <div className="text-[15px] font-bold leading-tight">
+                <span className="text-white">Travel</span>
+                <span className="text-gold">Hub</span>
+              </div>
               <div className="text-[9px] uppercase tracking-[0.15em] text-neutral-500">Discover more together</div>
             </div>
           </Link>
 
-          {/* Header search bar */}
-          <form onSubmit={handleSearch} className="hidden max-w-md flex-1 md:block">
+          {/* Header search bar - wider */}
+          <form onSubmit={handleSearch} className="hidden w-full max-w-lg md:block">
             <div className="relative">
               <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
                 <MagnifyingGlass size={16} weight="light" />
@@ -103,12 +107,13 @@ export default function MarketplaceHeader() {
           </form>
 
           {/* Desktop nav links */}
-          <div className="hidden items-center gap-1 xl:flex">
+          <div className="hidden items-center gap-0.5 xl:flex">
             <Link href="/search?category=destinations" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
               {t("nav.destinations", locale)}
             </Link>
             <Link href="/search" className="flex items-center gap-0.5 rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
               {t("nav.services", locale)}
+              <CaretDown size={12} weight="light" className="text-neutral-500" />
             </Link>
             <Link href="/search?sort=popular" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
               {t("nav.offers", locale)}
@@ -118,25 +123,31 @@ export default function MarketplaceHeader() {
             </Link>
           </div>
 
-          {/* Right side */}
-          <div className="ml-auto flex items-center gap-1">
-            <button className="hidden rounded-lg p-2 text-neutral-400 transition-colors hover:text-white sm:block" aria-label={t("nav.favorites", locale)}>
+          {/* Right side - icons with labels */}
+          <div className="ml-auto flex items-center gap-2">
+            <button className="hidden flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-neutral-400 transition-colors hover:text-white sm:flex" aria-label={t("nav.favorites", locale)}>
               <Heart size={20} weight="light" />
+              <span className="text-[10px]">{t("nav.favorites", locale)}</span>
             </button>
-            <button className="hidden rounded-lg p-2 text-neutral-400 transition-colors hover:text-white sm:block" aria-label={t("nav.notifications", locale)}>
-              <Bell size={20} weight="light" />
+            <button className="hidden flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-neutral-400 transition-colors hover:text-white sm:flex" aria-label={t("nav.notifications", locale)}>
+              <div className="relative">
+                <Bell size={20} weight="light" />
+                <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-gold text-[8px] font-bold text-dark">2</span>
+              </div>
+              <span className="text-[10px]">{t("nav.notifications", locale)}</span>
             </button>
-            <button className="hidden rounded-lg p-2 text-neutral-400 transition-colors hover:text-white sm:block" aria-label={t("nav.cart", locale)}>
+            <button className="hidden flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-neutral-400 transition-colors hover:text-white sm:flex" aria-label={t("nav.cart", locale)}>
               <ShoppingCart size={20} weight="light" />
+              <span className="text-[10px]">{t("nav.cart", locale)}</span>
             </button>
 
             {user === null ? (
               <Link
                 href="/login"
-                className="flex items-center gap-2 rounded-lg border border-dark-border bg-dark-card px-4 py-2 text-sm text-neutral-300 transition-all hover:border-gold/40 hover:text-white"
+                className="flex flex-col items-center gap-0.5 rounded-lg border border-dark-border bg-dark-card px-3 py-1.5 text-neutral-300 transition-all hover:border-gold/40 hover:text-white"
               >
-                <User size={16} weight="light" />
-                <span className="hidden sm:inline">{t("nav.login", locale)}</span>
+                <User size={18} weight="light" />
+                <span className="text-[10px]">{t("nav.login", locale)}</span>
               </Link>
             ) : isInternalRole(user.role) ? (
               <Link href="/app/dashboard" className="rounded-lg bg-gold/10 px-4 py-2 text-sm font-medium text-gold transition-colors hover:bg-gold/20">

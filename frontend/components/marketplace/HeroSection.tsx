@@ -8,7 +8,7 @@ export default function HeroSection() {
   const locale = useLocale();
 
   return (
-    <section className="relative min-h-[620px] overflow-hidden bg-dark lg:min-h-[700px]">
+    <section className="relative min-h-[540px] overflow-hidden bg-dark lg:min-h-[620px]">
       {/* Background image */}
       <div className="absolute inset-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -22,7 +22,7 @@ export default function HeroSection() {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 mx-auto max-w-[1400px] px-6 pb-14 pt-20 sm:pt-24 lg:pt-28">
+      <div className="relative z-10 mx-auto max-w-[1400px] px-6 pb-10 pt-16 sm:pt-20 lg:pt-24">
         <div className="flex items-end justify-between gap-8">
           {/* Left: Headline + Description */}
           <div className="max-w-3xl">
@@ -31,13 +31,13 @@ export default function HeroSection() {
               <br />
               <span className="text-gold-gradient">{t("marketplace.hero_title_2", locale)}</span>
             </h1>
-            <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-neutral-300 sm:text-base">
+            <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-neutral-300 sm:text-base">
               {t("marketplace.hero_description", locale)}
             </p>
           </div>
 
           {/* Right: Cursive tagline */}
-          <div className="hidden shrink-0 pb-4 lg:block">
+          <div className="hidden shrink-0 pb-2 lg:block">
             <p className="font-serif text-lg italic leading-snug text-gold/60">
               Больше,
               <br />
@@ -49,12 +49,12 @@ export default function HeroSection() {
         </div>
 
         {/* Search panel */}
-        <div className="mx-auto mt-10 max-w-5xl">
+        <div className="mx-auto mt-8 max-w-5xl">
           <GlobalSearch />
         </div>
 
         {/* Quick categories */}
-        <div className="mx-auto mt-8 max-w-5xl">
+        <div className="mx-auto mt-6 max-w-5xl">
           <QuickCategories />
         </div>
       </div>
