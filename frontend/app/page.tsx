@@ -10,6 +10,7 @@ import Tours from "@/components/marketplace/Tours";
 import Hotels from "@/components/marketplace/Hotels";
 import Flights from "@/components/marketplace/Flights";
 import Advertisement from "@/components/marketplace/Advertisement";
+import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter";
 import { useMarketplaceViewed } from "@/lib/behavioral-events";
 
 export default function MarketplacePage() {
@@ -30,11 +31,7 @@ export default function MarketplacePage() {
         <Advertisement />
       </main>
 
-      <footer className="border-t border-dark-border bg-dark py-8">
-        <div className="mx-auto max-w-[1400px] px-6 text-center text-sm text-neutral-500">
-          © {new Date().getFullYear()} TravelHub
-        </div>
-      </footer>
+      <MarketplaceFooter />
     </div>
   );
 }

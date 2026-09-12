@@ -641,6 +641,81 @@ export const DICT: Record<string, Record<Locale, string>> = {
     az: "TravelHub — turizm xidmətləri kataloqu. Vitrin.",
     en: "TravelHub — travel services catalog. Marketplace.",
   },
+  "footer.brand_description": {
+    ru: "Маркетплейс туристических услуг в Азербайджане.",
+    az: "Azərbaycanda turizm xidmətləri marketpleysi.",
+    en: "Travel services marketplace in Azerbaijan.",
+  },
+  "footer.heading_services": {
+    ru: "Услуги",
+    az: "Xidmətlər",
+    en: "Services",
+  },
+  "footer.heading_navigation": {
+    ru: "Навигация",
+    az: "Naviqasiya",
+    en: "Navigation",
+  },
+  "footer.heading_contact": {
+    ru: "Контакты",
+    az: "Əlaqə",
+    en: "Contact",
+  },
+  "footer.service_accommodation": {
+    ru: "Отели",
+    az: "Otellər",
+    en: "Hotels",
+  },
+  "footer.service_tours": {
+    ru: "Туры",
+    az: "Turlar",
+    en: "Tours",
+  },
+  "footer.service_excursions": {
+    ru: "Экскурсии",
+    az: "Ekskursiyalar",
+    en: "Excursions",
+  },
+  "footer.service_transfers": {
+    ru: "Трансферы",
+    az: "Transferlər",
+    en: "Transfers",
+  },
+  "footer.nav_destinations": {
+    ru: "Направления",
+    az: "Məkanlar",
+    en: "Destinations",
+  },
+  "footer.nav_offers": {
+    ru: "Популярные предложения",
+    az: "Populyar təkliflər",
+    en: "Popular offers",
+  },
+  "footer.nav_partners": {
+    ru: "Стать партнёром",
+    az: "Partnyor olun",
+    en: "Become a partner",
+  },
+  "footer.auth_login": {
+    ru: "Войти",
+    az: "Daxil ol",
+    en: "Sign in",
+  },
+  "footer.auth_register": {
+    ru: "Регистрация",
+    az: "Qeydiyyat",
+    en: "Register",
+  },
+  "footer.rights_reserved": {
+    ru: "Все права защищены.",
+    az: "Bütün hüquqlar qorunur.",
+    en: "All rights reserved.",
+  },
+  "footer.baku_azerbaijan": {
+    ru: "Баку, Азербайджан",
+    az: "Bakı, Azərbaycan",
+    en: "Baku, Azerbaijan",
+  },
 
   // ── Step 1.12.2 — Public Storefront site labels (Storefront-контекст) ─────
   "storefront.products": { ru: "Услуги", az: "Xidmətlər", en: "Services" },
