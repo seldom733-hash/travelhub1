@@ -58,8 +58,8 @@ export default function ConstructorCanvas({ slug }: Props) {
     );
   }
 
-  const isPublished = page?.status === "PUBLISHED";
-  const hasDraft = page?.draftVersion != null && page?.currentVersion != null && page.draftVersion > page.currentVersion;
+  const isPublished = page?.status === "PUBLISHED" && page?.currentVersion != null;
+  const hasDraft = page?.draftVersion != null && (page?.currentVersion == null || page.draftVersion > page.currentVersion);
 
   return (
     <div className="space-y-0">
