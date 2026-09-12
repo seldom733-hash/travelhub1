@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Airplane } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
+import HelpFindButton from "./search/HelpFindButton";
 
 function FlightCardSkeleton() {
   return (
@@ -118,8 +119,8 @@ export default function Flights() {
     return () => { alive = false; };
   }, []);
 
-  // Don't render section at all if empty or error
-  if (!loading && (flights.length === 0 || error)) return null;
+  // Don't render section during error
+  if (error) return null;
 
   return (
     <section className="bg-dark py-16 sm:py-20">
@@ -158,6 +159,23 @@ export default function Flights() {
             {flights.map((flight) => (
               <FlightCard key={flight.id} card={flight} />
             ))}
+          </div>
+        )}
+
+        {/* Empty state — premium availability message with Help Find CTA */}
+        {!loading && flights.length === 0 && (
+          <div className="flex flex-col items-center rounded-2xl border border-dark-border bg-dark-card/50 px-6 py-12 text-center">
+            <div className="mb-4 flex size-14 items-center justify-center rounded-full bg-dark-border/50">
+              <Airplane size={28} weight="light" className="text-neutral-500" />
+            </div>
+            <p className="max-w-md text-sm text-neutral-400">
+              {t("marketplace.flights_empty", locale)}
+            </p>
+            <div className="mt-6 w-full max-w-xs">
+              <HelpFindButton
+                context={{ serviceType: "flights" }}
+              />
+            </div>
           </div>
         )}
 

@@ -174,6 +174,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "marketplace.flights_title": { ru: "Авиабилеты", az: "Aviabiletlər", en: "Flights" },
   "marketplace.flights_subtitle": { ru: "Авиабилеты по лучшим ценам", az: "Ən yaxşı qiymətlərlə aviabiletlər", en: "Flights at best prices" },
   "marketplace.all_flights": { ru: "Все авиабилеты", az: "Bütün aviabiletlər", en: "All flights" },
+  "marketplace.flights_empty": { ru: "Актуальные предложения авиабилетов пока недоступны. Оставьте запрос — мы подберём для вас лучшие варианты.", az: "Aviabilet üzrə aktual təkliflər hələ mövcud deyil. Sorğu göndərin — sizin üçün ən yaxşı variantları seçəcəyik.", en: "Current flight offers are not available yet. Submit a request and we will find the best options for you." },
   "marketplace.published_title": { ru: "Популярные услуги", az: "Populyar xidmətlər", en: "Popular services" },
   "marketplace.published_subtitle": { ru: "Лучшие предложения от проверенных партнёров", az: "Təsdiqlənmiş tərəfdaşlardan ən yaxşı təkliflər", en: "Top offers from verified partners" },
   "marketplace.view_all": { ru: "Смотреть все", az: "Hamısına bax", en: "View all" },
