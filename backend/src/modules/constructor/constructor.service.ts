@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SecurityService } from "../../security/security.service";
 import { BLOCK_REGISTRY, getBlockDefinition, getBlocksForContext } from "./block-registry";
 import type { BlockRegistryEntry } from "./block-registry";
+import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.service";
+import { MediaProcessor } from "../catalog/media/media-processor.service";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,6 +32,11 @@ export interface PageConfigView {
   themeId: string | null;
   templateId: string | null;
   seo: Record<string, unknown> | null;
+  headerConfig: Record<string, unknown> | null;
+  heroConfig: Record<string, unknown> | null;
+  searchConfig: Record<string, unknown> | null;
+  footerConfig: Record<string, unknown> | null;
+  designConfig: Record<string, unknown> | null;
   sections: SectionView[];
   createdAt: Date;
   updatedAt: Date;
@@ -71,6 +78,8 @@ export class ConstructorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly security: SecurityService,
+    private readonly storage: S3ObjectStorageService,
+    private readonly mediaProcessor: MediaProcessor,
   ) {}
 
   // ─── Page CRUD ───────────────────────────────────────────────────────
@@ -175,6 +184,276 @@ export class ConstructorService {
     return this.getPage(slug, actorId);
   }
 
+  // ─── Publish / Preview ────────────────────────────────────────────────
+
+  async publish(slug: string, actorId: string): Promise<PageConfigView> {
+    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+    const draftVersion = page.draftVersion;
+    if (!draftVersion || draftVersion === page.currentVersion) {
+      throw new BadRequestException("Nothing to publish — draft is same as current");
+    }
+
+    // Get draft sections
+    const draftSections = await this.prisma.constructorPageSection.findMany({
+      where: { pageId: page.id, version: draftVersion },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    // Validate all blocks
+    for (const s of draftSections) {
+      if (!getBlockDefinition(s.blockType)) {
+        throw new ForbiddenException(`Unknown block type: ${s.blockType}`);
+      }
+    }
+
+    const snapshot = {
+      slug: page.slug,
+      context: page.context,
+      seo: page.seo,
+      headerConfig: page.headerConfig,
+      heroConfig: page.heroConfig,
+      searchConfig: page.searchConfig,
+      footerConfig: page.footerConfig,
+      designConfig: page.designConfig,
+      sections: draftSections.map((s) => ({
+        blockType: s.blockType,
+        blockInstanceId: s.blockInstanceId,
+        sortOrder: s.sortOrder,
+        enabled: s.enabled,
+        settings: s.settings,
+        style: s.style,
+        responsive: s.responsive,
+        dataSource: s.dataSource,
+        visibility: s.visibility,
+        localeContent: s.localeContent,
+      })),
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      // Create version snapshot
+      await tx.constructorPageVersion.create({
+        data: {
+          pageId: page.id,
+          version: draftVersion,
+          status: "published",
+          snapshot: snapshot as any,
+          createdBy: actorId,
+          publishedAt: new Date(),
+        },
+      });
+
+      // Update page: promote draft → current
+      await tx.constructorPage.update({
+        where: { id: page.id },
+        data: {
+          currentVersion: draftVersion,
+          status: "PUBLISHED",
+          publishedAt: new Date(),
+        },
+      });
+
+      // Audit log
+      try {
+        await tx.constructorPageAuditLog.create({
+          data: {
+            pageId: page.id,
+            version: draftVersion,
+            action: "publish",
+            actorId,
+            after: { version: page.draftVersion, sectionCount: draftSections.length },
+          },
+        });
+      } catch (auditErr) {
+        console.warn("[ConstructorService] Audit log failed (non-critical):", auditErr);
+      }
+    });
+
+    return this.getPage(slug, actorId);
+  }
+
+  /** Get published (live) configuration — for public renderer. */
+  async getPublished(slug: string): Promise<PageConfigView | null> {
+    const page = await this.prisma.constructorPage.findUnique({
+      where: { slug },
+      include: {
+        sections: { orderBy: { sortOrder: "asc" } },
+      },
+    });
+    if (!page || !page.currentVersion) return null;
+
+    // Only return published sections
+    const publishedSections = await this.prisma.constructorPageSection.findMany({
+      where: { pageId: page.id, version: page.currentVersion },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    return {
+      ...this.mapPage(page),
+      sections: publishedSections.map((s) => ({
+        id: s.id,
+        blockType: s.blockType,
+        blockInstanceId: s.blockInstanceId,
+        sortOrder: s.sortOrder,
+        enabled: s.enabled,
+        settings: s.settings as Record<string, unknown>,
+        style: s.style as Record<string, unknown>,
+        responsive: s.responsive as Record<string, unknown>,
+        dataSource: s.dataSource as Record<string, unknown>,
+        visibility: s.visibility as Record<string, unknown> | null,
+        localeContent: s.localeContent as Record<string, unknown>,
+      })),
+    };
+  }
+
+  /** Get preview (draft if exists, else published) — for admin preview. */
+  async getPreview(slug: string, actorId: string): Promise<PageConfigView> {
+    const page = await this.prisma.constructorPage.findUnique({
+      where: { slug },
+      include: { sections: true },
+    });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+
+    // Use draft version if exists, otherwise current
+    const version = page.draftVersion ?? page.currentVersion;
+    if (!version) return this.getPage(slug, actorId);
+
+    const sections = await this.prisma.constructorPageSection.findMany({
+      where: { pageId: page.id, version },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    return {
+      ...this.mapPage(page),
+      sections: sections.map((s) => ({
+        id: s.id,
+        blockType: s.blockType,
+        blockInstanceId: s.blockInstanceId,
+        sortOrder: s.sortOrder,
+        enabled: s.enabled,
+        settings: s.settings as Record<string, unknown>,
+        style: s.style as Record<string, unknown>,
+        responsive: s.responsive as Record<string, unknown>,
+        dataSource: s.dataSource as Record<string, unknown>,
+        visibility: s.visibility as Record<string, unknown> | null,
+        localeContent: s.localeContent as Record<string, unknown>,
+      })),
+    };
+  }
+
+  // ─── Page-level Config CRUD ──────────────────────────────────────────
+
+  async saveHeaderConfig(slug: string, config: Record<string, unknown>, actorId: string): Promise<PageConfigView> {
+    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+
+    await this.prisma.constructorPage.update({
+      where: { id: page.id },
+      data: { headerConfig: config as any },
+    });
+
+    return this.getPage(slug, actorId);
+  }
+
+  async saveHeroConfig(slug: string, config: Record<string, unknown>, actorId: string): Promise<PageConfigView> {
+    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+
+    await this.prisma.constructorPage.update({
+      where: { id: page.id },
+      data: { heroConfig: config as any },
+    });
+
+    return this.getPage(slug, actorId);
+  }
+
+  async saveSearchConfig(slug: string, config: Record<string, unknown>, actorId: string): Promise<PageConfigView> {
+    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+
+    await this.prisma.constructorPage.update({
+      where: { id: page.id },
+      data: { searchConfig: config as any },
+    });
+
+    return this.getPage(slug, actorId);
+  }
+
+  async saveFooterConfig(slug: string, config: Record<string, unknown>, actorId: string): Promise<PageConfigView> {
+    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+
+    await this.prisma.constructorPage.update({
+      where: { id: page.id },
+      data: { footerConfig: config as any },
+    });
+
+    return this.getPage(slug, actorId);
+  }
+
+  async saveDesignConfig(slug: string, config: Record<string, unknown>, actorId: string): Promise<PageConfigView> {
+    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+
+    await this.prisma.constructorPage.update({
+      where: { id: page.id },
+      data: { designConfig: config as any },
+    });
+
+    return this.getPage(slug, actorId);
+  }
+
+  // ─── Media Upload ────────────────────────────────────────────────────
+
+  async uploadMedia(
+    slug: string,
+    file: Express.Multer.File,
+    kind: "logo" | "hero-slide",
+    actorId: string,
+  ): Promise<{ url: string; width: number; height: number; size: number; format: string }> {
+    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+
+    // Validate MIME type
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException(`Invalid file type: ${file.mimetype}. Allowed: JPEG, PNG, WebP`);
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      throw new BadRequestException(`File too large: ${(file.size / 1024 / 1024).toFixed(1)}MB. Max: 10MB`);
+    }
+
+    // Process image to get dimensions
+    const processed = await this.mediaProcessor.processImage(file.buffer, [file.mimetype]);
+
+    // Validate dimensions for hero slides
+    if (kind === "hero-slide") {
+      if (processed.width < 1200 || processed.height < 400) {
+        throw new BadRequestException(
+          `Image too small: ${processed.width}×${processed.height}. Minimum for hero: 1200×400`,
+        );
+      }
+    }
+
+    // Upload to S3
+    const ext = file.mimetype.split("/")[1] || "jpg";
+    const key = `constructor/${slug}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    await this.storage.putObject({ key, body: file.buffer, contentType: file.mimetype });
+
+    // Return metadata
+    const format = file.mimetype.split("/")[1]?.toUpperCase() || "JPEG";
+    return {
+      url: `/api/v1/public/media/${encodeURIComponent(key)}`,
+      width: processed.width,
+      height: processed.height,
+      size: file.size,
+      format,
+    };
+  }
+
   // ─── Block Registry ──────────────────────────────────────────────────
 
   getRegistry(context: string): BlockRegistryEntry[] {
@@ -242,6 +521,11 @@ export class ConstructorService {
       themeId: page.themeId,
       templateId: page.templateId,
       seo: page.seo as Record<string, unknown> | null,
+      headerConfig: (page.headerConfig as Record<string, unknown>) ?? null,
+      heroConfig: (page.heroConfig as Record<string, unknown>) ?? null,
+      searchConfig: (page.searchConfig as Record<string, unknown>) ?? null,
+      footerConfig: (page.footerConfig as Record<string, unknown>) ?? null,
+      designConfig: (page.designConfig as Record<string, unknown>) ?? null,
       sections: page.sections.map((s: any) => ({
         id: s.id,
         blockType: s.blockType,

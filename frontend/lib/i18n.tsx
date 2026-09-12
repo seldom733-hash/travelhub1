@@ -799,6 +799,72 @@ export const DICT: Record<string, Record<Locale, string>> = {
     en: "Remove",
   },
 
+  // ── Constructor tabs ──────────────────────────────────────────────────
+  "constructor.tab_structure": { ru: "Структура", az: "Struktur", en: "Structure" },
+  "constructor.tab_header": { ru: "Branding / Header", az: "Branding / Header", en: "Branding / Header" },
+  "constructor.tab_hero": { ru: "Hero / Баннеры", az: "Hero / Bannerlar", en: "Hero / Banners" },
+  "constructor.tab_search": { ru: "Поиск", az: "Axtarış", en: "Search" },
+  "constructor.tab_content": { ru: "Контент", az: "Məzmun", en: "Content" },
+  "constructor.tab_footer": { ru: "Подвал", az: "Alt bilgi", en: "Footer" },
+  "constructor.tab_design": { ru: "Дизайн", az: "Dizayn", en: "Design" },
+  "constructor.publish": { ru: "Опубликовать", az: "Dərc et", en: "Publish" },
+  "constructor.preview": { ru: "Предпросмотр", az: "Öncədən baxış", en: "Preview" },
+  "constructor.published": { ru: "Опубликовано", az: "Dərc edilib", en: "Published" },
+  "constructor.draft_status": { ru: "Черновик", az: "Qaralama", en: "Draft" },
+  "constructor.published_status": { ru: "Опубликовано", az: "Dərc edilib", en: "Published" },
+
+  // ── Header constructor ────────────────────────────────────────────────
+  "constructor.header_logo": { ru: "Логотип", az: "Loqo", en: "Logo" },
+  "constructor.header_upload_logo": { ru: "Загрузить логотип", az: "Loqo yüklə", en: "Upload Logo" },
+  "constructor.header_company_name": { ru: "Название компании", az: "Şirkət adı", en: "Company Name" },
+  "constructor.header_phone": { ru: "Телефон", az: "Telefon", en: "Phone" },
+  "constructor.header_email": { ru: "Email", az: "E-poçt", en: "Email" },
+  "constructor.header_address": { ru: "Адрес", az: "Ünvan", en: "Address" },
+  "constructor.header_save": { ru: "Сохранить Header", az: "Header-i Saxla", en: "Save Header" },
+
+  // ── Hero constructor ──────────────────────────────────────────────────
+  "constructor.hero_add_slide": { ru: "Добавить слайд", az: "Slayd əlavə et", en: "Add Slide" },
+  "constructor.hero_delete_slide": { ru: "Удалить слайд", az: "Slaydı sil", en: "Delete Slide" },
+  "constructor.hero_upload_image": { ru: "Загрузить изображение", az: "Şəkil yüklə", en: "Upload Image" },
+  "constructor.hero_replace_image": { ru: "Заменить изображение", az: "Şəkli dəyiş", en: "Replace Image" },
+  "constructor.hero_slide_title": { ru: "Заголовок", az: "Başlıq", en: "Title" },
+  "constructor.hero_slide_subtitle": { ru: "Подзаголовок", az: "Alt başlıq", en: "Subtitle" },
+  "constructor.hero_slide_description": { ru: "Описание", az: "Təsvir", en: "Description" },
+  "constructor.hero_autoplay": { ru: "Автозапуск", az: "Avtomatik", en: "Autoplay" },
+  "constructor.hero_interval": { ru: "Интервал (мс)", az: "Aralıq (ms)", en: "Interval (ms)" },
+  "constructor.hero_show_arrows": { ru: "Стрелки", az: "Oxlar", en: "Arrows" },
+  "constructor.hero_show_indicators": { ru: "Индикаторы", az: "İndikatorlar", en: "Indicators" },
+  "constructor.hero_save": { ru: "Сохранить Hero", az: "Hero-nu Saxla", en: "Save Hero" },
+  "constructor.hero_image_valid": { ru: "✓ Валидно", az: "✓ Keçərli", en: "✓ Valid" },
+  "constructor.hero_image_invalid": { ru: "✗ Невалидно", az: "✗ Keçərsiz", en: "✗ Invalid" },
+  "constructor.hero_min_dimensions": { ru: "Минимум: 1200×400", az: "Minimum: 1200×400", en: "Minimum: 1200×400" },
+
+  // ── Search constructor ────────────────────────────────────────────────
+  "constructor.search_service_order": { ru: "Порядок сервисов", az: "Xidmətlər sırası", en: "Service Order" },
+  "constructor.search_default_service": { ru: "Сервис по умолчанию", az: "Defolt xidmət", en: "Default Service" },
+  "constructor.search_save": { ru: "Сохранить Поиск", az: "Axtarışı Saxla", en: "Save Search" },
+  "constructor.search_tours": { ru: "Туры", az: "Turlar", en: "Tours" },
+  "constructor.search_hotels": { ru: "Отели", az: "Otellər", en: "Hotels" },
+  "constructor.search_flights": { ru: "Авиабилеты", az: "Aviabiletlər", en: "Flights" },
+  "constructor.search_sanatoriums": { ru: "Санатории", az: "Sanatoriyalar", en: "Sanatoriums" },
+
+  // ── Footer constructor ────────────────────────────────────────────────
+  "constructor.footer_brand_name": { ru: "Название", az: "Ad", en: "Name" },
+  "constructor.footer_description": { ru: "Описание", az: "Təsvir", en: "Description" },
+  "constructor.footer_phone": { ru: "Телефон", az: "Telefon", en: "Phone" },
+  "constructor.footer_email": { ru: "Email", az: "E-poçt", en: "Email" },
+  "constructor.footer_copyright": { ru: "Копирайт", az: "Müəllif hüququ", en: "Copyright" },
+  "constructor.footer_save": { ru: "Сохранить Footer", az: "Footer-i Saxla", en: "Save Footer" },
+
+  // ── Design constructor ────────────────────────────────────────────────
+  "constructor.design_font_family": { ru: "Шрифт", az: "Şrift", en: "Font" },
+  "constructor.design_accent_color": { ru: "Цвет акцента", az: "Vurğu rəngi", en: "Accent Color" },
+  "constructor.design_bg_color": { ru: "Цвет фона", az: "Fon rəngi", en: "Background Color" },
+  "constructor.design_text_color": { ru: "Цвет текста", az: "Mətn rəngi", en: "Text Color" },
+  "constructor.design_section_spacing": { ru: "Отступ секций", az: "Bölmələr arası məsafə", en: "Section Spacing" },
+  "constructor.design_container_width": { ru: "Ширина контейнера", az: "Konteyner genişliyi", en: "Container Width" },
+  "constructor.design_save": { ru: "Сохранить Дизайн", az: "Dizaynı Saxla", en: "Save Design" },
+
   // ── Step 1.12.2 — Public Storefront site labels (Storefront-контекст) ─────
   "storefront.products": { ru: "Услуги", az: "Xidmətlər", en: "Services" },
   "storefront.contacts": { ru: "Контакты", az: "Əlaqə", en: "Contacts" },

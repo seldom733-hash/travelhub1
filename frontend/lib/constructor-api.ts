@@ -61,6 +61,11 @@ export interface PageConfigView {
   themeId: string | null;
   templateId: string | null;
   seo: Record<string, unknown> | null;
+  headerConfig: Record<string, unknown> | null;
+  heroConfig: Record<string, unknown> | null;
+  searchConfig: Record<string, unknown> | null;
+  footerConfig: Record<string, unknown> | null;
+  designConfig: Record<string, unknown> | null;
   sections: SectionView[];
   createdAt: string;
   updatedAt: string;
@@ -77,6 +82,54 @@ export const constructorApi = {
   /** Save draft sections for a page. */
   saveDraft(slug: string, sections: PageSectionInput[]): Promise<PageConfigView> {
     return api.put<PageConfigView>(`/constructor/pages/${slug}/sections`, { sections });
+  },
+
+  /** Publish draft to live. */
+  publish(slug: string): Promise<PageConfigView> {
+    return api.post<PageConfigView>(`/constructor/pages/${slug}/publish`);
+  },
+
+  /** Get preview (draft if exists, else published). */
+  getPreview(slug: string): Promise<PageConfigView> {
+    return api.get<PageConfigView>(`/constructor/pages/${slug}/preview`);
+  },
+
+  /** Get published (live) configuration. */
+  getPublished(slug: string): Promise<PageConfigView | null> {
+    return api.get<PageConfigView | null>(`/constructor/pages/${slug}/published`);
+  },
+
+  /** Save header config. */
+  saveHeaderConfig(slug: string, config: Record<string, unknown>): Promise<PageConfigView> {
+    return api.put<PageConfigView>(`/constructor/pages/${slug}/header`, { config });
+  },
+
+  /** Save hero config. */
+  saveHeroConfig(slug: string, config: Record<string, unknown>): Promise<PageConfigView> {
+    return api.put<PageConfigView>(`/constructor/pages/${slug}/hero`, { config });
+  },
+
+  /** Save search config. */
+  saveSearchConfig(slug: string, config: Record<string, unknown>): Promise<PageConfigView> {
+    return api.put<PageConfigView>(`/constructor/pages/${slug}/search-config`, { config });
+  },
+
+  /** Save footer config. */
+  saveFooterConfig(slug: string, config: Record<string, unknown>): Promise<PageConfigView> {
+    return api.put<PageConfigView>(`/constructor/pages/${slug}/footer`, { config });
+  },
+
+  /** Save design config. */
+  saveDesignConfig(slug: string, config: Record<string, unknown>): Promise<PageConfigView> {
+    return api.put<PageConfigView>(`/constructor/pages/${slug}/design`, { config });
+  },
+
+  /** Upload media (logo/hero-slide). */
+  uploadMedia(slug: string, file: File, kind: "logo" | "hero-slide"): Promise<{ url: string; width: number; height: number; size: number; format: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("kind", kind);
+    return api.post(`/constructor/pages/${slug}/media`, formData);
   },
 
   /** Get block registry for a context. */

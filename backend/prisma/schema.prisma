@@ -5149,6 +5149,11 @@ model ConstructorPage {
   themeId         String?
   templateId      String?
   seo             Json?    // SeoConfig { title, description, canonical, robots, ogImage }
+  headerConfig    Json?    // HeaderConfig { logo, companyName, phone, email, navItems, actions }
+  heroConfig      Json?    // HeroConfig { slides[], carousel }
+  searchConfig    Json?    // SearchConfig { services, order, defaultService }
+  footerConfig    Json?    // FooterConfig { logo, name, description, phone, email, navGroups, social, copyright }
+  designConfig    Json?    // DesignConfig { typography, colors, spacing, layout, components }
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   publishedAt     DateTime?

@@ -80,6 +80,105 @@ export function useConstructor(slug: string) {
     }
   }, [slug, draft]);
 
+  // Publish
+  const publish = useCallback(async () => {
+    if (!mountedRef.current) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await constructorApi.publish(slug);
+      if (!mountedRef.current) return;
+      setPage(updated);
+      setDraft(updated.sections);
+    } catch (e: unknown) {
+      if (!mountedRef.current) return;
+      setError(e instanceof Error ? e.message : "Failed to publish");
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
+  }, [slug]);
+
+  // Save page-level config
+  const saveHeaderConfig = useCallback(async (config: Record<string, unknown>) => {
+    if (!mountedRef.current) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await constructorApi.saveHeaderConfig(slug, config);
+      if (!mountedRef.current) return;
+      setPage(updated);
+    } catch (e: unknown) {
+      if (!mountedRef.current) return;
+      setError(e instanceof Error ? e.message : "Failed to save header");
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
+  }, [slug]);
+
+  const saveHeroConfig = useCallback(async (config: Record<string, unknown>) => {
+    if (!mountedRef.current) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await constructorApi.saveHeroConfig(slug, config);
+      if (!mountedRef.current) return;
+      setPage(updated);
+    } catch (e: unknown) {
+      if (!mountedRef.current) return;
+      setError(e instanceof Error ? e.message : "Failed to save hero");
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
+  }, [slug]);
+
+  const saveSearchConfig = useCallback(async (config: Record<string, unknown>) => {
+    if (!mountedRef.current) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await constructorApi.saveSearchConfig(slug, config);
+      if (!mountedRef.current) return;
+      setPage(updated);
+    } catch (e: unknown) {
+      if (!mountedRef.current) return;
+      setError(e instanceof Error ? e.message : "Failed to save search");
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
+  }, [slug]);
+
+  const saveFooterConfig = useCallback(async (config: Record<string, unknown>) => {
+    if (!mountedRef.current) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await constructorApi.saveFooterConfig(slug, config);
+      if (!mountedRef.current) return;
+      setPage(updated);
+    } catch (e: unknown) {
+      if (!mountedRef.current) return;
+      setError(e instanceof Error ? e.message : "Failed to save footer");
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
+  }, [slug]);
+
+  const saveDesignConfig = useCallback(async (config: Record<string, unknown>) => {
+    if (!mountedRef.current) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await constructorApi.saveDesignConfig(slug, config);
+      if (!mountedRef.current) return;
+      setPage(updated);
+    } catch (e: unknown) {
+      if (!mountedRef.current) return;
+      setError(e instanceof Error ? e.message : "Failed to save design");
+    } finally {
+      if (mountedRef.current) setSaving(false);
+    }
+  }, [slug]);
+
   // Add block
   const addBlock = useCallback((blockType: string) => {
     const def = registry.find((r) => r.type === blockType);
@@ -148,6 +247,12 @@ export function useConstructor(slug: string) {
     availableBlocks,
     refresh,
     saveDraft,
+    publish,
+    saveHeaderConfig,
+    saveHeroConfig,
+    saveSearchConfig,
+    saveFooterConfig,
+    saveDesignConfig,
     addBlock,
     removeBlock,
     toggleEnabled,
