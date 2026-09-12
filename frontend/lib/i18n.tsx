@@ -70,6 +70,22 @@ export const DICT: Record<string, Record<Locale, string>> = {
     az: "Otellər, turlar, ekskursiyalar, transferlər və digər səyahət xidmətləri — bir yerdə. TravelHub-da lazım olan hər şeyi planlaşdırın və bron edin.",
     en: "Hotels, tours, excursions, transfers and other travel services — all in one place. Plan and book everything you need on TravelHub.",
   },
+  // Hero slide 2 — Partners
+  "marketplace.hero_slide_2_title_1": { ru: "Для партнёров", az: "Tərəfdaşlar üçün", en: "For partners" },
+  "marketplace.hero_slide_2_title_2": { ru: "Развивайте бизнес", az: "Biznesinizi inkişaf etdirin", en: "Grow your business" },
+  "marketplace.hero_slide_2_description": {
+    ru: "Размещайте свои услуги на платформе TravelHub и получайте доступ к тысячам путешественников. Присоединяйтесь к нашей сети партнёров.",
+    az: "Xidmətlərinizi TravelHub platformasında yerləşdirin və minlərlə səyahətçiyə çıxış əldə edin. Bizim tərəfdaş şəbəkəmizə qoşulun.",
+    en: "List your services on the TravelHub platform and access thousands of travelers. Join our partner network.",
+  },
+  // Hero slide 3 — Storefront
+  "marketplace.hero_slide_3_title_1": { ru: "TravelHub Storefront", az: "TravelHub Storefront", en: "TravelHub Storefront" },
+  "marketplace.hero_slide_3_title_2": { ru: "Создайте свою витрину", az: "Öz vitrininizi yaradın", en: "Create your storefront" },
+  "marketplace.hero_slide_3_description": {
+    ru: "Персональная витрина для ваших услуг. Представьте свой бизнес путешественникам в лучшем виде.",
+    az: "Xidmətləriniz üçün şəxsi vitrin. Səyahətçilərə biznesinizi ən yaxşı şəkildə təqdim edin.",
+    en: "A personal storefront for your services. Present your business to travelers in the best light.",
+  },
   "marketplace.search_destination_label": { ru: "Куда вы едете?", az: "Haraya gedirsiniz?", en: "Where are you going?" },
   "marketplace.search_destination_placeholder": { ru: "Город, страна, отель...", az: "Şəhər, ölkə, otel...", en: "City, country, hotel..." },
   "marketplace.search_what_label": { ru: "Что ищете?", az: "Nə axtarırsınız?", en: "What are you looking for?" },
