@@ -9,6 +9,7 @@ import SpecialOffers from "@/components/marketplace/SpecialOffers";
 import Tours from "@/components/marketplace/Tours";
 import Hotels from "@/components/marketplace/Hotels";
 import Flights from "@/components/marketplace/Flights";
+import Advertisement from "@/components/marketplace/Advertisement";
 import { useMarketplaceViewed } from "@/lib/behavioral-events";
 
 export default function MarketplacePage() {
@@ -26,6 +27,7 @@ export default function MarketplacePage() {
         <Tours />
         <Hotels />
         <Flights />
+        <Advertisement />
       </main>
 
       <footer className="border-t border-dark-border bg-dark py-8">
