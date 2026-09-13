@@ -158,7 +158,7 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-ink">
       {/* Carousel settings */}
       <div className="rounded-lg border border-slate-200 bg-white p-5">
         <h3 className="mb-4 text-sm font-semibold text-slate-900">
@@ -172,7 +172,7 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
           </label>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">{t("constructor.hero_interval", locale)}</label>
-            <input type="number" min={3000} max={15000} step={500} value={cfg.carousel.interval} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, interval: Number(e.target.value) } }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <input type="number" min={3000} max={15000} step={500} value={cfg.carousel.interval} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, interval: Number(e.target.value) } }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none focus:border-blue-500" />
           </div>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={cfg.carousel.showArrows} onChange={(e) => setCfg((p) => ({ ...p, carousel: { ...p.carousel, showArrows: e.target.checked } }))} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
@@ -263,21 +263,21 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
                   placeholder={t("constructor.hero_slide_title", locale)}
                   value={slide.title[loc] ?? ""}
                   onChange={(e) => updateSlideLocale(idx, "title", loc, e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none focus:border-blue-500"
                 />
                 <input
                   type="text"
                   placeholder={t("constructor.hero_slide_subtitle", locale)}
                   value={slide.subtitle[loc] ?? ""}
                   onChange={(e) => updateSlideLocale(idx, "subtitle", loc, e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none focus:border-blue-500"
                 />
                 <input
                   type="text"
                   placeholder="CTA"
                   value={slide.ctaLabel[loc] ?? ""}
                   onChange={(e) => updateSlideLocale(idx, "ctaLabel", loc, e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none focus:border-blue-500"
                 />
               </div>
             ))}
@@ -290,7 +290,7 @@ export default function ConstructorHeroTab({ slug, config, onSaved, onSaving, on
               value={slide.ctaUrl}
               onChange={(e) => updateSlide(idx, { ctaUrl: e.target.value })}
               placeholder="/search"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-ink outline-none focus:border-blue-500"
             />
           </div>
         </div>
