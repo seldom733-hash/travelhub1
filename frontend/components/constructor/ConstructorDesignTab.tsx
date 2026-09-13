@@ -117,7 +117,7 @@ export default function ConstructorDesignTab({ slug, config, onSaved, onSaving, 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">Heading Font</label>
-            <select value={cfg.typography.headingFont} onChange={(e) => updateTypo("headingFont", e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500">
+            <select value={cfg.typography.headingFont} onChange={(e) => updateTypo("headingFont", e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500">
               <option value="Georgia, serif">Georgia (Serif)</option>
               <option value="'Playfair Display', serif">Playfair Display</option>
               <option value="'Times New Roman', serif">Times New Roman</option>
@@ -126,7 +126,7 @@ export default function ConstructorDesignTab({ slug, config, onSaved, onSaving, 
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">Body Font</label>
-            <select value={cfg.typography.bodyFont} onChange={(e) => updateTypo("bodyFont", e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500">
+            <select value={cfg.typography.bodyFont} onChange={(e) => updateTypo("bodyFont", e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500">
               <option value="Inter, system-ui, sans-serif">Inter</option>
               <option value="system-ui, sans-serif">System UI</option>
               <option value="'Segoe UI', sans-serif">Segoe UI</option>
@@ -134,11 +134,11 @@ export default function ConstructorDesignTab({ slug, config, onSaved, onSaving, 
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">Base Font Size (px)</label>
-            <input type="number" min={12} max={20} value={cfg.typography.baseFontSize} onChange={(e) => updateTypo("baseFontSize", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <input type="number" min={12} max={20} value={cfg.typography.baseFontSize} onChange={(e) => updateTypo("baseFontSize", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">Line Height</label>
-            <input type="number" min={1} max={2.5} step={0.1} value={cfg.typography.lineHeight} onChange={(e) => updateTypo("lineHeight", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <input type="number" min={1} max={2.5} step={0.1} value={cfg.typography.lineHeight} onChange={(e) => updateTypo("lineHeight", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" />
           </div>
         </div>
       </div>
@@ -162,7 +162,7 @@ export default function ConstructorDesignTab({ slug, config, onSaved, onSaving, 
               </label>
               <div className="flex gap-2">
                 <input type="color" value={cfg.colors[key]} onChange={(e) => updateColor(key, e.target.value)} className="h-9 w-9 cursor-pointer rounded border border-slate-200" />
-                <input type="text" value={cfg.colors[key]} onChange={(e) => updateColor(key, e.target.value)} className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-mono outline-none focus:border-blue-500" />
+                <input type="text" value={cfg.colors[key]} onChange={(e) => updateColor(key, e.target.value)} className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-mono text-slate-900 outline-none focus:border-blue-500" />
               </div>
             </div>
           ))}
@@ -175,15 +175,15 @@ export default function ConstructorDesignTab({ slug, config, onSaved, onSaving, 
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">{t("constructor.design_section_spacing", locale)} (px)</label>
-            <input type="number" min={0} max={200} step={8} value={cfg.spacing.sectionSpacing} onChange={(e) => updateSpacing("sectionSpacing", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <input type="number" min={0} max={200} step={8} value={cfg.spacing.sectionSpacing} onChange={(e) => updateSpacing("sectionSpacing", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">{t("constructor.design_container_width", locale)} (px)</label>
-            <input type="number" min={800} max={1800} step={50} value={cfg.spacing.containerWidth} onChange={(e) => updateSpacing("containerWidth", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <input type="number" min={800} max={1800} step={50} value={cfg.spacing.containerWidth} onChange={(e) => updateSpacing("containerWidth", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">Internal Padding (px)</label>
-            <input type="number" min={0} max={64} step={4} value={cfg.spacing.internalPadding} onChange={(e) => updateSpacing("internalPadding", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <input type="number" min={0} max={64} step={4} value={cfg.spacing.internalPadding} onChange={(e) => updateSpacing("internalPadding", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" />
           </div>
         </div>
       </div>
@@ -194,15 +194,15 @@ export default function ConstructorDesignTab({ slug, config, onSaved, onSaving, 
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">Card Radius (px)</label>
-            <input type="number" min={0} max={24} value={cfg.components.cardRadius} onChange={(e) => updateComponent("cardRadius", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <input type="number" min={0} max={24} value={cfg.components.cardRadius} onChange={(e) => updateComponent("cardRadius", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">Button Radius (px)</label>
-            <input type="number" min={0} max={24} value={cfg.components.buttonRadius} onChange={(e) => updateComponent("buttonRadius", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <input type="number" min={0} max={24} value={cfg.components.buttonRadius} onChange={(e) => updateComponent("buttonRadius", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-500">Input Radius (px)</label>
-            <input type="number" min={0} max={24} value={cfg.components.inputRadius} onChange={(e) => updateComponent("inputRadius", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+            <input type="number" min={0} max={24} value={cfg.components.inputRadius} onChange={(e) => updateComponent("inputRadius", Number(e.target.value))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" />
           </div>
         </div>
       </div>
