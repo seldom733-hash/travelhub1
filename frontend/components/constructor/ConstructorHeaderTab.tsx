@@ -8,11 +8,28 @@ import DefaultConfigActions from "./DefaultConfigActions";
 
 interface HeaderConfig {
   logo?: { url: string; width: number; height: number; size: number; format: string } | null;
+  /** Canonical single-value brand name (F1). Brand Name is not locale-dependent UI text. */
+  brandName?: string;
+  /** @deprecated legacy localized record — read-only fallback until data is re-saved. */
   companyName?: Record<string, string>;
   phone?: string;
   email?: string;
   address?: string;
   navVisible?: boolean;
+}
+
+/**
+ * Normalize legacy `companyName {ru,az,en}` to a single Brand Name value.
+ * Priority: ru → az → en, ignoring empty/whitespace; final fallback "TravelHub".
+ */
+function normalizeLegacyCompanyName(record: unknown): string | undefined {
+  if (!record || typeof record !== "object") return undefined;
+  const rec = record as Record<string, string>;
+  for (const loc of ["ru", "az", "en"] as const) {
+    const v = (rec[loc] ?? "").trim();
+    if (v) return v;
+  }
+  return undefined;
 }
 
 interface Props {
@@ -29,7 +46,10 @@ export default function ConstructorHeaderTab({ slug, config, onSaved, onSaving, 
   const [uploading, setUploading] = useState(false);
   const [cfg, setCfg] = useState<HeaderConfig>(() => ({
     logo: (config?.logo as HeaderConfig["logo"]) ?? null,
-    companyName: (config?.companyName as Record<string, string>) ?? { ru: "TravelHub", az: "TravelHub", en: "TravelHub" },
+    brandName:
+      (config?.brandName as string)?.trim() ||
+      normalizeLegacyCompanyName(config?.companyName) ||
+      "TravelHub",
     phone: (config?.phone as string) ?? "",
     email: (config?.email as string) ?? "",
     address: (config?.address as string) ?? "",
@@ -100,22 +120,17 @@ export default function ConstructorHeaderTab({ slug, config, onSaved, onSaving, 
         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLogoUpload} />
       </div>
 
-      {/* Company Name (localized) */}
+      {/* Brand Name (single value — not locale-dependent) */}
       <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.header_company_name", locale)}</h3>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {(["ru", "az", "en"] as const).map((loc) => (
-            <div key={loc}>
-              <label className="mb-1 block text-xs font-medium text-slate-500 uppercase">{loc}</label>
-              <input
-                type="text"
-                value={cfg.companyName?.[loc] ?? ""}
-                onChange={(e) => setCfg((prev) => ({ ...prev, companyName: { ...prev.companyName, [loc]: e.target.value } }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
-              />
-            </div>
-          ))}
-        </div>
+        <h3 className="mb-4 text-sm font-semibold text-slate-900">{t("constructor.header_brand_name", locale)}</h3>
+        <input
+          type="text"
+          value={cfg.brandName ?? ""}
+          onChange={(e) => setCfg((prev) => ({ ...prev, brandName: e.target.value }))}
+          placeholder="TravelHub"
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20"
+        />
+        <p className="mt-2 text-xs text-slate-400">{t("constructor.header_brand_name_hint", locale)}</p>
       </div>
 
       {/* Contacts */}

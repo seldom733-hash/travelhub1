@@ -817,6 +817,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "constructor.header_logo": { ru: "Логотип", az: "Loqo", en: "Logo" },
   "constructor.header_upload_logo": { ru: "Загрузить логотип", az: "Loqo yüklə", en: "Upload Logo" },
   "constructor.header_company_name": { ru: "Название компании", az: "Şirkət adı", en: "Company Name" },
+  "constructor.header_brand_name": { ru: "Название бренда", az: "Brend adı", en: "Brand Name" },
+  "constructor.header_brand_name_hint": { ru: "Единое значение для всех языков (не переводится).", az: "Bütün dillər üçün vahid dəyər (tərcümə olunmur).", en: "A single value for all languages (not translated)." },
   "constructor.header_phone": { ru: "Телефон", az: "Telefon", en: "Phone" },
   "constructor.header_email": { ru: "Email", az: "E-poçt", en: "Email" },
   "constructor.header_address": { ru: "Адрес", az: "Ünvan", en: "Address" },

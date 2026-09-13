@@ -37,6 +37,9 @@ interface ServiceItem {
 /** Published header configuration shape (Constructor → headerConfig). */
 export interface MarketplaceHeaderConfig {
   logo?: { url: string; width: number; height: number; size: number; format: string } | null;
+  /** Canonical single-value brand name (F1 normalization). */
+  brandName?: string;
+  /** @deprecated legacy localized record — read-only fallback until data is re-saved. */
   companyName?: Record<string, string>;
   phone?: string;
   email?: string;
@@ -44,9 +47,25 @@ export interface MarketplaceHeaderConfig {
   navVisible?: boolean;
 }
 
+/**
+ * Resolve the Brand Name from canonical `brandName` (string) with legacy
+ * `companyName {ru,az,en}` fallback (ru → az → en → "TravelHub").
+ * Brand Name is locale-independent: it must NOT change when the UI locale changes.
+ */
+export function resolveBrandName(cfg: MarketplaceHeaderConfig | null | undefined): string {
+  const fromNew = (cfg?.brandName ?? "").trim();
+  if (fromNew) return fromNew;
+  const legacy = cfg?.companyName;
+  if (legacy && typeof legacy === "object") {
+    const candidate = (legacy.ru ?? legacy.az ?? legacy.en ?? "").trim();
+    if (candidate) return candidate;
+  }
+  return "TravelHub";
+}
+
 const DEFAULT_HEADER_CONFIG: MarketplaceHeaderConfig = {
   logo: null,
-  companyName: { ru: "TravelHub", az: "TravelHub", en: "TravelHub" },
+  brandName: "TravelHub",
   phone: "+994 12 345 67 89",
   email: "info@travelhub.az",
   address: "Баку, Азербайджан",
@@ -73,7 +92,7 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
   const servicesRef = useRef<HTMLDivElement>(null);
 
   const cfg = { ...DEFAULT_HEADER_CONFIG, ...(config ?? {}) };
-  const companyName = (cfg.companyName?.[locale] || cfg.companyName?.ru || "TravelHub").trim();
+  const companyName = resolveBrandName(cfg);
   const navVisible = cfg.navVisible !== false;
 
   // Close services dropdown on outside click

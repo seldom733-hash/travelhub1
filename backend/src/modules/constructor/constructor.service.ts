@@ -123,12 +123,29 @@ export const DEFAULT_HERO_CONFIG: Record<string, unknown> = {
 
 export const DEFAULT_HEADER_CONFIG: Record<string, unknown> = {
   logo: null,
-  companyName: { ru: "TravelHub", az: "TravelHub", en: "TravelHub" },
+  // F1: Brand Name is a single locale-independent value (canonical model).
+  brandName: "TravelHub",
   phone: "",
   email: "",
   address: "",
   navVisible: true,
 };
+
+/**
+ * Normalize legacy `companyName {ru,az,en}` to the canonical single-value
+ * `brandName`. Priority ru → az → en, ignoring empty/whitespace values;
+ * falls back to "TravelHub" when nothing non-empty exists. Mirrors the
+ * frontend helper — keep both in sync.
+ */
+export function normalizeLegacyCompanyName(record: unknown): string | undefined {
+  if (!record || typeof record !== "object" || Array.isArray(record)) return undefined;
+  const rec = record as Record<string, unknown>;
+  for (const loc of ["ru", "az", "en"] as const) {
+    const v = typeof rec[loc] === "string" ? (rec[loc] as string).trim() : "";
+    if (v) return v;
+  }
+  return undefined;
+}
 
 export const DEFAULT_SEARCH_CONFIG: Record<string, unknown> = {
   services: [
