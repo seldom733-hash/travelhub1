@@ -2,7 +2,7 @@
 
 **Дата:** 13 сентября 2026  
 **Baseline SHA:** 5b7b48d  
-**Final SHA:** (pending commit)  
+**Final SHA:** ad5a1a8  
 **Branch:** master
 
 ---
