@@ -71,6 +71,15 @@ const DEFAULT_HOME_SECTIONS: PageSectionInput[] = [
   { blockType: "footer", blockInstanceId: "footer-main", sortOrder: 9, enabled: true },
 ];
 
+/**
+ * Block types that have been deprecated and removed from the registry.
+ * Sections with these block types are stripped from getPage / getPublished
+ * responses so they disappear from the Constructor Canvas and Content tabs.
+ * Existing DB rows are left in place (historical versions) — filtering is
+ * applied at the service layer only.
+ */
+const DEPRECATED_BLOCK_TYPES = new Set(["popular-destinations"]);
+
 // ─── Built-in Default Tab Configurations ────────────────────────────────────
 // Hero default texts are the canonical marketplace Hero copy (same strings as
 // the frontend i18n fallback: marketplace.hero_* keys). They are the source for
@@ -240,6 +249,11 @@ export class ConstructorService {
     }
     page.sections = Array.from(latestByBlock.values()).sort(
       (a, b) => a.sortOrder - b.sortOrder,
+    );
+
+    // Strip deprecated block types so they no longer appear in Canvas/Content.
+    page.sections = page.sections.filter(
+      (s) => !DEPRECATED_BLOCK_TYPES.has(s.blockType),
     );
 
     return this.mapPage(page);
@@ -447,6 +461,11 @@ export class ConstructorService {
         (a, b) => a.sortOrder - b.sortOrder,
       );
     }
+
+    // Strip deprecated block types from the public renderer.
+    publishedSections = publishedSections.filter(
+      (s) => !DEPRECATED_BLOCK_TYPES.has(s.blockType),
+    );
 
     // Page-level configs must come from the PUBLISHED version snapshot, not the
     // live page record — otherwise unpublished draft edits (header/hero/footer/
