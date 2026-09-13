@@ -66,5 +66,5 @@
 
 | Commit | Message |
 |---|---|
-| `TBD (code)` | `fix(marketplace): remove Search Block from Home, replace Направления/Предложения with Витрина in Header` |
-| `TBD (docs)` | `docs: Home/Vitrina/Catalog Search reconciliation architecture + report` |
+| `3de71ae` | `fix(marketplace): remove Search Block from Home, replace Направления/Предложения with Витрина in Header` |
+| `45f90cf` | `docs: Home/Vitrina/Catalog Search reconciliation architecture + report` |
