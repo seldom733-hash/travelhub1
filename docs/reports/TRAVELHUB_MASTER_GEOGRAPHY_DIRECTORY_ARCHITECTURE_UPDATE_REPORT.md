@@ -3,7 +3,7 @@
 **Дата:** 2026-09-14
 **Branch:** master
 **Baseline SHA:** aef98f9
-**Final SHA:** (pending commit)
+**Final SHA:** 86c8cbf
 
 ---
 
@@ -155,9 +155,11 @@ Marketplace Availability и Partner Storefront presentation разделены. 
 ```
 Branch:           master
 Baseline SHA:     aef98f9
-Final SHA:        (pending commit)
+Final SHA:        86c8cbf
 Working tree:     clean
 Untracked files:  unchanged (test scripts, evidence, prompts)
+Commit:           86c8cbf
+Push:             origin/master — OK
 ```
 
 ---
