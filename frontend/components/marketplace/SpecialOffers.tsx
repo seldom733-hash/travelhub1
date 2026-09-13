@@ -138,8 +138,8 @@ export default function SpecialOffers() {
   if (!loading && (offers.length === 0 || error)) return null;
 
   return (
-    <section className="bg-dark-card/30 py-16 sm:py-20">
-      <div className="mx-auto max-w-[1400px] px-6">
+    <section className="bg-dark-card/30 th-section">
+      <div className="th-container">
         {/* Header */}
         <div className="mb-8 flex items-end justify-between sm:mb-10">
           <div>

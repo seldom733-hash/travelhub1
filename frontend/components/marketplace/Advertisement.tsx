@@ -7,8 +7,8 @@ export default function Advertisement() {
   const locale = useLocale();
 
   return (
-    <section className="bg-dark py-16 sm:py-20">
-      <div className="mx-auto max-w-[1400px] px-6">
+    <section className="bg-dark th-section">
+      <div className="th-container">
         <div className="relative overflow-hidden rounded-2xl border border-dark-border bg-dark-card/50">
           {/* Decorative gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-gold/5 via-transparent to-gold/5" />

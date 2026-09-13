@@ -53,7 +53,7 @@ export default function MarketplaceFooter({ config, brandName: brandNameProp }: 
 
   return (
     <footer className="border-t border-dark-border bg-dark" role="contentinfo">
-      <div className="mx-auto max-w-[1400px] px-6 pt-16 pb-8">
+      <div className="th-container pt-16 pb-8">
         {/* Main grid */}
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}

@@ -148,8 +148,8 @@ export default function LatestOffers() {
 
   if (!loading && (offers.length === 0 || error)) {
     return (
-      <section className="bg-dark py-16 sm:py-20">
-        <div className="mx-auto max-w-[1400px] px-6 text-center">
+      <section className="bg-dark th-section">
+        <div className="th-container text-center">
           <h2 className="font-serif text-2xl font-bold text-white sm:text-3xl">
             {t("marketplace.latest_offers_title", locale)}
           </h2>
@@ -170,8 +170,8 @@ export default function LatestOffers() {
   }
 
   return (
-    <section className="bg-dark py-16 sm:py-20">
-      <div className="mx-auto max-w-[1400px] px-6">
+    <section className="bg-dark th-section">
+      <div className="th-container">
         <div className="mb-8 flex items-end justify-between sm:mb-10">
           <div>
             <h2 className="font-serif text-2xl font-bold text-white sm:text-3xl">

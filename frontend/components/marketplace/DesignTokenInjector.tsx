@@ -71,9 +71,9 @@ function applyDesignTokens(designConfig: DesignConfig | null) {
   // Spacing → CSS custom properties
   if (designConfig.spacing) {
     const s = designConfig.spacing;
-    if (s.sectionSpacing) tokens["--th-section-spacing"] = `${s.sectionSpacing}px`;
-    if (s.containerWidth) tokens["--th-container-width"] = `${s.containerWidth}px`;
-    if (s.internalPadding) tokens["--th-padding"] = `${s.internalPadding}px`;
+    if (s.sectionSpacing !== undefined && s.sectionSpacing !== null) tokens["--th-section-spacing"] = `${s.sectionSpacing}px`;
+    if (s.containerWidth !== undefined && s.containerWidth !== null) tokens["--th-container-width"] = `${s.containerWidth}px`;
+    if (s.internalPadding !== undefined && s.internalPadding !== null) tokens["--th-padding"] = `${s.internalPadding}px`;
   }
 
   // Components → CSS custom properties

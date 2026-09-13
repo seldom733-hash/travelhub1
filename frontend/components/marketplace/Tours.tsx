@@ -125,8 +125,8 @@ export default function Tours() {
   if (!loading && (tours.length === 0 || error)) return null;
 
   return (
-    <section className="bg-dark py-16 sm:py-20">
-      <div className="mx-auto max-w-[1400px] px-6">
+    <section className="bg-dark th-section">
+      <div className="th-container">
         {/* Header */}
         <div className="mb-8 flex items-end justify-between sm:mb-10">
           <div>

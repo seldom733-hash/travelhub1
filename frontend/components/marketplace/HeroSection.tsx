@@ -219,7 +219,7 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
 
       {/* Content — cinematic text only, NO search */}
       <div className="relative z-10 mx-auto flex min-h-[540px] flex-col justify-end px-6 pb-10 pt-16 sm:min-h-[620px] sm:pb-12 sm:pt-20 lg:pt-24">
-        <div className="mx-auto w-full max-w-[1400px]">
+        <div className="mx-auto w-full" style={{ maxWidth: "var(--th-container-width, 1400px)" }}>
           <div className="max-w-3xl pb-4">
             {configuredSlide ? (
               <>
