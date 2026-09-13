@@ -184,6 +184,7 @@ export default function ConstructorCanvas({ slug }: Props) {
           <ConstructorFooterTab
             slug={slug}
             config={page?.footerConfig ?? null}
+            headerConfig={page?.headerConfig ?? null}
             onSaved={refresh}
             onSaving={() => {}}
             onError={(msg) => { if (msg) alert(msg); }}

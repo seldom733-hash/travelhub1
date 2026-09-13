@@ -7,6 +7,7 @@ import { api, auth } from "@/lib/api";
 import { useCurrentUser } from "@/lib/use-user";
 import { homeForRole, isExternalRole } from "@/lib/routes";
 import { useLocale, t } from "@/lib/i18n";
+import { useGlobalBranding } from "@/lib/use-global-branding";
 
 interface NavItem {
   href: string;
@@ -126,6 +127,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const collapsedRef = useRef(false);
+  const { brandName } = useGlobalBranding();
 
   // Hydrate collapsed state from localStorage after mount.
   useEffect(() => {
@@ -207,7 +209,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           {!collapsed && (
             <div>
               <div className="text-base font-bold text-white">
-                Travel<span className="text-blue-400">Hub</span>
+                {brandName}
               </div>
               <div className="text-[10px] text-slate-400">Internal App</div>
             </div>

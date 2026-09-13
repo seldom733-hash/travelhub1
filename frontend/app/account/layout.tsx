@@ -7,6 +7,7 @@ import { api, auth } from "@/lib/api";
 import { useCurrentUser } from "@/lib/use-user";
 import { homeForRole } from "@/lib/routes";
 import { t, useLocale } from "@/lib/i18n";
+import { useGlobalBranding } from "@/lib/use-global-branding";
 import LocaleSelector from "@/components/public/LocaleSelector";
 
 /**
@@ -31,6 +32,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
   const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { brandName } = useGlobalBranding();
 
   useEffect(() => {
     setMounted(true);
@@ -72,12 +74,12 @@ export default function BuyerAccountLayout({ children }: { children: React.React
       {/* ── Header ── */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3">
-          <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="TravelHub">
+          <Link href="/" className="flex shrink-0 items-center gap-2" aria-label={brandName}>
             <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-base font-bold text-white shadow-sm">
               T
             </div>
             <span className="text-base font-bold text-slate-900">
-              Travel<span className="text-blue-600">Hub</span>
+              {brandName}
               <span className="ml-2 hidden rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 sm:inline">
                 {t("account.buyer_summary", locale)}
               </span>
@@ -180,7 +182,7 @@ export default function BuyerAccountLayout({ children }: { children: React.React
       {/* ── Content ── */}
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
       <footer className="border-t border-slate-200 bg-white py-5 text-center text-xs text-slate-400">
-        TravelHub — {t("account.title", locale)}
+        {brandName} — {t("account.title", locale)}
       </footer>
     </div>
   );

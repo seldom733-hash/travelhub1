@@ -8,6 +8,7 @@ import { useCurrentUser } from "@/lib/use-user";
 import { isInternalRole } from "@/lib/routes";
 import { useLocale } from "@/lib/i18n";
 import { pt } from "@/lib/partner-i18n";
+import { useGlobalBranding } from "@/lib/use-global-branding";
 import LocaleSelector from "@/components/public/LocaleSelector";
 
 /**
@@ -52,6 +53,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
   const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   const [crmTier, setCrmTier] = useState<"BASIC" | "PRO" | null>(null);
+  const { brandName } = useGlobalBranding();
 
   useEffect(() => {
     setMounted(true);
@@ -120,7 +122,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
           <div className="flex shrink-0 items-center gap-2" role="presentation">
             <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-base font-bold text-white">T</div>
             <span className="text-base font-bold text-slate-900">
-              Travel<span className="text-emerald-600">Hub</span>
+              {brandName}
               <span className="ml-2 hidden rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 sm:inline">
                 {pt("partner.nav.cabinet", locale)}
               </span>
@@ -173,7 +175,7 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
 
       <footer className="border-t border-slate-200 bg-white py-5 text-center text-xs text-slate-400">
-        TravelHub — {pt("partner.nav.cabinet", locale)}
+        {brandName} — {pt("partner.nav.cabinet", locale)}
       </footer>
     </div>
   );

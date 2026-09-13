@@ -36,12 +36,18 @@ const DEFAULT_FOOTER_CONFIG: MarketplaceFooterConfig = {
   email: "info@travelhub.az",
 };
 
-export default function MarketplaceFooter({ config }: { config?: MarketplaceFooterConfig | null }) {
+interface MarketplaceFooterProps {
+  config?: MarketplaceFooterConfig | null;
+  /** Canonical brand name — inherited from headerConfig.brandName (single source of truth). */
+  brandName?: string;
+}
+
+export default function MarketplaceFooter({ config, brandName: brandNameProp }: MarketplaceFooterProps) {
   const locale = useLocale();
   const year = new Date().getFullYear();
 
   const cfg = { ...DEFAULT_FOOTER_CONFIG, ...(config ?? {}) };
-  const brandName = (cfg.name?.[locale] || cfg.name?.ru || "TravelHub").trim();
+  const brandName = (brandNameProp ?? cfg.name?.[locale] ?? cfg.name?.ru ?? "TravelHub").trim();
   const description = (cfg.description?.[locale] || cfg.description?.ru || t("footer.brand_description", locale)).trim();
   const copyright = (cfg.copyright?.[locale] || cfg.copyright?.ru || `© ${year} TravelHub. ${t("footer.rights_reserved", locale)}`).trim();
 

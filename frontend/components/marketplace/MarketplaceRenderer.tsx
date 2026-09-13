@@ -12,6 +12,7 @@ import Tours from "@/components/marketplace/Tours";
 import Hotels from "@/components/marketplace/Hotels";
 import Flights from "@/components/marketplace/Flights";
 import Advertisement from "@/components/marketplace/Advertisement";
+import { resolveBrandName } from "@/components/marketplace/MarketplaceHeader";
 import { useConstructorPublished } from "@/lib/use-constructor-published";
 
 const BLOCK_COMPONENTS: Record<string, React.FC> = {
@@ -60,6 +61,9 @@ export default function MarketplaceRenderer() {
     footerConfig: page.footerConfig as Record<string, unknown> | null,
   };
 
+  // Single source of truth: brand name from headerConfig (canonical).
+  const canonicalBrandName = resolveBrandName(cfg.headerConfig as never);
+
   // Build ordered block list from published sections
   const enabledSections = page.sections
     .filter((s) => s.enabled && s.blockType !== "footer")
@@ -88,7 +92,7 @@ export default function MarketplaceRenderer() {
           return <Component key={section.blockInstanceId} />;
         })}
       </main>
-      <MarketplaceFooter config={cfg.footerConfig as never} />
+      <MarketplaceFooter config={cfg.footerConfig as never} brandName={canonicalBrandName} />
     </div>
   );
 }

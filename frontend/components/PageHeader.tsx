@@ -1,5 +1,7 @@
 "use client";
 
+import { useGlobalBranding } from "@/lib/use-global-branding";
+
 export default function PageHeader({
   title,
   breadcrumbs,
@@ -9,11 +11,16 @@ export default function PageHeader({
   breadcrumbs: string[];
   actions?: React.ReactNode;
 }) {
+  const { brandName } = useGlobalBranding();
+
+  // Replace hardcoded "TravelHub" with canonical brand name from constructor.
+  const resolved = breadcrumbs.map((c, i) => (i === 0 && c === "TravelHub" ? brandName : c));
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-4">
       <div>
         <div className="text-xs text-slate-400">
-          {breadcrumbs.map((c, i) => (
+          {resolved.map((c, i) => (
             <span key={i}>
               {i > 0 && <span className="mx-1">/</span>}
               {c}
