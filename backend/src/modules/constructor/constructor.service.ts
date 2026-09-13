@@ -231,6 +231,18 @@ export class ConstructorService {
       throw new NotFoundException(`Page "${slug}" not found`);
     }
 
+    // Deduplicate sections by blockInstanceId — keep highest version (latest)
+    const latestByBlock = new Map<string, (typeof page.sections)[number]>();
+    for (const s of page.sections) {
+      const existing = latestByBlock.get(s.blockInstanceId);
+      if (!existing || s.version > existing.version) {
+        latestByBlock.set(s.blockInstanceId, s);
+      }
+    }
+    page.sections = Array.from(latestByBlock.values()).sort(
+      (a, b) => a.sortOrder - b.sortOrder,
+    );
+
     return this.mapPage(page);
   }
 
