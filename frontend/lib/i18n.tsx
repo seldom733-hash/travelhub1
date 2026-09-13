@@ -45,6 +45,7 @@ const STORAGE_KEY = "travelhub.locale";
 export const DICT: Record<string, Record<Locale, string>> = {
   // nav
   "nav.services": { ru: "Услуги", az: "Xidmətlər", en: "Services" },
+  "nav.storefront": { ru: "Витрина", az: "Vitrin", en: "Storefront" },
   "nav.search": { ru: "Поиск", az: "Axtar", en: "Search" },
   "nav.categories": { ru: "Категории", az: "Kateqoriyalar", en: "Categories" },
   "nav.login": { ru: "Войти", az: "Daxil ol", en: "Sign in" },

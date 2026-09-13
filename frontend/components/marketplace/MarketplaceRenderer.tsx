@@ -3,7 +3,6 @@
 import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader";
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter";
 import HeroSection from "@/components/marketplace/HeroSection";
-import SearchBlock from "@/components/marketplace/SearchBlock";
 import LatestOffers from "@/components/marketplace/LatestOffers";
 import HotTours from "@/components/marketplace/HotTours";
 import SpecialOffers from "@/components/marketplace/SpecialOffers";
@@ -17,7 +16,6 @@ import { useConstructorPublished } from "@/lib/use-constructor-published";
 
 const BLOCK_COMPONENTS: Record<string, React.FC> = {
   "hero": HeroSection,
-  "search": SearchBlock,
   "latest-offers": LatestOffers,
   "hot-tours": HotTours,
   "special-offers": SpecialOffers,
@@ -56,7 +54,6 @@ export default function MarketplaceRenderer() {
   const cfg = {
     headerConfig: page.headerConfig as Record<string, unknown> | null,
     heroConfig: page.heroConfig as Record<string, unknown> | null,
-    searchConfig: page.searchConfig as Record<string, unknown> | null,
     footerConfig: page.footerConfig as Record<string, unknown> | null,
     designConfig: page.designConfig as Record<string, unknown> | null,
   };
@@ -87,9 +84,6 @@ export default function MarketplaceRenderer() {
           if (section.blockType === "hero") {
             return <HeroSection key={section.blockInstanceId} config={cfg.heroConfig as never} />;
           }
-          if (section.blockType === "search") {
-            return <SearchBlock key={section.blockInstanceId} config={cfg.searchConfig as never} />;
-          }
           return <Component key={section.blockInstanceId} />;
         })}
       </main>
@@ -104,7 +98,6 @@ function DefaultMarketplaceLayout() {
       <MarketplaceHeader />
       <main>
         <HeroSection />
-        <SearchBlock />
         <LatestOffers />
         <HotTours />
         <SpecialOffers />

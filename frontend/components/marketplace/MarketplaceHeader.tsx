@@ -190,8 +190,8 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
           {/* Desktop nav links */}
           {navVisible && (
           <div className="hidden items-center gap-0.5 xl:flex">
-            <Link href="/search?category=destinations" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
-              {t("nav.destinations", locale)}
+            <Link href="/search" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
+              {t("nav.storefront", locale)}
             </Link>
 
             {/* Услуги - click dropdown */}
@@ -224,9 +224,6 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
               )}
             </div>
 
-            <Link href="/search?sort=popular" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
-              {t("nav.offers", locale)}
-            </Link>
             <Link href="/become-a-partner" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
               {t("nav.for_partners", locale)}
             </Link>
@@ -289,14 +286,11 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
             <div className="mx-auto max-w-[1400px] px-6 py-4">
               <MobileSearch onClose={() => setMobileOpen(false)} />
               <div className="flex flex-col gap-1">
-                <Link href="/search?category=destinations" onClick={() => setMobileOpen(false)} className="rounded-lg px-4 py-3 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white">
-                  {t("nav.destinations", locale)}
+                <Link href="/search" onClick={() => setMobileOpen(false)} className="rounded-lg px-4 py-3 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white">
+                  {t("nav.storefront", locale)}
                 </Link>
                 <Link href="/search" onClick={() => setMobileOpen(false)} className="rounded-lg px-4 py-3 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white">
                   {t("nav.services", locale)}
-                </Link>
-                <Link href="/search?sort=popular" onClick={() => setMobileOpen(false)} className="rounded-lg px-4 py-3 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white">
-                  {t("nav.offers", locale)}
                 </Link>
                 <Link href="/become-a-partner" onClick={() => setMobileOpen(false)} className="rounded-lg px-4 py-3 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white">
                   {t("nav.for_partners", locale)}
