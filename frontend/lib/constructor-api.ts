@@ -124,12 +124,12 @@ export const constructorApi = {
     return api.put<PageConfigView>(`/constructor/pages/${slug}/design`, { config });
   },
 
-  /** Upload media (logo/hero-slide). */
-  uploadMedia(slug: string, file: File, kind: "logo" | "hero-slide"): Promise<{ url: string; width: number; height: number; size: number; format: string }> {
+  /** Upload media (logo/hero-slide) — multipart via api.postForm (никогда JSON.stringify). */
+  uploadMedia(slug: string, file: File, kind: "logo" | "hero-slide"): Promise<{ url: string; storageKey: string; width: number; height: number; size: number; format: string }> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("kind", kind);
-    return api.post(`/constructor/pages/${slug}/media`, formData);
+    return api.postForm(`/constructor/pages/${slug}/media`, formData);
   },
 
   /** Get block registry for a context. */

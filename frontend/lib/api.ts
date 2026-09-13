@@ -107,6 +107,13 @@ export const api = {
     }).then((r) => handle<T>(r)),
   del: <T>(path: string): Promise<T> =>
     fetch(`${BASE}${path}`, { ...fetchOptions(), method: "DELETE" }).then((r) => handle<T>(r)),
+  /** Multipart upload: НЕ трогает Content-Type (браузер ставит multipart boundary), FormData летит как есть. */
+  postForm: <T>(path: string, formData: FormData): Promise<T> =>
+    fetch(`${BASE}${path}`, {
+      ...fetchOptions(),
+      method: "POST",
+      body: formData,
+    }).then((r) => handle<T>(r)),
 };
 
 /** Публичная сессионная проба (GET /auth/session) — cookie-аутентификация. */
