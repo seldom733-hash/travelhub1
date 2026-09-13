@@ -36,10 +36,31 @@ const TABS: Tab[] = [
   { key: "cruises", labelKey: "search.tab_cruises", priority: "P2" },
 ];
 
-export default function HeroSearch() {
+interface HeroSearchProps {
+  /** Enabled service ids in display order (from published searchConfig). Undefined → all tabs, default order. */
+  enabledServices?: string[];
+  /** Initially selected service tab (from published searchConfig). */
+  defaultService?: string;
+}
+
+export default function HeroSearch({ enabledServices, defaultService }: HeroSearchProps = {}) {
   const locale = useLocale();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<ServiceType>("tours");
+
+  const visibleTabs = enabledServices?.length
+    ? TABS.filter((tab) => enabledServices.includes(tab.key))
+    : TABS;
+  const orderedTabs = enabledServices?.length
+    ? enabledServices
+        .map((id) => visibleTabs.find((tab) => tab.key === id))
+        .filter((tab): tab is Tab => Boolean(tab))
+    : TABS;
+  const initialTab =
+    defaultService && orderedTabs.some((tab) => tab.key === defaultService)
+      ? (defaultService as ServiceType)
+      : orderedTabs[0]?.key ?? "tours";
+
+  const [activeTab, setActiveTab] = useState<ServiceType>(initialTab);
 
   const handleSearch = (ctx: SearchContext) => {
     // Build search params from context and navigate to results
@@ -84,7 +105,7 @@ export default function HeroSearch() {
     <div className="search-glass rounded-2xl p-3 sm:p-4">
       {/* Service tabs */}
       <div className="mb-3 flex flex-wrap gap-1" role="tablist" aria-label="Тип услуги">
-        {TABS.map((tab) => (
+        {orderedTabs.map((tab) => (
           <button
             key={tab.key}
             role="tab"

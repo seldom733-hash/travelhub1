@@ -22,9 +22,28 @@ const FOOTER_AUTH = [
   { href: "/register", labelKey: "footer.auth_register" },
 ] as const;
 
-export default function MarketplaceFooter() {
+/** Published footer configuration shape (Constructor → footerConfig). */
+export interface MarketplaceFooterConfig {
+  name?: Record<string, string>;
+  description?: Record<string, string>;
+  phone?: string;
+  email?: string;
+  copyright?: Record<string, string>;
+}
+
+const DEFAULT_FOOTER_CONFIG: MarketplaceFooterConfig = {
+  phone: "+994 12 345 67 89",
+  email: "info@travelhub.az",
+};
+
+export default function MarketplaceFooter({ config }: { config?: MarketplaceFooterConfig | null }) {
   const locale = useLocale();
   const year = new Date().getFullYear();
+
+  const cfg = { ...DEFAULT_FOOTER_CONFIG, ...(config ?? {}) };
+  const brandName = (cfg.name?.[locale] || cfg.name?.ru || "TravelHub").trim();
+  const description = (cfg.description?.[locale] || cfg.description?.ru || t("footer.brand_description", locale)).trim();
+  const copyright = (cfg.copyright?.[locale] || cfg.copyright?.ru || `© ${year} TravelHub. ${t("footer.rights_reserved", locale)}`).trim();
 
   return (
     <footer className="border-t border-dark-border bg-dark" role="contentinfo">
@@ -33,16 +52,11 @@ export default function MarketplaceFooter() {
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <Link href="/" className="inline-flex items-center gap-2" aria-label="TravelHub">
+            <Link href="/" className="inline-flex items-center gap-2" aria-label={brandName || "TravelHub"}>
               <Buildings className="h-7 w-7 text-gold" weight="fill" />
-              <span className="font-display text-xl font-semibold tracking-tight">
-                <span className="text-white">Travel</span>
-                <span className="text-gold">Hub</span>
-              </span>
+              <span className="font-display text-xl font-semibold tracking-tight">{brandName || "TravelHub"}</span>
             </Link>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-neutral-500">
-              {t("footer.brand_description", locale)}
-            </p>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-neutral-500">{description}</p>
           </div>
 
           {/* Services */}
@@ -99,24 +113,28 @@ export default function MarketplaceFooter() {
               {t("footer.heading_contact", locale)}
             </h3>
             <ul className="space-y-3">
-              <li>
-                <a
-                  href="tel:+994123456789"
-                  className="inline-flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-white"
-                >
-                  <PaperPlaneRight className="h-4 w-4 text-gold" />
-                  +994 12 345 67 89
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:info@travelhub.az"
-                  className="inline-flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-white"
-                >
-                  <PaperPlaneRight className="h-4 w-4 text-gold" />
-                  info@travelhub.az
-                </a>
-              </li>
+              {cfg.phone && (
+                <li>
+                  <a
+                    href={`tel:${cfg.phone.replace(/\s+/g, "")}`}
+                    className="inline-flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-white"
+                  >
+                    <PaperPlaneRight className="h-4 w-4 text-gold" />
+                    {cfg.phone}
+                  </a>
+                </li>
+              )}
+              {cfg.email && (
+                <li>
+                  <a
+                    href={`mailto:${cfg.email}`}
+                    className="inline-flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-white"
+                  >
+                    <PaperPlaneRight className="h-4 w-4 text-gold" />
+                    {cfg.email}
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
         </div>
@@ -124,9 +142,7 @@ export default function MarketplaceFooter() {
         {/* Divider */}
         <div className="mt-12 border-t border-dark-border pt-6">
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <p className="text-xs text-neutral-600">
-              © {year} TravelHub. {t("footer.rights_reserved", locale)}
-            </p>
+            <p className="text-xs text-neutral-600">{copyright}</p>
             <p className="text-xs text-neutral-600">
               {t("footer.baku_azerbaijan", locale)}
             </p>

@@ -1,0 +1,9 @@
+{
+  "url": "/api/v1/public/constructor-media?key=constructor%2Fmarketplace-home%2Fhero-slide%2F1789257351790-7cos8v.jpeg",
+  "storageKey": "constructor/marketplace-home/hero-slide/1789257351790-7cos8v.jpeg",
+  "width": 1400,
+  "height": 500,
+  "format": "JPEG",
+  "size": 4493,
+  "publishedImageUrl": "/api/v1/public/constructor-media?key=constructor%2Fmarketplace-home%2Fhero-slide%2F1789257351790-7cos8v.jpeg"
+}

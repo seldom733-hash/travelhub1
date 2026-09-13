@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Put, Param, Body, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { Controller, Get, Post, Put, Param, Body, Query, UploadedFile, UseInterceptors, Res, NotFoundException } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import type { Response } from "express";
 import { IsArray, ValidateNested, IsString, IsBoolean, IsNumber, IsOptional } from "class-validator";
 import { Type } from "class-transformer";
 import { CurrentUser, RequirePermissions, Public } from "../../security/auth/decorators";
@@ -150,5 +151,34 @@ export class ConstructorController {
   @RequirePermissions("catalog.product.read")
   getRegistry(@Param("context") context: string) {
     return this.service.getRegistry(context);
+  }
+}
+
+/**
+ * Public constructor media delivery (no auth): serves uploaded logo/hero-slide
+ * images by storage key (302 → short-lived signed URL of the private bucket).
+ * Same delivery strategy as /api/v1/public/media/:mediaId/:derivative.
+ * Prefix-less controller — the route must live at /api/v1/public/... .
+ * Path traversal is impossible: key is constrained to the constructor/ prefix.
+ */
+@Controller()
+export class ConstructorPublicMediaController {
+  constructor(private readonly service: ConstructorService) {}
+
+  @Get("public/constructor-media")
+  @Public()
+  async getConstructorMedia(
+    @Query("key") key: string | undefined,
+    @Res() res: Response,
+  ): Promise<void> {
+    if (!key || !key.startsWith("constructor/") || key.includes("..")) {
+      throw new NotFoundException("Media not found");
+    }
+    const exists = await this.service.storageKeyExists(key);
+    if (!exists) {
+      throw new NotFoundException("Media not found");
+    }
+    const url = await this.service.getMediaReadUrl(key, 300);
+    res.redirect(302, url);
   }
 }

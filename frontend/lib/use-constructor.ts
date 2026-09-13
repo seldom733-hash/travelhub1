@@ -231,6 +231,13 @@ export function useConstructor(slug: string) {
     });
   }, []);
 
+  // Update a single section's settings/localeContent/style
+  const updateSection = useCallback((blockInstanceId: string, patch: Partial<SectionView>) => {
+    setDraft((prev) =>
+      prev.map((s) => (s.blockInstanceId === blockInstanceId ? { ...s, ...patch } : s))
+    );
+  }, []);
+
   // Available blocks (not in draft or not singleton)
   const availableBlocks = registry.filter((def) => {
     if (def.singleton && draft.some((s) => s.blockType === def.type)) return false;
@@ -257,5 +264,6 @@ export function useConstructor(slug: string) {
     removeBlock,
     toggleEnabled,
     reorder,
+    updateSection,
   };
 }

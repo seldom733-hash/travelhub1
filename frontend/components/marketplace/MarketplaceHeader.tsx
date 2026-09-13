@@ -34,6 +34,25 @@ interface ServiceItem {
   href: string;
 }
 
+/** Published header configuration shape (Constructor → headerConfig). */
+export interface MarketplaceHeaderConfig {
+  logo?: { url: string; width: number; height: number; size: number; format: string } | null;
+  companyName?: Record<string, string>;
+  phone?: string;
+  email?: string;
+  address?: string;
+  navVisible?: boolean;
+}
+
+const DEFAULT_HEADER_CONFIG: MarketplaceHeaderConfig = {
+  logo: null,
+  companyName: { ru: "TravelHub", az: "TravelHub", en: "TravelHub" },
+  phone: "+994 12 345 67 89",
+  email: "info@travelhub.az",
+  address: "Баку, Азербайджан",
+  navVisible: true,
+};
+
 const SERVICES: ServiceItem[] = [
   { icon: <HouseSimple size={18} weight="light" />, labelKey: "marketplace.category_accommodation", href: "/search?category=accommodation" },
   { icon: <MapPin size={18} weight="light" />, labelKey: "marketplace.category_tours", href: "/search?category=tours" },
@@ -44,7 +63,7 @@ const SERVICES: ServiceItem[] = [
   { icon: <ForkKnife size={18} weight="light" />, labelKey: "marketplace.category_gastronomy", href: "/search?category=gastronomy" },
 ];
 
-export default function MarketplaceHeader() {
+export default function MarketplaceHeader({ config }: { config?: MarketplaceHeaderConfig | null }) {
   const user = useCurrentUser();
   const locale = useLocale();
   const setLocale = useSetLocale();
@@ -52,6 +71,10 @@ export default function MarketplaceHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
+
+  const cfg = { ...DEFAULT_HEADER_CONFIG, ...(config ?? {}) };
+  const companyName = (cfg.companyName?.[locale] || cfg.companyName?.ru || "TravelHub").trim();
+  const navVisible = cfg.navVisible !== false;
 
   // Close services dropdown on outside click
   useEffect(() => {
@@ -83,18 +106,24 @@ export default function MarketplaceHeader() {
       <div className="border-b border-dark-border/60 bg-dark/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between px-6 py-1.5 text-xs text-neutral-500">
           <div className="hidden items-center gap-5 md:flex">
-            <a href="tel:+994123456789" className="flex items-center gap-1.5 transition-colors hover:text-neutral-300">
-              <Phone size={12} weight="light" />
-              <span>+994 12 345 67 89</span>
-            </a>
-            <a href="mailto:info@travelhub.az" className="flex items-center gap-1.5 transition-colors hover:text-neutral-300">
-              <EnvelopeSimple size={12} weight="light" />
-              <span>info@travelhub.az</span>
-            </a>
-            <span className="hidden items-center gap-1.5 lg:flex">
-              <MapPin size={12} weight="light" />
-              <span>Баку, Азербайджан</span>
-            </span>
+            {cfg.phone && (
+              <a href={`tel:${cfg.phone.replace(/\s+/g, "")}`} className="flex items-center gap-1.5 transition-colors hover:text-neutral-300">
+                <Phone size={12} weight="light" />
+                <span>{cfg.phone}</span>
+              </a>
+            )}
+            {cfg.email && (
+              <a href={`mailto:${cfg.email}`} className="flex items-center gap-1.5 transition-colors hover:text-neutral-300">
+                <EnvelopeSimple size={12} weight="light" />
+                <span>{cfg.email}</span>
+              </a>
+            )}
+            {cfg.address && (
+              <span className="hidden items-center gap-1.5 lg:flex">
+                <MapPin size={12} weight="light" />
+                <span>{cfg.address}</span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1 ml-auto">
             <Globe size={12} weight="light" className="text-neutral-500" />
@@ -119,14 +148,18 @@ export default function MarketplaceHeader() {
       <nav className="border-b border-dark-border/60 bg-dark/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1400px] items-center gap-5 px-6 py-3">
           {/* Logo */}
-          <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="TravelHub">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-gold/15 font-serif text-base font-bold text-gold">
-              T
-            </div>
+          <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label={companyName || "TravelHub"}>
+            {cfg.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={cfg.logo.url} alt={companyName || "TravelHub"} className="h-9 w-auto max-w-[140px] object-contain" />
+            ) : (
+              <div className="flex size-9 items-center justify-center rounded-lg bg-gold/15 font-serif text-base font-bold text-gold">
+                T
+              </div>
+            )}
             <div className="hidden sm:block">
               <div className="text-[15px] font-bold leading-tight">
-                <span className="text-white">Travel</span>
-                <span className="text-gold">Hub</span>
+                <span className="text-white">{companyName || "TravelHub"}</span>
               </div>
               <div className="text-[9px] uppercase tracking-[0.15em] text-neutral-500">Discover more together</div>
             </div>
@@ -136,6 +169,7 @@ export default function MarketplaceHeader() {
           <GlobalSearchAutocomplete />
 
           {/* Desktop nav links */}
+          {navVisible && (
           <div className="hidden items-center gap-0.5 xl:flex">
             <Link href="/search?category=destinations" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
               {t("nav.destinations", locale)}
@@ -178,6 +212,7 @@ export default function MarketplaceHeader() {
               {t("nav.for_partners", locale)}
             </Link>
           </div>
+          )}
 
           {/* Right side - icons with labels */}
           <div className="ml-auto flex items-center gap-2">

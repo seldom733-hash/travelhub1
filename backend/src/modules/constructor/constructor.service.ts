@@ -288,8 +288,23 @@ export class ConstructorService {
       orderBy: { sortOrder: "asc" },
     });
 
+    // Page-level configs must come from the PUBLISHED version snapshot, not the
+    // live page record — otherwise unpublished draft edits (header/hero/footer/
+    // search/design saved to the page record) would leak to the public site
+    // before Publish.
+    const publishedVersion = await this.prisma.constructorPageVersion.findUnique({
+      where: { pageId_version: { pageId: page.id, version: page.currentVersion } },
+    });
+    const snap = (publishedVersion?.snapshot ?? {}) as Record<string, unknown>;
+
     return {
       ...this.mapPage(page),
+      seo: (snap.seo as Record<string, unknown> | null) ?? (page.seo as Record<string, unknown> | null),
+      headerConfig: (snap.headerConfig as Record<string, unknown> | null) ?? null,
+      heroConfig: (snap.heroConfig as Record<string, unknown> | null) ?? null,
+      searchConfig: (snap.searchConfig as Record<string, unknown> | null) ?? null,
+      footerConfig: (snap.footerConfig as Record<string, unknown> | null) ?? null,
+      designConfig: (snap.designConfig as Record<string, unknown> | null) ?? null,
       sections: publishedSections.map((s) => ({
         id: s.id,
         blockType: s.blockType,
@@ -410,9 +425,13 @@ export class ConstructorService {
     file: Express.Multer.File,
     kind: "logo" | "hero-slide",
     actorId: string,
-  ): Promise<{ url: string; width: number; height: number; size: number; format: string }> {
+  ): Promise<{ url: string; storageKey: string; width: number; height: number; size: number; format: string }> {
     const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
     if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+
+    if (!file) {
+      throw new BadRequestException("No file uploaded");
+    }
 
     // Validate MIME type
     const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -427,7 +446,13 @@ export class ConstructorService {
     }
 
     // Process image to get dimensions
-    const processed = await this.mediaProcessor.processImage(file.buffer, [file.mimetype]);
+    let processed;
+    try {
+      processed = await this.mediaProcessor.processImage(file.buffer, [file.mimetype]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new BadRequestException(`Image processing failed: ${msg}`);
+    }
 
     // Validate dimensions for hero slides
     if (kind === "hero-slide") {
@@ -441,12 +466,22 @@ export class ConstructorService {
     // Upload to S3
     const ext = file.mimetype.split("/")[1] || "jpg";
     const key = `constructor/${slug}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    await this.storage.putObject({ key, body: file.buffer, contentType: file.mimetype });
+    try {
+      await this.storage.putObject({ key, body: file.buffer, contentType: file.mimetype });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[ConstructorService] S3 upload failed:", msg);
+      throw new BadRequestException(`Storage upload failed. Please try again later. Details: ${msg}`);
+    }
 
-    // Return metadata
+    // Return metadata. URL points at the dedicated constructor media delivery
+    // route (/api/v1/public/constructor-media/*), which 302-redirects to a
+    // short-lived signed URL of the private bucket — same delivery strategy
+    // as /api/v1/public/media/:mediaId/:derivative for ProductMedia.
     const format = file.mimetype.split("/")[1]?.toUpperCase() || "JPEG";
     return {
-      url: `/api/v1/public/media/${encodeURIComponent(key)}`,
+      url: `/api/v1/public/constructor-media?key=${encodeURIComponent(key)}`,
+      storageKey: key,
       width: processed.width,
       height: processed.height,
       size: file.size,
@@ -458,6 +493,20 @@ export class ConstructorService {
 
   getRegistry(context: string): BlockRegistryEntry[] {
     return getBlocksForContext(context);
+  }
+
+  // ─── Media delivery helpers (public constructor-media route) ─────────
+
+  async storageKeyExists(key: string): Promise<boolean> {
+    try {
+      return await this.storage.objectExists(key);
+    } catch {
+      return false;
+    }
+  }
+
+  async getMediaReadUrl(key: string, expiresInSeconds: number): Promise<string> {
+    return this.storage.getSignedReadUrl(key, expiresInSeconds);
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────

@@ -877,6 +877,7 @@ async function seedDetectorTriggers() {
           partnerId: partners[i % partners.length]?.id,
           createdAt, updatedAt: createdAt,
           isActivePayment: true, version: 1,
+          referenceNumber: `REF-F${String(i + 1).padStart(7, "0")}`,
         },
         update: {},
       });
@@ -908,6 +909,7 @@ async function seedDetectorTriggers() {
           amount: decimal([250, 180, 350, 120, 420][i]),
           currency: "AZN",
           serviceDate, createdAt, updatedAt: createdAt, version: 1,
+          referenceNumber: `REF-B${String(i + 1).padStart(7, "0")}`,
         },
         update: {},
       });

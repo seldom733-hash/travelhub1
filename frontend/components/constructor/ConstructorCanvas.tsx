@@ -11,6 +11,7 @@ import ConstructorHeroTab from "./ConstructorHeroTab";
 import ConstructorSearchTab from "./ConstructorSearchTab";
 import ConstructorFooterTab from "./ConstructorFooterTab";
 import ConstructorDesignTab from "./ConstructorDesignTab";
+import ConstructorContentTab from "./ConstructorContentTab";
 import { FloppyDisk, PaperPlaneRight, Eye } from "@phosphor-icons/react";
 
 interface Props {
@@ -39,6 +40,7 @@ export default function ConstructorCanvas({ slug }: Props) {
     removeBlock,
     toggleEnabled,
     reorder,
+    updateSection,
   } = useConstructor(slug);
 
   if (loading) {
@@ -172,17 +174,10 @@ export default function ConstructorCanvas({ slug }: Props) {
         )}
 
         {activeTab === "content" && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-slate-700">
-              {t("constructor.canvas_title", locale)} ({draft.length})
-            </h3>
-            <ConstructorBlockList
-              sections={draft}
-              onReorder={reorder}
-              onToggle={toggleEnabled}
-              onRemove={removeBlock}
-            />
-          </div>
+          <ConstructorContentTab
+            sections={draft}
+            onUpdateSection={updateSection}
+          />
         )}
 
         {activeTab === "footer" && (

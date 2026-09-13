@@ -1,29 +1,38 @@
 "use client";
 
-import { useLocale } from "@/lib/i18n";
-import MarketplaceHeader from "./MarketplaceHeader";
-import MarketplaceFooter from "./MarketplaceFooter";
-import HeroSection from "./HeroSection";
-import SearchBlock from "./SearchBlock";
-import PopularDestinations from "./PopularDestinations";
-import HotTours from "./HotTours";
-import SpecialOffers from "./SpecialOffers";
-import Tours from "./Tours";
-import Hotels from "./Hotels";
-import Flights from "./Flights";
-import Advertisement from "./Advertisement";
+import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader";
+import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter";
+import HeroSection from "@/components/marketplace/HeroSection";
+import SearchBlock from "@/components/marketplace/SearchBlock";
+import PopularDestinations from "@/components/marketplace/PopularDestinations";
+import HotTours from "@/components/marketplace/HotTours";
+import SpecialOffers from "@/components/marketplace/SpecialOffers";
+import Tours from "@/components/marketplace/Tours";
+import Hotels from "@/components/marketplace/Hotels";
+import Flights from "@/components/marketplace/Flights";
+import Advertisement from "@/components/marketplace/Advertisement";
 import { useConstructorPublished } from "@/lib/use-constructor-published";
+
+const BLOCK_COMPONENTS: Record<string, React.FC> = {
+  "hero": HeroSection,
+  "search": SearchBlock,
+  "popular-destinations": PopularDestinations,
+  "hot-tours": HotTours,
+  "special-offers": SpecialOffers,
+  "tours": Tours,
+  "hotels": Hotels,
+  "flights": Flights,
+  "advertisement": Advertisement,
+};
 
 /**
  * Configuration-driven Marketplace Renderer.
  *
- * When published config exists → renders from configuration.
- * When no published config → falls back to hardcoded default layout.
- *
- * This preserves backward compatibility while enabling constructor-driven rendering.
+ * Page-level configs (header/hero/search/footer) come from the published
+ * Constructor configuration; sections define the block order/visibility.
+ * Missing config → the same hardcoded default layout as before.
  */
 export default function MarketplaceRenderer() {
-  const locale = useLocale();
   const { page, loading } = useConstructorPublished("marketplace-home");
 
   // Show default layout while loading or if no published config
@@ -31,13 +40,20 @@ export default function MarketplaceRenderer() {
     return <DefaultMarketplaceLayout />;
   }
 
+  const cfg = {
+    headerConfig: page.headerConfig as Record<string, unknown> | null,
+    heroConfig: page.heroConfig as Record<string, unknown> | null,
+    searchConfig: page.searchConfig as Record<string, unknown> | null,
+    footerConfig: page.footerConfig as Record<string, unknown> | null,
+  };
+
   // Build ordered block list from published sections
   const enabledSections = page.sections
-    .filter((s) => s.enabled)
+    .filter((s) => s.enabled && s.blockType !== "footer")
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // Check if we have a meaningful config (at least one section or page-level config)
-  const hasConfig = enabledSections.length > 0 || page.headerConfig || page.heroConfig || page.searchConfig || page.footerConfig;
+  // Check if we have a meaningful config
+  const hasConfig = enabledSections.length > 0;
 
   if (!hasConfig) {
     return <DefaultMarketplaceLayout />;
@@ -45,40 +61,23 @@ export default function MarketplaceRenderer() {
 
   return (
     <div className="min-h-screen bg-dark">
-      <MarketplaceHeader />
+      <MarketplaceHeader config={cfg.headerConfig as never} />
       <main>
-        {enabledSections.map((section) => (
-          <MarketplaceBlock key={section.blockInstanceId} section={section} />
-        ))}
+        {enabledSections.map((section) => {
+          const Component = BLOCK_COMPONENTS[section.blockType];
+          if (!Component) return null;
+          if (section.blockType === "hero") {
+            return <HeroSection key={section.blockInstanceId} config={cfg.heroConfig as never} />;
+          }
+          if (section.blockType === "search") {
+            return <SearchBlock key={section.blockInstanceId} config={cfg.searchConfig as never} />;
+          }
+          return <Component key={section.blockInstanceId} />;
+        })}
       </main>
-      <MarketplaceFooter />
+      <MarketplaceFooter config={cfg.footerConfig as never} />
     </div>
   );
-}
-
-function MarketplaceBlock({ section }: { section: { blockType: string; settings: Record<string, unknown> } }) {
-  switch (section.blockType) {
-    case "hero":
-      return <HeroSection />;
-    case "search":
-      return <SearchBlock />;
-    case "popular-destinations":
-      return <PopularDestinations />;
-    case "hot-tours":
-      return <HotTours />;
-    case "special-offers":
-      return <SpecialOffers />;
-    case "tours":
-      return <Tours />;
-    case "hotels":
-      return <Hotels />;
-    case "flights":
-      return <Flights />;
-    case "advertisement":
-      return <Advertisement />;
-    default:
-      return null;
-  }
 }
 
 function DefaultMarketplaceLayout() {
