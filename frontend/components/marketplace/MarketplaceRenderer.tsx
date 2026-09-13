@@ -5,6 +5,7 @@ import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter";
 import HeroSection from "@/components/marketplace/HeroSection";
 import SearchBlock from "@/components/marketplace/SearchBlock";
 import PopularDestinations from "@/components/marketplace/PopularDestinations";
+import LatestOffers from "@/components/marketplace/LatestOffers";
 import HotTours from "@/components/marketplace/HotTours";
 import SpecialOffers from "@/components/marketplace/SpecialOffers";
 import Tours from "@/components/marketplace/Tours";
@@ -17,6 +18,7 @@ const BLOCK_COMPONENTS: Record<string, React.FC> = {
   "hero": HeroSection,
   "search": SearchBlock,
   "popular-destinations": PopularDestinations,
+  "latest-offers": LatestOffers,
   "hot-tours": HotTours,
   "special-offers": SpecialOffers,
   "tours": Tours,
@@ -28,15 +30,26 @@ const BLOCK_COMPONENTS: Record<string, React.FC> = {
 /**
  * Configuration-driven Marketplace Renderer.
  *
- * Page-level configs (header/hero/search/footer) come from the published
- * Constructor configuration; sections define the block order/visibility.
- * Missing config → the same hardcoded default layout as before.
+ * While the published config is loading, render a config-neutral shell —
+ * NOT the default layout with hardcoded hero copy. The default layout is
+ * reserved for the "no published config at all" state only. Rendering real
+ * hero texts before the published config arrives was the server-side source
+ * of the legacy-text flash.
  */
 export default function MarketplaceRenderer() {
   const { page, loading } = useConstructorPublished("marketplace-home");
 
-  // Show default layout while loading or if no published config
-  if (loading || !page) {
+  // Loading: neutral shell (dark hero-sized block, no text content).
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-dark">
+        <div className="min-h-[540px] bg-dark lg:min-h-[620px]" aria-busy="true" />
+      </div>
+    );
+  }
+
+  // No published config at all → the same hardcoded default layout as before.
+  if (!page) {
     return <DefaultMarketplaceLayout />;
   }
 
@@ -88,6 +101,7 @@ function DefaultMarketplaceLayout() {
         <HeroSection />
         <SearchBlock />
         <PopularDestinations />
+        <LatestOffers />
         <HotTours />
         <SpecialOffers />
         <Tours />
