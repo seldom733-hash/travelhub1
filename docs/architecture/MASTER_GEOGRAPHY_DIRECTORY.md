@@ -555,5 +555,84 @@ Marketplace Availability  ↔  Partner Storefront presentation
 
 ---
 
+## 30. Home / Витрина / Catalog Search Reconciliation (2026-09-14)
+
+**DECISION: ACCEPTED | IMPLEMENTATION: CODE CHANGES APPLIED**
+
+### Canonical UX Model
+
+```
+HOME (prelude/landing)
+  ↓
+Header → Витрина (one entry)
+  ↓
+CANONICAL ВИТРИНА / Product Catalog
+  ↓
+Catalog Search / Filters (Master Geography + Service Type + Dates + Travelers)
+  ↓
+Published Marketplace Products
+```
+
+### Home
+
+Home — prelude/landing page. На Главной НЕ должно быть полноценного Catalog Search/Filter Block.
+
+Остаётся: Global Search (Header), Hero, контентные блоки, Footer.
+
+Home Search Block **удалён** из active Constructor Structure/Content/Draft/Published.
+
+### Header
+
+Один пользовательский entry: **«Витрина»** → `/search`.
+
+`Направления` — НЕ отдельный Header entry (география становится частью фильтра Витрины).
+
+`Предложения` — НЕ отдельный Header entry (предложения являются содержимым Витрины).
+
+`Услуги` — dropdown с категориями услуг (остаётся).
+
+`Для партнёров` — отдельная ссылка (остаётся).
+
+### Витрина / Product Catalog
+
+Единая canonical public Витрина. Точки входа:
+1. `Header → Витрина` — чистая Витрина (Услуга = Все, без фильтров)
+2. `Home block → Показать все` — Витрина с initial service filter
+3. `Global Search` — может открывать Витрину с поисковым context
+
+### Catalog Search / Filters
+
+Фильтры располагаются на странице Витрины, над результатами.
+
+Общие фильтры:
+- Услуга
+- Страна → Город → Курорт (Master Geography)
+- Дата начала / окончания
+- Туристы (взрослые + дети с возрастами)
+
+Динамические service-specific фильтры отображаются после выбора услуги.
+
+### Default Sorting
+
+Единый default: **Новые поступления** (`publishedAt DESC`).
+
+### Global Search
+
+Сохраняется. Быстрый универсальный поиск. Не заменяет Catalog Search.
+
+### Master Geography в каталоге
+
+Country → City → Resort. Country required. City required. Resort optional. City-as-Resort supported.
+
+### Marketplace Availability
+
+Динамический вывод из: Product + PUBLISHED + MARKETPLACE + canonical geography.
+
+### Product Catalog Implementation
+
+Следующий продуктовый implementation stage. В текущем run НЕ реализуется.
+
+---
+
 *Authoritative reference: `backend/src/modules/catalog/seller/locations.ts` (current static reference)*
 *Architecture: `docs/architecture/TRAVELHUB_CURRENT_CANONICAL_ARCHITECTURE.md`*
