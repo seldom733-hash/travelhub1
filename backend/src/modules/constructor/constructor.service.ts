@@ -61,15 +61,14 @@ export interface SectionView {
 const DEFAULT_HOME_SECTIONS: PageSectionInput[] = [
   { blockType: "hero", blockInstanceId: "hero-main", sortOrder: 0, enabled: true },
   { blockType: "search", blockInstanceId: "search-main", sortOrder: 1, enabled: true },
-  { blockType: "popular-destinations", blockInstanceId: "popular-destinations-main", sortOrder: 2, enabled: true },
-  { blockType: "latest-offers", blockInstanceId: "latest-offers-main", sortOrder: 3, enabled: true },
-  { blockType: "hot-tours", blockInstanceId: "hot-tours-main", sortOrder: 4, enabled: true },
-  { blockType: "special-offers", blockInstanceId: "special-offers-main", sortOrder: 5, enabled: true },
-  { blockType: "tours", blockInstanceId: "tours-main", sortOrder: 6, enabled: true },
-  { blockType: "hotels", blockInstanceId: "hotels-main", sortOrder: 7, enabled: true },
-  { blockType: "flights", blockInstanceId: "flights-main", sortOrder: 8, enabled: true },
-  { blockType: "advertisement", blockInstanceId: "advertisement-main", sortOrder: 9, enabled: true },
-  { blockType: "footer", blockInstanceId: "footer-main", sortOrder: 10, enabled: true },
+  { blockType: "latest-offers", blockInstanceId: "latest-offers-main", sortOrder: 2, enabled: true },
+  { blockType: "hot-tours", blockInstanceId: "hot-tours-main", sortOrder: 3, enabled: true },
+  { blockType: "special-offers", blockInstanceId: "special-offers-main", sortOrder: 4, enabled: true },
+  { blockType: "tours", blockInstanceId: "tours-main", sortOrder: 5, enabled: true },
+  { blockType: "hotels", blockInstanceId: "hotels-main", sortOrder: 6, enabled: true },
+  { blockType: "flights", blockInstanceId: "flights-main", sortOrder: 7, enabled: true },
+  { blockType: "advertisement", blockInstanceId: "advertisement-main", sortOrder: 8, enabled: true },
+  { blockType: "footer", blockInstanceId: "footer-main", sortOrder: 9, enabled: true },
 ];
 
 // ─── Built-in Default Tab Configurations ────────────────────────────────────

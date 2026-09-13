@@ -4,7 +4,6 @@ import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader";
 import MarketplaceFooter from "@/components/marketplace/MarketplaceFooter";
 import HeroSection from "@/components/marketplace/HeroSection";
 import SearchBlock from "@/components/marketplace/SearchBlock";
-import PopularDestinations from "@/components/marketplace/PopularDestinations";
 import LatestOffers from "@/components/marketplace/LatestOffers";
 import HotTours from "@/components/marketplace/HotTours";
 import SpecialOffers from "@/components/marketplace/SpecialOffers";
@@ -19,7 +18,6 @@ import { useConstructorPublished } from "@/lib/use-constructor-published";
 const BLOCK_COMPONENTS: Record<string, React.FC> = {
   "hero": HeroSection,
   "search": SearchBlock,
-  "popular-destinations": PopularDestinations,
   "latest-offers": LatestOffers,
   "hot-tours": HotTours,
   "special-offers": SpecialOffers,
@@ -107,7 +105,6 @@ function DefaultMarketplaceLayout() {
       <main>
         <HeroSection />
         <SearchBlock />
-        <PopularDestinations />
         <LatestOffers />
         <HotTours />
         <SpecialOffers />
