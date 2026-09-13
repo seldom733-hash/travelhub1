@@ -745,9 +745,9 @@ export const DICT: Record<string, Record<Locale, string>> = {
     en: "Home",
   },
   "constructor.home_description": {
-    ru: "Настройте структуру публичной главной страницы TravelHub",
-    az: "TravelHub-un ictimai əsas səhifəsinin strukturunu tənzimləyin",
-    en: "Configure the public TravelHub homepage structure",
+    ru: "Настройте структуру публичной главной страницы",
+    az: "İctimai əsas səhifəsinin strukturunu tənzimləyin",
+    en: "Configure the public homepage structure",
   },
   "constructor.save_draft": {
     ru: "Сохранить черновик",

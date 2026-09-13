@@ -12,6 +12,7 @@ import Tours from "@/components/marketplace/Tours";
 import Hotels from "@/components/marketplace/Hotels";
 import Flights from "@/components/marketplace/Flights";
 import Advertisement from "@/components/marketplace/Advertisement";
+import DesignTokenInjector from "@/components/marketplace/DesignTokenInjector";
 import { resolveBrandName } from "@/components/marketplace/MarketplaceHeader";
 import { useConstructorPublished } from "@/lib/use-constructor-published";
 
@@ -59,6 +60,7 @@ export default function MarketplaceRenderer() {
     heroConfig: page.heroConfig as Record<string, unknown> | null,
     searchConfig: page.searchConfig as Record<string, unknown> | null,
     footerConfig: page.footerConfig as Record<string, unknown> | null,
+    designConfig: page.designConfig as Record<string, unknown> | null,
   };
 
   // Single source of truth: brand name from headerConfig (canonical).
@@ -78,6 +80,7 @@ export default function MarketplaceRenderer() {
 
   return (
     <div className="min-h-screen bg-dark">
+      <DesignTokenInjector designConfig={cfg.designConfig} />
       <MarketplaceHeader config={cfg.headerConfig as never} />
       <main>
         {enabledSections.map((section) => {

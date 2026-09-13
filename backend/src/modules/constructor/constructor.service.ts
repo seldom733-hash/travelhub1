@@ -413,11 +413,29 @@ export class ConstructorService {
     });
     if (!page || !page.currentVersion) return null;
 
-    // Only return published sections
-    const publishedSections = await this.prisma.constructorPageSection.findMany({
+    // Only return published sections — fall back to latest available version
+    // if currentVersion has no sections (tab-config saves bump draftVersion
+    // without migrating sections, which can leave currentVersion empty).
+    let publishedSections = await this.prisma.constructorPageSection.findMany({
       where: { pageId: page.id, version: page.currentVersion },
       orderBy: { sortOrder: "asc" },
     });
+
+    // Fallback: if currentVersion has no sections, use the sections already
+    // loaded via include (they represent all versions). Deduplicate by
+    // blockInstanceId, keeping the highest-version (latest) row.
+    if (publishedSections.length === 0 && page.sections.length > 0) {
+      const latestByBlock = new Map<string, (typeof page.sections)[number]>();
+      for (const s of page.sections) {
+        const existing = latestByBlock.get(s.blockInstanceId);
+        if (!existing || s.version > existing.version) {
+          latestByBlock.set(s.blockInstanceId, s);
+        }
+      }
+      publishedSections = Array.from(latestByBlock.values()).sort(
+        (a, b) => a.sortOrder - b.sortOrder,
+      );
+    }
 
     // Page-level configs must come from the PUBLISHED version snapshot, not the
     // live page record — otherwise unpublished draft edits (header/hero/footer/
@@ -493,9 +511,14 @@ export class ConstructorService {
     const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
     if (!page) throw new NotFoundException(`Page "${slug}" not found`);
 
+    const newDraftVersion = (page.draftVersion ?? page.currentVersion ?? 0) + 1;
+
     await this.prisma.constructorPage.update({
       where: { id: page.id },
-      data: { headerConfig: config as any },
+      data: {
+        headerConfig: config as any,
+        draftVersion: newDraftVersion,
+      },
     });
 
     return this.getPage(slug, actorId);
@@ -505,9 +528,14 @@ export class ConstructorService {
     const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
     if (!page) throw new NotFoundException(`Page "${slug}" not found`);
 
+    const newDraftVersion = (page.draftVersion ?? page.currentVersion ?? 0) + 1;
+
     await this.prisma.constructorPage.update({
       where: { id: page.id },
-      data: { heroConfig: config as any },
+      data: {
+        heroConfig: config as any,
+        draftVersion: newDraftVersion,
+      },
     });
 
     return this.getPage(slug, actorId);
@@ -517,9 +545,14 @@ export class ConstructorService {
     const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
     if (!page) throw new NotFoundException(`Page "${slug}" not found`);
 
+    const newDraftVersion = (page.draftVersion ?? page.currentVersion ?? 0) + 1;
+
     await this.prisma.constructorPage.update({
       where: { id: page.id },
-      data: { searchConfig: config as any },
+      data: {
+        searchConfig: config as any,
+        draftVersion: newDraftVersion,
+      },
     });
 
     return this.getPage(slug, actorId);
@@ -529,9 +562,14 @@ export class ConstructorService {
     const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
     if (!page) throw new NotFoundException(`Page "${slug}" not found`);
 
+    const newDraftVersion = (page.draftVersion ?? page.currentVersion ?? 0) + 1;
+
     await this.prisma.constructorPage.update({
       where: { id: page.id },
-      data: { footerConfig: config as any },
+      data: {
+        footerConfig: config as any,
+        draftVersion: newDraftVersion,
+      },
     });
 
     return this.getPage(slug, actorId);
@@ -541,9 +579,14 @@ export class ConstructorService {
     const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
     if (!page) throw new NotFoundException(`Page "${slug}" not found`);
 
+    const newDraftVersion = (page.draftVersion ?? page.currentVersion ?? 0) + 1;
+
     await this.prisma.constructorPage.update({
       where: { id: page.id },
-      data: { designConfig: config as any },
+      data: {
+        designConfig: config as any,
+        draftVersion: newDraftVersion,
+      },
     });
 
     return this.getPage(slug, actorId);

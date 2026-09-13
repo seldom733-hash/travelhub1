@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useLocale, t } from "@/lib/i18n";
+import { useGlobalBranding } from "@/lib/use-global-branding";
 import { useConstructor } from "@/lib/use-constructor";
 import ConstructorTabs, { type ConstructorTab } from "./ConstructorTabs";
 import ConstructorBlockList from "./ConstructorBlockList";
@@ -20,6 +21,7 @@ interface Props {
 
 export default function ConstructorCanvas({ slug }: Props) {
   const locale = useLocale();
+  const { brandName } = useGlobalBranding();
   const [activeTab, setActiveTab] = useState<ConstructorTab>("structure");
   const {
     page,
@@ -72,7 +74,7 @@ export default function ConstructorCanvas({ slug }: Props) {
             {t("constructor.home_title", locale)}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            {t("constructor.home_description", locale)}
+            {t("constructor.home_description", locale)} {brandName}
           </p>
         </div>
         <div className="flex items-center gap-2">

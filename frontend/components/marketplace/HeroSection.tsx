@@ -33,6 +33,12 @@ export interface HeroConfigShape {
   };
 }
 
+/**
+ * Last-resort fallback used ONLY when there is no hero config at all
+ * (no published version / block without config). These i18n keys are the
+ * original hero copy. This fallback must NEVER be applied to an existing
+ * config whose fields the user explicitly cleared — empty is a valid state.
+ */
 const SLIDES: Slide[] = [
   {
     image: "/hero1.png",
@@ -71,29 +77,29 @@ function localized(value: Record<string, string> | undefined, locale: string): s
 }
 
 /**
- * Build hero slides from the published config. Slides whose title/subtitle/desc
- * are all empty fall back to the canonical i18n copy for that slide index
- * (marketplace.hero_* keys) so the published page can never render blank text
- * after hydration — the "flash → disappear" bug.
+ * Build hero slides from the published config. Field semantics:
+ *   - field present with text  → render that text
+ *   - field explicitly "" (user cleared it) → render empty (NO default copy)
+ *   - field missing (never configured, e.g. legacy records) → canonical i18n copy for that slide index
+ *
+ * Explicit empty (Case B) always wins over defaults — `title || default` and
+ * similar coercions are intentionally avoided.
  */
 function buildConfiguredSlides(config: HeroConfigShape, locale: string): ConfiguredSlide[] | null {
   const slides = config.slides?.filter((s) => s.imageUrl);
   if (!slides?.length) return null;
+  const loc = locale as Locale;
   return slides.map((s, i) => {
-    const title1 = localized(s.title, locale);
-    const title2 = localized(s.subtitle, locale);
-    const description = localized(s.ctaLabel, locale);
-    if (title1 || title2 || description) {
-      return { image: s.imageUrl, title1, title2, description };
-    }
-    // Textless slide → canonical default copy for this position.
-    const loc = locale as Locale;
     const fallback = SLIDES[Math.min(i, SLIDES.length - 1)];
+    const resolve = (value: Record<string, string> | undefined, legacyKey: string): string => {
+      if (value === undefined) return t(legacyKey, loc); // never configured → default copy
+      return localized(value, locale); // explicit "" or filled → as configured
+    };
     return {
       image: s.imageUrl,
-      title1: t(fallback.titleKey1, loc),
-      title2: t(fallback.titleKey2, loc),
-      description: t(fallback.descKey, loc),
+      title1: resolve(s.title, fallback.titleKey1),
+      title2: resolve(s.subtitle, fallback.titleKey2),
+      description: resolve(s.ctaLabel, fallback.descKey),
     };
   });
 }
@@ -144,12 +150,6 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
   // ─── Content resolution ──────────────────────────────────────────────
   const configuredSlide = useConfigured ? configured![Math.min(current, configured!.length - 1)] : null;
   const defaultSlide = SLIDES[Math.min(current, SLIDES.length - 1)];
-  // A configured slide is only "textless" when the whole config slide has no
-  // text at all — buildConfiguredSlides already substitutes the canonical
-  // i18n copy in that case, so the configured branch always has content.
-  const hasText = useConfigured
-    ? Boolean(configuredSlide && (configuredSlide.title1 || configuredSlide.title2 || configuredSlide.description))
-    : true;
 
   const images = useConfigured
     ? configured!.map((s) => s.image)
@@ -221,17 +221,19 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
       <div className="relative z-10 mx-auto flex min-h-[540px] flex-col justify-end px-6 pb-10 pt-16 sm:min-h-[620px] sm:pb-12 sm:pt-20 lg:pt-24">
         <div className="mx-auto w-full max-w-[1400px]">
           <div className="max-w-3xl pb-4">
-            {configuredSlide && hasText ? (
+            {configuredSlide ? (
               <>
-                <h1 className="font-serif text-4xl font-bold leading-[1.1] text-white sm:text-5xl lg:text-6xl">
-                  {configuredSlide.title1}
-                  {configuredSlide.title2 && (
-                    <>
-                      <br />
-                      <span className="text-gold-gradient">{configuredSlide.title2}</span>
-                    </>
-                  )}
-                </h1>
+                {configuredSlide.title1 && (
+                  <h1 className="font-serif text-4xl font-bold leading-[1.1] text-white sm:text-5xl lg:text-6xl">
+                    {configuredSlide.title1}
+                    {configuredSlide.title2 && (
+                      <>
+                        <br />
+                        <span className="text-gold-gradient">{configuredSlide.title2}</span>
+                      </>
+                    )}
+                  </h1>
+                )}
                 {configuredSlide.description && (
                   <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-neutral-300 sm:text-base">
                     {configuredSlide.description}
