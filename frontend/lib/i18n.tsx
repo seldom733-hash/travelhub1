@@ -839,6 +839,13 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "constructor.hero_image_invalid": { ru: "✗ Невалидно", az: "✗ Keçərsiz", en: "✗ Invalid" },
   "constructor.hero_min_dimensions": { ru: "Минимум: 1200×400", az: "Minimum: 1200×400", en: "Minimum: 1200×400" },
 
+  // ── Default config actions (Restore / Make Default) ──────────────────
+  "constructor.restore_default": { ru: "Восстановить по умолчанию", az: "Defolt halına qaytar", en: "Restore default" },
+  "constructor.make_default": { ru: "Сделать текущим состоянием по умолчанию", az: "Cari halı defolt et", en: "Make current state default" },
+  "constructor.default_restore_confirm": { ru: "Восстановить конфигурацию этой вкладки к значению по умолчанию? Текущие значения будут заменены (сохранится как черновик; публикация — отдельным действием).", az: "Bu bölmənin konfiqurasiyasını defolt halına qaytarmaq istəyirsiniz? Cari dəyərlər əvəz olunacaq (qaralama kimi saxlanılır; dərc ayrıca addımdır).", en: "Restore this tab's configuration to its default? Current values will be replaced (saved as a draft; publishing is a separate action)." },
+  "constructor.default_restored": { ru: "Конфигурация вкладки восстановлена к значению по умолчанию (черновик). Не забудьте опубликовать.", az: "Bölmə konfiqurasiyası defolt halına qaytarıldı (qaralama). Dərc etməyi unutmayın.", en: "Tab configuration restored to default (draft). Remember to publish." },
+  "constructor.default_saved": { ru: "Текущее состояние сохранено как значение по умолчанию.", az: "Cari vəziyyət defolt kimi saxlanıldı.", en: "Current state saved as the default." },
+
   // ── Search constructor ────────────────────────────────────────────────
   "constructor.search_service_order": { ru: "Порядок сервисов", az: "Xidmətlər sırası", en: "Service Order" },
   "constructor.search_default_service": { ru: "Сервис по умолчанию", az: "Defolt xidmət", en: "Default Service" },

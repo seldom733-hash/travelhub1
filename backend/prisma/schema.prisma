@@ -5154,6 +5154,7 @@ model ConstructorPage {
   searchConfig    Json?    // SearchConfig { services, order, defaultService }
   footerConfig    Json?    // FooterConfig { logo, name, description, phone, email, navGroups, social, copyright }
   designConfig    Json?    // DesignConfig { typography, colors, spacing, layout, components }
+  defaultConfigs  Json?    // Per-tab default configs { header?, hero?, search?, footer?, design? } for restore-default / make-current-default
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   publishedAt     DateTime?

@@ -4,7 +4,7 @@ import type { Response } from "express";
 import { IsArray, ValidateNested, IsString, IsBoolean, IsNumber, IsOptional } from "class-validator";
 import { Type } from "class-transformer";
 import { CurrentUser, RequirePermissions, Public } from "../../security/auth/decorators";
-import { ConstructorService, type PageSectionInput, type PageConfigView } from "./constructor.service";
+import { ConstructorService, type PageSectionInput, type PageConfigView, type ConstructorTabKey } from "./constructor.service";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 
 // ─── DTOs ────────────────────────────────────────────────────────────────────
@@ -124,6 +124,41 @@ export class ConstructorController {
     @CurrentUser() actor: AuthedRequest["user"],
   ): Promise<PageConfigView> {
     return this.service.saveDesignConfig(slug, body.config ?? {}, actor.id);
+  }
+
+  // ─── Tab Default Config endpoints ───────────────────────────────────
+
+  /** Get the effective default config for a tab (stored override or built-in). */
+  @Get("pages/:slug/default/:tab")
+  @RequirePermissions("catalog.product.read")
+  async getDefaultConfig(
+    @Param("slug") slug: string,
+    @Param("tab") tab: ConstructorTabKey,
+  ) {
+    return this.service.getDefaultConfig(slug, tab);
+  }
+
+  /** "Сделать текущим состоянием по умолчанию" — persist current tab config as default. */
+  @Put("pages/:slug/default/:tab")
+  @RequirePermissions("catalog.product.read")
+  async setDefaultConfig(
+    @Param("slug") slug: string,
+    @Param("tab") tab: ConstructorTabKey,
+    @Body() body: SaveConfigDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.service.setDefaultConfig(slug, tab, body.config ?? {}, actor.id);
+  }
+
+  /** "Восстановить по умолчанию" — write tab default into working config (new draft, no auto-publish). */
+  @Post("pages/:slug/default/:tab/restore")
+  @RequirePermissions("catalog.product.read")
+  async restoreDefaultConfig(
+    @Param("slug") slug: string,
+    @Param("tab") tab: ConstructorTabKey,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ): Promise<PageConfigView> {
+    return this.service.restoreDefaultConfig(slug, tab, actor.id);
   }
 
   @Post("pages/:slug/media")

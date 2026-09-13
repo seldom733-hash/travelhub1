@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
-import { t, useLocale } from "@/lib/i18n";
+import { t, useLocale, type Locale } from "@/lib/i18n";
 
 interface Slide {
   image: string;
@@ -70,15 +70,32 @@ function localized(value: Record<string, string> | undefined, locale: string): s
   return (value?.[locale] || value?.ru || "").trim();
 }
 
+/**
+ * Build hero slides from the published config. Slides whose title/subtitle/desc
+ * are all empty fall back to the canonical i18n copy for that slide index
+ * (marketplace.hero_* keys) so the published page can never render blank text
+ * after hydration — the "flash → disappear" bug.
+ */
 function buildConfiguredSlides(config: HeroConfigShape, locale: string): ConfiguredSlide[] | null {
   const slides = config.slides?.filter((s) => s.imageUrl);
   if (!slides?.length) return null;
-  return slides.map((s) => ({
-    image: s.imageUrl,
-    title1: localized(s.title, locale),
-    title2: localized(s.subtitle, locale),
-    description: localized(s.ctaLabel, locale),
-  }));
+  return slides.map((s, i) => {
+    const title1 = localized(s.title, locale);
+    const title2 = localized(s.subtitle, locale);
+    const description = localized(s.ctaLabel, locale);
+    if (title1 || title2 || description) {
+      return { image: s.imageUrl, title1, title2, description };
+    }
+    // Textless slide → canonical default copy for this position.
+    const loc = locale as Locale;
+    const fallback = SLIDES[Math.min(i, SLIDES.length - 1)];
+    return {
+      image: s.imageUrl,
+      title1: t(fallback.titleKey1, loc),
+      title2: t(fallback.titleKey2, loc),
+      description: t(fallback.descKey, loc),
+    };
+  });
 }
 
 export default function HeroSection({ config }: { config?: HeroConfigShape | null }) {
@@ -127,6 +144,12 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
   // ─── Content resolution ──────────────────────────────────────────────
   const configuredSlide = useConfigured ? configured![Math.min(current, configured!.length - 1)] : null;
   const defaultSlide = SLIDES[Math.min(current, SLIDES.length - 1)];
+  // A configured slide is only "textless" when the whole config slide has no
+  // text at all — buildConfiguredSlides already substitutes the canonical
+  // i18n copy in that case, so the configured branch always has content.
+  const hasText = useConfigured
+    ? Boolean(configuredSlide && (configuredSlide.title1 || configuredSlide.title2 || configuredSlide.description))
+    : true;
 
   const images = useConfigured
     ? configured!.map((s) => s.image)
@@ -198,7 +221,7 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
       <div className="relative z-10 mx-auto flex min-h-[540px] flex-col justify-end px-6 pb-10 pt-16 sm:min-h-[620px] sm:pb-12 sm:pt-20 lg:pt-24">
         <div className="mx-auto w-full max-w-[1400px]">
           <div className="max-w-3xl pb-4">
-            {configuredSlide ? (
+            {configuredSlide && hasText ? (
               <>
                 <h1 className="font-serif text-4xl font-bold leading-[1.1] text-white sm:text-5xl lg:text-6xl">
                   {configuredSlide.title1}

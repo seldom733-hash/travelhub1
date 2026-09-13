@@ -8,6 +8,8 @@ import { api } from "./api";
 
 export type BlockCategory = "system" | "marketplace" | "content";
 
+export type ConstructorTabKey = "header" | "hero" | "search" | "footer" | "design";
+
 export interface BlockDefinition {
   type: string;
   version: number;
@@ -130,6 +132,21 @@ export const constructorApi = {
     formData.append("file", file);
     formData.append("kind", kind);
     return api.postForm(`/constructor/pages/${slug}/media`, formData);
+  },
+
+  /** Get effective default config for a tab (stored override or built-in). */
+  getDefaultConfig(slug: string, tab: ConstructorTabKey): Promise<{ tab: ConstructorTabKey; config: Record<string, unknown>; isCustom: boolean }> {
+    return api.get(`/constructor/pages/${slug}/default/${tab}`);
+  },
+
+  /** "Сделать текущим состоянием по умолчанию" — persist tab state as its default. */
+  setDefaultConfig(slug: string, tab: ConstructorTabKey, config: Record<string, unknown>): Promise<{ tab: ConstructorTabKey; config: Record<string, unknown>; isCustom: boolean }> {
+    return api.put(`/constructor/pages/${slug}/default/${tab}`, { config });
+  },
+
+  /** "Восстановить по умолчанию" — write tab default into working config (new draft, no auto-publish). */
+  restoreDefaultConfig(slug: string, tab: ConstructorTabKey): Promise<PageConfigView> {
+    return api.post(`/constructor/pages/${slug}/default/${tab}/restore`);
   },
 
   /** Get block registry for a context. */

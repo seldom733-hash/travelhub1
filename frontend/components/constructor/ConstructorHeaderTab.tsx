@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useLocale, t } from "@/lib/i18n";
 import { constructorApi } from "@/lib/constructor-api";
 import { Upload, X, Phone, EnvelopeSimple, MapPin } from "@phosphor-icons/react";
+import DefaultConfigActions from "./DefaultConfigActions";
 
 interface HeaderConfig {
   logo?: { url: string; width: number; height: number; size: number; format: string } | null;
@@ -173,10 +174,19 @@ export default function ConstructorHeaderTab({ slug, config, onSaved, onSaving, 
         </label>
       </div>
 
-      {/* Save */}
-      <button onClick={handleSave} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
-        {t("constructor.header_save", locale)}
-      </button>
+      {/* Save + Default actions */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={handleSave} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+          {t("constructor.header_save", locale)}
+        </button>
+        <DefaultConfigActions
+          slug={slug}
+          tab="header"
+          getSnapshot={() => cfg as unknown as Record<string, unknown>}
+          onRestored={onSaved}
+          onError={onError}
+        />
+      </div>
     </div>
   );
 }

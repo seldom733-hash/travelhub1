@@ -71,6 +71,119 @@ const DEFAULT_HOME_SECTIONS: PageSectionInput[] = [
   { blockType: "footer", blockInstanceId: "footer-main", sortOrder: 9, enabled: true },
 ];
 
+// ─── Built-in Default Tab Configurations ────────────────────────────────────
+// Hero default texts are the canonical marketplace Hero copy (same strings as
+// the frontend i18n fallback: marketplace.hero_* keys). They are the source for
+// "Восстановить по умолчанию" — restoring writes them into the tab config as
+// Draft; publishing remains an explicit separate action.
+
+const DEFAULT_HERO_SLIDES = [
+  {
+    id: "slide-1",
+    imageUrl: "/hero1.png",
+    title: { ru: "Единая экосистема", az: "Vahid ekosistem", en: "A unified ecosystem" },
+    subtitle: { ru: "для путешествий", az: "səyahətlər üçün", en: "for travel" },
+    ctaLabel: {
+      ru: "Отели, туры, экскурсии, трансферы и другие услуги для путешествий — в одном месте. Планируйте и бронируйте всё необходимое в TravelHub.",
+      az: "Otellər, turlar, ekskursiyalar, transferlər və digər səyahət xidmətləri — bir yerdə. TravelHub-da lazım olan hər şeyi planlaşdırın və bron edin.",
+      en: "Hotels, tours, excursions, transfers and other travel services — all in one place. Plan and book everything you need on TravelHub.",
+    },
+    ctaUrl: "/search",
+  },
+  {
+    id: "slide-2",
+    imageUrl: "/hero2.png",
+    title: { ru: "Для партнёров", az: "Tərəfdaşlar üçün", en: "For partners" },
+    subtitle: { ru: "Развивайте бизнес", az: "Biznesinizi inkişaf etdirin", en: "Grow your business" },
+    ctaLabel: {
+      ru: "Размещайте свои услуги на платформе TravelHub и получайте доступ к тысячам путешественников. Присоединяйтесь к нашей сети партнёров.",
+      az: "Xidmətlərinizi TravelHub platformasında yerləşdirin və minlərlə səyahətçiyə çıxış əldə edin. Bizim tərəfdaş şəbəkəmizə qoşulun.",
+      en: "List your services on the TravelHub platform and access thousands of travelers. Join our partner network.",
+    },
+    ctaUrl: "/search",
+  },
+  {
+    id: "slide-3",
+    imageUrl: "/hero3.png",
+    title: { ru: "TravelHub Storefront", az: "TravelHub Storefront", en: "TravelHub Storefront" },
+    subtitle: { ru: "Создайте свою витрину", az: "Öz vitrininizi yaradın", en: "Create your storefront" },
+    ctaLabel: {
+      ru: "Персональная витрина для ваших услуг. Представьте свой бизнес путешественникам в лучшем виде.",
+      az: "Xidmətləriniz üçün şəxsi vitrin. Səyahətçilərə biznesinizi ən yaxşı şəkildə təqdim edin.",
+      en: "A personal storefront for your services. Present your business to travelers in the best light.",
+    },
+    ctaUrl: "/search",
+  },
+];
+
+export const DEFAULT_HERO_CONFIG: Record<string, unknown> = {
+  slides: DEFAULT_HERO_SLIDES,
+  carousel: { autoplay: true, interval: 7000, showArrows: true, showIndicators: true },
+};
+
+export const DEFAULT_HEADER_CONFIG: Record<string, unknown> = {
+  logo: null,
+  companyName: { ru: "TravelHub", az: "TravelHub", en: "TravelHub" },
+  phone: "",
+  email: "",
+  address: "",
+  navVisible: true,
+};
+
+export const DEFAULT_SEARCH_CONFIG: Record<string, unknown> = {
+  services: [
+    { id: "tours", labelKey: "constructor.search_tours", enabled: true },
+    { id: "hotels", labelKey: "constructor.search_hotels", enabled: true },
+    { id: "flights", labelKey: "constructor.search_flights", enabled: true },
+    { id: "sanatoriums", labelKey: "constructor.search_sanatoriums", enabled: false },
+  ],
+  defaultService: "hotels",
+};
+
+export const DEFAULT_FOOTER_CONFIG: Record<string, unknown> = {
+  name: { ru: "TravelHub", az: "TravelHub", en: "TravelHub" },
+  description: {
+    ru: "Лучшие предложения для путешествий",
+    az: "Səyahət üçün ən yaxşı təkliflər",
+    en: "Best travel offers",
+  },
+  phone: "+994 12 345 67 89",
+  email: "info@travelhub.az",
+  copyright: { ru: "© TravelHub. Все права защищены.", az: "© TravelHub. Bütün hüquqlar qorunur.", en: "© TravelHub. All rights reserved." },
+};
+
+export const DEFAULT_DESIGN_CONFIG: Record<string, unknown> = {
+  typography: {
+    fontFamily: "Inter, system-ui, sans-serif",
+    headingFont: "Georgia, serif",
+    bodyFont: "Inter, system-ui, sans-serif",
+    baseFontSize: 16,
+    headingWeight: 700,
+    lineHeight: 1.6,
+    letterSpacing: "0",
+  },
+  colors: {
+    background: "#0a0a0a",
+    surface: "#1a1a1a",
+    text: "#ffffff",
+    mutedText: "#a0a0a0",
+    accent: "#d4a853",
+    border: "#2a2a2a",
+  },
+  spacing: { sectionSpacing: 80, containerWidth: 1400, internalPadding: 24 },
+  components: { cardRadius: 12, buttonRadius: 8, inputRadius: 8 },
+};
+
+export type ConstructorTabKey = "header" | "hero" | "search" | "footer" | "design";
+
+const DEFAULT_CONFIGS: Record<ConstructorTabKey, Record<string, unknown>> = {
+  header: DEFAULT_HEADER_CONFIG,
+  hero: DEFAULT_HERO_CONFIG,
+  search: DEFAULT_SEARCH_CONFIG,
+  footer: DEFAULT_FOOTER_CONFIG,
+  design: DEFAULT_DESIGN_CONFIG,
+};
+
 // ─── Service ─────────────────────────────────────────────────────────────────
 
 @Injectable()
@@ -414,6 +527,107 @@ export class ConstructorService {
       where: { id: page.id },
       data: { designConfig: config as any },
     });
+
+    return this.getPage(slug, actorId);
+  }
+
+  // ─── Tab Default Config Layer ──────────────────────────────────────────
+
+  /**
+   * Resolve the effective default config for a tab: tenant-stored override if
+   * present, otherwise the built-in DEFAULT_*_CONFIG constant.
+   */
+  private resolveDefaultConfig(page: { defaultConfigs: unknown }, tab: ConstructorTabKey): Record<string, unknown> {
+    const stored = (page.defaultConfigs as Record<string, Record<string, unknown>> | null)?.[tab];
+    return stored ?? DEFAULT_CONFIGS[tab];
+  }
+
+  async getDefaultConfig(slug: string, tab: ConstructorTabKey): Promise<{ tab: ConstructorTabKey; config: Record<string, unknown>; isCustom: boolean }> {
+    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+    const config = this.resolveDefaultConfig(page, tab);
+    const stored = (page.defaultConfigs as Record<string, Record<string, unknown>> | null)?.[tab];
+    return { tab, config, isCustom: stored != null };
+  }
+
+  /**
+   * "Сделать текущим состоянием по умолчанию" — persist the given config as
+   * the tab's default. Does NOT touch draft/published state.
+   */
+  async setDefaultConfig(slug: string, tab: ConstructorTabKey, config: Record<string, unknown>, actorId: string): Promise<{ tab: ConstructorTabKey; config: Record<string, unknown>; isCustom: boolean }> {
+    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      throw new BadRequestException("Invalid default config payload");
+    }
+
+    const existing = (page.defaultConfigs as Record<string, Record<string, unknown>> | null) ?? {};
+    // Empty config → reset the tab to the built-in default (remove the override).
+    const isReset = Object.keys(config).length === 0;
+    const next = { ...existing };
+    if (isReset) delete next[tab];
+    else next[tab] = config;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.constructorPage.update({
+        where: { id: page.id },
+        data: { defaultConfigs: next as any },
+      });
+      try {
+        await tx.constructorPageAuditLog.create({
+          data: { pageId: page.id, action: "set_default", actorId, after: { tab } },
+        });
+      } catch (auditErr) {
+        console.warn("[ConstructorService] Audit log failed (non-critical):", auditErr);
+      }
+    });
+
+    return { tab, config: isReset ? DEFAULT_CONFIGS[tab] : config, isCustom: !isReset };
+  }
+
+  /**
+   * "Восстановить по умолчанию" — write the effective default config for the
+   * tab into the page record as the new working config. This creates a NEW
+   * draft version (status → DRAFT) and never publishes automatically.
+   */
+  async restoreDefaultConfig(slug: string, tab: ConstructorTabKey, actorId: string): Promise<PageConfigView> {
+    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+    if (!page) throw new NotFoundException(`Page "${slug}" not found`);
+
+    const config = this.resolveDefaultConfig(page, tab);
+
+    // Reuse the existing per-tab save path so restore behaves exactly like a
+    // manual save of the default values (draft versioning + page-record write).
+    switch (tab) {
+      case "header":
+        await this.saveHeaderConfig(slug, config, actorId);
+        break;
+      case "hero":
+        await this.saveHeroConfig(slug, config, actorId);
+        break;
+      case "search":
+        await this.saveSearchConfig(slug, config, actorId);
+        break;
+      case "footer":
+        await this.saveFooterConfig(slug, config, actorId);
+        break;
+      case "design":
+        await this.saveDesignConfig(slug, config, actorId);
+        break;
+      default: {
+        const exhaustive: never = tab;
+        throw new BadRequestException(`Unknown tab: ${String(exhaustive)}`);
+      }
+    }
+
+    // Audit entry for the restore action itself
+    try {
+      await this.prisma.constructorPageAuditLog.create({
+        data: { pageId: page.id, action: "restore_default", actorId, after: { tab } },
+      });
+    } catch (auditErr) {
+      console.warn("[ConstructorService] Audit log failed (non-critical):", auditErr);
+    }
 
     return this.getPage(slug, actorId);
   }

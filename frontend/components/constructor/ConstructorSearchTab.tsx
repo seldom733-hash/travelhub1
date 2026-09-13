@@ -8,6 +8,7 @@ import type { DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { List } from "@phosphor-icons/react";
+import DefaultConfigActions from "./DefaultConfigActions";
 
 interface SearchService {
   id: string;
@@ -115,9 +116,18 @@ export default function ConstructorSearchTab({ slug, config, onSaved, onSaving, 
         </select>
       </div>
 
-      <button onClick={handleSave} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
-        {t("constructor.search_save", locale)}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={handleSave} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+          {t("constructor.search_save", locale)}
+        </button>
+        <DefaultConfigActions
+          slug={slug}
+          tab="search"
+          getSnapshot={() => cfg as unknown as Record<string, unknown>}
+          onRestored={onSaved}
+          onError={onError}
+        />
+      </div>
     </div>
   );
 }
