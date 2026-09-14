@@ -109,20 +109,7 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
         { timeout: 15_000 },
       );
 
-      // Set TOURINC program if specified
-      if (query.tourIncValue) {
-        await page.evaluate((val: string) => {
-          const sel = document.querySelector("select[name=TOURINC]") as HTMLSelectElement | null;
-          if (sel) {
-            sel.value = val;
-            sel.dispatchEvent(new Event("change", { bubbles: true }));
-          }
-        }, query.tourIncValue);
-        await page.waitForTimeout(SummertourAdapter.TOURINC_DELAY_MS);
-        this.logger.debug(`Set TOURINC to ${query.tourIncValue} (${query.tourIncName ?? "?"})`);
-      }
-
-      // Set date range via Playwright fill (triggers SAMO's internal handlers)
+      // Set date range via Playwright fill FIRST (before TOURINC — SAMO resets dates on TOURINC change)
       if (query.departureDateFrom && query.departureDateTo) {
         const begInput = await page.$("input[name=CHECKIN_BEG]");
         const endInput = await page.$("input[name=CHECKIN_END]");
@@ -137,6 +124,19 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
           await page.waitForTimeout(200);
           this.logger.debug(`Set date range: ${begFormatted} → ${endFormatted}`);
         }
+      }
+
+      // Set TOURINC program if specified (AFTER dates — SAMO change event may reset date inputs)
+      if (query.tourIncValue) {
+        await page.evaluate((val: string) => {
+          const sel = document.querySelector("select[name=TOURINC]") as HTMLSelectElement | null;
+          if (sel) {
+            sel.value = val;
+            sel.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        }, query.tourIncValue);
+        await page.waitForTimeout(SummertourAdapter.TOURINC_DELAY_MS);
+        this.logger.debug(`Set TOURINC to ${query.tourIncValue} (${query.tourIncName ?? "?"})`);
       }
 
       // Click the search button to trigger AJAX price loading

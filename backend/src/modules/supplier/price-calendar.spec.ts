@@ -240,6 +240,91 @@ describe("Offer grouping by date", () => {
   });
 });
 
+describe("tourIncValue pass-through", () => {
+  it("should accept tourIncValue and tourIncName in PriceCalendarQuery", () => {
+    const q: PriceCalendarQuery = {
+      supplierCode: "SUMMERTOUR",
+      adults: 2,
+      nights: 7,
+      dateFrom: "2026-09-15",
+      dateTo: "2027-03-15",
+      tourIncValue: "229",
+      tourIncName: "Antalya 2026",
+    };
+    expect(q.tourIncValue).toBe("229");
+    expect(q.tourIncName).toBe("Antalya 2026");
+  });
+
+  it("should allow undefined tourIncValue (anonymous flow)", () => {
+    const q: PriceCalendarQuery = {
+      supplierCode: "SUMMERTOUR",
+      adults: 2,
+      nights: 7,
+      dateFrom: "2026-09-15",
+      dateTo: "2027-03-15",
+    };
+    expect(q.tourIncValue).toBeUndefined();
+    expect(q.tourIncName).toBeUndefined();
+  });
+
+  it("should pass tourIncValue into SupplierSearchQuery for adapter", () => {
+    const calQuery: PriceCalendarQuery = {
+      supplierCode: "SUMMERTOUR",
+      adults: 2,
+      nights: 7,
+      dateFrom: "2026-09-15",
+      dateTo: "2027-03-15",
+      tourIncValue: "229",
+      tourIncName: "Antalya 2026",
+    };
+
+    const searchQuery: SupplierSearchQuery = {
+      adults: calQuery.adults,
+      children: calQuery.children,
+      childAges: calQuery.childAges,
+      hotel: calQuery.hotel,
+      room: calQuery.room,
+      meal: calQuery.meal,
+      nightsFrom: calQuery.nights,
+      nightsTo: calQuery.nights,
+      departureDateFrom: calQuery.dateFrom,
+      departureDateTo: calQuery.dateTo,
+      tourIncValue: calQuery.tourIncValue,
+      tourIncName: calQuery.tourIncName,
+    };
+
+    expect(searchQuery.tourIncValue).toBe("229");
+    expect(searchQuery.tourIncName).toBe("Antalya 2026");
+  });
+});
+
+describe("Date integrity — checkIn parsing", () => {
+  it("should parse 8-digit checkIn class (YYYYMMDD) to ISO date", () => {
+    const checkIn = "20260916";
+    const iso = `${checkIn.slice(0, 4)}-${checkIn.slice(4, 6)}-${checkIn.slice(6, 8)}`;
+    expect(iso).toBe("2026-09-16");
+  });
+
+  it("should parse departureDate text (DD.MM.YYYY) to ISO date", () => {
+    const text = "16.09.2026, Ср";
+    const match = text.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+    const iso = match ? `${match[3]}-${match[2]}-${match[1]}` : "";
+    expect(iso).toBe("2026-09-16");
+  });
+
+  it("should prioritize departureDate text over checkIn class", () => {
+    const departureDateText = "30.09.2026, Ср";
+    const checkInClass = "20260916";
+
+    const dateMatch = departureDateText.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+    const departureDate = dateMatch
+      ? `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`
+      : `${checkInClass.slice(0, 4)}-${checkInClass.slice(4, 6)}-${checkInClass.slice(6, 8)}`;
+
+    expect(departureDate).toBe("2026-09-30");
+  });
+});
+
 describe("Cache key derivation", () => {
   it("should produce unique keys for different configurations", () => {
     const base = {

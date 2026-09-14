@@ -295,6 +295,8 @@ export interface PriceCalendarQuery {
   nights: number;
   dateFrom: string;
   dateTo: string;
+  tourIncValue?: string;
+  tourIncName?: string;
 }
 
 export interface PriceCalendarEntry {

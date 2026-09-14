@@ -67,6 +67,14 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
     return (productAttributes?.tourKey as string) ?? (productAttributes?.rawTourKey as string) ?? "";
   }, [productAttributes]);
 
+  const tourIncValue = useMemo(() => {
+    return (productAttributes?.tourIncValue as string) ?? "";
+  }, [productAttributes]);
+
+  const tourIncName = useMemo(() => {
+    return (productAttributes?.tourIncName as string) ?? "";
+  }, [productAttributes]);
+
   // Child ages management
   const updateChildAge = useCallback((index: number, age: number) => {
     setConfig((prev) => {
@@ -132,6 +140,8 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
         nights: config.nights,
         dateFrom,
         dateTo,
+        tourIncValue: tourIncValue || undefined,
+        tourIncName: tourIncName || undefined,
       });
 
       setLastContextHash(contextHash);
@@ -146,7 +156,7 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
     } finally {
       setLoading(false);
     }
-  }, [config, productCode, hotel, hotelExternalId, contextHash, locale, onCalendarLoaded]);
+  }, [config, productCode, hotel, hotelExternalId, tourIncValue, tourIncName, contextHash, locale, onCalendarLoaded]);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
