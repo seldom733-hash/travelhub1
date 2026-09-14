@@ -10,6 +10,8 @@ import type {
   SupplierPriceSnapshot,
   SupplierAvailabilitySnapshot,
   SupplierMetrics,
+  PriceCalendarQuery,
+  PriceCalendarResult,
 } from "./supplier.types";
 
 /**
@@ -206,6 +208,81 @@ export class SupplierOfferService {
     this.cache.setAvailability(cacheKey, snapshot);
 
     return snapshot;
+  }
+
+  // ── Price Calendar ────────────────────────────────────────────────
+
+  async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult> {
+    const adapter = this.registry.get(query.supplierCode);
+    const config = this.registry.getConfig(query.supplierCode);
+
+    if (!adapter.enabled || !config.searchEnabled) {
+      throw new Error(`Supplier ${query.supplierCode} search is disabled`);
+    }
+
+    if (this.resilience.isCircuitOpen(query.supplierCode)) {
+      this.metrics.circuitOpen++;
+      throw new Error(`Supplier ${query.supplierCode} circuit is OPEN — supplier unavailable`);
+    }
+
+    // Cache key for calendar
+    const calendarKey = `calendar:${query.supplierCode}:${JSON.stringify({
+      hotel: query.hotel,
+      hotelExternalId: query.hotelExternalId,
+      room: query.room,
+      meal: query.meal,
+      adults: query.adults,
+      children: query.children,
+      childAges: query.childAges,
+      nights: query.nights,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`;
+
+    return this.resilience.coalesce(calendarKey, async () => {
+      // Check cache (reuse search cache with calendar prefix)
+      const cached = this.cache.getSearch(calendarKey);
+      if (cached) {
+        this.metrics.cacheHit++;
+        return cached as unknown as PriceCalendarResult;
+      }
+      this.metrics.cacheMiss++;
+
+      this.resilience.acquireBucket(query.supplierCode, config.maxConcurrency, config.requestsPerMinute);
+      this.resilience.incrementInflight(query.supplierCode, config.maxConcurrency);
+
+      try {
+        this.metrics.searchTotal++;
+        const start = Date.now();
+
+        const result = await this.resilience.withRetry(
+          query.supplierCode,
+          () => adapter.getPriceCalendar(query),
+          2,
+          1000,
+        );
+
+        const latency = Date.now() - start;
+        this.metrics.searchLatencyMs.push(latency);
+        if (this.metrics.searchLatencyMs.length > 1000) {
+          this.metrics.searchLatencyMs = this.metrics.searchLatencyMs.slice(-500);
+        }
+
+        // Cache the calendar result (using search cache store with calendar TTL)
+        this.cache.setSearch(calendarKey, result as unknown as SupplierOffer[]);
+        this.metrics.searchSuccess++;
+        this.resilience.recordSuccess(query.supplierCode);
+
+        this.logger.debug(`Supplier ${query.supplierCode} price calendar: ${result.entries.length} dates in ${latency}ms`);
+        return result;
+      } catch (err) {
+        this.metrics.searchError++;
+        this.resilience.recordFailure(query.supplierCode);
+        throw err;
+      } finally {
+        this.resilience.decrementInflight(query.supplierCode);
+      }
+    }) as Promise<PriceCalendarResult>;
   }
 
   // ── Schema Validation ───────────────────────────────────────────────

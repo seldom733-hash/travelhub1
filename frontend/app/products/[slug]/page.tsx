@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import PublicLayout from "@/components/PublicLayout";
@@ -12,8 +12,12 @@ import { formatDate, formatPrice as formatPriceRaw, t, useLocale } from "@/lib/i
 import { fireMarketplaceCta, useMarketplaceProductViewed } from "@/lib/behavioral-events";
 import { availabilityText, sectionLabel, sectionsFor } from "@/lib/marketplace-utils";
 import { publicApi, PublicNotFoundError, type PublicProductDetail, type PublicTariff } from "@/lib/public-api";
+import type { PriceCalendarResult, PriceCalendarEntry } from "@/lib/public-api";
+import { publicSupplierApi } from "@/lib/public-api";
 import { formatLocation } from "@/lib/locations";
 import { useCurrentUser } from "@/lib/use-user";
+import PriceConfigurator from "@/components/public/PriceConfigurator";
+import PriceCalendar from "@/components/public/PriceCalendar";
 
 /**
  * PHASE 1 STEP 1.7 §12 — Product Detail Page `/products/:slug`.
@@ -74,6 +78,78 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
   const p = detail.product;
   const availability = availabilityText(p.availability, locale);
   const attributeSections = sectionsFor(p.attributes, locale);
+
+  // Price calendar state
+  const [calendarResult, setCalendarResult] = useState<PriceCalendarResult | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<PriceCalendarEntry | null>(null);
+  const [requestLoading, setRequestLoading] = useState(false);
+
+  // Configurator state (extracted from attributes)
+  const configuratorConfig = useMemo(() => ({
+    hotel: (p.attributes?.hotel as string) ?? "",
+    room: (p.attributes?.room as string) ?? "",
+    meal: (p.attributes?.meal as string) ?? "",
+    adults: 2,
+    children: 0,
+    childAges: [] as number[],
+    nights: (p.attributes?.days as number) ?? 7,
+  }), [p.attributes]);
+
+  const handleCalendarLoaded = useCallback((result: PriceCalendarResult) => {
+    setCalendarResult(result);
+    setSelectedEntry(null);
+  }, []);
+
+  const handleDateSelected = useCallback((entry: PriceCalendarEntry) => {
+    setSelectedEntry(entry);
+  }, []);
+
+  // Fresh re-check on "Оформить запрос"
+  const handleCreateRequest = useCallback(async () => {
+    if (!selectedEntry?.bestOfferRef) return;
+    setRequestLoading(true);
+    try {
+      // Fresh price re-check
+      const [priceResult, availResult] = await Promise.all([
+        publicSupplierApi.refreshPrice({
+          supplierCode: selectedEntry.bestOfferRef.supplierCode,
+          offerId: selectedEntry.bestOfferRef.externalOfferId,
+          claim: selectedEntry.bestOfferRef.externalClaim,
+          searchContext: selectedEntry.bestOfferRef.searchContext,
+        }),
+        publicSupplierApi.refreshAvailability({
+          supplierCode: selectedEntry.bestOfferRef.supplierCode,
+          offerId: selectedEntry.bestOfferRef.externalOfferId,
+          claim: selectedEntry.bestOfferRef.externalClaim,
+          searchContext: selectedEntry.bestOfferRef.searchContext,
+        }),
+      ]);
+
+      if (availResult.availability !== "AVAILABLE") {
+        alert(t("calendar.unavailable_on_date", locale));
+        return;
+      }
+
+      if (priceResult.amount > 0 && priceResult.amount !== selectedEntry.price) {
+        // Price changed — update entry
+        setSelectedEntry((prev) => prev ? { ...prev, price: priceResult.amount, currency: priceResult.currency } : null);
+      }
+
+      // Redirect to request flow (existing auth flow)
+      const params = new URLSearchParams({
+        supplier: selectedEntry.bestOfferRef.supplierCode,
+        offer: selectedEntry.bestOfferRef.externalOfferId,
+        date: selectedEntry.date,
+        price: String(priceResult.amount),
+        currency: priceResult.currency,
+      });
+      window.location.href = `/requests/new?${params.toString()}`;
+    } catch (err) {
+      alert(t("calendar.recheck_error", locale));
+    } finally {
+      setRequestLoading(false);
+    }
+  }, [selectedEntry, locale]);
 
   // Step 1.13B: PDP реально открыт (client render, fire-once; не SSR/prefetch).
   useMarketplaceProductViewed(p.slug, true);
@@ -187,18 +263,48 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
         </section>
       </div>
 
-      {/* ── Right: price / CTA / seller (seller-safe projection, Step 1.11) ── */}
+      {/* ── Right: configurator / calendar / CTA / seller ── */}
       <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+        {/* Price Configurator */}
+        <PriceConfigurator
+          productCode={p.code}
+          productAttributes={p.attributes}
+          onCalendarLoaded={handleCalendarLoaded}
+        />
+
+        {/* Price Calendar (shown after successful price query) */}
+        {calendarResult && (
+          <PriceCalendar
+            result={calendarResult}
+            config={configuratorConfig}
+            onDateSelected={handleDateSelected}
+            selectedDate={selectedEntry?.date ?? null}
+          />
+        )}
+
+        {/* CTA: Оформить запрос */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="text-xs uppercase tracking-wide text-slate-400">{t("pdp.price_from", locale)}</div>
           <div className="mt-1">
-            <Price amount={p.priceFrom} currency={p.currency} size="lg" withPrefix={false} />
+            {selectedEntry?.price ? (
+              <div className="text-xl font-bold text-slate-900">
+                {selectedEntry.price.toLocaleString()} {selectedEntry.currency}
+              </div>
+            ) : (
+              <Price amount={p.priceFrom} currency={p.currency} size="lg" withPrefix={false} />
+            )}
           </div>
 
-          {user === null ? (
-            // Step 1.9 §6: anonymous → login с safe next (возврат к исходной
-            // Product-странице после аутентификации). Step 1.13B: CTA клик —
-            // намерение (НЕ Order/Booking), durable behavioral event.
+          {selectedEntry ? (
+            <button
+              type="button"
+              onClick={handleCreateRequest}
+              disabled={requestLoading}
+              className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {requestLoading ? t("calendar.rechecking", locale) : t("calendar.create_request", locale)}
+            </button>
+          ) : user === null ? (
             <Link
               href={`/login?next=${encodeURIComponent(`/products/${p.slug}`)}`}
               onClick={() => fireMarketplaceCta(p.slug)}

@@ -2408,6 +2408,39 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "documents.action.downloaded": { ru: "Скачивание", az: "Yükləmə", en: "Download" },
   "documents.action.invalidated": { ru: "Аннулирован", az: "Ləğv edilib", en: "Invalidated" },
   "documents.pii.redacted": { ru: "(маскировано)", az: "(maskalanıb)", en: "(redacted)" },
+
+  // ── Price Configurator ──────────────────────────────────────────────
+  "configurator.title": { ru: "Параметры поездки", az: "Səyahət parametrləri", en: "Trip parameters" },
+  "configurator.room": { ru: "Номер", az: "Otaq", en: "Room" },
+  "configurator.meal": { ru: "Питание", az: "Yemək", en: "Meal" },
+  "configurator.any": { ru: "Любой", az: "Hər hansı", en: "Any" },
+  "configurator.adults": { ru: "Взрослые", az: "Böyüklər", en: "Adults" },
+  "configurator.children": { ru: "Дети", az: "Uşaqlar", en: "Children" },
+  "configurator.child_ages": { ru: "Возраст детей", az: "Uşaqların yaşı", en: "Child ages" },
+  "configurator.nights": { ru: "Ночей", az: "Gecə", en: "Nights" },
+  "configurator.check_price": { ru: "Уточнить цену", az: "Qiyməti soruşun", en: "Check price" },
+  "configurator.loading": { ru: "Уточняем актуальные цены...", az: "Qiymətlər yenilənir...", en: "Checking prices..." },
+  "configurator.config_changed": { ru: "Параметры изменены. Нажмите «Уточнить цену» для обновления календаря.", az: "Parametrlər dəyişdirildi. Təqvim yeniləmək üçün «Qiyməti soruşun» düyməsinə basın.", en: "Parameters changed. Click \"Check price\" to refresh calendar." },
+  "configurator.supplier_unavailable": { ru: "Сейчас не удалось получить данные от поставщика. Попробуйте позже.", az: "Təchizatçıdan məlumat almaq mümkün olmadı. Bir az sonra cəhd edin.", en: "Unable to get data from supplier. Please try again later." },
+  "configurator.price_error": { ru: "Ошибка при запросе цены. Попробуйте ещё раз.", az: "Qiymət sorğusunda xəta. Yenidən cəhd edin.", en: "Price query error. Please try again." },
+  "configurator.supplier_attribution": { ru: "Поставщик: Summer (summertour.az)", az: "Təchizatçı: Summer (summertour.az)", en: "Supplier: Summer (summertour.az)" },
+
+  // ── Price Calendar ──────────────────────────────────────────────────
+  "calendar.title": { ru: "Календарь цен", az: "Qiymət təqvimləri", en: "Price Calendar" },
+  "calendar.selected": { ru: "Выбрано", az: "Seçilib", en: "Selected" },
+  "calendar.today": { ru: "Сегодня", az: "Bu gün", en: "Today" },
+  "calendar.unavailable": { ru: "Нет данных", az: "Məlumat yoxdur", en: "No data" },
+  "calendar.nights": { ru: "ночей", az: "gecə", en: "nights" },
+  "calendar.adults": { ru: "взрослых", az: "böyüklər", en: "adults" },
+  "calendar.children": { ru: "детей", az: "uşaq", en: "children" },
+  "calendar.ages": { ru: "возраст", az: "yaş", en: "ages" },
+  "calendar.total_price": { ru: "Итого по Summer", az: "Summer ümumi", en: "Total via Summer" },
+  "calendar.scanned": { ru: "Просканировано", az: "Skan edildi", en: "Scanned" },
+  "calendar.offers": { ru: "предложений", az: "təklif", en: "offers" },
+  "calendar.create_request": { ru: "Оформить запрос", az: "Sorğu göndər", en: "Create request" },
+  "calendar.rechecking": { ru: "Повторная проверка...", az: "Yenidən yoxlanılır...", en: "Re-checking..." },
+  "calendar.unavailable_on_date": { ru: "На выбранную дату вариант недоступен.", az: "Seçilmiş tarixdə variant mövcud deyil.", en: "Option not available on selected date." },
+  "calendar.recheck_error": { ru: "Ошибка повторной проверки. Попробуйте ещё раз.", az: "Yenidən yoxlama xətası. Yenidən cəhd edin.", en: "Re-check error. Please try again." },
 };
 
 /** Локализованная строка по ключу (fallback — сам ключ, затем default locale). */

@@ -6,6 +6,7 @@ import { SupplierOfferService } from "./supplier-offer.service";
 import { SummertourAdapter } from "./summertour/summertour.adapter";
 import { SummerSyncService } from "./summertour/summer-sync.service";
 import { SupplierController } from "./supplier.controller";
+import { PublicSupplierController } from "./public-supplier.controller";
 import { PrismaModule } from "../../prisma/prisma.module";
 
 /**
@@ -17,7 +18,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
 @Global()
 @Module({
   imports: [PrismaModule],
-  controllers: [SupplierController],
+  controllers: [SupplierController, PublicSupplierController],
   providers: [
     SupplierAdapterRegistry,
     SupplierCacheService,

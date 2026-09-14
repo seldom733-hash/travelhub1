@@ -7,7 +7,7 @@ import { SummerSyncService } from "./summertour/summer-sync.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { RequirePermissions, CurrentUser } from "../../security/auth/decorators";
-import type { SupplierSearchQuery } from "./supplier.types";
+import type { SupplierSearchQuery, PriceCalendarQuery } from "./supplier.types";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 
 /**
@@ -123,6 +123,16 @@ export class SupplierController {
       externalClaim: body.claim,
       searchContext: body.searchContext,
     });
+  }
+
+  // ── Price Calendar ────────────────────────────────────────────────
+
+  @Post("price-calendar")
+  @RequirePermissions("supplier.search.read")
+  async getPriceCalendar(
+    @Body() body: PriceCalendarQuery,
+  ) {
+    return this.offerService.getPriceCalendar(body);
   }
 
   // ── Registered Adapters ─────────────────────────────────────────────

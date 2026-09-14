@@ -9,6 +9,9 @@ import type {
   SupplierPriceSnapshot,
   SupplierAvailabilitySnapshot,
   SupplierAvailability,
+  PriceCalendarQuery,
+  PriceCalendarResult,
+  PriceCalendarEntry,
 } from "../supplier.types";
 
 /**
@@ -215,21 +218,51 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
     return checkIn;
   }
 
-  // ── Stub methods (not used for search flow) ───────────────────────
+  // ── Re-check via targeted search ─────────────────────────────────
 
   async getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail> {
+    const ctx = ref.searchContext;
+    const query: SupplierSearchQuery = {
+      country: ctx.country,
+      departureCity: ctx.departureCity,
+      destination: ctx.destination,
+      adults: ctx.adults,
+      children: ctx.children,
+      childAges: ctx.childAges,
+      hotel: ctx.hotel,
+      room: ctx.room,
+      meal: ctx.meal,
+      nightsFrom: ctx.nightsFrom,
+      nightsTo: ctx.nightsTo,
+      departureDateFrom: ctx.departureDateFrom,
+      departureDateTo: ctx.departureDateTo,
+    };
+
+    const offers = await this.search(query);
+    const match = offers.find((o) => o.externalOfferId === ref.externalOfferId);
+
+    if (match) {
+      return {
+        ...match,
+        packageComposition: undefined,
+        oldPrice: undefined,
+        priceType: undefined,
+      };
+    }
+
+    // Fallback: return not-found snapshot
     return {
       supplierCode: this.code,
       externalOfferId: ref.externalOfferId,
       externalClaim: ref.externalClaim,
-      hotel: "Unknown",
-      departureDate: "",
-      nights: 0,
-      adults: ref.searchContext.adults,
-      children: ref.searchContext.children ?? 0,
-      childAges: ref.searchContext.childAges ?? [],
+      hotel: ref.searchContext.hotel ?? "Unknown",
+      departureDate: ctx.departureDateFrom ?? "",
+      nights: ctx.nightsFrom ?? 0,
+      adults: ctx.adults,
+      children: ctx.children ?? 0,
+      childAges: ctx.childAges ?? [],
       price: { amount: 0, currency: "USD", fetchedAt: new Date(), expiresAt: new Date(), queryHash: "", source: this.code },
-      availability: "UNKNOWN",
+      availability: "NOT_AVAILABLE",
       fetchedAt: new Date(),
       expiresAt: new Date(),
       packageComposition: "",
@@ -237,6 +270,31 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
   }
 
   async refreshPrice(ref: SupplierOfferRef): Promise<SupplierPriceSnapshot> {
+    const ctx = ref.searchContext;
+    const query: SupplierSearchQuery = {
+      country: ctx.country,
+      departureCity: ctx.departureCity,
+      destination: ctx.destination,
+      adults: ctx.adults,
+      children: ctx.children,
+      childAges: ctx.childAges,
+      hotel: ctx.hotel,
+      room: ctx.room,
+      meal: ctx.meal,
+      nightsFrom: ctx.nightsFrom,
+      nightsTo: ctx.nightsTo,
+      departureDateFrom: ctx.departureDateFrom,
+      departureDateTo: ctx.departureDateTo,
+    };
+
+    const offers = await this.search(query);
+    const match = offers.find((o) => o.externalOfferId === ref.externalOfferId);
+
+    if (match) {
+      return match.price;
+    }
+
+    // Not found — return zero price
     return {
       amount: 0,
       currency: "USD",
@@ -248,10 +306,118 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
   }
 
   async refreshAvailability(ref: SupplierOfferRef): Promise<SupplierAvailabilitySnapshot> {
+    const ctx = ref.searchContext;
+    const query: SupplierSearchQuery = {
+      country: ctx.country,
+      departureCity: ctx.departureCity,
+      destination: ctx.destination,
+      adults: ctx.adults,
+      children: ctx.children,
+      childAges: ctx.childAges,
+      hotel: ctx.hotel,
+      room: ctx.room,
+      meal: ctx.meal,
+      nightsFrom: ctx.nightsFrom,
+      nightsTo: ctx.nightsTo,
+      departureDateFrom: ctx.departureDateFrom,
+      departureDateTo: ctx.departureDateTo,
+    };
+
+    const offers = await this.search(query);
+    const match = offers.find((o) => o.externalOfferId === ref.externalOfferId);
+
     return {
-      availability: "UNKNOWN",
+      availability: match ? match.availability : "NOT_AVAILABLE",
       fetchedAt: new Date(),
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    };
+  }
+
+  // ── Price Calendar ───────────────────────────────────────────────
+
+  async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult> {
+    const searchQuery: SupplierSearchQuery = {
+      country: "turkey",
+      departureCity: "baku",
+      destination: undefined,
+      adults: query.adults,
+      children: query.children,
+      childAges: query.childAges,
+      hotel: query.hotel,
+      room: query.room,
+      meal: query.meal,
+      nightsFrom: query.nights,
+      nightsTo: query.nights,
+      departureDateFrom: query.dateFrom,
+      departureDateTo: query.dateTo,
+    };
+
+    const offers = await this.search(searchQuery);
+
+    // Filter to matching hotel if specified
+    const filtered = query.hotel
+      ? offers.filter((o) => o.hotel === query.hotel || o.hotelExternalId === query.hotelExternalId)
+      : offers;
+
+    // Group by departure date, find best price per date
+    const dateMap = new Map<string, SupplierOffer[]>();
+    for (const offer of filtered) {
+      const existing = dateMap.get(offer.departureDate) || [];
+      existing.push(offer);
+      dateMap.set(offer.departureDate, existing);
+    }
+
+    const entries: PriceCalendarEntry[] = [];
+    for (const [date, dateOffers] of dateMap) {
+      // Find best (lowest price) offer for this date
+      const sorted = dateOffers.sort((a, b) => a.price.amount - b.price.amount);
+      const best = sorted[0];
+
+      entries.push({
+        date,
+        price: best.price.amount,
+        currency: best.price.currency,
+        availability: best.availability,
+        offerCount: dateOffers.length,
+        bestOfferRef: {
+          supplierCode: this.code,
+          externalOfferId: best.externalOfferId,
+          externalClaim: best.externalClaim,
+          searchContext: {
+            adults: query.adults,
+            children: query.children,
+            childAges: query.childAges,
+            hotel: query.hotel,
+            room: query.room,
+            meal: query.meal,
+            nightsFrom: query.nights,
+            nightsTo: query.nights,
+          },
+        },
+      });
+    }
+
+    // Sort entries by date
+    entries.sort((a, b) => a.date.localeCompare(b.date));
+
+    const now = new Date();
+    return {
+      supplierCode: this.code,
+      contextHash: JSON.stringify({
+        hotel: query.hotel,
+        room: query.room,
+        meal: query.meal,
+        adults: query.adults,
+        children: query.children,
+        childAges: query.childAges,
+        nights: query.nights,
+      }),
+      entries,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      fetchedAt: now,
+      expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
+      totalOffersScanned: filtered.length,
     };
   }
 }

@@ -151,6 +151,9 @@ export interface SupplierAdapter {
 
   /** Refresh availability for an existing offer. */
   refreshAvailability(ref: SupplierOfferRef): Promise<SupplierAvailabilitySnapshot>;
+
+  /** Get price calendar for a configuration over a date range. */
+  getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult>;
 }
 
 // ── Supplier Offer Reference ─────────────────────────────────────────────
@@ -190,6 +193,65 @@ export interface SupplierConfig {
   circuitBreakerThreshold: number;
   /** Circuit breaker: open duration (ms). */
   circuitBreakerOpenMs: number;
+}
+
+// ── Price Calendar ─────────────────────────────────────────────────────
+
+export interface PriceCalendarQuery {
+  /** Supplier code. */
+  supplierCode: string;
+  /** Product/card ID (for context). */
+  productId?: string;
+  /** Hotel name or external ID. */
+  hotel?: string;
+  /** Hotel external ID. */
+  hotelExternalId?: string;
+  /** Room type. */
+  room?: string;
+  /** Meal plan. */
+  meal?: string;
+  /** Passenger composition. */
+  adults: number;
+  children?: number;
+  childAges?: number[];
+  /** Night count. */
+  nights: number;
+  /** Date range (ISO-8601). */
+  dateFrom: string;
+  dateTo: string;
+}
+
+export interface PriceCalendarEntry {
+  /** Departure date (ISO-8601). */
+  date: string;
+  /** Total trip price (lowest available for this date). */
+  price: number | null;
+  /** Currency code. */
+  currency: string | null;
+  /** Availability state. */
+  availability: SupplierAvailability;
+  /** Number of offers found for this date. */
+  offerCount: number;
+  /** Best offer reference (for re-check). */
+  bestOfferRef?: SupplierOfferRef;
+}
+
+export interface PriceCalendarResult {
+  /** Supplier code. */
+  supplierCode: string;
+  /** Query context hash. */
+  contextHash: string;
+  /** Calendar entries keyed by date. */
+  entries: PriceCalendarEntry[];
+  /** Date range queried. */
+  dateFrom: string;
+  dateTo: string;
+  /** When this calendar was fetched. */
+  fetchedAt: Date;
+  /** When this calendar expires. */
+  expiresAt: Date;
+  /** Total offers scanned. */
+  totalOffersScanned: number;
 }
 
 // ── Cache Key ────────────────────────────────────────────────────────────

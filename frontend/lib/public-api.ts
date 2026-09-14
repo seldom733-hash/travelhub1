@@ -279,3 +279,106 @@ export const publicStorefrontApi = {
     return http<PublicProductDetail>(`/storefronts/${encodeURIComponent(slug)}/products/${encodeURIComponent(productSlug)}`);
   },
 };
+
+// ── Public Supplier API (Price Calendar + Re-check) ──────────────────────
+
+export interface PriceCalendarQuery {
+  supplierCode: string;
+  productId?: string;
+  hotel?: string;
+  hotelExternalId?: string;
+  room?: string;
+  meal?: string;
+  adults: number;
+  children?: number;
+  childAges?: number[];
+  nights: number;
+  dateFrom: string;
+  dateTo: string;
+}
+
+export interface PriceCalendarEntry {
+  date: string;
+  price: number | null;
+  currency: string | null;
+  availability: "AVAILABLE" | "NOT_AVAILABLE" | "UNKNOWN";
+  offerCount: number;
+  bestOfferRef?: {
+    supplierCode: string;
+    externalOfferId: string;
+    externalClaim?: string;
+    searchContext: Record<string, unknown>;
+  };
+}
+
+export interface PriceCalendarResult {
+  supplierCode: string;
+  contextHash: string;
+  entries: PriceCalendarEntry[];
+  dateFrom: string;
+  dateTo: string;
+  fetchedAt: string;
+  expiresAt: string;
+  totalOffersScanned: number;
+}
+
+export interface RefreshPriceResult {
+  amount: number;
+  currency: string;
+  fetchedAt: string;
+  expiresAt: string;
+  queryHash: string;
+  source: string;
+}
+
+export interface RefreshAvailabilityResult {
+  availability: "AVAILABLE" | "NOT_AVAILABLE" | "UNKNOWN";
+  fetchedAt: string;
+  expiresAt: string;
+}
+
+async function httpPost<T>(path: string, body: unknown): Promise<T> {
+  const base = typeof window === "undefined"
+    ? `${process.env.BACKEND_URL ?? "http://localhost:4000"}/api/v1/public`
+    : "/api/v1/public";
+  const res = await fetch(`${base}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const b = (await res.json()) as { message?: string };
+      if (b?.message) message = b.message;
+    } catch { /* ignore */ }
+    throw new PublicApiError(message, res.status);
+  }
+  return (await res.json()) as T;
+}
+
+/** Public Supplier API — anonymous price calendar + re-check (no auth required). */
+export const publicSupplierApi = {
+  /** Get price calendar for a configuration over a date range. */
+  getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult> {
+    return httpPost<PriceCalendarResult>("/supplier/price-calendar", query);
+  },
+  /** Refresh price for a specific offer (re-check). */
+  refreshPrice(body: {
+    supplierCode: string;
+    offerId: string;
+    claim?: string;
+    searchContext: Record<string, unknown>;
+  }): Promise<RefreshPriceResult> {
+    return httpPost<RefreshPriceResult>("/supplier/refresh-price", body);
+  },
+  /** Refresh availability for a specific offer (re-check). */
+  refreshAvailability(body: {
+    supplierCode: string;
+    offerId: string;
+    claim?: string;
+    searchContext: Record<string, unknown>;
+  }): Promise<RefreshAvailabilityResult> {
+    return httpPost<RefreshAvailabilityResult>("/supplier/refresh-availability", body);
+  },
+};
