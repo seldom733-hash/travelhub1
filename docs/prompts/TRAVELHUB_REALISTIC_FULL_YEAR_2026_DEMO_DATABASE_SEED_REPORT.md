@@ -28,23 +28,24 @@
 ### MARKETPLACE
 
 ```
-Partners:            25 (5 tour operators, 5 hotels, 5 excursion, 3 transfer, 4 guide, 3 photographer)
-Customers:           248 (200 marketplace + 48 storefront)
+Partners:            26 (5 tour operators, 5 hotels, 5 excursion, 3 transfer, 4 guide, 3 photographer, + 1)
+Customers:           262 total (82 users in security.User)
 Service types:       9 (TOUR, HOTEL, EXCURSION, TRANSFER, GUIDE, PHOTOGRAPHER, etc.)
-Publications:        199 (169 PUBLISHED + 30 new listings without sales)
-Bookings:            703 (5 AWAITING_CONFIRMATION + 136 CONFIRMED + 146 IN_SERVICE + 416 COMPLETED)
-Orders:              1000
-Payments:            826 (8 FAILED + 760 CAPTURED + 58 REFUNDED)
-Refunds:             39 (20 REQUESTED + 19 PROCESSED)
-Commissions:         732
+Publications:        288 products (199 published + archived historical)
+Bookings:            993 (5 AWAITING_CONFIRMATION + 136 CONFIRMED + 146 IN_SERVICE + 416 COMPLETED + other)
+Orders:              1022
+Payments:            1014 (8 FAILED + 760 CAPTURED + 58 REFUNDED + pending)
+Refunds:             42 (20 REQUESTED + 22 PROCESSED)
+Commissions:         981
+Decision Signals:    6 (across 6 detector types)
 ```
 
 ### STOREFRONT
 
 ```
-Partners:            8 active storefronts (out of 25 total partners)
+Partners:            13 PartnerStorefront records (8 active storefronts)
 Customers:           48 storefront customers (unevenly distributed)
-Subscriptions:       6 (2 free trial + 4 premium @199 AZN)
+Subscriptions:       11 StorefrontSubscription records (2 free trial + 9 premium @199 AZN)
 ```
 
 ### PERIOD
@@ -175,12 +176,14 @@ Deterministic: yes (stable UUIDs from seed strings)
 
 ```
 Starting HEAD: 7401a0b
-Final HEAD: (uncommitted — pending review)
-Changed files: backend/src/seed/demo-seed.ts, backend/package.json
-Commit: (pending)
-Pushed to origin: NO
-Working tree clean: NO
+Final HEAD: ce498be
+Changed files: backend/src/seed/demo-seed.ts, backend/package.json, docs/prompts/TRAVELHUB_REALISTIC_FULL_YEAR_2026_DEMO_DATABASE_SEED_REPORT.md
+Commit: ce498be (partner registration contrast fix report — seed already committed)
+Pushed to origin: YES
+Working tree clean: YES
 ```
+
+Note: Seed script and data were committed in earlier sessions. Report updated to reflect current DB state (26 partners, 288 products, 1022 orders, 993 bookings, 42 refunds, 82 users).
 
 ---
 
