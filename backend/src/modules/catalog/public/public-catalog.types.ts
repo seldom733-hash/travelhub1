@@ -186,6 +186,10 @@ export interface PublicProductListQuery {
   f?: Record<string, string>;
   /** Фильтр по discovery-availability: только продукты со строкой availability >= даты. */
   available_from?: string;
+  /** Фильтр по географии продавца: countryCode (2-letter ISO). */
+  country?: string;
+  /** Фильтр по географии продавца: cityCode (canonical city code). */
+  city?: string;
 }
 
 export interface PublicProductListResult {

@@ -287,6 +287,8 @@ export class PublicCatalogService {
       q: query.q?.trim() || undefined,
       availableFrom,
       attrFilters,
+      countryCode: query.country || undefined,
+      cityCode: query.city || undefined,
       sort,
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -606,6 +608,26 @@ export class PublicCatalogService {
     };
   }
 
+  // ── Public geography (countries + cities for filter UI) ────────────────────
+
+  /** Публичный справочник географии — страны и города для фильтров витрины. */
+  async getGeography(): Promise<{
+    countries: Array<{ code: string; name: string }>;
+    cities: Array<{ code: string; countryCode: string; name: string }>;
+  }> {
+    const { COUNTRY_NAMES, CITY_REF } = await import("../seller/locations");
+    const countries = Object.entries(COUNTRY_NAMES).map(([code, names]) => ({
+      code,
+      name: names.ru,
+    }));
+    const cities = Object.entries(CITY_REF).map(([code, ref]) => ({
+      code,
+      countryCode: ref.countryCode,
+      name: ref.ru,
+    }));
+    return { countries, cities };
+  }
+
   // ── helpers: sort / filters / SQL matching (FIX 2) ────────────────────────
 
   private assertSort(sort: string): PublicSortMode {
@@ -653,6 +675,8 @@ export class PublicCatalogService {
     q?: string;
     availableFrom?: Date;
     attrFilters: Array<{ key: string; value: unknown; type: string }>;
+    countryCode?: string;
+    cityCode?: string;
     sort: PublicSortMode;
     skip: number;
     take: number;
@@ -690,6 +714,18 @@ export class PublicCatalogService {
       } else {
         conds.push(Prisma.sql`(p."attributes" ->> ${f.key}) = ${String(f.value)}`);
       }
+    }
+    // Geography filter: JOIN on PublicSellerProfile via partnerId.
+    // Filter products whose seller is in the specified country/city.
+    if (input.countryCode) {
+      conds.push(
+        Prisma.sql`EXISTS (SELECT 1 FROM catalog."PublicSellerProfile" sp WHERE sp."partnerId" = p."partnerId" AND sp."status" = 'APPROVED' AND sp."countryCode" = ${input.countryCode})`,
+      );
+    }
+    if (input.cityCode) {
+      conds.push(
+        Prisma.sql`EXISTS (SELECT 1 FROM catalog."PublicSellerProfile" sp WHERE sp."partnerId" = p."partnerId" AND sp."status" = 'APPROVED' AND sp."cityCode" = ${input.cityCode})`,
+      );
     }
     const where = Prisma.join(conds, " AND ");
 

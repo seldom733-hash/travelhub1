@@ -41,6 +41,14 @@ export class PublicProductListDto implements PublicProductListQuery {
   @IsOptional()
   @IsISO8601()
   available_from?: string;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
 }
 
 /** Pagination-параметры списка продуктов витрины (только page/pageSize). */
@@ -119,6 +127,13 @@ export class PublicCatalogController {
   @Public()
   getCategoryFilters(@Param("slug") slug: string) {
     return this.publicCatalog.getCategoryFilters(slug);
+  }
+
+  /** Публичный справочник географии (страны + города) для фильтров витрины. */
+  @Get("public/geography")
+  @Public()
+  getGeography() {
+    return this.publicCatalog.getGeography();
   }
 
   // ── Partner Storefront public read (Phase 1 Step 1.12.1 §11/§12) ─────────

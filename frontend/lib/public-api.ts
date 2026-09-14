@@ -124,6 +124,22 @@ export interface PublicListResult {
   pageSize: number;
 }
 
+export interface GeographyCountry {
+  code: string;
+  name: string;
+}
+
+export interface GeographyCity {
+  code: string;
+  countryCode: string;
+  name: string;
+}
+
+export interface GeographyData {
+  countries: GeographyCountry[];
+  cities: GeographyCity[];
+}
+
 /** Query списка публичных продуктов (server-side, см. backend Step 1.5). */
 export interface PublicListQuery {
   q?: string;
@@ -134,6 +150,10 @@ export interface PublicListQuery {
   available_from?: string;
   /** Category-specific фильтры: f[days]=7 (требует category). */
   f?: Record<string, string>;
+  /** Фильтр по географии продавца: countryCode. */
+  country?: string;
+  /** Фильтр по географии продавца: cityCode. */
+  city?: string;
 }
 
 export class PublicApiError extends Error {
@@ -170,6 +190,8 @@ export function buildPublicQuery(q: PublicListQuery = {}): string {
   if (q.page && q.page > 1) sp.set("page", String(q.page));
   if (q.pageSize) sp.set("pageSize", String(q.pageSize));
   if (q.available_from) sp.set("available_from", q.available_from);
+  if (q.country) sp.set("country", q.country);
+  if (q.city) sp.set("city", q.city);
   for (const [k, v] of Object.entries(q.f ?? {})) {
     if (v !== undefined && v !== "") sp.set(`f[${k}]`, v);
   }
@@ -206,6 +228,7 @@ export const publicApi = {
   getCategory: (slug: string): Promise<PublicCategory> => http<PublicCategory>(`/categories/${encodeURIComponent(slug)}`),
   getCategoryFilters: (slug: string): Promise<PublicFilterMetadata> =>
     http<PublicFilterMetadata>(`/categories/${encodeURIComponent(slug)}/filters`),
+  getGeography: (): Promise<GeographyData> => http<GeographyData>("/geography"),
 };
 
 /**
