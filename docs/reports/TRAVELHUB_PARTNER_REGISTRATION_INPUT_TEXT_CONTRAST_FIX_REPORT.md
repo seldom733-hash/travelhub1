@@ -85,8 +85,9 @@ frontend TypeScript (tsc --noEmit): ✅ OK (no errors)
 |---|---|
 | Branch | `master` |
 | HEAD до | `bd22e8e` |
-| HEAD после | TBD (after commit) |
-| origin/master | `bd22e8e` |
+| HEAD после | `ce498be` |
+| origin/master | `ce498be` |
+| ahead/behind | 0/0 |
 | Working tree | 8 modified files |
 
 ## 9. Verdict
