@@ -13,6 +13,7 @@ import { validateAttributes, validateCategorySlug, validateSchemaConfig, toCateg
 import { isIanaTimeZone } from "../../shared/service-time";
 import { CANONICAL_CATEGORIES, DEFAULT_SCHEMA_CONFIG } from "./canonical-categories";
 import { CatalogAccessPolicy } from "./catalog-access.policy";
+import { PartnerCategoryService } from "./partner/partner-category.service";
 import { PublicSellerProfileService } from "./seller/seller-profile.service";
 import type { AuthUser } from "../../security/auth/auth.service";
 import { RoleCode } from "../../generated/prisma/enums";
@@ -167,6 +168,7 @@ export class CatalogService implements OnModuleInit {
     private readonly ids: IdsService,
     private readonly eventBus: EventBusService,
     private readonly policy: CatalogAccessPolicy,
+    private readonly partnerCategories: PartnerCategoryService,
     private readonly sellerProfiles: PublicSellerProfileService,
   ) {}
 
@@ -245,6 +247,18 @@ export class CatalogService implements OnModuleInit {
         throw new ForbiddenError(
           "Commercial Product creation requires a Partner owner. Platform actors cannot create ownerless Products.",
         );
+      }
+
+      // Partner Active Service Categories enforcement:
+      // PARTNER can only create Products in categories that are in their active set.
+      // ADMIN/staff override is allowed (partnerId set explicitly, not from actor scope).
+      if (actor?.role === RoleCode.PARTNER && input.categoryId) {
+        const isActive = await this.partnerCategories.isActiveCategory(partnerId, input.categoryId);
+        if (!isActive) {
+          throw new ForbiddenError(
+            `Category ${input.categoryId} is not in your active service categories. Add it in Partner Cabinet → Категории услуг.`,
+          );
+        }
       }
 
       // D2: validate travelerRequirements (if provided) before insert.

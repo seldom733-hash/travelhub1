@@ -450,10 +450,34 @@ model Category {
 
   schemas  CategorySchema[]
   products Product[]
+  partnerActiveCategories PartnerActiveCategory[]
 
   createdAt DateTime?
   updatedAt DateTime? @updatedAt
 
+  @@schema("catalog")
+}
+
+/// Partner Active Service Categories — partner-scoped набор категорий,
+/// в которых партнёр имеет право создавать Products.
+/// Ссылается на canonical Category (НЕ копирует). Модель:
+/// Master Category → Partner Active Category capability.
+/// При onboarding approve заполняется из PartnerApplication.serviceCategories.
+/// Partner может изменять в Partner Cabinet (add/remove).
+/// Backend enforcement: createProduct проверяет isActiveCategory(partnerId, categoryId).
+model PartnerActiveCategory {
+  id          String   @id @default(uuid())
+  partnerId   String   // cross-schema ref to crm.Partner (no FK between schemas)
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  status      EntityStatus @default(ACTIVE)
+  activatedAt DateTime @default(now())
+  deactivatedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([partnerId, categoryId])
+  @@index([partnerId])
   @@schema("catalog")
 }
 

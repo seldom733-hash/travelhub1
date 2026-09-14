@@ -12,6 +12,8 @@ import { PublicCatalogService } from "./public/public-catalog.service";
 import { PublicSuggestController } from "./public/public-suggest.controller";
 import { PublicSuggestService } from "./public/public-suggest.service";
 import { PartnerCatalogController } from "./partner/partner-catalog.controller";
+import { PartnerCategoryController } from "./partner/partner-category.controller";
+import { PartnerCategoryService } from "./partner/partner-category.service";
 import { AntiDisintermediationService } from "./anti-disintermediation/anti-disintermediation.service";
 import { SellerProfileController } from "./seller/seller-profile.controller";
 import { PublicSellerProfileService } from "./seller/seller-profile.service";
@@ -70,10 +72,11 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
  * soft lifecycle; валюта наследуется из Tariff; POR без числовых периодов.
  */
 @Module({
-  controllers: [CatalogController, ModerationController, PublicCatalogController, PublicSuggestController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController, CommercialRestrictionsController],
+  controllers: [CatalogController, ModerationController, PublicCatalogController, PublicSuggestController, PartnerCatalogController, PartnerCategoryController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController, CommercialRestrictionsController],
   providers: [
     CatalogService,
     CatalogAccessPolicy,
+    PartnerCategoryService,
     ProductMediaService,
     MediaProcessor,
     ModerationService,
@@ -91,6 +94,6 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
     CommercialRestrictionService,
     { provide: "ObjectStorageService", useClass: S3ObjectStorageService },
   ],
-  exports: [CatalogService, CatalogAccessPolicy, ProductMediaService, PublicSellerProfileService, ServiceUnitService, RatePlanService, "ObjectStorageService"],
+  exports: [CatalogService, CatalogAccessPolicy, PartnerCategoryService, ProductMediaService, PublicSellerProfileService, ServiceUnitService, RatePlanService, "ObjectStorageService"],
 })
 export class CatalogModule {}

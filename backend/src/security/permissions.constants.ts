@@ -16,6 +16,9 @@ export const PERMISSIONS = {
   "catalog.product.update_own_draft": "Редактирование собственного draft Product (PARTNER)",
   "catalog.product.read_own": "Чтение собственных продуктов (PARTNER)",
   "catalog.product.channels_own": "Управление каналами публикации собственного Product (own-scope)",
+  // Partner Active Service Categories — partner-scoped набор категорий для создания Products.
+  "catalog.partner_active_category.read": "Чтение активных категорий партнёра",
+  "catalog.partner_active_category.manage": "Управление активными категориями партнёра (add/remove)",
   // Step 1.8A: Service Unit publication — ОТДЕЛЬНАЯ publication authority.
   // Юнит — child-entity Product (create/update/read переиспользуют catalog.product.*
   // own-scope, §22), но publish/archive — отдельное право: PARTNER НЕ имеет
@@ -613,8 +616,12 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "catalog.product.read_own",
     "catalog.product.create_own",
     "catalog.product.update_own_draft",
+    "catalog.product.read_own",
     "catalog.product.submit_moderation",
     "catalog.product.channels_own",
+    // Partner Active Service Categories
+    "catalog.partner_active_category.read",
+    "catalog.partner_active_category.manage",
     // Step 1.8 (clarification): ТОЛЬКО editor-контракт ACTIVE схемы, НЕ internal
     // category_schema.read (последний отсутствует у PARTNER и не выдаётся).
     "catalog.category_schema.read_active_for_product_edit",

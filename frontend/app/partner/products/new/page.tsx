@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLocale } from "@/lib/i18n";
 import { pt } from "@/lib/partner-i18n";
-import { partnerApi, type PartnerSchemaContract } from "@/lib/partner-api";
+import { partnerApi, type PartnerSchemaContract, type ActiveCategory } from "@/lib/partner-api";
 import ProductEditorForm, { type ProductEditorValues } from "@/components/partner/ProductEditorForm";
 import { newTariffDraft, tariffDraftsToPayload } from "@/components/partner/TariffList";
 import type { PublicCategory } from "@/lib/public-api";
@@ -33,11 +33,14 @@ const initialValues = (): ProductEditorValues => ({
  * Dynamic Category Schema form строится ТОЛЬКО через Partner-safe contract
  * GET /api/v1/partner/categories/:slug/schema (НЕ internal /category-schemas).
  * Ownership назначает backend из actor context (frontend не отправляет partnerId).
+ *
+ * Step 1.10+: Category dropdown shows ONLY active service categories for the partner.
  */
 export default function NewProductPage() {
   const router = useRouter();
   const locale = useLocale();
-  const [categories, setCategories] = useState<PublicCategory[]>([]);
+  const [allCategories, setAllCategories] = useState<PublicCategory[]>([]);
+  const [activeCategories, setActiveCategories] = useState<ActiveCategory[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [schema, setSchema] = useState<PartnerSchemaContract | null>(null);
   const [schemaLoading, setSchemaLoading] = useState(false);
@@ -49,23 +52,30 @@ export default function NewProductPage() {
 
   useEffect(() => {
     let alive = true;
-    void partnerApi
-      .listCategories()
-      .then((c) => {
-        if (alive) setCategories(c);
-      })
-      .catch(() => undefined);
+    void Promise.all([
+      partnerApi.listCategories(),
+      partnerApi.listActiveCategories(),
+    ]).then(([cats, active]) => {
+      if (alive) {
+        setAllCategories(cats);
+        setActiveCategories(active);
+      }
+    }).catch(() => undefined);
     return () => {
       alive = false;
     };
   }, []);
+
+  // Filter categories to only show active ones
+  const activeCategoryIds = new Set(activeCategories.map((ac) => ac.categoryId));
+  const categories = allCategories.filter((c) => activeCategoryIds.has(c.id));
 
   const selectCategory = (id: string) => {
     setCategoryId(id);
     setSchema(null);
     setValues((v) => ({ ...v, attributes: {} }));
     if (!id) return;
-    const cat = categories.find((c) => c.id === id);
+    const cat = allCategories.find((c) => c.id === id);
     if (!cat) return;
     setSchemaLoading(true);
     partnerApi
@@ -80,7 +90,7 @@ export default function NewProductPage() {
     setSubmitting(true);
     setError("");
     try {
-      const cat = categories.find((c) => c.id === categoryId);
+      const cat = allCategories.find((c) => c.id === categoryId);
       const res = await partnerApi.createProduct({
         type: CATEGORY_TYPE[cat?.slug ?? ""] ?? "TOUR",
         title: values.title.trim(),
@@ -110,39 +120,50 @@ export default function NewProductPage() {
 
       {error && <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-      <ProductEditorForm
-        categories={categories}
-        categoryId={categoryId}
-        onSelectCategory={selectCategory}
-        schema={schema}
-        schemaLoading={schemaLoading}
-        values={values}
-        onChange={setValues}
-        onSubmit={submit}
-        submitting={submitting}
-        submitLabel={pt("partner.form.save", locale)}
-        mediaCount={0}
-        productType={categoryId ? (CATEGORY_TYPE[categories.find((c) => c.id === categoryId)?.slug ?? ""] ?? "TOUR") : "TOUR"}
-        travelerRequirements={travelerRequirements}
-        onTravelerRequirementsChange={setTravelerRequirements}
-      />
+      {categories.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center">
+          <p className="text-sm text-slate-500">{pt("partner.categories.empty", locale)}</p>
+          <a href="/partner/categories" className="mt-3 inline-block text-sm font-medium text-emerald-600 hover:text-emerald-700">
+            {pt("partner.categories.add", locale)} →
+          </a>
+        </div>
+      ) : (
+        <ProductEditorForm
+          categories={categories}
+          categoryId={categoryId}
+          onSelectCategory={selectCategory}
+          schema={schema}
+          schemaLoading={schemaLoading}
+          values={values}
+          onChange={setValues}
+          onSubmit={submit}
+          submitting={submitting}
+          submitLabel={pt("partner.form.save", locale)}
+          mediaCount={0}
+          productType={categoryId ? (CATEGORY_TYPE[allCategories.find((c) => c.id === categoryId)?.slug ?? ""] ?? "TOUR") : "TOUR"}
+          travelerRequirements={travelerRequirements}
+          onTravelerRequirementsChange={setTravelerRequirements}
+        />
+      )}
 
       {/* Примечание */}
-      <div className="mt-4">
-        <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("notes.initial_note", locale)}</label>
-        <textarea
-          value={initialNote}
-          onChange={(e) => setInitialNote(e.target.value)}
-          rows={3}
-          maxLength={5000}
-          aria-label={pt("notes.initial_note", locale)}
-          className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
-          placeholder={pt("notes.initial_note_helper", locale)}
-        />
-        <div className="mt-1 text-right text-xs text-slate-400">
-          {initialNote.length}/5000 {pt("notes.initial_note_max", locale)}
+      {categories.length > 0 && (
+        <div className="mt-4">
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{pt("notes.initial_note", locale)}</label>
+          <textarea
+            value={initialNote}
+            onChange={(e) => setInitialNote(e.target.value)}
+            rows={3}
+            maxLength={5000}
+            aria-label={pt("notes.initial_note", locale)}
+            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
+            placeholder={pt("notes.initial_note_helper", locale)}
+          />
+          <div className="mt-1 text-right text-xs text-slate-400">
+            {initialNote.length}/5000 {pt("notes.initial_note_max", locale)}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

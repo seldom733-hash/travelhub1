@@ -439,6 +439,25 @@ export const PARTNER_DICT: Record<string, Record<Locale, string>> = {
   "partner.form.traveler_requirements_clear": { ru: "Сбросить к умолчанию", az: "Susomata qaytar", en: "Reset to defaults" },
   "partner.form.traveler_requirements_overridden": { ru: "Настроено вручную", az: "Əl ilə tənzimlənib", en: "Custom overrides" },
   "partner.form.traveler_requirements_default": { ru: "По умолчанию", az: "Susomat", en: "Default" },
+
+  // Partner Active Service Categories
+  "partner.nav.categories": { ru: "Категории услуг", az: "Xidmət kateqoriyaları", en: "Service Categories" },
+  "partner.categories.title": { ru: "Категории услуг", az: "Xidmət kateqoriyaları", en: "Service Categories" },
+  "partner.categories.description": { ru: "Выберите категории, в которых вы хотите продавать услуги. Только активные категории доступны для создания новых услуг.", az: "Xidmətləri satmaq istədiyiniz kateqoriyaları seçin. Yalnız aktiv kateqoriyalar yeni xidmətlər yaratmaq üçün əlçatandır.", en: "Select categories where you want to sell services. Only active categories are available for creating new services." },
+  "partner.categories.empty": { ru: "У вас пока нет активных категорий. Добавьте категории из списка ниже.", az: "Hələ aktiv kateqoriyanız yoxdur. Aşağıdakı siyahıdan kateqoriya əlavə edin.", en: "You have no active categories yet. Add categories from the list below." },
+  "partner.categories.add": { ru: "Добавить категорию", az: "Kateqoriya əlavə et", en: "Add category" },
+  "partner.categories.remove": { ru: "Убрать", az: "Sil", en: "Remove" },
+  "partner.categories.remove_warning": {
+    ru: "У вас уже есть услуги этой категории. Удаление категории запретит создание новых услуг этой категории. Существующие услуги не будут удалены.",
+    az: "Bu kateqoriyada artıq xidmətləriniz var. Kateqoriyanı silmək bu kateqoriyada yeni xidmətlər yaratmağı qadağan edəcək. Mövcud xidmətlər silinməyəcək.",
+    en: "You already have services in this category. Removing the category will prevent creating new services in this category. Existing services will not be deleted.",
+  },
+  "partner.categories.remove_confirm": { ru: "Да, убрать", az: "Bəli, sil", en: "Yes, remove" },
+  "partner.categories.remove_cancel": { ru: "Отмена", az: "Ləğv et", en: "Cancel" },
+  "partner.categories.active_count": { ru: "{count} активных", az: "{count} aktiv", en: "{count} active" },
+  "partner.categories.no_products": { ru: "Нет услуг", az: "Xidmət yoxdur", en: "No services" },
+  "partner.categories.has_products": { ru: "Есть услуги", az: "Xidmətlər var", en: "Has services" },
+  "partner.categories.all_categories": { ru: "Все доступные категории", az: "Bütün mövcud kateqoriyalar", en: "All available categories" },
 };
 
 /** Локализованный партнёрский ярлык: PARTNER_DICT → общий t() → сам ключ. */

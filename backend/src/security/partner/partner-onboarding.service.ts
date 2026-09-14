@@ -4,6 +4,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { IdsService } from "../../shared/ids.service";
 import { CrmService, type CreateOrLinkPartnerInput } from "../../modules/crm/crm.service";
+import { PartnerCategoryService } from "../../modules/catalog/partner/partner-category.service";
 import { SecurityService } from "../security.service";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { normalizeEmail } from "../../shared/field-validation";
@@ -73,6 +74,7 @@ export class PartnerOnboardingService {
     private readonly crm: CrmService,
     private readonly security: SecurityService,
     private readonly eventBus: EventBusService,
+    private readonly partnerCategories: PartnerCategoryService,
   ) {}
 
   // ── Application journal + audit ───────────────────────────────────────────
@@ -424,6 +426,24 @@ export class PartnerOnboardingService {
 
       return { applicationId, status: PartnerApplicationStatus.APPROVED, partnerId, partnerCreated: created };
     });
+
+    // Sync active categories from onboarding application (after transaction commit).
+    // Categories are a secondary concern — if sync fails, partner is still created.
+    if (result.partnerId) {
+      try {
+        const app = await this.prisma.partnerApplication.findUnique({ where: { id: applicationId } });
+        if (app?.serviceCategories && Array.isArray(app.serviceCategories)) {
+          await this.partnerCategories.syncFromApplication(
+            result.partnerId,
+            app.serviceCategories as string[],
+            reviewer.id,
+          );
+        }
+      } catch (err) {
+        // Log but don't fail the approval — categories can be managed manually
+        console.error(`Failed to sync active categories for partner ${result.partnerId}:`, err);
+      }
+    }
 
     // Публикация outbox (PartnerCreated из approve-транзакции) после коммита.
     await this.eventBus.publishPending();

@@ -220,6 +220,15 @@ export interface PartnerModerationView {
   ageMinutes: number;
 }
 
+/* ── Partner Active Service Categories ──────────────────────────────────── */
+
+export interface ActiveCategory {
+  id: string;
+  categoryId: string;
+  category: { id: string; code: string; slug: string; title: string; status: string };
+  activatedAt: string;
+}
+
 /* ── Client ───────────────────────────────────────────────────────────────── */
 
 /** Запрос с multipart/form-data (upload/replace media). */
@@ -325,4 +334,13 @@ export const partnerApi = {
   // Authenticated signed preview (DRAFT media / draft preview) — не public.
   previewUrl: (id: string, mediaId: string, derivative: "thumb" | "large" | "original" = "large"): Promise<SignedPreview> =>
     api.post(`/products/${encodeURIComponent(id)}/media/${encodeURIComponent(mediaId)}/preview?derivative=${derivative}`, {}),
+
+  // Partner Active Service Categories
+  listActiveCategories: (): Promise<ActiveCategory[]> => api.get<ActiveCategory[]>("/partner/active-categories"),
+  addActiveCategory: (categoryId: string): Promise<{ id: string; categoryId: string }> =>
+    api.post("/partner/active-categories", { categoryId }),
+  removeActiveCategory: (categoryId: string): Promise<{ id: string; categoryId: string; hasProducts: boolean }> =>
+    api.del(`/partner/active-categories/${encodeURIComponent(categoryId)}`),
+  checkHasProductsInCategory: (categoryId: string): Promise<{ categoryId: string; hasProducts: boolean }> =>
+    api.get(`/partner/active-categories/${encodeURIComponent(categoryId)}/has-products`),
 };

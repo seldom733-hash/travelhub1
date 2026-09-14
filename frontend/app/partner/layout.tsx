@@ -31,6 +31,7 @@ const BASE_NAV = [
   { href: "/partner", labelKey: "partner.nav.overview", icon: "🏠" },
   { href: "/partner/products", labelKey: "partner.nav.products", icon: "🧳" },
   { href: "/partner/products/new", labelKey: "partner.nav.new_product", icon: "➕" },
+  { href: "/partner/categories", labelKey: "partner.nav.categories", icon: "📂" },
   { href: "/partner/seller-profile", labelKey: "partner.nav.seller_identity", icon: "🛡" },
   { href: "/partner/storefront", labelKey: "partner.nav.storefront", icon: "🏪" },
 ] as const;

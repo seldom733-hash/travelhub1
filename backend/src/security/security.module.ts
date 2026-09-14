@@ -10,6 +10,7 @@ import { PartnerOnboardingService } from "./partner/partner-onboarding.service";
 import { PartnerOnboardingController } from "./partner/partner-onboarding.controller";
 import { LoginThrottleService } from "../shared/login-throttle.service";
 import { CrmModule } from "../modules/crm/crm.module";
+import { CatalogModule } from "../modules/catalog/catalog.module";
 import { DocumentsModule } from "../modules/documents/documents.module";
 import { JwtAuthGuard } from "./auth/jwt-auth.guard";
 import { PermissionsGuard } from "./auth/permissions.guard";
@@ -35,6 +36,7 @@ import { PermissionsGuard } from "./auth/permissions.guard";
       signOptions: { expiresIn: (process.env.JWT_EXPIRES_IN ?? "8h") as never },
     }),
     CrmModule,
+    CatalogModule,
     DocumentsModule,
   ],
   controllers: [AuthController, UsersController, AccountController, PartnerOnboardingController],
