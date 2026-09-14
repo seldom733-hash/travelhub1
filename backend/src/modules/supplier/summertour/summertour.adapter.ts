@@ -21,6 +21,9 @@ import type {
  * The site uses a JavaScript SPA that loads prices via AJAX after DOM ready.
  * Direct HTTP no longer returns price data — Playwright is required.
  * Auth: anonymous (cookie SAMO auto-issued). Booking requires B2B login (out of scope).
+ *
+ * V3: Supports multi-program discovery (TOURINC), 31-day date windows,
+ * and pagination (5 pages per search).
  */
 @Injectable()
 export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
@@ -31,6 +34,53 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
   private readonly logger = new Logger(SummertourAdapter.name);
   private browser: Browser | null = null;
   private readonly browserLock = new Map<string, Promise<Browser>>();
+
+  /** Maximum pages to scrape per search (SAMO shows up to 5). */
+  private static readonly MAX_PAGES = 5;
+  /** Delay between page clicks (ms) to avoid SAMO rate limiting. */
+  private static readonly PAGE_DELAY_MS = 2_000;
+  /** Delay after TOURINC selection (ms) to let SAMO re-render. */
+  private static readonly TOURINC_DELAY_MS = 2_000;
+
+  // ── Program Discovery ─────────────────────────────────────────────
+
+  /** Discover all available TOURINC programs from SAMO form. */
+  async discoverPrograms(): Promise<Array<{ value: string; name: string }>> {
+    let page: Page | null = null;
+    try {
+      const browser = await this.getBrowser();
+      const context = await browser.newContext({
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        locale: "ru-RU",
+      });
+      page = await context.newPage();
+
+      await page.goto("https://summertour.az/search_tour", {
+        waitUntil: "networkidle",
+        timeout: 60_000,
+      });
+      await page.waitForFunction(
+        () => typeof (window as any).samo !== "undefined" && (window as any).samo.page_ready === true,
+        { timeout: 15_000 },
+      );
+
+      const programs = await page.evaluate(() => {
+        const sel = document.querySelector("select[name=TOURINC]") as HTMLSelectElement | null;
+        if (!sel) return [];
+        return Array.from(sel.options)
+          .filter((o) => o.value !== "0" && o.value !== "")
+          .map((o) => ({ value: o.value, name: o.text.trim() }));
+      });
+
+      await context.close();
+      this.logger.log(`Discovered ${programs.length} Summer programs`);
+      return programs;
+    } catch (err) {
+      this.logger.error(`Program discovery failed: ${(err as Error).message}`);
+      if (page) await page.context().close().catch(() => {});
+      return [];
+    }
+  }
 
   // ── Search (Playwright-based) ─────────────────────────────────────
 
@@ -59,16 +109,35 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
         { timeout: 15_000 },
       );
 
-      // Note: SAMO form has no hotel_name or HOTELINC inputs.
-      // Hotel filtering is done post-scrape in getPriceCalendar.
+      // Set TOURINC program if specified
+      if (query.tourIncValue) {
+        await page.evaluate((val: string) => {
+          const sel = document.querySelector("select[name=TOURINC]") as HTMLSelectElement | null;
+          if (sel) {
+            sel.value = val;
+            sel.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        }, query.tourIncValue);
+        await page.waitForTimeout(SummertourAdapter.TOURINC_DELAY_MS);
+        this.logger.debug(`Set TOURINC to ${query.tourIncValue} (${query.tourIncName ?? "?"})`);
+      }
 
-      // Note: SAMO form has no MEALS[] checkboxes. Meal filtering is post-scrape.
-
-      // Note: SAMO form dates must not be overridden — the form's JS SPA
-      // requires its own event handling. Date filtering is post-scrape.
-
-      // Note: SAMO form nights select also requires its own JS event handling.
-      // Nights filtering is post-scrape.
+      // Set date range via Playwright fill (triggers SAMO's internal handlers)
+      if (query.departureDateFrom && query.departureDateTo) {
+        const begInput = await page.$("input[name=CHECKIN_BEG]");
+        const endInput = await page.$("input[name=CHECKIN_END]");
+        if (begInput && endInput) {
+          const begFormatted = this.isoToSamodate(query.departureDateFrom);
+          const endFormatted = this.isoToSamodate(query.departureDateTo);
+          await begInput.click({ clickCount: 3 });
+          await begInput.fill(begFormatted);
+          await page.waitForTimeout(200);
+          await endInput.click({ clickCount: 3 });
+          await endInput.fill(endFormatted);
+          await page.waitForTimeout(200);
+          this.logger.debug(`Set date range: ${begFormatted} → ${endFormatted}`);
+        }
+      }
 
       // Click the search button to trigger AJAX price loading
       const searchBtn = await page.$(".load");
@@ -92,57 +161,53 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       // Wait for all rows to finish rendering
       await page.waitForTimeout(2_000);
 
-      // Extract offers
-      const offers = await page.evaluate(() => {
-        const rows = document.querySelectorAll("tr.price_info");
-        const results: any[] = [];
-        for (const row of rows) {
-          const classes = row.className;
-          const hotelKey = classes.match(/hotelKey-(\d+)/)?.[1] ?? "";
-          const spoKey = classes.match(/spoKey-(\d+)/)?.[1] ?? "";
-          const tourKey = classes.match(/tourKey-(\d+)/)?.[1] ?? "";
-          const mealKey = classes.match(/mealKey-(\d+)/)?.[1] ?? "";
-          const roomKey = classes.match(/roomKey-(\d+)/)?.[1] ?? "";
-          const nights = parseInt(classes.match(/nights-(\d+)/)?.[1] ?? "0");
-          const checkIn = classes.match(/checkIn-(\d+)/)?.[1] ?? "";
-          const adults = parseInt(classes.match(/adult-(\d+)/)?.[1] ?? "0");
-          const children = parseInt(classes.match(/child-(\d+)/)?.[1] ?? "0");
-          const claim = row.getAttribute("data-cat-claim") ?? "";
+      // Extract offers from current page
+      const allOffers: any[] = [];
+      let currentPageOffers = await this.extractPageOffers(page);
+      allOffers.push(...currentPageOffers);
 
-          const hotel = row.querySelector(".link-hotel")?.textContent?.trim() ?? "";
-          const priceEl = row.querySelector("[data-cat-price]");
-          const price = priceEl?.getAttribute("data-cat-price") ?? "0";
-          const currency = priceEl?.getAttribute("data-currency_title") ?? "USD";
-          const departureDate = row.querySelector(".sortie")?.textContent?.trim() ?? "";
-          const transport = row.querySelector(".transport")?.textContent?.trim() ?? "";
-
-          // Extract room and meal text from table cells using known column structure
-          // Table columns: [0]checkbox [1]Заезд [2]Тур [3]Ночей [4]Гостиница [5]Места [6]Питание [7]Номер/Размещение [8-9]empty [10]Цена [11-12]empty [13]Транспорт [14]Класс
-          const cells = row.querySelectorAll("td");
-          let roomText = "";
-          let mealText = "";
-          if (cells.length >= 8) {
-            mealText = cells[6]?.textContent?.trim() ?? "";
-            roomText = cells[7]?.textContent?.trim() ?? "";
+      // Paginate through remaining pages
+      const maxPages = SummertourAdapter.MAX_PAGES;
+      for (let p = 2; p <= maxPages; p++) {
+        const hasNextPage = await page.evaluate((targetPage: number) => {
+          const spans = document.querySelectorAll(".pager span.page");
+          const target = Array.from(spans).find(
+            (s) => s.getAttribute("data-page") === String(targetPage),
+          );
+          if (target) {
+            (target as HTMLElement).click();
+            return true;
           }
+          return false;
+        }, p);
 
-          results.push({
-            hotelKey, spoKey, tourKey, mealKey, roomKey,
-            nights, checkIn, adults, children,
-            claim, hotel, price: parseFloat(price), currency,
-            departureDate, transport,
-            roomText, mealText,
-          });
+        if (!hasNextPage) break;
+
+        await page.waitForTimeout(SummertourAdapter.PAGE_DELAY_MS);
+
+        // Wait for new rows to appear
+        try {
+          await page.waitForSelector("tr.price_info", { timeout: 10_000 });
+        } catch {
+          break;
         }
-        return results;
-      });
+        await page.waitForTimeout(1_000);
+
+        currentPageOffers = await this.extractPageOffers(page);
+        if (currentPageOffers.length === 0) break;
+        allOffers.push(...currentPageOffers);
+        this.logger.debug(`Page ${p}: ${currentPageOffers.length} offers`);
+      }
 
       await context.close();
 
       const latency = Date.now() - startTime;
-      this.logger.log(`Summertour Playwright: ${offers.length} offers in ${latency}ms`);
+      this.logger.log(
+        `Summertour Playwright: ${allOffers.length} offers in ${latency}ms` +
+        (query.tourIncName ? ` [program=${query.tourIncName}]` : ""),
+      );
 
-      return offers.map((o) => this.normalizeOffer(o, query));
+      return allOffers.map((o) => this.normalizeOffer(o, query));
     } catch (err) {
       this.logger.error(`Summertour Playwright search failed: ${(err as Error).message}`);
       if (page) {
@@ -150,6 +215,58 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       }
       throw err;
     }
+  }
+
+  /** Extract offers from the current page's tr.price_info rows. */
+  private async extractPageOffers(page: Page): Promise<any[]> {
+    return page.evaluate(() => {
+      const rows = document.querySelectorAll("tr.price_info");
+      const results: any[] = [];
+      for (const row of rows) {
+        const classes = row.className;
+        const hotelKey = classes.match(/hotelKey-(\d+)/)?.[1] ?? "";
+        const spoKey = classes.match(/spoKey-(\d+)/)?.[1] ?? "";
+        const tourKey = classes.match(/tourKey-(\d+)/)?.[1] ?? "";
+        const mealKey = classes.match(/mealKey-(\d+)/)?.[1] ?? "";
+        const roomKey = classes.match(/roomKey-(\d+)/)?.[1] ?? "";
+        const nights = parseInt(classes.match(/nights-(\d+)/)?.[1] ?? "0");
+        const checkIn = classes.match(/checkIn-(\d+)/)?.[1] ?? "";
+        const adults = parseInt(classes.match(/adult-(\d+)/)?.[1] ?? "0");
+        const children = parseInt(classes.match(/child-(\d+)/)?.[1] ?? "0");
+        const claim = row.getAttribute("data-cat-claim") ?? "";
+
+        const hotel = row.querySelector(".link-hotel")?.textContent?.trim() ?? "";
+        const priceEl = row.querySelector("[data-cat-price]");
+        const price = priceEl?.getAttribute("data-cat-price") ?? "0";
+        const currency = priceEl?.getAttribute("data-currency_title") ?? "USD";
+        const departureDate = row.querySelector(".sortie")?.textContent?.trim() ?? "";
+        const transport = row.querySelector(".transport")?.textContent?.trim() ?? "";
+
+        // Table columns: [0]checkbox [1]Заезд [2]Тур [3]Ночей [4]Гостиница [5]Места [6]Питание [7]Номер/Размещение [8-9]empty [10]Цена [11-12]empty [13]Транспорт [14]Класс
+        const cells = row.querySelectorAll("td");
+        let roomText = "";
+        let mealText = "";
+        if (cells.length >= 8) {
+          mealText = cells[6]?.textContent?.trim() ?? "";
+          roomText = cells[7]?.textContent?.trim() ?? "";
+        }
+
+        results.push({
+          hotelKey, spoKey, tourKey, mealKey, roomKey,
+          nights, checkIn, adults, children,
+          claim, hotel, price: parseFloat(price), currency,
+          departureDate, transport,
+          roomText, mealText,
+        });
+      }
+      return results;
+    });
+  }
+
+  /** Convert ISO date (YYYY-MM-DD) to SAMO format (DD.MM.YYYY). */
+  private isoToSamodate(iso: string): string {
+    const [y, m, d] = iso.split("-");
+    return `${d}.${m}.${y}`;
   }
 
   // ── Browser Lifecycle ─────────────────────────────────────────────
@@ -231,6 +348,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
         roomText: raw.roomText,
         mealText: raw.mealText,
         catClaim: raw.claim,
+        tourIncValue: query.tourIncValue,
+        tourIncName: query.tourIncName,
       },
     };
   }
@@ -260,6 +379,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       nightsTo: ctx.nightsTo,
       departureDateFrom: ctx.departureDateFrom,
       departureDateTo: ctx.departureDateTo,
+      tourIncValue: ctx.tourIncValue,
+      tourIncName: ctx.tourIncName,
     };
 
     const offers = await this.search(query);
@@ -309,6 +430,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       nightsTo: ctx.nightsTo,
       departureDateFrom: ctx.departureDateFrom,
       departureDateTo: ctx.departureDateTo,
+      tourIncValue: ctx.tourIncValue,
+      tourIncName: ctx.tourIncName,
     };
 
     const offers = await this.search(query);
@@ -345,6 +468,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       nightsTo: ctx.nightsTo,
       departureDateFrom: ctx.departureDateFrom,
       departureDateTo: ctx.departureDateTo,
+      tourIncValue: ctx.tourIncValue,
+      tourIncName: ctx.tourIncName,
     };
 
     const offers = await this.search(query);
@@ -375,6 +500,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       nightsTo: query.nights,
       departureDateFrom: query.dateFrom,
       departureDateTo: query.dateTo,
+      tourIncValue: (query as any).tourIncValue,
+      tourIncName: (query as any).tourIncName,
     };
 
     const offers = await this.search(searchQuery);
@@ -417,6 +544,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
             meal: query.meal,
             nightsFrom: query.nights,
             nightsTo: query.nights,
+            tourIncValue: (query as any).tourIncValue,
+            tourIncName: (query as any).tourIncName,
           },
         },
       });

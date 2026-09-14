@@ -40,6 +40,10 @@ export interface SupplierSearchQuery {
   transport?: string;
   /** Instant confirmation only. */
   instantConfirmOnly?: boolean;
+  /** Summertour TOURINC value (program ID). */
+  tourIncValue?: string;
+  /** Summertour program display name (for logging/attribution). */
+  tourIncName?: string;
   /** Page number (1-based). */
   page?: number;
   /** Max results per page. */
@@ -221,6 +225,10 @@ export interface PriceCalendarQuery {
   /** Date range (ISO-8601). */
   dateFrom: string;
   dateTo: string;
+  /** Summertour TOURINC value (program ID). */
+  tourIncValue?: string;
+  /** Summertour program display name. */
+  tourIncName?: string;
 }
 
 export interface PriceCalendarEntry {
