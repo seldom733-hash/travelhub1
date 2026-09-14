@@ -149,7 +149,7 @@ function PublicHeader({ user }: { user: AuthUser | null }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t("nav.search_placeholder", locale)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
           />
           <button
             type="submit"

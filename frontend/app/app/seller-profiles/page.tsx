@@ -250,7 +250,7 @@ export default function SellerProfilesReviewPage() {
                               </option>
                             ))}
                           </select>
-                          <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2} placeholder={t("seller.comment", locale)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                          <textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2} placeholder={t("seller.comment", locale)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 placeholder:text-slate-400" />
                         </>
                       )}
                       <div className="flex gap-2">

@@ -175,7 +175,7 @@ export default function PartnerSellerProfilePage() {
                   disabled={!editable && latest !== null}
                   placeholder={t("seller.display_name_hint", locale)}
                   maxLength={120}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:opacity-60"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 placeholder:text-slate-400 disabled:opacity-60"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -186,7 +186,7 @@ export default function PartnerSellerProfilePage() {
                   disabled={!editable && latest !== null}
                   rows={3}
                   maxLength={1000}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:opacity-60"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 placeholder:text-slate-400 disabled:opacity-60"
                 />
               </div>
               <div>
@@ -205,7 +205,7 @@ export default function PartnerSellerProfilePage() {
                   value={cityCode || latest?.requestedCityCode || ""}
                   onChange={(e) => setCityCode(e.target.value)}
                   disabled={!editable && latest !== null}
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:opacity-60"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 placeholder:text-slate-400 disabled:opacity-60"
                 >
                   <option value="">{t("seller.city_none", locale)}</option>
                   {citiesOf(profile.systemCountryCode ?? profile.countryCode).map((c) => (

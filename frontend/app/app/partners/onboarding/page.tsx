@@ -214,7 +214,7 @@ export default function PartnerOnboardingReviewPage() {
                   {action && (
                     <div className="space-y-2">
                       {action !== "approve" && (
-                        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder={t("partner.reason_placeholder", locale)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-400" />
+                        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder={t("partner.reason_placeholder", locale)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 placeholder:text-slate-400" />
                       )}
                       <div className="flex gap-2">
                         <button
