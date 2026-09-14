@@ -1,0 +1,43 @@
+[
+ {
+  "method": "GET",
+  "url": "https://summertour.az/search_tour?samo_action=TOURINC&TOWNFROMINC=1930&STATEINC=9&TOURINC=229&CHECKIN_BEG=20260914&NIGHTS_FROM=7&CHECKIN_END=20260915&NIGHTS_TILL=7&ADULT=2&CHILD=0&rev=2841405266&_=1789374684274",
+  "status": 200,
+  "type": "xhr",
+  "post_data": null,
+  "body_len": 129264,
+  "body_head": "(function(){if (typeof samo === \"undefined\") { samo = {}; } samo.current_request = null;samo.ROOT_URL = \"\\/search_tour?\";samo.jQuery(samo.controls.PROGRAMGROUPINC).addOptions(    [\n                                                                                                                            {inc: '0', title: '----', selected: false}                            ]\n);samo.jQuery('#search_tour').find('.ptype_group_filter').removeClass('hidden');samo.jQuery(samo.controls.PROGRAMINC).addOptions(    [\n                                                                ]\n);samo.jQuery(samo.controls.TOWNS).html(\"                                                                <div class=\\\"groupbox\\\">\\n                <label class=\\\"groupname\\\"><input type=\\\"checkbox\\\" class=\\\"group\\\"\\n                                                 \\/>\\u0410\\u043b\\u0430\\u043d\\u044c\\u044f\\n                <\\/label>\\n                                        <div class=\\\"groupboxChildren\\\">\\n                <label class=\\\" hidden\\\">\\n                                <input type=\\\"checkbox\\\"   value=\\\"1968\\\"\\/>\\n                                    \\u0410\\u0432\\u0441\\u0430\\u043b\\u043b\\u0430\\u0440\\n                                                <\\/label>\\n                            <\\/div>\\n                                            <div class=\\\"groupboxChildren\\\">\\n                <label class=\\\" hidden\\\">\\n                                <input type=\\\"checkbox\\\"   value=\\\"1959\\\"\\/>\\n                                    \\u0410\\u043b\\u0430\\u043d\\u044c\\u044f\\n                                                <\\/label>\\n                            <\\/div>\\n                                            <div class=\\\"groupboxChildren\\\">\\n                <label class=\\\" hidden\\\">\\n                                <input type=\\\"checkbox\\\"   value=\\\"1962\\\"\\/>\\n                                    \\u0418\\u043d\\u0436\\u0435\\u043a\\u0443\\u043c\\n                                                <\\/label>\\n     "
+ },
+ {
+  "method": "GET",
+  "url": "https://summertour.az/search_tour?samo_action=ADULT&TOWNFROMINC=1930&STATEINC=9&TOURINC=229&CHECKIN_BEG=20260914&NIGHTS_FROM=0&CHECKIN_END=20260915&NIGHTS_TILL=0&ADULT=2&CHILD=0&rev=2841405266&_=1789374684275",
+  "status": 200,
+  "type": "xhr",
+  "post_data": null,
+  "body_len": 5013,
+  "body_head": "(function(){if (typeof samo === \"undefined\") { samo = {}; } samo.current_request = null;samo.ROOT_URL = \"\\/search_tour?\";samo.jQuery(samo.controls.CHECKIN_BEG).datePicker({\"value\":\"14.09.2026\",\"start\":\"14.09.2026\",\"valid\":\"11100100010020002002\"});samo.jQuery(samo.controls.CHECKIN_END).datePicker({\"value\":\"15.09.2026\",\"start\":\"14.09.2026\",\"valid\":\"11100100010020002002\"});samo.jQuery(samo.controls.NIGHTS_FROM).addOptions(    [\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    {inc: '4', title: '4', selected: true, attrs: {\"class-yesplace\": \"\"}},                            {inc: '5', title: '5', selected: false, attrs: {\"class-yesplace\": \"\"}},                            {inc: '8', title: '8', selected: false, attrs: {\"class-yesplace\": \"\"}},                            {inc: '9', title: '9', selected: false, attrs: {\"class-yesplace\": \"\"}},                            {inc: '11', title: '11', selected: false, attrs: {\"class-yesplace\": \"\"}},                            {inc: '12', title: '12', selected: false, attrs: {\"class-yesplace\": \"\"}},                            {inc: '15', title: '15', selected: false, attrs: {\"class-yesplace\": \"\"}}                            ]\n);samo.jQuery('#search_tour').find('.NIGHTS_FROM').addClass('blink');samo.jQuery(samo.controls.NIGHTS_TILL).addOptions(    [\n                                                                                                                                                                                                                                                                       "
+ },
+ {
+  "method": "GET",
+  "url": "https://summertour.az/search_tour?samo_action=PRICES&TOWNFROMINC=1930&STATEINC=9&TOURINC=229&CHECKIN_BEG=20261001&NIGHTS_FROM=4&CHECKIN_END=20261001&NIGHTS_TILL=4&ADULT=2&CURRENCY=2&CHILD=0&TOWNS_ANY=1&TOWNS=&STARS_ANY=1&STARS=&hotelsearch=0&HOTELS_ANY=1&HOTELS=&MEALS_ANY=1&MEALS=&ROOMS_ANY=1&ROOMS=&FREIGHT=0&FILTER=0&MOMENT_CONFIRM=0&HOTELTYPES=&PARTITION_PRICE=32&PRICEPAGE=1&DYN_SEPARATE=1&rev=2841405266&_=1789374684276",
+  "status": 200,
+  "type": "xhr",
+  "post_data": null,
+  "body_len": 1061,
+  "body_head": "(function(){if (typeof samo === \"undefined\") { samo = {}; } samo.current_request = null;samo.ROOT_URL = \"\\/search_tour?\"; if (typeof samo != \"undefined\" && typeof samo.search_key != \"undefined\") {samo.search_key(null);};samo.jQuery(samo.controls.resultset).ehtml(\"                        \\u041d\\u0435\\u0442 \\u0434\\u0430\\u043d\\u043d\\u044b\\u0445. \\u0423\\u0442\\u043e\\u0447\\u043d\\u0438\\u0442\\u0435 \\u043f\\u0430\\u0440\\u0430\\u043c\\u0435\\u0442\\u0440\\u044b \\u043f\\u043e\\u0438\\u0441\\u043a\\u0430.\\n            \");samo.initResultset(); if (typeof samo != \"undefined\" && typeof samo.link_to_page != \"undefined\") {samo.link_to_page(\"https:\\/\\/summertour.az\\/search_tour?TOWNFROMINC=1930&STATEINC=9&TOURINC=229&CHECKIN_BEG=20261001&NIGHTS_FROM=4&CHECKIN_END=20261001&NIGHTS_TILL=4&ADULT=2&CURRENCY=2&CHILD=0&TOWNS_ANY=1&STARS_ANY=1&HOTELS_ANY=1&MEALS_ANY=1&ROOMS_ANY=1&PARTITION_PRICE=32&PRICEPAGE=1&DOLOAD=1\");}; if (typeof samo != \"undefined\" && typeof samo.page_callback != \"undefined\") {samo.page_callback(\"search_tour\",\"PRICES\",{\"TOWNFROMINC\":1930,\"STATEINC\":9});};})();"
+ },
+ {
+  "method": "POST",
+  "url": "https://www.google-analytics.com/g/collect?v=2&tid=G-EQQTDWFE8W&gtm=45je69a0h2v9103943163za200zb899986742zd899986742&_p=1789374684111&gcd=13l3l3l3l1l1&npa=0&dma=0&_eu=AEAAAAQ&ae=a&are=1&cid=689980416.1789374685&frm=0&ngs=1&pscdl=noapi&rcb=17&sr=1440x900&uaa=x86&uab=64&uafvl=Not%253DA%253FBrand%3B99.0.0.0%7CHeadlessChrome%3B151.0.7922.34%7CChromium%3B151.0.7922.34&uam=&uamb=0&uap=Windows&uapv=10.0&uaw=0&ul=ru-ru&_s=2&tag_exp=115938466~115938469~118897920~118897930~120213116~120385423~120469145~12",
+  "status": 204,
+  "type": "fetch",
+  "post_data": null
+ },
+ {
+  "method": "POST",
+  "url": "https://www.google-analytics.com/g/collect?v=2&tid=G-G18W2LRD68&gtm=45je6992v899986742za200zd899986742&_p=1789374684111&gcd=13l3l3l3l1l1&npa=0&dma=0&_eu=AEAAAAQ&ae=a&are=1&cid=689980416.1789374685&frm=0&ngs=1&pscdl=noapi&rcb=7&sr=1440x900&uaa=x86&uab=64&uafvl=Not%253DA%253FBrand%3B99.0.0.0%7CHeadlessChrome%3B151.0.7922.34%7CChromium%3B151.0.7922.34&uam=&uamb=0&uap=Windows&uapv=10.0&uaw=0&ul=ru-ru&_s=2&tag_exp=115938466~115938469~118897920~118897930~120213116~120385422~120412527~120469145~1204691",
+  "status": 204,
+  "type": "fetch",
+  "post_data": null
+ }
+]
