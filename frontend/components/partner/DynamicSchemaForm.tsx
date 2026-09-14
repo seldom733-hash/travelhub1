@@ -94,7 +94,7 @@ export default function DynamicSchemaForm({ attributes, value, onChange, disable
   const set = (key: string, next: unknown) => onChange({ ...value, [key]: next });
 
   const inputClass = (def: PartnerSchemaAttribute) =>
-    `w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:ring-2 ${
+    `w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 ${
       errors[def.key]
         ? "border-red-400 focus:border-red-400 focus:ring-red-100"
         : "border-slate-200 focus:border-emerald-400 focus:ring-emerald-100"

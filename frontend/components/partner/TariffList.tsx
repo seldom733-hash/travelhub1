@@ -58,7 +58,7 @@ export default function TariffList({
             onChange={(e) => update(t.id, { name: e.target.value })}
             placeholder={pt("partner.form.tariff_name", locale)}
             disabled={disabled}
-            className="w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 disabled:bg-slate-50"
+            className="w-40 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 disabled:bg-slate-50"
           />
           <label className="sr-only" htmlFor={`tariff-price-${t.id}`}>
             {pt("partner.form.tariff_price", locale)}
@@ -72,7 +72,7 @@ export default function TariffList({
             onChange={(e) => update(t.id, { price: e.target.value })}
             placeholder={pt("partner.form.tariff_price", locale)}
             disabled={disabled}
-            className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 disabled:bg-slate-50"
+            className="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 disabled:bg-slate-50"
           />
           <label className="sr-only" htmlFor={`tariff-currency-${t.id}`}>
             {pt("partner.form.tariff_currency", locale)}
@@ -84,7 +84,7 @@ export default function TariffList({
             placeholder="USD"
             maxLength={3}
             disabled={disabled}
-            className="w-20 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm uppercase outline-none transition focus:border-emerald-400 disabled:bg-slate-50"
+            className="w-20 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm uppercase text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 disabled:bg-slate-50"
           />
           {value.length > 1 && !disabled && (
             <button

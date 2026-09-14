@@ -319,7 +319,7 @@ function MetaInput({
         }}
         placeholder={label}
         disabled={disabled}
-        className="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] outline-none focus:border-emerald-400 disabled:bg-slate-50"
+        className="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald-400 disabled:bg-slate-50"
       />
     </div>
   );

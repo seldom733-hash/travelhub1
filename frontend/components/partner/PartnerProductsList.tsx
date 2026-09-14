@@ -187,7 +187,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
             value={draftQ}
             onChange={(e) => setDraftQ(e.target.value)}
             placeholder={pt("partner.products.search", locale)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
           />
         </form>
 
@@ -215,7 +215,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
             id="partner-category"
             value={categoryId}
             onChange={(e) => changeCategory(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs outline-none focus:border-emerald-400"
+            className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-900 outline-none focus:border-emerald-400"
           >
             <option value="">{pt("partner.product.category", locale)}: {pt("partner.filter.all", locale)}</option>
             {categories.map((c) => (
@@ -232,7 +232,7 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
             id="partner-sort"
             value={sort}
             onChange={(e) => changeSort(e.target.value as PartnerListSort)}
-            className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs outline-none focus:border-emerald-400"
+            className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-900 outline-none focus:border-emerald-400"
           >
             {SORTS.map((s) => (
               <option key={s.value} value={s.value}>

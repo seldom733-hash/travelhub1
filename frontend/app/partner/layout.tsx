@@ -114,7 +114,10 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50">
+    <div
+      className="flex min-h-screen flex-col bg-slate-50 text-slate-900 [color-scheme:light]"
+      style={{ colorScheme: "light" }}
+    >
       {/* ── Header ── */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3">
