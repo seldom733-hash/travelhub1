@@ -156,10 +156,13 @@ All deferred items are documented as architectural gaps. No fake data or fake fi
 | Metric | Value |
 |---|---|
 | Branch | `master` |
-| Local HEAD | TBD (after commit) |
-| Remote HEAD | `231487c` |
-| Working tree | Modified files ready to commit |
+| Local HEAD | `84d2bd1` |
+| Remote HEAD | `231487c` (before push) |
+| Working tree | Clean (only untracked files) |
 
 ## 12. Commit
 
-TBD — Will be committed after report finalization.
+| Commit | Message |
+|---|---|
+| `134ee00` | `feat(vitrine): canonical Product Catalog with geography/dates/travelers/service-specific filters` |
+| `84d2bd1` | `docs: Vitrine catalog filters implementation report + browser evidence` |
