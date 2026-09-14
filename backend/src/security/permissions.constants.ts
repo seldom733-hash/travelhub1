@@ -63,6 +63,10 @@ export const PERMISSIONS = {
   "crm.customer.create_own": "Прямое добавление клиента/лида в собственный CRM (partner intake)",
   "crm.customer.update_own": "Обновление собственных CRM-отношений (lifecycle/tags/notes)",
 
+  // ── Supplier Integration ──────────────────────────────────────────────
+  "supplier.search.read": "Чтение поиска поставщика (Supplier Search/Detail/Refresh)",
+  "supplier.search.manage": "Управление кэшем/метриками поставщика (ADMIN)",
+
   // ── Order ─────────────────────────────────────────────────────────────
   "order.read": "Чтение заказов",
   "order.accept": "Принятие заказа в работу",
@@ -625,6 +629,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // Step 1.8 (clarification): ТОЛЬКО editor-контракт ACTIVE схемы, НЕ internal
     // category_schema.read (последний отсутствует у PARTNER и не выдаётся).
     "catalog.category_schema.read_active_for_product_edit",
+    // Supplier integration — search/refresh (Mode A: Dynamic Supplier Inventory)
+    "supplier.search.read",
     "catalog.media.upload_own",
     "catalog.media.update_own",
     "catalog.media.delete_own",

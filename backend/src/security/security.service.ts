@@ -510,6 +510,8 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "crm.customer.read_own": "Чтение собственных CRM-отношений (partner own-scope)",
   "crm.customer.create_own": "Прямое добавление клиента/лида в собственный CRM (partner intake)",
   "crm.customer.update_own": "Обновление собственных CRM-отношений (lifecycle/tags/notes)",
+  "supplier.search.read": "Чтение поиска поставщика (Supplier Search/Detail/Refresh)",
+  "supplier.search.manage": "Управление кэшем/метриками поставщика (ADMIN)",
   "order.read": "Чтение заказов",
   "order.accept": "Принятие заказа в работу",
   "order.edit_noncritical": "Редактирование некритичных данных заказа",
