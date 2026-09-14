@@ -59,6 +59,17 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
         { timeout: 15_000 },
       );
 
+      // Note: SAMO form has no hotel_name or HOTELINC inputs.
+      // Hotel filtering is done post-scrape in getPriceCalendar.
+
+      // Note: SAMO form has no MEALS[] checkboxes. Meal filtering is post-scrape.
+
+      // Note: SAMO form dates must not be overridden — the form's JS SPA
+      // requires its own event handling. Date filtering is post-scrape.
+
+      // Note: SAMO form nights select also requires its own JS event handling.
+      // Nights filtering is post-scrape.
+
       // Click the search button to trigger AJAX price loading
       const searchBtn = await page.$(".load");
       if (!searchBtn) {
@@ -105,11 +116,22 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
           const departureDate = row.querySelector(".sortie")?.textContent?.trim() ?? "";
           const transport = row.querySelector(".transport")?.textContent?.trim() ?? "";
 
+          // Extract room and meal text from table cells using known column structure
+          // Table columns: [0]checkbox [1]Заезд [2]Тур [3]Ночей [4]Гостиница [5]Места [6]Питание [7]Номер/Размещение [8-9]empty [10]Цена [11-12]empty [13]Транспорт [14]Класс
+          const cells = row.querySelectorAll("td");
+          let roomText = "";
+          let mealText = "";
+          if (cells.length >= 8) {
+            mealText = cells[6]?.textContent?.trim() ?? "";
+            roomText = cells[7]?.textContent?.trim() ?? "";
+          }
+
           results.push({
             hotelKey, spoKey, tourKey, mealKey, roomKey,
             nights, checkIn, adults, children,
             claim, hotel, price: parseFloat(price), currency,
             departureDate, transport,
+            roomText, mealText,
           });
         }
         return results;
@@ -183,8 +205,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       tour: raw.tourKey || undefined,
       departureDate,
       nights: raw.nights,
-      room: raw.roomKey || undefined,
-      meal: raw.mealKey || undefined,
+      room: raw.roomText || raw.roomKey || undefined,
+      meal: raw.mealText || raw.mealKey || undefined,
       adults: raw.adults || (query.adults ?? 2),
       children: raw.children || (query.children ?? 0),
       childAges: query.childAges ?? [],
@@ -206,6 +228,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
         tourKey: raw.tourKey,
         mealKey: raw.mealKey,
         roomKey: raw.roomKey,
+        roomText: raw.roomText,
+        mealText: raw.mealText,
         catClaim: raw.claim,
       },
     };
@@ -344,6 +368,7 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       children: query.children,
       childAges: query.childAges,
       hotel: query.hotel,
+      hotelExternalId: query.hotelExternalId,
       room: query.room,
       meal: query.meal,
       nightsFrom: query.nights,

@@ -32,7 +32,7 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
       adults: 2,
       children: 0,
       childAges: [],
-      nights: (attrs.days as number) ?? 7,
+      nights: (attrs.nights as number) ?? (attrs.days as number) ?? 7,
     };
   });
 

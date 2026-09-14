@@ -26,6 +26,8 @@ export interface SupplierSearchQuery {
   childAges?: number[];
   /** Hotel filter. */
   hotel?: string;
+  /** Hotel external ID (for supplier-specific filtering). */
+  hotelExternalId?: string;
   hotelStars?: number[];
   /** Room type. */
   room?: string;

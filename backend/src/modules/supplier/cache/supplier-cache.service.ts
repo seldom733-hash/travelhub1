@@ -118,7 +118,7 @@ export class SupplierCacheService {
   invalidateSupplier(supplierCode: string): void {
     let count = 0;
     for (const key of this.searchCache.keys()) {
-      if (key.startsWith(supplierCode + ":")) { this.searchCache.delete(key); count++; }
+      if (key.includes(supplierCode)) { this.searchCache.delete(key); count++; }
     }
     for (const key of this.priceCache.keys()) {
       if (key.startsWith(supplierCode + ":")) { this.priceCache.delete(key); count++; }

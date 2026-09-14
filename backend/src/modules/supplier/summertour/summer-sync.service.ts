@@ -222,6 +222,13 @@ export class SummerSyncService {
     // Build attributes (tours schema: days, nights, itinerary, included, excluded)
     const nights = offers[0]?.nights ?? 7;
     const days = nights + 1;
+
+    // Extract unique rooms and meals from scraped offers
+    const uniqueRooms = [...new Set(offers.map((o) => o.room).filter((r): r is string => !!r))];
+    const uniqueMeals = [...new Set(offers.map((o) => o.meal).filter((m): m is string => !!m))];
+    // Also get unique nights from offers
+    const uniqueNights = [...new Set(offers.map((o) => o.nights).filter((n) => n > 0))].sort((a, b) => a - b);
+
     const attributes: Record<string, unknown> = {
       days,
       nights,
@@ -237,6 +244,10 @@ export class SummerSyncService {
       startingPrice: minPrice,
       currency,
       offerCount: offers.length,
+      // Real room/meal options from Summer
+      rooms: uniqueRooms,
+      meals: uniqueMeals,
+      availableNights: uniqueNights,
       // Raw supplier references for future price calendar
       rawHotelKey: hotelKey,
       rawTourKey: tourKey,
