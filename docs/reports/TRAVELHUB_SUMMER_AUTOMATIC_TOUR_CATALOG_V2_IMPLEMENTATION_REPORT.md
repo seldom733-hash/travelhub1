@@ -78,7 +78,7 @@ Permission: supplier.search.manage
 Создание набора сущностей (идемпотентно):
 - **Partner:** `Summer / Summertour` (код PAR-*, страна TR)
 - **Supplier:** `Summertour` (код SUP-*)
-- **User:** `summer@summertour.az` / `Summer2026!` (роль PARTNER)
+- **User:** `summer@summertour.az` (роль PARTNER, пароль генерируется случайно при seed)
 
 Запуск: `npx ts-node src/seed/summer-partner-seed.ts`
 

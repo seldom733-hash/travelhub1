@@ -4,9 +4,13 @@
  * Reuses existing entities if already present.
  * Safe to run multiple times (idempotent).
  *
+ * Security: generates a random temporary password on first creation.
+ * The password is printed ONCE to stdout and never stored in source.
+ *
  * Usage: npx ts-node src/seed/summer-partner-seed.ts
  */
 import "dotenv/config";
+import { randomBytes } from "crypto";
 import { PrismaClient } from "../generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import * as bcrypt from "bcryptjs";
@@ -16,9 +20,19 @@ const prisma = new PrismaClient({
 });
 
 const SUMMER_LOGIN = "summer@summertour.az";
-const SUMMER_PASSWORD = "Summer2026!";
 const SUMMER_PARTNER_NAME = "Summer / Summertour";
 const SUMMER_SUPPLIER_NAME = "Summertour";
+
+function generateTemporaryPassword(): string {
+  // 16 bytes = 32 hex chars, split into readable segments
+  const raw = randomBytes(16).toString("hex");
+  // Format: Xxx-9999-xxxx-9999 (mixed case + digits for readability)
+  const upper = raw.substring(0, 4).replace(/[0-9]/g, (c) => String.fromCharCode(65 + parseInt(c)));
+  const digits = raw.substring(4, 8).replace(/[^0-9]/g, "9");
+  const lower = raw.substring(8, 12).replace(/[0-9]/g, (c) => String.fromCharCode(97 + parseInt(c)));
+  const digits2 = raw.substring(12, 16).replace(/[^0-9]/g, "7");
+  return `${upper}-${digits}-${lower}-${digits2}`;
+}
 
 async function main() {
   console.log("=== Summer Partner Seed (idempotent) ===\n");
@@ -32,7 +46,6 @@ async function main() {
   if (partner) {
     console.log(`Partner REUSED: ${partner.code} (${partner.id})`);
   } else {
-    // Generate unique code
     const timestamp = Date.now().toString(36).toUpperCase();
     const code = `PAR-${timestamp}`;
 
@@ -81,6 +94,8 @@ async function main() {
     select: { id: true, code: true, username: true, partnerId: true },
   });
 
+  let temporaryPassword: string | null = null;
+
   if (user) {
     console.log(`User REUSED: ${user.code} (${user.username})`);
     if (!user.partnerId && partner) {
@@ -88,7 +103,8 @@ async function main() {
       console.log(`User linked to Partner`);
     }
   } else {
-    const passwordHash = await bcrypt.hash(SUMMER_PASSWORD, 10);
+    temporaryPassword = generateTemporaryPassword();
+    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
     const userCode = `USR-SUMMER`;
     user = await prisma.$transaction(async (tx) => {
       const id = await tx.$queryRaw<{ id: string }[]>`
@@ -110,8 +126,19 @@ async function main() {
   console.log(`User ID:       ${user!.id}`);
   console.log(`User Code:     ${user!.code}`);
   console.log(`Login:         ${SUMMER_LOGIN}`);
-  console.log(`Password:      ${SUMMER_PASSWORD}`);
   console.log(`Role:          PARTNER`);
+
+  if (temporaryPassword) {
+    console.log(`\n========================================`);
+    console.log(`SUMMER PARTNER INITIAL CREDENTIALS`);
+    console.log(`========================================`);
+    console.log(`Login:    ${SUMMER_LOGIN}`);
+    console.log(`Password: ${temporaryPassword}`);
+    console.log(`========================================`);
+    console.log(`(This password is shown ONCE. Save it securely.)`);
+  } else {
+    console.log(`\n(No new credentials — user already exists.)`);
+  }
 
   await prisma.$disconnect();
 }
