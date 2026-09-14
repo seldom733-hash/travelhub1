@@ -4,16 +4,19 @@ import { SupplierCacheService } from "./cache/supplier-cache.service";
 import { SupplierResilienceService } from "./resilience/supplier-resilience.service";
 import { SupplierOfferService } from "./supplier-offer.service";
 import { SummertourAdapter } from "./summertour/summertour.adapter";
+import { SummerSyncService } from "./summertour/summer-sync.service";
 import { SupplierController } from "./supplier.controller";
+import { PrismaModule } from "../../prisma/prisma.module";
 
 /**
- * Supplier module — registers adapters, cache, resilience, service.
+ * Supplier module — registers adapters, cache, resilience, service, sync.
  *
- * Adapters are registered at module init. No production providers yet.
- * Summertour is the first adapter (Mode A: Dynamic Supplier Inventory).
+ * Adapters are registered at module init. Summertour is the first adapter.
+ * SummerSyncService handles idempotent Product creation from supplier data.
  */
 @Global()
 @Module({
+  imports: [PrismaModule],
   controllers: [SupplierController],
   providers: [
     SupplierAdapterRegistry,
@@ -21,6 +24,7 @@ import { SupplierController } from "./supplier.controller";
     SupplierResilienceService,
     SupplierOfferService,
     SummertourAdapter,
+    SummerSyncService,
     {
       provide: "SUPPLIER_MODULE_INIT",
       useFactory: (registry: SupplierAdapterRegistry, summertour: SummertourAdapter) => {
@@ -45,6 +49,6 @@ import { SupplierController } from "./supplier.controller";
       inject: [SupplierAdapterRegistry, SummertourAdapter],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService],
 })
 export class SupplierModule {}

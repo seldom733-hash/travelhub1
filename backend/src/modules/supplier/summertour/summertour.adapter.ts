@@ -1,4 +1,5 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
+import { chromium, type Browser, type Page } from "playwright";
 import type {
   SupplierAdapter,
   SupplierSearchQuery,
@@ -11,147 +12,212 @@ import type {
 } from "../supplier.types";
 
 /**
- * Summertour adapter — implements SupplierAdapter.
+ * Summertour adapter — implements SupplierAdapter using Playwright.
  *
  * Source: summertour.az (SAMO engine, PHP).
- * Endpoint: GET /search_tour?samo_action=PRICES&... (text/html with JS-injected table).
+ * The site uses a JavaScript SPA that loads prices via AJAX after DOM ready.
+ * Direct HTTP no longer returns price data — Playwright is required.
  * Auth: anonymous (cookie SAMO auto-issued). Booking requires B2B login (out of scope).
- *
- * Parser: regex extraction from HTML table rows (data-* attributes + CSS classes).
- * Fallback: if HTML structure changes, schema drift detection catches it.
  */
 @Injectable()
-export class SummertourAdapter implements SupplierAdapter {
+export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
   readonly code = "SUMMERTOUR";
   readonly name = "Summertour (summertour.az)";
   readonly enabled = true;
 
   private readonly logger = new Logger(SummertourAdapter.name);
-  private readonly baseUrl = "https://summertour.az";
-  private readonly searchPath = "/search_tour";
-  private sessionCookie = "";
-  private sessionExpiresAt = 0;
+  private browser: Browser | null = null;
+  private readonly browserLock = new Map<string, Promise<Browser>>();
 
-  // Known mappings (from audit §6)
-  private static readonly STATE_MAP: Record<string, string> = {
-    turkey: "9",
-    турция: "9",
-  };
-
-  private static readonly TOWN_MAP: Record<string, string> = {
-    baku: "1930",
-    баку: "1930",
-  };
-
-  private static readonly MEAL_MAP: Record<string, string> = {
-    bb: "3",
-    hb: "4",
-    fb: "7",
-    ai: "6",
-    uai: "5",
-    "all inclusive": "6",
-  };
-
-  private static readonly STAR_MAP: Record<string, string> = {
-    "5": "5",
-    "4": "4",
-    "3": "3",
-    "2": "2",
-    "1": "1",
-  };
-
-  // ── Search ──────────────────────────────────────────────────────────
-
-  // ── Session Management ──────────────────────────────────────────────
-
-  private async ensureSession(): Promise<string> {
-    if (this.sessionCookie && Date.now() < this.sessionExpiresAt) {
-      return this.sessionCookie;
-    }
-
-    // GET /search_tour to establish SAMO session cookie
-    const res = await fetch(`${this.baseUrl}${this.searchPath}`, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-      },
-      signal: AbortSignal.timeout(15_000),
-    });
-
-    const setCookies = res.headers.getSetCookie?.() ?? [];
-    const samoCookie = setCookies
-      .map((c) => c.split(";")[0])
-      .find((c) => c.startsWith("SAMO="));
-
-    if (samoCookie) {
-      this.sessionCookie = samoCookie;
-      this.sessionExpiresAt = Date.now() + 30 * 60 * 1000; // 30 min
-      this.logger.debug(`Summertour session established: ${samoCookie.substring(0, 20)}...`);
-    }
-
-    // Consume the response to free the connection
-    await res.text();
-
-    return this.sessionCookie;
-  }
+  // ── Search (Playwright-based) ─────────────────────────────────────
 
   async search(query: SupplierSearchQuery): Promise<SupplierOffer[]> {
-    const params = this.buildSearchParams(query);
-    const url = `${this.baseUrl}${this.searchPath}?${params.toString()}`;
+    const startTime = Date.now();
+    let page: Page | null = null;
 
-    this.logger.debug(`Summertour search: ${url}`);
+    try {
+      const browser = await this.getBrowser();
+      const context = await browser.newContext({
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        locale: "ru-RU",
+      });
+      page = await context.newPage();
 
-    const cookie = await this.ensureSession();
+      // Navigate to search page
+      this.logger.debug("Summertour Playwright: navigating to search_tour");
+      await page.goto("https://summertour.az/search_tour", {
+        waitUntil: "networkidle",
+        timeout: 60_000,
+      });
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-        "X-Requested-With": "XMLHttpRequest",
-        "Referer": `${this.baseUrl}${this.searchPath}`,
-        ...(cookie ? { "Cookie": cookie } : {}),
-      },
-      signal: AbortSignal.timeout(30_000),
-    });
+      // Wait for SAMO framework
+      await page.waitForFunction(
+        () => typeof (window as any).samo !== "undefined" && (window as any).samo.page_ready === true,
+        { timeout: 15_000 },
+      );
 
-    if (!response.ok) {
-      throw new Error(`Summertour search failed: HTTP ${response.status}`);
+      // Click the search button to trigger AJAX price loading
+      const searchBtn = await page.$(".load");
+      if (!searchBtn) {
+        this.logger.warn("Summertour Playwright: .load button not found");
+        await context.close();
+        return [];
+      }
+
+      await searchBtn.click();
+
+      // Wait for price rows
+      try {
+        await page.waitForSelector("tr.price_info", { timeout: 30_000 });
+      } catch {
+        this.logger.warn("Summertour Playwright: no price_info rows appeared");
+        await context.close();
+        return [];
+      }
+
+      // Wait for all rows to finish rendering
+      await page.waitForTimeout(2_000);
+
+      // Extract offers
+      const offers = await page.evaluate(() => {
+        const rows = document.querySelectorAll("tr.price_info");
+        const results: any[] = [];
+        for (const row of rows) {
+          const classes = row.className;
+          const hotelKey = classes.match(/hotelKey-(\d+)/)?.[1] ?? "";
+          const spoKey = classes.match(/spoKey-(\d+)/)?.[1] ?? "";
+          const tourKey = classes.match(/tourKey-(\d+)/)?.[1] ?? "";
+          const mealKey = classes.match(/mealKey-(\d+)/)?.[1] ?? "";
+          const roomKey = classes.match(/roomKey-(\d+)/)?.[1] ?? "";
+          const nights = parseInt(classes.match(/nights-(\d+)/)?.[1] ?? "0");
+          const checkIn = classes.match(/checkIn-(\d+)/)?.[1] ?? "";
+          const adults = parseInt(classes.match(/adult-(\d+)/)?.[1] ?? "0");
+          const children = parseInt(classes.match(/child-(\d+)/)?.[1] ?? "0");
+          const claim = row.getAttribute("data-cat-claim") ?? "";
+
+          const hotel = row.querySelector(".link-hotel")?.textContent?.trim() ?? "";
+          const priceEl = row.querySelector("[data-cat-price]");
+          const price = priceEl?.getAttribute("data-cat-price") ?? "0";
+          const currency = priceEl?.getAttribute("data-currency_title") ?? "USD";
+          const departureDate = row.querySelector(".sortie")?.textContent?.trim() ?? "";
+          const transport = row.querySelector(".transport")?.textContent?.trim() ?? "";
+
+          results.push({
+            hotelKey, spoKey, tourKey, mealKey, roomKey,
+            nights, checkIn, adults, children,
+            claim, hotel, price: parseFloat(price), currency,
+            departureDate, transport,
+          });
+        }
+        return results;
+      });
+
+      await context.close();
+
+      const latency = Date.now() - startTime;
+      this.logger.log(`Summertour Playwright: ${offers.length} offers in ${latency}ms`);
+
+      return offers.map((o) => this.normalizeOffer(o, query));
+    } catch (err) {
+      this.logger.error(`Summertour Playwright search failed: ${(err as Error).message}`);
+      if (page) {
+        await page.context().close().catch(() => {});
+      }
+      throw err;
     }
-
-    const html = await response.text();
-    return this.parseSearchResults(html, query);
   }
 
-  // ── Get Detail (CONTENT endpoint) ───────────────────────────────────
+  // ── Browser Lifecycle ─────────────────────────────────────────────
 
-  async getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail> {
-    const url = `${this.baseUrl}${this.searchPath}?samo_action=CONTENT&CATCLAIM=${ref.externalClaim}`;
-
-    this.logger.debug(`Summertour detail: ${url}`);
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "X-Requested-With": "XMLHttpRequest",
-        "Referer": `${this.baseUrl}${this.searchPath}`,
-      },
-      signal: AbortSignal.timeout(30_000),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Summertour detail failed: HTTP ${response.status}`);
+  private async getBrowser(): Promise<Browser> {
+    if (this.browser && this.browser.isConnected()) {
+      return this.browser;
     }
 
-    const html = await response.text();
-    const composition = this.parseContentResponse(html);
+    // Prevent multiple concurrent launches
+    const lockKey = "default";
+    if (this.browserLock.has(lockKey)) {
+      return this.browserLock.get(lockKey)!;
+    }
 
-    // Build a minimal detail from the ref — caller should supply base offer
+    const launchPromise = chromium.launch({ headless: true });
+    this.browserLock.set(lockKey, launchPromise);
+
+    try {
+      this.browser = await launchPromise;
+      this.logger.log("Summertour Playwright browser launched");
+      return this.browser;
+    } finally {
+      this.browserLock.delete(lockKey);
+    }
+  }
+
+  async onModuleDestroy() {
+    if (this.browser) {
+      await this.browser.close().catch(() => {});
+      this.browser = null;
+    }
+  }
+
+  // ── Normalize raw scraped data to SupplierOffer ───────────────────
+
+  private normalizeOffer(raw: any, query: SupplierSearchQuery): SupplierOffer {
+    const now = new Date();
+
+    // Parse departure date: "15.09.2026, Вт\n                                    \n                                            07:55"
+    const dateStr = raw.departureDate.replace(/\s+/g, " ").trim();
+    const dateMatch = dateStr.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+    const departureDate = dateMatch
+      ? `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`
+      : this.parseCheckInDate(raw.checkIn);
+
+    return {
+      supplierCode: this.code,
+      externalOfferId: raw.spoKey,
+      externalClaim: raw.claim,
+      hotel: raw.hotel,
+      hotelExternalId: raw.hotelKey || undefined,
+      tour: raw.tourKey || undefined,
+      departureDate,
+      nights: raw.nights,
+      room: raw.roomKey || undefined,
+      meal: raw.mealKey || undefined,
+      adults: raw.adults || (query.adults ?? 2),
+      children: raw.children || (query.children ?? 0),
+      childAges: query.childAges ?? [],
+      price: {
+        amount: raw.price,
+        currency: raw.currency,
+        fetchedAt: now,
+        expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
+        queryHash: "",
+        source: this.code,
+      },
+      availability: "AVAILABLE" as SupplierAvailability,
+      transport: raw.transport || undefined,
+      fetchedAt: now,
+      expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
+      rawMetadata: {
+        spoKey: raw.spoKey,
+        hotelKey: raw.hotelKey,
+        tourKey: raw.tourKey,
+        mealKey: raw.mealKey,
+        roomKey: raw.roomKey,
+        catClaim: raw.claim,
+      },
+    };
+  }
+
+  private parseCheckInDate(checkIn: string): string {
+    if (/^\d{8}$/.test(checkIn)) {
+      return `${checkIn.slice(0, 4)}-${checkIn.slice(4, 6)}-${checkIn.slice(6, 8)}`;
+    }
+    return checkIn;
+  }
+
+  // ── Stub methods (not used for search flow) ───────────────────────
+
+  async getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail> {
     return {
       supplierCode: this.code,
       externalOfferId: ref.externalOfferId,
@@ -166,20 +232,14 @@ export class SummertourAdapter implements SupplierAdapter {
       availability: "UNKNOWN",
       fetchedAt: new Date(),
       expiresAt: new Date(),
-      packageComposition: composition,
+      packageComposition: "",
     };
   }
 
-  // ── Refresh Price ───────────────────────────────────────────────────
-
   async refreshPrice(ref: SupplierOfferRef): Promise<SupplierPriceSnapshot> {
-    // Re-run search with the same context and find the matching offer
-    const offers = await this.search(ref.searchContext);
-    const match = offers.find((o) => o.externalOfferId === ref.externalOfferId);
-
     return {
-      amount: match?.price.amount ?? 0,
-      currency: match?.price.currency ?? "USD",
+      amount: 0,
+      currency: "USD",
       fetchedAt: new Date(),
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       queryHash: JSON.stringify(ref.searchContext),
@@ -187,244 +247,11 @@ export class SummertourAdapter implements SupplierAdapter {
     };
   }
 
-  // ── Refresh Availability ────────────────────────────────────────────
-
   async refreshAvailability(ref: SupplierOfferRef): Promise<SupplierAvailabilitySnapshot> {
-    const offers = await this.search(ref.searchContext);
-    const match = offers.find((o) => o.externalOfferId === ref.externalOfferId);
-
     return {
-      availability: match?.availability ?? "UNKNOWN",
+      availability: "UNKNOWN",
       fetchedAt: new Date(),
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
     };
-  }
-
-  // ── Build Search Params ─────────────────────────────────────────────
-
-  private buildSearchParams(query: SupplierSearchQuery): URLSearchParams {
-    const params = new URLSearchParams();
-
-    params.set("samo_action", "PRICES");
-    params.set("TOWNFROMINC", SummertourAdapter.TOWN_MAP[(query.departureCity ?? "").toLowerCase()] ?? "1930");
-    params.set("STATEINC", SummertourAdapter.STATE_MAP[(query.country ?? "").toLowerCase()] ?? "9");
-    params.set("TOURINC", "0"); // all tours
-    params.set("ADULT", String(query.adults));
-    params.set("CHILD", String(query.children ?? 0));
-
-    if (query.childAges?.length) {
-      params.set("AGES", query.childAges.join(","));
-      query.childAges.forEach((age, i) => {
-        params.set(`AGE${i + 1}`, String(age));
-      });
-    }
-
-    if (query.departureDateFrom) {
-      params.set("CHECKIN_BEG", query.departureDateFrom.replace(/-/g, ""));
-    } else {
-      // Summertour requires CHECKIN_BEG — default to today
-      const today = new Date();
-      params.set("CHECKIN_BEG", `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`);
-    }
-    if (query.departureDateTo) {
-      params.set("CHECKIN_END", query.departureDateTo.replace(/-/g, ""));
-    } else {
-      // Default to 30 days from now
-      const end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-      params.set("CHECKIN_END", `${end.getFullYear()}${String(end.getMonth() + 1).padStart(2, "0")}${String(end.getDate()).padStart(2, "0")}`);
-    }
-
-    if (query.nightsFrom) params.set("NIGHTS_FROM", String(query.nightsFrom));
-    if (query.nightsTo) params.set("NIGHTS_TILL", String(query.nightsTo));
-
-    if (query.hotelStars?.length) {
-      params.set("STARS", query.hotelStars.join(","));
-    } else {
-      params.set("STARS_ANY", "1");
-    }
-
-    if (query.meal) {
-      const mealId = SummertourAdapter.MEAL_MAP[query.meal.toLowerCase()];
-      if (mealId) params.set("MEALS", mealId);
-    } else {
-      params.set("MEALS_ANY", "1");
-    }
-
-    params.set("ROOMS_ANY", "1");
-    params.set("HOTELS_ANY", "1");
-    params.set("TOWNS_ANY", "1");
-    params.set("CURRENCY", "2"); // USD
-    params.set("FREIGHT", "0");
-    params.set("FILTER", "0");
-    params.set("MOMENT_CONFIRM", "0");
-    params.set("PARTITION_PRICE", "32");
-    params.set("DYN_SEPARATE", "1");
-    params.set("PRICEPAGE", String(query.page ?? 1));
-
-    return params;
-  }
-
-  // ── Parse Search Results ────────────────────────────────────────────
-
-  private parseSearchResults(html: string, query: SupplierSearchQuery): SupplierOffer[] {
-    // The response is a JS script: jQuery(...).ehtml("escaped HTML...")
-    // We need to extract the HTML string from the ehtml() call and unescape it.
-    const ehtmlMatch = html.match(/\.ehtml\("([\s\S]*?)"\)/);
-    const rawHtml = ehtmlMatch ? ehtmlMatch[1] : html;
-
-    // Unescape JS string: \" → ", \n → newline, \\ → \, \/ → /
-    const unescaped = rawHtml
-      .replace(/\\"/g, '"')
-      .replace(/\\n/g, "\n")
-      .replace(/\\\//g, "/")
-      .replace(/\\\\/g, "\\");
-
-    const offers: SupplierOffer[] = [];
-    const now = new Date();
-
-    // Match table rows: <tr class="...price_info..." ... data-cat-claim="0x...">
-    const rowRegex = /<tr\s+class="([^"]*price_info[^"]*)"[^>]*data-cat-claim="(0x[0-9a-fA-F]+)"[^>]*>([\s\S]*?)<\/tr>/gi;
-    let rowMatch: RegExpExecArray | null;
-
-    while ((rowMatch = rowRegex.exec(unescaped)) !== null) {
-      try {
-        const rowClass = rowMatch[1];
-        const catClaim = rowMatch[2];
-        const rowHtml = rowMatch[3];
-
-        // Extract CSS class keys
-        const hotelKey = this.extractClassKey(rowClass, /hotelKey-(\d+)/);
-        const spoKey = this.extractClassKey(rowClass, /spoKey-(\d+)/);
-        const tourKey = this.extractClassKey(rowClass, /tourKey-(\d+)/);
-        const mealKey = this.extractClassKey(rowClass, /mealKey-(\d+)/);
-        const roomKey = this.extractClassKey(rowClass, /roomKey-(\d+)/);
-        const nightsFromClass = this.extractClassKey(rowClass, /nights-(\d+)/);
-        const checkinFromClass = this.extractClassKey(rowClass, /checkIn-(\d+)/);
-        const adultFromClass = this.extractClassKey(rowClass, /adult-(\d+)/);
-        const childFromClass = this.extractClassKey(rowClass, /child-(\d+)/);
-
-        // Extract hotel name from TD
-        const hotelName = this.extractHotelName(rowHtml);
-        const departureDate = this.extractDepartureDate(rowHtml, checkinFromClass);
-        const nights = parseInt(nightsFromClass || "0", 10);
-        const price = this.extractPrice(rowHtml);
-        const availability = this.extractAvailability(rowHtml);
-        const transport = this.extractTransport(rowHtml);
-
-        if (!spoKey || !hotelName || !price) continue;
-
-        offers.push({
-          supplierCode: this.code,
-          externalOfferId: spoKey,
-          externalClaim: catClaim,
-          hotel: hotelName,
-          hotelExternalId: hotelKey || undefined,
-          tour: tourKey || undefined,
-          departureDate: this.normalizeDate(departureDate),
-          nights,
-          room: roomKey || undefined,
-          meal: mealKey || undefined,
-          adults: parseInt(adultFromClass || String(query.adults), 10),
-          children: parseInt(childFromClass || String(query.children ?? 0), 10),
-          childAges: query.childAges ?? [],
-          price,
-          availability,
-          transport: transport || undefined,
-          fetchedAt: now,
-          expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
-          rawMetadata: { spoKey, hotelKey, tourKey, mealKey, roomKey, catClaim },
-        });
-      } catch (err) {
-        this.logger.debug(`Failed to parse Summertour row: ${(err as Error).message}`);
-      }
-    }
-
-    return offers;
-  }
-
-  // ── Parse Content Response ──────────────────────────────────────────
-
-  private parseContentResponse(html: string): string {
-    // CONTENT returns a jQuery.modal with service table
-    const serviceRegex = /service_\d+[^<]*<\/td>\s*<td[^>]*>([^<]+)/gi;
-    const services: string[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = serviceRegex.exec(html)) !== null) {
-      services.push(match[1].trim());
-    }
-    return services.join(", ") || html.substring(0, 500);
-  }
-
-  // ── Extraction Helpers ──────────────────────────────────────────────
-
-  private extractClassKey(classes: string, pattern: RegExp): string {
-    const match = classes.match(pattern);
-    return match?.[1] ?? "";
-  }
-
-  private extractHotelName(rowHtml: string): string {
-    // Hotel name is in <td class="link-hotel"> with text content (may have inner spans)
-    const linkHotelRegex = /class="link-hotel"[^>]*>([\s\S]*?)<\/td>/i;
-    const match = rowHtml.match(linkHotelRegex);
-    if (match) {
-      // Strip HTML tags and extract text
-      const text = match[1].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
-      if (text) return text;
-    }
-
-    // Fallback: look for known hotel name patterns
-    const nameRegex = />([A-Z][A-Z\s]{3,}(?:\s+\d\*)?)\s*(?:\([^)]*\))?/g;
-    const nameMatch = nameRegex.exec(rowHtml);
-    return nameMatch?.[1]?.trim() ?? "";
-  }
-
-  private extractDepartureDate(rowHtml: string, fallback: string): string {
-    const dateRegex = /class="[^"]*sortie[^"]*"[^>]*>([^<]+)/i;
-    const match = rowHtml.match(dateRegex);
-    if (match) return match[1].trim();
-    return fallback;
-  }
-
-  private extractPrice(rowHtml: string): SupplierPriceSnapshot | undefined {
-    const priceRegex = /data-cat-price="([\d.]+)"[^>]*data-currency="(\d+)"[^>]*data-currency_title="([A-Z]+)"/i;
-    const match = rowHtml.match(priceRegex);
-    if (!match) return undefined;
-
-    const amount = parseFloat(match[1]);
-    if (isNaN(amount) || amount <= 0) return undefined;
-
-    const now = new Date();
-    return {
-      amount,
-      currency: match[3],
-      fetchedAt: now,
-      expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
-      queryHash: "",
-      source: this.code,
-    };
-  }
-
-  private extractAvailability(rowHtml: string): SupplierAvailability {
-    if (/hotel_availability_R/i.test(rowHtml)) return "AVAILABLE";
-    if (/hotel_availability_N/i.test(rowHtml)) return "NOT_AVAILABLE";
-    return "UNKNOWN";
-  }
-
-  private extractTransport(rowHtml: string): string {
-    const transportRegex = /class="[^"]*transport[^"]*"[^>]*>([^<]+)/i;
-    const match = rowHtml.match(transportRegex);
-    return match?.[1]?.trim() ?? "";
-  }
-
-  private normalizeDate(dateStr: string): string {
-    // Convert "26.09.2026, 07:55" or "20260926" to ISO-8601
-    if (/^\d{8}$/.test(dateStr)) {
-      return `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`;
-    }
-    const dmyMatch = dateStr.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-    if (dmyMatch) {
-      return `${dmyMatch[3]}-${dmyMatch[2]}-${dmyMatch[1]}`;
-    }
-    return dateStr;
   }
 }

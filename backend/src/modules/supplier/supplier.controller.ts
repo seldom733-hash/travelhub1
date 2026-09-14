@@ -3,13 +3,15 @@ import { SupplierOfferService } from "./supplier-offer.service";
 import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { SupplierCacheService } from "./cache/supplier-cache.service";
 import { SupplierResilienceService } from "./resilience/supplier-resilience.service";
+import { SummerSyncService } from "./summertour/summer-sync.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
-import { RequirePermissions } from "../../security/auth/decorators";
+import { RequirePermissions, CurrentUser } from "../../security/auth/decorators";
 import type { SupplierSearchQuery } from "./supplier.types";
+import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 
 /**
- * Supplier API controller — exposes search, detail, refresh, metrics.
+ * Supplier API controller — exposes search, detail, refresh, metrics, sync.
  *
  * All endpoints require auth + permissions.
  */
@@ -21,7 +23,21 @@ export class SupplierController {
     private readonly registry: SupplierAdapterRegistry,
     private readonly cache: SupplierCacheService,
     private readonly resilience: SupplierResilienceService,
+    private readonly summerSync: SummerSyncService,
   ) {}
+
+  // ── Summer Sync ───────────────────────────────────────────────────
+
+  @Post("summertour/sync")
+  @RequirePermissions("supplier.search.manage")
+  async summerSyncEndpoint(@CurrentUser() actor: AuthedRequest["user"]) {
+    // Use admin's partnerId or find Summer partner
+    const partner = await this.summerSync["getSummerPartner"]();
+    if (!partner) {
+      throw new Error("Summer partner not found — run summer-partner-seed first");
+    }
+    return this.summerSync.runSync(partner.id);
+  }
 
   // ── Search ──────────────────────────────────────────────────────────
 
