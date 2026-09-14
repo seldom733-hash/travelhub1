@@ -118,9 +118,11 @@ Evidence: `backend/docs_evidence/contrast_fix_01_form_top.png`, `contrast_fix_02
 | Metric | Value |
 |---|---|
 | Branch | `master` |
-| Commit | см. git log (fix(partner): systemic form text contrast in Partner Cabinet) |
-| origin/master | push выполнен, ahead/behind = 0/0 |
-| Working tree | изменение затрагивает 6 файлов frontend (backend-файлы других задач не затрагивались) |
+| HEAD до | `64ebd9d` |
+| Commit (fix) | `55265b3` |
+| Commit (report SHA update) | см. `git log -- docs/reports/TRAVELHUB_PARTNER_CABINET_FORM_TEXT_CONTRAST_FIX_REPORT.md` |
+| origin/master | = local HEAD, ahead/behind **0/0** |
+| Working tree | только pre-existing изменения других задач (backend и др.), файлы данного фикса чистые |
 
 ## 10. Verdict
 
