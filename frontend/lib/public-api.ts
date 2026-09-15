@@ -308,6 +308,16 @@ export interface PriceCalendarEntryOffer {
   tourIncName?: string;
   externalOfferId: string;
   externalClaim?: string;
+  hotel: string;
+  hotelExternalId?: string;
+  departureDate: string;
+  nights: number;
+  room?: string;
+  meal?: string;
+  adults: number;
+  children: number;
+  childAges: number[];
+  availability: "AVAILABLE" | "NOT_AVAILABLE" | "UNKNOWN";
   price: number;
   currency: string;
   transport?: string;

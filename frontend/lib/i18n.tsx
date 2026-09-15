@@ -2450,6 +2450,16 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "calendar.rechecking": { ru: "Повторная проверка...", az: "Yenidən yoxlanılır...", en: "Re-checking..." },
   "calendar.unavailable_on_date": { ru: "На выбранную дату вариант недоступен.", az: "Seçilmiş tarixdə variant mövcud deyil.", en: "Option not available on selected date." },
   "calendar.recheck_error": { ru: "Ошибка повторной проверки. Попробуйте ещё раз.", az: "Yenidən yoxlama xətası. Yenidən cəhd edin.", en: "Re-check error. Please try again." },
+  "calendar.available_offers": { ru: "Доступные варианты на", az: "Mövcud variantlar", en: "Available offers for" },
+  "calendar.place_order": { ru: "Оформить заказ", az: "Sifariş et", en: "Place order" },
+  "calendar.offer_unavailable": { ru: "Предложение больше недоступно.", az: "Təklif artıq mövcud deyil.", en: "Offer is no longer available." },
+  "calendar.price_changed": { ru: "Цена изменилась: было {old}, стало {new}. Подтвердить?", az: "Qiymət dəyişdi: {old} → {new}. Təsdiqləsiniz?", en: "Price changed: {old} → {new}. Confirm?" },
+  "table.hotel": { ru: "Отель", az: "Otəl", en: "Hotel" },
+  "table.room": { ru: "Номер", az: "Otaq", en: "Room" },
+  "table.meal": { ru: "Питание", az: "Yemək", en: "Meal" },
+  "table.program": { ru: "Программа", az: "Proqram", en: "Program" },
+  "table.price": { ru: "Цена", az: "Qiymət", en: "Price" },
+  "table.action": { ru: "Действие", az: "Əməliyyat", en: "Action" },
 };
 
 /** Локализованная строка по ключу (fallback — сам ключ, затем default locale). */

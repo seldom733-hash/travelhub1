@@ -252,6 +252,26 @@ export interface PriceCalendarEntryOffer {
   externalOfferId: string;
   /** CATCLAIM — exact offer claim (primary supplier identity). */
   externalClaim?: string;
+  /** Hotel name. */
+  hotel: string;
+  /** Hotel external ID. */
+  hotelExternalId?: string;
+  /** Departure date (ISO-8601). */
+  departureDate: string;
+  /** Number of nights. */
+  nights: number;
+  /** Room type. */
+  room?: string;
+  /** Meal plan. */
+  meal?: string;
+  /** Passenger adults. */
+  adults: number;
+  /** Passenger children. */
+  children: number;
+  /** Child ages. */
+  childAges: number[];
+  /** Availability state. */
+  availability: SupplierAvailability;
   /** Real supplier price for this offer. */
   price: number;
   currency: string;

@@ -341,6 +341,20 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             selectedDate={selectedEntry?.date ?? null}
             onMonthChange={handleMonthChange}
             loadingMore={loadingMore}
+            supplierCode={calendarResult.supplierCode}
+            searchContext={{
+              hotel: configuratorConfig.hotel,
+              hotelExternalId: (p.attributes?.hotelKey as string) ?? (p.attributes?.rawHotelKey as string) ?? "",
+              room: configuratorConfig.room || undefined,
+              meal: configuratorConfig.meal || undefined,
+              adults: configuratorConfig.adults,
+              children: configuratorConfig.children,
+              childAges: configuratorConfig.childAges,
+              nightsFrom: configuratorConfig.nights,
+              nightsTo: configuratorConfig.nights,
+              tourIncValues: Array.isArray(p.attributes?.tourIncValues) ? p.attributes!.tourIncValues.map(String) : undefined,
+              tourIncNames: Array.isArray(p.attributes?.tourIncNames) ? p.attributes!.tourIncNames.map(String) : undefined,
+            }}
           />
         )}
 

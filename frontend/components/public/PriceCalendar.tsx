@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { t, useLocale, formatPrice } from "@/lib/i18n";
 import type { PriceCalendarResult, PriceCalendarEntry } from "@/lib/public-api";
+import SupplierOfferTable from "./SupplierOfferTable";
 
 interface PriceCalendarProps {
   result: PriceCalendarResult;
@@ -21,6 +22,10 @@ interface PriceCalendarProps {
   onMonthChange?: (year: number, month: number) => void;
   /** True when fetching additional month data. */
   loadingMore?: boolean;
+  /** Supplier code for order action. */
+  supplierCode?: string;
+  /** Search context for re-check. */
+  searchContext?: Record<string, unknown>;
 }
 
 const MONTH_NAMES_RU = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
@@ -46,7 +51,7 @@ function getFirstDayOfMonth(year: number, month: number): number {
   return day === 0 ? 6 : day - 1;
 }
 
-export default function PriceCalendar({ result, config, onDateSelected, selectedDate, onMonthChange, loadingMore }: PriceCalendarProps) {
+export default function PriceCalendar({ result, config, onDateSelected, selectedDate, onMonthChange, loadingMore, supplierCode, searchContext }: PriceCalendarProps) {
   const locale = useLocale();
   const monthNames = getMonthNames(locale);
   const dayNames = getDayNames(locale);
@@ -270,23 +275,6 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
             {config.meal && <div>{config.meal}</div>}
           </div>
 
-          {/* All real supplier offers for this date (multi-program merge). */}
-          {selectedEntry.offers && selectedEntry.offers.length > 0 && (
-            <div className="mt-2 border-t border-blue-100 pt-2">
-              <div className="text-[11px] font-semibold text-blue-600">{t("calendar.offers_for_date", locale)}:</div>
-              <ul className="mt-1 space-y-1">
-                {selectedEntry.offers.map((o, idx) => (
-                  <li key={`${o.externalOfferId}-${o.tourIncValue}-${idx}`} className="flex items-baseline justify-between gap-2 text-xs text-blue-800">
-                    <span className="truncate">
-                      {o.transport || o.tourIncName || o.tourIncValue}
-                      {o.oneWay && <span className="ml-1 text-[10px] text-blue-500">({t("calendar.one_way", locale)})</span>}
-                    </span>
-                    <span className="shrink-0 font-semibold">{o.price.toLocaleString()} {o.currency}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
           {/* §10 Absence reason when no price on selected date. */}
           {selectedEntry.price === null && selectedEntry.absenceText && (
             <div className="mt-2 border-t border-blue-100 pt-2">
@@ -308,6 +296,16 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
             )}
           </div>
         </div>
+      )}
+
+      {/* Offer Table (§7 — detailed table for selected date) */}
+      {selectedEntry && supplierCode && searchContext && selectedEntry.offers && selectedEntry.offers.length > 0 && (
+        <SupplierOfferTable
+          entry={selectedEntry}
+          supplierCode={supplierCode}
+          searchContext={searchContext}
+          config={config}
+        />
       )}
 
       {/* Stats */}

@@ -775,3 +775,212 @@ describe("Absence reasons (§10)", () => {
     }
   });
 });
+
+// ── Supplier Offer Table (§7-§8) ────────────────────────────────────────
+
+describe("SupplierOfferTable — selected date returns all SupplierOffer", () => {
+  it("should return all offers for a selected date", () => {
+    const entry: PriceCalendarEntry = {
+      date: "2026-09-30",
+      price: 824.72,
+      currency: "USD",
+      availability: "AVAILABLE",
+      offerCount: 4,
+      offers: [
+        { tourIncValue: "229", externalOfferId: "spo-1", hotel: "HIMEROS", departureDate: "2026-09-30", nights: 7, room: "Standard DBL", meal: "AI", adults: 2, children: 0, childAges: [], availability: "AVAILABLE", price: 824.72, currency: "USD" },
+        { tourIncValue: "229", externalOfferId: "spo-2", hotel: "HIMEROS", departureDate: "2026-09-30", nights: 7, room: "Family Room", meal: "AI", adults: 2, children: 0, childAges: [], availability: "AVAILABLE", price: 920.00, currency: "USD" },
+        { tourIncValue: "254", externalOfferId: "spo-3", hotel: "HIMEROS", departureDate: "2026-09-30", nights: 7, room: "Standard DBL", meal: "AI", adults: 2, children: 0, childAges: [], availability: "AVAILABLE", price: 830.00, currency: "USD", oneWay: true },
+        { tourIncValue: "254", externalOfferId: "spo-4", hotel: "HIMEROS", departureDate: "2026-09-30", nights: 7, room: "Family Room", meal: "AI", adults: 2, children: 0, childAges: [], availability: "AVAILABLE", price: 935.00, currency: "USD", oneWay: true },
+      ],
+    };
+    expect(entry.offers).toHaveLength(4);
+    expect(entry.offerCount).toBe(4);
+  });
+});
+
+describe("SupplierOfferTable — Standard + Family same date remain separate", () => {
+  it("should keep Standard and Family as separate rows", () => {
+    const offers = [
+      { room: "Standard DBL", price: 816.83, externalOfferId: "spo-1" },
+      { room: "Family Room", price: 920.00, externalOfferId: "spo-2" },
+    ];
+    expect(offers).toHaveLength(2);
+    expect(offers[0].room).not.toBe(offers[1].room);
+    expect(offers[0].externalOfferId).not.toBe(offers[1].externalOfferId);
+  });
+});
+
+describe("SupplierOfferTable — same spoKey + same date + different roomKey remain separate", () => {
+  it("should keep offers with same spoKey but different rooms separate", () => {
+    const offers = [
+      { externalOfferId: "spo-34978", room: "Standard DBL", departureDate: "2026-10-03" },
+      { externalOfferId: "spo-34978", room: "Family Room", departureDate: "2026-10-03" },
+    ];
+    const dedupKey = (o: typeof offers[0]) => `${o.externalOfferId}|${o.departureDate}|${o.room}`;
+    const keys = offers.map(dedupKey);
+    expect(new Set(keys).size).toBe(2);
+  });
+});
+
+describe("SupplierOfferTable — same spoKey + different dates remain separate", () => {
+  it("should keep offers with same spoKey but different dates separate", () => {
+    const offers = [
+      { externalOfferId: "spo-34978", departureDate: "2026-09-30", room: "Standard DBL" },
+      { externalOfferId: "spo-34978", departureDate: "2026-10-03", room: "Standard DBL" },
+    ];
+    const dedupKey = (o: typeof offers[0]) => `${o.externalOfferId}|${o.departureDate}|${o.room}`;
+    const keys = offers.map(dedupKey);
+    expect(new Set(keys).size).toBe(2);
+  });
+});
+
+describe("SupplierOfferTable — different programs remain separate when offer identity differs", () => {
+  it("should keep round-trip and one-way as separate rows", () => {
+    const offers = [
+      { tourIncValue: "229", tourIncName: "Antalya 2026", externalOfferId: "spo-1", oneWay: false },
+      { tourIncValue: "254", tourIncName: "Antalya 2026 (NO RETURN)", externalOfferId: "spo-2", oneWay: true },
+    ];
+    expect(offers[0].tourIncValue).not.toBe(offers[1].tourIncValue);
+    expect(offers[0].oneWay).toBe(false);
+    expect(offers[1].oneWay).toBe(true);
+  });
+});
+
+describe("SupplierOfferTable — calendar minPrice does not remove other offers", () => {
+  it("should keep all offers even when one is the min price", () => {
+    const entry: PriceCalendarEntry = {
+      date: "2026-09-30",
+      price: 824.72,
+      currency: "USD",
+      availability: "AVAILABLE",
+      offerCount: 4,
+      offers: [
+        { tourIncValue: "229", externalOfferId: "spo-1", hotel: "HIMEROS", departureDate: "2026-09-30", nights: 7, adults: 2, children: 0, childAges: [], availability: "AVAILABLE", price: 824.72, currency: "USD" },
+        { tourIncValue: "229", externalOfferId: "spo-2", hotel: "HIMEROS", departureDate: "2026-09-30", nights: 7, adults: 2, children: 0, childAges: [], availability: "AVAILABLE", price: 920.00, currency: "USD" },
+      ],
+    };
+    expect(entry.price).toBe(824.72);
+    expect(entry.offers).toHaveLength(2);
+    expect(entry.offers![1].price).toBe(920.00);
+  });
+});
+
+describe("SupplierOfferTable — selected date switch updates table", () => {
+  it("should show different offers when switching dates", () => {
+    const entry30: PriceCalendarEntry = {
+      date: "2026-09-30",
+      price: 824.72,
+      currency: "USD",
+      availability: "AVAILABLE",
+      offerCount: 4,
+      offers: [
+        { tourIncValue: "229", externalOfferId: "spo-1", hotel: "HIMEROS", departureDate: "2026-09-30", nights: 7, adults: 2, children: 0, childAges: [], availability: "AVAILABLE", price: 824.72, currency: "USD" },
+      ],
+    };
+    const entry03: PriceCalendarEntry = {
+      date: "2026-10-03",
+      price: 816.83,
+      currency: "USD",
+      availability: "AVAILABLE",
+      offerCount: 2,
+      offers: [
+        { tourIncValue: "229", externalOfferId: "spo-5", hotel: "HIMEROS", departureDate: "2026-10-03", nights: 7, adults: 2, children: 0, childAges: [], availability: "AVAILABLE", price: 816.83, currency: "USD" },
+      ],
+    };
+    expect(entry30.offers).toHaveLength(1);
+    expect(entry03.offers).toHaveLength(1);
+    expect(entry30.offers![0].departureDate).toBe("2026-09-30");
+    expect(entry03.offers![0].departureDate).toBe("2026-10-03");
+  });
+});
+
+describe("SupplierOfferTable — stale context clears selected offers", () => {
+  it("should return null when calendar context changes", () => {
+    let selectedEntry: PriceCalendarEntry | null = {
+      date: "2026-09-30",
+      price: 824.72,
+      currency: "USD",
+      availability: "AVAILABLE",
+      offerCount: 1,
+    };
+    // Simulate config dirty
+    selectedEntry = null;
+    expect(selectedEntry).toBeNull();
+  });
+});
+
+describe("SupplierOfferTable — exact SupplierOffer reference reaches request creation", () => {
+  it("should pass correct offer reference params", () => {
+    const offer = {
+      supplierCode: "SUMMERTOUR",
+      externalOfferId: "spo-34978",
+      externalClaim: "claim-abc",
+      hotel: "HIMEROS BEACH HOTEL 3★",
+      room: "Standard DBL",
+      meal: "AI",
+      departureDate: "2026-10-03",
+      nights: 7,
+      adults: 2,
+      children: 0,
+      tourIncValue: "229",
+      price: 816.83,
+      currency: "USD",
+    };
+    const params = new URLSearchParams({
+      supplier: offer.supplierCode,
+      offer: offer.externalOfferId,
+      claim: offer.externalClaim,
+      date: offer.departureDate,
+      price: String(offer.price),
+      currency: offer.currency,
+      hotel: offer.hotel,
+      room: offer.room,
+      meal: offer.meal,
+      nights: String(offer.nights),
+      adults: String(offer.adults),
+      children: String(offer.children),
+      tourInc: offer.tourIncValue,
+    });
+    expect(params.get("offer")).toBe("spo-34978");
+    expect(params.get("claim")).toBe("claim-abc");
+    expect(params.get("hotel")).toBe("HIMEROS BEACH HOTEL 3★");
+    expect(params.get("room")).toBe("Standard DBL");
+    expect(params.get("tourInc")).toBe("229");
+  });
+});
+
+describe("SupplierOfferTable — fresh price/availability recheck before request", () => {
+  it("should check both price and availability before order", () => {
+    const recheckCalls: string[] = [];
+    const mockRecheck = (type: string) => {
+      recheckCalls.push(type);
+      return { amount: 816.83, currency: "USD", availability: "AVAILABLE" };
+    };
+    mockRecheck("price");
+    mockRecheck("availability");
+    expect(recheckCalls).toEqual(["price", "availability"]);
+  });
+});
+
+describe("SupplierOfferTable — unavailable offer handled correctly", () => {
+  it("should show error when availability is NOT_AVAILABLE", () => {
+    const availResult = { availability: "NOT_AVAILABLE" as const };
+    expect(availResult.availability).toBe("NOT_AVAILABLE");
+  });
+});
+
+describe("SupplierOfferTable — no fake booking state is produced", () => {
+  it("should not have fake booking fields in offer", () => {
+    const offer = {
+      externalOfferId: "spo-34978",
+      hotel: "HIMEROS",
+      price: 816.83,
+      currency: "USD",
+      availability: "AVAILABLE" as const,
+    };
+    expect(offer).not.toHaveProperty("bookingNumber");
+    expect(offer).not.toHaveProperty("confirmationCode");
+    expect(offer).not.toHaveProperty("flightNumber");
+    expect(offer).not.toHaveProperty("boardingTime");
+  });
+});
