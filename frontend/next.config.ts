@@ -2,11 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
-  // Summer (SAMO) searches take 25–55s (Playwright scrape). The default dev
-  // proxy timeout is 30s and kills long price-calendar requests with ECONNRESET
-  // → PDP "Уточнить цену" could never complete in the browser (HIMEROS E2E P0).
+  // Summer (SAMO) searches with 31-day windows take 25–55s per window.
+  // 6-month horizon = ~6 windows × 2 programs = up to 5 min total.
+  // Set proxy timeout to 5 min to cover full horizon search.
   experimental: {
-    proxyTimeout: 120_000,
+    proxyTimeout: 300_000,
   },
   async rewrites() {
     return [

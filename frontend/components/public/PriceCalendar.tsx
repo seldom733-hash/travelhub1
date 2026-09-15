@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { t, useLocale, formatPrice } from "@/lib/i18n";
 import type { PriceCalendarResult, PriceCalendarEntry } from "@/lib/public-api";
 
@@ -17,6 +17,10 @@ interface PriceCalendarProps {
   };
   onDateSelected: (entry: PriceCalendarEntry) => void;
   selectedDate: string | null;
+  /** Demand-driven: called when user navigates to a month not yet loaded. */
+  onMonthChange?: (year: number, month: number) => void;
+  /** True when fetching additional month data. */
+  loadingMore?: boolean;
 }
 
 const MONTH_NAMES_RU = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
@@ -42,10 +46,11 @@ function getFirstDayOfMonth(year: number, month: number): number {
   return day === 0 ? 6 : day - 1;
 }
 
-export default function PriceCalendar({ result, config, onDateSelected, selectedDate }: PriceCalendarProps) {
+export default function PriceCalendar({ result, config, onDateSelected, selectedDate, onMonthChange, loadingMore }: PriceCalendarProps) {
   const locale = useLocale();
   const monthNames = getMonthNames(locale);
   const dayNames = getDayNames(locale);
+  const loadedMonthsRef = useRef<Set<string>>(new Set());
 
   // Build price map for quick lookup
   const priceMap = useMemo(() => {
@@ -54,6 +59,16 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
       map.set(entry.date, entry);
     }
     return map;
+  }, [result.entries]);
+
+  // Track which months have been loaded
+  const loadedMonths = useMemo(() => {
+    const months = new Set<string>();
+    for (const entry of result.entries) {
+      const d = new Date(entry.date);
+      months.add(`${d.getFullYear()}-${d.getMonth()}`);
+    }
+    return months;
   }, [result.entries]);
 
   // Current month navigation
@@ -76,13 +91,23 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
   }, [currentMonth]);
 
   const goToNextMonth = useCallback(() => {
+    let nextMonth = currentMonth;
+    let nextYear = currentYear;
     if (currentMonth === 11) {
-      setCurrentMonth(0);
-      setCurrentYear((y) => y + 1);
+      nextMonth = 0;
+      nextYear = currentYear + 1;
     } else {
-      setCurrentMonth((m) => m + 1);
+      nextMonth = currentMonth + 1;
     }
-  }, [currentMonth]);
+    setCurrentMonth(nextMonth);
+    setCurrentYear(nextYear);
+
+    // Demand-driven: fetch missing month data (§13).
+    const monthKey = `${nextYear}-${nextMonth}`;
+    if (!loadedMonths.has(monthKey) && onMonthChange) {
+      onMonthChange(nextYear, nextMonth);
+    }
+  }, [currentMonth, currentYear, loadedMonths, onMonthChange]);
 
   // Build calendar grid
   const calendarDays = useMemo(() => {
@@ -129,6 +154,7 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
         </button>
         <span className="text-sm font-semibold text-slate-800">
           {monthNames[currentMonth]} {currentYear}
+          {loadingMore && <span className="ml-2 text-[10px] text-slate-400 animate-pulse">…</span>}
         </span>
         <button
           type="button"
@@ -181,6 +207,14 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
               {hasPrice && cell.entry && (
                 <span className={`text-[9px] leading-tight ${cell.isSelected ? "text-blue-100" : "text-slate-500"}`}>
                   {cell.entry.price?.toLocaleString()}
+                </span>
+              )}
+              {/* Offer count badge when multiple offers exist (§12). */}
+              {cell.entry && cell.entry.offerCount > 1 && (
+                <span className={`absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[7px] font-bold ${
+                  cell.isSelected ? "bg-white text-blue-600" : "bg-blue-100 text-blue-600"
+                }`}>
+                  {cell.entry.offerCount}
                 </span>
               )}
               {!hasPrice && cell.entry === null && (

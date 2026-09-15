@@ -566,8 +566,52 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
 
   // ── Price Calendar ───────────────────────────────────────────────
 
+  /** Maximum days per SAMO search window (SAMO enforces ≤31). */
+  private static readonly CALENDAR_WINDOW_DAYS = 31;
+
+  /**
+   * Split a date range into contiguous ≤31-day windows.
+   * No gaps between windows: window[i].to + 1 day = window[i+1].from.
+   */
+  generateCalendarWindows(from: string, to: string): Array<{ from: string; to: string }> {
+    const windows: Array<{ from: string; to: string }> = [];
+    const maxDays = SummertourAdapter.CALENDAR_WINDOW_DAYS;
+    let current = new Date(from);
+    const end = new Date(to);
+
+    while (current <= end) {
+      const windowEnd = new Date(current);
+      windowEnd.setDate(windowEnd.getDate() + maxDays - 1);
+      if (windowEnd > end) windowEnd.setTime(end.getTime());
+
+      windows.push({
+        from: this.formatDate(current),
+        to: this.formatDate(windowEnd),
+      });
+
+      // Next window starts day after this one ends (contiguous, no gaps).
+      current = new Date(windowEnd);
+      current.setDate(current.getDate() + 1);
+    }
+
+    return windows;
+  }
+
+  private formatDate(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
   async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult> {
     const now = new Date();
+
+    // Split the requested range into ≤31-day windows (§6/§7).
+    const windows = this.generateCalendarWindows(query.dateFrom, query.dateTo);
+    this.logger.debug(
+      `PriceCalendar: ${query.dateFrom}→${query.dateTo} split into ${windows.length} window(s)`,
+    );
 
     // Base search params shared by every program search in this calendar request.
     const baseSearch: SupplierSearchQuery = {
@@ -594,22 +638,49 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
         ? [{ value: query.tourIncValue, name: query.tourIncName }]
         : [];
 
-    // Run one real search per program (bounded by rate limiter upstream) and
-    // collect offers per program. Never fabricate offers for missing programs.
+    // Run one real search per (window × program) combination.
+    // Windows × programs = total SAMO searches. Sequential to respect rate limits.
     const collected: SupplierOffer[] = [];
-    if (programs.length > 0) {
-      for (const program of programs) {
+    let totalScanned = 0;
+
+    for (const window of windows) {
+      if (programs.length > 0) {
+        for (const program of programs) {
+          try {
+            const offers = await this.search({
+              ...baseSearch,
+              departureDateFrom: window.from,
+              departureDateTo: window.to,
+              tourIncValue: program.value,
+              tourIncName: program.name,
+            });
+            collected.push(...offers);
+            totalScanned += offers.length;
+            this.logger.debug(
+              `Calendar window ${window.from}→${window.to} program ${program.value}: ${offers.length} offers`,
+            );
+          } catch (err) {
+            this.logger.warn(
+              `Calendar window ${window.from}→${window.to} program ${program.value} failed: ${(err as Error).message}`,
+            );
+          }
+        }
+      } else {
+        // No program specified — single unfiltered search per window (legacy behavior).
         try {
-          const offers = await this.search({ ...baseSearch, tourIncValue: program.value, tourIncName: program.name });
+          const offers = await this.search({
+            ...baseSearch,
+            departureDateFrom: window.from,
+            departureDateTo: window.to,
+          });
           collected.push(...offers);
+          totalScanned += offers.length;
         } catch (err) {
-          this.logger.warn(`Calendar program ${program.value} search failed: ${(err as Error).message}`);
+          this.logger.warn(
+            `Calendar window ${window.from}→${window.to} failed: ${(err as Error).message}`,
+          );
         }
       }
-    } else {
-      // No program specified — single unfiltered search (legacy behavior).
-      const offers = await this.search(baseSearch);
-      collected.push(...offers);
     }
 
     // Filter to matching hotel if specified
@@ -617,9 +688,12 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       ? collected.filter((o) => o.hotel === query.hotel || o.hotelExternalId === query.hotelExternalId)
       : collected;
 
+    // Deduplicate by spoKey across windows (same offer may appear in adjacent windows).
+    const deduped = this.deduplicateCalendarOffers(filtered);
+
     // Group by departure date, then keep ALL real offers per date (per program).
     const dateMap = new Map<string, SupplierOffer[]>();
-    for (const offer of filtered) {
+    for (const offer of deduped) {
       const existing = dateMap.get(offer.departureDate) || [];
       existing.push(offer);
       dateMap.set(offer.departureDate, existing);
@@ -671,6 +745,11 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
     // Sort entries by date
     entries.sort((a, b) => a.date.localeCompare(b.date));
 
+    this.logger.log(
+      `PriceCalendar: ${entries.length} dates from ${deduped.length} deduped offers ` +
+      `(${filtered.length} raw, ${totalScanned} across ${windows.length} windows × ${programs.length || 1} programs)`,
+    );
+
     return {
       supplierCode: this.code,
       contextHash: JSON.stringify({
@@ -688,7 +767,25 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       dateTo: query.dateTo,
       fetchedAt: now,
       expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
-      totalOffersScanned: filtered.length,
+      totalOffersScanned: deduped.length,
     };
+  }
+
+  /** Deduplicate calendar offers by spoKey (same offer may appear in adjacent windows). */
+  private deduplicateCalendarOffers(offers: SupplierOffer[]): SupplierOffer[] {
+    const seen = new Map<string, SupplierOffer>();
+    for (const offer of offers) {
+      const key = offer.externalOfferId;
+      if (!seen.has(key)) {
+        seen.set(key, offer);
+      } else {
+        // Keep the one with higher price (more recent scrape) or the existing one.
+        const existing = seen.get(key)!;
+        if (offer.price.amount > existing.price.amount) {
+          seen.set(key, offer);
+        }
+      }
+    }
+    return Array.from(seen.values());
   }
 }

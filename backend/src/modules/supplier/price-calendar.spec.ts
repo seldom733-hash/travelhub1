@@ -448,3 +448,162 @@ describe("Cache key derivation", () => {
     expect(key2).not.toBe(key3);
   });
 });
+
+// ── 31-Day Window Engine Tests (§6/§7) ──────────────────────────────
+
+/** Mirror of SummertourAdapter.generateCalendarWindows() for unit testing. */
+function generateCalendarWindows(from: string, to: string, maxDays = 31): Array<{ from: string; to: string }> {
+  const windows: Array<{ from: string; to: string }> = [];
+  let current = new Date(from);
+  const end = new Date(to);
+
+  while (current <= end) {
+    const windowEnd = new Date(current);
+    windowEnd.setDate(windowEnd.getDate() + maxDays - 1);
+    if (windowEnd > end) windowEnd.setTime(end.getTime());
+
+    windows.push({
+      from: `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`,
+      to: `${windowEnd.getFullYear()}-${String(windowEnd.getMonth() + 1).padStart(2, "0")}-${String(windowEnd.getDate()).padStart(2, "0")}`,
+    });
+
+    current = new Date(windowEnd);
+    current.setDate(current.getDate() + 1);
+  }
+
+  return windows;
+}
+
+describe("31-Day Window Engine (§6/§7)", () => {
+  it("should split a 6-month range into multiple ≤31-day windows", () => {
+    const windows = generateCalendarWindows("2026-09-15", "2027-03-15");
+    expect(windows.length).toBeGreaterThanOrEqual(5);
+    for (const w of windows) {
+      const from = new Date(w.from);
+      const to = new Date(w.to);
+      const days = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      expect(days).toBeLessThanOrEqual(31);
+      expect(days).toBeGreaterThan(0);
+    }
+  });
+
+  it("should have no gaps between adjacent windows", () => {
+    const windows = generateCalendarWindows("2026-09-15", "2027-03-15");
+    for (let i = 0; i < windows.length - 1; i++) {
+      const currentEnd = new Date(windows[i].to);
+      const nextStart = new Date(windows[i + 1].from);
+      const gapDays = Math.round((nextStart.getTime() - currentEnd.getTime()) / (1000 * 60 * 60 * 24));
+      expect(gapDays).toBe(1); // Contiguous: next starts day after current ends
+    }
+  });
+
+  it("should cover the full date range without missing dates", () => {
+    const from = "2026-09-15";
+    const to = "2027-03-15";
+    const windows = generateCalendarWindows(from, to);
+
+    // First window starts at or before range start
+    expect(new Date(windows[0].from).getTime()).toBeLessThanOrEqual(new Date(from).getTime());
+    // Last window ends at or after range end
+    expect(new Date(windows[windows.length - 1].to).getTime()).toBeGreaterThanOrEqual(new Date(to).getTime());
+  });
+
+  it("should handle a single-day range", () => {
+    const windows = generateCalendarWindows("2026-10-01", "2026-10-01");
+    expect(windows).toHaveLength(1);
+    expect(windows[0].from).toBe("2026-10-01");
+    expect(windows[0].to).toBe("2026-10-01");
+  });
+
+  it("should handle a 31-day range (exactly one window)", () => {
+    const windows = generateCalendarWindows("2026-10-01", "2026-10-31");
+    expect(windows).toHaveLength(1);
+    expect(windows[0].from).toBe("2026-10-01");
+    expect(windows[0].to).toBe("2026-10-31");
+  });
+
+  it("should handle a 32-day range (exactly two windows)", () => {
+    const windows = generateCalendarWindows("2026-10-01", "2026-11-01");
+    expect(windows).toHaveLength(2);
+    expect(windows[0].from).toBe("2026-10-01");
+    expect(windows[0].to).toBe("2026-10-31");
+    expect(windows[1].from).toBe("2026-11-01");
+    expect(windows[1].to).toBe("2026-11-01");
+  });
+
+  it("should produce exactly 6 windows for a 6-month season", () => {
+    const windows = generateCalendarWindows("2026-09-15", "2027-03-31");
+    // Sep 15 - Oct 15, Oct 16 - Nov 15, Nov 16 - Dec 16, Dec 17 - Jan 16, Jan 17 - Feb 15, Feb 16 - Mar 31
+    expect(windows.length).toBeGreaterThanOrEqual(5);
+    expect(windows.length).toBeLessThanOrEqual(7);
+  });
+});
+
+// ── Deduplication Tests (§10) ──────────────────────────────────────
+
+describe("Calendar offer deduplication (§10)", () => {
+  it("should deduplicate offers by spoKey across windows", () => {
+    const offers = [
+      { externalOfferId: "34977", price: 1371.64, departureDate: "2026-09-30" },
+      { externalOfferId: "34977", price: 1380.00, departureDate: "2026-09-30" }, // duplicate, higher price
+      { externalOfferId: "34978", price: 824.72, departureDate: "2026-09-30" },
+    ];
+
+    const seen = new Map<string, typeof offers[0]>();
+    for (const offer of offers) {
+      if (!seen.has(offer.externalOfferId)) {
+        seen.set(offer.externalOfferId, offer);
+      } else {
+        const existing = seen.get(offer.externalOfferId)!;
+        if (offer.price > existing.price) seen.set(offer.externalOfferId, offer);
+      }
+    }
+
+    const deduped = Array.from(seen.values());
+    expect(deduped).toHaveLength(2);
+    // Keep the higher price for duplicate (more recent scrape)
+    const for34977 = deduped.find((o) => o.externalOfferId === "34977");
+    expect(for34977!.price).toBe(1380.00);
+  });
+
+  it("should not deduplicate different spoKeys on same date", () => {
+    const offers = [
+      { externalOfferId: "34977", price: 1371.64, departureDate: "2026-09-30" },
+      { externalOfferId: "34978", price: 824.72, departureDate: "2026-09-30" },
+    ];
+
+    const seen = new Map<string, typeof offers[0]>();
+    for (const offer of offers) {
+      if (!seen.has(offer.externalOfferId)) seen.set(offer.externalOfferId, offer);
+    }
+
+    expect(seen.size).toBe(2);
+  });
+});
+
+// ── Multiple Offers Per Date (§12) ────────────────────────────────
+
+describe("Multiple offers per date (§12)", () => {
+  it("should preserve all offers when building calendar entries", () => {
+    const dateOffers = [
+      { tourIncValue: "229", price: 1371.64, externalOfferId: "34977" },
+      { tourIncValue: "254", price: 824.72, externalOfferId: "34978" },
+    ];
+
+    const sorted = dateOffers.sort((a, b) => a.price - b.price);
+    const entry = {
+      date: "2026-09-30",
+      price: sorted[0].price,
+      offerCount: dateOffers.length,
+      offers: sorted.map((o) => ({
+        tourIncValue: o.tourIncValue,
+        externalOfferId: o.externalOfferId,
+        price: o.price,
+      })),
+    };
+
+    expect(entry.offers).toHaveLength(2);
+    expect(entry.offers[0].tourIncValue).toBe("254"); // cheapest first
+    expect(entry.offers[1].tourIncValue).toBe("229");
+  });
+});

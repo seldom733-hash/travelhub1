@@ -83,6 +83,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
   const [calendarResult, setCalendarResult] = useState<PriceCalendarResult | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<PriceCalendarEntry | null>(null);
   const [requestLoading, setRequestLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Configurator state (extracted from attributes)
   const configuratorConfig = useMemo(() => ({
@@ -109,6 +110,58 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
   const handleDateSelected = useCallback((entry: PriceCalendarEntry) => {
     setSelectedEntry(entry);
   }, []);
+
+  // §13 Demand-driven: fetch missing month data when user navigates calendar.
+  const handleMonthChange = useCallback(async (year: number, month: number) => {
+    if (!calendarResult) return;
+    setLoadingMore(true);
+    try {
+      const from = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const to = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+      const moreResult = await publicSupplierApi.getPriceCalendar({
+        supplierCode: "SUMMERTOUR",
+        productId: p.code,
+        hotel: configuratorConfig.hotel,
+        hotelExternalId: (p.attributes?.hotelKey as string) ?? (p.attributes?.rawHotelKey as string) ?? "",
+        room: configuratorConfig.room || undefined,
+        meal: configuratorConfig.meal || undefined,
+        adults: configuratorConfig.adults,
+        children: configuratorConfig.children,
+        childAges: configuratorConfig.childAges,
+        nights: configuratorConfig.nights,
+        dateFrom: from,
+        dateTo: to,
+        tourIncValue: (p.attributes?.tourIncValue as string) ?? "",
+        tourIncName: (p.attributes?.tourIncName as string) ?? "",
+        tourIncValues: Array.isArray(p.attributes?.tourIncValues) ? p.attributes!.tourIncValues.map(String) : undefined,
+        tourIncNames: Array.isArray(p.attributes?.tourIncNames) ? p.attributes!.tourIncNames.map(String) : undefined,
+      });
+
+      // Merge new entries into existing result (deduplicate by date).
+      setCalendarResult((prev) => {
+        if (!prev) return moreResult;
+        const mergedMap = new Map<string, PriceCalendarEntry>();
+        for (const e of prev.entries) mergedMap.set(e.date, e);
+        for (const e of moreResult.entries) {
+          if (!mergedMap.has(e.date)) mergedMap.set(e.date, e);
+        }
+        const merged = Array.from(mergedMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+        return {
+          ...prev,
+          entries: merged,
+          dateFrom: prev.dateFrom < moreResult.dateFrom ? prev.dateFrom : moreResult.dateFrom,
+          dateTo: prev.dateTo > moreResult.dateTo ? prev.dateTo : moreResult.dateTo,
+          totalOffersScanned: prev.totalOffersScanned + moreResult.totalOffersScanned,
+        };
+      });
+    } catch (err) {
+      // Silently ignore — calendar shows what we have.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [calendarResult, p.code, p.attributes, configuratorConfig]);
 
   // Fresh re-check on "Оформить запрос"
   const handleCreateRequest = useCallback(async () => {
@@ -286,6 +339,8 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             config={configuratorConfig}
             onDateSelected={handleDateSelected}
             selectedDate={selectedEntry?.date ?? null}
+            onMonthChange={handleMonthChange}
+            loadingMore={loadingMore}
           />
         )}
 

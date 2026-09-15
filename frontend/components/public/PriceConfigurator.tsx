@@ -164,18 +164,17 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
     }
   }, [contextHash, lastContextHash, onConfigDirty]);
 
-  // "Уточнить цену" handler
+  // "Уточнить цену" handler — sends full 6-month range; backend splits into ≤31-day windows (§6).
   const handlePriceQuery = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Supplier hard limit: CHECKIN_BEG → CHECKIN_END ≤ 31 days.
       const from = config.dateFrom || isoDaysFromNow(0);
+      // 6-month horizon: backend handles 31-day windowing (§6/§7).
       const maxTo = new Date(from);
-      maxTo.setDate(maxTo.getDate() + 30);
+      maxTo.setMonth(maxTo.getMonth() + 6);
       const maxToIso = maxTo.toISOString().split("T")[0];
-      // min(user dateTo, from+30d) — ISO strings compare lexicographically.
       const to = config.dateTo && config.dateTo < maxToIso ? config.dateTo : maxToIso;
 
       const result = await publicSupplierApi.getPriceCalendar({
