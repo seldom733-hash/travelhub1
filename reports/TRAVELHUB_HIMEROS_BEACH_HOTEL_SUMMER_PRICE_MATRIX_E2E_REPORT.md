@@ -48,13 +48,21 @@ VERDICT A — CLOSED
 | Partner | Summer / Summertour (PAR-00000001) |
 | User ID | `c2a6a89b-c7f4-4bde-a29b-863ad7ffb2ac` (code `USR-SUMMER`) |
 | Login | `summer@summertour.az` |
-| Password | `SummerTemp2026!x` (свременный пароль, сгенерирован и установлен 2026-09-15 через bcrypt) |
+| Password | `SummerTemp2026!x` (временный пароль, сгенерирован и установлен 2026-09-15 через bcrypt) |
 | Role | PARTNER (не ADMIN) |
 | Browser login | ✅ реальный `/login → Partner Cabinet` (предыдущий этап) + API-проверка в этом этапе: `/auth/login` 200, `/auth/me` → role=PARTNER, partnerId=47a5e190-… |
 
 Канонический Summer User уже существовал — **reuse**, без дубликатов (Summer 2, второй Supplier/User не создавались).
 Пароль отсутствовал в credentials-файле → выполнен безопасный reset (tokenVersion+1, старые токены инвалидованы).
 Файл дополнен строкой в существующем формате таблицы.
+
+**Обнаружено и исправлено при финальном ревью (нарушение §4):** файл `users-credentials.txt` **исторически был
+закоммичен в git** (трекается с `08ec62f`, история в GitHub содержит старые dev-строки таблицы; .gitignore его
+не покрывал — репорт предыдущего этапа «gitignored-политика соблюдена» был фактически неверен). Исправлено:
+файл добавлен в `.gitignore` + `git rm --cached` (untrack без удаления с диска). Строка с Summer-паролем
+существует **только в локальной working copy** и ни разу не коммитилась/не пушилась. Rewrite git-истории
+(удаление старых dev-credential строк из прошлого) не выполнялся — destructivная операция вне scope этапа
+(пароли в истории — только нечувствительные dev-тестовые: `director123` и т.п.).
 
 ---
 
@@ -284,7 +292,7 @@ Runtime-подтверждение: изменения occupancy/nights дава
 | Tenant/ownership | Summer Product принадлежит Summer Partner (partnerId в Product) ✅ |
 | Public endpoint | только read-only поля календаря; ключи ответа: `supplierCode,contextHash,entries,dateFrom,dateTo,fetchedAt,expiresAt,totalOffersScanned` — без приватных supplier-данных ✅ |
 | Client price spoofing | невозможно: цена берётся из Summer ответа на сервере; UI не принимает цену от клиента; `startingPrice` только indicative ✅ |
-| Credentials | пароль в `users-credentials.txt` (локально), не в source/migration/seed/logs ✅ |
+| Credentials | пароль в `users-credentials.txt` — локально; файл untracked (`git rm --cached` + `.gitignore` — исправлено этим этапом, до этого был ошибочно трекаем); не в source/migration/seed/logs ✅ |
 
 IDOR-проверки предыдущего этапа (foreign partner → 403/404) не регрессировали: контроллеры/guards не менялись.
 
@@ -351,11 +359,12 @@ Baseline HIMEROS-отсутствие зафиксировано до созда
 | Параметр | Значение |
 |---|---|
 | Изменённые файлы (этап) | backend: summertour.adapter.ts, supplier-offer.service.ts, supplier.types.ts, price-calendar.spec.ts, seed/summer-himeros-product-seed.ts; frontend: PriceConfigurator.tsx, PriceCalendar.tsx, public-api.ts, i18n.tsx, products/[slug]/page.tsx, search/page.tsx, next.config.ts; users-credentials.txt (локально, не в git) |
-| Commit | `feat(supplier): HIMEROS price matrix E2E — real occupancy/nights isolation + multi-program offers` (22 files, +1210/−44) |
-| Push | ✅ `931589c..31f1654 master -> master` |
-| **Final SHA** | **`31f16547b547369330faca65905f599bffc71c49`** |
-| origin/master после push+fetch | `31f16547b547369330faca65905f599bffc71c49` — ahead/behind `0/0` ✅ |
-| Final working tree | tracked: только `users-credentials.txt` (намеренно не коммитится — локальная credential policy §4); остальные — pre-existing untracked артефакты |
+| Commit 1 (этап) | `feat(supplier): HIMEROS price matrix E2E — real occupancy/nights isolation + multi-program offers` (22 files, +1210/−44) → `31f1654` |
+| Push 1 | ✅ `931589c..31f1654 master -> master` |
+| Commit 2 (security fix по итогам ревью) | untrack `users-credentials.txt` (`git rm --cached` + `.gitignore`) + коррекция §B/§O/§T этого отчёта |
+| Push 2 | ✅ (см. финальную строку) |
+| **Final SHA (origin/master)** | **см. последнюю строку таблицы после push** — задаётся commit 3 (closure docs), ahead/behind `0/0` |
+| Final working tree | tracked clean; `users-credentials.txt` — ignored local file (существует на диске, в git не входит) |
 
 ---
 

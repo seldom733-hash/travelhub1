@@ -58,3 +58,7 @@ backend/.backups/
 # Step 2.17B perf harness run artifacts (generated, bulk) — never commit by default
 backend/artifacts/performance/
 login.json
+
+# E2E prompts §4: локальные test credentials никогда не должны попадать в GitHub.
+# Файл был ошибочно закоммичен ранее (история сохраняется) — снимаем с tracking.
+users-credentials.txt
