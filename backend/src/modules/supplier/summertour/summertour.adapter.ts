@@ -109,21 +109,40 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
         { timeout: 15_000 },
       );
 
-      // Set date range via Playwright fill FIRST (before TOURINC — SAMO resets dates on TOURINC change)
+      // Set date range via Playwright FIRST (before TOURINC — SAMO resets dates on TOURINC change).
+      // P0 (HIMEROS matrix E2E): click+fill was fragile — on a warm browser the
+      // input lookup could fail silently and SAMO searched its default dates
+      // (tomorrow) returning 0 rows. Use evaluate-based set + explicit logging.
       if (query.departureDateFrom && query.departureDateTo) {
-        const begInput = await page.$("input[name=CHECKIN_BEG]");
-        const endInput = await page.$("input[name=CHECKIN_END]");
-        if (begInput && endInput) {
-          const begFormatted = this.isoToSamodate(query.departureDateFrom);
-          const endFormatted = this.isoToSamodate(query.departureDateTo);
-          await begInput.click({ clickCount: 3 });
-          await begInput.fill(begFormatted);
-          await page.waitForTimeout(200);
-          await endInput.click({ clickCount: 3 });
-          await endInput.fill(endFormatted);
-          await page.waitForTimeout(200);
-          this.logger.debug(`Set date range: ${begFormatted} → ${endFormatted}`);
-        }
+        await this.setSamoDateInput(page, "CHECKIN_BEG", query.departureDateFrom);
+        await this.setSamoDateInput(page, "CHECKIN_END", query.departureDateTo);
+      }
+
+      // Set nights/adults/children/ages AFTER dates, BEFORE TOURINC.
+      // P0 (HIMEROS matrix E2E): without these, SAMO silently applies form
+      // defaults (7 nights / 2 adults / 0 children) — 7n vs 8n searches were
+      // returning identical offers. Order: dates → occupancy → TOURINC.
+      if (query.nightsFrom) {
+        await this.setSamoSelect(page, "NIGHTS_FROM", String(query.nightsFrom));
+      }
+      if (query.nightsTo) {
+        await this.setSamoSelect(page, "NIGHTS_TILL", String(query.nightsTo));
+      }
+      if (query.adults && query.adults > 0) {
+        await this.setSamoSelect(page, "ADULT", String(query.adults));
+      }
+      if (query.children !== undefined && query.children !== null) {
+        await this.setSamoSelect(page, "CHILD", String(query.children));
+      }
+      const ages = query.childAges ?? [];
+      if (ages.length >= 1) {
+        await this.setSamoSelect(page, "AGE1", String(ages[0]));
+      }
+      if (ages.length >= 2) {
+        await this.setSamoSelect(page, "AGE2", String(ages[1]));
+      }
+      if (ages.length >= 3) {
+        await this.setSamoSelect(page, "AGE3", String(ages[2]));
       }
 
       // Set TOURINC program if specified (AFTER dates — SAMO change event may reset date inputs)
@@ -261,6 +280,69 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       }
       return results;
     });
+  }
+
+  /**
+   * Set a SAMO date input (DD.MM.YYYY) via evaluate (no visibility requirement)
+   * with input/change event dispatch. Warns loudly when the input is missing so
+   * silent default-date searches cannot happen unnoticed.
+   */
+  private async setSamoDateInput(page: Page, name: string, isoDate: string): Promise<void> {
+    const value = this.isoToSamodate(isoDate);
+    try {
+      const ok = await page.evaluate(
+        ({ name, value }: { name: string; value: string }) => {
+          const input = document.querySelector(`input[name=${name}]`) as HTMLInputElement | null;
+          if (!input) return false;
+          input.value = value;
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          return true;
+        },
+        { name, value },
+      );
+      if (ok) {
+        await page.waitForTimeout(200);
+        this.logger.debug(`Set SAMO ${name} = ${value} (evaluate)`);
+      } else {
+        const inputs = await page.evaluate(() =>
+          Array.from(document.querySelectorAll("input")).map((i) => i.name).filter(Boolean).join(","),
+        );
+        this.logger.warn(`SAMO input ${name} NOT FOUND — date not applied. Page inputs: [${inputs.slice(0, 300)}]`);
+      }
+    } catch (err) {
+      this.logger.warn(`SAMO input ${name} set failed: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Set a SAMO form <select> by name with change event dispatch.
+   * Returns false if the select or option value does not exist (caller proceeds with SAMO default).
+   */
+  private async setSamoSelect(page: Page, name: string, value: string): Promise<boolean> {
+    try {
+      const ok = await page.evaluate(
+        ({ name, value }: { name: string; value: string }) => {
+          const sel = document.querySelector(`select[name=${name}]`) as HTMLSelectElement | null;
+          if (!sel) return false;
+          const opt = Array.from(sel.options).find((o) => o.value === value);
+          if (!opt) return false;
+          sel.value = value;
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+          return true;
+        },
+        { name, value },
+      );
+      if (ok) {
+        await page.waitForTimeout(300);
+        this.logger.debug(`Set SAMO ${name} = ${value}`);
+      } else {
+        this.logger.warn(`SAMO select ${name} = ${value} not set (missing select/option)`);
+      }
+      return ok;
+    } catch {
+      return false;
+    }
   }
 
   /** Convert ISO date (YYYY-MM-DD) to SAMO format (DD.MM.YYYY). */
@@ -485,7 +567,10 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
   // ── Price Calendar ───────────────────────────────────────────────
 
   async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult> {
-    const searchQuery: SupplierSearchQuery = {
+    const now = new Date();
+
+    // Base search params shared by every program search in this calendar request.
+    const baseSearch: SupplierSearchQuery = {
       country: "turkey",
       departureCity: "baku",
       destination: undefined,
@@ -500,18 +585,39 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       nightsTo: query.nights,
       departureDateFrom: query.dateFrom,
       departureDateTo: query.dateTo,
-      tourIncValue: (query as any).tourIncValue,
-      tourIncName: (query as any).tourIncName,
     };
 
-    const offers = await this.search(searchQuery);
+    // Determine program list: explicit multi-program merge, single program, or none.
+    const programs = (query.tourIncValues?.length ?? 0) > 0
+      ? query.tourIncValues!.map((v, i) => ({ value: v, name: query.tourIncNames?.[i] }))
+      : query.tourIncValue
+        ? [{ value: query.tourIncValue, name: query.tourIncName }]
+        : [];
+
+    // Run one real search per program (bounded by rate limiter upstream) and
+    // collect offers per program. Never fabricate offers for missing programs.
+    const collected: SupplierOffer[] = [];
+    if (programs.length > 0) {
+      for (const program of programs) {
+        try {
+          const offers = await this.search({ ...baseSearch, tourIncValue: program.value, tourIncName: program.name });
+          collected.push(...offers);
+        } catch (err) {
+          this.logger.warn(`Calendar program ${program.value} search failed: ${(err as Error).message}`);
+        }
+      }
+    } else {
+      // No program specified — single unfiltered search (legacy behavior).
+      const offers = await this.search(baseSearch);
+      collected.push(...offers);
+    }
 
     // Filter to matching hotel if specified
     const filtered = query.hotel
-      ? offers.filter((o) => o.hotel === query.hotel || o.hotelExternalId === query.hotelExternalId)
-      : offers;
+      ? collected.filter((o) => o.hotel === query.hotel || o.hotelExternalId === query.hotelExternalId)
+      : collected;
 
-    // Group by departure date, find best price per date
+    // Group by departure date, then keep ALL real offers per date (per program).
     const dateMap = new Map<string, SupplierOffer[]>();
     for (const offer of filtered) {
       const existing = dateMap.get(offer.departureDate) || [];
@@ -521,7 +627,7 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
 
     const entries: PriceCalendarEntry[] = [];
     for (const [date, dateOffers] of dateMap) {
-      // Find best (lowest price) offer for this date
+      // Best (lowest price) offer for this date across all programs
       const sorted = dateOffers.sort((a, b) => a.price.amount - b.price.amount);
       const best = sorted[0];
 
@@ -531,6 +637,17 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
         currency: best.price.currency,
         availability: best.availability,
         offerCount: dateOffers.length,
+        // All real offers for this date — one per program/transport (multi-program merge).
+        offers: sorted.map((o) => ({
+          tourIncValue: (o.rawMetadata?.tourIncValue as string) ?? "",
+          tourIncName: (o.rawMetadata?.tourIncName as string) ?? undefined,
+          externalOfferId: o.externalOfferId,
+          externalClaim: o.externalClaim,
+          price: o.price.amount,
+          currency: o.price.currency,
+          transport: o.transport,
+          oneWay: /no return|без обратного/i.test((o.rawMetadata?.tourIncName as string) ?? ""),
+        })),
         bestOfferRef: {
           supplierCode: this.code,
           externalOfferId: best.externalOfferId,
@@ -544,8 +661,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
             meal: query.meal,
             nightsFrom: query.nights,
             nightsTo: query.nights,
-            tourIncValue: (query as any).tourIncValue,
-            tourIncName: (query as any).tourIncName,
+            tourIncValue: (best.rawMetadata?.tourIncValue as string) ?? query.tourIncValue,
+            tourIncName: (best.rawMetadata?.tourIncName as string) ?? query.tourIncName,
           },
         },
       });
@@ -554,7 +671,6 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
     // Sort entries by date
     entries.sort((a, b) => a.date.localeCompare(b.date));
 
-    const now = new Date();
     return {
       supplierCode: this.code,
       contextHash: JSON.stringify({
@@ -565,6 +681,7 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
         children: query.children,
         childAges: query.childAges,
         nights: query.nights,
+        tourIncValues: query.tourIncValues ?? (query.tourIncValue ? [query.tourIncValue] : []),
       }),
       entries,
       dateFrom: query.dateFrom,

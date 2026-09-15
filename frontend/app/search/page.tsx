@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader";
 import CompactSearch from "@/components/marketplace/CompactSearch";
@@ -83,7 +83,7 @@ function serviceToCategorySlug(service: string): string | null {
   return map[service] ?? null;
 }
 
-export default function SearchResultsPage() {
+function SearchResultsInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const locale = useLocale();
@@ -311,3 +311,13 @@ const SORT_OPTIONS = [
   { value: "price_asc", labelKey: "sort.price_asc" },
   { value: "price_desc", labelKey: "sort.price_desc" },
 ];
+
+// Prerender bailout (Next.js): useSearchParams() must live inside a Suspense
+// boundary, otherwise `next build` fails on static export of /search.
+export default function SearchResultsPage() {
+  return (
+    <Suspense>
+      <SearchResultsInner />
+    </Suspense>
+  );
+}

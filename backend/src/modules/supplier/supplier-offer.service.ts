@@ -225,7 +225,8 @@ export class SupplierOfferService {
       throw new Error(`Supplier ${query.supplierCode} circuit is OPEN — supplier unavailable`);
     }
 
-    // Cache key for calendar
+    // Cache key for calendar — includes tourInc program(s) so that different
+    // program contexts (e.g. round-trip 229 vs one-way 254) never share cache.
     const calendarKey = `calendar:${query.supplierCode}:${JSON.stringify({
       hotel: query.hotel,
       hotelExternalId: query.hotelExternalId,
@@ -237,6 +238,7 @@ export class SupplierOfferService {
       nights: query.nights,
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
+      tourIncValues: query.tourIncValues ?? (query.tourIncValue ? [query.tourIncValue] : []),
     })}`;
 
     return this.resilience.coalesce(calendarKey, async () => {

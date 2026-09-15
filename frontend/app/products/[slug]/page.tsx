@@ -92,11 +92,17 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
     adults: 2,
     children: 0,
     childAges: [] as number[],
-    nights: (p.attributes?.days as number) ?? 7,
+    nights: (p.attributes?.nights as number) ?? 7,
   }), [p.attributes]);
 
   const handleCalendarLoaded = useCallback((result: PriceCalendarResult) => {
     setCalendarResult(result);
+    setSelectedEntry(null);
+  }, []);
+
+  // §19: parameters changed — stale result must not be displayed for the new context.
+  const handleConfigDirty = useCallback(() => {
+    setCalendarResult(null);
     setSelectedEntry(null);
   }, []);
 
@@ -270,6 +276,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           productCode={p.code}
           productAttributes={p.attributes}
           onCalendarLoaded={handleCalendarLoaded}
+          onConfigDirty={handleConfigDirty}
         />
 
         {/* Price Calendar (shown after successful price query) */}

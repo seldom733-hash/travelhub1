@@ -226,6 +226,24 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
             {config.room && <div>{config.room}</div>}
             {config.meal && <div>{config.meal}</div>}
           </div>
+
+          {/* All real supplier offers for this date (multi-program merge). */}
+          {selectedEntry.offers && selectedEntry.offers.length > 0 && (
+            <div className="mt-2 border-t border-blue-100 pt-2">
+              <div className="text-[11px] font-semibold text-blue-600">{t("calendar.offers_for_date", locale)}:</div>
+              <ul className="mt-1 space-y-1">
+                {selectedEntry.offers.map((o, idx) => (
+                  <li key={`${o.externalOfferId}-${o.tourIncValue}-${idx}`} className="flex items-baseline justify-between gap-2 text-xs text-blue-800">
+                    <span className="truncate">
+                      {o.transport || o.tourIncName || o.tourIncValue}
+                      {o.oneWay && <span className="ml-1 text-[10px] text-blue-500">({t("calendar.one_way", locale)})</span>}
+                    </span>
+                    <span className="shrink-0 font-semibold">{o.price.toLocaleString()} {o.currency}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="mt-2 border-t border-blue-100 pt-2">
             <div className="text-[11px] text-blue-600">{t("calendar.total_price", locale)}:</div>
             <div className="text-lg font-bold text-blue-900">

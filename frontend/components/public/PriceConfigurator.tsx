@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { t, useLocale, formatPrice } from "@/lib/i18n";
 import { publicSupplierApi, type PriceCalendarResult } from "@/lib/public-api";
 
@@ -8,6 +8,8 @@ interface PriceConfiguratorProps {
   productCode: string;
   productAttributes: Record<string, unknown> | null;
   onCalendarLoaded: (result: PriceCalendarResult) => void;
+  /** Fired when parameters change after a query — stale result must be dropped (§19). */
+  onConfigDirty?: () => void;
 }
 
 interface ConfigState {
@@ -17,11 +19,20 @@ interface ConfigState {
   children: number;
   childAges: number[];
   nights: number;
+  /** Search-first UX (§10): дата — параметр пользовательского поиска. */
+  dateFrom: string;
+  dateTo: string;
 }
 
 const NIGHT_OPTIONS = [7, 8, 9, 10, 11, 12, 13, 14];
 
-export default function PriceConfigurator({ productCode, productAttributes, onCalendarLoaded }: PriceConfiguratorProps) {
+function isoDaysFromNow(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+export default function PriceConfigurator({ productCode, productAttributes, onCalendarLoaded, onConfigDirty }: PriceConfiguratorProps) {
   const locale = useLocale();
   const [config, setConfig] = useState<ConfigState>(() => {
     // Initialize from product attributes if available
@@ -33,6 +44,8 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
       children: 0,
       childAges: [],
       nights: (attrs.nights as number) ?? (attrs.days as number) ?? 7,
+      dateFrom: isoDaysFromNow(0),
+      dateTo: isoDaysFromNow(7),
     };
   });
 
@@ -53,6 +66,30 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
     if (Array.isArray(meals)) return meals as string[];
     if (typeof meals === "string") return meals.split(",").map((s) => s.trim());
     return [];
+  }, [productAttributes]);
+
+  // Nights options: supplier-driven when available (e.g. [7, 8]), otherwise defaults.
+  const availableNights = useMemo(() => {
+    const nights = productAttributes?.availableNights;
+    if (Array.isArray(nights) && nights.length > 0) return nights.filter((n) => typeof n === "number") as number[];
+    return NIGHT_OPTIONS;
+  }, [productAttributes]);
+
+  // Multi-program merge (HIMEROS matrix E2E): product may declare several TOURINC
+  // programs (e.g. round-trip 229 + one-way 254). Backend runs one real search
+  // per program and merges offers per date.
+  const tourIncValues = useMemo(() => {
+    const multi = productAttributes?.tourIncValues;
+    if (Array.isArray(multi) && multi.length > 0) return multi.map(String);
+    const single = (productAttributes?.tourIncValue as string) ?? "";
+    return single ? [single] : [];
+  }, [productAttributes]);
+
+  const tourIncNames = useMemo(() => {
+    const names = productAttributes?.tourIncNames;
+    if (Array.isArray(names) && names.length > 0) return names.map(String);
+    const single = (productAttributes?.tourIncName as string) ?? "";
+    return single ? [single] : [];
   }, [productAttributes]);
 
   const hotel = useMemo(() => {
@@ -100,7 +137,7 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
     }));
   }, []);
 
-  // Context hash for invalidation detection
+  // Context hash for invalidation detection (includes dates — §19/§20)
   const contextHash = useMemo(() => {
     return JSON.stringify({
       hotel: config.room,
@@ -109,10 +146,23 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
       children: config.children,
       childAges: config.childAges,
       nights: config.nights,
+      dateFrom: config.dateFrom,
+      dateTo: config.dateTo,
     });
   }, [config]);
 
   const isConfigChanged = lastContextHash !== null && contextHash !== lastContextHash;
+
+  // §19 OLD RESULT / STALE STATE: after date/nights/room/tourists change the old
+  // result must not be shown as the result of the new context. Signal the parent
+  // to drop the stale calendar until the fresh Summer response arrives.
+  const lastDirtyHashRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastContextHash !== null && contextHash !== lastContextHash && lastDirtyHashRef.current !== contextHash) {
+      lastDirtyHashRef.current = contextHash;
+      onConfigDirty?.();
+    }
+  }, [contextHash, lastContextHash, onConfigDirty]);
 
   // "Уточнить цену" handler
   const handlePriceQuery = useCallback(async () => {
@@ -120,12 +170,13 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
     setError(null);
 
     try {
-      // Date range: next 6 months from today
-      const now = new Date();
-      const dateFrom = now.toISOString().split("T")[0];
-      const futureDate = new Date(now);
-      futureDate.setMonth(futureDate.getMonth() + 6);
-      const dateTo = futureDate.toISOString().split("T")[0];
+      // Supplier hard limit: CHECKIN_BEG → CHECKIN_END ≤ 31 days.
+      const from = config.dateFrom || isoDaysFromNow(0);
+      const maxTo = new Date(from);
+      maxTo.setDate(maxTo.getDate() + 30);
+      const maxToIso = maxTo.toISOString().split("T")[0];
+      // min(user dateTo, from+30d) — ISO strings compare lexicographically.
+      const to = config.dateTo && config.dateTo < maxToIso ? config.dateTo : maxToIso;
 
       const result = await publicSupplierApi.getPriceCalendar({
         supplierCode: "SUMMERTOUR",
@@ -138,10 +189,12 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
         children: config.children,
         childAges: config.childAges,
         nights: config.nights,
-        dateFrom,
-        dateTo,
-        tourIncValue: tourIncValue || undefined,
-        tourIncName: tourIncName || undefined,
+        dateFrom: from,
+        dateTo: to,
+        tourIncValue: tourIncValues[0],
+        tourIncName: tourIncNames[0],
+        tourIncValues: tourIncValues.length > 1 ? tourIncValues : undefined,
+        tourIncNames: tourIncValues.length > 1 ? tourIncNames : undefined,
       });
 
       setLastContextHash(contextHash);
@@ -156,11 +209,33 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
     } finally {
       setLoading(false);
     }
-  }, [config, productCode, hotel, hotelExternalId, tourIncValue, tourIncName, contextHash, locale, onCalendarLoaded]);
+  }, [config, productCode, hotel, hotelExternalId, tourIncValues, tourIncNames, contextHash, locale, onCalendarLoaded]);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <h3 className="text-sm font-bold text-slate-900">{t("configurator.title", locale)}</h3>
+
+      {/* Date range — search-first: дата является параметром поиска (§10) */}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs font-medium uppercase tracking-wide text-slate-400">{t("configurator.date_from", locale)}</label>
+          <input
+            type="date"
+            value={config.dateFrom}
+            onChange={(e) => setConfig((p) => ({ ...p, dateFrom: e.target.value }))}
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium uppercase tracking-wide text-slate-400">{t("configurator.date_to", locale)}</label>
+          <input
+            type="date"
+            value={config.dateTo}
+            onChange={(e) => setConfig((p) => ({ ...p, dateTo: e.target.value }))}
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+      </div>
 
       {/* Room */}
       {availableRooms.length > 0 && (
@@ -273,7 +348,7 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
           onChange={(e) => setConfig((p) => ({ ...p, nights: parseInt(e.target.value, 10) }))}
           className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
         >
-          {NIGHT_OPTIONS.map((n) => (
+          {availableNights.map((n) => (
             <option key={n} value={n}>{n}</option>
           ))}
         </select>

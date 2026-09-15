@@ -44,6 +44,14 @@ export interface SupplierSearchQuery {
   tourIncValue?: string;
   /** Summertour program display name (for logging/attribution). */
   tourIncName?: string;
+  /**
+   * Multiple TOURINC programs to merge into one calendar (HIMEROS matrix E2E).
+   * When set, the adapter runs one search per program and merges entries per date;
+   * each entry carries all real offers (per program/transport) in `offers`.
+   */
+  tourIncValues?: string[];
+  /** Program display names aligned with tourIncValues (optional). */
+  tourIncNames?: string[];
   /** Page number (1-based). */
   page?: number;
   /** Max results per page. */
@@ -229,6 +237,28 @@ export interface PriceCalendarQuery {
   tourIncValue?: string;
   /** Summertour program display name. */
   tourIncName?: string;
+  /** Multiple TOURINC programs to merge into one calendar (multi-program merge). */
+  tourIncValues?: string[];
+  /** Program display names aligned with tourIncValues (optional). */
+  tourIncNames?: string[];
+}
+
+export interface PriceCalendarEntryOffer {
+  /** TOURINC program this offer belongs to. */
+  tourIncValue: string;
+  /** Program display name (e.g., "Antalya 2026"). */
+  tourIncName?: string;
+  /** spoKey — search session id. */
+  externalOfferId: string;
+  /** CATCLAIM — exact offer claim (primary supplier identity). */
+  externalClaim?: string;
+  /** Real supplier price for this offer. */
+  price: number;
+  currency: string;
+  /** Transport class as returned by supplier (e.g., "Эконом"). */
+  transport?: string;
+  /** True when the program has no return segment (e.g., TOURINC 254). */
+  oneWay?: boolean;
 }
 
 export interface PriceCalendarEntry {
@@ -242,6 +272,8 @@ export interface PriceCalendarEntry {
   availability: SupplierAvailability;
   /** Number of offers found for this date. */
   offerCount: number;
+  /** All real offers for this date (per program/transport), sorted by price. */
+  offers?: PriceCalendarEntryOffer[];
   /** Best offer reference (for re-check). */
   bestOfferRef?: SupplierOfferRef;
 }

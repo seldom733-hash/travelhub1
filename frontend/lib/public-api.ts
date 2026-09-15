@@ -297,6 +297,21 @@ export interface PriceCalendarQuery {
   dateTo: string;
   tourIncValue?: string;
   tourIncName?: string;
+  /** Multiple TOURINC programs — backend merges one real search per program. */
+  tourIncValues?: string[];
+  tourIncNames?: string[];
+}
+
+/** One real supplier offer for a calendar date (per program/transport). */
+export interface PriceCalendarEntryOffer {
+  tourIncValue: string;
+  tourIncName?: string;
+  externalOfferId: string;
+  externalClaim?: string;
+  price: number;
+  currency: string;
+  transport?: string;
+  oneWay?: boolean;
 }
 
 export interface PriceCalendarEntry {
@@ -305,6 +320,8 @@ export interface PriceCalendarEntry {
   currency: string | null;
   availability: "AVAILABLE" | "NOT_AVAILABLE" | "UNKNOWN";
   offerCount: number;
+  /** All real offers for this date (per program/transport), sorted by price. */
+  offers?: PriceCalendarEntryOffer[];
   bestOfferRef?: {
     supplierCode: string;
     externalOfferId: string;

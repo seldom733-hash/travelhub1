@@ -1,0 +1,17 @@
+{
+ "V0 Vitrine→PDP": "PASS",
+ "A_cell": "30 1 371,64",
+ "A 7n/2ad → 1371.64": "PASS",
+ "B_nights_options": [
+  "7"
+ ],
+ "B_8n_cell": "NOT OFFERED — supplier data has no 8n for HIMEROS (availableNights=[7]); API check: 8n → 0 offers",
+ "B 8n isolation": "PASS",
+ "C_stale_dropped": true,
+ "C_price_1899_found": false,
+ "C occupancy fresh": "PASS",
+ "D_room_options": 2,
+ "D rooms": "PASS",
+ "E_selected_summary": true,
+ "E multiple offers UI": "PASS"
+}

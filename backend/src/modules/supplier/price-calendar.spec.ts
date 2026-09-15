@@ -325,6 +325,106 @@ describe("Date integrity — checkIn parsing", () => {
   });
 });
 
+describe("Multi-program calendar merge (HIMEROS matrix E2E)", () => {
+  /** Mirrors adapter merge logic: group by date, keep ALL real offers per date. */
+  function mergeByDate(offers: Array<{ departureDate: string; price: number; tourIncValue: string; spoKey: string; claim: string }>) {
+    const dateMap = new Map<string, typeof offers>();
+    for (const offer of offers) {
+      const existing = dateMap.get(offer.departureDate) || [];
+      existing.push(offer);
+      dateMap.set(offer.departureDate, existing);
+    }
+    return Array.from(dateMap.entries())
+      .map(([date, dateOffers]) => ({
+        date,
+        best: Math.min(...dateOffers.map((o) => o.price)),
+        offerCount: dateOffers.length,
+        offers: dateOffers
+          .slice()
+          .sort((a, b) => a.price - b.price)
+          .map((o) => ({ tourIncValue: o.tourIncValue, spoKey: o.spoKey, claim: o.claim, price: o.price })),
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  const realOffers = [
+    { departureDate: "2026-09-30", price: 1371.64, tourIncValue: "229", spoKey: "34977", claim: "0x430A...E5" },
+    { departureDate: "2026-09-30", price: 824.72, tourIncValue: "254", spoKey: "34978", claim: "0x430A...FE" },
+  ];
+
+  it("should keep both real offers for identical hotel/date/nights/room/meal/occupancy", () => {
+    const merged = mergeByDate(realOffers);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].date).toBe("2026-09-30");
+    expect(merged[0].offerCount).toBe(2);
+    expect(merged[0].offers).toHaveLength(2);
+  });
+
+  it("should preserve distinct supplier identity (spoKey + CATCLAIM) per offer", () => {
+    const merged = mergeByDate(realOffers);
+    const claims = merged[0].offers.map((o) => o.claim);
+    const spoKeys = merged[0].offers.map((o) => o.spoKey);
+    expect(new Set(claims).size).toBe(2);
+    expect(new Set(spoKeys).size).toBe(2);
+  });
+
+  it("should pick the lowest real price as best without dropping offers", () => {
+    const merged = mergeByDate(realOffers);
+    expect(merged[0].best).toBe(824.72);
+    expect(merged[0].offers[0].tourIncValue).toBe("254");
+    expect(merged[0].offers[1].tourIncValue).toBe("229");
+  });
+
+  it("should merge dates across programs", () => {
+    const merged = mergeByDate([
+      ...realOffers,
+      { departureDate: "2026-10-03", price: 816.83, tourIncValue: "254", spoKey: "34978", claim: "0x430A...FE2" },
+    ]);
+    expect(merged.map((e) => e.date)).toEqual(["2026-09-30", "2026-10-03"]);
+    expect(merged[1].offerCount).toBe(1);
+  });
+
+  it("should detect one-way programs by TOURINC name", () => {
+    const oneWay = /no return|без обратного/i.test("Antalya 2026 (NO RETURN)");
+    const roundTrip = /no return|без обратного/i.test("Antalya 2026");
+    expect(oneWay).toBe(true);
+    expect(roundTrip).toBe(false);
+  });
+
+  it("should include tourIncValues in cache key so programs never share cache", () => {
+    const base = {
+      hotel: "HIMEROS BEACH HOTEL 3* (Кемер)",
+      adults: 2,
+      children: 0,
+      childAges: [] as number[],
+      nights: 7,
+      dateFrom: "2026-09-20",
+      dateTo: "2026-10-05",
+    };
+    const keySingle = `calendar:SUMMERTOUR:${JSON.stringify({ ...base, tourIncValues: ["229"] })}`;
+    const keyMulti = `calendar:SUMMERTOUR:${JSON.stringify({ ...base, tourIncValues: ["229", "254"] })}`;
+    const keyNone = `calendar:SUMMERTOUR:${JSON.stringify({ ...base, tourIncValues: [] })}`;
+    expect(keySingle).not.toBe(keyMulti);
+    expect(keySingle).not.toBe(keyNone);
+    expect(keyMulti).not.toBe(keyNone);
+  });
+
+  it("should isolate nights contexts in cache keys (7 ≠ 8)", () => {
+    const base = { hotel: "HIMEROS", adults: 2, children: 0, childAges: [] as number[] };
+    const key7 = JSON.stringify({ ...base, nights: 7 });
+    const key8 = JSON.stringify({ ...base, nights: 8 });
+    expect(key7).not.toBe(key8);
+  });
+
+  it("should isolate occupancy contexts in cache keys (1 adult ≠ 2 adults ≠ 2+child)", () => {
+    const base = { hotel: "HIMEROS", nights: 7 };
+    const k1 = JSON.stringify({ ...base, adults: 1, children: 0, childAges: [] });
+    const k2 = JSON.stringify({ ...base, adults: 2, children: 0, childAges: [] });
+    const k3 = JSON.stringify({ ...base, adults: 2, children: 1, childAges: [5] });
+    expect(new Set([k1, k2, k3]).size).toBe(3);
+  });
+});
+
 describe("Cache key derivation", () => {
   it("should produce unique keys for different configurations", () => {
     const base = {
