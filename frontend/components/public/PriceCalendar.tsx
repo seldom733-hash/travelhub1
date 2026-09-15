@@ -191,6 +191,7 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
               type="button"
               disabled={!isAvailable}
               onClick={() => cell.entry && onDateSelected(cell.entry)}
+              title={cell.entry?.absenceText || undefined}
               className={`relative flex h-12 flex-col items-center justify-center rounded-lg text-xs transition-colors ${
                 cell.isSelected
                   ? "bg-blue-600 text-white"
@@ -208,6 +209,10 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
                 <span className={`text-[9px] leading-tight ${cell.isSelected ? "text-blue-100" : "text-slate-500"}`}>
                   {cell.entry.price?.toLocaleString()}
                 </span>
+              )}
+              {/* §10 Absence indicator: show X when date is in range but has no price. */}
+              {!hasPrice && cell.entry && cell.entry.absenceCode && (
+                <span className={`text-[9px] ${cell.isSelected ? "text-blue-200" : "text-red-400"}`}>✕</span>
               )}
               {/* Offer count badge when multiple offers exist (§12). */}
               {cell.entry && cell.entry.offerCount > 1 && (
@@ -234,6 +239,10 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
         <span className="flex items-center gap-1">
           <span className="inline-block h-2.5 w-2.5 rounded bg-blue-50" />
           {t("calendar.today", locale)}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="text-red-400 text-xs">✕</span>
+          {t("calendar.no_price", locale)}
         </span>
         <span>— {t("calendar.unavailable", locale)}</span>
       </div>
@@ -278,11 +287,25 @@ export default function PriceCalendar({ result, config, onDateSelected, selected
               </ul>
             </div>
           )}
+          {/* §10 Absence reason when no price on selected date. */}
+          {selectedEntry.price === null && selectedEntry.absenceText && (
+            <div className="mt-2 border-t border-blue-100 pt-2">
+              <div className="text-[11px] font-semibold text-red-500">{t("calendar.absence_title", locale)}:</div>
+              <div className="text-xs text-slate-600">{selectedEntry.absenceText}</div>
+              {selectedEntry.absenceCode && (
+                <div className="mt-0.5 text-[10px] text-slate-400">Code: {selectedEntry.absenceCode}</div>
+              )}
+            </div>
+          )}
           <div className="mt-2 border-t border-blue-100 pt-2">
             <div className="text-[11px] text-blue-600">{t("calendar.total_price", locale)}:</div>
-            <div className="text-lg font-bold text-blue-900">
-              {selectedEntry.price?.toLocaleString()} {selectedEntry.currency}
-            </div>
+            {selectedEntry.price !== null ? (
+              <div className="text-lg font-bold text-blue-900">
+                {selectedEntry.price?.toLocaleString()} {selectedEntry.currency}
+              </div>
+            ) : (
+              <div className="text-sm text-slate-400">{t("calendar.no_price", locale)}</div>
+            )}
           </div>
         </div>
       )}

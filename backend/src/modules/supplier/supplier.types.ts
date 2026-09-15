@@ -264,7 +264,7 @@ export interface PriceCalendarEntryOffer {
 export interface PriceCalendarEntry {
   /** Departure date (ISO-8601). */
   date: string;
-  /** Total trip price (lowest available for this date). */
+  /** Total trip price (lowest available for this date). Null when no offer found. */
   price: number | null;
   /** Currency code. */
   currency: string | null;
@@ -276,6 +276,10 @@ export interface PriceCalendarEntry {
   offers?: PriceCalendarEntryOffer[];
   /** Best offer reference (for re-check). */
   bestOfferRef?: SupplierOfferRef;
+  /** Absence reason when price is null (§10). */
+  absenceCode?: string;
+  /** Human-readable absence description for the user (§10). */
+  absenceText?: string;
 }
 
 export interface PriceCalendarResult {

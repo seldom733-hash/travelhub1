@@ -164,18 +164,19 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
     }
   }, [contextHash, lastContextHash, onConfigDirty]);
 
-  // "Уточнить цену" handler — sends full 6-month range; backend splits into ≤31-day windows (§6).
+  // "Уточнить цену" handler — sends user-selected range, max 31 days (§4).
   const handlePriceQuery = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
       const from = config.dateFrom || isoDaysFromNow(0);
-      // 6-month horizon: backend handles 31-day windowing (§6/§7).
+      // §4 Supplier capability: Summer accepts max 31 days.
+      // Clamp to 31-day window as safety layer.
       const maxTo = new Date(from);
-      maxTo.setMonth(maxTo.getMonth() + 6);
+      maxTo.setDate(maxTo.getDate() + 30);
       const maxToIso = maxTo.toISOString().split("T")[0];
-      const to = config.dateTo && config.dateTo < maxToIso ? config.dateTo : maxToIso;
+      const to = config.dateTo && config.dateTo <= maxToIso ? config.dateTo : maxToIso;
 
       const result = await publicSupplierApi.getPriceCalendar({
         supplierCode: "SUMMERTOUR",
@@ -210,6 +211,20 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
     }
   }, [config, productCode, hotel, hotelExternalId, tourIncValues, tourIncNames, contextHash, locale, onCalendarLoaded]);
 
+  // §4 Date range validation: max 31 days (Summer supplier capability).
+  const dateRangeDays = useMemo(() => {
+    if (!config.dateFrom || !config.dateTo) return 0;
+    const from = new Date(config.dateFrom);
+    const to = new Date(config.dateTo);
+    return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  }, [config.dateFrom, config.dateTo]);
+
+  const dateRangeError = dateRangeDays > 31
+    ? t("configurator.max_31_days", locale)
+    : dateRangeDays < 1 && config.dateFrom && config.dateTo
+      ? t("configurator.invalid_range", locale)
+      : null;
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <h3 className="text-sm font-bold text-slate-900">{t("configurator.title", locale)}</h3>
@@ -230,11 +245,40 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
           <input
             type="date"
             value={config.dateTo}
-            onChange={(e) => setConfig((p) => ({ ...p, dateTo: e.target.value }))}
+            min={config.dateFrom || undefined}
+            onChange={(e) => {
+              const newTo = e.target.value;
+              // §4 UX: enforce max 31 days inline.
+              if (config.dateFrom && newTo) {
+                const from = new Date(config.dateFrom);
+                const to = new Date(newTo);
+                const days = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                if (days > 31) {
+                  // Clamp to 31 days from dateFrom.
+                  const clamped = new Date(from);
+                  clamped.setDate(clamped.getDate() + 30);
+                  setConfig((p) => ({ ...p, dateTo: clamped.toISOString().split("T")[0] }));
+                  return;
+                }
+              }
+              setConfig((p) => ({ ...p, dateTo: newTo }));
+            }}
             className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
         </div>
       </div>
+      {/* §4 Supplier capability hint + validation error */}
+      <div className="mt-1 flex items-center justify-between text-[10px]">
+        <span className="text-slate-400">{t("configurator.max_31_hint", locale)}</span>
+        {dateRangeDays > 0 && (
+          <span className={dateRangeError ? "text-red-500 font-medium" : "text-slate-400"}>
+            {dateRangeDays} {locale === "ru" ? "дн." : "days"}
+          </span>
+        )}
+      </div>
+      {dateRangeError && (
+        <div className="mt-1 text-[10px] font-medium text-red-500">{dateRangeError}</div>
+      )}
 
       {/* Room */}
       {availableRooms.length > 0 && (
@@ -367,7 +411,7 @@ export default function PriceConfigurator({ productCode, productAttributes, onCa
       <button
         type="button"
         onClick={handlePriceQuery}
-        disabled={loading}
+        disabled={loading || !!dateRangeError}
         className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? (

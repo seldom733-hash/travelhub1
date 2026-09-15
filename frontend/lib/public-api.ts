@@ -328,6 +328,10 @@ export interface PriceCalendarEntry {
     externalClaim?: string;
     searchContext: Record<string, unknown>;
   };
+  /** §10 Absence reason code when price is null. */
+  absenceCode?: string;
+  /** §10 Human-readable absence description. */
+  absenceText?: string;
 }
 
 export interface PriceCalendarResult {

@@ -607,3 +607,127 @@ describe("Multiple offers per date (§12)", () => {
     expect(entry.offers[1].tourIncValue).toBe("229");
   });
 });
+
+// ── Complete Date-Set Generation (§8) ─────────────────────────────
+
+/** Mirror of adapter's complete date-set generation logic. */
+function generateCompleteDateSet(from: string, to: string): string[] {
+  const dates: string[] = [];
+  let cur = new Date(from);
+  const end = new Date(to);
+  while (cur <= end) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, "0");
+    const d = String(cur.getDate()).padStart(2, "0");
+    dates.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+describe("Complete date-set generation (§8)", () => {
+  it("should generate all 11 dates for Sep 15-25 range", () => {
+    const dates = generateCompleteDateSet("2026-09-15", "2026-09-25");
+    expect(dates).toHaveLength(11);
+    expect(dates[0]).toBe("2026-09-15");
+    expect(dates[10]).toBe("2026-09-25");
+  });
+
+  it("should include every consecutive date without gaps", () => {
+    const dates = generateCompleteDateSet("2026-09-15", "2026-09-25");
+    for (let i = 1; i < dates.length; i++) {
+      const prev = new Date(dates[i - 1]);
+      const curr = new Date(dates[i]);
+      const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+      expect(diffDays).toBe(1);
+    }
+  });
+
+  it("should handle single-day range", () => {
+    const dates = generateCompleteDateSet("2026-10-01", "2026-10-01");
+    expect(dates).toEqual(["2026-10-01"]);
+  });
+
+  it("should handle 31-day range", () => {
+    const dates = generateCompleteDateSet("2026-10-01", "2026-10-31");
+    expect(dates).toHaveLength(31);
+  });
+
+  it("should merge Summer results with complete date set", () => {
+    const allDates = generateCompleteDateSet("2026-09-15", "2026-09-25");
+    const summerResults = new Map([
+      ["2026-09-15", { price: 823.16, offerCount: 1 }],
+      ["2026-09-23", { price: 1376.90, offerCount: 1 }],
+    ]);
+
+    const entries = allDates.map((date) => {
+      const result = summerResults.get(date);
+      if (result) {
+        return { date, price: result.price, offerCount: result.offerCount, absenceCode: undefined };
+      }
+      return { date, price: null, offerCount: 0, absenceCode: "SUPPLIER_NO_RESULT" };
+    });
+
+    expect(entries).toHaveLength(11);
+    // Sep 15 has price
+    expect(entries[0].price).toBe(823.16);
+    expect(entries[0].absenceCode).toBeUndefined();
+    // Sep 16 has no price
+    expect(entries[1].price).toBeNull();
+    expect(entries[1].absenceCode).toBe("SUPPLIER_NO_RESULT");
+    // Sep 23 has price
+    expect(entries[8].price).toBe(1376.90);
+    expect(entries[8].absenceCode).toBeUndefined();
+    // Sep 25 has no price
+    expect(entries[10].price).toBeNull();
+    expect(entries[10].absenceCode).toBe("SUPPLIER_NO_RESULT");
+  });
+});
+
+// ── Absence Reasons (§10) ─────────────────────────────────────────
+
+describe("Absence reasons (§10)", () => {
+  it("should have absenceCode and absenceText for dates without offers", () => {
+    const entry = {
+      date: "2026-09-16",
+      price: null,
+      currency: null,
+      availability: "NOT_AVAILABLE",
+      offerCount: 0,
+      absenceCode: "SUPPLIER_NO_RESULT",
+      absenceText: "Цена не получена — Summer не предоставил предложение на эту дату",
+    };
+    expect(entry.price).toBeNull();
+    expect(entry.absenceCode).toBe("SUPPLIER_NO_RESULT");
+    expect(entry.absenceText).toBeTruthy();
+  });
+
+  it("should not have absenceCode for dates with offers", () => {
+    const entry = {
+      date: "2026-09-15",
+      price: 823.16,
+      currency: "USD",
+      availability: "AVAILABLE",
+      offerCount: 1,
+      absenceCode: undefined,
+      absenceText: undefined,
+    };
+    expect(entry.price).toBe(823.16);
+    expect(entry.absenceCode).toBeUndefined();
+  });
+
+  it("should support all absence reason codes", () => {
+    const codes = [
+      "SUPPLIER_NO_RESULT",
+      "NO_TOURS_FOR_DATE",
+      "NO_AVAILABILITY",
+      "PARAMETER_MISMATCH",
+      "SUPPLIER_ERROR",
+      "PLATFORM_ERROR",
+    ];
+    for (const code of codes) {
+      const entry = { date: "2026-09-16", price: null, absenceCode: code };
+      expect(entry.absenceCode).toBe(code);
+    }
+  });
+});

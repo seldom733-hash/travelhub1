@@ -699,47 +699,73 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       dateMap.set(offer.departureDate, existing);
     }
 
-    const entries: PriceCalendarEntry[] = [];
-    for (const [date, dateOffers] of dateMap) {
-      // Best (lowest price) offer for this date across all programs
-      const sorted = dateOffers.sort((a, b) => a.price.amount - b.price.amount);
-      const best = sorted[0];
+    // §8 Generate COMPLETE date set from dateFrom to dateTo inclusive.
+    // Every date must appear in the calendar — with price OR absence reason.
+    const allDates: string[] = [];
+    {
+      let cur = new Date(query.dateFrom);
+      const end = new Date(query.dateTo);
+      while (cur <= end) {
+        allDates.push(this.formatDate(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
 
-      entries.push({
-        date,
-        price: best.price.amount,
-        currency: best.price.currency,
-        availability: best.availability,
-        offerCount: dateOffers.length,
-        // All real offers for this date — one per program/transport (multi-program merge).
-        offers: sorted.map((o) => ({
-          tourIncValue: (o.rawMetadata?.tourIncValue as string) ?? "",
-          tourIncName: (o.rawMetadata?.tourIncName as string) ?? undefined,
-          externalOfferId: o.externalOfferId,
-          externalClaim: o.externalClaim,
-          price: o.price.amount,
-          currency: o.price.currency,
-          transport: o.transport,
-          oneWay: /no return|без обратного/i.test((o.rawMetadata?.tourIncName as string) ?? ""),
-        })),
-        bestOfferRef: {
-          supplierCode: this.code,
-          externalOfferId: best.externalOfferId,
-          externalClaim: best.externalClaim,
-          searchContext: {
-            adults: query.adults,
-            children: query.children,
-            childAges: query.childAges,
-            hotel: query.hotel,
-            room: query.room,
-            meal: query.meal,
-            nightsFrom: query.nights,
-            nightsTo: query.nights,
-            tourIncValue: (best.rawMetadata?.tourIncValue as string) ?? query.tourIncValue,
-            tourIncName: (best.rawMetadata?.tourIncName as string) ?? query.tourIncName,
+    const entries: PriceCalendarEntry[] = [];
+    for (const date of allDates) {
+      const dateOffers = dateMap.get(date);
+
+      if (dateOffers && dateOffers.length > 0) {
+        // Best (lowest price) offer for this date across all programs
+        const sorted = dateOffers.sort((a, b) => a.price.amount - b.price.amount);
+        const best = sorted[0];
+
+        entries.push({
+          date,
+          price: best.price.amount,
+          currency: best.price.currency,
+          availability: best.availability,
+          offerCount: dateOffers.length,
+          offers: sorted.map((o) => ({
+            tourIncValue: (o.rawMetadata?.tourIncValue as string) ?? "",
+            tourIncName: (o.rawMetadata?.tourIncName as string) ?? undefined,
+            externalOfferId: o.externalOfferId,
+            externalClaim: o.externalClaim,
+            price: o.price.amount,
+            currency: o.price.currency,
+            transport: o.transport,
+            oneWay: /no return|без обратного/i.test((o.rawMetadata?.tourIncName as string) ?? ""),
+          })),
+          bestOfferRef: {
+            supplierCode: this.code,
+            externalOfferId: best.externalOfferId,
+            externalClaim: best.externalClaim,
+            searchContext: {
+              adults: query.adults,
+              children: query.children,
+              childAges: query.childAges,
+              hotel: query.hotel,
+              room: query.room,
+              meal: query.meal,
+              nightsFrom: query.nights,
+              nightsTo: query.nights,
+              tourIncValue: (best.rawMetadata?.tourIncValue as string) ?? query.tourIncValue,
+              tourIncName: (best.rawMetadata?.tourIncName as string) ?? query.tourIncName,
+            },
           },
-        },
-      });
+        });
+      } else {
+        // §10 Absence: no Summer offer on this date.
+        entries.push({
+          date,
+          price: null,
+          currency: null,
+          availability: "NOT_AVAILABLE",
+          offerCount: 0,
+          absenceCode: "SUPPLIER_NO_RESULT",
+          absenceText: "Цена не получена — Summer не предоставил предложение на эту дату",
+        });
+      }
     }
 
     // Sort entries by date
