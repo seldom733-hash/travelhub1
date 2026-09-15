@@ -351,10 +351,11 @@ Baseline HIMEROS-отсутствие зафиксировано до созда
 | Параметр | Значение |
 |---|---|
 | Изменённые файлы (этап) | backend: summertour.adapter.ts, supplier-offer.service.ts, supplier.types.ts, price-calendar.spec.ts, seed/summer-himeros-product-seed.ts; frontend: PriceConfigurator.tsx, PriceCalendar.tsx, public-api.ts, i18n.tsx, products/[slug]/page.tsx, search/page.tsx, next.config.ts; users-credentials.txt (локально, не в git) |
-| Commit | см. финальный SHA ниже |
-| Push | выполнен (см. ниже) |
-| Final SHA | _см. Git Closure в конце сессии_ |
-| Final status | _см. ниже_ |
+| Commit | `feat(supplier): HIMEROS price matrix E2E — real occupancy/nights isolation + multi-program offers` (22 files, +1210/−44) |
+| Push | ✅ `931589c..31f1654 master -> master` |
+| **Final SHA** | **`31f16547b547369330faca65905f599bffc71c49`** |
+| origin/master после push+fetch | `31f16547b547369330faca65905f599bffc71c49` — ahead/behind `0/0` ✅ |
+| Final working tree | tracked: только `users-credentials.txt` (намеренно не коммитится — локальная credential policy §4); остальные — pre-existing untracked артефакты |
 
 ---
 
