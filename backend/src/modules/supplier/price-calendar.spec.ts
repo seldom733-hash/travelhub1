@@ -579,6 +579,50 @@ describe("Calendar offer deduplication (§10)", () => {
 
     expect(seen.size).toBe(2);
   });
+
+  it("should NOT deduplicate same spoKey on different dates (price calendar)", () => {
+    const offers = [
+      { externalOfferId: "34978", price: 1118.30, departureDate: "2026-09-30", room: "STANDARD ROOM / DBL" },
+      { externalOfferId: "34978", price: 1103.30, departureDate: "2026-10-03", room: "STANDARD ROOM / DBL" },
+      { externalOfferId: "34978", price: 1070.71, departureDate: "2026-10-07", room: "STANDARD ROOM / DBL" },
+    ];
+
+    const seen = new Map<string, typeof offers[0]>();
+    for (const offer of offers) {
+      const key = `${offer.externalOfferId}|${offer.departureDate}|${offer.room ?? ""}`;
+      if (!seen.has(key)) {
+        seen.set(key, offer);
+      } else {
+        const existing = seen.get(key)!;
+        if (offer.price > existing.price) seen.set(key, offer);
+      }
+    }
+
+    const deduped = Array.from(seen.values());
+    expect(deduped).toHaveLength(3);
+    expect(deduped.map((o) => o.departureDate).sort()).toEqual(["2026-09-30", "2026-10-03", "2026-10-07"]);
+  });
+
+  it("should NOT deduplicate same spoKey+date with different rooms", () => {
+    const offers = [
+      { externalOfferId: "34978", price: 824.72, departureDate: "2026-09-30", room: "STANDARD ROOM / DBL" },
+      { externalOfferId: "34978", price: 1118.30, departureDate: "2026-09-30", room: "FAMILY ROOM [FAM] / 2ADL" },
+    ];
+
+    const seen = new Map<string, typeof offers[0]>();
+    for (const offer of offers) {
+      const key = `${offer.externalOfferId}|${offer.departureDate}|${offer.room ?? ""}`;
+      if (!seen.has(key)) {
+        seen.set(key, offer);
+      } else {
+        const existing = seen.get(key)!;
+        if (offer.price > existing.price) seen.set(key, offer);
+      }
+    }
+
+    const deduped = Array.from(seen.values());
+    expect(deduped).toHaveLength(2);
+  });
 });
 
 // ── Multiple Offers Per Date (§12) ────────────────────────────────

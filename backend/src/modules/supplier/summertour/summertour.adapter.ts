@@ -158,6 +158,22 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
         this.logger.debug(`Set TOURINC to ${query.tourIncValue} (${query.tourIncName ?? "?"})`);
       }
 
+      // Force hotel filter and disable grouping in SAMO PRICES requests via page.route().
+      // TOURINC change resets form state, so we must intercept the network request itself.
+      // SAMO uses a popup for hotel selection (no select[name=HOTELS] exists on page),
+      // so page.evaluate() cannot set the hotel filter — page.route() is the only way.
+      if (query.hotelExternalId) {
+        await page.route('**samo_action=PRICES**', (route) => {
+          const url = route.request().url();
+          const newUrl = url
+            .replace(/HOTELS_ANY=\d*/g, 'HOTELS_ANY=0')
+            .replace(/HOTELS=[^&]*/g, `HOTELS=${query.hotelExternalId}`)
+            .replace(/PARTITION_PRICE=[^&]*/g, 'PARTITION_PRICE=0');
+          route.continue({ url: newUrl });
+        });
+        this.logger.debug(`page.route set: HOTELS=${query.hotelExternalId}, grouping disabled`);
+      }
+
       // Click the search button to trigger AJAX price loading
       const searchBtn = await page.$(".load");
       if (!searchBtn) {
@@ -688,7 +704,7 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       ? collected.filter((o) => o.hotel === query.hotel || o.hotelExternalId === query.hotelExternalId)
       : collected;
 
-    // Deduplicate by spoKey across windows (same offer may appear in adjacent windows).
+    // Deduplicate by spoKey + departureDate across windows (same offer may appear in adjacent windows).
     const deduped = this.deduplicateCalendarOffers(filtered);
 
     // Group by departure date, then keep ALL real offers per date (per program).
@@ -797,11 +813,11 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
     };
   }
 
-  /** Deduplicate calendar offers by spoKey (same offer may appear in adjacent windows). */
+  /** Deduplicate calendar offers by spoKey + departureDate (same offer may appear in adjacent windows). */
   private deduplicateCalendarOffers(offers: SupplierOffer[]): SupplierOffer[] {
     const seen = new Map<string, SupplierOffer>();
     for (const offer of offers) {
-      const key = offer.externalOfferId;
+      const key = `${offer.externalOfferId}|${offer.departureDate}|${offer.room ?? ""}`;
       if (!seen.has(key)) {
         seen.set(key, offer);
       } else {
