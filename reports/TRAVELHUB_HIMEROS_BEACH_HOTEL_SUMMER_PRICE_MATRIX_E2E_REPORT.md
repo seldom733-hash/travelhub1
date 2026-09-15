@@ -361,9 +361,9 @@ Baseline HIMEROS-отсутствие зафиксировано до созда
 | Изменённые файлы (этап) | backend: summertour.adapter.ts, supplier-offer.service.ts, supplier.types.ts, price-calendar.spec.ts, seed/summer-himeros-product-seed.ts; frontend: PriceConfigurator.tsx, PriceCalendar.tsx, public-api.ts, i18n.tsx, products/[slug]/page.tsx, search/page.tsx, next.config.ts; users-credentials.txt (локально, не в git) |
 | Commit 1 (этап) | `feat(supplier): HIMEROS price matrix E2E — real occupancy/nights isolation + multi-program offers` (22 files, +1210/−44) → `31f1654` |
 | Push 1 | ✅ `931589c..31f1654 master -> master` |
-| Commit 2 (security fix по итогам ревью) | untrack `users-credentials.txt` (`git rm --cached` + `.gitignore`) + коррекция §B/§O/§T этого отчёта |
-| Push 2 | ✅ (см. финальную строку) |
-| **Final SHA (origin/master)** | **см. последнюю строку таблицы после push** — задаётся commit 3 (closure docs), ahead/behind `0/0` |
+| Commit 2 (closure docs) | финализация §T → `ea2c230`, push ✅ `31f1654..ea2c230` |
+| Commit 3 (security fix по итогам ревью) | untrack `users-credentials.txt` (`git rm --cached` + `.gitignore`) + коррекция §B/§O/§T → `36e1f71`, push ✅ `ea2c230..36e1f71` |
+| **Final SHA (origin/master)** | **`36e1f71ecf1cc8f1499eb3a5081e803b50345430`** — впереди идёт только docs-closure commit этой правки (self-reference: коммит не может содержать собственный SHA); после push: ahead/behind `0/0` ✅ |
 | Final working tree | tracked clean; `users-credentials.txt` — ignored local file (существует на диске, в git не входит) |
 
 ---
