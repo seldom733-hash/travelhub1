@@ -133,17 +133,10 @@ export const storefrontApi = {
   },
 
   /** Upload/replace logo|hero (multipart, до 15 MB). */
-  async uploadMedia(kind: StorefrontMediaKind, file: File): Promise<StorefrontView> {
+  uploadMedia(kind: StorefrontMediaKind, file: File): Promise<StorefrontView> {
     const fd = new FormData();
     fd.append("file", file);
-    const res = await fetch("/api/v1/partner/storefront/media/" + kind, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("travelhub.token") ?? ""}` },
-      body: fd,
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`);
-    return body as StorefrontView;
+    return api.postForm(`/partner/storefront/media/${kind}`, fd);
   },
 
   deleteMedia(kind: StorefrontMediaKind): Promise<StorefrontView> {
