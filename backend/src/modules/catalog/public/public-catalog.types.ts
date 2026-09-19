@@ -105,6 +105,10 @@ export interface PublicProductCard {
   currency: string | null;
   /** Гранулярность цены: per-unit тарифа (per person/service не моделируется отдельно). */
   pricingUnit: "unit";
+  /** Дата вылета из минимального headline-тарифа (ISO-8601 date). */
+  headlineDepartureDate: string | null;
+  /** Количество ночей из минимального headline-тарифа. */
+  headlineNights: number | null;
   /** Discovery-availability (§12); null, если строк Availability нет. */
   availabilitySummary: PublicAvailabilitySummary | null;
   /** Seller-safe проекция (§8, Step 1.11); null — идентичность скрыта/не задана. */

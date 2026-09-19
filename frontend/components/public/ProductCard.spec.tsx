@@ -24,6 +24,8 @@ function card(overrides: Partial<PublicProductCard> = {}): PublicProductCard {
     priceFrom: "350.00",
     currency: "USD",
     pricingUnit: "unit",
+    headlineDepartureDate: null,
+    headlineNights: null,
     availabilitySummary: null,
     seller: null,
     publishedAt: "2026-08-07T19:24:06.555Z",

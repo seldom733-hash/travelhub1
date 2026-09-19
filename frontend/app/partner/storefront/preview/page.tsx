@@ -143,6 +143,8 @@ function toCard(p: PartnerProductListItem): PublicProductCard {
     priceFrom: p.priceFrom,
     currency: p.currency,
     pricingUnit: "unit",
+    headlineDepartureDate: null,
+    headlineNights: null,
     availabilitySummary: null,
     seller: null,
     publishedAt: p.publishedAt ?? new Date().toISOString(),

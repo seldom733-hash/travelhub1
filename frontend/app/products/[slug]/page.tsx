@@ -14,6 +14,7 @@ import { availabilityText, sectionLabel, sectionsFor } from "@/lib/marketplace-u
 import { publicApi, PublicNotFoundError, type PublicProductDetail, type PublicTariff } from "@/lib/public-api";
 import { formatLocation } from "@/lib/locations";
 import { useCurrentUser } from "@/lib/use-user";
+import TourDetail from "@/components/supplier/TourDetail";
 
 /**
  * PHASE 1 STEP 1.7 §12 — Product Detail Page `/products/:slug`.
@@ -185,6 +186,9 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             <p className="mt-2 text-[11px] opacity-70">{t("pdp.availability_notice", locale)}</p>
           </div>
         </section>
+
+        {/* Tour Detail — live KOMPAS integration (filters + calendar + modal) */}
+        <TourDetail attributes={p.attributes} title={p.title} />
       </div>
 
       {/* ── Right: price / CTA / seller (seller-safe projection, Step 1.11) ── */}

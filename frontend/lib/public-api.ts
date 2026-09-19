@@ -65,6 +65,8 @@ export interface PublicProductCard {
   priceFrom: string | null;
   currency: string | null;
   pricingUnit: "unit";
+  headlineDepartureDate: string | null;
+  headlineNights: number | null;
   availabilitySummary: PublicAvailabilitySummary | null;
   seller: PublicSeller | null;
   publishedAt: string;

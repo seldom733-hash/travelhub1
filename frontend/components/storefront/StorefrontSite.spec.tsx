@@ -54,6 +54,8 @@ function products(): PublicListResult {
         priceFrom: "120.00",
         currency: "USD",
         pricingUnit: "unit",
+        headlineDepartureDate: null,
+        headlineNights: null,
         availabilitySummary: null,
         seller: null,
         publishedAt: "2026-08-08T00:00:00.000Z",

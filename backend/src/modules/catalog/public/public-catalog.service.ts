@@ -874,6 +874,13 @@ export class PublicCatalogService {
       ? { id: primary.id, thumbUrl: this.publicMediaUrl(primary.id, "thumb"), largeUrl: this.publicMediaUrl(primary.id, "large") }
       : null;
     const price = this.minTariff(row.tariffs);
+    // Extract headline departure date and nights from the minimum tariff
+    const headlineDepartureDate = price?.validFrom ? price.validFrom.toISOString().slice(0, 10) : null;
+    let headlineNights: number | null = null;
+    if (price?.name) {
+      const nightsMatch = price.name.match(/(\d+)\s*nights?/i);
+      if (nightsMatch) headlineNights = parseInt(nightsMatch[1], 10);
+    }
     return {
       id: row.id,
       slug: row.slug,
@@ -885,6 +892,8 @@ export class PublicCatalogService {
       priceFrom: price?.amount ?? null,
       currency: price?.currency ?? null,
       pricingUnit: "unit",
+      headlineDepartureDate,
+      headlineNights,
       availabilitySummary: availability,
       seller,
       publishedAt: row.publishedAt!.toISOString(),
@@ -906,12 +915,12 @@ export class PublicCatalogService {
    * Marketplace (позже). DATE-scope ADVANCE_BOOKING granularity — вне priceFrom
    * policy (documented: per-date granularity ниже «from N»).
    */
-  private minTariff(tariffs: PublicTariffRow[]): { amount: string; currency: string } | null {
-    const candidates: Array<{ price: Prisma.Decimal; currency: string }> = [];
+  private minTariff(tariffs: PublicTariffRow[]): { amount: string; currency: string; validFrom: Date | null; name: string } | null {
+    const candidates: Array<{ price: Prisma.Decimal; currency: string; validFrom: Date | null; name: string }> = [];
     const today = todayStartUtc().getTime();
     const DAY_MS = 86_400_000;
     for (const t of tariffs) {
-      if (t.pricingMode === "FIXED") candidates.push({ price: t.price, currency: t.currency });
+      if (t.pricingMode === "FIXED") candidates.push({ price: t.price, currency: t.currency, validFrom: t.validFrom ?? null, name: t.name });
       const base = (t.restrictions ?? null) as { advanceBookingDays?: unknown } | null;
       const baseAdv = typeof base?.advanceBookingDays === "number" && Number.isInteger(base.advanceBookingDays) ? base.advanceBookingDays : 0;
       const dateStopSet = new Set<number>(
@@ -937,7 +946,7 @@ export class PublicCatalogService {
           }
         }
         if (fullyStopped) continue;
-        candidates.push({ price: p.price, currency: t.currency });
+        candidates.push({ price: p.price, currency: t.currency, validFrom: t.validFrom ?? null, name: t.name });
       }
     }
     if (candidates.length === 0) return null;
@@ -945,7 +954,7 @@ export class PublicCatalogService {
     for (const c of candidates) {
       if (c.price.lessThan(best.price)) best = c;
     }
-    return { amount: this.money(best.price), currency: best.currency };
+    return { amount: this.money(best.price), currency: best.currency, validFrom: best.validFrom, name: best.name };
   }
 
   /** Детерминированное денежное представление (Decimal(12,2) → "100.00"). */

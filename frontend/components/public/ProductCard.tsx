@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { t, useLocale } from "@/lib/i18n";
+import { t, useLocale, formatDate } from "@/lib/i18n";
 import { useMarketplaceCardImpression } from "@/lib/behavioral-events";
 import type { PublicProductCard } from "@/lib/public-api";
 import { formatLocation } from "@/lib/locations";
@@ -96,7 +96,20 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
         )}
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-          <Price amount={card.priceFrom} currency={card.currency} size="sm" />
+          <div>
+            <Price amount={card.priceFrom} currency={card.currency} size="sm" />
+            {(card.headlineDepartureDate || card.headlineNights) && (
+              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-400">
+                {card.headlineDepartureDate && (
+                  <span>{formatDate(card.headlineDepartureDate, locale)}</span>
+                )}
+                {card.headlineDepartureDate && card.headlineNights && <span>·</span>}
+                {card.headlineNights != null && (
+                  <span>{card.headlineNights} {card.headlineNights === 1 ? t("card.night", locale) : t("card.nights", locale)}</span>
+                )}
+              </div>
+            )}
+          </div>
           <span className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors group-hover:bg-blue-600 group-hover:text-white">
             {t("card.details", locale)}
           </span>

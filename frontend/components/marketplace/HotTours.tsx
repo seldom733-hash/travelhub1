@@ -66,13 +66,22 @@ function HotTourCard({ card }: { card: PublicProductCard }) {
           </p>
         )}
         <div className="mt-3 flex items-center justify-between">
-          {card.priceFrom ? (
-            <p className="text-sm font-semibold text-gold">
-              {t("price.from", locale)} {card.priceFrom} {card.currency || ""}
-            </p>
-          ) : (
-            <p className="text-xs text-neutral-500">{t("price.on_request", locale)}</p>
-          )}
+          <div>
+            {card.priceFrom ? (
+              <p className="text-sm font-semibold text-gold">
+                {t("price.from", locale)} {card.priceFrom} {card.currency || ""}
+              </p>
+            ) : (
+              <p className="text-xs text-neutral-500">{t("price.on_request", locale)}</p>
+            )}
+            {(card.headlineDepartureDate || card.headlineNights != null) && (
+              <p className="mt-0.5 text-[11px] text-neutral-500">
+                {card.headlineDepartureDate && <span>{card.headlineDepartureDate}</span>}
+                {card.headlineDepartureDate && card.headlineNights != null && <span> · </span>}
+                {card.headlineNights != null && <span>{card.headlineNights} {card.headlineNights === 1 ? t("card.night", locale) : t("card.nights", locale)}</span>}
+              </p>
+            )}
+          </div>
           <div className="flex size-7 items-center justify-center rounded-full border border-dark-border bg-dark/60 text-neutral-400 transition-colors group-hover:border-gold/40 group-hover:text-gold">
             <ArrowRight size={14} weight="light" />
           </div>
