@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
 import {
@@ -32,34 +32,60 @@ export default function MonthlyCalendar({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Race condition protection: monotonically increasing fetch ID + AbortController
+  const fetchIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
   // Current month being displayed
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
-  // Fetch calendar for the displayed month
+  // Fetch calendar with race condition protection
   const fetchCalendar = useCallback(async () => {
+    // Cancel any in-flight request
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const myId = ++fetchIdRef.current;
     setLoading(true);
     setError(null);
+
     try {
       const query = queryBuilder(currentMonth.getFullYear(), currentMonth.getMonth());
-      const data = await getPriceCalendar(query);
-      setEntries(data.entries);
+      const data = await getPriceCalendar(query, controller.signal);
+      // Only apply if this is still the latest fetch
+      if (myId === fetchIdRef.current) {
+        setEntries(data.entries);
+        setError(null);
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("supports nights") || msg.includes("UNSUPPORTED")) {
-        setError(t("supplier.error.unsupported", locale));
-      } else {
-        setError(t("supplier.error.generic", locale));
+      // Ignore AbortError (cancelled by a newer fetch)
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      if (myId === fetchIdRef.current) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("supports nights") || msg.includes("UNSUPPORTED")) {
+          setError(t("supplier.error.unsupported", locale));
+        } else {
+          setError(t("supplier.error.generic", locale));
+        }
       }
     } finally {
-      setLoading(false);
+      if (myId === fetchIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [queryBuilder, currentMonth, locale]);
 
   useEffect(() => {
     fetchCalendar();
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+    };
   }, [fetchCalendar]);
 
   // Build a map from date string to entry
@@ -171,8 +197,8 @@ export default function MonthlyCalendar({
         </button>
       </div>
 
-      {/* Loading */}
-      {loading && (
+      {/* Loading skeleton — only on first load, not during background refresh */}
+      {loading && entries.length === 0 && (
         <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: 42 }).map((_, i) => (
             <div key={i} className="h-16 rounded-lg bg-slate-100 animate-pulse" />
@@ -180,8 +206,8 @@ export default function MonthlyCalendar({
         </div>
       )}
 
-      {/* Error */}
-      {error && (
+      {/* Error — only when no entries to show */}
+      {error && entries.length === 0 && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="text-sm font-medium text-amber-800">{error}</p>
           <button
@@ -193,8 +219,8 @@ export default function MonthlyCalendar({
         </div>
       )}
 
-      {/* Calendar grid */}
-      {!loading && !error && (
+      {/* Calendar grid — shown once entries are loaded, stays visible during background refresh */}
+      {entries.length > 0 && (
         <>
           {/* Week day headers */}
           <div className="grid grid-cols-7 gap-1">
