@@ -148,11 +148,12 @@ async function get<T>(path: string, params: Record<string, string | number | und
   return res.json();
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) {
     const text = await res.text();
@@ -187,11 +188,12 @@ export async function searchSupplierOffers(
   });
 }
 
-/** Get price calendar (anonymous). */
+/** Get price calendar (anonymous). Supports abort via AbortController. */
 export async function getPriceCalendar(
   query: SupplierPriceCalendarQuery,
+  signal?: AbortSignal,
 ): Promise<SupplierPriceCalendarResult> {
-  return post<SupplierPriceCalendarResult>("/price-calendar", query);
+  return post<SupplierPriceCalendarResult>("/price-calendar", query, signal);
 }
 
 /** Refresh price for re-check (anonymous). */

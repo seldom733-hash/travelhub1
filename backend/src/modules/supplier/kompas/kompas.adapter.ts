@@ -58,8 +58,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
   private readonly baseUrl: string;
   private static readonly MAX_PAGES = 15;
-  private static readonly PAGE_DELAY_MS = 2_000;
-  private static readonly TOURINC_DELAY_MS = 3_000;
+  private static readonly PAGE_DELAY_MS = 1_000;
   private static readonly CALENDAR_WINDOW_DAYS = 31;
 
   constructor() {
@@ -254,13 +253,13 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       // §7: TOWNFROMINC = Baku ALWAYS
       await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-      await page.waitForTimeout(5_000);
+      await page.waitForTimeout(2_000);
 
 // STATEINC (destination country) — set from query if provided
       const stateId = this.mapStateInc(query.destination ?? query.country);
       if (stateId) {
         await this.setSamoSelect(page, "STATEINC", stateId);
-        await page.waitForTimeout(5_000);
+        await page.waitForTimeout(2_000);
         // SAMO may reset TOWNFROMINC after STATEINC change — verify and re-set Baku
         const currentTown = await page.evaluate(() => {
           const sel = document.querySelector("select[name=TOWNFROMINC]") as HTMLSelectElement | null;
@@ -269,9 +268,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         if (currentTown !== BAKU_TOWNFROMINC) {
           this.logger.warn(`TOWNFROMINC was reset to ${currentTown} after STATEINC, re-setting Baku`);
           await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-          await page.waitForTimeout(5_000);
+          await page.waitForTimeout(2_000);
           await this.setSamoSelect(page, "STATEINC", stateId);
-          await page.waitForTimeout(5_000);
+          await page.waitForTimeout(2_000);
         }
       }
 
@@ -284,7 +283,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
             sel.dispatchEvent(new Event("change", { bubbles: true }));
           }
         }, query.tourIncValue);
-        await page.waitForTimeout(KompasSupplierAdapter.TOURINC_DELAY_MS);
+        await page.waitForTimeout(1_500);
         this.logger.debug(`Set TOURINC to ${query.tourIncValue} (${query.tourIncName ?? "?"})`);
       }
 
@@ -338,7 +337,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         } else {
           this.logger.warn(`KOMPAS: hotel checkbox #hotel${hotelId} not found in DOM`);
         }
-        await page.waitForTimeout(1_000);
+        await page.waitForTimeout(500);
       }
 
       // Set dates via DOM
@@ -412,7 +411,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         return [];
       }
 
-      await page.waitForTimeout(2_000);
+      await page.waitForTimeout(1_000);
 
       // §6: DOM/result consistency — verify first row matches query parameters
       const expectedTourKey = query.tourIncValue ?? "";

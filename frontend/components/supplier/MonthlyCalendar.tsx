@@ -15,12 +15,16 @@ import {
  * Shows a standard travel booking calendar with month navigation.
  * Each available departure date shows the minimum price.
  * Clicking an available date triggers onSelect with the full entry data.
+ *
+ * Props:
+ * - queryBuilder: (year, month) => SupplierPriceCalendarQuery — builds a query for the given month
+ * - onSelect: callback when a date is selected
  */
 export default function MonthlyCalendar({
-  query,
+  queryBuilder,
   onSelect,
 }: {
-  query: SupplierPriceCalendarQuery;
+  queryBuilder: (year: number, month: number) => SupplierPriceCalendarQuery;
   onSelect?: (entry: SupplierPriceCalendarEntry) => void;
 }) {
   const locale = useLocale();
@@ -34,10 +38,12 @@ export default function MonthlyCalendar({
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
+  // Fetch calendar for the displayed month
   const fetchCalendar = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      const query = queryBuilder(currentMonth.getFullYear(), currentMonth.getMonth());
       const data = await getPriceCalendar(query);
       setEntries(data.entries);
     } catch (err) {
@@ -50,7 +56,7 @@ export default function MonthlyCalendar({
     } finally {
       setLoading(false);
     }
-  }, [query, locale]);
+  }, [queryBuilder, currentMonth, locale]);
 
   useEffect(() => {
     fetchCalendar();
