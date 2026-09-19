@@ -2,25 +2,23 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { t, useLocale } from "@/lib/i18n";
-import Price from "@/components/public/Price";
-import PriceCalendar from "@/components/supplier/PriceCalendar";
-import VitrinaFilters from "@/components/supplier/VitrinaFilters";
+import MonthlyCalendar from "@/components/supplier/MonthlyCalendar";
+import OfferModal from "@/components/supplier/OfferModal";
 import {
   searchSupplierOffers,
-  getPriceCalendar,
   type SupplierOffer,
   type SupplierSearchQuery,
   type SupplierPriceCalendarEntry,
 } from "@/lib/supplier-api";
 
 /**
- * TourDetail — live KOMPAS integration for the product detail page.
+ * TourDetail — live KOMPAS integration with left-side tour selection panel.
  *
- * Uses product attributes (hotelExternalId, destination, departureCity)
- * to query KOMPAS for real offers. Shows:
- * - VitrinaFilters (pre-filled from product attributes)
- * - PriceCalendar (real prices by departure date)
- * - Offer Details Modal (all variants for selected date)
+ * Layout:
+ * - Left: tour selection (city, adults, children, nights, calendar)
+ * - Right: hotel info / description
+ *
+ * Uses product attributes to pre-fill filters and query KOMPAS.
  */
 export default function TourDetail({
   attributes,
@@ -35,31 +33,49 @@ export default function TourDetail({
   const [error, setError] = useState<string | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<SupplierPriceCalendarEntry | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [filtersVisible, setFiltersVisible] = useState(true);
 
-  // Extract KOMPAS identity from product attributes
+  // Filter state
+  const [departureCity, setDepartureCity] = useState(
+    (attributes?.departureCity as string) ?? "1411",
+  );
+  const [destination, setDestination] = useState(
+    (attributes?.destination as string) ?? (attributes?.country as string) ?? "",
+  );
+  const [adults, setAdults] = useState(2);
+  const [children, setChildren] = useState(0);
+  const [childAges, setChildAges] = useState<number[]>([]);
+  const [nights, setNights] = useState(7);
+
+  // Product identity
   const hotelExternalId = (attributes?.hotelExternalId as string) ?? undefined;
   const hotelName = title;
-  const destination = (attributes?.destination as string) ?? (attributes?.country as string) ?? undefined;
-  const departureCity = (attributes?.departureCity as string) ?? undefined;
   const tourIncValue = (attributes?.tourKey as string) ?? undefined;
 
-  // Initial search query based on product attributes
-  const buildInitialQuery = useCallback(
-    (overrides?: Partial<SupplierSearchQuery>): SupplierSearchQuery => ({
-      supplierCode: "KOMPAS",
-      hotel: hotelName,
-      hotelExternalId,
-      destination,
-      departureCity,
-      tourIncValue,
-      adults: 2,
-      children: 0,
-      nightsFrom: 7,
-      nightsTo: 7,
-      ...overrides,
-    }),
-    [hotelName, hotelExternalId, destination, departureCity, tourIncValue],
+  // Build calendar query
+  const buildCalendarQuery = useCallback(
+    (overrides?: Partial<SupplierSearchQuery>) => {
+      const nowLocal = new Date();
+      const today = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
+      const dateTo = new Date(nowLocal.getTime() + 60 * 86400000)
+        .toISOString()
+        .slice(0, 10);
+
+      return {
+        supplierCode: "KOMPAS",
+        hotel: hotelName?.replace(/\s*\r?\n\s*/g, " ").replace(/\s{2,}/g, " ").trim(),
+        hotelExternalId,
+        destination,
+        dateFrom: today,
+        dateTo,
+        nights,
+        adults,
+        children: children || undefined,
+        childAges: childAges.length > 0 ? childAges : undefined,
+        tourIncValue,
+        ...overrides,
+      };
+    },
+    [hotelName, hotelExternalId, destination, nights, adults, children, childAges, tourIncValue],
   );
 
   // Auto-search on mount
@@ -69,7 +85,19 @@ export default function TourDetail({
     setLoading(true);
     setError(null);
 
-    searchSupplierOffers(buildInitialQuery())
+    searchSupplierOffers({
+      supplierCode: "KOMPAS",
+      hotel: hotelName,
+      hotelExternalId,
+      destination,
+      departureCity,
+      tourIncValue,
+      adults,
+      children,
+      childAges: childAges.length > 0 ? childAges : undefined,
+      nightsFrom: nights,
+      nightsTo: nights,
+    })
       .then((result) => {
         if (alive) {
           setOffers(result);
@@ -89,54 +117,7 @@ export default function TourDetail({
       });
 
     return () => { alive = false; };
-  }, [hotelExternalId, hotelName, buildInitialQuery, locale]);
-
-  // Handle filter change
-  const handleFilterSearch = useCallback(
-    (query: SupplierSearchQuery) => {
-      setLoading(true);
-      setError(null);
-      setOffers([]);
-      setSelectedEntry(null);
-
-      searchSupplierOffers({ ...query, hotel: hotelName, hotelExternalId, destination, departureCity, tourIncValue })
-        .then((result) => {
-          setOffers(result);
-          setLoading(false);
-        })
-        .catch((e) => {
-          const msg = (e as Error).message;
-          if (msg.includes("supports nights") || msg.includes("UNSUPPORTED")) {
-            setError(t("supplier.error.unsupported", locale));
-          } else {
-            setError(t("supplier.error.generic", locale));
-          }
-          setLoading(false);
-        });
-    },
-    [hotelName, hotelExternalId, destination, departureCity, tourIncValue, locale],
-  );
-
-  // Build price calendar query from current offers
-  const buildCalendarQuery = useCallback(() => {
-    if (offers.length === 0) return null;
-    const first = offers[0];
-    const nowLocal = new Date();
-    const today = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
-    const dateTo = new Date(nowLocal.getTime() + 30 * 86400000).toISOString().slice(0, 10);
-    return {
-      supplierCode: first.supplierCode,
-      hotel: first.hotel?.replace(/\s*\r?\n\s*/g, " ").replace(/\s{2,}/g, " ").trim(),
-      hotelExternalId: first.hotelExternalId,
-      destination,
-      dateFrom: today,
-      dateTo,
-      nights: first.nights,
-      adults: first.adults,
-      children: first.children || undefined,
-      childAges: first.childAges.length > 0 ? first.childAges : undefined,
-    };
-  }, [offers, destination]);
+  }, [hotelExternalId, hotelName, destination, departureCity, tourIncValue, adults, children, childAges, nights, locale]);
 
   // Handle calendar date click
   const handleCalendarSelect = useCallback((entry: SupplierPriceCalendarEntry) => {
@@ -144,204 +125,253 @@ export default function TourDetail({
     setModalOpen(true);
   }, []);
 
-  // Group offers by room+meal for the modal
-  const groupedOffers = selectedEntry?.offers
-    ? selectedEntry.offers.reduce<Record<string, SupplierOffer[]>>((acc, offer) => {
-        const key = `${offer.room ?? "STD"}|${offer.meal ?? "RO"}`;
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(offer);
-        return acc;
-      }, {})
-    : {};
+  // Handle filter change
+  const handleFilterChange = useCallback(() => {
+    // Re-trigger search with updated filters
+    setLoading(true);
+    setError(null);
+    setOffers([]);
 
-  const calQuery = buildCalendarQuery();
+    searchSupplierOffers({
+      supplierCode: "KOMPAS",
+      hotel: hotelName,
+      hotelExternalId,
+      destination,
+      departureCity,
+      tourIncValue,
+      adults,
+      children,
+      childAges: childAges.length > 0 ? childAges : undefined,
+      nightsFrom: nights,
+      nightsTo: nights,
+    })
+      .then((result) => {
+        setOffers(result);
+        setLoading(false);
+      })
+      .catch((e) => {
+        const msg = (e as Error).message;
+        if (msg.includes("supports nights") || msg.includes("UNSUPPORTED")) {
+          setError(t("supplier.error.unsupported", locale));
+        } else {
+          setError(t("supplier.error.generic", locale));
+        }
+        setLoading(false);
+      });
+  }, [hotelName, hotelExternalId, destination, departureCity, tourIncValue, adults, children, childAges, nights, locale]);
+
+  // Handle request creation
+  const handleRequestCreated = useCallback((offer: SupplierOffer) => {
+    console.log("[TourDetail] Request created for offer:", offer.externalOfferId);
+    setModalOpen(false);
+  }, []);
+
+  const calendarQuery = buildCalendarQuery();
 
   return (
-    <section className="mt-8 space-y-6" aria-labelledby="tour-detail-section">
-      <h2 id="tour-detail-section" className="text-lg font-bold text-slate-900">
-        {t("tour.filters_title", locale)}
-      </h2>
+    <section className="mt-8" aria-labelledby="tour-detail-section">
+      <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+        {/* ── Left: Tour Selection Panel ── */}
+        <div className="space-y-4">
+          <h2
+            id="tour-detail-section"
+            className="font-serif text-lg font-bold text-slate-900"
+          >
+            {t("tour.selection_title", locale) ?? "Подбор тура"}
+          </h2>
 
-      {/* Filters */}
-      {filtersVisible && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <VitrinaFilters
-            initial={{
-              departureCity,
-              destination,
-              hotel: hotelName,
-              nightsFrom: 7,
-              nightsTo: 7,
-              adults: 2,
-              children: 0,
-            }}
-            onSearch={handleFilterSearch}
-          />
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+            {/* Departure city */}
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-slate-500">
+                {t("tour.departure_city", locale) ?? "Город вылета"}
+              </label>
+              <select
+                value={departureCity}
+                onChange={(e) => setDepartureCity(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="1411">Баку (GYD)</option>
+              </select>
+            </div>
+
+            {/* Adults */}
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-slate-500">
+                {t("tour.adults", locale) ?? "Взрослые"}
+              </label>
+              <select
+                value={adults}
+                onChange={(e) => setAdults(Number(e.target.value))}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                {[1, 2, 3, 4].map((n) => (
+                  <option key={n} value={n}>
+                    {n} {n === 1 ? "взрослый" : "взрослых"}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Children */}
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-slate-500">
+                {t("tour.children", locale) ?? "Дети"}
+              </label>
+              <select
+                value={children}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setChildren(v);
+                  if (v === 0) setChildAges([]);
+                  else if (childAges.length < v) {
+                    setChildAges([...childAges, ...Array(v - childAges.length).fill(5)]);
+                  } else {
+                    setChildAges(childAges.slice(0, v));
+                  }
+                }}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                {[0, 1].map((n) => (
+                  <option key={n} value={n}>
+                    {n === 0 ? "Нет детей" : `${n} ребенок`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Child ages */}
+            {children > 0 && (
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-slate-500">
+                  {t("tour.child_ages", locale) ?? "Возраст ребенка"}
+                </label>
+                {childAges.map((age, idx) => (
+                  <select
+                    key={idx}
+                    value={age}
+                    onChange={(e) => {
+                      const newAges = [...childAges];
+                      newAges[idx] = Number(e.target.value);
+                      setChildAges(newAges);
+                    }}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                  >
+                    {Array.from({ length: 15 }, (_, i) => i).map((a) => (
+                      <option key={a} value={a}>
+                        {a} {a === 1 ? "год" : a < 5 ? "года" : "лет"}
+                      </option>
+                    ))}
+                  </select>
+                ))}
+              </div>
+            )}
+
+            {/* Nights */}
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-slate-500">
+                {t("tour.nights_count", locale) ?? "Количество ночей"}
+              </label>
+              <select
+                value={nights}
+                onChange={(e) => setNights(Number(e.target.value))}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 3).map((n) => (
+                  <option key={n} value={n}>
+                    {n} {n === 1 ? "ночь" : n < 5 ? "ночи" : "ночей"}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Search button */}
+            <button
+              onClick={handleFilterChange}
+              disabled={loading}
+              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+            >
+              {t("supplier.search", locale) ?? "Найти варианты"}
+            </button>
+          </div>
+
+          {/* Monthly Calendar */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">
+              {t("tour.calendar_title", locale) ?? "Календарь цен"}
+            </h3>
+            <MonthlyCalendar query={calendarQuery} onSelect={handleCalendarSelect} />
+          </div>
+
+          {/* Offer count */}
+          {!loading && offers.length > 0 && (
+            <div className="text-sm text-slate-500">
+              {t("search.found", locale)}: {offers.length}{" "}
+              {t("tour.offers_title", locale).toLowerCase()}
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
-          {t("tour.loading", locale)}
+        {/* ── Right: Hotel Info ── */}
+        <div className="space-y-4">
+          {/* Loading */}
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+              {t("tour.loading", locale)}
+            </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+              <p className="text-sm font-medium text-amber-800">{error}</p>
+            </div>
+          )}
+
+          {/* Hotel info placeholder */}
+          {!loading && !error && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+              <h3 className="font-serif text-xl font-bold text-slate-900">
+                {hotelName}
+              </h3>
+              {destination && (
+                <p className="mt-1 text-sm text-slate-500">📍 {destination}</p>
+              )}
+              {hotelExternalId && (
+                <p className="mt-1 text-xs text-slate-400">
+                  KOMPAS ID: {hotelExternalId}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!loading && !error && offers.length === 0 && hotelExternalId && (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+              <p className="text-sm text-slate-500">{t("tour.no_offers", locale)}</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Error */}
-      {error && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-800">{error}</p>
-        </div>
-      )}
-
-      {/* Price Calendar */}
-      {!loading && !error && calQuery && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h3 className="mb-3 text-sm font-semibold text-slate-800">
-            {t("tour.calendar_title", locale)}
-          </h3>
-          <PriceCalendar query={calQuery} onSelect={handleCalendarSelect} />
-        </div>
-      )}
-
-      {/* Offer summary */}
-      {!loading && !error && offers.length > 0 && (
-        <div className="text-sm text-slate-500">
-          {t("search.found", locale)}: {offers.length} {t("tour.offers_title", locale).toLowerCase()}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && !error && offers.length === 0 && hotelExternalId && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-          <p className="text-sm text-slate-500">{t("tour.no_offers", locale)}</p>
-        </div>
-      )}
-
-      {/* Offer Details Modal */}
+      {/* Offer Modal */}
       {modalOpen && selectedEntry && (
         <OfferModal
-          entry={selectedEntry}
-          groupedOffers={groupedOffers}
+          date={selectedEntry.date}
+          offers={selectedEntry.offers}
+          summary={{
+            departureCity: departureCity === "1411" ? "Баку (GYD)" : departureCity,
+            destination,
+            adults,
+            children,
+            childAges,
+            nights,
+          }}
           onClose={() => setModalOpen(false)}
+          onRequestCreated={handleRequestCreated}
         />
       )}
     </section>
-  );
-}
-
-/** Modal showing all offer variants for a selected calendar date. */
-function OfferModal({
-  entry,
-  groupedOffers,
-  onClose,
-}: {
-  entry: SupplierPriceCalendarEntry;
-  groupedOffers: Record<string, SupplierOffer[]>;
-  onClose: () => void;
-}) {
-  const locale = useLocale();
-  const variantKeys = Object.keys(groupedOffers);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div
-        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">
-              {t("tour.offers_title", locale)}
-            </h3>
-            <p className="text-sm text-slate-500">
-              {entry.date} · {entry.price !== null ? <Price amount={entry.price} currency={entry.currency} size="sm" withPrefix /> : "—"}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Offer variants */}
-        {variantKeys.length === 0 ? (
-          <p className="text-sm text-slate-500">{t("tour.no_offers", locale)}</p>
-        ) : (
-          <div className="space-y-4">
-            {variantKeys.map((key) => {
-              const variantOffers = groupedOffers[key];
-              const first = variantOffers[0];
-              return (
-                <div
-                  key={key}
-                  className="rounded-xl border border-slate-200 p-4 space-y-3"
-                >
-                  {/* Room + Meal header */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {first.room && (
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                        🛏 {first.room}
-                      </span>
-                    )}
-                    {first.meal && (
-                      <span className="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
-                        🍽 {first.meal}
-                      </span>
-                    )}
-                    {first.transport && (
-                      <span className="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
-                        ✈️ {first.transport}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Details grid */}
-                  <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
-                    <div>
-                      <span className="font-medium">{t("tour.departure", locale)}:</span>{" "}
-                      {first.departureDate}
-                    </div>
-                    <div>
-                      <span className="font-medium">{t("tour.nights_count", locale)}:</span>{" "}
-                      {first.nights}
-                    </div>
-                    <div>
-                      <span className="font-medium">{t("tour.passengers", locale)}:</span>{" "}
-                      {first.adults} {t("supplier.adults", locale)}
-                      {first.children > 0 && `, ${first.children} ${t("supplier.children", locale)}`}
-                    </div>
-                    <div>
-                      <span className="font-medium">{t("tour.hotel", locale) ?? "Hotel"}:</span>{" "}
-                      {first.hotel?.split("\n")[0]?.trim()}
-                    </div>
-                  </div>
-
-                  {/* Price */}
-                  <div className="border-t border-slate-100 pt-3">
-                    <Price
-                      amount={first.price.amount}
-                      currency={first.price.currency}
-                      size="lg"
-                      withPrefix={false}
-                    />
-                    {variantOffers.length > 1 && (
-                      <p className="mt-1 text-xs text-slate-400">
-                        {variantOffers.length} variants available
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
