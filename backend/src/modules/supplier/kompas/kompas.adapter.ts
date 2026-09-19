@@ -376,6 +376,18 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`)
                    .replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
         }
+        // §9: Force FREIGHT=1 (seats available on flight) and FILTER=1 (no sales stop)
+        // to only return bookable offers in the calendar.
+        if (!url.includes("FREIGHT=")) {
+          url += "&FREIGHT=1";
+        } else {
+          url = url.replace(/FREIGHT=\d+/g, "FREIGHT=1");
+        }
+        if (!url.includes("FILTER=")) {
+          url += "&FILTER=1";
+        } else {
+          url = url.replace(/FILTER=\d+/g, "FILTER=1");
+        }
         route.continue({ url });
       });
 
