@@ -61,6 +61,10 @@ export class PublicSupplierController {
     @Query("hotelStars") hotelStars?: string,
     @Query("meal") meal?: string,
     @Query("page") page?: string,
+    @Query("hotelExternalId") hotelExternalId?: string,
+    @Query("hotel") hotel?: string,
+    @Query("tourIncValue") tourIncValue?: string,
+    @Query("tourIncName") tourIncName?: string,
   ) {
     const query: SupplierSearchQuery = {
       country,
@@ -76,6 +80,10 @@ export class PublicSupplierController {
       hotelStars: hotelStars ? hotelStars.split(",").map(Number) : undefined,
       meal,
       page: page ? parseInt(page, 10) : 1,
+      hotelExternalId,
+      hotel,
+      tourIncValue,
+      tourIncName,
     };
 
     return this.offerService.search(supplierCode, query).catch((err) => this.mapSupplierError(err));

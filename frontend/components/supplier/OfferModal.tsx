@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
-import { refreshSupplierPrice, createTourRequest, type SupplierOffer } from "@/lib/supplier-api";
+import { refreshSupplierPrice, createTourRequest, type SupplierPriceCalendarEntryOffer } from "@/lib/supplier-api";
 
 /**
  * OfferModal — shows all KOMPAS offer variants for a selected date.
@@ -25,7 +25,7 @@ export default function OfferModal({
   onRequestCreated,
 }: {
   date: string;
-  offers: SupplierOffer[];
+  offers: SupplierPriceCalendarEntryOffer[];
   summary: {
     departureCity?: string;
     destination?: string;
@@ -35,7 +35,7 @@ export default function OfferModal({
     nights: number;
   };
   onClose: () => void;
-  onRequestCreated?: (offer: SupplierOffer) => void;
+  onRequestCreated?: (offer: SupplierPriceCalendarEntryOffer) => void;
 }) {
   const locale = useLocale();
 
@@ -116,29 +116,31 @@ function OfferRow({
   index,
   onRequestCreated,
 }: {
-  offer: SupplierOffer;
+  offer: SupplierPriceCalendarEntryOffer;
   index: number;
-  onRequestCreated?: (offer: SupplierOffer) => void;
+  onRequestCreated?: (offer: SupplierPriceCalendarEntryOffer) => void;
 }) {
   const locale = useLocale();
   const [verificationState, setVerificationState] = useState<
     "idle" | "checking" | "confirmed" | "changed" | "error"
   >("idle");
   const [verifiedPrice, setVerifiedPrice] = useState<number | null>(null);
-  const [originalPrice] = useState(offer.price.amount);
+  const [originalPrice] = useState(offer.price);
   const [requestState, setRequestState] = useState<"idle" | "creating" | "done" | "error">("idle");
 
   const handleVerifyPrice = useCallback(async () => {
     setVerificationState("checking");
     try {
       const result = await refreshSupplierPrice(
-        offer.supplierCode,
+        offer.supplierCode ?? "KOMPAS",
         offer.externalOfferId,
         offer.externalClaim,
         {
-          supplierCode: offer.supplierCode,
+          supplierCode: offer.supplierCode ?? "KOMPAS",
           hotel: offer.hotel,
           hotelExternalId: offer.hotelExternalId,
+          tourIncValue: offer.tourIncValue,
+          tourIncName: offer.tourIncName,
           destination: offer.destination,
           adults: offer.adults,
           children: offer.children,
@@ -173,7 +175,7 @@ function OfferRow({
     setRequestState("creating");
     try {
       await createTourRequest({
-        supplierCode: offer.supplierCode,
+        supplierCode: offer.supplierCode ?? "KOMPAS",
         externalOfferId: offer.externalOfferId,
         hotel: offer.hotel?.split("\n")[0]?.trim() ?? "",
         hotelExternalId: offer.hotelExternalId,
@@ -184,8 +186,8 @@ function OfferRow({
         childAges: offer.childAges.length > 0 ? offer.childAges : undefined,
         room: offer.room,
         meal: offer.meal,
-        price: verifiedPrice ?? offer.price.amount,
-        currency: offer.price.currency,
+        price: verifiedPrice ?? offer.price,
+        currency: offer.currency,
         destination: offer.destination,
       });
       setRequestState("done");
@@ -273,7 +275,7 @@ function OfferRow({
             <div className="text-lg font-bold text-slate-900">
               <Price
                 amount={verifiedPrice ?? originalPrice}
-                currency={offer.price.currency}
+                currency={offer.currency}
                 size="lg"
                 withPrefix={false}
               />
@@ -325,7 +327,7 @@ function OfferRow({
                     {t("offer.was", locale) ?? "Было"}:{" "}
                     <Price
                       amount={originalPrice}
-                      currency={offer.price.currency}
+                      currency={offer.currency}
                       size="sm"
                       withPrefix={false}
                     />
@@ -334,7 +336,7 @@ function OfferRow({
                     {t("offer.now", locale) ?? "Сейчас"}:{" "}
                     <Price
                       amount={verifiedPrice ?? 0}
-                      currency={offer.price.currency}
+                      currency={offer.currency}
                       size="sm"
                       withPrefix={false}
                     />

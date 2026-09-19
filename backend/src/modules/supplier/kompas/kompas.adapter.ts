@@ -57,7 +57,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
   private readonly browserLock = new Map<string, Promise<Browser>>();
 
   private readonly baseUrl: string;
-  private static readonly MAX_PAGES = 5;
+  private static readonly MAX_PAGES = 15;
   private static readonly PAGE_DELAY_MS = 2_000;
   private static readonly TOURINC_DELAY_MS = 3_000;
   private static readonly CALENDAR_WINDOW_DAYS = 31;
@@ -310,6 +310,37 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       if (kq.freightType) await this.setSamoSelect(page, "FREIGHTTYPE", kq.freightType);
       if (kq.hotelTypes) await this.setSamoSelect(page, "HOTELTYPES", kq.hotelTypes);
 
+      // §8: Hotel checkbox — check specific hotel when hotelExternalId is provided.
+      // This causes the PRICES request to include HOTELS=<id> + HOTELS_ANY=0,
+      // returning only offers for the selected hotel (server-side filtering).
+      let hotelFilterApplied = false;
+      if (query.hotelExternalId) {
+        const hotelId = query.hotelExternalId;
+        hotelFilterApplied = await page.evaluate((id: string) => {
+          // Enable hotel selection mode
+          const sel = document.querySelector('input[name=HOTELS_SEL]') as HTMLInputElement | null;
+          if (sel && !sel.checked) sel.click();
+
+          // Uncheck "any hotel" to enable specific hotel filtering
+          const any = document.querySelector('input[name=HOTELS_ANY]') as HTMLInputElement | null;
+          if (any && any.checked) any.click();
+
+          // Check the specific hotel checkbox
+          const cb = document.querySelector(`#hotel${id}`) as HTMLInputElement | null;
+          if (cb && !cb.checked) {
+            cb.click();
+            return true;
+          }
+          return cb?.checked ?? false;
+        }, hotelId);
+        if (hotelFilterApplied) {
+          this.logger.debug(`KOMPAS: checked hotel checkbox for ID ${hotelId}`);
+        } else {
+          this.logger.warn(`KOMPAS: hotel checkbox #hotel${hotelId} not found in DOM`);
+        }
+        await page.waitForTimeout(1_000);
+      }
+
       // Set dates via DOM
       if (query.departureDateFrom && query.departureDateTo) {
         const begDate = this.isoToSamodate(query.departureDateFrom);
@@ -335,10 +366,12 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       await page.route("**samo_action=PRICES**", (route) => {
         let url = route.request().url();
-        // NOTE: do NOT inject HOTELS=<id> into the SAMO request. With HOTELS_ANY=0 +
-        // HOTELS=<id> KOMPAS SAMO returns 0 price_info rows in this flow (verified live
-        // 2026-09-19), even though the same id works in the direct PRICES URL format.
-        // Hotel narrowing is done post-collection in getPriceCalendar() instead.
+        // When hotel checkbox was checked, HOTELS=<id> is already in the URL from the form.
+        // Only strip HOTELS when doing a generic search (no hotel checkbox).
+        // With the checkbox properly checked, KOMPAS returns hotel-specific results.
+        if (!hotelFilterApplied) {
+          url = url.replace(/HOTELS=\d+&?/g, "").replace(/HOTELS_ANY=\d+&?/g, "");
+        }
         if (routeDates) {
           url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`)
                    .replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
@@ -618,6 +651,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       children: ctx.children,
       childAges: ctx.childAges,
       hotel: ctx.hotel,
+      hotelExternalId: ctx.hotelExternalId,
       room: ctx.room,
       meal: ctx.meal,
       nightsFrom: ctx.nightsFrom,
@@ -653,6 +687,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       children: ctx.children,
       childAges: ctx.childAges,
       hotel: ctx.hotel,
+      hotelExternalId: ctx.hotelExternalId,
       room: ctx.room,
       meal: ctx.meal,
       nightsFrom: ctx.nightsFrom,
@@ -857,12 +892,15 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
               children: query.children,
               childAges: query.childAges,
               hotel: query.hotel,
+              hotelExternalId: query.hotelExternalId,
               room: query.room,
               meal: query.meal,
               nightsFrom: query.nights,
               nightsTo: query.nights,
               tourIncValue: (best.rawMetadata?.tourIncValue as string) ?? query.tourIncValue,
               tourIncName: (best.rawMetadata?.tourIncName as string) ?? query.tourIncName,
+              destination: query.destination,
+              country: query.destination,
             },
           },
         });

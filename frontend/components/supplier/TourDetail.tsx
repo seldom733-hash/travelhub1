@@ -7,6 +7,7 @@ import OfferModal from "@/components/supplier/OfferModal";
 import {
   searchSupplierOffers,
   type SupplierOffer,
+  type SupplierPriceCalendarEntryOffer,
   type SupplierSearchQuery,
   type SupplierPriceCalendarEntry,
 } from "@/lib/supplier-api";
@@ -54,6 +55,8 @@ export default function TourDetail({
 
   // Product identity
   const hotelExternalId = (attributes?.hotelExternalId as string) ?? undefined;
+  const tourIncValue = (attributes?.tourIncValue as string) ?? (attributes?.programIncValue as string) ?? undefined;
+  const tourIncName = (attributes?.tourIncName as string) ?? (attributes?.programIncName as string) ?? undefined;
   const hotelName = title;
 
   // Strip location suffix like "(Султанахмет)" from hotel name for KOMPAS queries
@@ -70,7 +73,11 @@ export default function TourDetail({
 
       return {
         supplierCode: "KOMPAS",
+        hotelExternalId,
+        hotel: cleanHotelName,
         destination,
+        tourIncValue,
+        tourIncName,
         dateFrom: today,
         dateTo,
         nights,
@@ -80,7 +87,7 @@ export default function TourDetail({
         ...overrides,
       };
     },
-    [destination, nights, adults, children, childAges],
+    [hotelExternalId, cleanHotelName, destination, tourIncValue, tourIncName, nights, adults, children, childAges],
   );
 
   // Auto-search on mount
@@ -140,6 +147,8 @@ export default function TourDetail({
       supplierCode: "KOMPAS",
       hotel: cleanHotelName,
       hotelExternalId,
+      tourIncValue,
+      tourIncName,
       destination,
       departureCity,
       adults,
@@ -161,10 +170,10 @@ export default function TourDetail({
         }
         setLoading(false);
       });
-  }, [cleanHotelName, hotelExternalId, destination, departureCity, adults, children, childAges, nights, locale]);
+  }, [cleanHotelName, hotelExternalId, tourIncValue, tourIncName, destination, departureCity, adults, children, childAges, nights, locale]);
 
   // Handle request creation
-  const handleRequestCreated = useCallback((offer: SupplierOffer) => {
+  const handleRequestCreated = useCallback((offer: SupplierPriceCalendarEntryOffer) => {
     console.log("[TourDetail] Request created for offer:", offer.externalOfferId);
     setModalOpen(false);
   }, []);

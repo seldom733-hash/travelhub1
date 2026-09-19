@@ -64,6 +64,8 @@ export interface SupplierOffer {
   transport?: string;
   fetchedAt: string;
   expiresAt: string;
+  tourIncValue?: string;
+  tourIncName?: string;
   rawMetadata?: Record<string, unknown>;
 }
 
@@ -80,7 +82,32 @@ export interface SupplierPriceCalendarQuery {
   adults?: number;
   children?: number;
   childAges?: number[];
+  tourIncValue?: string;
+  tourIncName?: string;
   tourIncValues?: string[];
+}
+
+export interface SupplierPriceCalendarEntryOffer {
+  tourIncValue: string;
+  tourIncName?: string;
+  externalOfferId: string;
+  externalClaim?: string;
+  hotel: string;
+  hotelExternalId?: string;
+  departureDate: string;
+  nights: number;
+  room?: string;
+  meal?: string;
+  adults: number;
+  children: number;
+  childAges: number[];
+  availability: SupplierAvailability;
+  price: number;
+  currency: string;
+  transport?: string;
+  oneWay?: boolean;
+  supplierCode?: string;
+  destination?: string;
 }
 
 export interface SupplierPriceCalendarEntry {
@@ -88,7 +115,7 @@ export interface SupplierPriceCalendarEntry {
   price: number | null;
   currency: string | null;
   availability: SupplierAvailability;
-  offers: SupplierOffer[];
+  offers: SupplierPriceCalendarEntryOffer[];
   absenceCode?: string;
   absenceText?: string;
 }
@@ -153,6 +180,10 @@ export async function searchSupplierOffers(
     hotelStars: query.hotelStars?.join(","),
     meal: query.meal,
     page: query.page,
+    hotelExternalId: query.hotelExternalId,
+    hotel: query.hotel,
+    tourIncValue: query.tourIncValue,
+    tourIncName: query.tourIncName,
   });
 }
 
