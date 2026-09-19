@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Body, Query, HttpException, BadRequestException, RequestTimeoutException, BadGatewayException, Logger } from "@nestjs/common";
 import { Public } from "../../security/auth/decorators";
 import { SupplierOfferService } from "./supplier-offer.service";
+import { TourRequestService } from "./tour-request.service";
 import type { PriceCalendarQuery, SupplierOfferRef, SupplierSearchQuery } from "./supplier.types";
 
 /**
@@ -13,7 +14,10 @@ import type { PriceCalendarQuery, SupplierOfferRef, SupplierSearchQuery } from "
 export class PublicSupplierController {
   private readonly logger = new Logger(PublicSupplierController.name);
 
-  constructor(private readonly offerService: SupplierOfferService) {}
+  constructor(
+    private readonly offerService: SupplierOfferService,
+    private readonly tourRequestService: TourRequestService,
+  ) {}
 
   /**
    * Preserve supplier error classification across the HTTP boundary.
@@ -110,5 +114,30 @@ export class PublicSupplierController {
       externalClaim: body.claim,
       searchContext: body.searchContext,
     });
+  }
+
+  /** Create a tour request from verified offer (anonymous). */
+  @Post("public/supplier/create-request")
+  @Public()
+  async createTourRequest(
+    @Body() body: {
+      supplierCode: string;
+      externalOfferId: string;
+      hotel: string;
+      hotelExternalId?: string;
+      departureDate: string;
+      nights: number;
+      adults: number;
+      children: number;
+      childAges?: number[];
+      room?: string;
+      meal?: string;
+      price: number;
+      currency: string;
+      destination?: string;
+      departureCity?: string;
+    },
+  ) {
+    return this.tourRequestService.createTourRequest(body);
   }
 }

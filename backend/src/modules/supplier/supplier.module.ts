@@ -9,7 +9,9 @@ import { KompasSupplierAdapter } from "./kompas/kompas.adapter";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
 import { SupplierController } from "./supplier.controller";
 import { PublicSupplierController } from "./public-supplier.controller";
+import { TourRequestService } from "./tour-request.service";
 import { PrismaModule } from "../../prisma/prisma.module";
+import { EventBusModule } from "../../eventbus/eventbus.module";
 
 /**
  * Supplier module — registers adapters, cache, resilience, service, sync.
@@ -19,7 +21,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
  */
 @Global()
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, EventBusModule],
   controllers: [SupplierController, PublicSupplierController],
   providers: [
     SupplierAdapterRegistry,
@@ -30,6 +32,7 @@ import { PrismaModule } from "../../prisma/prisma.module";
     SummerSyncService,
     KompasSupplierAdapter,
     KompasSyncService,
+    TourRequestService,
     {
       provide: "SUPPLIER_MODULE_INIT",
       useFactory: (

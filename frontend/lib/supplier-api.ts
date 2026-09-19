@@ -192,3 +192,38 @@ export async function refreshSupplierAvailability(
     searchContext,
   });
 }
+
+/** Create a tour request from verified offer (anonymous). */
+export interface TourRequestInput {
+  supplierCode: string;
+  externalOfferId: string;
+  hotel: string;
+  hotelExternalId?: string;
+  departureDate: string;
+  nights: number;
+  adults: number;
+  children: number;
+  childAges?: number[];
+  room?: string;
+  meal?: string;
+  price: number;
+  currency: string;
+  destination?: string;
+  departureCity?: string;
+}
+
+export interface TourRequestResult {
+  id: string;
+  code: string;
+  referenceNumber: string;
+  status: string;
+  displayedPrice: number;
+  displayedCurrency: string;
+  createdAt: string;
+}
+
+export async function createTourRequest(
+  input: TourRequestInput,
+): Promise<TourRequestResult> {
+  return post<TourRequestResult>("/create-request", input);
+}

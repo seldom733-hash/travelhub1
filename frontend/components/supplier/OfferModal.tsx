@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
-import { refreshSupplierPrice, type SupplierOffer } from "@/lib/supplier-api";
+import { refreshSupplierPrice, createTourRequest, type SupplierOffer } from "@/lib/supplier-api";
 
 /**
  * OfferModal — shows all KOMPAS offer variants for a selected date.
@@ -172,15 +172,28 @@ function OfferRow({
   const handleCreateRequest = useCallback(async () => {
     setRequestState("creating");
     try {
-      // TODO: wire to real backend request creation endpoint
-      // For now, simulate the flow
-      await new Promise((r) => setTimeout(r, 1000));
+      await createTourRequest({
+        supplierCode: offer.supplierCode,
+        externalOfferId: offer.externalOfferId,
+        hotel: offer.hotel?.split("\n")[0]?.trim() ?? "",
+        hotelExternalId: offer.hotelExternalId,
+        departureDate: offer.departureDate,
+        nights: offer.nights,
+        adults: offer.adults,
+        children: offer.children,
+        childAges: offer.childAges.length > 0 ? offer.childAges : undefined,
+        room: offer.room,
+        meal: offer.meal,
+        price: verifiedPrice ?? offer.price.amount,
+        currency: offer.price.currency,
+        destination: offer.destination,
+      });
       setRequestState("done");
       onRequestCreated?.(offer);
     } catch {
       setRequestState("error");
     }
-  }, [offer, onRequestCreated]);
+  }, [offer, verifiedPrice, onRequestCreated]);
 
   const passengers = [
     `${offer.adults} ${t("supplier.adults", locale)}`,
@@ -227,17 +240,13 @@ function OfferRow({
           )}
         </div>
 
-        {/* Return flight (placeholder — KOMPAS doesn't always provide) */}
+        {/* Return flight — KOMPAS SAMO search does not provide return flight details */}
         <div className="rounded-lg border border-slate-200 p-3">
           <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
             {t("offer.return", locale) ?? "ПЕРЕЛЕТ ОБРАТНО"}
           </div>
           <div className="text-xs text-slate-400">
-            {offer.nights}{" "}
-            {offer.nights === 1
-              ? t("card.night", locale)
-              : t("card.nights", locale)}{" "}
-            позже
+            {t("offer.return_not_available", locale) ?? "Информация не предоставлена поставщиком"}
           </div>
         </div>
 

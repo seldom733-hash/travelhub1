@@ -271,6 +271,9 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "offer.accept": { ru: "\u041f\u0440\u0438\u043d\u044f\u0442\u044c", az: "Q\u0131bul etm\u0259k", en: "Accept" },
   "offer.reject": { ru: "\u041e\u0442\u043a\u0430\u0437\u0430\u0442\u044c", az: "R\u0259dd etm\u0259k", en: "Reject" },
   "offer.retry_verify": { ru: "\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443", az: "Yoxlam\u0131 t\u0259krarla", en: "Retry verification" },
+  "offer.return_not_available": { ru: "\u0418\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044f \u043d\u0435 \u043f\u0440\u0435\u0434\u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u0430 \u043f\u043e\u0441\u0442\u0430\u0432\u0449\u0438\u043a\u043e\u043c", az: "M\u0131lumat t\u0259chizat\u0131 t\u0259r\u0259find\u0259n t\u0259min olunmayıb", en: "Information not provided by supplier" },
+  "offer.request_success": { ru: "\u0417\u0430\u043f\u0440\u043e\u0441 \u0441\u043e\u0437\u0434\u0430\u043d", az: "Sor\u0131\u015f yarad\u0131ld\u0131", en: "Request created" },
+  "offer.request_success_detail": { ru: "\u0412\u0430\u0448 \u0437\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u0442\u0443\u0440 \u0443\u0441\u043f\u0435\u0448\u043d\u043e \u0441\u043e\u0437\u0434\u0430\u043d. \u041c\u0435\u043d\u0435\u0434\u0436\u0435\u0440 \u0441\u0432\u044f\u0436\u0435\u0442\u0441\u044f \u0441 \u0432\u0430\u043c\u0438.", az: "Tur sor\u0131\u015f\u0131n\u0131z uğurla yarad\u0131ld\u0131. Menecer sizinl\u0259 \u0259laq\u0259 saxlayacaq.", en: "Your tour request has been created successfully. A manager will contact you." },
 
   // search
   "search.title": { ru: "Поиск услуг", az: "Xidmət axtarışı", en: "Search services" },
