@@ -76,6 +76,14 @@ export default function MonthlyCalendar({
     // Monday-based: 0=Mon, 6=Sun
     const startDow = (firstDay.getDay() + 6) % 7;
 
+    // Helper: local date → YYYY-MM-DD (avoids UTC mismatch from toISOString)
+    const toLocalDateStr = (d: Date): string => {
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const day = d.getDate();
+      return `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    };
+
     const days: Array<{
       date: Date;
       dateStr: string;
@@ -88,7 +96,7 @@ export default function MonthlyCalendar({
       const d = new Date(year, month, -(startDow - 1 - i));
       days.push({
         date: d,
-        dateStr: d.toISOString().slice(0, 10),
+        dateStr: toLocalDateStr(d),
         isCurrentMonth: false,
         entry: null,
       });
@@ -97,7 +105,7 @@ export default function MonthlyCalendar({
     // Current month
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(year, month, day);
-      const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const dateStr = toLocalDateStr(d);
       days.push({
         date: d,
         dateStr,
@@ -112,7 +120,7 @@ export default function MonthlyCalendar({
       const d = new Date(year, month + 1, i);
       days.push({
         date: d,
-        dateStr: d.toISOString().slice(0, 10),
+        dateStr: toLocalDateStr(d),
         isCurrentMonth: false,
         entry: null,
       });
