@@ -2395,6 +2395,39 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "documents.action.downloaded": { ru: "Скачивание", az: "Yükləmə", en: "Download" },
   "documents.action.invalidated": { ru: "Аннулирован", az: "Ləğv edilib", en: "Invalidated" },
   "documents.pii.redacted": { ru: "(маскировано)", az: "(maskalanıb)", en: "(redacted)" },
+
+  // supplier / price configurator
+  "supplier.no_offer": { ru: "Предложение не загружено", az: "Təklif yüklənməyib", en: "No offer loaded" },
+  "supplier.adults": { ru: "взр.", az: "böyük", en: "ad." },
+  "supplier.children": { ru: "детей", az: "uşaq", en: "ch." },
+  "supplier.nights": { ru: "Ночей", az: "Gecə", en: "Nights" },
+  "supplier.passengers": { ru: "Пассажиры", az: "Sərnişinlər", en: "Passengers" },
+  "supplier.departure": { ru: "Вылет", az: "Gediş", en: "Departure" },
+  "supplier.source": { ru: "Источник", az: "Mənbə", en: "Source" },
+
+  // supplier / calendar
+  "supplier.available": { ru: "Есть места", az: "Yer var", en: "Available" },
+  "supplier.unavailable": { ru: "Нет мест", az: "Yer yoxdur", en: "Unavailable" },
+  "supplier.unknown": { ru: "Неизвестно", az: "Naməlum", en: "Unknown" },
+  "supplier.calendar.empty": { ru: "Нет данных за период", az: "Dövr üçün məlumat yoxdur", en: "No data for this period" },
+  "supplier.calendar.show": { ru: "Показать календарь цен", az: "Qiymət təqvimini göstər", en: "Show price calendar" },
+  "supplier.calendar.hide": { ru: "Скрыть календарь цен", az: "Qiymət təqvimini gizlə", en: "Hide price calendar" },
+  "supplier.retry": { ru: "Повторить", az: "Təkrar cəhd", en: "Retry" },
+
+  // supplier / filters
+  "supplier.filter.nights": { ru: "Ночей", az: "Gecə", en: "Nights" },
+  "supplier.filter.adults": { ru: "Взрослых", az: "Böyüklər", en: "Adults" },
+  "supplier.filter.children": { ru: "Детей", az: "Uşaqlar", en: "Children" },
+  "supplier.filter.destination": { ru: "Направление", az: "İstiqamət", en: "Destination" },
+  "supplier.filter.meal": { ru: "Питание", az: "Yemək", en: "Meal" },
+  "supplier.search": { ru: "Найти туры", az: "Turlar tap", en: "Search tours" },
+
+  // supplier / errors
+  "supplier.error.unsupported": { ru: "Параметр не поддерживается", az: "Parametr dəstəklənmir", en: "Unsupported parameter" },
+  "supplier.error.timeout": { ru: "Превышено время ожидания", az: "Gözləmə müddəti aşıldı", en: "Request timed out" },
+  "supplier.error.no_results": { ru: "Нет результатов", az: "Nəticə yoxdur", en: "No results" },
+  "supplier.error.generic": { ru: "Ошибка поиска", az: "Axtarış xətası", en: "Search error" },
+  "supplier.validation.nights_range": { ru: "Ночи: от {min} до {max}", az: "Gecələr: {min}–{max}", en: "Nights: {min}–{max}" },
 };
 
 /** Локализованная строка по ключу (fallback — сам ключ, затем default locale). */

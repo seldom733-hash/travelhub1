@@ -63,6 +63,7 @@ export default function CompactSearch({ service, params }: CompactSearchProps) {
     if (ctx.baggage) sp.set("baggage", "1");
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.language) sp.set("lang", ctx.language);
+    if (ctx.serviceType === "tours") sp.set("supplier", "KOMPAS");
     setIsOpen(false);
     router.push(`/search?${sp.toString()}`);
   };

@@ -82,6 +82,7 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
     if (ctx.baggage) sp.set("baggage", "1");
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.language) sp.set("lang", ctx.language);
+    if (ctx.serviceType === "tours") sp.set("supplier", "KOMPAS");
     router.push(`/search?${sp.toString()}`);
   };
 
