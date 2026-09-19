@@ -110,50 +110,15 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           </div>
         </div>
 
-        {/* Main image */}
-        {detail.media.length > 0 && (
-          <div className="mb-6">
-            <MediaGallery media={detail.media} />
-          </div>
-        )}
-
         {/* TourDetail — primary tour experience: filters + calendar + offers + modal */}
-        <TourDetail attributes={p.attributes} title={p.title} />
+        <TourDetail
+          attributes={p.attributes}
+          title={p.title}
+          media={detail.media.length > 0 ? <MediaGallery media={detail.media} /> : undefined}
+          description={p.description}
+          attributeSections={sectionsFor(p.attributes, locale)}
+        />
 
-        {/* Description + attributes below the tour search */}
-        {p.description && (
-          <section className="mt-8" aria-labelledby="pdp-description">
-            <h2 id="pdp-description" className="text-lg font-bold text-slate-900">
-              {t("pdp.description_title", locale)}
-            </h2>
-            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
-              {p.description}
-            </p>
-          </section>
-        )}
-
-        {sectionsFor(p.attributes, locale).length > 0 && (
-          <section className="mt-8" aria-labelledby="pdp-attrs">
-            <h2 id="pdp-attrs" className="text-lg font-bold text-slate-900">
-              {t("pdp.attributes_title", locale)}
-            </h2>
-            <div className="mt-3 space-y-4">
-              {sectionsFor(p.attributes, locale).map((s) => (
-                <div key={s.section} className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <h3 className="text-sm font-semibold text-slate-800">{sectionLabel(s.section, locale)}</h3>
-                  <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
-                    {s.items.map((i) => (
-                      <div key={i.key} className="flex flex-col">
-                        <dt className="text-[11px] uppercase tracking-wide text-slate-400">{i.label}</dt>
-                        <dd className="whitespace-pre-line text-slate-700">{i.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
       </div>
     );
   }

@@ -23,9 +23,15 @@ import {
 export default function TourDetail({
   attributes,
   title,
+  media,
+  description,
+  attributeSections,
 }: {
   attributes: Record<string, unknown> | null;
   title: string;
+  media?: React.ReactNode;
+  description?: string | null;
+  attributeSections?: Array<{ section: string; items: Array<{ key: string; label: string; value: string }> }>;
 }) {
   const locale = useLocale();
   const [offers, setOffers] = useState<SupplierOffer[]>([]);
@@ -49,7 +55,9 @@ export default function TourDetail({
   // Product identity
   const hotelExternalId = (attributes?.hotelExternalId as string) ?? undefined;
   const hotelName = title;
-  const tourIncValue = (attributes?.tourKey as string) ?? undefined;
+
+  // Strip location suffix like "(Султанахмет)" from hotel name for KOMPAS queries
+  const cleanHotelName = hotelName?.replace(/\s*\(.*?\)\s*$/, "").replace(/\s*\r?\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
 
   // Build calendar query
   const buildCalendarQuery = useCallback(
@@ -62,8 +70,6 @@ export default function TourDetail({
 
       return {
         supplierCode: "KOMPAS",
-        hotel: hotelName?.replace(/\s*\r?\n\s*/g, " ").replace(/\s{2,}/g, " ").trim(),
-        hotelExternalId,
         destination,
         dateFrom: today,
         dateTo,
@@ -71,11 +77,10 @@ export default function TourDetail({
         adults,
         children: children || undefined,
         childAges: childAges.length > 0 ? childAges : undefined,
-        tourIncValue,
         ...overrides,
       };
     },
-    [hotelName, hotelExternalId, destination, nights, adults, children, childAges, tourIncValue],
+    [destination, nights, adults, children, childAges],
   );
 
   // Auto-search on mount
@@ -87,11 +92,10 @@ export default function TourDetail({
 
     searchSupplierOffers({
       supplierCode: "KOMPAS",
-      hotel: hotelName,
+      hotel: cleanHotelName,
       hotelExternalId,
       destination,
       departureCity,
-      tourIncValue,
       adults,
       children,
       childAges: childAges.length > 0 ? childAges : undefined,
@@ -117,7 +121,7 @@ export default function TourDetail({
       });
 
     return () => { alive = false; };
-  }, [hotelExternalId, hotelName, destination, departureCity, tourIncValue, adults, children, childAges, nights, locale]);
+  }, [hotelExternalId, cleanHotelName, destination, departureCity, adults, children, childAges, nights, locale]);
 
   // Handle calendar date click
   const handleCalendarSelect = useCallback((entry: SupplierPriceCalendarEntry) => {
@@ -134,11 +138,10 @@ export default function TourDetail({
 
     searchSupplierOffers({
       supplierCode: "KOMPAS",
-      hotel: hotelName,
+      hotel: cleanHotelName,
       hotelExternalId,
       destination,
       departureCity,
-      tourIncValue,
       adults,
       children,
       childAges: childAges.length > 0 ? childAges : undefined,
@@ -158,7 +161,7 @@ export default function TourDetail({
         }
         setLoading(false);
       });
-  }, [hotelName, hotelExternalId, destination, departureCity, tourIncValue, adults, children, childAges, nights, locale]);
+  }, [cleanHotelName, hotelExternalId, destination, departureCity, adults, children, childAges, nights, locale]);
 
   // Handle request creation
   const handleRequestCreated = useCallback((offer: SupplierOffer) => {
@@ -189,7 +192,7 @@ export default function TourDetail({
               <select
                 value={departureCity}
                 onChange={(e) => setDepartureCity(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               >
                 <option value="1411">Баку (GYD)</option>
               </select>
@@ -203,7 +206,7 @@ export default function TourDetail({
               <select
                 value={adults}
                 onChange={(e) => setAdults(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               >
                 {[1, 2, 3, 4].map((n) => (
                   <option key={n} value={n}>
@@ -230,11 +233,17 @@ export default function TourDetail({
                     setChildAges(childAges.slice(0, v));
                   }
                 }}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               >
-                {[0, 1].map((n) => (
+                {[0, 1, 2, 3].map((n) => (
                   <option key={n} value={n}>
-                    {n === 0 ? "Нет детей" : `${n} ребенок`}
+                    {n === 0
+                      ? "Нет детей"
+                      : n === 1
+                        ? "1 ребёнок"
+                        : n === 2
+                          ? "2 детей"
+                          : "3 детей"}
                   </option>
                 ))}
               </select>
@@ -255,7 +264,7 @@ export default function TourDetail({
                       newAges[idx] = Number(e.target.value);
                       setChildAges(newAges);
                     }}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                   >
                     {Array.from({ length: 15 }, (_, i) => i).map((a) => (
                       <option key={a} value={a}>
@@ -275,7 +284,7 @@ export default function TourDetail({
               <select
                 value={nights}
                 onChange={(e) => setNights(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               >
                 {Array.from({ length: 12 }, (_, i) => i + 3).map((n) => (
                   <option key={n} value={n}>
@@ -312,7 +321,7 @@ export default function TourDetail({
           )}
         </div>
 
-        {/* ── Right: Hotel Info ── */}
+        {/* ── Right: Hotel Info + Photo + Description ── */}
         <div className="space-y-4">
           {/* Loading */}
           {loading && (
@@ -329,20 +338,57 @@ export default function TourDetail({
             </div>
           )}
 
-          {/* Hotel info placeholder */}
-          {!loading && !error && (
+          {/* Main hotel photo */}
+          {media}
+
+          {/* Hotel info */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 className="font-serif text-xl font-bold text-slate-900">
+              {hotelName}
+            </h3>
+            {destination && (
+              <p className="mt-1 text-sm text-slate-500">📍 {destination}</p>
+            )}
+            {hotelExternalId && (
+              <p className="mt-1 text-xs text-slate-400">
+                KOMPAS ID: {hotelExternalId}
+              </p>
+            )}
+          </div>
+
+          {/* Description */}
+          {description && (
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <h3 className="font-serif text-xl font-bold text-slate-900">
-                {hotelName}
-              </h3>
-              {destination && (
-                <p className="mt-1 text-sm text-slate-500">📍 {destination}</p>
-              )}
-              {hotelExternalId && (
-                <p className="mt-1 text-xs text-slate-400">
-                  KOMPAS ID: {hotelExternalId}
-                </p>
-              )}
+              <h4 className="text-sm font-semibold text-slate-800">
+                {t("pdp.description_title", locale)}
+              </h4>
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
+                {description}
+              </p>
+            </div>
+          )}
+
+          {/* Attributes */}
+          {attributeSections && attributeSections.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+              <h4 className="text-sm font-semibold text-slate-800">
+                {t("pdp.attributes_title", locale)}
+              </h4>
+              <div className="mt-3 space-y-3">
+                {attributeSections.map((s) => (
+                  <div key={s.section}>
+                    <h5 className="text-xs font-medium text-slate-500">{s.section}</h5>
+                    <dl className="mt-1 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+                      {s.items.map((i) => (
+                        <div key={i.key} className="flex flex-col">
+                          <dt className="text-[10px] uppercase tracking-wide text-slate-400">{i.label}</dt>
+                          <dd className="whitespace-pre-line text-slate-700">{i.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

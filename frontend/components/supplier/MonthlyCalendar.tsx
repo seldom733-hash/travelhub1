@@ -40,6 +40,20 @@ export default function MonthlyCalendar({
     try {
       const data = await getPriceCalendar(query);
       setEntries(data.entries);
+
+      // Auto-advance to first month with available prices
+      const availableEntry = data.entries.find(
+        (e) => e.availability === "AVAILABLE" && e.price !== null,
+      );
+      if (availableEntry) {
+        const [y, m] = availableEntry.date.split("-").map(Number);
+        const firstOfMonth = new Date(y, m - 1, 1);
+        const now = new Date();
+        const currentFirst = new Date(now.getFullYear(), now.getMonth(), 1);
+        if (firstOfMonth.getTime() > currentFirst.getTime()) {
+          setCurrentMonth(firstOfMonth);
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("supports nights") || msg.includes("UNSUPPORTED")) {
