@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight } from "@phosphor-icons/react";
-import { t, useLocale } from "@/lib/i18n";
+import { t, useLocale, formatDate } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 
 function LatestOfferCardSkeleton() {
@@ -96,13 +96,26 @@ function LatestOfferCard({ card }: { card: PublicProductCard }) {
           </p>
         )}
         <div className="mt-3 flex items-center justify-between">
-          {card.priceFrom ? (
-            <p className="text-sm font-semibold text-gold">
-              {t("price.from", locale)} {card.priceFrom} {card.currency || ""}
-            </p>
-          ) : (
-            <p className="text-xs text-neutral-500">{t("price.on_request", locale)}</p>
-          )}
+          <div>
+            {card.priceFrom ? (
+              <p className="text-sm font-semibold text-gold">
+                {t("price.from", locale)} {card.priceFrom} {card.currency || ""}
+              </p>
+            ) : (
+              <p className="text-xs text-neutral-500">{t("price.on_request", locale)}</p>
+            )}
+            {(card.headlineDepartureDate || card.headlineNights != null) && (
+              <p className="mt-1 text-xs text-neutral-400">
+                {card.headlineDepartureDate && (
+                  <span>{formatDate(card.headlineDepartureDate, locale)}</span>
+                )}
+                {card.headlineDepartureDate && card.headlineNights != null && <span> · </span>}
+                {card.headlineNights != null && (
+                  <span>{card.headlineNights} {card.headlineNights === 1 ? t("card.night", locale) : t("card.nights", locale)}</span>
+                )}
+              </p>
+            )}
+          </div>
           <div className="flex size-7 items-center justify-center rounded-full border border-dark-border bg-dark/60 text-neutral-400 transition-colors group-hover:border-gold/40 group-hover:text-gold">
             <ArrowRight size={14} weight="light" />
           </div>

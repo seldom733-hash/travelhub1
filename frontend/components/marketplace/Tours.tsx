@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Compass } from "@phosphor-icons/react";
-import { t, useLocale } from "@/lib/i18n";
+import { t, useLocale, formatDate } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 
 function TourCardSkeleton() {
@@ -83,10 +83,14 @@ function TourCard({ card }: { card: PublicProductCard }) {
               <p className="text-xs text-neutral-500">{t("price.on_request", locale)}</p>
             )}
             {(card.headlineDepartureDate || card.headlineNights != null) && (
-              <p className="mt-0.5 text-[11px] text-neutral-500">
-                {card.headlineDepartureDate && <span>{card.headlineDepartureDate}</span>}
+              <p className="mt-1 text-xs text-neutral-400">
+                {card.headlineDepartureDate && (
+                  <span>{formatDate(card.headlineDepartureDate, locale)}</span>
+                )}
                 {card.headlineDepartureDate && card.headlineNights != null && <span> · </span>}
-                {card.headlineNights != null && <span>{card.headlineNights} {card.headlineNights === 1 ? t("card.night", locale) : t("card.nights", locale)}</span>}
+                {card.headlineNights != null && (
+                  <span>{card.headlineNights} {card.headlineNights === 1 ? t("card.night", locale) : t("card.nights", locale)}</span>
+                )}
               </p>
             )}
           </div>

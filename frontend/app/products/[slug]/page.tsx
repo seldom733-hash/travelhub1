@@ -71,19 +71,100 @@ function PdpInner() {
 
 function PdpContent({ detail }: { detail: PublicProductDetail }) {
   const locale = useLocale();
-  const user = useCurrentUser();
   const p = detail.product;
-  const availability = availabilityText(p.availability, locale);
-  const attributeSections = sectionsFor(p.attributes, locale);
+  const isTour = p.type === "TOUR";
 
-  // Step 1.13B: PDP реально открыт (client render, fire-once; не SSR/prefetch).
   useMarketplaceProductViewed(p.slug, true);
+
+  if (isTour) {
+    return (
+      <div>
+        {/* Breadcrumbs */}
+        <nav className="mb-3 text-xs text-slate-400" aria-label="breadcrumb">
+          <Link href="/" className="hover:text-blue-600 hover:underline">
+            {t("pdp.breadcrumb_home", locale)}
+          </Link>
+          {p.category && (
+            <>
+              <span className="mx-1.5">/</span>
+              <Link href={`/categories/${p.category.slug}`} className="hover:text-blue-600 hover:underline">
+                {p.category.title}
+              </Link>
+            </>
+          )}
+          <span className="mx-1.5">/</span>
+          <span className="text-slate-600" aria-current="page">
+            {p.title}
+          </span>
+        </nav>
+
+        {/* Hotel header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{p.title}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+            {p.category && (
+              <Link href={`/categories/${p.category.slug}`} className="rounded-full bg-blue-50 px-2.5 py-0.5 font-medium text-blue-700 hover:bg-blue-100">
+                {p.category.title}
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Main image */}
+        {detail.media.length > 0 && (
+          <div className="mb-6">
+            <MediaGallery media={detail.media} />
+          </div>
+        )}
+
+        {/* TourDetail — primary tour experience: filters + calendar + offers + modal */}
+        <TourDetail attributes={p.attributes} title={p.title} />
+
+        {/* Description + attributes below the tour search */}
+        {p.description && (
+          <section className="mt-8" aria-labelledby="pdp-description">
+            <h2 id="pdp-description" className="text-lg font-bold text-slate-900">
+              {t("pdp.description_title", locale)}
+            </h2>
+            <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
+              {p.description}
+            </p>
+          </section>
+        )}
+
+        {sectionsFor(p.attributes, locale).length > 0 && (
+          <section className="mt-8" aria-labelledby="pdp-attrs">
+            <h2 id="pdp-attrs" className="text-lg font-bold text-slate-900">
+              {t("pdp.attributes_title", locale)}
+            </h2>
+            <div className="mt-3 space-y-4">
+              {sectionsFor(p.attributes, locale).map((s) => (
+                <div key={s.section} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <h3 className="text-sm font-semibold text-slate-800">{sectionLabel(s.section, locale)}</h3>
+                  <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+                    {s.items.map((i) => (
+                      <div key={i.key} className="flex flex-col">
+                        <dt className="text-[11px] uppercase tracking-wide text-slate-400">{i.label}</dt>
+                        <dd className="whitespace-pre-line text-slate-700">{i.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    );
+  }
+
+  // Non-tour products: original two-column layout
+  const availability = availabilityText(p.availability, locale);
+  const user = useCurrentUser();
 
   return (
     <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-      {/* ── Left: gallery + description ── */}
       <div>
-        {/* Breadcrumbs */}
         <nav className="mb-3 text-xs text-slate-400" aria-label="breadcrumb">
           <Link href="/" className="hover:text-blue-600 hover:underline">
             {t("pdp.breadcrumb_home", locale)}
@@ -114,12 +195,10 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           </span>
         </div>
 
-        {/* Media gallery — только PUBLISHED media, stable public URLs */}
         <div className="mt-5">
           <MediaGallery media={detail.media} />
         </div>
 
-        {/* Description */}
         <section className="mt-8" aria-labelledby="pdp-description">
           <h2 id="pdp-description" className="text-lg font-bold text-slate-900">
             {t("pdp.description_title", locale)}
@@ -129,31 +208,32 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           </p>
         </section>
 
-        {/* Attributes sections — только реальные данные */}
-        {attributeSections.length > 0 && (
-          <section className="mt-8" aria-labelledby="pdp-attrs">
-            <h2 id="pdp-attrs" className="text-lg font-bold text-slate-900">
-              {t("pdp.attributes_title", locale)}
-            </h2>
-            <div className="mt-3 space-y-4">
-              {attributeSections.map((s) => (
-                <div key={s.section} className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <h3 className="text-sm font-semibold text-slate-800">{sectionLabel(s.section, locale)}</h3>
-                  <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
-                    {s.items.map((i) => (
-                      <div key={i.key} className="flex flex-col">
-                        <dt className="text-[11px] uppercase tracking-wide text-slate-400">{i.label}</dt>
-                        <dd className="whitespace-pre-line text-slate-700">{i.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+        {(() => {
+          const attrSections = sectionsFor(p.attributes, locale);
+          return attrSections.length > 0 ? (
+            <section className="mt-8" aria-labelledby="pdp-attrs">
+              <h2 id="pdp-attrs" className="text-lg font-bold text-slate-900">
+                {t("pdp.attributes_title", locale)}
+              </h2>
+              <div className="mt-3 space-y-4">
+                {attrSections.map((s) => (
+                  <div key={s.section} className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <h3 className="text-sm font-semibold text-slate-800">{sectionLabel(s.section, locale)}</h3>
+                    <dl className="mt-2 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+                      {s.items.map((i) => (
+                        <div key={i.key} className="flex flex-col">
+                          <dt className="text-[11px] uppercase tracking-wide text-slate-400">{i.label}</dt>
+                          <dd className="whitespace-pre-line text-slate-700">{i.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null;
+        })()}
 
-        {/* Tariffs / options */}
         {p.tariffs.length > 0 && (
           <section className="mt-8" aria-labelledby="pdp-tariffs">
             <h2 id="pdp-tariffs" className="text-lg font-bold text-slate-900">
@@ -167,7 +247,6 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           </section>
         )}
 
-        {/* Availability (discovery-only, без бронирования) */}
         <section className="mt-8" aria-labelledby="pdp-availability">
           <h2 id="pdp-availability" className="text-lg font-bold text-slate-900">
             {t("pdp.availability_title", locale)}
@@ -186,12 +265,8 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             <p className="mt-2 text-[11px] opacity-70">{t("pdp.availability_notice", locale)}</p>
           </div>
         </section>
-
-        {/* Tour Detail — live KOMPAS integration (filters + calendar + modal) */}
-        <TourDetail attributes={p.attributes} title={p.title} />
       </div>
 
-      {/* ── Right: price / CTA / seller (seller-safe projection, Step 1.11) ── */}
       <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="text-xs uppercase tracking-wide text-slate-400">{t("pdp.price_from", locale)}</div>
@@ -200,9 +275,6 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           </div>
 
           {user === null ? (
-            // Step 1.9 §6: anonymous → login с safe next (возврат к исходной
-            // Product-странице после аутентификации). Step 1.13B: CTA клик —
-            // намерение (НЕ Order/Booking), durable behavioral event.
             <Link
               href={`/login?next=${encodeURIComponent(`/products/${p.slug}`)}`}
               onClick={() => fireMarketplaceCta(p.slug)}
