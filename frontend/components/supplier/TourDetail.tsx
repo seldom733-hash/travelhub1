@@ -5,10 +5,7 @@ import { t, useLocale } from "@/lib/i18n";
 import MonthlyCalendar from "@/components/supplier/MonthlyCalendar";
 import OfferModal from "@/components/supplier/OfferModal";
 import {
-  searchSupplierOffers,
-  type SupplierOffer,
   type SupplierPriceCalendarEntryOffer,
-  type SupplierSearchQuery,
   type SupplierPriceCalendarEntry,
 } from "@/lib/supplier-api";
 
@@ -35,9 +32,6 @@ export default function TourDetail({
   attributeSections?: Array<{ section: string; items: Array<{ key: string; label: string; value: string }> }>;
 }) {
   const locale = useLocale();
-  const [searchOffers, setSearchOffers] = useState<SupplierOffer[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<SupplierPriceCalendarEntry | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -53,43 +47,33 @@ export default function TourDetail({
   const [childAges, setChildAges] = useState<number[]>([]);
   const [nights, setNights] = useState(7);
 
-  // Product identity
+  // Product identity — KOMPAS live ingestion stores tourKey (e.g. 3332) as tourKey/stateInc; use it as tourIncValue
   const hotelExternalId = (attributes?.hotelExternalId as string) ?? undefined;
-  const tourIncValue = (attributes?.tourIncValue as string) ?? (attributes?.programIncValue as string) ?? undefined;
+  const tourIncValue =
+    (attributes?.tourIncValue as string) ??
+    (attributes?.programIncValue as string) ??
+    (attributes?.tourKey as string) ??
+    undefined;
   const tourIncName = (attributes?.tourIncName as string) ?? (attributes?.programIncName as string) ?? undefined;
   const hotelName = title;
 
   // Strip location suffix like "(Султанахмет)" from hotel name for KOMPAS queries
   const cleanHotelName = hotelName?.replace(/\s*\(.*?\)\s*$/, "").replace(/\s*\r?\n\s*/g, " ").replace(/\s{2,}/g, " ").trim();
 
-  // Build calendar query for a specific month
-  const buildCalendarQuery = useCallback(
-    (year: number, month: number, overrides?: Partial<SupplierSearchQuery>) => {
-      const firstDay = `${year}-${String(month + 1).padStart(2, "0")}-01`;
-      const lastDay = new Date(year, month + 1, 0);
-      const dateTo = `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`;
-
-      return {
-        supplierCode: "KOMPAS",
-        hotelExternalId,
-        hotel: cleanHotelName,
-        destination,
-        tourIncValue,
-        tourIncName,
-        dateFrom: firstDay,
-        dateTo,
-        nights,
-        adults,
-        children: children || undefined,
-        childAges: childAges.length > 0 ? childAges : undefined,
-        ...overrides,
-      };
-    },
-    [hotelExternalId, cleanHotelName, destination, tourIncValue, tourIncName, nights, adults, children, childAges],
-  );
-
-  // NOTE: No auto-search on mount — search is only triggered by the "Найти варианты" button.
-  // The price calendar (MonthlyCalendar) fetches its own data independently.
+  // Build calendar query — dates are derived per-month inside MonthlyCalendar; only context here.
+  const calendarQuery = {
+    supplierCode: "KOMPAS" as const,
+    hotelExternalId,
+    hotel: cleanHotelName,
+    destination,
+    departureCity,
+    tourIncValue,
+    tourIncName,
+    nights,
+    adults,
+    children: children || undefined,
+    childAges: childAges.length > 0 ? childAges : undefined,
+  };
 
   // Handle calendar date click
   const handleCalendarSelect = useCallback((entry: SupplierPriceCalendarEntry) => {
@@ -97,40 +81,7 @@ export default function TourDetail({
     setModalOpen(true);
   }, []);
 
-  // Handle filter change — triggered by "Найти варианты" button
-  const handleFilterChange = useCallback(() => {
-    setSearchLoading(true);
-    setError(null);
-    setSearchOffers([]);
 
-    searchSupplierOffers({
-      supplierCode: "KOMPAS",
-      hotel: cleanHotelName,
-      hotelExternalId,
-      tourIncValue,
-      tourIncName,
-      destination,
-      departureCity,
-      adults,
-      children,
-      childAges: childAges.length > 0 ? childAges : undefined,
-      nightsFrom: nights,
-      nightsTo: nights,
-    })
-      .then((result) => {
-        setSearchOffers(result);
-        setSearchLoading(false);
-      })
-      .catch((e) => {
-        const msg = (e as Error).message;
-        if (msg.includes("supports nights") || msg.includes("UNSUPPORTED")) {
-          setError(t("supplier.error.unsupported", locale));
-        } else {
-          setError(t("supplier.error.generic", locale));
-        }
-        setSearchLoading(false);
-      });
-  }, [cleanHotelName, hotelExternalId, tourIncValue, tourIncName, destination, departureCity, adults, children, childAges, nights, locale]);
 
   // Handle request creation
   const handleRequestCreated = useCallback((offer: SupplierPriceCalendarEntryOffer) => {
@@ -261,49 +212,19 @@ export default function TourDetail({
               </select>
             </div>
 
-            {/* Search button */}
-            <button
-              onClick={handleFilterChange}
-              disabled={searchLoading}
-              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-            >
-              {t("supplier.search", locale) ?? "Найти варианты"}
-            </button>
           </div>
 
-          {/* Monthly Calendar */}
+          {/* Monthly Calendar — monthly cache, lastUpdated + Обновить цены */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <h3 className="mb-3 text-sm font-semibold text-slate-800">
               {t("tour.calendar_title", locale) ?? "Календарь цен"}
             </h3>
-            <MonthlyCalendar queryBuilder={buildCalendarQuery} onSelect={handleCalendarSelect} />
+            <MonthlyCalendar query={calendarQuery} onSelect={handleCalendarSelect} />
           </div>
-
-          {/* Search offer count */}
-          {!searchLoading && searchOffers.length > 0 && (
-            <div className="text-sm text-slate-500">
-              {t("search.found", locale)}: {searchOffers.length}{" "}
-              {t("tour.offers_title", locale).toLowerCase()}
-            </div>
-          )}
         </div>
 
         {/* ── Right: Hotel Info + Photo + Description ── */}
         <div className="space-y-4">
-          {/* Search loading */}
-          {searchLoading && (
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
-              {t("tour.loading", locale)}
-            </div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-              <p className="text-sm font-medium text-amber-800">{error}</p>
-            </div>
-          )}
 
           {/* Main hotel photo */}
           {media}
@@ -359,12 +280,7 @@ export default function TourDetail({
             </div>
           )}
 
-          {/* Empty state */}
-          {!searchLoading && !error && searchOffers.length === 0 && hotelExternalId && (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-              <p className="text-sm text-slate-500">{t("tour.no_offers", locale)}</p>
-            </div>
-          )}
+
         </div>
       </div>
 

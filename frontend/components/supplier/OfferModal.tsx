@@ -3,7 +3,9 @@
 import { useState, useCallback } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
-import { refreshSupplierPrice, createTourRequest, type SupplierPriceCalendarEntryOffer } from "@/lib/supplier-api";
+import { refreshSupplierPrice, createTourRequest, isCaptchaRequired, type SupplierPriceCalendarEntryOffer } from "@/lib/supplier-api";
+import { useKompasCaptcha } from "@/lib/useKompasCaptcha";
+import { KompasCaptchaModal } from "@/components/supplier/KompasCaptchaModal";
 
 /**
  * OfferModal — shows all KOMPAS offer variants for a selected date.
@@ -127,11 +129,12 @@ function OfferRow({
   const [verifiedPrice, setVerifiedPrice] = useState<number | null>(null);
   const [originalPrice] = useState(offer.price);
   const [requestState, setRequestState] = useState<"idle" | "creating" | "done" | "error">("idle");
+  const { challenge, checkResponseForCaptcha, submit, refresh, cancel } = useKompasCaptcha();
 
   const handleVerifyPrice = useCallback(async () => {
     setVerificationState("checking");
     try {
-      const result = await refreshSupplierPrice(
+      const result: any = await refreshSupplierPrice(
         offer.supplierCode ?? "KOMPAS",
         offer.externalOfferId,
         offer.externalClaim,
@@ -150,6 +153,12 @@ function OfferRow({
         },
       );
 
+      if (isCaptchaRequired(result)) {
+        checkResponseForCaptcha(result);
+        setVerificationState("idle");
+        return;
+      }
+
       if (Math.abs(result.amount - originalPrice) < 0.01) {
         setVerificationState("confirmed");
         setVerifiedPrice(result.amount);
@@ -160,7 +169,7 @@ function OfferRow({
     } catch {
       setVerificationState("error");
     }
-  }, [offer, originalPrice]);
+  }, [offer, originalPrice, checkResponseForCaptcha]);
 
   const handleAcceptPrice = useCallback(() => {
     setVerificationState("confirmed");
@@ -212,6 +221,30 @@ function OfferRow({
 
   return (
     <div className="py-5">
+      {challenge && (
+        <KompasCaptchaModal
+          challengeId={challenge.challengeId}
+          captchaImage={challenge.captchaImage}
+          status={challenge.status as any}
+          onSubmit={async (answer) => {
+            await submit(answer, (data: unknown) => {
+              const res = data as { amount: number };
+              if (Math.abs(res.amount - originalPrice) < 0.01) {
+                setVerificationState("confirmed");
+                setVerifiedPrice(res.amount);
+              } else {
+                setVerificationState("changed");
+                setVerifiedPrice(res.amount);
+              }
+            });
+          }}
+          onRefresh={refresh}
+          onCancel={() => {
+            cancel();
+            setVerificationState("idle");
+          }}
+        />
+      )}
       {/* Row header */}
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-slate-600">

@@ -7,8 +7,10 @@ import { SummertourAdapter } from "./summertour/summertour.adapter";
 import { SummerSyncService } from "./summertour/summer-sync.service";
 import { KompasSupplierAdapter } from "./kompas/kompas.adapter";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
+import { KompasCaptchaStore } from "./kompas/kompas-captcha.store";
 import { SupplierController } from "./supplier.controller";
 import { PublicSupplierController } from "./public-supplier.controller";
+import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
 import { TourRequestService } from "./tour-request.service";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { EventBusModule } from "../../eventbus/eventbus.module";
@@ -22,7 +24,7 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
 @Global()
 @Module({
   imports: [PrismaModule, EventBusModule],
-  controllers: [SupplierController, PublicSupplierController],
+  controllers: [SupplierController, PublicSupplierController, KompasCaptchaController],
   providers: [
     SupplierAdapterRegistry,
     SupplierCacheService,
@@ -30,6 +32,7 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
     SupplierOfferService,
     SummertourAdapter,
     SummerSyncService,
+    KompasCaptchaStore,
     KompasSupplierAdapter,
     KompasSyncService,
     TourRequestService,
@@ -64,8 +67,8 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
           searchEnabled: true,
           livePriceEnabled: true,
           availabilityEnabled: true,
-          maxConcurrency: 2,
-          requestsPerMinute: 10,
+          maxConcurrency: 10,
+          requestsPerMinute: 30,
           timeoutMs: 60_000,
           searchCacheTtlMs: 5 * 60 * 1000,
           priceCacheTtlMs: 5 * 60 * 1000,

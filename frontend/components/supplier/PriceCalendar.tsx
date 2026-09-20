@@ -5,10 +5,13 @@ import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
 import {
   getPriceCalendar,
+  isCaptchaRequired,
   type SupplierPriceCalendarQuery,
   type SupplierPriceCalendarEntry,
   type SupplierPriceCalendarResult,
 } from "@/lib/supplier-api";
+import { useKompasCaptcha } from "@/lib/useKompasCaptcha";
+import { KompasCaptchaModal } from "@/components/supplier/KompasCaptchaModal";
 
 /**
  * PriceCalendar — displays a grid of prices per date for a given configuration.
@@ -27,13 +30,18 @@ export default function PriceCalendar({
   const [result, setResult] = useState<SupplierPriceCalendarResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { challenge, checkResponseForCaptcha, submit, refresh, cancel } = useKompasCaptcha();
 
   const fetchCalendar = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await getPriceCalendar(query);
-      setResult(data);
+      if (isCaptchaRequired(data)) {
+        checkResponseForCaptcha(data);
+        return;
+      }
+      setResult(data as SupplierPriceCalendarResult);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       // Distinguish validation errors from transient errors
@@ -49,7 +57,7 @@ export default function PriceCalendar({
     } finally {
       setLoading(false);
     }
-  }, [query, locale]);
+  }, [query, locale, checkResponseForCaptcha]);
 
   useEffect(() => {
     fetchCalendar();
@@ -84,16 +92,42 @@ export default function PriceCalendar({
 
   if (!result || result.entries.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-        <p className="text-sm text-slate-500">
-          {t("supplier.calendar.empty", locale)}
-        </p>
-      </div>
+      <>
+        {challenge && (
+          <KompasCaptchaModal
+            challengeId={challenge.challengeId}
+            captchaImage={challenge.captchaImage}
+            status={challenge.status as any}
+            onSubmit={async (answer) => {
+              await submit(answer, (data) => setResult(data as SupplierPriceCalendarResult));
+            }}
+            onRefresh={refresh}
+            onCancel={cancel}
+          />
+        )}
+        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+          <p className="text-sm text-slate-500">
+            {t("supplier.calendar.empty", locale)}
+          </p>
+        </div>
+      </>
     );
   }
 
   return (
     <div className="space-y-2">
+      {challenge && (
+        <KompasCaptchaModal
+          challengeId={challenge.challengeId}
+          captchaImage={challenge.captchaImage}
+          status={challenge.status as any}
+          onSubmit={async (answer) => {
+            await submit(answer, (data) => setResult(data as SupplierPriceCalendarResult));
+          }}
+          onRefresh={refresh}
+          onCancel={cancel}
+        />
+      )}
       {/* Legend */}
       <div className="flex gap-4 text-xs text-slate-500 mb-2">
         <span className="flex items-center gap-1">

@@ -85,6 +85,10 @@ export interface SupplierPriceCalendarQuery {
   tourIncValue?: string;
   tourIncName?: string;
   tourIncValues?: string[];
+  tourIncNames?: string[];
+  productId?: string;
+  room?: string;
+  meal?: string;
 }
 
 export interface SupplierPriceCalendarEntryOffer {
@@ -128,6 +132,39 @@ export interface SupplierPriceCalendarResult {
   expiresAt: string;
 }
 
+// ── CAPTCHA Human-in-the-Loop Types ──────────────────────────────────────
+
+export interface KompasCaptchaPayload {
+  type: "image";
+  mimeType: string;
+  data: string; // data:image/jpeg;base64,...
+}
+
+export interface KompasCaptchaRequiredResponse {
+  status: "CAPTCHA_REQUIRED";
+  challengeId: string;
+  supplier: "KOMPAS";
+  captcha: KompasCaptchaPayload;
+}
+
+export interface KompasCaptchaVerifySuccessResponse {
+  status: "SUCCESS";
+  challengeId: string;
+  supplier: "KOMPAS";
+  data: unknown; // PriceCalendarResult | SupplierOffer[] | SupplierPriceSnapshot depending on original operation
+}
+
+export interface KompasCaptchaVerifyErrorResponse {
+  status: "INVALID_ANSWER" | "EXPIRED" | "SESSION_LOST" | "KOMPAS_ERROR" | "TIMEOUT" | "CANCELLED" | "CAPTCHA_REQUIRED";
+  challengeId?: string;
+  supplier?: "KOMPAS";
+  captcha?: KompasCaptchaPayload;
+}
+
+export function isCaptchaRequired(data: unknown): data is KompasCaptchaRequiredResponse {
+  return !!data && typeof data === "object" && (data as any).status === "CAPTCHA_REQUIRED" && typeof (data as any).challengeId === "string";
+}
+
 // ── API Client ───────────────────────────────────────────────────────────
 
 const BASE = "/api/v1/public/supplier";
@@ -157,7 +194,23 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
   });
   if (!res.ok) {
     const text = await res.text();
+    console.error(`[supplier-api] POST ${BASE}${path} FAILED ${res.status} body=${JSON.stringify(body).slice(0,800)} resp=${text.slice(0,1000)}`);
     throw new Error(`Supplier API ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+async function postCaptcha<T>(path: string, body: unknown): Promise<T> {
+  // Dedicated helper for kompas/captcha endpoints (base is /api/v1, not /api/v1/public/supplier)
+  const url = `/api/v1${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Captcha API ${res.status}: ${text}`);
   }
   return res.json();
 }
@@ -188,22 +241,42 @@ export async function searchSupplierOffers(
   });
 }
 
-/** Get price calendar (anonymous). Supports abort via AbortController. */
+/** Get price calendar (anonymous) — may return CAPTCHA_REQUIRED. */
 export async function getPriceCalendar(
   query: SupplierPriceCalendarQuery,
   signal?: AbortSignal,
-): Promise<SupplierPriceCalendarResult> {
-  return post<SupplierPriceCalendarResult>("/price-calendar", query, signal);
+): Promise<SupplierPriceCalendarResult | KompasCaptchaRequiredResponse> {
+  return post<SupplierPriceCalendarResult | KompasCaptchaRequiredResponse>("/price-calendar", query, signal);
 }
 
-/** Refresh price for re-check (anonymous). */
+export async function verifyKompasCaptcha(
+  challengeId: string,
+  answer: string,
+): Promise<KompasCaptchaVerifySuccessResponse | KompasCaptchaVerifyErrorResponse> {
+  return postCaptcha<KompasCaptchaVerifySuccessResponse | KompasCaptchaVerifyErrorResponse>("/public/supplier/kompas/captcha/verify", {
+    challengeId,
+    answer,
+  });
+}
+
+export async function refreshKompasCaptcha(
+  challengeId: string,
+): Promise<{ status: string; challengeId: string; supplier: string; captcha: KompasCaptchaPayload } | KompasCaptchaVerifyErrorResponse> {
+  return postCaptcha("/public/supplier/kompas/captcha/refresh", { challengeId });
+}
+
+export async function cancelKompasCaptcha(challengeId: string): Promise<{ status: string }> {
+  return postCaptcha("/public/supplier/kompas/captcha/cancel", { challengeId });
+}
+
+/** Refresh price for re-check (anonymous) — may return CAPTCHA_REQUIRED. */
 export async function refreshSupplierPrice(
   supplierCode: string,
   offerId: string,
   claim: string | undefined,
   searchContext: SupplierSearchQuery,
-): Promise<SupplierPriceSnapshot> {
-  return post<SupplierPriceSnapshot>("/refresh-price", {
+): Promise<SupplierPriceSnapshot | KompasCaptchaRequiredResponse> {
+  return post<SupplierPriceSnapshot | KompasCaptchaRequiredResponse>("/refresh-price", {
     supplierCode,
     offerId,
     claim,
@@ -217,7 +290,7 @@ export async function refreshSupplierAvailability(
   offerId: string,
   claim: string | undefined,
   searchContext: SupplierSearchQuery,
-): Promise<{ availability: SupplierAvailability; fetchedAt: string; expiresAt: string }> {
+): Promise<{ availability: SupplierAvailability; fetchedAt: string; expiresAt: string } | KompasCaptchaRequiredResponse> {
   return post("/refresh-availability", {
     supplierCode,
     offerId,
