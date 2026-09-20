@@ -4,6 +4,7 @@ import { SupplierCacheService } from "./cache/supplier-cache.service";
 import { SupplierResilienceService } from "./resilience/supplier-resilience.service";
 import { SupplierOfferService } from "./supplier-offer.service";
 import { SummertourAdapter } from "./summertour/summertour.adapter";
+import { SummertourNewAdapter } from "./summertour/summertour-new.adapter";
 import { SummerSyncService } from "./summertour/summer-sync.service";
 import { KompasSupplierAdapter } from "./kompas/kompas.adapter";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
@@ -31,6 +32,7 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
     SupplierResilienceService,
     SupplierOfferService,
     SummertourAdapter,
+    SummertourNewAdapter,
     SummerSyncService,
     KompasCaptchaStore,
     KompasSupplierAdapter,
@@ -40,7 +42,7 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
       provide: "SUPPLIER_MODULE_INIT",
       useFactory: (
         registry: SupplierAdapterRegistry,
-        summertour: SummertourAdapter,
+        summertour: SummertourNewAdapter,
         kompas: KompasSupplierAdapter,
       ) => {
         registry.register(summertour, {
@@ -78,7 +80,7 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
           circuitBreakerOpenMs: 60_000,
         });
       },
-      inject: [SupplierAdapterRegistry, SummertourAdapter, KompasSupplierAdapter],
+      inject: [SupplierAdapterRegistry, SummertourNewAdapter, KompasSupplierAdapter],
     },
   ],
   exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService, KompasSyncService],

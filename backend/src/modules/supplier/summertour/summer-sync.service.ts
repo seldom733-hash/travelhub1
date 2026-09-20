@@ -9,7 +9,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { SupplierOfferService } from "../supplier-offer.service";
-import { SummertourAdapter } from "./summertour.adapter";
+import { SummertourNewAdapter } from "./summertour-new.adapter";
 import type { SupplierSearchQuery, SupplierOffer } from "../supplier.types";
 
 export interface SyncResult {
@@ -86,7 +86,7 @@ export class SummerSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly offerService: SupplierOfferService,
-    private readonly summertour: SummertourAdapter,
+    private readonly summertour: SummertourNewAdapter,
   ) {}
 
   /**
