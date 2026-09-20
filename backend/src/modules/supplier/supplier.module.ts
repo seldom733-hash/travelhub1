@@ -76,8 +76,8 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
           priceCacheTtlMs: 5 * 60 * 1000,
           availabilityCacheTtlMs: 5 * 60 * 1000,
           detailCacheTtlMs: 24 * 60 * 60 * 1000,
-          circuitBreakerThreshold: 5,
-          circuitBreakerOpenMs: 60_000,
+          circuitBreakerThreshold: 10,
+          circuitBreakerOpenMs: 120_000,
         });
       },
       inject: [SupplierAdapterRegistry, SummertourNewAdapter, KompasSupplierAdapter],

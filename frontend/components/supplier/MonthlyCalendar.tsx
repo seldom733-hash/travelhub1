@@ -24,9 +24,13 @@ import { KompasCaptchaModal } from "@/components/supplier/KompasCaptchaModal";
  */
 type MonthlyCalendarQuery = Omit<SupplierPriceCalendarQuery, "dateFrom" | "dateTo">;
 
+// Bump this to invalidate all cached calendar data (old keys become stale)
+const CAL_CACHE_V = 4;
+
 function buildCacheKey(base: MonthlyCalendarQuery, year: number, month: number): string {
   // month 0-based — includes all KOMPAS filters that affect price
   return JSON.stringify({
+    v: CAL_CACHE_V,
     supplier: base.supplierCode,
     tourIncValue: base.tourIncValue ?? null,
     tourIncValues: base.tourIncValues ?? null,
@@ -57,16 +61,38 @@ function formatLastUpdated(d: Date, locale: string): string {
   return `${dd}.${mm}.${yy} ${hh}:${min}`;
 }
 
+// DO NOT CHANGE monthRange: KOMPAS returns empty results for past/current-day dates.
+// First day must be tomorrow (now.getDate() + 1) for current month, otherwise
+// same-day flights are in the past and supplier shows no prices.
 function monthRange(year: number, month: number): { dateFrom: string; dateTo: string } {
   const pad = (n: number) => String(n).padStart(2, "0");
-  const first = `${year}-${pad(month + 1)}-01`;
+  const now = new Date();
   const lastDate = new Date(year, month + 1, 0).getDate();
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+  const firstDay = isCurrentMonth ? Math.min(now.getDate() + 1, lastDate) : 1;
+  const first = `${year}-${pad(month + 1)}-${pad(firstDay)}`;
   const last = `${year}-${pad(month + 1)}-${pad(lastDate)}`;
   return { dateFrom: first, dateTo: last };
 }
 
 // Global cache survives unmount / SPA navigation; sessionStorage survives full reload
 const globalCalendarCache = new Map<string, { entries: SupplierPriceCalendarEntry[]; lastUpdated: Date }>();
+
+// Auto-clear stale cal: keys from sessionStorage that lack the current version
+if (typeof window !== "undefined" && window.sessionStorage) {
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k && k.startsWith("cal:")) {
+        try {
+          const parsed = JSON.parse(sessionStorage.getItem(k) ?? "");
+          const keyObj = JSON.parse(k.replace("cal:", ""));
+          if (keyObj?.v !== CAL_CACHE_V) sessionStorage.removeItem(k);
+        } catch { sessionStorage.removeItem(k); }
+      }
+    }
+  } catch {}
+}
 const globalInflight = new Map<string, Promise<SupplierPriceCalendarResult>>();
 
 function getSessionCache(key: string): { entries: SupplierPriceCalendarEntry[]; lastUpdated: Date } | null {
@@ -356,7 +382,14 @@ export default function MonthlyCalendar({
     return days;
   }, [currentMonth, entryMap]);
 
-  const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  const nowForNav = new Date();
+  const startOfCurrentMonth = new Date(nowForNav.getFullYear(), nowForNav.getMonth(), 1);
+  const isPrevDisabled = currentMonth <= startOfCurrentMonth;
+
+  const prevMonth = () => {
+    if (isPrevDisabled) return;
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
   const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
 
   const monthLabel = currentMonth.toLocaleDateString(locale === "ru" ? "ru-RU" : locale === "az" ? "az-AZ" : "en-US", {
@@ -391,9 +424,16 @@ export default function MonthlyCalendar({
         />
       )}
 
-      {/* Month navigation */}
+      {/* Month navigation — past months forbidden */}
       <div className="flex items-center justify-between">
-        <button onClick={prevMonth} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50" aria-label="Previous month">‹</button>
+        <button
+          onClick={prevMonth}
+          disabled={isPrevDisabled}
+          className={`rounded-lg border px-3 py-1.5 text-sm ${isPrevDisabled ? "border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+          aria-label="Previous month"
+        >
+          ‹
+        </button>
         <h4 className="text-sm font-semibold text-slate-800">{monthLabel}</h4>
         <button onClick={nextMonth} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50" aria-label="Next month">›</button>
       </div>

@@ -270,13 +270,35 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       // §7: TOWNFROMINC = Baku ALWAYS
       await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-      await page.waitForTimeout(5_000);
+      await page.waitForTimeout(2_000);
+      // Wait for STATEINC options to populate for Baku (Turkey 17 should appear)
+      if (this.mapStateInc(query.destination ?? query.country)) {
+        try {
+          await page.waitForFunction(
+            (sid: string) => !!document.querySelector(`select[name=STATEINC] option[value="${sid}"]`),
+            this.mapStateInc(query.destination ?? query.country)!,
+            { timeout: 10_000 },
+          );
+        } catch {}
+      }
+      await page.waitForTimeout(1_000);
 
 // STATEINC (destination country) — set from query if provided
       const stateId = this.mapStateInc(query.destination ?? query.country);
       if (stateId) {
         await this.setSamoSelect(page, "STATEINC", stateId);
-        await page.waitForTimeout(5_000);
+        await page.waitForTimeout(2_000);
+        // Wait for TOURINC options for this country to populate
+        if (query.tourIncValue) {
+          try {
+            await page.waitForFunction(
+              (tid: string) => !!document.querySelector(`select[name=TOURINC] option[value="${tid}"]`),
+              query.tourIncValue,
+              { timeout: 10_000 },
+            );
+          } catch {}
+        }
+        await page.waitForTimeout(1_000);
         // SAMO may reset TOWNFROMINC after STATEINC change — verify and re-set Baku
         const currentTown = await page.evaluate(() => {
           const sel = document.querySelector("select[name=TOWNFROMINC]") as HTMLSelectElement | null;
@@ -302,6 +324,17 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         }, query.tourIncValue);
         await page.waitForTimeout(KompasSupplierAdapter.TOURINC_DELAY_MS);
         this.logger.debug(`Set TOURINC to ${query.tourIncValue} (${query.tourIncName ?? "?"})`);
+        // Wait for hotel list for this tour to populate if hotel filter is needed
+        if (query.hotelExternalId) {
+          try {
+            await page.waitForFunction(
+              (hid: string) => !!document.querySelector(`#hotel${hid}`),
+              query.hotelExternalId,
+              { timeout: 10_000 },
+            );
+          } catch {}
+          await page.waitForTimeout(500);
+        }
       }
 
       // Nights, adults, children
@@ -382,6 +415,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       await page.route("**samo_action=PRICES**", (route) => {
         let url = route.request().url();
+        const origUrl = url;
         // When hotel checkbox was checked, HOTELS=<id> is already in the URL from the form.
         // Only strip HOTELS when doing a generic search (no hotel checkbox).
         // With the checkbox properly checked, KOMPAS returns hotel-specific results.
@@ -392,8 +426,8 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`)
                    .replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
         }
-        // §9: Force FREIGHT=1 (seats available on flight) and FILTER=1 (no sales stop)
-        // to only return bookable offers in the calendar.
+        // §9: Force FREIGHT=1 (seats available on flight), FILTER=1 (no sales stop),
+        // and PARTITION_PRICE=0 (no grouping — return all individual room/meal variants).
         if (!url.includes("FREIGHT=")) {
           url += "&FREIGHT=1";
         } else {
@@ -404,6 +438,12 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         } else {
           url = url.replace(/FILTER=\d+/g, "FILTER=1");
         }
+        if (!url.includes("PARTITION_PRICE=")) {
+          url += "&PARTITION_PRICE=0";
+        } else {
+          url = url.replace(/PARTITION_PRICE=\d+/g, "PARTITION_PRICE=0");
+        }
+        this.logger.debug(`KOMPAS PRICES intercept: ${origUrl.slice(0,400)} -> ${url.slice(0,400)} hotelFilter=${hotelFilterApplied}`);
         route.continue({ url });
       });
 
@@ -427,7 +467,18 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         if (await this.isCaptchaPresent(page)) {
           await this.createCaptchaChallengeAndThrow(page, context, "search", query);
         }
-        this.logger.warn("KOMPAS: no price_info rows appeared");
+        // Debug: dump page title + first 500 chars of body for diagnostics
+        const dbg = await page.evaluate(() => ({
+          title: document.title,
+          url: location.href,
+          bodySnippet: document.body?.innerText?.slice(0, 500) ?? "",
+          hasCaptcha: !!document.querySelector("#captchaForm, #icaptcha, #fcaptcha"),
+          rowPrice: document.querySelectorAll("tr.price_info").length,
+          rowAll: document.querySelectorAll("tr").length,
+        })).catch(() => null);
+        const dbgLine = `[KOMPAS] NO_ROWS page=${JSON.stringify(dbg)} | ${new Date().toISOString()}\n`;
+        try { require("fs").appendFileSync("D:\\travelhub_v1\\backend_price_chain.log", dbgLine); } catch {}
+        this.logger.warn(`KOMPAS: no price_info rows appeared. page=${JSON.stringify(dbg)}`);
         await context.close();
         return [];
       }
@@ -439,27 +490,38 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       await page.waitForTimeout(2_000);
 
-      // §6: DOM/result consistency — verify first row matches query parameters
+      // §6: DOM/result consistency — verify at least one row matches expected tour.
+      // With PARTITION_PRICE=0, rows from different tours may appear; only stateKey/townFromKey must match.
       const expectedTourKey = query.tourIncValue ?? "";
       const expectedStateKey = this.mapStateInc(query.destination ?? query.country) ?? "";
       const expectedTownFromKey = BAKU_TOWNFROMINC;
       const consistencyIssue = await page.evaluate(
         (expected: { tourKey: string; stateKey: string; townFromKey: string }) => {
-          const firstRow = document.querySelector("tr.price_info");
-          if (!firstRow) return "no rows";
+          const rows = Array.from(document.querySelectorAll("tr.price_info"));
+          if (rows.length === 0) return "no rows";
+          const firstRow = rows[0];
           const cls = firstRow.className;
-          const tourKey = cls.match(/tourKey-(\d+)/)?.[1] ?? "";
           const stateKey = cls.match(/stateKey-(\d+)/)?.[1] ?? "";
           const townFromKey = cls.match(/townFromKey-(\d+)/)?.[1] ?? "";
           const mismatches: string[] = [];
-          if (expected.tourKey && tourKey !== expected.tourKey) mismatches.push(`tourKey: expected ${expected.tourKey}, got ${tourKey}`);
+          // stateKey and townFromKey must match on first row
           if (expected.stateKey && stateKey !== expected.stateKey) mismatches.push(`stateKey: expected ${expected.stateKey}, got ${stateKey}`);
           if (expected.townFromKey && townFromKey !== expected.townFromKey) mismatches.push(`townFromKey: expected ${expected.townFromKey}, got ${townFromKey}`);
+          // tourKey: check if ANY row has the expected tour (soft check — with PARTITION_PRICE=0 other tours may be first)
+          if (expected.tourKey) {
+            const hasTour = rows.some((r) => {
+              const m = r.className.match(/tourKey-(\d+)/);
+              return m?.[1] === expected.tourKey;
+            });
+            if (!hasTour) mismatches.push(`tourKey: expected ${expected.tourKey} but no row has it`);
+          }
           return mismatches.length > 0 ? mismatches.join("; ") : null;
         },
         { tourKey: expectedTourKey, stateKey: expectedStateKey, townFromKey: expectedTownFromKey },
       );
       if (consistencyIssue) {
+        const cLine = `[KOMPAS] CONSISTENCY_FAIL ${consistencyIssue} | ${new Date().toISOString()}\n`;
+        try { require("fs").appendFileSync("D:\\travelhub_v1\\backend_price_chain.log", cLine); } catch {}
         await context.close();
         throw new Error(
           `KOMPAS DOM consistency hard-fail: ${consistencyIssue}. ` +
@@ -520,9 +582,17 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       const generic = await page.evaluate(() => {
         const f = document.querySelector('#captchaForm, form[name="captchaForm"]');
         const img = document.querySelector('#icaptcha, img.captcha-self');
-        return !!(f || img);
+        const fcaptcha = document.querySelector('#fcaptcha, input[name="antibot"]');
+        const samoBlock = document.querySelector('.samo-block, .captcha-block, .samo_message');
+        return !!(f || img || fcaptcha || samoBlock);
       }).catch(() => false);
-      return generic;
+      if (generic) return true;
+      // Last resort: check if page title/body contains captcha keywords
+      const bodyCheck = await page.evaluate(() => {
+        const text = document.body?.innerText?.toLowerCase() ?? "";
+        return text.includes("captcha") || text.includes("капча") || text.includes("проверка на робота") || text.includes("подтвердите, что вы не робот");
+      }).catch(() => false);
+      return bodyCheck;
     } catch {
       return false;
     }
@@ -967,7 +1037,13 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       const h = norm(query.hotel);
       filtered = collected.filter((o) => (o.hotel && norm(o.hotel).includes(h)) || (query.hotelExternalId != null && o.hotelExternalId === query.hotelExternalId));
     }
+    console.log(`[KOMPAS dedup ctx] filtered=${filtered.length} offers, before dedup`);
+    for (const o of filtered.slice(0, 10)) {
+      const rm = o.rawMetadata as any;
+      console.log(`  offer: spoKey=${o.externalOfferId} date=${o.departureDate} roomKey=${rm?.roomKey} mealKey=${rm?.mealKey} room="${o.room}" meal="${o.meal}" price=${o.price.amount} tourKey=${rm?.tourKey}`);
+    }
     const deduped = this.deduplicateCalendarOffers(filtered);
+    console.log(`[KOMPAS dedup ctx] after dedup: ${deduped.length} offers`);
     const dateMap = new Map<string, SupplierOffer[]>();
     for (const offer of deduped) {
       const list = dateMap.get(offer.departureDate) || [];
@@ -1109,6 +1185,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       if (routeDates) url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`).replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
       if (!url.includes("FREIGHT=")) url += "&FREIGHT=1"; else url = url.replace(/FREIGHT=\d+/g, "FREIGHT=1");
       if (!url.includes("FILTER=")) url += "&FILTER=1"; else url = url.replace(/FILTER=\d+/g, "FILTER=1");
+      if (!url.includes("PARTITION_PRICE=")) url += "&PARTITION_PRICE=0"; else url = url.replace(/PARTITION_PRICE=\d+/g, "PARTITION_PRICE=0");
       route.continue({ url });
     });
     await page.evaluate(() => document.getElementById("samo_popup")?.remove());
@@ -1182,6 +1259,13 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           departureDate, transport,
           roomText, mealText,
         });
+      }
+      if (results.length > 0) {
+        const sample = results.slice(0, 5).map((r: any) => ({
+          hotelKey: r.hotelKey, tourKey: r.tourKey, roomKey: r.roomKey, mealKey: r.mealKey,
+          roomText: r.roomText, mealText: r.mealText, price: r.price, spoKey: r.spoKey,
+        }));
+        console.log(`[KOMPAS extract] rows=${results.length} sample=${JSON.stringify(sample)}`);
       }
       return results;
     });
@@ -1502,6 +1586,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           } catch (err) {
             if (err instanceof KompasCaptchaRequiredException) {
               await this.promoteCaptcha(err, "priceCalendar", query);
+              throw err;
             }
             this.logger.warn(
               `KOMPAS window ${window.from}→${window.to} program ${program.value} failed: ${(err as Error).message}`,
@@ -1520,6 +1605,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         } catch (err) {
           if (err instanceof KompasCaptchaRequiredException) {
             await this.promoteCaptcha(err, "priceCalendar", query);
+            throw err;
           }
           this.logger.warn(
             `KOMPAS window ${window.from}→${window.to} failed: ${(err as Error).message}`,
@@ -1540,7 +1626,14 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       );
     }
 
+    console.log(`[KOMPAS dedup] filtered=${filtered.length} offers by hotel, before dedup`);
+    for (const o of filtered.slice(0, 10)) {
+      const rm = o.rawMetadata as any;
+      console.log(`  offer: spoKey=${o.externalOfferId} date=${o.departureDate} roomKey=${rm?.roomKey} mealKey=${rm?.mealKey} room="${o.room}" meal="${o.meal}" price=${o.price.amount} tourKey=${rm?.tourKey}`);
+    }
+
     const deduped = this.deduplicateCalendarOffers(filtered);
+    console.log(`[KOMPAS dedup] after dedup: ${deduped.length} offers`);
 
     const dateMap = new Map<string, SupplierOffer[]>();
     for (const offer of deduped) {
@@ -1679,7 +1772,11 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
   private deduplicateCalendarOffers(offers: SupplierOffer[]): SupplierOffer[] {
     const seen = new Map<string, SupplierOffer>();
     for (const offer of offers) {
-      const key = `${offer.externalOfferId}|${offer.departureDate}|${offer.room ?? ""}`;
+      const roomKey = (offer.rawMetadata as any)?.roomKey ?? "";
+      const mealKey = (offer.rawMetadata as any)?.mealKey ?? "";
+      const roomText = offer.room ?? "";
+      const mealText = offer.meal ?? "";
+      const key = `${offer.externalOfferId}|${offer.departureDate}|${roomKey}|${mealKey}|${roomText}|${mealText}`;
       if (!seen.has(key)) {
         seen.set(key, offer);
       } else {

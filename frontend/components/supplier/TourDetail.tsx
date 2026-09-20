@@ -48,7 +48,7 @@ export default function TourDetail({
   const [nights, setNights] = useState(7);
 
   // Product identity — KOMPAS live ingestion stores tourKey (e.g. 3332) as tourKey/stateInc; use it as tourIncValue
-  const hotelExternalId = (attributes?.hotelExternalId as string) ?? undefined;
+  const hotelExternalId = (attributes?.hotelExternalId as string) ?? (attributes?.hotelKey as string) ?? undefined;
   const tourIncValue =
     (attributes?.tourIncValue as string) ??
     (attributes?.programIncValue as string) ??
