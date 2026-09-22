@@ -635,6 +635,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       throw new Error("KompasCaptchaStore not injected — cannot create human-in-the-loop challenge");
     }
     const ch = this.captchaStore.create({
+      supplier: "KOMPAS",
       operation,
       originalQuery,
       context,
@@ -1345,6 +1346,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       if (prev) {
         await this.captchaStore.consume(err.challengeId);
         const ch = this.captchaStore.create({
+          supplier: "KOMPAS",
           operation: newOperation as any,
           originalQuery,
           context: prev.context,

@@ -17,6 +17,7 @@ export function KompasCaptchaModal({
   captchaImage,
   status,
   errorText,
+  supplier = "KOMPAS",
   onSubmit,
   onRefresh,
   onCancel,
@@ -26,6 +27,7 @@ export function KompasCaptchaModal({
   captchaImage: string;
   status?: KompasCaptchaModalStatus;
   errorText?: string;
+  supplier?: "KOMPAS" | "SUMMERTOUR";
   onSubmit: (answer: string) => Promise<void>;
   onRefresh: () => Promise<void>;
   onCancel: () => void;
@@ -70,7 +72,7 @@ export function KompasCaptchaModal({
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h3 className="text-base font-semibold text-slate-900">Проверка KOMPAS</h3>
+          <h3 className="text-base font-semibold text-slate-900">Проверка {supplier === "SUMMERTOUR" ? "Summertour" : "KOMPAS"}</h3>
           <button
             onClick={onCancel}
             aria-label="Закрыть"
@@ -81,7 +83,7 @@ export function KompasCaptchaModal({
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          <p className="text-sm text-slate-600">Для обновления цен необходимо пройти проверку KOMPAS.</p>
+          <p className="text-sm text-slate-600">Для обновления цен необходимо пройти проверку {supplier === "SUMMERTOUR" ? "Summertour" : "KOMPAS"}.</p>
 
           {/* Captcha image — real #icaptcha src, never fake */}
           <div className="flex justify-center">
@@ -108,7 +110,7 @@ export function KompasCaptchaModal({
           )}
           {isSessionLost && (
             <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
-              Сессия KOMPAS утеряна. Закройте окно и повторите запрос.
+              Сессия {supplier === "SUMMERTOUR" ? "Summertour" : "KOMPAS"} утеряна. Закройте окно и повторите запрос.
             </div>
           )}
           {isInvalid && (

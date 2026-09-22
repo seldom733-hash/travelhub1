@@ -226,6 +226,7 @@ function OfferRow({
           challengeId={challenge.challengeId}
           captchaImage={challenge.captchaImage}
           status={challenge.status as any}
+          supplier={challenge.supplier}
           onSubmit={async (answer) => {
             await submit(answer, (data: unknown) => {
               const res = data as { amount: number };

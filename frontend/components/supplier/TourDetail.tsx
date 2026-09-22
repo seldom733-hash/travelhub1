@@ -62,7 +62,7 @@ export default function TourDetail({
 
   // Build calendar query — dates are derived per-month inside MonthlyCalendar; only context here.
   const calendarQuery = {
-    supplierCode: "KOMPAS" as const,
+    supplierCode: ((attributes?.supplierCode as string) ?? "KOMPAS") as "KOMPAS" | "SUMMERTOUR",
     hotelExternalId,
     hotel: cleanHotelName,
     destination,

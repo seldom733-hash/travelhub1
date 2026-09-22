@@ -6,6 +6,8 @@ import { SupplierOfferService } from "./supplier-offer.service";
 import { SummertourAdapter } from "./summertour/summertour.adapter";
 import { SummertourNewAdapter } from "./summertour/summertour-new.adapter";
 import { SummerSyncService } from "./summertour/summer-sync.service";
+import { SummertourHttpService } from "./summertour/summertour-http.service";
+import { SummerBulkSyncService } from "./summertour/summer-bulk-sync.service";
 import { KompasSupplierAdapter } from "./kompas/kompas.adapter";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
 import { KompasCaptchaStore } from "./kompas/kompas-captcha.store";
@@ -34,6 +36,8 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
     SummertourAdapter,
     SummertourNewAdapter,
     SummerSyncService,
+    SummertourHttpService,
+    SummerBulkSyncService,
     KompasCaptchaStore,
     KompasSupplierAdapter,
     KompasSyncService,
@@ -83,6 +87,6 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
       inject: [SupplierAdapterRegistry, SummertourNewAdapter, KompasSupplierAdapter],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService, KompasSyncService],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService],
 })
 export class SupplierModule {}

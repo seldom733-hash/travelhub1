@@ -407,6 +407,7 @@ export default function MonthlyCalendar({
           challengeId={challenge.challengeId}
           captchaImage={challenge.captchaImage}
           status={challenge.status as any}
+          supplier={challenge.supplier}
           onSubmit={async (answer) => {
             await submit(answer, (data) => {
               const result = data as SupplierPriceCalendarResult;
@@ -481,8 +482,8 @@ export default function MonthlyCalendar({
                 >
                   <div className={`text-xs font-medium ${day.isCurrentMonth ? "text-slate-700" : "text-slate-300"}`}>{day.date.getDate()}</div>
                   {isAvailable && day.entry!.price !== null ? (
-                    <div className="mt-0.5 text-[11px] font-bold text-green-700">
-                      <Price amount={day.entry!.price} currency={day.entry!.currency} size="sm" withPrefix={false} />
+                    <div className="mt-0.5 text-[9px] font-bold leading-tight text-green-700">
+                      <Price amount={day.entry!.price} currency={day.entry!.currency} size="xs" withPrefix={false} />
                     </div>
                   ) : day.isCurrentMonth && day.entry?.absenceCode ? (
                     <div className="mt-0.5 text-[9px] text-amber-600 truncate">—</div>

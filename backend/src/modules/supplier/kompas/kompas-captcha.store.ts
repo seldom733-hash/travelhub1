@@ -11,6 +11,8 @@ export type KompasCaptchaOperation =
   | "refreshAvailability"
   | "getOffer";
 
+export type CaptchaSupplier = "KOMPAS" | "SUMMERTOUR";
+
 export type KompasCaptchaChallengeStatus =
   | "WAITING_FOR_USER"
   | "SUBMITTING"
@@ -24,7 +26,7 @@ export type KompasCaptchaChallengeStatus =
 
 export interface KompasCaptchaChallenge {
   challengeId: string;
-  supplier: "KOMPAS";
+  supplier: CaptchaSupplier;
   status: KompasCaptchaChallengeStatus;
   operation: KompasCaptchaOperation;
   createdAt: Date;
@@ -34,7 +36,7 @@ export interface KompasCaptchaChallenge {
   mimeType: string;
   /** Original request payload — needed to resume after success. */
   originalQuery: SupplierSearchQuery | PriceCalendarQuery | SupplierOfferRef;
-  /** KOMPAS browser context + page — MUST be same across captcha + resume. */
+  /** Browser context + page — MUST be same across captcha + resume. */
   context: BrowserContext;
   page: Page;
 }
@@ -66,6 +68,7 @@ export class KompasCaptchaStore implements OnModuleDestroy {
   }
 
   create(args: {
+    supplier: CaptchaSupplier;
     operation: KompasCaptchaOperation;
     originalQuery: SupplierSearchQuery | PriceCalendarQuery | SupplierOfferRef;
     context: BrowserContext;
@@ -77,7 +80,7 @@ export class KompasCaptchaStore implements OnModuleDestroy {
     const now = new Date();
     const challenge: KompasCaptchaChallenge = {
       challengeId,
-      supplier: "KOMPAS",
+      supplier: args.supplier,
       status: "WAITING_FOR_USER",
       operation: args.operation,
       createdAt: now,
@@ -91,15 +94,15 @@ export class KompasCaptchaStore implements OnModuleDestroy {
     this.challenges.set(challengeId, challenge);
     this.logger.log(
       JSON.stringify({
-        event: "KOMPAS_CAPTCHA_DETECTED",
+        event: `${args.supplier}_CAPTCHA_DETECTED`,
         challengeId,
         operation: args.operation,
-        supplier: "KOMPAS",
+        supplier: args.supplier,
       }),
     );
     this.logger.log(
       JSON.stringify({
-        event: "KOMPAS_CAPTCHA_PRESENTED",
+        event: `${args.supplier}_CAPTCHA_PRESENTED`,
         challengeId,
         operation: args.operation,
       }),

@@ -30,6 +30,8 @@ export interface SummerSearchRequest {
   FILTER: string;
   CURRENCY: string;
   PARTITION_PRICE?: string;
+  /** Use TOWNS action instead of PRICES (for HOTELS_ANY=1 calendar queries). */
+  useTownsAction?: boolean;
 }
 
 const SUMMER_TOWNFROMINC = "1930";
@@ -107,7 +109,8 @@ export function buildSummerSearchRequest(query: {
  */
 export function buildSummerXhrUrl(req: SummerSearchRequest): string {
   const p = new URLSearchParams();
-  p.set("samo_action", "PRICES");
+  const useTowns = req.useTownsAction === true;
+  p.set("samo_action", useTowns ? "TOWNS" : "PRICES");
   p.set("TOWNFROMINC", req.TOWNFROMINC);
   p.set("STATEINC", req.STATEINC);
   p.set("TOURINC", req.TOURINC);
@@ -120,16 +123,24 @@ export function buildSummerXhrUrl(req: SummerSearchRequest): string {
   if (req.CHILD) p.set("CHILD", req.CHILD);
   p.set("CURRENCY", req.CURRENCY);
   p.set("MEALS_ANY", req.MEALS_ANY);
-  if (req.MEALS) p.set("MEALS", req.MEALS);
+  p.set("MEALS", req.MEALS ?? "");
   p.set("ROOMS_ANY", req.ROOMS_ANY);
+  p.set("ROOMS", req.ROOMS ?? "");
   p.set("HOTELS_ANY", req.HOTELS_ANY);
   if (req.HOTELS) p.set("HOTELS", req.HOTELS);
   p.set("FREIGHT", req.FREIGHT);
   p.set("FILTER", req.FILTER);
   p.set("MOMENT_CONFIRM", "0");
-  p.set("PARTITION_PRICE", "32");
-  p.set("PRICEPAGE", "1");
-  p.set("DYN_SEPARATE", "1");
+  p.set("hotelsearch", "0");
+  if (useTowns) {
+    p.set("STARS_ANY", "1");
+    p.set("STARS", "");
+    p.set("HOTELTYPES", "");
+  } else {
+    p.set("PARTITION_PRICE", "32");
+    p.set("PRICEPAGE", "1");
+    p.set("DYN_SEPARATE", "1");
+  }
   p.set("rev", String(Math.floor(Math.random() * 1e9)));
   p.set("_", String(Date.now()));
   return `https://summertour.az/search_tour?${p.toString()}`;

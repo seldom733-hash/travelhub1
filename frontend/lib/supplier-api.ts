@@ -143,21 +143,21 @@ export interface KompasCaptchaPayload {
 export interface KompasCaptchaRequiredResponse {
   status: "CAPTCHA_REQUIRED";
   challengeId: string;
-  supplier: "KOMPAS";
+  supplier: "KOMPAS" | "SUMMERTOUR";
   captcha: KompasCaptchaPayload;
 }
 
 export interface KompasCaptchaVerifySuccessResponse {
   status: "SUCCESS";
   challengeId: string;
-  supplier: "KOMPAS";
+  supplier: "KOMPAS" | "SUMMERTOUR";
   data: unknown; // PriceCalendarResult | SupplierOffer[] | SupplierPriceSnapshot depending on original operation
 }
 
 export interface KompasCaptchaVerifyErrorResponse {
   status: "INVALID_ANSWER" | "EXPIRED" | "SESSION_LOST" | "KOMPAS_ERROR" | "TIMEOUT" | "CANCELLED" | "CAPTCHA_REQUIRED";
   challengeId?: string;
-  supplier?: "KOMPAS";
+  supplier?: "KOMPAS" | "SUMMERTOUR";
   captcha?: KompasCaptchaPayload;
 }
 
@@ -267,6 +267,26 @@ export async function refreshKompasCaptcha(
 
 export async function cancelKompasCaptcha(challengeId: string): Promise<{ status: string }> {
   return postCaptcha("/public/supplier/kompas/captcha/cancel", { challengeId });
+}
+
+export async function verifySummertourCaptcha(
+  challengeId: string,
+  answer: string,
+): Promise<KompasCaptchaVerifySuccessResponse | KompasCaptchaVerifyErrorResponse> {
+  return postCaptcha<KompasCaptchaVerifySuccessResponse | KompasCaptchaVerifyErrorResponse>("/public/supplier/summertour/captcha/verify", {
+    challengeId,
+    answer,
+  });
+}
+
+export async function refreshSummertourCaptcha(
+  challengeId: string,
+): Promise<{ status: string; challengeId: string; supplier: string; captcha: KompasCaptchaPayload } | KompasCaptchaVerifyErrorResponse> {
+  return postCaptcha("/public/supplier/summertour/captcha/refresh", { challengeId });
+}
+
+export async function cancelSummertourCaptcha(challengeId: string): Promise<{ status: string }> {
+  return postCaptcha("/public/supplier/summertour/captcha/cancel", { challengeId });
 }
 
 /** Refresh price for re-check (anonymous) — may return CAPTCHA_REQUIRED. */

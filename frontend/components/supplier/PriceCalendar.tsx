@@ -98,6 +98,7 @@ export default function PriceCalendar({
             challengeId={challenge.challengeId}
             captchaImage={challenge.captchaImage}
             status={challenge.status as any}
+            supplier={challenge.supplier}
             onSubmit={async (answer) => {
               await submit(answer, (data) => setResult(data as SupplierPriceCalendarResult));
             }}
@@ -121,6 +122,7 @@ export default function PriceCalendar({
           challengeId={challenge.challengeId}
           captchaImage={challenge.captchaImage}
           status={challenge.status as any}
+          supplier={challenge.supplier}
           onSubmit={async (answer) => {
             await submit(answer, (data) => setResult(data as SupplierPriceCalendarResult));
           }}

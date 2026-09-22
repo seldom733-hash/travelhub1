@@ -4,6 +4,7 @@ import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { SupplierCacheService } from "./cache/supplier-cache.service";
 import { SupplierResilienceService } from "./resilience/supplier-resilience.service";
 import { SummerSyncService } from "./summertour/summer-sync.service";
+import { SummerBulkSyncService } from "./summertour/summer-bulk-sync.service";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
@@ -25,6 +26,7 @@ export class SupplierController {
     private readonly cache: SupplierCacheService,
     private readonly resilience: SupplierResilienceService,
     private readonly summerSync: SummerSyncService,
+    private readonly summerBulkSync: SummerBulkSyncService,
     private readonly kompasSync: KompasSyncService,
   ) {}
 
@@ -39,6 +41,12 @@ export class SupplierController {
       throw new Error("Summer partner not found — run summer-partner-seed first");
     }
     return this.summerSync.runSync(partner.id);
+  }
+
+  @Post("summertour/bulk-sync")
+  @RequirePermissions("supplier.search.manage")
+  async summerBulkSyncEndpoint(@CurrentUser() actor: AuthedRequest["user"]) {
+    return this.summerBulkSync.runBulkSync();
   }
 
   // ── KOMPAS Sync ──────────────────────────────────────────────────

@@ -15,7 +15,7 @@ export default function Price({
 }: {
   amount: string | number | null | undefined;
   currency?: string | null;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   withPrefix?: boolean;
 }) {
   const locale = useLocale();
@@ -33,7 +33,9 @@ export default function Price({
       ? "text-3xl font-bold text-slate-900"
       : size === "sm"
         ? "text-sm font-bold text-slate-900"
-        : "text-lg font-bold text-slate-900";
+        : size === "xs"
+          ? "text-[10px] font-bold leading-none text-slate-900"
+          : "text-lg font-bold text-slate-900";
 
   return (
     <span className={cls}>

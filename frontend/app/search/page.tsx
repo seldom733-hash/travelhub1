@@ -106,6 +106,10 @@ function SearchResultsInner() {
       adults: first.adults,
       children: first.children || undefined,
       childAges: first.childAges.length > 0 ? first.childAges : undefined,
+      tourIncValue: first.tourIncValue ?? (first.rawMetadata?.tourIncValue as string) ?? undefined,
+      tourIncName: first.tourIncName ?? (first.rawMetadata?.tourIncName as string) ?? undefined,
+      tourIncValues: first.tourIncValues ?? undefined,
+      tourIncNames: first.tourIncNames ?? undefined,
     };
   }, [supplierOffers, params]);
 

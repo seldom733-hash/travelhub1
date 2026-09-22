@@ -2,10 +2,12 @@ import { Controller, Post, Body, Logger } from "@nestjs/common";
 import { Public } from "../../../security/auth/decorators";
 import { KompasCaptchaStore } from "./kompas-captcha.store";
 import { KompasSupplierAdapter } from "./kompas.adapter";
+import { SummertourNewAdapter } from "../summertour/summertour-new.adapter";
 import { KompasCaptchaRequiredException } from "./kompas-captcha.exception";
 
 /**
- * Public KOMPAS CAPTCHA human-in-the-loop controller.
+ * Public CAPTCHA human-in-the-loop controller.
+ * Supports both KOMPAS and Summertour (same SAMO CAPTCHA mechanism).
  *
  * Holds SAME browser context/page across challenge → verify → resume.
  * Never exposes cookies / antibot tokens / answers in logs or responses.
@@ -17,6 +19,7 @@ export class KompasCaptchaController {
   constructor(
     private readonly store: KompasCaptchaStore,
     private readonly adapter: KompasSupplierAdapter,
+    private readonly summertour: SummertourNewAdapter,
   ) {}
 
   /** Refresh CAPTCHA image — uses samo.captchaRefreshUrl / #recaptcha in SAME context. */
@@ -127,6 +130,100 @@ export class KompasCaptchaController {
     if (ch) {
       this.store.setStatus(challengeId, "CANCELLED");
       this.logger.log(JSON.stringify({ event: "KOMPAS_CAPTCHA_CANCELLED", challengeId }));
+      await this.store.remove(challengeId).catch(() => {});
+    }
+    return { status: "CANCELLED" };
+  }
+
+  // ── Summertour CAPTCHA (same SAMO mechanism) ───────────────────────
+
+  @Post("public/supplier/summertour/captcha/refresh")
+  @Public()
+  async summerRefresh(@Body() body: { challengeId: string }) {
+    const { challengeId } = body;
+    if (!challengeId) return { status: "EXPIRED" };
+    const ch = this.store.get(challengeId);
+    if (!ch) return { status: "EXPIRED" };
+    if (ch.supplier !== "SUMMERTOUR") return { status: "EXPIRED" };
+    if (ch.expiresAt.getTime() < Date.now()) {
+      this.store.setStatus(challengeId, "EXPIRED");
+      return { status: "EXPIRED" };
+    }
+    const res = await this.summertour.refreshCaptcha(challengeId);
+    if (!res) return { status: "SESSION_LOST" };
+    return {
+      status: "WAITING_FOR_USER",
+      challengeId,
+      supplier: "SUMMERTOUR",
+      captcha: { type: "image", mimeType: "image/jpeg", data: res.newImage },
+    };
+  }
+
+  @Post("public/supplier/summertour/captcha/verify")
+  @Public()
+  async summerVerify(@Body() body: { challengeId: string; answer: string }) {
+    const { challengeId, answer } = body;
+    if (!challengeId || typeof answer !== "string") return { status: "EXPIRED" };
+    const ch = this.store.get(challengeId);
+    if (!ch) return { status: "EXPIRED" };
+    if (ch.supplier !== "SUMMERTOUR") return { status: "EXPIRED" };
+    if (ch.expiresAt.getTime() < Date.now()) {
+      this.store.setStatus(challengeId, "EXPIRED");
+      await this.store.remove(challengeId).catch(() => {});
+      return { status: "EXPIRED" };
+    }
+
+    const submit = await this.summertour.submitCaptchaAnswer(challengeId, answer);
+
+    if (submit.status === "INVALID_ANSWER") {
+      const cur = this.store.get(challengeId);
+      const data = submit.newImage ?? cur?.captchaImage;
+      return {
+        status: "INVALID_ANSWER",
+        challengeId,
+        supplier: "SUMMERTOUR",
+        captcha: data ? { type: "image", mimeType: "image/jpeg", data } : undefined,
+      };
+    }
+    if (submit.status === "EXPIRED") return { status: "EXPIRED" };
+    if (submit.status === "SESSION_LOST") {
+      await this.store.remove(challengeId).catch(() => {});
+      return { status: "SESSION_LOST" };
+    }
+    if (submit.status !== "SUCCESS") return { status: submit.status };
+
+    // SUCCESS → resume original operation in SAME page/context (like KOMPAS)
+    try {
+      const result = await this.summertour.resumeOperationAfterCaptcha(challengeId);
+      await this.store.remove(challengeId).catch(() => {});
+      return { status: "SUCCESS", challengeId, supplier: "SUMMERTOUR", data: result };
+    } catch (err) {
+      const msg = (err as Error).message;
+      this.logger.error(`summertour resume after captcha failed ${challengeId}: ${msg}`);
+      if (msg === "SESSION_LOST") return { status: "SESSION_LOST" };
+      if (msg === "EXPIRED") return { status: "EXPIRED" };
+      if (err instanceof KompasCaptchaRequiredException) {
+        return {
+          status: "CAPTCHA_REQUIRED",
+          challengeId: (err as any).challengeId,
+          supplier: "SUMMERTOUR",
+          captcha: { type: "image", mimeType: (err as any).mimeType, data: (err as any).captchaImage },
+        };
+      }
+      await this.store.remove(challengeId).catch(() => {});
+      return { status: "KOMPAS_ERROR" };
+    }
+  }
+
+  @Post("public/supplier/summertour/captcha/cancel")
+  @Public()
+  async summerCancel(@Body() body: { challengeId: string }) {
+    const { challengeId } = body;
+    if (!challengeId) return { status: "CANCELLED" };
+    const ch = this.store.get(challengeId);
+    if (ch) {
+      this.store.setStatus(challengeId, "CANCELLED");
+      this.logger.log(JSON.stringify({ event: "SUMMERTOUR_CAPTCHA_CANCELLED", challengeId }));
       await this.store.remove(challengeId).catch(() => {});
     }
     return { status: "CANCELLED" };
