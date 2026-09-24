@@ -17,17 +17,21 @@ import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
 import { TourRequestService } from "./tour-request.service";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { EventBusModule } from "../../eventbus/eventbus.module";
+import { AzalAdapter } from "./azal/azal.adapter";
+import { AzalHttpService } from "./azal/azal.http.service";
+import { AzalController } from "./azal/azal.controller";
+import { FlightSupplierRegistry } from "./flight-supplier.registry";
 
 /**
  * Supplier module — registers adapters, cache, resilience, service, sync.
  *
- * Adapters are registered at module init. Summertour and KOMPAS are registered.
+ * Adapters are registered at module init.
  * SummerSyncService handles idempotent Product creation from supplier data.
  */
 @Global()
 @Module({
   imports: [PrismaModule, EventBusModule],
-  controllers: [SupplierController, PublicSupplierController, KompasCaptchaController],
+  controllers: [SupplierController, PublicSupplierController, KompasCaptchaController, AzalController],
   providers: [
     SupplierAdapterRegistry,
     SupplierCacheService,
@@ -42,13 +46,18 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
     KompasSupplierAdapter,
     KompasSyncService,
     TourRequestService,
+    AzalAdapter,
+    AzalHttpService,
+    FlightSupplierRegistry,
     {
       provide: "SUPPLIER_MODULE_INIT",
-      useFactory: (
-        registry: SupplierAdapterRegistry,
-        summertour: SummertourNewAdapter,
-        kompas: KompasSupplierAdapter,
-      ) => {
+		useFactory: (
+		  registry: SupplierAdapterRegistry,
+		  summertour: SummertourNewAdapter,
+		  kompas: KompasSupplierAdapter,
+          flightRegistry: FlightSupplierRegistry,
+          azal: AzalAdapter,
+		) => {
         registry.register(summertour, {
           code: "SUMMERTOUR",
           name: "Summertour",
@@ -83,10 +92,18 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
           circuitBreakerThreshold: 10,
           circuitBreakerOpenMs: 120_000,
         });
+
+        flightRegistry.register(azal);
       },
-      inject: [SupplierAdapterRegistry, SummertourNewAdapter, KompasSupplierAdapter],
+      inject: [
+        SupplierAdapterRegistry,
+        SummertourNewAdapter,
+        KompasSupplierAdapter,
+        FlightSupplierRegistry,
+        AzalAdapter,
+      ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, AzalAdapter, AzalHttpService, FlightSupplierRegistry],
 })
 export class SupplierModule {}

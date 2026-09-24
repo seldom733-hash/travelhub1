@@ -19,6 +19,12 @@ import {
 } from "@/lib/supplier-api";
 import ProductCard from "@/components/public/ProductCard";
 import { ProductGridSkeleton } from "@/components/public/Skeletons";
+import FlightResults from "@/components/marketplace/search/FlightResults";
+import {
+  searchAzalFlights,
+  type FlightSearchResponse,
+} from "@/lib/flight-api";
+import { getFlightLocationCode } from "@/lib/flight-locations";
 
 const VALID_SERVICES: ServiceType[] = [
   "tours", "hotels", "flights", "sanatoriums",
@@ -66,6 +72,9 @@ function SearchResultsInner() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const [flightResults, setFlightResults] = useState<FlightSearchResponse | null>(null);
+  const [flightError, setFlightError] = useState<string | null>(null);
+  const [flightLoading, setFlightLoading] = useState(false);
 
   // VitrinaFilters: convert SupplierSearchQuery back to URL params and navigate
   const handleFilterSearch = useCallback((query: SupplierSearchQuery) => {
@@ -134,6 +143,74 @@ function SearchResultsInner() {
     setSupplierError(null);
     setResult(null);
     setSupplierOffers([]);
+    setFlightResults(null);
+    setFlightError(null);
+    setFlightLoading(false);
+
+    // AZAL flight search path
+    if (service === "flights") {
+      const from = getFlightLocationCode(params.from || "");
+      const to = getFlightLocationCode(params.to || "");
+      const departureDate =
+        params.departureDate ||
+        params.departure ||
+        params.start ||
+        "";
+
+      const tripType =
+        (params.tripType || (params.roundTrip === "true" || params.roundTrip === "1" ? "RT" : "OW")).toUpperCase() === "RT"
+          ? "RT"
+          : "OW";
+
+      const adults = Math.max(1, Number(params.adults) || 1);
+      const children = Math.max(0, Number(params.children) || 0);
+      const infants = Math.max(0, Number(params.infants) || 0);
+      const returnDate = params.returnDate || params.return || undefined;
+
+      if (!from || !to || !departureDate) {
+        setFlightError(
+          "Flight search requires departure airport, arrival airport and departure date.",
+        );
+        setFlightLoading(false);
+        setLoading(false);
+        return () => {
+          alive = false;
+        };
+      }
+
+      setFlightLoading(true);
+
+      void searchAzalFlights({
+        from,
+        to,
+        departureDate,
+        tripType,
+        passengers: {
+          adults,
+          children,
+          infants,
+        },
+        ...(returnDate ? { returnDate } : {}),
+      })
+        .then((flightResult) => {
+          if (!alive) return;
+          setFlightResults(flightResult);
+          setFlightLoading(false);
+          setLoading(false);
+        })
+        .catch((e) => {
+          if (!alive) return;
+          setFlightError(
+            e instanceof Error ? e.message : "Unable to search AZAL flights.",
+          );
+          setFlightLoading(false);
+          setLoading(false);
+        });
+
+      return () => {
+        alive = false;
+      };
+    }
 
     // Supplier search path
     if (supplierCode) {
@@ -248,9 +325,14 @@ function SearchResultsInner() {
               {t("search.found", locale)}: {result.total}
             </span>
           )}
-          {supplierOffers.length > 0 && (
+          {supplierOffers.length > 0 && service !== "flights" && (
             <span className="text-sm text-neutral-500">
               {t("search.found", locale)}: {supplierOffers.length}
+            </span>
+          )}
+          {service === "flights" && flightResults && (
+            <span className="text-sm text-neutral-500">
+              {t("search.found", locale)}: {flightResults.flights.length}
             </span>
           )}
         </div>
@@ -259,6 +341,17 @@ function SearchResultsInner() {
         {loading && (
           <div className="mt-6">
             <ProductGridSkeleton count={6} />
+          </div>
+        )}
+
+        {/* AZAL flight results */}
+        {service === "flights" && (
+          <div className="mt-6">
+            <FlightResults
+              flights={flightResults?.flights ?? []}
+              loading={flightLoading || loading}
+              error={flightError}
+            />
           </div>
         )}
 
@@ -323,7 +416,7 @@ function SearchResultsInner() {
         )}
 
         {/* Catalog results */}
-        {!loading && !error && result && (
+        {service !== "flights" && !loading && !error && result && (
           <>
             {result.items.length === 0 ? (
               <div className="mt-12 text-center">

@@ -13,6 +13,7 @@ import Advertisement from "@/components/marketplace/Advertisement";
 import DesignTokenInjector from "@/components/marketplace/DesignTokenInjector";
 import { resolveBrandName } from "@/components/marketplace/MarketplaceHeader";
 import { useConstructorPublished } from "@/lib/use-constructor-published";
+import SearchBlock from "@/components/marketplace/SearchBlock";
 
 const BLOCK_COMPONENTS: Record<string, React.FC> = {
   "hero": HeroSection,
@@ -79,6 +80,15 @@ export default function MarketplaceRenderer() {
       <MarketplaceHeader config={cfg.headerConfig as never} />
       <main>
         {enabledSections.map((section) => {
+          if (section.blockType === "search") {
+            return (
+              <SearchBlock
+                key={section.blockInstanceId}
+                config={page.searchConfig as never}
+              />
+            );
+          }
+
           const Component = BLOCK_COMPONENTS[section.blockType];
           if (!Component) return null;
           if (section.blockType === "hero") {
@@ -86,6 +96,10 @@ export default function MarketplaceRenderer() {
           }
           return <Component key={section.blockInstanceId} />;
         })}
+
+        {!enabledSections.some((section) => section.blockType === "search") && (
+          <SearchBlock config={page.searchConfig as never} />
+        )}
       </main>
       <MarketplaceFooter config={cfg.footerConfig as never} brandName={canonicalBrandName} />
     </div>

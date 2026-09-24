@@ -78,7 +78,7 @@ const DEFAULT_HOME_SECTIONS: PageSectionInput[] = [
  * Existing DB rows are left in place (historical versions) — filtering is
  * applied at the service layer only.
  */
-const DEPRECATED_BLOCK_TYPES = new Set(["popular-destinations", "search"]);
+const DEPRECATED_BLOCK_TYPES = new Set(["popular-destinations"]);
 
 // ─── Built-in Default Tab Configurations ────────────────────────────────────
 // Hero default texts are the canonical marketplace Hero copy (same strings as

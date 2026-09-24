@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { MapPin, CalendarBlank, ArrowRight, Airplane } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import type { SearchContext } from "@/lib/search-engine";
-import LiveSearchInput from "./LiveSearchInput";
+import FlightAirportSelect from "./FlightAirportSelect";
 import ChildAges from "./ChildAges";
 import HelpFindButton from "./HelpFindButton";
 
@@ -14,8 +14,8 @@ interface FlightSearchProps {
 
 export default function FlightSearch({ onSearch }: FlightSearchProps) {
   const locale = useLocale();
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState<import("@/lib/flight-locations").FlightAirport | null>(null);
+  const [to, setTo] = useState<import("@/lib/flight-locations").FlightAirport | null>(null);
   const [departureDate, setDepartureDate] = useState("");
   const [roundTrip, setRoundTrip] = useState(false);
   const [returnDate, setReturnDate] = useState("");
@@ -45,8 +45,8 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
     e.preventDefault();
     onSearch({
       serviceType: "flights",
-      fromDestination: from,
-      toDestination: to,
+      fromDestination: from?.city ?? "",
+      toDestination: to?.city ?? "",
       departureDate,
       returnDate: roundTrip ? returnDate : undefined,
       roundTrip,
@@ -63,25 +63,21 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* From */}
-        <LiveSearchInput
+        <FlightAirportSelect
           id="flight-from"
           label={t("search.from", locale)}
-          placeholder="Город вылета"
-          icon={<MapPin size={14} weight="light" />}
-          onSelect={(r) => setFrom(r.name)}
-          onClear={() => setFrom("")}
-          filterType="destination"
+          placeholder="Выберите город вылета"
+          value={from}
+          onChange={setFrom}
         />
 
         {/* To */}
-        <LiveSearchInput
+        <FlightAirportSelect
           id="flight-to"
           label={t("search.to", locale)}
-          placeholder="Город прилёта"
-          icon={<MapPin size={14} weight="light" />}
-          onSelect={(r) => setTo(r.name)}
-          onClear={() => setTo("")}
-          filterType="destination"
+          placeholder="Выберите город прилёта"
+          value={to}
+          onChange={setTo}
         />
 
         {/* Departure date */}
@@ -232,8 +228,8 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
       <HelpFindButton
         context={{
           serviceType: "flights",
-          fromDestination: from,
-          toDestination: to,
+          fromDestination: from?.city ?? "",
+          toDestination: to?.city ?? "",
           departureDate,
           returnDate: roundTrip ? returnDate : undefined,
           roundTrip,
@@ -249,7 +245,8 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
       {/* Submit */}
       <button
         type="submit"
-        className="btn-gold flex w-full items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-[13px] font-semibold"
+        disabled={!from || !to || !departureDate}
+        className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-[13px] font-semibold transition-opacity ${!from || !to || !departureDate ? "bg-neutral-700 text-neutral-400 cursor-not-allowed opacity-60" : "btn-gold"}`}
       >
         <span>{t("marketplace.search_submit", locale)}</span>
         <ArrowRight size={16} weight="bold" />

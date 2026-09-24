@@ -10,6 +10,7 @@ interface LiveSearchInputProps {
   placeholder: string;
   icon?: React.ReactNode;
   onSelect: (result: SuggestResult) => void;
+  onChange?: (value: string) => void;
   onClear?: () => void;
   value?: string;
   className?: string;
@@ -25,6 +26,7 @@ export default function LiveSearchInput({
   placeholder,
   icon,
   onSelect,
+  onChange,
   onClear,
   value: controlledValue,
   className = "",
@@ -48,6 +50,7 @@ export default function LiveSearchInput({
 
   const handleSelect = useCallback((result: SuggestResult) => {
     setQuery(result.name);
+    onChange?.(result.name);
     setIsOpen(false);
     setHighlightedIndex(-1);
     onSelect(result);
@@ -55,6 +58,7 @@ export default function LiveSearchInput({
 
   const handleClear = useCallback(() => {
     setQuery("");
+    onChange?.("");
     setIsOpen(false);
     onClear?.();
     inputRef.current?.focus();
@@ -122,7 +126,9 @@ export default function LiveSearchInput({
           type="text"
           value={query}
           onChange={(e) => {
-            setQuery(e.target.value);
+            const value = e.target.value;
+            setQuery(value);
+            onChange?.(value);
             setIsOpen(true);
             setHighlightedIndex(-1);
           }}

@@ -12,7 +12,22 @@ export interface SearchBlockConfig {
 export default function SearchBlock({ config }: { config?: SearchBlockConfig | null }) {
   const locale = useLocale();
 
-  const enabledServices = config?.services?.filter((s) => s.enabled).map((s) => s.id) ?? null;
+  const configuredServices =
+    config?.services?.filter((s) => s.enabled).map((s) => s.id) ?? null;
+
+  // Flights are supplied by the flight supplier layer, not by published
+  // marketplace products. Therefore the absence of a "flights" entry in the
+  // published searchConfig must not hide the flight search UI.
+  // If flights are explicitly configured, respect that configuration
+  // (including an explicit disabled state).
+  const hasExplicitFlightConfig =
+    config?.services?.some((service) => service.id === "flights") ?? false;
+
+  const enabledServices =
+    configuredServices && !hasExplicitFlightConfig
+      ? [...configuredServices, "flights"]
+      : configuredServices;
+
   const defaultService = config?.defaultService;
 
   return (

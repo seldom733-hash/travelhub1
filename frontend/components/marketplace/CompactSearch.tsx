@@ -52,7 +52,9 @@ export default function CompactSearch({ service, params }: CompactSearchProps) {
     if (ctx.cityName) sp.set("city", ctx.cityName);
     if (ctx.hotelId) sp.set("hotelId", ctx.hotelId);
     if (ctx.startDate) sp.set("start", ctx.startDate);
+    if (ctx.departureDate) sp.set("departureDate", ctx.departureDate);
     if (ctx.returnDate) sp.set("return", ctx.returnDate);
+    if (ctx.returnDate) sp.set("returnDate", ctx.returnDate);
     if (ctx.nights) sp.set("nights", String(ctx.nights));
     if (ctx.duration) sp.set("duration", String(ctx.duration));
     if (ctx.adults) sp.set("adults", String(ctx.adults));
