@@ -24,7 +24,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   const [childAges, setChildAges] = useState<number[]>([]);
   const [infants, setInfants] = useState(0);
   const [serviceClass, setServiceClass] = useState("economy");
-  const [baggage, setBaggage] = useState(false);
+  const [tariff, setTariff] = useState("ALL");
 
   // Disable return dates before departure date
   const minReturnDate = useMemo(() => {
@@ -55,7 +55,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
       childAges: childAges.slice(0, children),
       infants,
       serviceClass,
-      baggage,
+      tariff,
     });
   };
 
@@ -213,16 +213,25 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         <ChildAges count={children} ages={childAges} onChange={setChildAges} />
       )}
 
-      {/* Baggage checkbox */}
-      <label className="flex cursor-pointer items-center gap-2 self-start rounded-xl border border-dark-border bg-dark-card px-4 py-2 text-[13px] text-neutral-300 transition-colors hover:border-gold/30 hover:text-white">
-        <input
-          type="checkbox"
-          checked={baggage}
-          onChange={(e) => setBaggage(e.target.checked)}
-          className="size-3.5 rounded border-dark-border accent-gold"
-        />
-        {t("search.baggage", locale)}
-      </label>
+      {/* Tariff (baggage) */}
+      <div>
+        <label htmlFor="flight-tariff" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
+          Тариф (багаж)
+        </label>
+        <select
+          id="flight-tariff"
+          value={tariff}
+          onChange={(e) => setTariff(e.target.value)}
+          className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
+        >
+          <option value="ALL">Все</option>
+          <option value="BUDGET">BUDGET — No bag + Hand 10kg</option>
+          <option value="CLASSIC">CLASSIC — Bag 1×23kg + Hand 10kg</option>
+          <option value="PLUS">PLUS — Bag 1×32kg + Hand 10kg</option>
+          <option value="COMFORT">COMFORT — Bag 2×32kg + Hand 10kg</option>
+          <option value="BUSINESS">BUSINESS — Bag 2×32kg + Hand 10kg</option>
+        </select>
+      </div>
 
       {/* Help Find */}
       <HelpFindButton
@@ -238,7 +247,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           childAges: childAges.slice(0, children),
           infants,
           serviceClass,
-          baggage,
+          tariff,
         }}
       />
 

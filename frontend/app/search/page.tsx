@@ -166,6 +166,7 @@ function SearchResultsInner() {
       const children = Math.max(0, Number(params.children) || 0);
       const infants = Math.max(0, Number(params.infants) || 0);
       const returnDate = params.returnDate || params.return || undefined;
+      const tariff = params.tariff || "ALL";
 
       if (!from || !to || !departureDate) {
         setFlightError(
@@ -194,6 +195,11 @@ function SearchResultsInner() {
       })
         .then((flightResult) => {
           if (!alive) return;
+          if (tariff !== "ALL") {
+            flightResult.flights = flightResult.flights
+              .map((f) => ({ ...f, fares: (f.fares ?? []).filter((ff: any) => (ff.family ?? ff.fareFamily) === tariff) }))
+              .filter((f) => (f.fares ?? []).length > 0);
+          }
           setFlightResults(flightResult);
           setFlightLoading(false);
           setLoading(false);

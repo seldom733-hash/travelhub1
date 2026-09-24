@@ -52,6 +52,9 @@ function pointName(
   const point = segment?.[side];
   return point?.airport || point?.code || point?.city || "—";
 }
+function getTimezone(point?: any): string | undefined {
+  return point?.timezone ?? point?.terminal ?? undefined;
+}
 
 export default function FlightResults({
   flights,
@@ -127,13 +130,17 @@ export default function FlightResults({
                         {formatTime(getTime(first?.departure))}
                       </div>
                       <div className={`${isOWLeg ? "text-xs" : "text-sm"} text-neutral-500`}>
-                        {pointName(first, "departure")}
+                        {pointName(first, "departure")} {getTimezone(first?.departure) ? `(${getTimezone(first?.departure)?.split("/").pop()})` : ""}
                       </div>
                     </div>
 
                     <div className="min-w-0 flex-1 text-center">
                       <div className="text-xs text-neutral-500">
-                        {formatDuration(first?.duration?.minutes)}
+                        {formatDuration(
+                          flight.route?.duration
+                            ? flight.route.duration.hours * 60 + flight.route.duration.minutes + (flight.route.duration.days ?? 0) * 1440
+                            : segments.reduce((sum, s) => sum + (s.duration?.minutes ?? (s.duration?.hours ? s.duration.hours * 60 : 0)), 0) || first?.duration?.minutes
+                        )}
                       </div>
                       <div className="my-2 h-px bg-white/15" />
                       <div className="text-xs text-neutral-500">
@@ -146,13 +153,21 @@ export default function FlightResults({
                         {formatTime(getTime(last?.arrival))}
                       </div>
                       <div className={`${isOWLeg ? "text-xs" : "text-sm"} text-neutral-500`}>
-                        {pointName(last, "arrival")}
+                        {pointName(last, "arrival")} {getTimezone(last?.arrival) ? `(${getTimezone(last?.arrival)?.split("/").pop()})` : ""}
                       </div>
                     </div>
                   </div>
                 )}
                 {isRTCombined && (
-                  <div className="text-sm text-neutral-400">Round trip • {segments.length} flights • {formatDuration(segments.reduce((sum, s) => sum + (s.duration?.minutes ?? 0), 0))} total</div>
+                  <div className="text-sm text-neutral-400">
+                    Round trip • {segments.length} flights •{" "}
+                    {formatDuration(
+                      flight.route?.duration
+                        ? flight.route.duration.hours * 60 + flight.route.duration.minutes + (flight.route.duration.days ?? 0) * 1440
+                        : segments.reduce((sum, s) => sum + (s.duration?.minutes ?? 0), 0)
+                    )}{" "}
+                    total
+                  </div>
                 )}
 
                 {fare?.fareFamily && (
@@ -162,14 +177,20 @@ export default function FlightResults({
                 )}
               </div>
 
-              <div className={`flex items-center justify-between gap-6 border-t border-white/10 pt-4 lg:min-w-[220px] lg:flex-col lg:items-end lg:border-t-0 lg:pt-0 ${isOWLeg ? "opacity-90" : ""}`}>
+              <div className={`flex flex-col gap-2 border-t border-white/10 pt-4 lg:min-w-[260px] lg:border-t-0 lg:pt-0 ${isOWLeg ? "opacity-90" : ""}`}>
                 <div className="text-right">
                   <div className={`${isOWLeg ? "text-lg" : "text-2xl"} font-bold text-white`}>
-                    {amount !== null
-                      ? `${amount.toLocaleString()} ${getCurrency(fare)}`
-                      : "Price unavailable"}
+                    {(() => {
+                      const fares = flight.fares ?? [];
+                      const amounts = fares.map((f: any) => f.total?.amount ?? f.price?.total?.amount).filter((v: any) => typeof v === "number") as number[];
+                      const min = amounts.length ? Math.min(...amounts) : amount;
+                      const max = amounts.length ? Math.max(...amounts) : amount;
+                      const cur = getCurrency(fare as any);
+                      if (min == null || max == null) return "Price unavailable";
+                      return min === max ? `${(min as number).toLocaleString()} ${cur}` : `${(min as number).toLocaleString()} - ${(max as number).toLocaleString()} ${cur}`;
+                    })()}
                   </div>
-                  <div className="text-xs text-neutral-500">total fare</div>
+                  <div className="text-xs text-neutral-500">total fare {flight.fares?.length ? `• ${flight.fares.length} tariffs` : ""}</div>
                   {(fare as any)?.facilities?.priceBreakdown && !isOWLeg && (
                     <div className="mt-1 text-[11px] leading-tight text-neutral-400">
                       <div>Outbound: {(fare as any).facilities.priceBreakdown.outbound.amount} {(fare as any).facilities.priceBreakdown.outbound.currency}</div>
@@ -177,14 +198,21 @@ export default function FlightResults({
                     </div>
                   )}
                 </div>
-                {!isOWLeg && (
-                  <button
-                    type="button"
-                    className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition-opacity hover:opacity-90"
-                  >
-                    Select
-                  </button>
-                )}
+                <div className="space-y-1">
+                  {[...(flight.fares ?? [])].sort((a: any, b: any) => (a.total?.amount ?? a.price?.total?.amount ?? 999999) - (b.total?.amount ?? b.price?.total?.amount ?? 999999)).map((f: any) => (
+                    <div key={f.id} className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-1.5 text-xs">
+                      <span className="font-medium text-white">{f.family} • {f.cabin}</span>
+                      <span className="text-neutral-300">{f.total?.amount ?? f.price?.total?.amount ?? 0} {f.total?.currency ?? f.price?.total?.currency ?? "AZN"}</span>
+                      <span className="text-neutral-400">
+                        {f.baggage?.status === "available" ? `Bag ${f.baggage.amount}×${f.baggage.weight}kg` : f.baggage?.status === "unavailable" ? "No bag" : ""}
+                        {f.luggage?.status === "available" ? ` + Hand ${f.luggage.weight}kg` : ""}
+                      </span>
+                      {isRTCombined && (
+                        <button type="button" className="rounded-lg bg-white px-3 py-1 text-xs font-semibold text-black hover:opacity-90">Select</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </article>

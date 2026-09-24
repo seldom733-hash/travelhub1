@@ -62,7 +62,7 @@ export default function CompactSearch({ service, params }: CompactSearchProps) {
     if (ctx.childAges?.length) sp.set("childAges", ctx.childAges.join(","));
     if (ctx.infants) sp.set("infants", String(ctx.infants));
     if (ctx.serviceClass) sp.set("class", ctx.serviceClass);
-    if (ctx.baggage) sp.set("baggage", "1");
+    if (ctx.tariff && ctx.tariff !== "ALL") sp.set("tariff", ctx.tariff);
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.language) sp.set("lang", ctx.language);
     if (ctx.serviceType === "tours") sp.set("supplier", "KOMPAS");

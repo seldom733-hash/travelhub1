@@ -54,22 +54,36 @@ export class AzalAdapter implements FlightSupplier {
       const outFlight = outbound.flights.find(f => f.fares.some(ff => ff.id === cheapestOut?.id)) ?? outbound.flights[0];
       const inFlight = inbound.flights.find(f => f.fares.some(ff => ff.id === cheapestIn?.id)) ?? inbound.flights[0];
       if (cheapestOut && cheapestIn && outFlight && inFlight) {
-        const totalAmount = (cheapestOut.total.amount ?? 0) + (cheapestIn.total.amount ?? 0);
-        const baseAmount = (cheapestOut.base.amount ?? 0) + (cheapestIn.base.amount ?? 0);
-        const combinedFare: FlightFare = {
-          id: `${cheapestOut.id}_${cheapestIn.id}`, family: cheapestOut.family, total: { amount: totalAmount, currency: cheapestOut.total.currency ?? "AZN" }, base: { amount: baseAmount, currency: cheapestOut.base.currency ?? "AZN" }, taxes: [], fees: [], cabin: cheapestOut.cabin, bookingClass: cheapestOut.bookingClass, fareCode: cheapestOut.fareCode, available: cheapestOut.available && cheapestIn.available, selected: false, baggage: cheapestOut.baggage, luggage: cheapestOut.luggage, changes: cheapestOut.changes, refund: cheapestOut.refund, facilities: { ...cheapestOut.facilities, priceBreakdown: { outbound: { amount: cheapestOut.total.amount, currency: cheapestOut.total.currency, base: cheapestOut.base.amount, departure: outFlight.segments[0]?.departure, arrival: outFlight.segments[0]?.arrival }, inbound: { amount: cheapestIn.total.amount, currency: cheapestIn.total.currency, base: cheapestIn.base.amount, departure: inFlight.segments[0]?.departure, arrival: inFlight.segments[0]?.arrival }, total: { amount: totalAmount, currency: cheapestOut.total.currency } } }, earnMiles: (cheapestOut.earnMiles ?? 0) + (cheapestIn.earnMiles ?? 0), earnPoints: (cheapestOut.earnPoints ?? 0) + (cheapestIn.earnPoints ?? 0), labels: [`Outbound ${cheapestOut.total.amount} ${cheapestOut.total.currency}`, `Inbound ${cheapestIn.total.amount} ${cheapestIn.total.currency}`],
-        };
+        // Build all tariff combinations for RT first row
+        const outByFamily = new Map(outbound.flights.flatMap(f => f.fares).filter(f => f.available).map(f => [f.family, f] as const));
+        const inByFamily = new Map(inbound.flights.flatMap(f => f.fares).filter(f => f.available).map(f => [f.family, f] as const));
+        const families = [...new Set([...outByFamily.keys(), ...inByFamily.keys()])].filter(f => outByFamily.has(f) && inByFamily.has(f));
+        const combinedFares: FlightFare[] = families.map(fam => {
+          const o = outByFamily.get(fam)!; const inn = inByFamily.get(fam)!;
+          const totalAmt = (o.total.amount ?? 0) + (inn.total.amount ?? 0);
+          const baseAmt = (o.base.amount ?? 0) + (inn.base.amount ?? 0);
+          return { id: `${o.id}_${inn.id}`, family: fam, total: { amount: totalAmt, currency: o.total.currency ?? "AZN" }, base: { amount: baseAmt, currency: o.base.currency ?? "AZN" }, taxes: [], fees: [], cabin: o.cabin, bookingClass: o.bookingClass, fareCode: o.fareCode, available: o.available && inn.available, selected: false, baggage: o.baggage, luggage: o.luggage, changes: o.changes, refund: o.refund, facilities: { ...o.facilities, priceBreakdown: { outbound: { amount: o.total.amount, currency: o.total.currency, base: o.base.amount }, inbound: { amount: inn.total.amount, currency: inn.total.currency, base: inn.base.amount }, total: { amount: totalAmt, currency: o.total.currency } } }, earnMiles: (o.earnMiles ?? 0) + (inn.earnMiles ?? 0), earnPoints: (o.earnPoints ?? 0) + (inn.earnPoints ?? 0), labels: [] } as FlightFare;
+        }).sort((a,b) => (a.total.amount ?? 999999) - (b.total.amount ?? 999999));
+        // Fallback to cheapest if no matching families
+        if (combinedFares.length === 0) {
+          const totalAmount = (cheapestOut.total.amount ?? 0) + (cheapestIn.total.amount ?? 0);
+          const baseAmount = (cheapestOut.base.amount ?? 0) + (cheapestIn.base.amount ?? 0);
+          combinedFares.push({ id: `${cheapestOut.id}_${cheapestIn.id}`, family: cheapestOut.family, total: { amount: totalAmount, currency: cheapestOut.total.currency ?? "AZN" }, base: { amount: baseAmount, currency: cheapestOut.base.currency ?? "AZN" }, taxes: [], fees: [], cabin: cheapestOut.cabin, bookingClass: cheapestOut.bookingClass, fareCode: cheapestOut.fareCode, available: cheapestOut.available && cheapestIn.available, selected: false, baggage: cheapestOut.baggage, luggage: cheapestOut.luggage, changes: cheapestOut.changes, refund: cheapestOut.refund, facilities: { ...cheapestOut.facilities, priceBreakdown: { outbound: { amount: cheapestOut.total.amount, currency: cheapestOut.total.currency }, inbound: { amount: cheapestIn.total.amount, currency: cheapestIn.total.currency }, total: { amount: totalAmount, currency: cheapestOut.total.currency } } }, earnMiles: (cheapestOut.earnMiles ?? 0) + (cheapestIn.earnMiles ?? 0), earnPoints: (cheapestOut.earnPoints ?? 0) + (cheapestIn.earnPoints ?? 0), labels: [] } as FlightFare);
+        }
+        const outDur = outFlight.route.duration; const inDur = inFlight.route.duration;
+        const totalMins = (outDur ? (outDur.days ?? 0)*1440 + outDur.hours*60 + outDur.minutes : 0) + (inDur ? (inDur.days ?? 0)*1440 + inDur.hours*60 + inDur.minutes : 0);
+        const totalDur: FlightDuration = { days: Math.floor(totalMins/1440), hours: Math.floor((totalMins%1440)/60), minutes: totalMins%60 };
         const combinedOffer: FlightOffer = {
           ...outFlight,
           optionId: `${outFlight.optionId}_${inFlight.optionId}_RT`,
           segments: [...outFlight.segments, ...inFlight.segments],
-          fares: [combinedFare],
-          route: { ...outFlight.route, actualTo: inFlight.route.actualTo, arrivalDate: inFlight.route.arrivalDate, arrivalTimezone: inFlight.route.arrivalTimezone, stops: [...outFlight.route.stops, ...inFlight.route.stops] },
+          fares: combinedFares,
+          route: { ...outFlight.route, actualTo: inFlight.route.actualTo, arrivalDate: inFlight.route.arrivalDate, arrivalTimezone: inFlight.route.arrivalTimezone, duration: totalDur, stops: [...outFlight.route.stops, ...inFlight.route.stops] },
         };
-        // Return 3 flights: combined RT + outbound OW + inbound OW
+        // Return 3 flights: combined RT (all tariffs) + outbound OW + inbound OW (no Select, smaller)
         const outboundOnly: FlightOffer = { ...outFlight, optionId: `${outFlight.optionId}_OW_OUT`, requested: { ...query, tripType: "OW" as const } };
         const inboundOnly: FlightOffer = { ...inFlight, optionId: `${inFlight.optionId}_OW_IN`, requested: { from: query.to, to: query.from, departureDate: query.returnDate!, tripType: "OW" as const, passengers: query.passengers, isStudent: query.isStudent } };
-        return { source: "AZAL", collectedAt: new Date().toISOString(), requested: query, summary: { optionSets: 1, flights: 3, fares: 3 }, flights: [combinedOffer, outboundOnly, inboundOnly] };
+        return { source: "AZAL", collectedAt: new Date().toISOString(), requested: query, summary: { optionSets: 1, flights: 3, fares: combinedFares.length + outFlight.fares.length + inFlight.fares.length }, flights: [combinedOffer, outboundOnly, inboundOnly] };
       }
     }
     const request: AzalFlightSearchQuery = {

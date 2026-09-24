@@ -53,7 +53,7 @@ export interface SearchContext {
   roundTrip?: boolean;
   infants?: number;
   serviceClass?: string;
-  baggage?: boolean;
+  tariff?: string;
   // Sanatoriums
   duration?: number;
   // Guides
