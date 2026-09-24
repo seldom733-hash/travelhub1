@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { MapPin, CalendarBlank, ArrowRight, Airplane } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import type { SearchContext } from "@/lib/search-engine";
@@ -25,6 +25,13 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   const [infants, setInfants] = useState(0);
   const [serviceClass, setServiceClass] = useState("economy");
   const [tariff, setTariff] = useState("ALL");
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const t = sp.get("tariff");
+      if (t) setTariff(t);
+    } catch {}
+  }, []);
 
   // Disable return dates before departure date
   const minReturnDate = useMemo(() => {

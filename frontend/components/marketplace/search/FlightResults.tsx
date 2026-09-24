@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { FlightFare, FlightOffer, FlightSegment } from "@/lib/flight-api";
 
 interface FlightResultsProps {
@@ -61,6 +62,8 @@ export default function FlightResults({
   loading = false,
   error = null,
 }: FlightResultsProps) {
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   if (loading) {
     return (
       <div className="space-y-4">
@@ -89,6 +92,113 @@ export default function FlightResults({
         <p className="mt-2 text-sm text-neutral-500">
           Try another date or route.
         </p>
+      </div>
+    );
+  }
+
+  // RT table: if we have combined + outbound + inbound, show table of all tariff combinations
+  const rtCombined = flights.find((f) => f.optionId?.endsWith("_RT"));
+  const rtOutbounds = flights.filter((f) => f.optionId?.endsWith("_OW_OUT"));
+  const rtInbounds = flights.filter((f) => f.optionId?.endsWith("_OW_IN"));
+  const isRTTable = !!rtCombined && rtOutbounds.length > 0 && rtInbounds.length > 0;
+  if (isRTTable) {
+    const outFlights = rtOutbounds;
+    const inFlights = rtInbounds;
+    const rows: Array<{ out: typeof outFlights[0]; inn: typeof inFlights[0]; fareFamily: string; total: number; currency: string; outFare: any; inFare: any }> = [];
+    for (const out of outFlights) {
+      for (const inn of inFlights) {
+        const outMap = new Map((out.fares ?? []).filter((f: any) => f.available !== false).map((f: any) => [f.family, f]));
+        const inMap = new Map((inn.fares ?? []).filter((f: any) => f.available !== false).map((f: any) => [f.family, f]));
+        const families = [...new Set([...outMap.keys(), ...inMap.keys()])].filter(f => outMap.has(f) && inMap.has(f));
+        if (families.length === 0) {
+          const oF = [...(out.fares ?? [])].filter((f: any) => f.available !== false).sort((a: any,b: any)=> (a.total?.amount??999999)-(b.total?.amount??999999))[0];
+          const iF = [...(inn.fares ?? [])].filter((f: any) => f.available !== false).sort((a: any,b: any)=> (a.total?.amount??999999)-(b.total?.amount??999999))[0];
+          if (oF && iF) rows.push({ out, inn, fareFamily: oF.family, total: (oF.total?.amount??0)+(iF.total?.amount??0), currency: oF.total?.currency ?? "AZN", outFare: oF, inFare: iF });
+        } else {
+          for (const fam of families) {
+            const oF = outMap.get(fam)!; const iF = inMap.get(fam)!;
+            const total = (oF.total?.amount ?? 0) + (iF.total?.amount ?? 0);
+            rows.push({ out, inn, fareFamily: fam, total, currency: oF.total?.currency ?? "AZN", outFare: oF, inFare: iF });
+          }
+        }
+      }
+    }
+    // Sorting
+    const sortedRows = [...rows].sort((a,b) => {
+      if (!sortCol) return new Date(a.out.segments?.[0]?.departure?.dateTime ?? 0).getTime() - new Date(b.out.segments?.[0]?.departure?.dateTime ?? 0).getTime();
+      let av: any, bv: any;
+      if (sortCol === "code") { av = `${a.out.segments?.[0]?.departure?.airport}-${a.out.segments?.[0]?.arrival?.airport}`; bv = `${b.out.segments?.[0]?.departure?.airport}-${b.out.segments?.[0]?.arrival?.airport}`; }
+      else if (sortCol === "time") { av = getTime(a.out.segments?.[0]?.departure) ?? ""; bv = getTime(b.out.segments?.[0]?.departure) ?? ""; }
+      else if (sortCol === "inTime") { av = getTime(a.inn.segments?.[0]?.departure) ?? ""; bv = getTime(b.inn.segments?.[0]?.departure) ?? ""; }
+      else if (sortCol === "price") { av = a.total; bv = b.total; }
+      else if (sortCol === "outPrice") { av = a.outFare?.total?.amount ?? 999999; bv = b.outFare?.total?.amount ?? 999999; }
+      else if (sortCol === "inPrice") { av = a.inFare?.total?.amount ?? 999999; bv = b.inFare?.total?.amount ?? 999999; }
+      else if (sortCol === "adults") { av = a.out.requested?.passengers?.adults ?? 0; bv = b.out.requested?.passengers?.adults ?? 0; }
+      else if (sortCol === "children") { av = a.out.requested?.passengers?.children ?? 0; bv = b.out.requested?.passengers?.children ?? 0; }
+      else return 0;
+      if (typeof av === "number" && typeof bv === "number") return sortDir === "asc" ? av - bv : bv - av;
+      return sortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
+    const displayRows = sortedRows.slice(0, 50);
+    const toggleSort = (col: string) => {
+      if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+      else { setSortCol(col); setSortDir("asc"); }
+    };
+    return (
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="w-full text-left text-[11px]">
+          <thead className="bg-white/5 text-neutral-400">
+            <tr>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("code")}>Код {sortCol==="code" ? (sortDir==="asc"?"▲":"▼") : "↕"}</th>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("time")}>Время вылета {sortCol==="time" ? (sortDir==="asc"?"▲":"▼") : "↕"}</th>
+              <th className="px-2 py-2">Время прилета</th>
+              <th className="px-2 py-2">Время в полете</th>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("outPrice")}>Цена за туда {sortCol==="outPrice" ? (sortDir==="asc"?"▲":"▼") : "↕"}</th>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("code")}>Код {sortCol==="code" ? (sortDir==="asc"?"▲":"▼") : "↕"}</th>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("inTime")}>Время вылета {sortCol==="inTime" ? (sortDir==="asc"?"▲":"▼") : "↕"}</th>
+              <th className="px-2 py-2">Время прилета</th>
+              <th className="px-2 py-2">Время в полете</th>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("inPrice")}>Цена за обратно {sortCol==="inPrice" ? (sortDir==="asc"?"▲":"▼") : "↕"}</th>
+              <th className="px-2 py-2">Общее время полета</th>
+              <th className="px-2 py-2">Тариф+багаж</th>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("adults")}>Взрослые {sortCol==="adults" ? (sortDir==="asc"?"▲":"▼") : "↕"}</th>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("children")}>Дети {sortCol==="children" ? (sortDir==="asc"?"▲":"▼") : "↕"}</th>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("price")}>Общая цена {sortCol==="price" ? (sortDir==="asc"?"▲":"▼") : "↕"}</th>
+              <th className="px-2 py-2"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {displayRows.map((r, idx) => {
+              const outSeg = r.out.segments?.[0]; const inSeg = r.inn.segments?.[0];
+              const outMins = r.out.route?.duration ? r.out.route.duration.hours*60 + r.out.route.duration.minutes + (r.out.route.duration.days??0)*1440 : r.out.segments?.reduce((s, seg:any)=>s+(seg.duration?.minutes??0),0) ?? 0;
+              const inMins = r.inn.route?.duration ? r.inn.route.duration.hours*60 + r.inn.route.duration.minutes + (r.inn.route.duration.days??0)*1440 : r.inn.segments?.reduce((s, seg:any)=>s+(seg.duration?.minutes??0),0) ?? 0;
+              const totalMins = outMins + inMins;
+              const baggageLabel = r.outFare.baggage?.status === "available" ? `Bag ${r.outFare.baggage.amount}×${r.outFare.baggage.weight}kg` : r.outFare.baggage?.status === "unavailable" ? "No bag" : "";
+              const handLabel = r.outFare.luggage?.status === "available" ? `+ Hand ${r.outFare.luggage.weight}kg` : "";
+              return (
+                <tr key={`${r.out.optionId}-${r.inn.optionId}-${r.fareFamily}-${idx}`} className="hover:bg-white/5">
+                  <td className="px-2 py-2 text-white">{outSeg?.departure?.airport ?? ""}-{outSeg?.arrival?.airport ?? ""}</td>
+                  <td className="px-2 py-2 text-white">{formatTime(getTime(outSeg?.departure))}</td>
+                  <td className="px-2 py-2 text-white">{formatTime(getTime(outSeg?.arrival))}</td>
+                  <td className="px-2 py-2 text-neutral-300">{formatDuration(outMins)}</td>
+                  <td className="px-2 py-2 text-white">{r.outFare.total.amount} {r.outFare.total.currency}</td>
+                  <td className="px-2 py-2 text-white">{inSeg?.departure?.airport ?? ""}-{inSeg?.arrival?.airport ?? ""}</td>
+                  <td className="px-2 py-2 text-white">{formatTime(getTime(inSeg?.departure))}</td>
+                  <td className="px-2 py-2 text-white">{formatTime(getTime(inSeg?.arrival))}</td>
+                  <td className="px-2 py-2 text-neutral-300">{formatDuration(inMins)}</td>
+                  <td className="px-2 py-2 text-white">{r.inFare.total.amount} {r.inFare.total.currency}</td>
+                  <td className="px-2 py-2 text-neutral-300">{formatDuration(totalMins)}</td>
+                  <td className="px-2 py-2 text-white">{r.fareFamily} {baggageLabel} {handLabel}</td>
+                  <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.adults ?? 1}</td>
+                  <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.children ?? 0}</td>
+                  <td className="px-2 py-2 font-bold text-white">{r.total} {r.currency}</td>
+                  <td className="px-2 py-2"><button type="button" onClick={async () => { try { const { createFlightRequest } = await import("@/lib/flight-api"); await createFlightRequest({ from: r.out.segments?.[0]?.departure?.airport ?? "", to: r.out.segments?.[0]?.arrival?.airport ?? "", departureDate: r.out.segments?.[0]?.departure?.dateTime ?? "", returnDate: r.inn.segments?.[0]?.departure?.dateTime, tripType: "RT", passengers: r.out.requested?.passengers ?? { adults: 1, children: 0, infants: 0 }, fareFamily: r.fareFamily, price: r.total, currency: r.currency, segments: [...(r.out.segments ?? []), ...(r.inn.segments ?? [])] }); alert(`Заявка создана: ${r.fareFamily} ${r.total} ${r.currency}`); } catch (e) { alert(`Ошибка: ${(e as Error).message}`); } }} className="rounded-lg bg-white px-3 py-1 text-xs font-semibold text-black hover:opacity-90">Подать заявку</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {rows.length > 30 && <div className="px-3 py-2 text-center text-xs text-neutral-500">Показано 30 из {rows.length} комбинаций</div>}
       </div>
     );
   }
@@ -208,7 +318,7 @@ export default function FlightResults({
                         {f.luggage?.status === "available" ? ` + Hand ${f.luggage.weight}kg` : ""}
                       </span>
                       {isRTCombined && (
-                        <button type="button" className="rounded-lg bg-white px-3 py-1 text-xs font-semibold text-black hover:opacity-90">Select</button>
+                        <button type="button" onClick={() => alert(`Заявка создана: ${r.fareFamily} ${r.total} ${r.currency} — ${r.out.segments?.[0]?.departure?.airport}-${r.out.segments?.[0]?.arrival?.airport} ${formatTime(getTime(r.out.segments?.[0]?.departure))} → ${r.inn.segments?.[0]?.departure?.airport}-${r.inn.segments?.[0]?.arrival?.airport} ${formatTime(getTime(r.inn.segments?.[0]?.departure))}`)} className="rounded-lg bg-white px-3 py-1 text-xs font-semibold text-black hover:opacity-90">Подать заявку</button>
                       )}
                     </div>
                   ))}

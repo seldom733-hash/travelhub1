@@ -80,10 +80,10 @@ export class AzalAdapter implements FlightSupplier {
           fares: combinedFares,
           route: { ...outFlight.route, actualTo: inFlight.route.actualTo, arrivalDate: inFlight.route.arrivalDate, arrivalTimezone: inFlight.route.arrivalTimezone, duration: totalDur, stops: [...outFlight.route.stops, ...inFlight.route.stops] },
         };
-        // Return 3 flights: combined RT (all tariffs) + outbound OW + inbound OW (no Select, smaller)
-        const outboundOnly: FlightOffer = { ...outFlight, optionId: `${outFlight.optionId}_OW_OUT`, requested: { ...query, tripType: "OW" as const } };
-        const inboundOnly: FlightOffer = { ...inFlight, optionId: `${inFlight.optionId}_OW_IN`, requested: { from: query.to, to: query.from, departureDate: query.returnDate!, tripType: "OW" as const, passengers: query.passengers, isStudent: query.isStudent } };
-        return { source: "AZAL", collectedAt: new Date().toISOString(), requested: query, summary: { optionSets: 1, flights: 3, fares: combinedFares.length + outFlight.fares.length + inFlight.fares.length }, flights: [combinedOffer, outboundOnly, inboundOnly] };
+        // Return all outbound/inbound flights plus combined RT
+        const outboundOnlyFlights: FlightOffer[] = outbound.flights.map(f => ({ ...f, optionId: `${f.optionId}_OW_OUT`, requested: { ...query, tripType: "OW" as const } }));
+        const inboundOnlyFlights: FlightOffer[] = inbound.flights.map(f => ({ ...f, optionId: `${f.optionId}_OW_IN`, requested: { from: query.to, to: query.from, departureDate: query.returnDate!, tripType: "OW" as const, passengers: query.passengers, isStudent: query.isStudent } }));
+        return { source: "AZAL", collectedAt: new Date().toISOString(), requested: query, summary: { optionSets: 1, flights: 1 + outboundOnlyFlights.length + inboundOnlyFlights.length, fares: combinedFares.length + outboundOnlyFlights.reduce((s,f)=>s+f.fares.length,0) + inboundOnlyFlights.reduce((s,f)=>s+f.fares.length,0) }, flights: [combinedOffer, ...outboundOnlyFlights, ...inboundOnlyFlights] };
       }
     }
     const request: AzalFlightSearchQuery = {
