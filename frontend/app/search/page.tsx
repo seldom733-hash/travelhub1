@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader";
 import CompactSearch from "@/components/marketplace/CompactSearch";
@@ -136,16 +136,10 @@ function SearchResultsInner() {
     return parts.join(" ");
   };
 
+  const flightSearchCacheRef = useRef<{ key: string; promise: Promise<FlightSearchResponse> } | null>(null);
+  const flightRequestIdRef = useRef(0);
   useEffect(() => {
     let alive = true;
-    setLoading(true);
-    setError("");
-    setSupplierError(null);
-    setResult(null);
-    setSupplierOffers([]);
-    setFlightResults(null);
-    setFlightError(null);
-    setFlightLoading(false);
 
     // AZAL flight search path
     if (service === "flights") {
@@ -167,6 +161,16 @@ function SearchResultsInner() {
       const infants = Math.max(0, Number(params.infants) || 0);
       const returnDate = params.returnDate || params.return || undefined;
       const tariff = params.tariff || "ALL";
+      const dedupKey = `${from}-${to}-${departureDate}-${tripType}-${adults}-${children}-${infants}-${returnDate}-${tariff}`;
+      const requestId = ++flightRequestIdRef.current;
+
+      setLoading(true);
+      setError("");
+      setSupplierError(null);
+      setResult(null);
+      setSupplierOffers([]);
+      setFlightError(null);
+      setFlightLoading(true);
 
       if (!from || !to || !departureDate) {
         setFlightError(
@@ -179,36 +183,45 @@ function SearchResultsInner() {
         };
       }
 
-      setFlightLoading(true);
+      let searchPromise: Promise<FlightSearchResponse>;
+      if (flightSearchCacheRef.current?.key === dedupKey) {
+        searchPromise = flightSearchCacheRef.current.promise;
+      } else {
+        setFlightResults(null);
+        searchPromise = searchAzalFlights({
+          from,
+          to,
+          departureDate,
+          tripType,
+          passengers: {
+            adults,
+            children,
+            infants,
+          },
+          ...(returnDate ? { returnDate } : {}),
+        });
+        flightSearchCacheRef.current = { key: dedupKey, promise: searchPromise };
+      }
 
-      void searchAzalFlights({
-        from,
-        to,
-        departureDate,
-        tripType,
-        passengers: {
-          adults,
-          children,
-          infants,
-        },
-        ...(returnDate ? { returnDate } : {}),
-      })
+      searchPromise
         .then((flightResult) => {
           if (!alive) return;
+          let flights = flightResult.flights;
           if (tariff !== "ALL") {
-            flightResult.flights = flightResult.flights
+            flights = flights
               .map((f) => ({ ...f, fares: (f.fares ?? []).filter((ff: any) => (ff.family ?? ff.fareFamily) === tariff) }))
               .filter((f) => (f.fares ?? []).length > 0);
           }
-          setFlightResults(flightResult);
-          setFlightLoading(false);
-          setLoading(false);
+          setFlightResults({ ...flightResult, flights });
         })
         .catch((e) => {
           if (!alive) return;
           setFlightError(
             e instanceof Error ? e.message : "Unable to search AZAL flights.",
           );
+        })
+        .finally(() => {
+          if (requestId !== flightRequestIdRef.current) return;
           setFlightLoading(false);
           setLoading(false);
         });
@@ -217,6 +230,15 @@ function SearchResultsInner() {
         alive = false;
       };
     }
+
+    setLoading(true);
+    setError("");
+    setSupplierError(null);
+    setResult(null);
+    setSupplierOffers([]);
+    setFlightResults(null);
+    setFlightError(null);
+    setFlightLoading(false);
 
     // Supplier search path
     if (supplierCode) {
@@ -344,7 +366,7 @@ function SearchResultsInner() {
         </div>
 
         {/* Loading */}
-        {loading && (
+        {loading && service !== "flights" && (
           <div className="mt-6">
             <ProductGridSkeleton count={6} />
           </div>

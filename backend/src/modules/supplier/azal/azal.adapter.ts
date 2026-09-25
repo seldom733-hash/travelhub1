@@ -85,6 +85,18 @@ export class AzalAdapter implements FlightSupplier {
         const inboundOnlyFlights: FlightOffer[] = inbound.flights.map(f => ({ ...f, optionId: `${f.optionId}_OW_IN`, requested: { from: query.to, to: query.from, departureDate: query.returnDate!, tripType: "OW" as const, passengers: query.passengers, isStudent: query.isStudent } }));
         return { source: "AZAL", collectedAt: new Date().toISOString(), requested: query, summary: { optionSets: 1, flights: 1 + outboundOnlyFlights.length + inboundOnlyFlights.length, fares: combinedFares.length + outboundOnlyFlights.reduce((s,f)=>s+f.fares.length,0) + inboundOnlyFlights.reduce((s,f)=>s+f.fares.length,0) }, flights: [combinedOffer, ...outboundOnlyFlights, ...inboundOnlyFlights] };
       }
+      // AZAL returns neighbouring-day flights when the requested date has no
+      // seats. Never fall back to another date — report the RT search as empty.
+      console.log(
+        `[AZAL RT EMPTY] ${query.from}->${query.to} departure=${query.departureDate} return=${query.returnDate} outboundFlights=${outbound.flights.length} inboundFlights=${inbound.flights.length}`,
+      );
+      return {
+        source: "AZAL",
+        collectedAt: new Date().toISOString(),
+        requested: query,
+        summary: { optionSets: 0, flights: 0, fares: 0 },
+        flights: [],
+      };
     }
     const request: AzalFlightSearchQuery = {
       from: query.from,
@@ -99,6 +111,18 @@ export class AzalAdapter implements FlightSupplier {
     };
 
     const result = await this.http.search(request);
+
+    // The AZAL deeplink API answers with the nearest day's flights when the
+    // requested date has no seats. Drop everything that departs on another day.
+    const flightsOnDate = result.flights.filter((flight) => {
+      const departure = flight.segments?.[0]?.departure?.dateTime;
+      return typeof departure === "string" && departure.slice(0, 10) === query.departureDate;
+    });
+    if (flightsOnDate.length !== result.flights.length) {
+      console.log(
+        `[AZAL DATE FILTER] ${query.from}->${query.to} requested=${query.departureDate} kept=${flightsOnDate.length} of ${result.flights.length} (neighbouring-day results dropped)`,
+      );
+    }
 
     return {
       source: result.source,
@@ -116,8 +140,12 @@ export class AzalAdapter implements FlightSupplier {
         isStudent: query.isStudent,
         returnDate: query.returnDate,
       },
-      summary: result.summary,
-      flights: result.flights.map((flight) =>
+      summary: {
+        ...result.summary,
+        flights: flightsOnDate.length,
+        fares: flightsOnDate.reduce((sum, flight) => sum + (flight.fares?.length ?? 0), 0),
+      },
+      flights: flightsOnDate.map((flight) =>
         this.mapFlight(flight, query),
       ),
     };

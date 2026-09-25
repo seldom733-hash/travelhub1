@@ -1,9 +1,10 @@
-import { Body, Controller, Post } from "@nestjs/common";
+import { Body, Controller, HttpCode, Post } from "@nestjs/common";
 import { Public } from "../../../security/auth/decorators";
 import { AzalAdapter } from "./azal.adapter";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { ReferenceNumberService } from "../../../shared/reference-number.service";
+import { FlightSupplierRegistry } from "../flight-supplier.registry";
 import type {
   AzalHistogramRequest,
   AzalHistogramResult,
@@ -21,12 +22,69 @@ import type {
  */
 @Controller("supplier/azal")
 export class AzalController {
-  constructor(private readonly azal: AzalAdapter, private readonly prisma: PrismaService, private readonly ids: IdsService, private readonly refNum: ReferenceNumberService) {}
+  constructor(
+    private readonly azal: AzalAdapter,
+    private readonly prisma: PrismaService,
+    private readonly ids: IdsService,
+    private readonly refNum: ReferenceNumberService,
+    private readonly flightRegistry: FlightSupplierRegistry,
+  ) {}
 
   @Post("search")
+  @HttpCode(200)
   @Public()
-  search(@Body() body: FlightSearchQuery) {
-    return this.azal.search(body);
+  async search(@Body() body: FlightSearchQuery) {
+    this.flightRegistry.list().forEach(s => console.log(`[FlightSearch] supplier ${s} called for ${body.from}->${body.to} ${body.departureDate}`));
+    const suppliers = this.flightRegistry.list();
+    const results = await Promise.allSettled(
+      suppliers.map((code) => this.flightRegistry.get(code).search(body)),
+    );
+
+    const successful = results
+      .filter((result): result is PromiseFulfilledResult<Awaited<ReturnType<AzalAdapter["search"]>>> => result.status === "fulfilled")
+      .map((result) => result.value);
+
+    const failed = results
+      .map((result, index) => ({ result, code: suppliers[index] }))
+      .filter((item): item is { result: PromiseRejectedResult; code: string } => item.result.status === "rejected");
+
+    for (const failure of failed) {
+      console.warn(`[FlightSearch] supplier ${failure.code} failed:`, failure.result.reason);
+    }
+
+    const flights = successful.flatMap((result) => result.flights);
+    const fares = successful.reduce((sum, result) => sum + result.summary.fares, 0);
+
+    const perSupplier = suppliers.map((code, index) => {
+      const r = results[index];
+      const count = r.status === "fulfilled" ? r.value.summary.flights : 0;
+      return `${code} flights=${count}`;
+    });
+    console.log(
+      `[SUPPLIER AGGREGATOR] ${perSupplier.join(" ")} TOTAL flights=${flights.length}`,
+    );
+
+    return {
+      source: successful.map((result) => result.source).join(",") || "FLIGHTS",
+      collectedAt: new Date().toISOString(),
+      requested: body,
+      summary: {
+        optionSets: successful.reduce((sum, result) => sum + result.summary.optionSets, 0),
+        flights: flights.length,
+        fares,
+      },
+      flights,
+      suppliers: successful.map((result) => ({
+        source: result.source,
+        summary: result.summary,
+      })),
+      errors: failed.map((failure) => ({
+        source: failure.code,
+        message: failure.result.reason instanceof Error
+          ? failure.result.reason.message
+          : String(failure.result.reason),
+      })),
+    };
   }
 
   @Post("request")

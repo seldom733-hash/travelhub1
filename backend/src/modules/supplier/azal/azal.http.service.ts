@@ -40,7 +40,7 @@ export class AzalHttpService implements OnModuleDestroy {
   } | null = null;
 
   private pageClientError: string | null = null;
-  private pageDiagnosticInstalled = false;
+  private capturedPage: Page | null = null;
 
   private static readonly BASE_URL = "https://www.azal.az";
   private static readonly OFFERS_PATH =
@@ -303,16 +303,54 @@ export class AzalHttpService implements OnModuleDestroy {
 // Recreating the session here would destroy captured session headers and
 // hide the actual AZAL response needed for diagnosis.
 
+      if (this.page?.isClosed()) {
+        this.page = null;
+      }
+
       throw error;
     }
   }
 
+  /**
+   * CDP page isolation: AZAL and Wizz Air share one Chrome over CDP.
+   * A page on wizzair.com belongs to the other supplier and must never be
+   * adopted or navigated by AZAL.
+   */
+  private isForeignPage(page: Page): boolean {
+    return page.url().includes("wizzair.com");
+  }
+
+  /** Our AZAL page: azal.az itself or a Cloudflare challenge on it. */
+  private isOwnPage(page: Page): boolean {
+    const url = page.url();
+    return url.includes("azal.az") || url.includes("cloudflare.com");
+  }
+
+  private isReusablePage(page: Page | null): page is Page {
+    return Boolean(
+      page &&
+        !page.isClosed() &&
+        this.context &&
+        this.context.pages().includes(page),
+    );
+  }
+
+  private findAzalPage(): Page | null {
+    if (!this.context) {
+      return null;
+    }
+
+    return (
+      this.context.pages().find(
+        (p) => !p.isClosed() && this.isOwnPage(p),
+      ) ?? null
+    );
+  }
+
   private async getPage(): Promise<Page> {
     if (
-      this.page &&
-      !this.page.isClosed() &&
-      this.context &&
-      this.context.pages().includes(this.page)
+      this.isReusablePage(this.page) &&
+      this.isOwnPage(this.page)
     ) {
       return this.page;
     }
@@ -325,15 +363,22 @@ export class AzalHttpService implements OnModuleDestroy {
       throw new Error("AZAL persistent browser context was not initialized");
     }
 
+    // CDP page isolation: adopt only an AZAL/Cloudflare tab — never
+    // context.pages()[0], which may belong to Wizz Air. Keep our own
+    // non-foreign tab (e.g. about:blank after a failed goto); otherwise
+    // create a dedicated AZAL tab.
     this.page =
-      this.context.pages()[0] ??
+      this.findAzalPage() ??
+      (this.isReusablePage(this.page) && !this.isForeignPage(this.page)
+        ? this.page
+        : null) ??
       (await this.context.newPage());
 
     this.installSessionCapture(this.page);
 
     // The real AZAL frontend creates its own min-price/city request.
     // We only observe it; we never call it ourselves.
-    if (!this.page.url().startsWith(`${AzalHttpService.BASE_URL}/`)) {
+    if (!this.isOwnPage(this.page)) {
       await this.page.goto(`${AzalHttpService.BASE_URL}/az/#flight`, {
         waitUntil: "domcontentloaded",
         timeout: 60_000,
@@ -378,11 +423,11 @@ export class AzalHttpService implements OnModuleDestroy {
    * requests. Do not hardcode these values: both are session-specific.
    */
   private installSessionCapture(page: Page): void {
-    if (this.pageDiagnosticInstalled) {
+    if (this.capturedPage === page) {
       return;
     }
 
-    this.pageDiagnosticInstalled = true;
+    this.capturedPage = page;
     this.pageClientError = null;
 
     page.on("pageerror", (error) => {
@@ -699,18 +744,19 @@ export class AzalHttpService implements OnModuleDestroy {
       throw new Error("Connected Chrome has no browser context.");
     }
 
-    const azalPages = this.context.pages().filter((p) =>
-      p.url().includes("azal.az"),
-    );
-
+    // CDP page isolation: adopt only an existing AZAL tab (or keep our own
+    // non-foreign tab, or create one). Never fall back to context.pages()[0]
+    // — that tab may belong to Wizz Air.
     this.page =
-      azalPages[0] ??
-      this.context.pages()[0] ??
+      this.findAzalPage() ??
+      (this.isReusablePage(this.page) && !this.isForeignPage(this.page)
+        ? this.page
+        : null) ??
       (await this.context.newPage());
 
     this.installSessionCapture(this.page);
 
-    if (!this.page.url().includes("azal.az")) {
+    if (!this.isOwnPage(this.page)) {
       await this.page.goto(`${AzalHttpService.BASE_URL}/az/#flight`, {
         waitUntil: "domcontentloaded",
         timeout: 60_000,
@@ -730,7 +776,7 @@ export class AzalHttpService implements OnModuleDestroy {
     this.authToken = null;
     this.conversation = null;
     this.pageClientError = null;
-    this.pageDiagnosticInstalled = false;
+    this.capturedPage = null;
     this.page = null;
     this.context = null;
 
