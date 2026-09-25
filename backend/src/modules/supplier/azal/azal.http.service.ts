@@ -311,19 +311,21 @@ export class AzalHttpService implements OnModuleDestroy {
     }
   }
 
-  /**
-   * CDP page isolation: AZAL and Wizz Air share one Chrome over CDP.
-   * A page on wizzair.com belongs to the other supplier and must never be
-   * adopted or navigated by AZAL.
-   */
-  private isForeignPage(page: Page): boolean {
-    return page.url().includes("wizzair.com");
-  }
-
   /** Our AZAL page: azal.az itself or a Cloudflare challenge on it. */
   private isOwnPage(page: Page): boolean {
     const url = page.url();
     return url.includes("azal.az") || url.includes("cloudflare.com");
+  }
+
+  /**
+   * A tab we may keep without adopting someone else's page:
+   * our AZAL tab or a fresh blank tab.
+   */
+  private isKeepablePage(page: Page | null): page is Page {
+    return Boolean(
+      this.isReusablePage(page) &&
+        (this.isOwnPage(page) || page.url() === "about:blank"),
+    );
   }
 
   private isReusablePage(page: Page | null): page is Page {
@@ -363,15 +365,12 @@ export class AzalHttpService implements OnModuleDestroy {
       throw new Error("AZAL persistent browser context was not initialized");
     }
 
-    // CDP page isolation: adopt only an AZAL/Cloudflare tab — never
-    // context.pages()[0], which may belong to Wizz Air. Keep our own
-    // non-foreign tab (e.g. about:blank after a failed goto); otherwise
-    // create a dedicated AZAL tab.
+    // Adopt only an AZAL/Cloudflare tab or our own fresh tab
+    // (e.g. about:blank after a failed goto) — never pages()[0]
+    // blindly; otherwise create a dedicated AZAL tab.
     this.page =
       this.findAzalPage() ??
-      (this.isReusablePage(this.page) && !this.isForeignPage(this.page)
-        ? this.page
-        : null) ??
+      (this.isKeepablePage(this.page) ? this.page : null) ??
       (await this.context.newPage());
 
     this.installSessionCapture(this.page);
@@ -744,14 +743,11 @@ export class AzalHttpService implements OnModuleDestroy {
       throw new Error("Connected Chrome has no browser context.");
     }
 
-    // CDP page isolation: adopt only an existing AZAL tab (or keep our own
-    // non-foreign tab, or create one). Never fall back to context.pages()[0]
-    // — that tab may belong to Wizz Air.
+    // Adopt only an existing AZAL tab (or keep our own fresh tab,
+    // or create one). Never fall back to context.pages()[0] blindly.
     this.page =
       this.findAzalPage() ??
-      (this.isReusablePage(this.page) && !this.isForeignPage(this.page)
-        ? this.page
-        : null) ??
+      (this.isKeepablePage(this.page) ? this.page : null) ??
       (await this.context.newPage());
 
     this.installSessionCapture(this.page);

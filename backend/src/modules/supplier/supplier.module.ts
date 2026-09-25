@@ -21,9 +21,6 @@ import { AzalAdapter } from "./azal/azal.adapter";
 import { AzalHttpService } from "./azal/azal.http.service";
 import { AzalController } from "./azal/azal.controller";
 import { FlightSupplierRegistry } from "./flight-supplier.registry";
-import { WizzAirAdapter } from "./wizzair/wizzair.adapter";
-import { WizzAirHttpService } from "./wizzair/wizzair.http.service";
-import { WizzAirController } from "./wizzair/wizzair.controller";
 
 /**
  * Supplier module — registers adapters, cache, resilience, service, sync.
@@ -34,7 +31,7 @@ import { WizzAirController } from "./wizzair/wizzair.controller";
 @Global()
 @Module({
   imports: [PrismaModule, EventBusModule],
-  controllers: [SupplierController, PublicSupplierController, KompasCaptchaController, AzalController, WizzAirController],
+  controllers: [SupplierController, PublicSupplierController, KompasCaptchaController, AzalController],
   providers: [
     SupplierAdapterRegistry,
     SupplierCacheService,
@@ -51,8 +48,6 @@ import { WizzAirController } from "./wizzair/wizzair.controller";
     TourRequestService,
     AzalAdapter,
     AzalHttpService,
-    WizzAirAdapter,
-    WizzAirHttpService,
     FlightSupplierRegistry,
     {
       provide: "SUPPLIER_MODULE_INIT",
@@ -62,7 +57,6 @@ import { WizzAirController } from "./wizzair/wizzair.controller";
 		  kompas: KompasSupplierAdapter,
           flightRegistry: FlightSupplierRegistry,
           azal: AzalAdapter,
-          wizzAir: WizzAirAdapter,
 		) => {
         registry.register(summertour, {
           code: "SUMMERTOUR",
@@ -100,7 +94,6 @@ import { WizzAirController } from "./wizzair/wizzair.controller";
         });
 
         flightRegistry.register(azal);
-        flightRegistry.register(wizzAir);
       },
       inject: [
         SupplierAdapterRegistry,
@@ -108,10 +101,9 @@ import { WizzAirController } from "./wizzair/wizzair.controller";
         KompasSupplierAdapter,
         FlightSupplierRegistry,
         AzalAdapter,
-        WizzAirAdapter,
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, AzalAdapter, AzalHttpService, WizzAirAdapter, WizzAirHttpService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, AzalAdapter, AzalHttpService, FlightSupplierRegistry],
 })
 export class SupplierModule {}
