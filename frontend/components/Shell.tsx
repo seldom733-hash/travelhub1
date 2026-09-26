@@ -66,6 +66,12 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    headingKey: "nav.group.references",
+    items: [
+      { href: "/app/geography", icon: "🗺", labelKey: "nav.geography", permission: "geography.read" },
+    ],
+  },
+  {
     headingKey: "nav.group.partner_network",
     items: [
       { href: "/app/partners/onboarding", icon: "📋", labelKey: "nav.partner_onboarding", permission: "partner.onboarding.review" },
