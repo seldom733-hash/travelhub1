@@ -239,7 +239,9 @@ export default function TourDetail({
             )}
             {hotelExternalId && (
               <p className="mt-1 text-xs text-slate-400">
-                KOMPAS ID: {hotelExternalId}
+                {((attributes?.supplierCode as string) ?? "KOMPAS") === "SUMMERTOUR"
+                  ? `Summer ID: ${hotelExternalId}`
+                  : `KOMPAS ID: ${hotelExternalId}`}
               </p>
             )}
           </div>
