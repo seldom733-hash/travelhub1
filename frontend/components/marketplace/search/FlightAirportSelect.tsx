@@ -28,7 +28,10 @@ export default function FlightAirportSelect({
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const airports = useMemo(() => findFlightAirports(query).slice(0, 12), [query]);
+  // No slice limit: the directory is small (~73 entries) and the list
+  // scrolls, so every matching city (e.g. Анталия on query "ан")
+  // must be visible, not just the first 12.
+  const airports = useMemo(() => findFlightAirports(query), [query]);
 
   const selectAirport = (airport: FlightAirport) => {
     onChange(airport);

@@ -1,6 +1,7 @@
-import { Body, Controller, HttpCode, Post } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Post, Query } from "@nestjs/common";
 import { Public } from "../../../security/auth/decorators";
 import { AzalAdapter } from "./azal.adapter";
+import { AzalLocationsService } from "./azal.locations.service";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { ReferenceNumberService } from "../../../shared/reference-number.service";
@@ -28,7 +29,14 @@ export class AzalController {
     private readonly ids: IdsService,
     private readonly refNum: ReferenceNumberService,
     private readonly flightRegistry: FlightSupplierRegistry,
+    private readonly locations: AzalLocationsService,
   ) {}
+
+  @Get("locations")
+  @Public()
+  async directory(@Query("refresh") refresh?: string) {
+    return this.locations.getLocations(refresh === "true");
+  }
 
   @Post("search")
   @HttpCode(200)

@@ -66,6 +66,8 @@ export interface SupplierOffer {
   expiresAt: string;
   tourIncValue?: string;
   tourIncName?: string;
+  tourIncValues?: string[];
+  tourIncNames?: string[];
   rawMetadata?: Record<string, unknown>;
 }
 
@@ -130,6 +132,7 @@ export interface SupplierPriceCalendarResult {
   dateTo: string;
   fetchedAt: string;
   expiresAt: string;
+  totalOffersScanned?: number;
 }
 
 // ── CAPTCHA Human-in-the-Loop Types ──────────────────────────────────────

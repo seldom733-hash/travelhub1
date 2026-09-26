@@ -20,6 +20,7 @@ import { EventBusModule } from "../../eventbus/eventbus.module";
 import { AzalAdapter } from "./azal/azal.adapter";
 import { AzalHttpService } from "./azal/azal.http.service";
 import { AzalController } from "./azal/azal.controller";
+import { AzalLocationsService } from "./azal/azal.locations.service";
 import { FlightSupplierRegistry } from "./flight-supplier.registry";
 
 /**
@@ -48,6 +49,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     TourRequestService,
     AzalAdapter,
     AzalHttpService,
+    AzalLocationsService,
     FlightSupplierRegistry,
     {
       provide: "SUPPLIER_MODULE_INIT",
@@ -104,6 +106,6 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, AzalAdapter, AzalHttpService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, AzalAdapter, AzalHttpService, AzalLocationsService, FlightSupplierRegistry],
 })
 export class SupplierModule {}

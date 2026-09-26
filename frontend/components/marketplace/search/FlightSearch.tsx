@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { MapPin, CalendarBlank, ArrowRight, Airplane } from "@phosphor-icons/react";
+import { MapPin, ArrowRight, Airplane } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import type { SearchContext } from "@/lib/search-engine";
 import FlightAirportSelect from "./FlightAirportSelect";
+import FlightDatePicker from "./FlightDatePicker";
+import { fetchAzalDirectory, fetchFlightCalendar, type FlightCalendarDayPrice } from "@/lib/flight-api";
+import { setRemoteAirports } from "@/lib/flight-locations";
 import ChildAges from "./ChildAges";
 import HelpFindButton from "./HelpFindButton";
 
@@ -33,12 +36,86 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
     } catch {}
   }, []);
 
+  // Load the live AZAL directory once: new AZAL destinations then appear
+  // in the From/To filters automatically (merged after the bundled list).
+  useEffect(() => {
+    let alive = true;
+    fetchAzalDirectory()
+      .then((entries) => {
+        if (alive) {
+          setRemoteAirports(entries);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // Disable return dates before departure date
   const minReturnDate = useMemo(() => {
     if (!departureDate) return "";
     const d = new Date(departureDate);
     return d.toISOString().split("T")[0];
   }, [departureDate]);
+
+  // Flight-date availability for the selected direction, fetched with a
+  // SINGLE backend calendar request (never per-day). Presence of a date
+  // in the map means AZAL has flights that day.
+  const [availability, setAvailability] = useState<Record<string, FlightCalendarDayPrice> | null>(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [returnAvailability, setReturnAvailability] = useState<Record<string, FlightCalendarDayPrice> | null>(null);
+
+  useEffect(() => {
+    if (!from?.code || !to?.code) {
+      setAvailability(null);
+      return;
+    }
+    let alive = true;
+    setAvailabilityLoading(true);
+    fetchFlightCalendar(from.code, to.code)
+      .then((data) => {
+        if (alive) {
+          setAvailability(data);
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setAvailability(null);
+        }
+      })
+      .finally(() => {
+        if (alive) {
+          setAvailabilityLoading(false);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [from?.code, to?.code]);
+
+  // Return-leg availability uses the reverse direction.
+  useEffect(() => {
+    if (!roundTrip || !from?.code || !to?.code) {
+      setReturnAvailability(null);
+      return;
+    }
+    let alive = true;
+    fetchFlightCalendar(to.code, from.code)
+      .then((data) => {
+        if (alive) {
+          setReturnAvailability(data);
+        }
+      })
+      .catch(() => {
+        if (alive) {
+          setReturnAvailability(null);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [roundTrip, from?.code, to?.code]);
 
   // Clear return date if it becomes invalid
   const handleDepartureChange = (date: string) => {
@@ -88,42 +165,28 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         />
 
         {/* Departure date */}
-        <div>
-          <label htmlFor="flight-departure" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
-            {t("search.departure_date", locale)}
-          </label>
-          <div className="relative">
-            <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-            <input
-              id="flight-departure"
-              type="date"
-              value={departureDate}
-              onChange={(e) => handleDepartureChange(e.target.value)}
-              min={new Date().toISOString().split("T")[0]}
-              className="w-full rounded-xl border border-dark-border bg-dark-card py-2 pl-9 pr-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
-            />
-          </div>
-        </div>
+        <FlightDatePicker
+          id="flight-departure"
+          label={t("search.departure_date", locale)}
+          placeholder="Выберите дату"
+          value={departureDate}
+          onChange={handleDepartureChange}
+          availability={availability}
+          loadingAvailability={availabilityLoading}
+        />
 
         {/* Return date (conditional) */}
         {roundTrip && (
-          <div>
-            <label htmlFor="flight-return" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
-              {t("search.return_date", locale)}
-            </label>
-            <div className="relative">
-              <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-              <input
-                id="flight-return"
-                type="date"
-                value={returnDate}
-                onChange={(e) => setReturnDate(e.target.value)}
-                min={minReturnDate || new Date().toISOString().split("T")[0]}
-                disabled={!departureDate}
-                className="w-full rounded-xl border border-dark-border bg-dark-card py-2 pl-9 pr-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50 disabled:opacity-50"
-              />
-            </div>
-          </div>
+          <FlightDatePicker
+            id="flight-return"
+            label={t("search.return_date", locale)}
+            placeholder="Выберите дату"
+            value={returnDate}
+            onChange={setReturnDate}
+            minDate={minReturnDate || undefined}
+            availability={returnAvailability}
+            disabled={!departureDate}
+          />
         )}
       </div>
 

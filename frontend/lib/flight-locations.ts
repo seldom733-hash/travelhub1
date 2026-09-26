@@ -524,14 +524,49 @@ export const FLIGHT_AIRPORTS: FlightAirport[] = [
   },
 ];
 
+/**
+ * Remote entries loaded from the backend AZAL directory
+ * (GET /supplier/azal/locations). Merged after the bundled list so that
+ * new AZAL destinations appear in the filter automatically, while our
+ * curated entries (with Russian spelling aliases) keep priority on
+ * code conflicts.
+ */
+let remoteAirports: FlightAirport[] = [];
+
+export function setRemoteAirports(entries: FlightAirport[]): void {
+  const known = new Set(FLIGHT_AIRPORTS.map((item) => item.code));
+  const fresh: FlightAirport[] = [];
+  for (const entry of entries ?? []) {
+    if (!entry || typeof entry.code !== "string" || known.has(entry.code)) {
+      continue;
+    }
+    known.add(entry.code);
+    fresh.push({
+      code: entry.code,
+      city: entry.city || entry.code,
+      country: entry.country || "",
+      airport: entry.airport || "",
+      search: entry.search || "",
+    });
+  }
+  remoteAirports = fresh;
+}
+
+function allAirports(): FlightAirport[] {
+  return remoteAirports.length > 0
+    ? [...FLIGHT_AIRPORTS, ...remoteAirports]
+    : FLIGHT_AIRPORTS;
+}
+
 export function findFlightAirports(query: string): FlightAirport[] {
   const q = query.trim().toLowerCase();
+  const airports = allAirports();
 
   if (!q) {
-    return FLIGHT_AIRPORTS;
+    return airports;
   }
 
-  return FLIGHT_AIRPORTS.filter((airport) =>
+  return airports.filter((airport) =>
     `${airport.code} ${airport.city} ${airport.country} ${airport.airport} ${airport.search}`
       .toLowerCase()
       .includes(q),
@@ -550,7 +585,7 @@ export function getFlightLocationCode(value: string): string {
     return normalized;
   }
 
-  const airport = FLIGHT_AIRPORTS.find(
+  const airport = allAirports().find(
     (item) =>
       item.city.toUpperCase() === normalized ||
       item.airport.toUpperCase() === normalized ||
