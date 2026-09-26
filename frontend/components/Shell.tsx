@@ -69,6 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
     headingKey: "nav.group.references",
     items: [
       { href: "/app/geography", icon: "🗺", labelKey: "nav.geography", permission: "geography.read" },
+      { href: "/app/hotel-directory", icon: "🏨", labelKey: "nav.hotels", permission: "hotel_directory.read" },
     ],
   },
   {

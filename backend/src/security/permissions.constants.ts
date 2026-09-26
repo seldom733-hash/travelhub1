@@ -11,6 +11,11 @@ export const PERMISSIONS = {
   "geography.create": "Создание записей географического справочника",
   "geography.update": "Изменение записей географического справочника",
   "geography.delete": "Удаление записей географического справочника",
+  // ── Hotel directory (Справочники → Отели) ─────────────────────────────
+  "hotel_directory.read": "Чтение гостиничного справочника",
+  "hotel_directory.create": "Создание записей гостиничного справочника",
+  "hotel_directory.update": "Изменение записей гостиничного справочника",
+  "hotel_directory.delete": "Удаление записей гостиничного справочника",
   // ── Catalog ───────────────────────────────────────────────────────────
   "catalog.product.read": "Чтение продуктов",
   "catalog.product.read_for_moderation": "Чтение продуктов для модерации (MODERATOR)",
@@ -288,6 +293,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "account.profile.update",
     "catalog.product.read",
     "geography.read",
+    "hotel_directory.read",
     "catalog.category_schema.read",
     "crm.customer.read",
     "crm.partner.read",

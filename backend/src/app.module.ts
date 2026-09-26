@@ -24,6 +24,7 @@ import { DocumentsModule } from "./modules/documents/documents.module";
 import { ConstructorModule } from "./modules/constructor/constructor.module";
 import { SupplierModule } from "./modules/supplier/supplier.module";
 import { GeoModule } from "./modules/geo/geo.module";
+import { HotelDirectoryModule } from "./modules/hotel-directory/hotel-directory.module";
 import { IdempotencyInterceptor } from "./shared/idempotency/idempotency.interceptor";
 import { SecurityModule } from "./security/security.module";
 import { JwtAuthGuard } from "./security/auth/jwt-auth.guard";
@@ -37,7 +38,7 @@ import { PermissionsGuard } from "./security/auth/permissions.guard";
  * открывает эндпоинты), PermissionsGuard глобально (проверка @RequirePermissions).
  */
 @Module({
-  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, CrmActivityModule, OrderModule, RequestModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, AnalyticsModule, DashboardModule, WorkspaceModule, ConstructorModule, SupplierModule, GeoModule, IdempotencyModule, OperationalNotesModule, MarketingModule, SupportModule, DocumentsModule],
+  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, CrmActivityModule, OrderModule, RequestModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, AnalyticsModule, DashboardModule, WorkspaceModule, ConstructorModule, SupplierModule, GeoModule, HotelDirectoryModule, IdempotencyModule, OperationalNotesModule, MarketingModule, SupportModule, DocumentsModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

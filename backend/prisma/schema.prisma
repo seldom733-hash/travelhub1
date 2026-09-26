@@ -514,6 +514,80 @@ model CategorySchema {
   @@schema("catalog")
 }
 
+// ── Hotel reference directory (Справочники → Отели) ─────────────────────
+// Master classifications for hotel products: categories (stars), room types,
+// placement (occupancy) types, meal types. Standalone master data (no FK to
+// Product); Category schemas may reference codes. Status reuses
+// catalog.CategoryStatus (ACTIVE/INACTIVE).
+
+/// Категория отеля (звёздность / формат): 5*, 4*, HV-1…
+model HotelCategory {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  names     Json // { ru, en, az }
+  sortOrder Int            @default(0)
+  status    CategoryStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([status])
+  @@index([sortOrder])
+  @@schema("catalog")
+}
+
+/// Тип номера: Standard, Deluxe, Suite, Family…
+model RoomType {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  names     Json // { ru, en, az }
+  sortOrder Int            @default(0)
+  status    CategoryStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([status])
+  @@index([sortOrder])
+  @@schema("catalog")
+}
+
+/// Тип размещения (occupancy): SNGL, DBL, TRPL, QDPL, CHD…
+model PlacementType {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  names     Json // { ru, en, az }
+  sortOrder Int            @default(0)
+  status    CategoryStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([status])
+  @@index([sortOrder])
+  @@schema("catalog")
+}
+
+/// Тип питания: RO, BB, HB, FB, AI, UAI…
+model MealType {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  names     Json // { ru, en, az }
+  sortOrder Int            @default(0)
+  status    CategoryStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([status])
+  @@index([sortOrder])
+  @@schema("catalog")
+}
+
 /// Tariff — canonical Rate Plan foundation (Step 1.8B, DD-024; Universal Pricing §1/§17).
 ///
 /// Канонический коммерческий граф: Product → ServiceUnit → Tariff/Rate Plan →
