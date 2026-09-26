@@ -11,12 +11,14 @@ import {
 } from "@nestjs/common";
 import {
   CurrentUser,
+  Public,
   RequirePermissions,
 } from "../../security/auth/decorators";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import type { AuthUser } from "../../security/auth/auth.service";
 import { GeoService } from "./geo.service";
+import { GeographyAvailabilityService } from "./geo-availability.service";
 import {
   CreateAirportDto,
   CreateCityDto,
@@ -38,7 +40,21 @@ import {
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("geo")
 export class GeoController {
-  constructor(private readonly geo: GeoService) {}
+  constructor(
+    private readonly geo: GeoService,
+    private readonly availability: GeographyAvailabilityService,
+  ) {}
+
+  /**
+   * Public category availability for user searches (prompt §24):
+   * GET /geo/availability?service=tours|hotels|flights.
+   * Returns ONLY geography with actual inventory in that category.
+   */
+  @Get("availability")
+  @Public()
+  getAvailability(@Query("service") service?: string) {
+    return this.availability.getAvailability(service ?? "");
+  }
 
   @Get("search")
   @RequirePermissions("geography.read")
