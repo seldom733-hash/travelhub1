@@ -1749,6 +1749,8 @@ model GeoAirport {
   city      GeoCity  @relation(fields: [cityId], references: [id], onDelete: Restrict)
   code      String   @unique // IATA
   names     Json // { ru, en, az }
+  latitude  Float?
+  longitude Float?
   timeZone  String?
   status    GeoStatus @default(ACTIVE)
   createdAt DateTime  @default(now())

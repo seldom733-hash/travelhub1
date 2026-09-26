@@ -6,6 +6,11 @@ import type { RoleCode } from "../generated/prisma/enums";
  * Каталог расширяется по мере добавления доменов (Sales/Finance в Phase 2).
  */
 export const PERMISSIONS = {
+  // ── Geography (Master Geography: Country/City/Resort/Airport) ──────────
+  "geography.read": "Чтение географического справочника",
+  "geography.create": "Создание записей географического справочника",
+  "geography.update": "Изменение записей географического справочника",
+  "geography.delete": "Удаление записей географического справочника",
   // ── Catalog ───────────────────────────────────────────────────────────
   "catalog.product.read": "Чтение продуктов",
   "catalog.product.read_for_moderation": "Чтение продуктов для модерации (MODERATOR)",
@@ -282,6 +287,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "account.profile.read",
     "account.profile.update",
     "catalog.product.read",
+    "geography.read",
     "catalog.category_schema.read",
     "crm.customer.read",
     "crm.partner.read",
