@@ -26,7 +26,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision", "marketing", "support", "documents", "constructor"]
+  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision", "marketing", "support", "documents", "constructor", "geo"]
 }
 
 // ─────────────────────────────── events.* ────────────────────────────────
@@ -406,9 +406,21 @@ model Product {
   // запрещены (ADR-0001); орфанные ссылки валидируются при установке в сервисе.
   partnerId String?
 
+  /// Master Geography linkage (Phase Geography): plain ID refs into geo.*
+  /// (без cross-schema FK по ADR-0001). NULL = география не задана.
+  /// Резолвятся и валидируются в сервисном слое против справочника geo.
+  geoCountryId String?
+  geoCityId    String?
+  geoResortId  String?
+  geoAirportId String?
+
   @@index([status])
   @@index([categoryId])
   @@index([partnerId])
+  @@index([geoCountryId])
+  @@index([geoCityId])
+  @@index([geoResortId])
+  @@index([geoAirportId])
   @@schema("catalog")
 }
 
@@ -1658,6 +1670,95 @@ model ProductHistory {
 
   @@index([productId])
   @@schema("catalog")
+}
+
+// ─────────────────────────────── geo.* ───────────────────────────────────
+// Master Geography: единый справочник стран/городов/курортов/аэропортов.
+// Правила: между схемами НЕТ foreign keys (ADR-0001) — catalog.Product
+// ссылается plain ID-строками (geoCountryId/geoCityId/geoResortId/
+// geoAirportId), валидация ссылок в сервисном слое. Внутри geo.* связи
+// обычные FK. Аудит изменений — через security.AuditLog (без history-таблиц).
+
+enum GeoStatus {
+  ACTIVE
+  INACTIVE
+
+  @@schema("geo")
+}
+
+model GeoCountry {
+  id        String    @id @default(uuid())
+  code      String    @unique // ISO 3166-1 alpha-2
+  names     Json // { ru, en, az }
+  status    GeoStatus @default(ACTIVE)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  cities GeoCity[]
+
+  @@index([status])
+  @@schema("geo")
+}
+
+model GeoCity {
+  id        String     @id @default(uuid())
+  countryId String
+  country   GeoCountry @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  code      String     @unique
+  names     Json // { ru, en, az }
+  latitude  Float?
+  longitude Float?
+  status    GeoStatus  @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  resorts  GeoResort[]
+  airports GeoAirport[]
+
+  @@index([countryId])
+  @@index([status])
+  @@schema("geo")
+}
+
+model GeoResort {
+  id        String   @id @default(uuid())
+  cityId    String
+  city      GeoCity  @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  code      String   @unique
+  names     Json // { ru, en, az }
+  latitude  Float?
+  longitude Float?
+  status    GeoStatus @default(ACTIVE)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([cityId])
+  @@index([status])
+  @@schema("geo")
+}
+
+model GeoAirport {
+  id        String   @id @default(uuid())
+  cityId    String
+  city      GeoCity  @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  code      String   @unique // IATA
+  names     Json // { ru, en, az }
+  timeZone  String?
+  status    GeoStatus @default(ACTIVE)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([cityId])
+  @@index([status])
+  @@schema("geo")
 }
 
 // ─────────────────────────────── crm.* ───────────────────────────────────
