@@ -61,7 +61,7 @@ export default function HotelSearch({ onSearch }: HotelSearchProps) {
           setHotelId("");
           setHotelName("");
         }}
-        filterType="destination"
+        filterType="geo:hotels"
       />
 
       {/* Hotel — SEPARATE field, filtered by city */}

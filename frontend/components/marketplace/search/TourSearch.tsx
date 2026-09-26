@@ -52,7 +52,7 @@ export default function TourSearch({ onSearch }: TourSearchProps) {
           icon={<MapPin size={14} weight="light" />}
           onSelect={(r) => setFrom(r.name)}
           onClear={() => setFrom("")}
-          filterType="destination"
+          filterType="geo:tours"
         />
 
         {/* To */}
@@ -63,7 +63,7 @@ export default function TourSearch({ onSearch }: TourSearchProps) {
           icon={<MapPin size={14} weight="light" />}
           onSelect={(r) => setTo(r.name)}
           onClear={() => setTo("")}
-          filterType="destination"
+          filterType="geo:tours"
         />
 
         {/* Start date */}
