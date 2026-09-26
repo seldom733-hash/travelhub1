@@ -49,6 +49,9 @@ export default function CompactSearch({ service, params }: CompactSearchProps) {
     sp.set("service", ctx.serviceType);
     if (ctx.fromDestination) sp.set("from", ctx.fromDestination);
     if (ctx.toDestination) sp.set("to", ctx.toDestination);
+    if (ctx.toGeoCountry) sp.set("geoCountry", ctx.toGeoCountry);
+    if (ctx.toGeoCity) sp.set("geoCity", ctx.toGeoCity);
+    if (ctx.toGeoResort) sp.set("geoResort", ctx.toGeoResort);
     if (ctx.cityName) sp.set("city", ctx.cityName);
     if (ctx.hotelId) sp.set("hotelId", ctx.hotelId);
     if (ctx.startDate) sp.set("start", ctx.startDate);
@@ -65,7 +68,12 @@ export default function CompactSearch({ service, params }: CompactSearchProps) {
     if (ctx.tariff && ctx.tariff !== "ALL") sp.set("tariff", ctx.tariff);
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.language) sp.set("lang", ctx.language);
-    if (ctx.serviceType === "tours") sp.set("supplier", "KOMPAS");
+    // Tours: country-level direction → aggregate live search across ALL
+    // suppliers that support the query; city/resort selections go to the
+    // linked catalog inventory instead.
+    if (ctx.serviceType === "tours" && !ctx.toGeoCity && !ctx.toGeoResort) {
+      sp.set("aggregate", "1");
+    }
     setIsOpen(false);
     router.push(`/search?${sp.toString()}`);
   };

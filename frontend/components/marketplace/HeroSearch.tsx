@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { t, useLocale } from "@/lib/i18n";
@@ -68,6 +68,9 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
     sp.set("service", ctx.serviceType);
     if (ctx.fromDestination) sp.set("from", ctx.fromDestination);
     if (ctx.toDestination) sp.set("to", ctx.toDestination);
+    if (ctx.toGeoCountry) sp.set("geoCountry", ctx.toGeoCountry);
+    if (ctx.toGeoCity) sp.set("geoCity", ctx.toGeoCity);
+    if (ctx.toGeoResort) sp.set("geoResort", ctx.toGeoResort);
     if (ctx.cityName) sp.set("city", ctx.cityName);
     if (ctx.hotelId) sp.set("hotelId", ctx.hotelId);
     if (ctx.startDate) sp.set("start", ctx.startDate);
@@ -83,7 +86,12 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
     if ((ctx as any).tariff && (ctx as any).tariff !== "ALL") sp.set("tariff", (ctx as any).tariff);
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.language) sp.set("lang", ctx.language);
-    if (ctx.serviceType === "tours") sp.set("supplier", "KOMPAS");
+    // Tours: country-level direction → aggregate live search across ALL
+    // suppliers that support the query; city/resort selections go to the
+    // linked catalog inventory instead.
+    if (ctx.serviceType === "tours" && !ctx.toGeoCity && !ctx.toGeoResort) {
+      sp.set("aggregate", "1");
+    }
     router.push(`/search?${sp.toString()}`);
   };
 
@@ -113,7 +121,7 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
             role="tab"
             aria-selected={activeTab === tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-all ${
+            className={`rounded-lg px-3 py-1.5 text-[14px] font-medium transition-all ${
               activeTab === tab.key
                 ? "bg-gold text-dark"
                 : "text-neutral-400 hover:bg-white/5 hover:text-white"

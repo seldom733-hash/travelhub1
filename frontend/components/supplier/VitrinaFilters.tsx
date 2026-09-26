@@ -5,13 +5,21 @@ import { t, useLocale } from "@/lib/i18n";
 import type { SupplierSearchQuery } from "@/lib/supplier-api";
 
 /**
- * KOMPAS-verified parameter ranges.
- * These are the ONLY values the adapter accepts.
- * Values outside these ranges cause explicit rejection.
+ * Per-supplier verified parameter ranges (capability matrix, mirrors the
+ * backend aggregator). Values outside a supplier's range cause explicit
+ * rejection by that supplier — the aggregate endpoint skips such suppliers.
  */
 const KOMPAS_NIGHTS = { min: 3, max: 14 } as const;
 const KOMPAS_ADULTS = { min: 1, max: 4 } as const;
 const KOMPAS_CHILDREN = { min: 0, max: 1 } as const;
+const SUMMERTOUR_NIGHTS = { min: 1, max: 30 } as const;
+
+type Range = { readonly min: number; readonly max: number };
+
+const SUPPLIER_RANGES: Record<string, { nights: Range; adults: Range; children: Range }> = {
+  KOMPAS: { nights: KOMPAS_NIGHTS, adults: KOMPAS_ADULTS, children: KOMPAS_CHILDREN },
+  SUMMERTOUR: { nights: SUMMERTOUR_NIGHTS, adults: { min: 1, max: 4 }, children: { min: 0, max: 1 } },
+};
 
 /**
  * VitrinaFilters — supplier-agnostic search filter bar.
@@ -31,6 +39,7 @@ export default function VitrinaFilters({
   supplierCode?: string;
 }) {
   const locale = useLocale();
+  const range = SUPPLIER_RANGES[supplierCode] ?? SUPPLIER_RANGES.KOMPAS;
 
   const [departureCity, setDepartureCity] = useState(initial?.departureCity ?? "1411");
   const [destination, setDestination] = useState(initial?.destination ?? "");
@@ -40,10 +49,12 @@ export default function VitrinaFilters({
   const [children, setChildren] = useState(initial?.children ?? 0);
   const [hotel, setHotel] = useState(initial?.hotel ?? "");
   const [meal, setMeal] = useState(initial?.meal ?? "");
+  const [departureDate, setDepartureDate] = useState(initial?.departureDateFrom ?? "");
   const [nightsError, setNightsError] = useState<string | null>(null);
 
   const validateNights = useCallback((from: number, to: number): boolean => {
-    if (from < KOMPAS_NIGHTS.min || from > KOMPAS_NIGHTS.max) {
+    const range = SUPPLIER_RANGES[supplierCode]?.nights ?? KOMPAS_NIGHTS;
+    if (from < range.min || from > range.max) {
       setNightsError(
         t("supplier.validation.nights_range", locale)
           .replace("{min}", String(KOMPAS_NIGHTS.min))
@@ -51,11 +62,11 @@ export default function VitrinaFilters({
       );
       return false;
     }
-    if (to < KOMPAS_NIGHTS.min || to > KOMPAS_NIGHTS.max) {
+    if (to < range.min || to > range.max) {
       setNightsError(
         t("supplier.validation.nights_range", locale)
-          .replace("{min}", String(KOMPAS_NIGHTS.min))
-          .replace("{max}", String(KOMPAS_NIGHTS.max))
+          .replace("{min}", String(range.min))
+          .replace("{max}", String(range.max))
       );
       return false;
     }
@@ -72,6 +83,8 @@ export default function VitrinaFilters({
         supplierCode,
         departureCity,
         destination: destination || undefined,
+        departureDateFrom: departureDate || undefined,
+        departureDateTo: departureDate || undefined,
         nightsFrom,
         nightsTo,
         adults,
@@ -80,7 +93,7 @@ export default function VitrinaFilters({
         meal: meal || undefined,
       });
     },
-    [departureCity, destination, nightsFrom, nightsTo, adults, children, hotel, meal, supplierCode, onSearch, validateNights],
+    [departureCity, destination, departureDate, nightsFrom, nightsTo, adults, children, hotel, meal, supplierCode, onSearch, validateNights],
   );
 
   return (
@@ -100,7 +113,7 @@ export default function VitrinaFilters({
             }}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
           >
-            {Array.from({ length: KOMPAS_NIGHTS.max - KOMPAS_NIGHTS.min + 1 }, (_, i) => KOMPAS_NIGHTS.min + i).map((n) => (
+            {Array.from({ length: range.nights.max - range.nights.min + 1 }, (_, i) => range.nights.min + i).map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
@@ -114,7 +127,7 @@ export default function VitrinaFilters({
             }}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
           >
-            {Array.from({ length: KOMPAS_NIGHTS.max - KOMPAS_NIGHTS.min + 1 }, (_, i) => KOMPAS_NIGHTS.min + i).map((n) => (
+            {Array.from({ length: range.nights.max - range.nights.min + 1 }, (_, i) => range.nights.min + i).map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
@@ -122,6 +135,19 @@ export default function VitrinaFilters({
         {nightsError && (
           <p className="text-xs text-red-600">{nightsError}</p>
         )}
+      </div>
+
+      {/* Departure date */}
+      <div className="space-y-1">
+        <label className="block text-sm font-medium text-slate-700">
+          {t("search.date", locale)}
+        </label>
+        <input
+          type="date"
+          value={departureDate}
+          onChange={(e) => setDepartureDate(e.target.value)}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+        />
       </div>
 
       {/* Adults */}

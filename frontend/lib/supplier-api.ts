@@ -218,6 +218,45 @@ async function postCaptcha<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+/** Aggregated offer with normalized Master Geography keys. */
+export interface AggregatedOffer extends SupplierOffer {
+  geo?: {
+    country?: string;
+    city?: string;
+    resort?: string;
+  };
+}
+
+export interface AggregatedSearchResult {
+  offers: AggregatedOffer[];
+  perSupplier: Record<string, { count: number; error?: string }>;
+}
+
+/**
+ * Aggregate tour search across all suppliers that support the query.
+ * Suppliers are isolated: one failing supplier never fails the response.
+ */
+export async function searchSupplierOffersAll(
+  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string },
+): Promise<AggregatedSearchResult> {
+  return get<AggregatedSearchResult>("/search-all", {
+    service: query.service,
+    country: query.country,
+    departureCity: query.departureCity,
+    destination: query.destination,
+    departureDateFrom: query.departureDateFrom,
+    departureDateTo: query.departureDateTo,
+    nightsFrom: query.nightsFrom,
+    nightsTo: query.nightsTo,
+    adults: query.adults,
+    children: query.children,
+    childAges: query.childAges?.join(","),
+    meal: query.meal,
+    hotel: query.hotel,
+    page: query.page,
+  });
+}
+
 /** Search supplier offers (anonymous). */
 export async function searchSupplierOffers(
   query: SupplierSearchQuery,

@@ -3,6 +3,7 @@ import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { SupplierCacheService } from "./cache/supplier-cache.service";
 import { SupplierResilienceService } from "./resilience/supplier-resilience.service";
 import { SupplierOfferService } from "./supplier-offer.service";
+import { SupplierAggregatorService } from "./supplier-aggregator.service";
 import { SummertourAdapter } from "./summertour/summertour.adapter";
 import { SummertourNewAdapter } from "./summertour/summertour-new.adapter";
 import { SummerSyncService } from "./summertour/summer-sync.service";
@@ -38,6 +39,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     SupplierCacheService,
     SupplierResilienceService,
     SupplierOfferService,
+    SupplierAggregatorService,
     SummertourAdapter,
     SummertourNewAdapter,
     SummerSyncService,
@@ -63,6 +65,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
         registry.register(summertour, {
           code: "SUMMERTOUR",
           name: "Summertour",
+          serviceTypes: ["tours"],
           enabled: true,
           searchEnabled: true,
           livePriceEnabled: true,
@@ -80,6 +83,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
         registry.register(kompas, {
           code: "KOMPAS",
           name: "Kompas Tour",
+          serviceTypes: ["tours"],
           enabled: true,
           searchEnabled: true,
           livePriceEnabled: true,
@@ -106,6 +110,6 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, AzalAdapter, AzalHttpService, AzalLocationsService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, AzalAdapter, AzalHttpService, AzalLocationsService, FlightSupplierRegistry],
 })
 export class SupplierModule {}

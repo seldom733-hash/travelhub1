@@ -287,6 +287,9 @@ export class PublicCatalogService {
       q: query.q?.trim() || undefined,
       availableFrom,
       attrFilters,
+      geoCountry: query.geoCountry?.trim().toUpperCase() || undefined,
+      geoCity: query.geoCity?.trim().toUpperCase() || undefined,
+      geoResort: query.geoResort?.trim().toUpperCase() || undefined,
       sort,
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -653,6 +656,9 @@ export class PublicCatalogService {
     q?: string;
     availableFrom?: Date;
     attrFilters: Array<{ key: string; value: unknown; type: string }>;
+    geoCountry?: string;
+    geoCity?: string;
+    geoResort?: string;
     sort: PublicSortMode;
     skip: number;
     take: number;
@@ -674,6 +680,45 @@ export class PublicCatalogService {
       conds.push(
         Prisma.sql`EXISTS (SELECT 1 FROM catalog."Availability" a WHERE a."productId" = p."id" AND a."date" >= ${input.availableFrom})`,
       );
+    }
+    // Master Geography filters (codes → ids; unknown code = empty result,
+    // fail closed so a wrong code never shows foreign geography).
+    if (input.geoCountry || input.geoCity || input.geoResort) {
+      const [country, city, resort] = await Promise.all([
+        input.geoCountry
+          ? this.prisma.geoCountry.findUnique({
+            where: { code: input.geoCountry },
+            select: { id: true },
+          })
+          : null,
+        input.geoCity
+          ? this.prisma.geoCity.findUnique({
+            where: { code: input.geoCity },
+            select: { id: true },
+          })
+          : null,
+        input.geoResort
+          ? this.prisma.geoResort.findUnique({
+            where: { code: input.geoResort },
+            select: { id: true },
+          })
+          : null,
+      ]);
+      if (
+        (input.geoCountry && !country) ||
+        (input.geoCity && !city) ||
+        (input.geoResort && !resort)
+      ) {
+        return { ids: [], total: 0 };
+      }
+      // Иерархический гео-фильтр (resort ⊂ city ⊂ country): выбор более
+      // узкой единицы включает карточки, слинкованные с родительской единицей.
+      // Критично для туров поставщиков: KOMPAS-синк линкует карточки на уровне
+      // страны/города (конкретный город тура поставщику неизвестен), поэтому
+      // строгий resort-фильтр всегда давал пустоту.
+      if (country) conds.push(Prisma.sql`p."geoCountryId" = ${country.id}`);
+      if (city) conds.push(Prisma.sql`(p."geoCityId" = ${city.id} OR p."geoResortId" IN (SELECT r."id" FROM geo."GeoResort" r WHERE r."cityId" = ${city.id}))`);
+      if (resort) conds.push(Prisma.sql`(p."geoResortId" = ${resort.id} OR p."geoCityId" = (SELECT r2."cityId" FROM geo."GeoResort" r2 WHERE r2."id" = ${resort.id}))`);
     }
     // Category-specific attribute сравнение. Для одиночного ключа PG использует
     // оператор ->> (jsonb, text) — у #>>/#> только text[] перегрузки (одиночный

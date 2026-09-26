@@ -22,6 +22,19 @@ export interface KompasSyncResult {
   errors: string[];
 }
 
+export interface KompasSyncOptions {
+  /** Restrict sync to discovered countries whose name contains this (case-insensitive). */
+  countryNameContains?: string;
+  /** Search window override (ISO dates). Default: today → +30 days. */
+  dateFrom?: string;
+  dateTo?: string;
+  /** Master Geography country code to link created cards (e.g. "EG"). */
+  geoCountryCode?: string;
+  /** Master Geography city code to link created cards (e.g. "SHARM"). */
+  /** @deprecated Ignored: city-level geo linkage requires offer-level geo enrichment. */
+  geoCityCode?: string;
+}
+
 @Injectable()
 export class KompasSyncService {
   private readonly logger = new Logger(KompasSyncService.name);
@@ -38,7 +51,7 @@ export class KompasSyncService {
   /**
    * §10: Full sync from Baku — discover countries → programs → search → upsert.
    */
-  async runSync(partnerId: string): Promise<KompasSyncResult> {
+  async runSync(partnerId: string, options?: KompasSyncOptions): Promise<KompasSyncResult> {
     const syncStart = Date.now();
     this.logger.log(`Starting KOMPAS sync from Baku for partner ${partnerId}`);
 
@@ -81,30 +94,78 @@ export class KompasSyncService {
       return result;
     }
 
+    // 1b. Optional country scope (e.g. Egypt-only import)
+    let scopedCountries = countryPrograms;
+    if (options?.countryNameContains) {
+      const needle = options.countryNameContains.toLowerCase();
+      scopedCountries = countryPrograms.filter((c) =>
+        c.countryName.toLowerCase().includes(needle),
+      );
+      this.logger.log(
+        `KOMPAS country filter '${options.countryNameContains}': ${scopedCountries.length} of ${countryPrograms.length} countries`,
+      );
+      if (scopedCountries.length === 0) {
+        result.errors.push(
+          `No discovered country matches '${options.countryNameContains}'`,
+        );
+        return result;
+      }
+    }
+
+    // 1c. Optional Master Geography linkage for created cards.
+    // ONLY country is linked from sync options: KOMPAS offers do not carry
+    // city identity (§1A — geography comes from SAMO DOM stateKey, country
+    // granularity). Stamping every card with one city from options was
+    // wrong (a Sharm scope run relinked Turkey cards to Sharm) and made
+    // city/resort-level catalog filters miss inventory. Per-card city
+    // linkage requires offer-level geo enrichment (separate task).
+    let geoCountryId: string | null = null;
+    if (options?.geoCountryCode) {
+      const gc = await this.prisma.geoCountry.findUnique({
+        where: { code: options.geoCountryCode },
+        select: { id: true },
+      });
+      geoCountryId = gc?.id ?? null;
+      if (!geoCountryId) {
+        result.errors.push(`Geo country ${options.geoCountryCode} not found`);
+      }
+    }
+
     // 2. Search each program
     const allOffers: SupplierOffer[] = [];
-    const dateFrom = this.formatDate(new Date());
-    const dateTo = this.formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+    const dateFrom = options?.dateFrom ?? this.formatDate(new Date());
+    const dateTo =
+      options?.dateTo ??
+      this.formatDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
 
-    for (const country of countryPrograms) {
+    for (const country of scopedCountries) {
       for (const program of country.programs) {
-        try {
-          const offers = await this.kompas.search({
-            destination: country.countryName,
-            adults: 2,
-            tourIncValue: program.value,
-            tourIncName: program.name,
-            departureDateFrom: dateFrom,
-            departureDateTo: dateTo,
-          });
-          allOffers.push(...offers);
-          result.programsSearched++;
-          this.logger.log(
-            `KOMPAS [${country.countryName}] ${program.name}: ${offers.length} offers`,
-          );
-        } catch (err) {
-          result.errors.push(`[${country.countryName}] ${program.name}: ${(err as Error).message}`);
+        // SAMO silently returns empty for multi-month ranges — search in
+        // 31-day windows (same as the price calendar).
+        const windows = this.generateDateWindows(dateFrom, dateTo);
+        let programOffers = 0;
+        for (const window of windows) {
+          try {
+            const offers = await this.kompas.search({
+              destination: country.countryName,
+              adults: 2,
+              tourIncValue: program.value,
+              tourIncName: program.name,
+              departureDateFrom: window.from,
+              departureDateTo: window.to,
+            });
+            allOffers.push(...offers);
+            programOffers += offers.length;
+          } catch (err) {
+            result.errors.push(
+              `[${country.countryName}] ${program.name} ${window.from}→${window.to}: ${(err as Error).message}`,
+            );
+          }
         }
+        result.programsSearched++;
+        this.logger.log(
+          `KOMPAS [${country.countryName}] ${program.name}: ${programOffers} offers`,
+        );
       }
     }
 
@@ -187,6 +248,20 @@ export class KompasSyncService {
                 data: { price: minPrice },
               });
             }
+            const existingAny = existing as unknown as {
+              geoCountryId?: string | null;
+            };
+            // Country-level linkage only — see the note at option parsing.
+            const geoPatch: { geoCountryId?: string } = {};
+            if (geoCountryId && !existingAny.geoCountryId) {
+              geoPatch.geoCountryId = geoCountryId;
+            }
+            if (Object.keys(geoPatch).length > 0) {
+              await tx.product.update({
+                where: { id: existing.id },
+                data: geoPatch,
+              });
+            }
           });
           if (minPrice > 0 && (existing.attributes as any)?.startingPrice !== minPrice) {
             result.updatedCards++;
@@ -196,18 +271,20 @@ export class KompasSyncService {
         } else {
           const slug = `kompas-${tourIncValue}-${hotelKey}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
           await this.prisma.$transaction(async (tx: any) => {
-            const idResult = await tx.$queryRaw<{ id: string }[]>`
-              INSERT INTO "catalog"."Product" (
-                "id", "code", "type", "title", "slug", "status", "version",
-                "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt"
-              ) VALUES (
-                gen_random_uuid(), ${productCode}, 'TOUR'::"catalog"."ProductType",
-                ${`${hotelName} — ${tourIncName}`}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
-                ${toursCategory.id}, ${JSON.stringify(attributes)}::jsonb, ${kompasPartner.id},
-                now(), now(), now()
-              )
-              RETURNING "id"
-            `;
+          const idResult = await tx.$queryRaw<{ id: string }[]>`
+            INSERT INTO "catalog"."Product" (
+              "id", "code", "type", "title", "slug", "status", "version",
+              "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt",
+            "geoCountryId"
+          ) VALUES (
+            gen_random_uuid(), ${productCode}, 'TOUR'::"catalog"."ProductType",
+            ${`${hotelName} — ${tourIncName}`}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
+            ${toursCategory.id}, ${JSON.stringify(attributes)}::jsonb, ${kompasPartner.id},
+            now(), now(), now(),
+            ${geoCountryId}
+          )
+          RETURNING "id"
+          `;
             const productId = idResult[0].id;
 
             if (minPrice > 0) {
@@ -239,6 +316,21 @@ export class KompasSyncService {
     );
 
     return result;
+  }
+
+  private generateDateWindows(from: string, to: string): Array<{ from: string; to: string }> {
+    const windows: Array<{ from: string; to: string }> = [];
+    const current = new Date(from);
+    const end = new Date(to);
+    while (current <= end) {
+      const windowEnd = new Date(current);
+      windowEnd.setDate(windowEnd.getDate() + 30);
+      if (windowEnd > end) windowEnd.setTime(end.getTime());
+      windows.push({ from: this.formatDate(current), to: this.formatDate(windowEnd) });
+      current.setTime(windowEnd.getTime());
+      current.setDate(current.getDate() + 1);
+    }
+    return windows;
   }
 
   private formatDate(d: Date): string {

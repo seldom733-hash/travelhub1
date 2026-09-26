@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Body, Query, HttpException, BadRequestException, RequestTimeoutException, BadGatewayException, Logger } from "@nestjs/common";
 import { Public } from "../../security/auth/decorators";
 import { SupplierOfferService } from "./supplier-offer.service";
+import { SupplierAggregatorService } from "./supplier-aggregator.service";
 import { TourRequestService } from "./tour-request.service";
 import { KompasCaptchaRequiredException } from "./kompas/kompas-captcha.exception";
 import type { PriceCalendarQuery, SupplierOfferRef, SupplierSearchQuery } from "./supplier.types";
@@ -18,6 +19,7 @@ export class PublicSupplierController {
   constructor(
     private readonly offerService: SupplierOfferService,
     private readonly tourRequestService: TourRequestService,
+    private readonly aggregatorService: SupplierAggregatorService,
   ) {}
 
   /**
@@ -124,6 +126,47 @@ export class PublicSupplierController {
     };
 
     return this.handleCaptcha(this.offerService.search(supplierCode, query)).catch((err) => this.mapSupplierError(err));
+  }
+
+  /**
+   * Aggregate search across enabled suppliers OF THE REQUESTED SERVICE
+   * (service=tours → tour suppliers only). Capability-filtered; suppliers
+   * are isolated: failures degrade to perSupplier[code].error.
+   */
+  @Get("public/supplier/search-all")
+  @Public()
+  async searchAll(
+    @Query("service") serviceType?: string,
+    @Query("country") country?: string,
+    @Query("departureCity") departureCity?: string,
+    @Query("destination") destination?: string,
+    @Query("departureDateFrom") departureDateFrom?: string,
+    @Query("departureDateTo") departureDateTo?: string,
+    @Query("nightsFrom") nightsFrom?: string,
+    @Query("nightsTo") nightsTo?: string,
+    @Query("adults") adults?: string,
+    @Query("children") children?: string,
+    @Query("childAges") childAges?: string,
+    @Query("meal") meal?: string,
+    @Query("hotel") hotel?: string,
+    @Query("page") page?: string,
+  ) {
+    const query: SupplierSearchQuery = {
+      country,
+      departureCity,
+      destination,
+      departureDateFrom,
+      departureDateTo,
+      nightsFrom: nightsFrom ? parseInt(nightsFrom, 10) : undefined,
+      nightsTo: nightsTo ? parseInt(nightsTo, 10) : undefined,
+      adults: adults ? parseInt(adults, 10) : 2,
+      children: children ? parseInt(children, 10) : 0,
+      childAges: childAges ? childAges.split(",").map(Number) : undefined,
+      meal,
+      hotel,
+      page: page ? parseInt(page, 10) : 1,
+    };
+    return this.aggregatorService.searchByService(serviceType || "tours", query);
   }
 
   /** Price calendar for a configuration over a date range (anonymous). */

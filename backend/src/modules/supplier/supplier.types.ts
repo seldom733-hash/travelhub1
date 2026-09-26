@@ -185,6 +185,12 @@ export interface SupplierOfferRef {
 export interface SupplierConfig {
   code: string;
   name: string;
+  /**
+   * Service categories this supplier provides (tour search → "tours",
+   * flight search → "flights", …). Aggregate search for a service MUST
+   * only query suppliers whose serviceTypes include that service.
+   */
+  serviceTypes?: string[];
   enabled: boolean;
   searchEnabled: boolean;
   livePriceEnabled: boolean;
@@ -243,6 +249,12 @@ export interface PriceCalendarQuery {
   tourIncValues?: string[];
   /** Program display names aligned with tourIncValues (optional). */
   tourIncNames?: string[];
+  /**
+   * Hotel-calendar fetch strategy (Summertour): "range" (default) fetches
+   * 31-day windows with PRICEPAGE pagination (KOMPAS-style, few requests);
+   * "perday" iterates every date (legacy, ~30 requests/month, A/B + fallback).
+   */
+  calendarMode?: "range" | "perday";
 }
 
 export interface PriceCalendarEntryOffer {

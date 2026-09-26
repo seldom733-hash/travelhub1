@@ -13,9 +13,11 @@ import type { ServiceType, SearchContext } from "@/lib/search-engine";
 import { publicApi, type PublicListResult } from "@/lib/public-api";
 import {
   searchSupplierOffers,
+  searchSupplierOffersAll,
   type SupplierOffer,
   type SupplierSearchQuery,
   type SupplierPriceCalendarQuery,
+  type AggregatedSearchResult,
 } from "@/lib/supplier-api";
 import ProductCard from "@/components/public/ProductCard";
 import { ProductGridSkeleton } from "@/components/public/Skeletons";
@@ -65,9 +67,11 @@ function SearchResultsInner() {
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const params = parseParams(searchParams);
   const supplierCode = searchParams.get("supplier") || undefined;
+  const aggregate = searchParams.get("aggregate") === "1" && service === "tours";
 
   const [result, setResult] = useState<PublicListResult | null>(null);
   const [supplierOffers, setSupplierOffers] = useState<SupplierOffer[]>([]);
+  const [aggregateResult, setAggregateResult] = useState<AggregatedSearchResult | null>(null);
   const [supplierError, setSupplierError] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -80,7 +84,9 @@ function SearchResultsInner() {
   const handleFilterSearch = useCallback((query: SupplierSearchQuery) => {
     const sp = new URLSearchParams();
     sp.set("service", "tours");
-    sp.set("supplier", query.supplierCode || "KOMPAS");
+    // Keep aggregate mode when the search came from the aggregate vitrina.
+    if (aggregate && !query.supplierCode) sp.set("aggregate", "1");
+    else sp.set("supplier", query.supplierCode || "KOMPAS");
     if (query.departureCity) sp.set("from", query.departureCity);
     if (query.destination) sp.set("to", query.destination);
     if (query.nightsFrom) sp.set("nights", String(query.nightsFrom));
@@ -89,8 +95,9 @@ function SearchResultsInner() {
     if (query.childAges?.length) sp.set("childAges", query.childAges.join(","));
     if (query.hotel) sp.set("hotel", query.hotel);
     if (query.meal) sp.set("meal", query.meal);
+    if (query.departureDateFrom) sp.set("start", query.departureDateFrom);
     router.push(`/search?${sp.toString()}`);
-  }, [router]);
+  }, [router, aggregate]);
 
   // Build PriceCalendar query from first offer + search params.
   // NOTE: PriceCalendarQuery contract uses singular `nights`; hotel name is
@@ -236,16 +243,51 @@ function SearchResultsInner() {
     setSupplierError(null);
     setResult(null);
     setSupplierOffers([]);
+    setAggregateResult(null);
     setFlightResults(null);
     setFlightError(null);
     setFlightLoading(false);
 
-    // Supplier search path
+    // Aggregate search path — country-level tours across ALL suppliers.
+    if (aggregate) {
+      searchSupplierOffersAll({
+        service: "tours",
+        destination: params.to || undefined,
+        departureCity: params.from || undefined,
+        departureDateFrom: params.start || undefined,
+        departureDateTo: params.start || undefined,
+        nightsFrom: params.nights ? Number(params.nights) : undefined,
+        nightsTo: params.nights ? Number(params.nights) : undefined,
+        adults: params.adults ? Number(params.adults) : 2,
+        children: params.children ? Number(params.children) : 0,
+        childAges: params.childAges ? params.childAges.split(",").map(Number) : undefined,
+        hotel: params.hotel || undefined,
+        meal: params.meal || undefined,
+        page,
+      })
+        .then((r) => {
+          if (alive) {
+            setAggregateResult(r);
+            setLoading(false);
+          }
+        })
+        .catch((e) => {
+          if (alive) {
+            setSupplierError((e as Error).message);
+            setLoading(false);
+          }
+        });
+      return () => { alive = false; };
+    }
+
+    // Single-supplier search path
     if (supplierCode) {
       searchSupplierOffers({
         supplierCode,
         destination: params.to || undefined,
         departureCity: params.from || undefined,
+        departureDateFrom: params.start || undefined,
+        departureDateTo: params.start || undefined,
         nightsFrom: params.nights ? Number(params.nights) : undefined,
         nightsTo: params.nights ? Number(params.nights) : undefined,
         adults: params.adults ? Number(params.adults) : 2,
@@ -279,22 +321,69 @@ function SearchResultsInner() {
       return () => { alive = false; };
     }
 
-    // Catalog search path (existing behavior)
-    const searchQuery = buildQuery();
+    // Catalog search path (existing behavior). With Master Geography
+    // selection (geoCountry/geoCity/geoResort) the geo filter is authoritative:
+    // free-text direction names are excluded from q so they cannot hide
+    // linked inventory.
+    const geoMode = params.geoCity || params.geoResort;
+    const searchQuery = geoMode
+      ? [q, params.hotel, params.start, params.checkIn, params.departure]
+        .filter(Boolean)
+        .join(" ")
+      : buildQuery();
 
     void publicApi
       .listProducts({
         q: searchQuery || undefined,
         category: service === "tours" ? "tours" : service === "hotels" ? "accommodation" : undefined,
+        geoCountry: params.geoCountry || undefined,
+        geoCity: params.geoCity || undefined,
+        geoResort: params.geoResort || undefined,
         sort,
         page,
         pageSize: 12,
       })
       .then((r) => {
-        if (alive) {
-          setResult(r);
-          setLoading(false);
+        if (!alive) return;
+        // Hybrid fallback: city/resort-level tour search with empty catalog
+        // falls back to the aggregate supplier search (live offers), so the
+        // user sees actual supplier inventory instead of a dead end.
+        if (
+          service === "tours" &&
+          r.items.length === 0 &&
+          (params.geoCity || params.geoResort)
+        ) {
+          searchSupplierOffersAll({
+            service: "tours",
+            country: params.geoCountry,
+            destination: params.to || undefined,
+            departureCity: params.from || undefined,
+            departureDateFrom: params.start || undefined,
+            departureDateTo: params.start || undefined,
+            nightsFrom: params.nights ? Number(params.nights) : undefined,
+            nightsTo: params.nights ? Number(params.nights) : undefined,
+            adults: params.adults ? Number(params.adults) : 2,
+            children: params.children ? Number(params.children) : 0,
+            childAges: params.childAges ? params.childAges.split(",").map(Number) : undefined,
+            hotel: params.hotel || undefined,
+            meal: params.meal || undefined,
+            page,
+          })
+            .then((agg) => {
+              if (!alive) return;
+              setAggregateResult(agg);
+              setResult({ ...r, items: [], total: 0 });
+              setLoading(false);
+            })
+            .catch(() => {
+              if (!alive) return;
+              setResult(r);
+              setLoading(false);
+            });
+          return;
         }
+        setResult(r);
+        setLoading(false);
       })
       .catch((e) => {
         if (alive) {
@@ -304,7 +393,7 @@ function SearchResultsInner() {
       });
 
     return () => { alive = false; };
-  }, [service, q, sort, page, JSON.stringify(params), supplierCode, locale]);
+  }, [service, q, sort, page, JSON.stringify(params), supplierCode, aggregate, locale]);
 
   const totalPages = result ? Math.max(1, Math.ceil(result.total / 12)) : 1;
 
@@ -353,9 +442,14 @@ function SearchResultsInner() {
               {t("search.found", locale)}: {result.total}
             </span>
           )}
-          {supplierOffers.length > 0 && service !== "flights" && (
+          {supplierOffers.length > 0 && service !== "flights" && !aggregate && (
             <span className="text-sm text-neutral-500">
               {t("search.found", locale)}: {supplierOffers.length}
+            </span>
+          )}
+          {aggregate && aggregateResult && aggregateResult.offers.length > 0 && (
+            <span className="text-sm text-neutral-500">
+              {t("search.found", locale)}: {aggregateResult.offers.length}
             </span>
           )}
           {service === "flights" && flightResults && (
@@ -368,6 +462,11 @@ function SearchResultsInner() {
         {/* Loading */}
         {loading && service !== "flights" && (
           <div className="mt-6">
+            {aggregate && (
+              <p className="mb-4 text-sm text-neutral-400">
+                {t("search.suppliers_searching", locale)}
+              </p>
+            )}
             <ProductGridSkeleton count={6} />
           </div>
         )}
@@ -397,8 +496,32 @@ function SearchResultsInner() {
           </div>
         )}
 
+        {/* Aggregate results — country-level search OR city/resort fallback */}
+        {!loading && !supplierError && (aggregate || (params.geoCity || params.geoResort)) && aggregateResult && (
+          <>
+            {aggregateResult.offers.length > 0 && (
+              <p className="mb-3 text-sm text-neutral-500">
+                {Object.entries(aggregateResult.perSupplier)
+                  .map(([code, r]) => `${code}: ${r.count}`)
+                  .join(" · ")}
+              </p>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {aggregateResult.offers.map((offer, i) => (
+                <PriceConfigurator key={`${offer.supplierCode}-${offer.externalOfferId}-${i}`} offer={offer} />
+              ))}
+            </div>
+            {aggregateResult.offers.length === 0 && (
+              <div className="mt-12 text-center">
+                <p className="text-lg text-neutral-400">{t("search.empty_results", locale)}</p>
+                <p className="mt-2 text-sm text-neutral-500">{t("search.empty_results_hint", locale)}</p>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Supplier results */}
-        {!loading && !supplierError && supplierOffers.length > 0 && (
+        {!loading && !supplierError && !aggregate && supplierOffers.length > 0 && (
           <>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {supplierOffers.map((offer, i) => (
@@ -436,15 +559,16 @@ function SearchResultsInner() {
         )}
 
         {/* Supplier empty */}
-        {!loading && !supplierError && supplierCode && supplierOffers.length === 0 && (
+        {!loading && !supplierError && !aggregate && supplierCode && supplierOffers.length === 0 && (
           <div className="mt-12 text-center">
             <p className="text-lg text-neutral-400">{t("search.empty_results", locale)}</p>
             <p className="mt-2 text-sm text-neutral-500">{t("search.empty_results_hint", locale)}</p>
           </div>
         )}
 
-        {/* Catalog results */}
-        {service !== "flights" && !loading && !error && result && (
+        {/* Catalog results — skipped when the aggregate fallback already
+            rendered live supplier offers for an empty catalog */}
+        {service !== "flights" && !loading && !error && result && !(aggregateResult && (params.geoCity || params.geoResort)) && (
           <>
             {result.items.length === 0 ? (
               <div className="mt-12 text-center">
