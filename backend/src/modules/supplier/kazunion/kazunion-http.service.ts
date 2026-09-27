@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import * as https from "https";
-import * as http from "http";
+import * as fs from "fs";
+import * as path from "path";
+import { execFile } from "child_process";
 
 /**
  * KazUnion HTTP Service — direct HTTP requests to the KazUnion SAMO endpoint
@@ -90,6 +92,8 @@ export interface KazunionFetchParams {
   mealKey?: string;
   /** TOWNS checklistbox value (city/district). Omit = all towns. */
   townKey?: string;
+  /** TOWNS CSV (multiple ids) — city filter resolved from Master Geography. */
+  townsCsv?: string;
   /** FREIGHTTYPE select — KazUnion native transport filter (0 = any, 2 = regular). */
   freightType?: string;
   /** STARS checklistbox values (comma-separated KazUnion ids). Omit = any. */
@@ -112,6 +116,69 @@ export class KazunionHttpService {
   private static readonly PARTITION_PRICE = "232";
   /** Dictionary cache: key = `${townFromInc}:${stateInc ?? ""}`. */
   private readonly dictCache = new Map<string, KazunionDictionary>();
+  /** Global pacing: min interval between supplier requests (~30 rpm cap). */
+  private static readonly MIN_REQUEST_INTERVAL_MS = 2_000;
+  /** Backoff between captcha auto-solve attempts (fresh image each round). */
+  private static readonly CAPTCHA_RETRY_DELAYS_MS = [15_000, 30_000, 60_000];
+  /** Fresh-image rounds per solve attempt (all OCR candidates POSTed per round). */
+  private static readonly CAPTCHA_SOLVE_ROUNDS = 3;
+  /** Serializes every supplier request: pacing must not race concurrent callers. */
+  private requestQueue: Promise<unknown> = Promise.resolve();
+  private lastRequestAt = 0;
+  /**
+   * Persistent session cookie jar. Solving the antibot challenge unlocks the
+   * whole session, so cookies survive backend restarts and a manual solve
+   * between runs reuses the same SAMO session.
+   */
+  private readonly sessionFile = path.resolve(process.cwd(), ".kazunion-session.json");
+  private jar: Record<string, string> = this.loadJar();
+  private lastCaptchaImagePath: string | null = null;
+
+  private loadJar(): Record<string, string> {
+    try {
+      const raw = JSON.parse(fs.readFileSync(this.sessionFile, "utf-8"));
+      if (raw && typeof raw.cookies === "object" && raw.cookies) return raw.cookies;
+    } catch {
+      /* first run / missing file */
+    }
+    return {};
+  }
+
+  private saveJar(pending?: { url: string; image: string } | null): void {
+    try {
+      fs.writeFileSync(
+        this.sessionFile,
+        JSON.stringify({ cookies: this.jar, pending: pending ?? null }, null, 2),
+        "utf-8",
+      );
+    } catch {
+      /* non-fatal */
+    }
+  }
+
+  private absorbCookies(setCookie: string[] | string | undefined): boolean {
+    if (!setCookie) return false;
+    const list = Array.isArray(setCookie) ? setCookie : [setCookie];
+    let changed = false;
+    for (const c of list) {
+      const nv = c.split(";")[0];
+      const eq = nv.indexOf("=");
+      if (eq <= 0) continue;
+      const name = nv.slice(0, eq).trim();
+      const value = nv.slice(eq + 1).trim();
+      if (this.jar[name] !== value) {
+        this.jar[name] = value;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  private cookieHeader(): string {
+    return Object.entries(this.jar)
+      .map(([k, v]) => `${k}=${v}`)
+      .join("; ");
+  }
 
   // ── Dictionary discovery ──────────────────────────────────────────────
 
@@ -125,21 +192,51 @@ export class KazunionHttpService {
     if (cached) return cached;
 
     const url = `${KazunionHttpService.BASE_URL}?TOWNFROMINC=${townFromInc}${stateInc ? `&STATEINC=${stateInc}` : ""}`;
-    const body = await this.httpGet(url);
-
-    const dict: KazunionDictionary = {
-      states: this.parseSelectOptions(body, "STATEINC", true),
-      programs: this.parseSelectOptions(body, "TOURINC", true),
-      meals: this.parseChecklistbox(body, "MEALS"),
-      towns: this.parseChecklistbox(body, "TOWNS"),
-    };
-    this.dictCache.set(key, dict);
+    let body = await this.pacedGet(url);
+    let dict = this.parseDictionary(body);
+    if (this.isEmptyDictionary(dict)) {
+      // All-empty parse = the supplier served a non-form page (soft block).
+      this.logger.warn(
+        `KazUnion dictionary (town=${townFromInc}, state=${stateInc ?? "default"}) parsed empty ` +
+          `(len=${body.length}, captcha=${this.isCaptchaResponse(body)}), retrying once in 10s`,
+      );
+      await new Promise((r) => setTimeout(r, 10_000));
+      body = await this.pacedGet(url);
+      dict = this.parseDictionary(body);
+      if (this.isEmptyDictionary(dict)) {
+        this.logger.warn(
+          `KazUnion dictionary (state=${stateInc ?? "default"}) still empty after retry: ` +
+            `len=${body.length} captcha=${this.isCaptchaResponse(body)} sample="` +
+            `${body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160)}"`,
+        );
+      }
+    }
+    if (!this.isEmptyDictionary(dict)) this.dictCache.set(key, dict);
     this.logger.log(
       `KazUnion dictionary (town=${townFromInc}, state=${stateInc ?? "default"}): ` +
       `${dict.states.length} states, ${dict.programs.length} programs, ` +
       `${dict.meals.length} meals, ${dict.towns.length} towns`,
     );
     return dict;
+  }
+
+  private parseDictionary(body: string): KazunionDictionary {
+    return {
+      states: this.parseSelectOptions(body, "STATEINC", true),
+      programs: this.parseSelectOptions(body, "TOURINC", true),
+      meals: this.parseChecklistbox(body, "MEALS"),
+      towns: this.parseChecklistbox(body, "TOWNS"),
+    };
+  }
+
+  /** All-empty dictionary = challenge/block page instead of the search form. */
+  private isEmptyDictionary(dict: KazunionDictionary): boolean {
+    return (
+      dict.states.length === 0 &&
+      dict.programs.length === 0 &&
+      dict.meals.length === 0 &&
+      dict.towns.length === 0
+    );
   }
 
   /** All states available for a departure town. */
@@ -164,6 +261,9 @@ export class KazunionHttpService {
         out.push({ countryId: state.value, countryName: state.name, programs });
       } catch (err) {
         this.logger.warn(`KazUnion discovery for state ${state.name} failed: ${(err as Error).message}`);
+        // Keep the country visible (empty programs) so sync reports it as an error
+        // instead of silently shrinking the discovered country list.
+        out.push({ countryId: state.value, countryName: state.name, programs: [] });
       }
     }
     return out;
@@ -183,13 +283,7 @@ export class KazunionHttpService {
 
     for (let page = startPage; page < startPage + maxPages; page++) {
       const url = this.buildPricesUrl(params, page);
-      const body = await this.httpGet(url);
-
-      if (this.isCaptchaResponse(body)) {
-        throw new Error(
-          "KazUnion: antibot/captcha challenge in response — supplier temporarily blocked, retry later",
-        );
-      }
+      const body = await this.pacedGet(url);
 
       const html = this.extractHtmlFromJs(body);
       if (!html) {
@@ -209,6 +303,9 @@ export class KazunionHttpService {
       }
 
       const totalPages = this.parseTotalPages(body, html);
+      this.logger.debug(
+        `KazUnion PRICES ${params.tourInc} page ${page}/${totalPages}: +${added} → ${rows.length} rows`,
+      );
       if (added === 0) break;
       if (page >= totalPages) break;
     }
@@ -469,8 +566,8 @@ export class KazunionHttpService {
       HOTELS: params.hotelKey ?? "",
       MEALS_ANY: params.mealKey ? "0" : "1",
       MEALS: params.mealKey ?? "",
-      TOWNS_ANY: params.townKey ? "0" : "1",
-      TOWNS: params.townKey ?? "",
+      TOWNS_ANY: params.townKey || params.townsCsv ? "0" : "1",
+      TOWNS: params.townsCsv ?? params.townKey ?? "",
       ROOMS_ANY: "1",
       ROOMS: "",
       // Native KazUnion form fields — same shape as the supplier's own request.
@@ -507,50 +604,216 @@ export class KazunionHttpService {
     return iso.replace(/-/g, "");
   }
 
-  /** Simple HTTPS GET with browser-like headers. Returns body as UTF-8 string. */
+  /**
+   * Paced GET with captcha backoff. All calls are serialized through a single
+   * queue (so concurrent search/sync callers cannot race the pacing clock),
+   * enforce MIN_REQUEST_INTERVAL_MS between requests, and retry the same URL
+   * after CAPTCHA_RETRY_DELAYS_MS when the antibot challenge is served.
+   * Throws the captcha error when all attempts are exhausted.
+   */
+  async pacedGet(url: string): Promise<string> {
+    const task = this.requestQueue.then(() => this.fetchPaced(url));
+    this.requestQueue = task.catch(() => undefined);
+    return task;
+  }
+
+  private async fetchPaced(url: string): Promise<string> {
+    for (let attempt = 0; ; attempt++) {
+      const wait =
+        KazunionHttpService.MIN_REQUEST_INTERVAL_MS - (Date.now() - this.lastRequestAt);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      this.lastRequestAt = Date.now();
+
+      const body = await this.httpGet(url);
+      if (!this.isCaptchaResponse(body)) return body;
+
+      if (await this.tryAutoSolveCaptcha(url, body)) {
+        this.logger.log("KazUnion: captcha solved automatically — session unlocked");
+        continue; // retry the same URL with the now-trusted session
+      }
+
+      const delay = KazunionHttpService.CAPTCHA_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) break;
+      this.logger.warn(
+        `KazUnion: captcha challenge on attempt ${attempt + 1}, retrying in ${delay / 1000}s`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+    }
+    await this.dumpManualCaptcha(url);
+    throw new Error(
+      `KazUnion: antibot/captcha challenge in response — manual solve required. ` +
+        `Image: ${this.lastCaptchaImagePath ?? "n/a"}; ` +
+        `run: node scripts/kazunion-captcha-solve.js <digits>`,
+    );
+  }
+
+  /**
+   * Auto-solve the kcaptcha challenge. Wrong digits do NOT invalidate the code
+   * (verified live), so every round: fetch a fresh image, collect OCR
+   * candidates, POST them all, and verify once with a GET — the server always
+   * answers 301 to the POST, only the subsequent GET tells the truth.
+   */
+  private async tryAutoSolveCaptcha(pageUrl: string, pageBody: string): Promise<boolean> {
+    try {
+      let imgTag = pageBody.match(/src="([^"]*kcaptcha\/reg\.php[^"]*)"/);
+      for (let round = 0; round < KazunionHttpService.CAPTCHA_SOLVE_ROUNDS && imgTag; round++) {
+        const img = await this.httpGetRaw(imgTag[1].replace(/&amp;/g, "&"), 0, "image/*");
+        const imgPath = path.resolve(process.cwd(), ".kazunion-captcha.jpg");
+        fs.writeFileSync(imgPath, img);
+        this.lastCaptchaImagePath = imgPath;
+
+        const candidates = await this.ocrCaptcha(imgPath);
+        if (candidates.length > 0) {
+          this.logger.log(`KazUnion: captcha OCR guesses (round ${round + 1}): ${candidates.join(", ")}`);
+        }
+        for (const digits of candidates) {
+          await this.httpPostForm(
+            pageUrl,
+            `antibot=${encodeURIComponent(digits)}&samo_action=antibot`,
+          );
+        }
+        await new Promise((r) => setTimeout(r, 300));
+        const verify = await this.httpGet(pageUrl);
+        if (!this.isCaptchaResponse(verify)) return true;
+        imgTag = verify.match(/src="([^"]*kcaptcha\/reg\.php[^"]*)"/);
+      }
+      return false;
+    } catch (err) {
+      this.logger.warn(`KazUnion: auto captcha solve failed: ${(err as Error).message}`);
+      return false;
+    }
+  }
+
+  /** OCR candidates via backend/scripts/kazunion-captcha-ocr.py (one per line). */
+  private ocrCaptcha(imagePath: string): Promise<string[]> {
+    const script = path.resolve(process.cwd(), "scripts", "kazunion-captcha-ocr.py");
+    if (!fs.existsSync(script)) return Promise.resolve([]);
+    return new Promise((resolve) => {
+      execFile(
+        "python",
+        [script, imagePath],
+        { timeout: 90_000, windowsHide: true },
+        (err, stdout) => {
+          if (err) {
+            this.logger.warn(`KazUnion: OCR helper failed: ${err.message}`);
+            resolve([]);
+            return;
+          }
+          const candidates = (stdout || "")
+            .split(/\r?\n/)
+            .map((s) => s.replace(/[^0-9]/g, ""))
+            .filter((s) => s.length >= 1);
+          resolve([...new Set(candidates)].slice(0, 6));
+        },
+      );
+    });
+  }
+
+  /** Save the challenge image + pending URL for a manual solve between runs. */
+  private async dumpManualCaptcha(url: string): Promise<void> {
+    try {
+      const body = await this.httpGet(url);
+      const imgTag = body.match(/src="([^"]*kcaptcha\/reg\.php[^"]*)"/);
+      if (!imgTag) return;
+      const img = await this.httpGetRaw(imgTag[1].replace(/&amp;/g, "&"), 0, "image/*");
+      const imgPath = path.resolve(process.cwd(), ".kazunion-captcha.jpg");
+      fs.writeFileSync(imgPath, img);
+      this.lastCaptchaImagePath = imgPath;
+      this.saveJar({ url, image: imgPath });
+    } catch (err) {
+      this.logger.warn(`KazUnion: failed to dump captcha for manual solve: ${(err as Error).message}`);
+    }
+  }
+
+  /** Plain string GET (browser-like headers + session cookies). */
   httpGet(url: string, redirectDepth = 0): Promise<string> {
+    return this.httpGetRaw(url, redirectDepth).then((b) => b.toString("utf-8"));
+  }
+
+  /** Raw byte GET (for captcha images) with cookie jar absorb. */
+  private httpGetRaw(url: string, redirectDepth = 0, accept?: string): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       if (redirectDepth > 5) {
         reject(new Error("Too many redirects"));
         return;
       }
-      const parsedUrl = new URL(url);
-      const client = parsedUrl.protocol === "https:" ? https : http;
+      const headers: Record<string, string> = {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: accept ?? "*/*",
+        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+        Referer: "https://online.kazunion.com/search_tour",
+      };
+      const cookie = this.cookieHeader();
+      if (cookie) headers.Cookie = cookie;
 
-      const req = client.get(
-        url,
-        {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            Accept: "*/*",
-            "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-            Referer: "https://online.kazunion.com/search_tour",
-          },
-          timeout: 30_000,
-        },
-        (res) => {
-          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-            const redirectUrl = new URL(res.headers.location, url).toString();
-            this.httpGet(redirectUrl, redirectDepth + 1).then(resolve, reject);
-            return;
-          }
-          if (res.statusCode && res.statusCode >= 400) {
-            reject(new Error(`HTTP ${res.statusCode} from ${url}`));
-            return;
-          }
-          const chunks: Buffer[] = [];
-          res.on("data", (chunk: Buffer) => chunks.push(chunk));
-          res.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-          res.on("error", reject);
-        },
-      );
+      const req = https.get(url, { headers, timeout: 30_000 }, (res) => {
+        if (this.absorbCookies(res.headers["set-cookie"])) this.saveJar();
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          const redirectUrl = new URL(res.headers.location, url).toString();
+          this.httpGetRaw(redirectUrl, redirectDepth + 1, accept).then(resolve, reject);
+          return;
+        }
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`HTTP ${res.statusCode} from ${url}`));
+          return;
+        }
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => resolve(Buffer.concat(chunks)));
+        res.on("error", reject);
+      });
 
       req.on("error", reject);
       req.on("timeout", () => {
         req.destroy();
         reject(new Error(`Timeout fetching ${url}`));
       });
+    });
+  }
+
+  /** urlencoded POST (does NOT follow redirects — the 301 status is the signal). */
+  private httpPostForm(
+    url: string,
+    form: string,
+  ): Promise<{ status: number; setCookie: string[] | undefined }> {
+    return new Promise((resolve, reject) => {
+      const headers: Record<string, string> = {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+        Referer: url,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": String(Buffer.byteLength(form)),
+      };
+      const cookie = this.cookieHeader();
+      if (cookie) headers.Cookie = cookie;
+
+      const req = https.request(
+        url,
+        { method: "POST", headers, timeout: 30_000 },
+        (res) => {
+          if (this.absorbCookies(res.headers["set-cookie"])) this.saveJar();
+          res.resume();
+          res.on("end", () =>
+            resolve({ status: res.statusCode ?? 0, setCookie: res.headers["set-cookie"] }),
+          );
+          res.on("error", reject);
+        },
+      );
+      req.on("error", reject);
+      req.on("timeout", () => {
+        req.destroy();
+        reject(new Error(`Timeout POST ${url}`));
+      });
+      req.write(form);
+      req.end();
     });
   }
 }

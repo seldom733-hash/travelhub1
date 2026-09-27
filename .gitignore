@@ -58,3 +58,7 @@ backend/.backups/
 # Step 2.17B perf harness run artifacts (generated, bulk) — never commit by default
 backend/artifacts/performance/
 login.json
+
+# KazUnion supplier session/captcha artifacts
+.kazunion-session.json
+.kazunion-captcha.jpg

@@ -16,6 +16,7 @@ import type {
   PriceCalendarQuery,
   PriceCalendarEntry,
   PriceCalendarResult,
+  SupplierGeoOption,
 } from "../supplier.types";
 
 /**
@@ -108,6 +109,13 @@ function generateWindows(from: string, to: string, sizeDays = 30): Array<{ from:
   return windows;
 }
 
+/** KazUnion-specific search extensions (SupplierAdapter contract stays generic). */
+export interface KazunionSearchQuery extends SupplierSearchQuery {
+  /** Max PRICES pages per program (100 rows/page). Default 5 keeps UI searches
+   *  fast; catalog sync raises it to collect the full program inventory. */
+  maxPages?: number;
+}
+
 @Injectable()
 export class KazunionAdapter implements SupplierAdapter {
   readonly code = "KAZUNION";
@@ -180,6 +188,22 @@ export class KazunionAdapter implements SupplierAdapter {
     return this.http.discoverCountriesAndPrograms("849");
   }
 
+  /**
+   * Discover KazUnion geo options (TOWNS checkbox values) for a country.
+   * KazUnion serves its dictionary over plain HTTP — no browser session
+   * needed (unlike KOMPAS/SUMMERTOUR lazy-loaded checklists).
+   */
+  async discoverGeoOptions(countryExternalId?: string): Promise<SupplierGeoOption[]> {
+    const stateInc = countryExternalId ?? "6"; // 6 = Turkey (verified)
+    const dict = await this.http.fetchDictionary("849", stateInc);
+    return dict.towns.map((t) => ({
+      externalId: t.value,
+      label: t.name,
+      kind: "TOWN",
+      countryExternalId: stateInc,
+    }));
+  }
+
   // ── SupplierAdapter ───────────────────────────────────────────────────
 
   async search(query: SupplierSearchQuery): Promise<SupplierOffer[]> {
@@ -208,6 +232,11 @@ export class KazunionAdapter implements SupplierAdapter {
     const dict = await this.http.fetchDictionary(townFrom, state.value);
     const mealKey = this.resolveMeal(query.meal, dict.meals);
     const townKey = this.resolveTownFilter(query.destination, dict.towns, state.name);
+    // City filter resolved from Master Geography (SupplierGeoLink TOWN ids):
+    // takes precedence over fuzzy destination matching (verified supplier
+    // capture: TOWNS=<ids>&TOWNS_ANY=0).
+    const townsCsv = (query as { towns?: string }).towns?.replace(/\s+/g, "") || undefined;
+    const maxPages = (query as KazunionSearchQuery).maxPages ?? 5;
 
     const rows: KazunionOfferRow[] = [];
     for (const program of programs) {
@@ -220,12 +249,14 @@ export class KazunionAdapter implements SupplierAdapter {
           checkInEnd: dateTo,
           nightsFrom,
           nightsTill,
+          maxPages,
           adults: query.adults ?? 2,
           children: query.children ?? 0,
           childAges: query.childAges,
           hotelKey: query.hotelExternalId,
           mealKey,
           townKey,
+          townsCsv,
           freightType: this.resolveFreightType(query.transport),
           starsKey: this.resolveStarsKey(query.hotelStars),
           starsAny: !query.hotelStars?.length,

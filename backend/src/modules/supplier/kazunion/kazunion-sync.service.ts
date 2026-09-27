@@ -9,7 +9,7 @@
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
-import { KazunionAdapter, kazunionCountryCandidates } from "./kazunion.adapter";
+import { KazunionAdapter, kazunionCountryCandidates, type KazunionSearchQuery } from "./kazunion.adapter";
 import type { SupplierOffer } from "../supplier.types";
 
 export interface KazunionSyncResult {
@@ -114,6 +114,13 @@ export class KazunionSyncService {
       this.logger.log(
         `KazUnion: ${result.countriesDiscovered} countries, ${result.programsDiscovered} programs from Baku`,
       );
+      for (const c of countryPrograms) {
+        if (c.programs.length === 0) {
+          result.errors.push(
+            `[${c.countryName}] no programs discovered (empty dictionary — possible supplier block)`,
+          );
+        }
+      }
     } catch (err) {
       result.errors.push(`Country/program discovery failed: ${(err as Error).message}`);
       return result;
@@ -156,8 +163,9 @@ export class KazunionSyncService {
       }
     }
 
-    // 2. Search each program in 31-day windows (SAMO is silent on wide ranges)
-    const allOffers: SupplierOffer[] = [];
+    // 2. Search each program in 31-day windows (SAMO is silent on wide ranges).
+    //    Cards are persisted per program so a mid-run restart keeps progress.
+    const defaultGeoCountryId = scoped.length === 1 ? geoCountryId : null;
     const dateFrom = options?.dateFrom ?? this.formatDate(new Date());
     const dateTo =
       options?.dateTo ??
@@ -167,6 +175,7 @@ export class KazunionSyncService {
     for (const country of scoped) {
       for (const program of country.programs) {
         let programOffers = 0;
+        const programOfferList: SupplierOffer[] = [];
         for (const window of windows) {
           try {
             const offers = await this.kazunion.search({
@@ -176,8 +185,10 @@ export class KazunionSyncService {
               tourIncName: program.name,
               departureDateFrom: window.from,
               departureDateTo: window.to,
-            });
-            allOffers.push(...offers);
+              // Full program inventory: 30 pages x 100 rows (UI keeps 5).
+              maxPages: 30,
+            } as KazunionSearchQuery);
+            programOfferList.push(...offers);
             programOffers += offers.length;
           } catch (err) {
             result.errors.push(
@@ -186,21 +197,43 @@ export class KazunionSyncService {
           }
         }
         result.programsSearched++;
+        result.offersReceived += programOffers;
         this.logger.log(
           `KazUnion [${country.countryName}] ${program.name}: ${programOffers} offers`,
         );
+        if (programOfferList.length > 0) {
+          await this.persistOffers(
+            programOfferList,
+            { toursCategoryId: toursCategory.id, partnerId, geoCountryId: defaultGeoCountryId },
+            result,
+          );
+        }
       }
     }
 
-    result.offersReceived = allOffers.length;
-    if (allOffers.length === 0) {
+    if (result.offersReceived === 0) {
       this.logger.warn("No offers received from any KazUnion program");
-      return result;
+    } else {
+      this.logger.log(`Grouped into ${result.uniqueIdentities} unique identities`);
     }
 
-    // 3. Group by tourIncValue + hotelKey
+    this.logger.log(
+      `KazUnion sync complete in ${Date.now() - syncStart}ms: ` +
+        `${result.countriesDiscovered} countries, ${result.programsDiscovered} programs, ` +
+        `${result.programsSearched} searched, ${result.offersReceived} offers, ` +
+        `${result.uniqueIdentities} unique, ${result.newCards} created, ${result.updatedCards} updated`,
+    );
+    return result;
+  }
+
+  /** Group a program's offers by identity (tourInc+hotel) and upsert cards. */
+  private async persistOffers(
+    offers: SupplierOffer[],
+    ctx: { toursCategoryId: string; partnerId: string; geoCountryId: string | null },
+    result: KazunionSyncResult,
+  ): Promise<void> {
     const groups: Record<string, SupplierOffer[]> = {};
-    for (const offer of allOffers) {
+    for (const offer of offers) {
       const tourIncValue = (offer.rawMetadata?.tourIncValue as string) ?? "0";
       const hotelKey =
         (offer.rawMetadata?.hotelKey as string) ?? offer.hotelExternalId ?? "";
@@ -209,16 +242,15 @@ export class KazunionSyncService {
       if (!groups[key]) groups[key] = [];
       groups[key].push(offer);
     }
-    result.uniqueIdentities = Object.keys(groups).length;
-    this.logger.log(`Grouped into ${result.uniqueIdentities} unique identities`);
+    result.uniqueIdentities += Object.keys(groups).length;
 
-    // 4. Upsert each card (idempotent by code)
-    for (const [key, offers] of Object.entries(groups)) {
+    // Upsert each card (idempotent by code)
+    for (const [key, groupOffers] of Object.entries(groups)) {
       try {
         const [tourIncValue, hotelKey] = key.split(":");
         const productCode = `KAZUNION-${tourIncValue}-${hotelKey}`;
 
-        const validOffers = offers.filter((o) => o.price.amount > 0);
+        const validOffers = groupOffers.filter((o) => o.price.amount > 0);
         const minPrice =
           validOffers.length > 0
             ? Math.min(...validOffers.map((o) => o.price.amount))
@@ -226,21 +258,19 @@ export class KazunionSyncService {
         const currency = validOffers[0]?.price.currency ?? "USD";
 
         const rooms = Array.from(
-          new Set(offers.map((o) => o.room).filter((r): r is string => !!r)),
+          new Set(groupOffers.map((o) => o.room).filter((r): r is string => !!r)),
         );
         const meals = Array.from(
-          new Set(offers.map((o) => o.meal).filter((m): m is string => !!m)),
+          new Set(groupOffers.map((o) => o.meal).filter((m): m is string => !!m)),
         );
 
-        const hotelName = offers[0].hotel ?? "Unknown Hotel";
-        const tourIncName = (offers[0].rawMetadata?.tourIncName as string) ?? "";
-        const country = (offers[0].rawMetadata?.country as string) ?? "Unknown";
+        const hotelName = groupOffers[0].hotel ?? "Unknown Hotel";
+        const tourIncName = (groupOffers[0].rawMetadata?.tourIncName as string) ?? "";
+        const country = (groupOffers[0].rawMetadata?.country as string) ?? "Unknown";
 
         // Country granularity geo link: discovered name → ISO-2 → geo id
         // (per card, so a full 8-country sync links each card correctly).
-        const cardGeoId =
-          (await this.geoIdForCountry(country)) ??
-          (scoped.length === 1 ? geoCountryId : null);
+        const cardGeoId = (await this.geoIdForCountry(country)) ?? ctx.geoCountryId;
 
         const attributes = {
           hotelName,
@@ -249,7 +279,7 @@ export class KazunionSyncService {
           tourIncName,
           rooms,
           meals,
-          nights: offers[0].nights,
+          nights: groupOffers[0].nights,
           startingPrice: minPrice,
           currency,
           supplierCode: "KAZUNION",
@@ -310,7 +340,7 @@ export class KazunionSyncService {
               ) VALUES (
                 gen_random_uuid(), ${productCode}, 'TOUR'::"catalog"."ProductType",
                 ${`${hotelName} — ${tourIncName}`}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
-                ${toursCategory.id}, ${JSON.stringify(attributes)}::jsonb, ${partnerId},
+                ${ctx.toursCategoryId}, ${JSON.stringify(attributes)}::jsonb, ${ctx.partnerId},
                 now(), now(), now(),
                 ${cardGeoId}
               )
@@ -337,14 +367,6 @@ export class KazunionSyncService {
         result.normalizationFailures++;
       }
     }
-
-    this.logger.log(
-      `KazUnion sync complete in ${Date.now() - syncStart}ms: ` +
-        `${result.countriesDiscovered} countries, ${result.programsDiscovered} programs, ` +
-        `${result.programsSearched} searched, ${result.offersReceived} offers, ` +
-        `${result.uniqueIdentities} unique, ${result.newCards} created, ${result.updatedCards} updated`,
-    );
-    return result;
   }
 
   /** ISO-2 → geo country id (cached). Returns null when unmapped/absent. */
