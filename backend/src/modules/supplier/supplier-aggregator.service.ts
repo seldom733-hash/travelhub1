@@ -95,6 +95,8 @@ export class SupplierAggregatorService {
    * outside the range), adults 1–4 / children 0–1 per verified context.
    * SUMMERTOUR: STATEINC=9 (Turkey) hardcoded in the request builder,
    * nights unrestricted at adapter level.
+   * KAZUNION: STATEINC dictionary discovered from the Baku form (8 countries),
+   * nights 3–15 (site NIGHTS_FROM/TILL options).
    */
   private static readonly CAPABILITIES: Record<string, SupplierCapability> = {
     KOMPAS: {
@@ -106,6 +108,12 @@ export class SupplierAggregatorService {
     },
     SUMMERTOUR: {
       countries: ["TR"],
+    },
+    // KazUnion serves 8 countries from Baku (discovered live from the form);
+    // nights 3–15 matches the site's NIGHTS_FROM/TILL options.
+    KAZUNION: {
+      countries: ["TR", "TH", "MV", "CN", "GE", "KZ", "QA", "SG"],
+      nights: { min: 3, max: 15 },
     },
   };
 
@@ -190,8 +198,17 @@ export class SupplierAggregatorService {
     settled.forEach((res, i) => {
       const code = candidates[i].code;
       if (res.status === "fulfilled") {
-        perSupplier[code] = { count: res.value.offers.length };
-        for (const offer of res.value.offers) {
+        // Only bookable offers reach the marketplace: rows with a sales stop
+        // or without flight seats are excluded, UNKNOWN stays (no fake data).
+        const bookable = res.value.offers.filter(
+          (o) => o.availability !== "NOT_AVAILABLE",
+        );
+        const hidden = res.value.offers.length - bookable.length;
+        if (hidden > 0) {
+          this.logger.log(`Aggregated search: ${code} — ${hidden} offers hidden (stop-sale/no seats)`);
+        }
+        perSupplier[code] = { count: bookable.length };
+        for (const offer of bookable) {
           aggregated.push(this.normalizeGeo(offer));
         }
       } else {

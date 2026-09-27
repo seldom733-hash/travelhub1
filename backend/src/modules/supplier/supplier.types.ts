@@ -146,6 +146,25 @@ export interface SupplierOfferDetail extends SupplierOffer {
 
 // ── Supplier Adapter Interface ───────────────────────────────────────────
 
+// ── Supplier Geo Discovery (provider-agnostic) ─────────────────────────
+
+/**
+ * Raw geo option as exposed by a supplier's own form/directory.
+ * `label` is the human-readable text exactly as the supplier renders it
+ * (e.g. "AE: Дубай из Баку (GDS: AZAL)"); matching to Master Geography
+ * happens downstream via normalization, never by inventing supplier ids.
+ */
+export interface SupplierGeoOption {
+  /** Supplier's internal identifier (e.g. SAMO TOURINC=3706). */
+  externalId: string;
+  /** Raw supplier label. */
+  label: string;
+  /** Dimension: TOUR (city/program tours), TOWN, HOTEL, ... */
+  kind: string;
+  /** Country scope this option belongs to (supplier STATEINC or ISO-2). */
+  countryExternalId?: string;
+}
+
 export interface SupplierAdapter {
   /** Unique supplier code. */
   readonly code: string;
@@ -168,6 +187,13 @@ export interface SupplierAdapter {
 
   /** Get price calendar for a configuration over a date range. */
   getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult>;
+
+  /**
+   * Discover the supplier's geo/tour options for a given country (optional
+   * capability — adapters that support it return raw options; adapters that
+   * do not simply return []). Used to auto-populate SupplierGeoLink table.
+   */
+  discoverGeoOptions?(countryExternalId?: string): Promise<SupplierGeoOption[]>;
 }
 
 // ── Supplier Offer Reference ─────────────────────────────────────────────

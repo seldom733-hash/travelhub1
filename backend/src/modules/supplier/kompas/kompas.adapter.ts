@@ -30,7 +30,11 @@ import type {
   PriceCalendarQuery,
   PriceCalendarResult,
   PriceCalendarEntry,
+  SupplierGeoOption,
 } from "../supplier.types";
+
+const KOMPAS_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36";
 
 export interface KompasSearchQuery extends SupplierSearchQuery {
   programGroupInc?: string;
@@ -272,11 +276,14 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
       await page.waitForTimeout(2_000);
       // Wait for STATEINC options to populate for Baku (Turkey 17 should appear)
-      if (this.mapStateInc(query.destination ?? query.country)) {
+      const resolvedStateId =
+        this.mapStateInc(query.destination) ??
+        this.mapStateInc(query.country);
+      if (resolvedStateId) {
         try {
           await page.waitForFunction(
             (sid: string) => !!document.querySelector(`select[name=STATEINC] option[value="${sid}"]`),
-            this.mapStateInc(query.destination ?? query.country)!,
+            resolvedStateId,
             { timeout: 10_000 },
           );
         } catch {}
@@ -284,8 +291,24 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       await page.waitForTimeout(1_000);
 
 // STATEINC (destination country) — set from query if provided
-      const stateId = this.mapStateInc(query.destination ?? query.country);
-      if (stateId) {
+      // Resolve STATEINC from country name OR ISO-2 code. Order matters:
+      // destination may hold a resort/city display name ("Аль-Джаддаф") that
+      // cannot resolve — country (ISO-2 or name) must win in that case.
+      const stateId =
+        this.mapStateInc(query.destination) ??
+        this.mapStateInc(query.country) ??
+        this.deriveStateIncFromTourIncName(query.tourIncName) ??
+        this.deriveStateIncFromTourIncName(query.tourIncNames?.[0]);
+      if (!stateId) {
+        // Never fall back to the supplier form's default country — it silently
+        // returns another country's tours (e.g. Maldives/India) for the
+        // selected date. Fail explicitly so the aggregator isolates KOMPAS.
+        throw new Error(
+          `KOMPAS: UNSUPPORTED destination "${query.destination ?? query.country ?? ""}" — ` +
+            `cannot resolve STATEINC (country/destination required)`,
+        );
+      }
+      {
         await this.setSamoSelect(page, "STATEINC", stateId);
         await page.waitForTimeout(2_000);
         // Wait for TOURINC options for this country to populate
@@ -493,7 +516,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       // §6: DOM/result consistency — verify at least one row matches expected tour.
       // With PARTITION_PRICE=0, rows from different tours may appear; only stateKey/townFromKey must match.
       const expectedTourKey = query.tourIncValue ?? "";
-      const expectedStateKey = this.mapStateInc(query.destination ?? query.country) ?? "";
+      const expectedStateKey =
+        this.mapStateInc(query.destination) ??
+        this.mapStateInc(query.country) ?? "";
       const expectedTownFromKey = BAKU_TOWNFROMINC;
       const consistencyIssue = await page.evaluate(
         (expected: { tourKey: string; stateKey: string; townFromKey: string }) => {
@@ -1123,7 +1148,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     await page.evaluate(() => { document.getElementById("samo_popup")?.remove(); document.getElementById("samo_popup_mini")?.remove(); });
     await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
     await page.waitForTimeout(2_000);
-    const stateId = this.mapStateInc(query.destination ?? query.country);
+    const stateId =
+      this.mapStateInc(query.destination) ??
+      this.mapStateInc(query.country);
     if (stateId) {
       await this.setSamoSelect(page, "STATEINC", stateId);
       await page.waitForTimeout(2_000);
@@ -1213,6 +1240,55 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     return offers.map((r) => this.normalizeOffer(r, query));
   }
 
+  // ── Geo Discovery (provider-agnostic contract) ─────────────────────
+
+  /**
+   * Discover KOMPAS geo/tour options for a country. In SAMO the
+   * city/resort dimension is the TOURINC select ("AE: Дубай из Баку"),
+   * populated after selecting STATEINC. Opens one headless page (no search
+   * submit), reads select options, closes — read-only against the supplier.
+   */
+  async discoverGeoOptions(countryExternalId?: string): Promise<SupplierGeoOption[]> {
+    const stateInc = countryExternalId ?? "";
+    if (!/^(0|[1-9]\d*)$/.test(stateInc)) return [];
+    const browser = await this.getBrowser();
+    const context = await browser.newContext({
+      userAgent: KOMPAS_USER_AGENT, // keep consistent with other contexts
+      viewport: { width: 1366, height: 900 },
+      locale: "ru-RU",
+    });
+    try {
+      const page = await context.newPage();
+      await page.goto(`${this.baseUrl}/search_tour`, { waitUntil: "networkidle", timeout: 60_000 });
+      await page.waitForFunction(
+        () => (window as any).samo?.page_ready === true,
+        { timeout: 15_000 },
+      );
+      await page.evaluate(() => {
+        document.getElementById("samo_popup")?.remove();
+        document.getElementById("samo_popup_mini")?.remove();
+      });
+      await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
+      await page.waitForTimeout(2_000);
+      await this.setSamoSelect(page, "STATEINC", stateInc);
+      await page.waitForTimeout(4_000);
+
+      const options = await page.evaluate(() => {
+        const sel = document.querySelector("select[name=TOURINC]") as HTMLSelectElement | null;
+        if (!sel) return [];
+        return Array.from(sel.options)
+          .filter((o) => o.value && o.value !== "0")
+          .map((o) => ({
+            externalId: o.value,
+            label: (o.textContent ?? "").replace(/\s+/g, " ").trim(),
+          }));
+      });
+      return options.map((o) => ({ ...o, kind: "TOUR", countryExternalId: stateInc }));
+    } finally {
+      await context.close().catch(() => {});
+    }
+  }
+
   // ── DOM Extraction ────────────────────────────────────────────────
 
   private async extractPageOffers(page: Page): Promise<any[]> {
@@ -1253,12 +1329,34 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           roomText = cells[7]?.textContent?.trim() ?? "";
         }
 
+        // Availability markers (SAMO): seats left on the flight (freight) and
+        // sales-stop flag. Absent markers = unknown (null), NOT available.
+        let flightSeatsAvailable: boolean | null = null;
+        const frAttrs = (row.getAttribute("data-fr-place") ?? row.getAttribute("data-freight-place") ?? "").trim();
+        const frCellText = (row.querySelector(".freight, .flight, .sortie")?.textContent ?? "").toLowerCase();
+        if (/нет\s*мест|no\s*seats|places?-0\b|fr-place-0\b/.test(frCellText) || frAttrs === "0") {
+          flightSeatsAvailable = false;
+        } else if (frAttrs === "1" || /есть\s*места|seats\s*available|fr-place-1\b/.test(frCellText)) {
+          flightSeatsAvailable = true;
+        }
+        let stopSale: boolean | null = null;
+        const stopEl = row.querySelector("[data-stop-sale], [data-blocked], .stop-sale") as HTMLElement | null;
+        if (stopEl) {
+          const v = stopEl.getAttribute("data-stop-sale") ?? stopEl.getAttribute("data-blocked");
+          if (v === "1" || v === "true" || stopEl.className.includes("stop-sale")) stopSale = true;
+          else if (v === "0" || v === "false") stopSale = false;
+        }
+        // SAMO marks fully stopped rows with a dedicated class.
+        const rowClass = row.className;
+        if (/stopsale|stop-sale|blocked/i.test(rowClass)) stopSale = true;
+
         results.push({
           hotelKey, spoKey, tourKey, mealKey, roomKey,
           nights, checkIn, adults, children, stateKey, townFromKey,
           claim, hotel, price: parseFloat(price), currency,
           departureDate, transport,
           roomText, mealText,
+          flightSeatsAvailable, stopSale,
         });
       }
       if (results.length > 0) {
@@ -1282,7 +1380,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       ? `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`
       : this.parseCheckInDate(raw.checkIn);
 
-    return {
+    const offer: SupplierOffer = {
       supplierCode: this.code,
       externalOfferId: raw.spoKey,
       externalClaim: raw.claim,
@@ -1327,8 +1425,20 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         stateKey: raw.stateKey,
         townFromKey: raw.townFromKey,
         country: KompasSupplierAdapter.STATE_INC_TO_COUNTRY[raw.stateKey] ?? "Unknown",
+        flightSeatsAvailable: raw.flightSeatsAvailable ?? null,
+        stopSale: raw.stopSale ?? null,
       },
     };
+
+    // Honest availability: row is bookable only when the flight has seats
+    // and sales are not stopped. Unknown markers keep UNKNOWN (never fake
+    // AVAILABLE — §1A verified-context rule).
+    if (raw.stopSale === true) {
+      (offer as any).availability = "NOT_AVAILABLE" as SupplierAvailability;
+    } else if (raw.flightSeatsAvailable === false) {
+      (offer as any).availability = "NOT_AVAILABLE" as SupplierAvailability;
+    }
+    return offer;
   }
 
   private parseCheckInDate(checkIn: string): string {
@@ -1820,28 +1930,28 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     const norm = country.trim().toLowerCase();
     const stateIncMap: Record<string, string> = {
       "turkey": "17", "türkiye": "17", "turkiye": "17", "turquía": "17", "tr": "17", "турция": "17",
-      "egypt": "37", "egypte": "37", "misr": "37",
-      "uae": "23", "оаэ": "23", "dubai": "23",
-      "maldives": "40", "мальдивы": "40",
-      "thailand": "28", "таиланд": "28",
-      "india": "6", "индия": "6",
-      "indonesia": "11", "индонезия": "11",
-      "sri lanka": "27", "шри-ланка": "27", "srilanka": "27",
-      "georgia": "30", "грузия": "30",
-      "china": "31", "китай": "31",
-      "singapore": "33", "сингапур": "33",
-      "malaysia": "12", "малайзия": "12",
-      "kazakhstan": "7", "казахстан": "7",
-      "uzbekistan": "14", "узбекистан": "14",
-      "usa": "22", "сша": "22", "united states": "22",
-      "switzerland": "59", "швейцария": "59",
-      "japan": "94", "япония": "94",
-      "mauritius": "86", "маврикий": "86",
-      "zanzibar": "109", "занзибар": "109", "tanzania": "109",
-      "qatar": "111", "катар": "111",
-      "kenya": "139", "кения": "139",
-      "austria": "51", "австрия": "51",
-      "seychelles": "77", "сейшелы": "77",
+      "egypt": "37", "egypte": "37", "misr": "37", "египет": "37", "eg": "37",
+      "uae": "23", "оаэ": "23", "dubai": "23", "ae": "23", "эмираты": "23",
+      "maldives": "40", "мальдивы": "40", "mv": "40",
+      "thailand": "28", "таиланд": "28", "th": "28",
+      "india": "6", "индия": "6", "in": "6",
+      "indonesia": "11", "индонезия": "11", "id": "11",
+      "sri lanka": "27", "шри-ланка": "27", "srilanka": "27", "lk": "27",
+      "georgia": "30", "грузия": "30", "ge": "30",
+      "china": "31", "китай": "31", "cn": "31",
+      "singapore": "33", "сингапур": "33", "sg": "33",
+      "malaysia": "12", "малайзия": "12", "my": "12",
+      "kazakhstan": "7", "казахстан": "7", "kz": "7",
+      "uzbekistan": "14", "узбекистан": "14", "uz": "14",
+      "usa": "22", "сша": "22", "united states": "22", "us": "22",
+      "switzerland": "59", "швейцария": "59", "ch": "59",
+      "japan": "94", "япония": "94", "jp": "94",
+      "mauritius": "86", "маврикий": "86", "mu": "86",
+      "zanzibar": "109", "занзибар": "109", "tanzania": "109", "tz": "109",
+      "qatar": "111", "катар": "111", "qa": "111",
+      "kenya": "139", "кения": "139", "ke": "139",
+      "austria": "51", "австрия": "51", "at": "51",
+      "seychelles": "77", "сейшелы": "77", "sc": "77",
     };
     return stateIncMap[norm] ?? null;
   }

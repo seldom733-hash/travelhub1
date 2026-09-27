@@ -6,6 +6,7 @@ import { SupplierResilienceService } from "./resilience/supplier-resilience.serv
 import { SummerSyncService } from "./summertour/summer-sync.service";
 import { SummerBulkSyncService } from "./summertour/summer-bulk-sync.service";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
+import { KazunionSyncService } from "./kazunion/kazunion-sync.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { RequirePermissions, CurrentUser } from "../../security/auth/decorators";
@@ -28,6 +29,7 @@ export class SupplierController {
     private readonly summerSync: SummerSyncService,
     private readonly summerBulkSync: SummerBulkSyncService,
     private readonly kompasSync: KompasSyncService,
+    private readonly kazunionSync: KazunionSyncService,
   ) {}
 
   // ── Summer Sync ───────────────────────────────────────────────────
@@ -59,6 +61,29 @@ export class SupplierController {
       throw new Error("KOMPAS partner not found — run partner seed first");
     }
     return this.kompasSync.runSync(partner.id);
+  }
+
+  // ── KazUnion Sync ─────────────────────────────────────────────────────
+
+  @Post("kazunion/sync")
+  @RequirePermissions("supplier.search.manage")
+  async kazunionSyncEndpoint(
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Query("country") country?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("geoCountryCode") geoCountryCode?: string,
+  ) {
+    const partner = await this.kazunionSync.getKazunionPartner();
+    if (!partner) {
+      throw new Error("KazUnion partner not found — sync cannot run");
+    }
+    return this.kazunionSync.runSync(partner.id, {
+      countryNameContains: country,
+      dateFrom,
+      dateTo,
+      geoCountryCode,
+    });
   }
 
   // ── Search ──────────────────────────────────────────────────────────

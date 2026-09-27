@@ -7,6 +7,7 @@ import type {
   SupplierOfferDetail,
   SupplierOfferRef,
   SupplierPriceSnapshot,
+  SupplierAvailability,
   SupplierAvailabilitySnapshot,
   PriceCalendarQuery,
   PriceCalendarResult,
@@ -121,8 +122,9 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
         children: query.children,
         childAges: query.childAges,
         meal: (query as any).meal,
-        freight: (query as any).freightType ?? "0",
-        filter: "0",
+        // §9: FREIGHT=1 (seats available on flight), FILTER=1 (no sales stop)
+        freight: (query as any).freightType ?? "1",
+        filter: "1",
       });
 
       // Step 3b: When HOTELS_ANY=1 (no specific hotel), discover towns from form, then query each
@@ -230,7 +232,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     // Step A: Navigate with DOLOAD=1 to trigger SAMO search directly
     const checkinBeg = summerReq.CHECKIN_BEG ?? "";
     const checkinEnd = summerReq.CHECKIN_END ?? "";
-    const initUrl = `https://summertour.az/search_tour?TOWNFROMINC=${summerReq.TOWNFROMINC}&STATEINC=${summerReq.STATEINC}&TOURINC=${tourIncValue}&CHECKIN_BEG=${checkinBeg}&CHECKIN_END=${checkinEnd}&NIGHTS_FROM=${summerReq.NIGHTS_FROM ?? ""}&NIGHTS_TILL=${summerReq.NIGHTS_TILL ?? ""}&ADULT=${summerReq.ADULT ?? "2"}&CHILD=${summerReq.CHILD ?? "0"}&CURRENCY=2&MEALS_ANY=1&ROOMS_ANY=1&HOTELS_ANY=1&PARTITION_PRICE=32&PRICEPAGE=1&DOLOAD=1`;
+    const initUrl = `https://summertour.az/search_tour?TOWNFROMINC=${summerReq.TOWNFROMINC}&STATEINC=${summerReq.STATEINC}&TOURINC=${tourIncValue}&CHECKIN_BEG=${checkinBeg}&CHECKIN_END=${checkinEnd}&NIGHTS_FROM=${summerReq.NIGHTS_FROM ?? ""}&NIGHTS_TILL=${summerReq.NIGHTS_TILL ?? ""}&ADULT=${summerReq.ADULT ?? "2"}&CHILD=${summerReq.CHILD ?? "0"}&CURRENCY=2&MEALS_ANY=1&ROOMS_ANY=1&HOTELS_ANY=1&FREIGHT=1&FILTER=1&PARTITION_PRICE=32&PRICEPAGE=1&DOLOAD=1`;
     this.logger.log(`[Summertour] Navigating to: ${initUrl.slice(0, 150)}`);
     await page.goto(initUrl, { waitUntil: "networkidle", timeout: 60_000 });
     await page.waitForFunction(() => typeof (window as any).samo !== "undefined" && (window as any).samo.page_ready === true, { timeout: 15_000 }).catch(() => {});
@@ -277,7 +279,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
 
         for (const dateStr of missingDates) {
           const dmY = `${dateStr.slice(8, 10)}.${dateStr.slice(5, 7)}.${dateStr.slice(0, 4)}`;
-          const dateUrl = `https://summertour.az/search_tour?TOWNFROMINC=${summerReq.TOWNFROMINC}&STATEINC=${summerReq.STATEINC}&TOURINC=${tourIncValue}&CHECKIN_BEG=${dmY}&CHECKIN_END=${dmY}&NIGHTS_FROM=${summerReq.NIGHTS_FROM ?? ""}&NIGHTS_TILL=${summerReq.NIGHTS_TILL ?? ""}&ADULT=${summerReq.ADULT ?? "2"}&CHILD=${summerReq.CHILD ?? "0"}&CURRENCY=2&MEALS_ANY=1&ROOMS_ANY=1&HOTELS_ANY=1&PARTITION_PRICE=32&PRICEPAGE=1&DOLOAD=1`;
+          const dateUrl = `https://summertour.az/search_tour?TOWNFROMINC=${summerReq.TOWNFROMINC}&STATEINC=${summerReq.STATEINC}&TOURINC=${tourIncValue}&CHECKIN_BEG=${dmY}&CHECKIN_END=${dmY}&NIGHTS_FROM=${summerReq.NIGHTS_FROM ?? ""}&NIGHTS_TILL=${summerReq.NIGHTS_TILL ?? ""}&ADULT=${summerReq.ADULT ?? "2"}&CHILD=${summerReq.CHILD ?? "0"}&CURRENCY=2&MEALS_ANY=1&ROOMS_ANY=1&HOTELS_ANY=1&FREIGHT=1&FILTER=1&PARTITION_PRICE=32&PRICEPAGE=1&DOLOAD=1`;
           try {
             await page.goto(dateUrl, { waitUntil: "networkidle", timeout: 60_000 });
             await page.waitForFunction(() => typeof (window as any).samo !== "undefined" && (window as any).samo.page_ready === true, { timeout: 10_000 }).catch(() => {});
@@ -351,7 +353,15 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       children: raw.children || (query.children ?? 0),
       childAges: query.childAges ?? [],
       price: { amount: raw.price, currency: raw.currency, fetchedAt: now, expiresAt: new Date(now.getTime() + 5 * 60 * 1000), queryHash: "", source: this.code },
-      availability: "AVAILABLE",
+      // Honest availability: no flight seats or stop-sale → NOT_AVAILABLE;
+      // unknown markers → UNKNOWN (never fake AVAILABLE).
+      availability: (
+        raw.stopSale === true || raw.flightSeatsAvailable === false
+          ? "NOT_AVAILABLE"
+          : raw.stopSale === false && raw.flightSeatsAvailable === true
+            ? "AVAILABLE"
+            : "UNKNOWN"
+      ) as SupplierAvailability,
       transport: raw.transport || undefined,
       fetchedAt: now,
       expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
@@ -419,9 +429,12 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     const collected: SupplierOffer[] = [];
 
     if (query.hotelExternalId && programs.length > 0) {
-      // Hotel-specific calendar: iterate per-date (SAMO XHR paginates, so range queries miss dates)
+      // Hotel-specific calendar. Default "range" (KOMPAS-style): 31-day
+      // windows with PRICEPAGE pagination — few requests. "perday" keeps the
+      // legacy per-date iteration (~30 requests/month, A/B + fallback).
       // Captcha: script D:\test.ps1 flow — detect captchaForm/bfcaptcha/antibot in response → show image + input → POST antibot
-      this.logger.log(`[Summertour calendar] hotel-specific mode: iterating per-date for extId=${query.hotelExternalId}`);
+      const mode = query.calendarMode ?? "range";
+      this.logger.log(`[Summertour calendar] hotel-specific mode=${mode} for extId=${query.hotelExternalId}`);
       const browser = await this.getBrowser();
       const context = await browser.newContext({
         userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -439,11 +452,13 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
           if (ex) { captchaThrown = true; throw ex; }
         }
 
-        const allDates: string[] = [];
-        { let cur = new Date(query.dateFrom); const end = new Date(query.dateTo); while (cur <= end) { allDates.push(this.formatDate(cur)); cur.setDate(cur.getDate() + 1); } }
-
         const parserPage = await context.newPage();
         try {
+          if (mode !== "perday") {
+            await this.collectHotelRanged(page, parserPage, context, query, programs, collected, () => { captchaThrown = true; });
+          } else {
+          const allDates: string[] = [];
+          { let cur = new Date(query.dateFrom); const end = new Date(query.dateTo); while (cur <= end) { allDates.push(this.formatDate(cur)); cur.setDate(cur.getDate() + 1); } }
           for (const dateStr of allDates) {
             for (const pr of programs) {
               const p = new URLSearchParams();
@@ -464,8 +479,9 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
               p.set("ROOMS", "");
               p.set("HOTELS_ANY", "0");
               p.set("HOTELS", query.hotelExternalId);
-              p.set("FREIGHT", "0");
-              p.set("FILTER", "0");
+              // §9: seats available on flight, no sales stop
+              p.set("FREIGHT", "1");
+              p.set("FILTER", "1");
               p.set("MOMENT_CONFIRM", "0");
               p.set("hotelsearch", "0");
               p.set("PARTITION_PRICE", "");
@@ -567,6 +583,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
               }
             }
           }
+          }
         } finally { await parserPage.close().catch(() => {}); }
       } catch (e) {
         if (e instanceof KompasCaptchaRequiredException) throw e;
@@ -666,7 +683,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
           p.set("MEALS_ANY", "1"); p.set("MEALS", "");
           p.set("ROOMS_ANY", "1"); p.set("ROOMS", "");
           p.set("HOTELS_ANY", "0"); p.set("HOTELS", query.hotelExternalId!);
-          p.set("FREIGHT", "0"); p.set("FILTER", "0"); p.set("MOMENT_CONFIRM", "0"); p.set("hotelsearch", "0");
+          p.set("FREIGHT", "1"); p.set("FILTER", "1"); p.set("MOMENT_CONFIRM", "0"); p.set("hotelsearch", "0");
           p.set("PARTITION_PRICE", ""); p.set("PRICEPAGE", "1"); p.set("DYN_SEPARATE", "1");
           p.set("rev", String(Math.floor(Math.random() * 1e9))); p.set("_", String(Date.now()));
           const xhrUrl = `https://summertour.az/search_tour?${p.toString()}`;
@@ -720,6 +737,186 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       else if (o.price.amount < m.get(k)!.price.amount) m.set(k, o);
     }
     return Array.from(m.values());
+  }
+
+  /**
+   * KOMPAS-style hotel calendar: 31-day windows with PRICEPAGE pagination.
+   * Proven equivalent to per-day iteration on live data (identical date
+   * coverage), with ~10-30x fewer requests for a single hotel. Pagination
+   * MUST run to the first empty page — cheaper offers can sit on later pages.
+   */
+  private async collectHotelRanged(
+    page: Page,
+    parserPage: Page,
+    context: BrowserContext,
+    query: PriceCalendarQuery,
+    programs: Array<{ value: string; name?: string }>,
+    collected: SupplierOffer[],
+    onCaptcha: () => void,
+  ): Promise<void> {
+    const windows = this.generateCalendarWindows(query.dateFrom, query.dateTo);
+    for (const w of windows) {
+      const beg = w.from.replace(/-/g, "");
+      const end = w.to.replace(/-/g, "");
+      for (const pr of programs) {
+        try {
+          for (let pg = 1; pg <= 30; pg += 1) {
+            const n = await this.fetchHotelPricesPage(page, parserPage, context, query, pr, beg, end, pg, collected, onCaptcha);
+            if (n === 0) break;
+          }
+        } catch (e) {
+          if (e instanceof KompasCaptchaRequiredException) throw e;
+          this.logger.warn(`[Summertour calendar] window ${w.from}→${w.to} ${pr.value} failed: ${(e as Error).message}`);
+        }
+      }
+    }
+    this.logger.log(`[Summertour calendar] collected=${collected.length} from ranged+paginate`);
+  }
+
+  private buildHotelPricesParams(
+    query: PriceCalendarQuery,
+    pr: { value: string; name?: string },
+    checkinBeg: string,
+    checkinEnd: string,
+    pricePage: number,
+  ): URLSearchParams {
+    const p = new URLSearchParams();
+    p.set("samo_action", "PRICES");
+    p.set("TOWNFROMINC", "1930");
+    p.set("STATEINC", "9");
+    p.set("TOURINC", pr.value);
+    p.set("CHECKIN_BEG", checkinBeg);
+    p.set("CHECKIN_END", checkinEnd);
+    p.set("NIGHTS_FROM", String(query.nights));
+    p.set("NIGHTS_TILL", String(query.nights));
+    p.set("ADULT", String(query.adults));
+    p.set("CHILD", String(query.children ?? 0));
+    p.set("CURRENCY", "2");
+    p.set("MEALS_ANY", "1");
+    p.set("MEALS", "");
+    p.set("ROOMS_ANY", "1");
+    p.set("ROOMS", "");
+    p.set("HOTELS_ANY", "0");
+    p.set("HOTELS", query.hotelExternalId ?? "");
+    p.set("FREIGHT", "1");
+    p.set("FILTER", "1");
+    p.set("MOMENT_CONFIRM", "0");
+    p.set("hotelsearch", "0");
+    p.set("PARTITION_PRICE", "");
+    p.set("PRICEPAGE", String(pricePage));
+    p.set("DYN_SEPARATE", "1");
+    p.set("rev", String(Math.floor(Math.random() * 1e9)));
+    p.set("_", String(Date.now()));
+    return p;
+  }
+
+  /**
+   * One SAMO PRICES XHR for a date range + page, parsed into collected.
+   * Returns the raw offer count (0 = empty page = pagination terminator).
+   * Mirrors the legacy per-day fetch incl. captcha challenge flow.
+   */
+  private async fetchHotelPricesPage(
+    page: Page,
+    parserPage: Page,
+    context: BrowserContext,
+    query: PriceCalendarQuery,
+    pr: { value: string; name?: string },
+    checkinBeg: string,
+    checkinEnd: string,
+    pricePage: number,
+    collected: SupplierOffer[],
+    onCaptcha: () => void,
+  ): Promise<number> {
+    const p = this.buildHotelPricesParams(query, pr, checkinBeg, checkinEnd, pricePage);
+    const xhrUrl = `https://summertour.az/search_tour?${p.toString()}`;
+
+    const jsResponse: string = await page.evaluate(async (url: string) => {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.text();
+    }, xhrUrl);
+
+    // Captcha detection in XHR response (script Test-CaptchaRequired) — string-based as in D:\test.ps1
+    if (this.isCaptchaInResponseText(jsResponse)) {
+      // Extract image URL via script's Get-CaptchaImageUrl logic, then fetch to data URI
+      const imgMatch = jsResponse.match(/<img\b[^>]*\bsrc\s*=\s*["']([^"']*(?:kcaptcha|captcha)[^"']*)["']/i);
+      let imgSrc: string | null = imgMatch ? imgMatch[1] : null;
+      if (imgSrc) {
+        imgSrc = imgSrc.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+        if (imgSrc.startsWith("/")) imgSrc = `https://summertour.az${imgSrc}`;
+        else if (!imgSrc.startsWith("http")) imgSrc = `https://summertour.az/${imgSrc}`;
+        let dataUri: string | null = null;
+        try {
+          dataUri = await page.evaluate(async (url: string) => {
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const blob = await r.blob();
+            return new Promise<string>((resolve, reject) => {
+              const fr = new FileReader();
+              fr.onloadend = () => resolve(fr.result as string);
+              fr.onerror = reject;
+              fr.readAsDataURL(blob);
+            });
+          }, imgSrc);
+        } catch {}
+        if (dataUri && this.captchaStore) {
+          const ch = this.captchaStore.create({ supplier: "SUMMERTOUR", operation: "priceCalendar", originalQuery: query as unknown as SupplierSearchQuery, context, page, captchaImage: dataUri, mimeType: this.inferMimeType(dataUri) });
+          this.logger.log(`[Summertour] CAPTCHA challenge created via XHR ${ch.challengeId}`);
+          onCaptcha();
+          throw new KompasCaptchaRequiredException(ch.challengeId, dataUri, this.inferMimeType(dataUri), "SUMMERTOUR");
+        }
+      }
+      // Fallback: render HTML and use DOM-based extraction
+      await page.setContent(jsResponse, { waitUntil: "domcontentloaded" }).catch(() => {});
+      const ex2 = await this.createCaptchaChallengeIfNeeded(page, context, "priceCalendar", query as unknown as SupplierSearchQuery);
+      if (ex2) { onCaptcha(); throw ex2; }
+      this.logger.warn(`[Summertour calendar] captcha without challenge for ${checkinBeg}-${checkinEnd} p${pricePage}`);
+      return 0;
+    }
+
+    const html = this.extractHtmlFromJsResponse(jsResponse);
+    // Captcha may be inside ehtml payload
+    if (html && this.isCaptchaInResponseText(html)) {
+      const imgMatch2 = html.match(/<img\b[^>]*\bsrc\s*=\s*["']([^"']*(?:kcaptcha|captcha)[^"']*)["']/i);
+      let imgSrc2: string | null = imgMatch2 ? imgMatch2[1] : null;
+      if (imgSrc2) {
+        imgSrc2 = imgSrc2.replace(/&amp;/g, "&");
+        if (imgSrc2.startsWith("/")) imgSrc2 = `https://summertour.az${imgSrc2}`;
+        else if (!imgSrc2.startsWith("http")) imgSrc2 = `https://summertour.az/${imgSrc2}`;
+        let dataUri2: string | null = null;
+        try {
+          dataUri2 = await page.evaluate(async (url: string) => {
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const blob = await r.blob();
+            return new Promise<string>((resolve, reject) => {
+              const fr = new FileReader();
+              fr.onloadend = () => resolve(fr.result as string);
+              fr.onerror = reject;
+              fr.readAsDataURL(blob);
+            });
+          }, imgSrc2);
+        } catch {}
+        if (dataUri2 && this.captchaStore) {
+          const ch2 = this.captchaStore.create({ supplier: "SUMMERTOUR", operation: "priceCalendar", originalQuery: query as unknown as SupplierSearchQuery, context, page, captchaImage: dataUri2, mimeType: this.inferMimeType(dataUri2) });
+          this.logger.log(`[Summertour] CAPTCHA challenge created via XHR ${ch2.challengeId}`);
+          onCaptcha();
+          throw new KompasCaptchaRequiredException(ch2.challengeId, dataUri2, this.inferMimeType(dataUri2), "SUMMERTOUR");
+        }
+      }
+      await page.setContent(html, { waitUntil: "domcontentloaded" }).catch(() => {});
+      const ex3 = await this.createCaptchaChallengeIfNeeded(page, context, "priceCalendar", query as unknown as SupplierSearchQuery);
+      if (ex3) { onCaptcha(); throw ex3; }
+      return 0;
+    }
+    if (html) {
+      await parserPage.setContent(`<table>${html}</table>`, { waitUntil: "domcontentloaded" });
+      const rawOffers = await parseSummerOffers(parserPage);
+      const off = rawOffers.map(o => this.normalizeOffer(o, { tourIncValue: pr.value, tourIncName: pr.name, adults: query.adults, children: query.children, childAges: query.childAges, hotel: query.hotel, hotelExternalId: query.hotelExternalId }));
+      collected.push(...off);
+      return rawOffers.length;
+    }
+    return 0;
   }
 
   private generateCalendarWindows(from: string, to: string): Array<{ from: string; to: string }> {

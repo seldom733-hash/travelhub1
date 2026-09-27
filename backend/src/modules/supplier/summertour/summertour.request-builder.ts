@@ -77,8 +77,11 @@ export function buildSummerSearchRequest(query: {
     HOTELS_ANY: query.hotelExternalId ? "0" : "1",
     MEALS_ANY: query.meal ? "0" : "1",
     ROOMS_ANY: "1",
-    FREIGHT: query.freight ?? "0",
-    FILTER: query.filter ?? "0",
+    // §9 parity with KOMPAS: FREIGHT=1 → only flights with seats available,
+    // FILTER=1 → no sales stop (остановка продаж). Suppliers otherwise return
+    // non-bookable rows that we cannot honestly sell.
+    FREIGHT: query.freight ?? "1",
+    FILTER: query.filter ?? "1",
     CURRENCY: "2",
   };
   if (query.towns) {

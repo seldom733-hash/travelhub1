@@ -109,8 +109,9 @@ export class SummertourHttpService {
       MEALS: params.mealKey ?? "",
       ROOMS_ANY: "1",
       ROOMS: "",
-      FREIGHT: params.freight ?? "0",
-      FILTER: params.filter ?? "0",
+      // FREIGHT=1 → seats available on flight; FILTER=1 → no sales stop (§9)
+      FREIGHT: params.freight ?? "1",
+      FILTER: params.filter ?? "1",
       MOMENT_CONFIRM: "0",
       PARTITION_PRICE: params.partitionPrice ?? SummertourHttpService.PARTITION_PRICE,
       PRICEPAGE: "1",

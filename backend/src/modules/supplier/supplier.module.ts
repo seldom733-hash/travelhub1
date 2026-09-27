@@ -4,6 +4,7 @@ import { SupplierCacheService } from "./cache/supplier-cache.service";
 import { SupplierResilienceService } from "./resilience/supplier-resilience.service";
 import { SupplierOfferService } from "./supplier-offer.service";
 import { SupplierAggregatorService } from "./supplier-aggregator.service";
+import { SupplierGeoIngestService } from "./supplier-geo-ingest.service";
 import { SummertourAdapter } from "./summertour/summertour.adapter";
 import { SummertourNewAdapter } from "./summertour/summertour-new.adapter";
 import { SummerSyncService } from "./summertour/summer-sync.service";
@@ -12,6 +13,9 @@ import { SummerBulkSyncService } from "./summertour/summer-bulk-sync.service";
 import { KompasSupplierAdapter } from "./kompas/kompas.adapter";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
 import { KompasCaptchaStore } from "./kompas/kompas-captcha.store";
+import { KazunionHttpService } from "./kazunion/kazunion-http.service";
+import { KazunionAdapter } from "./kazunion/kazunion.adapter";
+import { KazunionSyncService } from "./kazunion/kazunion-sync.service";
 import { SupplierController } from "./supplier.controller";
 import { PublicSupplierController } from "./public-supplier.controller";
 import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
@@ -40,6 +44,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     SupplierResilienceService,
     SupplierOfferService,
     SupplierAggregatorService,
+    SupplierGeoIngestService,
     SummertourAdapter,
     SummertourNewAdapter,
     SummerSyncService,
@@ -48,6 +53,9 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     KompasCaptchaStore,
     KompasSupplierAdapter,
     KompasSyncService,
+    KazunionHttpService,
+    KazunionAdapter,
+    KazunionSyncService,
     TourRequestService,
     AzalAdapter,
     AzalHttpService,
@@ -59,6 +67,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
 		  registry: SupplierAdapterRegistry,
 		  summertour: SummertourNewAdapter,
 		  kompas: KompasSupplierAdapter,
+          kazunion: KazunionAdapter,
           flightRegistry: FlightSupplierRegistry,
           azal: AzalAdapter,
 		) => {
@@ -99,17 +108,37 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           circuitBreakerOpenMs: 120_000,
         });
 
+        registry.register(kazunion, {
+          code: "KAZUNION",
+          name: "KazUnion",
+          serviceTypes: ["tours"],
+          enabled: true,
+          searchEnabled: true,
+          livePriceEnabled: true,
+          availabilityEnabled: true,
+          maxConcurrency: 4,
+          requestsPerMinute: 20,
+          timeoutMs: 60_000,
+          searchCacheTtlMs: 5 * 60 * 1000,
+          priceCacheTtlMs: 5 * 60 * 1000,
+          availabilityCacheTtlMs: 5 * 60 * 1000,
+          detailCacheTtlMs: 24 * 60 * 60 * 1000,
+          circuitBreakerThreshold: 10,
+          circuitBreakerOpenMs: 120_000,
+        });
+
         flightRegistry.register(azal);
       },
       inject: [
         SupplierAdapterRegistry,
         SummertourNewAdapter,
         KompasSupplierAdapter,
+        KazunionAdapter,
         FlightSupplierRegistry,
         AzalAdapter,
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, AzalAdapter, AzalHttpService, AzalLocationsService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KazunionHttpService, KazunionAdapter, KazunionSyncService, AzalAdapter, AzalHttpService, AzalLocationsService, FlightSupplierRegistry],
 })
 export class SupplierModule {}

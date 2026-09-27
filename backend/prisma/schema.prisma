@@ -17,8 +17,8 @@
 // ============================================================================
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
   // Partial indexes (review fix Step 1.2): DB-level invariant — не более одного
   // primary media на Product (CREATE UNIQUE INDEX ... WHERE "isPrimary" = true).
   previewFeatures = ["partialIndexes"]
@@ -122,21 +122,21 @@ enum ExternalIdempotencyStatus {
 /// takeover по claimedAt (bound), повторное выполнение безопасно благодаря
 /// business-idempotency защищённых операций.
 model ExternalIdempotencyRecord {
-  id             String                     @id @default(uuid())
+  id             String                    @id @default(uuid())
   /// sha256 digest слота (scope+operation+clientKey) — unique DB backstop.
-  slotKey        String                     @unique
+  slotKey        String                    @unique
   scopeType      String
   scopeId        String
   operation      String
   fingerprint    String
   status         ExternalIdempotencyStatus @default(IN_PROGRESS)
-  claimedAt      DateTime                   @default(now())
+  claimedAt      DateTime                  @default(now())
   /// Safe client-visible replay (HTTP status + whitelisted business body).
   responseStatus Int?
   responseBody   Json?
   completedAt    DateTime?
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
 
   @@index([scopeType, scopeId, operation])
   @@index([status, claimedAt])
@@ -367,11 +367,11 @@ model Product {
   // Category Schema foundation (Step 1.1): категория + снапшот версии schema,
   // по которой валидировались attributes (не меняет молча смысл Product при
   // изменении Category Schema) + сами attributes (JSONB, валидированный).
-  categoryId        String?
-  category          Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  categorySchemaId  String?
-  categorySchema    CategorySchema? @relation(fields: [categorySchemaId], references: [id], onDelete: SetNull)
-  attributes        Json?
+  categoryId           String?
+  category             Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categorySchemaId     String?
+  categorySchema       CategorySchema? @relation(fields: [categorySchemaId], references: [id], onDelete: SetNull)
+  attributes           Json?
   /// Step 2.8A: канонический commercial timezone услуги (IANA ID, напр.
   /// "Asia/Baku") — AUTHORITY времени услуги для TIME_SLOT-бронирований.
   /// Seller-декларация локации, где оказывается услуга (Catalog owns calendar/
@@ -379,7 +379,7 @@ model Product {
   /// (гейт 2.8A §8). NULL = date-only услуга / zone unknown (честно, без
   /// угадывания). Замораживается в CheckoutIntent при binding — Booking никогда
   /// не пере-резолвит текущий Catalog.
-  serviceTimeZone String?
+  serviceTimeZone      String?
   /// D2: Seller-defined Traveler Data Requirements per Product.
   /// JSONB shape: { firstName: "REQUIRED", lastName: "REQUIRED", birthDate: "OPTIONAL", ... }.
   /// States: NOT_REQUESTED | OPTIONAL | REQUIRED.
@@ -387,13 +387,13 @@ model Product {
   /// Frozen at checkout acceptance (termsAcceptedAt) for D3 snapshot.
   travelerRequirements Json?
 
-  tariffs      Tariff[]
-  availability Availability[]
-  serviceUnits ServiceUnit[]
-  history      ProductHistory[]
-  media        ProductMedia[]
-  moderation   ModerationSubmission[]
-  draft        ProductDraft?
+  tariffs             Tariff[]
+  availability        Availability[]
+  serviceUnits        ServiceUnit[]
+  history             ProductHistory[]
+  media               ProductMedia[]
+  moderation          ModerationSubmission[]
+  draft               ProductDraft?
   /// Каналы публикации (REVIEW FIX 3): canonical Product используется Marketplace
   /// и/или Partner Storefront. Пустое множество = ни один публичный канал.
   publicationChannels ProductPublicationChannel[]
@@ -431,11 +431,11 @@ model Product {
 /// Default при создании Product — MARKETPLACE (обратная совместимость);
 /// PARTNER_STOREFRONT добавляется явно (own-scope, аудит).
 model ProductPublicationChannel {
-  id        String   @id @default(uuid())
-  productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  channel   PublicationChannel
-  createdAt DateTime @default(now())
+  id          String             @id @default(uuid())
+  productId   String
+  product     Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  channel     PublicationChannel
+  createdAt   DateTime           @default(now())
   createdById String?
 
   @@unique([productId, channel])
@@ -454,7 +454,7 @@ model Category {
   id       String         @id @default(uuid())
   code     String         @unique // CAT-00000001
   slug     String         @unique // стабильный технический id: "tours", "accommodation"
-  title    String         // display name по умолчанию (локализация отдельно)
+  title    String // display name по умолчанию (локализация отдельно)
   status   CategoryStatus @default(ACTIVE)
   parentId String?
   parent   Category?      @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
@@ -489,21 +489,21 @@ model CategorySchema {
   status     CategorySchemaStatus @default(DRAFT)
 
   /// Определения attribute: [{ key, label, type, required, searchable, filterable, options?, min?, max?, pattern? }]
-  attributes Json
+  attributes        Json
   /// Требования availability (дата/слоты) — конфигурация.
-  availability Json?
+  availability      Json?
   /// Требования Tariff/Option (обязательные опции и т.п.) — конфигурация.
-  tariffRules Json?
+  tariffRules       Json?
   /// Требования media для Step 1.2: minImages/maxImages/primaryImageRequired/allowedMediaTypes/videoAllowed.
   mediaRequirements Json?
   /// Логические секции Product Detail Page (overview/gallery/itinerary/...).
-  pdpSections Json?
+  pdpSections       Json?
 
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   /// Step 1.13A: момент перехода DRAFT→ACTIVE (реальный lifecycle, не updatedAt).
-  activatedAt DateTime?
+  activatedAt  DateTime?
   /// Step 1.13A: момент перехода ACTIVE→DEPRECATED (реальный lifecycle, не updatedAt).
   deprecatedAt DateTime?
 
@@ -612,35 +612,35 @@ model MealType {
 ///
 /// Никаких CommercialPeriod/calendar/resolver/availability-полей (1.8C/1.8D).
 model Tariff {
-  id        String   @id @default(uuid())
-  code      String   @unique // TRF-00000001
-  productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id            String              @id @default(uuid())
+  code          String              @unique // TRF-00000001
+  productId     String
+  product       Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   /// Канонический ServiceUnit-аттач (Step 1.8B §6). NULL — legacy Product-only.
   serviceUnitId String?
-  serviceUnit   ServiceUnit? @relation(fields: [serviceUnitId], references: [id], onDelete: SetNull)
-  name      String
-  price     Decimal  @db.Decimal(12, 2)
-  currency  String   @default("USD")
+  serviceUnit   ServiceUnit?        @relation(fields: [serviceUnitId], references: [id], onDelete: SetNull)
+  name          String
+  price         Decimal             @db.Decimal(12, 2)
+  currency      String              @default("USD")
   /// LEGACY booking/commercial validity window — НЕ stay-period (см. выше).
-  validFrom DateTime?
-  validTo   DateTime?
-  priceBasis PriceBasis?
+  validFrom     DateTime?
+  validTo       DateTime?
+  priceBasis    PriceBasis?
   refundability Refundability?
   pricingMode   RatePlanPricingMode @default(FIXED)
   status        RatePlanStatus      @default(ACTIVE)
   /// Category-driven inclusions foundation (напр. mealPlan/includedServices).
-  inclusions Json?
+  inclusions    Json?
   /// Restrictions metadata foundation (minStay/advanceBooking/...); engine — 1.8D.
-  restrictions Json?
-  version   Int      @default(1)
-  createdAt DateTime @default(now())
+  restrictions  Json?
+  version       Int                 @default(1)
+  createdAt     DateTime            @default(now())
   /// @default(now()) — только для additive-миграции существующих legacy-строк;
   /// фактическое значение поддерживает @updatedAt (как остальные Catalog-модели).
-  updatedAt DateTime @updatedAt @default(now())
+  updatedAt     DateTime            @default(now()) @updatedAt
 
-  history TariffHistory[]
-  periods CommercialPeriod[]
+  history                TariffHistory[]
+  periods                CommercialPeriod[]
   commercialRestrictions CommercialRestriction[]
 
   @@index([productId])
@@ -676,25 +676,25 @@ model CommercialPeriod {
   tariffId String
   tariff   Tariff @relation(fields: [tariffId], references: [id], onDelete: Cascade)
 
-  kind      CommercialPeriodKind @default(PERIOD)
+  kind      CommercialPeriodKind   @default(PERIOD)
   startDate DateTime
   endDate   DateTime
   /// Условие внутри периода: 0=Sunday..6=Saturday (JS getUTCDay-совместимо).
   /// Пустой массив = bare период (без условия).
   dayOfWeek Int[]
   /// Периодная цена (Decimal(12,2), наследует валюту Tariff).
-  price Decimal @db.Decimal(12, 2)
+  price     Decimal                @db.Decimal(12, 2)
   /// Периодная sellability (stop-sell): false = даты периода не продаются.
-  sellable Boolean @default(true)
+  sellable  Boolean                @default(true)
   /// Soft commercial lifecycle (как Tariff): ACTIVE — действует, ARCHIVED —
   /// коммерчески снят (resolver игнорирует; данные/история сохраняются).
-  status CommercialPeriodStatus @default(ACTIVE)
+  status    CommercialPeriodStatus @default(ACTIVE)
 
   version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  history CommercialPeriodHistory[]
+  history      CommercialPeriodHistory[]
   restrictions CommercialRestriction[]
 
   @@index([tariffId, status])
@@ -705,18 +705,18 @@ model CommercialPeriod {
 /// физическое удаление периода с аудит-историей запрещено (lifecycle = soft
 /// archive; delete-safety, как TariffHistory §52).
 model CommercialPeriodHistory {
-  id       String @id @default(uuid())
-  periodId String
-  period   CommercialPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
-  version  Int
-  action   String
-  from     String?
-  to       String?
-  fields   Json?
-  actorId  String?
+  id        String           @id @default(uuid())
+  periodId  String
+  period    CommercialPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  version   Int
+  action    String
+  from      String?
+  to        String?
+  fields    Json?
+  actorId   String?
   actorName String?
-  comment  String?
-  createdAt DateTime @default(now())
+  comment   String?
+  createdAt DateTime         @default(now())
 
   @@index([periodId])
   @@schema("catalog")
@@ -752,25 +752,25 @@ model CommercialRestriction {
   tariffId String
   tariff   Tariff @relation(fields: [tariffId], references: [id], onDelete: Cascade)
 
-  scope CommercialRestrictionScope
+  scope              CommercialRestrictionScope
   /// PERIOD-scope: обязательная ссылка на CommercialPeriod (ownership
   /// наследуется через Tariff; сервер валидирует принадлежность + ACTIVE).
   commercialPeriodId String?
-  commercialPeriod   CommercialPeriod? @relation(fields: [commercialPeriodId], references: [id], onDelete: Cascade)
+  commercialPeriod   CommercialPeriod?          @relation(fields: [commercialPeriodId], references: [id], onDelete: Cascade)
   /// DATE-scope: точная дата (startDate == endDate, date-only UTC).
-  startDate DateTime?
-  endDate   DateTime?
+  startDate          DateTime?
+  endDate            DateTime?
 
   type  CommercialRestrictionType
   /// MIN_STAY/ADVANCE_BOOKING — значение; STOP_SELL/CTA/CTD — NULL (presence).
   value Int?
 
-  status    CommercialRestrictionStatus @default(ACTIVE)
-  version   Int                         @default(1)
+  status      CommercialRestrictionStatus @default(ACTIVE)
+  version     Int                         @default(1)
   createdById String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
-  archivedAt DateTime?
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @default(now()) @updatedAt
+  archivedAt  DateTime?
 
   history CommercialRestrictionHistory[]
 
@@ -784,23 +784,22 @@ model CommercialRestriction {
 /// физическое удаление restriction с историей запрещено; lifecycle = soft
 /// archive, как TariffHistory/CommercialPeriodHistory).
 model CommercialRestrictionHistory {
-  id   String @id @default(uuid())
+  id            String                @id @default(uuid())
   restrictionId String
   restriction   CommercialRestriction @relation(fields: [restrictionId], references: [id], onDelete: Restrict)
-  version Int
-  action  String
-  from    String?
-  to      String?
-  fields  Json?
-  actorId String?
-  actorName String?
-  comment String?
-  createdAt DateTime @default(now())
+  version       Int
+  action        String
+  from          String?
+  to            String?
+  fields        Json?
+  actorId       String?
+  actorName     String?
+  comment       String?
+  createdAt     DateTime              @default(now())
 
   @@index([restrictionId])
   @@schema("catalog")
 }
-
 
 /// Журнал аудита Rate Plan (audit by default; без dump inclusions/restrictions в
 /// security audit — только refs и lifecycle/коммерческие transition-факты).
@@ -866,21 +865,21 @@ enum AvailabilityReservationStatus {
 /// НЕ Booking (supplier-level) и НЕ Order hold: inventory capacity hold,
 /// предшествующий OrderRequested. release/consume — owner-step (2.5+).
 model AvailabilityReservation {
-  id         String                        @id @default(uuid())
+  id           String                        @id @default(uuid())
   /// Канонический ID резервации: RSR-00000001 (IdsService, атомарный счётчик).
-  code       String                        @unique
-  productId  String
-  tariffId   String?
+  code         String                        @unique
+  productId    String
+  tariffId     String?
   /// Дата услуги (date-only, UTC midnight — та же модель, что у Availability).
-  date       DateTime
-  quantity   Int                           @default(1)
+  date         DateTime
+  quantity     Int                           @default(1)
   /// Ссылка на Sales Sale (без FK). Один Sale → один hold на item.
   sourceSaleId String
-  status     AvailabilityReservationStatus @default(HELD)
-  createdById String?
-  createdAt  DateTime                      @default(now())
+  status       AvailabilityReservationStatus @default(HELD)
+  createdById  String?
+  createdAt    DateTime                      @default(now())
   /// Момент release (HELD → RELEASED), если owner-step введёт release.
-  releasedAt DateTime?
+  releasedAt   DateTime?
 
   @@index([productId, tariffId, date])
   @@index([sourceSaleId])
@@ -912,11 +911,11 @@ model AvailabilityReservation {
 ///  - никаких price/availability полей в юните (1.8A — structure only);
 ///  - business code UNI-* генерирует ТОЛЬКО IdsService (атомарный счётчик).
 model ServiceUnit {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   /// Канонический бизнес-код: UNI-00000001 (IdsService, атомарный счётчик).
-  code      String   @unique
+  code      String  @unique
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   /// Seller-определённое коммерческое название — verbatim (только trim;
   /// case/порядок слов НЕ нормализуются, НЕ переводятся).
@@ -931,7 +930,7 @@ model ServiceUnit {
   categorySchemaId String?
   /// Normalized structured attributes (валидированный JSON, whitelist-ключи
   /// CategorySchema; источник/original value НЕ перезаписывается таксономией).
-  attributes Json?
+  attributes       Json?
 
   /// Import identity foundation (DD-025 §17/§18): source — trusted интеграционный
   /// контекст (не произвольный клиентский authority), externalKey — seller-
@@ -973,9 +972,9 @@ model ServiceUnit {
 /// Журнал аудита Service Unit (audit by default; без PII — атрибуты не
 /// dump'ятся в security audit, только refs и lifecycle-переходы).
 model ServiceUnitHistory {
-  id        String       @id @default(uuid())
+  id        String      @id @default(uuid())
   unitId    String
-  unit      ServiceUnit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unit      ServiceUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
   version   Int
   action    String
   from      String?
@@ -984,7 +983,7 @@ model ServiceUnitHistory {
   actorId   String?
   actorName String?
   comment   String?
-  createdAt DateTime     @default(now())
+  createdAt DateTime    @default(now())
 
   @@index([unitId])
   @@schema("catalog")
@@ -995,34 +994,34 @@ model ServiceUnitHistory {
 /// Три ключа (derivatives): original + large.webp + thumb.webp.
 /// Внутренние storage keys НЕ публикуются: API отдаёт signed preview URL (абстракция).
 model ProductMedia {
-  id           String      @id @default(uuid())
-  productId    String
-  product      Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  type         MediaType   @default(IMAGE)
+  id        String    @id @default(uuid())
+  productId String
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type      MediaType @default(IMAGE)
 
-  originalStorageKey    String @unique
-  largeStorageKey       String
-  thumbnailStorageKey   String
-  originalFileName      String
-  mimeType              String
-  size                  Int
-  width                 Int?
-  height                Int?
-  sortOrder             Int    @default(0)
-  isPrimary             Boolean @default(false)
-  caption               String?
-  altText               String?
-  status                MediaStatus @default(DRAFT)
-  createdById           String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  originalStorageKey  String      @unique
+  largeStorageKey     String
+  thumbnailStorageKey String
+  originalFileName    String
+  mimeType            String
+  size                Int
+  width               Int?
+  height              Int?
+  sortOrder           Int         @default(0)
+  isPrimary           Boolean     @default(false)
+  caption             String?
+  altText             String?
+  status              MediaStatus @default(DRAFT)
+  createdById         String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
-  @@index([productId])
-  @@index([status])
   // DB-level invariant (review fix): partial unique index — для одного Product
   // ФИЗИЧЕСКИ невозможно иметь более одного isPrimary=true, даже при concurrent
   // writes (раньше инвариант гарантировался только application-транзакцией).
   @@unique([productId], where: { isPrimary: true }, map: "ProductMedia_one_primary_per_product")
+  @@index([productId])
+  @@index([status])
   @@schema("catalog")
 }
 
@@ -1037,26 +1036,26 @@ model ProductMedia {
 ///    ревизию; approve применяет draft к live (version N+1) и удаляет draft;
 ///  - reject/request_changes НЕ трогают live N и НЕ удаляют draft (PARTNER продолжает правки).
 model ProductDraft {
-  id          String   @id @default(uuid())
-  productId   String   @unique
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
+  id               String   @id @default(uuid())
+  productId        String   @unique
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title            String
+  description      String?
   /// Категория + схема-снапшот черновика (валидируется на PATCH черновика).
-  categoryId        String?
-  categorySchemaId  String?
-  attributes        Json?
+  categoryId       String?
+  categorySchemaId String?
+  attributes       Json?
   /// Step 2.8A: change-proposal N+1 commercial timezone (поле Draft, как
   /// title/description — применяется на approve; frozen Booking НЕ пере-резолвит).
-  serviceTimeZone   String?
+  serviceTimeZone  String?
   /// Тарифы N+1 (JSON payload; применяются на approve — заменяют live tariffs).
-  tariffs     Json?
+  tariffs          Json?
   /// Ревизия черновика: 1,2,3… на каждую правку PARTNER-а.
-  version     Int      @default(1)
-  createdById String?
-  updatedById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  version          Int      @default(1)
+  createdById      String?
+  updatedById      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@schema("catalog")
 }
@@ -1074,44 +1073,44 @@ model ProductDraft {
 ///    SUBMITTED И одну IN_REVIEW одновременно);
 ///  - решение фиксируется CAS-переходом (только одно финальное решение побеждает).
 model ModerationSubmission {
-  id           String   @id @default(uuid())
-  productId    String
-  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id                        String                     @id @default(uuid())
+  productId                 String
+  product                   Product                    @relation(fields: [productId], references: [id], onDelete: Cascade)
   /// Проверяемая версия Product (snapshot). Решение относится к ней, а не к live row.
-  productVersion Int
+  productVersion            Int
   /// Для change proposal (PUBLISHED): ревизия ProductDraft, проверяемая этой submission.
   /// null — для обычной submission нового Product (DRAFT → COMPLETE).
-  draftVersion    Int?
-  submittedById   String?
-  submittedByUsername String?
-  submittedAt     DateTime @default(now())
-  status          ModerationSubmissionStatus @default(SUBMITTED)
+  draftVersion              Int?
+  submittedById             String?
+  submittedByUsername       String?
+  submittedAt               DateTime                   @default(now())
+  status                    ModerationSubmissionStatus @default(SUBMITTED)
   /// Managed-флаг «активная submission» (SUBMITTED/IN_REVIEW). Устанавливается
   /// атомарно в тех же переходах, что и status. DB-level единый инвариант — partial
   /// unique index ниже (шаблон тот же, что и ProductMedia.isPrimary).
-  isActiveSubmission Boolean @default(false)
-  assignedModeratorId String?
+  isActiveSubmission        Boolean                    @default(false)
+  assignedModeratorId       String?
   assignedModeratorUsername String?
-  reviewStartedAt DateTime?
-  decidedAt       DateTime?
-  reasonCode      String?
-  comment         String?
+  reviewStartedAt           DateTime?
+  decidedAt                 DateTime?
+  reasonCode                String?
+  comment                   String?
   /// Immutable JSON snapshot проверяемой версии (fields + category/schema ref +
   /// attributes + tariffs + availability + media metadata, БЕЗ storage keys).
-  snapshot        Json
-  previousSubmissionId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  snapshot                  Json
+  previousSubmissionId      String?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
 
+  // ЕДИНЫЙ DB-level инвариант активной submission (Step 1.4 review fix): для одного
+  // Product физически не более одной строки с isActiveSubmission=true, независимо от
+  // того SUBMITTED это или IN_REVIEW. Апп-уровень тоже проверяет внутри tx.
+  @@unique([productId], where: { isActiveSubmission: true }, map: "ModerationSubmission_one_active_per_product")
   @@index([productId])
   @@index([status])
   @@index([isActiveSubmission])
   @@index([submittedAt])
   @@index([assignedModeratorId])
-  // ЕДИНЫЙ DB-level инвариант активной submission (Step 1.4 review fix): для одного
-  // Product физически не более одной строки с isActiveSubmission=true, независимо от
-  // того SUBMITTED это или IN_REVIEW. Апп-уровень тоже проверяет внутри tx.
-  @@unique([productId], where: { isActiveSubmission: true }, map: "ModerationSubmission_one_active_per_product")
   @@schema("catalog")
 }
 
@@ -1206,12 +1205,12 @@ enum PublicationChannel {
 /// FK (межсхемные FK запрещены). publicId (SELL-*) — стабильный публичный
 /// идентификатор, НЕ partnerId: по partnerId публичный контур не ищет.
 model PublicSellerProfile {
-  id        String   @id @default(uuid())
+  id             String               @id @default(uuid())
   /// Публичный идентификатор продавца (SELL-*), генерирует Catalog.
-  publicId  String   @unique
+  publicId       String               @unique
   /// Ссылка на crm.Partner (без FK). Каноническая связь: один профиль на Partner.
-  partnerId String   @unique
-  status    SellerProfileStatus @default(APPROVED)
+  partnerId      String               @unique
+  status         SellerProfileStatus  @default(APPROVED)
   /// Консервативный default: ANONYMOUS. Переключение — только через moderated
   /// proposal (PARTNER не может сам переключить себя в PUBLIC_BRAND/VERIFIED_ALIAS).
   visibilityMode SellerVisibilityMode @default(ANONYMOUS)
@@ -1225,20 +1224,20 @@ model PublicSellerProfile {
   /// approve; proposal НЕ может её подменить). cityCode — код из канонического
   /// справочника Catalog (должен принадлежать стране партнёра). Локализация
   /// (RU/AZ/EN display label) — обязанность клиента по кодам, не хранится здесь.
-  countryCode String?
-  cityCode    String?
+  countryCode       String?
+  cityCode          String?
 
   /// Партнёр прошёл проверку (onboarding approve / существующий ACTIVE Partner).
-  verified Boolean @default(true)
+  verified           Boolean   @default(true)
   /// Дата вступления (memberSince) — момент создания профиля.
-  memberSince DateTime @default(now())
+  memberSince        DateTime  @default(now())
   /// Время/автор последнего утверждённого изменения видимости/контента.
-  approvedAt DateTime?
-  approvedById String?
+  approvedAt         DateTime?
+  approvedById       String?
   approvedByUsername String?
 
   /// CAS-версия (stale-решения отклоняются 409).
-  version Int @default(1)
+  version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1257,36 +1256,36 @@ model PublicSellerProfile {
 /// немедленное переключение — requestedVisibilityMode ограничен VERIFIED_ALIAS;
 /// решение PUBLIC_BRAND принимает MODERATOR (approve_brand).
 model PublicSellerProfileProposal {
-  id        String   @id @default(uuid())
-  code      String   @unique // SPP-00000001
+  id        String               @id @default(uuid())
+  code      String               @unique // SPP-00000001
   profileId String
-  profile   PublicSellerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profile   PublicSellerProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
   status    SellerProposalStatus @default(DRAFT)
   /// CAS-версия предложения (stale-редактирование/решения → 409).
-  version   Int @default(1)
+  version   Int                  @default(1)
 
   /// Запрашиваемые PARTNER-ом поля (только seller-safe).
   /// Страна в предложении ОТСУТСТВУЕТ: country — системная identity crm.Partner,
   /// proposal не может подменить её locale-значением. Город — код из
   /// канонического справочника (cityCode), валидируется по стране партнёра.
-  requestedDisplayName String?
-  requestedDescription String?
-  requestedLogoMediaId String?
-  requestedCityCode    String?
+  requestedDisplayName    String?
+  requestedDescription    String?
+  requestedLogoMediaId    String?
+  requestedCityCode       String?
   /// Что PARTNER запрашивает: только VERIFIED_ALIAS (свой alias). PUBLIC_BRAND
   /// устанавливается решением MODERATOR (поле approvedVisibilityMode).
   requestedVisibilityMode SellerVisibilityMode @default(VERIFIED_ALIAS)
 
   /// Решение MODERATOR: какой режим фактически утверждён (alias или brand).
   approvedVisibilityMode SellerVisibilityMode?
-  submittedById String?
-  submittedByUsername String?
-  submittedAt DateTime?
-  reviewedAt DateTime?
-  reviewedById String?
-  reviewedByUsername String?
-  decisionReason String?
-  decisionComment String?
+  submittedById          String?
+  submittedByUsername    String?
+  submittedAt            DateTime?
+  reviewedAt             DateTime?
+  reviewedById           String?
+  reviewedByUsername     String?
+  decisionReason         String?
+  decisionComment        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1321,28 +1320,28 @@ model PublicSellerProfileProposal {
 /// - lifecycle timestamps: activatedAt/deactivatedAt — реальные бизнес-переходы
 ///   (НЕ updatedAt), + actor (activatedById/deactivatedById).
 model PartnerStorefront {
-  id        String   @id @default(uuid())
+  id                String                      @id @default(uuid())
   /// Стабильный публичный код (SF-00000001), генерирует Catalog (IdsService).
-  code      String   @unique
+  code              String                      @unique
   /// Tenant-scoped short code (SF001, SF002, ...). Immutable after creation.
   /// Deterministic: assigned by ROW_NUMBER() OVER (ORDER BY code).
-  storefrontCode String @unique
+  storefrontCode    String                      @unique
   /// Ссылка на crm.Partner (без FK). Одна витрина на Partner.
-  partnerId String   @unique
+  partnerId         String                      @unique
   /// Публичный slug: normalized, URL-safe, immutable после создания.
-  slug      String   @unique
-  status    StorefrontStatus @default(DRAFT)
+  slug              String                      @unique
+  status            StorefrontStatus            @default(DRAFT)
   /// Коммерческий entitlement (REVIEW FIX 2). PUBLIC activation требует ACTIVE.
   /// SUSPENDED/EXPIRED скрывают публичную витрину без удаления данных.
   entitlementStatus StorefrontEntitlementStatus @default(NONE)
   /// Storefront business identity (Step 1.12.2 §3): ИМЯ бизнеса на платном
   /// сайте PARTNER. НЕ привязано к seller profile; anti-disintermediation
   /// применяется на запись. В Marketplace контур НЕ попадает.
-  businessName String?
-  tagline     String?
-  description String?
+  businessName      String?
+  tagline           String?
+  description       String?
   /// Локаль контента витрины по умолчанию (ru/az/en). НЕ является country code.
-  defaultLocale String @default("ru")
+  defaultLocale     String                      @default("ru")
 
   /// География витрины (коды, locale-независимы). countryCode — системная
   /// identity из crm.Partner (записывается сервисом, НЕ из body); cityCode —
@@ -1353,31 +1352,31 @@ model PartnerStorefront {
   /// Structured business contacts (Step 1.12.2 §4) — публикуются ТОЛЬКО в
   /// Storefront-контексте (ACTIVE + entitlement ACTIVE). В Marketplace/CRM/
   /// PublicSellerProfile не попадают. Валидация: формат email/phone/URL.
-  publicPhone  String?
-  publicEmail  String?
-  websiteUrl   String?
-  whatsapp     String?
-  socialLinks  Json?
+  publicPhone String?
+  publicEmail String?
+  websiteUrl  String?
+  whatsapp    String?
+  socialLinks Json?
 
   /// Branding (Step 1.12.2 §5): hero heading/subheading + безопасный theme
   /// preset (whitelist). Arbitrary CSS/JS/HTML запрещён. Логотип/hero-изображения
   /// — отдельная модель StorefrontMedia (private storage, controlled upload).
   heroHeading    String?
   heroSubheading String?
-  themePreset    String @default("default")
+  themePreset    String  @default("default")
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   /// Моменты РЕАЛЬНЫХ lifecycle-переходов (не updatedAt).
-  activatedAt   DateTime?
-  deactivatedAt DateTime?
-  createdById   String?
-  updatedById   String?
+  activatedAt     DateTime?
+  deactivatedAt   DateTime?
+  createdById     String?
+  updatedById     String?
   activatedById   String?
   deactivatedById String?
 
   /// Storefront-owned media (logo/hero) — private storage, controlled upload.
-  media StorefrontMedia[]
+  media        StorefrontMedia[]
   /// Subscription linking this storefront to a billing plan.
   subscription StorefrontSubscription?
 
@@ -1422,20 +1421,20 @@ enum SubscriptionPaymentStatus {
 }
 
 model StorefrontSubscriptionPlan {
-  id        String   @id @default(uuid())
-  code      String   @unique // SUB-PLAN-001
-  name      String   // "First Month Free" / "Premium"
-  planType  StorefrontPlanType
+  id         String             @id @default(uuid())
+  code       String             @unique // SUB-PLAN-001
+  name       String // "First Month Free" / "Premium"
+  planType   StorefrontPlanType
   /// Monthly price in USD. 0 for free trial.
-  priceUsd  Decimal  @db.Decimal(10, 2)
+  priceUsd   Decimal            @db.Decimal(10, 2)
   /// Billing period in days. 30 for monthly.
-  periodDays Int     @default(30)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  periodDays Int                @default(30)
+  isActive   Boolean            @default(true)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
 
   subscriptions StorefrontSubscription[]
-  contracts    SubscriptionContract[]
+  contracts     SubscriptionContract[]
 
   @@schema("catalog")
 }
@@ -1452,28 +1451,28 @@ enum StorefrontSubscriptionStatus {
 }
 
 model StorefrontSubscription {
-  id          String   @id @default(uuid())
-  code        String   @unique // SUB-00000001
-  storefrontId String
-  storefront   PartnerStorefront @relation(fields: [storefrontId], references: [id], onDelete: Cascade)
-  planId      String
-  plan        StorefrontSubscriptionPlan @relation(fields: [planId], references: [id])
-  status      StorefrontSubscriptionStatus @default(ACTIVE)
+  id                 String                       @id @default(uuid())
+  code               String                       @unique // SUB-00000001
+  storefrontId       String
+  storefront         PartnerStorefront            @relation(fields: [storefrontId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               StorefrontSubscriptionPlan   @relation(fields: [planId], references: [id])
+  status             StorefrontSubscriptionStatus @default(ACTIVE)
   /// When the current billing period starts.
   currentPeriodStart DateTime
   /// When the current billing period ends (exclusive).
   currentPeriodEnd   DateTime
   /// When the subscription was created.
-  startedAt   DateTime @default(now())
+  startedAt          DateTime                     @default(now())
   /// When cancelled (null if active).
-  cancelledAt DateTime?
+  cancelledAt        DateTime?
   /// Total amount paid to date.
-  totalPaidUsd Decimal @db.Decimal(10, 2) @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  totalPaidUsd       Decimal                      @default(0) @db.Decimal(10, 2)
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
 
-  contracts             SubscriptionContract[]
-  invoices             SubscriptionInvoice[]
+  contracts SubscriptionContract[]
+  invoices  SubscriptionInvoice[]
 
   @@unique([storefrontId])
   @@index([status])
@@ -1485,28 +1484,28 @@ model StorefrontSubscription {
 /// List Price ≠ Contracted Price: contract stores the actual agreed amount.
 /// Changing plan list price does NOT alter existing contracts.
 model SubscriptionContract {
-  id                   String   @id @default(uuid())
-  code                 String   @unique // SC-00000001
-  subscriptionId       String
-  subscription         StorefrontSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  planId               String
-  plan                 StorefrontSubscriptionPlan @relation(fields: [planId], references: [id])
+  id                    String                     @id @default(uuid())
+  code                  String                     @unique // SC-00000001
+  subscriptionId        String
+  subscription          StorefrontSubscription     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  planId                String
+  plan                  StorefrontSubscriptionPlan @relation(fields: [planId], references: [id])
   /// Authoritative contracted unit amount (NOT list price).
-  contractedUnitAmount Decimal  @db.Decimal(10, 2)
+  contractedUnitAmount  Decimal                    @db.Decimal(10, 2)
   /// Canonical billing currency: AZN.
-  currency             String   @default("AZN")
-  billingInterval      BillingInterval @default(MONTHLY)
+  currency              String                     @default("AZN")
+  billingInterval       BillingInterval            @default(MONTHLY)
   /// Billable host/seat quantity.
-  quantity             Int      @default(1)
+  quantity              Int                        @default(1)
   /// Total = unitAmount × quantity (snapshot).
-  contractedTotalAmount Decimal @db.Decimal(12, 2)
-  effectiveFrom        DateTime
-  effectiveTo          DateTime?
-  isActive             Boolean  @default(true)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  contractedTotalAmount Decimal                    @db.Decimal(12, 2)
+  effectiveFrom         DateTime
+  effectiveTo           DateTime?
+  isActive              Boolean                    @default(true)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
 
-  invoices             SubscriptionInvoice[]
+  invoices SubscriptionInvoice[]
 
   @@index([subscriptionId])
   @@index([isActive])
@@ -1515,28 +1514,28 @@ model SubscriptionContract {
 
 /// Subscription invoice — one per billing period, monetary snapshot immutable after OPEN.
 model SubscriptionInvoice {
-  id               String   @id @default(uuid())
-  code             String   @unique // SINV-00000001
-  contractId       String
-  contract         SubscriptionContract @relation(fields: [contractId], references: [id])
-  subscriptionId   String
-  subscription     StorefrontSubscription @relation(fields: [subscriptionId], references: [id])
+  id             String                    @id @default(uuid())
+  code           String                    @unique // SINV-00000001
+  contractId     String
+  contract       SubscriptionContract      @relation(fields: [contractId], references: [id])
+  subscriptionId String
+  subscription   StorefrontSubscription    @relation(fields: [subscriptionId], references: [id])
   /// Monetary snapshot from contract at invoice time.
-  subtotalAmount   Decimal  @db.Decimal(12, 2)
-  discountAmount   Decimal  @db.Decimal(12, 2) @default(0)
-  totalAmount      Decimal  @db.Decimal(12, 2)
-  currency         String   @default("AZN")
-  status           SubscriptionInvoiceStatus @default(OPEN)
+  subtotalAmount Decimal                   @db.Decimal(12, 2)
+  discountAmount Decimal                   @default(0) @db.Decimal(12, 2)
+  totalAmount    Decimal                   @db.Decimal(12, 2)
+  currency       String                    @default("AZN")
+  status         SubscriptionInvoiceStatus @default(OPEN)
   /// Billing period this invoice covers.
-  periodStart      DateTime
-  periodEnd        DateTime
-  issuedAt         DateTime @default(now())
-  dueAt            DateTime?
-  paidAt           DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  periodStart    DateTime
+  periodEnd      DateTime
+  issuedAt       DateTime                  @default(now())
+  dueAt          DateTime?
+  paidAt         DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
 
-  payments         SubscriptionPayment[]
+  payments SubscriptionPayment[]
 
   @@unique([contractId, periodStart])
   @@index([subscriptionId])
@@ -1546,16 +1545,16 @@ model SubscriptionInvoice {
 
 /// Payment against a subscription invoice.
 model SubscriptionPayment {
-  id          String   @id @default(uuid())
-  code        String   @unique // SPAY-00000001
-  invoiceId   String
-  invoice     SubscriptionInvoice @relation(fields: [invoiceId], references: [id])
-  amount      Decimal  @db.Decimal(12, 2)
-  currency    String   @default("AZN")
-  status      SubscriptionPaymentStatus @default(PENDING)
-  paidAt      DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String                    @id @default(uuid())
+  code      String                    @unique // SPAY-00000001
+  invoiceId String
+  invoice   SubscriptionInvoice       @relation(fields: [invoiceId], references: [id])
+  amount    Decimal                   @db.Decimal(12, 2)
+  currency  String                    @default("AZN")
+  status    SubscriptionPaymentStatus @default(PENDING)
+  paidAt    DateTime?
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
 
   @@index([invoiceId])
   @@index([status])
@@ -1579,18 +1578,18 @@ enum StorefrontMediaKind {
 /// Media не публикуется автоматически при upload — публичность определяется
 /// состоянием витрины (public predicate), а не статусом самого файла.
 model StorefrontMedia {
-  id         String   @id @default(uuid())
-  storefrontId String
-  kind       StorefrontMediaKind
+  id               String              @id @default(uuid())
+  storefrontId     String
+  kind             StorefrontMediaKind
   /// Private storage key (никогда не публикуется наружу).
-  storageKey String
-  mimeType   String
-  size       Int
-  width      Int?
-  height     Int?
+  storageKey       String
+  mimeType         String
+  size             Int
+  width            Int?
+  height           Int?
   originalFileName String
-  createdAt  DateTime @default(now())
-  createdById String?
+  createdAt        DateTime            @default(now())
+  createdById      String?
 
   storefront PartnerStorefront @relation(fields: [storefrontId], references: [id])
 
@@ -1642,18 +1641,18 @@ enum AcquisitionSource {
 ///  НЕ FK между bounded contexts (ADR-0001): storefrontId/productId — ссылки
 ///  по ID без relations (таблица в catalog, но события не lifecycle-связаны).
 model StorefrontBehavioralEvent {
-  id              String   @id @default(uuid())
-  eventId         String   @unique
-  eventType       StorefrontBehavioralEventType
-  occurredAt      DateTime
-  receivedAt      DateTime @default(now())
-  storefrontId    String
-  productId       String?
-  sessionId       String
+  id                String                        @id @default(uuid())
+  eventId           String                        @unique
+  eventType         StorefrontBehavioralEventType
+  occurredAt        DateTime
+  receivedAt        DateTime                      @default(now())
+  storefrontId      String
+  productId         String?
+  sessionId         String
   acquisitionSource AcquisitionSource
-  locale          String
-  path            String
-  payload         Json?
+  locale            String
+  path              String
+  payload           Json?
 
   @@index([storefrontId, occurredAt])
   @@index([eventType, occurredAt])
@@ -1703,19 +1702,19 @@ enum MarketplaceBehavioralEventType {
 ///    без privacy guard; НИКОГДА email/phone/URL/contact/токены/User/CRM ids;
 ///  - createdById НЕТ: анонимная телеметрия, не AuditLog, не outbox.
 model MarketplaceBehavioralEvent {
-  id              String   @id @default(uuid())
-  eventId         String   @unique
-  eventType       MarketplaceBehavioralEventType
-  occurredAt      DateTime
-  receivedAt      DateTime @default(now())
-  productId       String?
-  categoryId      String?
-  sessionId       String
-  visitorId       String?  // Phase 3 Pre-3.12: persistent anonymous browser identity for Visitors KPI
+  id                String                         @id @default(uuid())
+  eventId           String                         @unique
+  eventType         MarketplaceBehavioralEventType
+  occurredAt        DateTime
+  receivedAt        DateTime                       @default(now())
+  productId         String?
+  categoryId        String?
+  sessionId         String
+  visitorId         String? // Phase 3 Pre-3.12: persistent anonymous browser identity for Visitors KPI
   acquisitionSource AcquisitionSource
-  locale          String
-  path            String
-  payload         Json?
+  locale            String
+  path              String
+  payload           Json?
 
   @@index([eventType, occurredAt])
   @@index([productId, occurredAt])
@@ -1725,7 +1724,6 @@ model MarketplaceBehavioralEvent {
   @@index([acquisitionSource, occurredAt])
   @@schema("catalog")
 }
-
 
 /// Журнал аудита Catalog (audit by default).
 model ProductHistory {
@@ -1770,7 +1768,8 @@ model GeoCountry {
   createdBy String?
   updatedBy String?
 
-  cities GeoCity[]
+  cities        GeoCity[]
+  supplierLinks SupplierGeoLink[]
 
   @@index([status])
   @@schema("geo")
@@ -1790,8 +1789,9 @@ model GeoCity {
   createdBy String?
   updatedBy String?
 
-  resorts  GeoResort[]
-  airports GeoAirport[]
+  resorts       GeoResort[]
+  airports      GeoAirport[]
+  supplierLinks SupplierGeoLink[]
 
   @@index([countryId])
   @@index([status])
@@ -1799,10 +1799,10 @@ model GeoCity {
 }
 
 model GeoResort {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   cityId    String
-  city      GeoCity  @relation(fields: [cityId], references: [id], onDelete: Restrict)
-  code      String   @unique
+  city      GeoCity   @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  code      String    @unique
   names     Json // { ru, en, az }
   latitude  Float?
   longitude Float?
@@ -1812,16 +1812,18 @@ model GeoResort {
   createdBy String?
   updatedBy String?
 
+  supplierLinks SupplierGeoLink[]
+
   @@index([cityId])
   @@index([status])
   @@schema("geo")
 }
 
 model GeoAirport {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   cityId    String
-  city      GeoCity  @relation(fields: [cityId], references: [id], onDelete: Restrict)
-  code      String   @unique // IATA
+  city      GeoCity   @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  code      String    @unique // IATA
   names     Json // { ru, en, az }
   latitude  Float?
   longitude Float?
@@ -1869,8 +1871,8 @@ model Customer {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  contacts    Contact[]
-  history     CustomerHistory[]
+  contacts         Contact[]
+  history          CustomerHistory[]
   partnerRelations PartnerCustomerRelation[] // Step 3.5B
 
   @@index([status])
@@ -1906,10 +1908,10 @@ model Company {
 }
 
 model Partner {
-  id        String      @id @default(uuid())
-  code      String      @unique // PAR-00000001
+  id        String       @id @default(uuid())
+  code      String       @unique // PAR-00000001
   companyId String?
-  company   Company?    @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  company   Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
   name      String
   status    EntityStatus @default(ACTIVE)
 
@@ -1929,19 +1931,19 @@ model Partner {
   /// Partner (тогда seller profile без countryCode — консервативно).
   countryCode        String?
 
+  // Step 3.5B — reverse relation to PartnerCustomerRelation
+  customerRelations PartnerCustomerRelation[]
+
   @@unique([contactEmail], where: { contactEmail: { not: null } }, map: "Partner_unique_contactEmail")
   @@unique([registrationNumber], where: { registrationNumber: { not: null } }, map: "Partner_unique_registrationNumber")
   @@schema("crm")
-
-  // Step 3.5B — reverse relation to PartnerCustomerRelation
-  customerRelations PartnerCustomerRelation[]
 }
 
 model Supplier {
-  id        String      @id @default(uuid())
-  code      String      @unique // SUP-00000001
+  id        String       @id @default(uuid())
+  code      String       @unique // SUP-00000001
   companyId String?
-  company   Company?    @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  company   Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
   name      String
   status    EntityStatus @default(ACTIVE)
 
@@ -1970,21 +1972,21 @@ model CustomerHistory {
 /// Один Customer может иметь отношения с несколькими Partners.
 /// Partner-specific data (notes, tags, lifecycle, manager) НЕ являются global Customer fields.
 model PartnerCustomerRelation {
-  id           String    @id @default(uuid())
-  partnerId    String
-  partner      Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  customerId   String
-  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  status       EntityStatus @default(ACTIVE)
-  leadSource   String?   // Storefront/Direct/Manual/Marketplace
-  assignedTo   String?   // manager/user ID
-  lifecycle    String?   // LEAD/PROSPECT/ACTIVE/CHURNED (partner-specific)
-  tags         String[]  // partner-specific tags
-  notes        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  version      Int       @default(1)
-  history      PartnerCustomerRelationHistory[] // Step 3.5B audit trail
+  id         String                           @id @default(uuid())
+  partnerId  String
+  partner    Partner                          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer                         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  status     EntityStatus                     @default(ACTIVE)
+  leadSource String? // Storefront/Direct/Manual/Marketplace
+  assignedTo String? // manager/user ID
+  lifecycle  String? // LEAD/PROSPECT/ACTIVE/CHURNED (partner-specific)
+  tags       String[] // partner-specific tags
+  notes      String?
+  createdAt  DateTime                         @default(now())
+  updatedAt  DateTime                         @updatedAt
+  version    Int                              @default(1)
+  history    PartnerCustomerRelationHistory[] // Step 3.5B audit trail
 
   @@unique([partnerId, customerId])
   @@index([partnerId])
@@ -1994,17 +1996,17 @@ model PartnerCustomerRelation {
 
 /// Step 3.5B — Audit trail for PartnerCustomerRelation changes.
 model PartnerCustomerRelationHistory {
-  id                    String   @id @default(uuid())
-  relationId            String
-  relation              PartnerCustomerRelation @relation(fields: [relationId], references: [id], onDelete: Cascade)
-  action                String
-  from                  String?
-  to                    String?
-  fields                Json?
-  actorId               String?
-  actorName             String?
-  comment               String?
-  createdAt             DateTime @default(now())
+  id         String                  @id @default(uuid())
+  relationId String
+  relation   PartnerCustomerRelation @relation(fields: [relationId], references: [id], onDelete: Cascade)
+  action     String
+  from       String?
+  to         String?
+  fields     Json?
+  actorId    String?
+  actorName  String?
+  comment    String?
+  createdAt  DateTime                @default(now())
 
   @@index([relationId])
   @@schema("crm")
@@ -2027,15 +2029,15 @@ model PartnerCustomerRelationHistory {
 ///  - Pagination: notes are append-only / unbounded, independently pageable
 ///  - Soft delete: deletedAt/deletedBy preserve audit trail
 model OperationalNote {
-  id           String   @id @default(uuid())
-  entityType   String   // Customer|Partner|Order|Booking|Request|Payment|Refund|Product|Fulfillment|Reservation|BuyerRequest|PartnerApplication
+  id           String    @id @default(uuid())
+  entityType   String // Customer|Partner|Order|Booking|Request|Payment|Refund|Product|Fulfillment|Reservation|BuyerRequest|PartnerApplication
   entityId     String
-  text         String   @db.Text // 1-5000 chars, plain text
-  visibility   String   @default("INTERNAL") // INTERNAL|PARTNER_VISIBLE|CUSTOMER_VISIBLE
+  text         String    @db.Text // 1-5000 chars, plain text
+  visibility   String    @default("INTERNAL") // INTERNAL|PARTNER_VISIBLE|CUSTOMER_VISIBLE
   authorUserId String?
-  authorName   String?  // snapshot for historical rendering
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  authorName   String? // snapshot for historical rendering
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   editedAt     DateTime?
   deletedAt    DateTime?
   deletedBy    String?
@@ -2102,46 +2104,46 @@ enum TravelerDataCompleteness {
 ///  - cross-schema refs (saleId/quoteId/checkoutId/reservationId) — по ID без
 ///    FK (ADR-0001).
 model Order {
-  id            String              @id @default(uuid())
-  code          String              @unique // ORD-00000001
-  number        String              @unique // TH-2026-000001
+  id               String             @id @default(uuid())
+  code             String             @unique // ORD-00000001
+  number           String             @unique // TH-2026-000001
   /// Tenant-scoped human-readable reference number.
   /// Marketplace: MKT-ORD-{SEQ}; Storefront: {SF_CODE}-ORD-{SEQ}; SaaS: SAAS-{SF_CODE}-ORD-{SEQ}
-  referenceNumber String            @unique
+  referenceNumber  String             @unique
   /// Shared Commerce Sequence (8 digits): root for all entities in this commerce chain.
   /// MKT-REQ-{commerceSequence}, MKT-ORD-{commerceSequence}, MKT-BKG-{commerceSequence}, MKT-PAY-{commerceSequence}-N
   commerceSequence String?
-  customerId    String? // ссылка на CRM, без FK; NULL — internal assisted flow
-  status        OrderStatus         @default(NEW)
-  paymentStatus OrderPaymentStatus  @default(UNPAID)
-  currency      String              @default("USD")
-  amount        Decimal             @default(0) @db.Decimal(12, 2)
-  paidAmount    Decimal             @default(0) @db.Decimal(12, 2)
+  customerId       String? // ссылка на CRM, без FK; NULL — internal assisted flow
+  status           OrderStatus        @default(NEW)
+  paymentStatus    OrderPaymentStatus @default(UNPAID)
+  currency         String             @default("USD")
+  amount           Decimal            @default(0) @db.Decimal(12, 2)
+  paidAmount       Decimal            @default(0) @db.Decimal(12, 2)
   /// Step 2.13: сумма возвратов (Order-owned projection на RefundProcessed;
   /// Server-owned. paidAmount — исторический факт «деньги получены» НЕ
   /// переписывается; refundedAmount — возвраты поверх него. Полный refund
   /// (refundedAmount >= paidAmount) → paymentStatus REFUNDED; partial → PAID.
-  refundedAmount Decimal            @default(0) @db.Decimal(12, 2)
-  serviceDate   DateTime?
+  refundedAmount   Decimal            @default(0) @db.Decimal(12, 2)
+  serviceDate      DateTime?
   /// Step 2.8A: frozen local temporal facts услуги (verbatim из OrderRequested,
   /// произошли из CheckoutIntent; НЕ пере-вычисляются). serviceTime — local
   /// wall-clock "HH:mm" (TIME_SLOT); serviceEndTime — опциональный local end;
   /// serviceTimeZone — IANA (frozen authority из Catalog на момент binding).
   /// Date-only услуга: все три NULL. UTC instant НЕ дублируется здесь —
   /// единственная точка деривации — Booking (инвариант local↔UTC, §13).
-  serviceTime     String?
-  serviceEndTime  String?
-  serviceTimeZone String?
-  version       Int                 @default(1)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  createdBy     String?
-  updatedBy     String?
+  serviceTime      String?
+  serviceEndTime   String?
+  serviceTimeZone  String?
+  version          Int                @default(1)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  createdBy        String?
+  updatedBy        String?
 
   // ── Step 2.5 — upstream refs (без FK) + frozen commercial snapshot ──
   /// Один Sale completion → один Order (DB-level инвариант; NULL для
   /// legacy/bootstrap Order).
-  saleId                String?    @unique
+  saleId                String?  @unique
   saleCode              String?
   quoteId               String?
   checkoutId            String?
@@ -2153,18 +2155,18 @@ model Order {
   /// OrderRequested eventId, создавший Order (traceability/idempotency).
   orderRequestedEventId String?
   /// Сумма строк (без скидки) — frozen snapshot из OrderRequested.
-  subtotal              Decimal?   @db.Decimal(12, 2)
+  subtotal              Decimal? @db.Decimal(12, 2)
   /// Snapshot QuoteDiscountType (cross-schema enum → String, честно).
   discountType          String?
-  discountValue         Decimal?   @db.Decimal(12, 2)
-  discountAmount        Decimal?   @db.Decimal(12, 2)
+  discountValue         Decimal? @db.Decimal(12, 2)
+  discountAmount        Decimal? @db.Decimal(12, 2)
   /// Payment terms snapshot (Step 2.3B) — immutable commercial facts,
   /// НЕ пересчитываются из текущей конфигурации.
   paymentScheme         String?
   prepaymentType        String?
-  prepaymentValue       Decimal?   @db.Decimal(12, 2)
-  initialAmount         Decimal?   @db.Decimal(12, 2)
-  remainingAmount       Decimal?   @db.Decimal(12, 2)
+  prepaymentValue       Decimal? @db.Decimal(12, 2)
+  initialAmount         Decimal? @db.Decimal(12, 2)
+  remainingAmount       Decimal? @db.Decimal(12, 2)
   /// Acquisition source snapshot (Step 2.5B propagation boundary — не
   /// ре-вычисляется consumer-ом).
   acquisitionSource     String?
@@ -2198,13 +2200,13 @@ model Order {
   /// (OrderFulfilled). Server-owned; immutable.
   fulfilledAt DateTime?
   /// Момент перехода close → CLOSED (OrderClosed). Server-owned; immutable.
-  closedAt DateTime?
+  closedAt    DateTime?
 
   // ── D3 — Traveler Collection + Order/Booking Population ──
   /// D3: момент принятия условий/цен (terms acceptance). Server-owned;
   /// immutable. При создании Order из OrderRequested — момент acceptance.
   /// NULL = legacy Order (до D3, без backfill).
-  termsAcceptedAt DateTime?
+  termsAcceptedAt         DateTime?
   /// D3: момент завершения сбора данных всех обязательных туристов.
   /// Server-owned; immutable (однажды установлен — не перезаписывается).
   /// NULL = данные ещё не собраны / legacy Order.
@@ -2212,21 +2214,21 @@ model Order {
   /// D3: момент явного финального подтверждения перед созданием Booking.
   /// Отличается от termsAcceptedAt (принятие цен/условий).
   /// Server-owned; immutable. NULL = не подтверждено.
-  finalConfirmedAt DateTime?
+  finalConfirmedAt        DateTime?
   /// D3: pinned traveler requirements snapshot (immutable JSONB).
   /// Server-owned: getEffectiveTravelerRequirements(Product.type, Product.travelerRequirements)
   /// на момент termsAcceptedAt. Клиент НЕ может произвольно заменить.
   /// {firstName: "REQUIRED", lastName: "REQUIRED", birthDate: "OPTIONAL", ...}
   /// NULL = legacy Order (до D3;requirements не закреплены).
-  pinnedRequirements Json?
+  pinnedRequirements      Json?
   /// D3: ожидаемое количество туристов (canonical traveler count).
   /// Server-owned; immutable. 1 = minimum. NULL = legacy Order.
-  travelerCount Int?
+  travelerCount           Int?
 
-  items      OrderItem[]
-  travelers  OrderTraveler[]
+  items        OrderItem[]
+  travelers    OrderTraveler[]
   fulfillments Fulfillment[]
-  history    OrderHistory[]
+  history      OrderHistory[]
 
   @@index([status])
   @@index([customerId])
@@ -2238,17 +2240,17 @@ model Order {
 }
 
 model OrderItem {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId   String // ссылка на Catalog, без FK
   productCode String // снапшот канонического кода (PRD-*), не дублирование данных
   title       String
   type        String
-  quantity    Int      @default(1)
-  price       Decimal  @db.Decimal(12, 2)
-  currency    String   @default("USD")
-  amount      Decimal  @db.Decimal(12, 2)
+  quantity    Int       @default(1)
+  price       Decimal   @db.Decimal(12, 2)
+  currency    String    @default("USD")
+  amount      Decimal   @db.Decimal(12, 2)
   serviceDate DateTime?
 
   @@index([orderId])
@@ -2256,34 +2258,34 @@ model OrderItem {
 }
 
 model OrderTraveler {
-  id                String                  @id @default(uuid())
-  orderId           String
-  order             Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  customerId        String?
+  id               String                   @id @default(uuid())
+  orderId          String
+  order            Order                    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customerId       String?
   /// D3 §13: позиция в списке туристов (1-based, порядок checkout party list).
   /// Детерминированный порядок для UI collection и save/resume (OrderTraveler
   /// не имеет createdAt; без position порядок выборки нестабилен).
-  position          Int                     @default(0)
-  firstName         String
-  lastName          String
-  birthDate         DateTime?
-  citizenship       String?
-  gender            String?
-  passportNumber    String?
-  passportExpiry    DateTime?
-  dataCompleteness  TravelerDataCompleteness @default(INCOMPLETE)
-  version           Int                     @default(1)
+  position         Int                      @default(0)
+  firstName        String
+  lastName         String
+  birthDate        DateTime?
+  citizenship      String?
+  gender           String?
+  passportNumber   String?
+  passportExpiry   DateTime?
+  dataCompleteness TravelerDataCompleteness @default(INCOMPLETE)
+  version          Int                      @default(1)
 
   @@index([orderId])
   @@schema("order")
 }
 
 model Fulfillment {
-  id        String            @id @default(uuid())
-  orderId   String
-  order     Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  status    FulfillmentStatus @default(NOT_STARTED)
-  notes     String?
+  id      String            @id @default(uuid())
+  orderId String
+  order   Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status  FulfillmentStatus @default(NOT_STARTED)
+  notes   String?
 
   @@index([orderId])
   @@schema("order")
@@ -2339,48 +2341,48 @@ enum RequestStatus {
 /// Orchestrates the flow from customer intent to final Order creation.
 /// All entities in one commerce chain share the same 8-digit commerceSequence.
 model Request {
-  id                 String        @id @default(uuid())
-  code               String        @unique // REQ-00000001 (IdsService)
+  id               String @id @default(uuid())
+  code             String @unique // REQ-00000001 (IdsService)
   /// Shared commerceSequence: 8-digit root for all entities in this chain.
-  commerceSequence   String        @unique
+  commerceSequence String @unique
   /// Tenant-scoped human-readable reference number.
   /// Marketplace: MKT-REQ-{commerceSequence}
-  referenceNumber    String        @unique
+  referenceNumber  String @unique
 
-  customerId         String?       // ref crm.Customer (no FK)
-  productId          String?       // ref catalog.Product (no FK)
-  partnerId          String?       // ref crm.Partner/supplier (no FK)
+  customerId String? // ref crm.Customer (no FK)
+  productId  String? // ref catalog.Product (no FK)
+  partnerId  String? // ref crm.Partner/supplier (no FK)
 
-  status             RequestStatus @default(NEW)
+  status RequestStatus @default(NEW)
 
   // ── Service snapshot ──
   requestedServiceDate DateTime?
-  quantity             Int         @default(1)
+  quantity             Int       @default(1)
 
   // ── Price snapshot ──
-  displayedPrice    Decimal?      @db.Decimal(12, 2)  // price customer saw at submission
+  displayedPrice    Decimal? @db.Decimal(12, 2) // price customer saw at submission
   displayedCurrency String?
-  confirmedPrice    Decimal?      @db.Decimal(12, 2)  // supplier-confirmed price
+  confirmedPrice    Decimal? @db.Decimal(12, 2) // supplier-confirmed price
   confirmedCurrency String?
 
   // ── Supplier Response SLA ──
   supplierResponseDeadline DateTime?
   supplierRespondedAt      DateTime?
-  supplierDecision         String?   // CONFIRMED / REJECTED / UNAVAILABLE / PRICE_CHANGED
+  supplierDecision         String? // CONFIRMED / REJECTED / UNAVAILABLE / PRICE_CHANGED
   supplierPriceProposal    Decimal?  @db.Decimal(12, 2)
   supplierNote             String?
 
   // ── Customer Confirmation / Payment TTL ──
   customerActionDeadline DateTime?
   customerAcceptedAt     DateTime?
-  customerDecision       String?   // ACCEPTED / DECLINED
+  customerDecision       String? // ACCEPTED / DECLINED
 
   // ── D3 — Request → Order (Request Flow Integration, F6 closure) ──
   /// D3: явный размер партии (количество туристов/гостей) на момент создания
   /// заявки. Canonical source для Order.travelerCount при конвертации. NULL =
   /// legacy заявка (до D3): при customerAccept замораживается из quantity
   /// (единственное прежнее count-представление; DB default 1 = 1 гость).
-  travelerCount Int?
+  travelerCount      Int?
   /// D3: frozen effective traveler requirements, ЗАМОРОЖЕННЫЕ на customerAccept
   /// (acceptance boundary; та же транзакция). Consumer/конвертация НЕ читает
   /// mutable Product позже — acceptance→pin race невозможен (§7). NULL = legacy.
@@ -2389,23 +2391,23 @@ model Request {
   /// productType), зафиксированный при создании заявки (продукт как подан).
   /// Используется конвертацией для OrderItem без повторного чтения mutable
   /// Catalog. NULL = legacy заявка без product-контекста.
-  productSnapshot Json?
+  productSnapshot    Json?
 
   // ── Conversion ──
-  convertedOrderId  String?       // ref Order.id after conversion
-  convertedAt       DateTime?
+  convertedOrderId String? // ref Order.id after conversion
+  convertedAt      DateTime?
 
   // ── Rejection / timeout info ──
-  rejectedAt        DateTime?
-  rejectedBy        String?   // supplier / system / customer
-  rejectionReason   String?
+  rejectedAt      DateTime?
+  rejectedBy      String? // supplier / system / customer
+  rejectionReason String?
 
   // ── Lifecycle timestamps ──
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  version           Int           @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  version   Int      @default(1)
 
-  history           RequestHistory[]
+  history RequestHistory[]
 
   @@index([status])
   @@index([customerId])
@@ -2481,29 +2483,29 @@ enum ReservationStatus {
 /// Booking — единственный владелец: Booking Center.
 /// Создаётся ТОЛЬКО consumer-ом события BookingRequested (идемпотентно).
 model Booking {
-  id          String        @id @default(uuid())
-  code        String        @unique // BKG-00000001
+  id                String                 @id @default(uuid())
+  code              String                 @unique // BKG-00000001
   /// Tenant-scoped human-readable reference number.
   /// Marketplace: MKT-BKG-{SEQ}; Storefront: {SF_CODE}-BKG-{SEQ}
-  referenceNumber String     @unique
+  referenceNumber   String                 @unique
   /// Shared Commerce Sequence: derived from parent Order.
-  commerceSequence String?
-  orderId     String // ссылка на Order, без FK
-  productId   String // ссылка на Catalog, без FK
+  commerceSequence  String?
+  orderId           String // ссылка на Order, без FK
+  productId         String // ссылка на Catalog, без FK
   /// Step 2.8: canonical linkage OrderItem ↔ Booking (1 OrderItem → ≤1 Booking,
   /// DB-level unique; consumer BookingRequested заполняет из order.items).
   /// NULL — legacy Booking, созданные до Step 2.8 (без backfill).
-  orderItemId String?       @unique
-  status      BookingStatus @default(NEW)
-  amount      Decimal       @default(0) @db.Decimal(12, 2)
+  orderItemId       String?                @unique
+  status            BookingStatus          @default(NEW)
+  amount            Decimal                @default(0) @db.Decimal(12, 2)
   /// Step 2.11 (Pricing & Financial Snapshot): frozen money fact — валюта,
   /// скопированная consumer-ом verbatim из OrderItem.currency при создании
   /// Booking (READ-only, ADR-0001; НЕ пересчитывается из mutable Catalog/
   /// Finance master-data). Без валюты сумма amount не имеет однозначной
   /// денежной семантики. NULL — legacy Booking (до 2.11, валюта не
   /// фиксировалась; без fabricated backfill).
-  currency    String?
-  serviceDate DateTime?
+  currency          String?
+  serviceDate       DateTime?
   /// Step 2.5B: frozen acquisition source, скопированный consumer-ом из Order
   /// (READ-only, ADR-0001) в момент создания Booking. Cross-schema ref — String
   /// (Prisma multiSchema); NULL — legacy Booking до 2.5B (без backfill).
@@ -2512,43 +2514,43 @@ model Booking {
   /// Тип occurrence: DATE_ONLY (default — точная классификация legacy: у них
   /// только serviceDate) | TIME_SLOT | OPEN_DATE (serviceDate null) |
   /// DATE_RANGE (зарезервирован, не продуцируется — нет duration-авторитета).
-  serviceTimeType BookingServiceTimeType @default(DATE_ONLY)
+  serviceTimeType   BookingServiceTimeType @default(DATE_ONLY)
   /// Local wall-clock start "HH:mm" (TIME_SLOT only; date-only → NULL).
-  serviceTime     String?
+  serviceTime       String?
   /// Local wall-clock end "HH:mm" (опционально, только с serviceTime).
-  serviceEndTime  String?
+  serviceEndTime    String?
   /// IANA zone (TIME_SLOT only; frozen authority из Catalog через Order).
-  serviceTimeZone String?
+  serviceTimeZone   String?
   /// Derived UTC instant: serviceDate + serviceTime в serviceTimeZone (§13).
   /// NULL для date-only/OPEN_DATE (не фабрикуется как UTC-midnight, §7).
   /// Деривация — ОДИН раз при создании consumer-ом (frozen; не пере-резолвится).
-  serviceStartsAt DateTime?
+  serviceStartsAt   DateTime?
   /// Derived UTC end instant: serviceEndTime на дате старта (или следующей,
   /// если end <= start); NULL без endTime/для date-only.
-  serviceEndsAt   DateTime?
+  serviceEndsAt     DateTime?
   /// ── Step 2.9A: Booking temporal contract (lifecycle milestones) ────────
   /// Сервер-owned UTC instants, immutable после установки (первый переход),
   /// атомарны с CAS-переходом (status+version+milestone+history+outbox).
   /// НЕ связаны с service occurrence (2.8A) — lifecycle время ≠ время услуги.
   /// nullable: legacy Booking (до 2.9A) — без backfill/fabrication.
   /// requestAt: запрос отправлен поставщику (transition `send` → SENT_TO_SUPPLIER).
-  requestedAt DateTime?
+  requestedAt       DateTime?
   /// Подтверждено (transition `confirm` → CONFIRMED).
-  confirmedAt  DateTime?
+  confirmedAt       DateTime?
   /// Отклонено поставщиком (transition `reject` → SUPPLIER_REJECTED).
-  rejectedAt   DateTime?
+  rejectedAt        DateTime?
   /// Отменено (explicit `cancel`, компенсация OrderCancelled, born-CANCELLED).
-  cancelledAt  DateTime?
+  cancelledAt       DateTime?
   /// Исполнено (transition `complete` → COMPLETED).
-  completedAt  DateTime?
-  version     Int           @default(1)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  completedAt       DateTime?
+  version           Int                    @default(1)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
 
-  reservations         Reservation[]
+  reservations          Reservation[]
   supplierConfirmations SupplierConfirmation[]
-  passengers           Passenger[]
-  history              BookingHistory[]
+  passengers            Passenger[]
+  history               BookingHistory[]
 
   @@index([orderId])
   @@index([status])
@@ -2556,25 +2558,25 @@ model Booking {
 }
 
 model Reservation {
-  id          String            @id @default(uuid())
-  bookingId   String
-  booking     Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  supplierId  String // ссылка на CRM Supplier, без FK
-  status      ReservationStatus @default(HELD)
-  notes       String?
+  id         String            @id @default(uuid())
+  bookingId  String
+  booking    Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  supplierId String // ссылка на CRM Supplier, без FK
+  status     ReservationStatus @default(HELD)
+  notes      String?
 
   @@index([bookingId])
   @@schema("booking")
 }
 
 model SupplierConfirmation {
-  id                  String   @id @default(uuid())
-  bookingId           String
-  booking             Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  supplierId          String // ссылка на CRM Supplier, без FK
-  confirmationNumber  String?
-  payload             Json?
-  receivedAt          DateTime @default(now())
+  id                 String   @id @default(uuid())
+  bookingId          String
+  booking            Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  supplierId         String // ссылка на CRM Supplier, без FK
+  confirmationNumber String?
+  payload            Json?
+  receivedAt         DateTime @default(now())
 
   @@index([bookingId])
   @@schema("booking")
@@ -2702,14 +2704,14 @@ model Communication {
   code String @unique // CML-00000001 — immutable, server-generated (§4)
 
   type      CommunicationType
-  channel   CommunicationChannel  @default(PLATFORM)
+  channel   CommunicationChannel   @default(PLATFORM)
   direction CommunicationDirection
-  status    CommunicationStatus   @default(ACTIVE)
+  status    CommunicationStatus    @default(ACTIVE)
 
   /// Опциональный заголовок (≤200).
   subject String?
   /// Plain text (1..4000), БЕЗ arbitrary HTML; XSS-safe; Unicode RU/AZ/EN (§14).
-  body String
+  body    String
 
   /// Canonical typed context reference (БЕЗ FK). NULL только если контекст
   /// не определён — по факту create всегда передаёт контекст (§10).
@@ -2740,11 +2742,11 @@ model Communication {
   createdAt  DateTime @default(now())
   /// Row-level change tracking (например, archive). НИКОГДА не milestone
   /// (sent/read/delivered time) — §16/§58.
-  updatedAt DateTime @updatedAt
+  updatedAt  DateTime @updatedAt
 
   /// Step 1.15 correlation — диагностическая reference, НЕ competing tracing
   /// model (§18): requestId + correlationId из активного request context.
-  requestId    String?
+  requestId     String?
   correlationId String?
 
   @@index([contextType, contextId])
@@ -2787,17 +2789,17 @@ model CommunicationThread {
 
   /// reverse.BuyerRequest ref (БЕЗ FK, ADR-0001). Server-derived из client
   /// входного buyerRequestId (open-команда), НИКОГДА не подменяется клиентом.
-  buyerRequestId String
+  buyerRequestId  String
   /// crm.Customer ref — server-derived из BuyerRequest.buyerId (member 1).
   buyerCustomerId String
   /// crm.Partner ref — server-derived из BuyerRequestDistribution.sellerId
   /// (member 2; Buyer-у — через publicId SELL-*, сервер резолвит partnerId).
   sellerPartnerId String
   /// reverse.SellerProposal ref (trusted, optional; тот же request+seller).
-  proposalId String?
+  proposalId      String?
 
   /// Row-level version (зарезервирован; мутации потоков в 2.2E отсутствуют).
-  version Int @default(1)
+  version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2863,20 +2865,20 @@ model User {
   partnerId  String?
   customerId String?
 
-  lastLoginAt DateTime?
-  version     Int      @default(1)
+  lastLoginAt  DateTime?
+  version      Int       @default(1)
   /// Step 2.17: session revocation counter. Инкрементируется при logout —
   /// все ранее выданные JWT (с старым tv) немедленно недействительны.
-  tokenVersion Int     @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  tokenVersion Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  auditLogs              AuditLog[]
-  partnerApplications    PartnerApplication[]
-  workspaceLayouts       UserWorkspaceLayout[]
-  createdCampaigns       Campaign[]
-  createdAudiences       CampaignAudience[]
-  createdAttributions    CampaignAttribution[]
+  auditLogs           AuditLog[]
+  partnerApplications PartnerApplication[]
+  workspaceLayouts    UserWorkspaceLayout[]
+  createdCampaigns    Campaign[]
+  createdAudiences    CampaignAudience[]
+  createdAttributions CampaignAttribution[]
 
   @@index([roleId])
   @@index([status])
@@ -2892,41 +2894,41 @@ model User {
 /// crm.Partner.status / Product.status / ModerationSubmission.status.
 /// Payment/KYC onboarding — отдельный будущий этап (здесь не хранится).
 model PartnerApplication {
-  id           String                  @id @default(uuid())
-  code         String                  @unique // APP-00000001
-  userId       String
-  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String                   @id @default(uuid())
+  code      String                   @unique // APP-00000001
+  userId    String
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Ссылка на crm.Partner (без FK) — заполняется только на approve.
-  partnerId    String?
-  status       PartnerApplicationStatus @default(DRAFT)
+  partnerId String?
+  status    PartnerApplicationStatus @default(DRAFT)
 
-  applicantType ApplicantType
+  applicantType       ApplicantType
   /// Юрлицо: legal/company name.
-  legalName    String?
+  legalName           String?
   /// Отображаемое имя бренда/партнёра (обязательно). НЕ identity-ключ.
-  brandName    String
-  country      String
-  registrationNumber String?
-  taxId        String?
-  website      String?
-  contactEmail String
-  contactPhone String?
-  address      String?
+  brandName           String
+  country             String
+  registrationNumber  String?
+  taxId               String?
+  website             String?
+  contactEmail        String
+  contactPhone        String?
+  address             String?
   businessDescription String?
   /// Onboarding-метаданные: slugs ACTIVE категорий, которые заявитель планирует
   /// продавать. НЕ даёт ownership Product (это не Product-привязка).
-  serviceCategories Json?
-  termsAccepted Boolean              @default(false)
+  serviceCategories   Json?
+  termsAccepted       Boolean       @default(false)
 
-  submittedAt DateTime?
-  reviewedAt  DateTime?
-  reviewedById String?
+  submittedAt        DateTime?
+  reviewedAt         DateTime?
+  reviewedById       String?
   reviewedByUsername String?
-  decisionReason String?
+  decisionReason     String?
   /// Оптимистичный замок (CAS): stale-правки/решения отклоняются (409).
-  version     Int                   @default(1)
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  version            Int       @default(1)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   history PartnerApplicationHistory[]
 
@@ -2937,7 +2939,7 @@ model PartnerApplication {
 
 /// Журнал PartnerApplication (audit by default) — полная история решений.
 model PartnerApplicationHistory {
-  id            String   @id @default(uuid())
+  id            String             @id @default(uuid())
   applicationId String
   application   PartnerApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   action        String
@@ -2947,7 +2949,7 @@ model PartnerApplicationHistory {
   actorId       String?
   actorName     String?
   comment       String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime           @default(now())
 
   @@index([applicationId])
   @@schema("security")
@@ -2970,10 +2972,10 @@ enum RoleCode {
 }
 
 model Role {
-  id         String           @id @default(uuid())
-  code       RoleCode         @unique
-  title      String
-  users      User[]
+  id          String           @id @default(uuid())
+  code        RoleCode         @unique
+  title       String
+  users       User[]
   permissions RolePermission[]
 
   @@schema("security")
@@ -3063,7 +3065,7 @@ model SellerCapability {
   /// Категория/сервисная capability — ref на catalog.Category (без FK).
   /// Catalog остаётся владельцем taxonomy (DD-028). Immutable после создания
   /// (смена категории = deactivate + create нового capability).
-  categoryId String
+  categoryId   String
   /// Slug-снапшот категории для отображения/диагностики (НЕ authority).
   categorySlug String
 
@@ -3084,9 +3086,9 @@ model SellerCapability {
   /// Optimistic concurrency (CAS): stale expectedVersion → 409.
   version Int @default(1)
 
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   /// Lifecycle milestones (реальные переходы, НЕ updatedAt).
   activatedAt   DateTime?
   deactivatedAt DateTime?
@@ -3177,7 +3179,7 @@ model BuyerRequest {
   infants  Int @default(0)
 
   /// Не-binding demand hint: {currency, min?, max?} (валидируется сервером).
-  budget Json?
+  budget      Json?
   /// Category-dependent demand preferences (free-form hints, НЕ binding,
   /// без контактов/PII; размер ограничен).
   preferences Json?
@@ -3185,11 +3187,11 @@ model BuyerRequest {
   /// Серверный acquisition source: всегда "BUYER_REQUEST" (клиент не передаёт).
   acquisitionSource String @default("BUYER_REQUEST")
 
-  status    BuyerRequestStatus @default(DRAFT)
-  version   Int                @default(1)
-  createdBy String?
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  status      BuyerRequestStatus @default(DRAFT)
+  version     Int                @default(1)
+  createdBy   String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   /// Milestones (реальные переходы, НЕ updatedAt).
   submittedAt DateTime?
   cancelledAt DateTime?
@@ -3202,9 +3204,9 @@ model BuyerRequest {
   /// атомарны с созданием Opportunity (Sales owner service, единая tx).
   selectedProposalId String? @unique
 
-  history        BuyerRequestHistory[]
-  distributions  BuyerRequestDistribution[]
-  proposals      SellerProposal[]
+  history       BuyerRequestHistory[]
+  distributions BuyerRequestDistribution[]
+  proposals     SellerProposal[]
 
   @@index([buyerId])
   @@index([buyerId, status])
@@ -3230,14 +3232,14 @@ model BuyerRequest {
 ///    Seller projection показывает актуальный request.status;
 ///  - UUID-only (без business-префикса: internal fact, §34 prompt).
 model BuyerRequestDistribution {
-  id             String        @id @default(uuid())
+  id             String       @id @default(uuid())
   buyerRequestId String
-  buyerRequest   BuyerRequest  @relation(fields: [buyerRequestId], references: [id], onDelete: Cascade)
+  buyerRequest   BuyerRequest @relation(fields: [buyerRequestId], references: [id], onDelete: Cascade)
   /// crm.Partner ref (без FK). Всегда из server-owned eligibility state.
   sellerId       String
-  distributedAt  DateTime      @default(now())
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  distributedAt  DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   proposals SellerProposal[]
 
@@ -3337,15 +3339,15 @@ model SellerProposal {
   notes            String?
   /// Validity hint (date-only, UTC midnight) — НЕ Sales Quote expiry semantics;
   /// это Reverse Marketplace fact.
-  validUntil DateTime?
+  validUntil       DateTime?
 
   status  ProposalStatus @default(DRAFT)
   /// Optimistic concurrency (CAS): stale expectedVersion → 409.
-  version Int @default(1)
+  version Int            @default(1)
 
   createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   /// Lifecycle milestones (реальные переходы, НЕ updatedAt).
   submittedAt DateTime?
   withdrawnAt DateTime?
@@ -3357,9 +3359,9 @@ model SellerProposal {
   /// WITHDRAWN); selection — отдельный факт. `convertedOpportunityId` — trusted
   /// ref на sales.Opportunity (без FK); @unique = DB-invariant «один Proposal →
   /// максимум одна Opportunity» (защита duplicate conversion, §12/§34).
-  selectedAt          DateTime?
-  convertedOpportunityId String? @unique
-  convertedAt         DateTime?
+  selectedAt             DateTime?
+  convertedOpportunityId String?   @unique
+  convertedAt            DateTime?
 
   history SellerProposalHistory[]
 
@@ -3419,18 +3421,18 @@ enum LeadStatus {
 /// Контакты/PII не копируются — предпочтителен canonical customerId
 /// (crm.Customer ref); ранний Lead может быть без Customer (только name).
 model Lead {
-  id          String     @id @default(uuid())
-  code        String     @unique // LED-00000001 (IdsService, атомарный счётчик)
-  name        String
+  id           String     @id @default(uuid())
+  code         String     @unique // LED-00000001 (IdsService, атомарный счётчик)
+  name         String
   /// Ссылка на crm.Customer (без FK). NULL для раннего Lead-интереса.
-  customerId  String?
+  customerId   String?
   /// Ссылка на security.User (ответственный, без FK). НЕ является security source.
   assignedToId String?
-  status      LeadStatus @default(NEW)
-  version     Int        @default(1)
-  createdById String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  status       LeadStatus @default(NEW)
+  version      Int        @default(1)
+  createdById  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   opportunities Opportunity[]
   history       LeadHistory[]
@@ -3494,14 +3496,14 @@ model Opportunity {
   // ── Step 2.2F — Reverse Marketplace provenance (DD-030, server-owned) ──
   /// Trusted ref на reverse.BuyerRequest (без FK; ADR-0001/ADR-0012).
   /// Заполняется ТОЛЬКО конверсией выбранного Proposal (Sales owner method).
-  buyerRequestId String?
+  buyerRequestId    String?
   /// Trusted ref на reverse.SellerProposal (без FK). @unique = DB-invariant
   /// «selected Proposal → максимум одна Opportunity» (защита duplicate
   /// conversion при retry/конкурентности, DD-030 §12).
-  proposalId     String?  @unique
+  proposalId        String?                 @unique
   /// Выбранный Seller — crm.Partner ref (без FK). Коммерческий контур: Seller
   /// продавца, НЕ internal staff owner (assignedToId остаётся staff-owner).
-  sellerId       String?
+  sellerId          String?
   /// Server-derived acquisition source (клиент не передаёт). Конверсия из
   /// BuyerRequest → BUYER_REQUEST; staff-созданные Opportunity → NULL (честно,
   /// без угадывания). Пропагируется далее: Quote → Checkout → Sale → Order.
@@ -3525,7 +3527,7 @@ model Opportunity {
 
 /// Журнал Opportunity (audit by default).
 model OpportunityHistory {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   opportunityId String
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   action        String
@@ -3535,7 +3537,7 @@ model OpportunityHistory {
   actorId       String?
   actorName     String?
   comment       String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime    @default(now())
 
   @@index([opportunityId])
   @@schema("sales")
@@ -3565,8 +3567,8 @@ enum QuoteDiscountType {
 
 /// Quote foundation. Money-поля отсутствуют осознанно (см. sales header).
 model Quote {
-  id            String      @id @default(uuid())
-  code          String      @unique // QTE-00000001
+  id            String       @id @default(uuid())
+  code          String       @unique // QTE-00000001
   customerId    String?
   opportunityId String?
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
@@ -3575,11 +3577,11 @@ model Quote {
   /// использует QuoteItem (состав) — колонка остаётся nullable с честной
   /// семантикой (quote, созданные до 2.3, могут нести одиночный ref).
   productId     String?
-  status        QuoteStatus @default(DRAFT)
-  version       Int         @default(1)
+  status        QuoteStatus  @default(DRAFT)
+  version       Int          @default(1)
   createdById   String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   /// Step 2.2F: server-derived acquisition source, унаследованный из
   /// Opportunity.acquisitionSource при создании Quote по opportunityId
@@ -3592,21 +3594,21 @@ model Quote {
   /// Единая валюта КП (ISO 4217 code). Источник — Catalog Tariff.currency
   /// (все items одной валюты; свободный список не вводится — Finance Currency
   /// master data — будущий домен). Для DRAFT — валюта первого item.
-  currency String @default("USD")
+  currency           String            @default("USD")
   /// Срок действия коммерческого предложения (UTC instant). Обязателен при ISSUE;
   /// server validates > now. Не заменяет issuedAt (temporal contract).
-  validUntil   DateTime?
+  validUntil         DateTime?
   /// Lifecycle time ISSUE (temporal contract; updatedAt не заменяет).
-  issuedAt     DateTime?
-  discountType QuoteDiscountType @default(NONE)
+  issuedAt           DateTime?
+  discountType       QuoteDiscountType @default(NONE)
   /// PERCENTAGE: 0..100; FIXED: >= 0 (в валюте КП). Игнорируется при NONE.
-  discountValue Decimal? @db.Decimal(12, 2)
+  discountValue      Decimal?          @db.Decimal(12, 2)
   /// Вычисленное backend-ом значение скидки (subtotal - total), замораживается при ISSUE.
-  discountAmount Decimal? @db.Decimal(12, 2)
+  discountAmount     Decimal?          @db.Decimal(12, 2)
   /// Сумма строк (без скидки). Для DRAFT — вычисляется при чтении; персистится при ISSUE.
-  subtotal Decimal? @db.Decimal(12, 2)
+  subtotal           Decimal?          @db.Decimal(12, 2)
   /// Итог = subtotal - discountAmount (>= 0). Персистится при ISSUE (immutable).
-  total Decimal? @db.Decimal(12, 2)
+  total              Decimal?          @db.Decimal(12, 2)
   /// Step 2.12E (ADR-0013 D6/D7) — frozen commission snapshot, ЗАМОРОЖЕН
   /// server-side при ISSUE (selection/freeze boundary): policyCode/policyVersion/
   /// rateType/rate/baseAmount/baseCurrency/channel/sellerPartnerId/selectedAt/
@@ -3640,30 +3642,30 @@ model QuoteItem {
   quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 
   /// Canonical refs (без FK, ADR-0001).
-  productId String
+  productId    String
   /// Snapshot канонического кода (PRD-*) для исторического display.
-  productCode String
+  productCode  String
   /// Snapshot названия Product.
   productTitle String
-  tariffId String
+  tariffId     String
   /// Snapshot кода тарифа (TRF-*).
-  tariffCode String
+  tariffCode   String
   /// Snapshot названия Tariff.
-  tariffName String
+  tariffName   String
 
   /// Количество/участники (>= 1).
-  quantity Int @default(1)
+  quantity            Int       @default(1)
   /// Step 1.8C: сервисная дата, на которую резолвлена unitPrice (date-only UTC
   /// midnight). NULL — legacy/base snapshot без даты. Snapshot для provenance
   /// (STRICT REVIEW §41: amount/currency/serviceDate/tariff ref); НЕ изменяется
   /// при reprice — frozen commercial fact.
-  serviceDate DateTime?
+  serviceDate         DateTime?
   /// Snapshot unit price из Catalog Tariff (Decimal(12,2), backend-authoritative).
-  unitPrice Decimal @db.Decimal(12, 2)
+  unitPrice           Decimal   @db.Decimal(12, 2)
   /// Валюта тарифа (единая для КП).
-  currency String @default("USD")
+  currency            String    @default("USD")
   /// Сумма строки = unitPrice * quantity (backend, Decimal, без JS float).
-  amount Decimal @db.Decimal(12, 2)
+  amount              Decimal   @db.Decimal(12, 2)
   /// Step 1.8D: провенанс применённых коммерческих ограничений на момент
   /// binding (Quote ISSUE) — [{type, value, source, code}]. Frozen documentary
   /// snapshot, НЕ re-validated после ISSUE (canonical freeze, 1.8C §44).
@@ -3682,13 +3684,13 @@ model QuoteItem {
 /// Passenger — свои домены; паспортные данные — только при доказанной необходимости
 /// в их доменах, Step 2.5 создаст OrderTraveler из canonical snapshot).
 model QuoteTraveler {
-  id        String @id @default(uuid())
+  id        String    @id @default(uuid())
   quoteId   String
-  quote     Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  quote     Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   firstName String
   lastName  String
   birthDate DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([quoteId])
   @@schema("sales")
@@ -3725,58 +3727,58 @@ enum SaleStatus {
 /// не резервирует Availability, не меняет inventory. Sale completion →
 /// canonical OrderRequested — Step 2.4 (единственная граница).
 model Sale {
-  id            String       @id @default(uuid())
-  code          String       @unique // SAL-00000001
-  customerId    String?
-  opportunityId String?
-  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
-  quoteId       String?      @unique
-  quote         Quote?       @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  id               String       @id @default(uuid())
+  code             String       @unique // SAL-00000001
+  customerId       String?
+  opportunityId    String?
+  opportunity      Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  quoteId          String?      @unique
+  quote            Quote?       @relation(fields: [quoteId], references: [id], onDelete: SetNull)
   /// Step 2.4: CheckoutIntent, чей commercial контекст завершается этим Sale
   /// (cross-schema ref без FK). Один Sale → один Checkout (unique).
-  checkoutIntentId String?   @unique
-  status        SaleStatus   @default(OPEN)
-  version       Int          @default(1)
-  createdById   String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  checkoutIntentId String?      @unique
+  status           SaleStatus   @default(OPEN)
+  version          Int          @default(1)
+  createdById      String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   // ── Step 2.4 — Immutable commercial snapshot (замораживается при completion) ──
   /// Заполняется ТОЛЬКО при completeSale (не backfill). NULL = Sale ещё не
   /// завершён (OPEN) ИЛИ legacy (Step 2.1 CLOSED без snapshot — честно, без
   /// угадывания). Order consumer читает эти факты — без повторного Catalog
   /// reprice (G3).
-  currency        String?
-  subtotal        Decimal?          @db.Decimal(12, 2)
-  discountType    QuoteDiscountType?
-  discountValue   Decimal?          @db.Decimal(12, 2)
-  discountAmount  Decimal?          @db.Decimal(12, 2)
-  total           Decimal?          @db.Decimal(12, 2)
+  currency              String?
+  subtotal              Decimal?                @db.Decimal(12, 2)
+  discountType          QuoteDiscountType?
+  discountValue         Decimal?                @db.Decimal(12, 2)
+  discountAmount        Decimal?                @db.Decimal(12, 2)
+  total                 Decimal?                @db.Decimal(12, 2)
   /// Step 2.12E (ADR-0013 D7) — frozen commission snapshot из CheckoutIntent,
   /// verbatim при completion. NULL = нет commission-контекста. Копируется в
   /// OrderRequested payload → Order (Order.sellerPartnerId/commissionSnapshot).
-  commissionSnapshot Json?
-  paymentScheme   PaymentScheme?
-  prepaymentType  PaymentPrepaymentType?
-  prepaymentValue Decimal?          @db.Decimal(12, 2)
-  initialAmount   Decimal?          @db.Decimal(12, 2)
-  remainingAmount Decimal?          @db.Decimal(12, 2)
-  acquisitionSource SalesAcquisitionSource?
-  serviceDate     DateTime?
+  commissionSnapshot    Json?
+  paymentScheme         PaymentScheme?
+  prepaymentType        PaymentPrepaymentType?
+  prepaymentValue       Decimal?                @db.Decimal(12, 2)
+  initialAmount         Decimal?                @db.Decimal(12, 2)
+  remainingAmount       Decimal?                @db.Decimal(12, 2)
+  acquisitionSource     SalesAcquisitionSource?
+  serviceDate           DateTime?
   /// Step 2.8A: frozen local temporal факты (verbatim из CheckoutIntent при
   /// completion; UTC instant НЕ дублируется — деривация только на Booking).
-  serviceTime     String?
-  serviceEndTime  String?
-  serviceTimeZone String?
+  serviceTime           String?
+  serviceEndTime        String?
+  serviceTimeZone       String?
   /// Ссылка на catalog.AvailabilityReservation (без FK) — первая/каноническая
   /// резервация Sale. Полный список резерваций — по sourceSaleId в catalog.*.
-  reservationId   String?
+  reservationId         String?
   /// Идемпотентность/traceability: событие OrderRequested этого Sale.
   orderRequestedEventId String?
   /// Lifecycle milestone completion (Step 2.4): реальный переход OPEN → CLOSED.
   /// updatedAt НЕ является milestone (§38).
-  completedAt     DateTime?
-  completedById   String?
+  completedAt           DateTime?
+  completedById         String?
 
   history SaleHistory[]
 
@@ -3882,29 +3884,29 @@ enum PaymentPrepaymentType {
 
 /// Authoritative checkout/commercial-intent context (Step 2.3A).
 model CheckoutIntent {
-  id          String   @id @default(uuid())
-  code        String   @unique // CKT-00000001 (IdsService, атомарный счётчик)
+  id         String         @id @default(uuid())
+  code       String         @unique // CKT-00000001 (IdsService, атомарный счётчик)
   /// ISSUED Quote (обязателен): binding-price источник. Restrict — Quote с
   /// привязанным intent не удаляется.
-  quoteId     String
-  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  quoteId    String
+  quote      Quote          @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   /// crm.Customer ref (без FK). По умолчанию наследуется из Quote; staff может
   /// задать при создании (server валидирует existence). Scope фиксирован после
   /// создания (нет customer-мутации).
-  customerId  String?
-  status      CheckoutStatus @default(ACTIVE)
-  version     Int      @default(1)
+  customerId String?
+  status     CheckoutStatus @default(ACTIVE)
+  version    Int            @default(1)
 
   // ── Frozen commercial snapshot (server-copied из issued Quote, immutable) ──
   /// Единая валюта (из Quote; frontend не передаёт).
-  currency     String
+  currency           String
   /// Итог строк (без скидки) — Quote.subtotal (frozen).
-  subtotal     Decimal  @db.Decimal(12, 2)
-  discountType QuoteDiscountType @default(NONE)
-  discountValue Decimal? @db.Decimal(12, 2)
-  discountAmount Decimal? @db.Decimal(12, 2)
+  subtotal           Decimal           @db.Decimal(12, 2)
+  discountType       QuoteDiscountType @default(NONE)
+  discountValue      Decimal?          @db.Decimal(12, 2)
+  discountAmount     Decimal?          @db.Decimal(12, 2)
   /// Итог = subtotal - discountAmount (frozen; НЕ paid amount — §49).
-  total        Decimal  @db.Decimal(12, 2)
+  total              Decimal           @db.Decimal(12, 2)
   /// Step 2.12E (ADR-0013 D7) — frozen commission snapshot из ISSUED Quote,
   /// verbatim (как currency/subtotal/total). NULL = нет commission-контекста.
   /// Immutable после создания; копируется в Sale completion → OrderRequested.
@@ -3913,40 +3915,40 @@ model CheckoutIntent {
   // ── Step 2.3B — Payment Terms (коммерческие условия, server-derived) ──
   /// Выбранная схема оплаты. NULL = payment terms not selected (честно, НЕ
   /// подразумевается дефолтная схема; никакого backfill для existing rows).
-  paymentScheme  PaymentScheme?
+  paymentScheme   PaymentScheme?
   /// PERCENTAGE|FIXED — как задан prepayment (PARTIAL/DEPOSIT); NULL для схем
   /// без параметра (FULL/PAY_LATER/PAY_AT_SERVICE). Discriminated, не по значению.
-  prepaymentType PaymentPrepaymentType?
+  prepaymentType  PaymentPrepaymentType?
   /// PERCENTAGE: 0 < p < 100; FIXED: 0 < v < total (валюта Checkout).
   /// NULL для схем без параметра.
-  prepaymentValue Decimal? @db.Decimal(12, 2)
+  prepaymentValue Decimal?               @db.Decimal(12, 2)
   /// Server-derived: сколько покупатель платит сейчас (в валюте Checkout).
   /// FULL → total; PARTIAL/DEPOSIT → вычислено (round_half_up);
   /// PAY_LATER/PAY_AT_SERVICE → 0. Frontend НЕ передаёт.
-  initialAmount    Decimal? @db.Decimal(12, 2)
+  initialAmount   Decimal?               @db.Decimal(12, 2)
   /// Server-derived: total - initialAmount (для всех схем, где prepayment —
   /// часть total). Инвариант: initialAmount + remainingAmount == total.
-  remainingAmount  Decimal? @db.Decimal(12, 2)
+  remainingAmount Decimal?               @db.Decimal(12, 2)
 
   // ── Service context ──
   /// Дата услуги: date-only (YYYY-MM-DD → UTC midnight).
-  serviceDate  DateTime?
+  serviceDate       DateTime?
   /// Step 2.8A: local wall-clock start "HH:mm" (TIME_SLOT; settable через
   /// service-date команду). NULL = date-only.
-  serviceTime     String?
+  serviceTime       String?
   /// Local wall-clock end "HH:mm" (опционально, только с serviceTime).
-  serviceEndTime  String?
+  serviceEndTime    String?
   /// IANA zone — ЗАМОРОЖЕН server-side при создании CheckoutIntent из Quote
   /// items' products (Catalog authority; client НЕ передаёт — forbidden key).
   /// NULL = date-only или mixed/missing zones. serviceTime без zone → 422.
-  serviceTimeZone String?
+  serviceTimeZone   String?
   /// Server-derived acquisition source (internal-assisted = DIRECT), immutable.
   acquisitionSource SalesAcquisitionSource @default(DIRECT)
 
-  cancelledAt  DateTime?
-  createdById  String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  cancelledAt DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   travelers CheckoutIntentTraveler[]
   history   CheckoutIntentHistory[]
@@ -3991,7 +3993,6 @@ model CheckoutIntentHistory {
   @@index([checkoutIntentId])
   @@schema("sales")
 }
-
 
 // ============================================================================
 // finance.* — Finance Center (Phase 2, Step 2.10 — Finance Domain Foundation)
@@ -4041,30 +4042,30 @@ enum PaymentStatus {
 /// orchestration — 2.12/2.12A; temporal milestones (authorizedAt/capturedAt/
 /// failedAt/cancelledAt) — 2.10C.
 model Payment {
-  id            String        @id @default(uuid())
-  code          String        @unique // PAY-00000001
+  id               String        @id @default(uuid())
+  code             String        @unique // PAY-00000001
   /// Tenant-scoped human-readable reference number.
   /// Marketplace: MKT-PAY-{SEQ}; Storefront: {SF_CODE}-PAY-{SEQ}
-  referenceNumber String      @unique
+  referenceNumber  String        @unique
   /// Shared Commerce Sequence: derived from parent Order.
   commerceSequence String?
   /// Payment ordinal within commerce chain: MKT-PAY-{root}-{ordinal}
-  paymentOrdinal Int?
+  paymentOrdinal   Int?
   /// ref order.Order, без FK (ADR-0001).
-  orderId       String
+  orderId          String
   /// ref crm.Customer, без FK. NULL — internal assisted flow.
-  customerId    String?
+  customerId       String?
   /// ref crm.Partner, без FK. NULL — платформенный (platform) платеж.
-  partnerId     String?
-  amount        Decimal       @db.Decimal(12, 2)
-  currency      String        @default("USD")
-  status        PaymentStatus @default(PENDING)
-  paymentMethod String?
+  partnerId        String?
+  amount           Decimal       @db.Decimal(12, 2)
+  currency         String        @default("USD")
+  status           PaymentStatus @default(PENDING)
+  paymentMethod    String?
   /// Опакованная ссылка внешнего провайдера (без секретов/PII; НЕ authority).
-  providerRef   String?
-  version       Int           @default(1)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  providerRef      String?
+  version          Int           @default(1)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   /// ── Step 2.12 (Payment Flow): lifecycle milestones (2.10C DEFER → 2.12) ──
   /// Сервер-owned UTC instants, immutable после установки (первый переход),
@@ -4075,9 +4076,9 @@ model Payment {
   /// failedAt — PENDING → FAILED. cancelledAt — PENDING → CANCELLED.
   /// authorizedAt/capturedAt — DEFER (2.12B, PSP authorize/capture).
   /// NULL — milestone ещё не произошёл; legacy/без backfill.
-  paidAt      DateTime?
-  failedAt    DateTime?
-  cancelledAt DateTime?
+  paidAt          DateTime?
+  failedAt        DateTime?
+  cancelledAt     DateTime?
   /// Step 2.12 cardinality (CRITICAL §6): managed projection «Payment блокирует
   /// второй Payment того же Order». true для PENDING/AUTHORIZED/CAPTURED/
   /// REFUNDED (overpayment protection — после успеха/возврата повторная оплата
@@ -4091,15 +4092,15 @@ model Payment {
   /// (P2002 → controlled 409, один факт). 2.12F (partial/installments)
   /// переработает этот индекс в своей аддитивной миграции (документировано) —
   /// будущие approved semantics не блокируются (Prompt §6).
-  isActivePayment Boolean @default(true)
+  isActivePayment Boolean   @default(true)
 
   history PaymentHistory[]
 
+  @@unique([orderId], where: { isActivePayment: true }, map: "Payment_one_active_per_order")
   @@index([orderId])
   @@index([customerId])
   @@index([partnerId])
   @@index([status])
-  @@unique([orderId], where: { isActivePayment: true }, map: "Payment_one_active_per_order")
   @@schema("finance")
 }
 
@@ -4161,33 +4162,33 @@ enum RefundStatus {
 /// Order snapshot (никакого reprice); НЕ становится Settlement/Payout/Commission/
 /// double-entry логикой (boundaries 2.12D/2.12C/2.14/2.14A).
 model Refund {
-  id         String       @id @default(uuid())
-  code       String       @unique // RFD-00000001
+  id              String       @id @default(uuid())
+  code            String       @unique // RFD-00000001
   /// Tenant-scoped human-readable reference number.
   /// Marketplace: MKT-REF-{SEQ}; Storefront: {SF_CODE}-REF-{SEQ}
   referenceNumber String?
   /// ref finance.Payment (без FK). Source authority — ТОЛЬКО CAPTURED.
-  paymentId  String
+  paymentId       String
   /// ref order.Order, без FK (server-derived из Payment.orderId — не клиентский).
-  orderId    String
-  amount     Decimal      @db.Decimal(12, 2)
+  orderId         String
+  amount          Decimal      @db.Decimal(12, 2)
   /// Server-copied verbatim из Payment.currency (forged → 422).
-  currency   String       @default("USD")
-  status     RefundStatus @default(REQUESTED)
+  currency        String       @default("USD")
+  status          RefundStatus @default(REQUESTED)
   /// Опциональный business reason (descriptive, без PII).
-  reason     String?
-  version    Int          @default(1)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  reason          String?
+  version         Int          @default(1)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   /// ── Step 2.13 milestones (2.10C DEFER → 2.13) ──
   /// Server-owned UTC, first-only, атомарны с CAS-переходом
   /// (status+version+milestone+history+outbox). request = creation milestone
   /// (как Order.submittedAt). NULL — milestone ещё не произошёл; без backfill.
-  requestedAt DateTime?
-  approvedAt  DateTime?
-  processedAt DateTime?
-  failedAt    DateTime?
+  requestedAt    DateTime?
+  approvedAt     DateTime?
+  processedAt    DateTime?
+  failedAt       DateTime?
   /// Step 2.13 idempotency slot: «один Refund на (paymentId, amount) пока НЕ
   /// FAILED». true для REQUESTED/APPROVED/PROCESSED (identical retry → no-op
   /// существующий факт — защита от двойного refund при network retry; второй
@@ -4196,14 +4197,14 @@ model Refund {
   /// суммы — независимые partial refunds (key = paymentId+amount). Server-owned,
   /// атомарно с CAS. Паттерн: ModerationSubmission.isActiveSubmission /
   /// Payment.isActivePayment (managed boolean + partial unique).
-  isActiveRefund Boolean @default(true)
+  isActiveRefund Boolean   @default(true)
 
   history RefundHistory[]
 
+  @@unique([paymentId, amount], where: { isActiveRefund: true }, map: "Refund_one_active_per_payment_amount")
   @@index([paymentId])
   @@index([orderId])
   @@index([status])
-  @@unique([paymentId, amount], where: { isActiveRefund: true }, map: "Refund_one_active_per_payment_amount")
   @@schema("finance")
 }
 
@@ -4246,30 +4247,30 @@ enum DisputeStatus {
 /// 0 cross-domain writes. chargeback — vocabulary-категория причины, НЕ отдельная
 /// сущность (Roadmap не различает Dispute/Chargeback как две модели).
 model Dispute {
-  id         String        @id @default(uuid())
-  code       String        @unique // DSP-00000001
+  id        String        @id @default(uuid())
+  code      String        @unique // DSP-00000001
   /// ref finance.Payment (без FK). Source authority — ТОЛЬКО CAPTURED.
-  paymentId  String
+  paymentId String
   /// ref order.Order, без FK (server-derived из Payment.orderId — не клиентский).
-  orderId    String
+  orderId   String
   /// Оспариваемая сумма (server-validated 0 < amount ≤ payment.amount;
   /// DECIMAL(12,2); НЕ netting с Refund — monetary netting deferred, документировано).
-  amount     Decimal       @db.Decimal(12, 2)
+  amount    Decimal       @db.Decimal(12, 2)
   /// Server-copied verbatim из Payment.currency (forged → 422).
-  currency   String        @default("USD")
-  status     DisputeStatus @default(OPENED)
+  currency  String        @default("USD")
+  status    DisputeStatus @default(OPENED)
   /// Опциональный business reason (descriptive, без PII/evidence-body).
-  reason     String?
-  version    Int           @default(1)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  reason    String?
+  version   Int           @default(1)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   /// ── Step 2.13A milestones (server-owned UTC, first-only, атомарны с CAS) ──
   /// openedAt = creation (как Refund.requestedAt). NULL — milestone ещё не
   /// произошёл; без backfill. resolvedAt/cancelledAt — терминальные переходы.
-  openedAt    DateTime?
-  resolvedAt  DateTime?
-  cancelledAt DateTime?
+  openedAt        DateTime?
+  resolvedAt      DateTime?
+  cancelledAt     DateTime?
   /// Step 2.13A idempotency slot: «один активный Dispute на Payment» (паттерн
   /// Payment.isActivePayment / Refund.isActiveRefund). true для OPENED; false
   /// ТОЛЬКО для терминальных (RESOLVED/CANCELLED — повторное открытие после
@@ -4277,14 +4278,14 @@ model Dispute {
   /// один на платёж, а не на сумму-срез (в отличие от Refund partial-срезов);
   /// future partial dispute slices — аддитивная переработка ключа (2.13A+/2.14+,
   /// документировано). Server-owned, атомарно с CAS.
-  isActiveDispute Boolean @default(true)
+  isActiveDispute Boolean   @default(true)
 
   history DisputeHistory[]
 
+  @@unique([paymentId], where: { isActiveDispute: true }, map: "Dispute_one_active_per_payment")
   @@index([paymentId])
   @@index([orderId])
   @@index([status])
-  @@unique([paymentId], where: { isActiveDispute: true }, map: "Dispute_one_active_per_payment")
   @@schema("finance")
 }
 
@@ -4319,21 +4320,21 @@ enum InvoiceStatus {
 
 /// Invoice (INV-*) — canonical Finance aggregate foundation. Генерация — 2.14.
 model Invoice {
-  id         String        @id @default(uuid())
-  code       String        @unique // INV-00000001
+  id              String        @id @default(uuid())
+  code            String        @unique // INV-00000001
   /// Tenant-scoped human-readable reference number (nullable — SaaS billing not yet implemented).
   /// Marketplace: MKT-INV-{SEQ}; SaaS: SAAS-{SF_CODE}-INV-{SEQ}
   referenceNumber String?
   /// ref order.Order, без FK.
-  orderId    String
+  orderId         String
   /// ref crm.Customer, без FK.
-  customerId String?
-  amount     Decimal       @db.Decimal(12, 2)
-  currency   String        @default("USD")
-  status     InvoiceStatus @default(DRAFT)
-  version    Int           @default(1)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  customerId      String?
+  amount          Decimal       @db.Decimal(12, 2)
+  currency        String        @default("USD")
+  status          InvoiceStatus @default(DRAFT)
+  version         Int           @default(1)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([orderId])
   @@index([customerId])
@@ -4371,21 +4372,21 @@ enum CommissionCollectionModel {
 /// 2.12E+/2.14). collectionModel — PARTNER_COLLECT (V1); SPLIT_AT_PAYMENT —
 /// 2.12C (аддитивное расширение enum).
 model Commission {
-  id         String                   @id @default(uuid())
-  code       String                   @unique // CMS-00000001
+  id              String                    @id @default(uuid())
+  code            String                    @unique // CMS-00000001
   /// ref order.Order, без FK. Идемпотентность: ОДИН Commission на Order
   /// (источник-факт) — @@unique([orderId]) DB backstop.
-  orderId    String
+  orderId         String
   /// ref crm.Partner, без FK (frozen sellerPartnerId из Order).
-  partnerId  String
-  amount     Decimal                  @db.Decimal(12, 2)
-  currency   String                   @default("USD")
+  partnerId       String
+  amount          Decimal                   @db.Decimal(12, 2)
+  currency        String                    @default("USD")
   /// Collection-модель (ADR-0013 D8/D9). V1: PARTNER_COLLECT (2.12E producer).
   collectionModel CommissionCollectionModel @default(PARTNER_COLLECT)
-  status     CommissionStatus         @default(ACCRUED)
-  version    Int                      @default(1)
-  createdAt  DateTime                 @default(now())
-  updatedAt  DateTime                 @updatedAt
+  status          CommissionStatus          @default(ACCRUED)
+  version         Int                       @default(1)
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
 
   @@unique([orderId])
   @@index([orderId])
@@ -4413,24 +4414,24 @@ enum CommissionAccrualStatus {
 /// периодизация — deferred). accruedAt — сервер-owned время признания
 /// (Order creation, 2.10C DEFER → 2.12E; первый-wins, без backfill).
 model CommissionAccrual {
-  id          String                   @id @default(uuid())
-  code        String                   @unique // CAA-00000001
+  id                 String                  @id @default(uuid())
+  code               String                  @unique // CAA-00000001
   /// ref crm.Partner, без FK (frozen sellerPartnerId).
-  partnerId   String
-  amount      Decimal                  @db.Decimal(12, 2)
-  currency    String                   @default("USD")
-  status      CommissionAccrualStatus  @default(ACCRUED)
-  periodStart DateTime?
-  periodEnd   DateTime?
+  partnerId          String
+  amount             Decimal                 @db.Decimal(12, 2)
+  currency           String                  @default("USD")
+  status             CommissionAccrualStatus @default(ACCRUED)
+  periodStart        DateTime?
+  periodEnd          DateTime?
   /// ref finance.Commission (canonical earned-факт), без FK. ОДИН accrual на
   /// Commission — @@unique backstop.
   sourceCommissionId String?
   /// 2.10C DEFER → 2.12E: время признания receivable (Order creation, UTC).
   /// Server-owned, first-only; NULL = legacy/не известно (без backfill).
-  accruedAt   DateTime?
-  version     Int                      @default(1)
-  createdAt   DateTime                 @default(now())
-  updatedAt   DateTime                 @updatedAt
+  accruedAt          DateTime?
+  version            Int                     @default(1)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
   @@unique([sourceCommissionId])
   @@index([partnerId])
@@ -4515,7 +4516,7 @@ model CommissionPolicy {
 /// политики на этой версии (fields Json) — future frozen snapshot воспроизводит
 /// (code, version) без текущего lookup.
 model CommissionPolicyHistory {
-  id        String   @id @default(uuid())
+  id        String           @id @default(uuid())
   policyId  String
   policy    CommissionPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
   action    String
@@ -4526,12 +4527,11 @@ model CommissionPolicyHistory {
   actorId   String?
   actorName String?
   comment   String?
-  createdAt DateTime @default(now())
+  createdAt DateTime         @default(now())
 
   @@index([policyId])
   @@schema("finance")
 }
-
 
 /// Валюта (CUR-*) — Finance master data (единственный владелец, Screen Design
 /// §7 / Architecture §8; Settings НЕ дублирует). isoCode — canonical ключ.
@@ -4552,18 +4552,18 @@ model Currency {
 /// Курс валюты (FXR-*) — Finance master data. НЕ выполняет FX-конверсию
 /// (cross-currency settlement — вне 2.10; конверсия — 2.12A/2.14D).
 model ExchangeRate {
-  id               String   @id @default(uuid())
-  code             String   @unique // FXR-00000001
+  id               String    @id @default(uuid())
+  code             String    @unique // FXR-00000001
   baseCurrencyIso  String
   quoteCurrencyIso String
   /// Курс «1 base = rate quote» (Decimal, НЕ float). Точность rate — 6 знаков
   /// (rate ≠ amount; amount-контракт DECIMAL(12,2) не применяется к rate).
-  rate             Decimal  @db.Decimal(18, 6)
+  rate             Decimal   @db.Decimal(18, 6)
   validFrom        DateTime
   validTo          DateTime?
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([baseCurrencyIso, quoteCurrencyIso])
   @@schema("finance")
@@ -4581,7 +4581,8 @@ model Tax {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  rules     TaxRule[]
+  rules TaxRule[]
+
   @@schema("finance")
 }
 
@@ -4611,11 +4612,11 @@ model TaxRule {
 /// Double-entry/account chart/balances — НЕ входят в 2.10A (Roadmap определяет
 /// только append-only; debit/credit/balance — без канонического контракта).
 model LedgerTransaction {
-  id            String   @id @default(uuid())
-  code          String   @unique // LTX-########
+  id            String    @id @default(uuid())
+  code          String    @unique // LTX-########
   /// Immutable amount > 0 (DECIMAL(12,2) платформенный money-контракт).
   /// Экономический смысл несёт type (vocabulary приходит с producer-шагом 2.12+).
-  amount        Decimal  @db.Decimal(12, 2)
+  amount        Decimal   @db.Decimal(12, 2)
   /// ISO 4217 code-снапшот, валидируется против finance.Currency (без FK).
   currency      String
   /// Классификация факта (String; словарь значений — с producer-шагом).
@@ -4644,7 +4645,7 @@ model LedgerTransaction {
   /// перезаписывает первое вхождение).
   occurredAt    DateTime?
   /// Время финансового факта (сервер-owned, UTC).
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   /// Idempotency invariant: один ledger fact данного типа на source-факт.
   @@unique([sourceType, sourceId, type])
@@ -4758,9 +4759,9 @@ model UserWorkspaceLayout {
   id            String   @id @default(uuid())
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pageId        String   // e.g. "command-center", "analytics"
+  pageId        String // e.g. "command-center", "analytics"
   layoutVersion Int      @default(1)
-  widgets       Json     // JSON array of widget positions/sizes/visibility/config
+  widgets       Json // JSON array of widget positions/sizes/visibility/config
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -4777,39 +4778,39 @@ model UserWorkspaceLayout {
 // not AI opinions. Hybrid model: dynamic facts + persisted lifecycle state.
 // Owner: Command Center / Decision Intelligence module.
 model DecisionSignal {
-  id              String             @id @default(uuid())
+  id               String       @id @default(uuid())
   /// Stable signal code — detector-specific identifier.
-  code            String
+  code             String
   /// Operational category: OPERATIONAL / FINANCIAL / CATALOG / CHANNEL.
-  category        String
+  category         String
   /// Lifecycle state: OPEN / ACKNOWLEDGED / RESOLVED / DISMISSED.
-  status          SignalStatus       @default(OPEN)
+  status           SignalStatus @default(OPEN)
   /// Detector module that produced this signal.
-  source          String
+  source           String
   /// Deterministic fingerprint: detectorKey + business scope.
   /// Used for dedup: one active signal per fingerprint.
-  fingerprint     String             @unique
+  fingerprint      String       @unique
   /// JSON array of typed entity references: [{entityType, entityId}].
   affectedEntities Json
   /// JSON array of structured evidence: [{key, value, unit?, source, observedAt}].
-  evidence        Json
+  evidence         Json
   /// Timestamp when this signal was first detected.
-  firstDetectedAt DateTime           @default(now())
+  firstDetectedAt  DateTime     @default(now())
   /// Timestamp of most recent detection/re-observation.
-  lastDetectedAt  DateTime           @default(now())
+  lastDetectedAt   DateTime     @default(now())
   /// Acknowledgement: {at, byUserId, byUsername}.
-  acknowledgedAt  DateTime?
-  acknowledgedBy  String?
+  acknowledgedAt   DateTime?
+  acknowledgedBy   String?
   /// Resolution: {at, byUserId, byUsername, reason?}.
-  resolvedAt      DateTime?
-  resolvedBy      String?
+  resolvedAt       DateTime?
+  resolvedBy       String?
   /// Dismissal: {at, byUserId, byUsername, reason?}.
-  dismissedAt     DateTime?
-  dismissedBy     String?
+  dismissedAt      DateTime?
+  dismissedBy      String?
   /// Count of re-observations (recurrence tracking).
-  observationCount Int                @default(1)
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  observationCount Int          @default(1)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@index([status])
   @@index([category])
@@ -4901,24 +4902,24 @@ enum CrmActivitySubjectType {
 }
 
 model CrmActivity {
-  id            String                   @id @default(uuid())
-  sourceType    CrmActivitySourceType
-  sourceId      String                   // canonical source entity ID
-  sourceEvent   String                   // event discriminator (e.g. "created", "status:CAPTURED")
-  activityType  CrmActivityActivityType
-  subjectType   CrmActivitySubjectType
-  subjectId     String                   // customer.id or partner.id
-  customerId    String?                  // denormalized for efficient Customer 360 queries
-  partnerId     String?                  // denormalized for efficient Partner 360 queries
-  occurredAt    DateTime                 // canonical business timestamp from source
-  actorUserId   String?                  // server-derived from source/audit
-  actorName     String?                  // display snapshot
-  title         String                   // i18n key or resolved display text
-  summary       String?                  // role-filtered preview (truncated)
-  metadata      Json?                    // role-filtered source-specific data
-  deepLink      String?                  // relative route (e.g. /app/orders/:id)
-  visibility    String                   @default("INTERNAL") // INTERNAL|PARTNER_VISIBLE|CUSTOMER_VISIBLE
-  projectedAt   DateTime                 @default(now())
+  id           String                  @id @default(uuid())
+  sourceType   CrmActivitySourceType
+  sourceId     String // canonical source entity ID
+  sourceEvent  String // event discriminator (e.g. "created", "status:CAPTURED")
+  activityType CrmActivityActivityType
+  subjectType  CrmActivitySubjectType
+  subjectId    String // customer.id or partner.id
+  customerId   String? // denormalized for efficient Customer 360 queries
+  partnerId    String? // denormalized for efficient Partner 360 queries
+  occurredAt   DateTime // canonical business timestamp from source
+  actorUserId  String? // server-derived from source/audit
+  actorName    String? // display snapshot
+  title        String // i18n key or resolved display text
+  summary      String? // role-filtered preview (truncated)
+  metadata     Json? // role-filtered source-specific data
+  deepLink     String? // relative route (e.g. /app/orders/:id)
+  visibility   String                  @default("INTERNAL") // INTERNAL|PARTNER_VISIBLE|CUSTOMER_VISIBLE
+  projectedAt  DateTime                @default(now())
 
   @@unique([sourceType, sourceId, sourceEvent], name: "CrmActivity_dedupe_key")
   @@index([customerId, occurredAt, id], name: "CrmActivity_customer_timeline")
@@ -4959,24 +4960,24 @@ enum CampaignObjective {
 /// Platform-owned campaigns have partnerId = NULL.
 /// Partner-owned campaigns reference their partnerId.
 model Campaign {
-  id            String             @id @default(uuid())
-  code          String             @unique // MKT-* human-readable
-  name          String
-  description   String?
-  objective     CampaignObjective?
-  status        CampaignStatus     @default(DRAFT)
-  partnerId     String?            // NULL = Platform campaign
-  startAt       DateTime?
-  endAt         DateTime?
-  createdById   String
-  createdBy     User               @relation(fields: [createdById], references: [id])
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  version       Int                @default(1)
+  id          String             @id @default(uuid())
+  code        String             @unique // MKT-* human-readable
+  name        String
+  description String?
+  objective   CampaignObjective?
+  status      CampaignStatus     @default(DRAFT)
+  partnerId   String? // NULL = Platform campaign
+  startAt     DateTime?
+  endAt       DateTime?
+  createdById String
+  createdBy   User               @relation(fields: [createdById], references: [id])
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  version     Int                @default(1)
 
   // Relations
-  audiences     CampaignAudience[]
-  attributions  CampaignAttribution[]
+  audiences    CampaignAudience[]
+  attributions CampaignAttribution[]
 
   @@index([partnerId, status])
   @@index([status, createdAt])
@@ -4986,22 +4987,22 @@ model Campaign {
 /// Audience — a saved segment/rule definition for targeting campaign recipients.
 /// Does NOT store customer data; references CRM filter criteria.
 model CampaignAudience {
-  id            String   @id @default(uuid())
-  code          String   @unique // MKA-* human-readable
-  campaignId    String
-  campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  name          String
-  description   String?
+  id             String   @id @default(uuid())
+  code           String   @unique // MKA-* human-readable
+  campaignId     String
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
   // Segment criteria — stored as JSON for flexibility.
   // Examples: { "lifecycle": ["LEAD","PROSPECT"], "leadSource": ["MARKETPLACE"], "tags": ["vip"] }
-  criteria      Json?
-  estimatedCount Int?    // snapshot count at creation/update time
-  partnerId     String?  // NULL = Platform audience
-  createdById   String
-  createdBy     User     @relation(fields: [createdById], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  version       Int      @default(1)
+  criteria       Json?
+  estimatedCount Int? // snapshot count at creation/update time
+  partnerId      String? // NULL = Platform audience
+  createdById    String
+  createdBy      User     @relation(fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  version        Int      @default(1)
 
   @@index([campaignId])
   @@index([partnerId])
@@ -5011,19 +5012,19 @@ model CampaignAudience {
 /// Attribution — links a Campaign to a CRM entity (Customer/Lead/Order/Booking)
 /// for conversion tracking. Additive reference; does NOT mutate canonical source fields.
 model CampaignAttribution {
-  id            String   @id @default(uuid())
-  campaignId    String
-  campaign      Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  id              String   @id @default(uuid())
+  campaignId      String
+  campaign        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   // Target entity — one of: CUSTOMER, LEAD, ORDER, BOOKING
-  entityType    String   // enum-like: CUSTOMER | LEAD | ORDER | BOOKING
-  entityId      String   // reference to the target entity
-  attributionType String @default("FIRST_TOUCH") // FIRST_TOUCH | LAST_TOUCH | MANUAL
-  attributedAt  DateTime @default(now())
-  notes         String?
-  partnerId     String?  // NULL = Platform attribution
-  createdById   String
-  createdBy     User     @relation(fields: [createdById], references: [id])
-  createdAt     DateTime @default(now())
+  entityType      String // enum-like: CUSTOMER | LEAD | ORDER | BOOKING
+  entityId        String // reference to the target entity
+  attributionType String   @default("FIRST_TOUCH") // FIRST_TOUCH | LAST_TOUCH | MANUAL
+  attributedAt    DateTime @default(now())
+  notes           String?
+  partnerId       String? // NULL = Platform attribution
+  createdById     String
+  createdBy       User     @relation(fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
 
   @@unique([campaignId, entityType, entityId])
   @@index([entityType, entityId])
@@ -5074,48 +5075,48 @@ enum SupportCaseStatus {
 /// References canonical entities (Order/Booking/Customer/Partner) by ID.
 /// Does NOT own their lifecycle — read-only references.
 model Case {
-  id              String               @id @default(uuid())
-  code            String               @unique // SUP-00000001
-  title           String
-  description     String?
-  caseType        SupportCaseType      @default(GENERAL)
-  priority        SupportCasePriority  @default(MEDIUM)
-  status          SupportCaseStatus    @default(OPEN)
-  source          String?              // e.g. "email", "phone", "chat", "api"
+  id          String              @id @default(uuid())
+  code        String              @unique // SUP-00000001
+  title       String
+  description String?
+  caseType    SupportCaseType     @default(GENERAL)
+  priority    SupportCasePriority @default(MEDIUM)
+  status      SupportCaseStatus   @default(OPEN)
+  source      String? // e.g. "email", "phone", "chat", "api"
 
   // ── Related entity references (no FK — cross-schema) ──
-  customerId      String?              // ref crm.Customer
-  orderId         String?              // ref order.Order
-  bookingId       String?              // ref booking.Booking
+  customerId String? // ref crm.Customer
+  orderId    String? // ref order.Order
+  bookingId  String? // ref booking.Booking
 
   // ── Assignment ──
-  assignedToId    String?              // ref security.User
+  assignedToId String? // ref security.User
 
   // ── SLA ──
-  slaDeadline     DateTime?
-  slaBreached     Boolean              @default(false)
+  slaDeadline DateTime?
+  slaBreached Boolean   @default(false)
 
   // ── Escalation ──
-  escalatedAt     DateTime?
-  escalatedById   String?              // ref security.User
+  escalatedAt      DateTime?
+  escalatedById    String? // ref security.User
   escalationReason String?
 
   // ── Metadata ──
-  createdById     String               // ref security.User (creator)
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  resolvedAt      DateTime?
-  closedAt        DateTime?
-  version         Int                  @default(1)
+  createdById String // ref security.User (creator)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  resolvedAt  DateTime?
+  closedAt    DateTime?
+  version     Int       @default(1)
 
   // ── Soft delete (R13) ──
-  deletedAt       DateTime?
-  deletedBy       String?
-  deletionReason  String?
+  deletedAt      DateTime?
+  deletedBy      String?
+  deletionReason String?
 
-  comments        CaseComment[]
-  caseLinks       CaseCommunicationLink[]
-  history         CaseHistory[]
+  comments  CaseComment[]
+  caseLinks CaseCommunicationLink[]
+  history   CaseHistory[]
 
   @@index([status])
   @@index([customerId])
@@ -5129,17 +5130,17 @@ model Case {
 
 /// Case comment — internal or customer-facing note on a support case.
 model CaseComment {
-  id          String   @id @default(uuid())
-  caseId      String
-  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  authorId    String   // ref security.User
-  body        String
-  isInternal  Boolean  @default(false) // true = internal staff note, not visible to customer/partner
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  editedAt    DateTime?
-  deletedAt   DateTime?
-  deletedBy   String?
+  id         String    @id @default(uuid())
+  caseId     String
+  case       Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  authorId   String // ref security.User
+  body       String
+  isInternal Boolean   @default(false) // true = internal staff note, not visible to customer/partner
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  editedAt   DateTime?
+  deletedAt  DateTime?
+  deletedBy  String?
 
   @@index([caseId])
   @@index([authorId])
@@ -5152,7 +5153,7 @@ model CaseCommunicationLink {
   id              String   @id @default(uuid())
   caseId          String
   case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  communicationId String   // ref communication.Communication (no FK)
+  communicationId String // ref communication.Communication (no FK)
   createdAt       DateTime @default(now())
   createdById     String?
 
@@ -5163,16 +5164,16 @@ model CaseCommunicationLink {
 
 /// Support Case audit history (append-only).
 model CaseHistory {
-  id          String   @id @default(uuid())
-  caseId      String
-  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  action      String   // e.g. "created", "status:IN_PROGRESS", "assigned", "priority:HIGH"
-  actorId     String?  // ref security.User
-  actorName   String?
+  id            String   @id @default(uuid())
+  caseId        String
+  case          Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  action        String // e.g. "created", "status:IN_PROGRESS", "assigned", "priority:HIGH"
+  actorId       String? // ref security.User
+  actorName     String?
   previousValue String?
-  newValue    String?
-  details     String?
-  createdAt   DateTime @default(now())
+  newValue      String?
+  details       String?
+  createdAt     DateTime @default(now())
 
   @@index([caseId])
   @@index([createdAt])
@@ -5206,34 +5207,34 @@ enum DocumentStatus {
 
 /// Document entity — owns version history and current status.
 model Document {
-  id              String         @id @default(uuid())
-  code            String         @unique // PPD-*, VCH-*, RFD-*
-  type            DocumentType
-  status          DocumentStatus @default(NOT_ISSUED)
+  id     String         @id @default(uuid())
+  code   String         @unique // PPD-*, VCH-*, RFD-*
+  type   DocumentType
+  status DocumentStatus @default(NOT_ISSUED)
 
   // Ownership chain: Document → Booking → Order → Customer → User (Buyer)
-  bookingId       String         // ref booking.Booking (no FK — ADR-0001)
-  orderId         String         // ref order.Order (no FK — ADR-0001)
-  customerId      String?        // ref crm.Customer (no FK; NULL = internal)
+  bookingId  String // ref booking.Booking (no FK — ADR-0001)
+  orderId    String // ref order.Order (no FK — ADR-0001)
+  customerId String? // ref crm.Customer (no FK; NULL = internal)
 
   // Current version pointer
-  currentVersionId String?       // ref DocumentVersion.id
+  currentVersionId String? // ref DocumentVersion.id
 
   // Snapshot facts at issuance (immutable after first version created)
   serviceDate     DateTime?
   serviceTime     String?
   serviceTimeZone String?
-  totalAmount     Decimal?       @db.Decimal(12, 2)
-  paidAmount      Decimal?       @db.Decimal(12, 2)
+  totalAmount     Decimal?  @db.Decimal(12, 2)
+  paidAmount      Decimal?  @db.Decimal(12, 2)
   currency        String?
-  paymentStatus   String?        // OrderPaymentStatus snapshot
+  paymentStatus   String? // OrderPaymentStatus snapshot
 
-  version         Int            @default(1)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  versions        DocumentVersion[]
-  history         DocumentHistory[]
+  versions DocumentVersion[]
+  history  DocumentHistory[]
 
   @@index([bookingId])
   @@index([orderId])
@@ -5245,30 +5246,30 @@ model Document {
 
 /// Immutable document version — one PDF binary per version.
 model DocumentVersion {
-  id              String         @id @default(uuid())
-  documentId      String
-  document        Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  id         String   @id @default(uuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
-  versionNumber   Int            // sequential: 1, 2, 3...
-  status          DocumentStatus @default(NOT_ISSUED)
+  versionNumber Int // sequential: 1, 2, 3...
+  status        DocumentStatus @default(NOT_ISSUED)
 
   // Storage
-  s3Key           String?        // documents/{documentId}/v{version}.pdf
-  fileSize        Int?           // bytes
+  s3Key    String? // documents/{documentId}/v{version}.pdf
+  fileSize Int? // bytes
 
   // Template reference
-  templateId      String?        // ref DocumentTemplate.id
-  templateVersion String?        // snapshot of template version at issuance
+  templateId      String? // ref DocumentTemplate.id
+  templateVersion String? // snapshot of template version at issuance
 
   // Audit metadata
   issuedAt        DateTime?
-  triggeringEvent String?        // e.g. "BookingConfirmed+PaymentCaptured", "RefundProcessed"
-  actorId         String?        // NULL for system, userId for manual
+  triggeringEvent String? // e.g. "BookingConfirmed+PaymentCaptured", "RefundProcessed"
+  actorId         String? // NULL for system, userId for manual
 
   // Snapshot of traveler data at issuance (for audit/versioning)
-  snapshot        Json?          // full snapshot of rendered data
+  snapshot Json? // full snapshot of rendered data
 
-  createdAt       DateTime       @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([documentId, versionNumber])
   @@index([documentId])
@@ -5277,17 +5278,17 @@ model DocumentVersion {
 
 /// Audit history for document lifecycle events.
 model DocumentHistory {
-  id              String   @id @default(uuid())
-  documentId      String
-  document        Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  action          String   // e.g. "created", "issued", "superseded", "invalidated"
-  from            String?  // previous DocumentStatus
-  to              String?  // new DocumentStatus
-  actorId         String?  // NULL for system
-  actorName       String?
-  versionNumber   Int?     // related version
-  comment         String?
-  createdAt       DateTime @default(now())
+  id            String   @id @default(uuid())
+  documentId    String
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  action        String // e.g. "created", "issued", "superseded", "invalidated"
+  from          String? // previous DocumentStatus
+  to            String? // new DocumentStatus
+  actorId       String? // NULL for system
+  actorName     String?
+  versionNumber Int? // related version
+  comment       String?
+  createdAt     DateTime @default(now())
 
   @@index([documentId])
   @@index([createdAt])
@@ -5296,15 +5297,15 @@ model DocumentHistory {
 
 /// Document template definition (version-controlled via git).
 model DocumentTemplate {
-  id              String   @id @default(uuid())
-  name            String   @unique // e.g. "voucher-v1", "partial-payment-v1"
-  type            DocumentType
-  version         Int      @default(1)
-  description     String?
-  schema          Json?    // template field schema for validation
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String       @id @default(uuid())
+  name        String       @unique // e.g. "voucher-v1", "partial-payment-v1"
+  type        DocumentType
+  version     Int          @default(1)
+  description String?
+  schema      Json? // template field schema for validation
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@index([type])
   @@schema("documents")
@@ -5316,29 +5317,29 @@ model DocumentTemplate {
 
 /// Page-level configuration for Constructor-managed pages.
 model ConstructorPage {
-  id              String   @id @default(uuid())
-  slug            String   @unique
-  context         String   // "marketplace" | "storefront"
-  tenantId        String?  // NULL for marketplace, partnerId for storefront
-  status          String   @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
-  currentVersion  Int?
-  draftVersion    Int?
-  themeId         String?
-  templateId      String?
-  seo             Json?    // SeoConfig { title, description, canonical, robots, ogImage }
-  headerConfig    Json?    // HeaderConfig { logo, companyName, phone, email, navItems, actions }
-  heroConfig      Json?    // HeroConfig { slides[], carousel }
-  searchConfig    Json?    // SearchConfig { services, order, defaultService }
-  footerConfig    Json?    // FooterConfig { logo, name, description, phone, email, navGroups, social, copyright }
-  designConfig    Json?    // DesignConfig { typography, colors, spacing, layout, components }
-  defaultConfigs  Json?    // Per-tab default configs { header?, hero?, search?, footer?, design? } for restore-default / make-current-default
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  publishedAt     DateTime?
+  id             String    @id @default(uuid())
+  slug           String    @unique
+  context        String // "marketplace" | "storefront"
+  tenantId       String? // NULL for marketplace, partnerId for storefront
+  status         String    @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  currentVersion Int?
+  draftVersion   Int?
+  themeId        String?
+  templateId     String?
+  seo            Json? // SeoConfig { title, description, canonical, robots, ogImage }
+  headerConfig   Json? // HeaderConfig { logo, companyName, phone, email, navItems, actions }
+  heroConfig     Json? // HeroConfig { slides[], carousel }
+  searchConfig   Json? // SearchConfig { services, order, defaultService }
+  footerConfig   Json? // FooterConfig { logo, name, description, phone, email, navGroups, social, copyright }
+  designConfig   Json? // DesignConfig { typography, colors, spacing, layout, components }
+  defaultConfigs Json? // Per-tab default configs { header?, hero?, search?, footer?, design? } for restore-default / make-current-default
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  publishedAt    DateTime?
 
-  sections        ConstructorPageSection[]
-  versions        ConstructorPageVersion[]
-  auditLog        ConstructorPageAuditLog[]
+  sections ConstructorPageSection[]
+  versions ConstructorPageVersion[]
+  auditLog ConstructorPageAuditLog[]
 
   @@index([slug])
   @@index([context])
@@ -5348,22 +5349,22 @@ model ConstructorPage {
 
 /// Individual block sections within a page version.
 model ConstructorPageSection {
-  id              String   @id @default(uuid())
+  id              String          @id @default(uuid())
   pageId          String
   page            ConstructorPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
   version         Int
   blockType       String
   blockInstanceId String
   sortOrder       Int
-  enabled         Boolean  @default(true)
-  settings        Json     @default("{}")
-  style           Json     @default("{}")
-  responsive      Json     @default("{}")
-  dataSource      Json     @default("{}")
+  enabled         Boolean         @default(true)
+  settings        Json            @default("{}")
+  style           Json            @default("{}")
+  responsive      Json            @default("{}")
+  dataSource      Json            @default("{}")
   visibility      Json?
-  localeContent   Json     @default("{}")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  localeContent   Json            @default("{}")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   @@unique([pageId, version, blockInstanceId])
   @@index([pageId])
@@ -5373,14 +5374,14 @@ model ConstructorPageSection {
 
 /// Version snapshots for publish/rollback.
 model ConstructorPageVersion {
-  id          String   @id @default(uuid())
+  id          String          @id @default(uuid())
   pageId      String
   page        ConstructorPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
   version     Int
-  status      String   // "draft" | "published" | "archived"
-  snapshot    Json     // Full page configuration snapshot
+  status      String // "draft" | "published" | "archived"
+  snapshot    Json // Full page configuration snapshot
   createdBy   String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime        @default(now())
   publishedAt DateTime?
 
   @@unique([pageId, version])
@@ -5390,18 +5391,42 @@ model ConstructorPageVersion {
 
 /// Audit trail for Constructor actions.
 model ConstructorPageAuditLog {
-  id          String   @id @default(uuid())
-  pageId      String
-  page        ConstructorPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  version     Int?
-  action      String   // "create" | "update_section" | "reorder" | "enable" | "disable" | "save_draft" | "publish" | "rollback"
-  actorId     String
-  actorName   String?
-  before      Json?
-  after       Json?
-  createdAt   DateTime @default(now())
+  id        String          @id @default(uuid())
+  pageId    String
+  page      ConstructorPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  version   Int?
+  action    String // "create" | "update_section" | "reorder" | "enable" | "disable" | "save_draft" | "publish" | "rollback"
+  actorId   String
+  actorName String?
+  before    Json?
+  after     Json?
+  createdAt DateTime        @default(now())
 
   @@index([pageId])
   @@index([createdAt])
   @@schema("constructor")
+}
+
+/// Provider-agnostic supplier geo mapping (KOMPAS TOURINC, SAMO TOWNS, etc.).
+/// Adding a new supplier requires zero schema changes — new rows only.
+model SupplierGeoLink {
+  id           String      @id @default(uuid())
+  supplierCode String // "KOMPAS", "SUMMERTOUR", ...
+  kind         String // "TOUR" | "TOWN" | "HOTEL" | ...
+  externalId   String // supplier's internal id (e.g. SAMO TOURINC=3706)
+  label        String // raw label from supplier form ("AE: Дубай из Баку (GDS: AZAL)")
+  geoCountryId String?
+  geoCountry   GeoCountry? @relation(fields: [geoCountryId], references: [id], onDelete: SetNull)
+  geoCityId    String?
+  geoCity      GeoCity?    @relation(fields: [geoCityId], references: [id], onDelete: SetNull)
+  geoResortId  String?
+  geoResort    GeoResort?  @relation(fields: [geoResortId], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([supplierCode, kind, externalId])
+  @@index([geoCityId])
+  @@index([geoCountryId])
+  @@index([supplierCode])
+  @@schema("geo")
 }

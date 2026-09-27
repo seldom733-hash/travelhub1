@@ -19,6 +19,7 @@ type Range = { readonly min: number; readonly max: number };
 const SUPPLIER_RANGES: Record<string, { nights: Range; adults: Range; children: Range }> = {
   KOMPAS: { nights: KOMPAS_NIGHTS, adults: KOMPAS_ADULTS, children: KOMPAS_CHILDREN },
   SUMMERTOUR: { nights: SUMMERTOUR_NIGHTS, adults: { min: 1, max: 4 }, children: { min: 0, max: 1 } },
+  KAZUNION: { nights: { min: 3, max: 15 }, adults: { min: 1, max: 5 }, children: { min: 0, max: 4 } },
 };
 
 /**
