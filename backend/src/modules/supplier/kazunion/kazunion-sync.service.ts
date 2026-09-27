@@ -31,9 +31,23 @@ export interface KazunionSyncOptions {
   /** Search window override (ISO dates). Default: today → +30 days. */
   dateFrom?: string;
   dateTo?: string;
-  /** Master Geography country code to link created cards (e.g. "TR"). */
+  /** Master Geography country code to link created cards (e.g. "TR").
+   *  Only used as fallback when the discovered country name has no ISO-2 mapping;
+   *  per-card linkage is derived from the supplier's own country name. */
   geoCountryCode?: string;
 }
+
+/** Supplier country names (ru/en) → ISO-2 (geo directory codes). */
+const COUNTRY_ISO: Record<string, string> = {
+  "турция": "TR", "turkey": "TR",
+  "китай": "CN", "china": "CN",
+  "грузия": "GE", "georgia": "GE",
+  "казахстан": "KZ", "kazakhstan": "KZ",
+  "мальдивы": "MV", "maldives": "MV",
+  "катар": "QA", "qatar": "QA",
+  "сингапур": "SG", "singapore": "SG",
+  "таиланд": "TH", "thailand": "TH",
+};
 
 @Injectable()
 export class KazunionSyncService {
@@ -222,6 +236,12 @@ export class KazunionSyncService {
         const tourIncName = (offers[0].rawMetadata?.tourIncName as string) ?? "";
         const country = (offers[0].rawMetadata?.country as string) ?? "Unknown";
 
+        // Country granularity geo link: discovered name → ISO-2 → geo id
+        // (per card, so a full 8-country sync links each card correctly).
+        const cardGeoId =
+          (await this.geoIdForCountry(country)) ??
+          (scoped.length === 1 ? geoCountryId : null);
+
         const attributes = {
           hotelName,
           hotelKey,
@@ -263,8 +283,8 @@ export class KazunionSyncService {
               });
             }
             const geoPatch: { geoCountryId?: string } = {};
-            if (geoCountryId && !(existing as any).geoCountryId) {
-              geoPatch.geoCountryId = geoCountryId;
+            if (cardGeoId && !(existing as any).geoCountryId) {
+              geoPatch.geoCountryId = cardGeoId;
             }
             if (Object.keys(geoPatch).length > 0) {
               await tx.product.update({
@@ -292,7 +312,7 @@ export class KazunionSyncService {
                 ${`${hotelName} — ${tourIncName}`}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
                 ${toursCategory.id}, ${JSON.stringify(attributes)}::jsonb, ${partnerId},
                 now(), now(), now(),
-                ${geoCountryId}
+                ${cardGeoId}
               )
               RETURNING "id"
             `;
@@ -325,6 +345,22 @@ export class KazunionSyncService {
         `${result.uniqueIdentities} unique, ${result.newCards} created, ${result.updatedCards} updated`,
     );
     return result;
+  }
+
+  /** ISO-2 → geo country id (cached). Returns null when unmapped/absent. */
+  private readonly geoIsoCache = new Map<string, string | null>();
+
+  private async geoIdForCountry(countryName: string): Promise<string | null> {
+    const iso = COUNTRY_ISO[countryName.trim().toLowerCase()];
+    if (!iso) return null;
+    if (this.geoIsoCache.has(iso)) return this.geoIsoCache.get(iso)!;
+    const gc = await this.prisma.geoCountry.findUnique({
+      where: { code: iso },
+      select: { id: true },
+    });
+    const id = gc?.id ?? null;
+    this.geoIsoCache.set(iso, id);
+    return id;
   }
 
   private generateDateWindows(

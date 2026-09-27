@@ -38,6 +38,11 @@ export const COUNTRY_NAMES: Record<string, LocalizedNames> = {
   FR: { ru: "Франция", az: "Fransa", en: "France" },
   IT: { ru: "Италия", az: "İtaliya", en: "Italy" },
   ES: { ru: "Испания", az: "İspaniya", en: "Spain" },
+  CN: { ru: "Китай", az: "Çin", en: "China" },
+  TH: { ru: "Таиланд", az: "Tayland", en: "Thailand" },
+  MV: { ru: "Мальдивы", az: "Maldivlər", en: "Maldives" },
+  QA: { ru: "Катار", az: "Qətər", en: "Qatar" },
+  SG: { ru: "Сингапур", az: "Sinqapur", en: "Singapore" },
 };
 
 export interface CityRef extends LocalizedNames {
