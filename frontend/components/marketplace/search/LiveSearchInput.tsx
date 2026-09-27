@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { MagnifyingGlass, CaretDown, X } from "@phosphor-icons/react";
@@ -110,7 +110,7 @@ export default function LiveSearchInput({
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
-      <label htmlFor={id} className="mb-0.5 block text-[11px] font-medium text-neutral-400">
+      <label htmlFor={id} className="mb-0.5 block text-[13px] font-medium text-neutral-400">
         {label}
         {required && <span className="ml-0.5 text-gold">*</span>}
       </label>
@@ -142,7 +142,7 @@ export default function LiveSearchInput({
           aria-controls={`${id}-listbox`}
           aria-activedescendant={highlightedIndex >= 0 ? `${id}-option-${highlightedIndex}` : undefined}
           aria-describedby={ariaDescribedBy}
-          className="w-full rounded-xl border border-dark-border bg-dark-card py-2 pl-9 pr-8 text-[13px] text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/50"
+          className="w-full rounded-xl border border-dark-border bg-dark-card py-2 pl-9 pr-8 text-[15px] text-white placeholder-neutral-500 outline-none transition-colors focus:border-gold/50"
         />
         {query && (
           <button
@@ -197,12 +197,12 @@ export default function LiveSearchInput({
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium text-white">{result.name}</div>
+                <div className="truncate text-[15px] font-medium text-white">{result.name}</div>
                 {result.subtitle && (
-                  <div className="truncate text-[11px] text-neutral-500">{result.subtitle}</div>
+                  <div className="truncate text-[13px] text-neutral-500">{result.subtitle}</div>
                 )}
               </div>
-              <span className="shrink-0 rounded-full bg-dark-card px-2 py-0.5 text-[10px] text-neutral-500">
+              <span className="shrink-0 rounded-full bg-dark-card px-2 py-0.5 text-[14px] text-neutral-500">
                 {result.type}
               </span>
             </li>

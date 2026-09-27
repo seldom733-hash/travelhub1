@@ -12,11 +12,14 @@ export default function Price({
   currency,
   size = "md",
   withPrefix = true,
+  tone = "dark",
 }: {
   amount: string | number | null | undefined;
   currency?: string | null;
   size?: "xs" | "sm" | "md" | "lg";
   withPrefix?: boolean;
+  /** "dark" = тёмный текст (светлый фон), "light" = белый текст (тёмный фон). */
+  tone?: "dark" | "light";
 }) {
   const locale = useLocale();
   const formatted = formatPrice(amount, currency, locale);
@@ -28,14 +31,15 @@ export default function Price({
     return <span className="text-sm text-slate-400">{t("price.on_request", locale)}</span>;
   }
 
+  const color = tone === "light" ? "text-white" : "text-slate-900";
   const cls =
     size === "lg"
-      ? "text-3xl font-bold text-slate-900"
+      ? `text-3xl font-bold ${color}`
       : size === "sm"
-        ? "text-sm font-bold text-slate-900"
+        ? `text-sm font-bold ${color}`
         : size === "xs"
-          ? "text-[10px] font-bold leading-none text-slate-900"
-          : "text-lg font-bold text-slate-900";
+          ? `text-[10px] font-bold leading-none ${color}`
+          : `text-lg font-bold ${color}`;
 
   return (
     <span className={cls}>

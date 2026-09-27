@@ -87,6 +87,9 @@ interface PrismaStub {
   categorySchema: { findFirst: jest.Mock };
   availability: { groupBy: jest.Mock };
   publicSellerProfile: { findMany: jest.Mock };
+  geoCountry: { findUnique: jest.Mock };
+  geoCity: { findUnique: jest.Mock };
+  geoResort: { findUnique: jest.Mock };
 }
 
 function makePrismaStub(overrides?: Record<string, unknown>): PrismaStub {
@@ -98,6 +101,9 @@ function makePrismaStub(overrides?: Record<string, unknown>): PrismaStub {
     categorySchema: { findFirst: jest.fn().mockResolvedValue(null) },
     availability: { groupBy: jest.fn().mockResolvedValue([]) },
     publicSellerProfile: { findMany: jest.fn().mockResolvedValue([]) },
+    geoCountry: { findUnique: jest.fn().mockResolvedValue(null) },
+    geoCity: { findUnique: jest.fn().mockResolvedValue(null) },
+    geoResort: { findUnique: jest.fn().mockResolvedValue(null) },
   };
   Object.assign(prisma, overrides);
   return prisma;
@@ -354,6 +360,42 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       const prisma = makePrismaStub();
       const service = makeService(prisma);
       await expect(service.listProducts({ page: 1, pageSize: 10, available_from: "not-a-date" })).rejects.toThrow(ValidationDomainError);
+    });
+
+    it("geo-фильтры: коды резолвятся и реально попадают в SQL (geoCountryId/geoCityId/geoResortId)", async () => {
+      const prisma = makePrismaStub();
+      prisma.geoCountry = { findUnique: jest.fn().mockResolvedValue({ id: "geo-c1" }) };
+      prisma.geoCity = { findUnique: jest.fn().mockResolvedValue({ id: "geo-city1" }) };
+      prisma.geoResort = { findUnique: jest.fn().mockResolvedValue(null) };
+      mockMatch(prisma, [], 0);
+      const service = makeService(prisma);
+
+      await service.listProducts({ page: 1, pageSize: 10, geoCountry: "TR", geoCity: "ANTALYA" });
+
+      // Гео-справочник запрошен по кодам.
+      expect(prisma.geoCountry.findUnique).toHaveBeenCalledWith({ where: { code: "TR" }, select: { id: true } });
+      expect(prisma.geoCity.findUnique).toHaveBeenCalledWith({ where: { code: "ANTALYA" }, select: { id: true } });
+      // FIX: гео-условия присутствуют в SQL (раньше резолвились, но не применялись).
+      const pageSql = flattenSql(rawSqlCall(prisma, 0));
+      expect(pageSql).toContain('p."geoCountryId"');
+      expect(pageSql).toContain('p."geoCityId"');
+      // id резолвов переданы параметрами.
+      expect(rawSqlCall(prisma, 0).values).toContain("geo-c1");
+      expect(rawSqlCall(prisma, 0).values).toContain("geo-city1");
+    });
+
+    it("geo-фильтры: неизвестный код → fail closed (пустой результат, SQL не выполняется)", async () => {
+      const prisma = makePrismaStub();
+      prisma.geoCountry = { findUnique: jest.fn().mockResolvedValue(null) };
+      prisma.geoCity = { findUnique: jest.fn().mockResolvedValue(null) };
+      prisma.geoResort = { findUnique: jest.fn().mockResolvedValue(null) };
+      const service = makeService(prisma);
+
+      const result = await service.listProducts({ page: 1, pageSize: 10, geoCountry: "XX" });
+
+      expect(result.total).toBe(0);
+      expect(result.items).toEqual([]);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
   });
 

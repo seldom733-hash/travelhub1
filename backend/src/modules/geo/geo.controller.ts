@@ -56,6 +56,31 @@ export class GeoController {
     return this.availability.getAvailability(service ?? "");
   }
 
+  /**
+   * Public master directory for storefront search filters (no auth).
+   * GET /geo/directory?type=country|city&countryId=&status= (default ACTIVE).
+   * Unlike availability, returns the FULL directory — search forms (e.g.
+   * tours From/To dropdowns) need all entries; the supplier live search
+   * itself is the inventory check.
+   */
+  @Get("directory")
+  @Public()
+  getDirectory(
+    @Query("type") type?: string,
+    @Query("countryId") countryId?: string,
+    @Query("cityId") cityId?: string,
+    @Query("status") status?: string,
+  ) {
+    const activeOnly = status ?? "ACTIVE";
+    if (type === "city") {
+      return this.geo.listCities(countryId, activeOnly);
+    }
+    if (type === "resort") {
+      return this.geo.listResorts(cityId, activeOnly);
+    }
+    return this.geo.listCountries(activeOnly);
+  }
+
   @Get("search")
   @RequirePermissions("geography.read")
   search(
@@ -151,8 +176,9 @@ export class GeoController {
   listResorts(
     @Query("cityId") cityId?: string,
     @Query("status") status?: string,
+    @Query("countryId") countryId?: string,
   ) {
-    return this.geo.listResorts(cityId, status);
+    return this.geo.listResorts(cityId, status, countryId);
   }
 
   @Get("resorts/:id")

@@ -109,6 +109,12 @@ export interface PublicProductCard {
   headlineDepartureDate: string | null;
   /** Количество ночей из минимального headline-тарифа. */
   headlineNights: number | null;
+  /** Номер/размещение (первый из атрибутов синка) — для табличного вывода. */
+  room?: string | null;
+  /** Питание (первое из атрибутов синка) — для табличного вывода. */
+  meal?: string | null;
+  /** Код поставщика (KOMPAS/SUMMERTOUR/…) для синк-карточек. */
+  supplierCode?: string | null;
   /** Discovery-availability (§12); null, если строк Availability нет. */
   availabilitySummary: PublicAvailabilitySummary | null;
   /** Seller-safe проекция (§8, Step 1.11); null — идентичность скрыта/не задана. */
@@ -190,6 +196,10 @@ export interface PublicProductListQuery {
   f?: Record<string, string>;
   /** Фильтр по discovery-availability: только продукты со строкой availability >= даты. */
   available_from?: string;
+  /** Master Geography фильтры (коды справочника): страна / город / курорт. */
+  geoCountry?: string;
+  geoCity?: string;
+  geoResort?: string;
 }
 
 export interface PublicProductListResult {

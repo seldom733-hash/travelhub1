@@ -85,10 +85,11 @@ export const geoApi = {
     remove: (id: string) => api.del<{ deleted: boolean }>(`${BASE}/cities/${id}`),
   },
   resorts: {
-    list: (cityId?: string, status?: string) => {
+    list: (cityId?: string, status?: string, countryId?: string) => {
       const sp = new URLSearchParams();
       if (cityId) sp.set("cityId", cityId);
       if (status) sp.set("status", status);
+      if (countryId) sp.set("countryId", countryId);
       const qs = sp.toString();
       return api.get<GeoResort[]>(`${BASE}/resorts${qs ? `?${qs}` : ""}`);
     },
@@ -138,4 +139,50 @@ export const geoApi = {
 export function geoDisplayName(names: GeoNames | null | undefined, fallback = ""): string {
   if (!names) return fallback;
   return names.ru || names.en || names.az || fallback;
+}
+
+const PUBLIC_API_BASE =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  "http://localhost:4000/api/v1";
+
+export interface GeoDirectoryEntry {
+  id: string;
+  code: string;
+  names: GeoNames;
+  status: "ACTIVE" | "INACTIVE";
+  countryId?: string;
+  cityId?: string;
+}
+
+let directoryPromise: Record<string, Promise<GeoDirectoryEntry[]>> = {};
+
+/**
+ * Public master directory for storefront filters (no auth).
+ * Cached per parameter set for the page lifetime.
+ */
+export function fetchGeoDirectory(
+  type: "country" | "city" | "resort",
+  countryId?: string,
+  cityId?: string,
+): Promise<GeoDirectoryEntry[]> {
+  const key = `${type}:${countryId ?? ""}:${cityId ?? ""}`;
+  if (!directoryPromise[key]) {
+    const sp = new URLSearchParams();
+    if (type !== "country") sp.set("type", type);
+    if (countryId) sp.set("countryId", countryId);
+    if (cityId) sp.set("cityId", cityId);
+    const qs = sp.toString();
+    directoryPromise[key] = (async () => {
+      const res = await fetch(`${PUBLIC_API_BASE}/geo/directory${qs ? `?${qs}` : ""}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`Geo directory failed (${res.status})`);
+      const json = await res.json();
+      return Array.isArray(json) ? json : [];
+    })();
+    directoryPromise[key].catch(() => {
+      delete directoryPromise[key];
+    });
+  }
+  return directoryPromise[key];
 }

@@ -86,11 +86,10 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
     if ((ctx as any).tariff && (ctx as any).tariff !== "ALL") sp.set("tariff", (ctx as any).tariff);
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.language) sp.set("lang", ctx.language);
-    // Tours: country-level direction → aggregate live search across ALL
-    // suppliers that support the query; city/resort selections go to the
-    // linked catalog inventory instead.
-    if (ctx.serviceType === "tours" && !ctx.toGeoCity && !ctx.toGeoResort) {
-      sp.set("aggregate", "1");
+    // Tours → universal live search across Summer + KOMPAS (§1): results
+    // come from supplier live availability, not the static catalog.
+    if (ctx.serviceType === "tours") {
+      sp.set("live", "1");
     }
     router.push(`/search?${sp.toString()}`);
   };

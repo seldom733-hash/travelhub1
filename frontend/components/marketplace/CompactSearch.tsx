@@ -68,11 +68,9 @@ export default function CompactSearch({ service, params }: CompactSearchProps) {
     if (ctx.tariff && ctx.tariff !== "ALL") sp.set("tariff", ctx.tariff);
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.language) sp.set("lang", ctx.language);
-    // Tours: country-level direction → aggregate live search across ALL
-    // suppliers that support the query; city/resort selections go to the
-    // linked catalog inventory instead.
-    if (ctx.serviceType === "tours" && !ctx.toGeoCity && !ctx.toGeoResort) {
-      sp.set("aggregate", "1");
+    // Tours → universal live search across Summer + KOMPAS (§1).
+    if (ctx.serviceType === "tours") {
+      sp.set("live", "1");
     }
     setIsOpen(false);
     router.push(`/search?${sp.toString()}`);

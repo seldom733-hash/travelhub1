@@ -261,10 +261,11 @@ export class GeoService {
 
   // ── Resorts ───────────────────────────────────────────────────────
 
-  listResorts(cityId?: string, status?: string) {
+  listResorts(cityId?: string, status?: string, countryId?: string) {
     return this.prisma.geoResort.findMany({
       where: {
         ...(cityId ? { cityId } : {}),
+        ...(countryId ? { city: { countryId } } : {}),
         ...(status ? { status: status as GeoStatus } : {}),
       },
       orderBy: { code: "asc" },
@@ -417,43 +418,88 @@ export class GeoService {
 
   async search(query: string, type?: string, status?: string) {
     const q = query.trim();
-    if (q.length < 2) return { countries: [], cities: [], resorts: [], airports: [] };
-    const statusFilter = status ? { status: status as GeoStatus } : {};
-    // NOTE: names is JSONB — code matched via Prisma, localized names via
-    // JSON text search.
-    const namesMatch = {
-      names: { string_contains: q },
+    const empty = { countries: [], cities: [], resorts: [], airports: [] };
+    if (q.length < 2) return empty;
+    // NOTE: Prisma string_contains on Json is case-SENSITIVE, so "чешме"
+    // would miss "Чешме". Raw SQL with ILIKE covers codes and localized
+    // names case-insensitively (same pattern as public-suggest).
+    const kinds =
+      type && ["country", "city", "resort", "airport"].includes(type)
+        ? [type]
+        : ["country", "city", "resort", "airport"];
+    const like = `%${q}%`;
+    const statusCond =
+      status && (status === "ACTIVE" || status === "INACTIVE")
+        ? Prisma.sql`AND "status"::text = ${status}`
+        : Prisma.empty;
+    const parts: Prisma.Sql[] = [];
+    if (kinds.includes("country")) {
+      parts.push(Prisma.sql`
+        SELECT "id", "code", "names", "status", 'country' AS "kind",
+          NULL::text AS "countryId", NULL::text AS "cityId"
+        FROM geo."GeoCountry"
+        WHERE ("code" ILIKE ${like} OR "names"::text ILIKE ${like}) ${statusCond}`);
+    }
+    if (kinds.includes("city")) {
+      parts.push(Prisma.sql`
+        SELECT "id", "code", "names", "status", 'city' AS "kind",
+          "countryId", NULL::text AS "cityId"
+        FROM geo."GeoCity"
+        WHERE ("code" ILIKE ${like} OR "names"::text ILIKE ${like}) ${statusCond}`);
+    }
+    if (kinds.includes("resort")) {
+      parts.push(Prisma.sql`
+        SELECT "id", "code", "names", "status", 'resort' AS "kind",
+          NULL::text AS "countryId", "cityId"
+        FROM geo."GeoResort"
+        WHERE ("code" ILIKE ${like} OR "names"::text ILIKE ${like}) ${statusCond}`);
+    }
+    if (kinds.includes("airport")) {
+      parts.push(Prisma.sql`
+        SELECT "id", "code", "names", "status", 'airport' AS "kind",
+          NULL::text AS "countryId", "cityId"
+        FROM geo."GeoAirport"
+        WHERE ("code" ILIKE ${like} OR "names"::text ILIKE ${like}) ${statusCond}`);
+    }
+    const union = parts.reduce((acc, part, index) =>
+      index === 0 ? part : Prisma.sql`${acc} UNION ALL ${part}`,
+    );
+    const stmt = Prisma.sql`${union} ORDER BY "code" ASC LIMIT 100`;
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        code: string;
+        names: unknown;
+        status: string;
+        kind: string;
+        countryId: string | null;
+        cityId: string | null;
+      }>
+    >(stmt);
+    const result: Record<string, typeof rows> = {
+      countries: [],
+      cities: [],
+      resorts: [],
+      airports: [],
     };
-    const [countries, cities, resorts, airports] = await Promise.all([
-      type && type !== "country"
-        ? []
-        : this.prisma.geoCountry.findMany({
-          where: { ...statusFilter, OR: [{ code: { contains: q.toUpperCase() } }, namesMatch] },
-          take: 25,
-          orderBy: { code: "asc" },
-        }),
-      type && type !== "city"
-        ? []
-        : this.prisma.geoCity.findMany({
-          where: { ...statusFilter, OR: [{ code: { contains: q.toUpperCase() } }, namesMatch] },
-          take: 25,
-          orderBy: { code: "asc" },
-        }),
-      type && type !== "resort"
-        ? []
-        : this.prisma.geoResort.findMany({
-          where: { ...statusFilter, OR: [{ code: { contains: q.toUpperCase() } }, namesMatch] },
-          take: 25,
-          orderBy: { code: "asc" },
-        }),
-      type && type !== "airport"
-        ? []
-        : this.prisma.geoAirport.findMany({
-          where: { ...statusFilter, OR: [{ code: { contains: q.toUpperCase() } }, namesMatch] },
-          take: 25,
-          orderBy: { code: "asc" },
-        }),
-    ]);
-    return { countries, cities, resorts, airports };
+    for (const row of rows) {
+      const bucket =
+        row.kind === "country"
+          ? result.countries
+          : row.kind === "city"
+            ? result.cities
+            : row.kind === "resort"
+              ? result.resorts
+              : result.airports;
+      const { kind: _kind, ...rest } = row;
+      void _kind;
+      bucket.push(rest as (typeof rows)[number]);
+    }
+    return {
+      countries: result.countries,
+      cities: result.cities,
+      resorts: result.resorts,
+      airports: result.airports,
+    };
   }
 }

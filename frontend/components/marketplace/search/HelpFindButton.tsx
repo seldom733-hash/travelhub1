@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { PaperPlaneRight } from "@phosphor-icons/react";
@@ -53,7 +53,7 @@ export default function HelpFindButton({ context, disabled = false }: HelpFindBu
       type="button"
       onClick={handleClick}
       disabled={disabled || loading}
-      className="flex w-full items-center justify-center gap-2 rounded-xl border border-gold/30 bg-gold/10 px-4 py-2.5 text-[13px] font-medium text-gold transition-all hover:bg-gold/20 disabled:opacity-50"
+      className="flex w-full items-center justify-center gap-2 rounded-xl border border-gold/30 bg-gold/10 px-4 py-2.5 text-[15px] font-medium text-gold transition-all hover:bg-gold/20 disabled:opacity-50"
     >
       <PaperPlaneRight size={16} weight="light" />
       <span>{loading ? "Отправка..." : "Помочь найти"}</span>

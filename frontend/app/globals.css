@@ -43,6 +43,15 @@ body {
   animation: fadeInUp 0.25s ease-out;
 }
 
+/* Индетерминированный прогресс-бар загрузки офферов поставщиков */
+@keyframes progressIndeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.progress-indeterminate {
+  animation: progressIndeterminate 1.4s ease-in-out infinite;
+}
+
 .font-serif {
   font-family: "Georgia", "Times New Roman", serif;
 }

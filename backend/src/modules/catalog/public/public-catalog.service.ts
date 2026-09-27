@@ -711,14 +711,31 @@ export class PublicCatalogService {
       ) {
         return { ids: [], total: 0 };
       }
-      // Иерархический гео-фильтр (resort ⊂ city ⊂ country): выбор более
-      // узкой единицы включает карточки, слинкованные с родительской единицей.
-      // Критично для туров поставщиков: KOMPAS-синк линкует карточки на уровне
-      // страны/города (конкретный город тура поставщику неизвестен), поэтому
-      // строгий resort-фильтр всегда давал пустоту.
-      if (country) conds.push(Prisma.sql`p."geoCountryId" = ${country.id}`);
-      if (city) conds.push(Prisma.sql`(p."geoCityId" = ${city.id} OR p."geoResortId" IN (SELECT r."id" FROM geo."GeoResort" r WHERE r."cityId" = ${city.id}))`);
-      if (resort) conds.push(Prisma.sql`(p."geoResortId" = ${resort.id} OR p."geoCityId" = (SELECT r2."cityId" FROM geo."GeoResort" r2 WHERE r2."id" = ${resort.id}))`);
+      // Строгая семантика уровней: выбор единицы географии отбирает только
+      // карточки, слинкованные ИМЕННО с ней.
+      // - resort → только карточки этого курорта (чужие курорты города не
+      //   попадают: выбор «Аксарай» не должен возвращать весь Стамбул);
+      // - city → только карточки этого города;
+      // - country → карточки страны.
+      // Общая специфика тур-поставщиков (KOMPAS, SUMMERTOUR и будущие):
+      // синхи линкуют карточки максимум на уровне страны — курорт/город
+      // тура поставщик в оффере не сообщает. Поэтому resort/city-выбор по
+      // каталогу может быть пуст; это штатный случай, закрываемый fallback
+      // на живой поиск поставщиков на фронте, а не ослаблением фильтра
+      // здесь. Полное решение — гео-обогащение карточек в синках
+      // (отель → Master Geography), поставщико-независимо.
+      // FIX: фильтры реально применяются в SQL (раньше коды резолвились,
+      // но условия не добавлялись — гео-выбор молча игнорировался).
+      // resort subsumes city (строгая семантика «только этот курорт»),
+      // country всегда применяется поверх (AND — цепочка resort→city→country).
+      if (input.geoResort && resort) {
+        conds.push(Prisma.sql`p."geoResortId" = ${resort.id}`);
+      } else if (input.geoCity && city) {
+        conds.push(Prisma.sql`p."geoCityId" = ${city.id}`);
+      }
+      if (input.geoCountry && country) {
+        conds.push(Prisma.sql`p."geoCountryId" = ${country.id}`);
+      }
     }
     // Category-specific attribute сравнение. Для одиночного ключа PG использует
     // оператор ->> (jsonb, text) — у #>>/#> только text[] перегрузки (одиночный
@@ -939,6 +956,12 @@ export class PublicCatalogService {
       pricingUnit: "unit",
       headlineDepartureDate,
       headlineNights,
+      // Табличный вывод туров: ключевые поля из атрибутов синков
+      // (поставщико-независимо: attrs пишут KOMPAS-, SUMMERTOUR- и будущие
+      // синки по общему контракту).
+      room: (row.attributes as any)?.rooms?.[0] ?? (row.attributes as any)?.room ?? null,
+      meal: (row.attributes as any)?.meals?.[0] ?? (row.attributes as any)?.meal ?? null,
+      supplierCode: (row.attributes as any)?.supplierCode ?? null,
       availabilitySummary: availability,
       seller,
       publishedAt: row.publishedAt!.toISOString(),

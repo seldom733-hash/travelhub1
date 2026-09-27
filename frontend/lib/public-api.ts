@@ -67,6 +67,12 @@ export interface PublicProductCard {
   pricingUnit: "unit";
   headlineDepartureDate: string | null;
   headlineNights: number | null;
+  /** Room/accommodation text (from sync attributes) for the table view. */
+  room?: string | null;
+  /** Meal code/label (from sync attributes) for the table view. */
+  meal?: string | null;
+  /** Supplier code (KOMPAS/SUMMERTOUR/…) when the card is sync-backed. */
+  supplierCode?: string | null;
   availabilitySummary: PublicAvailabilitySummary | null;
   seller: PublicSeller | null;
   publishedAt: string;
@@ -136,6 +142,10 @@ export interface PublicListQuery {
   available_from?: string;
   /** Category-specific фильтры: f[days]=7 (требует category). */
   f?: Record<string, string>;
+  /** Master Geography фильтры (коды справочника). */
+  geoCountry?: string;
+  geoCity?: string;
+  geoResort?: string;
 }
 
 export class PublicApiError extends Error {
@@ -172,6 +182,9 @@ export function buildPublicQuery(q: PublicListQuery = {}): string {
   if (q.page && q.page > 1) sp.set("page", String(q.page));
   if (q.pageSize) sp.set("pageSize", String(q.pageSize));
   if (q.available_from) sp.set("available_from", q.available_from);
+  if (q.geoCountry) sp.set("geoCountry", q.geoCountry);
+  if (q.geoCity) sp.set("geoCity", q.geoCity);
+  if (q.geoResort) sp.set("geoResort", q.geoResort);
   for (const [k, v] of Object.entries(q.f ?? {})) {
     if (v !== undefined && v !== "") sp.set(`f[${k}]`, v);
   }

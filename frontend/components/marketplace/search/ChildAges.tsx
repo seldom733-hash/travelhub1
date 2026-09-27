@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { CaretDown } from "@phosphor-icons/react";
 
@@ -27,12 +27,12 @@ export default function ChildAges({ count, ages, onChange }: ChildAgesProps) {
     <div className="mt-2 flex flex-wrap gap-2">
       {displayAges.map((age, index) => (
         <div key={index} className="flex flex-col items-center gap-0.5">
-          <span className="text-[10px] text-neutral-500">Ребёнок {index + 1}</span>
+          <span className="text-[14px] text-neutral-500">Ребёнок {index + 1}</span>
           <div className="relative">
             <select
               value={age}
               onChange={(e) => handleChange(index, Number(e.target.value))}
-              className="appearance-none rounded-lg border border-dark-border bg-dark-card px-3 py-1.5 pr-7 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
+              className="appearance-none rounded-lg border border-dark-border bg-dark-card px-3 py-1.5 pr-7 text-[15px] text-white outline-none transition-colors focus:border-gold/50"
               aria-label={`Возраст ребёнка ${index + 1}`}
             >
               {AGE_OPTIONS.map((opt) => (

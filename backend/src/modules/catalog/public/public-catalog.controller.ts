@@ -41,6 +41,18 @@ export class PublicProductListDto implements PublicProductListQuery {
   @IsOptional()
   @IsISO8601()
   available_from?: string;
+
+  @IsOptional()
+  @IsString()
+  geoCountry?: string;
+
+  @IsOptional()
+  @IsString()
+  geoCity?: string;
+
+  @IsOptional()
+  @IsString()
+  geoResort?: string;
 }
 
 /** Pagination-параметры списка продуктов витрины (только page/pageSize). */

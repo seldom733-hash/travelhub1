@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Inject } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 
@@ -20,8 +20,8 @@ export class SupplierGeoIngestService {
   private readonly logger = new Logger(SupplierGeoIngestService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly registry: SupplierAdapterRegistry,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(SupplierAdapterRegistry) private readonly registry: SupplierAdapterRegistry,
   ) {}
 
   /** Label normalization: "AE: Дубай из Баку (GDS: AZAL)" → "Дубай". */

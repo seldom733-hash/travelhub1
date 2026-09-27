@@ -47,6 +47,10 @@ export interface SearchContext {
   // Hotels
   cityId?: string;
   cityName?: string;
+  // Tours direction as Master Geography codes (most specific wins)
+  toGeoCountry?: string;
+  toGeoCity?: string;
+  toGeoResort?: string;
   // Flights
   departureDate?: string;
   returnDate?: string;
