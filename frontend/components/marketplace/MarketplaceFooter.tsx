@@ -5,7 +5,7 @@ import { t, useLocale } from "@/lib/i18n";
 import { Buildings, PaperPlaneRight } from "@phosphor-icons/react";
 
 const FOOTER_SERVICES = [
-  { href: "/search?category=accommodation", labelKey: "footer.service_accommodation" },
+  { href: "/search?category=hotels", labelKey: "footer.service_accommodation" },
   { href: "/search?category=tours", labelKey: "footer.service_tours" },
   { href: "/search?category=excursions", labelKey: "footer.service_excursions" },
   { href: "/search?category=transfers", labelKey: "footer.service_transfers" },

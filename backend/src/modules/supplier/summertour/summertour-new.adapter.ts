@@ -1,5 +1,8 @@
-import { Injectable, Logger, OnModuleDestroy, Optional } from "@nestjs/common";
+﻿import { Injectable, Logger, OnModuleDestroy, Optional } from "@nestjs/common";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { execFile } from "child_process";
+import * as fs from "fs";
+import * as path from "path";
 import type {
   SupplierAdapter,
   SupplierSearchQuery,
@@ -17,9 +20,30 @@ import { buildSummerSearchRequest, buildSummerXhrUrl, SummerSearchRequest } from
 import { parseSummerOffers } from "./summertour.response-parser";
 import { KompasCaptchaStore, type KompasCaptchaOperation } from "../kompas/kompas-captcha.store";
 import { KompasCaptchaRequiredException } from "../kompas/kompas-captcha.exception";
+import { discoverSamoGeoOptions } from "../samo-geo-discovery";
+import type { SupplierGeoOption } from "../supplier.types";
 
 /**
- * Summertour (SAMO) Adapter — XHR/fetch approach.
+ * В§TOWNS precision: fragment appended to manually-built DOLOAD navigation
+ * URLs (init + per-date). SAMO city filter = TOWNS=<ids>&TOWNS_ANY=0
+ * (verified supplier capture). Exported for unit tests вЂ” a regression here
+ * silently widens В«СЃС‚СЂР°РЅР°+РіРѕСЂРѕРґВ» to В«РІСЃРµ С‚СѓСЂС‹ СЃС‚СЂР°РЅС‹В».
+ */
+export function buildSummerDoloadTownsParam(towns: string | undefined): string {
+  return towns ? `&TOWNS=${encodeURIComponent(towns)}&TOWNS_ANY=0` : "";
+}
+
+/**
+ * В§STARS parity: fragment appended to manually-built DOLOAD navigation URLs вЂ”
+ * hotel category filter from the aggregator (starKeys["SUMMERTOUR"] via
+ * SupplierGeoLink kind=STAR). Empty = any category (previous behaviour).
+ */
+export function buildSummerDoloadStarsParam(stars: string | undefined): string {
+  return stars ? `&STARS=${encodeURIComponent(stars)}&STARS_ANY=0` : "";
+}
+
+/**
+ * Summertour (SAMO) Adapter вЂ” XHR/fetch approach.
  *
  * Core strategy:
  *  1. Navigate to summertour.az/search_tour to initialize SAMO session + cookies
@@ -36,17 +60,22 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
   readonly name = "Summertour (summertour.az)";
   readonly enabled = true;
 
+  /** SAMO STATEINC в†’ discovery scope; Turkey (9) is the verified Summer country. */
+  private static readonly KNOWN_STATEINC: Record<string, string> = { "9": "TR" };
+
   private readonly logger = new Logger(SummertourNewAdapter.name);
   private browser: Browser | null = null;
   private readonly browserLock = new Map<string, Promise<Browser>>();
 
   private static readonly MAX_PAGES = 5;
   private static readonly PAGE_DELAY_MS = 2_000;
+  /** Transient empty-XHR retries (parity with the KOMPAS no-rows retry). */
+  private static readonly XHR_ATTEMPTS = 3;
   private static readonly CALENDAR_WINDOW_DAYS = 31;
 
   constructor(@Optional() private readonly captchaStore?: KompasCaptchaStore) {}
 
-  // ── Program Discovery ─────────────────────────────────────────────
+  // в”Ђв”Ђ Program Discovery в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   async discoverPrograms(): Promise<Array<{ value: string; name: string }>> {
     let page: Page | null = null;
@@ -80,7 +109,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     }
   }
 
-  // ── Search ────────────────────────────────────────────────────────
+  // в”Ђв”Ђ Search в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   async search(query: SupplierSearchQuery): Promise<SupplierOffer[]> {
     const start = Date.now();
@@ -102,11 +131,15 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       // Step 2: Check for CAPTCHA before searching
       const blockedBefore = await this.isBlocked(page);
       if (blockedBefore) {
-        const captchaThrown = await this.createCaptchaChallengeIfNeeded(page, context, "search", query);
-        if (captchaThrown) throw captchaThrown;
-        this.logger.warn("Summertour BLOCKED before search (no captcha store)");
-        await context.close();
-        return [];
+        const solved = await this.autoSolveCaptcha(page, { query, verifySession: true });
+        if (!solved) {
+          const captchaThrown = await this.createCaptchaChallengeIfNeeded(page, context, "search", query);
+          if (captchaThrown) throw captchaThrown;
+          this.logger.warn("Summertour BLOCKED before search (no captcha store)");
+          await context.close();
+          return [];
+        }
+        this.logger.log("[Summertour captcha] pre-search challenge auto-solved");
       }
 
       // Step 3: Build XHR URL with YYYYMMDD dates (browser session cookies apply)
@@ -122,7 +155,10 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
         children: query.children,
         childAges: query.childAges,
         meal: (query as any).meal,
-        // §9: FREIGHT=1 (seats available on flight), FILTER=1 (no sales stop)
+        // В§STARS: hotel category вЂ” supplier-native ids from the aggregator
+        // (starKeys via SupplierGeoLink kind=STAR).
+        stars: query.starKeys?.["SUMMERTOUR"],
+        // В§9: FREIGHT=1 (seats available on flight), FILTER=1 (no sales stop)
         freight: (query as any).freightType ?? "1",
         filter: "1",
       });
@@ -135,25 +171,40 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       const xhrUrl = buildSummerXhrUrl(summerReq);
       this.logger.log(`[Summertour] XHR URL: ${xhrUrl}`);
 
-      // Step 4: Fetch via page.evaluate (uses browser's cookies/session)
-      const jsResponse: string = await page.evaluate(async (url: string) => {
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        return await resp.text();
-      }, xhrUrl);
+      // Step 4: Fetch via page.evaluate (uses browser's cookies/session).
+      // В§RETRY: transient empty XHR answers (same flake class as the KOMPAS
+      // "no price rows" вЂ” the supplier answers but without the price HTML).
+      // Re-submit up to 3 times with a short pause; a genuine В«РќРµС‚ РґР°РЅРЅС‹С…В»
+      // answer is not retried (it is a real empty result, not a transport flake).
+      let jsResponse = "";
+      let html: string | null = null;
+      for (let attempt = 1; attempt <= SummertourNewAdapter.XHR_ATTEMPTS; attempt++) {
+        jsResponse = await this.fetchXhrWithCaptchaSolve(page, xhrUrl, query);
+        if (jsResponse && jsResponse.length >= 50) {
+          html = this.extractHtmlFromJsResponse(jsResponse);
+          if (html) break;
+          if (jsResponse.includes("РќРµС‚ РґР°РЅРЅС‹С…")) break;
+        }
+        if (attempt < SummertourNewAdapter.XHR_ATTEMPTS) {
+          this.logger.warn(
+            `Summertour: empty/incomplete XHR for TOURINC=${summerReq.TOURINC} ` +
+            `(attempt ${attempt}/${SummertourNewAdapter.XHR_ATTEMPTS}, len=${jsResponse.length}) вЂ” retrying in 3s`,
+          );
+          await page.waitForTimeout(3_000);
+        }
+      }
 
       this.logger.log(`[Summertour] XHR response length=${jsResponse.length} for TOURINC=${summerReq.TOURINC} HOTELS=${summerReq.HOTELS ?? "any"}`);
 
       if (!jsResponse || jsResponse.length < 50) {
-        this.logger.warn(`Summertour: empty response for TOURINC=${summerReq.TOURINC}`);
+        this.logger.warn(`Summertour: empty response for TOURINC=${summerReq.TOURINC} after ${SummertourNewAdapter.XHR_ATTEMPTS} attempts`);
         await context.close();
         return [];
       }
 
-      // Step 5: Extract HTML from JS response
-      const html = this.extractHtmlFromJsResponse(jsResponse);
+      // Step 5: HTML was extracted inside the retry loop above
       if (!html) {
-        const isNoData = jsResponse.includes("Нет данных");
+        const isNoData = jsResponse.includes("РќРµС‚ РґР°РЅРЅС‹С…");
         this.logger.warn(`Summertour: no HTML in response (noData=${isNoData}) len=${jsResponse.length} for TOURINC=${summerReq.TOURINC} HOTELS=${summerReq.HOTELS ?? "any"}`);
         await context.close();
         return [];
@@ -186,11 +237,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       for (let pg = 2; pg <= SummertourNewAdapter.MAX_PAGES; pg++) {
         const pageXhrUrl = xhrUrl.replace(/PRICEPAGE=\d+/, `PRICEPAGE=${pg}`);
         try {
-          const pageJs = await page.evaluate(async (url: string) => {
-            const resp = await fetch(url);
-            if (!resp.ok) return "";
-            return await resp.text();
-          }, pageXhrUrl);
+          const pageJs = await this.fetchXhrWithCaptchaSolve(page, pageXhrUrl, query);
           const pageHtml = this.extractHtmlFromJsResponse(pageJs);
           if (!pageHtml) break;
           await page.evaluate((h: string) => {
@@ -220,7 +267,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
   /**
    * When HOTELS_ANY=1 (calendar query, no specific hotel), discover available towns from the
    * page form, then query each town with samo_action=TOWNS to get results.
-   * This mirrors what the website does: select program → discover towns → search by town.
+   * This mirrors what the website does: select program в†’ discover towns в†’ search by town.
    */
   private async searchWithTownDiscovery(
     page: Page, summerReq: SummerSearchRequest, query: SupplierSearchQuery, start: number,
@@ -229,10 +276,17 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     const tourIncValue = summerReq.TOURINC;
     this.logger.log(`[Summertour] DOLOAD search for TOURINC=${tourIncValue}`);
 
+    // В§TOWNS: city/resort filter вЂ” the request builder sets TOWNS=<ids>
+    // &TOWNS_ANY=0 when the aggregator resolved Master Geography city links.
+    // DOLOAD URLs are built manually here, so the filter must be appended
+    // explicitly вЂ” omitting it silently widens the result to the whole country.
+    const townsParam = buildSummerDoloadTownsParam(summerReq.TOWNS);
+    const starsParam = buildSummerDoloadStarsParam(summerReq.STARS);
+
     // Step A: Navigate with DOLOAD=1 to trigger SAMO search directly
     const checkinBeg = summerReq.CHECKIN_BEG ?? "";
     const checkinEnd = summerReq.CHECKIN_END ?? "";
-    const initUrl = `https://summertour.az/search_tour?TOWNFROMINC=${summerReq.TOWNFROMINC}&STATEINC=${summerReq.STATEINC}&TOURINC=${tourIncValue}&CHECKIN_BEG=${checkinBeg}&CHECKIN_END=${checkinEnd}&NIGHTS_FROM=${summerReq.NIGHTS_FROM ?? ""}&NIGHTS_TILL=${summerReq.NIGHTS_TILL ?? ""}&ADULT=${summerReq.ADULT ?? "2"}&CHILD=${summerReq.CHILD ?? "0"}&CURRENCY=2&MEALS_ANY=1&ROOMS_ANY=1&HOTELS_ANY=1&FREIGHT=1&FILTER=1&PARTITION_PRICE=32&PRICEPAGE=1&DOLOAD=1`;
+    const initUrl = `https://summertour.az/search_tour?TOWNFROMINC=${summerReq.TOWNFROMINC}&STATEINC=${summerReq.STATEINC}&TOURINC=${tourIncValue}&CHECKIN_BEG=${checkinBeg}&CHECKIN_END=${checkinEnd}&NIGHTS_FROM=${summerReq.NIGHTS_FROM ?? ""}&NIGHTS_TILL=${summerReq.NIGHTS_TILL ?? ""}&ADULT=${summerReq.ADULT ?? "2"}&CHILD=${summerReq.CHILD ?? "0"}&CURRENCY=2&MEALS_ANY=1&ROOMS_ANY=1&HOTELS_ANY=1&FREIGHT=1&FILTER=1&PARTITION_PRICE=0&PRICEPAGE=1${townsParam}${starsParam}&DOLOAD=1`;
     this.logger.log(`[Summertour] Navigating to: ${initUrl.slice(0, 150)}`);
     await page.goto(initUrl, { waitUntil: "networkidle", timeout: 60_000 });
     await page.waitForFunction(() => typeof (window as any).samo !== "undefined" && (window as any).samo.page_ready === true, { timeout: 15_000 }).catch(() => {});
@@ -250,7 +304,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       for (const o of initialOffers) {
         const ds = (o.departureDate || "").replace(/\s+/g, " ").trim();
         const rawDate = ds.split(",")[0]?.trim() || ds.split(" ")[0]?.trim() || "";
-        // Convert DD.MM.YYYY → YYYY-MM-DD
+        // Convert DD.MM.YYYY в†’ YYYY-MM-DD
         const parts = rawDate.split(".");
         if (parts.length === 3) {
           datesWithData.add(`${parts[2]}-${parts[1]}-${parts[0]}`);
@@ -279,7 +333,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
 
         for (const dateStr of missingDates) {
           const dmY = `${dateStr.slice(8, 10)}.${dateStr.slice(5, 7)}.${dateStr.slice(0, 4)}`;
-          const dateUrl = `https://summertour.az/search_tour?TOWNFROMINC=${summerReq.TOWNFROMINC}&STATEINC=${summerReq.STATEINC}&TOURINC=${tourIncValue}&CHECKIN_BEG=${dmY}&CHECKIN_END=${dmY}&NIGHTS_FROM=${summerReq.NIGHTS_FROM ?? ""}&NIGHTS_TILL=${summerReq.NIGHTS_TILL ?? ""}&ADULT=${summerReq.ADULT ?? "2"}&CHILD=${summerReq.CHILD ?? "0"}&CURRENCY=2&MEALS_ANY=1&ROOMS_ANY=1&HOTELS_ANY=1&FREIGHT=1&FILTER=1&PARTITION_PRICE=32&PRICEPAGE=1&DOLOAD=1`;
+          const dateUrl = `https://summertour.az/search_tour?TOWNFROMINC=${summerReq.TOWNFROMINC}&STATEINC=${summerReq.STATEINC}&TOURINC=${tourIncValue}&CHECKIN_BEG=${dmY}&CHECKIN_END=${dmY}&NIGHTS_FROM=${summerReq.NIGHTS_FROM ?? ""}&NIGHTS_TILL=${summerReq.NIGHTS_TILL ?? ""}&ADULT=${summerReq.ADULT ?? "2"}&CHILD=${summerReq.CHILD ?? "0"}&CURRENCY=2&MEALS_ANY=1&ROOMS_ANY=1&HOTELS_ANY=1&FREIGHT=1&FILTER=1&PARTITION_PRICE=0&PRICEPAGE=1${townsParam}${starsParam}&DOLOAD=1`;
           try {
             await page.goto(dateUrl, { waitUntil: "networkidle", timeout: 60_000 });
             await page.waitForFunction(() => typeof (window as any).samo !== "undefined" && (window as any).samo.page_ready === true, { timeout: 10_000 }).catch(() => {});
@@ -299,7 +353,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     return all.map(o => this.normalizeOffer(o, query));
   }
 
-  // ── XHR Response Parsing ──────────────────────────────────────────
+  // в”Ђв”Ђ XHR Response Parsing в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   private extractHtmlFromJsResponse(js: string): string | null {
     const m = js.match(/\.ehtml\("((?:[^"\\]|\\.)*)"\)/);
@@ -322,7 +376,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     return page.evaluate(() => {
       if (document.querySelector("#captchaForm") || document.querySelector("#icaptcha")) return true;
       const txt = document.body.innerText.toLowerCase();
-      return txt.includes("captcha") || txt.includes("заблокирован") || txt.includes("blocked") || txt.includes("cloudflare");
+      return txt.includes("captcha") || txt.includes("Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ") || txt.includes("blocked") || txt.includes("cloudflare");
     }).catch(() => false);
   }
 
@@ -353,8 +407,8 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       children: raw.children || (query.children ?? 0),
       childAges: query.childAges ?? [],
       price: { amount: raw.price, currency: raw.currency, fetchedAt: now, expiresAt: new Date(now.getTime() + 5 * 60 * 1000), queryHash: "", source: this.code },
-      // Honest availability: no flight seats or stop-sale → NOT_AVAILABLE;
-      // unknown markers → UNKNOWN (never fake AVAILABLE).
+      // Honest availability: no flight seats or stop-sale в†’ NOT_AVAILABLE;
+      // unknown markers в†’ UNKNOWN (never fake AVAILABLE).
       availability: (
         raw.stopSale === true || raw.flightSeatsAvailable === false
           ? "NOT_AVAILABLE"
@@ -430,9 +484,9 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
 
     if (query.hotelExternalId && programs.length > 0) {
       // Hotel-specific calendar. Default "range" (KOMPAS-style): 31-day
-      // windows with PRICEPAGE pagination — few requests. "perday" keeps the
+      // windows with PRICEPAGE pagination вЂ” few requests. "perday" keeps the
       // legacy per-date iteration (~30 requests/month, A/B + fallback).
-      // Captcha: script D:\test.ps1 flow — detect captchaForm/bfcaptcha/antibot in response → show image + input → POST antibot
+      // Captcha: script D:\test.ps1 flow вЂ” detect captchaForm/bfcaptcha/antibot in response в†’ show image + input в†’ POST antibot
       const mode = query.calendarMode ?? "range";
       this.logger.log(`[Summertour calendar] hotel-specific mode=${mode} for extId=${query.hotelExternalId}`);
       const browser = await this.getBrowser();
@@ -448,8 +502,13 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
 
         // Initial captcha check (script Ensure-CaptchaSolved after initial GET)
         if (await this.isCaptchaPresent(page)) {
-          const ex = await this.createCaptchaChallengeIfNeeded(page, context, "priceCalendar", query as unknown as SupplierSearchQuery);
-          if (ex) { captchaThrown = true; throw ex; }
+          const solved = await this.autoSolveCaptcha(page, { query, verifySession: true });
+          if (solved) {
+            this.logger.log("[Summertour captcha] initial page challenge auto-solved");
+          } else {
+            const ex = await this.createCaptchaChallengeIfNeeded(page, context, "priceCalendar", query as unknown as SupplierSearchQuery);
+            if (ex) { captchaThrown = true; throw ex; }
+          }
         }
 
         const parserPage = await context.newPage();
@@ -479,7 +538,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
               p.set("ROOMS", "");
               p.set("HOTELS_ANY", "0");
               p.set("HOTELS", query.hotelExternalId);
-              // §9: seats available on flight, no sales stop
+              // В§9: seats available on flight, no sales stop
               p.set("FREIGHT", "1");
               p.set("FILTER", "1");
               p.set("MOMENT_CONFIRM", "0");
@@ -492,13 +551,9 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
               const xhrUrl = `https://summertour.az/search_tour?${p.toString()}`;
 
               try {
-                const jsResponse: string = await page.evaluate(async (url: string) => {
-                  const resp = await fetch(url);
-                  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                  return await resp.text();
-                }, xhrUrl);
+                const jsResponse: string = await this.fetchXhrWithCaptchaSolve(page, xhrUrl, query);
 
-                // Captcha detection in XHR response (script Test-CaptchaRequired) — string-based as in D:\test.ps1
+                // Captcha detection in XHR response (script Test-CaptchaRequired) вЂ” string-based as in D:\test.ps1
                 if (this.isCaptchaInResponseText(jsResponse)) {
                   // Extract image URL via script's Get-CaptchaImageUrl logic, then fetch to data URI
                   const imgMatch = jsResponse.match(/<img\b[^>]*\bsrc\s*=\s*["']([^"']*(?:kcaptcha|captcha)[^"']*)["']/i);
@@ -606,13 +661,13 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
             try {
               const off = await this.search({ ...base, departureDateFrom: w.from, departureDateTo: w.to, tourIncValue: pr.value, tourIncName: pr.name });
               collected.push(...off);
-            } catch (e) { this.logger.warn(`window ${w.from}→${w.to} ${pr.value} ${(e as Error).message}`); }
+            } catch (e) { this.logger.warn(`window ${w.from}в†’${w.to} ${pr.value} ${(e as Error).message}`); }
           }
         } else {
           try {
             const off = await this.search({ ...base, departureDateFrom: w.from, departureDateTo: w.to });
             collected.push(...off);
-          } catch (e) { this.logger.warn(`window ${w.from}→${w.to} ${(e as Error).message}`); }
+          } catch (e) { this.logger.warn(`window ${w.from}в†’${w.to} ${(e as Error).message}`); }
         }
       }
       this.logger.log(`[Summertour calendar] collected=${collected.length} from windowed approach`);
@@ -645,7 +700,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
           bestOfferRef: { supplierCode: this.code, externalOfferId: best.externalOfferId, externalClaim: best.externalClaim, searchContext: { adults: query.adults, children: query.children, childAges: query.childAges, hotel: query.hotel, room: query.room, meal: query.meal, nightsFrom: query.nights, nightsTo: query.nights, tourIncValue: (best.rawMetadata?.tourIncValue as string) ?? query.tourIncValue, tourIncName: (best.rawMetadata?.tourIncName as string) ?? query.tourIncName } },
         });
       } else {
-        entries.push({ date: d, price: null, currency: null, availability: "NOT_AVAILABLE", offerCount: 0, absenceCode: "SUPPLIER_NO_RESULT", absenceText: "Цена не получена — Summer не предоставил предложение на эту дату" });
+        entries.push({ date: d, price: null, currency: null, availability: "NOT_AVAILABLE", offerCount: 0, absenceCode: "SUPPLIER_NO_RESULT", absenceText: "Р¦РµРЅР° РЅРµ РїРѕР»СѓС‡РµРЅР° вЂ” Summer РЅРµ РїСЂРµРґРѕСЃС‚Р°РІРёР» РїСЂРµРґР»РѕР¶РµРЅРёРµ РЅР° СЌС‚Сѓ РґР°С‚Сѓ" });
       }
     }
     entries.sort((a, b) => a.date.localeCompare(b.date));
@@ -688,12 +743,11 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
           p.set("rev", String(Math.floor(Math.random() * 1e9))); p.set("_", String(Date.now()));
           const xhrUrl = `https://summertour.az/search_tour?${p.toString()}`;
           try {
-            const jsResponse: string = await page.evaluate(async (url: string) => {
-              const resp = await fetch(url);
-              if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-              return await resp.text();
-            }, xhrUrl);
-            if (this.isCaptchaInResponseText(jsResponse)) throw new KompasCaptchaRequiredException(challengeId, "", "image/jpeg", "SUMMERTOUR");
+            const jsResponse: string = await this.fetchXhrWithCaptchaSolve(page, xhrUrl, query);
+            if (this.isCaptchaInResponseText(jsResponse)) {
+              const img = ch.captchaImage || "";
+              throw new KompasCaptchaRequiredException(challengeId, img, img ? this.inferMimeType(img) : "image/jpeg", "SUMMERTOUR");
+            }
             const html = this.extractHtmlFromJsResponse(jsResponse);
             if (!html || !html.includes("price_info")) continue;
             await parserPage.setContent(`<table>${html}</table>`, { waitUntil: "domcontentloaded" });
@@ -721,7 +775,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
         const best = sorted[0];
         entries.push({ date: d, price: best.price.amount, currency: best.price.currency, availability: best.availability, offerCount: arr.length, offers: sorted.map(o => ({ tourIncValue: (o.rawMetadata?.tourIncValue as string) ?? "", tourIncName: (o.rawMetadata?.tourIncName as string) ?? undefined, externalOfferId: o.externalOfferId, externalClaim: o.externalClaim, hotel: o.hotel, hotelExternalId: o.hotelExternalId, departureDate: o.departureDate, nights: o.nights, room: o.room, meal: o.meal, adults: o.adults, children: o.children, childAges: o.childAges, availability: o.availability, price: o.price.amount, currency: o.price.currency, transport: o.transport })), bestOfferRef: { supplierCode: this.code, externalOfferId: best.externalOfferId, externalClaim: best.externalClaim, searchContext: { adults: query.adults, children: query.children, childAges: query.childAges, hotel: query.hotel, room: query.room, meal: query.meal, nightsFrom: query.nights, nightsTo: query.nights, tourIncValue: (best.rawMetadata?.tourIncValue as string) ?? query.tourIncValue, tourIncName: (best.rawMetadata?.tourIncName as string) ?? query.tourIncName } } });
       } else {
-        entries.push({ date: d, price: null, currency: null, availability: "NOT_AVAILABLE", offerCount: 0, absenceCode: "SUPPLIER_NO_RESULT", absenceText: "Цена не получена — Summer не предоставил предложение на эту дату" });
+        entries.push({ date: d, price: null, currency: null, availability: "NOT_AVAILABLE", offerCount: 0, absenceCode: "SUPPLIER_NO_RESULT", absenceText: "Р¦РµРЅР° РЅРµ РїРѕР»СѓС‡РµРЅР° вЂ” Summer РЅРµ РїСЂРµРґРѕСЃС‚Р°РІРёР» РїСЂРµРґР»РѕР¶РµРЅРёРµ РЅР° СЌС‚Сѓ РґР°С‚Сѓ" });
       }
     }
     entries.sort((a, b) => a.date.localeCompare(b.date));
@@ -743,7 +797,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
    * KOMPAS-style hotel calendar: 31-day windows with PRICEPAGE pagination.
    * Proven equivalent to per-day iteration on live data (identical date
    * coverage), with ~10-30x fewer requests for a single hotel. Pagination
-   * MUST run to the first empty page — cheaper offers can sit on later pages.
+   * MUST run to the first empty page вЂ” cheaper offers can sit on later pages.
    */
   private async collectHotelRanged(
     page: Page,
@@ -766,7 +820,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
           }
         } catch (e) {
           if (e instanceof KompasCaptchaRequiredException) throw e;
-          this.logger.warn(`[Summertour calendar] window ${w.from}→${w.to} ${pr.value} failed: ${(e as Error).message}`);
+          this.logger.warn(`[Summertour calendar] window ${w.from}в†’${w.to} ${pr.value} failed: ${(e as Error).message}`);
         }
       }
     }
@@ -830,13 +884,9 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     const p = this.buildHotelPricesParams(query, pr, checkinBeg, checkinEnd, pricePage);
     const xhrUrl = `https://summertour.az/search_tour?${p.toString()}`;
 
-    const jsResponse: string = await page.evaluate(async (url: string) => {
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      return await resp.text();
-    }, xhrUrl);
+    const jsResponse: string = await this.fetchXhrWithCaptchaSolve(page, xhrUrl, query);
 
-    // Captcha detection in XHR response (script Test-CaptchaRequired) — string-based as in D:\test.ps1
+    // Captcha detection in XHR response (script Test-CaptchaRequired) вЂ” string-based as in D:\test.ps1
     if (this.isCaptchaInResponseText(jsResponse)) {
       // Extract image URL via script's Get-CaptchaImageUrl logic, then fetch to data URI
       const imgMatch = jsResponse.match(/<img\b[^>]*\bsrc\s*=\s*["']([^"']*(?:kcaptcha|captcha)[^"']*)["']/i);
@@ -932,6 +982,25 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
   }
   private formatDate(d: Date): string { const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0"); const day = String(d.getDate()).padStart(2, "0"); return `${y}-${m}-${day}`; }
 
+  /**
+   * Discover SUMMERTOUR geo options (TOWNS checkbox-list) for a country.
+   * Shared SAMO mechanics via discoverSamoGeoOptions helper.
+   */
+  async discoverGeoOptions(countryExternalId?: string): Promise<SupplierGeoOption[]> {
+    const browser = await this.getBrowser();
+    const context = await browser.newContext({ locale: "ru-RU" });
+    try {
+      const page = await context.newPage();
+      return await discoverSamoGeoOptions(page, {
+        baseUrl: "https://summertour.az",
+        townFromInc: "1930",
+        stateInc: countryExternalId ?? "",
+      });
+    } finally {
+      await context.close().catch(() => {});
+    }
+  }
+
   private async getBrowser(): Promise<Browser> {
     if (this.browser && this.browser.isConnected()) return this.browser;
     const k = "default";
@@ -941,7 +1010,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     try { this.browser = await p; this.logger.log("Summertour (new) browser launched"); return this.browser; } finally { this.browserLock.delete(k); }
   }
 
-  // ── CAPTCHA Human-in-the-Loop (SAMO — same as KOMPAS) ──────────────
+  // в”Ђв”Ђ CAPTCHA Human-in-the-Loop (SAMO вЂ” same as KOMPAS) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
 
   private async isCaptchaPresent(page: Page): Promise<boolean> {
     try {
@@ -958,7 +1027,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       if (generic) return true;
       const bodyCheck = await page.evaluate(() => {
         const text = document.body?.innerText?.toLowerCase() ?? "";
-        return text.includes("captcha") || text.includes("капча") || text.includes("проверка на робота") || text.includes("подтвердите, что вы не робот");
+        return text.includes("captcha") || text.includes("РєР°РїС‡Р°") || text.includes("РїСЂРѕРІРµСЂРєР° РЅР° СЂРѕР±РѕС‚Р°") || text.includes("РїРѕРґС‚РІРµСЂРґРёС‚Рµ, С‡С‚Рѕ РІС‹ РЅРµ СЂРѕР±РѕС‚");
       }).catch(() => false);
       return bodyCheck;
     } catch {
@@ -988,6 +1057,329 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     return m?.[1] ?? "image/jpeg";
   }
 
+  // в”Ђв”Ђ CAPTCHA Auto-Solve (ddddocr) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+
+  /**
+   * SAMO XHR fetch that auto-solves the antibot challenge when the response
+   * carries it. Returns the original (captcha) text when the auto-solve fails
+   * so every caller keeps its existing human-in-the-loop fallback untouched.
+   */
+  private async fetchXhrWithCaptchaSolve(
+    page: Page,
+    xhrUrl: string,
+    query?: SupplierSearchQuery | PriceCalendarQuery,
+  ): Promise<string> {
+    const jsResponse: string = await page.evaluate(async (url: string) => {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.text();
+    }, xhrUrl);
+    if (!this.isCaptchaInResponseText(jsResponse)) return jsResponse;
+
+    const solved = await this.autoSolveCaptcha(page, { responseText: jsResponse, query });
+    if (!solved) return jsResponse;
+
+    // The session is trusted now вЂ” re-fetch the very same URL.
+    const retried: string = await page.evaluate(async (url: string) => {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.text();
+    }, xhrUrl);
+    if (this.isCaptchaInResponseText(retried)) {
+      this.logger.warn("[Summertour captcha] still challenged after auto-solve вЂ” falling back");
+    }
+    return retried;
+  }
+
+  /**
+   * Solve the SAMO antibot challenge without the user.
+   *
+   * Constraints verified live on summertour.az:
+   *  - kcaptcha reg.php issues a NEW code on every hit в†’ the image we OCR must
+   *    be the one we answer against, and no other request may fetch it again;
+   *  - a WRONG answer rotates the code в†’ exactly ONE candidate per round, never
+   *    a batch of guesses;
+   *  - POST target = the captcha form action (a full PRICES URL); when the
+   *    response/DOM action is missing or garbled we rebuild it from the query.
+   *
+   * Round budget (SUMMERTOUR_CAPTCHA_SOLVE_ROUNDS, default 4) buys fresh
+   * images after each rejection. Returns true only when the session is
+   * confirmed unlocked вЂ” for DOM-driven callers (verifySession) that means a
+   * reload of search_tour shows no challenge, because their `isBlocked` checks
+   * read the stale document; XHR callers verify by re-fetching instead.
+   */
+  private async autoSolveCaptcha(
+    page: Page,
+    opts: {
+      responseText?: string | null;
+      query?: SupplierSearchQuery | PriceCalendarQuery | SupplierOfferRef | null;
+      verifySession?: boolean;
+    },
+  ): Promise<boolean> {
+    const rounds = Number(process.env.SUMMERTOUR_CAPTCHA_SOLVE_ROUNDS ?? "") || 4;
+    let text = opts.responseText ?? null;
+    let imageUrl = text ? this.extractCaptchaImageUrl(text) : null;
+    let action =
+      this.rebuildCaptchaAction(opts.query) ??
+      (text ? this.extractCaptchaAction(text) : null) ??
+      (await this.readCaptchaFormActionFromDom(page));
+    if (!action) {
+      this.logger.warn("[Summertour captcha] auto-solve: no POST action available");
+      return false;
+    }
+
+    try {
+      for (let round = 1; round <= rounds; round++) {
+        let dataUri: string | null = null;
+        if (imageUrl) dataUri = await this.fetchCaptchaImageAsDataUri(page, imageUrl);
+        if (!dataUri) dataUri = await this.captureCaptchaImage(page, true);
+        if (!dataUri) {
+          this.logger.warn(`[Summertour captcha] auto-solve round ${round}: image unavailable`);
+          break;
+        }
+        const file = this.dataUriToTempFile(dataUri);
+        if (!file) break;
+
+        const candidates = await this.ocrCaptcha(file);
+        if (candidates.length === 0) {
+          this.logger.warn(`[Summertour captcha] auto-solve round ${round}: OCR returned nothing`);
+          break;
+        }
+        const guess = candidates[0];
+        this.logger.log(`[Summertour captcha] auto-solve round ${round}/${rounds} guess=${guess}`);
+
+        const resp = await this.postCaptchaAnswer(page, action, guess);
+        if (resp === null) {
+          this.logger.warn(`[Summertour captcha] auto-solve round ${round}: POST failed/timed out`);
+          break;
+        }
+        if (this.isCaptchaInResponseText(resp)) {
+          this.logger.log(`[Summertour captcha] guess ${guess} rejected вЂ” code rotated`);
+          text = resp;
+          imageUrl = this.extractCaptchaImageUrl(resp) ?? imageUrl;
+          const nextAction = this.extractCaptchaAction(resp);
+          if (nextAction && /[?&]samo_action=/i.test(nextAction)) action = nextAction;
+          continue;
+        }
+
+        if (opts.verifySession) {
+          const state = await this.verifyCaptchaSolved(page);
+          if (state === "error") break;
+          if (state === "captcha") {
+            this.logger.log(`[Summertour captcha] guess ${guess} not accepted by session вЂ” retrying`);
+            text = await page.content().catch(() => text);
+            imageUrl = this.extractCaptchaImageUrl(text ?? "") ?? imageUrl;
+            continue;
+          }
+        }
+        this.logger.log(`[Summertour captcha] auto-solved round ${round}/${rounds} guess=${guess}`);
+        return true;
+      }
+    } catch (err) {
+      this.logger.warn(`Summertour auto captcha solve failed: ${(err as Error).message}`);
+    }
+    return false;
+  }
+
+  /** OCR candidates via backend/scripts/summertour-captcha-ocr.py (ddddocr, one per line). */
+  private ocrCaptcha(imagePath: string): Promise<string[]> {
+    const script = path.resolve(process.cwd(), "scripts", "summertour-captcha-ocr.py");
+    if (!fs.existsSync(script)) return Promise.resolve([]);
+    return new Promise((resolve) => {
+      execFile("python", [script, imagePath], { timeout: 60_000, windowsHide: true }, (err, stdout) => {
+        if (err) {
+          this.logger.warn(`Summertour OCR helper failed: ${err.message}`);
+          resolve([]);
+          return;
+        }
+        const candidates = (stdout || "")
+          .split(/\r?\n/)
+          .map((s) => s.replace(/[^0-9]/g, ""))
+          .filter((s) => s.length >= 1 && s.length <= 6);
+        resolve([...new Set(candidates)]);
+      });
+    });
+  }
+
+  /** Decode a captcha data URI into a temp file for the OCR helper. */
+  private dataUriToTempFile(dataUri: string): string | null {
+    const m = dataUri.match(/^data:([^;]+);base64,([\s\S]+)$/);
+    if (!m) return null;
+    try {
+      const ext = m[1].includes("png") ? "png" : m[1].includes("gif") ? "gif" : "jpg";
+      const file = path.resolve(process.cwd(), `.summer-captcha-auto.${ext}`);
+      fs.writeFileSync(file, Buffer.from(m[2], "base64"));
+      return file;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Absolute captcha image URL found inside an XHR/HTML response text. */
+  private extractCaptchaImageUrl(text: string): string | null {
+    const m = text.match(/<img\b[^>]*\bsrc\s*=\s*["']([^"']*(?:kcaptcha|captcha)[^"']*)["']/i);
+    if (!m) return null;
+    return this.absolutizeSummerUrl(m[1]);
+  }
+
+  /** Action of the captcha form inside a response text вЂ” the verified POST target. */
+  private extractCaptchaAction(text: string): string | null {
+    const tags = text.match(/<form\b[^>]*>/gi) ?? [];
+    for (const tag of tags) {
+      const am = tag.match(/\baction\s*=\s*["']([^"']*)["']/i);
+      if (!am) continue;
+      const action = am[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\\/g, "").trim();
+      if (!action) continue;
+      if (/captcha|antibot/i.test(tag) || /samo_action|search_tour/i.test(action)) {
+        return this.absolutizeSummerUrl(action);
+      }
+    }
+    return null;
+  }
+
+  private absolutizeSummerUrl(raw: string): string | null {
+    let u = raw.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+    if (!u || u.startsWith("data:")) return null;
+    if (u.startsWith("/")) u = `https://summertour.az${u}`;
+    else if (!/^https?:\/\//i.test(u)) u = `https://summertour.az/${u}`;
+    return u;
+  }
+
+  /** Action of the captcha form currently rendered in the DOM. */
+  private async readCaptchaFormActionFromDom(page: Page): Promise<string | null> {
+    try {
+      return await page.evaluate(() => {
+        const forms = Array.from(document.querySelectorAll("form")) as HTMLFormElement[];
+        for (const f of forms) {
+          const id = `${f.id} ${f.name} ${f.getAttribute("class") ?? ""}`;
+          const a = (f.getAttribute("action") || "").replace(/&amp;/g, "&").trim();
+          if (!a) continue;
+          if (/captcha/i.test(id) || /samo_action|search_tour/i.test(a)) {
+            try {
+              return new URL(a, location.href).toString();
+            } catch {
+              /* next form */
+            }
+          }
+        }
+        return null;
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Rebuild a PRICES/search action from the operation query вЂ” used when the
+   * response/DOM action is absent or garbled (verified in submitCaptchaAnswer:
+   * ANY valid query marks the SAMO session as captcha-passed).
+   */
+  private rebuildCaptchaAction(
+    query: SupplierSearchQuery | PriceCalendarQuery | SupplierOfferRef | null | undefined,
+  ): string | null {
+    if (!query) return null;
+    try {
+      const q = query as PriceCalendarQuery;
+      if (q.hotelExternalId && (q.tourIncValue || q.tourIncValues?.length) && q.dateFrom && q.dateTo) {
+        const wins = this.generateCalendarWindows(q.dateFrom, q.dateTo);
+        const w = wins[0] ?? { from: q.dateFrom, to: q.dateTo };
+        const pr = { value: q.tourIncValue ?? q.tourIncValues![0], name: q.tourIncName };
+        const p = this.buildHotelPricesParams(q, pr, w.from.replace(/-/g, ""), w.to.replace(/-/g, ""), 1);
+        return `https://summertour.az/search_tour?${p.toString()}`;
+      }
+      const s = query as SupplierSearchQuery;
+      if (s.tourIncValue) {
+        return buildSummerXhrUrl(
+          buildSummerSearchRequest({
+            tourIncValue: s.tourIncValue,
+            towns: (s as SupplierSearchQuery & { towns?: string }).towns,
+            hotelExternalId: s.hotelExternalId,
+            departureDateFrom: s.departureDateFrom,
+            departureDateTo: s.departureDateTo,
+            nightsFrom: s.nightsFrom,
+            nightsTo: s.nightsTo,
+            adults: s.adults,
+            children: s.children,
+            childAges: s.childAges,
+            meal: (s as SupplierSearchQuery & { meal?: string }).meal,
+            freight: (s as SupplierSearchQuery & { freightType?: string }).freightType ?? "1",
+            filter: "1",
+          }),
+        );
+      }
+    } catch (err) {
+      this.logger.warn(`Summertour captcha action rebuild failed: ${(err as Error).message}`);
+    }
+    return null;
+  }
+
+  /** Fetch a captcha image URL into a data URI (fresh hit = fresh code). */
+  private async fetchCaptchaImageAsDataUri(page: Page, url: string): Promise<string | null> {
+    try {
+      return await page.evaluate(async (u: string) => {
+        const target = new URL(u);
+        target.searchParams.set("_", String(Date.now()));
+        const r = await fetch(target.toString(), { cache: "no-store" });
+        if (!r.ok) return null;
+        const blob = await r.blob();
+        return await new Promise<string | null>((resolve) => {
+          const fr = new FileReader();
+          fr.onloadend = () => resolve(typeof fr.result === "string" ? fr.result : null);
+          fr.onerror = () => resolve(null);
+          fr.readAsDataURL(blob);
+        });
+      }, url);
+    } catch {
+      return null;
+    }
+  }
+
+  /** POST one captcha answer (hard timeout вЂ” the SAMO re-search can hang). */
+  private async postCaptchaAnswer(page: Page, actionUrl: string, answer: string): Promise<string | null> {
+    try {
+      return await page.evaluate(
+        async ([action, digits]: [string, string]) => {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 60_000);
+          try {
+            const r = await fetch(action, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: `antibot=${encodeURIComponent(digits)}&samo_action=antibot`,
+              signal: ctrl.signal,
+            });
+            return await r.text();
+          } catch {
+            return null;
+          } finally {
+            clearTimeout(timer);
+          }
+        },
+        [actionUrl, answer] as [string, string],
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Reload search_tour and report whether the challenge is really gone.
+   * Needed by DOM-driven callers: a fetch-based solve never navigates, so
+   * their `isCaptchaPresent`/`isBlocked` reads keep seeing the stale document.
+   */
+  private async verifyCaptchaSolved(page: Page): Promise<"ok" | "captcha" | "error"> {
+    try {
+      await page.goto("https://summertour.az/search_tour", { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await page
+        .waitForFunction(() => typeof (window as any).samo !== "undefined" && (window as any).samo.page_ready === true, { timeout: 8_000 })
+        .catch(() => {});
+      return (await this.isCaptchaPresent(page)) ? "captcha" : "ok";
+    } catch (err) {
+      this.logger.warn(`Summertour captcha verification failed: ${(err as Error).message}`);
+      return "error";
+    }
+  }
+
   private async createCaptchaChallengeIfNeeded(
     page: Page,
     context: BrowserContext,
@@ -997,7 +1389,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     const hasCaptcha = await this.isCaptchaPresent(page);
     if (!hasCaptcha) return null;
 
-    const src = await this.getCaptchaImageSrc(page);
+    const src = await this.captureCaptchaImage(page, true);
     if (!src) {
       this.logger.warn("Summertour CAPTCHA detected but #icaptcha src missing");
       return null;
@@ -1038,6 +1430,49 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       await fcaptcha.fill(answer);
       await page.waitForTimeout(300);
 
+      // The captcha DOM may carry a lost/garbled form action (page loaded via
+      // setContent of an escaped XHR payload, or the bare initial GET вЂ” both
+      // end up POSTing to /search_tour WITHOUT the PRICES query, so the server
+      // answers "no tours" and never validates the answer against the search
+      // context). Rebuild a real PRICES action from the stored operation query
+      // вЂ” ANY valid query marks the SAMO session as captcha-passed вЂ” and fall
+      // back to cleaning the raw attribute.
+      let rebuilt: string | null = null;
+      try {
+        const q = ch.originalQuery as PriceCalendarQuery;
+        if (q && q.supplierCode === "SUMMERTOUR" && q.hotelExternalId && (q.tourIncValue || q.tourIncValues?.length)) {
+          const wins = this.generateCalendarWindows(q.dateFrom, q.dateTo);
+          const w = wins[0] ?? { from: q.dateFrom, to: q.dateTo };
+          const pr = { value: q.tourIncValue ?? q.tourIncValues![0], name: q.tourIncName };
+          const p = this.buildHotelPricesParams(q, pr, w.from.replace(/-/g, ""), w.to.replace(/-/g, ""), 1);
+          rebuilt = `https://summertour.az/search_tour?${p.toString()}`;
+        }
+      } catch {
+        rebuilt = null;
+      }
+      const pre = await page.evaluate((fixed: string | null) => {
+        const form = document.querySelector('#captchaForm, form[name="captchaForm"]') as HTMLFormElement | null;
+        if (!form) return { err: "no form", cookie: document.cookie.slice(0, 80) };
+        if (!fixed) {
+          let a = (form.getAttribute("action") || "").replace(/\\/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/^["']+|["']+$/g, "").trim();
+          if (/^https?:\/\//.test(a) && /samo_action/.test(a)) form.setAttribute("action", a);
+        } else {
+          form.setAttribute("action", fixed);
+        }
+        return {
+          cookie: document.cookie.slice(0, 160),
+          len: (document.querySelector("#fcaptcha") as HTMLInputElement | null)?.value?.length ?? 0,
+          action: (form.getAttribute("action") || "").slice(0, 150),
+        };
+      }, rebuilt);
+      this.logger.log(`[Summertour captcha] pre-submit ${JSON.stringify(pre)}`);
+
+      // SAMO re-executes the whole PRICES search on the antibot POST вЂ” live
+      // timings run 5-60s, so wait for the navigation instead of a fixed delay
+      // (a premature check reads the OLD document and reports INVALID_ANSWER).
+      const nav = page
+        .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60_000 })
+        .catch(() => null);
       await page.evaluate(() => {
         const form = document.querySelector('#captchaForm, form[name="captchaForm"]') as HTMLFormElement | null;
         if (form) form.submit();
@@ -1046,12 +1481,19 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
           if (btn) btn.click();
         }
       });
+      await nav;
+      await page.waitForTimeout(500);
 
-      await page.waitForTimeout(3_000);
+      const post = await page.evaluate(() => ({
+        cookie: document.cookie.slice(0, 160),
+        captcha: !!document.querySelector("#captchaForm, #fcaptcha, #icaptcha"),
+        body: (document.body?.innerText ?? "").slice(0, 120).replace(/\s+/g, " "),
+      })).catch(() => null);
+      this.logger.log(`[Summertour captcha] post-nav url=${page.url().slice(0, 140)} ${JSON.stringify(post)}`);
 
       const stillCaptcha = await this.isCaptchaPresent(page);
       if (stillCaptcha) {
-        const newImage = await this.getCaptchaImageSrc(page);
+        const newImage = await this.captureCaptchaImage(page, true);
         if (newImage) this.captchaStore!.updateImage(challengeId, newImage, this.inferMimeType(newImage));
         this.captchaStore!.setStatus(challengeId, "WAITING_FOR_USER");
         return { status: "INVALID_ANSWER", newImage: newImage ?? undefined };
@@ -1067,12 +1509,84 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     }
   }
 
+  /**
+   * Capture the live CAPTCHA image as a data URI.
+   * kcaptcha reg.php regenerates the session code on EVERY network hit, so the
+   * LAST fetch wins. The browser's own load of #icaptcha can land after ours
+   * and silently rotate the code (verified: correct answers rejected), hence:
+   * wait for networkidle first, then fetch with a cache-buster, then PIN the
+   * rendered src to our data URI so no later DOM load hits reg.php again.
+   * The original generator URL is kept in data-gen for future refreshes.
+   */
+  private async captureCaptchaImage(page: Page, forceRegen = false): Promise<string | null> {
+    try {
+      await page.waitForLoadState("networkidle", { timeout: 8_000 }).catch(() => {});
+      const url = await page.evaluate(() => {
+        const el = document.querySelector("#icaptcha") as HTMLImageElement | null;
+        if (!el) return null;
+        const s = el.getAttribute("data-gen") || el.getAttribute("src") || "";
+        if (!s || s.startsWith("data:")) return null;
+        try {
+          return new URL(s, location.href).toString();
+        } catch {
+          return null;
+        }
+      }).catch(() => null);
+      if (url) {
+        const data = await page.evaluate(
+          async ([u, regen]: [string, boolean]) => {
+            const target = new URL(u);
+            if (regen) target.searchParams.set("_", String(Date.now()));
+            const r = await fetch(target.toString(), { cache: "no-store" });
+            if (!r.ok) return null;
+            const blob = await r.blob();
+            const dataUri = await new Promise<string | null>((resolve) => {
+              const fr = new FileReader();
+              fr.onloadend = () => resolve(fr.result as string);
+              fr.onerror = () => resolve(null);
+              fr.readAsDataURL(blob);
+            });
+            if (dataUri) {
+              const el = document.querySelector("#icaptcha") as HTMLImageElement | null;
+              if (el) {
+                el.setAttribute("data-gen", u);
+                el.src = dataUri;
+              }
+            }
+            return dataUri;
+          },
+          [url, forceRegen] as [string, boolean],
+        ).catch(() => null);
+        if (data) {
+          const diag = await page.evaluate(() => ({
+            cookie: document.cookie.slice(0, 160),
+            pinned: (document.querySelector("#icaptcha") as HTMLImageElement | null)?.src?.startsWith("data:") ?? false,
+            gen: document.querySelector("#icaptcha")?.getAttribute("data-gen")?.slice(0, 90) ?? null,
+          })).catch(() => null);
+          this.logger.log(`[Summertour captcha] capture len=${data.length} url=${url.slice(0, 100)} diag=${JSON.stringify(diag)}`);
+          return data;
+        }
+      }
+      if (!forceRegen) return await this.getCaptchaImageSrc(page);
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   async refreshCaptcha(challengeId: string): Promise<{ newImage: string } | null> {
     const ch = this.captchaStore?.get(challengeId);
     if (!ch || ch.supplier !== "SUMMERTOUR") return null;
     const { page } = ch;
 
     try {
+      // Summertour's captcha page has no refresh control вЂ” regenerating the
+      // reg.php image (new code) IS the refresh.
+      const fresh = await this.captureCaptchaImage(page, true);
+      if (fresh) {
+        this.captchaStore!.updateImage(challengeId, fresh, this.inferMimeType(fresh));
+        return { newImage: fresh };
+      }
       const refreshed = await page.evaluate(() => {
         const samo = (window as any).samo;
         if (samo?.captchaRefreshUrl) {
@@ -1086,7 +1600,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
 
       if (refreshed) {
         await page.waitForTimeout(2_000);
-        const newImage = await this.getCaptchaImageSrc(page);
+        const newImage = await this.captureCaptchaImage(page, true);
         if (newImage) {
           this.captchaStore!.updateImage(challengeId, newImage, this.inferMimeType(newImage));
           return { newImage };

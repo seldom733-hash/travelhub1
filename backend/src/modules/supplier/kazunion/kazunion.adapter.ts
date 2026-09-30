@@ -152,10 +152,21 @@ export class KazunionAdapter implements SupplierAdapter {
     return "0";
   }
 
-  /** Supplier-neutral stars → KazUnion STARS checklistbox ids (undefined = any). */
-  private resolveStarsKey(stars?: number[]): string | undefined {
+  /**
+   * Supplier-neutral stars → KazUnion STARS checklistbox ids (undefined = any).
+   * Accepts numeric stars and label strings ("5*" → 5); non-numeric labels
+   * ("HV-1") have no static mapping — only the aggregator-resolved starKeys
+   * cover those.
+   */
+  private resolveStarsKey(stars?: Array<number | string> | string[]): string | undefined {
     if (!stars?.length) return undefined;
-    const keys = stars.map((s) => STARS_KEY[s]).filter((k): k is string => Boolean(k));
+    const keys = stars
+      .map((s) => {
+        if (typeof s === "number") return STARS_KEY[s];
+        const m = s.trim().match(/^(\d)\s*\*?$/);
+        return m ? STARS_KEY[parseInt(m[1], 10)] : undefined;
+      })
+      .filter((k): k is string => Boolean(k));
     return keys.length ? keys.join(",") : undefined;
   }
 
@@ -196,12 +207,34 @@ export class KazunionAdapter implements SupplierAdapter {
   async discoverGeoOptions(countryExternalId?: string): Promise<SupplierGeoOption[]> {
     const stateInc = countryExternalId ?? "6"; // 6 = Turkey (verified)
     const dict = await this.http.fetchDictionary("849", stateInc);
-    return dict.towns.map((t) => ({
+    const out: SupplierGeoOption[] = dict.towns.map((t) => ({
       externalId: t.value,
       label: t.name,
       kind: "TOWN",
       countryExternalId: stateInc,
     }));
+    // Hotel categories (STARS checklistbox) — ingested as kind=STAR links;
+    // the frontend «Категория отеля» list is built from these.
+    for (const s of dict.stars) {
+      out.push({
+        externalId: s.value,
+        label: s.name,
+        kind: "STAR",
+        countryExternalId: stateInc,
+      });
+    }
+    // Hotel dictionary (inline samo.hotelDynamic, state-scoped) — kind=HOTEL
+    // links power the search form's hotel picker and hotelExternalId resolution.
+    for (const h of dict.hotels) {
+      out.push({
+        externalId: h.id,
+        label: h.name,
+        kind: "HOTEL",
+        countryExternalId: stateInc,
+        townKey: h.townKey,
+      });
+    }
+    return out;
   }
 
   // ── SupplierAdapter ───────────────────────────────────────────────────
@@ -258,8 +291,14 @@ export class KazunionAdapter implements SupplierAdapter {
           townKey,
           townsCsv,
           freightType: this.resolveFreightType(query.transport),
-          starsKey: this.resolveStarsKey(query.hotelStars),
-          starsAny: !query.hotelStars?.length,
+          // Star filter: aggregator-resolved native STARS ids (from the
+          // ingested kind=STAR dictionary) win over the static numeric map.
+          starsKey:
+            (query as { starKeys?: Record<string, string> }).starKeys?.["KAZUNION"] ??
+            this.resolveStarsKey(query.hotelStars),
+          starsAny:
+            !(query as { starKeys?: Record<string, string> }).starKeys?.["KAZUNION"] &&
+            !query.hotelStars?.length,
         });
         rows.push(...programRows);
         this.programState.set(program.value, state.value);
@@ -393,10 +432,21 @@ export class KazunionAdapter implements SupplierAdapter {
     const dict = await this.http.fetchDictionary(townFrom, stateInc);
     const mealKey = this.resolveMeal(query.meal, dict.meals);
 
+    // Hotel-scoped calendars price across ALL programs of the country: the
+    // supplier site searches with an empty TOURINC + HOTELS=key, while a card
+    // remembers only the one program of the search that created it — restricting
+    // to it hides dates sold through sibling programs (verified: NAI HARN PHUKET
+    // 7n/2a Oct'26 — program 3548 holds only 04+11, any-program query returns
+    // 04..31 daily; HOTELS may also be ignored server-side per single program).
+    const hotelScoped = Boolean(query.hotelExternalId);
+    const fetchPrograms: Array<{ value: string; name: string }> = hotelScoped
+      ? [{ value: "", name: "" }]
+      : programs;
+
     const collected: SupplierOffer[] = [];
     const windows = generateWindows(query.dateFrom, query.dateTo, 30);
     for (const window of windows) {
-      for (const program of programs) {
+      for (const program of fetchPrograms) {
         try {
           const rows = await this.http.fetchPrices({
             townFromInc: townFrom,
@@ -412,37 +462,52 @@ export class KazunionAdapter implements SupplierAdapter {
             hotelKey: query.hotelExternalId,
             mealKey,
             starsAny: true,
-            maxPages: 5,
+            maxPages: hotelScoped ? 10 : 5,
           });
-          this.programState.set(program.value, stateInc);
+          if (program.value) {
+            this.programState.set(program.value, stateInc);
+          }
+          for (const row of rows) {
+            if (row.tourKey) this.programState.set(row.tourKey, stateInc);
+          }
           const offers = this.normalizeRows(
             rows,
             {
               adults: query.adults ?? 2,
               children: query.children,
               childAges: query.childAges,
-              tourIncValue: program.value,
-              tourIncName: program.name,
+              ...(program.value
+                ? { tourIncValue: program.value, tourIncName: program.name }
+                : {}),
               destination: query.destination,
               hotel: query.hotel,
               hotelExternalId: query.hotelExternalId,
             } as SupplierSearchQuery,
             { value: stateInc, name: stateName },
-            [{ value: program.value, name: program.name }],
+            hotelScoped ? dict.programs : [program],
           );
           collected.push(...offers);
         } catch (err) {
           this.logger.warn(
-            `KazUnion calendar window ${window.from}→${window.to} program ${program.value}: ${(err as Error).message}`,
+            `KazUnion calendar window ${window.from}→${window.to} program ${program.value || "ANY"}: ${(err as Error).message}`,
           );
         }
       }
     }
 
     const deduped = this.dedup(collected);
-    const filtered = query.hotel
-      ? deduped.filter((o) => o.hotel === query.hotel || o.hotelExternalId === query.hotelExternalId)
-      : deduped;
+    const filtered =
+      query.hotel || query.hotelExternalId
+        ? deduped.filter(
+            (o) => o.hotel === query.hotel || o.hotelExternalId === query.hotelExternalId,
+          )
+        : deduped;
+    if ((query.hotel || query.hotelExternalId) && deduped.length > 0 && filtered.length < deduped.length / 2) {
+      this.logger.warn(
+        `KazUnion calendar: hotel filter dropped ${deduped.length - filtered.length}/${deduped.length} rows ` +
+          `(server HOTELS leak); hotel="${query.hotel}" key=${query.hotelExternalId}`,
+      );
+    }
 
     const byDate = new Map<string, SupplierOffer[]>();
     for (const offer of filtered) {

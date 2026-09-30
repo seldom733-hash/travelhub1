@@ -414,6 +414,120 @@ export class GeoService {
     return { deleted: true, id };
   }
 
+  // ── Supplier dictionaries for search forms (hotel stars, hotels) ──
+
+  /**
+   * Hotel star categories ingested from supplier forms (SupplierGeoLink
+   * kind=STAR). Returns distinct labels sorted by parsed star count (5* →
+   * 1*, non-numeric labels like "HV-1" last). Powers the universal search
+   * «Категория отеля» dropdown; the frontend maps a label back to the
+   * supplier's STARS ids via /supplier-stars?countryId=.
+   */
+  /**
+   * Resolve an ISO-2 country code to its GeoCountry id (public query-param
+   * convenience: /geo/supplier-stars?countryCode=TR).
+   */
+  async resolveCountryIdByCode(code: string): Promise<string | undefined> {
+    const country = await this.prisma.geoCountry.findUnique({
+      where: { code: code.trim().toUpperCase() },
+      select: { id: true },
+    });
+    return country?.id;
+  }
+
+  async listSupplierStars(countryId?: string): Promise<
+    Array<{ label: string; stars: number | null; suppliers: string[]; externalIds: Record<string, string> }>
+  > {
+    const links = await this.prisma.supplierGeoLink.findMany({
+      where: {
+        kind: "STAR",
+        // Country scope keeps per-country dictionaries distinct; links without
+        // a country (global dictionary rows) always participate.
+        ...(countryId ? { OR: [{ geoCountryId: countryId }, { geoCountryId: null }] } : {}),
+      },
+      select: { supplierCode: true, externalId: true, label: true },
+    });
+    const byLabel = new Map<string, { stars: number | null; suppliers: Set<string>; externalIds: Record<string, string> }>();
+    for (const l of links) {
+      const label = l.label.trim();
+      if (!label) continue;
+      let entry = byLabel.get(label);
+      if (!entry) {
+        const m = label.match(/^(\d)\s*\*$/);
+        entry = { stars: m ? parseInt(m[1], 10) : null, suppliers: new Set(), externalIds: {} };
+        byLabel.set(label, entry);
+      }
+      entry.suppliers.add(l.supplierCode);
+      if (!entry.externalIds[l.supplierCode]) entry.externalIds[l.supplierCode] = l.externalId;
+    }
+    return [...byLabel.entries()]
+      .map(([label, v]) => ({
+        label,
+        stars: v.stars,
+        suppliers: [...v.suppliers],
+        externalIds: v.externalIds,
+      }))
+      .sort((a, b) => {
+        if (a.stars !== null && b.stars !== null) return b.stars - a.stars; // 5* first
+        if (a.stars !== null) return -1;
+        if (b.stars !== null) return 1;
+        return a.label.localeCompare(b.label, "ru");
+      });
+  }
+
+  /**
+   * Supplier hotel directory for the search form's hotel picker. Sources:
+   * SupplierGeoLink kind=HOTEL rows (supplier hotel dictionaries) grouped by
+   * hotel label. Region filters (country/city/resort) restrict to hotels
+   * linked to that geography; q filters by substring in the label.
+   */
+  async listSupplierHotels(params: {
+    geoCountry?: string;
+    geoCity?: string;
+    geoResort?: string;
+    q?: string;
+    limit?: number;
+  }): Promise<Array<{ id: string; name: string; suppliers: string[] }>> {
+    const limit = Math.min(params.limit ?? 500, 2000);
+    // Hotels geo-link through their town: a town ingested as a resort carries
+    // geoResortId (city on the resort), so a city filter must cover both the
+    // hotel's direct geoCityId and resorts OF that city.
+    const cityCondition: Prisma.SupplierGeoLinkWhereInput[] = params.geoCity
+      ? [{ geoCity: { code: params.geoCity } }, { geoResort: { city: { code: params.geoCity } } }]
+      : [];
+    const where: Prisma.SupplierGeoLinkWhereInput = {
+      kind: "HOTEL",
+      label: params.q
+        ? { contains: params.q, mode: "insensitive" }
+        : { not: "" },
+      ...(params.geoCountry ? { geoCountry: { code: params.geoCountry } } : {}),
+      ...(params.geoResort ? { geoResort: { code: params.geoResort } } : {}),
+      ...(cityCondition.length ? { OR: cityCondition } : {}),
+    };
+    const links = await this.prisma.supplierGeoLink.findMany({
+      where,
+      select: { supplierCode: true, label: true },
+      orderBy: { label: "asc" },
+      take: limit * 4, // grouping headroom before the limit cut
+    });
+    // One entry per hotel NAME: external ids are per-supplier and differ, the
+    // name is the only supplier-neutral identity (the picker's id).
+    const byLabel = new Map<string, Set<string>>();
+    for (const l of links) {
+      const name = l.label.replace(/\s+/g, " ").trim();
+      if (!name) continue;
+      let suppliers = byLabel.get(name);
+      if (!suppliers) {
+        suppliers = new Set();
+        byLabel.set(name, suppliers);
+      }
+      suppliers.add(l.supplierCode);
+    }
+    return [...byLabel.entries()]
+      .slice(0, limit)
+      .map(([name, suppliers]) => ({ id: name, name, suppliers: [...suppliers] }));
+  }
+
   // ── Unified search (admin directory) ──────────────────────────────
 
   async search(query: string, type?: string, status?: string) {

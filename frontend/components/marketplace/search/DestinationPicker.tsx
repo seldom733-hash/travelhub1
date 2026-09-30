@@ -1,12 +1,14 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CaretDown, CaretRight, MapPin, X } from "@phosphor-icons/react";
 import {
   fetchGeoDirectory,
   geoDisplayName,
   type GeoDirectoryEntry,
 } from "@/lib/geo-api";
+import { widestText } from "@/lib/measure-text";
+import { useClickOutside } from "./useClickOutside";
 
 interface DestinationPickerProps {
   id: string;
@@ -72,6 +74,12 @@ export default function DestinationPicker({
   const [qCountry, setQCountry] = useState("");
   const [qCity, setQCity] = useState("");
   const [qResort, setQResort] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // «Куда» is the only picker that STAYS open on selection (country → city →
+  // resort is a cascade) — it closes on the parent (trigger) click or when
+  // another search element is clicked.
+  useClickOutside(containerRef, open, () => setOpen(false));
 
   // Load countries once (cached in fetchGeoDirectory).
   useEffect(() => {
@@ -99,11 +107,12 @@ export default function DestinationPicker({
     };
   }, [country?.id]);
 
-  // Resorts follow the selected city (or all resorts for direct entry).
+  // Resorts follow the selected city (or the selected country, or all
+  // resorts for direct entry).
   useEffect(() => {
     let alive = true;
     setLoadingResorts(true);
-    fetchGeoDirectory("resort", undefined, city?.id)
+    fetchGeoDirectory("resort", country?.id, city?.id)
       .then((list) => {
         if (alive) setResorts(list);
       })
@@ -116,23 +125,40 @@ export default function DestinationPicker({
     return () => {
       alive = false;
     };
-  }, [city?.id]);
+  }, [city?.id, country?.id]);
 
   const selected = resort ?? city ?? country;
 
+  // Content-width: sized to the longest «Name · CODE» text across all three
+  // sections (country/city/resort lists), placeholder as fallback.
+  const maxTextPx = useMemo(() => {
+    const labels = [
+      ...(countries ?? []).map((i) => `${geoDisplayName(i.names, i.code)} · ${i.code}`),
+      ...(cities ?? []).map((i) => `${geoDisplayName(i.names, i.code)} · ${i.code}`),
+      ...(resorts ?? []).map((i) => `${geoDisplayName(i.names, i.code)} · ${i.code}`),
+    ];
+    if (labels.length === 0) return 0;
+    labels.push(placeholder);
+    return widestText(labels);
+  }, [countries, cities, resorts, placeholder]);
+
+  // Picking an entry collapses only its own section — the dropdown stays
+  // open so a deeper level (city/resort) can be picked right away.
   const pickCountry = (entry: GeoDirectoryEntry) => {
     onCountryChange(entry);
-    setExpanded("city");
+    setExpanded(null);
   };
 
   const pickCity = (entry: GeoDirectoryEntry) => {
     onCityChange(entry);
-    setExpanded("resort");
+    setExpanded(null);
   };
 
   const pickResort = (entry: GeoDirectoryEntry) => {
+    // Terminal level — still no collapse: the dropdown closes only via the
+    // trigger or a click outside (same contract as country/city picks).
     onResortChange(entry);
-    setOpen(false);
+    setExpanded(null);
   };
 
   const toggle = (section: Section) =>
@@ -208,7 +234,7 @@ export default function DestinationPicker({
   );
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative" style={{ maxWidth: maxTextPx > 0 ? maxTextPx + 56 : undefined }}>
       <label
         htmlFor={id}
         className="mb-0.5 block text-[13px] font-medium text-neutral-400"
@@ -233,7 +259,7 @@ export default function DestinationPicker({
             : placeholder}
         </span>
 
-        {selected && !required ? (
+        {selected ? (
           <span
             role="button"
             tabIndex={0}

@@ -3,6 +3,7 @@ import * as https from "https";
 import * as fs from "fs";
 import * as path from "path";
 import { execFile } from "child_process";
+import { parseSamoHotelDynamic } from "../samo-hotel-dict";
 
 /**
  * KazUnion HTTP Service — direct HTTP requests to the KazUnion SAMO endpoint
@@ -38,6 +39,10 @@ export interface KazunionDictionary {
   meals: Array<{ value: string; name: string }>;
   /** TOWNS checklistbox value → label (city/district filter). */
   towns: Array<{ value: string; name: string }>;
+  /** STARS checklistbox value → label (hotel categories, e.g. 10001 → "5*"). */
+  stars: Array<{ value: string; name: string }>;
+  /** Inline samo.hotelDynamic hotel dictionary (state-scoped). */
+  hotels: Array<{ id: string; name: string; townKey?: string }>;
 }
 
 // ── One parsed price_info row ────────────────────────────────────────────
@@ -112,8 +117,14 @@ export interface KazunionFetchParams {
 export class KazunionHttpService {
   private readonly logger = new Logger(KazunionHttpService.name);
   private static readonly BASE_URL = "https://online.kazunion.com/search_tour";
-  /** KazUnion groups results by price id 232 (default checked on the form). */
-  private static readonly PARTITION_PRICE = "232";
+  /**
+   * PARTITION_PRICE=0 → no price grouping: return every room/meal/program
+   * variant individually. The former value "232" grouped rows by price id and
+   * hid most variants (verified live: NAI HARN 04.10 Oct'26 — 6 rows on the
+   * supplier site, only 2 with 232; geo Oct — 31 vs 100 rows, shared keys keep
+   * identical prices). Same approach as KOMPAS (PARTITION_PRICE=0).
+   */
+  private static readonly PARTITION_PRICE = "0";
   /** Dictionary cache: key = `${townFromInc}:${stateInc ?? ""}`. */
   private readonly dictCache = new Map<string, KazunionDictionary>();
   /** Global pacing: min interval between supplier requests (~30 rpm cap). */
@@ -214,8 +225,9 @@ export class KazunionHttpService {
     if (!this.isEmptyDictionary(dict)) this.dictCache.set(key, dict);
     this.logger.log(
       `KazUnion dictionary (town=${townFromInc}, state=${stateInc ?? "default"}): ` +
-      `${dict.states.length} states, ${dict.programs.length} programs, ` +
-      `${dict.meals.length} meals, ${dict.towns.length} towns`,
+        `${dict.states.length} states, ${dict.programs.length} programs, ` +
+        `${dict.meals.length} meals, ${dict.towns.length} towns, ${dict.stars.length} stars, ` +
+        `${dict.hotels.length} hotels`,
     );
     return dict;
   }
@@ -226,6 +238,8 @@ export class KazunionHttpService {
       programs: this.parseSelectOptions(body, "TOURINC", true),
       meals: this.parseChecklistbox(body, "MEALS"),
       towns: this.parseChecklistbox(body, "TOWNS"),
+      stars: this.parseChecklistbox(body, "STARS"),
+      hotels: parseSamoHotelDynamic(body),
     };
   }
 
@@ -235,7 +249,8 @@ export class KazunionHttpService {
       dict.states.length === 0 &&
       dict.programs.length === 0 &&
       dict.meals.length === 0 &&
-      dict.towns.length === 0
+      dict.towns.length === 0 &&
+      dict.stars.length === 0
     );
   }
 
@@ -283,6 +298,12 @@ export class KazunionHttpService {
 
     for (let page = startPage; page < startPage + maxPages; page++) {
       const url = this.buildPricesUrl(params, page);
+      if (page === startPage) {
+        const u = new URL(url);
+        this.logger.debug(
+          `KazUnion PRICES ${params.tourInc} stars: STARS_ANY=${u.searchParams.get("STARS_ANY")}&STARS=${u.searchParams.get("STARS")}`,
+        );
+      }
       const body = await this.pacedGet(url);
 
       const html = this.extractHtmlFromJs(body);
@@ -566,8 +587,12 @@ export class KazunionHttpService {
       HOTELS: params.hotelKey ?? "",
       MEALS_ANY: params.mealKey ? "0" : "1",
       MEALS: params.mealKey ?? "",
-      TOWNS_ANY: params.townKey || params.townsCsv ? "0" : "1",
-      TOWNS: params.townsCsv ?? params.townKey ?? "",
+      // §TOWNS precision: normalize whitespace/CSV before the ANY-flag decision —
+      // a whitespace-only townsCsv must behave like "no filter" (TOWNS_ANY=1),
+      // never like a broken TOWNS=&TOWNS_ANY=0 pair (which widens the result
+      // set instead of restricting it).
+      TOWNS_ANY: params.townKey || params.townsCsv?.replace(/\s+/g, "") ? "0" : "1",
+      TOWNS: params.townsCsv?.replace(/\s+/g, "") || params.townKey || "",
       ROOMS_ANY: "1",
       ROOMS: "",
       // Native KazUnion form fields — same shape as the supplier's own request.

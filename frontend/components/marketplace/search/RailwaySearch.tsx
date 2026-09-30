@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MapPin, CalendarBlank, ArrowRight } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
+import { todayISO } from "@/lib/dates";
 import type { SearchContext } from "@/lib/search-engine";
 import LiveSearchInput from "./LiveSearchInput";
 import HelpFindButton from "./HelpFindButton";
@@ -15,7 +16,8 @@ export default function RailwaySearch({ onSearch }: RailwaySearchProps) {
   const locale = useLocale();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [date, setDate] = useState("");
+  // Default date = today (platform-wide default for date fields).
+  const [date, setDate] = useState(todayISO());
   const [roundTrip, setRoundTrip] = useState(false);
   const [passengers, setPassengers] = useState(1);
 

@@ -25,7 +25,7 @@ import { KompasCaptchaModal } from "@/components/supplier/KompasCaptchaModal";
 type MonthlyCalendarQuery = Omit<SupplierPriceCalendarQuery, "dateFrom" | "dateTo">;
 
 // Bump this to invalidate all cached calendar data (old keys become stale)
-const CAL_CACHE_V = 4;
+const CAL_CACHE_V = 5;
 
 function buildCacheKey(base: MonthlyCalendarQuery, year: number, month: number): string {
   // month 0-based — includes all KOMPAS filters that affect price

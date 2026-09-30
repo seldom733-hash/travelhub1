@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MapPin, CalendarBlank, ArrowRight } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
+import { todayISO } from "@/lib/dates";
 import type { SearchContext } from "@/lib/search-engine";
 import LiveSearchInput from "./LiveSearchInput";
 import HelpFindButton from "./HelpFindButton";
@@ -15,8 +16,9 @@ export default function CarRentalSearch({ onSearch }: CarRentalSearchProps) {
   const locale = useLocale();
   const [pickup, setPickup] = useState("");
   const [dropoff, setDropoff] = useState("");
-  const [pickupDate, setPickupDate] = useState("");
-  const [returnDate, setReturnDate] = useState("");
+  // Default pickup/return = today (platform-wide default for date fields).
+  const [pickupDate, setPickupDate] = useState(todayISO());
+  const [returnDate, setReturnDate] = useState(todayISO());
   const [driverAge, setDriverAge] = useState(25);
 
   const handleSubmit = (e: React.FormEvent) => {

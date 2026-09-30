@@ -76,9 +76,51 @@ export class GeoController {
       return this.geo.listCities(countryId, activeOnly);
     }
     if (type === "resort") {
-      return this.geo.listResorts(cityId, activeOnly);
+      return this.geo.listResorts(cityId, activeOnly, countryId);
     }
     return this.geo.listCountries(activeOnly);
+  }
+
+  /**
+   * Hotel star categories known from supplier dictionaries (SupplierGeoLink
+   * kind=STAR, ingested from KOMPAS/KazUnion forms). No auth — powers the
+   * universal search «Категория отеля» dropdown.
+   * GET /geo/supplier-stars?countryId= (distinct star labels + counts).
+   */
+  @Get("supplier-stars")
+  @Public()
+  async getSupplierStars(
+    @Query("countryId") countryId?: string,
+    @Query("countryCode") countryCode?: string,
+  ) {
+    let id = countryId;
+    if (!id && countryCode) {
+      id = await this.geo.resolveCountryIdByCode(countryCode);
+    }
+    return this.geo.listSupplierStars(id);
+  }
+
+  /**
+   * Supplier hotel directory (SupplierGeoLink kind=HOTEL plus hotels seen in
+   * past offers) for the search form's hotel picker. No auth.
+   * GET /geo/supplier-hotels?geoCountry=TR&geoCity=ISTANBUL&q=...
+   */
+  @Get("supplier-hotels")
+  @Public()
+  async getSupplierHotels(
+    @Query("geoCountry") geoCountry?: string,
+    @Query("geoCity") geoCity?: string,
+    @Query("geoResort") geoResort?: string,
+    @Query("q") q?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.geo.listSupplierHotels({
+      geoCountry,
+      geoCity,
+      geoResort,
+      q,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get("search")

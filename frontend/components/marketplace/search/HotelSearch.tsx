@@ -1,39 +1,76 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, CalendarBlank, ArrowRight, Buildings } from "@phosphor-icons/react";
+import { CalendarBlank, ArrowRight, Buildings } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
+import { todayISO } from "@/lib/dates";
 import type { SearchContext } from "@/lib/search-engine";
+import DestinationPicker from "./DestinationPicker";
+import { geoDisplayName, type GeoDirectoryEntry } from "@/lib/geo-api";
 import LiveSearchInput from "./LiveSearchInput";
 import ChildAges from "./ChildAges";
 import HelpFindButton from "./HelpFindButton";
+import NightsRange from "./NightsRange";
 
 interface HotelSearchProps {
   onSearch: (ctx: SearchContext) => void;
 }
 
+/**
+ * Hotels search form. Destination is the Master Geography picker (country →
+ * city → resort, same as tours): it feeds the live query's ISO country/city
+ * codes, which the capability gate and SupplierGeoLink town resolution need —
+ * the legacy free-text city field resolved through geo:hotels availability
+ * (catalog-only) and could not reach supplier search at all.
+ */
 export default function HotelSearch({ onSearch }: HotelSearchProps) {
   const locale = useLocale();
-  const [cityId, setCityId] = useState("");
-  const [cityName, setCityName] = useState("");
+  // Destination as Master Geography entries (most specific wins).
+  const [toCountry, setToCountry] = useState<GeoDirectoryEntry | null>(null);
+  const [toCity, setToCity] = useState<GeoDirectoryEntry | null>(null);
+  const [toResort, setToResort] = useState<GeoDirectoryEntry | null>(null);
   const [hotelId, setHotelId] = useState("");
   const [hotelName, setHotelName] = useState("");
-  const [checkIn, setCheckIn] = useState("");
-  const [nights, setNights] = useState(3);
+  // Default check-in = today (platform-wide default for date fields).
+  const [checkIn, setCheckIn] = useState(todayISO());
+  // Night range «от–до» (same contract as the tours search).
+  const [nightsFrom, setNightsFrom] = useState(3);
+  const [nightsTo, setNightsTo] = useState(3);
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
 
+  const destination = toResort ?? toCity ?? toCountry;
+  // Supplier hotel directory scoped to the chosen region.
+  const hotelRegion = {
+    geoCountry: toCountry?.code,
+    geoCity: toCity?.code,
+    geoResort: toResort?.code,
+  };
+
+  const resetHotel = () => {
+    setHotelId("");
+    setHotelName("");
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!destination) return;
     onSearch({
       serviceType: "hotels",
-      cityId,
-      cityName,
+      // Display name + geo codes (the live query's country/geoCity/geoResort).
+      toDestination: geoDisplayName(destination.names, destination.code),
+      toGeoCountry: toCountry?.code,
+      toGeoCity: toCity?.code,
+      toGeoResort: toResort?.code,
       hotelId: hotelId || undefined,
+      // Hotel NAME is what the supplier search filters on (per-supplier ids
+      // are resolved by the aggregator from this name).
       hotelName: hotelName || undefined,
       startDate: checkIn,
-      nights,
+      nights: nightsFrom,
+      nightsFrom,
+      nightsTo,
       adults,
       children,
       childAges: childAges.slice(0, children),
@@ -42,38 +79,46 @@ export default function HotelSearch({ onSearch }: HotelSearchProps) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      {/* City — SEPARATE field */}
-      <LiveSearchInput
-        id="hotel-city"
-        label={t("search.city", locale)}
-        placeholder="Город или направление"
-        icon={<MapPin size={14} weight="light" />}
-        onSelect={(r) => {
-          setCityId(r.id);
-          setCityName(r.name);
-          // Reset hotel when city changes
-          setHotelId("");
-          setHotelName("");
+      {/* Destination — Master Geography picker (country → city → resort) */}
+      <DestinationPicker
+        id="hotel-to"
+        label={t("search.to", locale)}
+        placeholder="Куда"
+        country={toCountry}
+        city={toCity}
+        resort={toResort}
+        onCountryChange={(entry) => {
+          setToCountry(entry);
+          resetHotel();
         }}
-        onClear={() => {
-          setCityId("");
-          setCityName("");
-          setHotelId("");
-          setHotelName("");
+        onCityChange={(entry) => {
+          setToCity(entry);
+          resetHotel();
         }}
-        filterType="geo:hotels"
+        onResortChange={(entry) => {
+          setToResort(entry);
+          resetHotel();
+        }}
+        onClearAll={() => {
+          setToCountry(null);
+          setToCity(null);
+          setToResort(null);
+          resetHotel();
+        }}
+        required
       />
 
-      {/* Hotel — SEPARATE field, filtered by city */}
+      {/* Hotel — supplier dictionary directory, scoped to the region */}
       <LiveSearchInput
         id="hotel-name"
         label={t("search.hotel", locale)}
         placeholder={t("search.hotel_placeholder", locale)}
         icon={<Buildings size={14} weight="light" />}
         onSelect={(r) => { setHotelId(r.id); setHotelName(r.name); }}
-        onClear={() => { setHotelId(""); setHotelName(""); }}
+        onClear={resetHotel}
         value={hotelName}
-        filterType="hotel"
+        filterType="supplierHotels"
+        hotelRegion={hotelRegion}
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -94,22 +139,18 @@ export default function HotelSearch({ onSearch }: HotelSearchProps) {
           </div>
         </div>
 
-        {/* Nights */}
-        <div>
-          <label htmlFor="hotel-nights" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
-            {t("search.nights", locale)}
-          </label>
-          <select
-            id="hotel-nights"
-            value={nights}
-            onChange={(e) => setNights(Number(e.target.value))}
-            className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
-          >
-            {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
-        </div>
+        {/* Nights — range «от–до» */}
+        <NightsRange
+          idPrefix="hotel-nights"
+          from={nightsFrom}
+          to={nightsTo}
+          options={Array.from({ length: 30 }, (_, i) => i + 1)}
+          compact
+          onChange={(f, t2) => {
+            setNightsFrom(f);
+            setNightsTo(t2);
+          }}
+        />
 
         {/* Adults */}
         <div>
@@ -159,12 +200,16 @@ export default function HotelSearch({ onSearch }: HotelSearchProps) {
       <HelpFindButton
         context={{
           serviceType: "hotels",
-          cityId,
-          cityName,
+          toDestination: destination ? geoDisplayName(destination.names, destination.code) : "",
+          toGeoCountry: toCountry?.code,
+          toGeoCity: toCity?.code,
+          toGeoResort: toResort?.code,
           hotelId: hotelId || undefined,
           hotelName: hotelName || undefined,
           startDate: checkIn,
-          nights,
+          nights: nightsFrom,
+          nightsFrom,
+          nightsTo,
           adults,
           children,
           childAges: childAges.slice(0, children),

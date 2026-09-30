@@ -114,7 +114,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
         <TourDetail
           attributes={p.attributes}
           title={p.title}
-          media={detail.media.length > 0 ? <MediaGallery media={detail.media} /> : undefined}
+          media={<MediaGallery media={detail.media} productSlug={p.slug} />}
           description={p.description}
           attributeSections={sectionsFor(p.attributes, locale)}
         />

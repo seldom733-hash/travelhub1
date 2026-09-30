@@ -35,8 +35,10 @@ export class SupplierOfferService {
   // ── Search ──────────────────────────────────────────────────────────
 
   async search(supplierCode: string, query: SupplierSearchQuery): Promise<SupplierOffer[]> {
-    const adapter = this.registry.get(supplierCode);
-    const config = this.registry.getConfig(supplierCode);
+    // service context selects the category adapter when one provider code
+    // registers several (ANEX tours / ANEX hotels) — prompt §2.
+    const adapter = this.registry.get(supplierCode, query.service);
+    const config = this.registry.getConfig(supplierCode, query.service);
 
     if (!adapter.enabled || !config.searchEnabled) {
       throw new Error(`Supplier ${supplierCode} search is disabled`);
@@ -53,7 +55,7 @@ export class SupplierOfferService {
     const cacheKey = SupplierCacheService.deriveSearchKey(supplierCode, query as unknown as Record<string, unknown>, page);
 
     // Request coalescing
-    return this.resilience.coalesce(cacheKey, async () => {
+    const searchPromise = this.resilience.coalesce(cacheKey, async () => {
       // Check cache
       const cached = this.cache.getSearch(cacheKey);
       if (cached) {
@@ -101,13 +103,35 @@ export class SupplierOfferService {
         this.resilience.decrementInflight(supplierCode);
       }
     }) as Promise<SupplierOffer[]>;
+    // config.timeoutMs was part of the registry contract but never enforced —
+    // a supplier without its own deadline (e.g. KOMPAS waiting up to 3×45s for
+    // price rows) held the whole aggregated search hostage until it finished.
+    // The abandoned coalesced promise keeps running (later identical searches
+    // still share it) — swallow its late rejection so it cannot surface as an
+    // unhandled rejection.
+    searchPromise.catch(() => {});
+    if (config.timeoutMs > 0) {
+      let timer: NodeJS.Timeout | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Supplier ${supplierCode} search timed out after ${config.timeoutMs}ms`)),
+          config.timeoutMs,
+        );
+      });
+      try {
+        return await Promise.race([searchPromise, timeout]);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    return searchPromise;
   }
 
   // ── Get Detail ──────────────────────────────────────────────────────
 
   async getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail> {
-    const adapter = this.registry.get(ref.supplierCode);
-    const config = this.registry.getConfig(ref.supplierCode);
+    const adapter = this.registry.get(ref.supplierCode, ref.searchContext.service);
+    const config = this.registry.getConfig(ref.supplierCode, ref.searchContext.service);
 
     if (!adapter.enabled) {
       throw new Error(`Supplier ${ref.supplierCode} is disabled`);
@@ -156,8 +180,8 @@ export class SupplierOfferService {
   // ── Refresh Price ───────────────────────────────────────────────────
 
   async refreshPrice(ref: SupplierOfferRef): Promise<SupplierPriceSnapshot> {
-    const adapter = this.registry.get(ref.supplierCode);
-    const config = this.registry.getConfig(ref.supplierCode);
+    const adapter = this.registry.get(ref.supplierCode, ref.searchContext.service);
+    const config = this.registry.getConfig(ref.supplierCode, ref.searchContext.service);
 
     if (!adapter.enabled || !config.livePriceEnabled) {
       throw new Error(`Supplier ${ref.supplierCode} live price is disabled`);
@@ -188,8 +212,8 @@ export class SupplierOfferService {
   // ── Refresh Availability ────────────────────────────────────────────
 
   async refreshAvailability(ref: SupplierOfferRef): Promise<SupplierAvailabilitySnapshot> {
-    const adapter = this.registry.get(ref.supplierCode);
-    const config = this.registry.getConfig(ref.supplierCode);
+    const adapter = this.registry.get(ref.supplierCode, ref.searchContext.service);
+    const config = this.registry.getConfig(ref.supplierCode, ref.searchContext.service);
 
     if (!adapter.enabled || !config.availabilityEnabled) {
       throw new Error(`Supplier ${ref.supplierCode} availability is disabled`);

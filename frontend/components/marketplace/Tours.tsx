@@ -5,11 +5,12 @@ import Link from "next/link";
 import { ArrowRight, Compass } from "@phosphor-icons/react";
 import { t, useLocale, formatDate } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
+import { useHotelPhoto } from "@/lib/hotel-photo";
 
 function TourCardSkeleton() {
   return (
     <div className="overflow-hidden rounded-2xl bg-dark-card">
-      <div className="aspect-[4/3] w-full animate-pulse bg-dark-border" />
+      <div className="h-36 w-full animate-pulse bg-dark-border" />
       <div className="p-4">
         <div className="mb-2 h-3 w-16 animate-pulse rounded bg-dark-border" />
         <div className="mb-2 h-5 w-3/4 animate-pulse rounded bg-dark-border" />
@@ -26,15 +27,17 @@ function TourCardSkeleton() {
 
 function TourCard({ card }: { card: PublicProductCard }) {
   const locale = useLocale();
-  const img = card.primaryImage;
+  // Fallback: локальное фото отеля /hotels/<tourinc>-<hotelKey>.jpg (см. hotel-photo.ts).
+  const hotelPhoto = useHotelPhoto(card.type === "TOUR" ? card.slug : null);
+  const img = card.primaryImage ? { thumbUrl: card.primaryImage.thumbUrl } : hotelPhoto ? { thumbUrl: hotelPhoto } : null;
 
   return (
     <Link
       href={`/products/${card.slug}`}
       className="card-premium group relative overflow-hidden rounded-2xl bg-dark-card"
     >
-      {/* Image */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-dark-border">
+      {/* Image — уменьшенная высота фото */}
+      <div className="relative h-36 overflow-hidden bg-dark-border">
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -58,16 +61,16 @@ function TourCard({ card }: { card: PublicProductCard }) {
             {card.category.title}
           </p>
         )}
-        <h3 className="line-clamp-2 font-serif text-base font-semibold text-white transition-colors group-hover:text-gold">
+        <h3 className="line-clamp-2 font-serif text-sm font-semibold text-white transition-colors group-hover:text-gold">
           {card.title}
         </h3>
         {card.shortDescription && (
-          <p className="mt-1 line-clamp-1 text-xs text-neutral-500">
+          <p className="mt-1 line-clamp-1 text-[10px] text-neutral-500">
             {card.shortDescription}
           </p>
         )}
         {card.seller && (
-          <p className="mt-1 text-[11px] text-neutral-500">
+          <p className="mt-1 text-[10px] text-neutral-500">
             {card.seller.visibilityMode === "ANONYMOUS"
               ? t("seller.anonymous_label", locale)
               : card.seller.displayName ?? t("seller.anonymous_label", locale)}
@@ -76,14 +79,14 @@ function TourCard({ card }: { card: PublicProductCard }) {
         <div className="mt-3 flex items-center justify-between">
           <div>
             {card.priceFrom ? (
-              <p className="text-sm font-semibold text-gold">
+              <p className="text-xs font-semibold text-gold">
                 {t("price.from", locale)} {card.priceFrom} {card.currency || ""}
               </p>
             ) : (
               <p className="text-xs text-neutral-500">{t("price.on_request", locale)}</p>
             )}
             {(card.headlineDepartureDate || card.headlineNights != null) && (
-              <p className="mt-1 text-xs text-neutral-400">
+              <p className="mt-1 text-[10px] text-neutral-400">
                 {card.headlineDepartureDate && (
                   <span>{formatDate(card.headlineDepartureDate, locale)}</span>
                 )}
@@ -94,7 +97,7 @@ function TourCard({ card }: { card: PublicProductCard }) {
               </p>
             )}
           </div>
-          <span className="text-xs text-neutral-500 transition-colors group-hover:text-gold">
+          <span className="text-[11px] text-neutral-500 transition-colors group-hover:text-gold">
             {t("card.details", locale)}
           </span>
         </div>

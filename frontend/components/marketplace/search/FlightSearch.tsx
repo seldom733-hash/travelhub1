@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { MapPin, ArrowRight, Airplane } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
+import { todayISO } from "@/lib/dates";
 import type { SearchContext } from "@/lib/search-engine";
 import FlightAirportSelect from "./FlightAirportSelect";
 import FlightDatePicker from "./FlightDatePicker";
@@ -19,9 +20,10 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   const locale = useLocale();
   const [from, setFrom] = useState<import("@/lib/flight-locations").FlightAirport | null>(null);
   const [to, setTo] = useState<import("@/lib/flight-locations").FlightAirport | null>(null);
-  const [departureDate, setDepartureDate] = useState("");
+  // Default departure/return = today (platform-wide default for date fields).
+  const [departureDate, setDepartureDate] = useState(todayISO());
   const [roundTrip, setRoundTrip] = useState(false);
-  const [returnDate, setReturnDate] = useState("");
+  const [returnDate, setReturnDate] = useState(todayISO());
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);

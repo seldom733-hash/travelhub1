@@ -117,7 +117,7 @@ export class SupplierController {
       adults: adults ? parseInt(adults, 10) : 2,
       children: children ? parseInt(children, 10) : 0,
       childAges: childAges ? childAges.split(",").map(Number) : undefined,
-      hotelStars: hotelStars ? hotelStars.split(",").map(Number) : undefined,
+      hotelStars: hotelStars ? hotelStars.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
       meal,
       page: page ? parseInt(page, 10) : 1,
     };
@@ -187,10 +187,13 @@ export class SupplierController {
   @Get("adapters")
   @RequirePermissions("supplier.search.read")
   listAdapters() {
-    return this.registry.getAll().map((a) => ({
+    // Entries, not getAll(): one provider code can register several category
+    // adapters (ANEX tours + ANEX hotels) — serviceTypes tells them apart.
+    return this.registry.getEntries().map(({ adapter: a, config }) => ({
       code: a.code,
       name: a.name,
       enabled: a.enabled,
+      serviceTypes: config.serviceTypes,
     }));
   }
 

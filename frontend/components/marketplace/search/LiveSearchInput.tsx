@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { MagnifyingGlass, CaretDown, X } from "@phosphor-icons/react";
-import { useLiveSearch, type SuggestResult } from "@/lib/search-engine";
+import { useLiveSearch, searchSupplierHotels, type SuggestResult } from "@/lib/search-engine";
 
 interface LiveSearchInputProps {
   id: string;
@@ -15,6 +15,8 @@ interface LiveSearchInputProps {
   value?: string;
   className?: string;
   filterType?: string;
+  /** Supplier-hotel mode: region scope for /geo/supplier-hotels. */
+  hotelRegion?: { geoCountry?: string; geoCity?: string; geoResort?: string };
   disabled?: boolean;
   required?: boolean;
   "aria-describedby"?: string;
@@ -31,6 +33,7 @@ export default function LiveSearchInput({
   value: controlledValue,
   className = "",
   filterType,
+  hotelRegion,
   disabled = false,
   required = false,
   "aria-describedby": ariaDescribedBy,
@@ -108,6 +111,31 @@ export default function LiveSearchInput({
 
   const showDropdown = isOpen && query.length >= 2;
 
+  // Supplier-hotel mode: results come from the supplier hotel directory
+  // (/geo/supplier-hotels) instead of the generic suggest.
+  const [supplierResults, setSupplierResults] = useState<SuggestResult[]>([]);
+  useEffect(() => {
+    if (filterType !== "supplierHotels") return;
+    if (!isOpen || query.trim().length < 2) {
+      setSupplierResults([]);
+      return;
+    }
+    let alive = true;
+    const timer = setTimeout(() => {
+      searchSupplierHotels(query, hotelRegion)
+        .then((r) => {
+          if (alive) setSupplierResults(r);
+        })
+        .catch(() => {
+          if (alive) setSupplierResults([]);
+        });
+    }, 300);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [filterType, isOpen, query, hotelRegion]);
+
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       <label htmlFor={id} className="mb-0.5 block text-[13px] font-medium text-neutral-400">
@@ -163,17 +191,23 @@ export default function LiveSearchInput({
           role="listbox"
           className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-xl border border-dark-border bg-dark-surface/95 shadow-xl backdrop-blur-md"
         >
-          {loading && (
-            <li className="px-4 py-3 text-center text-sm text-neutral-500">
-              <span className="inline-block animate-pulse">Поиск...</span>
-            </li>
-          )}
-          {!loading && results.length === 0 && query.length >= 2 && (
-            <li className="px-4 py-3 text-center text-sm text-neutral-500">
-              Ничего не найдено
-            </li>
-          )}
-          {!loading && results.map((result, index) => (
+          {(() => {
+            // Supplier-hotel mode replaces the generic suggest results.
+            const isSupplierMode = filterType === "supplierHotels";
+            const list = isSupplierMode ? supplierResults : results;
+            const busy = isSupplierMode ? false : loading;
+            return (
+              <>
+                {busy && (
+                  <li className="px-4 py-3 text-center text-sm text-neutral-500">
+                    <span className="inline-block animate-pulse">Поиск...</span>
+                  </li>
+                )}
+                {!busy && list.length === 0 && query.length >= 2 && (
+                  <li className="px-4 py-3 text-center text-sm text-neutral-500">Ничего не найдено</li>
+                )}
+                {!busy &&
+                  list.map((result, index) => (
             <li
               key={`${result.type}-${result.id}`}
               id={`${id}-option-${index}`}
@@ -206,7 +240,10 @@ export default function LiveSearchInput({
                 {result.type}
               </span>
             </li>
-          ))}
+                  ))}
+              </>
+            );
+          })()}
         </ul>
       )}
     </div>

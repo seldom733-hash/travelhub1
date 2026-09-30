@@ -61,6 +61,9 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
       : orderedTabs[0]?.key ?? "tours";
 
   const [activeTab, setActiveTab] = useState<ServiceType>(initialTab);
+  // «Сбросить все» → TourSearch resets every picker (tours is the only
+  // service whose form keeps a restorable draft).
+  const [resetSignal, setResetSignal] = useState(0);
 
   const handleSearch = (ctx: SearchContext) => {
     // Build search params from context and navigate to results
@@ -73,10 +76,20 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
     if (ctx.toGeoResort) sp.set("geoResort", ctx.toGeoResort);
     if (ctx.cityName) sp.set("city", ctx.cityName);
     if (ctx.hotelId) sp.set("hotelId", ctx.hotelId);
+    // Hotel NAME is what the supplier search filters on (per-supplier ids
+    // are resolved by the aggregator from this name).
+    if (ctx.hotelName) sp.set("hotel", ctx.hotelName);
     if (ctx.startDate) sp.set("start", ctx.startDate);
     if (ctx.departureDate) sp.set("departureDate", ctx.departureDate);
     if (ctx.returnDate) sp.set("return", ctx.returnDate);
     if (ctx.nights) sp.set("nights", String(ctx.nights));
+    // Night range «от–до» (nights alone is the legacy single-value param).
+    if (ctx.nightsFrom) sp.set("nightsFrom", String(ctx.nightsFrom));
+    if (ctx.nightsTo) sp.set("nightsTo", String(ctx.nightsTo));
+    // Departure range upper bound + hotel star categories (universal search).
+    if (ctx.endDate) sp.set("end", ctx.endDate);
+    if (ctx.hotelStars?.length) sp.set("hotelStars", ctx.hotelStars.join(","));
+    if (ctx.suppliers?.length) sp.set("suppliers", ctx.suppliers.join(","));
     if (ctx.duration) sp.set("duration", String(ctx.duration));
     if (ctx.adults) sp.set("adults", String(ctx.adults));
     if (ctx.children) sp.set("children", String(ctx.children));
@@ -86,9 +99,10 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
     if ((ctx as any).tariff && (ctx as any).tariff !== "ALL") sp.set("tariff", (ctx as any).tariff);
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.language) sp.set("lang", ctx.language);
-    // Tours → universal live search across Summer + KOMPAS (§1): results
-    // come from supplier live availability, not the static catalog.
-    if (ctx.serviceType === "tours") {
+    // Tours → universal live search across Summer + KOMPAS (§1) and hotels →
+    // supplier live search (ANEX hotels): results come from supplier live
+    // availability, not the static catalog.
+    if (ctx.serviceType === "tours" || ctx.serviceType === "hotels") {
       sp.set("live", "1");
     }
     router.push(`/search?${sp.toString()}`);
@@ -96,7 +110,7 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
 
   const renderForm = () => {
     switch (activeTab) {
-      case "tours": return <TourSearch onSearch={handleSearch} />;
+      case "tours": return <TourSearch onSearch={handleSearch} resetSignal={resetSignal} />;
       case "hotels": return <HotelSearch onSearch={handleSearch} />;
       case "flights": return <FlightSearch onSearch={handleSearch} />;
       case "sanatoriums": return <SanatoriumSearch onSearch={handleSearch} />;
@@ -112,23 +126,34 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
 
   return (
     <div className="search-glass rounded-2xl p-3 sm:p-4">
-      {/* Service tabs */}
-      <div className="mb-3 flex flex-wrap gap-1" role="tablist" aria-label="Тип услуги">
-        {orderedTabs.map((tab) => (
+      {/* Service tabs + «Сбросить все» (right, same row as the services) */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Тип услуги">
+          {orderedTabs.map((tab) => (
+            <button
+              key={tab.key}
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`rounded-lg px-3 py-1.5 text-[14px] font-medium transition-all ${
+                activeTab === tab.key
+                  ? "bg-gold text-dark"
+                  : "text-neutral-400 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              {t(tab.labelKey, locale)}
+            </button>
+          ))}
+        </div>
+        {activeTab === "tours" && (
           <button
-            key={tab.key}
-            role="tab"
-            aria-selected={activeTab === tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`rounded-lg px-3 py-1.5 text-[14px] font-medium transition-all ${
-              activeTab === tab.key
-                ? "bg-gold text-dark"
-                : "text-neutral-400 hover:bg-white/5 hover:text-white"
-            }`}
+            type="button"
+            onClick={() => setResetSignal((n) => n + 1)}
+            className="rounded-lg px-3 py-1.5 text-[14px] font-medium text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
           >
-            {t(tab.labelKey, locale)}
+            {t("search.reset_all", locale)}
           </button>
-        ))}
+        )}
       </div>
 
       {/* Service-specific form */}

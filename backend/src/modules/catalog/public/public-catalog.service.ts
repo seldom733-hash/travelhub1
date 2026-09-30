@@ -926,6 +926,18 @@ export class PublicCatalogService {
     };
   }
 
+  /**
+   * Локальное фото отеля для витрины туров (заказчик: файлы tripadvisor.ru
+   * сохраняются синком в frontend/public/hotels/<tourinc>-<hotelKey>.jpg|.png).
+   * Slug тура содержит identity `<supplier>-<tourinc>-<hotelKey>…`, поэтому URL
+   * выводится всегда — фронт сам решает показать img или иконку-фолбэк (HEAD).
+   */
+  private hotelPhotoUrl(slug: string): string | null {
+    const m = slug.match(/^[a-z]+-(\d+)-(\d+)/);
+    if (!m) return null;
+    return `/hotels/${m[1]}-${m[2]}.jpg`;
+  }
+
   private toCard(
     row: PublicProductRow,
     availability: PublicAvailabilitySummary | null,
@@ -961,6 +973,7 @@ export class PublicCatalogService {
       // синки по общему контракту).
       room: (row.attributes as any)?.rooms?.[0] ?? (row.attributes as any)?.room ?? null,
       meal: (row.attributes as any)?.meals?.[0] ?? (row.attributes as any)?.meal ?? null,
+      hotelImage: this.hotelPhotoUrl(row.slug),
       supplierCode: (row.attributes as any)?.supplierCode ?? null,
       availabilitySummary: availability,
       seller,

@@ -2,7 +2,8 @@
  * Summer Request Builder — TravelHub generic → Summertour SAMO params.
  *
  * Maps only proven Summer mappings per Tests 1-11.
- * STARS mapping NOT PROVEN — left empty / extensible.
+ * STARS: supplier-native ids resolved by the aggregator from
+ * SupplierGeoLink kind=STAR (starKeys["SUMMERTOUR"]) → STARS=<ids>&STARS_ANY=0.
  */
 
 export interface SummerSearchRequest {
@@ -13,6 +14,9 @@ export interface SummerSearchRequest {
   TOWNS_ANY?: string;
   HOTELS?: string;
   HOTELS_ANY: string;
+  /** Supplier-native star ids (CSV) — hotel category filter. */
+  STARS?: string;
+  STARS_ANY?: string;
   CHECKIN_BEG?: string;
   CHECKIN_END?: string;
   NIGHTS_FROM?: string;
@@ -69,6 +73,8 @@ export function buildSummerSearchRequest(query: {
   meal?: string;
   freight?: string;
   filter?: string;
+  /** Supplier-native star ids (CSV, starKeys["SUMMERTOUR"]). */
+  stars?: string;
 }): SummerSearchRequest {
   const req: SummerSearchRequest = {
     TOWNFROMINC: SUMMER_TOWNFROMINC,
@@ -89,6 +95,10 @@ export function buildSummerSearchRequest(query: {
     req.TOWNS_ANY = "0";
   }
   if (query.hotelExternalId) req.HOTELS = query.hotelExternalId;
+  if (query.stars) {
+    req.STARS = query.stars;
+    req.STARS_ANY = "0";
+  }
   if (query.meal) req.MEALS = query.meal;
   if (query.departureDateFrom) req.CHECKIN_BEG = isoToSamodate(query.departureDateFrom);
   if (query.departureDateTo) req.CHECKIN_END = isoToSamodate(query.departureDateTo);
@@ -107,7 +117,10 @@ export function buildSummerSearchRequest(query: {
  * Build a full SAMO XHR URL for fetching prices.
  *
  * Uses YYYYMMDD date format (not DD.MM.YYYY).
- * Includes PARTITION_PRICE=32, PRICEPAGE=1, DYN_SEPARATE=1 as proven in Tests 1-11.
+ * Includes PRICEPAGE=1, DYN_SEPARATE=1 as proven in Tests 1-11.
+ * PARTITION_PRICE=0 — no server-side price grouping: every room/meal
+ * variant comes back as its own row (parity with KOMPAS/KazUnion;
+ * PARTITION_PRICE=32 was collapsing variants into one grouped row).
  * `rev` and `_` are dynamic cache-busters.
  */
 export function buildSummerXhrUrl(req: SummerSearchRequest): string {
@@ -136,11 +149,16 @@ export function buildSummerXhrUrl(req: SummerSearchRequest): string {
   p.set("MOMENT_CONFIRM", "0");
   p.set("hotelsearch", "0");
   if (useTowns) {
-    p.set("STARS_ANY", "1");
-    p.set("STARS", "");
+    p.set("STARS_ANY", req.STARS ? "0" : "1");
+    p.set("STARS", req.STARS ?? "");
     p.set("HOTELTYPES", "");
   } else {
-    p.set("PARTITION_PRICE", "32");
+    // §STARS: native form parity — always send both params: a category is
+    // STARS=<ids>&STARS_ANY=0, "any category" is STARS=&STARS_ANY=1
+    // (same shape as KOMPAS/KazUnion native requests).
+    p.set("STARS", req.STARS ?? "");
+    p.set("STARS_ANY", req.STARS ? "0" : "1");
+    p.set("PARTITION_PRICE", "0");
     p.set("PRICEPAGE", "1");
     p.set("DYN_SEPARATE", "1");
   }

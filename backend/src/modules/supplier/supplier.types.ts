@@ -8,12 +8,23 @@
 // ── Supplier Search Query ────────────────────────────────────────────────
 
 export interface SupplierSearchQuery {
+  /**
+   * Service category of the search ("tours" | "hotels" | …). Injected by the
+   * aggregator at the job boundary: it selects the category adapter (the same
+   * provider code can register a Tour adapter and a Hotel adapter) and is part
+   * of the search cache key (tours and hotels never share a cache entry).
+   */
+  service?: string;
   /** Country code or name (supplier-neutral). */
   country?: string;
   /** Departure city/location. */
   departureCity?: string;
   /** Destination/resort. */
   destination?: string;
+  /** Master Geography city code (e.g. DUBAI) — resolved to supplier geo links by the aggregator. */
+  geoCity?: string;
+  /** Master Geography resort code (e.g. AL-JADDAF) — resolved to supplier geo links by the aggregator. */
+  geoResort?: string;
   /** Departure date range (inclusive). */
   departureDateFrom?: string;
   departureDateTo?: string;
@@ -28,7 +39,18 @@ export interface SupplierSearchQuery {
   hotel?: string;
   /** Hotel external ID (for supplier-specific filtering). */
   hotelExternalId?: string;
-  hotelStars?: number[];
+  /** Hotel star category labels ("5*", "HV-1") — resolved to supplier STAR ids per supplier. */
+  hotelStars?: string[];
+  /**
+   * Supplier whitelist (aggregated search): only these codes are queried.
+   * Empty/undefined = all capable suppliers of the service.
+   */
+  suppliers?: string[];
+  /**
+   * Supplier-native star ids per supplier (CSV per code): resolved from
+   * hotelStars labels via SupplierGeoLink kind=STAR by the aggregator.
+   */
+  starKeys?: Record<string, string>;
   /** Room type. */
   room?: string;
   /** Meal plan. */
@@ -52,6 +74,25 @@ export interface SupplierSearchQuery {
   tourIncValues?: string[];
   /** Program display names aligned with tourIncValues (optional). */
   tourIncNames?: string[];
+  /**
+   * Supplier-native town/resort ids (CSV) — SAMO TOWNS=<ids>&TOWNS_ANY=0 city
+   * filter. Calendar searches opened from a city-specific context must carry
+   * it through, otherwise the calendar silently widens to the whole country.
+   */
+  towns?: string;
+  /**
+   * Display names of the selected Master Geography city/resort (its own
+   * names + the supplier's TOWN link labels) — the NAME channel of the city
+   * filter, resolved by the aggregator next to `towns`.
+   *
+   * Why it exists: ANEX hotel rows carry a NEGATIVE `townInc` hash for the
+   * no-flight packets (AT/FR/IT/SG rows: 0 positive ids — verified live), so
+   * an id-only filter drops every row of those countries. The rows still
+   * carry correct `townName`/`hotelTownName`, which is what adapters match
+   * against this list. Adapters that do not implement the name channel
+   * simply ignore it (their `towns` behaviour is unchanged).
+   */
+  townNames?: string[];
   /** Page number (1-based). */
   page?: number;
   /** Max results per page. */
@@ -65,6 +106,12 @@ export type SupplierAvailability = "AVAILABLE" | "NOT_AVAILABLE" | "UNKNOWN";
 export interface SupplierOffer {
   /** Supplier code (e.g., "SUMMERTOUR"). */
   supplierCode: string;
+  /**
+   * Service category this offer belongs to ("tours" | "hotels"). Set by the
+   * category adapter; carried through re-check flows so refreshPrice /
+   * refreshAvailability resolve the SAME category adapter that produced it.
+   */
+  service?: string;
   /** External offer ID (composite, supplier-specific). */
   externalOfferId: string;
   /** External claim/reference (supplier-specific, for re-check). */
@@ -163,6 +210,19 @@ export interface SupplierGeoOption {
   kind: string;
   /** Country scope this option belongs to (supplier STATEINC or ISO-2). */
   countryExternalId?: string;
+  /**
+   * Supplier's own group/parent label for hierarchical directories (e.g. the
+   * TOWNS checklist groups towns under a city: "Пхукет" → "Ао Йон Бич").
+   * Present only when the supplier form exposes the hierarchy; a town with a
+   * parent different from its own name is a resort of that city.
+   */
+  parentLabel?: string;
+  /**
+   * HOTEL options: the supplier town (SAMO townKey) the hotel belongs to —
+   * the same id space as kind=TOWNS externalIds, so ingest can link the
+   * hotel to the town's Master Geography (city/resort/country).
+   */
+  townKey?: string;
 }
 
 export interface SupplierAdapter {

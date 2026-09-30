@@ -17,6 +17,7 @@
     "prisma:studio": "prisma studio",
     "seed:demo-2026": "ts-node src/seed/demo-seed.ts",
     "seed:geo": "ts-node src/seed/geo-seed.ts",
+    "ingest:geo": "ts-node src/scripts/run-geo-ingest.ts",
     "seed:hotel-directory": "ts-node src/seed/hotel-directory-seed.ts",
     "start:dev": "powershell -ExecutionPolicy Bypass -File .\\start-azal-chrome.ps1 && npm run dev"
   },

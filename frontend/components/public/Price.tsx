@@ -18,11 +18,17 @@ export default function Price({
   currency?: string | null;
   size?: "xs" | "sm" | "md" | "lg";
   withPrefix?: boolean;
-  /** "dark" = тёмный текст (светлый фон), "light" = белый текст (тёмный фон). */
-  tone?: "dark" | "light";
+  /** "dark" = тёмный текст (светлый фон), "light" = белый текст (тёмный фон), "gold" = золотой цвет для цен в шапке таблицы универсального поиска. */
+  tone?: "dark" | "light" | "gold";
 }) {
   const locale = useLocale();
   const formatted = formatPrice(amount, currency, locale);
+  const isBasicTone = tone === "dark" || tone === "light";
+  const color = tone === "gold" ? "text-gold" : isBasicTone
+    ? tone === "light"
+      ? "text-white"
+      : "text-slate-900"
+    : "text-gold";
   const prefix = withPrefix ? `${t("price.from", locale)} ` : "";
 
   // formatPrice returns null only for null/undefined/empty/NaN/negative.
@@ -31,7 +37,6 @@ export default function Price({
     return <span className="text-sm text-slate-400">{t("price.on_request", locale)}</span>;
   }
 
-  const color = tone === "light" ? "text-white" : "text-slate-900";
   const cls =
     size === "lg"
       ? `text-3xl font-bold ${color}`

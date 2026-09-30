@@ -1,4 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
+import type { Prisma } from "../../generated/prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
 import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { SupplierOfferService } from "./supplier-offer.service";
 import type { SupplierSearchQuery, SupplierOffer } from "./supplier.types";
@@ -16,6 +18,13 @@ export interface SupplierCapability {
   /** Guests bounds. */
   adults?: { min?: number; max?: number };
   children?: { max?: number };
+  /**
+   * Per-service overrides keyed by service type ("hotels", "flights", …).
+   * A provider can accept different bounds per category (ANEX tours: nights
+   * 2–28 and at most 1 child; ANEX hotels: nights 1–30 and up to 5 children).
+   * The active capability = base merged with services[query.service].
+   */
+  services?: Record<string, Omit<SupplierCapability, "services">>;
 }
 
 /** Aggregated supplier offer with normalized Master Geography keys. */
@@ -66,6 +75,39 @@ const COUNTRY_NAME_TO_ISO2: Record<string, string> = {
   kenya: "KE", "кения": "KE",
   austria: "AT", "австрия": "AT",
   seychelles: "SC", "сейшелы": "SC",
+  azerbaijan: "AZ", "азербайджан": "AZ",
+  russia: "RU", "россия": "RU",
+  greece: "GR", "греция": "GR",
+  cyprus: "CY", "кипр": "CY",
+  hungary: "HU", "венгрия": "HU",
+  serbia: "RS", "сербия": "RS",
+  montenegro: "ME", "черногория": "ME",
+  portugal: "PT", "португалия": "PT",
+  vietnam: "VN", "вьетнам": "VN",
+  oman: "OM", "оман": "OM",
+  nepal: "NP", "непал": "NP",
+  cuba: "CU", "куба": "CU",
+  dominican: "DO", "dominican republic": "DO", "доминикана": "DO", "доминиканская республика": "DO",
+  // Remaining /samo/searchhotel/States countries (52-state hotel dictionary —
+  // the tour ingest never covered them, so their names must normalize too).
+  argentina: "AR", аргентина: "AR",
+  brazil: "BR", бразилия: "BR",
+  "cape verde": "CV", "кабо-верде": "CV", "cabo verde": "CV",
+  fiji: "FJ", фиджи: "FJ",
+  "hong kong": "HK", гонконг: "HK", "китай (гонконг)": "HK",
+  jordan: "JO", иордания: "JO",
+  cambodia: "KH", камбоджа: "KH",
+  monaco: "MC", монако: "MC",
+  madagascar: "MG", мадагаскар: "MG",
+  mongolia: "MN", монголия: "MN",
+  macau: "MO", "китай (макао)": "MO", "china (macau)": "MO",
+  mexico: "MX", мексика: "MX",
+  namibia: "NA", намибия: "NA",
+  panama: "PA", панама: "PA",
+  peru: "PE", перу: "PE",
+  philippines: "PH", филиппины: "PH",
+  tunisia: "TN", тунис: "TN",
+  uruguay: "UY", уругвай: "UY",
 };
 
 /**
@@ -115,11 +157,43 @@ export class SupplierAggregatorService {
       countries: ["TR", "TH", "MV", "CN", "GE", "KZ", "QA", "SG"],
       nights: { min: 3, max: 15 },
     },
+    // ANEX (webapi.anextour.az): 21 countries from Baku (verified live from
+    // /samo/searchtour/States), nights 2–28 (Nights dictionary), children
+    // limited to 1 — the AGES param only accepts a single child age.
+    ANEX: {
+      countries: [
+        "TR", "EG", "AE", "TH", "LK", "AT", "GE", "IN", "ID", "ES", "IT",
+        "KZ", "CN", "MU", "MY", "MV", "SC", "SG", "UZ", "FR", "QA",
+      ],
+      nights: { min: 2, max: 28 },
+      children: { max: 1 },
+      // Hotels (AnexHotelAdapter, verified live): stay nights 1..30 and the
+      // AGES csv accepts several children — override the tour bounds.
+      // countries is a FULL override (supports() merges {...base, ...svc}):
+      // hotels use a separate upstream dictionary /samo/searchhotel/States
+      // (52 countries — AZ, CH, KE, RU, GR, CY, JP… — verified live), while
+      // /samo/searchtour/States has 21 and has no AZ at all.
+      services: {
+        hotels: {
+          countries: [
+            "AE", "AR", "AT", "AZ", "BR", "CH", "CN", "CV", "CY", "DO",
+            "EG", "ES", "FJ", "FR", "GE", "GR", "HK", "HU", "ID", "IN",
+            "IT", "JO", "JP", "KE", "KH", "KZ", "LK", "MC", "ME", "MG",
+            "MN", "MO", "MU", "MV", "MX", "NA", "NP", "OM", "PA", "PE",
+            "PH", "PT", "RS", "RU", "SC", "SG", "TH", "TN", "TR", "UY",
+            "UZ", "VN",
+          ],
+          nights: { min: 1, max: 30 },
+          children: { max: 5 },
+        },
+      },
+    },
   };
 
   constructor(
     private readonly registry: SupplierAdapterRegistry,
     private readonly offerService: SupplierOfferService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /** Normalize a supplier-neutral country (code or ru/en name) to ISO-2. */
@@ -132,8 +206,12 @@ export class SupplierAggregatorService {
 
   /** True when the supplier publicly supports this query. */
   supports(supplierCode: string, query: SupplierSearchQuery): boolean {
-    const cap = SupplierAggregatorService.CAPABILITIES[supplierCode];
-    if (!cap) return true; // unknown supplier → optimistic (no capability data)
+    const base = SupplierAggregatorService.CAPABILITIES[supplierCode];
+    if (!base) return true; // unknown supplier → optimistic (no capability data)
+    // Per-service capability override (§: one provider, different category
+    // bounds — ANEX hotels accept nights 1..30 / 5 children vs tours 2..28 / 1).
+    const svc = query.service ? base.services?.[query.service] : undefined;
+    const cap = svc ? { ...base, ...svc, services: undefined } : base;
 
     if (cap.countries) {
       const iso = this.normalizeCountry(query.country ?? query.destination);
@@ -165,61 +243,471 @@ export class SupplierAggregatorService {
     serviceType: SupplierServiceType,
     query: SupplierSearchQuery,
   ): Promise<AggregatedSearchResult> {
-    const candidates = this.registry
-      .getEnabled()
-      .filter((a) => {
-        try {
-          const cfg = this.registry.getConfig(a.code);
-          // Service-type gate: only suppliers OF THIS SERVICE participate.
-          // Missing serviceTypes on a legacy registration → treat as "all".
-          if (cfg.serviceTypes?.length && !cfg.serviceTypes.includes(serviceType)) {
-            return false;
-          }
-          return cfg.searchEnabled;
-        } catch {
-          return false;
-        }
-      })
-      .filter((a) => this.supports(a.code, query));
+    const { jobs, hasCandidates } = await this.buildJobs(serviceType, query);
 
-    if (candidates.length === 0) {
+    if (jobs.length === 0) {
+      if (hasCandidates && (query.geoCity || query.geoResort)) {
+        this.logger.warn(
+          `Aggregated search: no supplier has a geo mapping for city "${query.geoResort ?? query.geoCity}" — returning empty result instead of whole-country data`,
+        );
+      }
       return { offers: [], perSupplier: {} };
     }
-
     const perSupplier: Record<string, { count: number; error?: string }> = {};
+    // Supplier-side STARS filters are best-effort (KazUnion can leak rows of
+    // adjacent categories) — enforce the requested hotel category below.
+    const wantedStars = this.wantedStarTokens(query);
+    // Selected hotel: jobs WITH a resolved HOTELS id are filtered server-side
+    // (and adapters re-check by name); jobs without one — the supplier's
+    // dictionary lacks that hotel — must never leak other hotels either.
+    const wantedHotel = this.normHotel(query.hotel ?? "");
     const settled = await Promise.allSettled(
-      candidates.map(async (adapter) => ({
-        code: adapter.code,
-        offers: await this.offerService.search(adapter.code, query),
+      jobs.map(async (job) => ({
+        code: job.code,
+        offers: await this.offerService.search(job.code, job.q),
       })),
     );
 
     const aggregated: AggregatedOffer[] = [];
+    // Jobs can legitimately return the SAME offer (TOURINC fan-out = N jobs
+    // over one supplier, verified live: Гойнюк 3 jobs → 2235 offers of which
+    // only 921 unique). One external offer must reach the marketplace once.
+    const seenOffers = new Set<string>();
     settled.forEach((res, i) => {
-      const code = candidates[i].code;
+      const code = jobs[i].code;
       if (res.status === "fulfilled") {
         // Only bookable offers reach the marketplace: rows with a sales stop
         // or without flight seats are excluded, UNKNOWN stays (no fake data).
-        const bookable = res.value.offers.filter(
+        let bookable = res.value.offers.filter(
           (o) => o.availability !== "NOT_AVAILABLE",
         );
+        if (wantedStars) {
+          const before = bookable.length;
+          bookable = bookable.filter((o) => this.offerStarInCategory(o.hotel, wantedStars));
+          const dropped = before - bookable.length;
+          if (dropped > 0) {
+            this.logger.log(
+              `Aggregated search: ${code} — ${dropped} offers dropped (hotel category ${[...wantedStars].join(", ")})`,
+            );
+          }
+        }
+        if (wantedHotel && !jobs[i].q.hotelExternalId) {
+          // No native HOTELS id for this supplier → the name is the only
+          // truth: drop every offer of another hotel.
+          const before = bookable.length;
+          bookable = bookable.filter((o) => this.offerHotelMatches(o.hotel, wantedHotel));
+          const dropped = before - bookable.length;
+          if (dropped > 0) {
+            this.logger.log(
+              `Aggregated search: ${code} — ${dropped} offers dropped (hotel "${query.hotel}" not in supplier dictionary)`,
+            );
+          }
+        }
         const hidden = res.value.offers.length - bookable.length;
         if (hidden > 0) {
           this.logger.log(`Aggregated search: ${code} — ${hidden} offers hidden (stop-sale/no seats)`);
         }
-        perSupplier[code] = { count: bookable.length };
+        let unique = 0;
         for (const offer of bookable) {
+          const key = `${code}:${offer.externalOfferId}`;
+          if (seenOffers.has(key)) continue;
+          seenOffers.add(key);
+          unique += 1;
           aggregated.push(this.normalizeGeo(offer));
         }
+        perSupplier[code] = {
+          count: (perSupplier[code]?.count ?? 0) + unique,
+        };
       } else {
         const err = res.reason instanceof Error ? res.reason.message : String(res.reason);
-        this.logger.warn(`Aggregated search: supplier ${code} failed: ${err}`);
-        perSupplier[code] = { count: 0, error: err };
+        this.logger.warn(`Aggregated search: ${code} (job ${i}) failed: ${err}`);
+        if (!perSupplier[code]?.count) perSupplier[code] = { count: 0, error: err };
       }
     });
 
     aggregated.sort((a, b) => (a.price?.amount ?? Infinity) - (b.price?.amount ?? Infinity));
     return { offers: aggregated, perSupplier };
+  }
+
+  /**
+   * Requested hotel-category tokens ("3*", "4*+") parsed from the query's
+   * hotelStars labels. Returns null when the post-filter must not run:
+   * no stars requested, or a non-star label («Семейный», «SpecClass» …)
+   * that cannot be verified from the hotel name.
+   */
+  private wantedStarTokens(query: SupplierSearchQuery): Set<string> | null {
+    if (!query.hotelStars?.length) return null;
+    const tokens = new Set<string>();
+    for (const label of query.hotelStars) {
+      const m = label.trim().match(/^([1-5])\s*(\*\+?)$/);
+      if (!m) return null;
+      tokens.add(`${m[1]}${m[2]}`);
+    }
+    return tokens;
+  }
+
+  /**
+   * true when the offer may belong to the requested category: hotels without
+   * a parsable star rating in the name stay (cannot disprove), hotels with a
+   * different token ("4*" vs wanted "3*") are dropped.
+   */
+  private offerStarInCategory(hotel: string | undefined, wanted: Set<string>): boolean {
+    const m = (hotel ?? "").match(/([1-5])\s*(\*\+?)/);
+    if (!m) return true;
+    return wanted.has(`${m[1]}${m[2]}`);
+  }
+
+  /** Normalized hotel identity: lowercase, ё→е, alphanumerics only. */
+  private normHotel(s: string): string {
+    return s.toLowerCase().replace(/ё/g, "е").replace(/[^a-zа-я0-9]/gi, "");
+  }
+
+  /**
+   * The offer is for the selected hotel: exact normalized match, or one name
+   * contains the other (supplier strings vary in suffixes/parentheses) with a
+   * length guard so a very short name cannot match everything.
+   */
+  private offerHotelMatches(hotel: string | undefined, wanted: string): boolean {
+    const n = this.normHotel(hotel ?? "");
+    if (!n) return false;
+    if (n === wanted) return true;
+    if (n.length >= 4 && wanted.includes(n)) return true;
+    if (wanted.length >= 4 && n.includes(wanted)) return true;
+    return false;
+  }
+
+  /**
+   * Enabled supplier adapters OF THE GIVEN SERVICE (search-enabled), for the
+   * search form's «Поставщики» picker. Deterministic order by code.
+   */
+  listSuppliersOfService(serviceType: SupplierServiceType): Array<{
+    code: string;
+    name: string;
+  }> {
+    return this.registry
+      .getEntries()
+      .filter(({ adapter, config }) => {
+        // Entries-based: the same code can be registered per category, so the
+        // registration's own serviceTypes decide (not getConfig(code), which
+        // resolves only the first entry of that code).
+        if (config.serviceTypes?.length && !config.serviceTypes.includes(serviceType)) {
+          return false;
+        }
+        return adapter.enabled && config.searchEnabled;
+      })
+      .map(({ adapter }) => ({ code: adapter.code, name: adapter.name }))
+      .sort((x, y) => x.code.localeCompare(y.code));
+  }
+
+  /**
+   * Distinct supplier codes that WILL be queried for this direction: the same
+   * capability + geo-link resolution as the live search, but without spending a
+   * live request. Powers the loading UI ("Определяем поставщиков…" → "Найдены
+   * поставщики: …") so the user sees who is being asked while the search runs.
+   */
+  async resolveSuppliers(
+    serviceType: SupplierServiceType,
+    query: SupplierSearchQuery,
+  ): Promise<string[]> {
+    const { jobs } = await this.buildJobs(serviceType, query);
+    const codes: string[] = [];
+    for (const job of jobs) {
+      if (!codes.includes(job.code)) codes.push(job.code);
+    }
+    return codes;
+  }
+
+  /**
+   * Candidate suppliers → concrete search jobs: capability gate, then
+   * SupplierGeoLink resolution, then TOURINC fan-out. Shared by the live
+   * search and by resolveSuppliers so both always agree on who participates.
+   */
+  private async buildJobs(
+    serviceType: SupplierServiceType,
+    query: SupplierSearchQuery,
+  ): Promise<{ jobs: { code: string; q: SupplierSearchQuery }[]; hasCandidates: boolean }> {
+    // Category context travels WITH the query: it selects the right adapter on
+    // registry lookups (tours vs hotels of one provider), participates in the
+    // search cache key (deriveSearchKey hashes the whole query), and lets
+    // per-service capability overrides apply in supports().
+    const svcQuery: SupplierSearchQuery = { ...query, service: serviceType };
+    const candidates = this.registry
+      .getEntries()
+      .filter(({ adapter, config }) => {
+        // Entries-based: a provider code registers one adapter per service;
+        // the registration's own serviceTypes gate the category (not
+        // getConfig(code), which can only resolve the first entry of a code).
+        if (config.serviceTypes?.length && !config.serviceTypes.includes(serviceType)) {
+          return false;
+        }
+        return adapter.enabled && config.searchEnabled;
+      })
+      // Supplier whitelist («Поставщики» picker): empty = all.
+      .filter(({ adapter }) => !svcQuery.suppliers?.length || svcQuery.suppliers.includes(adapter.code))
+      .filter(({ adapter }) => this.supports(adapter.code, svcQuery))
+      .map(({ adapter }) => adapter);
+
+    if (candidates.length === 0) {
+      return { jobs: [], hasCandidates: false };
+    }
+
+    // City/resort → supplier town/program resolution (SupplierGeoLink): when
+    // the user picks a Master Geography city/resort, replace the whole-country
+    // search with per-city filters (e.g. Дубай → TOWNS=<ids>, legacy: TOURINC
+    // 3706). Suppliers without a mapping for the city are skipped — they
+    // cannot answer the query precisely (a country-wide result would be a
+    // false match).
+    const perSupplierQueries = await this.resolveGeoQueries(
+      candidates.map((a) => a.code),
+      svcQuery,
+    );
+
+    // Hotel star category labels ("5*", "HV-1") → supplier-native STARS ids
+    // (SupplierGeoLink kind=STAR). Per-supplier: a supplier without an ingested
+    // mapping for the label searches without the star filter (never a wrong id).
+    if (svcQuery.hotelStars?.length) {
+      await this.resolveStarKeys(svcQuery, perSupplierQueries);
+    }
+
+    // Selected hotel NAME → per-supplier native HOTELS ids (kind=HOTEL), so
+    // each adapter filters server-side (HOTELS=<id>&HOTELS_ANY=0).
+    if (svcQuery.hotel?.trim()) {
+      await this.resolveHotelKeys(svcQuery, perSupplierQueries);
+    }
+
+    // Fan out per geo link when resolved (TOURINC is singular per SAMO search).
+    const jobs: { code: string; q: SupplierSearchQuery }[] = [];
+    for (const adapter of candidates) {
+      const raw = perSupplierQueries[adapter.code];
+      // No entry = no precise city mapping for this supplier → skip it.
+      if (!raw) continue;
+      // `suppliers` is a ROUTING hint (which suppliers to query), not search
+      // criteria — but resolveGeoQueries shares the original query object, so
+      // it used to leak into job.q. The search cache derives its key from the
+      // whole q: «KOMPAS» and «KOMPAS,ANEX» selections then produced different
+      // keys for the SAME search — every multi-supplier query missed the cache
+      // and re-ran the slowest adapter. Strip it at the job boundary.
+      const q: SupplierSearchQuery = { ...raw, suppliers: undefined };
+      if (q.tourIncValues?.length) {
+        q.tourIncValues.forEach((v, i) => {
+          jobs.push({ code: adapter.code, q: { ...q, tourIncValue: v, tourIncName: q.tourIncNames?.[i], tourIncValues: undefined, tourIncNames: undefined } });
+        });
+      } else {
+        jobs.push({ code: adapter.code, q });
+      }
+    }
+    return { jobs, hasCandidates: true };
+  }
+
+  /**
+   * Resolve hotelStars labels → per-supplier native STARS ids (starKeys) via
+   * SupplierGeoLink kind=STAR. Mutates the per-supplier query map: a supplier
+   * whose dictionary has no such category searches without the filter.
+   */
+  private async resolveStarKeys(
+    query: SupplierSearchQuery,
+    perSupplierQueries: Record<string, SupplierSearchQuery>,
+  ): Promise<void> {
+    const wanted = query.hotelStars!.map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const links = await this.prisma.supplierGeoLink.findMany({
+      where: { kind: "STAR", supplierCode: { in: Object.keys(perSupplierQueries) } },
+      select: { supplierCode: true, externalId: true, label: true },
+    });
+    for (const [code, q] of Object.entries(perSupplierQueries)) {
+      const supplierLinks = links.filter((l) => l.supplierCode === code);
+      if (supplierLinks.length === 0) {
+        // No ingested star dictionary → the adapter's own mapping handles
+        // numeric stars (KazUnion STARS_KEY), or the filter is dropped.
+        continue;
+      }
+      const ids = supplierLinks
+        .filter((l) => wanted.includes(l.label.trim().toLowerCase()))
+        .map((l) => l.externalId);
+      if (ids.length > 0) {
+        perSupplierQueries[code] = { ...q, starKeys: { ...q.starKeys, [code]: ids.join(",") } };
+      }
+    }
+  }
+
+  /**
+   * Resolve the selected hotel NAME → per-supplier native HOTELS id
+   * (SupplierGeoLink kind=HOTEL) so adapters filter server-side
+   * (HOTELS=<id>&HOTELS_ANY=0). Country-scoped: the same name can exist in
+   * different countries with different ids. A supplier whose dictionary has
+   * no such hotel keeps no key — its offers are then name-post-filtered in
+   * searchByService (and adapters re-check by name themselves).
+   */
+  private async resolveHotelKeys(
+    query: SupplierSearchQuery,
+    perSupplierQueries: Record<string, SupplierSearchQuery>,
+  ): Promise<void> {
+    const wanted = this.normHotel(query.hotel!.trim());
+    if (!wanted) return;
+
+    const iso = this.normalizeCountry(query.country ?? query.destination);
+    const country = iso
+      ? await this.prisma.geoCountry.findUnique({ where: { code: iso }, select: { id: true } })
+      : null;
+    const links = await this.prisma.supplierGeoLink.findMany({
+      where: {
+        kind: "HOTEL",
+        supplierCode: { in: Object.keys(perSupplierQueries) },
+        ...(country ? { OR: [{ geoCountryId: country!.id }, { geoCountryId: null }] } : {}),
+      },
+      select: { supplierCode: true, externalId: true, label: true },
+    });
+    for (const [code, q] of Object.entries(perSupplierQueries)) {
+      const match = links.find(
+        (l) => l.supplierCode === code && this.normHotel(l.label) === wanted,
+      );
+      if (match) {
+        perSupplierQueries[code] = { ...q, hotelExternalId: match.externalId };
+      }
+    }
+  }
+
+  /**
+   * When geoCity/geoResort is set, resolve SupplierGeoLink rows to supplier-
+   * specific town filters (TOWNS=<ids>) or legacy TOURINC fan-out.
+   *
+   * Precision rule: a supplier WITHOUT links for the selected city must NOT
+   * silently widen to the whole-country search — that is exactly how
+   * "страна+город» returned «все туры страны". Such suppliers are skipped
+   * for this query: showing nothing from a supplier is honest, showing
+   * another city's tours as if they matched is not.
+   */
+  private async resolveGeoQueries(
+    supplierCodes: string[],
+    query: SupplierSearchQuery,
+  ): Promise<Record<string, SupplierSearchQuery>> {
+    const result: Record<string, SupplierSearchQuery> = {};
+    const geoCode = query.geoResort ?? query.geoCity;
+    if (!geoCode) {
+      for (const code of supplierCodes) result[code] = query;
+      return result;
+    }
+
+    try {
+      // Codes such as "AE-DEIRA" or "AE-DUBAY IZ BAKU" never appear verbatim in
+      // a supplier label — their Master Geography names do ("Deira",
+      // "Дубай из Баку"). Match labels against those names too, scoped to the
+      // geo entity's own country so a name cannot bleed into another country.
+      const { names: geoNames, countryCode, cityId } = await this.resolveGeoNames(geoCode);
+
+      const conditions: Prisma.SupplierGeoLinkWhereInput[] = [
+        { geoCity: { code: geoCode } },
+        { geoResort: { code: geoCode } },
+        // Scoped to the entity's country: a bare `contains: geoCode` matches
+        // "BAKU" inside "Bakung Beach Resort" (Indonesia) and fanned a Baku
+        // city search out into 3 whole-inventory jobs.
+        ...(countryCode
+          ? [{ label: { contains: geoCode, mode: "insensitive" as const }, geoCountry: { code: countryCode } }]
+          : []),
+      ];
+      // A city search must cover its resorts too: selecting "Пхукет" means all
+      // of Phuket's towns (KOMPAS groups them under the city), not only the
+      // town that carries the city's own name.
+      if (cityId) conditions.push({ geoResort: { cityId } });
+      for (const name of geoNames) {
+        conditions.push({
+          label: { contains: name, mode: "insensitive" },
+          ...(countryCode ? { geoCountry: { code: countryCode } } : {}),
+        });
+      }
+
+      const links = await this.prisma.supplierGeoLink.findMany({
+        where: {
+          supplierCode: { in: supplierCodes },
+          OR: conditions,
+        },
+        select: { supplierCode: true, externalId: true, label: true, kind: true },
+      });
+      for (const code of supplierCodes) {
+        const supplierLinks = links.filter((l) => l.supplierCode === code);
+        if (supplierLinks.length === 0) {
+          // No mapping for this city → the supplier cannot answer it precisely.
+          // Leave the code out of the result: the job builder skips suppliers
+          // missing from the map instead of running a whole-country search.
+          continue;
+        }
+        // SAMO: city/resort filter = TOWNS=<ids>&TOWNS_ANY=0 (verified
+        // supplier capture). Resort selection = subset of the city's towns.
+        const townLinks = supplierLinks.filter((l) => l.kind === "TOWN");
+        const townIds = townLinks.map((l) => l.externalId);
+        // The NAME channel travels with the id one: ANEX hotel rows of the
+        // no-flight packets carry a NEGATIVE townInc (id filter dead), so the
+        // adapter also matches the row's townName/hotelTownName against these
+        // (entity names + the supplier's own TOWN labels).
+        const townNames = [
+          ...new Set([...geoNames, ...townLinks.map((l) => l.label).filter((l): l is string => !!l)]),
+        ];
+        if (townIds.length > 0) {
+          result[code] = { ...query, towns: townIds.join(","), townNames };
+          continue;
+        }
+        // Fallback: TOUR-dimension links (legacy TOURINC fan-out). No TOWN ids
+        // to filter by → the entity's own names are the only precise handle.
+        result[code] = {
+          ...query,
+          townNames: geoNames,
+          tourIncValues: supplierLinks.map((l) => l.externalId),
+          tourIncNames: supplierLinks.map((l) => l.label),
+          tourIncValue: undefined,
+        };
+      }
+    } catch (e) {
+      // Geo resolution failed → be conservative: skip every supplier for this
+      // city query rather than returning an unfiltered country result.
+      this.logger.warn(
+        `resolveGeoQueries failed — skipping suppliers for city "${geoCode}" ` +
+        `(no precise country fallback): ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return {};
+    }
+    return result;
+  }
+
+  /**
+   * Display names + ISO country of a Master Geography code (city or resort).
+   * Supplier labels carry names ("Deira"), never our codes ("AE-DEIRA"), so
+   * this is what makes label matching possible for unlinked geo objects.
+   */
+  private async resolveGeoNames(
+    geoCode: string,
+  ): Promise<{ names: string[]; countryCode: string; cityId?: string }> {
+    const city = await this.prisma.geoCity.findUnique({
+      where: { code: geoCode },
+      select: { id: true, names: true, country: { select: { code: true } } },
+    });
+    if (city) {
+      return {
+        names: this.nameVariants(city.names),
+        countryCode: city.country.code,
+        cityId: city.id,
+      };
+    }
+    const resort = await this.prisma.geoResort.findUnique({
+      where: { code: geoCode },
+      select: { names: true, city: { select: { country: { select: { code: true } } } } },
+    });
+    if (resort) {
+      // No cityId for a RESORT on purpose: widening to the city's TOWN links
+      // would answer «Гойнюк» with every town of KEMER. The resort keeps its
+      // direct links plus the name channel (townNames) which is precise.
+      return { names: this.nameVariants(resort.names), countryCode: resort.city.country.code };
+    }
+    return { names: [], countryCode: "" };
+  }
+
+  private nameVariants(names: unknown): string[] {
+    if (!names || typeof names !== "object") return [];
+    const out = new Set<string>();
+    for (const value of Object.values(names as Record<string, unknown>)) {
+      if (typeof value !== "string") continue;
+      const name = value.trim();
+      if (name.length >= 3) out.add(name);
+    }
+    return [...out];
   }
 
   /**

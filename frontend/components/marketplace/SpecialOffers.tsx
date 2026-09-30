@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Tag } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
+import { useHotelPhoto } from "@/lib/hotel-photo";
 
 const SERVICE_BADGES: Record<string, { ru: string; az: string; en: string }> = {
   TOUR: { ru: "ТУР", az: "TUR", en: "TOUR" },
@@ -37,7 +38,9 @@ function OfferCardSkeleton() {
 
 function OfferCard({ card }: { card: PublicProductCard }) {
   const locale = useLocale();
-  const img = card.primaryImage;
+  // Fallback: локальное фото отеля /hotels/<tourinc>-<hotelKey>.jpg (см. hotel-photo.ts).
+  const hotelPhoto = useHotelPhoto(card.type === "TOUR" ? card.slug : null);
+  const img = card.primaryImage ? { thumbUrl: card.primaryImage.thumbUrl } : hotelPhoto ? { thumbUrl: hotelPhoto } : null;
   const badge = card.type ? SERVICE_BADGES[card.type] : null;
 
   return (

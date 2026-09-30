@@ -25,6 +25,36 @@ export interface SuggestResult {
   href: string;
 }
 
+/**
+ * Supplier hotel directory search (GET /geo/supplier-hotels): hotels known
+ * from supplier dictionaries, optionally scoped to the selected region.
+ * Used by the universal search «Выбрать отель» live-search.
+ */
+export async function searchSupplierHotels(
+  q: string,
+  region?: { geoCountry?: string; geoCity?: string; geoResort?: string },
+  limit = 20,
+): Promise<SuggestResult[]> {
+  const sp = new URLSearchParams();
+  if (q.trim()) sp.set("q", q.trim());
+  if (region?.geoCountry) sp.set("geoCountry", region.geoCountry);
+  if (region?.geoCity) sp.set("geoCity", region.geoCity);
+  if (region?.geoResort) sp.set("geoResort", region.geoResort);
+  sp.set("limit", String(limit));
+  const res = await fetch(`/api/v1/geo/supplier-hotels?${sp.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Supplier hotels failed (${res.status})`);
+  const list = (await res.json()) as Array<{ id: string; name: string; suppliers: string[] }>;
+  return list.map((h) => ({
+    type: "hotel" as const,
+    id: h.id,
+    name: h.name,
+    subtitle: h.suppliers.length ? h.suppliers.join(", ") : undefined,
+    href: "",
+  }));
+}
+
 export interface SuggestResponse {
   query: string;
   results: SuggestResult[];
@@ -38,7 +68,17 @@ export interface SearchContext {
   fromDestination?: string;
   toDestination?: string;
   startDate?: string;
+  /** Departure date range upper bound («вылет по») — universal tour search. */
+  endDate?: string;
+  /** Single-night value (legacy consumers: HelpFind, summaries). */
   nights?: number;
+  /** Night range «от–до» — the universal search sends both bounds. */
+  nightsFrom?: number;
+  nightsTo?: number;
+  /** Hotel star category labels (supplier dictionaries, e.g. "5*", "HV-1"). */
+  hotelStars?: string[];
+  /** Supplier whitelist for the aggregated search («Поставщики» picker). */
+  suppliers?: string[];
   adults?: number;
   children?: number;
   childAges?: number[];

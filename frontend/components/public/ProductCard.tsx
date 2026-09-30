@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { t, useLocale, formatDate } from "@/lib/i18n";
 import { useMarketplaceCardImpression } from "@/lib/behavioral-events";
 import type { PublicProductCard } from "@/lib/public-api";
 import { formatLocation } from "@/lib/locations";
 import { availabilityText } from "@/lib/marketplace-utils";
+import { fetchHotelPhoto, hotelPhotoKeyFromSlug } from "@/lib/hotel-photo";
 import Price from "./Price";
 
 /** Дефолтная иконка по типу категории/услуги (нейтральный fallback без image). */
@@ -35,9 +37,26 @@ const TYPE_ICON: Record<string, string> = {
  */
 export default function ProductCard({ card, position = 0 }: { card: PublicProductCard; position?: number }) {
   const locale = useLocale();
-  const img = card.primaryImage;
   const availability = availabilityText(card.availabilitySummary, locale);
   const icon = TYPE_ICON[card.type] ?? "🏝";
+
+  // Фото отеля витрины туров: локальный файл /hotels/<tourinc>-<hotelKey>.jpg|png
+  // (скачивается с tripadvisor.ru скриптом fetch-hotel-photos). Используется, когда
+  // у карточки нет primaryImage (ProductMedia пуст у supplier-синков).
+  const photoKey = card.hotelImage && card.type === "TOUR" ? hotelPhotoKeyFromSlug(card.slug) : null;
+  const [hotelPhoto, setHotelPhoto] = useState<string | null>(null);
+  useEffect(() => {
+    setHotelPhoto(null);
+    if (!photoKey) return;
+    let alive = true;
+    void fetchHotelPhoto(photoKey).then((url) => {
+      if (alive) setHotelPhoto(url);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [photoKey]);
+  const img = card.primaryImage ? { thumbUrl: card.primaryImage.thumbUrl } : hotelPhoto ? { thumbUrl: hotelPhoto } : null;
 
   // Step 1.13B: rendered-card impression (карточка реально отрисована в grid;
   // viewport — deferred). 0-based позиция в текущем grid; fire-once per mount.

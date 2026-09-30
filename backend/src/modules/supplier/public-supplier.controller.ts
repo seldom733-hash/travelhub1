@@ -104,8 +104,13 @@ export class PublicSupplierController {
     @Query("hotel") hotel?: string,
     @Query("tourIncValue") tourIncValue?: string,
     @Query("tourIncName") tourIncName?: string,
+    @Query("towns") towns?: string,
+    @Query("service") service?: string,
   ) {
     const query: SupplierSearchQuery = {
+      // Category context: selects the right adapter when one provider code
+      // registers several (ANEX tours / ANEX hotels) — prompt §2.
+      service,
       country,
       departureCity,
       destination,
@@ -116,16 +121,60 @@ export class PublicSupplierController {
       adults: adults ? parseInt(adults, 10) : 2,
       children: children ? parseInt(children, 10) : 0,
       childAges: childAges ? childAges.split(",").map(Number) : undefined,
-      hotelStars: hotelStars ? hotelStars.split(",").map(Number) : undefined,
+      hotelStars: hotelStars ? hotelStars.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
       meal,
       page: page ? parseInt(page, 10) : 1,
       hotelExternalId,
       hotel,
       tourIncValue,
       tourIncName,
+      // Supplier-town filter (e.g. KOMPAS TOWNS=<ids>) — normally resolved from
+      // Master Geography by the aggregator; usable directly on a single-supplier
+      // search as well.
+      towns,
     };
 
     return this.handleCaptcha(this.offerService.search(supplierCode, query)).catch((err) => this.mapSupplierError(err));
+  }
+
+  /** Parse the shared search query params once (search-all / search-suppliers). */
+  private buildSearchQuery(params: Record<string, unknown>): SupplierSearchQuery {
+    const str = (key: string): string | undefined => {
+      const v = params[key];
+      if (v === undefined || v === "") return undefined;
+      return String(Array.isArray(v) ? v[0] : v);
+    };
+    const num = (key: string): number | undefined => {
+      const v = str(key);
+      return v === undefined ? undefined : parseInt(v, 10);
+    };
+    const childAges = str("childAges");
+    const suppliersRaw = str("suppliers");
+    return {
+      // Category context (searchByService re-stamps it with its serviceType).
+      service: str("service"),
+      country: str("country"),
+      departureCity: str("departureCity"),
+      destination: str("destination"),
+      geoCity: str("geoCity"),
+      geoResort: str("geoResort"),
+      suppliers: suppliersRaw
+        ? suppliersRaw.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+        : undefined,
+      departureDateFrom: str("departureDateFrom"),
+      departureDateTo: str("departureDateTo"),
+      nightsFrom: num("nightsFrom"),
+      nightsTo: num("nightsTo"),
+      adults: num("adults") ?? 2,
+      children: num("children") ?? 0,
+      childAges: childAges ? childAges.split(",").map(Number) : undefined,
+      meal: str("meal"),
+      hotel: str("hotel"),
+      hotelStars: str("hotelStars")
+        ? str("hotelStars")!.split(",").map((s) => s.trim()).filter(Boolean)
+        : undefined,
+      page: num("page") ?? 1,
+    };
   }
 
   /**
@@ -135,38 +184,39 @@ export class PublicSupplierController {
    */
   @Get("public/supplier/search-all")
   @Public()
-  async searchAll(
-    @Query("service") serviceType?: string,
-    @Query("country") country?: string,
-    @Query("departureCity") departureCity?: string,
-    @Query("destination") destination?: string,
-    @Query("departureDateFrom") departureDateFrom?: string,
-    @Query("departureDateTo") departureDateTo?: string,
-    @Query("nightsFrom") nightsFrom?: string,
-    @Query("nightsTo") nightsTo?: string,
-    @Query("adults") adults?: string,
-    @Query("children") children?: string,
-    @Query("childAges") childAges?: string,
-    @Query("meal") meal?: string,
-    @Query("hotel") hotel?: string,
-    @Query("page") page?: string,
-  ) {
-    const query: SupplierSearchQuery = {
-      country,
-      departureCity,
-      destination,
-      departureDateFrom,
-      departureDateTo,
-      nightsFrom: nightsFrom ? parseInt(nightsFrom, 10) : undefined,
-      nightsTo: nightsTo ? parseInt(nightsTo, 10) : undefined,
-      adults: adults ? parseInt(adults, 10) : 2,
-      children: children ? parseInt(children, 10) : 0,
-      childAges: childAges ? childAges.split(",").map(Number) : undefined,
-      meal,
-      hotel,
-      page: page ? parseInt(page, 10) : 1,
-    };
-    return this.aggregatorService.searchByService(serviceType || "tours", query);
+  async searchAll(@Query() params: Record<string, unknown>) {
+    const query = this.buildSearchQuery(params);
+    const serviceType = String(params.service ?? "") || "tours";
+    return this.aggregatorService.searchByService(serviceType, query);
+  }
+
+  /**
+   * Resolve which suppliers WILL answer this direction (country/city/resort)
+   * without performing the search — lets the UI show "Определяем поставщиков…"
+   * → "Найдены поставщики: …" while search-all runs in parallel.
+   */
+  @Get("public/supplier/search-suppliers")
+  @Public()
+  async searchSuppliers(@Query() params: Record<string, unknown>) {
+    try {
+      const query = this.buildSearchQuery(params);
+      const serviceType = String(params.service ?? "") || "tours";
+      const suppliers = await this.aggregatorService.resolveSuppliers(serviceType, query);
+      return { suppliers };
+    } catch (err) {
+      throw this.mapSupplierError(err);
+    }
+  }
+
+  /**
+   * Registered supplier adapters of a service (default: tours) for the search
+   * form's «Поставщики» picker. No auth — the codes are not sensitive.
+   * GET /public/supplier/suppliers?service=tours
+   */
+  @Get("public/supplier/suppliers")
+  @Public()
+  listSuppliers(@Query("service") service?: string) {
+    return this.aggregatorService.listSuppliersOfService(service ?? "tours");
   }
 
   /** Price calendar for a configuration over a date range (anonymous). */

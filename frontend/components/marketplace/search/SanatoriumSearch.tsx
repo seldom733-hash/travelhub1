@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MapPin, CalendarBlank, ArrowRight, Sun } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
+import { todayISO } from "@/lib/dates";
 import type { SearchContext } from "@/lib/search-engine";
 import LiveSearchInput from "./LiveSearchInput";
 import ChildAges from "./ChildAges";
@@ -15,7 +16,8 @@ interface SanatoriumSearchProps {
 export default function SanatoriumSearch({ onSearch }: SanatoriumSearchProps) {
   const locale = useLocale();
   const [destination, setDestination] = useState("");
-  const [startDate, setStartDate] = useState("");
+  // Default start date = today (platform-wide default for date fields).
+  const [startDate, setStartDate] = useState(todayISO());
   const [duration, setDuration] = useState(7);
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);

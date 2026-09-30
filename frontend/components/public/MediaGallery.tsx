@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import type { PublicMedia } from "@/lib/public-api";
+import { fetchHotelPhoto, hotelPhotoKeyFromSlug } from "@/lib/hotel-photo";
 
 /**
  * PHASE 1 STEP 1.7 §13 — Media Gallery на стабильных public delivery URL
@@ -11,9 +12,31 @@ import type { PublicMedia } from "@/lib/public-api";
  * - keyboard: ← → переключение, focus-visible на кнопках, aria-live для alt;
  * - lazy loading + graceful fallback.
  */
-export default function MediaGallery({ media }: { media: PublicMedia[] }) {
+export default function MediaGallery({
+  media,
+  productSlug,
+}: {
+  media: PublicMedia[];
+  /** Slug продукта: если media пуст, показываем локальное фото отеля /hotels/<tourinc>-<hotelKey>.jpg|png. */
+  productSlug?: string;
+}) {
   const locale = useLocale();
   const [active, setActive] = useState(0);
+
+  // Локальное фото отеля витрины туров (файл скачивается скриптом fetch-hotel-photos).
+  const photoKey = productSlug ? hotelPhotoKeyFromSlug(productSlug) : null;
+  const [hotelPhoto, setHotelPhoto] = useState<string | null>(null);
+  useEffect(() => {
+    setHotelPhoto(null);
+    if (!photoKey) return;
+    let alive = true;
+    void fetchHotelPhoto(photoKey).then((url) => {
+      if (alive) setHotelPhoto(url);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [photoKey]);
 
   const ordered = [...media].sort((a, b) => a.sortOrder - b.sortOrder || Number(b.isPrimary) - Number(a.isPrimary));
   const images = ordered.length > 0 ? ordered : [];
@@ -32,6 +55,14 @@ export default function MediaGallery({ media }: { media: PublicMedia[] }) {
   }, [media]);
 
   if (images.length === 0) {
+    if (hotelPhoto) {
+      return (
+        <div className="overflow-hidden rounded-xl bg-slate-100">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={hotelPhoto} alt="Hotel" loading="lazy" className="aspect-[16/9] w-full object-cover" />
+        </div>
+      );
+    }
     return (
       <div className="flex aspect-[16/9] w-full items-center justify-center rounded-xl bg-slate-100 text-5xl text-slate-300">
         🏝

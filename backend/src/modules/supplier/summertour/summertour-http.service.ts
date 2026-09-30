@@ -68,7 +68,7 @@ interface HttpRequestParams {
 export class SummertourHttpService {
   private readonly logger = new Logger(SummertourHttpService.name);
   private static readonly BASE_URL = "https://summertour.az/search_tour";
-  private static readonly PARTITION_PRICE = "32"; // grouped by price on Summertour site
+  private static readonly PARTITION_PRICE = "0"; // no price grouping — every room/meal variant as its own row
 
   /**
    * Fetch prices via direct HTTP GET request.

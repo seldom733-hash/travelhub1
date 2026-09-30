@@ -9,6 +9,8 @@
 
 export interface SupplierSearchQuery {
   supplierCode: string;
+  /** Category context ("hotels" …) — selects the supplier's category adapter. */
+  service?: string;
   country?: string;
   departureCity?: string;
   destination?: string;
@@ -21,7 +23,7 @@ export interface SupplierSearchQuery {
   childAges?: number[];
   hotelExternalId?: string;
   hotel?: string;
-  hotelStars?: number[];
+  hotelStars?: string[];
   room?: string;
   meal?: string;
   priceMin?: number;
@@ -45,6 +47,8 @@ export type SupplierAvailability = "AVAILABLE" | "NOT_AVAILABLE" | "UNKNOWN";
 
 export interface SupplierOffer {
   supplierCode: string;
+  /** Category context ("hotels" etc.) — absent on legacy tour offers. */
+  service?: string;
   externalOfferId: string;
   externalClaim?: string;
   tour?: string;
@@ -232,18 +236,18 @@ export interface AggregatedSearchResult {
   perSupplier: Record<string, { count: number; error?: string }>;
 }
 
-/**
- * Aggregate tour search across all suppliers that support the query.
- * Suppliers are isolated: one failing supplier never fails the response.
- */
-export async function searchSupplierOffersAll(
-  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string },
-): Promise<AggregatedSearchResult> {
-  return get<AggregatedSearchResult>("/search-all", {
+/** Shared query → URL params mapping for search-all and search-suppliers. */
+function supplierSearchParams(
+  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string; geoCity?: string; geoResort?: string },
+): Record<string, string | number | undefined> {
+  return {
     service: query.service,
     country: query.country,
     departureCity: query.departureCity,
     destination: query.destination,
+    geoCity: (query as any).geoCity,
+    geoResort: (query as any).geoResort,
+    suppliers: (query as any).suppliers?.join(","),
     departureDateFrom: query.departureDateFrom,
     departureDateTo: query.departureDateTo,
     nightsFrom: query.nightsFrom,
@@ -253,8 +257,30 @@ export async function searchSupplierOffersAll(
     childAges: query.childAges?.join(","),
     meal: query.meal,
     hotel: query.hotel,
+    hotelStars: query.hotelStars?.join(","),
     page: query.page,
-  });
+  };
+}
+
+/**
+ * Aggregate tour search across all suppliers that support the query.
+ * Suppliers are isolated: one failing supplier never fails the response.
+ */
+export async function searchSupplierOffersAll(
+  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string; geoCity?: string; geoResort?: string },
+): Promise<AggregatedSearchResult> {
+  return get<AggregatedSearchResult>("/search-all", supplierSearchParams(query));
+}
+
+/**
+ * Which suppliers WILL answer this direction (country/city/resort) — resolved
+ * without performing the search, so the UI can show "Определяем поставщиков…"
+ * → "Найдены поставщики: …" while the search itself is still running.
+ */
+export async function searchSupplierResolve(
+  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string; geoCity?: string; geoResort?: string },
+): Promise<{ suppliers: string[] }> {
+  return get<{ suppliers: string[] }>("/search-suppliers", supplierSearchParams(query));
 }
 
 /** Search supplier offers (anonymous). */

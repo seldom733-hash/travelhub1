@@ -26,7 +26,7 @@ export default function QuickCategories() {
     {
       icon: <HouseSimple size={20} weight="light" />,
       label: t("marketplace.category_accommodation", locale),
-      href: "/search?category=accommodation",
+      href: "/search?category=hotels",
     },
     {
       icon: <MapPin size={20} weight="light" />,

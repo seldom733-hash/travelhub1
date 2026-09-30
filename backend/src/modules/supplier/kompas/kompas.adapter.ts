@@ -32,6 +32,7 @@ import type {
   PriceCalendarEntry,
   SupplierGeoOption,
 } from "../supplier.types";
+import { parseSamoHotelDynamic } from "../samo-hotel-dict";
 
 const KOMPAS_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36";
@@ -377,8 +378,12 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       // Additional KOMPAS-specific filters
       const kq = query as KompasSearchQuery;
-      if (kq.stars) await this.setSamoSelect(page, "STARS", kq.stars);
-      if (kq.towns) await this.setSamoSelect(page, "TOWNS", kq.towns);
+      // §STARS: hotel category — aggregator-resolved native ids
+      // (starKeys via SupplierGeoLink kind=STAR); kq.stars wins when set
+      // explicitly (searchContext passthrough).
+      const starsVal = kq.stars ?? query.starKeys?.["KOMPAS"];
+      if (starsVal) await this.setSamoSelect(page, "STARS", starsVal);
+      if (kq.towns) await this.setSamoSelect(page, "TOWNS", kq.towns, true);
       if (kq.freightType) await this.setSamoSelect(page, "FREIGHTTYPE", kq.freightType);
       if (kq.hotelTypes) await this.setSamoSelect(page, "HOTELTYPES", kq.hotelTypes);
 
@@ -436,7 +441,33 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         ? { beg: query.departureDateFrom.replace(/-/g, ""), end: query.departureDateTo.replace(/-/g, "") }
         : null;
 
+      let pricesRequested = false;
+      let pricesResponse: { status: number; len: number; body: string } | null = null;
+      // Resolves when the server answers PRICES with a payload carrying no
+      // price rows at all — an honest "no tours for these params" (live:
+      // a result page embeds 200–520KB of ehtml, an empty answer is ~1.4KB).
+      let resolvePricesEmpty: () => void = () => {};
+      const pricesEmptyAnswer = new Promise<void>((resolve) => {
+        resolvePricesEmpty = resolve;
+      });
+      page.on("response", (res) => {
+        if (!res.url().includes("samo_action=PRICES")) return;
+        void res
+          .text()
+          .then((text) => {
+            const hasRows = text.includes("price_info");
+            pricesResponse = { status: res.status(), len: text.length, body: text };
+            this.logger.debug(
+              `KOMPAS PRICES response: status=${res.status()} len=${text.length} hasRows=${hasRows} head=${JSON.stringify(text.slice(0, 300))}`,
+            );
+            if (!hasRows) resolvePricesEmpty();
+          })
+          .catch(() => {
+            pricesResponse = { status: res.status(), len: -1, body: "" };
+          });
+      });
       await page.route("**samo_action=PRICES**", (route) => {
+        pricesRequested = true;
         let url = route.request().url();
         const origUrl = url;
         // When hotel checkbox was checked, HOTELS=<id> is already in the URL from the form.
@@ -444,6 +475,27 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         // With the checkbox properly checked, KOMPAS returns hotel-specific results.
         if (!hotelFilterApplied) {
           url = url.replace(/HOTELS=\d+&?/g, "").replace(/HOTELS_ANY=\d+&?/g, "");
+        }
+        // §TOWNS: city/resort filter — the site's own widget sends
+        // TOWNS=<ids>&TOWNS_ANY=0 (verified supplier capture). The form has no
+        // select[name=TOWNS] (custom popup), so inject at the network layer.
+        const kqTowns = (query as KompasSearchQuery).towns;
+        if (kqTowns) {
+          url = url.replace(/TOWNS=[^&]*/g, `TOWNS=${kqTowns}`)
+                   .replace(/TOWNS_ANY=\d+/g, "TOWNS_ANY=0");
+        }
+        // §STARS: hotel-category filter — same pattern as TOWNS: the STARS
+        // checklistbox is a custom popup (no select[name=STARS]), so the
+        // supplier's own widget sends STARS=<ids>&STARS_ANY=0 at the network
+        // layer. starKeys come from the aggregator (SupplierGeoLink kind=STAR).
+        if (starsVal) {
+          url = /STARS=/.test(url)
+            ? url.replace(/STARS=[^&]*/g, `STARS=${starsVal}`)
+            : `${url}&STARS=${starsVal}`;
+          url = /STARS_ANY=/.test(url)
+            ? url.replace(/STARS_ANY=\d+/g, "STARS_ANY=0")
+            : `${url}&STARS_ANY=0`;
+          this.logger.log(`KOMPAS PRICES: hotel category filter STARS=${starsVal}`);
         }
         if (routeDates) {
           url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`)
@@ -483,12 +535,76 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       await searchBtn.click({ force: true });
 
-      try {
-        await page.waitForSelector("tr.price_info", { timeout: 30_000 });
-      } catch {
-        // Check if absence is due to CAPTCHA rather than NO_RESULT.
+      // §: the site occasionally ignores the programmatic submit (handler not yet
+      // attached / overlay) — then no PRICES request is ever issued, and we would
+      // report "0 offers" for a city that does have data. It also sometimes sends
+      // PRICES yet never renders tr.price_info (slow partition / anti-bot), which
+      // is the same "0 offers" symptom. Re-submit via a DOM click (fires the
+      // element's own handler regardless of overlays, keeps the route interceptor
+      // active for TOWNS injection) — up to 3 attempts, 45s of waiting each.
+      let rowsAppeared = false;
+      const MAX_ROW_ATTEMPTS = 3;
+      const ROW_WAIT_MS = 45_000;
+      for (let attempt = 0; attempt < MAX_ROW_ATTEMPTS && !rowsAppeared; attempt++) {
+        // Race the DOM against the server's answer: when PRICES comes back
+        // without a single price row the answer is honest — there are no
+        // tours for these params — and re-submitting cannot invent them.
+        // (Without this, an empty search burned 3×45s ≈ 150s per attempt
+        // cycle and blocked every multi-supplier search.)
+        const raced = await Promise.race([
+          page.waitForSelector("tr.price_info", { timeout: ROW_WAIT_MS })
+            .then(() => "rows" as const)
+            .catch(() => "timeout" as const),
+          pricesEmptyAnswer.then(() => "empty" as const),
+        ]);
+        if (raced === "rows") {
+          rowsAppeared = true;
+          break;
+        }
+        if (raced === "empty") {
+          if (await this.isCaptchaPresent(page)) {
+            await this.createCaptchaChallengeAndThrow(page, context, "search", query);
+          }
+          // Short grace: a just-delivered result set still has to render.
+          const lateRows = await page
+            .waitForSelector("tr.price_info", { timeout: 5_000 })
+            .then(() => true)
+            .catch(() => false);
+          if (lateRows) {
+            rowsAppeared = true;
+            break;
+          }
+          this.logger.warn(
+            `KOMPAS: server answered PRICES without price rows — no tours for this search (attempt ${attempt + 1}/${MAX_ROW_ATTEMPTS})`,
+          );
+          await context.close();
+          return [];
+        }
+        // raced === "timeout": PRICES answered with rows but they never
+        // rendered (slow partition / anti-bot) or no PRICES went out at all —
+        // legacy behavior: captcha check, re-submit, diagnostics.
         if (await this.isCaptchaPresent(page)) {
           await this.createCaptchaChallengeAndThrow(page, context, "search", query);
+        }
+        if (attempt < MAX_ROW_ATTEMPTS - 1) {
+          await page.waitForTimeout(3_000);
+          const retried = await page
+            .evaluate(() => {
+              document.getElementById("samo_popup")?.remove();
+              const btn = document.querySelector<HTMLElement>(".load");
+              if (!btn) return false;
+              btn.click();
+              return true;
+            })
+            .catch(() => false);
+          if (retried) {
+            this.logger.warn(
+              pricesRequested
+                ? `KOMPAS: no price rows after attempt ${attempt + 1}/${MAX_ROW_ATTEMPTS} (PRICES sent) — re-submitting`
+                : `KOMPAS: search submit was not sent (no PRICES request) — retrying`,
+            );
+            continue;
+          }
         }
         // Debug: dump page title + first 500 chars of body for diagnostics
         const dbg = await page.evaluate(() => ({
@@ -499,9 +615,18 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           rowPrice: document.querySelectorAll("tr.price_info").length,
           rowAll: document.querySelectorAll("tr").length,
         })).catch(() => null);
-        const dbgLine = `[KOMPAS] NO_ROWS page=${JSON.stringify(dbg)} | ${new Date().toISOString()}\n`;
+        const pr = pricesResponse as { status: number; len: number; body: string } | null;
+        const dbgLine = `[KOMPAS] NO_ROWS submitted=${pricesRequested} pricesResp=${pr ? `status=${pr.status} len=${pr.len} head=${JSON.stringify(pr.body.slice(0, 300))}` : "none"} page=${JSON.stringify(dbg)} | ${new Date().toISOString()}\n`;
         try { require("fs").appendFileSync("D:\\travelhub_v1\\backend_price_chain.log", dbgLine); } catch {}
-        this.logger.warn(`KOMPAS: no price_info rows appeared. page=${JSON.stringify(dbg)}`);
+        this.logger.warn(
+          pricesRequested
+            ? `KOMPAS: search submitted but no rows appeared. page=${JSON.stringify(dbg)}`
+            : `KOMPAS: no price_info rows appeared. page=${JSON.stringify(dbg)}`,
+        );
+        await context.close();
+        return [];
+      }
+      if (!rowsAppeared) {
         await context.close();
         return [];
       }
@@ -515,7 +640,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       // §6: DOM/result consistency — verify at least one row matches expected tour.
       // With PARTITION_PRICE=0, rows from different tours may appear; only stateKey/townFromKey must match.
-      const expectedTourKey = query.tourIncValue ?? "";
+      // tourIncValue "0"/"" means "Любой" (no program) — nothing to match, skip the check.
+      const expectedTourKey =
+        query.tourIncValue && query.tourIncValue !== "0" ? query.tourIncValue : "";
       const expectedStateKey =
         this.mapStateInc(query.destination) ??
         this.mapStateInc(query.country) ?? "";
@@ -947,6 +1074,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         departureDateTo: (ref.searchContext as any).departureDateTo,
         tourIncValue: (ref.searchContext as any).tourIncValue,
         tourIncName: (ref.searchContext as any).tourIncName,
+        // §TOWNS: re-check must run in the same city context as the original
+        // search, otherwise it re-searches the whole country.
+        towns: (ref.searchContext as any).towns,
       };
       const offers = await this.searchWithPage(page, q);
       const match = this.matchOffer(offers, ref);
@@ -1025,6 +1155,8 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       nightsTo: query.nights,
       departureDateFrom: query.dateFrom,
       departureDateTo: query.dateTo,
+      // §TOWNS: keep the city/resort filter across calendar windows.
+      towns: (query as PriceCalendarQuery & { towns?: string }).towns,
       destination: query.destination ?? this.deriveCountryFromTourIncName(query.tourIncName) ?? this.deriveCountryFromTourIncName(query.tourIncNames?.[0]) ?? undefined,
     };
     const programs = (query.tourIncValues?.length ?? 0) > 0
@@ -1130,6 +1262,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
               tourIncName: (best.rawMetadata?.tourIncName as string) ?? query.tourIncName,
               destination: query.destination,
               country: query.destination,
+              towns: (query as { towns?: string }).towns,
             },
           },
         });
@@ -1178,8 +1311,10 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     if (ages.length >= 2) await this.setSamoSelect(page, "AGE2", String(ages[1]));
     if (ages.length >= 3) await this.setSamoSelect(page, "AGE3", String(ages[2]));
     const kq = query as KompasSearchQuery;
-    if (kq.stars) await this.setSamoSelect(page, "STARS", kq.stars);
-    if (kq.towns) await this.setSamoSelect(page, "TOWNS", kq.towns);
+    // §STARS: hotel category — aggregator-resolved native ids (starKeys).
+    const starsVal = kq.stars ?? query.starKeys?.["KOMPAS"];
+    if (starsVal) await this.setSamoSelect(page, "STARS", starsVal);
+    if (kq.towns) await this.setSamoSelect(page, "TOWNS", kq.towns, true);
     if (kq.freightType) await this.setSamoSelect(page, "FREIGHTTYPE", kq.freightType);
     if (kq.hotelTypes) await this.setSamoSelect(page, "HOTELTYPES", kq.hotelTypes);
     let hotelFilterApplied = false;
@@ -1210,6 +1345,19 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     await page.route("**samo_action=PRICES**", (route) => {
       let url = route.request().url();
       if (!hotelFilterApplied) url = url.replace(/HOTELS=\d+&?/g, "").replace(/HOTELS_ANY=\d+&?/g, "");
+      // §TOWNS: city/resort network-level filter (verified supplier capture).
+      if (kq.towns) {
+        url = url.replace(/TOWNS=[^&]*/g, `TOWNS=${kq.towns}`).replace(/TOWNS_ANY=\d+/g, "TOWNS_ANY=0");
+      }
+      // §STARS: hotel-category network-level filter (starKeys / kq.stars).
+      if (starsVal) {
+        url = /STARS=/.test(url)
+          ? url.replace(/STARS=[^&]*/g, `STARS=${starsVal}`)
+          : `${url}&STARS=${starsVal}`;
+        url = /STARS_ANY=/.test(url)
+          ? url.replace(/STARS_ANY=\d+/g, "STARS_ANY=0")
+          : `${url}&STARS_ANY=0`;
+      }
       if (routeDates) url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`).replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
       if (!url.includes("FREIGHT=")) url += "&FREIGHT=1"; else url = url.replace(/FREIGHT=\d+/g, "FREIGHT=1");
       if (!url.includes("FILTER=")) url += "&FILTER=1"; else url = url.replace(/FILTER=\d+/g, "FILTER=1");
@@ -1243,17 +1391,21 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
   // ── Geo Discovery (provider-agnostic contract) ─────────────────────
 
   /**
-   * Discover KOMPAS geo/tour options for a country. In SAMO the
-   * city/resort dimension is the TOURINC select ("AE: Дубай из Баку"),
-   * populated after selecting STATEINC. Opens one headless page (no search
-   * submit), reads select options, closes — read-only against the supplier.
+   * Discover KOMPAS geo options for a country. TWO dimensions are captured:
+   * - TOURINC: tour programs ("AE: Дубай из Баку (GDS: AZAL)") — kind=TOUR;
+   * - TOWNS: the city/resort tree (verified supplier capture sends
+   *   TOWNS=<ids>&TOWNS_ANY=0 at the network layer). The form has no
+   *   select[name=TOWNS] — the widget lives in a SAMO popup. We extract it
+   *   from the popup markup when present; the popup is re-opened by SAMO
+   *   on widget click. kind=TOWN for each option.
+   * Opens one headless page (no search submit), read-only against supplier.
    */
   async discoverGeoOptions(countryExternalId?: string): Promise<SupplierGeoOption[]> {
     const stateInc = countryExternalId ?? "";
     if (!/^(0|[1-9]\d*)$/.test(stateInc)) return [];
     const browser = await this.getBrowser();
     const context = await browser.newContext({
-      userAgent: KOMPAS_USER_AGENT, // keep consistent with other contexts
+      userAgent: KOMPAS_USER_AGENT,
       viewport: { width: 1366, height: 900 },
       locale: "ru-RU",
     });
@@ -1270,10 +1422,38 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       });
       await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
       await page.waitForTimeout(2_000);
-      await this.setSamoSelect(page, "STATEINC", stateInc);
+      // The country list is rebuilt after the departure city changes; without
+      // waiting for the target STATEINC we would ingest the default country's
+      // towns under the requested one (verified: EG run read Mauritius).
+      const hasState = await page
+        .waitForFunction(
+          (v) => {
+            const sel = document.querySelector("select[name=STATEINC]") as HTMLSelectElement | null;
+            return !!sel && Array.from(sel.options).some((o) => o.value === v);
+          },
+          stateInc,
+          { timeout: 20_000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      if (!hasState || !(await this.setSamoSelect(page, "STATEINC", stateInc))) {
+        this.logger.warn(`KOMPAS discover: STATEINC=${stateInc} unavailable — skipping country`);
+        return [];
+      }
       await page.waitForTimeout(4_000);
+      const applied = await page.evaluate(() => {
+        const sel = document.querySelector("select[name=STATEINC]") as HTMLSelectElement | null;
+        return sel?.value ?? "";
+      });
+      if (applied !== stateInc) {
+        this.logger.warn(`KOMPAS discover: STATEINC stuck at ${applied || "?"} (wanted ${stateInc}) — skipping`);
+        return [];
+      }
 
-      const options = await page.evaluate(() => {
+      const result: SupplierGeoOption[] = [];
+
+      // Dimension 1: TOURINC select.
+      const tours = await page.evaluate(() => {
         const sel = document.querySelector("select[name=TOURINC]") as HTMLSelectElement | null;
         if (!sel) return [];
         return Array.from(sel.options)
@@ -1283,7 +1463,109 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
             label: (o.textContent ?? "").replace(/\s+/g, " ").trim(),
           }));
       });
-      return options.map((o) => ({ ...o, kind: "TOUR", countryExternalId: stateInc }));
+      for (const o of tours) result.push({ ...o, kind: "TOUR", countryExternalId: stateInc });
+
+      // Dimension 2: TOWNS checkbox-list widget (div.checklistbox.TOWNS).
+      // Lazy-populated after the townssearch input gains focus. The form is
+      // hierarchical: div.groupbox > label.groupname (city/region header) +
+      // div.groupboxChildren (its towns). Each option:
+      // input[value=<townId>] inside a label with the town name. Group
+      // headers have value="on" — skipped. parentLabel keeps the hierarchy so
+      // ingest can tell a city's own town from the resorts under it.
+      await page.evaluate(() => {
+        const inp = document.querySelector("input.townssearch") as HTMLInputElement | null;
+        if (inp) { inp.focus(); inp.click(); }
+      });
+      await page.waitForTimeout(5_000);
+      const towns = await page.evaluate(() => {
+        const box = document.querySelector("div.checklistbox.TOWNS") as HTMLElement | null;
+        if (!box) return [];
+        const out: { externalId: string; label: string; parentLabel?: string }[] = [];
+        const seen = new Set<string>();
+        const push = (inp: HTMLInputElement, group?: string) => {
+          if (!/^\d+$/.test(inp.value) || seen.has(inp.value)) return;
+          seen.add(inp.value);
+          out.push({
+            externalId: inp.value,
+            label: (inp.closest("label")?.textContent ?? "").replace(/\s+/g, " ").trim(),
+            ...(group ? { parentLabel: group } : {}),
+          });
+        };
+        for (const gb of Array.from(box.querySelectorAll("div.groupbox"))) {
+          const name = (gb.querySelector("label.groupname")?.textContent ?? "")
+            .replace(/\s+/g, " ")
+            .trim() || undefined;
+          for (const inp of Array.from(gb.querySelectorAll("div.groupboxChildren input"))) {
+            push(inp as HTMLInputElement, name);
+          }
+        }
+        for (const inp of Array.from(box.querySelectorAll("input"))) {
+          if ((inp as HTMLInputElement).closest("div.groupbox")) continue;
+          push(inp as HTMLInputElement);
+        }
+        return out;
+      });
+      for (const o of towns) result.push({ ...o, kind: "TOWN", countryExternalId: stateInc });
+
+      // Dimension 3: STARS checklistbox (hotel categories). SAMO renders it
+      // as div.checklistbox.STARS with input[value=<id>] + label text like
+      // "5*", "4*", "HV-1". Values differ per supplier, so they are ingested
+      // as kind=STAR links — the frontend «Категория отеля» list is built
+      // from them (labels mapped back to star counts for search filters).
+      const stars = await page.evaluate(() => {
+        const box = document.querySelector("div.checklistbox.STARS") as HTMLElement | null;
+        if (!box) return [];
+        const out: { externalId: string; label: string }[] = [];
+        const seen = new Set<string>();
+        for (const inp of Array.from(box.querySelectorAll("input"))) {
+          const el = inp as HTMLInputElement;
+          if (!/^\d+$/.test(el.value) || seen.has(el.value)) continue;
+          seen.add(el.value);
+          out.push({
+            externalId: el.value,
+            label: (el.closest("label")?.textContent ?? "").replace(/\s+/g, " ").trim(),
+          });
+        }
+        return out;
+      });
+      for (const o of stars) result.push({ ...o, kind: "STAR", countryExternalId: stateInc });
+
+      // Dimension 4: hotel dictionary — the form embeds the state's full hotel
+      // list as the inline samo.hotelDynamic JSON (verified over plain HTTP,
+      // state-scoped). No browser interaction needed: one GET of the form with
+      // the already-validated STATEINC. Each entry's townKey matches kind=TOWN
+      // externalIds so ingest can geo-link the hotel.
+      try {
+        const res = await fetch(
+          `${this.baseUrl}/search_tour?TOWNFROMINC=${BAKU_TOWNFROMINC}&STATEINC=${encodeURIComponent(stateInc)}`,
+          {
+            headers: {
+              "User-Agent": KOMPAS_USER_AGENT,
+              "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
+            },
+          },
+        );
+        if (res.ok) {
+          const hotels = parseSamoHotelDynamic(await res.text());
+          for (const h of hotels) {
+            result.push({
+              externalId: h.id,
+              label: h.name,
+              kind: "HOTEL",
+              countryExternalId: stateInc,
+              townKey: h.townKey,
+            });
+          }
+        } else {
+          this.logger.warn(`KOMPAS discover: hotel dictionary HTTP ${res.status} for STATEINC=${stateInc}`);
+        }
+      } catch (e) {
+        this.logger.warn(
+          `KOMPAS discover: hotel dictionary fetch failed for STATEINC=${stateInc}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+
+      return result;
     } finally {
       await context.close().catch(() => {});
     }
@@ -1664,6 +1946,10 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       nightsTo: query.nights,
       departureDateFrom: query.dateFrom,
       departureDateTo: query.dateTo,
+      // §TOWNS: carry the city/resort filter from the calendar context —
+      // a calendar opened for a city-specific hotel/offer must not silently
+      // widen to the whole country.
+      towns: (query as PriceCalendarQuery & { towns?: string }).towns,
       // §1A: derive destination from tourIncName prefix so search() sets STATEINC.
       // Explicit query.destination (from the search UI) takes precedence — without it
       // STATEINC is never set and KOMPAS returns 0 offers for the whole calendar.
@@ -1814,6 +2100,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
               tourIncName: (best.rawMetadata?.tourIncName as string) ?? query.tourIncName,
               destination: query.destination,
               country: query.destination,
+              towns: (query as { towns?: string }).towns,
             },
           },
         });
@@ -1984,7 +2271,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     return KompasSupplierAdapter.STATE_INC_TO_COUNTRY[stateId] ?? null;
   }
 
-  private async setSamoSelect(page: Page, name: string, value: string): Promise<boolean> {
+  private async setSamoSelect(page: Page, name: string, value: string, quiet = false): Promise<boolean> {
     try {
       const ok = await page.evaluate(
         ({ name, value }: { name: string; value: string }) => {
@@ -2001,6 +2288,10 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       if (ok) {
         await page.waitForTimeout(300);
         this.logger.debug(`Set KOMPAS ${name} = ${value}`);
+      } else if (quiet) {
+        // Known-absent control (e.g. TOWNS lives in a SAMO popup and is applied
+        // at the network layer) — expected, so do not raise a warning.
+        this.logger.debug(`KOMPAS select ${name} not present in DOM (applied at network layer)`);
       } else {
         this.logger.warn(`KOMPAS select ${name} = ${value} not set (missing select/option)`);
       }

@@ -115,6 +115,9 @@ export interface PublicProductCard {
   meal?: string | null;
   /** Код поставщика (KOMPAS/SUMMERTOUR/…) для синк-карточек. */
   supplierCode?: string | null;
+  /** Локальное фото отеля витрины туров (frontend/public/hotels/<tourinc>-<hotelKey>.jpg).
+   *  Файл может отсутствовать — фронт проверяет и показывает иконку-фолбэк. */
+  hotelImage?: string | null;
   /** Discovery-availability (§12); null, если строк Availability нет. */
   availabilitySummary: PublicAvailabilitySummary | null;
   /** Seller-safe проекция (§8, Step 1.11); null — идентичность скрыта/не задана. */

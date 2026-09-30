@@ -62,6 +62,11 @@ export default function OfferDetailsModal({
         setChecking(true);
         const searchContext = {
           supplierCode: offer.supplierCode,
+          // Category context: re-check must hit the same category adapter
+          // (ANEX hotels vs ANEX tours), and country drives the upstream
+          // state resolution (destination alone can be a region name).
+          service: offer.service,
+          country: offer.country ?? offer.destination,
           destination: offer.destination ?? offer.country,
           departureDateFrom: offer.departureDate,
           departureDateTo: offer.departureDate,
@@ -155,7 +160,13 @@ export default function OfferDetailsModal({
             </p>
           </div>
           <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-neutral-300">
-            {offer.supplierCode === "SUMMERTOUR" ? "Summer" : "Компас"}
+            {offer.supplierCode === "SUMMERTOUR"
+              ? "Summer"
+              : offer.supplierCode === "KAZUNION"
+                ? "KazUnion"
+                : offer.supplierCode === "ANEX"
+                  ? "ANEX"
+                  : "Компас"}
           </span>
         </div>
 

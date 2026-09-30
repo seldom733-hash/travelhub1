@@ -28,12 +28,22 @@ function buildSummary(service: ServiceType, params: Record<string, string>, loca
   const to = params.to || params.hotel || "";
   const date = params.start || params.checkIn || params.departure || "";
   const guests = [params.adults, params.children].filter(Boolean).join("+");
+  // Night range «от–до» (legacy ?nights fills both bounds).
+  const nightsFrom = params.nightsFrom || params.nights || "";
+  const nightsTo = params.nightsTo || params.nights || "";
+  const nights =
+    nightsFrom && nightsTo
+      ? nightsFrom === nightsTo
+        ? nightsFrom
+        : `${nightsFrom}–${nightsTo}`
+      : nightsFrom || nightsTo;
 
   const parts: string[] = [serviceLabel];
   if (from && to) parts.push(`${from} → ${to}`);
   else if (from) parts.push(from);
   else if (to) parts.push(to);
   if (date) parts.push(date);
+  if (nights) parts.push(`${nights} ${t("search.nights", locale).toLowerCase()}`);
   if (guests) parts.push(guests);
 
   return parts.join(" · ");
@@ -54,11 +64,21 @@ export default function CompactSearch({ service, params }: CompactSearchProps) {
     if (ctx.toGeoResort) sp.set("geoResort", ctx.toGeoResort);
     if (ctx.cityName) sp.set("city", ctx.cityName);
     if (ctx.hotelId) sp.set("hotelId", ctx.hotelId);
+    // Hotel NAME is what the supplier search filters on (per-supplier ids
+    // are resolved by the aggregator from this name).
+    if (ctx.hotelName) sp.set("hotel", ctx.hotelName);
     if (ctx.startDate) sp.set("start", ctx.startDate);
     if (ctx.departureDate) sp.set("departureDate", ctx.departureDate);
     if (ctx.returnDate) sp.set("return", ctx.returnDate);
     if (ctx.returnDate) sp.set("returnDate", ctx.returnDate);
     if (ctx.nights) sp.set("nights", String(ctx.nights));
+    // Night range «от–до» (nights alone is the legacy single-value param).
+    if (ctx.nightsFrom) sp.set("nightsFrom", String(ctx.nightsFrom));
+    if (ctx.nightsTo) sp.set("nightsTo", String(ctx.nightsTo));
+    // Departure range upper bound + hotel star categories (universal search).
+    if (ctx.endDate) sp.set("end", ctx.endDate);
+    if (ctx.hotelStars?.length) sp.set("hotelStars", ctx.hotelStars.join(","));
+    if (ctx.suppliers?.length) sp.set("suppliers", ctx.suppliers.join(","));
     if (ctx.duration) sp.set("duration", String(ctx.duration));
     if (ctx.adults) sp.set("adults", String(ctx.adults));
     if (ctx.children) sp.set("children", String(ctx.children));
@@ -68,8 +88,10 @@ export default function CompactSearch({ service, params }: CompactSearchProps) {
     if (ctx.tariff && ctx.tariff !== "ALL") sp.set("tariff", ctx.tariff);
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.language) sp.set("lang", ctx.language);
-    // Tours → universal live search across Summer + KOMPAS (§1).
-    if (ctx.serviceType === "tours") {
+    // Tours → universal live search across Summer + KOMPAS (§1) and hotels →
+    // supplier live search (ANEX hotels): results come from supplier live
+    // availability, not the static catalog.
+    if (ctx.serviceType === "tours" || ctx.serviceType === "hotels") {
       sp.set("live", "1");
     }
     setIsOpen(false);

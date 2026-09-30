@@ -73,6 +73,8 @@ export interface PublicProductCard {
   meal?: string | null;
   /** Supplier code (KOMPAS/SUMMERTOUR/…) when the card is sync-backed. */
   supplierCode?: string | null;
+  /** Local hotel photo (frontend/public/hotels/<tourinc>-<hotelKey>.jpg); may 404 — check before showing. */
+  hotelImage?: string | null;
   availabilitySummary: PublicAvailabilitySummary | null;
   seller: PublicSeller | null;
   publishedAt: string;

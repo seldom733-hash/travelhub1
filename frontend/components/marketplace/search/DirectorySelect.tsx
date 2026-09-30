@@ -3,6 +3,8 @@
 import { useMemo, useRef, useState } from "react";
 import { CaretDown, MapPin, X } from "@phosphor-icons/react";
 import { geoDisplayName, type GeoDirectoryEntry } from "@/lib/geo-api";
+import { widestText } from "@/lib/measure-text";
+import { useClickOutside } from "./useClickOutside";
 
 interface DirectorySelectProps {
   id: string;
@@ -72,8 +74,22 @@ export default function DirectorySelect({
     setQuery("");
   };
 
+  // Close when clicking another search control (selection itself closes too).
+  useClickOutside(containerRef, open, () => setOpen(false));
+
+  // Content-width: the control is as wide as the longest display text it can
+  // hold (longest geo name + « · CODE» suffix), with placeholder fallback.
+  const maxTextPx = useMemo(() => {
+    const labels = (items ?? []).map(
+      (i) => `${geoDisplayName(i.names, i.code)} · ${i.code}`,
+    );
+    if (labels.length === 0) return 0;
+    labels.push(placeholder);
+    return widestText(labels);
+  }, [items, placeholder]);
+
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative" style={{ maxWidth: maxTextPx > 0 ? maxTextPx + 56 : undefined }}>
       <label
         htmlFor={id}
         className="mb-0.5 block text-[13px] font-medium text-neutral-400"

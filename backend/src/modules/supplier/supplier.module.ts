@@ -16,6 +16,9 @@ import { KompasCaptchaStore } from "./kompas/kompas-captcha.store";
 import { KazunionHttpService } from "./kazunion/kazunion-http.service";
 import { KazunionAdapter } from "./kazunion/kazunion.adapter";
 import { KazunionSyncService } from "./kazunion/kazunion-sync.service";
+import { AnexAdapter } from "./anex/anex.adapter";
+import { AnexProvider } from "./anex/anex.provider";
+import { AnexHotelAdapter } from "./anex/anex-hotel.adapter";
 import { SupplierController } from "./supplier.controller";
 import { PublicSupplierController } from "./public-supplier.controller";
 import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
@@ -56,6 +59,9 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     KazunionHttpService,
     KazunionAdapter,
     KazunionSyncService,
+    AnexAdapter,
+    AnexProvider,
+    AnexHotelAdapter,
     TourRequestService,
     AzalAdapter,
     AzalHttpService,
@@ -67,7 +73,9 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
 		  registry: SupplierAdapterRegistry,
 		  summertour: SummertourNewAdapter,
 		  kompas: KompasSupplierAdapter,
-          kazunion: KazunionAdapter,
+		  kazunion: KazunionAdapter,
+          anex: AnexAdapter,
+          anexHotel: AnexHotelAdapter,
           flightRegistry: FlightSupplierRegistry,
           azal: AzalAdapter,
 		) => {
@@ -79,9 +87,16 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           searchEnabled: true,
           livePriceEnabled: true,
           availabilityEnabled: true,
-          maxConcurrency: 2,
-          requestsPerMinute: 10,
-          timeoutMs: 30_000,
+          // Raised 2/10 → 4/20: Summer's live search takes 30–70s (browser
+          // form scraping), so the old limits were exhausted by any 3rd
+          // overlapping user query → "Rate limit exceeded" → UI "временно
+          // недоступен". 4/20 matches KazUnion and tolerates multi-tab usage.
+          maxConcurrency: 4,
+          requestsPerMinute: 20,
+          // Enforced now (see offer service): keep well above the documented
+          // 30–70s of browser form scraping — a timeout would drop the whole
+          // supplier from an otherwise healthy search.
+          timeoutMs: 180_000,
           searchCacheTtlMs: 5 * 60 * 1000,
           priceCacheTtlMs: 5 * 60 * 1000,
           availabilityCacheTtlMs: 5 * 60 * 1000,
@@ -99,7 +114,9 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           availabilityEnabled: true,
           maxConcurrency: 10,
           requestsPerMinute: 30,
-          timeoutMs: 60_000,
+          // Enforced now: honest-empty answers return in ~40s, but the legacy
+          // anti-bot re-submit path can legitimately run up to ~150s.
+          timeoutMs: 120_000,
           searchCacheTtlMs: 5 * 60 * 1000,
           priceCacheTtlMs: 5 * 60 * 1000,
           availabilityCacheTtlMs: 5 * 60 * 1000,
@@ -118,7 +135,58 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           availabilityEnabled: true,
           maxConcurrency: 4,
           requestsPerMinute: 20,
-          timeoutMs: 60_000,
+          // Enforced now — browser flow, keep headroom above slow searches.
+          timeoutMs: 120_000,
+          searchCacheTtlMs: 5 * 60 * 1000,
+          priceCacheTtlMs: 5 * 60 * 1000,
+          availabilityCacheTtlMs: 5 * 60 * 1000,
+          detailCacheTtlMs: 24 * 60 * 60 * 1000,
+          circuitBreakerThreshold: 10,
+          circuitBreakerOpenMs: 120_000,
+        });
+
+        registry.register(anex, {
+          code: "ANEX",
+          name: "ANEX",
+          serviceTypes: ["tours"],
+          enabled: true,
+          searchEnabled: true,
+          livePriceEnabled: true,
+          availabilityEnabled: true,
+          // Plain REST GET, no browser/captcha — same class as KazUnion.
+          maxConcurrency: 4,
+          // 30 rpm throttled the calendar's town probe (21 cached Towns
+          // lookups) into a 503 rate-limit; ANEX served the geo ingest at
+          // ~70 rpm without flinching.
+          requestsPerMinute: 120,
+          // A wide nights range expands into one exact-night request per
+          // value (up to 27 for 2..28) — give the job room to finish.
+          timeoutMs: 120_000,
+          searchCacheTtlMs: 5 * 60 * 1000,
+          priceCacheTtlMs: 5 * 60 * 1000,
+          availabilityCacheTtlMs: 5 * 60 * 1000,
+          detailCacheTtlMs: 24 * 60 * 60 * 1000,
+          circuitBreakerThreshold: 10,
+          circuitBreakerOpenMs: 120_000,
+        });
+
+        // HOTELS category adapter of the SAME provider code (prompt §2:
+        // Provider → Category-Adapter; serviceTypes do not overlap with the
+        // tours registration above). Registered after tours so legacy
+        // service-less lookups keep resolving the tours adapter.
+        registry.register(anexHotel, {
+          code: "ANEX",
+          name: "ANEX",
+          serviceTypes: ["hotels"],
+          enabled: true,
+          searchEnabled: true,
+          livePriceEnabled: true,
+          availabilityEnabled: true,
+          // Same class as the tours registration: plain REST GET, one exact
+          // request per night of the range (≤30) with bounded parallelism.
+          maxConcurrency: 4,
+          requestsPerMinute: 120,
+          timeoutMs: 120_000,
           searchCacheTtlMs: 5 * 60 * 1000,
           priceCacheTtlMs: 5 * 60 * 1000,
           availabilityCacheTtlMs: 5 * 60 * 1000,
@@ -134,11 +202,13 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
         SummertourNewAdapter,
         KompasSupplierAdapter,
         KazunionAdapter,
+        AnexAdapter,
+        AnexHotelAdapter,
         FlightSupplierRegistry,
         AzalAdapter,
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KazunionHttpService, KazunionAdapter, KazunionSyncService, AzalAdapter, AzalHttpService, AzalLocationsService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KazunionHttpService, KazunionAdapter, KazunionSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, FlightSupplierRegistry],
 })
 export class SupplierModule {}
