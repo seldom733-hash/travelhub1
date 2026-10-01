@@ -292,6 +292,7 @@ enum ProductType {
 
 enum CategoryStatus {
   ACTIVE
+  PENDING
   INACTIVE
 
   @@schema("catalog")
@@ -573,6 +574,25 @@ model PlacementType {
 
 /// Тип питания: RO, BB, HB, FB, AI, UAI…
 model MealType {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  names     Json // { ru, en, az }
+  sortOrder Int            @default(0)
+  status    CategoryStatus @default(ACTIVE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  @@index([status])
+  @@index([sortOrder])
+  @@schema("catalog")
+}
+
+/// Вид с окна: STANDARD (без вида), SEA, CITY, POOL, GARDEN, MOUNTAIN,
+/// MARINA, PARKING… Базовый список — seed; новые от партнёров проходят
+/// модерацию (PENDING → ACTIVE после утверждения/слияния).
+model ViewType {
   id        String         @id @default(uuid())
   code      String         @unique
   names     Json // { ru, en, az }

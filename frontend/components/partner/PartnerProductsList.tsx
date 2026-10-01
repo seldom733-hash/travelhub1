@@ -168,12 +168,20 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
           <h1 className="text-2xl font-bold text-slate-900">{pt("partner.products.title", locale)}</h1>
           <p className="mt-1 text-sm text-slate-500">{pt("partner.products.subtitle", locale)}</p>
         </div>
-        <Link
-          href="/partner/products/new"
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
-        >
-          {pt("partner.products.new", locale)}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/partner/products/new/constructor"
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700"
+          >
+            🧳 Конструктор тура
+          </Link>
+          <Link
+            href="/partner/products/new"
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+          >
+            {pt("partner.products.new", locale)}
+          </Link>
+        </div>
       </div>
 
       {/* Controls */}

@@ -30,6 +30,9 @@ import { StorefrontBehavioralController } from "./behavioral/storefront-behavior
 import { StorefrontBehavioralService } from "./behavioral/storefront-behavioral.service";
 import { MarketplaceBehavioralController } from "./behavioral/marketplace-behavioral.controller";
 import { MarketplaceBehavioralService } from "./behavioral/marketplace-behavioral.service";
+import { TourBuilderController, TourBuilderDictionariesController } from "./tour-builder/tour-builder.controller";
+import { TourBuilderService } from "./tour-builder/tour-builder.service";
+import { DictionaryModerationService } from "./moderation/dictionary-moderation.service";
 
 /**
  * CatalogModule — Catalog Center (Product/Category/Tariff/Availability/Media).
@@ -70,13 +73,14 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
  * soft lifecycle; валюта наследуется из Tariff; POR без числовых периодов.
  */
 @Module({
-  controllers: [CatalogController, ModerationController, PublicCatalogController, PublicSuggestController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController, CommercialRestrictionsController],
+  controllers: [CatalogController, ModerationController, PublicCatalogController, PublicSuggestController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController, CommercialRestrictionsController, TourBuilderController, TourBuilderDictionariesController],
   providers: [
     CatalogService,
     CatalogAccessPolicy,
     ProductMediaService,
     MediaProcessor,
     ModerationService,
+    DictionaryModerationService,
     PublicCatalogService,
     PublicSuggestService,
     AntiDisintermediationService,
@@ -85,6 +89,7 @@ import { MarketplaceBehavioralService } from "./behavioral/marketplace-behaviora
     StorefrontService,
     StorefrontBehavioralService,
     MarketplaceBehavioralService,
+    TourBuilderService,
     ServiceUnitService,
     RatePlanService,
     CommercialPeriodService,

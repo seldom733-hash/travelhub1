@@ -1275,9 +1275,16 @@ export class CatalogService implements OnModuleInit {
     product: { id: string; categoryId: string | null; categorySchemaId: string | null; attributes: Prisma.JsonValue | null; status: ProductStatus },
   ): Promise<void> {
     // Category attributes: валидируются по схеме-снапшоту (как при updateProduct §5-контракт).
-    const attributes = (product.attributes ?? undefined) as Record<string, unknown> | undefined;
+    // Ключи tour-builder (packageKind/tourBuilder) — платформенно-управляемое состояние
+    // Partner Tour Builder (валидация структуры — TourBuilderService, не категория),
+    // поэтому при проверке «attributes без категории» они не учитываются.
+    const BUILDER_MANAGED_KEYS = new Set(["packageKind", "tourBuilder"]);
+    const rawAttributes = (product.attributes ?? undefined) as Record<string, unknown> | undefined;
+    const attributes = rawAttributes
+      ? Object.fromEntries(Object.entries(rawAttributes).filter(([k]) => !BUILDER_MANAGED_KEYS.has(k)))
+      : undefined;
     if (product.categoryId) {
-      await this.resolveCategoryData(tx, product.categoryId, attributes, product.categorySchemaId ?? undefined);
+      await this.resolveCategoryData(tx, product.categoryId, rawAttributes, product.categorySchemaId ?? undefined);
     } else if (attributes && Object.keys(attributes).length > 0) {
       throw new ValidationDomainError("Category-specific attributes require a category");
     }
@@ -1725,10 +1732,18 @@ export class CatalogService implements OnModuleInit {
     preferredSchemaId?: string,
   ): Promise<{ categoryId?: string; categorySchemaId?: string; attributes?: Prisma.InputJsonValue }> {
     if (!categoryId) {
-      if (attributes !== undefined && Object.keys(attributes).length > 0) {
+      // Ключи tour-builder (packageKind/tourBuilder) — платформенно-управляемое состояние
+      // Partner Tour Builder (валидация структуры — TourBuilderService, не категория);
+      // они не требуют категории — та же семантика, что в validateSubmissionEligibility.
+      const BUILDER_MANAGED_KEYS = new Set(["packageKind", "tourBuilder"]);
+      const nonBuilderAttributes =
+        attributes !== undefined
+          ? Object.fromEntries(Object.entries(attributes).filter(([k]) => !BUILDER_MANAGED_KEYS.has(k)))
+          : undefined;
+      if (nonBuilderAttributes && Object.keys(nonBuilderAttributes).length > 0) {
         throw new ValidationDomainError("Category-specific attributes require a category");
       }
-      return {};
+      return attributes !== undefined ? { attributes: attributes as Prisma.InputJsonValue } : {};
     }
     let schema: { id: string; attributes: unknown } | null = null;
     if (preferredSchemaId) {

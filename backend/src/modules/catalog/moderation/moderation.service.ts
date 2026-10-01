@@ -8,6 +8,7 @@ import type { AuthUser } from "../../../security/auth/auth.service";
 import { CatalogAccessPolicy } from "../catalog-access.policy";
 import { CatalogService, type ModerationSnapshot } from "../catalog.service";
 import { AntiDisintermediationService } from "../anti-disintermediation/anti-disintermediation.service";
+import { DictionaryModerationService } from "./dictionary-moderation.service";
 
 /** Stable backend reason codes (Step 1.4 §15). OTHER требует comment.
  * Step 1.11: anti-disintermediation reason codes (§13) — используются MODERATOR-ом
@@ -87,6 +88,7 @@ export class ModerationService {
     private readonly policy: CatalogAccessPolicy,
     private readonly security: SecurityService,
     private readonly antiDisintermediation: AntiDisintermediationService,
+    private readonly dictionaryModeration: DictionaryModerationService,
   ) {}
 
   // ── Submit (PARTNER: свой Product) ─────────────────────────────────────────
@@ -336,6 +338,9 @@ export class ModerationService {
           `Submission is stale: change proposal revision ${product.draft?.version ?? "<none>"} != reviewed revision ${row.draftVersion}; re-submit required`,
         );
       }
+      // Pre-publish гейт справочников (решение №3 плана): продукт со ссылками на
+      // PENDING типы номеров/видов не публикуется — сначала очередь справочников.
+      await this.dictionaryModeration.assertNoPendingDictionaryRefs(tx, row.productId);
       await this.catalog.publishAfterModerationApproval(tx, row.productId, actor, row.id);
       await this.security.audit(tx, {
         userId: actor.id,
@@ -387,6 +392,106 @@ export class ModerationService {
       });
       return tx.moderationSubmission.findUniqueOrThrow({ where: { id: row.id }, include: { product: { select: { code: true, title: true } } } });
     }, reasonCode, comment);
+  }
+
+  /**
+   * Editorial-правка модератора во время review (решение №3 плана): контент
+   * карточки БЕЗ цен (title/description/имена компонентов/подписи media).
+   *
+   * Границы:
+   *  - только активная submission (SUBMITTED/IN_REVIEW) и без change proposal
+   *    (draft редактирует партнёром — инвариант draftVersion остаётся нетронут);
+   *  - цены (Tariff/CommercialPeriod) и атрибуты-структура не входят в whitelist;
+   *  - snapshot submission остаётся историей submitted-контента; публикация
+   *    увидит отредактированный live (approve не сломан — version не растёт).
+   */
+  async editorialPatch(
+    id: string,
+    actor: AuthUser,
+    input: {
+      title?: string;
+      description?: string;
+      units?: Array<{ id: string; name: string }>;
+      media?: Array<{ id: string; caption?: string | null; altText?: string | null }>;
+      comment?: string;
+    },
+  ): Promise<SubmissionView> {
+    const row = await this.prisma.moderationSubmission.findUnique({
+      where: { id },
+      include: { product: { select: { id: true, code: true, partnerId: true, draft: { select: { id: true } } } } },
+    });
+    if (!row) throw new NotFoundError(`Moderation submission ${id} not found`);
+    if (row.status !== "SUBMITTED" && row.status !== "IN_REVIEW") {
+      throw new ConflictError(`Cannot editorial-patch: submission is ${row.status}`);
+    }
+    this.assertNoSelfModeration(actor, row.product.partnerId);
+    if (row.product.draft) {
+      throw new ConflictError("Change proposal: content is edited by the partner (draft); editorial patch is not available");
+    }
+
+    const title = input.title?.trim();
+    const description = input.description;
+    const units = input.units ?? [];
+    const media = input.media ?? [];
+    if (title !== undefined && title.length < 1) throw new ValidationDomainError("title is empty");
+    if (title !== undefined && title.length > 300) throw new ValidationDomainError("title: max 300 chars");
+    if (description !== undefined && description.length > 10_000) throw new ValidationDomainError("description: max 10000 chars");
+    if (title === undefined && description === undefined && units.length === 0 && media.length === 0) {
+      throw new ValidationDomainError("editorial: no changes requested (whitelist: title/description/units/media)");
+    }
+
+    const changed: string[] = [];
+    await this.prisma.$transaction(async (tx) => {
+      if (title !== undefined || description !== undefined) {
+        await tx.product.update({
+          where: { id: row.productId },
+          data: {
+            ...(title !== undefined ? { title } : {}),
+            ...(description !== undefined ? { description } : {}),
+            updatedBy: actor.username,
+          },
+        });
+        if (title !== undefined) changed.push("title");
+        if (description !== undefined) changed.push("description");
+      }
+      for (const unit of units) {
+        const name = unit.name?.trim() ?? "";
+        if (name.length < 1 || name.length > 200) throw new ValidationDomainError(`unit ${unit.id}: name must be 1..200 chars`);
+        const res = await tx.serviceUnit.updateMany({
+          where: { id: unit.id, productId: row.productId },
+          data: { name },
+        });
+        if (res.count === 0) throw new NotFoundError(`ServiceUnit ${unit.id} not found in product ${row.product.code}`);
+        changed.push(`unit:${unit.id}`);
+      }
+      for (const m of media) {
+        const data: Record<string, string> = {};
+        if (m.caption !== undefined && m.caption !== null) {
+          if (m.caption.length > 500) throw new ValidationDomainError(`media ${m.id}: caption max 500 chars`);
+          data.caption = m.caption;
+        }
+        if (m.altText !== undefined && m.altText !== null) {
+          if (m.altText.length > 500) throw new ValidationDomainError(`media ${m.id}: altText max 500 chars`);
+          data.altText = m.altText;
+        }
+        if (Object.keys(data).length === 0) continue;
+        const res = await tx.productMedia.updateMany({
+          where: { id: m.id, productId: row.productId },
+          data,
+        });
+        if (res.count === 0) throw new NotFoundError(`Media ${m.id} not found in product ${row.product.code}`);
+        changed.push(`media:${m.id}`);
+      }
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "moderation.editorial_patch",
+        resource: "ModerationSubmission",
+        resourceId: id,
+        details: { productId: row.productId, changed, comment: input.comment ?? null },
+      });
+    });
+    return this.getById(id);
   }
 
   /**

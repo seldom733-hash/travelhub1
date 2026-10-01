@@ -8,6 +8,7 @@ import { ConflictError, NotFoundError, ValidationDomainError } from "../../../sh
 import type { AuthUser } from "../../../security/auth/auth.service";
 import type { PrismaService } from "../../../prisma/prisma.service";
 import { AntiDisintermediationService } from "../anti-disintermediation/anti-disintermediation.service";
+import type { DictionaryModerationService } from "./dictionary-moderation.service";
 
 const MODERATOR: AuthUser = {
   id: "u-mod",
@@ -155,8 +156,19 @@ function makeSecurityStub() {
   return { audit: jest.fn().mockResolvedValue(undefined) } as unknown as SecurityService;
 }
 
+function makeDictionaryStub() {
+  return { assertNoPendingDictionaryRefs: jest.fn().mockResolvedValue(undefined) } as unknown as DictionaryModerationService;
+}
+
 function makeService(prisma: PrismaStub, catalog: CatalogService, security: SecurityService) {
-  return new ModerationService(prisma as never, catalog, new CatalogAccessPolicy(), security, new AntiDisintermediationService());
+  return new ModerationService(
+    prisma as never,
+    catalog,
+    new CatalogAccessPolicy(),
+    security,
+    new AntiDisintermediationService(),
+    makeDictionaryStub(),
+  );
 }
 
 describe("ModerationService (Phase 1 Step 1.4) — unit", () => {

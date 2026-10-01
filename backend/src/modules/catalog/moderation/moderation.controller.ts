@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { Type } from "class-transformer";
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { IsArray, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested } from "class-validator";
 import { ModerationSubmissionStatus, RoleCode } from "../../../generated/prisma/enums";
 import { ModerationService, MODERATION_REASON_CODES, type ModerationListQuery } from "./moderation.service";
+import { DictionaryModerationService } from "./dictionary-moderation.service";
 import { JwtAuthGuard } from "../../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../../security/auth/decorators";
@@ -52,6 +53,53 @@ class ListSubmissionsQuery implements ModerationListQuery {
   pageSize?: number;
 }
 
+class EditorialUnitDto {
+  @IsString()
+  id!: string;
+
+  @IsString() @MaxLength(200)
+  name!: string;
+}
+
+class EditorialMediaDto {
+  @IsString()
+  id!: string;
+
+  @IsOptional() @IsString() @MaxLength(500)
+  caption?: string;
+
+  @IsOptional() @IsString() @MaxLength(500)
+  altText?: string;
+}
+
+/** Editorial-правка модератора: только контент-поля, БЕЗ цен (решение №3). */
+class EditorialPatchDto {
+  @IsOptional() @IsString() @MaxLength(300)
+  title?: string;
+
+  @IsOptional() @IsString() @MaxLength(10_000)
+  description?: string;
+
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => EditorialUnitDto)
+  units?: EditorialUnitDto[];
+
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => EditorialMediaDto)
+  media?: EditorialMediaDto[];
+
+  @IsOptional() @IsString() @MaxLength(1000)
+  comment?: string;
+}
+
+class DictionaryMergeDto {
+  @IsString()
+  targetId!: string;
+}
+
+class DictionaryRejectDto {
+  @IsOptional() @IsString() @MaxLength(1000)
+  comment?: string;
+}
+
 /**
  * Moderation API (Phase 1 Step 1.4): /api/v1/moderation/submissions + submit/history.
  *
@@ -67,7 +115,10 @@ class ListSubmissionsQuery implements ModerationListQuery {
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller()
 export class ModerationController {
-  constructor(private readonly moderation: ModerationService) {}
+  constructor(
+    private readonly moderation: ModerationService,
+    private readonly dictionary: DictionaryModerationService,
+  ) {}
 
   // ── Submit (PARTNER: свой Product) ─────────────────────────────────────────
 
@@ -135,6 +186,52 @@ export class ModerationController {
   @RequirePermissions("moderation.request_changes")
   requestChanges(@Param("id") id: string, @Body() dto: RejectDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.moderation.requestChanges(id, actor, dto.reasonCode, dto.comment);
+  }
+
+  /**
+   * Editorial-правка карточки продукта во время review (без цен): whitelist
+   * title/description/имена компонентов/подписи media (решение №3 плана).
+   */
+  @Patch("moderation/submissions/:id/editorial")
+  @RequirePermissions("moderation.review")
+  editorialPatch(@Param("id") id: string, @Body() dto: EditorialPatchDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.moderation.editorialPatch(id, actor, dto);
+  }
+
+  // ── Dictionary entries queue (типы номеров/видов конструктора) ─────────────
+
+  @Get("moderation/dictionary-entries")
+  @RequirePermissions("moderation.review")
+  listDictionaryEntries(@Query("type") type: string | undefined, @Query("status") status: string | undefined) {
+    return this.dictionary.list(type ?? "", status);
+  }
+
+  @Post("moderation/dictionary-entries/:type/:id/approve")
+  @RequirePermissions("moderation.approve")
+  approveDictionaryEntry(@Param("type") type: string, @Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.dictionary.approve(type, id, actor);
+  }
+
+  @Post("moderation/dictionary-entries/:type/:id/merge")
+  @RequirePermissions("moderation.approve")
+  mergeDictionaryEntry(
+    @Param("type") type: string,
+    @Param("id") id: string,
+    @Body() dto: DictionaryMergeDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.dictionary.merge(type, id, dto.targetId, actor);
+  }
+
+  @Post("moderation/dictionary-entries/:type/:id/reject")
+  @RequirePermissions("moderation.reject")
+  rejectDictionaryEntry(
+    @Param("type") type: string,
+    @Param("id") id: string,
+    @Body() dto: DictionaryRejectDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.dictionary.reject(type, id, actor, dto.comment);
   }
 }
 

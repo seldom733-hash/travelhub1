@@ -16,6 +16,7 @@ export const PARTNER_DICT: Record<string, Record<Locale, string>> = {
   "partner.nav.overview": { ru: "Обзор", az: "İcmal", en: "Overview" },
   "partner.nav.products": { ru: "Мои услуги", az: "Mənim xidmətlərim", en: "My Products" },
   "partner.nav.new_product": { ru: "Новая услуга", az: "Yeni xidmət", en: "New product" },
+  "partner.nav.tour_constructor": { ru: "Конструктор тура", az: "Tur konstruktoru", en: "Tour builder" },
   "partner.nav.seller_identity": { ru: "Идентичность", az: "Kimlik", en: "Seller identity" },
   "partner.nav.storefront": { ru: "Витрина", az: "Vitrin", en: "Storefront" },
   "partner.nav.account": { ru: "Аккаунт", az: "Hesab", en: "Account" },

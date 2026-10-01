@@ -65,3 +65,6 @@ login.json
 
 # Archived unused files (moved out of backend/frontend/root with paths preserved)
 /unneeded/
+
+# Hotel photos (707 MB, downloaded separately — referenced by lib/hotel-photo.ts)
+frontend/public/hotels/

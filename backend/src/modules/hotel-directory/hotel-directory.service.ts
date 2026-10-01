@@ -18,6 +18,7 @@ export const HOTEL_DIRECTORY_TYPES = [
   "room-types",
   "placement-types",
   "meal-types",
+  "view-types",
 ] as const;
 export type HotelDirectoryType = (typeof HOTEL_DIRECTORY_TYPES)[number];
 
@@ -26,6 +27,7 @@ const MODEL_BY_TYPE: Record<HotelDirectoryType, string> = {
   "room-types": "roomType",
   "placement-types": "placementType",
   "meal-types": "mealType",
+  "view-types": "viewType",
 };
 
 const AUDIT_BY_TYPE: Record<HotelDirectoryType, string> = {
@@ -33,6 +35,7 @@ const AUDIT_BY_TYPE: Record<HotelDirectoryType, string> = {
   "room-types": "RoomType",
   "placement-types": "PlacementType",
   "meal-types": "MealType",
+  "view-types": "ViewType",
 };
 
 interface DirectoryWhere {

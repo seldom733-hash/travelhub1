@@ -16,6 +16,9 @@ export const PERMISSIONS = {
   "hotel_directory.create": "Создание записей гостиничного справочника",
   "hotel_directory.update": "Изменение записей гостиничного справочника",
   "hotel_directory.delete": "Удаление записей гостиничного справочника",
+  // Конструктор туров: партнёр предлагает запись справочника (тип номера/вида)
+  // со статусом PENDING — утверждает модератор (approve/merge/reject).
+  "catalog.dictionary.propose": "Предложение записи справочника типов/видов (PARTNER, PENDING → модерация)",
   // ── Catalog ───────────────────────────────────────────────────────────
   "catalog.product.read": "Чтение продуктов",
   "catalog.product.read_for_moderation": "Чтение продуктов для модерации (MODERATOR)",
@@ -627,6 +630,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "catalog.product.update_own_draft",
     "catalog.product.submit_moderation",
     "catalog.product.channels_own",
+    // Конструктор туров: предложение своего типа номера/вида (PENDING → модерация).
+    "catalog.dictionary.propose",
     // Step 1.8 (clarification): ТОЛЬКО editor-контракт ACTIVE схемы, НЕ internal
     // category_schema.read (последний отсутствует у PARTNER и не выдаётся).
     "catalog.category_schema.read_active_for_product_edit",

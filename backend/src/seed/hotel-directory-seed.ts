@@ -48,6 +48,7 @@ const ROOM_TYPES: Entry[] = [
 const PLACEMENT_TYPES: Entry[] = [
   { code: "SNGL", ru: "Одноместное", en: "Single", az: "Tək nəfərlik" },
   { code: "DBL", ru: "Двухместное", en: "Double", az: "İki nəfərlik" },
+  { code: "TWIN", ru: "Двухспальное", en: "Twin", az: "Twin" },
   { code: "TRPL", ru: "Трёхместное", en: "Triple", az: "Üç nəfərlik" },
   { code: "QDPL", ru: "Четырёхместное", en: "Quadruple", az: "Dörd nəfərlik" },
 ];
@@ -61,8 +62,19 @@ const MEAL_TYPES: Entry[] = [
   { code: "UAI", ru: "Ультра всё включено", en: "Ultra all inclusive", az: "Ultra hər şey daxil" },
 ];
 
+const VIEW_TYPES: Entry[] = [
+  { code: "STANDARD", ru: "Без вида", en: "No view", az: "Mənzərəsiz" },
+  { code: "SEA", ru: "На море", en: "Sea view", az: "Dəniz mənzərəsi" },
+  { code: "CITY", ru: "На город", en: "City view", az: "Şəhər mənzərəsi" },
+  { code: "POOL", ru: "На бассейн", en: "Pool view", az: "Hovuz mənzərəsi" },
+  { code: "GARDEN", ru: "На сад", en: "Garden view", az: "Bağ mənzərəsi" },
+  { code: "MOUNTAIN", ru: "На горы", en: "Mountain view", az: "Dağ mənzərəsi" },
+  { code: "MARINA", ru: "На марину", en: "Marina view", az: "Marina mənzərəsi" },
+  { code: "PARKING", ru: "На парковку", en: "Parking view", az: "Parkinq mənzərəsi" },
+];
+
 async function seed(
-  delegate: "hotelCategory" | "roomType" | "placementType" | "mealType",
+  delegate: "hotelCategory" | "roomType" | "placementType" | "mealType" | "viewType",
   entries: Entry[],
 ): Promise<number> {
   let n = 0;
@@ -91,8 +103,9 @@ async function main(): Promise<void> {
   const roomTypes = await seed("roomType", ROOM_TYPES);
   const placements = await seed("placementType", PLACEMENT_TYPES);
   const meals = await seed("mealType", MEAL_TYPES);
+  const views = await seed("viewType", VIEW_TYPES);
   console.log(
-    `hotel-directory-seed done: categories=${categories} roomTypes=${roomTypes} placements=${placements} meals=${meals}`,
+    `hotel-directory-seed done: categories=${categories} roomTypes=${roomTypes} placements=${placements} meals=${meals} views=${views}`,
   );
 }
 
