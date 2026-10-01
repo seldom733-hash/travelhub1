@@ -29,37 +29,45 @@ export interface TourSearchDraft {
   selectedSuppliers: string[];
 }
 
-const KEY = "th.tourSearchDraft.v1";
-// undefined = not read yet; null = no draft.
-let mem: TourSearchDraft | null | undefined;
+const BASE_KEY = "th.tourSearchDraft.v1";
+// Per-namespace drafts: separate mounts of the search form must not restore
+// each other's picks. undefined = not read yet; null = no draft.
+const mem = new Map<string, TourSearchDraft | null | undefined>();
 
-export function readTourDraft(): TourSearchDraft | null {
-  if (mem !== undefined) return mem;
+const storageKey = (ns: string) => (ns ? `${BASE_KEY}.${ns}` : BASE_KEY);
+
+export function readTourDraft(ns = ""): TourSearchDraft | null {
+  const cached = mem.get(ns);
+  if (cached !== undefined) return cached;
+  let value: TourSearchDraft | null = null;
   try {
     const raw =
-      typeof window !== "undefined" ? window.sessionStorage.getItem(KEY) : null;
-    mem = raw ? (JSON.parse(raw) as TourSearchDraft) : null;
+      typeof window !== "undefined"
+        ? window.sessionStorage.getItem(storageKey(ns))
+        : null;
+    value = raw ? (JSON.parse(raw) as TourSearchDraft) : null;
   } catch {
-    mem = null;
+    value = null;
   }
-  return mem;
+  mem.set(ns, value);
+  return value;
 }
 
-export function writeTourDraft(draft: TourSearchDraft): void {
-  mem = draft;
+export function writeTourDraft(draft: TourSearchDraft, ns = ""): void {
+  mem.set(ns, draft);
   try {
     if (typeof window !== "undefined") {
-      window.sessionStorage.setItem(KEY, JSON.stringify(draft));
+      window.sessionStorage.setItem(storageKey(ns), JSON.stringify(draft));
     }
   } catch {
     // storage unavailable (private mode/quota) — module memory still works
   }
 }
 
-export function clearTourDraft(): void {
-  mem = null;
+export function clearTourDraft(ns = ""): void {
+  mem.set(ns, null);
   try {
-    if (typeof window !== "undefined") window.sessionStorage.removeItem(KEY);
+    if (typeof window !== "undefined") window.sessionStorage.removeItem(storageKey(ns));
   } catch {
     // ignore
   }
