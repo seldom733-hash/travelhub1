@@ -62,3 +62,6 @@ login.json
 # KazUnion supplier session/captcha artifacts
 .kazunion-session.json
 .kazunion-captcha.jpg
+
+# Archived unused files (moved out of backend/frontend/root with paths preserved)
+/unneeded/
