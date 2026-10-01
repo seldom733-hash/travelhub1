@@ -471,7 +471,7 @@ export default function MonthlyCalendar({
           </div>
           <div className="grid grid-cols-7 gap-1">
             {calendarDays.map((day) => {
-              const isAvailable = day.isCurrentMonth && day.entry && day.entry.availability === "AVAILABLE" && day.entry.price !== null;
+              const isAvailable = day.isCurrentMonth && day.entry && day.entry.availability !== "NOT_AVAILABLE" && day.entry.price !== null;
               const isToday = day.dateStr === new Date().toISOString().slice(0, 10);
               return (
                 <button

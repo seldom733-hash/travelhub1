@@ -171,7 +171,7 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     }
   });
 
-  it("falls back to TOURINC fan-out when the supplier only has TOUR links for the city", async () => {
+  it("searches WITHOUT a program («Любой») when the supplier only has TOUR links for the city", async () => {
     mockPrisma.supplierGeoLink.findMany.mockResolvedValue([
       { supplierCode: "KOMPAS", externalId: "3706", label: "AE: Дубай из Баку (GDS: AZAL)", kind: "TOUR" },
     ]);
@@ -179,8 +179,13 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     await aggregator.searchByService("tours", baseQuery);
 
     const kompasIdx = searchedSuppliers.indexOf("KOMPAS");
-    expect(searchedQueries[kompasIdx].tourIncValue).toBe("3706");
-    expect(searchedQueries[kompasIdx].tourIncValues).toBeUndefined(); // consumed by fan-out
+    expect(kompasIdx).toBeGreaterThanOrEqual(0);
+    // The legacy TOURINC fan-out pinned the search to the programs stored at
+    // ingest time; when the supplier re-numbered its programs those ids went
+    // stale and the search silently returned nothing. No program, ever.
+    expect(searchedQueries[kompasIdx].tourIncValue).toBeUndefined();
+    expect(searchedQueries[kompasIdx].tourIncValues).toBeUndefined();
+    expect(searchedQueries[kompasIdx].towns).toBeUndefined();
   });
 
   it("matches supplier labels against the geo entity's own names, scoped to its country", async () => {
@@ -301,7 +306,7 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     );
   });
 
-  it("passes the entity's names as townNames even in the TOURINC fallback", async () => {
+  it("passes the entity's names as townNames even when the supplier has no TOWN links", async () => {
     mockPrisma.geoCity.findUnique.mockResolvedValue({
       names: { ru: "Баку", en: "Baku" },
       country: { code: "TR" },
@@ -317,24 +322,29 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     expect(searchedQueries[kompasIdx].townNames).toEqual(["Баку", "Baku"]);
   });
 
-  it("returns one offer (and one counted) when several jobs answer the same external id", async () => {
-    // TOURINC fan-out = N jobs over ONE supplier; without dedupe Гойнюк
-    // returned 2235 offers for 921 unique external ids (verified live).
+  it("counts one offer when a job answers the same external id twice", async () => {
+    // One job per supplier («Любой», no TOURINC fan-out); the global dedupe
+    // still collapses duplicate external ids inside a job's own rows.
     mockPrisma.supplierGeoLink.findMany.mockResolvedValue([
       { supplierCode: "KOMPAS", externalId: "77", label: "Dubai City Tour", kind: "TOUR" },
-      { supplierCode: "KOMPAS", externalId: "78", label: "Dubai Safari", kind: "TOUR" },
     ]);
+    mockOfferService.search.mockImplementation((code: string, q: SupplierSearchQuery) => {
+      searchedSuppliers.push(code);
+      searchedQueries.push(q);
+      return Promise.resolve([makeOffer(code, "Hotel X"), makeOffer(code, "Hotel X")]);
+    });
 
     const result = await aggregator.searchByService("tours", baseQuery);
 
-    expect(searchedSuppliers.filter((c) => c === "KOMPAS")).toHaveLength(2);
+    expect(searchedSuppliers.filter((c) => c === "KOMPAS")).toHaveLength(1);
     expect(result.offers).toHaveLength(1);
     expect(result.perSupplier["KOMPAS"]).toEqual({ count: 1 });
   });
 
-  it("does not treat a label-substring hit as the city when another supplier has TOWN links", async () => {
+  it("never turns a label-substring hit into a city filter or a program filter", async () => {
     // KAZUNION has no TOWN link for Dubai but a TOUR label contains "DUBAI"
-    // → legacy TOUR fan-out, never a country-wide search.
+    // → the label must NOT become towns=…, and «Любой» means no tourIncValue
+    // either (the legacy TOURINC fan-out is gone).
     mockPrisma.supplierGeoLink.findMany.mockImplementation(async (args: { where: { supplierCode: { in: string[] }; OR: unknown } }) => {
       const codes = args.where.supplierCode.in;
       return codes.includes("KOMPAS")
@@ -346,8 +356,7 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
 
     const kazIdx = searchedSuppliers.indexOf("KAZUNION");
     if (kazIdx >= 0) {
-      // If queried at all, it must be scoped to the TOUR program — not country-wide.
-      expect(searchedQueries[kazIdx].tourIncValue).toBe("77");
+      expect(searchedQueries[kazIdx].tourIncValue).toBeUndefined();
       expect(searchedQueries[kazIdx].towns).toBeUndefined();
     } else {
       expect(result.perSupplier["KAZUNION"]).toBeUndefined();
@@ -381,7 +390,7 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     expect([...new Set(searchedSuppliers)]).toEqual(resolved);
   });
 
-  it("resolveSuppliers deduplicates suppliers when TOURINC fan-out creates several jobs", async () => {
+  it("resolveSuppliers lists the supplier once when it only has TOUR links (no fan-out)", async () => {
     mockPrisma.supplierGeoLink.findMany.mockResolvedValue([
       { supplierCode: "KOMPAS", externalId: "77", label: "Dubai City Tour", kind: "TOUR" },
       { supplierCode: "KOMPAS", externalId: "78", label: "Dubai Safari", kind: "TOUR" },

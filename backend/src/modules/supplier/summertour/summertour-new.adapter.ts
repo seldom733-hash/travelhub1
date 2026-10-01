@@ -67,8 +67,11 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
   private browser: Browser | null = null;
   private readonly browserLock = new Map<string, Promise<Browser>>();
 
-  private static readonly MAX_PAGES = 5;
-  private static readonly PAGE_DELAY_MS = 2_000;
+  // The SAMO price table for a whole country runs 30+ pages × 100 rows
+  // (verified live: PRICEPAGE keeps returning rows past the pager window).
+  // 5 pages truncated the answer to a fraction of the catalog.
+  private static readonly MAX_PAGES = 30;
+  private static readonly PAGE_DELAY_MS = 1_000;
   /** Transient empty-XHR retries (parity with the KOMPAS no-rows retry). */
   private static readonly XHR_ATTEMPTS = 3;
   private static readonly CALENDAR_WINDOW_DAYS = 31;
@@ -394,7 +397,11 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     }
     return {
       supplierCode: this.code,
-      externalOfferId: raw.spoKey,
+      // Composite id (parity with KazUnion): one row of the SAMO price table =
+      // spoKey + hotel + checkIn + room + meal. A bare spoKey is the PROGRAM
+      // group id (probe: 3000 rows → 7 spoKeys) and collapses every room/meal
+      // variant in the aggregator's global dedupe.
+      externalOfferId: `${raw.spoKey}-${raw.hotelKey}-${raw.checkIn}-${raw.roomKey}-${raw.mealKey}`,
       externalClaim: raw.claim,
       hotel: raw.hotel || query.hotel || undefined,
       hotelExternalId: raw.hotelKey || query.hotelExternalId || undefined,
@@ -482,9 +489,14 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     const programs = (query.tourIncValues?.length ?? 0) > 0 ? query.tourIncValues!.map((v, i) => ({ value: v, name: query.tourIncNames?.[i] })) : query.tourIncValue ? [{ value: query.tourIncValue, name: query.tourIncName }] : [];
     const collected: SupplierOffer[] = [];
 
-    if (query.hotelExternalId && programs.length > 0) {
+    if (query.hotelExternalId) {
+      // «Любой»: no program on the query → TOURINC=0 (any program of the
+      // hotel). Programs get re-numbered by the supplier, so card calendars
+      // no longer pin a stored tourIncValue (stale id = silent empty month).
+      const programList: Array<{ value: string; name?: string }> =
+        programs.length > 0 ? programs : [{ value: "0" }];
       // Hotel-specific calendar. Default "range" (KOMPAS-style): 31-day
-      // windows with PRICEPAGE pagination вЂ” few requests. "perday" keeps the
+      // windows with PRICEPAGE pagination - few requests. "perday" keeps the
       // legacy per-date iteration (~30 requests/month, A/B + fallback).
       // Captcha: script D:\test.ps1 flow вЂ” detect captchaForm/bfcaptcha/antibot in response в†’ show image + input в†’ POST antibot
       const mode = query.calendarMode ?? "range";
@@ -514,12 +526,12 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
         const parserPage = await context.newPage();
         try {
           if (mode !== "perday") {
-            await this.collectHotelRanged(page, parserPage, context, query, programs, collected, () => { captchaThrown = true; });
+            await this.collectHotelRanged(page, parserPage, context, query, programList, collected, () => { captchaThrown = true; });
           } else {
           const allDates: string[] = [];
           { let cur = new Date(query.dateFrom); const end = new Date(query.dateTo); while (cur <= end) { allDates.push(this.formatDate(cur)); cur.setDate(cur.getDate() + 1); } }
           for (const dateStr of allDates) {
-            for (const pr of programs) {
+            for (const pr of programList) {
               const p = new URLSearchParams();
               p.set("samo_action", "PRICES");
               p.set("TOWNFROMINC", "1930");
@@ -715,7 +727,10 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     // Reuse the solved page/context to fetch prices (keeps antibot cookie)
     const page = ch.page;
     const context = ch.context;
-    const programs = (query.tourIncValues?.length ?? 0) > 0 ? query.tourIncValues!.map((v, i) => ({ value: v, name: query.tourIncNames?.[i] })) : query.tourIncValue ? [{ value: query.tourIncValue, name: query.tourIncName }] : [];
+    // Captcha-resume of the per-day hotel flow: same «Любой» default — without
+    // a program on the query the XHR runs with TOURINC=0 instead of looping
+    // over an empty program list (which collected nothing).
+    const programs: Array<{ value: string; name?: string }> = (query.tourIncValues?.length ?? 0) > 0 ? query.tourIncValues!.map((v, i) => ({ value: v, name: query.tourIncNames?.[i] })) : query.tourIncValue ? [{ value: query.tourIncValue, name: query.tourIncName }] : [{ value: "0" }];
     const collected: SupplierOffer[] = [];
     const allDates: string[] = [];
     { let cur = new Date(query.dateFrom); const end = new Date(query.dateTo); while (cur <= end) { allDates.push(this.formatDate(cur)); cur.setDate(cur.getDate() + 1); } }

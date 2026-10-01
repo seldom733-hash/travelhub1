@@ -53,7 +53,9 @@ describe("KompasSupplierAdapter", () => {
       const result = (adapter as any).normalizeOffer(raw, query);
 
       expect(result.supplierCode).toBe("KOMPAS");
-      expect(result.externalOfferId).toBe("35000");
+      // Composite: spoKey alone is the program group id — it must never be
+      // the dedupe identity (every row of a program shares one spoKey).
+      expect(result.externalOfferId).toBe("35000-2807-20260919-5-10");
       expect(result.externalClaim).toBe("cat-claim-123");
       expect(result.hotel).toBe("Rixos Premium Tekirova");
       expect(result.hotelExternalId).toBe("2807");

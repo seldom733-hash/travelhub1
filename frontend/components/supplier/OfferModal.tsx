@@ -142,8 +142,6 @@ function OfferRow({
           supplierCode: offer.supplierCode ?? "KOMPAS",
           hotel: offer.hotel,
           hotelExternalId: offer.hotelExternalId,
-          tourIncValue: offer.tourIncValue,
-          tourIncName: offer.tourIncName,
           destination: offer.destination,
           adults: offer.adults,
           children: offer.children,

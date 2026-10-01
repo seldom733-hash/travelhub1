@@ -47,14 +47,11 @@ export default function TourDetail({
   const [childAges, setChildAges] = useState<number[]>([]);
   const [nights, setNights] = useState(7);
 
-  // Product identity — KOMPAS live ingestion stores tourKey (e.g. 3332) as tourKey/stateInc; use it as tourIncValue
+  // Product identity — hotel keys pin the calendar to THIS hotel; the program
+  // (tourIncValue) is deliberately NOT sent: supplier programs get re-numbered
+  // and a stale id silently returns an empty calendar. «Любой» covers all
+  // programs of the hotel (user decision, 2026-10-01).
   const hotelExternalId = (attributes?.hotelExternalId as string) ?? (attributes?.hotelKey as string) ?? undefined;
-  const tourIncValue =
-    (attributes?.tourIncValue as string) ??
-    (attributes?.programIncValue as string) ??
-    (attributes?.tourKey as string) ??
-    undefined;
-  const tourIncName = (attributes?.tourIncName as string) ?? (attributes?.programIncName as string) ?? undefined;
   const hotelName = title;
 
   // Strip location suffix like "(Султанахмет)" from hotel name for KOMPAS queries
@@ -67,8 +64,6 @@ export default function TourDetail({
     hotel: cleanHotelName,
     destination,
     departureCity,
-    tourIncValue,
-    tourIncName,
     nights,
     adults,
     children: children || undefined,

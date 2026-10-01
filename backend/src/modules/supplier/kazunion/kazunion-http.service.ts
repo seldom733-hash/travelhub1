@@ -294,7 +294,9 @@ export class KazunionHttpService {
     const rows: KazunionOfferRow[] = [];
     const seen = new Set<string>();
     const startPage = params.startPage ?? 1;
-    const maxPages = params.maxPages ?? 5;
+    // 30 × 100 rows: the SAMO table for a whole country runs 10-11+ pages
+    // (verified live) — the old 5-page cap truncated every program.
+    const maxPages = params.maxPages ?? 30;
 
     for (let page = startPage; page < startPage + maxPages; page++) {
       const url = this.buildPricesUrl(params, page);

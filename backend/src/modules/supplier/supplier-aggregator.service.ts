@@ -419,8 +419,8 @@ export class SupplierAggregatorService {
 
   /**
    * Candidate suppliers → concrete search jobs: capability gate, then
-   * SupplierGeoLink resolution, then TOURINC fan-out. Shared by the live
-   * search and by resolveSuppliers so both always agree on who participates.
+   * SupplierGeoLink resolution. Shared by the live search and by
+   * resolveSuppliers so both always agree on who participates.
    */
   private async buildJobs(
     serviceType: SupplierServiceType,
@@ -475,7 +475,8 @@ export class SupplierAggregatorService {
       await this.resolveHotelKeys(svcQuery, perSupplierQueries);
     }
 
-    // Fan out per geo link when resolved (TOURINC is singular per SAMO search).
+    // One job per geo link (TOURINC is singular per SAMO search); without a
+    // program filter — «Любой» — a supplier resolves to a single job.
     const jobs: { code: string; q: SupplierSearchQuery }[] = [];
     for (const adapter of candidates) {
       const raw = perSupplierQueries[adapter.code];
@@ -488,13 +489,7 @@ export class SupplierAggregatorService {
       // keys for the SAME search — every multi-supplier query missed the cache
       // and re-ran the slowest adapter. Strip it at the job boundary.
       const q: SupplierSearchQuery = { ...raw, suppliers: undefined };
-      if (q.tourIncValues?.length) {
-        q.tourIncValues.forEach((v, i) => {
-          jobs.push({ code: adapter.code, q: { ...q, tourIncValue: v, tourIncName: q.tourIncNames?.[i], tourIncValues: undefined, tourIncNames: undefined } });
-        });
-      } else {
-        jobs.push({ code: adapter.code, q });
-      }
+      jobs.push({ code: adapter.code, q });
     }
     return { jobs, hasCandidates: true };
   }
@@ -645,15 +640,14 @@ export class SupplierAggregatorService {
           result[code] = { ...query, towns: townIds.join(","), townNames };
           continue;
         }
-        // Fallback: TOUR-dimension links (legacy TOURINC fan-out). No TOWN ids
-        // to filter by → the entity's own names are the only precise handle.
-        result[code] = {
-          ...query,
-          townNames: geoNames,
-          tourIncValues: supplierLinks.map((l) => l.externalId),
-          tourIncNames: supplierLinks.map((l) => l.label),
-          tourIncValue: undefined,
-        };
+        // No TOWN ids for this city (e.g. KOMPAS has no resort link for a
+        // city-tour destination like Istanbul): search WITHOUT a program
+        // filter — «Любой». The legacy TOURINC fan-out pinned the search to
+        // the programs stored at ingest time; when the supplier re-numbers its
+        // programs those ids go stale and the search silently returns nothing.
+        // Country-wide precision for such cities is an accepted trade-off;
+        // townNames still travels for adapters that post-filter by name.
+        result[code] = { ...query, townNames };
       }
     } catch (e) {
       // Geo resolution failed → be conservative: skip every supplier for this

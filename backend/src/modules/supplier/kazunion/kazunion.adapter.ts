@@ -269,7 +269,7 @@ export class KazunionAdapter implements SupplierAdapter {
     // takes precedence over fuzzy destination matching (verified supplier
     // capture: TOWNS=<ids>&TOWNS_ANY=0).
     const townsCsv = (query as { towns?: string }).towns?.replace(/\s+/g, "") || undefined;
-    const maxPages = (query as KazunionSearchQuery).maxPages ?? 5;
+    const maxPages = (query as KazunionSearchQuery).maxPages ?? 30;
 
     const rows: KazunionOfferRow[] = [];
     for (const program of programs) {

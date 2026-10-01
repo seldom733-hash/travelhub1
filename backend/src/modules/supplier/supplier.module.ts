@@ -114,9 +114,11 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           availabilityEnabled: true,
           maxConcurrency: 10,
           requestsPerMinute: 30,
-          // Enforced now: honest-empty answers return in ~40s, but the legacy
-          // anti-bot re-submit path can legitimately run up to ~150s.
-          timeoutMs: 120_000,
+          // Enforced now (see offer service). Budget from live timing: 30
+          // pager pages ≈ 115s of active work + form fill ≈ 25s → ~140s
+          // healthy; the anti-bot re-submit path adds more. 120s dropped
+          // whole (often full) results — give it 5 minutes.
+          timeoutMs: 300_000,
           searchCacheTtlMs: 5 * 60 * 1000,
           priceCacheTtlMs: 5 * 60 * 1000,
           availabilityCacheTtlMs: 5 * 60 * 1000,
@@ -135,8 +137,12 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           availabilityEnabled: true,
           maxConcurrency: 4,
           requestsPerMinute: 20,
-          // Enforced now — browser flow, keep headroom above slow searches.
-          timeoutMs: 120_000,
+          // Enforced now. A generic «Любой» search fans out over ALL
+          // programs of the country (live TR: 5 programs × up to 30 pages,
+          // 2s pacing inside kazunion-http) ≈ 400s of pure request time —
+          // 120s guaranteed a zeroed supplier. 8 minutes covers the worst
+          // case; repeat searches are served from the 5-min search cache.
+          timeoutMs: 480_000,
           searchCacheTtlMs: 5 * 60 * 1000,
           priceCacheTtlMs: 5 * 60 * 1000,
           availabilityCacheTtlMs: 5 * 60 * 1000,

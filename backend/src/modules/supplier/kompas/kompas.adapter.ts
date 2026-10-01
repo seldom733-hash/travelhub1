@@ -73,7 +73,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
   private readonly browserLock = new Map<string, Promise<Browser>>();
 
   private readonly baseUrl: string;
-  private static readonly MAX_PAGES = 15;
+  private static readonly MAX_PAGES = 30;
   private static readonly PAGE_DELAY_MS = 2_000;
   private static readonly TOURINC_DELAY_MS = 3_000;
   private static readonly CALENDAR_WINDOW_DAYS = 31;
@@ -348,17 +348,32 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         }, query.tourIncValue);
         await page.waitForTimeout(KompasSupplierAdapter.TOURINC_DELAY_MS);
         this.logger.debug(`Set TOURINC to ${query.tourIncValue} (${query.tourIncName ?? "?"})`);
-        // Wait for hotel list for this tour to populate if hotel filter is needed
-        if (query.hotelExternalId) {
-          try {
-            await page.waitForFunction(
-              (hid: string) => !!document.querySelector(`#hotel${hid}`),
-              query.hotelExternalId,
-              { timeout: 10_000 },
-            );
-          } catch {}
-          await page.waitForTimeout(500);
-        }
+      } else {
+        // «Любой»: force the program select to TOURINC=0. The fresh form's
+        // default option is a concrete program (live capture posted
+        // TOURINC=3332 «Стамбул из Баку»), which silently narrowed the
+        // generic country search to that single program.
+        await page.evaluate(() => {
+          const sel = document.querySelector("select[name=TOURINC]") as HTMLSelectElement | null;
+          if (sel && sel.value !== "0") {
+            sel.value = "0";
+            sel.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        });
+        await page.waitForTimeout(KompasSupplierAdapter.TOURINC_DELAY_MS);
+        this.logger.debug("No tourIncValue — forced TOURINC to 0 («Любой»)");
+      }
+      // Wait for hotel list for this program (or the «Любой» list) to
+      // populate if hotel filter is needed
+      if (query.hotelExternalId) {
+        try {
+          await page.waitForFunction(
+            (hid: string) => !!document.querySelector(`#hotel${hid}`),
+            query.hotelExternalId,
+            { timeout: 10_000 },
+          );
+        } catch {}
+        await page.waitForTimeout(500);
       }
 
       // Nights, adults, children
@@ -475,6 +490,15 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         // With the checkbox properly checked, KOMPAS returns hotel-specific results.
         if (!hotelFilterApplied) {
           url = url.replace(/HOTELS=\d+&?/g, "").replace(/HOTELS_ANY=\d+&?/g, "");
+        }
+        // «Любой» (no program on the query): force TOURINC=0 at the network
+        // layer too — the form may still post its default program (live
+        // capture: TOURINC=3332), pinning a country-wide search to one
+        // program.
+        if (!query.tourIncValue) {
+          url = /TOURINC=/.test(url)
+            ? url.replace(/TOURINC=[^&]*/g, "TOURINC=0")
+            : `${url}&TOURINC=0`;
         }
         // §TOWNS: city/resort filter — the site's own widget sends
         // TOWNS=<ids>&TOWNS_ANY=0 (verified supplier capture). The form has no
@@ -1133,6 +1157,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     let pricesUrl = `${this.baseUrl}/search_tour?samo_action=PRICES`;
     if (routeDates) pricesUrl += `&CHECKIN_BEG=${routeDates.beg}&CHECKIN_END=${routeDates.end}`;
     pricesUrl += `&FREIGHT=1&FILTER=1`;
+    // Keep the program scope: without TOURINC the URL falls back to the
+    // form's default program — generic searches must stay TOURINC=0.
+    pricesUrl += `&TOURINC=${query.tourIncValue || "0"}`;
     if (query.hotelExternalId) pricesUrl += `&HOTELS=${query.hotelExternalId}&HOTELS_ANY=0`;
     await page.goto(pricesUrl, { waitUntil: "networkidle", timeout: 30_000 }).catch(() => {});
     try { await page.waitForSelector("tr.price_info", { timeout: 15_000 }); } catch {}
@@ -1301,6 +1328,17 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         if (sel) { sel.value = val; sel.dispatchEvent(new Event("change", { bubbles: true })); }
       }, query.tourIncValue);
       await page.waitForTimeout(KompasSupplierAdapter.TOURINC_DELAY_MS);
+    } else {
+      // «Любой»: same as search() — the fresh form defaults to a concrete
+      // program, force TOURINC=0 so the window is country/hotel-wide.
+      await page.evaluate(() => {
+        const sel = document.querySelector("select[name=TOURINC]") as HTMLSelectElement | null;
+        if (sel && sel.value !== "0") {
+          sel.value = "0";
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      });
+      await page.waitForTimeout(KompasSupplierAdapter.TOURINC_DELAY_MS);
     }
     if (query.nightsFrom) await this.setSamoSelect(page, "NIGHTS_FROM", String(query.nightsFrom));
     if (query.nightsTo) await this.setSamoSelect(page, "NIGHTS_TILL", String(query.nightsTo));
@@ -1345,6 +1383,12 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     await page.route("**samo_action=PRICES**", (route) => {
       let url = route.request().url();
       if (!hotelFilterApplied) url = url.replace(/HOTELS=\d+&?/g, "").replace(/HOTELS_ANY=\d+&?/g, "");
+      // «Любой»: network-layer guarantee (see the main search() interceptor).
+      if (!query.tourIncValue) {
+        url = /TOURINC=/.test(url)
+          ? url.replace(/TOURINC=[^&]*/g, "TOURINC=0")
+          : `${url}&TOURINC=0`;
+      }
       // §TOWNS: city/resort network-level filter (verified supplier capture).
       if (kq.towns) {
         url = url.replace(/TOWNS=[^&]*/g, `TOWNS=${kq.towns}`).replace(/TOWNS_ANY=\d+/g, "TOWNS_ANY=0");
@@ -1664,7 +1708,10 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
     const offer: SupplierOffer = {
       supplierCode: this.code,
-      externalOfferId: raw.spoKey,
+      // Composite id (parity with KazUnion): spoKey is the program group id
+      // (probe: 3000 rows of one program share ONE spoKey) — a bare spoKey
+      // collapses every hotel/room/meal variant in the aggregator dedupe.
+      externalOfferId: `${raw.spoKey}-${raw.hotelKey}-${raw.checkIn}-${raw.roomKey}-${raw.mealKey}`,
       externalClaim: raw.claim,
       hotel: raw.hotel || query.hotel || undefined,
       hotelExternalId: raw.hotelKey || query.hotelExternalId || undefined,
