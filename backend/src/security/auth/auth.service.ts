@@ -233,10 +233,19 @@ export class AuthService {
 
   /** Вход: проверка пароля, выдача JWT. */
   async login(username: string, password: string): Promise<LoginResult> {
-    const user = await this.prisma.user.findUnique({
-      where: { username },
+    const raw = (username ?? "").trim();
+    // Case-insensitive lookup: email-логины регистронезависимы (Seldom733@… = seldom733@…).
+    // Приоритет — точное совпадение; при промахе — поиск в нижнем регистре.
+    let user = await this.prisma.user.findUnique({
+      where: { username: raw },
       include: { role: true },
     });
+    if (!user && raw.toLowerCase() !== raw) {
+      user = await this.prisma.user.findFirst({
+        where: { username: raw.toLowerCase() },
+        include: { role: true },
+      });
+    }
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       throw new UnauthorizedException("Invalid username or password");
     }

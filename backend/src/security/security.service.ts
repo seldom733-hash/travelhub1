@@ -286,6 +286,39 @@ export class SecurityService implements OnModuleInit {
   }
 
   /**
+   * Смена пароля администратором (settings.write) для ЛЮБОГО пользователя.
+   *
+   * Безопасность:
+   *  - пароль хешируется bcrypt(10); старый хеш перезаписывается;
+   *  - tokenVersion++ инвалидирует ВСЕ ранее выданные JWT/сессии целевого
+   *    пользователя (иначе компрометированный токен живёт до истечения);
+   *  - аудит user.password_reset (кто сменил, кому) — без значения пароля.
+   */
+  async resetPassword(userId: string, newPassword: string, actorId: string): Promise<void> {
+    if (newPassword.length < 8) {
+      throw new ValidationDomainError("Password must be at least 8 characters");
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundError(`User ${userId} not found`);
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { passwordHash, tokenVersion: { increment: 1 } },
+      });
+      await this.audit(tx, {
+        userId: actorId,
+        username: null,
+        action: "user.password_reset",
+        resource: "User",
+        resourceId: user.id,
+        details: { username: user.username, sessionsRevoked: true },
+      });
+    });
+  }
+
+  /**
    * Запись в журнал аудита. Может выполняться в рамках транзакции вызывающего
    * (передать tx) либо отдельной записью (tx опущен).
    *

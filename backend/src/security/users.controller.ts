@@ -90,6 +90,14 @@ class SetStatusDto {
   status!: UserStatus;
 }
 
+class ResetPasswordDto {
+  /** Новый пароль для пользователя (любого, кроме изменения собственного). */
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password!: string;
+}
+
 class ReconcileBuyersDto {
   /** dry-run: только отчёт, без изменений (review Step 1.9). */
   @IsOptional()
@@ -165,6 +173,18 @@ export class UsersController {
   @RequirePermissions("settings.write")
   setStatus(@Param("id") id: string, @Body() dto: SetStatusDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.security.setStatus(id, dto.status, actor.id);
+  }
+
+  /**
+   * Смена пароля ЛЮБОГО пользователя администратором (settings.write).
+   * Хеш перезаписывается, все активные сессии пользователя отзываются
+   * (tokenVersion++), действие попадает в аудит.
+   */
+  @Patch(":id/password")
+  @RequirePermissions("settings.write")
+  async resetPassword(@Param("id") id: string, @Body() dto: ResetPasswordDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    await this.security.resetPassword(id, dto.password, actor.id);
+    return { ok: true };
   }
 
   /**

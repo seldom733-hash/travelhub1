@@ -11,6 +11,7 @@
 import * as bcryptjs from "bcryptjs";
 import { SecurityService } from "./security.service";
 import { RoleCode } from "../generated/prisma/enums";
+import { NotFoundError, ValidationDomainError } from "../shared/errors";
 
 // ─── Mock Prisma ────────────────────────────────────────────────────────────
 
@@ -36,6 +37,8 @@ function createMockPrisma() {
   return {
     _store: store,
     _setAdminExists: (v: boolean) => { adminExists = v; },
+    $transaction: undefined as unknown,
+    auditLog: { create: jest.fn().mockResolvedValue({ id: "audit-1" }) },
     role: {
       upsert: jest.fn().mockImplementation(async ({ where, create }: any) => {
         if (!store.roles.has(where.code)) {
@@ -81,6 +84,13 @@ function createMockPrisma() {
       update: jest.fn().mockResolvedValue({ id: "admin-id" }),
     },
   };
+}
+
+/** Объект мока c рабочим $transaction (fn(mock) — как в tour-builder спеках). */
+function createFullMockPrisma() {
+  const prisma = createMockPrisma() as any;
+  prisma.$transaction = jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma));
+  return prisma;
 }
 
 function createMockIds() {
@@ -229,5 +239,54 @@ describe("SecurityService — seedAdmin P2002 handling", () => {
     );
 
     await expect(service.onModuleInit()).rejects.toThrow("DB connection lost");
+  });
+});
+
+describe("SecurityService — resetPassword (admin-смена пароля)", () => {
+  function makeService(prisma: ReturnType<typeof createMockPrisma>) {
+    return new SecurityService(prisma as any, createMockIds() as any, createMockCrm() as any);
+  }
+
+  it("хеширует новый пароль, инкрементит tokenVersion (revocation) и пишет аудит без пароля", async () => {
+    const prisma = createFullMockPrisma();
+    prisma.user.findUnique.mockImplementation(async ({ where }: any) =>
+      where?.id === "u1" ? { id: "u1", username: "victim" } : null,
+    );
+    const service = makeService(prisma);
+
+    await service.resetPassword("u1", "new-secret-123", "admin-id");
+
+    const upd = prisma.user.update.mock.calls[0][0];
+    expect(upd.where).toEqual({ id: "u1" });
+    // bcrypt-хеш проверяем реальным compare (не plaintext).
+    expect(bcryptjs.compareSync("new-secret-123", upd.data.passwordHash)).toBe(true);
+    expect(bcryptjs.compareSync("old-password", upd.data.passwordHash)).toBe(false);
+    // Все ранее выданные токены пользователя отзываются.
+    expect(upd.data.tokenVersion).toEqual({ increment: 1 });
+
+    const audit = prisma.auditLog.create.mock.calls[0][0].data;
+    expect(audit.action).toBe("user.password_reset");
+    expect(audit.resourceId).toBe("u1");
+    expect(JSON.stringify(audit.details ?? {})).not.toContain("new-secret-123");
+    expect(audit.details).toMatchObject({ username: "victim", sessionsRevoked: true });
+  });
+
+  it("пароль короче 8 символов → ValidationDomainError, user.update НЕ вызван", async () => {
+    const prisma = createFullMockPrisma();
+    prisma.user.findUnique.mockResolvedValue({ id: "u1", username: "victim" });
+    const service = makeService(prisma);
+
+    await expect(service.resetPassword("u1", "short", "admin-id")).rejects.toThrow(ValidationDomainError);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it("неизвестный пользователь → NotFoundError, аудит не пишется", async () => {
+    const prisma = createFullMockPrisma();
+    prisma.user.findUnique.mockResolvedValue(null);
+    const service = makeService(prisma);
+
+    await expect(service.resetPassword("nope", "new-secret-123", "admin-id")).rejects.toThrow(NotFoundError);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
   });
 });

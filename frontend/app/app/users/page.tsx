@@ -46,10 +46,14 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ username: "", password: "", fullName: "", email: "", roleCode: "OPERATOR" });
+  const [pwdUser, setPwdUser] = useState<PlatformUser | null>(null);
+  const [pwdValue, setPwdValue] = useState("");
+  const [pwdBusy, setPwdBusy] = useState(false);
 
   const router = useRouter();
   const isInitialMount = useRef(true);
@@ -126,6 +130,25 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
       await load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo);
     } catch (e) {
       setError((e as Error).message);
+    }
+  };
+
+  /** Смена пароля любому пользователю (settings.write): PATCH /users/:id/password. */
+  const resetPassword = async () => {
+    if (!pwdUser || pwdValue.length < 8) return;
+    setPwdBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      await api.patch(`/users/${pwdUser.id}/password`, { password: pwdValue });
+      setNotice(t("admin.form.reset_done", locale));
+      setPwdUser(null);
+      setPwdValue("");
+      await load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPwdBusy(false);
     }
   };
 
@@ -235,6 +258,7 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
             </div>
 
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{error}</div>}
+          {notice && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">{notice}</div>}
 
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
@@ -289,6 +313,13 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                           className="rounded-md px-1.5 py-0.5 text-xs text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
                         >
                           ↻
+                        </button>
+                        <button
+                          onClick={() => { setPwdUser(u); setPwdValue(""); setNotice(""); setError(""); }}
+                          title={t("admin.table.reset_password", locale)}
+                          className="rounded-md px-1.5 py-0.5 text-xs text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        >
+                          🔑
                         </button>
                       </div>
                     </td>
@@ -385,6 +416,43 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
 
             <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
               {t("admin.form.audit_note", locale)}
+            </div>
+        </PanelFrame>
+      )}
+
+      {/* Side Panel: смена пароля пользователя */}
+      {pwdUser && (
+        <PanelFrame
+          title={t("admin.form.reset_title", locale)}
+          subtitle={`@${pwdUser.username} · ${t("admin.form.reset_subtitle", locale)}`}
+          onClose={() => { setPwdUser(null); setPwdValue(""); }}
+        >
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("admin.form.password_label", locale)}</label>
+              <input
+                type="password"
+                autoFocus
+                value={pwdValue}
+                onChange={(e) => setPwdValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void resetPassword(); }}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-400"
+                placeholder="••••••••"
+              />
+              {pwdValue.length > 0 && pwdValue.length < 8 && (
+                <div className="mt-1 text-xs text-red-500">{t("admin.form.reset_short", locale)}</div>
+              )}
+            </div>
+
+            <button
+              onClick={() => void resetPassword()}
+              disabled={pwdBusy || pwdValue.length < 8}
+              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {pwdBusy ? t("admin.form.creating", locale) : t("admin.form.reset_submit", locale)}
+            </button>
+
+            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
+              {t("admin.form.reset_subtitle", locale)}
             </div>
         </PanelFrame>
       )}
