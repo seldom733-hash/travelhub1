@@ -32,6 +32,6 @@ import { SettlementService } from "./settlement.service";
   /** Step 2.12E: CommissionPolicyService экспортируется для Sales/Order
    *  freeze-time read (ADR-0013 D1: read by Sales/Order at freeze boundary,
    *  READ-only cross-domain). CommissionService/Consumer — Finance-internal. */
-  exports: [CommissionPolicyService, CommissionService, PaymentProviderModule],
+  exports: [CommissionPolicyService, CommissionService, FinanceService, PaymentProviderModule],
 })
 export class FinanceModule {}
