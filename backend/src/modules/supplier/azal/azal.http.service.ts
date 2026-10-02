@@ -261,6 +261,12 @@ export class AzalHttpService implements OnModuleDestroy {
       ? requestedLanguage
       : "en";
 
+    // The AZAL site always pins a display currency (site default: AZN).
+    // Without it the API prices some directions in USD — e.g. SAW→GYD comes
+    // back as USD while azal.az shows the same flight in ₼.
+    const requestedCurrency = String((query as any).currency ?? "AZN").toUpperCase();
+    const currency = /^[A-Z]{3}$/.test(requestedCurrency) ? requestedCurrency : "AZN";
+
     const params = new URLSearchParams({
       lang,
       from: query.from,
@@ -271,6 +277,7 @@ export class AzalHttpService implements OnModuleDestroy {
       child_count: String(query.children ?? 0),
       infant_count: String(query.infants ?? 0),
       is_student: query.isStudent ? "1" : "0",
+      currency,
       timestamp: String(Date.now()),
     });
     if (query.tripType === "RT" && query.returnDate) {
