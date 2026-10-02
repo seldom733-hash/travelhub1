@@ -109,6 +109,7 @@ function makePrismaStub() {
     checkoutIntentTraveler: {
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      count: jest.fn().mockResolvedValue(0),
     },
     customer: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -554,7 +555,7 @@ describe("SalesService — Wave 0 characterization", () => {
         const { service, prisma } = makeService();
         prisma.checkoutIntent.findUnique.mockResolvedValue(cktRow);
         // For getCheckoutIntentDetail: quote lookup
-        prisma.quote.findUnique.mockResolvedValue({ code: "QTE-00000001", validUntil: new Date("2026-09-15T00:00:00Z") });
+        prisma.quote.findUnique.mockResolvedValue({ code: "QTE-00000001", validUntil: new Date("2027-09-15T00:00:00Z") });
         // quoteItems for availability
         prisma.quoteItem.findMany.mockResolvedValue([]);
 
@@ -590,7 +591,7 @@ describe("SalesService — Wave 0 characterization", () => {
         status: QuoteStatus.DRAFT,
         version: 1,
         currency: "USD",
-        validUntil: new Date("2026-09-01T00:00:00Z"),
+        validUntil: new Date("2027-09-01T00:00:00Z"),
         discountType: QuoteDiscountType.NONE,
         discountValue: null,
         subtotal: null,

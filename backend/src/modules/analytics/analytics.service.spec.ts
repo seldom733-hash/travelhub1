@@ -111,7 +111,9 @@ describe("AnalyticsService — Decimal Arithmetic (HIGH-2)", () => {
 
   it("Net Revenue subtracts correctly across currencies", async () => {
     const prisma = createMockPrisma();
-    prisma.order.findMany.mockResolvedValue([]);
+    prisma.order.findMany.mockResolvedValue([
+      { id: "o1", amount: "1000.00", paidAmount: "1000.00", currency: "USD", status: "FULFILLED", customerId: "c1" },
+    ]);
     prisma.payment.findMany.mockImplementation((args: any) => {
       if (args.where?.status === "CAPTURED") {
         return Promise.resolve([
@@ -320,7 +322,9 @@ describe("AnalyticsService — Multi-Currency (MEDIUM-4)", () => {
 describe("AnalyticsService — Revenue uses paidAt (HIGH-1)", () => {
   it("payment queries use paidAt not createdAt", async () => {
     const prisma = createMockPrisma();
-    prisma.order.findMany.mockResolvedValue([]);
+    prisma.order.findMany.mockResolvedValue([
+      { id: "o1", amount: "100.00", paidAmount: "100.00", currency: "USD", status: "FULFILLED", customerId: "c1" },
+    ]);
     prisma.payment.findMany.mockResolvedValue([]);
     prisma.refund.findMany.mockResolvedValue([]);
     prisma.commission.findMany.mockResolvedValue([]);
@@ -349,6 +353,7 @@ describe("AnalyticsService — Revenue uses paidAt (HIGH-1)", () => {
 describe("AnalyticsService — Financial Reconciliation (HIGH-3)", () => {
   it("returns reconciliation summary with correct structure", async () => {
     const prisma = createMockPrisma();
+    prisma.order.findMany.mockResolvedValue([{ id: "o1" }]);
     prisma.payment.findMany.mockResolvedValue([
       { id: "p1", amount: "500.00", currency: "USD" },
     ]);
@@ -530,7 +535,9 @@ describe("AnalyticsService — Partner Performance (HIGH-6)", () => {
 describe("AnalyticsService — Time Series payments paidAt (HIGH-NEW-2)", () => {
   it("payments metric uses paidAt not createdAt", async () => {
     const prisma = createMockPrisma();
-    prisma.order.findMany.mockResolvedValue([]);
+    prisma.order.findMany.mockResolvedValue([
+      { id: "o1", customerId: "c1" },
+    ]);
     prisma.payment.findMany.mockResolvedValue([]);
     prisma.refund.findMany.mockResolvedValue([]);
     prisma.commission.findMany.mockResolvedValue([]);
@@ -648,6 +655,7 @@ describe("AnalyticsService — Partner Performance integer-cent (HIGH-NEW-1)", (
 describe("AnalyticsService — Financial Reconciliation multi-currency (MEDIUM-NEW-1)", () => {
   it("returns currency-separated reconciliation", async () => {
     const prisma = createMockPrisma();
+    prisma.order.findMany.mockResolvedValue([{ id: "o1" }]);
     prisma.payment.findMany.mockResolvedValue([
       { id: "p1", amount: "500.00", currency: "USD" },
       { id: "p2", amount: "300.00", currency: "EUR" },
@@ -696,6 +704,7 @@ describe("AnalyticsService — Financial Reconciliation multi-currency (MEDIUM-N
 
   it("returns deterministic currency ordering (sorted)", async () => {
     const prisma = createMockPrisma();
+    prisma.order.findMany.mockResolvedValue([{ id: "o1" }]);
     prisma.payment.findMany.mockResolvedValue([
       { id: "p1", amount: "100.00", currency: "AZN" },
       { id: "p2", amount: "200.00", currency: "EUR" },

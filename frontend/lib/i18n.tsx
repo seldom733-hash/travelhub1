@@ -2638,7 +2638,7 @@ export function formatPrice(
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(n);
-    return `${formatted} ${symbol}`;
+    return `${formatted}\u00A0${symbol}`;
   }
   // Fallback: use Intl.NumberFormat with ISO code
   return new Intl.NumberFormat(LOCALE_TAGS[locale], {

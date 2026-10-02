@@ -19,6 +19,8 @@ import type { EventBusService } from "../../eventbus/eventbus.service";
 
 interface PrismaStub {
   payment: { findUnique: jest.Mock };
+  order: { findUnique: jest.Mock };
+  partnerStorefront: { findUnique: jest.Mock };
   refund: {
     findFirst: jest.Mock;
     findUnique: jest.Mock;
@@ -65,6 +67,8 @@ const REFUND_ROW = {
 function makePrismaStub(): PrismaStub {
   const prisma: PrismaStub = {
     payment: { findUnique: jest.fn().mockResolvedValue(PAYMENT_ROW) },
+    order: { findUnique: jest.fn().mockResolvedValue({ acquisitionSource: "MARKETPLACE", sellerPartnerId: null }) },
+    partnerStorefront: { findUnique: jest.fn().mockResolvedValue(null) },
     refund: {
       findFirst: jest.fn().mockResolvedValue(null),
       findUnique: jest.fn().mockResolvedValue(null),

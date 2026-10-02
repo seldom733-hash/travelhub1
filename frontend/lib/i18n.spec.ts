@@ -12,12 +12,15 @@ describe("i18n (Step 1.7 §17 — RU/AZ/EN foundation)", () => {
     expect(t("no.such.key", "en")).toBe("no.such.key");
   });
 
-  it("formatPrice: locale-aware currency formatting; 0/NaN/пусто → null (по запросу)", () => {
-    // Intl разделяет число и валюту неразрывным пробелом (U+00A0).
+  it("formatPrice: locale-aware currency formatting; NaN/пусто → null; 0 — валидная сумма (Round 2)", () => {
+    // Intl разделяет число и валюту неразрывным пробелом (U+00A0);
+    // symbol branch использует тот же разделитель (см. money.spec.ts).
     expect(formatPrice("120.00", "AZN", "az")).toBe(`120,00\u00A0₼`);
     expect(formatPrice("350.00", "USD", "ru")).toBe(`350,00\u00A0$`);
-    expect(formatPrice(120, "AZN", "en")).toBe("AZN\u00A0120.00");
-    expect(formatPrice("0", "USD", "en")).toBeNull();
+    // EN: канонический символ (₼), не ISO-код — Global Currency Presentation Contract.
+    expect(formatPrice(120, "AZN", "en")).toBe(`120.00\u00A0₼`);
+    // Round 2 (5409dd3): 0 — валидная монетарная сумма, а не «по запросу».
+    expect(formatPrice("0", "USD", "en")).toBe(`0.00\u00A0$`);
     expect(formatPrice("", "USD", "en")).toBeNull();
     expect(formatPrice(null, "USD", "en")).toBeNull();
     expect(formatPrice("abc", "USD", "en")).toBeNull();

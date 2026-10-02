@@ -210,6 +210,12 @@ function createMockPrisma() {
             notes.push(note);
             return note;
           }),
+          update: jest.fn(async ({ where, data }: any) => {
+            const idx = notes.findIndex((n) => n.id === where.id);
+            if (idx === -1) throw new Error('Note not found');
+            Object.assign(notes[idx], data);
+            return notes[idx];
+          }),
         },
         customer: makeResolver(), partner: makeResolver(), order: makeResolver(),
         booking: makeResolver(), payment: makeResolver(), refund: makeResolver(),
