@@ -1,0 +1,27 @@
+capturedAt=2026-10-03T11:54:24.461Z
+== conversations ==
+1bc85a58-34b2-4b7a-b631-d138f24372aa phone=+994507000000 status=MATCHED customerId=bf8c6390-7c53-432b-807d-5a3afe7090df unread=0 suppressed=false last=2026-10-03T09:06:34.323Z
+48c06f46-788e-40e7-8b86-a64674966585 phone=+994507777788 status=MATCHED customerId=26697b40-64a4-4c9d-a8d4-3abefa46eea3 unread=0 suppressed=false last=2026-10-03T11:42:38.476Z
+892deadd-1fe0-4a50-b54d-5629645175f0 phone=+994507666666 status=UNMATCHED customerId=- unread=1 suppressed=true last=2026-10-03T11:40:13.890Z
+== timeline (matched conversation) ==
+CML-00000201 dir=INBOUND status=ACTIVE ctx=CUSTOMER:bf8c6390-7c53-432b-807d-5a3afe7090df at=2026-10-03T08:24:12.340Z body=Здравствуйте! Хочу уточнить статус заявки.
+CML-00000301 dir=OUTBOUND status=ACTIVE ctx=CUSTOMER:bf8c6390-7c53-432b-807d-5a3afe7090df at=2026-10-03T09:06:34.311Z body=Заявка в обработке, менеджер свяжется с вами в течение дня.
+CML-00000401 dir=INBOUND status=ACTIVE ctx=CUSTOMER:26697b40-64a4-4c9d-a8d4-3abefa46eea3 at=2026-10-03T11:21:42.356Z body=Здравствуйте! Хотим в Турцию на двоих, есть ли туры на декабрь?
+CML-00000302 dir=OUTBOUND status=ACTIVE ctx=CUSTOMER:26697b40-64a4-4c9d-a8d4-3abefa46eea3 at=2026-10-03T11:37:47.341Z body=Здравствуйте! Да, есть туры в Турцию на декабрь на двоих — отправляю актуальные 
+CML-00000501 dir=INBOUND status=ACTIVE ctx=-:- at=2026-10-03T11:40:14.306Z body=STOP
+CML-00000303 dir=OUTBOUND status=ACTIVE ctx=-:- at=2026-10-03T11:42:38.464Z body=Контрольная отправка в привязанный диалог
+inbound gate-smoke-1791026501968 fromMe=false proc=PROCESSED match=AMBIGUOUS at=2026-10-03T11:21:42.133Z text=Здравствуйте! Хотим в Турцию на двоих, есть ли туры на декаб
+outbound 8f356042-1511-4bef-99d3-31a2c8082e26 status=SENT comm=ae0b958c-ce6a-4aa2-a6ea-57bebfc52e9e sentAt=2026-10-03T11:37:47.455Z deliveredAt=- readAt=- providerId=3EB05171C99872F83F76DF0175FDDD0A0459D786
+outbound c44e4984-8010-4423-b460-aafaf40243c5 status=SENT comm=9706bfe6-761d-4a76-92c0-86c314143945 sentAt=2026-10-03T11:42:38.499Z deliveredAt=- readAt=- providerId=3EB06B1233C97C4AC741739699257F145D37011B
+== suppressions ==
++994507666666 reason=STOP scope=ALL at=2026-10-03T11:40:14.353Z
+== audit (whatsapp.*, latest 12) ==
+2026-10-03T11:42:38.481Z action=whatsapp.send userId=56b6ced0-2003-4097-b457-b107a0c95c28 details={"customerId":null,"correlation":{"requestId":"4068cb70-2744-4ed8-abc6-c6adaa6063fa","correlationId":"4068cb70-2744-4ed8-abc6-c6adaa6063fa"},"operationKey":"gat
+2026-10-03T11:42:38.310Z action=whatsapp.send.suppressed userId=56b6ced0-2003-4097-b457-b107a0c95c28 details={"reason":"suppression","customerId":null,"correlation":{"requestId":"ed6c334a-4624-4678-83cf-a634cd342357","correlationId":"ed6c334a-4624-4678-83cf-a634cd34235
+2026-10-03T11:40:14.365Z action=whatsapp.suppression.added userId=null details={"scope":"ALL","reason":"STOP","source":"inbound"}
+2026-10-03T11:37:47.364Z action=whatsapp.send userId=56b6ced0-2003-4097-b457-b107a0c95c28 details={"customerId":"26697b40-64a4-4c9d-a8d4-3abefa46eea3","correlation":{"requestId":"619105f8-f625-49b1-ab6b-d60390c18cd7","correlationId":"619105f8-f625-49b1-ab6b-
+2026-10-03T11:31:56.681Z action=whatsapp.customer_linked userId=56b6ced0-2003-4097-b457-b107a0c95c28 details={"correlation":{"requestId":"1ab6630d-bcd6-4dfd-a602-41865c0d2244","correlationId":"1ab6630d-bcd6-4dfd-a602-41865c0d2244"},"toCustomerId":"26697b40-64a4-4c9d-a8
+2026-10-03T09:06:34.326Z action=whatsapp.send userId=56b6ced0-2003-4097-b457-b107a0c95c28 details={"customerId":"bf8c6390-7c53-432b-807d-5a3afe7090df","correlation":{"requestId":"229e7122-ae63-484d-a383-7849c59ce54c","correlationId":"229e7122-ae63-484d-a383-
+2026-10-03T09:05:54.734Z action=whatsapp.customer_linked userId=56b6ced0-2003-4097-b457-b107a0c95c28 details={"correlation":{"requestId":"34ac322e-fa2b-420e-aef5-f4276406046e","correlationId":"34ac322e-fa2b-420e-aef5-f4276406046e"},"toCustomerId":"bf8c6390-7c53-432b-80
+2026-10-03T08:24:57.585Z action=whatsapp.connected userId=null details={"instanceId":"Seldom:4988:e902367c","fencingToken":4}
+2026-10-03T01:38:00.394Z action=whatsapp.send userId=56b6ced0-2003-4097-b457-b107a0c95c28 details={"customerId":null,"correlation":{"requestId":"f3e213f0-2cd0-4a82-a619-7302e4ba511c","correlationId":"f3e213f0-2cd0-4a82-a619-7302e4ba511c"},"operationKey":"wha

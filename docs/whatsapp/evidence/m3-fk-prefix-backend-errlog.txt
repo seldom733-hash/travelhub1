@@ -1,0 +1,11 @@
+[whatsapp] auto-connect failed {
+  error: '\n' +
+    'Invalid `client.auditLog.create()` invocation in\n' +
+    'D:\\travelhub_v1\\backend\\src\\security\\security.service.ts:349:27\n' +
+    '\n' +
+    '  346 const correlation = ctx ? { correlation: { requestId: ctx.requestId, correlationId: ctx.correlationId } } : undefined;\n' +
+    '  347 const details: Prisma.InputJsonValue | undefined =\n' +
+    '  348   entry.details || correlation ? ({ ...(entry.details ?? {}), ...(correlation ?? {}) } as Prisma.InputJsonValue) : undefined;\n' +
+    '→ 349 await client.auditLog.create(\n' +
+    'Foreign key constraint violated on the constraint: `AuditLog_userId_fkey`'
+}

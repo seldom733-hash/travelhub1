@@ -27,6 +27,7 @@ import { GeoModule } from "./modules/geo/geo.module";
 import { HotelDirectoryModule } from "./modules/hotel-directory/hotel-directory.module";
 import { IdempotencyInterceptor } from "./shared/idempotency/idempotency.interceptor";
 import { SecurityModule } from "./security/security.module";
+import { WhatsAppModule } from "./integrations/whatsapp/whatsapp.module";
 import { JwtAuthGuard } from "./security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "./security/auth/permissions.guard";
 
@@ -38,7 +39,7 @@ import { PermissionsGuard } from "./security/auth/permissions.guard";
  * открывает эндпоинты), PermissionsGuard глобально (проверка @RequirePermissions).
  */
 @Module({
-  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, CrmActivityModule, OrderModule, RequestModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, AnalyticsModule, DashboardModule, WorkspaceModule, ConstructorModule, SupplierModule, GeoModule, HotelDirectoryModule, IdempotencyModule, OperationalNotesModule, MarketingModule, SupportModule, DocumentsModule],
+  imports: [PrismaModule, EventBusModule, SecurityModule, CatalogModule, CrmModule, CrmActivityModule, OrderModule, RequestModule, BookingModule, CommunicationModule, SalesModule, ReverseModule, FinanceModule, AnalyticsModule, DashboardModule, WorkspaceModule, ConstructorModule, SupplierModule, GeoModule, HotelDirectoryModule, IdempotencyModule, OperationalNotesModule, MarketingModule, SupportModule, DocumentsModule, WhatsAppModule],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

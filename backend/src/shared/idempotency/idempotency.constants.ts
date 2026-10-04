@@ -18,7 +18,7 @@ export const IDEMPOTENCY_KEY_MAX_LENGTH = 128;
 export const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9._~-]+$/;
 
 /** Реестр защищённых операций (explicit metadata). */
-export const IDEMPOTENT_OPERATIONS = new Set<string>(["payment.create"]);
+export const IDEMPOTENT_OPERATIONS = new Set<string>(["payment.create", "whatsapp.send"]);
 
 /** Metadata key для @Idempotent() декоратора. */
 export const IDEMPOTENT_KEY = "idempotentOperation";

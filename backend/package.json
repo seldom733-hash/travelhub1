@@ -31,12 +31,14 @@
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@react-pdf/renderer": "^4.9.0",
+    "@whiskeysockets/baileys": "6.7.24",
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
+    "libphonenumber-js": "^1.13.14",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.35.3"
@@ -86,6 +88,8 @@
   "allowScripts": {
     "@prisma/engines@7.9.1": true,
     "prisma@7.9.1": true,
-    "esbuild@0.28.1": true
+    "esbuild@0.28.1": true,
+    "@whiskeysockets/baileys@6.7.24": true,
+    "protobufjs@7.6.6": true
   }
 }

@@ -26,7 +26,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision", "marketing", "support", "documents", "constructor", "geo"]
+  schemas  = ["events", "catalog", "crm", "order", "booking", "security", "communication", "sales", "reverse", "finance", "decision", "marketing", "support", "documents", "constructor", "geo", "whatsapp"]
 }
 
 // ─────────────────────────────── events.* ────────────────────────────────
@@ -2656,10 +2656,13 @@ enum CommunicationType {
 }
 
 /// Канал описывает транспорт/поверхность, а НЕ business context (§7).
-/// EMAIL/PHONE/WHATSAPP НЕ объявляются, пока TravelHub реально не отправляет/
-/// не принимает их (без имитации интеграций).
+/// WHATSAPP объявляется с M1 интеграции WhatsApp (реальный транспорт);
+/// EMAIL/PHONE НЕ объявляются, пока TravelHub реально не отправляет/
+/// не принимает их (без имитаций интеграций).
 enum CommunicationChannel {
   PLATFORM
+  /// WhatsApp transport (провайдер подключается в milestone M2+).
+  WHATSAPP
 
   @@schema("communication")
 }
@@ -5449,4 +5452,288 @@ model SupplierGeoLink {
   @@index([geoCountryId])
   @@index([supplierCode])
   @@schema("geo")
+}
+
+// ─────────────────────────────── whatsapp.* ───────────────────────────────
+//
+// Milestone M1 «Фундамент» интеграции WhatsApp (мастер-промпт v2.3; ADR M0-02):
+//  - только provider/session/integration metadata (правило I2): БЕЗ текста
+//    сообщений и БЕЗ business-контекста (booking/order/crm — только ref-ID);
+//  - ссылки между схемами — без FK (Baseline: «межсхемных foreign keys нет»);
+//  - outbound-lifecycle хранится ТОЛЬКО здесь (D6/M0-05): CommunicationStatus
+//    остаётся ACTIVE|ARCHIVED, delivery-статусы в Communication не пишутся;
+//  - фича выключена по умолчанию: WHATSAPP_ENABLED=false (A2);
+//  - WhatsAppAuthState в v1 НЕ создаётся — файловый encrypted store (D1).
+
+/// Connection state machine транспорта (§6.2). Никогда не смешивается со
+/// статусами Communication/Order/Booking — это состояние транспорта.
+enum WhatsAppConnectionState {
+  DISCONNECTED
+  INITIALIZING
+  QR_REQUIRED
+  CONNECTING
+  CONNECTED
+  RECONNECTING
+  ERROR
+  LOGGING_OUT
+  /// Удалённый logout (DisconnectReason.loggedOut) — сессия уничтожена на
+  /// сервере WhatsApp; без auto-reconnect. M2: явный терминал lifecycle
+  /// (решение владельца M2: DISCONNECTED/CONNECTING/QR/CONNECTED/LOGGED_OUT/ERROR).
+  LOGGED_OUT
+
+  @@schema("whatsapp")
+}
+
+/// Интеграционный lifecycle исходящего сообщения (D6; M0-05):
+/// CREATED → QUEUED → SENDING → SENT → (DELIVERED | READ)
+/// / FAILED_RETRYABLE / FAILED_PERMANENT / UNKNOWN.
+/// Crash в SENDING → при восстановлении UNKNOWN (автоповтор запрещён).
+enum WhatsAppOutboundStatus {
+  CREATED
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED_RETRYABLE
+  FAILED_PERMANENT
+  UNKNOWN
+
+  @@schema("whatsapp")
+}
+
+/// Источник связи контакта с Customer (D3).
+enum WhatsAppContactLinkSource {
+  AUTO
+  MANUAL
+
+  @@schema("whatsapp")
+}
+
+/// Статус сопоставления диалога с crm.Customer (M3 §10):
+/// 0 совпадений → UNMATCHED; 1 → MATCHED; >1 → AMBIGUOUS (ручной выбор).
+enum WhatsAppMatchingStatus {
+  UNMATCHED
+  MATCHED
+  AMBIGUOUS
+
+  @@schema("whatsapp")
+}
+
+/// Внутренний статус обработки входящего события (M3 §6):
+/// RECEIVED → PROCESSED; SKIPPED — пустой/неподдерживаемый тип;
+/// FAILED — ошибка обработки (сохранённая строка + лог, без потери события).
+enum WhatsAppInboundProcessingStatus {
+  RECEIVED
+  PROCESSED
+  SKIPPED
+  FAILED
+
+  @@schema("whatsapp")
+}
+
+/// Platform WhatsApp-аккаунт компании (v1: одна строка — dedicated number,
+/// решение владельца №6).
+model WhatsAppAccount {
+  id                 String                    @id @default(uuid())
+  /// Провайдер: "baileys" (закреплён M0-04); "cloud_api" — future extension point.
+  provider           String                    @default("baileys")
+  state              WhatsAppConnectionState   @default(DISCONNECTED)
+  /// Канонический номер аккаунта в E.164 (nullable до pairing).
+  phone              String?
+  connectedAt        DateTime?
+  lastDisconnectedAt DateTime?
+  lastError          String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  contacts          WhatsAppContact[]
+  conversations     WhatsAppConversation[]
+  inboundMessages   WhatsAppInboundMessage[]
+  outboundMessages  WhatsAppOutboundMessage[]
+
+  @@schema("whatsapp")
+}
+
+/// Контакт WhatsApp: связь JID ↔ Customer (D3). LID/PN — provider-neutral
+/// поля (I2): специфика Baileys живёт здесь, не в business-доменах.
+model WhatsAppContact {
+  id             String                    @id @default(uuid())
+  accountId      String
+  account        WhatsAppAccount           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// Полный JID (валидный для провайдера).
+  jid            String
+  /// LID — стабильный внутренний идентификатор WhatsApp (если доступен).
+  lid            String?
+  /// Канонический телефон E.164 (shared/phone нормализация; null = неизвестен).
+  canonicalPhone String?
+  /// crm.Customer ref без FK (ADR-0001).
+  customerId     String?
+  linkSource     WhatsAppContactLinkSource @default(AUTO)
+  linkedAt       DateTime                  @default(now())
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@unique([accountId, jid])
+  @@index([canonicalPhone])
+  @@index([customerId])
+  @@schema("whatsapp")
+}
+
+/// WhatsApp-диалог (M3 §4: минимальный связующий слой — CommunicationThread
+/// остаётся pre-sale и не используется для WhatsApp). Якорь истории:
+/// (accountId, remoteJid); customerId/matchingStatus — текущее состояние
+/// связи диалога с CRM; бизнес-контекст (Booking→Order→Request→Customer)
+/// резолвится на лету и НЕ хранится здесь.
+model WhatsAppConversation {
+  id         String                   @id @default(uuid())
+  accountId  String
+  account    WhatsAppAccount          @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// JID чата (для личных диалогов — phone@s.whatsapp.net; для групп — id).
+  remoteJid  String
+  /// Канонический телефон E.164 (shared/phone; null = неизвестен/не личный).
+  canonicalPhone String?
+  /// crm.Customer ref без FK (ADR-0001): текущий связанный Customer.
+  customerId String?
+  matchingStatus WhatsAppMatchingStatus @default(UNMATCHED)
+  matchedAt  DateTime?
+  /// Последнее сообщение (для сортировки списка диалогов).
+  lastMessageAt      DateTime?
+  lastMessagePreview String?
+  /// База непрочитанных: unread = входящие новее этого момента.
+  lastReadAt         DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  inboundMessages   WhatsAppInboundMessage[]
+  outboundMessages  WhatsAppOutboundMessage[]
+
+  @@unique([accountId, remoteJid])
+  @@index([matchingStatus])
+  @@index([customerId])
+  @@index([canonicalPhone])
+  @@schema("whatsapp")
+}
+
+/// Inbound dedup (D7): повторная доставка тем же providerMessageId не
+/// создаёт дублей и не порождает второго события. M3 §7: канонический
+/// dedup-ключ — (accountId, providerMessageId).
+model WhatsAppInboundMessage {
+  id                String                         @id @default(uuid())
+  accountId         String
+  account           WhatsAppAccount                @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  remoteJid         String
+  fromMe            Boolean
+  providerMessageId String
+  participant       String?
+  /// LID/PN отправителя (provider-neutral, I2).
+  lid               String?
+  senderPn          String?
+  occurredAt        DateTime
+  receivedAt        DateTime                       @default(now())
+  /// communication.Communication ref без FK (ADR-0001); создание — M3.
+  communicationId   String?
+  /// WhatsAppConversation ref: якорь непрерывной истории (M3 §4).
+  conversationId    String?
+  conversation      WhatsAppConversation?          @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  /// Текст сообщения (null для медиа/неподдерживаемых типов; M3 §6).
+  text              String?
+  /// Тип события провайдера (text/image/video/audio/document/sticker/other).
+  messageType       String                         @default("text")
+  /// Медиа (M3+ файлы): оригинальное имя/размер с stanza (null для текста).
+  mediaFilename     String?
+  mediaMime         String?
+  mediaSize         Int?
+  /// Относительный путь файла в WHATSAPP_MEDIA_DIR (null = не скачан).
+  mediaPath         String?
+  /// Канонический телефон отправителя E.164 (null = не извлечён/не личный).
+  canonicalPhone    String?
+  /// Внутренний статус обработки (M3 §6).
+  processingStatus  WhatsAppInboundProcessingStatus @default(RECEIVED)
+  /// Статус сопоставления на момент обработки (снимок; M3 §6).
+  matchingStatus    WhatsAppMatchingStatus         @default(UNMATCHED)
+
+  @@unique([accountId, providerMessageId])
+  @@index([providerMessageId])
+  @@index([conversationId])
+  @@index([communicationId])
+  @@schema("whatsapp")
+}
+
+/// Integration lifecycle исходящего сообщения (D6/D7; M0-05): записывается
+/// атомарно с Communication + operationKey ДО provider call (D6 crash-safety).
+model WhatsAppOutboundMessage {
+  id                String                @id @default(uuid())
+  accountId         String
+  account           WhatsAppAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// communication.Communication ref без FK (ADR-0001); Communication создаётся до send.
+  communicationId   String                @unique
+  /// Ключ идемпотентности операции отправки (unique: не более одной отправки).
+  operationKey      String                @unique
+  /// Провайдерский JID получателя (после разрешения контакта).
+  recipientJid      String?
+  /// Канонический телефон получателя E.164 — нужен D9 suppression/D10 throttle.
+  recipientPhone    String?
+  /// WhatsAppConversation ref: вкладка исходящего в общую историю (M3 §4).
+  conversationId    String?
+  conversation      WhatsAppConversation?          @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  status            WhatsAppOutboundStatus @default(CREATED)
+  providerMessageId String?               @unique
+  /// Медиа (M3+ файлы): бэкенд читает staged-загрузку до provider send.
+  mediaFilename     String?
+  mediaMime         String?
+  mediaSize         Int?
+  /// Относительный путь файла в WHATSAPP_MEDIA_DIR (null = текст-only).
+  mediaPath         String?
+  attempts          Int                   @default(0)
+  nextAttemptAt     DateTime?
+  /// Fencing token из WhatsAppSessionLease (I13) — шлёт только владелец аренды.
+  fencingToken      Int?
+  lastError         String?
+  /// Receipt-факты (M2): фактические отметки отправки/доставления/прочтения.
+  /// Для строки в UNKNOWN колонки заполняются как EVIDENCE (статус НЕ
+  /// меняется автоматически — только через явный Reconcile, решение №5).
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([conversationId])
+  @@schema("whatsapp")
+}
+
+/// Single-owner lease (D2/I13): v1 — одна singleton-строка на платформу.
+/// Истёкший heartbeat + fencing token отсекают прежних владельцев на записи.
+model WhatsAppSessionLease {
+  /// Ключ аренды (v1: singleton; расширение — по accountId).
+  key          String   @id
+  /// Идентификатор инстанса-владельца.
+  instanceId   String
+  /// Монотонно растущий fencing token.
+  fencingToken Int      @default(1)
+  heartbeatAt  DateTime
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@schema("whatsapp")
+}
+
+/// Opt-out / suppression (D9): остановка исходящих по каноническому телефону.
+/// В v1 — только транспортная таблица WhatsApp-слоя (не CRM Preferences).
+model WhatsAppSuppression {
+  id             String   @id @default(uuid())
+  /// Канонический телефон E.164 (shared/phone нормализация).
+  canonicalPhone String   @unique
+  /// Область подавления: "ALL" — все WhatsApp-сообщения (D9).
+  scope          String   @default("ALL")
+  /// Причина: "STOP" (inbound keyword STOP/СТОП/UNSUBSCRIBE) | "manual" | ...
+  reason         String?
+  /// Кто отключил (manual): security.User ref без FK (ADR-0001).
+  actorUserId    String?
+  createdAt      DateTime @default(now())
+
+  @@schema("whatsapp")
 }

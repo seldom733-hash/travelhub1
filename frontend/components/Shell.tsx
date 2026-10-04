@@ -83,6 +83,7 @@ export const NAV_GROUPS: NavGroup[] = [
     headingKey: "nav.group.service",
     items: [
       { href: "/app/support", icon: "🎫", labelKey: "nav.support", permission: "support.case.read" },
+      { href: "/app/whatsapp", icon: "💬", labelKey: "nav.whatsapp", permission: "whatsapp.read" },
       { href: "/app/help", icon: "❓", labelKey: "nav.help" },
     ],
   },
@@ -96,6 +97,7 @@ export const NAV_GROUPS: NavGroup[] = [
     headingKey: "nav.group.settings",
     items: [
       { href: "/app/page-builder", icon: "🔧", labelKey: "nav.constructor", permission: "settings.write" },
+      { href: "/app/settings/integrations/whatsapp", icon: "🔌", labelKey: "nav.integrations", permission: "whatsapp.read" },
     ],
   },
 ];

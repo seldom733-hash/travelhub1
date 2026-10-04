@@ -278,6 +278,18 @@ export const PERMISSIONS = {
   "marketing.audience.manage": "Управление маркетинговыми аудиториями",
   "marketing.attribution.read": "Чтение маркетинговых атрибуций",
   "marketing.attribution.manage": "Управление маркетинговыми атрибуциями",
+
+  // ── WhatsApp integration (M1 «Фундамент», whatsapp.*) ───────────────────
+  // Решение владельца №7 (мастер-промпт §5 D7): read — внутренние роли;
+  // send — операционный контур (ADMIN/OPERATOR/SALES_MANAGER); session.admin
+  // и manage — ADMIN/OPERATOR (link/unlink гейтится manage); send.recover —
+  // только ADMIN (UNKNOWN «Retry anyway»). Все link/unlink/session/recovery
+  // действия обязаны писать audit (security.service.audit).
+  "whatsapp.read": "Чтение WhatsApp-интеграции (сессии, контакты, статусы, delivery)",
+  "whatsapp.send": "Отправка сообщений в WhatsApp через TravelHUB (операционный контур)",
+  "whatsapp.send.recover": "Recovery-отправка UNKNOWN-сообщений («Retry anyway», только ADMIN)",
+  "whatsapp.manage": "Управление WhatsApp-интеграцией (link/unlink контактов, параметры)",
+  "whatsapp.session.admin": "Администрирование WhatsApp-сессии (connect/disconnect/logout)",
 } as const;
 
 export type PermissionCode = keyof typeof PERMISSIONS;
@@ -354,6 +366,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "marketing.audience.manage",
     "marketing.attribution.read",
     "marketing.attribution.manage",
+    // M1 WhatsApp: DIRECTOR читает статусы интеграции (решение владельца №7).
+    "whatsapp.read",
   ],
 
   FINANCE: [
@@ -411,6 +425,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "operational-notes.read",
     // Phase 3 Step 3.5.3 Round 2B: FINANCE — CRM Activity Timeline read.
     "crm.activity.read",
+    // M1 WhatsApp: FINANCE читает статусы интеграции (решение владельца №7).
+    "whatsapp.read",
   ],
 
   MARKETER: [
@@ -448,6 +464,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "marketing.audience.manage",
     "marketing.attribution.read",
     "marketing.attribution.manage",
+    // M1 WhatsApp: MARKETER читает статусы интеграции (решение владельца №7).
+    "whatsapp.read",
   ],
 
   ANALYST: [
@@ -493,6 +511,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     // R1/R2 back-port: support.case.read — remediation migration 20260830000000
     // (Step 3.10) grants it explicitly (read-only data-analysis pattern).
     "support.case.read",
+    // M1 WhatsApp: ANALYST читает статусы интеграции (решение владельца №7).
+    "whatsapp.read",
   ],
 
   // Step 1.3 review fix: MODERATOR имеет ТОЛЬКО moderation-права — review/approve/
@@ -519,6 +539,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "seller_public_profile.approve_brand",
     "seller_public_profile.request_changes",
     "seller_public_profile.hide_identity",
+    // M1 WhatsApp: MODERATOR читает статусы интеграции (решение владельца №7).
+    "whatsapp.read",
   ],
 
   SALES_MANAGER: [
@@ -563,6 +585,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "operational-notes.create",
     // Phase 3 Step 3.5.3 Round 2B: SALES_MANAGER — CRM Activity Timeline read.
     "crm.activity.read",
+    // M1 WhatsApp: SALES_MANAGER читает интеграцию + отправляет сообщения
+    // (решение владельца №7: whatsapp.read + whatsapp.send).
+    "whatsapp.read",
+    "whatsapp.send",
   ],
 
   OPERATOR: [
@@ -618,6 +644,12 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "operational-notes.delete",
     // Phase 3 Step 3.5.3 Round 2B: OPERATOR — CRM Activity Timeline read.
     "crm.activity.read",
+    // M1 WhatsApp: операционный контур (решение владельца №7) — read + send +
+    // manage (link/unlink) + session admin (connect/disconnect/logout).
+    "whatsapp.read",
+    "whatsapp.send",
+    "whatsapp.manage",
+    "whatsapp.session.admin",
   ],
 
   // Step 1.3: PARTNER НЕ имеет unrestricted catalog.product.read — только

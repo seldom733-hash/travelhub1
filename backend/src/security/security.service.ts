@@ -602,4 +602,10 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "operational-notes.create": "Создание operational notes",
   "operational-notes.update": "Редактирование operational notes",
   "operational-notes.delete": "Удаление operational notes (soft-delete)",
+  // M1 WhatsApp integration (решение владельца №7).
+  "whatsapp.read": "Чтение WhatsApp-интеграции (сессии, контакты, статусы, delivery)",
+  "whatsapp.send": "Отправка сообщений в WhatsApp через TravelHUB (операционный контур)",
+  "whatsapp.send.recover": "Recovery-отправка UNKNOWN-сообщений («Retry anyway», только ADMIN)",
+  "whatsapp.manage": "Управление WhatsApp-интеграцией (link/unlink контактов, параметры)",
+  "whatsapp.session.admin": "Администрирование WhatsApp-сессии (connect/disconnect/logout)",
 };

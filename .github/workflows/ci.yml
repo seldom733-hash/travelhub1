@@ -61,6 +61,13 @@ jobs:
       - name: Install backend dependencies
         run: npm ci
 
+      # M1 WhatsApp (решение владельца №17): закреплённая версия Baileys
+      # (@whiskeysockets/baileys@6.7.24, exact pin) не должна тянуть критичных
+      # уязвимостей. Порог critical: существующие high/moderate у зависимостей
+      # (sharp/exceljs/prisma и т.п.) известны и разбираются отдельно.
+      - name: Dependency audit (production, critical)
+        run: npm audit --omit=dev --audit-level=critical
+
       - name: Generate Prisma Client
         run: npx prisma generate
 

@@ -1,0 +1,124 @@
+M3 evidence — §30/§34 chain verification (live API + DB, captured 2026-10-03T09:53:03.367Z)
+backend: http://localhost:4000 (npm run dev, mock provider), auth: admin/admin123 -> Bearer
+
+CHAIN: inbox -> AMBIGUOUS -> candidates -> link -> MATCHED -> customer/context -> outbound SENT
+
+[1] inbox            -> UI: m3-ui-01-inbox-list.png (AMBIGUOUS badge, unread=1, до link)
+                     -> API GET /whatsapp/conversations:
+[
+  {
+    "id": "1bc85a58-34b2-4b7a-b631-d138f24372aa",
+    "remoteJid": "994507000000@s.whatsapp.net",
+    "canonicalPhone": "+994507000000",
+    "matchingStatus": "MATCHED",
+    "customerId": "bf8c6390-7c53-432b-807d-5a3afe7090df",
+    "lastMessageAt": "2026-10-03T09:06:34.323Z",
+    "lastMessagePreview": "Заявка в обработке, менеджер свяжется с вами в течение дня.",
+    "lastReadAt": "2026-10-03T09:00:06.934Z",
+    "unreadCount": 0,
+    "suppressed": false,
+    "createdAt": "2026-10-03T08:24:12.225Z",
+    "updatedAt": "2026-10-03T09:06:34.324Z"
+  }
+]
+
+[2] AMBIGUOUS        -> UI: m3-ui-02-ambiguous-candidates.png (badge «Несколько клиентов»,
+                        candidates=2 после «показать кандидатов» — состояние ДО link,
+                        зафиксировано скриншотом в момент smoke);
+                     -> сейчас link уже выполнен, доказательство 2 кандидатов по тому же
+                        телефону — customer-search (оба «Иван Петров», +994507000000):
+[
+  {
+    "id": "bf8c6390-7c53-432b-807d-5a3afe7090df",
+    "code": "CUS-00000001",
+    "name": "Иван Петров",
+    "email": "m3-smoke-1790992329387@test.local"
+  },
+  {
+    "id": "94c29ee3-cae9-4e59-9108-958329241cbc",
+    "code": "CUS-00000002",
+    "name": "Иван Петров",
+    "email": "m3-smoke2-1790992354872@test.local"
+  }
+]
+
+[3] link -> MATCHED   -> UI: m3-ui-03-matched-customer.png («Клиент привязан», MATCHED)
+                     -> API detail: matchingStatus="MATCHED" customerId="bf8c6390-7c53-432b-807d-5a3afe7090df"
+                     -> audit whatsapp.customer_linked: [{"action":"whatsapp.customer_linked","userId":"56b6ced0-2003-4097-b457-b107a0c95c28","username":"admin","createdAt":"2026-10-03T09:05:54.734Z"}]
+
+[4] customer/context -> UI: правая колонка m3-ui-03/04 (КЛИЕНТ CUS-00000001 / контекст)
+                     -> API detail:
+{
+  "customer": {
+    "id": "bf8c6390-7c53-432b-807d-5a3afe7090df",
+    "code": "CUS-00000001",
+    "name": "Иван Петров",
+    "email": "m3-smoke-1790992329387@test.local"
+  },
+  "context": {
+    "type": "CUSTOMER",
+    "id": "bf8c6390-7c53-432b-807d-5a3afe7090df",
+    "code": "CUS-00000001",
+    "status": null
+  },
+  "candidates": [],
+  "suppressed": false,
+  "unreadCount": 0
+}
+
+[5] outbound SENT    -> UI: m3-ui-04-sent-reply.png («Отправлено», CML-00000301)
+                     -> API messages (одна история: INBOUND + OUTBOUND[SENT]):
+[
+  {
+    "id": "81552851-f43b-4bae-8038-5c95c755fa19",
+    "origin": "inbound",
+    "direction": "INBOUND",
+    "body": "Здравствуйте! Хочу уточнить статус заявки.",
+    "messageType": "text",
+    "occurredAt": "2026-10-03T08:24:12.200Z",
+    "communicationCode": "CML-00000201",
+    "providerMessageId": "m3-dev-smoke-1791015852200",
+    "status": null,
+    "sentAt": null,
+    "deliveredAt": null,
+    "readAt": null
+  },
+  {
+    "id": "00588380-7e76-4b75-8649-2e24ed2c5aa3",
+    "origin": "outbound",
+    "direction": "OUTBOUND",
+    "body": "Заявка в обработке, менеджер свяжется с вами в течение дня.",
+    "messageType": "text",
+    "occurredAt": "2026-10-03T09:06:34.311Z",
+    "communicationCode": "CML-00000301",
+    "providerMessageId": "3EB0809433874A220F880DA8CB3E07F52AE50319",
+    "status": "SENT",
+    "sentAt": "2026-10-03T09:06:34.346Z",
+    "deliveredAt": null,
+    "readAt": null
+  }
+]
+
+DB conversation row:
+[
+  {
+    "id": "1bc85a58-34b2-4b7a-b631-d138f24372aa",
+    "matchingStatus": "MATCHED",
+    "lastReadAt": "2026-10-03T09:00:06.934Z",
+    "lastMessageAt": "2026-10-03T09:06:34.323Z",
+    "customerId": "bf8c6390-7c53-432b-807d-5a3afe7090df",
+    "canonicalPhone": "+994507000000"
+  }
+]
+
+Audit chain (whatsapp.*, ascending):
+  2026-10-03T01:38:00.394Z  whatsapp.send  userId=56b6ced0-2003-4097-b457-b107a0c95c28  username=admin
+  2026-10-03T08:24:57.585Z  whatsapp.connected  userId=null  username=system
+  2026-10-03T09:05:54.734Z  whatsapp.customer_linked  userId=56b6ced0-2003-4097-b457-b107a0c95c28  username=admin
+  2026-10-03T09:06:34.326Z  whatsapp.send  userId=56b6ced0-2003-4097-b457-b107a0c95c28  username=admin
+
+Notes:
+- §34: communication history = ONE (CML-00000201 inbound + CML-00000301 outbound в одном потоке).
+- whatsapp.connected пишется с userId=null (fix A-30) — до фикса таких строк 0 за историю.
+- Шаги [1]/[2] — состояние на момент smoke (скриншоты 01/02); [3]/[4]/[5] подтверждены
+  live-API после smoke (detail MATCHED, candidates=[], OUTBOUND status=SENT).
