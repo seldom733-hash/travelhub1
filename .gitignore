@@ -68,3 +68,7 @@ login.json
 
 # Hotel photos (707 MB, downloaded separately — referenced by lib/hotel-photo.ts)
 frontend/public/hotels/
+
+# WhatsApp runtime artifacts: Baileys session (secrets — NEVER commit) + media
+backend/.whatsapp-session/
+backend/.whatsapp-media/
