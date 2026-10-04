@@ -64,3 +64,64 @@ describe("FlightResults seat availability column", () => {
     expect((buttons[0] as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe("FlightResults itinerary columns", () => {
+  function makeConnectingOffer(): FlightOffer {
+    return makeOffer({
+      segments: [
+        {
+          departure: { airport: "GYD", date: "2026-09-28T07:25:00" },
+          arrival: { airport: "FRA", date: "2026-09-28T10:40:00" },
+          duration: { minutes: 355 },
+          operatingAirline: { code: "J2", flightNumber: "J2-123" },
+          marketingAirline: { code: "J2", flightNumber: "J2-123" },
+        },
+        {
+          departure: { airport: "FRA", date: "2026-09-28T13:05:00" },
+          arrival: { airport: "IST", date: "2026-09-28T17:20:00" },
+          duration: { minutes: 195 },
+          operatingAirline: { code: "TK", flightNumber: "TK-1580" },
+          marketingAirline: { code: "TK", flightNumber: "TK-1580" },
+        },
+      ],
+    });
+  }
+
+  it("prints the whole chain in «Код» so a connection does not read as a separate destination", () => {
+    render(<FlightResults flights={[makeConnectingOffer()]} />);
+    expect(screen.getByText("GYD-FRA-IST")).toBeTruthy();
+    expect(screen.queryByText("GYD-FRA")).toBeNull();
+  });
+
+  it("renders «Перевозчик» as the column right after «Код»", () => {
+    render(<FlightResults flights={[makeConnectingOffer()]} />);
+    const headers = [...screen.getAllByRole("columnheader")].map((th) => th.textContent ?? "");
+    expect(headers[0]).toContain("Код");
+    expect(headers[1]).toContain("Перевозчик");
+  });
+
+  it("resolves the carrier from the first segment's operating airline", () => {
+    render(<FlightResults flights={[makeConnectingOffer()]} />);
+    expect(screen.getByText("Azerbaijan Airlines")).toBeTruthy();
+  });
+
+  it("falls back to the raw IATA code for an unknown carrier", () => {
+    render(
+      <FlightResults
+        flights={[
+          makeOffer({
+            segments: [
+              {
+                departure: { airport: "GYD", date: "2026-09-28T07:25:00" },
+                arrival: { airport: "IST", date: "2026-09-28T10:40:00" },
+                duration: { minutes: 195 },
+                operatingAirline: { code: "ZZ", flightNumber: "ZZ-1" },
+              },
+            ],
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByText("ZZ")).toBeTruthy();
+  });
+});

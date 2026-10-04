@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader";
-import CompactSearch from "@/components/marketplace/CompactSearch";
+import HeroSearch from "@/components/marketplace/HeroSearch";
 import HelpFindButton from "@/components/marketplace/search/HelpFindButton";
 import TourResultsTable from "@/components/supplier/TourResultsTable";
 import { t, useLocale } from "@/lib/i18n";
@@ -152,7 +152,8 @@ function SearchResultsInner() {
       const infants = Math.max(0, Number(params.infants) || 0);
       const returnDate = params.returnDate || params.return || undefined;
       const tariff = params.tariff || "ALL";
-      const dedupKey = `${from}-${to}-${departureDate}-${tripType}-${adults}-${children}-${infants}-${returnDate}-${tariff}`;
+      const supplier = params.supplier || "ALL";
+      const dedupKey = `${from}-${to}-${departureDate}-${tripType}-${adults}-${children}-${infants}-${returnDate}-${tariff}-${supplier}`;
       const requestId = ++flightRequestIdRef.current;
 
       setLoading(true);
@@ -188,6 +189,7 @@ function SearchResultsInner() {
             infants,
           },
           ...(returnDate ? { returnDate } : {}),
+          ...(supplier !== "ALL" ? { supplier } : {}),
         });
         flightSearchCacheRef.current = { key: dedupKey, promise: searchPromise };
       }
@@ -349,9 +351,11 @@ function SearchResultsInner() {
     <div className="min-h-screen bg-dark">
       <MarketplaceHeader />
       <main className="mx-auto max-w-[1400px] px-6 py-8">
-        {/* Compact search bar */}
+        {/* Универсальный поисковик — тот же HeroSearch (вкладки услуг), что и
+            на главной; активна вкладка текущего поиска, чтобы параметры можно
+            было поменять прямо со страницы результатов. */}
         <div className="mb-6">
-          <CompactSearch service={isValidService ? service : "tours"} params={params} />
+          <HeroSearch defaultService={isValidService ? service : "tours"} />
         </div>
 
         {/* Universal live search results — table (§6) */}

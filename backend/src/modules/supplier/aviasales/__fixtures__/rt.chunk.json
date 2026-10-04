@@ -1,0 +1,7485 @@
+{
+ "chunk_id": "results",
+ "last_update_timestamp": 0,
+ "tickets": [
+  {
+   "id": "b951b95a1217726d81e461ba9bc79e02-ad",
+   "segments": [
+    {
+     "flights": [
+      4
+     ],
+     "transfers": [],
+     "tags": []
+    },
+    {
+     "flights": [
+      2
+     ],
+     "transfers": [],
+     "tags": []
+    }
+   ],
+   "proposals": [
+    {
+     "id": "386:162",
+     "itinerary_key": "r2lpWlIlHWumzRvMmAFR8A",
+     "price": {
+      "currency_code": "AZN",
+      "value": 419.68
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 419.68
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ABA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "4": {
+       "fare_code": "VL002ABA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8103"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 20564.220017411764
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false
+    },
+    {
+     "id": "386:163",
+     "itinerary_key": "r2lpWlIlHWumzRvMmAFR8A",
+     "price": {
+      "currency_code": "AZN",
+      "value": 477.4
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 477.4
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ABB",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "4": {
+       "fare_code": "VL002ABA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8103"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 23392.486266470587
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false
+    },
+    {
+     "id": "386:164",
+     "itinerary_key": "r2lpWlIlHWumzRvMmAFR8A",
+     "price": {
+      "currency_code": "AZN",
+      "value": 477.4
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 477.4
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ABA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "4": {
+       "fare_code": "VL002ABB",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8103"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 23392.486266470587
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false
+    },
+    {
+     "id": "386:165",
+     "itinerary_key": "r2lpWlIlHWumzRvMmAFR8A",
+     "price": {
+      "currency_code": "AZN",
+      "value": 535.12
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 535.12
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ABB",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "4": {
+       "fare_code": "VL002ABB",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8103"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 26220.75251552941
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH1|R1|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": true
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false
+    },
+    {
+     "id": "386:166",
+     "itinerary_key": "r2lpWlIlHWumzRvMmAFR8A",
+     "price": {
+      "currency_code": "AZN",
+      "value": 535.13
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 535.13
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ABC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 32
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": true
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "4": {
+       "fare_code": "VL002ABA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8103"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 26221.24251314706
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false
+    },
+    {
+     "id": "386:167",
+     "itinerary_key": "r2lpWlIlHWumzRvMmAFR8A",
+     "price": {
+      "currency_code": "AZN",
+      "value": 535.13
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 535.13
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ABA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "4": {
+       "fare_code": "VL002ABC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8103"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 32
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": true
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 26221.24251314706
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false
+    },
+    {
+     "id": "386:168",
+     "itinerary_key": "r2lpWlIlHWumzRvMmAFR8A",
+     "price": {
+      "currency_code": "AZN",
+      "value": 592.85
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 592.85
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ABC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 32
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": true
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "4": {
+       "fare_code": "VL002ABB",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8103"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 29049.50876220588
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH0|R1|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": true
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false
+    },
+    {
+     "id": "386:169",
+     "itinerary_key": "r2lpWlIlHWumzRvMmAFR8A",
+     "price": {
+      "currency_code": "AZN",
+      "value": 592.85
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 592.85
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ABB",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "4": {
+       "fare_code": "VL002ABC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8103"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 32
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": true
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 29049.50876220588
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH0|R1|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": true
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false
+    },
+    {
+     "id": "386:170",
+     "itinerary_key": "r2lpWlIlHWumzRvMmAFR8A",
+     "price": {
+      "currency_code": "AZN",
+      "value": 650.58
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 650.58
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ABC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 32
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": true
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "4": {
+       "fare_code": "VL002ABC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8103"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 32
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": true
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 31878.265008882354
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_32|CH0|R1|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 32,
+       "total_weight": 32
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": true
+      },
+      "return_after_flight": {
+       "available": true
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false
+    }
+   ],
+   "signature": "b951b95a1217726d81e461ba9bc79e02-ad",
+   "popularity": 0,
+   "score": 0.08216483547578048,
+   "hashsum": "81e13529d062ec78",
+   "tags": [
+    "convenient_ticket",
+    "direct",
+    "is_ad"
+   ],
+   "badges": [
+    {
+     "type": "recommended",
+     "scores": [
+      0.08216483547578048,
+      -20564
+     ],
+     "meta": {
+      "name": {
+       "az": "Tövsiyə olunan"
+      },
+      "priority": 30,
+      "position": 30,
+      "limit": 3,
+      "colors": {
+       "light": "#d33881",
+       "dark": "#FB6FB0"
+      }
+     }
+    }
+   ],
+   "secondary_badges": [
+    {
+     "id": "baggage_can_purchase_baggage_known",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "price",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": {
+         "currency_code": "AZN",
+         "value": 536
+        },
+        "token": "price_short"
+       },
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": " baqaj ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 23,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    },
+    {
+     "id": "handbag",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": "Əl yükü ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 10,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    }
+   ],
+   "extra_fares": {},
+   "position": 1
+  },
+  {
+   "id": "dce6dbc8cb3fde504e2993f6863b0551",
+   "segments": [
+    {
+     "flights": [
+      5
+     ],
+     "transfers": [],
+     "tags": []
+    },
+    {
+     "flights": [
+      2
+     ],
+     "transfers": [],
+     "tags": []
+    }
+   ],
+   "proposals": [
+    {
+     "id": "192:1706",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 362.15987991240206
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 362.15987991240206
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 18672.33921567647
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:1707",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 362.15987991240206
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 362.15987991240206
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 18672.33921567647
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:1710",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 362.15987991240206
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 362.15987991240206
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 18672.33921567647
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:1711",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 362.15987991240206
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 362.15987991240206
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 18672.33921567647
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "471:111",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 378.99432829020594
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 378.99432829020594
+     },
+     "agent_id": 471,
+     "flight_terms": {
+      "2": {
+       "fare_code": "B100",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "B100",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 18658.129284764706
+     },
+     "weight": 1.3152571478519521,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "471:112",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 378.99432829020594
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 378.99432829020594
+     },
+     "agent_id": 471,
+     "flight_terms": {
+      "2": {
+       "fare_code": "2",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "2",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 18658.129284764706
+     },
+     "weight": 1.3152571478519521,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "404:10",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 390.4696471955446
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 390.4696471955446
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "2": {
+       "fare_code": "BUDGETY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "BUDGETY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 19854.703467058822
+     },
+     "weight": 1.4717002550191522,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "492:538",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 390.8929554050911
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 390.8929554050911
+     },
+     "agent_id": 492,
+     "flight_terms": {
+      "2": {
+       "fare_code": "V",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "V",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 19599.904705882353
+     },
+     "weight": 0.5451258623552699,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "65:6",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 401.67609809303843
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 401.67609809303843
+     },
+     "agent_id": 65,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 20129.102132941178
+     },
+     "weight": 0.024273156074558763,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "404:11",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 407.58401277844905
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 407.58401277844905
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "2": {
+       "fare_code": "BudgetY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "BudgetY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 20724.939236
+     },
+     "weight": 1.4717002550191522,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "11:12",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 416.2335729193901
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 416.2335729193901
+     },
+     "agent_id": 11,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Y",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 55,
+        "width": 40,
+        "height": 23
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "Y",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 55,
+        "width": 40,
+        "height": 23
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 20181.026200488002
+     },
+     "weight": 0.000001,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 55,
+       "width": 40,
+       "height": 23
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "8:3",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 418.1822363626132
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 418.1822363626132
+     },
+     "agent_id": 8,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 20579.89994117647
+     },
+     "weight": 1.692569153659807,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "496:0",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 418.92821481253753
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 418.92821481253753
+     },
+     "agent_id": 496,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ARA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "VL002ARA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 21071.4655512
+     },
+     "weight": 1.9347017707206922,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:1708",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 425.88260788397304
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 425.88260788397304
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Classic",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 21957.773242
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:1712",
+     "itinerary_key": "EchirOQETbmqBLYOsmzXbw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 425.88260788397304
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 425.88260788397304
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Classic",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "5": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 21957.773242
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    }
+   ],
+   "signature": "dce6dbc8cb3fde504e2993f6863b0551",
+   "popularity": 0,
+   "score": 0.10735308567298393,
+   "hashsum": "498d117b71a29031",
+   "tags": [
+    "convenient_ticket",
+    "direct"
+   ],
+   "badges": [
+    {
+     "type": "cheapest",
+     "scores": [
+      -18658,
+      0.10735308567298393,
+      8.288444444444446,
+      1.3152571478519521
+     ],
+     "meta": {
+      "name": {
+       "az": "Ən ucuz"
+      },
+      "priority": 50,
+      "position": 50,
+      "limit": 1,
+      "colors": {
+       "light": "#34a84c",
+       "dark": "#4EC165"
+      }
+     }
+    },
+    {
+     "type": "cheapest_direct",
+     "scores": [
+      -18658,
+      0.10735308567298393,
+      8.288444444444446,
+      1.3152571478519521
+     ],
+     "meta": {
+      "name": {
+       "az": "Ən ucuz birbaşa"
+      },
+      "priority": 60,
+      "position": 60,
+      "limit": 1,
+      "colors": {
+       "light": "#8555f2",
+       "dark": "#AA86FD"
+      }
+     }
+    },
+    {
+     "type": "optimal_manual",
+     "scores": [
+      -274.15475129260835,
+      -18672,
+      0.10735308567298393,
+      8.288444444444446,
+      -5.833333333333333
+     ],
+     "meta": {
+      "name": {
+       "az": "Ən münasib"
+      },
+      "priority": 260,
+      "position": 40,
+      "limit": 1,
+      "colors": {
+       "light": "#0c73fe",
+       "dark": "#1781F3"
+      }
+     }
+    },
+    {
+     "type": "may_also_be_suitable",
+     "scores": [
+      0.10735308567298393,
+      -18672
+     ],
+     "meta": {
+      "name": {
+       "az": "Uyğun ola bilər"
+      },
+      "priority": 270,
+      "position": 270,
+      "limit": 3,
+      "colors": {
+       "light": "#0c73fe",
+       "dark": "#1781F3"
+      }
+     }
+    }
+   ],
+   "secondary_badges": [
+    {
+     "id": "optimal_manual",
+     "style": {
+      "full_width": true,
+      "background_color": {
+       "light": {
+        "r": 146,
+        "g": 192,
+        "b": 255,
+        "a": 0.28
+       },
+       "dark": {
+        "r": 23,
+        "g": 129,
+        "b": 243,
+        "a": 0.12
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 10,
+           "g": 100,
+           "b": 221,
+           "a": 1
+          },
+          "dark": {
+           "r": 23,
+           "g": 129,
+           "b": 243,
+           "a": 1
+          }
+         }
+        },
+        "value": "Ən münasib"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    },
+    {
+     "id": "baggage_can_purchase_baggage_known",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "price",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": {
+         "currency_code": "AZN",
+         "value": 490
+        },
+        "token": "price_short"
+       },
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": " baqaj ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 23,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    },
+    {
+     "id": "handbag",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": "Əl yükü ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 10,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    }
+   ],
+   "extra_fares": {},
+   "position": 2
+  },
+  {
+   "id": "063a0ca8e46d5057882d1e465e3a1d1a",
+   "segments": [
+    {
+     "flights": [
+      3
+     ],
+     "transfers": [],
+     "tags": []
+    },
+    {
+     "flights": [
+      2
+     ],
+     "transfers": [],
+     "tags": []
+    }
+   ],
+   "proposals": [
+    {
+     "id": "192:104",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 374.0395831136643
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 374.0395831136643
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 19284.836237735293
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:105",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 374.0395831136643
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 374.0395831136643
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 19284.836237735293
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:108",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 374.0395831136643
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 374.0395831136643
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 19284.836237735293
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:109",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 374.0395831136643
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 374.0395831136643
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 19284.836237735293
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "471:148",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 396.31273081200226
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 396.31273081200226
+     },
+     "agent_id": 471,
+     "flight_terms": {
+      "2": {
+       "fare_code": "2",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "2",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 19510.72513947059
+     },
+     "weight": 1.3152571478519521,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "404:41",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 407.1407352915045
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 407.1407352915045
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "2": {
+       "fare_code": "BUDGETY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "BUDGETY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 20702.399345588234
+     },
+     "weight": 1.4717002550191522,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "492:511",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 408.48313839832014
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 408.48313839832014
+     },
+     "agent_id": 492,
+     "flight_terms": {
+      "2": {
+       "fare_code": "V",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "P",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 20481.90041764706
+     },
+     "weight": 0.5451258623552699,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "65:10",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 422.8745835035961
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 422.8745835035961
+     },
+     "agent_id": 65,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 21191.416968
+     },
+     "weight": 0.024273156074558763,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "404:42",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 424.4189208152363
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 424.4189208152363
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "2": {
+       "fare_code": "BudgetY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "BudgetY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 21580.965074029413
+     },
+     "weight": 1.4717002550191522,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:113",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 435.7285058971793
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 435.7285058971793
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "Classic",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 22465.41077388235
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH1|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:112",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 435.7285058971793
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 435.7285058971793
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "Classic",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 22465.41077388235
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:106",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 435.76652094742326
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 435.76652094742326
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Classic",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 22467.370764352938
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:110",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 435.76652094742326
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 435.76652094742326
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Classic",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 22467.370764352938
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "8:5",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 436.1043322067252
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 436.1043322067252
+     },
+     "agent_id": 8,
+     "flight_terms": {
+      "2": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 21461.895652941177
+     },
+     "weight": 1.692569153659807,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "496:16",
+     "itinerary_key": "AJQn4GLnT_V29G3b7PSD9Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 437.50970821148076
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 437.50970821148076
+     },
+     "agent_id": 496,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL002ARA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8106"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "3": {
+       "fare_code": "PL002ARA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [],
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 22006.0870071
+     },
+     "weight": 1.9347017707206922,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    }
+   ],
+   "signature": "063a0ca8e46d5057882d1e465e3a1d1a",
+   "popularity": 0,
+   "score": 0.05518825443785713,
+   "hashsum": "d4bf32010614e101",
+   "tags": [
+    "airport_different",
+    "convenient_ticket",
+    "direct"
+   ],
+   "secondary_badges": [
+    {
+     "id": "baggage_can_purchase_baggage_known",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "price",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": {
+         "currency_code": "AZN",
+         "value": 498
+        },
+        "token": "price_short"
+       },
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": " baqaj ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 23,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    },
+    {
+     "id": "handbag",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": "Əl yükü ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 10,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    }
+   ],
+   "extra_fares": {},
+   "position": 6
+  }
+ ],
+ "flight_legs": [
+  {
+   "origin": "IST",
+   "destination": "GYD",
+   "local_departure_date_time": "2026-10-22 22:50",
+   "local_arrival_date_time": "2026-10-23 02:50",
+   "departure_unix_timestamp": 1792698600,
+   "arrival_unix_timestamp": 1792709400,
+   "operating_carrier_designator": {
+    "carrier": "J2",
+    "airline_id": "J2",
+    "number": "78"
+   },
+   "equipment": {
+    "code": "32Q",
+    "type": "plane",
+    "name": "Airbus A321neo"
+   },
+   "technical_stops": [],
+   "signature": "1792709400:1792723800:IST:GYD",
+   "tags": []
+  },
+  {
+   "origin": "SAW",
+   "destination": "GYD",
+   "local_departure_date_time": "2026-10-22 10:30",
+   "local_arrival_date_time": "2026-10-22 14:20",
+   "departure_unix_timestamp": 1792654200,
+   "arrival_unix_timestamp": 1792664400,
+   "operating_carrier_designator": {
+    "carrier": "J2",
+    "airline_id": "J2",
+    "number": "8104"
+   },
+   "equipment": {
+    "code": "319",
+    "type": "plane",
+    "name": "Airbus A319"
+   },
+   "technical_stops": [],
+   "signature": "1792665000:1792678800:SAW:GYD",
+   "tags": []
+  },
+  {
+   "origin": "SAW",
+   "destination": "GYD",
+   "local_departure_date_time": "2026-10-22 15:55",
+   "local_arrival_date_time": "2026-10-22 19:45",
+   "departure_unix_timestamp": 1792673700,
+   "arrival_unix_timestamp": 1792683900,
+   "operating_carrier_designator": {
+    "carrier": "J2",
+    "airline_id": "J2",
+    "number": "8106"
+   },
+   "equipment": {
+    "code": "320",
+    "type": "plane",
+    "name": "Airbus A320"
+   },
+   "technical_stops": [],
+   "signature": "1792684500:1792698300:SAW:GYD",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "IST",
+   "local_departure_date_time": "2026-10-15 19:45",
+   "local_arrival_date_time": "2026-10-15 21:50",
+   "departure_unix_timestamp": 1792079100,
+   "arrival_unix_timestamp": 1792090200,
+   "operating_carrier_designator": {
+    "carrier": "J2",
+    "airline_id": "J2",
+    "number": "77"
+   },
+   "equipment": {
+    "code": "32Q",
+    "type": "plane",
+    "name": "Airbus A321neo"
+   },
+   "technical_stops": [],
+   "signature": "1792093500:1792101000:GYD:IST",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "SAW",
+   "local_departure_date_time": "2026-10-15 07:20",
+   "local_arrival_date_time": "2026-10-15 09:20",
+   "departure_unix_timestamp": 1792034400,
+   "arrival_unix_timestamp": 1792045200,
+   "operating_carrier_designator": {
+    "carrier": "J2",
+    "airline_id": "J2",
+    "number": "8103"
+   },
+   "equipment": {
+    "code": "320",
+    "type": "plane",
+    "name": "Airbus A320"
+   },
+   "technical_stops": [],
+   "signature": "1792048800:1792056000:GYD:SAW",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "SAW",
+   "local_departure_date_time": "2026-10-15 12:55",
+   "local_arrival_date_time": "2026-10-15 14:55",
+   "departure_unix_timestamp": 1792054500,
+   "arrival_unix_timestamp": 1792065300,
+   "operating_carrier_designator": {
+    "carrier": "J2",
+    "airline_id": "J2",
+    "number": "8105"
+   },
+   "equipment": {
+    "code": "320",
+    "type": "plane",
+    "name": "Airbus A320"
+   },
+   "technical_stops": [],
+   "signature": "1792068900:1792076100:GYD:SAW",
+   "tags": []
+  }
+ ],
+ "airlines": {
+  "A3": {
+   "iata": "A3",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Aegean Airlines"
+    }
+   },
+   "alliance_id": 1,
+   "site_name": "Aegeanair.com",
+   "brand_color": "94A4D4"
+  },
+  "EK": {
+   "iata": "EK",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Emirates"
+    }
+   },
+   "site_name": "",
+   "brand_color": "D42424"
+  },
+  "FZ": {
+   "iata": "FZ",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Flydubai"
+    }
+   },
+   "site_name": "Flydubai",
+   "brand_color": "346CAC"
+  },
+  "G9": {
+   "iata": "G9",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Air Arabia"
+    }
+   },
+   "site_name": "",
+   "brand_color": "FC0444"
+  },
+  "HY": {
+   "iata": "HY",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Özbəkistan Hava Yolları"
+    }
+   },
+   "site_name": "",
+   "brand_color": "FCD444"
+  },
+  "J2": {
+   "iata": "J2",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Azərbaycan Hava Yolları"
+    }
+   },
+   "site_name": "",
+   "brand_color": "04B4E4"
+  },
+  "KC": {
+   "iata": "KC",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Air Astana"
+    }
+   },
+   "site_name": "",
+   "brand_color": "A48C64"
+  },
+  "LH": {
+   "iata": "LH",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Lufthansa"
+    }
+   },
+   "alliance_id": 1,
+   "site_name": "",
+   "brand_color": "04245C"
+  },
+  "LO": {
+   "iata": "LO",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "LOT Polish"
+    }
+   },
+   "alliance_id": 1,
+   "site_name": "",
+   "brand_color": "1C2C5C"
+  },
+  "PC": {
+   "iata": "PC",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Pegasus Airlines"
+    }
+   },
+   "site_name": "",
+   "brand_color": "FCA404"
+  },
+  "QR": {
+   "iata": "QR",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Qatar Airways"
+    }
+   },
+   "alliance_id": 2,
+   "site_name": "",
+   "brand_color": "64043C"
+  },
+  "TK": {
+   "iata": "TK",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Turkish Airlines"
+    }
+   },
+   "alliance_id": 1,
+   "site_name": "",
+   "brand_color": "CC2424"
+  },
+  "VF": {
+   "iata": "VF",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Ajet"
+    }
+   },
+   "site_name": "",
+   "brand_color": "048CFC"
+  }
+ },
+ "places": {
+  "airports": {
+   "ADB": {
+    "name": {
+     "az": {
+      "default": "İzmir Adnan Menderes"
+     }
+    },
+    "code": "ADB",
+    "city_code": "IZM",
+    "metro_area_code": "IZM",
+    "coordinates": {
+     "lat": 38.294403,
+     "lng": 27.147594
+    },
+    "has_transit_zone": null
+   },
+   "ALA": {
+    "name": {
+     "az": {
+      "default": "Almatı"
+     }
+    },
+    "code": "ALA",
+    "city_code": "ALA",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 43.346653,
+     "lng": 77.01145
+    },
+    "has_transit_zone": true
+   },
+   "ATH": {
+    "name": {
+     "az": {
+      "default": "Elefterios Venizelos"
+     }
+    },
+    "code": "ATH",
+    "city_code": "ATH",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 37.93635,
+     "lng": 23.946486
+    },
+    "has_transit_zone": null
+   },
+   "AYT": {
+    "name": {
+     "az": {
+      "default": "Antalya"
+     }
+    },
+    "code": "AYT",
+    "city_code": "AYT",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 36.89928,
+     "lng": 30.80135
+    },
+    "has_transit_zone": null
+   },
+   "COV": {
+    "name": {
+     "az": {
+      "default": "Çukurova"
+     }
+    },
+    "code": "COV",
+    "city_code": "COV",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 36.896944,
+     "lng": 35.0675
+    },
+    "has_transit_zone": null
+   },
+   "DOH": {
+    "name": {
+     "az": {
+      "default": "Hamad"
+     }
+    },
+    "code": "DOH",
+    "city_code": "DOH",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 25.267569,
+     "lng": 51.558067
+    },
+    "has_transit_zone": true
+   },
+   "DWC": {
+    "name": {
+     "az": {
+      "default": "Dubay World Central - Al-Maktum Beynəlxalq Hava Limanı"
+     }
+    },
+    "code": "DWC",
+    "city_code": "DXB",
+    "metro_area_code": "DXB",
+    "coordinates": {
+     "lat": 24.918056,
+     "lng": 55.175278
+    },
+    "has_transit_zone": null
+   },
+   "DXB": {
+    "name": {
+     "az": {
+      "default": "Dubay"
+     }
+    },
+    "code": "DXB",
+    "city_code": "DXB",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 25.248665,
+     "lng": 55.352917
+    },
+    "has_transit_zone": true
+   },
+   "ESB": {
+    "name": {
+     "az": {
+      "default": "Əsənboğa"
+     }
+    },
+    "code": "ESB",
+    "city_code": "ANK",
+    "metro_area_code": "ANK",
+    "coordinates": {
+     "lat": 40.11494,
+     "lng": 32.993145
+    },
+    "has_transit_zone": null
+   },
+   "FRA": {
+    "name": {
+     "az": {
+      "default": "Frankfurt"
+     }
+    },
+    "code": "FRA",
+    "city_code": "FRA",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 50.050735,
+     "lng": 8.570773
+    },
+    "has_transit_zone": true
+   },
+   "GUW": {
+    "name": {
+     "az": {
+      "default": "Atırau"
+     }
+    },
+    "code": "GUW",
+    "city_code": "GUW",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 47.122814,
+     "lng": 51.829556
+    },
+    "has_transit_zone": null
+   },
+   "GYD": {
+    "name": {
+     "az": {
+      "default": "Heydər Əliyev"
+     }
+    },
+    "code": "GYD",
+    "city_code": "BAK",
+    "metro_area_code": "BAK",
+    "coordinates": {
+     "lat": 40.462486,
+     "lng": 50.05039
+    },
+    "has_transit_zone": null
+   },
+   "HHN": {
+    "name": {
+     "az": {
+      "default": "Frankfurt-Han"
+     }
+    },
+    "code": "HHN",
+    "city_code": "FRA",
+    "metro_area_code": "FRA",
+    "coordinates": {
+     "lat": 49.948334,
+     "lng": 7.264167
+    },
+    "has_transit_zone": null
+   },
+   "IST": {
+    "name": {
+     "az": {
+      "default": "Istanbul Yeni Hava Limanı"
+     }
+    },
+    "code": "IST",
+    "city_code": "IST",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 40.9769,
+     "lng": 28.82055
+    },
+    "has_transit_zone": true
+   },
+   "QGV": {
+    "name": {
+     "az": {
+      "default": "Noy-İzenburq"
+     }
+    },
+    "code": "QGV",
+    "city_code": "FRA",
+    "metro_area_code": "FRA",
+    "coordinates": {
+     "lat": 50.05,
+     "lng": 8.683333
+    },
+    "has_transit_zone": null
+   },
+   "RMO": {
+    "name": {
+     "az": {
+      "default": "Кишинёв",
+      "from": "из Кишинёва",
+      "lookAt": "Кишинёв",
+      "to": "в Кишинёв",
+      "where": "в Кишинёве",
+      "which": "Кишинёва"
+     }
+    },
+    "code": "RMO",
+    "city_code": "RMO",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 47.024512,
+     "lng": 28.832292
+    },
+    "has_transit_zone": true
+   },
+   "SAW": {
+    "name": {
+     "az": {
+      "default": "Sabiha Gökçən"
+     }
+    },
+    "code": "SAW",
+    "city_code": "IST",
+    "metro_area_code": "IST",
+    "coordinates": {
+     "lat": 40.904675,
+     "lng": 29.309189
+    },
+    "has_transit_zone": true
+   },
+   "SHJ": {
+    "name": {
+     "az": {
+      "default": "Şarca"
+     }
+    },
+    "code": "SHJ",
+    "city_code": "SHJ",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 25.320873,
+     "lng": 55.52029
+    },
+    "has_transit_zone": null
+   },
+   "TAS": {
+    "name": {
+     "az": {
+      "default": "Daşkənd"
+     }
+    },
+    "code": "TAS",
+    "city_code": "TAS",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 41.262714,
+     "lng": 69.26619
+    },
+    "has_transit_zone": null
+   },
+   "TBS": {
+    "name": {
+     "az": {
+      "default": "Tbilisi"
+     }
+    },
+    "code": "TBS",
+    "city_code": "TBS",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 41.674065,
+     "lng": 44.958958
+    },
+    "has_transit_zone": null
+   },
+   "TZX": {
+    "name": {
+     "az": {
+      "default": "Trabzon"
+     }
+    },
+    "code": "TZX",
+    "city_code": "TZX",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 40.99419,
+     "lng": 39.78168
+    },
+    "has_transit_zone": null
+   },
+   "WAW": {
+    "name": {
+     "az": {
+      "default": "Frederik Şopen"
+     }
+    },
+    "code": "WAW",
+    "city_code": "WAW",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 52.170906,
+     "lng": 20.97329
+    },
+    "has_transit_zone": true
+   },
+   "XEU": {
+    "name": {
+     "az": {
+      "default": "Hyat Recensi EY Avtostansiya"
+     }
+    },
+    "code": "XEU",
+    "city_code": "DXB",
+    "metro_area_code": "DXB",
+    "coordinates": {
+     "lat": 25.2644444,
+     "lng": 55.3116667
+    },
+    "has_transit_zone": null
+   },
+   "XMB": {
+    "name": {
+     "az": {
+      "default": "Marina Moll EY Avtovağzalı"
+     }
+    },
+    "code": "XMB",
+    "city_code": "DXB",
+    "metro_area_code": "DXB",
+    "coordinates": {
+     "lat": 7.45,
+     "lng": -4.333333
+    },
+    "has_transit_zone": null
+   },
+   "XNB": {
+    "name": {
+     "az": {
+      "default": "Çelsi EY Tauer (avtovağzal)"
+     }
+    },
+    "code": "XNB",
+    "city_code": "DXB",
+    "metro_area_code": "DXB",
+    "coordinates": {
+     "lat": 25.2644444,
+     "lng": 55.3116667
+    },
+    "has_transit_zone": null
+   },
+   "ZRB": {
+    "name": {
+     "az": {
+      "default": "Frankfurt Əsas Dəmir Yolu Vağzalı"
+     }
+    },
+    "code": "ZRB",
+    "city_code": "FRA",
+    "metro_area_code": "FRA",
+    "coordinates": {
+     "lat": 50.11361,
+     "lng": 8.67972
+    },
+    "has_transit_zone": null
+   },
+   "ZXZ": {
+    "name": {
+     "az": {
+      "default": "Cumeyra Biç Avtovağzalı"
+     }
+    },
+    "code": "ZXZ",
+    "city_code": "DXB",
+    "metro_area_code": "DXB",
+    "coordinates": {
+     "lat": 25.2644444,
+     "lng": 55.3116667
+    },
+    "has_transit_zone": null
+   },
+   "СТЗ": {
+    "name": {
+     "az": {
+      "default": "Байрампаша (автовокзал)"
+     }
+    },
+    "code": "СТЗ",
+    "city_code": "IST",
+    "metro_area_code": "IST",
+    "coordinates": {
+     "lat": 41.039990739846026,
+     "lng": 28.894625730814514
+    },
+    "has_transit_zone": null
+   },
+   "ТАШ": {
+    "name": {
+     "az": {
+      "default": "Ташкент-Пассажирский",
+      "from": "из Ташкента-Пассажирского",
+      "lookAt": "Ташкенте-Пассажирском",
+      "to": "в Ташкенте-Пассажирском",
+      "where": "в Ташкенте-Пассажирском",
+      "which": "Ташкента-Пассажирского"
+     }
+    },
+    "code": "ТАШ",
+    "city_code": "TAS",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 41.29184569286561,
+     "lng": 69.286561
+    },
+    "has_transit_zone": null
+   }
+  },
+  "cities": {
+   "ALA": {
+    "code": "ALA",
+    "name": {
+     "az": {
+      "default": "Almatı"
+     }
+    },
+    "country": "KZ",
+    "timezone": "Asia/Almaty",
+    "airports": [
+     "ALA"
+    ]
+   },
+   "ANK": {
+    "code": "ANK",
+    "name": {
+     "az": {
+      "default": "Ankara"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "ESB"
+    ]
+   },
+   "ATH": {
+    "code": "ATH",
+    "name": {
+     "az": {
+      "default": "Afina"
+     }
+    },
+    "country": "GR",
+    "timezone": "Europe/Athens",
+    "airports": [
+     "ATH"
+    ]
+   },
+   "AYT": {
+    "code": "AYT",
+    "name": {
+     "az": {
+      "default": "Antalya"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "AYT"
+    ]
+   },
+   "BAK": {
+    "code": "BAK",
+    "name": {
+     "az": {
+      "default": "Bakı"
+     }
+    },
+    "country": "AZ",
+    "timezone": "Asia/Baku",
+    "airports": [
+     "GYD"
+    ]
+   },
+   "COV": {
+    "code": "COV",
+    "name": {
+     "az": {
+      "default": "Mersin"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "COV"
+    ]
+   },
+   "DOH": {
+    "code": "DOH",
+    "name": {
+     "az": {
+      "default": "Doha"
+     }
+    },
+    "country": "QA",
+    "timezone": "Asia/Qatar",
+    "airports": [
+     "DOH"
+    ]
+   },
+   "DXB": {
+    "code": "DXB",
+    "name": {
+     "az": {
+      "default": "Dubay"
+     }
+    },
+    "country": "AE",
+    "timezone": "Asia/Dubai",
+    "airports": [
+     "DXB",
+     "XMB",
+     "XEU",
+     "ZXZ",
+     "XNB",
+     "DWC"
+    ]
+   },
+   "FRA": {
+    "code": "FRA",
+    "name": {
+     "az": {
+      "default": "Frankfurt-Mayn"
+     }
+    },
+    "country": "DE",
+    "timezone": "Europe/Berlin",
+    "airports": [
+     "HHN",
+     "FRA",
+     "ZRB",
+     "QGV"
+    ]
+   },
+   "GUW": {
+    "code": "GUW",
+    "name": {
+     "az": {
+      "default": "Atırau"
+     }
+    },
+    "country": "KZ",
+    "timezone": "Asia/Atyrau",
+    "airports": [
+     "GUW"
+    ]
+   },
+   "IST": {
+    "code": "IST",
+    "name": {
+     "az": {
+      "default": "İstanbul"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "SAW",
+     "СТЗ",
+     "IST"
+    ]
+   },
+   "IZM": {
+    "code": "IZM",
+    "name": {
+     "az": {
+      "default": "İzmir"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "ADB"
+    ]
+   },
+   "RMO": {
+    "code": "RMO",
+    "name": {
+     "az": {
+      "default": "Kişinyov"
+     }
+    },
+    "country": "MD",
+    "timezone": "Europe/Chisinau",
+    "airports": [
+     "RMO"
+    ]
+   },
+   "SHJ": {
+    "code": "SHJ",
+    "name": {
+     "az": {
+      "default": "Şarca"
+     }
+    },
+    "country": "AE",
+    "timezone": "Asia/Dubai",
+    "airports": [
+     "SHJ"
+    ]
+   },
+   "TAS": {
+    "code": "TAS",
+    "name": {
+     "az": {
+      "default": "Daşkənd"
+     }
+    },
+    "country": "UZ",
+    "timezone": "Asia/Tashkent",
+    "airports": [
+     "ТАШ",
+     "TAS"
+    ]
+   },
+   "TBS": {
+    "code": "TBS",
+    "name": {
+     "az": {
+      "default": "Tbilisi"
+     }
+    },
+    "country": "GE",
+    "timezone": "Asia/Tbilisi",
+    "airports": [
+     "TBS"
+    ]
+   },
+   "TZX": {
+    "code": "TZX",
+    "name": {
+     "az": {
+      "default": "Trabzon"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "TZX"
+    ]
+   },
+   "WAW": {
+    "code": "WAW",
+    "name": {
+     "az": {
+      "default": "Varşava"
+     }
+    },
+    "country": "PL",
+    "timezone": "Europe/Warsaw",
+    "airports": [
+     "WMI",
+     "WAW"
+    ]
+   }
+  },
+  "countries": {
+   "AE": {
+    "code": "AE",
+    "name": {
+     "az": {
+      "default": "Birləşmiş Ərəb Əmirlikləri"
+     }
+    },
+    "unified_visa": ""
+   },
+   "AZ": {
+    "code": "AZ",
+    "name": {
+     "az": {
+      "default": "Azərbaycan"
+     }
+    },
+    "unified_visa": ""
+   },
+   "DE": {
+    "code": "DE",
+    "name": {
+     "az": {
+      "default": "Almaniya"
+     }
+    },
+    "unified_visa": "Schengen"
+   },
+   "GE": {
+    "code": "GE",
+    "name": {
+     "az": {
+      "default": "Gürcüstan"
+     }
+    },
+    "unified_visa": ""
+   },
+   "GR": {
+    "code": "GR",
+    "name": {
+     "az": {
+      "default": "Yunanıstan"
+     }
+    },
+    "unified_visa": "Schengen"
+   },
+   "KZ": {
+    "code": "KZ",
+    "name": {
+     "az": {
+      "default": "Qazaxıstan"
+     }
+    },
+    "unified_visa": ""
+   },
+   "MD": {
+    "code": "MD",
+    "name": {
+     "az": {
+      "default": "Moldova"
+     }
+    },
+    "unified_visa": ""
+   },
+   "PL": {
+    "code": "PL",
+    "name": {
+     "az": {
+      "default": "Polşa"
+     }
+    },
+    "unified_visa": "Schengen"
+   },
+   "QA": {
+    "code": "QA",
+    "name": {
+     "az": {
+      "default": "Qətər"
+     }
+    },
+    "unified_visa": ""
+   },
+   "TR": {
+    "code": "TR",
+    "name": {
+     "az": {
+      "default": "Türkiyə"
+     }
+    },
+    "unified_visa": ""
+   },
+   "UZ": {
+    "code": "UZ",
+    "name": {
+     "az": {
+      "default": "Özbəkistan"
+     }
+    },
+    "unified_visa": ""
+   }
+  },
+  "metro_areas": {
+   "ALA": {
+    "code": "ALA",
+    "airports": [
+     "ALA",
+     "BXJ"
+    ],
+    "timezone": "Asia/Almaty"
+   },
+   "ANK": {
+    "code": "ANK",
+    "airports": [
+     "ANK",
+     "ESB"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "ATH": {
+    "code": "ATH",
+    "airports": [
+     "ATH"
+    ],
+    "timezone": "Europe/Athens"
+   },
+   "AYT": {
+    "code": "AYT",
+    "airports": [
+     "AYT"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "BAK": {
+    "code": "BAK",
+    "airports": [
+     "GYD",
+     "ZXT",
+     "BAK"
+    ],
+    "timezone": "Asia/Baku"
+   },
+   "COV": {
+    "code": "COV",
+    "airports": [
+     "COV"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "DOH": {
+    "code": "DOH",
+    "airports": [
+     "DOH"
+    ],
+    "timezone": "Asia/Qatar"
+   },
+   "DXB": {
+    "code": "DXB",
+    "airports": [
+     "DWC",
+     "XNB",
+     "DXB",
+     "NHD",
+     "XEU",
+     "XMB",
+     "ZXZ",
+     "DCG",
+     "SHJ"
+    ],
+    "timezone": "Asia/Dubai"
+   },
+   "FRA": {
+    "code": "FRA",
+    "airports": [
+     "ZRB",
+     "FRA",
+     "HHN",
+     "FRF",
+     "QGV"
+    ],
+    "timezone": "Europe/Berlin"
+   },
+   "GUW": {
+    "code": "GUW",
+    "airports": [
+     "GUW"
+    ],
+    "timezone": "Asia/Atyrau"
+   },
+   "IST": {
+    "code": "IST",
+    "airports": [
+     "IST",
+     "SAW",
+     "СТЗ"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "IZM": {
+    "code": "IZM",
+    "airports": [
+     "IGL",
+     "IZM",
+     "ADB"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "RMO": {
+    "code": "RMO",
+    "airports": [
+     "RMO"
+    ],
+    "timezone": "Europe/Chisinau"
+   },
+   "SHJ": {
+    "code": "SHJ",
+    "airports": [
+     "SHJ"
+    ],
+    "timezone": "Asia/Dubai"
+   },
+   "TAS": {
+    "code": "TAS",
+    "airports": [
+     "TAS",
+     "ТАШ"
+    ],
+    "timezone": "Asia/Tashkent"
+   },
+   "TBS": {
+    "code": "TBS",
+    "airports": [
+     "TBS"
+    ],
+    "timezone": "Asia/Tbilisi"
+   },
+   "TZX": {
+    "code": "TZX",
+    "airports": [
+     "TZX"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "WAW": {
+    "code": "WAW",
+    "airports": [
+     "WAW",
+     "WMI"
+    ],
+    "timezone": "Europe/Warsaw"
+   }
+  },
+  "airports_to_metro": null
+ },
+ "agents": {
+  "8": {
+   "id": 8,
+   "gate_name": "tickets",
+   "label": {
+    "az": {
+     "default": "Tickets.az"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "11": {
+   "id": 11,
+   "gate_name": "trip_ru",
+   "label": {
+    "az": {
+     "default": "Mytrip.com"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "34": {
+   "id": 34,
+   "gate_name": "uzbekistan_airways",
+   "label": {
+    "az": {
+     "default": "Uzbekistan airways"
+    }
+   },
+   "payment_methods": [
+    "uzcard",
+    "card",
+    "sbp",
+    "installments"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "HY"
+   ]
+  },
+  "42": {
+   "id": 42,
+   "gate_name": "all_nippon_airways_ta",
+   "label": {
+    "az": {
+     "default": "All Nippon Airways"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "NH"
+   ]
+  },
+  "65": {
+   "id": 65,
+   "gate_name": "city_travel",
+   "label": {
+    "az": {
+     "default": "City.Travel"
+    }
+   },
+   "payment_methods": [
+    "card",
+    "sbp",
+    "unionpay"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "81": {
+   "id": 81,
+   "gate_name": "qatar_api",
+   "label": {
+    "az": {
+     "default": "Qatar Airways"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "QR"
+   ]
+  },
+  "89": {
+   "id": 89,
+   "gate_name": "luxair_ta",
+   "label": {
+    "az": {
+     "default": "Luxair"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "LG"
+   ]
+  },
+  "95": {
+   "id": 95,
+   "gate_name": "aerowingo",
+   "label": {
+    "az": {
+     "default": "Aerowingo"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "122": {
+   "id": 122,
+   "gate_name": "finnair_ta",
+   "label": {
+    "az": {
+     "default": "Finnair"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "AY"
+   ]
+  },
+  "148": {
+   "id": 148,
+   "gate_name": "supercassa",
+   "label": {
+    "az": {
+     "default": "SuperKassa"
+    }
+   },
+   "payment_methods": [
+    "card",
+    "sbp",
+    "unionpay"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "192": {
+   "id": 192,
+   "gate_name": "enuygun",
+   "label": {
+    "az": {
+     "default": "Wingie"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "203": {
+   "id": 203,
+   "gate_name": "kiwi_tequila",
+   "label": {
+    "az": {
+     "default": "Kiwi.com"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "205": {
+   "id": 205,
+   "gate_name": "flydubai",
+   "label": {
+    "az": {
+     "default": "Flydubai"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "FZ"
+   ]
+  },
+  "215": {
+   "id": 215,
+   "gate_name": "travellizy",
+   "label": {
+    "az": {
+     "default": "Travellizy"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "230": {
+   "id": 230,
+   "gate_name": "pegasus",
+   "label": {
+    "az": {
+     "default": "Pegasus Airlines"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "PC"
+   ]
+  },
+  "301": {
+   "id": 301,
+   "gate_name": "tap_ta",
+   "label": {
+    "az": {
+     "default": "TAP Portugal"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "TP"
+   ]
+  },
+  "339": {
+   "id": 339,
+   "gate_name": "icelandair_ta",
+   "label": {
+    "az": {
+     "default": "Icelandair"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "FI"
+   ]
+  },
+  "352": {
+   "id": 352,
+   "gate_name": "oman_air_ta",
+   "label": {
+    "az": {
+     "default": "Oman Air"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "WY"
+   ]
+  },
+  "356": {
+   "id": 356,
+   "gate_name": "smartwings_ta",
+   "label": {
+    "az": {
+     "default": "SmartWings"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "QS"
+   ]
+  },
+  "386": {
+   "id": 386,
+   "gate_name": "azal",
+   "label": {
+    "az": {
+     "default": "AZAL"
+    }
+   },
+   "payment_methods": [
+    "card",
+    "uzcard"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "J2"
+   ]
+  },
+  "389": {
+   "id": 389,
+   "gate_name": "frenchbee_ta",
+   "label": {
+    "az": {
+     "default": "Frenchbee"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "BF"
+   ]
+  },
+  "391": {
+   "id": 391,
+   "gate_name": "air_caraibes_ta",
+   "label": {
+    "az": {
+     "default": "Air Caraïbes"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "TX"
+   ]
+  },
+  "404": {
+   "id": 404,
+   "gate_name": "etstur",
+   "label": {
+    "az": {
+     "default": "Ucuzabilet"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "471": {
+   "id": 471,
+   "gate_name": "turna",
+   "label": {
+    "az": {
+     "default": "Turna.com"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "478": {
+   "id": 478,
+   "gate_name": "gtavia",
+   "label": {
+    "az": {
+     "default": "GTAvia"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "492": {
+   "id": 492,
+   "gate_name": "farera",
+   "label": {
+    "az": {
+     "default": "Farera"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "493": {
+   "id": 493,
+   "gate_name": "bilet_com",
+   "label": {
+    "az": {
+     "default": "Bilet.com"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "496": {
+   "id": 496,
+   "gate_name": "onetwotrip_us",
+   "label": {
+    "az": {
+     "default": "Onetwotrip.com"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "497": {
+   "id": 497,
+   "gate_name": "wowtickets",
+   "label": {
+    "az": {
+     "default": "Wowtickets"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  }
+ },
+ "alliances": {
+  "1": {
+   "id": 1,
+   "name": "Star Alliance"
+  },
+  "2": {
+   "id": 2,
+   "name": "OneWorld"
+  }
+ },
+ "equipments": {},
+ "meta": {
+  "autosearch_tickets_count": 3,
+  "filtered_tickets_count": 851,
+  "total_tickets_count": 850,
+  "direct_tickets_count": 196,
+  "cheapest_direct_ticket_price": 362.15987991240206,
+  "cheapest_baggage_ticket_price": 489.6433509057881,
+  "cheapest_direct_and_baggage_ticket_price": 489.6433509057881,
+  "price_dynamics_enabled": false,
+  "first_ticket_price": 362.15987991240206
+ },
+ "order": "best",
+ "brand": "AS",
+ "search_params": {
+  "passengers": {
+   "adults": 1
+  },
+  "trip_class": "Y",
+  "source_kind": "web",
+  "experiments": {},
+  "payment_options": null
+ }
+}

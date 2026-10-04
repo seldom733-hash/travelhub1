@@ -29,6 +29,8 @@ import { AzalAdapter } from "./azal/azal.adapter";
 import { AzalHttpService } from "./azal/azal.http.service";
 import { AzalController } from "./azal/azal.controller";
 import { AzalLocationsService } from "./azal/azal.locations.service";
+import { AviasalesAdapter } from "./aviasales/aviasales.adapter";
+import { AviasalesHttpService } from "./aviasales/aviasales.http.service";
 import { FlightSupplierRegistry } from "./flight-supplier.registry";
 
 /**
@@ -66,6 +68,8 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     AzalAdapter,
     AzalHttpService,
     AzalLocationsService,
+    AviasalesAdapter,
+    AviasalesHttpService,
     FlightSupplierRegistry,
     {
       provide: "SUPPLIER_MODULE_INIT",
@@ -78,6 +82,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           anexHotel: AnexHotelAdapter,
           flightRegistry: FlightSupplierRegistry,
           azal: AzalAdapter,
+          aviasales: AviasalesAdapter,
 		) => {
         registry.register(summertour, {
           code: "SUMMERTOUR",
@@ -202,6 +207,10 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
         });
 
         flightRegistry.register(azal);
+        // Second live flight price source. Registering it makes every
+        // /supplier/azal/search call fan out over both suppliers; failures
+        // stay isolated through the controller's Promise.allSettled.
+        flightRegistry.register(aviasales);
       },
       inject: [
         SupplierAdapterRegistry,
@@ -212,9 +221,10 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
         AnexHotelAdapter,
         FlightSupplierRegistry,
         AzalAdapter,
+        AviasalesAdapter,
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KazunionHttpService, KazunionAdapter, KazunionSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KazunionHttpService, KazunionAdapter, KazunionSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
 })
 export class SupplierModule {}

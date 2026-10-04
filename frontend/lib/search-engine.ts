@@ -98,6 +98,8 @@ export interface SearchContext {
   infants?: number;
   serviceClass?: string;
   tariff?: string;
+  /** Flight supplier filter (registry code, "ALL" = every supplier). */
+  supplier?: string;
   // Sanatoriums
   duration?: number;
   // Guides

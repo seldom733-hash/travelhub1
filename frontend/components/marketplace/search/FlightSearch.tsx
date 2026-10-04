@@ -30,11 +30,14 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   const [infants, setInfants] = useState(0);
   const [serviceClass, setServiceClass] = useState("economy");
   const [tariff, setTariff] = useState("ALL");
+  const [supplier, setSupplier] = useState("ALL");
   useEffect(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
       const t = sp.get("tariff");
       if (t) setTariff(t);
+      const s = sp.get("supplier");
+      if (s) setSupplier(s);
     } catch {}
   }, []);
 
@@ -142,6 +145,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
       infants,
       serviceClass,
       tariff,
+      supplier,
     });
   };
 
@@ -176,6 +180,23 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           availability={availability}
           loadingAvailability={availabilityLoading}
         />
+
+        {/* Supplier */}
+        <div>
+          <label htmlFor="flight-supplier" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
+            Поставщик
+          </label>
+          <select
+            id="flight-supplier"
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+            className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
+          >
+            <option value="ALL">Все поставщики</option>
+            <option value="AZAL">AZAL</option>
+            <option value="AVIASALES">Aviasales</option>
+          </select>
+        </div>
 
         {/* Return date (conditional) */}
         {roundTrip && (
@@ -320,6 +341,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           infants,
           serviceClass,
           tariff,
+          supplier,
         }}
       />
 

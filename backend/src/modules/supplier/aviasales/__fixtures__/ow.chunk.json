@@ -1,0 +1,8728 @@
+{
+ "chunk_id": "results",
+ "last_update_timestamp": 0,
+ "tickets": [
+  {
+   "id": "9c9ecfc56976a1e9fd8d06cf85ffc68c-ad",
+   "segments": [
+    {
+     "flights": [
+      2
+     ],
+     "transfers": [],
+     "tags": []
+    }
+   ],
+   "proposals": [
+    {
+     "id": "386:12",
+     "itinerary_key": "W-iFnh5KRCPJzVyr0Pe4sA",
+     "price": {
+      "currency_code": "AZN",
+      "value": 250.21
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 250.21
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL003ABA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 12260.230391147059
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false
+    },
+    {
+     "id": "386:13",
+     "itinerary_key": "W-iFnh5KRCPJzVyr0Pe4sA",
+     "price": {
+      "currency_code": "AZN",
+      "value": 307.94
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 307.94
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL003ABB",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 15088.98663782353
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH1|R1|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": true
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false
+    },
+    {
+     "id": "386:14",
+     "itinerary_key": "W-iFnh5KRCPJzVyr0Pe4sA",
+     "price": {
+      "currency_code": "AZN",
+      "value": 365.67
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 365.67
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "2": {
+       "fare_code": "VL003ABC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "8105"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 32
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": true
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 17917.7428845
+     },
+     "weight": 0,
+     "from_main_airline": true,
+     "tags": null,
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_32|CH0|R1|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 32,
+       "total_weight": 32
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": true
+      },
+      "return_after_flight": {
+       "available": true
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false
+    }
+   ],
+   "signature": "9c9ecfc56976a1e9fd8d06cf85ffc68c-ad",
+   "popularity": 0,
+   "score": 0.15424402381215707,
+   "hashsum": "f396e37d2ceed1ee",
+   "tags": [
+    "convenient_ticket",
+    "direct",
+    "is_ad"
+   ],
+   "badges": [
+    {
+     "type": "recommended",
+     "scores": [
+      0.15424402381215707,
+      -12260
+     ],
+     "meta": {
+      "name": {
+       "az": "Tövsiyə olunan"
+      },
+      "priority": 30,
+      "position": 30,
+      "limit": 3,
+      "colors": {
+       "light": "#d33881",
+       "dark": "#FB6FB0"
+      }
+     }
+    }
+   ],
+   "secondary_badges": [
+    {
+     "id": "baggage_can_purchase_baggage_known",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "price",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": {
+         "currency_code": "AZN",
+         "value": 308
+        },
+        "token": "price_short"
+       },
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": " baqaj ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 23,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    },
+    {
+     "id": "handbag",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": "Əl yükü ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 10,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    }
+   ],
+   "extra_fares": {},
+   "position": 1
+  },
+  {
+   "id": "2bebbe0b887aaa8fd2f09026892969ff",
+   "segments": [
+    {
+     "flights": [
+      11
+     ],
+     "transfers": [],
+     "tags": []
+    }
+   ],
+   "proposals": [
+    {
+     "id": "404:40",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 260.6259935910771
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 260.6259935910771
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "11": {
+       "fare_code": "CLY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 13309.315290529412
+     },
+     "weight": 1.0147553255951904,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "492:26",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 269.16185298216067
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 269.16185298216067
+     },
+     "agent_id": 492,
+     "flight_terms": {
+      "11": {
+       "fare_code": "V",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 13131.936152941176
+     },
+     "weight": 0.6999196903333084,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:39",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 276.7693781782937
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 276.7693781782937
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "11": {
+       "fare_code": "Eco Fly",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 13961.992117235293
+     },
+     "weight": 0.5901378532479925,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "8:11",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 277.38954756035884
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 277.38954756035884
+     },
+     "agent_id": 8,
+     "flight_terms": {
+      "11": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14209.930911764704
+     },
+     "weight": 0.3332638153037274,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "471:25",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 281.97657879831803
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 281.97657879831803
+     },
+     "agent_id": 471,
+     "flight_terms": {
+      "11": {
+       "fare_code": "CL",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 13260.315528764706
+     },
+     "weight": 0.6011942170009644,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "497:24",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 292.7203591806834
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 292.7203591806834
+     },
+     "agent_id": 497,
+     "flight_terms": {
+      "11": {
+       "fare_code": "VLYCLO",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 55,
+        "width": 40,
+        "height": 23
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14868.9777075
+     },
+     "weight": 0.4204166153765444,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 55,
+       "width": 40,
+       "height": 23
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "203:17",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 301.8552156315168
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 301.8552156315168
+     },
+     "agent_id": 203,
+     "flight_terms": {
+      "11": {
+       "fare_code": "B0H1",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14699.0465337
+     },
+     "weight": 0,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "11:20",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 303.2600071909485
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 303.2600071909485
+     },
+     "agent_id": 11,
+     "flight_terms": {
+      "11": {
+       "fare_code": "Y",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 55,
+        "width": 40,
+        "height": 23
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14261.473761164998
+     },
+     "weight": 0.02070778541557871,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 55,
+       "width": 40,
+       "height": 23
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "65:22",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 303.8909182890508
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 303.8909182890508
+     },
+     "agent_id": 65,
+     "flight_terms": {
+      "11": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14639.168824823528
+     },
+     "weight": 0.028319869394280012,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 0
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "404:41",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 332.20650725683936
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 332.20650725683936
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "11": {
+       "fare_code": "LGY1PC23CAF_1CBF_1RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 16964.697518176472
+     },
+     "weight": 1.0147553255951904,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH1|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      },
+      "change_after_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:40",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 339.9929298931289
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 339.9929298931289
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "11": {
+       "fare_code": "Extra Fly",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 17151.386610499998
+     },
+     "weight": 0.5901378532479925,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH1|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "11:21",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 345.71821492992547
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 345.71821492992547
+     },
+     "agent_id": 11,
+     "flight_terms": {
+      "11": {
+       "fare_code": "Y/EXTRA.AIR_REBOOKING",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 55,
+        "width": 40,
+        "height": 23
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": true,
+         "penalty": {
+          "currency_code": "USD",
+          "value": 0
+         }
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 16258.165053314999
+     },
+     "weight": 0.02070778541557871,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH1_0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 55,
+       "width": 40,
+       "height": 23
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": true,
+       "penalty": {
+        "currency_code": "USD",
+        "value": 0
+       }
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "8:12",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 347.2151922910699
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 347.2151922910699
+     },
+     "agent_id": 8,
+     "flight_terms": {
+      "11": {
+       "fare_code": "Y_1PC23",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 17786.913520588234
+     },
+     "weight": 0.3332638153037274,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH0|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "404:42",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 350.6581597741665
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 350.6581597741665
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "11": {
+       "fare_code": "GNY1PC23CAF_1CBF_1RAF_1RBF_1",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": true
+        },
+        "return_after_flight": {
+         "available": true
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 17906.962936911765
+     },
+     "weight": 1.0147553255951904,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH1|R1|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": true
+      },
+      "return_after_flight": {
+       "available": true
+      },
+      "change_before_flight": {
+       "available": true
+      },
+      "change_after_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "497:25",
+     "itinerary_key": "2jv0PfJlmP2tkNQnxVvF8Q",
+     "price": {
+      "currency_code": "AZN",
+      "value": 351.2644310168201
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 351.2644310168201
+     },
+     "agent_id": 497,
+     "flight_terms": {
+      "11": {
+       "fare_code": "VLYLGO",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "TK",
+        "airline_id": "TK",
+        "number": "341"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 55,
+        "width": 40,
+        "height": 23
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 17842.773248999998
+     },
+     "weight": 0.4204166153765444,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH0|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 8,
+       "length": 55,
+       "width": 40,
+       "height": 23
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    }
+   ],
+   "signature": "2bebbe0b887aaa8fd2f09026892969ff",
+   "popularity": 0,
+   "score": 0.07232921818530155,
+   "hashsum": "fc11aefe7411570a",
+   "tags": [
+    "convenient_ticket",
+    "direct"
+   ],
+   "badges": [
+    {
+     "type": "optimal_manual",
+     "scores": [
+      -159.77268556947965,
+      -13309,
+      0,
+      0,
+      0
+     ],
+     "meta": {
+      "name": {
+       "az": "Ən münasib"
+      },
+      "priority": 260,
+      "position": 40,
+      "limit": 1,
+      "colors": {
+       "light": "#0c73fe",
+       "dark": "#1781F3"
+      }
+     }
+    }
+   ],
+   "secondary_badges": [
+    {
+     "id": "baggage_can_purchase_baggage_known",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "price",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": {
+         "currency_code": "AZN",
+         "value": 333
+        },
+        "token": "price_short"
+       },
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": " baqaj ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 23,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    },
+    {
+     "id": "handbag",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": "Əl yükü ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 8,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    }
+   ],
+   "extra_fares": {},
+   "position": 2
+  },
+  {
+   "id": "b8ed7a6e08f7c1dbec263487a03263b7",
+   "segments": [
+    {
+     "flights": [
+      0
+     ],
+     "transfers": [],
+     "tags": []
+    }
+   ],
+   "proposals": [
+    {
+     "id": "404:24",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 231.96500239541595
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 231.96500239541595
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "0": {
+       "fare_code": "BUDGETY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 11845.692406617647
+     },
+     "weight": 1.4717002550191522,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:22",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 235.8280245943284
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 235.8280245943284
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "0": {
+       "fare_code": "Budget",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 11896.65215885294
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "492:18",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 245.0578064464448
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 245.0578064464448
+     },
+     "agent_id": 492,
+     "flight_terms": {
+      "0": {
+       "fare_code": "P",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 11955.941870588234
+     },
+     "weight": 0.5451258623552699,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "8:7",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 250.6071084855656
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 250.6071084855656
+     },
+     "agent_id": 8,
+     "flight_terms": {
+      "0": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 12837.93758235294
+     },
+     "weight": 1.692569153659807,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "471:18",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 251.3636459585627
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 251.3636459585627
+     },
+     "agent_id": 471,
+     "flight_terms": {
+      "0": {
+       "fare_code": "B0",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 11820.702528117647
+     },
+     "weight": 1.3152571478519521,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "471:19",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 251.3636459585627
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 251.3636459585627
+     },
+     "agent_id": 471,
+     "flight_terms": {
+      "0": {
+       "fare_code": "2",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 11820.702528117647
+     },
+     "weight": 1.3152571478519521,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "404:25",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 253.18968017405754
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 253.18968017405754
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "0": {
+       "fare_code": "BudgetY0PCCAF_0CBF_0RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 12929.56713685294
+     },
+     "weight": 1.4717002550191522,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "493:11",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 261.31274152765184
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 261.31274152765184
+     },
+     "agent_id": 493,
+     "flight_terms": {
+      "0": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "seats_available": 9,
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 13107.926269676469
+     },
+     "weight": 0.6022010423519686,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "497:12",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 262.61197937924163
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 262.61197937924163
+     },
+     "agent_id": 497,
+     "flight_terms": {
+      "0": {
+       "fare_code": "PL003ARA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 55,
+        "width": 40,
+        "height": 23
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 13339.597143299998
+     },
+     "weight": 1.5571975202919401,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 55,
+       "width": 40,
+       "height": 23
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "386:3",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 263.309615474598
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 263.309615474598
+     },
+     "agent_id": 386,
+     "flight_terms": {
+      "0": {
+       "fare_code": "PL003ABA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 12827.157634764704
+     },
+     "weight": 0.8175750257762088,
+     "from_main_airline": true,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "65:10",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 264.0075239052187
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 264.0075239052187
+     },
+     "agent_id": 65,
+     "flight_terms": {
+      "0": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "077"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 12717.888166029412
+     },
+     "weight": 0.024273156074558763,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "11:8",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 268.4984788123137
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 268.4984788123137
+     },
+     "agent_id": 11,
+     "flight_terms": {
+      "0": {
+       "fare_code": "Y",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 55,
+        "width": 40,
+        "height": 23
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 12626.735869209
+     },
+     "weight": 0.000001,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": null,
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 55,
+       "width": 40,
+       "height": 23
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "496:4",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 283.7072090311459
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 283.7072090311459
+     },
+     "agent_id": 496,
+     "flight_terms": {
+      "0": {
+       "fare_code": "PL003ARA",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 13339.597143299998
+     },
+     "weight": 1.9347017707206922,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:23",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 299.6149448756808
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 299.6149448756808
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "0": {
+       "fare_code": "Classic",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 15114.466513941175
+     },
+     "weight": 1.2379874193818055,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH1|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "8:8",
+     "itinerary_key": "OhQQlohr87Yms7y5qvhwlw",
+     "price": {
+      "currency_code": "AZN",
+      "value": 305.12850231639476
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 305.12850231639476
+     },
+     "agent_id": 8,
+     "flight_terms": {
+      "0": {
+       "fare_code": "Y_1PC23",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "J2",
+        "airline_id": "J2",
+        "number": "77"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 23
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 10,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false,
+         "is_from_config": true
+        },
+        "change_before_flight": {
+         "available": false,
+         "is_from_config": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      []
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 15630.924002941176
+     },
+     "weight": 1.692569153659807,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_23|CH0|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 23,
+       "total_weight": 23
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 10,
+       "length": 40,
+       "width": 23,
+       "height": 55
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false,
+       "is_from_config": true
+      },
+      "change_before_flight": {
+       "available": false,
+       "is_from_config": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    }
+   ],
+   "signature": "b8ed7a6e08f7c1dbec263487a03263b7",
+   "popularity": 0,
+   "score": 0.19497354976993667,
+   "hashsum": "670dc4f26b77e145",
+   "tags": [
+    "convenient_ticket",
+    "direct"
+   ],
+   "badges": [
+    {
+     "type": "arrival_evening",
+     "scores": [
+      0.19497354976993667,
+      -11845,
+      9.889,
+      1.4717002550191522
+     ],
+     "meta": {
+      "name": {
+       "az": "Axşam gəliş"
+      },
+      "priority": 170,
+      "position": 170,
+      "limit": 1,
+      "colors": {
+       "light": "#219ada",
+       "dark": "#2EB0F5"
+      }
+     }
+    }
+   ],
+   "secondary_badges": [
+    {
+     "id": "baggage_can_purchase_baggage_known",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "price",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": {
+         "currency_code": "AZN",
+         "value": 300
+        },
+        "token": "price_short"
+       },
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": " baqaj ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 23,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    },
+    {
+     "id": "handbag",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": "Əl yükü ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 10,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    }
+   ],
+   "extra_fares": {},
+   "position": 5
+  },
+  {
+   "id": "6868a0e7a6e20d4c8c0d560c4d96c57c",
+   "segments": [
+    {
+     "flights": [
+      8,
+      10
+     ],
+     "transfers": [
+      {
+       "visa_rules": {
+        "required": false
+       },
+       "recheck_baggage": false,
+       "night_transfer": false,
+       "tags": [
+        "third_country_transfer"
+       ]
+      }
+     ],
+     "tags": []
+    }
+   ],
+   "proposals": [
+    {
+     "id": "492:2",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 274.18352934376816
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 274.18352934376816
+     },
+     "agent_id": 492,
+     "flight_terms": {
+      "8": {
+       "fare_code": "T",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0,
+        "weight": 4,
+        "length": 30,
+        "width": 15,
+        "height": 40
+       },
+       "additional_tariff_info": {},
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "Y",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0
+       },
+       "additional_tariff_info": {},
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 13376.934961764706
+     },
+     "weight": 2,
+     "from_main_airline": false,
+     "tags": [
+      "cheap",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 0
+      },
+      "personal_item": null
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "404:61",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 277.5136214800505
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 277.5136214800505
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "8": {
+       "fare_code": "XBAGY0PCCAF_1CBF_1RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0,
+        "weight": 4,
+        "length": 30,
+        "width": 15,
+        "height": 40
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "XBAGY0PCCAF_1CBF_1RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14171.711097588235
+     },
+     "weight": 0.4632219487510746,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L0|CH1|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 0
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      },
+      "change_after_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:46",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 282.2087988205288
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 282.2087988205288
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "8": {
+       "fare_code": "BASIC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0,
+        "weight": 4,
+        "length": 30,
+        "width": 15,
+        "height": 40
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "BASIC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14236.390783117648
+     },
+     "weight": 0.6960462183249045,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 0
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "8:15",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 286.95470437278505
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 286.95470437278505
+     },
+     "agent_id": 8,
+     "flight_terms": {
+      "8": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0,
+        "weight": 4,
+        "length": 30,
+        "width": 15,
+        "height": 40
+       },
+       "additional_tariff_info": {},
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0
+       },
+       "additional_tariff_info": {},
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14699.928529411764
+     },
+     "weight": 0,
+     "from_main_airline": false,
+     "tags": [
+      "codeshare",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 0
+      },
+      "personal_item": null
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "497:29",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 296.0657347141769
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 296.0657347141769
+     },
+     "agent_id": 497,
+     "flight_terms": {
+      "8": {
+       "fare_code": "TLYEJRO",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0,
+        "weight": 4,
+        "length": 30,
+        "width": 15,
+        "height": 40
+       },
+       "additional_tariff_info": {
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "TLYEJRO",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 15038.908881299998
+     },
+     "weight": 0.18050127093548024,
+     "from_main_airline": false,
+     "tags": [
+      "codeshare",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L0|CH1|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 0,
+       "weight": 4,
+       "length": 30,
+       "width": 15,
+       "height": 40
+      },
+      "personal_item": null,
+      "change_before_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "471:35",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 300.9924407563008
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 300.9924407563008
+     },
+     "agent_id": 471,
+     "flight_terms": {
+      "8": {
+       "fare_code": "sic578",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0,
+        "weight": 4,
+        "length": 30,
+        "width": 15,
+        "height": 40
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "sic578",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": false
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14154.561180970588
+     },
+     "weight": 0.6373825553134332,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 0
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": false
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "203:30",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 303.60004346753703
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 303.60004346753703
+     },
+     "agent_id": 203,
+     "flight_terms": {
+      "8": {
+       "fare_code": "B0H0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0,
+        "weight": 4,
+        "length": 30,
+        "width": 15,
+        "height": 40
+       },
+       "additional_tariff_info": {},
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "B0H0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0
+       },
+       "additional_tariff_info": {},
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14784.012120599999
+     },
+     "weight": 0,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 0
+      },
+      "personal_item": null
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "65:14",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 303.85023132716987
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 303.85023132716987
+     },
+     "agent_id": 65,
+     "flight_terms": {
+      "8": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0,
+        "weight": 4,
+        "length": 30,
+        "width": 15,
+        "height": 40
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "Y_0PC",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 0
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 14637.208834352941
+     },
+     "weight": 0.014281538372848493,
+     "from_main_airline": false,
+     "tags": [
+      "codeshare",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L0|CH1|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 0
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "203:31",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 350.6976647761943
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 350.6976647761943
+     },
+     "agent_id": 203,
+     "flight_terms": {
+      "8": {
+       "fare_code": "B0H1",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8
+       },
+       "additional_tariff_info": {},
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "B0H1",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 0
+       },
+       "total_baggage_count": 0,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {},
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 17077.463057977977
+     },
+     "weight": 0,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L0|CH0|R0|TBC0",
+      "baggage": {
+       "count": 0
+      },
+      "total_baggage_count": 0,
+      "handbags": {
+       "count": 1,
+       "weight": 8
+      },
+      "personal_item": null
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "192:47",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 371.7552611433227
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 371.7552611433227
+     },
+     "agent_id": 192,
+     "flight_terms": {
+      "8": {
+       "fare_code": "ECOJET",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "ECOJET",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 18753.67882020588
+     },
+     "weight": 0.6960462183249045,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_20|CH1|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 20,
+       "total_weight": 20
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 8
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "404:62",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 372.17069484637017
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 372.17069484637017
+     },
+     "agent_id": 404,
+     "flight_terms": {
+      "8": {
+       "fare_code": "ECOJETY1PC20CAF_1CBF_1RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "ECOJETY1PC20CAF_1CBF_1RAF_0RBF_0",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 19005.53759567647
+     },
+     "weight": 0.4632219487510746,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_20|CH1|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 20,
+       "total_weight": 20
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 8
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      },
+      "change_after_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "492:3",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 378.63439766520366
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 378.63439766520366
+     },
+     "agent_id": 492,
+     "flight_terms": {
+      "8": {
+       "fare_code": "T",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 0,
+        "weight": 4,
+        "length": 30,
+        "width": 15,
+        "height": 40
+       },
+       "additional_tariff_info": {},
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "Y",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 0
+       },
+       "additional_tariff_info": {},
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 18472.910185294117
+     },
+     "weight": 2,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L1_1_20|CH0|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 20,
+       "total_weight": 20
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 0
+      },
+      "personal_item": null
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "471:36",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 399.39561901996626
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 399.39561901996626
+     },
+     "agent_id": 471,
+     "flight_terms": {
+      "8": {
+       "fare_code": "ojet578",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "ojet578",
+       "trip_class": "Y",
+       "seats_available": 5,
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "return_after_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        },
+        "change_after_flight": {
+         "available": false
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 18782.098682029413
+     },
+     "weight": 0.6373825553134332,
+     "from_main_airline": false,
+     "tags": [
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_20|CH1|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 20,
+       "total_weight": 20
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 8
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "return_after_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      },
+      "change_after_flight": {
+       "available": false
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "497:30",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 399.77237625247614
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 399.77237625247614
+     },
+     "agent_id": 497,
+     "flight_terms": {
+      "8": {
+       "fare_code": "TLYEJSO",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 0,
+        "weight": 4,
+        "length": 30,
+        "width": 15,
+        "height": 40
+       },
+       "additional_tariff_info": {
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "TLYEJSO",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 20306.7752691
+     },
+     "weight": 0.18050127093548024,
+     "from_main_airline": false,
+     "tags": [
+      "codeshare",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H0|L1_1_20|CH1|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 20,
+       "total_weight": 20
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 0,
+       "weight": 4,
+       "length": 30,
+       "width": 15,
+       "height": 40
+      },
+      "personal_item": null,
+      "change_before_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    },
+    {
+     "id": "65:43",
+     "itinerary_key": "tun-jFm2k_CNVEFLetJYzQ",
+     "price": {
+      "currency_code": "AZN",
+      "value": 400.16644183992327
+     },
+     "price_per_person": {
+      "currency_code": "AZN",
+      "value": 400.16644183992327
+     },
+     "agent_id": 65,
+     "flight_terms": {
+      "8": {
+       "fare_code": "Y_1PC20",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "578"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      },
+      "10": {
+       "fare_code": "Y_1PC20",
+       "trip_class": "Y",
+       "marketing_carrier_designator": {
+        "carrier": "VF",
+        "airline_id": "VF",
+        "number": "3009"
+       },
+       "baggage": {
+        "count": 1,
+        "weight": 20
+       },
+       "total_baggage_count": 1,
+       "handbags": {
+        "count": 1,
+        "weight": 8,
+        "length": 40,
+        "width": 23,
+        "height": 55
+       },
+       "additional_tariff_info": {
+        "return_before_flight": {
+         "available": false
+        },
+        "change_before_flight": {
+         "available": true
+        }
+       },
+       "is_charter": false
+      }
+     },
+     "transfer_terms": [
+      [
+       {
+        "is_virtual_interline": false,
+        "tags": []
+       }
+      ]
+     ],
+     "unified_price": {
+      "currency_code": "RUB",
+      "value": 19276.99627585294
+     },
+     "weight": 0.014281538372848493,
+     "from_main_airline": false,
+     "tags": [
+      "codeshare",
+      "from_cache",
+      "with_cache"
+     ],
+     "minimum_fare": {
+      "code": "",
+      "fare_key": "TY|P0|H1|L1_1_20|CH1|R0|TBC1",
+      "baggage": {
+       "count": 1,
+       "weight": 20,
+       "total_weight": 20
+      },
+      "total_baggage_count": 1,
+      "handbags": {
+       "count": 1,
+       "weight": 8
+      },
+      "personal_item": null,
+      "return_before_flight": {
+       "available": false
+      },
+      "change_before_flight": {
+       "available": true
+      }
+     },
+     "is_warmcache": false,
+     "cashback": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     },
+     "cashback_per_person": {
+      "localized_amount": {
+       "currency_code": "AZN",
+       "value": 0
+      },
+      "available": false
+     }
+    }
+   ],
+   "signature": "6868a0e7a6e20d4c8c0d560c4d96c57c",
+   "popularity": 0,
+   "score": 0.002862139385683683,
+   "hashsum": "b1be9fc727c44f15",
+   "tags": [
+    "convenient_ticket",
+    "has_third_country_transfer"
+   ],
+   "secondary_badges": [
+    {
+     "id": "baggage_can_purchase_baggage_known",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "price",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": {
+         "currency_code": "AZN",
+         "value": 372
+        },
+        "token": "price_short"
+       },
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": " baqaj ilə 1×"
+       },
+       {
+        "type": "mass",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": 20,
+        "token": "mass_regular"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    },
+    {
+     "id": "handbag",
+     "style": {
+      "full_width": false,
+      "background_color": {
+       "light": {
+        "r": 67,
+        "g": 83,
+        "b": 106,
+        "a": 0.08
+       },
+       "dark": {
+        "r": 255,
+        "g": 255,
+        "b": 255,
+        "a": 0.08
+       }
+      }
+     },
+     "text": {
+      "text": [
+       {
+        "type": "simple",
+        "text_type": "Body3Regular",
+        "style": {
+         "color": {
+          "light": {
+           "r": 12,
+           "g": 19,
+           "b": 29,
+           "a": 1
+          },
+          "dark": {
+           "r": 238,
+           "g": 239,
+           "b": 239,
+           "a": 1
+          }
+         }
+        },
+        "value": "Şəxsi əşya hər insan üçün"
+       }
+      ],
+      "text_type": "Body3Regular"
+     }
+    }
+   ],
+   "extra_fares": {},
+   "position": 11
+  }
+ ],
+ "flight_legs": [
+  {
+   "origin": "GYD",
+   "destination": "IST",
+   "local_departure_date_time": "2026-10-15 19:45",
+   "local_arrival_date_time": "2026-10-15 21:50",
+   "departure_unix_timestamp": 1792079100,
+   "arrival_unix_timestamp": 1792090200,
+   "operating_carrier_designator": {
+    "carrier": "J2",
+    "airline_id": "J2",
+    "number": "77"
+   },
+   "equipment": {
+    "code": "32Q",
+    "type": "plane",
+    "name": "Airbus A321neo"
+   },
+   "technical_stops": [],
+   "signature": "1792093500:1792101000:GYD:IST",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "SAW",
+   "local_departure_date_time": "2026-10-15 07:20",
+   "local_arrival_date_time": "2026-10-15 09:20",
+   "departure_unix_timestamp": 1792034400,
+   "arrival_unix_timestamp": 1792045200,
+   "operating_carrier_designator": {
+    "carrier": "J2",
+    "airline_id": "J2",
+    "number": "8103"
+   },
+   "equipment": {
+    "code": "320",
+    "type": "plane",
+    "name": "Airbus A320"
+   },
+   "technical_stops": [],
+   "signature": "1792048800:1792056000:GYD:SAW",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "SAW",
+   "local_departure_date_time": "2026-10-15 12:55",
+   "local_arrival_date_time": "2026-10-15 14:55",
+   "departure_unix_timestamp": 1792054500,
+   "arrival_unix_timestamp": 1792065300,
+   "operating_carrier_designator": {
+    "carrier": "J2",
+    "airline_id": "J2",
+    "number": "8105"
+   },
+   "equipment": {
+    "code": "320",
+    "type": "plane",
+    "name": "Airbus A320"
+   },
+   "technical_stops": [],
+   "signature": "1792068900:1792076100:GYD:SAW",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "SAW",
+   "local_departure_date_time": "2026-10-15 18:05",
+   "local_arrival_date_time": "2026-10-15 20:20",
+   "departure_unix_timestamp": 1792073100,
+   "arrival_unix_timestamp": 1792084800,
+   "operating_carrier_designator": {
+    "carrier": "TK",
+    "airline_id": "TK",
+    "number": "178"
+   },
+   "equipment": {
+    "code": "7M8",
+    "type": "plane",
+    "name": "Boeing 737 MAX 8 / BBJ MAX 8 / Boeing 737 MAX 200"
+   },
+   "technical_stops": [],
+   "signature": "1792087500:1792095600:GYD:SAW",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "SAW",
+   "local_departure_date_time": "2026-10-15 04:45",
+   "local_arrival_date_time": "2026-10-15 07:00",
+   "departure_unix_timestamp": 1792025100,
+   "arrival_unix_timestamp": 1792036800,
+   "operating_carrier_designator": {
+    "carrier": "TK",
+    "airline_id": "TK",
+    "number": "180"
+   },
+   "equipment": {
+    "code": "7M8",
+    "type": "plane",
+    "name": "Boeing 737 MAX 8 / BBJ MAX 8 / Boeing 737 MAX 200"
+   },
+   "technical_stops": [],
+   "signature": "1792039500:1792047600:GYD:SAW",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "IST",
+   "local_departure_date_time": "2026-10-15 06:25",
+   "local_arrival_date_time": "2026-10-15 08:35",
+   "departure_unix_timestamp": 1792031100,
+   "arrival_unix_timestamp": 1792042500,
+   "operating_carrier_designator": {
+    "carrier": "TK",
+    "airline_id": "TK",
+    "number": "339"
+   },
+   "equipment": {
+    "code": "32Q",
+    "type": "plane",
+    "name": "Airbus A321neo"
+   },
+   "technical_stops": [],
+   "signature": "1792045500:1792053300:GYD:IST",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "IST",
+   "local_departure_date_time": "2026-10-15 20:50",
+   "local_arrival_date_time": "2026-10-15 23:00",
+   "departure_unix_timestamp": 1792083000,
+   "arrival_unix_timestamp": 1792094400,
+   "operating_carrier_designator": {
+    "carrier": "TK",
+    "airline_id": "TK",
+    "number": "335"
+   },
+   "equipment": {
+    "code": "32B",
+    "type": "plane",
+    "name": "Airbus A321 (sharklets)"
+   },
+   "technical_stops": [],
+   "signature": "1792097400:1792105200:GYD:IST",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "SAW",
+   "local_departure_date_time": "2026-10-15 04:10",
+   "local_arrival_date_time": "2026-10-15 06:15",
+   "departure_unix_timestamp": 1792023000,
+   "arrival_unix_timestamp": 1792034100,
+   "operating_carrier_designator": {
+    "carrier": "PC",
+    "airline_id": "PC",
+    "number": "855"
+   },
+   "equipment": {
+    "code": "321",
+    "type": "plane",
+    "name": "Airbus A321"
+   },
+   "technical_stops": [],
+   "signature": "1792037400:1792044900:GYD:SAW",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "ESB",
+   "local_departure_date_time": "2026-10-15 16:30",
+   "local_arrival_date_time": "2026-10-15 18:05",
+   "departure_unix_timestamp": 1792067400,
+   "arrival_unix_timestamp": 1792076700,
+   "operating_carrier_designator": {
+    "carrier": "TK",
+    "airline_id": "TK",
+    "number": "578"
+   },
+   "equipment": {
+    "code": "7M8",
+    "type": "plane",
+    "name": "Boeing 737 MAX 8 / BBJ MAX 8 / Boeing 737 MAX 200"
+   },
+   "technical_stops": [],
+   "signature": "1792081800:1792087500:GYD:ESB",
+   "tags": []
+  },
+  {
+   "origin": "ESB",
+   "destination": "SAW",
+   "local_departure_date_time": "2026-10-16 00:30",
+   "local_arrival_date_time": "2026-10-16 01:40",
+   "departure_unix_timestamp": 1792099800,
+   "arrival_unix_timestamp": 1792104000,
+   "operating_carrier_designator": {
+    "carrier": "VF",
+    "airline_id": "VF",
+    "number": "3011"
+   },
+   "equipment": {
+    "code": "7M8",
+    "type": "plane",
+    "name": "Boeing 737 MAX 8 / BBJ MAX 8 / Boeing 737 MAX 200"
+   },
+   "technical_stops": [],
+   "signature": "1792110600:1792114800:ESB:SAW",
+   "tags": []
+  },
+  {
+   "origin": "ESB",
+   "destination": "SAW",
+   "local_departure_date_time": "2026-10-15 19:55",
+   "local_arrival_date_time": "2026-10-15 21:05",
+   "departure_unix_timestamp": 1792083300,
+   "arrival_unix_timestamp": 1792087500,
+   "operating_carrier_designator": {
+    "carrier": "TK",
+    "airline_id": "TK",
+    "number": "3009"
+   },
+   "equipment": {
+    "code": "32N",
+    "type": "plane",
+    "name": "Airbus A320neo"
+   },
+   "technical_stops": [],
+   "signature": "1792094100:1792098300:ESB:SAW",
+   "tags": []
+  },
+  {
+   "origin": "GYD",
+   "destination": "IST",
+   "local_departure_date_time": "2026-10-15 17:00",
+   "local_arrival_date_time": "2026-10-15 19:15",
+   "departure_unix_timestamp": 1792069200,
+   "arrival_unix_timestamp": 1792080900,
+   "operating_carrier_designator": {
+    "carrier": "TK",
+    "airline_id": "TK",
+    "number": "341"
+   },
+   "equipment": {
+    "code": "32Q",
+    "type": "plane",
+    "name": "Airbus A321neo"
+   },
+   "technical_stops": [],
+   "signature": "1792083600:1792091700:GYD:IST",
+   "tags": []
+  }
+ ],
+ "airlines": {
+  "3L": {
+   "iata": "3L",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Air Arabia Abu Dhabi"
+    }
+   },
+   "site_name": "",
+   "brand_color": "FC0444"
+  },
+  "A3": {
+   "iata": "A3",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Aegean Airlines"
+    }
+   },
+   "alliance_id": 1,
+   "site_name": "Aegeanair.com",
+   "brand_color": "94A4D4"
+  },
+  "AZ": {
+   "iata": "AZ",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "ITA Airways"
+    }
+   },
+   "alliance_id": 1,
+   "site_name": "",
+   "brand_color": "046444"
+  },
+  "DV": {
+   "iata": "DV",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "SCAT"
+    }
+   },
+   "site_name": "",
+   "brand_color": "1C54BC"
+  },
+  "EK": {
+   "iata": "EK",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Emirates"
+    }
+   },
+   "site_name": "",
+   "brand_color": "D42424"
+  },
+  "EY": {
+   "iata": "EY",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Etihad Airways"
+    }
+   },
+   "site_name": "Etihad Airways",
+   "brand_color": "C9C8BA"
+  },
+  "FZ": {
+   "iata": "FZ",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Flydubai"
+    }
+   },
+   "site_name": "Flydubai",
+   "brand_color": "346CAC"
+  },
+  "G9": {
+   "iata": "G9",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Air Arabia"
+    }
+   },
+   "site_name": "",
+   "brand_color": "FC0444"
+  },
+  "GF": {
+   "iata": "GF",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Gulf Air"
+    }
+   },
+   "site_name": "",
+   "brand_color": "A48C64"
+  },
+  "HH": {
+   "iata": "HH",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Qanot Sharq"
+    }
+   },
+   "site_name": "",
+   "brand_color": "3C4474"
+  },
+  "HY": {
+   "iata": "HY",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Özbəkistan Hava Yolları"
+    }
+   },
+   "site_name": "",
+   "brand_color": "FCD444"
+  },
+  "J2": {
+   "iata": "J2",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Azərbaycan Hava Yolları"
+    }
+   },
+   "site_name": "",
+   "brand_color": "04B4E4"
+  },
+  "J9": {
+   "iata": "J9",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Jazeera Airways"
+    }
+   },
+   "site_name": "",
+   "brand_color": "1484C4"
+  },
+  "KC": {
+   "iata": "KC",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Air Astana"
+    }
+   },
+   "site_name": "",
+   "brand_color": "A48C64"
+  },
+  "LH": {
+   "iata": "LH",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Lufthansa"
+    }
+   },
+   "alliance_id": 1,
+   "site_name": "",
+   "brand_color": "04245C"
+  },
+  "LO": {
+   "iata": "LO",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "LOT Polish"
+    }
+   },
+   "alliance_id": 1,
+   "site_name": "",
+   "brand_color": "1C2C5C"
+  },
+  "MS": {
+   "iata": "MS",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Egyptair"
+    }
+   },
+   "alliance_id": 1,
+   "site_name": "",
+   "brand_color": "042C64"
+  },
+  "PC": {
+   "iata": "PC",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Pegasus Airlines"
+    }
+   },
+   "site_name": "",
+   "brand_color": "FCA404"
+  },
+  "QR": {
+   "iata": "QR",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Qatar Airways"
+    }
+   },
+   "alliance_id": 2,
+   "site_name": "",
+   "brand_color": "64043C"
+  },
+  "TK": {
+   "iata": "TK",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Turkish Airlines"
+    }
+   },
+   "alliance_id": 1,
+   "site_name": "",
+   "brand_color": "CC2424"
+  },
+  "U6": {
+   "iata": "U6",
+   "is_lowcost": false,
+   "name": {
+    "az": {
+     "default": "Ural Airlines"
+    }
+   },
+   "site_name": "",
+   "brand_color": "DC241C"
+  },
+  "VF": {
+   "iata": "VF",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Ajet"
+    }
+   },
+   "site_name": "",
+   "brand_color": "048CFC"
+  },
+  "W6": {
+   "iata": "W6",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Wizz Air"
+    }
+   },
+   "site_name": "",
+   "brand_color": "C52C85"
+  },
+  "XY": {
+   "iata": "XY",
+   "is_lowcost": true,
+   "name": {
+    "az": {
+     "default": "Flynas"
+    }
+   },
+   "site_name": "",
+   "brand_color": "04B4AC"
+  }
+ },
+ "places": {
+  "airports": {
+   "ADB": {
+    "name": {
+     "az": {
+      "default": "İzmir Adnan Menderes"
+     }
+    },
+    "code": "ADB",
+    "city_code": "IZM",
+    "metro_area_code": "IZM",
+    "coordinates": {
+     "lat": 38.294403,
+     "lng": 27.147594
+    },
+    "has_transit_zone": null
+   },
+   "ALA": {
+    "name": {
+     "az": {
+      "default": "Almatı"
+     }
+    },
+    "code": "ALA",
+    "city_code": "ALA",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 43.346653,
+     "lng": 77.01145
+    },
+    "has_transit_zone": true
+   },
+   "ATH": {
+    "name": {
+     "az": {
+      "default": "Elefterios Venizelos"
+     }
+    },
+    "code": "ATH",
+    "city_code": "ATH",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 37.93635,
+     "lng": 23.946486
+    },
+    "has_transit_zone": null
+   },
+   "AUH": {
+    "name": {
+     "az": {
+      "default": "Əbu-Dabi"
+     }
+    },
+    "code": "AUH",
+    "city_code": "AUH",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 24.426912,
+     "lng": 54.645973
+    },
+    "has_transit_zone": true
+   },
+   "BAH": {
+    "name": {
+     "az": {
+      "default": "Bəhreyn"
+     }
+    },
+    "code": "BAH",
+    "city_code": "BAH",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 26.26918,
+     "lng": 50.62605
+    },
+    "has_transit_zone": true
+   },
+   "BUD": {
+    "name": {
+     "az": {
+      "default": "Ferens List"
+     }
+    },
+    "code": "BUD",
+    "city_code": "BUD",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 47.433037,
+     "lng": 19.261621
+    },
+    "has_transit_zone": true
+   },
+   "CAI": {
+    "name": {
+     "az": {
+      "default": "Qahirə"
+     }
+    },
+    "code": "CAI",
+    "city_code": "CAI",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 30.120106,
+     "lng": 31.40647
+    },
+    "has_transit_zone": true
+   },
+   "CCE": {
+    "name": {
+     "az": {
+      "default": "Новая столица (Египет)"
+     }
+    },
+    "code": "CCE",
+    "city_code": "CAI",
+    "metro_area_code": "CAI",
+    "coordinates": {
+     "lat": 30.075833,
+     "lng": 31.833333
+    },
+    "has_transit_zone": null
+   },
+   "CIA": {
+    "name": {
+     "az": {
+      "default": "Çampino-C. B. Pastine"
+     }
+    },
+    "code": "CIA",
+    "city_code": "ROM",
+    "metro_area_code": "ROM",
+    "coordinates": {
+     "lat": 41.799065,
+     "lng": 12.590987
+    },
+    "has_transit_zone": null
+   },
+   "CIT": {
+    "name": {
+     "az": {
+      "default": "Çimkent"
+     }
+    },
+    "code": "CIT",
+    "city_code": "CIT",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 42.3,
+     "lng": 69.6
+    },
+    "has_transit_zone": null
+   },
+   "COV": {
+    "name": {
+     "az": {
+      "default": "Çukurova"
+     }
+    },
+    "code": "COV",
+    "city_code": "COV",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 36.896944,
+     "lng": 35.0675
+    },
+    "has_transit_zone": null
+   },
+   "DAM": {
+    "name": {
+     "az": {
+      "default": "Dəməşq"
+     }
+    },
+    "code": "DAM",
+    "city_code": "DAM",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 33.41117,
+     "lng": 36.51249
+    },
+    "has_transit_zone": null
+   },
+   "DOH": {
+    "name": {
+     "az": {
+      "default": "Hamad"
+     }
+    },
+    "code": "DOH",
+    "city_code": "DOH",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 25.267569,
+     "lng": 51.558067
+    },
+    "has_transit_zone": true
+   },
+   "DWC": {
+    "name": {
+     "az": {
+      "default": "Dubay World Central - Al-Maktum Beynəlxalq Hava Limanı"
+     }
+    },
+    "code": "DWC",
+    "city_code": "DXB",
+    "metro_area_code": "DXB",
+    "coordinates": {
+     "lat": 24.918056,
+     "lng": 55.175278
+    },
+    "has_transit_zone": null
+   },
+   "DXB": {
+    "name": {
+     "az": {
+      "default": "Dubay"
+     }
+    },
+    "code": "DXB",
+    "city_code": "DXB",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 25.248665,
+     "lng": 55.352917
+    },
+    "has_transit_zone": true
+   },
+   "ECN": {
+    "name": {
+     "az": {
+      "default": "Ercan"
+     }
+    },
+    "code": "ECN",
+    "city_code": "ECN",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 35.15812,
+     "lng": 33.50307
+    },
+    "has_transit_zone": null
+   },
+   "ESB": {
+    "name": {
+     "az": {
+      "default": "Əsənboğa"
+     }
+    },
+    "code": "ESB",
+    "city_code": "ANK",
+    "metro_area_code": "ANK",
+    "coordinates": {
+     "lat": 40.11494,
+     "lng": 32.993145
+    },
+    "has_transit_zone": null
+   },
+   "FCO": {
+    "name": {
+     "az": {
+      "default": "Fyumiçino"
+     }
+    },
+    "code": "FCO",
+    "city_code": "ROM",
+    "metro_area_code": "ROM",
+    "coordinates": {
+     "lat": 41.794594,
+     "lng": 12.250346
+    },
+    "has_transit_zone": true
+   },
+   "FRA": {
+    "name": {
+     "az": {
+      "default": "Frankfurt"
+     }
+    },
+    "code": "FRA",
+    "city_code": "FRA",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 50.050735,
+     "lng": 8.570773
+    },
+    "has_transit_zone": true
+   },
+   "GUW": {
+    "name": {
+     "az": {
+      "default": "Atırau"
+     }
+    },
+    "code": "GUW",
+    "city_code": "GUW",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 47.122814,
+     "lng": 51.829556
+    },
+    "has_transit_zone": null
+   },
+   "GYD": {
+    "name": {
+     "az": {
+      "default": "Heydər Əliyev"
+     }
+    },
+    "code": "GYD",
+    "city_code": "BAK",
+    "metro_area_code": "BAK",
+    "coordinates": {
+     "lat": 40.462486,
+     "lng": 50.05039
+    },
+    "has_transit_zone": null
+   },
+   "HHN": {
+    "name": {
+     "az": {
+      "default": "Frankfurt-Han"
+     }
+    },
+    "code": "HHN",
+    "city_code": "FRA",
+    "metro_area_code": "FRA",
+    "coordinates": {
+     "lat": 49.948334,
+     "lng": 7.264167
+    },
+    "has_transit_zone": null
+   },
+   "IRR": {
+    "name": {
+     "az": {
+      "default": "Ostiense Dəmir Yolu Stansiyası"
+     }
+    },
+    "code": "IRR",
+    "city_code": "ROM",
+    "metro_area_code": "ROM",
+    "coordinates": {
+     "lat": 41.8905198,
+     "lng": 12.4942486
+    },
+    "has_transit_zone": null
+   },
+   "IRT": {
+    "name": {
+     "az": {
+      "default": "Tiburtina"
+     }
+    },
+    "code": "IRT",
+    "city_code": "ROM",
+    "metro_area_code": "ROM",
+    "coordinates": {
+     "lat": 41.8905198,
+     "lng": 12.4942486
+    },
+    "has_transit_zone": null
+   },
+   "IST": {
+    "name": {
+     "az": {
+      "default": "Istanbul Yeni Hava Limanı"
+     }
+    },
+    "code": "IST",
+    "city_code": "IST",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 40.9769,
+     "lng": 28.82055
+    },
+    "has_transit_zone": true
+   },
+   "JED": {
+    "name": {
+     "az": {
+      "default": "Kral Əbdüləziz Beynəlxalq Hava Limanı"
+     }
+    },
+    "code": "JED",
+    "city_code": "JED",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 21.670233,
+     "lng": 39.150578
+    },
+    "has_transit_zone": null
+   },
+   "KRK": {
+    "name": {
+     "az": {
+      "default": "Krakov-Balitse II İohann Pavel"
+     }
+    },
+    "code": "KRK",
+    "city_code": "KRK",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 50.075493,
+     "lng": 19.793743
+    },
+    "has_transit_zone": null
+   },
+   "KWI": {
+    "name": {
+     "az": {
+      "default": "Küveyt"
+     }
+    },
+    "code": "KWI",
+    "city_code": "KWI",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 29.240116,
+     "lng": 47.971252
+    },
+    "has_transit_zone": null
+   },
+   "NQZ": {
+    "name": {
+     "az": {
+      "default": "Astana (Nursultan)"
+     }
+    },
+    "code": "NQZ",
+    "city_code": "NQZ",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 51.02781,
+     "lng": 71.4612
+    },
+    "has_transit_zone": null
+   },
+   "PFL": {
+    "name": {
+     "az": {
+      "default": "Florens Avtovağzalı"
+     }
+    },
+    "code": "PFL",
+    "city_code": "PRG",
+    "metro_area_code": "PRG",
+    "coordinates": {
+     "lat": 50.0878114,
+     "lng": 14.4204598
+    },
+    "has_transit_zone": null
+   },
+   "PRG": {
+    "name": {
+     "az": {
+      "default": "Vatslav Havel Praqa"
+     }
+    },
+    "code": "PRG",
+    "city_code": "PRG",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 50.10619,
+     "lng": 14.266638
+    },
+    "has_transit_zone": true
+   },
+   "QGV": {
+    "name": {
+     "az": {
+      "default": "Noy-İzenburq"
+     }
+    },
+    "code": "QGV",
+    "city_code": "FRA",
+    "metro_area_code": "FRA",
+    "coordinates": {
+     "lat": 50.05,
+     "lng": 8.683333
+    },
+    "has_transit_zone": null
+   },
+   "RMO": {
+    "name": {
+     "az": {
+      "default": "Кишинёв",
+      "from": "из Кишинёва",
+      "lookAt": "Кишинёв",
+      "to": "в Кишинёв",
+      "where": "в Кишинёве",
+      "which": "Кишинёва"
+     }
+    },
+    "code": "RMO",
+    "city_code": "RMO",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 47.024512,
+     "lng": 28.832292
+    },
+    "has_transit_zone": true
+   },
+   "RUH": {
+    "name": {
+     "az": {
+      "default": "Kral Xalid"
+     }
+    },
+    "code": "RUH",
+    "city_code": "RUH",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 24.95929,
+     "lng": 46.702877
+    },
+    "has_transit_zone": null
+   },
+   "SAW": {
+    "name": {
+     "az": {
+      "default": "Sabiha Gökçən"
+     }
+    },
+    "code": "SAW",
+    "city_code": "IST",
+    "metro_area_code": "IST",
+    "coordinates": {
+     "lat": 40.904675,
+     "lng": 29.309189
+    },
+    "has_transit_zone": true
+   },
+   "SHJ": {
+    "name": {
+     "az": {
+      "default": "Şarca"
+     }
+    },
+    "code": "SHJ",
+    "city_code": "SHJ",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 25.320873,
+     "lng": 55.52029
+    },
+    "has_transit_zone": null
+   },
+   "SPX": {
+    "name": {
+     "az": {
+      "default": "Giza Sfinks"
+     }
+    },
+    "code": "SPX",
+    "city_code": "CAI",
+    "metro_area_code": "CAI",
+    "coordinates": {
+     "lat": 30.109722,
+     "lng": 30.894444
+    },
+    "has_transit_zone": null
+   },
+   "SVX": {
+    "name": {
+     "az": {
+      "default": "Koltsovo"
+     }
+    },
+    "code": "SVX",
+    "city_code": "SVX",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 56.750336,
+     "lng": 60.804314
+    },
+    "has_transit_zone": null
+   },
+   "TAS": {
+    "name": {
+     "az": {
+      "default": "Daşkənd"
+     }
+    },
+    "code": "TAS",
+    "city_code": "TAS",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 41.262714,
+     "lng": 69.26619
+    },
+    "has_transit_zone": null
+   },
+   "TBS": {
+    "name": {
+     "az": {
+      "default": "Tbilisi"
+     }
+    },
+    "code": "TBS",
+    "city_code": "TBS",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 41.674065,
+     "lng": 44.958958
+    },
+    "has_transit_zone": null
+   },
+   "TZX": {
+    "name": {
+     "az": {
+      "default": "Trabzon"
+     }
+    },
+    "code": "TZX",
+    "city_code": "TZX",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 40.99419,
+     "lng": 39.78168
+    },
+    "has_transit_zone": null
+   },
+   "WAW": {
+    "name": {
+     "az": {
+      "default": "Frederik Şopen"
+     }
+    },
+    "code": "WAW",
+    "city_code": "WAW",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 52.170906,
+     "lng": 20.97329
+    },
+    "has_transit_zone": true
+   },
+   "WMI": {
+    "name": {
+     "az": {
+      "default": "Varşava-Modlin"
+     }
+    },
+    "code": "WMI",
+    "city_code": "WAW",
+    "metro_area_code": "WAW",
+    "coordinates": {
+     "lat": 52.45111,
+     "lng": 20.651667
+    },
+    "has_transit_zone": null
+   },
+   "XEU": {
+    "name": {
+     "az": {
+      "default": "Hyat Recensi EY Avtostansiya"
+     }
+    },
+    "code": "XEU",
+    "city_code": "DXB",
+    "metro_area_code": "DXB",
+    "coordinates": {
+     "lat": 25.2644444,
+     "lng": 55.3116667
+    },
+    "has_transit_zone": null
+   },
+   "XMB": {
+    "name": {
+     "az": {
+      "default": "Marina Moll EY Avtovağzalı"
+     }
+    },
+    "code": "XMB",
+    "city_code": "DXB",
+    "metro_area_code": "DXB",
+    "coordinates": {
+     "lat": 7.45,
+     "lng": -4.333333
+    },
+    "has_transit_zone": null
+   },
+   "XNB": {
+    "name": {
+     "az": {
+      "default": "Çelsi EY Tauer (avtovağzal)"
+     }
+    },
+    "code": "XNB",
+    "city_code": "DXB",
+    "metro_area_code": "DXB",
+    "coordinates": {
+     "lat": 25.2644444,
+     "lng": 55.3116667
+    },
+    "has_transit_zone": null
+   },
+   "XRJ": {
+    "name": {
+     "az": {
+      "default": "Termini"
+     }
+    },
+    "code": "XRJ",
+    "city_code": "ROM",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 41.8905198,
+     "lng": 12.4942486
+    },
+    "has_transit_zone": null
+   },
+   "XXJ": {
+    "name": {
+     "az": {
+      "default": "Deli Dəmir Yolu Vağzalı /Budapeşt"
+     }
+    },
+    "code": "XXJ",
+    "city_code": "BUD",
+    "metro_area_code": "BUD",
+    "coordinates": {
+     "lat": 47.4984056,
+     "lng": 19.0407578
+    },
+    "has_transit_zone": null
+   },
+   "XXQ": {
+    "name": {
+     "az": {
+      "default": "Keleti dəmir yolu vağzalı"
+     }
+    },
+    "code": "XXQ",
+    "city_code": "BUD",
+    "metro_area_code": "BUD",
+    "coordinates": {
+     "lat": 47.4984056,
+     "lng": 19.0407578
+    },
+    "has_transit_zone": null
+   },
+   "XYG": {
+    "name": {
+     "az": {
+      "default": "Praqa Əsas Dəmir Yolu Vağzalı"
+     }
+    },
+    "code": "XYG",
+    "city_code": "PRG",
+    "metro_area_code": "PRG",
+    "coordinates": {
+     "lat": 50.0878114,
+     "lng": 14.4204598
+    },
+    "has_transit_zone": null
+   },
+   "XYJ": {
+    "name": {
+     "az": {
+      "default": "Holeşovitse Dəmir Yolu Vağzalı"
+     }
+    },
+    "code": "XYJ",
+    "city_code": "PRG",
+    "metro_area_code": "PRG",
+    "coordinates": {
+     "lat": 50.0878114,
+     "lng": 14.4204598
+    },
+    "has_transit_zone": null
+   },
+   "ZRB": {
+    "name": {
+     "az": {
+      "default": "Frankfurt Əsas Dəmir Yolu Vağzalı"
+     }
+    },
+    "code": "ZRB",
+    "city_code": "FRA",
+    "metro_area_code": "FRA",
+    "coordinates": {
+     "lat": 50.11361,
+     "lng": 8.67972
+    },
+    "has_transit_zone": null
+   },
+   "ZVJ": {
+    "name": {
+     "az": {
+      "default": "EK Avtovağzalı"
+     }
+    },
+    "code": "ZVJ",
+    "city_code": "AUH",
+    "metro_area_code": "AUH",
+    "coordinates": {
+     "lat": 24.4666667,
+     "lng": 54.3666667
+    },
+    "has_transit_zone": null
+   },
+   "ZXZ": {
+    "name": {
+     "az": {
+      "default": "Cumeyra Biç Avtovağzalı"
+     }
+    },
+    "code": "ZXZ",
+    "city_code": "DXB",
+    "metro_area_code": "DXB",
+    "coordinates": {
+     "lat": 25.2644444,
+     "lng": 55.3116667
+    },
+    "has_transit_zone": null
+   },
+   "ЕКА": {
+    "name": {
+     "az": {
+      "default": "ЖД вокзал"
+     }
+    },
+    "code": "ЕКА",
+    "city_code": "SVX",
+    "metro_area_code": "SVX",
+    "coordinates": {
+     "lat": 0,
+     "lng": 0
+    },
+    "has_transit_zone": null
+   },
+   "СТЗ": {
+    "name": {
+     "az": {
+      "default": "Байрампаша (автовокзал)"
+     }
+    },
+    "code": "СТЗ",
+    "city_code": "IST",
+    "metro_area_code": "IST",
+    "coordinates": {
+     "lat": 41.039990739846026,
+     "lng": 28.894625730814514
+    },
+    "has_transit_zone": null
+   },
+   "ТАШ": {
+    "name": {
+     "az": {
+      "default": "Ташкент-Пассажирский",
+      "from": "из Ташкента-Пассажирского",
+      "lookAt": "Ташкенте-Пассажирском",
+      "to": "в Ташкенте-Пассажирском",
+      "where": "в Ташкенте-Пассажирском",
+      "which": "Ташкента-Пассажирского"
+     }
+    },
+    "code": "ТАШ",
+    "city_code": "TAS",
+    "metro_area_code": "",
+    "coordinates": {
+     "lat": 41.29184569286561,
+     "lng": 69.286561
+    },
+    "has_transit_zone": null
+   }
+  },
+  "cities": {
+   "ALA": {
+    "code": "ALA",
+    "name": {
+     "az": {
+      "default": "Almatı"
+     }
+    },
+    "country": "KZ",
+    "timezone": "Asia/Almaty",
+    "airports": [
+     "ALA"
+    ]
+   },
+   "ANK": {
+    "code": "ANK",
+    "name": {
+     "az": {
+      "default": "Ankara"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "ESB"
+    ]
+   },
+   "ATH": {
+    "code": "ATH",
+    "name": {
+     "az": {
+      "default": "Afina"
+     }
+    },
+    "country": "GR",
+    "timezone": "Europe/Athens",
+    "airports": [
+     "ATH"
+    ]
+   },
+   "AUH": {
+    "code": "AUH",
+    "name": {
+     "az": {
+      "default": "Əbu-Dabi"
+     }
+    },
+    "country": "AE",
+    "timezone": "Asia/Dubai",
+    "airports": [
+     "AUH",
+     "ZVJ"
+    ]
+   },
+   "BAH": {
+    "code": "BAH",
+    "name": {
+     "az": {
+      "default": "Manama"
+     }
+    },
+    "country": "BH",
+    "timezone": "Asia/Bahrain",
+    "airports": [
+     "BAH"
+    ]
+   },
+   "BAK": {
+    "code": "BAK",
+    "name": {
+     "az": {
+      "default": "Bakı"
+     }
+    },
+    "country": "AZ",
+    "timezone": "Asia/Baku",
+    "airports": [
+     "GYD"
+    ]
+   },
+   "BUD": {
+    "code": "BUD",
+    "name": {
+     "az": {
+      "default": "Budapeşt"
+     }
+    },
+    "country": "HU",
+    "timezone": "Europe/Budapest",
+    "airports": [
+     "BUD",
+     "XXJ",
+     "XXQ"
+    ]
+   },
+   "CAI": {
+    "code": "CAI",
+    "name": {
+     "az": {
+      "default": "Qəhirə"
+     }
+    },
+    "country": "EG",
+    "timezone": "Africa/Cairo",
+    "airports": [
+     "SPX",
+     "CAI",
+     "CCE"
+    ]
+   },
+   "CIT": {
+    "code": "CIT",
+    "name": {
+     "az": {
+      "default": "Çimkənd"
+     }
+    },
+    "country": "KZ",
+    "timezone": "Asia/Almaty",
+    "airports": [
+     "CIT"
+    ]
+   },
+   "COV": {
+    "code": "COV",
+    "name": {
+     "az": {
+      "default": "Mersin"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "COV"
+    ]
+   },
+   "DAM": {
+    "code": "DAM",
+    "name": {
+     "az": {
+      "default": "Dəməşq"
+     }
+    },
+    "country": "SY",
+    "timezone": "Asia/Damascus",
+    "airports": [
+     "DAM"
+    ]
+   },
+   "DOH": {
+    "code": "DOH",
+    "name": {
+     "az": {
+      "default": "Doha"
+     }
+    },
+    "country": "QA",
+    "timezone": "Asia/Qatar",
+    "airports": [
+     "DOH"
+    ]
+   },
+   "DXB": {
+    "code": "DXB",
+    "name": {
+     "az": {
+      "default": "Dubay"
+     }
+    },
+    "country": "AE",
+    "timezone": "Asia/Dubai",
+    "airports": [
+     "DXB",
+     "XMB",
+     "XEU",
+     "ZXZ",
+     "XNB",
+     "DWC"
+    ]
+   },
+   "ECN": {
+    "code": "ECN",
+    "name": {
+     "az": {
+      "default": "Ercan"
+     }
+    },
+    "country": "NY",
+    "timezone": "Asia/Nicosia",
+    "airports": [
+     "ECN"
+    ]
+   },
+   "FRA": {
+    "code": "FRA",
+    "name": {
+     "az": {
+      "default": "Frankfurt-Mayn"
+     }
+    },
+    "country": "DE",
+    "timezone": "Europe/Berlin",
+    "airports": [
+     "HHN",
+     "FRA",
+     "ZRB",
+     "QGV"
+    ]
+   },
+   "GUW": {
+    "code": "GUW",
+    "name": {
+     "az": {
+      "default": "Atırau"
+     }
+    },
+    "country": "KZ",
+    "timezone": "Asia/Atyrau",
+    "airports": [
+     "GUW"
+    ]
+   },
+   "IST": {
+    "code": "IST",
+    "name": {
+     "az": {
+      "default": "İstanbul"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "SAW",
+     "СТЗ",
+     "IST"
+    ]
+   },
+   "IZM": {
+    "code": "IZM",
+    "name": {
+     "az": {
+      "default": "İzmir"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "ADB"
+    ]
+   },
+   "JED": {
+    "code": "JED",
+    "name": {
+     "az": {
+      "default": "Ciddə"
+     }
+    },
+    "country": "SA",
+    "timezone": "Asia/Riyadh",
+    "airports": [
+     "JED"
+    ]
+   },
+   "KRK": {
+    "code": "KRK",
+    "name": {
+     "az": {
+      "default": "Krakov"
+     }
+    },
+    "country": "PL",
+    "timezone": "Europe/Warsaw",
+    "airports": [
+     "KRK"
+    ]
+   },
+   "KWI": {
+    "code": "KWI",
+    "name": {
+     "az": {
+      "default": "Küveyt"
+     }
+    },
+    "country": "KW",
+    "timezone": "Asia/Kuwait",
+    "airports": [
+     "KWI"
+    ]
+   },
+   "NQZ": {
+    "code": "NQZ",
+    "name": {
+     "az": {
+      "default": "Astana"
+     }
+    },
+    "country": "KZ",
+    "timezone": "Asia/Almaty",
+    "airports": [
+     "NQZ"
+    ]
+   },
+   "PRG": {
+    "code": "PRG",
+    "name": {
+     "az": {
+      "default": "Praqa"
+     }
+    },
+    "country": "CZ",
+    "timezone": "Europe/Prague",
+    "airports": [
+     "PFL",
+     "PRG",
+     "XYJ",
+     "XYG"
+    ]
+   },
+   "RMO": {
+    "code": "RMO",
+    "name": {
+     "az": {
+      "default": "Kişinyov"
+     }
+    },
+    "country": "MD",
+    "timezone": "Europe/Chisinau",
+    "airports": [
+     "RMO"
+    ]
+   },
+   "ROM": {
+    "code": "ROM",
+    "name": {
+     "az": {
+      "default": "Roma"
+     }
+    },
+    "country": "IT",
+    "timezone": "Europe/Rome",
+    "airports": [
+     "FCO",
+     "CIA",
+     "IRT",
+     "IRR",
+     "XRJ"
+    ]
+   },
+   "RUH": {
+    "code": "RUH",
+    "name": {
+     "az": {
+      "default": "Ər-Riyad"
+     }
+    },
+    "country": "SA",
+    "timezone": "Asia/Riyadh",
+    "airports": [
+     "RUH"
+    ]
+   },
+   "SHJ": {
+    "code": "SHJ",
+    "name": {
+     "az": {
+      "default": "Şarca"
+     }
+    },
+    "country": "AE",
+    "timezone": "Asia/Dubai",
+    "airports": [
+     "SHJ"
+    ]
+   },
+   "SVX": {
+    "code": "SVX",
+    "name": {
+     "az": {
+      "default": "Yekaterinburq"
+     }
+    },
+    "country": "RU",
+    "timezone": "Asia/Yekaterinburg",
+    "airports": [
+     "SVX"
+    ]
+   },
+   "TAS": {
+    "code": "TAS",
+    "name": {
+     "az": {
+      "default": "Daşkənd"
+     }
+    },
+    "country": "UZ",
+    "timezone": "Asia/Tashkent",
+    "airports": [
+     "ТАШ",
+     "TAS"
+    ]
+   },
+   "TBS": {
+    "code": "TBS",
+    "name": {
+     "az": {
+      "default": "Tbilisi"
+     }
+    },
+    "country": "GE",
+    "timezone": "Asia/Tbilisi",
+    "airports": [
+     "TBS"
+    ]
+   },
+   "TZX": {
+    "code": "TZX",
+    "name": {
+     "az": {
+      "default": "Trabzon"
+     }
+    },
+    "country": "TR",
+    "timezone": "Europe/Istanbul",
+    "airports": [
+     "TZX"
+    ]
+   },
+   "WAW": {
+    "code": "WAW",
+    "name": {
+     "az": {
+      "default": "Varşava"
+     }
+    },
+    "country": "PL",
+    "timezone": "Europe/Warsaw",
+    "airports": [
+     "WMI",
+     "WAW"
+    ]
+   }
+  },
+  "countries": {
+   "AE": {
+    "code": "AE",
+    "name": {
+     "az": {
+      "default": "Birləşmiş Ərəb Əmirlikləri"
+     }
+    },
+    "unified_visa": ""
+   },
+   "AZ": {
+    "code": "AZ",
+    "name": {
+     "az": {
+      "default": "Azərbaycan"
+     }
+    },
+    "unified_visa": ""
+   },
+   "BH": {
+    "code": "BH",
+    "name": {
+     "az": {
+      "default": "Bəhreyn"
+     }
+    },
+    "unified_visa": ""
+   },
+   "CZ": {
+    "code": "CZ",
+    "name": {
+     "az": {
+      "default": "Çexiya"
+     }
+    },
+    "unified_visa": "Schengen"
+   },
+   "DE": {
+    "code": "DE",
+    "name": {
+     "az": {
+      "default": "Almaniya"
+     }
+    },
+    "unified_visa": "Schengen"
+   },
+   "EG": {
+    "code": "EG",
+    "name": {
+     "az": {
+      "default": "Misir"
+     }
+    },
+    "unified_visa": ""
+   },
+   "GE": {
+    "code": "GE",
+    "name": {
+     "az": {
+      "default": "Gürcüstan"
+     }
+    },
+    "unified_visa": ""
+   },
+   "GR": {
+    "code": "GR",
+    "name": {
+     "az": {
+      "default": "Yunanıstan"
+     }
+    },
+    "unified_visa": "Schengen"
+   },
+   "HU": {
+    "code": "HU",
+    "name": {
+     "az": {
+      "default": "Macarıstan"
+     }
+    },
+    "unified_visa": "Schengen"
+   },
+   "IT": {
+    "code": "IT",
+    "name": {
+     "az": {
+      "default": "İtaliya"
+     }
+    },
+    "unified_visa": "Schengen"
+   },
+   "KW": {
+    "code": "KW",
+    "name": {
+     "az": {
+      "default": "Küveyt"
+     }
+    },
+    "unified_visa": ""
+   },
+   "KZ": {
+    "code": "KZ",
+    "name": {
+     "az": {
+      "default": "Qazaxıstan"
+     }
+    },
+    "unified_visa": ""
+   },
+   "MD": {
+    "code": "MD",
+    "name": {
+     "az": {
+      "default": "Moldova"
+     }
+    },
+    "unified_visa": ""
+   },
+   "NY": {
+    "code": "NY",
+    "name": {
+     "az": {
+      "default": "Şimali Kipr Türk Respublikası"
+     }
+    },
+    "unified_visa": ""
+   },
+   "PL": {
+    "code": "PL",
+    "name": {
+     "az": {
+      "default": "Polşa"
+     }
+    },
+    "unified_visa": "Schengen"
+   },
+   "QA": {
+    "code": "QA",
+    "name": {
+     "az": {
+      "default": "Qətər"
+     }
+    },
+    "unified_visa": ""
+   },
+   "RU": {
+    "code": "RU",
+    "name": {
+     "az": {
+      "default": "Rusiya"
+     }
+    },
+    "unified_visa": ""
+   },
+   "SA": {
+    "code": "SA",
+    "name": {
+     "az": {
+      "default": "Səudiyyə Ərəbistanı"
+     }
+    },
+    "unified_visa": ""
+   },
+   "SY": {
+    "code": "SY",
+    "name": {
+     "az": {
+      "default": "Suriya"
+     }
+    },
+    "unified_visa": ""
+   },
+   "TR": {
+    "code": "TR",
+    "name": {
+     "az": {
+      "default": "Türkiyə"
+     }
+    },
+    "unified_visa": ""
+   },
+   "UZ": {
+    "code": "UZ",
+    "name": {
+     "az": {
+      "default": "Özbəkistan"
+     }
+    },
+    "unified_visa": ""
+   }
+  },
+  "metro_areas": {
+   "ALA": {
+    "code": "ALA",
+    "airports": [
+     "ALA",
+     "BXJ"
+    ],
+    "timezone": "Asia/Almaty"
+   },
+   "ANK": {
+    "code": "ANK",
+    "airports": [
+     "ANK",
+     "ESB"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "ATH": {
+    "code": "ATH",
+    "airports": [
+     "ATH"
+    ],
+    "timezone": "Europe/Athens"
+   },
+   "AUH": {
+    "code": "AUH",
+    "airports": [
+     "AUH",
+     "AZI",
+     "DHF",
+     "ZVJ"
+    ],
+    "timezone": "Asia/Dubai"
+   },
+   "BAH": {
+    "code": "BAH",
+    "airports": [
+     "BAH"
+    ],
+    "timezone": "Asia/Bahrain"
+   },
+   "BAK": {
+    "code": "BAK",
+    "airports": [
+     "GYD",
+     "ZXT",
+     "BAK"
+    ],
+    "timezone": "Asia/Baku"
+   },
+   "BUD": {
+    "code": "BUD",
+    "airports": [
+     "XXJ",
+     "XXQ",
+     "BUD"
+    ],
+    "timezone": "Europe/Budapest"
+   },
+   "CAI": {
+    "code": "CAI",
+    "airports": [
+     "CAI",
+     "SPX",
+     "CCE"
+    ],
+    "timezone": "Africa/Cairo"
+   },
+   "CIT": {
+    "code": "CIT",
+    "airports": [
+     "CIT"
+    ],
+    "timezone": "Asia/Almaty"
+   },
+   "COV": {
+    "code": "COV",
+    "airports": [
+     "COV"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "DAM": {
+    "code": "DAM",
+    "airports": [
+     "DAM"
+    ],
+    "timezone": "Asia/Damascus"
+   },
+   "DOH": {
+    "code": "DOH",
+    "airports": [
+     "DOH"
+    ],
+    "timezone": "Asia/Qatar"
+   },
+   "DXB": {
+    "code": "DXB",
+    "airports": [
+     "DWC",
+     "XNB",
+     "DXB",
+     "NHD",
+     "XEU",
+     "XMB",
+     "ZXZ",
+     "DCG",
+     "SHJ"
+    ],
+    "timezone": "Asia/Dubai"
+   },
+   "ECN": {
+    "code": "ECN",
+    "airports": [
+     "ECN"
+    ],
+    "timezone": "Asia/Nicosia"
+   },
+   "FRA": {
+    "code": "FRA",
+    "airports": [
+     "ZRB",
+     "FRA",
+     "HHN",
+     "FRF",
+     "QGV"
+    ],
+    "timezone": "Europe/Berlin"
+   },
+   "GUW": {
+    "code": "GUW",
+    "airports": [
+     "GUW"
+    ],
+    "timezone": "Asia/Atyrau"
+   },
+   "IST": {
+    "code": "IST",
+    "airports": [
+     "IST",
+     "SAW",
+     "СТЗ"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "IZM": {
+    "code": "IZM",
+    "airports": [
+     "IGL",
+     "IZM",
+     "ADB"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "JED": {
+    "code": "JED",
+    "airports": [
+     "JED"
+    ],
+    "timezone": "Asia/Riyadh"
+   },
+   "KRK": {
+    "code": "KRK",
+    "airports": [
+     "KRK"
+    ],
+    "timezone": "Europe/Warsaw"
+   },
+   "KWI": {
+    "code": "KWI",
+    "airports": [
+     "KWI"
+    ],
+    "timezone": "Asia/Kuwait"
+   },
+   "NQZ": {
+    "code": "NQZ",
+    "airports": [
+     "NQZ"
+    ],
+    "timezone": "Asia/Almaty"
+   },
+   "PRG": {
+    "code": "PRG",
+    "airports": [
+     "XYJ",
+     "PRG",
+     "PFL",
+     "VOD",
+     "XYG"
+    ],
+    "timezone": "Europe/Prague"
+   },
+   "RMO": {
+    "code": "RMO",
+    "airports": [
+     "RMO"
+    ],
+    "timezone": "Europe/Chisinau"
+   },
+   "ROM": {
+    "code": "ROM",
+    "airports": [
+     "IRR",
+     "FCO",
+     "XRJ",
+     "IRT",
+     "CIA"
+    ],
+    "timezone": "Europe/Rome"
+   },
+   "RUH": {
+    "code": "RUH",
+    "airports": [
+     "RUH"
+    ],
+    "timezone": "Asia/Riyadh"
+   },
+   "SHJ": {
+    "code": "SHJ",
+    "airports": [
+     "SHJ"
+    ],
+    "timezone": "Asia/Dubai"
+   },
+   "SVX": {
+    "code": "SVX",
+    "airports": [
+     "SVX",
+     "ЕКА"
+    ],
+    "timezone": "Asia/Yekaterinburg"
+   },
+   "TAS": {
+    "code": "TAS",
+    "airports": [
+     "TAS",
+     "ТАШ"
+    ],
+    "timezone": "Asia/Tashkent"
+   },
+   "TBS": {
+    "code": "TBS",
+    "airports": [
+     "TBS"
+    ],
+    "timezone": "Asia/Tbilisi"
+   },
+   "TZX": {
+    "code": "TZX",
+    "airports": [
+     "TZX"
+    ],
+    "timezone": "Europe/Istanbul"
+   },
+   "WAW": {
+    "code": "WAW",
+    "airports": [
+     "WAW",
+     "WMI"
+    ],
+    "timezone": "Europe/Warsaw"
+   }
+  },
+  "airports_to_metro": null
+ },
+ "agents": {
+  "8": {
+   "id": 8,
+   "gate_name": "tickets",
+   "label": {
+    "az": {
+     "default": "Tickets.az"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "11": {
+   "id": 11,
+   "gate_name": "trip_ru",
+   "label": {
+    "az": {
+     "default": "Mytrip.com"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "34": {
+   "id": 34,
+   "gate_name": "uzbekistan_airways",
+   "label": {
+    "az": {
+     "default": "Uzbekistan airways"
+    }
+   },
+   "payment_methods": [
+    "uzcard",
+    "card",
+    "sbp",
+    "installments"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "HY"
+   ]
+  },
+  "42": {
+   "id": 42,
+   "gate_name": "all_nippon_airways_ta",
+   "label": {
+    "az": {
+     "default": "All Nippon Airways"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "NH"
+   ]
+  },
+  "65": {
+   "id": 65,
+   "gate_name": "city_travel",
+   "label": {
+    "az": {
+     "default": "City.Travel"
+    }
+   },
+   "payment_methods": [
+    "card",
+    "sbp",
+    "unionpay"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "81": {
+   "id": 81,
+   "gate_name": "qatar_api",
+   "label": {
+    "az": {
+     "default": "Qatar Airways"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "QR"
+   ]
+  },
+  "89": {
+   "id": 89,
+   "gate_name": "luxair_ta",
+   "label": {
+    "az": {
+     "default": "Luxair"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "LG"
+   ]
+  },
+  "95": {
+   "id": 95,
+   "gate_name": "aerowingo",
+   "label": {
+    "az": {
+     "default": "Aerowingo"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "122": {
+   "id": 122,
+   "gate_name": "finnair_ta",
+   "label": {
+    "az": {
+     "default": "Finnair"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "AY"
+   ]
+  },
+  "148": {
+   "id": 148,
+   "gate_name": "supercassa",
+   "label": {
+    "az": {
+     "default": "SuperKassa"
+    }
+   },
+   "payment_methods": [
+    "card",
+    "sbp",
+    "unionpay"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "192": {
+   "id": 192,
+   "gate_name": "enuygun",
+   "label": {
+    "az": {
+     "default": "Wingie"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "203": {
+   "id": 203,
+   "gate_name": "kiwi_tequila",
+   "label": {
+    "az": {
+     "default": "Kiwi.com"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "205": {
+   "id": 205,
+   "gate_name": "flydubai",
+   "label": {
+    "az": {
+     "default": "Flydubai"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "FZ"
+   ]
+  },
+  "215": {
+   "id": 215,
+   "gate_name": "travellizy",
+   "label": {
+    "az": {
+     "default": "Travellizy"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "230": {
+   "id": 230,
+   "gate_name": "pegasus",
+   "label": {
+    "az": {
+     "default": "Pegasus Airlines"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "PC"
+   ]
+  },
+  "301": {
+   "id": 301,
+   "gate_name": "tap_ta",
+   "label": {
+    "az": {
+     "default": "TAP Portugal"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "TP"
+   ]
+  },
+  "339": {
+   "id": 339,
+   "gate_name": "icelandair_ta",
+   "label": {
+    "az": {
+     "default": "Icelandair"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "FI"
+   ]
+  },
+  "352": {
+   "id": 352,
+   "gate_name": "oman_air_ta",
+   "label": {
+    "az": {
+     "default": "Oman Air"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "WY"
+   ]
+  },
+  "356": {
+   "id": 356,
+   "gate_name": "smartwings_ta",
+   "label": {
+    "az": {
+     "default": "SmartWings"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "QS"
+   ]
+  },
+  "386": {
+   "id": 386,
+   "gate_name": "azal",
+   "label": {
+    "az": {
+     "default": "AZAL"
+    }
+   },
+   "payment_methods": [
+    "card",
+    "uzcard"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "J2"
+   ]
+  },
+  "389": {
+   "id": 389,
+   "gate_name": "frenchbee_ta",
+   "label": {
+    "az": {
+     "default": "Frenchbee"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "BF"
+   ]
+  },
+  "391": {
+   "id": 391,
+   "gate_name": "air_caraibes_ta",
+   "label": {
+    "az": {
+     "default": "Air Caraïbes"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "TX"
+   ]
+  },
+  "404": {
+   "id": 404,
+   "gate_name": "etstur",
+   "label": {
+    "az": {
+     "default": "Ucuzabilet"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "471": {
+   "id": 471,
+   "gate_name": "turna",
+   "label": {
+    "az": {
+     "default": "Turna.com"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "476": {
+   "id": 476,
+   "gate_name": "centrum_air",
+   "label": {
+    "az": {
+     "default": "Centrum Air"
+    }
+   },
+   "payment_methods": [
+    "uzcard",
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false,
+   "airline_iatas": [
+    "C6"
+   ]
+  },
+  "478": {
+   "id": 478,
+   "gate_name": "gtavia",
+   "label": {
+    "az": {
+     "default": "GTAvia"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "492": {
+   "id": 492,
+   "gate_name": "farera",
+   "label": {
+    "az": {
+     "default": "Farera"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "493": {
+   "id": 493,
+   "gate_name": "bilet_com",
+   "label": {
+    "az": {
+     "default": "Bilet.com"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "496": {
+   "id": 496,
+   "gate_name": "onetwotrip_us",
+   "label": {
+    "az": {
+     "default": "Onetwotrip.com"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": true,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "497": {
+   "id": 497,
+   "gate_name": "wowtickets",
+   "label": {
+    "az": {
+     "default": "Wowtickets"
+    }
+   },
+   "payment_methods": [
+    "card"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  },
+  "512": {
+   "id": 512,
+   "gate_name": "alifavia_uz",
+   "label": {
+    "az": {
+     "default": "Alif Sayohat"
+    }
+   },
+   "payment_methods": [
+    "card",
+    "uzcard",
+    "installments"
+   ],
+   "mobile_version": false,
+   "hide_proposals": false,
+   "assisted": false
+  }
+ },
+ "alliances": {
+  "1": {
+   "id": 1,
+   "name": "Star Alliance"
+  },
+  "2": {
+   "id": 2,
+   "name": "OneWorld"
+  }
+ },
+ "equipments": {},
+ "meta": {
+  "autosearch_tickets_count": 5,
+  "filtered_tickets_count": 136,
+  "total_tickets_count": 135,
+  "direct_tickets_count": 14,
+  "cheapest_direct_ticket_price": 207.2284656353174,
+  "cheapest_baggage_ticket_price": 252.5758527787611,
+  "cheapest_direct_and_baggage_ticket_price": 252.5758527787611,
+  "price_dynamics_enabled": false,
+  "first_ticket_price": 207.2284656353174
+ },
+ "order": "best",
+ "brand": "AS",
+ "search_params": {
+  "passengers": {
+   "adults": 1
+  },
+  "trip_class": "Y",
+  "source_kind": "web",
+  "experiments": {},
+  "payment_options": null
+ }
+}

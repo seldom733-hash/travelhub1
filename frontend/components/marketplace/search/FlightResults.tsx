@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { airlineNameOf, routeChain } from "@/lib/flight-api";
 import type { FlightFare, FlightOffer, FlightSegment } from "@/lib/flight-api";
 
 interface FlightResultsProps {
@@ -58,6 +59,33 @@ function getLowestFare(flight: FlightOffer): FlightFare | undefined {
         (getAmount(a) ?? Number.MAX_SAFE_INTEGER) -
         (getAmount(b) ?? Number.MAX_SAFE_INTEGER),
     )[0];
+}
+
+function supplierOf(offer?: FlightOffer): string {
+  return offer?.source || "AZAL";
+}
+
+/**
+ * «Код» shows the WHOLE itinerary (GYD-FRA-IST), not just the first leg —
+ * otherwise a connection reads as a flight to the transfer airport.
+ */
+function chainOf(segments?: FlightSegment[]): string {
+  return routeChain(segments);
+}
+
+function baggageLabel(fare: any): string {
+  const baggage = fare?.baggage;
+  if (baggage?.status === "available") {
+    // Aviasales reports the bag count but never its weight.
+    return `Bag ${baggage.amount ?? ""}${baggage.weight ? `×${baggage.weight}kg` : ""}`;
+  }
+  return baggage?.status === "unavailable" ? "No bag" : "";
+}
+
+function handLabel(fare: any): string {
+  const luggage = fare?.luggage;
+  if (luggage?.status !== "available") return "";
+  return luggage.weight ? `+ Hand ${luggage.weight}kg` : "+ Hand";
 }
 
 function formatTime(value?: string): string {
@@ -200,7 +228,9 @@ export default function FlightResults({
         return new Date(at).getTime() - new Date(bt).getTime();
       }
       let av: any, bv: any;
-      if (sortCol === "code") { av = `${a.out.segments?.[0]?.departure?.airport}-${a.out.segments?.[0]?.arrival?.airport}`; bv = `${b.out.segments?.[0]?.departure?.airport}-${b.out.segments?.[0]?.arrival?.airport}`; }
+      if (sortCol === "code") { av = chainOf(a.out.segments); bv = chainOf(b.out.segments); }
+      else if (sortCol === "inCode") { av = chainOf(a.inn?.segments); bv = chainOf(b.inn?.segments); }
+      else if (sortCol === "carrier") { av = airlineNameOf(a.out.segments?.[0]); bv = airlineNameOf(b.out.segments?.[0]); }
       else if (sortCol === "time") { av = getTime(a.out.segments?.[0]?.departure) ?? ""; bv = getTime(b.out.segments?.[0]?.departure) ?? ""; }
       else if (sortCol === "inTime") { av = getTime(a.inn?.segments?.[0]?.departure) ?? ""; bv = getTime(b.inn?.segments?.[0]?.departure) ?? ""; }
       else if (sortCol === "price") { av = a.total; bv = b.total; }
@@ -224,11 +254,12 @@ export default function FlightResults({
           <thead className="bg-white/5 text-neutral-400">
             <tr>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("code")}>Код {arrow("code")}</th>
+              <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("carrier")}>Перевозчик {arrow("carrier")}</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("time")}>Время вылета {arrow("time")}</th>
               <th className="px-2 py-2">Время прилета</th>
               <th className="px-2 py-2">Время в полете</th>
               {hasInbound && <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("outPrice")}>Цена за туда {arrow("outPrice")}</th>}
-              {hasInbound && <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("code")}>Код {arrow("code")}</th>}
+              {hasInbound && <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("inCode")}>Код {arrow("inCode")}</th>}
               {hasInbound && <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("inTime")}>Время вылета {arrow("inTime")}</th>}
               {hasInbound && <th className="px-2 py-2">Время прилета</th>}
               {hasInbound && <th className="px-2 py-2">Время в полете</th>}
@@ -249,6 +280,7 @@ export default function FlightResults({
                   </select>
                 </div>
               </th>
+              <th className="px-2 py-2">Поставщик</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("adults")}>Взрослые {arrow("adults")}</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("children")}>Дети {arrow("children")}</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("price")}>{hasInbound ? "Общая цена" : "Цена"} {arrow("price")}</th>
@@ -259,26 +291,29 @@ export default function FlightResults({
           <tbody className="divide-y divide-white/5">
             {displayRows.map((r, idx) => {
               const outSeg = r.out.segments?.[0]; const inSeg = r.inn?.segments?.[0];
+              const outLast = r.out.segments?.[r.out.segments.length - 1];
               const outMins = flightDurationMins(r.out);
               const inMins = r.inn ? flightDurationMins(r.inn) : 0;
               const totalMins = outMins + inMins;
-              const baggageLabel = r.outFare?.baggage?.status === "available" ? `Bag ${r.outFare.baggage.amount}×${r.outFare.baggage.weight}kg` : r.outFare?.baggage?.status === "unavailable" ? "No bag" : "";
-              const handLabel = r.outFare?.luggage?.status === "available" ? `+ Hand ${r.outFare.luggage.weight}kg` : "";
+              const baggage = baggageLabel(r.outFare);
+              const hand = handLabel(r.outFare);
               const seatsAvailable = isRowAvailable(r);
               return (
                 <tr key={`${r.out.optionId}-${r.inn?.optionId ?? "ow"}-${r.fareFamily}-${idx}`} className={`hover:bg-white/5 ${seatsAvailable ? "" : "opacity-60"}`}>
-                  <td className="px-2 py-2 text-white">{outSeg?.departure?.airport ?? ""}-{outSeg?.arrival?.airport ?? ""}</td>
+                  <td className="px-2 py-2 text-white">{chainOf(r.out.segments)}</td>
+                  <td className="px-2 py-2 text-neutral-300">{airlineNameOf(outSeg)}</td>
                   <td className="px-2 py-2 text-white">{formatTime(getTime(outSeg?.departure))}</td>
                   <td className="px-2 py-2 text-white">{formatTime(getTime(outSeg?.arrival))}</td>
                   <td className="px-2 py-2 text-neutral-300">{formatDuration(outMins)}</td>
                   {hasInbound && <td className="px-2 py-2 text-white">{fareAmount(r.outFare)} {fareCurrency(r.outFare)}</td>}
-                  {hasInbound && <td className="px-2 py-2 text-white">{inSeg?.departure?.airport ?? ""}-{inSeg?.arrival?.airport ?? ""}</td>}
+                  {hasInbound && <td className="px-2 py-2 text-white">{chainOf(r.inn?.segments)}</td>}
                   {hasInbound && <td className="px-2 py-2 text-white">{formatTime(getTime(inSeg?.departure))}</td>}
                   {hasInbound && <td className="px-2 py-2 text-white">{formatTime(getTime(inSeg?.arrival))}</td>}
                   {hasInbound && <td className="px-2 py-2 text-neutral-300">{formatDuration(inMins)}</td>}
                   {hasInbound && <td className="px-2 py-2 text-white">{r.inFare ? `${fareAmount(r.inFare)} ${fareCurrency(r.inFare)}` : ""}</td>}
                   {hasInbound && <td className="px-2 py-2 text-neutral-300">{formatDuration(totalMins)}</td>}
-                  <td className="px-2 py-2 text-white">{r.fareFamily} {baggageLabel} {handLabel}</td>
+                  <td className="px-2 py-2 text-white">{r.fareFamily} {baggage} {hand}</td>
+                  <td className="px-2 py-2 text-neutral-300">{supplierOf(r.out)}</td>
                   <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.adults ?? 1}</td>
                   <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.children ?? 0}</td>
                   <td className="px-2 py-2 font-bold text-white">{r.total} {r.currency}</td>
@@ -287,7 +322,7 @@ export default function FlightResults({
                       {seatsAvailable ? "Есть места" : "Нет мест"}
                     </span>
                   </td>
-                  <td className="px-2 py-2"><button type="button" disabled={!seatsAvailable} onClick={async () => { try { const { createFlightRequest } = await import("@/lib/flight-api"); await createFlightRequest({ from: outSeg?.departure?.airport ?? "", to: outSeg?.arrival?.airport ?? "", departureDate: getDateTime(outSeg?.departure) || r.out.requested?.departureDate || "", returnDate: r.inn ? (getDateTime(r.inn.segments?.[0]?.departure) || r.inn.requested?.departureDate || undefined) : undefined, tripType: r.inn ? "RT" : "OW", passengers: r.out.requested?.passengers ?? { adults: 1, children: 0, infants: 0 }, fareFamily: r.fareFamily, price: r.total, currency: r.currency, segments: [...(r.out.segments ?? []), ...(r.inn?.segments ?? [])] }); alert(`Заявка создана: ${r.fareFamily} ${r.total} ${r.currency}`); } catch (e) { alert(`Ошибка: ${(e as Error).message}`); } }} className={`rounded-lg px-3 py-1 text-xs font-semibold ${seatsAvailable ? "bg-white text-black hover:opacity-90" : "cursor-not-allowed bg-white/20 text-white/50"}`}>Подать заявку</button></td>
+                  <td className="px-2 py-2"><button type="button" disabled={!seatsAvailable} onClick={async () => { try { const { createFlightRequest } = await import("@/lib/flight-api"); await createFlightRequest({ from: outSeg?.departure?.airport ?? "", to: outLast?.arrival?.airport ?? outSeg?.arrival?.airport ?? "", departureDate: getDateTime(outSeg?.departure) || r.out.requested?.departureDate || "", returnDate: r.inn ? (getDateTime(r.inn.segments?.[0]?.departure) || r.inn.requested?.departureDate || undefined) : undefined, tripType: r.inn ? "RT" : "OW", passengers: r.out.requested?.passengers ?? { adults: 1, children: 0, infants: 0 }, fareFamily: r.fareFamily, price: r.total, currency: r.currency, supplierCode: r.out.source, segments: [...(r.out.segments ?? []), ...(r.inn?.segments ?? [])] }); alert(`Заявка создана: ${r.fareFamily} ${r.total} ${r.currency}`); } catch (e) { alert(`Ошибка: ${(e as Error).message}`); } }} className={`rounded-lg px-3 py-1 text-xs font-semibold ${seatsAvailable ? "bg-white text-black hover:opacity-90" : "cursor-not-allowed bg-white/20 text-white/50"}`}>Подать заявку</button></td>
                 </tr>
               );
             })}
@@ -319,7 +354,7 @@ export default function FlightResults({
               <div className="flex-1">
                 <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
                   <span className="rounded-full bg-white/10 px-3 py-1 font-medium text-white">
-                    AZAL
+                    {supplierOf(flight)}
                   </span>
                   {first?.flightNumber && (
                     <span className="text-neutral-500">{first.flightNumber}</span>
@@ -402,11 +437,11 @@ export default function FlightResults({
                       <span className="font-medium text-white">{f.family} • {f.cabin}</span>
                       <span className="text-neutral-300">{f.total?.amount ?? f.price?.total?.amount ?? 0} {f.total?.currency ?? f.price?.total?.currency ?? "AZN"}</span>
                       <span className="text-neutral-400">
-                        {f.baggage?.status === "available" ? `Bag ${f.baggage.amount}×${f.baggage.weight}kg` : f.baggage?.status === "unavailable" ? "No bag" : ""}
-                        {f.luggage?.status === "available" ? ` + Hand ${f.luggage.weight}kg` : ""}
+                        {baggageLabel(f)}
+                        {handLabel(f) ? ` ${handLabel(f)}` : ""}
                       </span>
                       {isRTCombined && (
-                        <button type="button" onClick={async () => { try { const { createFlightRequest } = await import("@/lib/flight-api"); await createFlightRequest({ from: first?.departure?.airport ?? "", to: last?.arrival?.airport ?? "", departureDate: getDateTime(first?.departure) || flight.requested?.departureDate || "", returnDate: segments[1] ? (getDateTime(segments[1]?.departure) || flight.requested?.returnDate || undefined) : undefined, tripType: segments[1] ? "RT" : "OW", passengers: flight.requested?.passengers ?? { adults: 1, children: 0, infants: 0 }, fareFamily: fareFamilyOf(f), price: fareAmount(f), currency: fareCurrency(f), segments }); alert(`Заявка создана: ${fareFamilyOf(f)} ${fareAmount(f)} ${fareCurrency(f)}`); } catch (e) { alert(`Ошибка: ${(e as Error).message}`); } }} className="rounded-lg bg-white px-3 py-1 text-xs font-semibold text-black hover:opacity-90">Подать заявку</button>
+                        <button type="button" onClick={async () => { try { const { createFlightRequest } = await import("@/lib/flight-api"); await createFlightRequest({ from: first?.departure?.airport ?? "", to: last?.arrival?.airport ?? "", departureDate: getDateTime(first?.departure) || flight.requested?.departureDate || "", returnDate: segments[1] ? (getDateTime(segments[1]?.departure) || flight.requested?.returnDate || undefined) : undefined, tripType: segments[1] ? "RT" : "OW", passengers: flight.requested?.passengers ?? { adults: 1, children: 0, infants: 0 }, fareFamily: fareFamilyOf(f), price: fareAmount(f), currency: fareCurrency(f), supplierCode: flight.source, segments }); alert(`Заявка создана: ${fareFamilyOf(f)} ${fareAmount(f)} ${fareCurrency(f)}`); } catch (e) { alert(`Ошибка: ${(e as Error).message}`); } }} className="rounded-lg bg-white px-3 py-1 text-xs font-semibold text-black hover:opacity-90">Подать заявку</button>
                       )}
                     </div>
                   ))}

@@ -86,6 +86,7 @@ export default function CompactSearch({ service, params }: CompactSearchProps) {
     if (ctx.infants) sp.set("infants", String(ctx.infants));
     if (ctx.serviceClass) sp.set("class", ctx.serviceClass);
     if (ctx.tariff && ctx.tariff !== "ALL") sp.set("tariff", ctx.tariff);
+    if (ctx.supplier && ctx.supplier !== "ALL") sp.set("supplier", ctx.supplier);
     if (ctx.roundTrip) sp.set("roundTrip", "1");
     if (ctx.language) sp.set("lang", ctx.language);
     // Tours → universal live search across Summer + KOMPAS (§1) and hotels →

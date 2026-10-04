@@ -21,6 +21,11 @@ export interface FlightSearchQuery {
   passengers: FlightPassengerCount;
   isStudent?: boolean;
   returnDate?: string;
+  /**
+   * Supplier whitelist coming from the search form. The registry resolves it
+   * in the controller — adapters always see their own query, never a filter.
+   */
+  supplier?: string;
 }
 
 export interface FlightDuration {
@@ -120,6 +125,8 @@ export interface FlightRoute {
 export interface FlightOffer {
   optionId: string | null;
   optionSetId: string | null;
+  /** Supplier code that produced this offer (AZAL, AVIASALES, …). */
+  source?: string;
   available: boolean;
   selected: boolean;
   userSelected: boolean;

@@ -10,6 +10,8 @@ export interface FlightSearchRequest {
   };
   returnDate?: string;
   isStudent?: boolean;
+  /** Supplier whitelist: "ALL" (default) or a single registry code. */
+  supplier?: string;
 }
 
 export interface FlightPoint {
@@ -20,13 +22,79 @@ export interface FlightPoint {
   time?: string;
 }
 
+export interface FlightAirline {
+  code?: string | null;
+  flightNumber?: string | null;
+}
+
 export interface FlightSegment {
   id?: string;
   departure?: FlightPoint;
   arrival?: FlightPoint;
   duration?: { minutes?: number };
+  marketingAirline?: FlightAirline;
+  operatingAirline?: FlightAirline;
   airline?: { code?: string; name?: string };
   flightNumber?: string;
+}
+
+/**
+ * Display names for the carrier IATA codes that reach the UI. Suppliers only
+ * report the two-letter designator (Aviasales additionally ships names in
+ * Azerbaijani only), so the column falls back to the raw code for anything
+ * outside this list — the code is always correct, just less readable.
+ */
+export const AIRLINE_NAMES: Record<string, string> = {
+  "3L": "Air Arabia Abu Dhabi",
+  A3: "Aegean Airlines",
+  AZ: "ITA Airways",
+  BA: "British Airways",
+  BT: "airBaltic",
+  CY: "Cyprus Airways",
+  DV: "SCAT",
+  EK: "Emirates",
+  EY: "Etihad Airways",
+  FZ: "Flydubai",
+  FR: "Ryanair",
+  G9: "Air Arabia",
+  GF: "Gulf Air",
+  HH: "Qanot Sharq",
+  HY: "Uzbekistan Airways",
+  J2: "Azerbaijan Airlines",
+  J9: "Jazeera Airways",
+  KC: "Air Astana",
+  KL: "KLM",
+  LH: "Lufthansa",
+  LO: "LOT Polish Airlines",
+  MS: "EgyptAir",
+  PC: "Pegasus Airlines",
+  QR: "Qatar Airways",
+  SU: "Aeroflot",
+  TK: "Turkish Airlines",
+  U2: "easyJet",
+  U6: "Ural Airlines",
+  VF: "Ajet",
+  VY: "Vueling",
+  W6: "Wizz Air",
+  XY: "Flynas",
+};
+
+/** Carrier label for the «Перевозчик» column: operating, then marketing. */
+export function airlineNameOf(segment?: FlightSegment): string {
+  const operating = segment?.operatingAirline?.code;
+  const marketing = segment?.marketingAirline?.code;
+  const code = operating || marketing || segment?.airline?.code || "";
+  if (!code) return "—";
+  return AIRLINE_NAMES[code] || code;
+}
+
+/** Every airport of the itinerary in order: GYD-FRA-IST. */
+export function routeChain(segments?: FlightSegment[]): string {
+  if (!segments?.length) return "—";
+  const airports = segments.map((s) => s.departure?.airport).filter(Boolean);
+  const last = segments[segments.length - 1].arrival?.airport;
+  if (last) airports.push(last);
+  return airports.length ? (airports as string[]).join("-") : "—";
 }
 
 export interface FlightPrice {
@@ -49,6 +117,8 @@ export interface FlightFare {
 export interface FlightOffer {
   optionId?: string | null;
   optionSetId?: string | null;
+  /** Supplier that produced this offer (AZAL, AVIASALES, …). */
+  source?: string;
   available?: boolean;
   soldOut?: boolean;
   requested?: FlightSearchRequest;
@@ -69,7 +139,7 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
   "http://localhost:4000/api/v1";
 
-export async function createFlightRequest(body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[] }): Promise<any> {
+export async function createFlightRequest(body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string }): Promise<any> {
   const res = await fetch(`${API_BASE}/supplier/azal/request`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!res.ok) throw new Error(`Flight request failed (${res.status})`);
   return res.json();

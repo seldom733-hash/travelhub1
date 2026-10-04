@@ -42,8 +42,15 @@ export class AzalController {
   @HttpCode(200)
   @Public()
   async search(@Body() body: FlightSearchQuery) {
-    this.flightRegistry.list().forEach(s => console.log(`[FlightSearch] supplier ${s} called for ${body.from}->${body.to} ${body.departureDate}`));
-    const suppliers = this.flightRegistry.list();
+    const requestedSupplier = (body.supplier ?? "").trim().toUpperCase();
+    const registry = this.flightRegistry.list();
+    // "ALL"/absent = every registered supplier; otherwise only the picked one
+    // is queried, so the request costs one supplier round-trip instead of two.
+    const suppliers =
+      requestedSupplier && requestedSupplier !== "ALL"
+        ? registry.filter((code) => code.toUpperCase() === requestedSupplier)
+        : registry;
+    suppliers.forEach(s => console.log(`[FlightSearch] supplier ${s} called for ${body.from}->${body.to} ${body.departureDate}`));
     const results = await Promise.allSettled(
       suppliers.map((code) => this.flightRegistry.get(code).search(body)),
     );
@@ -60,7 +67,14 @@ export class AzalController {
       console.warn(`[FlightSearch] supplier ${failure.code} failed:`, failure.result.reason);
     }
 
-    const flights = successful.flatMap((result) => result.flights);
+    const flights = successful.flatMap((result) =>
+      result.flights.map((flight) => ({
+        ...flight,
+        // Stamped here rather than in every adapter so a new supplier only
+        // has to report a `source` on its FlightSearchResult.
+        source: flight.source ?? result.source,
+      })),
+    );
     const fares = successful.reduce((sum, result) => sum + result.summary.fares, 0);
 
     const perSupplier = suppliers.map((code, index) => {
@@ -97,7 +111,7 @@ export class AzalController {
 
   @Post("request")
   @Public()
-  async createRequest(@Body() body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[] }) {
+  async createRequest(@Body() body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string }) {
     const code = await this.ids.nextCode(null as any, "REQ");
     const commerceSequence = await this.refNum.nextCommerceSequence(null as any);
     const referenceNumber = this.refNum.commerceRequestRef(commerceSequence);
@@ -108,7 +122,7 @@ export class AzalController {
         requestedServiceDate: new Date(body.departureDate), quantity: 1, travelerCount: body.passengers?.adults ?? 1,
         productSnapshot: { type: "FLIGHT", from: body.from, to: body.to, fareFamily: body.fareFamily },
         displayedPrice: body.price, displayedCurrency: body.currency, confirmedPrice: null, confirmedCurrency: null,
-        pinnedRequirements: { ...body, supplierCode: "AZAL" },
+        pinnedRequirements: { ...body, supplierCode: body.supplierCode || "AZAL" },
         supplierResponseDeadline: new Date(now.getTime() + 24*60*60*1000),
       },
     });
