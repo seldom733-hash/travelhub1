@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { IdsService } from "../../shared/ids.service";
 import { ReferenceNumberService } from "../../shared/reference-number.service";
@@ -62,6 +63,26 @@ export class TourRequestService {
     const now = new Date();
     const supplierResponseDeadline = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h SLA
 
+    // Json-поля: Prisma принимает только JsonNull/DbNull вместо null, а
+    // undefined внутри Json-объекта не сериализуется — собираем без дыр.
+    const pinnedRequirements = JSON.parse(
+      JSON.stringify({
+        supplierCode: dto.supplierCode,
+        externalOfferId: dto.externalOfferId,
+        hotel: dto.hotel,
+        hotelExternalId: dto.hotelExternalId,
+        departureDate: dto.departureDate,
+        nights: dto.nights,
+        adults: dto.adults,
+        children: dto.children,
+        childAges: dto.childAges ?? [],
+        room: dto.room,
+        meal: dto.meal,
+        destination: dto.destination,
+        departureCity: dto.departureCity,
+      }),
+    ) as Prisma.InputJsonValue;
+
     const request = await (this.prisma as any).request.create({
       data: {
         code,
@@ -75,27 +96,13 @@ export class TourRequestService {
         quantity: 1,
         travelerCount: dto.adults + dto.children,
         productSnapshot: productId
-          ? { productId, productCode, productTitle, type: "TOUR" }
-          : null,
+          ? ({ productId, productCode, productTitle, type: "TOUR" } as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
         displayedPrice: dto.price,
         displayedCurrency: dto.currency,
         confirmedPrice: null,
         confirmedCurrency: null,
-        pinnedRequirements: {
-          supplierCode: dto.supplierCode,
-          externalOfferId: dto.externalOfferId,
-          hotel: dto.hotel,
-          hotelExternalId: dto.hotelExternalId,
-          departureDate: dto.departureDate,
-          nights: dto.nights,
-          adults: dto.adults,
-          children: dto.children,
-          childAges: dto.childAges ?? [],
-          room: dto.room,
-          meal: dto.meal,
-          destination: dto.destination,
-          departureCity: dto.departureCity,
-        },
+        pinnedRequirements,
         supplierResponseDeadline,
         supplierRespondedAt: null,
         supplierDecision: null,
@@ -106,7 +113,6 @@ export class TourRequestService {
         customerDecision: null,
         convertedOrderId: null,
         convertedAt: null,
-        acquisitionSource: "MARKETPLACE",
       },
     });
 

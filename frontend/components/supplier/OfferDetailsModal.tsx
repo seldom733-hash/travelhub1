@@ -15,7 +15,7 @@ import type { AggregatedOffer } from "@/lib/supplier-api";
 /**
  * OfferDetailsModal — card of the EXACTLY selected offer (§8).
  *
- * Shows all offer parameters + «Забронировать» CTA. Booking follows the
+ * Shows all offer parameters + «Оформить заказ» CTA. Order follows the
  * EXISTING TravelHub flow: revalidate price (refresh-price) → confirm if
  * changed (§9) → create-request (TourRequest). No new booking entities.
  */

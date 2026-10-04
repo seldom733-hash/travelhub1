@@ -423,6 +423,13 @@ function RequestsContent({
           {loading && <span className="text-xs text-slate-400">{t("common.loading", locale)}</span>}
 
           <TableExportButton exportUrl={exportUrl} label={t("export.label", locale)} />
+
+          <Link
+            href="/app/requests/new"
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+          >
+            ＋ Новая заявка
+          </Link>
         </OperationsToolbarSlot>
 
         {/* Error */}

@@ -632,19 +632,15 @@ export class OrderService {
   }> {
     const r = input.request;
     // Валидация доменных инвариантов ДО создания (неполный Request не может
-    // стать Order): принятый коммерческий факт (customerAcceptedAt), pinned
-    // snapshot, party size, продукт и деньги обязательны.
+    // стать Order): принятый коммерческий факт (customerAcceptedAt), party size
+    // и деньги обязательны. Продукт НЕ обязателен: заявка без productId
+    // конвертируется в заказ без продуктовой привязки (OrderItem с placeholder
+    // identity) — ограничение снято.
     if (!r.customerAcceptedAt) {
       throw new ValidationDomainError(`Request ${r.id} has no customerAcceptedAt; conversion requires customer acceptance`);
     }
-    if (!r.pinnedRequirements) {
-      throw new ValidationDomainError(`Request ${r.id} has no pinned traveler requirements; conversion requires D3 acceptance snapshot`);
-    }
     if (!r.travelerCount || r.travelerCount < 1) {
       throw new ValidationDomainError(`Request ${r.id} has no frozen travelerCount; conversion requires explicit party composition`);
-    }
-    if (!r.productSnapshot) {
-      throw new ValidationDomainError(`Request ${r.id} has no product snapshot; conversion requires a product`);
     }
     const money = r.confirmedPrice ?? r.displayedPrice;
     const currency = r.confirmedCurrency ?? r.displayedCurrency;
@@ -685,8 +681,9 @@ export class OrderService {
         // D3 §6: Order.termsAcceptedAt = реальный Request acceptance instant
         // (customerAcceptedAt), НЕ Order.createdAt / processing time.
         termsAcceptedAt: r.customerAcceptedAt,
-        // D3 §7: pinned snapshot, замороженный при customerAccept (immutable).
-        pinnedRequirements: r.pinnedRequirements as Prisma.InputJsonValue,
+        // D3 §7: pinned snapshot, замороженный при customerAccept (immutable);
+        // product-less заявка → пустой pinned snapshot (не null).
+        pinnedRequirements: (r.pinnedRequirements ?? {}) as Prisma.InputJsonValue,
         // D3 §8: frozen traveler count (party size) → OrderTraveler placeholders.
         travelerCount: r.travelerCount,
         acquisitionSource: "MARKETPLACE",
@@ -715,10 +712,10 @@ export class OrderService {
     await tx.orderItem.create({
       data: {
         orderId: order.id,
-        productId: r.productSnapshot.productId,
-        productCode: r.productSnapshot.productCode,
-        title: r.productSnapshot.productTitle,
-        type: r.productSnapshot.productType,
+        productId: r.productSnapshot?.productId ?? "",
+        productCode: r.productSnapshot?.productCode ?? "",
+        title: r.productSnapshot?.productTitle ?? `Услуга без продукта (${r.id})`,
+        type: r.productSnapshot?.productType ?? "SERVICE",
         quantity: 1,
         price: amount,
         currency: currencyCode,

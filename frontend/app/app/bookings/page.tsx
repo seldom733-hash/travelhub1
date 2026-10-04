@@ -401,6 +401,13 @@ function BookingsContent({ initialUpcoming, initialOverdue, initialSlaMinutes, i
               ...(search ? { search } : {}),
             }}
           />
+
+          <Link
+            href="/app/bookings/new"
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+          >
+            ＋ Новое бронирование
+          </Link>
         </OperationsToolbarSlot>
 
         {error && <OperationsErrorState message={error} onRetry={() => void load()} />}

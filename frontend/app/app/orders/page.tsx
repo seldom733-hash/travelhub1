@@ -404,19 +404,26 @@ function OrdersContent({ initialStatus, initialSearch, initialPaymentStatus, ini
               {t("filters.reset", locale)}
             </button>
             {busy && <span className="text-xs text-slate-400">{t("common.loading", locale)}</span>}
-            <TableExportButton
-              exportUrl="/api/v1/orders/export"
-              extraParams={{
-                ...(statusFilter ? { status: statusFilter } : {}),
-                ...(paymentStatusFilter ? { paymentStatus: paymentStatusFilter } : {}),
-                ...(dateFrom ? { dateFrom } : {}),
-                ...(dateTo ? { dateTo } : {}),
-                ...(search ? { search } : {}),
-                ...(cancelledWithin ? { cancelledWithin } : {}),
-                ...(paymentFailed ? { paymentFailed } : {}),
-                ...(pendingRefund ? { pendingRefund } : {}),
-              }}
-            />
+          <TableExportButton
+            exportUrl="/api/v1/orders/export"
+            extraParams={{
+              ...(statusFilter ? { status: statusFilter } : {}),
+              ...(paymentStatusFilter ? { paymentStatus: paymentStatusFilter } : {}),
+              ...(dateFrom ? { dateFrom } : {}),
+              ...(dateTo ? { dateTo } : {}),
+              ...(search ? { search } : {}),
+              ...(cancelledWithin ? { cancelledWithin } : {}),
+              ...(paymentFailed ? { paymentFailed } : {}),
+              ...(pendingRefund ? { pendingRefund } : {}),
+            }}
+          />
+
+          <Link
+            href="/app/orders/new"
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+          >
+            ＋ Новый заказ
+          </Link>
           </OperationsToolbarSlot>
 
           {error && <OperationsErrorState message={error} onRetry={() => void load()} />}

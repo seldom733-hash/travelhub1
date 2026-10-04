@@ -628,21 +628,26 @@ export class RequestService {
 
     // D3 §7: pin effective requirements в acceptance boundary. Продукт читается
     // ТОЛЬКО здесь (одна транзакция с acceptance) — позже не перечитывается.
+    // Product-less запросы (публичные supplier-инквairi из create-request:
+    // productId=null) — каталог-политика требований неприменима; их pin
+    // (tour-offer) уже заморожен при создании и ЗДЕСЬ НЕ перезаписывается.
     const product = request.productId
       ? await this.prisma.product.findUnique({
           where: { id: request.productId },
           select: { id: true, code: true, title: true, type: true, travelerRequirements: true },
         })
       : null;
-    if (!product) {
+    if (request.productId && !product) {
       throw new BadRequestException(
         "Cannot accept: Request has no resolvable Product for pinned traveler requirements (D3 §7)",
       );
     }
-    const pinnedRequirements = getEffectiveTravelerRequirements(
-      product.type as string,
-      (product as unknown as { travelerRequirements: Record<string, string> | null }).travelerRequirements ?? null,
-    );
+    const pinnedRequirements = product
+      ? getEffectiveTravelerRequirements(
+          product.type as string,
+          (product as unknown as { travelerRequirements: Record<string, string> | null }).travelerRequirements ?? null,
+        )
+      : null;
     // D3 §8: frozen traveler count. Explicit travelerCount (party composition)
     // — canonical; legacy NULL → quantity (единственное прежнее представление,
     // DB default 1 = 1 гость). Замораживается явно на Request.
@@ -660,14 +665,20 @@ export class RequestService {
         customerDecision: "ACCEPTED",
         confirmedPrice: request.supplierPriceProposal ?? request.displayedPrice,
         confirmedCurrency: request.displayedCurrency,
-        pinnedRequirements: pinnedRequirements as Prisma.InputJsonValue,
+        // Product-less: pin/snapshot НЕ трогаем (undefined = no-op) — сохраняем
+        // замороженный при создании tour-pin и исходный (или null) snapshot.
+        ...(product
+          ? {
+              pinnedRequirements: pinnedRequirements as Prisma.InputJsonValue,
+              productSnapshot: {
+                productId: product.id,
+                productCode: product.code,
+                productTitle: product.title,
+                productType: product.type,
+              } as Prisma.InputJsonValue,
+            }
+          : {}),
         travelerCount: frozenTravelerCount,
-        productSnapshot: {
-          productId: product.id,
-          productCode: product.code,
-          productTitle: product.title,
-          productType: product.type,
-        } as Prisma.InputJsonValue,
         version: { increment: 1 },
       },
     });
@@ -792,21 +803,21 @@ export class RequestService {
         `Cannot convert Request ${requestId} in status ${existing.status}; conversion requires CUSTOMER_ACCEPTED`,
       );
     }
-    if (!existing.customerAcceptedAt || !existing.pinnedRequirements || !existing.travelerCount) {
+    if (!existing.customerAcceptedAt || !existing.travelerCount) {
       throw new ConflictException(
-        `Request ${requestId} has no D3 acceptance snapshot (customerAcceptedAt/pinnedRequirements/travelerCount); conversion rejected`,
+        `Request ${requestId} has no D3 acceptance snapshot (customerAcceptedAt/travelerCount); conversion rejected`,
       );
     }
 
+    // Заявка без productId конвертируется в заказ без продуктовой привязки
+    // (ограничение снято): productSnapshot может быть null → OrderItem получает
+    // placeholder identity в OrderService.createOrderFromRequest.
     const productSnapshot = (existing.productSnapshot ?? null) as unknown as {
       productId: string;
       productCode: string;
       productTitle: string;
       productType: string;
     } | null;
-    if (!productSnapshot || !productSnapshot.productId) {
-      throw new ConflictException(`Request ${requestId} has no product snapshot; conversion rejected`);
-    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       // CAS-claim: CUSTOMER_ACCEPTED → CONVERTED (один победитель при гонке).
