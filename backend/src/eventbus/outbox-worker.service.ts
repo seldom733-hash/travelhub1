@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from "@nestjs/common";
+import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown, OnModuleDestroy } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { EventBusService, OUTBOX_MAX_ATTEMPTS } from "./eventbus.service";
 
@@ -21,15 +21,26 @@ import { EventBusService, OUTBOX_MAX_ATTEMPTS } from "./eventbus.service";
  *  - no tight loop: интервал, а не бесконечный занятой цикл;
  *  - event identity/lineage сохранены: retryFailed/publishPending НЕ меняют
  *    eventId/correlation/causation; InboxEvent dedup — authoritative защита от
- *    duplicate side effect (не полагаемся на exactly-once доставку).
+ *    duplicate side effect (не полагаемся на exactly-once доставку);
+ *  - shutdown race устранён (самостоятельный lifecycle-баг, не dev/two-instance):
+ *    PrismaService $disconnect выполняется в onModuleDestroy, а воркер раньше
+ *    останавливался только в onApplicationShutdown — таймер успевал выстрелить
+ *    между хуками и цикл падал с «Transaction not found … before disconnecting»
+ *    (плюс scheduleNext мог перепланировать цикл уже после shutdown). Теперь:
+ *    stop() в onModuleDestroy/onApplicationShutdown, guard в scheduleNext и
+ *    классификация disconnect-race как штатной остановки (без error-лога).
  *
  * Наблюдаемость (не мониторинг-платформа): каждый цикл логирует published/
  * retried/exhausted counts; метод status() даёт текущие бэклоги.
  */
 @Injectable()
-export class OutboxWorkerService implements OnApplicationBootstrap, OnApplicationShutdown {
+export class OutboxWorkerService implements OnModuleDestroy, OnApplicationBootstrap, OnApplicationShutdown {
   private readonly logger = new Logger(OutboxWorkerService.name);
   private timer: NodeJS.Timeout | null = null;
+  /** После stop() никакие циклы не планируются и не запускаются. */
+  private shuttingDown = false;
+  /** Текущий (in-flight) цикл — await в stop(), чтобы не гонять с $disconnect. */
+  private inFlight: Promise<void> | null = null;
   private readonly intervalMs = Number(process.env.OUTBOX_WORKER_INTERVAL_MS ?? 500);
   private readonly batchSize = Number(process.env.OUTBOX_WORKER_BATCH ?? 100);
   /**
@@ -71,17 +82,41 @@ export class OutboxWorkerService implements OnApplicationBootstrap, OnApplicatio
   }
 
   private scheduleNext(delayMs: number): void {
+    if (this.shuttingDown) return;
     if (this.timer) {
       clearTimeout(this.timer);
     }
     this.timer = setTimeout(() => {
-      void this.runCycleAndReschedule().catch((err) => {
-        this.logger.error(`outbox worker cycle failed: ${String((err as Error)?.message ?? err)}`);
-        this.scheduleNext(this.intervalMs);
+      const run: Promise<void> = this.runCycleAndReschedule()
+        .then(() => undefined)
+        .catch((err) => {
+          const msg = String((err as Error)?.message ?? err);
+          if (OutboxWorkerService.isDisconnectRace(msg)) {
+            // $disconnect уже идёт/выполнен: штатная остановка, не инцидент.
+            this.shuttingDown = true;
+            this.timer = null;
+            this.logger.log(`outbox worker stopped (prisma disconnected): ${msg}`);
+            return;
+          }
+          this.logger.error(`outbox worker cycle failed: ${msg}`);
+          this.scheduleNext(this.intervalMs);
+        });
+      this.inFlight = run;
+      void run.then(() => {
+        if (this.inFlight === run) this.inFlight = null;
       });
     }, delayMs);
     // Не держать процесс живым из-за таймера.
     this.timer.unref?.();
+  }
+
+  /**
+   * Prisma «Transaction not found … obtained before disconnecting» — семантика
+   * отключения клиента ($disconnect в onModuleDestroy PrismaService), а не
+   * инцидент БД (обрыв соединения даст другой текст: Can't reach database server).
+   */
+  private static isDisconnectRace(message: string): boolean {
+    return /Transaction not found|before disconnecting|Client is closed/i.test(message);
   }
 
   private async runCycleAndReschedule(): Promise<void> {
@@ -90,11 +125,32 @@ export class OutboxWorkerService implements OnApplicationBootstrap, OnApplicatio
     this.scheduleNext(busy ? this.drainBackoffMs : this.intervalMs);
   }
 
-  onApplicationShutdown(): void {
+  /**
+   * Остановка воркера. Вызывается из onModuleDestroy (тот же хук, где
+   * PrismaService делает $disconnect) и — идемпотентно — из
+   * onApplicationShutdown: закрывает оба варианта порядка уничтожения
+   * модулей. Ждём in-flight цикл, чтобы он не работал с уже отключённым
+   * клиентом.
+   */
+  private async stop(): Promise<void> {
+    this.shuttingDown = true;
     if (this.timer) {
-      clearInterval(this.timer);
+      clearTimeout(this.timer);
       this.timer = null;
     }
+    if (this.inFlight) {
+      const inFlight = this.inFlight;
+      this.inFlight = null;
+      await inFlight;
+    }
+  }
+
+  onModuleDestroy(): Promise<void> {
+    return this.stop();
+  }
+
+  onApplicationShutdown(): Promise<void> {
+    return this.stop();
   }
 
   /**
