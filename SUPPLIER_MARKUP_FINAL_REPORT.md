@@ -278,20 +278,28 @@ deleted (untracked artifact).
 
 ## 23. Commit
 
-**Not yet executed — pending owner decision on mixed-file policy.**
-Pure-markup file set is ready to stage; the 4 mixed files (§21) cannot be
-committed wholesale (would commit foreign Stage-1/M4/booking changes —
-violates §6.21/§10.15) and cannot be safely excluded in full (markup code
-depends on `schema.prisma` MarkupRule/snapshot fields; committed-tree
-compilability). Options: (a) hunk-level split of the 4 files → full markup-only
-commit; (b) wholesale commit incl. foreign hunks inside those 4 files (violates
-§6.21); (c) no commit, leave tree for owner coordination. NO COMMIT / NO PUSH
-was performed (§6.22 conditions on "unrelated changes excluded" are not yet
-satisfiable without choosing an option).
+**Executed — `d52d4cc` (`feat(pricing): supplier markup — pricing boundary,
+MarkupRule matrix, Live Sales discounts, commercial snapshots (Phases 0-6)`),
+96 files, +18 612 / −533.**
+
+Owner decision: **hunk-split** (only Supplier Markup changes staged) + **no
+push**. Executed for all 8 mixed-author files — `schema.prisma`,
+`app.module.ts`, `request.service.ts`, `order.service.ts`,
+`permissions.constants.ts`, `security.service.ts`, `i18n.tsx`,
+`tour-request.service.ts` (+ its untracked spec): foreign hunks (Stage-1/2,
+M4, WhatsApp, booking, catalog, checkout) left in the working tree;
+`git diff` index↔worktree of those files = foreign hunks only.
+`tour-request.service.spec.ts` customer-identity §4.8 block (depends on
+untracked M4 `shared/customer-resolver`) stripped from the staged copy;
+worktree copy byte-identical to pre-commit state. Foreign-marker scan of
+`git diff --cached`: zero hits outside prose (reports/prompts) and HEAD
+context lines. Post-commit worktree: 112 dirty entries, all unstaged,
+untracked M4/WhatsApp/booking/`requests/page.spec.tsx` untouched.
 
 ## 24. Push
 
-Not performed (follows §23).
+**Not performed** — explicit owner instruction (commit only, no push;
+`master` is 13 commits ahead of `origin/master`, `0d7de62` HEAD).
 
 ## 25. Final verdict
 
@@ -305,4 +313,5 @@ Gate I = PASS   Gate J = PASS   Gate K = PASS   Gate L = PASS
 
 All technical conditions of §9 (FINAL VERDICT RULE) are satisfied:
 Phase 5 PASS, Phase 6 PASS, Gates A–L PASS →
-**SUPPLIER MARKUP = COMPLETE** (git commit/push gated per §21–23 owner decision).
+**SUPPLIER MARKUP = COMPLETE** (committed in `d52d4cc`, hunk-split per owner
+decision; push = not performed, §24).
