@@ -135,3 +135,138 @@ describe("requestDto — requests table data contract (Phase 4)", () => {
     expect(dto.status).toBeUndefined();
   });
 });
+
+/**
+ * Hotel Identity Fix B (HOTEL_IDENTITY_AUDIT_REPORT §11 option C) —
+ * conversion projection for product-less Requests with a valid frozen
+ * productSnapshot (manual / live-sales contract §12):
+ *   - projection precedence: live Product snapshot → frozen Request.productSnapshot;
+ *   - convert must NOT be false solely because productId is NULL;
+ *   - all execution gates (status/acceptance/money/permissions/already-converted)
+ *     stay intact — projection only repairs the snapshot source.
+ */
+import {
+  computeRequestAvailableActions,
+  buildRequestProjectionProductSnapshot,
+} from "./request.service";
+
+describe("computeRequestAvailableActions — product-less conversion projection (Fix B)", () => {
+  const FROZEN_SNAPSHOT = {
+    productId: "",
+    productCode: "",
+    productTitle: "CONSTANTINOPOLIS HOTEL Бутик (Султанахмет)",
+    productType: "TOUR",
+  };
+  const BASE = {
+    convertedOrderId: null as string | null,
+    customerActionDeadline: null as Date | null,
+    customerAcceptedAt: new Date("2026-10-06T09:29:39Z"),
+    pinnedRequirements: { supplierCode: "SUMMERTOUR", hotelExternalId: "1144" } as unknown,
+    travelerCount: 2 as number | null,
+    confirmedPrice: 698.76 as unknown,
+    confirmedCurrency: "USD" as string | null,
+    displayedPrice: 698.76 as unknown,
+    displayedCurrency: "USD" as string | null,
+  };
+  const GRANTED = ["order.edit_noncritical"];
+
+  it("positive: productId=NULL + valid frozen snapshot + CUSTOMER_ACCEPTED + money → convert=true", () => {
+    const actions = computeRequestAvailableActions(
+      {
+        ...BASE,
+        status: "CUSTOMER_ACCEPTED" as never,
+        productSnapshot: FROZEN_SNAPSHOT as unknown,
+      },
+      GRANTED,
+    );
+    expect(actions.convert).toBe(true);
+  });
+
+  it("precedence: live Product snapshot builds from Product; NULL product → frozen fallback path", () => {
+    const live = buildRequestProjectionProductSnapshot({
+      id: "p-live",
+      code: "PRD-1",
+      title: "Live",
+      type: "TOUR" as never,
+      travelerRequirements: null,
+    });
+    expect(live).toMatchObject({ productId: "p-live" });
+    expect(buildRequestProjectionProductSnapshot(null)).toBeNull();
+  });
+
+  it("negative: frozen snapshot absent → convert=false", () => {
+    const actions = computeRequestAvailableActions(
+      {
+        ...BASE,
+        status: "CUSTOMER_ACCEPTED" as never,
+        productSnapshot: null,
+      },
+      GRANTED,
+    );
+    expect(actions.convert).toBe(false);
+  });
+
+  it("negative: status invalid (CONFIRMED) → convert=false", () => {
+    const actions = computeRequestAvailableActions(
+      {
+        ...BASE,
+        status: "CONFIRMED" as never,
+        productSnapshot: FROZEN_SNAPSHOT as unknown,
+      },
+      GRANTED,
+    );
+    expect(actions.convert).toBe(false);
+  });
+
+  it("negative: money invalid (zero confirmed/displayed) → convert=false", () => {
+    const actions = computeRequestAvailableActions(
+      {
+        ...BASE,
+        status: "CUSTOMER_ACCEPTED" as never,
+        productSnapshot: FROZEN_SNAPSHOT as unknown,
+        confirmedPrice: 0,
+        displayedPrice: 0,
+      },
+      GRANTED,
+    );
+    expect(actions.convert).toBe(false);
+  });
+
+  it("negative: already converted (convertedOrderId set) → convert=false", () => {
+    const actions = computeRequestAvailableActions(
+      {
+        ...BASE,
+        status: "CUSTOMER_ACCEPTED" as never,
+        productSnapshot: FROZEN_SNAPSHOT as unknown,
+        convertedOrderId: "ord-1",
+      },
+      GRANTED,
+    );
+    expect(actions.convert).toBe(false);
+  });
+
+  it("negative: permission missing (order.edit_noncritical not granted) → convert=false", () => {
+    const actions = computeRequestAvailableActions(
+      {
+        ...BASE,
+        status: "CUSTOMER_ACCEPTED" as never,
+        productSnapshot: FROZEN_SNAPSHOT as unknown,
+      },
+      [],
+    );
+    expect(actions.convert).toBe(false);
+  });
+
+  it("negative: acceptance snapshot absent (customerAcceptedAt NULL) → convert=false", () => {
+    const actions = computeRequestAvailableActions(
+      {
+        ...BASE,
+        status: "CUSTOMER_ACCEPTED" as never,
+        customerAcceptedAt: null,
+        productSnapshot: FROZEN_SNAPSHOT as unknown,
+      },
+      GRANTED,
+    );
+    expect(actions.convert).toBe(false);
+  });
+});

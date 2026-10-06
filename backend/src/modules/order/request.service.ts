@@ -99,6 +99,7 @@ export function computeRequestAvailableActions(
       canEdit &&
       hasD3AcceptSnapshot &&
       hasAcceptedMoney &&
+      request.status === "CUSTOMER_ACCEPTED" &&
       request.convertedOrderId === null,
   };
 }
@@ -441,6 +442,25 @@ export class RequestService {
 
     // UI-C6: server-authoritative action availability projection.
     // Controller passes the actor's granted permissions explicitly.
+    //
+    // Hotel Identity Fix B (HOTEL_IDENTITY_AUDIT_REPORT §11 option C):
+    // projection precedence — live Product snapshot when the Product exists,
+    // otherwise the FROZEN Request.productSnapshot. A product-less Request
+    // (productId = NULL, valid manual/live-sales case §12) must not lose the
+    // convert action solely because the projection could not reconstruct a
+    // snapshot from a NULL productId. Execution remains authoritative: the
+    // conversion path reads the same frozen Request.productSnapshot
+    // (convertRequestToOrder), so the projection no longer diverges from it.
+    const projectionProductSnapshot =
+      buildRequestProjectionProductSnapshot(
+        product as RequestProjectionProductShape | null,
+      ) ??
+      ((request.productSnapshot ?? null) as {
+        productId?: string;
+        productCode?: string;
+        productTitle?: string;
+        productType?: string;
+      } | null);
     dto.availableActions = computeRequestAvailableActions(
       {
         status: request.status,
@@ -449,9 +469,7 @@ export class RequestService {
         customerAcceptedAt: request.customerAcceptedAt,
         pinnedRequirements: request.pinnedRequirements,
         travelerCount: request.travelerCount ?? null,
-        productSnapshot: buildRequestProjectionProductSnapshot(
-          product as RequestProjectionProductShape | null,
-        ),
+        productSnapshot: projectionProductSnapshot,
         confirmedPrice: request.confirmedPrice,
         confirmedCurrency: request.confirmedCurrency,
         displayedPrice: request.displayedPrice,
