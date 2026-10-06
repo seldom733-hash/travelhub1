@@ -612,6 +612,9 @@ export class OrderService {
         customerAcceptedAt: Date | null;
         pinnedRequirements: Record<string, string> | null;
         travelerCount: number | null;
+        /** Supplier Markup Phase 4 §4.6: frozen commercial snapshot из Request
+         *  (verbatim → Order.commercialSnapshot; immutable, Gate G). */
+        commercialSnapshot: Record<string, unknown> | null;
       };
       actor: { id: string; username: string } | null;
       orderRequestedEventId?: string | null;
@@ -686,6 +689,12 @@ export class OrderService {
         pinnedRequirements: (r.pinnedRequirements ?? {}) as Prisma.InputJsonValue,
         // D3 §8: frozen traveler count (party size) → OrderTraveler placeholders.
         travelerCount: r.travelerCount,
+        // Supplier Markup Phase 4 §4.6: verbatim commercial snapshot из frozen
+        // Request (JSON; immutable после создания — пересчёт только при
+        // конверсии, НЕ позднейшим MarkupRule change). Legacy → колонка null.
+        ...(r.commercialSnapshot
+          ? { commercialSnapshot: r.commercialSnapshot as Prisma.InputJsonValue }
+          : {}),
         acquisitionSource: "MARKETPLACE",
         subtotal: amount,
         discountType: null,

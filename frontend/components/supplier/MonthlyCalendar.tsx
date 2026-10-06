@@ -476,6 +476,7 @@ export default function MonthlyCalendar({
               return (
                 <button
                   key={day.dateStr}
+                  aria-label={day.dateStr}
                   onClick={() => isAvailable && onSelect?.(day.entry!)}
                   disabled={!isAvailable}
                   className={`relative h-16 rounded-lg border p-1.5 text-left transition-colors ${!day.isCurrentMonth ? "border-transparent bg-transparent" : isAvailable ? "border-green-200 bg-green-50 hover:bg-green-100 cursor-pointer" : day.entry?.absenceCode ? "border-amber-200 bg-amber-50 cursor-not-allowed" : "border-slate-100 bg-slate-50/50 cursor-not-allowed"} ${isToday ? "ring-2 ring-blue-400" : ""}`}

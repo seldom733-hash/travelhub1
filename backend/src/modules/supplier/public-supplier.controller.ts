@@ -4,6 +4,7 @@ import { SupplierOfferService } from "./supplier-offer.service";
 import { SupplierAggregatorService } from "./supplier-aggregator.service";
 import { TourRequestService } from "./tour-request.service";
 import { KompasCaptchaRequiredException } from "./kompas/kompas-captcha.exception";
+import { DomainError } from "../../shared/errors";
 import type { PriceCalendarQuery, SupplierOfferRef, SupplierSearchQuery } from "./supplier.types";
 
 /**
@@ -42,7 +43,6 @@ export class PublicSupplierController {
     const msg = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack?.slice(0,1200) : "";
     this.logger.error(`Public supplier API error: ${msg} | stack=${stack}`);
-    try { require("fs").appendFileSync("D:\\travelhub_v1\\backend_price_chain.log", `[MAP ERR] ${msg} | stack=${stack?.slice(0,600)}\n`); } catch {}
     if (/supports nights|UNSUPPORTED/i.test(msg)) {
       throw new BadRequestException(msg);
     }
@@ -51,6 +51,10 @@ export class PublicSupplierController {
     }
     if (/DOM hard-fail|schema drift|malformed/i.test(msg)) {
       throw new BadGatewayException(msg);
+    }
+    if (/PRICE_UNAVAILABLE/i.test(msg)) {
+      // Supplier re-check returned no valid price — reject the booking input.
+      throw new HttpException(msg, 400);
     }
     if (/no price_info|NO_RESULT/i.test(msg)) {
       throw new HttpException(msg, 204);
@@ -61,6 +65,10 @@ export class PublicSupplierController {
     }
     // Preserve original error status if already HttpException
     if (err instanceof HttpException) throw err;
+    // Domain errors (ValidationDomainError 422, ConflictError 409, ...) carry
+    // their own httpStatus — let the global AppExceptionFilter map them
+    // (§4.8: customer validation must reach the client as 422/409, not 500).
+    if (err instanceof DomainError) throw err;
     // Expose 500 with message so frontend can see cause (instead of generic Internal Server Error)
     throw new HttpException(msg, 500);
   }
@@ -223,31 +231,22 @@ export class PublicSupplierController {
   @Post("public/supplier/price-calendar")
   @Public()
   async getPriceCalendar(@Body() body: PriceCalendarQuery) {
-    const line = `[PriceCalendar] REQ ${JSON.stringify(body)} | ${new Date().toISOString()}\n`;
-    try { require("fs").appendFileSync("D:\\travelhub_v1\\backend_price_chain.log", line); } catch {}
     this.logger.log(`[PriceCalendar] REQ ${JSON.stringify(body)}`);
     let result: any;
     try {
       result = await this.handleCaptcha(this.offerService.getPriceCalendar(body));
     } catch (e) {
-      const errLine = `[PriceCalendar] ERR ${(e as Error).message} | stack=${(e as Error).stack?.slice(0,600)} | body=${JSON.stringify(body).slice(0,400)}\n`;
-      try { require("fs").appendFileSync("D:\\travelhub_v1\\backend_price_chain.log", errLine); } catch {}
       throw this.mapSupplierError(e);
     }
     // Log result summary (not full entries)
-    let resLine = "";
     if (result && (result as any).status === "CAPTCHA_REQUIRED") {
-      resLine = `[PriceCalendar] RES CAPTCHA_REQUIRED challengeId=${(result as any).challengeId}\n`;
       this.logger.log(`[PriceCalendar] RES CAPTCHA_REQUIRED challengeId=${(result as any).challengeId}`);
     } else if (result && (result as any).entries) {
       const r = result as any;
-      resLine = `[PriceCalendar] RES entries=${r.entries.length} scanned=${r.totalOffersScanned} from=${r.dateFrom} to=${r.dateTo} | ${new Date().toISOString()}\n`;
       this.logger.log(`[PriceCalendar] RES entries=${r.entries.length} scanned=${r.totalOffersScanned} from=${r.dateFrom} to=${r.dateTo}`);
     } else {
-      resLine = `[PriceCalendar] RES ${JSON.stringify(result).slice(0,500)}\n`;
       this.logger.log(`[PriceCalendar] RES ${JSON.stringify(result).slice(0,500)}`);
     }
-    try { require("fs").appendFileSync("D:\\travelhub_v1\\backend_price_chain.log", resLine); } catch {}
     return result;
   }
 
@@ -303,8 +302,22 @@ export class PublicSupplierController {
       currency: string;
       destination?: string;
       departureCity?: string;
+      country?: string;
+      tourIncValue?: string;
+      tourIncName?: string;
+      customer?: {
+        phone?: string;
+        email?: string;
+        country?: string;
+        firstName?: string;
+        lastName?: string;
+      };
     },
   ) {
-    return this.tourRequestService.createTourRequest(body);
+    // displayedPrice is derived server-side from a supplier re-check
+    // (TourRequestService) — body.price is accepted but never trusted.
+    return this.handleCaptcha(this.tourRequestService.createTourRequest(body)).catch(
+      (err) => this.mapSupplierError(err),
+    );
   }
 }

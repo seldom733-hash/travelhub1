@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import Price from "@/components/public/Price";
 import OfferDetailsModal from "@/components/supplier/OfferDetailsModal";
+import { useSupplierLabels } from "@/lib/supplier-registry";
 import type { AggregatedOffer, AggregatedSearchResult } from "@/lib/supplier-api";
 
 /**
@@ -17,13 +18,6 @@ import type { AggregatedOffer, AggregatedSearchResult } from "@/lib/supplier-api
 
 type SortKey = "date" | "nights" | "hotel" | "stars" | "meal" | "room" | "price" | "source";
 type SortDir = "asc" | "desc";
-
-const SUPPLIER_LABELS: Record<string, string> = {
-  KOMPAS: "Компас",
-  SUMMERTOUR: "Summer",
-  KAZUNION: "KazUnion",
-  ANEX: "ANEX",
-};
 
 /** Hotel-category token ("3*", "4*+") parsed from the hotel name; "" = unknown. */
 const starOf = (hotel?: string): string => {
@@ -130,6 +124,7 @@ export default function TourResultsTable({
   loading,
   error,
   resolvedSuppliers,
+  departureCity,
 }: {
   result: AggregatedSearchResult | null;
   searchId: string;
@@ -137,8 +132,11 @@ export default function TourResultsTable({
   error?: string;
   /** null = supplier set still resolving, [] = none, string[] = will be queried. */
   resolvedSuppliers?: string[] | null;
+  /** City of departure from the search query — forwarded to the offer card. */
+  departureCity?: string;
 }) {
   const locale = useLocale();
+  const supplierLabels = useSupplierLabels("tours");
   const [sortKey, setSortKey] = useState<SortKey>("price");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [supplierFilter, setSupplierFilter] = useState("");
@@ -316,7 +314,7 @@ export default function TourResultsTable({
     // Progressive status: resolve who will answer the direction first, then
     // show that set while the (much slower) live search is running.
     const pending = resolvedSuppliers == null;
-    const found = (resolvedSuppliers ?? []).map((c) => SUPPLIER_LABELS[c] ?? c);
+    const found = (resolvedSuppliers ?? []).map((c) => supplierLabels[c] ?? c);
     return (
       <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center">
         <p className="text-sm text-neutral-300">{t("tourSearch.searching", locale)}</p>
@@ -368,8 +366,8 @@ export default function TourResultsTable({
             {Object.entries(result.perSupplier)
               .map(([code, r]) =>
                 r.error
-                  ? `${SUPPLIER_LABELS[code] ?? code} — ${t("tourSearch.unavailable", locale)}`
-                  : `${SUPPLIER_LABELS[code] ?? code} — ${r.count}`,
+                  ? `${supplierLabels[code] ?? code} — ${t("tourSearch.unavailable", locale)}`
+                  : `${supplierLabels[code] ?? code} — ${r.count}`,
               )
               .join(" · ")}
           </p>
@@ -385,8 +383,8 @@ export default function TourResultsTable({
         {Object.entries(result.perSupplier)
           .map(([code, r]) =>
             r.error
-              ? `${SUPPLIER_LABELS[code] ?? code} — ${t("tourSearch.unavailable", locale)}`
-              : `${SUPPLIER_LABELS[code] ?? code} — ${r.count}`,
+              ? `${supplierLabels[code] ?? code} — ${t("tourSearch.unavailable", locale)}`
+              : `${supplierLabels[code] ?? code} — ${r.count}`,
           )
           .join(" · ")}
         {" · "}
@@ -528,7 +526,7 @@ export default function TourResultsTable({
                   <option value="">{t("tourSearch.filter_all_suppliers", locale)}</option>
                   {suppliers.map((c) => (
                     <option key={c} value={c}>
-                      {SUPPLIER_LABELS[c] ?? c}
+                      {supplierLabels[c] ?? c}
                     </option>
                   ))}
                 </select>
@@ -565,7 +563,7 @@ export default function TourResultsTable({
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
                   <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-neutral-300">
-                    {SUPPLIER_LABELS[o.supplierCode] ?? o.supplierCode}
+                    {supplierLabels[o.supplierCode] ?? o.supplierCode}
                   </span>
                 </td>
               </tr>
@@ -581,7 +579,7 @@ export default function TourResultsTable({
 
       {/* Offer card of the EXACTLY clicked row (§8) */}
       {selected && (
-        <OfferDetailsModal offer={selected} searchId={searchId} onClose={() => setSelected(null)} />
+          <OfferDetailsModal offer={selected} searchId={searchId} departureCity={departureCity} onClose={() => setSelected(null)} />
       )}
     </div>
   );

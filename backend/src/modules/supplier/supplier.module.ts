@@ -23,8 +23,10 @@ import { SupplierController } from "./supplier.controller";
 import { PublicSupplierController } from "./public-supplier.controller";
 import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
 import { TourRequestService } from "./tour-request.service";
+import { CrmModule } from "../crm/crm.module";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { EventBusModule } from "../../eventbus/eventbus.module";
+import { PricingModule } from "../pricing/pricing.module";
 import { AzalAdapter } from "./azal/azal.adapter";
 import { AzalHttpService } from "./azal/azal.http.service";
 import { AzalController } from "./azal/azal.controller";
@@ -41,7 +43,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
  */
 @Global()
 @Module({
-  imports: [PrismaModule, EventBusModule],
+  imports: [PrismaModule, EventBusModule, PricingModule, CrmModule],
   controllers: [SupplierController, PublicSupplierController, KompasCaptchaController, AzalController],
   providers: [
     SupplierAdapterRegistry,

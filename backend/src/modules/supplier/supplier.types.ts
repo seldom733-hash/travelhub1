@@ -4,6 +4,7 @@
  * Mode A: Dynamic Supplier Inventory (no Product import per search).
  * Pricing ≠ Availability ≠ Quote: supplier price is external snapshot, not TravelHub pricing authority.
  */
+import type { MarkupPricingJson } from "../pricing/pricing.types";
 
 // ── Supplier Search Query ────────────────────────────────────────────────
 
@@ -140,6 +141,13 @@ export interface SupplierOffer {
   childAges: number[];
   /** Price snapshot. */
   price: SupplierPriceSnapshot;
+  /**
+   * Markup breakdown (STRICT PROMPT §20) — present only when this offer has
+   * passed the pricing boundary (price.amount is the PUBLIC selling price,
+   * raw supplier price lives in pricing.supplierAmount). Absent on raw
+   * adapter output / cache entries.
+   */
+  pricing?: MarkupPricingJson;
   /** Availability state. */
   availability: SupplierAvailability;
   /** Transport/airline info. */
@@ -155,7 +163,11 @@ export interface SupplierOffer {
 // ── Price Snapshot ───────────────────────────────────────────────────────
 
 export interface SupplierPriceSnapshot {
-  /** Raw amount from supplier. */
+  /**
+   * Price amount. RAW supplier amount inside adapters/cache; after the
+   * pricing boundary (SupplierPricingService) it carries the PUBLIC selling
+   * price and `pricing.supplierAmount` preserves the raw supplier value.
+   */
   amount: number;
   /** Currency code (e.g., "USD"). */
   currency: string;
@@ -167,6 +179,8 @@ export interface SupplierPriceSnapshot {
   queryHash: string;
   /** Source supplier code. */
   source: string;
+  /** Markup breakdown (§20) — set by the pricing boundary only. */
+  pricing?: MarkupPricingJson;
 }
 
 // ── Availability Snapshot ────────────────────────────────────────────────
@@ -306,6 +320,13 @@ export interface SupplierConfig {
 export interface PriceCalendarQuery {
   /** Supplier code. */
   supplierCode: string;
+  /**
+   * Service category ("tours" | "hotels" | …) — selects the category adapter
+   * and the markup rule's serviceType. Optional: absent → registry default
+   * (first registered category) which matches the adapter actually serving
+   * this calendar.
+   */
+  service?: string;
   /** Product/card ID (for context). */
   productId?: string;
   /** Destination country name — mapped to STATEINC by adapters that need it (e.g. KOMPAS). */
@@ -372,9 +393,14 @@ export interface PriceCalendarEntryOffer {
   childAges: number[];
   /** Availability state. */
   availability: SupplierAvailability;
-  /** Real supplier price for this offer. */
+  /**
+   * Offer price. RAW supplier price inside adapters/cache; after the pricing
+   * boundary it is the PUBLIC price (supplier value in pricing.supplierAmount).
+   */
   price: number;
   currency: string;
+  /** Markup breakdown (§20) — set by the pricing boundary (price = public). */
+  pricing?: MarkupPricingJson;
   /** Transport class as returned by supplier (e.g., "Эконом"). */
   transport?: string;
   /** True when the program has no return segment (e.g., TOURINC 254). */
@@ -400,6 +426,8 @@ export interface PriceCalendarEntry {
   absenceCode?: string;
   /** Human-readable absence description for the user (§10). */
   absenceText?: string;
+  /** Markup breakdown (§20) for the entry-level price (set by the pricing boundary). */
+  pricing?: MarkupPricingJson;
 }
 
 export interface PriceCalendarResult {
@@ -442,4 +470,23 @@ export interface SupplierMetrics {
   availabilityChanged: number;
   schemaError: number;
   circuitOpen: number;
+}
+
+// ── PRICE_UNAVAILABLE (established error model, Phase 5 §5.5–5.7) ────────
+
+/**
+ * Fail closed when a supplier price is missing / not found / non-positive.
+ *
+ * This is the ONE established PRICE_UNAVAILABLE model (public boundary
+ * `mapSupplierError` → HTTP 400, `SupplierOfferService.priceBoundary`,
+ * `azal.deriveAuthoritativePrice`, `tour-request` recheck all match on the
+ * `PRICE_UNAVAILABLE:` message prefix). Adapters MUST throw this instead of
+ * synthesizing an `amount: 0` snapshot — a zero snapshot used to poison the
+ * supplier cache and produced a misleading 422 ValidationDomainError at the
+ * authenticated boundary.
+ *
+ * Never returns (always throws) — typed `never` for use in mapper fallbacks.
+ */
+export function priceUnavailable(context: string): never {
+  throw new Error(`PRICE_UNAVAILABLE: ${context}`);
 }

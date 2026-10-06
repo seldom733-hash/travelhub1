@@ -1,4 +1,4 @@
-﻿import { Injectable, Logger, OnModuleDestroy, Optional } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy, Optional } from "@nestjs/common";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { execFile } from "child_process";
 import * as fs from "fs";
@@ -16,6 +16,7 @@ import type {
   PriceCalendarResult,
   PriceCalendarEntry,
 } from "../supplier.types";
+import { priceUnavailable } from "../supplier.types";
 import { buildSummerSearchRequest, buildSummerXhrUrl, SummerSearchRequest } from "./summertour.request-builder";
 import { parseSummerOffers } from "./summertour.response-parser";
 import { KompasCaptchaStore, type KompasCaptchaOperation } from "../kompas/kompas-captcha.store";
@@ -446,14 +447,11 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     };
     const offers = await this.search(q);
     const m = offers.find(o => o.externalOfferId === ref.externalOfferId);
-    if (m) return { ...m, packageComposition: undefined, oldPrice: undefined, priceType: undefined };
-    return {
-      supplierCode: this.code, externalOfferId: ref.externalOfferId, externalClaim: ref.externalClaim,
-      hotel: ref.searchContext.hotel ?? "", departureDate: ref.searchContext.departureDateFrom ?? "", nights: ref.searchContext.nightsFrom ?? 0,
-      adults: ref.searchContext.adults, children: ref.searchContext.children ?? 0, childAges: ref.searchContext.childAges ?? [],
-      price: { amount: 0, currency: "USD", fetchedAt: new Date(), expiresAt: new Date(), queryHash: "", source: this.code },
-      availability: "NOT_AVAILABLE", fetchedAt: new Date(), expiresAt: new Date(),
-    };
+    if (!m) {
+      // §5.5: no synthetic zero snapshot — established PRICE_UNAVAILABLE model.
+      priceUnavailable(`SUMMERTOUR offer ${ref.externalOfferId} not found for the original search context`);
+    }
+    return { ...m, packageComposition: undefined, oldPrice: undefined, priceType: undefined };
   }
 
   async refreshPrice(ref: SupplierOfferRef): Promise<SupplierPriceSnapshot> {
@@ -467,7 +465,11 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     };
     const offers = await this.search(q);
     const m = offers.find(o => o.externalOfferId === ref.externalOfferId);
-    return m ? m.price : { amount: 0, currency: "USD", fetchedAt: new Date(), expiresAt: new Date(Date.now() + 5 * 60 * 1000), queryHash: JSON.stringify(ref.searchContext), source: this.code };
+    // §5.5: no synthetic zero snapshot — established PRICE_UNAVAILABLE model.
+    if (!m) {
+      priceUnavailable(`SUMMERTOUR offer ${ref.externalOfferId} no longer in search results`);
+    }
+    return m.price;
   }
 
   async refreshAvailability(ref: SupplierOfferRef): Promise<SupplierAvailabilitySnapshot> {

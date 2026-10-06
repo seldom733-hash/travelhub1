@@ -4,6 +4,7 @@
  * AZAL-specific DTOs remain in azal.types.ts and are translated by
  * AzalAdapter at the supplier boundary.
  */
+import type { MarkupPricingJson } from "../../pricing/pricing.types";
 
 export type FlightTripType = "OW" | "RT";
 
@@ -85,6 +86,8 @@ export interface FlightFareRule {
 export interface FlightPrice {
   amount: number | null;
   currency: string | null;
+  /** Markup breakdown (§20) — set by the pricing boundary (amount = public). */
+  pricing?: MarkupPricingJson;
 }
 
 export interface FlightFare {
@@ -107,6 +110,12 @@ export interface FlightFare {
   earnMiles?: number | null;
   earnPoints?: number | null;
   labels: string[];
+  /**
+   * Markup breakdown (§20) — set by the pricing boundary: `total.amount`
+   * becomes the PUBLIC price, supplier price preserved in pricing.supplierAmount
+   * (base/taxes/priceBreakdown stay supplier-side on purpose — §16).
+   */
+  pricing?: MarkupPricingJson;
 }
 
 export interface FlightRoute {

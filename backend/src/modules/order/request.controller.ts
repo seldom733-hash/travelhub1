@@ -94,8 +94,15 @@ export class RequestController {
       customerCode: r.customerCode ?? "",
       productName: r.productName ?? "",
       productCode: r.productCode ?? "",
+      // Phase 4: supplier code is its own column; partner* is the B2B partner.
+      supplierCode: r.supplierCode ?? "",
       partnerName: r.partnerName ?? "",
       partnerCode: r.partnerCode ?? "",
+      // Selected-service parameters (nights, party «2+0», country).
+      nights: r.nights ?? "",
+      tourists:
+        r.adults != null && r.children != null ? `${r.adults}+${r.children}` : r.travelerCount != null ? String(r.travelerCount) : "",
+      country: r.country ?? "",
       displayedPrice: r.displayedPrice ?? "",
       displayedCurrency: r.displayedCurrency ?? "",
       confirmedPrice: r.confirmedPrice ?? "",
@@ -118,8 +125,12 @@ export class RequestController {
       { header: "Код клиента", key: "customerCode", width: 14 },
       { header: "Услуга", key: "productName", width: 28 },
       { header: "Код услуги", key: "productCode", width: 14 },
-      { header: "Поставщик", key: "partnerName", width: 24 },
-      { header: "Код поставщика", key: "partnerCode", width: 14 },
+      { header: "Поставщик", key: "supplierCode", width: 16 },
+      { header: "Партнёр", key: "partnerName", width: 24 },
+      { header: "Код партнёра", key: "partnerCode", width: 14 },
+      { header: "Ночей", key: "nights", width: 8 },
+      { header: "Туристы", key: "tourists", width: 10 },
+      { header: "Страна", key: "country", width: 14 },
       { header: "Цена витрины", key: "displayedPrice", width: 15 },
       { header: "Валюта", key: "displayedCurrency", width: 8 },
       { header: "Подтв. цена", key: "confirmedPrice", width: 15 },
@@ -221,6 +232,26 @@ export class RequestController {
     @Body() body: { reason?: string },
   ) {
     return this.requestService.markUnavailable(id, { id: user.id, username: user.username }, body.reason);
+  }
+
+  /**
+   * Supplier Markup Phase 4 §4.3 (Live Sales): server-authoritative
+   * individual discount (отдельный grants-пермишен, не order.edit_noncritical).
+   * Все условия/guard'ы и floor-валидация — в сервисе (422 через
+   * AppExceptionFilter); DTO валидируется как body-тип контроллера.
+   */
+  @Post(":id/discount")
+  @RequirePermissions("sales.discount.grant")
+  grantDiscount(
+    @CurrentUser() user: any,
+    @Param("id") id: string,
+    @Body() body: { discountType: string; discountValue?: number | string },
+  ) {
+    return this.requestService.grantDiscount(
+      id,
+      { discountType: body.discountType, discountValue: body.discountValue },
+      { id: user.id, username: user.username },
+    );
   }
 
   @Post(":id/customer-accept")

@@ -20,6 +20,10 @@ interface SortableHeaderProps {
   onSort: (field: string, direction: SortDirection) => void;
   /** Optional: right-align the content */
   alignRight?: boolean;
+  /** Optional: horizontal cell padding override (default «px-4»); lets a
+   * registry tighten the gap at specific column boundaries without relying
+   * on px/pr utility order */
+  padX?: string;
   /** Optional: additional CSS classes */
   className?: string;
   /** Optional: filter control rendered next to sort button */
@@ -44,6 +48,7 @@ export default function SortableHeader({
   currentSort,
   onSort,
   alignRight = false,
+  padX = "px-4",
   className = "",
   filterSlot,
 }: SortableHeaderProps) {
@@ -59,7 +64,7 @@ export default function SortableHeader({
 
   return (
     <th
-      className={`px-4 py-2.5 font-medium ${alignRight ? 'text-right' : ''} ${className}`}
+      className={`${padX} py-2.5 font-medium ${alignRight ? 'text-right' : ''} ${className}`}
     >
       <div className="flex items-center gap-1">
         <button

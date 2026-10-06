@@ -110,6 +110,11 @@ export const PERMISSIONS = {
   // raw checkout context (PII-adjacent travelers, frozen money snapshot).
   "sales.checkout.read": "Чтение checkout commercial intent context",
   "sales.checkout.write": "Управление checkout commercial intent context",
+  // Supplier Markup Phase 4 §4.3 (Live Sales): server-authoritative
+  // индивидуальная скидка к Request (floor customerFinalPrice >= supplierPrice;
+  // хранится только в Request.commercialSnapshot → Order, НЕ в MarkupRule/
+  // Tariff/Storefront/CommissionPolicy).
+  "sales.discount.grant": "Применение индивидуальной скидки к заявке (Live Sales)",
 
   // ── Finance (Phase 2, каталог прав зарезервирован) ───────────────────
   "finance.payment.read": "Чтение платежей",
@@ -147,6 +152,12 @@ export const PERMISSIONS = {
   "finance.provider_fee.read": "Чтение ProviderFee (Finance Center)",
   "finance.settlement.read": "Чтение Settlement (Finance Center)",
   "finance.payout.read": "Чтение Payout (Finance Center)",
+
+  // ── Pricing (Supplier Markup, design §12 / STRICT PROMPT §23, Gate J) ───
+  // НЕ зависит от supplier.search.* (undeclared → fail-closed 403, audit
+  // дефект): admin markup UI использует только эти два канонических права.
+  "pricing.markup.read": "Чтение MarkupRule и матрицы наценок",
+  "pricing.markup.manage": "Управление MarkupRule (master data, DRAFT→ACTIVE→ARCHIVED)",
 
   // ── Communication (Step 1.16, canonical CML-*) ─────────────────────────
   // Узкие права: internal staff — read/create (заметки и зафиксированные
@@ -331,6 +342,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.provider_fee.read",
     "finance.settlement.read",
     "finance.payout.read",
+    // Supplier Markup (design §12): DIRECTOR — read-only oversight матрицы
+    // наценок (manage только FINANCE, зеркало finance.commission.* грантов).
+    "pricing.markup.read",
     "support.read",
     "support.case.read",
     "documents.read",
@@ -407,6 +421,12 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.provider_fee.read",
     "finance.settlement.read",
     "finance.payout.read",
+    // Supplier Markup (design §12 / Gate J): FINANCE управляет MarkupRule.
+    "pricing.markup.read",
+    "pricing.markup.manage",
+    // Supplier Markup Phase 4 §4.3: FINANCE — денежный authority,
+    // применяет/контрололирует индивидуальные скидки заявок.
+    "sales.discount.grant",
     "support.read",
     "documents.read",
     "settings.read",
@@ -491,6 +511,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.provider_fee.read",
     "finance.settlement.read",
     "finance.payout.read",
+    // Supplier Markup (design §12): ANALYST — read-only oversight матрицы.
+    "pricing.markup.read",
     "support.read",
     "documents.read",
     "settings.read",
@@ -564,6 +586,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "sales.sale.write",
     "sales.sale.complete",
     "sales.kpi.read",
+    // Supplier Markup Phase 4 §4.3: SALES_MANAGER — единственная
+    // commercial-write роль, применяет индивидуальную скидку (Live Sales)
+    // к Request до acceptance клиента.
+    "sales.discount.grant",
     // Step 2.3A: SALES_MANAGER — полный operational доступ к checkout intents
     // (create/update/revalidate/cancel + read).
     "sales.checkout.read",

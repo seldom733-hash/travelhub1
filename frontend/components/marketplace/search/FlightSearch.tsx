@@ -9,6 +9,7 @@ import FlightAirportSelect from "./FlightAirportSelect";
 import FlightDatePicker from "./FlightDatePicker";
 import { fetchAzalDirectory, fetchFlightCalendar, type FlightCalendarDayPrice } from "@/lib/flight-api";
 import { setRemoteAirports } from "@/lib/flight-locations";
+import { useSupplierOptions } from "@/lib/supplier-registry";
 import ChildAges from "./ChildAges";
 import HelpFindButton from "./HelpFindButton";
 
@@ -31,6 +32,17 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   const [serviceClass, setServiceClass] = useState("economy");
   const [tariff, setTariff] = useState("ALL");
   const [supplier, setSupplier] = useState("ALL");
+  // Registry-driven supplier options (§4.7): backend FlightSupplierRegistry,
+  // no hardcoded option list. A URL-selected supplier missing from the
+  // registry is kept as its own option so the <select> never blanks out.
+  const flightSuppliers = useSupplierOptions("flights");
+  const supplierOptions = useMemo(() => {
+    const options = flightSuppliers.map((s) => ({ value: s.code, label: s.name }));
+    if (supplier && supplier !== "ALL" && !options.some((o) => o.value === supplier)) {
+      options.unshift({ value: supplier, label: supplier });
+    }
+    return options;
+  }, [flightSuppliers, supplier]);
   useEffect(() => {
     try {
       const sp = new URLSearchParams(window.location.search);
@@ -193,8 +205,11 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
             className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
           >
             <option value="ALL">Все поставщики</option>
-            <option value="AZAL">AZAL</option>
-            <option value="AVIASALES">Aviasales</option>
+            {supplierOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </select>
         </div>
 

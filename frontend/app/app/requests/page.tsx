@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useState, useRef, useCallback } from "react";
+import { Suspense, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useLocale, t, LOCALE_TAGS, type Locale } from "@/lib/i18n";
+import { useSupplierLabels } from "@/lib/supplier-registry";
 import { fmtDate } from "@/lib/temporal-display"; // D8 SHOULD #1 — shared TemporalDisplay
 import Pagination from "@/components/Pagination";
 import TableExportButton from "@/components/TableExportButton";
@@ -31,12 +32,21 @@ interface RequestItem {
   productId: string | null;
   productName: string | null;
   productCode: string | null;
+  serviceType: string | null;
   partnerId: string | null;
   partnerName: string | null;
   partnerCode: string | null;
+  supplierCode: string | null;
   status: string;
   requestedServiceDate: string | null;
   quantity: number;
+  travelerCount: number | null;
+  nights: number | null;
+  adults: number | null;
+  children: number | null;
+  country: string | null;
+  destination: string | null;
+  departureCity: string | null;
   displayedPrice: string | null;
   displayedCurrency: string | null;
   confirmedPrice: string | null;
@@ -110,6 +120,34 @@ function fmtDateTime(iso: string | null, locale: Locale): string {
   return new Date(iso).toLocaleString(LOCALE_TAGS[locale]);
 }
 
+const SERVICE_TYPE_I18N: Record<string, string> = {
+  tour: "requests.service_tour",
+  tours: "requests.service_tour",
+  hotel: "requests.service_hotel",
+  hotels: "requests.service_hotel",
+  flight: "requests.service_flight",
+  flights: "requests.service_flight",
+};
+
+/** «Услуга» type (тур / отель / авиабилет), raw supplier values normalized. */
+function serviceTypeLabel(raw: string | null, locale: Locale): string {
+  if (!raw) return "—";
+  const key = SERVICE_TYPE_I18N[raw.toLowerCase()];
+  return key ? t(key, locale) : raw;
+}
+
+/**
+ * «Подтв. цена» — принята́я цена витрины при подаче из карточки услуги.
+ * Legacy rows created before the rule keep confirmedPrice NULL, so the column
+ * falls back to displayed (display-only; conversion money-gate untouched).
+ */
+function confirmedPriceCell(r: RequestItem): string {
+  const confirmed = r.confirmedPrice ?? r.displayedPrice;
+  if (!confirmed) return "—";
+  const currency = r.confirmedPrice ? r.confirmedCurrency : r.displayedCurrency;
+  return currency ? `${confirmed} ${currency}` : String(confirmed);
+}
+
 /**
  * UI-C1.2B/UI-C1.2F.1G — Requests registry with URL-state synchronization.
  *
@@ -149,6 +187,15 @@ function RequestsContent({
 }) {
   const locale = useLocale();
   const router = useRouter();
+  // Supplier display labels (registry SSOT §4.7): merged across services so
+  // tour/flight/hotel supplier codes render as names in the «Поставщик» cell.
+  const tourLabels = useSupplierLabels("tours");
+  const hotelLabels = useSupplierLabels("hotels");
+  const flightLabels = useSupplierLabels("flights");
+  const supplierLabels = useMemo(
+    () => ({ ...tourLabels, ...hotelLabels, ...flightLabels }),
+    [tourLabels, hotelLabels, flightLabels],
+  );
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [total, setTotal] = useState(0);
@@ -440,25 +487,31 @@ function RequestsContent({
           {loading && requests.length === 0 ? (
             <OperationsLoadingState />
           ) : (
-            <table className="w-full text-left text-sm" style={{ tableLayout: "fixed" }}>
-              <thead className="border-b border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+            <table
+              className="w-full text-left text-[13px] [&_button]:text-[13px] [&_span]:text-[13px]"
+              style={{ tableLayout: "fixed" }}
+            >
+              <thead className="border-b border-slate-100 bg-slate-50 uppercase tracking-wide text-slate-400">
                 <tr>
-                  <SortableHeader field="referenceNumber" currentSort={currentSort} onSort={handleSort}>{t("requests.ref", locale)}</SortableHeader>
+                  <SortableHeader field="referenceNumber" currentSort={currentSort} onSort={handleSort} padX="pl-4 pr-2">{t("requests.ref", locale)}</SortableHeader>
+                  <SortableHeader field="createdAt" currentSort={currentSort} onSort={handleSort} padX="pl-2 pr-4">{t("requests.created", locale)}</SortableHeader>
                   <th className="px-4 py-2.5 font-medium">{t("requests.customer", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("requests.product", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("requests.supplier", locale)}</th>
-                  <SortableHeader field="displayedPrice" currentSort={currentSort} onSort={handleSort}>{t("requests.displayed_price", locale)}</SortableHeader>
-                  <SortableHeader field="confirmedPrice" currentSort={currentSort} onSort={handleSort}>{t("requests.confirmed_price", locale)}</SortableHeader>
+                  <SortableHeader field="displayedPrice" currentSort={currentSort} onSort={handleSort} padX="pl-4 pr-2">{t("requests.displayed_price", locale)}</SortableHeader>
+                  <SortableHeader field="confirmedPrice" currentSort={currentSort} onSort={handleSort} padX="pl-2 pr-4">{t("requests.confirmed_price", locale)}</SortableHeader>
                   <SortableHeader field="serviceDate" currentSort={currentSort} onSort={handleSort}>{t("requests.service_date", locale)}</SortableHeader>
-                  <SortableHeader field="status" currentSort={currentSort} onSort={handleSort} filterSlot={<TableHeaderFilter id="requests-status-filter" label="" options={statusFilterOptions} value={statusFilter} onChange={applyStatus} ariaLabel={t("admin.filter.all_statuses", locale)} />}>{t("admin.table.col.status", locale)}</SortableHeader>
-                  <SortableHeader field="createdAt" currentSort={currentSort} onSort={handleSort}>{t("requests.created", locale)}</SortableHeader>
+                  <th className="px-4 py-2.5 font-medium">{t("requests.country", locale)}</th>
+                  <th className="pl-4 pr-2 py-2.5 font-medium">{t("requests.nights", locale)}</th>
+                  <th className="pl-2 pr-2 py-2.5 font-medium">{t("requests.travelers", locale)}</th>
+                  <SortableHeader field="status" currentSort={currentSort} onSort={handleSort} filterSlot={<TableHeaderFilter id="requests-status-filter" label="" options={statusFilterOptions} value={statusFilter} onChange={applyStatus} ariaLabel={t("admin.filter.all_statuses", locale)} />} padX="pl-2 pr-4">{t("admin.table.col.status", locale)}</SortableHeader>
                   <SortableHeader field="slaDeadline" currentSort={currentSort} onSort={handleSort}>{t("requests.sla_deadline", locale)}</SortableHeader>
                 </tr>
               </thead>
               <tbody>
                 {requests.length === 0 && !loading && (
                   <OperationsEmptyState
-                    colSpan={10}
+                    colSpan={13}
                     message={filtersActive ? t("ops.empty_no_results", locale) : t("requests.no_data", locale)}
                   />
                 )}
@@ -468,39 +521,53 @@ function RequestsContent({
                     className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-blue-50/50"
                     onClick={() => router.push(`/app/requests/${r.id}`)}
                   >
-                    <td className="px-4 py-2.5">
+                    <td className="pl-4 pr-2 py-2.5">
                       <Link
                         href={`/app/requests/${r.id}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="font-mono text-xs text-blue-600 hover:underline"
+                        className="font-mono text-blue-600 hover:underline"
                       >
                         {r.referenceNumber}
                       </Link>
                     </td>
+                    <td className="pl-2 pr-4 py-2.5 text-slate-500">{fmtDate(r.createdAt, locale)}</td>
                     <td className="px-4 py-2.5 text-slate-900">
                       <div>{r.customerName || "—"}</div>
-                      {r.customerCode && <div className="text-xs text-slate-400">{r.customerCode}</div>}
+                      {r.customerCode && <div className="text-slate-400">{r.customerCode}</div>}
                     </td>
                     <td className="px-4 py-2.5 text-slate-900">
-                      <div>{r.productName || "—"}</div>
-                      {r.productCode && <div className="text-xs text-slate-400">{r.productCode}</div>}
+                      <div>{serviceTypeLabel(r.serviceType, locale)}</div>
+                      {r.productName && <div className="text-slate-400">{r.productName}</div>}
+                      {r.productCode && <div className="text-slate-400">{r.productCode}</div>}
                     </td>
                     <td className="px-4 py-2.5 text-slate-900">
-                      <div>{r.partnerName || "—"}</div>
-                      {r.partnerCode && <div className="text-xs text-slate-400">{r.partnerCode}</div>}
+                      <div>
+                        {r.supplierCode
+                          ? supplierLabels[r.supplierCode] ?? r.supplierCode
+                          : r.partnerName || "—"}
+                      </div>
+                      {r.supplierCode ? (
+                        <div className="text-slate-400">{r.supplierCode}</div>
+                      ) : r.partnerCode ? (
+                        <div className="text-slate-400">{r.partnerCode}</div>
+                      ) : null}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-900">
+                    <td className="pl-4 pr-2 py-2.5 text-slate-900">
                       {r.displayedPrice ? `${r.displayedPrice} ${r.displayedCurrency ?? ""}` : "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-slate-900">
-                      {r.confirmedPrice ? `${r.confirmedPrice} ${r.confirmedCurrency ?? ""}` : "—"}
-                    </td>
+                    <td className="pl-2 pr-4 py-2.5 text-slate-900">{confirmedPriceCell(r)}</td>
                     <td className="px-4 py-2.5 text-slate-900">{fmtDate(r.requestedServiceDate, locale)}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-2.5 text-slate-900">{r.country || "—"}</td>
+                    <td className="pl-4 pr-2 py-2.5 text-slate-900">{r.nights ?? "—"}</td>
+                    <td className="pl-2 pr-2 py-2.5 text-slate-900">
+                      {typeof r.adults === "number"
+                        ? `${r.adults}+${r.children ?? 0}`
+                        : r.travelerCount ?? "—"}
+                    </td>
+                    <td className="pl-2 pr-4 py-2.5">
                       <StatusBadge status={r.status} label={requestStatusLabel(r.status, locale)} />
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">{fmtDate(r.createdAt, locale)}</td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">{fmtDateTime(r.supplierResponseDeadline, locale)}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{fmtDateTime(r.supplierResponseDeadline, locale)}</td>
                   </tr>
                 ))}
               </tbody>

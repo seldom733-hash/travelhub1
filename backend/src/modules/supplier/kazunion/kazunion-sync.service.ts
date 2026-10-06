@@ -10,6 +10,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { KazunionAdapter, kazunionCountryCandidates, type KazunionSearchQuery } from "./kazunion.adapter";
+import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import type { SupplierOffer } from "../supplier.types";
 
 export interface KazunionSyncResult {
@@ -56,6 +57,7 @@ export class KazunionSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly kazunion: KazunionAdapter,
+    private readonly pricing: SupplierPricingService,
   ) {}
 
   /** Find (or create) the KazUnion supplier partner. */
@@ -251,11 +253,21 @@ export class KazunionSyncService {
         const productCode = `KAZUNION-${tourIncValue}-${hotelKey}`;
 
         const validOffers = groupOffers.filter((o) => o.price.amount > 0);
-        const minPrice =
+        let minPrice =
           validOffers.length > 0
             ? Math.min(...validOffers.map((o) => o.price.amount))
             : 0;
         const currency = validOffers[0]?.price.currency ?? "USD";
+        // Markup boundary (§9): Tariff/startingPrice are customer-facing —
+        // write the PUBLIC price (already-priced feeds pass through).
+        if (minPrice > 0 && !groupOffers.some((o) => o.pricing)) {
+          minPrice = await this.pricing.publicAmountFor(
+            minPrice,
+            currency,
+            this.kazunion.code,
+            "tours",
+          );
+        }
 
         const rooms = Array.from(
           new Set(groupOffers.map((o) => o.room).filter((r): r is string => !!r)),

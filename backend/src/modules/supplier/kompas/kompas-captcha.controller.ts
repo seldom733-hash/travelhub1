@@ -4,6 +4,12 @@ import { KompasCaptchaStore } from "./kompas-captcha.store";
 import { KompasSupplierAdapter } from "./kompas.adapter";
 import { SummertourNewAdapter } from "../summertour/summertour-new.adapter";
 import { KompasCaptchaRequiredException } from "./kompas-captcha.exception";
+import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
+import type {
+  PriceCalendarResult,
+  SupplierOffer,
+  SupplierPriceSnapshot,
+} from "../supplier.types";
 
 /**
  * Public CAPTCHA human-in-the-loop controller.
@@ -11,6 +17,10 @@ import { KompasCaptchaRequiredException } from "./kompas-captcha.exception";
  *
  * Holds SAME browser context/page across challenge → verify → resume.
  * Never exposes cookies / antibot tokens / answers in logs or responses.
+ *
+ * Supplier Markup (STRICT PROMPT §9): resume returns adapter output directly,
+ * so the pricing boundary is applied HERE — the captcha path must never leak
+ * unmarked supplier prices (same rules as SupplierOfferService).
  */
 @Controller()
 export class KompasCaptchaController {
@@ -20,6 +30,7 @@ export class KompasCaptchaController {
     private readonly store: KompasCaptchaStore,
     private readonly adapter: KompasSupplierAdapter,
     private readonly summertour: SummertourNewAdapter,
+    private readonly pricing: SupplierPricingService,
   ) {}
 
   /** Refresh CAPTCHA image — uses samo.captchaRefreshUrl / #recaptcha in SAME context. */
@@ -91,16 +102,9 @@ export class KompasCaptchaController {
       await this.store.remove(challengeId).catch(() => {});
 
       // Return operation-specific payload so frontend can continue without re-issuing request.
-      if (ch.operation === "priceCalendar") {
-        return { status: "SUCCESS", challengeId, supplier: "KOMPAS", data: result };
-      }
-      if (ch.operation === "search") {
-        return { status: "SUCCESS", challengeId, supplier: "KOMPAS", data: result };
-      }
-      if (ch.operation === "refreshPrice" || ch.operation === "refreshAvailability" || ch.operation === "getOffer") {
-        return { status: "SUCCESS", challengeId, supplier: "KOMPAS", data: result };
-      }
-      return { status: "SUCCESS", challengeId, supplier: "KOMPAS", data: result };
+      // Markup boundary applied uniformly per operation (§9).
+      const data = await this.applyPricing(result, ch.operation, "KOMPAS", ch.originalQuery);
+      return { status: "SUCCESS", challengeId, supplier: "KOMPAS", data };
     } catch (err) {
       const msg = (err as Error).message;
       this.logger.error(`resume after captcha failed ${challengeId}: ${msg}`);
@@ -118,6 +122,46 @@ export class KompasCaptchaController {
       await this.store.remove(challengeId).catch(() => {});
       return { status: "KOMPAS_ERROR" };
     }
+  }
+
+  /**
+   * Markup boundary for resumed operations (§9): search offers / calendar /
+   * re-check snapshot / offer detail get the public price + §20 pricing block.
+   * Zero/absent prices pass through untouched (they are not commercial money —
+   * Gate E rejects them at the booking gates instead of inventing a markup).
+   */
+  private async applyPricing(
+    result: unknown,
+    operation: string,
+    supplier: string,
+    originalQuery: unknown,
+  ): Promise<unknown> {
+    const q = originalQuery as
+      | { service?: string; searchContext?: { service?: string } }
+      | undefined;
+    const serviceType = q?.service ?? q?.searchContext?.service ?? "tours";
+    if (operation === "search" && Array.isArray(result)) {
+      return this.pricing.applyToOffers(result as SupplierOffer[], supplier, serviceType);
+    }
+    if (
+      operation === "priceCalendar" &&
+      result &&
+      Array.isArray((result as PriceCalendarResult).entries)
+    ) {
+      return this.pricing.applyToCalendar(result as PriceCalendarResult, supplier, serviceType);
+    }
+    if (result && typeof (result as SupplierPriceSnapshot).amount === "number") {
+      // refreshPrice snapshot
+      if (!((result as SupplierPriceSnapshot).amount > 0)) return result;
+      return this.pricing.applyToPriceSnapshot(result as SupplierPriceSnapshot, supplier, serviceType);
+    }
+    if (result && typeof (result as SupplierOffer).price?.amount === "number") {
+      // getOffer detail (SupplierOfferDetail extends SupplierOffer)
+      if (!((result as SupplierOffer).price.amount > 0)) return result;
+      return this.pricing.applyToOffer(result as SupplierOffer, supplier, serviceType);
+    }
+    // refreshAvailability and anything unrecognized — no price to mark up.
+    return result;
   }
 
   /** Cancel challenge — user closed modal. */
@@ -196,7 +240,8 @@ export class KompasCaptchaController {
     try {
       const result = await this.summertour.resumeOperationAfterCaptcha(challengeId);
       await this.store.remove(challengeId).catch(() => {});
-      return { status: "SUCCESS", challengeId, supplier: "SUMMERTOUR", data: result };
+      const data = await this.applyPricing(result, ch.operation, "SUMMERTOUR", ch.originalQuery);
+      return { status: "SUCCESS", challengeId, supplier: "SUMMERTOUR", data };
     } catch (err) {
       const msg = (err as Error).message;
       this.logger.error(`summertour resume after captcha failed ${challengeId}: ${msg}`);

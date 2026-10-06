@@ -404,6 +404,18 @@ export interface TourRequestInput {
   currency: string;
   destination?: string;
   departureCity?: string;
+  /** Supplier-neutral geography/program hints for the supplier re-check. */
+  country?: string;
+  tourIncValue?: string;
+  tourIncName?: string;
+  /** §4.8: traveler identity — phone required (E.164), email optional-but-valid. */
+  customer?: {
+    phone: string;
+    email?: string;
+    country?: string;
+    firstName?: string;
+    lastName?: string;
+  };
 }
 
 export interface TourRequestResult {

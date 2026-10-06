@@ -293,4 +293,29 @@ export class AnexProvider {
     }
     return this.resolveState(candidate); // rethrow the descriptive error
   }
+
+  /**
+   * resolveHotelState that also accepts a resort/city label (what hotel
+   * offers carry as destination — regionName/hotelTownName/townName).
+   * Probes the HOTELS dictionaries (hotelStates + hotelTowns) — never the
+   * tour ones (disjoint id spaces).
+   */
+  async resolveHotelStateFlexible(candidate?: string): Promise<AnexState> {
+    if (!candidate?.trim()) return this.resolveHotelState(candidate);
+    try {
+      return await this.resolveHotelState(candidate);
+    } catch {
+      // not a country — fall through to the hotel-town probe
+    }
+    const wanted = normName(candidate);
+    const states = await this.hotelStates();
+    for (const s of states) {
+      const towns = await this.hotelTowns(String(s.id)).catch(() => [] as AnexTown[]);
+      const hit = towns.find(
+        (t) => normName(t.name) === wanted || normName(t.region ?? "") === wanted,
+      );
+      if (hit) return s;
+    }
+    return this.resolveHotelState(candidate); // rethrow the descriptive error
+  }
 }

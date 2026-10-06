@@ -32,6 +32,7 @@ import type {
   PriceCalendarEntry,
   SupplierGeoOption,
 } from "../supplier.types";
+import { priceUnavailable } from "../supplier.types";
 import { parseSamoHotelDynamic } from "../samo-hotel-dict";
 
 const KOMPAS_USER_AGENT =
@@ -640,11 +641,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           rowAll: document.querySelectorAll("tr").length,
         })).catch(() => null);
         const pr = pricesResponse as { status: number; len: number; body: string } | null;
-        const dbgLine = `[KOMPAS] NO_ROWS submitted=${pricesRequested} pricesResp=${pr ? `status=${pr.status} len=${pr.len} head=${JSON.stringify(pr.body.slice(0, 300))}` : "none"} page=${JSON.stringify(dbg)} | ${new Date().toISOString()}\n`;
-        try { require("fs").appendFileSync("D:\\travelhub_v1\\backend_price_chain.log", dbgLine); } catch {}
         this.logger.warn(
           pricesRequested
-            ? `KOMPAS: search submitted but no rows appeared. page=${JSON.stringify(dbg)}`
+            ? `KOMPAS: search submitted but no rows appeared. resp=${pr ? `status=${pr.status} len=${pr.len}` : "none"} page=${JSON.stringify(dbg)}`
             : `KOMPAS: no price_info rows appeared. page=${JSON.stringify(dbg)}`,
         );
         await context.close();
@@ -696,8 +695,6 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         { tourKey: expectedTourKey, stateKey: expectedStateKey, townFromKey: expectedTownFromKey },
       );
       if (consistencyIssue) {
-        const cLine = `[KOMPAS] CONSISTENCY_FAIL ${consistencyIssue} | ${new Date().toISOString()}\n`;
-        try { require("fs").appendFileSync("D:\\travelhub_v1\\backend_price_chain.log", cLine); } catch {}
         await context.close();
         throw new Error(
           `KOMPAS DOM consistency hard-fail: ${consistencyIssue}. ` +
@@ -1105,14 +1102,8 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       const offers = await this.searchWithPage(page, q);
       const match = this.matchOffer(offers, ref);
       if (match) return match.price;
-      return {
-        amount: 0,
-        currency: "USD",
-        fetchedAt: new Date(),
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-        queryHash: JSON.stringify(ref.searchContext),
-        source: this.code,
-      } as SupplierPriceSnapshot;
+      // §5.5: no synthetic zero snapshot after CAPTCHA resume either.
+      priceUnavailable(`KOMPAS offer ${ref.externalOfferId} not found after CAPTCHA resume`);
     }
 
     throw new Error(`Unsupported resume operation: ${op}`);
@@ -1222,13 +1213,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       const h = norm(query.hotel);
       filtered = collected.filter((o) => (o.hotel && norm(o.hotel).includes(h)) || (query.hotelExternalId != null && o.hotelExternalId === query.hotelExternalId));
     }
-    console.log(`[KOMPAS dedup ctx] filtered=${filtered.length} offers, before dedup`);
-    for (const o of filtered.slice(0, 10)) {
-      const rm = o.rawMetadata as any;
-      console.log(`  offer: spoKey=${o.externalOfferId} date=${o.departureDate} roomKey=${rm?.roomKey} mealKey=${rm?.mealKey} room="${o.room}" meal="${o.meal}" price=${o.price.amount} tourKey=${rm?.tourKey}`);
-    }
     const deduped = this.deduplicateCalendarOffers(filtered);
-    console.log(`[KOMPAS dedup ctx] after dedup: ${deduped.length} offers`);
     const dateMap = new Map<string, SupplierOffer[]>();
     for (const offer of deduped) {
       const list = dateMap.get(offer.departureDate) || [];
@@ -1685,13 +1670,6 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           flightSeatsAvailable, stopSale,
         });
       }
-      if (results.length > 0) {
-        const sample = results.slice(0, 5).map((r: any) => ({
-          hotelKey: r.hotelKey, tourKey: r.tourKey, roomKey: r.roomKey, mealKey: r.mealKey,
-          roomText: r.roomText, mealText: r.mealText, price: r.price, spoKey: r.spoKey,
-        }));
-        console.log(`[KOMPAS extract] rows=${results.length} sample=${JSON.stringify(sample)}`);
-      }
       return results;
     });
   }
@@ -1832,28 +1810,8 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       return { ...match, packageComposition: undefined, oldPrice: undefined, priceType: undefined };
     }
 
-    return {
-      supplierCode: this.code,
-      externalOfferId: ref.externalOfferId,
-      externalClaim: ref.externalClaim,
-      hotel: ctx.hotel ?? "",
-      departureDate: (ctx.departureDateFrom as string) ?? "",
-      nights: ctx.nightsFrom ?? 0,
-      adults: ctx.adults,
-      children: ctx.children ?? 0,
-      childAges: ctx.childAges ?? [],
-      price: {
-        amount: 0,
-        currency: "USD",
-        fetchedAt: new Date(),
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-        queryHash: "",
-        source: this.code,
-      },
-      availability: "NOT_AVAILABLE" as SupplierAvailability,
-      fetchedAt: new Date(),
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-    };
+    // §5.5: no synthetic zero snapshot — established PRICE_UNAVAILABLE model.
+    priceUnavailable(`KOMPAS offer ${ref.externalOfferId} not found for the original search context`);
   }
 
   async refreshPrice(ref: SupplierOfferRef): Promise<SupplierPriceSnapshot> {
@@ -1888,14 +1846,8 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
     if (match) return match.price;
 
-    return {
-      amount: 0,
-      currency: "USD",
-      fetchedAt: new Date(),
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-      queryHash: JSON.stringify(ref.searchContext),
-      source: this.code,
-    };
+    // §5.5: no synthetic zero snapshot — established PRICE_UNAVAILABLE model.
+    priceUnavailable(`KOMPAS offer ${ref.externalOfferId} no longer in search results`);
   }
 
   async refreshAvailability(ref: SupplierOfferRef): Promise<SupplierAvailabilitySnapshot> {
@@ -2071,14 +2023,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       );
     }
 
-    console.log(`[KOMPAS dedup] filtered=${filtered.length} offers by hotel, before dedup`);
-    for (const o of filtered.slice(0, 10)) {
-      const rm = o.rawMetadata as any;
-      console.log(`  offer: spoKey=${o.externalOfferId} date=${o.departureDate} roomKey=${rm?.roomKey} mealKey=${rm?.mealKey} room="${o.room}" meal="${o.meal}" price=${o.price.amount} tourKey=${rm?.tourKey}`);
-    }
-
     const deduped = this.deduplicateCalendarOffers(filtered);
-    console.log(`[KOMPAS dedup] after dedup: ${deduped.length} offers`);
 
     const dateMap = new Map<string, SupplierOffer[]>();
     for (const offer of deduped) {

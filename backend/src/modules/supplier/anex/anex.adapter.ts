@@ -13,6 +13,7 @@ import type {
   PriceCalendarResult,
   SupplierGeoOption,
 } from "../supplier.types";
+import { priceUnavailable } from "../supplier.types";
 import {
   AnexProvider,
   addDays,
@@ -112,11 +113,56 @@ export class AnexAdapter implements SupplierAdapter {
 
   constructor(private readonly provider: AnexProvider) {}
 
+  /**
+   * State resolution for search/refresh/calendar (§4.8 Request Modal re-check):
+   * the re-check rebuilds the query from the offer, which may carry a
+   * resort/town label as destination (calendar offers) and no country at all
+   * (hotel-scoped calendars). Mirrors the calendar's flexible resolution and
+   * adds a hotel dictionary scan as the last resort — explicit country/
+   * destination (country match, then town probe) → hotel dictionary scan →
+   * the original descriptive UNSUPPORTED error.
+   */
+  private async resolveStateForQuery(
+    candidate: string | undefined,
+    hotelExternalId?: string,
+  ): Promise<AnexState> {
+    let firstErr: unknown;
+    try {
+      return await this.provider.resolveStateFlexible(candidate);
+    } catch (err) {
+      firstErr = err;
+    }
+    if (hotelExternalId) {
+      const states = await this.provider.states().catch(() => [] as AnexState[]);
+      for (const s of states) {
+        try {
+          const hotels = await this.provider.hotels(String(s.id));
+          if (hotels.some((h) => String(h.id) === String(hotelExternalId))) {
+            this.logger.log(
+              `ANEX: resolved state ${s.name} for hotel ${hotelExternalId} (no usable country/destination)`,
+            );
+            return s;
+          }
+        } catch (err) {
+          this.logger.warn(
+            `ANEX: hotel dictionary scan ${s.name} failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    }
+    throw firstErr instanceof Error
+      ? firstErr
+      : new Error("ANEX: UNSUPPORTED query — country/destination is required");
+  }
+
   // ── SupplierAdapter: search ───────────────────────────────────────────
 
   async search(query: SupplierSearchQuery): Promise<SupplierOffer[]> {
     const start = Date.now();
-    const state = await this.provider.resolveState(query.country ?? query.destination);
+    const state = await this.resolveStateForQuery(
+      query.country ?? query.destination,
+      query.hotelExternalId,
+    );
 
     const dateFrom = query.departureDateFrom ?? toIsoDate(new Date());
     const dateTo = query.departureDateTo && query.departureDateTo >= dateFrom ? query.departureDateTo : dateFrom;
@@ -139,10 +185,17 @@ export class AnexAdapter implements SupplierAdapter {
     if (starIds) {
       filtered = filtered.filter((r) => starIds.has(String(r.groupStarInc ?? "")));
     }
-    const offers = filtered.map((r) => this.normalizeRow(r, query, state));
+    // §5.7: rows without a positive supplier price are dropped here — they
+    // are NOT offer-shaped (`normalizeRow` fails closed via priceUnavailable),
+    // and `amount: 0` must never be synthesized as a valid price.
+    const pricedRows = filtered.filter((r) => this.rowPrice(r) !== null);
+    const offers = pricedRows.map((r) => this.normalizeRow(r, query, state));
     this.logger.log(
       `ANEX search ${state.name} ${dateFrom}→${dateTo} ${nightsFrom}-${nightsTo}n: ` +
-        `${rows.length} rows → ${offers.length} offers in ${Date.now() - start}ms`,
+        `${rows.length} rows → ${offers.length} offers in ${Date.now() - start}ms` +
+        (filtered.length - pricedRows.length > 0
+          ? ` (${filtered.length - pricedRows.length} priceless rows dropped)`
+          : ""),
     );
     return offers;
   }
@@ -363,43 +416,17 @@ export class AnexAdapter implements SupplierAdapter {
     const offers = await this.search({ ...ref.searchContext, adults: ref.searchContext.adults ?? 2 });
     const m = offers.find((o) => o.externalOfferId === ref.externalOfferId);
     if (m) return { ...m };
-    return {
-      supplierCode: this.code,
-      externalOfferId: ref.externalOfferId,
-      externalClaim: ref.externalClaim,
-      hotel: ref.searchContext.hotel ?? "",
-      departureDate: ref.searchContext.departureDateFrom ?? "",
-      nights: ref.searchContext.nightsFrom ?? 0,
-      adults: ref.searchContext.adults ?? 2,
-      children: ref.searchContext.children ?? 0,
-      childAges: ref.searchContext.childAges ?? [],
-      price: {
-        amount: 0,
-        currency: "AZN",
-        fetchedAt: new Date(),
-        expiresAt: new Date(),
-        queryHash: "",
-        source: this.code,
-      },
-      availability: "NOT_AVAILABLE",
-      fetchedAt: new Date(),
-      expiresAt: new Date(),
-    };
+    // §5.5: no synthetic zero snapshot — established PRICE_UNAVAILABLE model.
+    priceUnavailable(`ANEX offer ${ref.externalOfferId} not found for the original search context`);
   }
 
   async refreshPrice(ref: SupplierOfferRef): Promise<SupplierPriceSnapshot> {
     const offers = await this.search({ ...ref.searchContext, adults: ref.searchContext.adults ?? 2 });
     const m = offers.find((o) => o.externalOfferId === ref.externalOfferId);
-    return m
-      ? m.price
-      : {
-          amount: 0,
-          currency: "AZN",
-          fetchedAt: new Date(),
-          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-          queryHash: JSON.stringify(ref.searchContext),
-          source: this.code,
-        };
+    if (!m) {
+      priceUnavailable(`ANEX offer ${ref.externalOfferId} no longer in search results`);
+    }
+    return m.price;
   }
 
   async refreshAvailability(ref: SupplierOfferRef): Promise<SupplierAvailabilitySnapshot> {
@@ -416,7 +443,7 @@ export class AnexAdapter implements SupplierAdapter {
 
   async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult> {
     const now = new Date();
-    const state = await this.provider.resolveStateFlexible(query.destination);
+    const state = await this.resolveStateForQuery(query.destination, query.hotelExternalId);
 
     const collected: AnexPriceRow[] = [];
     const sizeDays = 30;
@@ -458,6 +485,10 @@ export class AnexAdapter implements SupplierAdapter {
     for (const row of filtered) {
       const iso = (row.checkIn ?? "").slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) continue;
+      // §5.7: rows without a positive price never enter the calendar — the
+      // honest shape for a missing price is PriceCalendarEntry.price = null,
+      // NOT 0 (a synthesized 0 crashes the pricing boundary / lies to buyers).
+      if (this.rowPrice(row) === null) continue;
       const arr = byDate.get(iso) ?? [];
       arr.push(row);
       byDate.set(iso, arr);
@@ -467,11 +498,11 @@ export class AnexAdapter implements SupplierAdapter {
     let cursorDate = query.dateFrom;
     while (cursorDate <= query.dateTo) {
       const arr = (byDate.get(cursorDate) ?? []).sort(
-        (a, b) => (a.converted_price ?? a.price ?? Infinity) - (b.converted_price ?? b.price ?? Infinity),
+        (a, b) => (this.rowPrice(a) ?? Infinity) - (this.rowPrice(b) ?? Infinity),
       );
-      if (arr.length > 0) {
-        const best = arr[0];
-        const price = best.converted_price ?? best.price ?? 0;
+      const best = arr.length > 0 ? arr[0] : null;
+      const price = best === null ? null : this.rowPrice(best);
+      if (best !== null && price !== null) {
         entries.push({
           date: cursorDate,
           price,
@@ -506,7 +537,7 @@ export class AnexAdapter implements SupplierAdapter {
           price: null,
           currency: null,
           availability: "NOT_AVAILABLE",
-          offerCount: 0,
+          offerCount: arr.length,
           absenceCode: "SUPPLIER_NO_RESULT",
           absenceText: `Цена не получена — ANEX не предоставил предложение на ${cursorDate}`,
         });
@@ -559,6 +590,10 @@ export class AnexAdapter implements SupplierAdapter {
     currency: string;
     transport?: string;
   } {
+    const price = this.rowPrice(row);
+    if (price === null) {
+      priceUnavailable(`ANEX calendar offer ${this.offerIdOf(row)} has no valid supplier price`);
+    }
     return {
       tourIncValue: row.tourInc !== undefined ? String(row.tourInc) : "",
       tourIncName: row.tourName,
@@ -574,7 +609,7 @@ export class AnexAdapter implements SupplierAdapter {
       children: row.child ?? 0,
       childAges: query.childAges ?? [],
       availability: this.availabilityOf(row),
-      price: row.converted_price ?? row.price ?? 0,
+      price,
       currency: "AZN",
       transport: row.programTypeName,
     };
@@ -657,6 +692,12 @@ export class AnexAdapter implements SupplierAdapter {
 
   // ── Normalization ─────────────────────────────────────────────────────
 
+  /** Positive supplier price for a row, or null when absent/non-positive (§5.7). */
+  private rowPrice(row: AnexPriceRow): number | null {
+    const p = row.converted_price ?? row.price;
+    return typeof p === "number" && Number.isFinite(p) && p > 0 ? p : null;
+  }
+
   private offerIdOf(row: AnexPriceRow): string {
     if (row.cat_Claim) return row.cat_Claim;
     return [
@@ -681,6 +722,10 @@ export class AnexAdapter implements SupplierAdapter {
   private normalizeRow(raw: AnexPriceRow, query: SupplierSearchQuery, state: AnexState): SupplierOffer {
     const now = new Date();
     const departureDate = (raw.checkIn ?? "").slice(0, 10);
+    const amount = this.rowPrice(raw);
+    if (amount === null) {
+      priceUnavailable(`ANEX search offer ${this.offerIdOf(raw)} has no valid supplier price`);
+    }
     return {
       supplierCode: this.code,
       externalOfferId: this.offerIdOf(raw),
@@ -701,7 +746,9 @@ export class AnexAdapter implements SupplierAdapter {
         // converted_price is the total in the requested currency (CURRENCY=26 → AZN);
         // plain `price` is in the hotel's own currency (USD/EUR) — verified by
         // constant ratios 1.7055 (USD→AZN) and 1.964 (EUR→AZN).
-        amount: raw.converted_price ?? raw.price ?? 0,
+        // §5.7: missing/non-positive values are filtered upstream (search) and
+        // fail closed here — `amount: 0` is never a valid price.
+        amount,
         currency: "AZN",
         fetchedAt: now,
         expiresAt: new Date(now.getTime() + 5 * 60 * 1000),

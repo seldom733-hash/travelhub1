@@ -13,6 +13,7 @@ import type {
   PriceCalendarResult,
   PriceCalendarEntry,
 } from "../supplier.types";
+import { priceUnavailable } from "../supplier.types";
 
 /**
  * Summertour adapter — implements SupplierAdapter using Playwright.
@@ -493,23 +494,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       };
     }
 
-    // Fallback: return not-found snapshot
-    return {
-      supplierCode: this.code,
-      externalOfferId: ref.externalOfferId,
-      externalClaim: ref.externalClaim,
-      hotel: ref.searchContext.hotel ?? "Unknown",
-      departureDate: ctx.departureDateFrom ?? "",
-      nights: ctx.nightsFrom ?? 0,
-      adults: ctx.adults,
-      children: ctx.children ?? 0,
-      childAges: ctx.childAges ?? [],
-      price: { amount: 0, currency: "USD", fetchedAt: new Date(), expiresAt: new Date(), queryHash: "", source: this.code },
-      availability: "NOT_AVAILABLE",
-      fetchedAt: new Date(),
-      expiresAt: new Date(),
-      packageComposition: "",
-    };
+    // §5.5: no synthetic zero snapshot — established PRICE_UNAVAILABLE model.
+    priceUnavailable(`SUMMERTOUR offer ${ref.externalOfferId} not found for the original search context`);
   }
 
   async refreshPrice(ref: SupplierOfferRef): Promise<SupplierPriceSnapshot> {
@@ -539,15 +525,8 @@ export class SummertourAdapter implements SupplierAdapter, OnModuleDestroy {
       return match.price;
     }
 
-    // Not found — return zero price
-    return {
-      amount: 0,
-      currency: "USD",
-      fetchedAt: new Date(),
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-      queryHash: JSON.stringify(ref.searchContext),
-      source: this.code,
-    };
+    // §5.5: no synthetic zero snapshot — established PRICE_UNAVAILABLE model.
+    priceUnavailable(`SUMMERTOUR offer ${ref.externalOfferId} no longer in search results`);
   }
 
   async refreshAvailability(ref: SupplierOfferRef): Promise<SupplierAvailabilitySnapshot> {

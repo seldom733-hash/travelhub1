@@ -11,6 +11,7 @@ import {
   type SupplierPriceSnapshot,
 } from "@/lib/supplier-api";
 import type { AggregatedOffer } from "@/lib/supplier-api";
+import { useSupplierLabels } from "@/lib/supplier-registry";
 
 /**
  * OfferDetailsModal — card of the EXACTLY selected offer (§8).
@@ -22,13 +23,17 @@ import type { AggregatedOffer } from "@/lib/supplier-api";
 export default function OfferDetailsModal({
   offer,
   searchId,
+  departureCity,
   onClose,
 }: {
   offer: AggregatedOffer;
   searchId: string;
+  /** City of departure from the search query — re-check/create contract parity. */
+  departureCity?: string;
   onClose: () => void;
 }) {
   const locale = useLocale();
+  const supplierLabels = useSupplierLabels("tours");
   const [checking, setChecking] = useState(false);
   const [revalidated, setRevalidated] = useState(false);
   const [priceChange, setPriceChange] = useState<{ from: number; to: number } | null>(null);
@@ -67,7 +72,12 @@ export default function OfferDetailsModal({
           // state resolution (destination alone can be a region name).
           service: offer.service,
           country: offer.country ?? offer.destination,
-          destination: offer.destination ?? offer.country,
+        // City of stay only — never the country: a country must land in
+        // `country`, otherwise the «Город» column shows the country name.
+        destination: offer.destination ?? undefined,
+          departureCity,
+          tourIncValue: offer.tourIncValue,
+          tourIncName: offer.tourIncName,
           departureDateFrom: offer.departureDate,
           departureDateTo: offer.departureDate,
           nightsFrom: offer.nights,
@@ -129,6 +139,12 @@ export default function OfferDetailsModal({
         price: priceChange ? priceChange.to : offer.price?.amount ?? 0,
         currency: offer.price?.currency ?? "USD",
         destination: offer.destination ?? offer.country,
+        // Contract parity with the OfferModal path: geography/program context
+        // (Phase 4) — the server re-check resolves supplier state from these.
+        country: offer.country ?? offer.destination,
+        departureCity,
+        tourIncValue: offer.tourIncValue,
+        tourIncName: offer.tourIncName,
       });
       setBooked({ referenceNumber: res.referenceNumber });
     } catch (e) {
@@ -160,13 +176,7 @@ export default function OfferDetailsModal({
             </p>
           </div>
           <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-neutral-300">
-            {offer.supplierCode === "SUMMERTOUR"
-              ? "Summer"
-              : offer.supplierCode === "KAZUNION"
-                ? "KazUnion"
-                : offer.supplierCode === "ANEX"
-                  ? "ANEX"
-                  : "Компас"}
+            {supplierLabels[offer.supplierCode] ?? offer.supplierCode}
           </span>
         </div>
 
@@ -226,6 +236,11 @@ export default function OfferDetailsModal({
             {error}
           </div>
         )}
+
+        {/* Phase 4: how to submit a request from this service card window */}
+        <p className="mt-5 text-xs leading-relaxed text-neutral-400">
+          {t("offer.details_hint", locale)}
+        </p>
 
         <div className="mt-6 flex items-center justify-end gap-3">
           <button

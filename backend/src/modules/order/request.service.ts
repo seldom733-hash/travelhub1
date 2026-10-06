@@ -46,6 +46,12 @@ export function computeRequestAvailableActions(
     pinnedRequirements: unknown;
     travelerCount: number | null;
     productSnapshot: unknown;
+    // Supplier Markup Phase 3 (design §8): convert-gate mirrors the Order
+    // conversion money gate (order.service: confirmed ?? displayed > 0 + currency).
+    confirmedPrice: unknown;
+    confirmedCurrency: string | null;
+    displayedPrice: unknown;
+    displayedCurrency: string | null;
   },
   granted: readonly string[],
 ): RequestAvailableActions {
@@ -64,6 +70,16 @@ export function computeRequestAvailableActions(
     request.travelerCount != null &&
     request.productSnapshot != null;
 
+  // Money gate order mirrors convertRequestToOrder (order.service:658-661):
+  // accepted money = confirmed ?? displayed; currency likewise.
+  const convertMoney = request.confirmedPrice ?? request.displayedPrice;
+  const convertCurrency = request.confirmedCurrency ?? request.displayedCurrency;
+  const hasAcceptedMoney =
+    convertMoney != null &&
+    convertCurrency != null &&
+    Number(convertMoney) > 0 &&
+    String(convertCurrency).trim().length > 0;
+
   return {
     confirmPrice: canEdit && (request.status === "NEW" || request.status === "CHECKING"),
     proposePrice: canEdit && (request.status === "NEW" || request.status === "CHECKING"),
@@ -77,7 +93,13 @@ export function computeRequestAvailableActions(
     customerDecline: canEdit &&
       (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED") &&
       request.convertedOrderId === null,
-    convert: canEdit && hasD3AcceptSnapshot && request.convertedOrderId === null,
+    // Phase 3 (design §8): convert-gate зеркалит money gate (order.service) —
+    // без валидных принятых денег convert=false.
+    convert:
+      canEdit &&
+      hasD3AcceptSnapshot &&
+      hasAcceptedMoney &&
+      request.convertedOrderId === null,
   };
 }
 
@@ -110,6 +132,8 @@ import { SecurityService } from "../../security/security.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { ConflictError, ValidationDomainError } from "../../shared/errors";
 import { getEffectiveTravelerRequirements } from "../catalog/traveler-requirements";
+import { freezeForAcceptance, applyIndividualDiscount, validateForAcceptance, type CommercialSnapshot } from "../pricing/commercial-snapshot";
+import { QuoteDiscountType } from "../../generated/prisma/enums";
 
 /**
  * Helper used only by the availability projection so the projection mirrors the
@@ -428,6 +452,10 @@ export class RequestService {
         productSnapshot: buildRequestProjectionProductSnapshot(
           product as RequestProjectionProductShape | null,
         ),
+        confirmedPrice: request.confirmedPrice,
+        confirmedCurrency: request.confirmedCurrency,
+        displayedPrice: request.displayedPrice,
+        displayedCurrency: request.displayedCurrency,
       },
       grantedPermissions,
     );
@@ -603,6 +631,115 @@ export class RequestService {
   }
 
   /**
+   * Supplier Markup Phase 4 §4.3 (Live Sales): server-authoritative
+   * individual discount on a Request.
+   *
+   * RBAC: sales.discount.grant (controller). Money-математика — только
+   * sales.money через applyIndividualDiscount (пересчёт из publicPrice/
+   * discount, publicPrice/displayedPrice НЕ меняются) + validateForAcceptance
+   * (floor customerFinalPrice >= supplierPrice → 422 "final price <
+   * supplier price"). Скидка хранится ТОЛЬКО в Request.commercialSnapshot
+   * (→ Order при конвертации); MarkupRule/Tariff/Storefront/
+   * CommissionPolicy не трогаются.
+   *
+   * Замороженный snapshot (customerAcceptedAt) и конвертированная заявка —
+   * reject. PRICE_CHANGED: acceptance-контракт (Phase 3 §13) отдаёт приоритет
+   * supplierPriceProposal — скидка в snapshot была бы проигнорирована, поэтому
+   * pending supplier proposal блокируется с явным сообщением.
+   */
+  async grantDiscount(
+    requestId: string,
+    input: { discountType: string; discountValue?: string | number | null },
+    actor: Actor,
+  ): Promise<Record<string, unknown>> {
+    const allowedTypes = Object.values(QuoteDiscountType) as string[];
+    if (!allowedTypes.includes(input.discountType)) {
+      throw new ValidationDomainError(
+        `invalid discountType: must be one of ${allowedTypes.join(", ")}`,
+      );
+    }
+    const discountType = input.discountType as QuoteDiscountType;
+
+    const request = await this.prisma.request.findUnique({ where: { id: requestId } });
+    if (!request) throw new NotFoundException(`Request ${requestId} not found`);
+    if (request.convertedOrderId) {
+      throw new ValidationDomainError(
+        `Request ${requestId} is already converted to Order ${request.convertedOrderId}: commercial snapshot is immutable`,
+      );
+    }
+    if (!request.commercialSnapshot) {
+      throw new ValidationDomainError(
+        "request has no commercial snapshot: discount requires a priced request (missing supplier price)",
+      );
+    }
+    const snapshot = request.commercialSnapshot as unknown as CommercialSnapshot;
+    if (snapshot.customerAcceptedAt) {
+      throw new ValidationDomainError(
+        "commercial snapshot is frozen (customer already accepted): discount cannot be changed",
+      );
+    }
+    const allowedStatuses: RequestStatus[] = ["NEW", "CHECKING", "CONFIRMED"];
+    if (!allowedStatuses.includes(request.status)) {
+      if (request.status === "PRICE_CHANGED") {
+        throw new ValidationDomainError(
+          "supplier price proposal pending: resolve the supplier proposal before granting a discount",
+        );
+      }
+      throw new ValidationDomainError(
+        `discount cannot be applied in status ${request.status}: allowed ${allowedStatuses.join(", ")}`,
+      );
+    }
+    if (request.supplierPriceProposal != null) {
+      throw new ValidationDomainError(
+        "supplier price proposal pending: resolve the supplier proposal before granting a discount",
+      );
+    }
+
+    const beforeFinal = snapshot.customerFinalPrice;
+    // Server-authoritative: пересчёт из publicPrice/discount через
+    // sales.money + полная acceptance-валидация (consistency + floor → 422).
+    const updated = applyIndividualDiscount(snapshot, discountType, input.discountValue ?? null);
+    validateForAcceptance(updated);
+
+    const updatedRow = await this.prisma.request.update({
+      where: { id: requestId },
+      data: {
+        commercialSnapshot: updated as unknown as Prisma.InputJsonValue,
+        version: { increment: 1 },
+      },
+    });
+
+    await this.prisma.requestHistory.create({
+      data: {
+        requestId,
+        action: "discount_granted",
+        from: request.status,
+        to: request.status,
+        actorId: actor.id,
+        actorName: actor.username,
+        comment: `Индивидуальная скидка ${discountType}=${input.discountValue ?? 0}: final ${beforeFinal} → ${updated.customerFinalPrice} ${updated.customerCurrency} (discountAmount ${updated.discountAmount})`,
+      },
+    });
+
+    await this.security.audit(null as any, {
+      userId: actor.id,
+      username: actor.username,
+      action: "request.discount_granted",
+      resource: "Request",
+      resourceId: requestId,
+      details: {
+        discountType,
+        discountValue: updated.discountValue,
+        discountAmount: updated.discountAmount,
+        customerFinalPrice: updated.customerFinalPrice,
+        currency: updated.customerCurrency,
+      },
+    });
+
+    return this.requestDto(updatedRow);
+  }
+
+  /**
    * Customer action: accept price change / confirm terms.
    *
    * D3 (Request Flow §6/§7/§8) — acceptance boundary фиксирует В ОДНОЙ
@@ -657,14 +794,45 @@ export class RequestService {
     }
     const now = new Date();
 
+    // Supplier Markup Phase 3 (§13 / design §8): commercial-money gate —
+    // acceptance never stores 0/missing money. Accepted money precedence:
+    // supplier proposal (supplier-confirmed current money) ?? snapshot final
+    // ?? displayed price (legacy requests without snapshot: money-gate only).
+    const snapshot = (request.commercialSnapshot ?? null) as CommercialSnapshot | null;
+    const acceptedMoney =
+      request.supplierPriceProposal ?? (snapshot ? snapshot.customerFinalPrice : request.displayedPrice);
+    const acceptedCurrency =
+      request.supplierPriceProposal != null || !snapshot
+        ? request.displayedCurrency
+        : snapshot.customerCurrency;
+    let frozenSnapshot: CommercialSnapshot | null = null;
+    if (snapshot) {
+      // Snapshot path: full §13 validation — ValidationDomainError (422) with
+      // the canonical rejection phrases (missing/invalid/floor). Freezes the
+      // snapshot at acceptance (Gate F basis).
+      if (acceptedMoney == null) {
+        throw new ValidationDomainError("invalid final price: missing accepted money");
+      }
+      if (!acceptedCurrency) {
+        throw new ValidationDomainError("missing currency: accepted currency required");
+      }
+      frozenSnapshot = freezeForAcceptance(snapshot, acceptedMoney, acceptedCurrency, now);
+    } else if (acceptedMoney == null || !(Number(acceptedMoney) > 0) || !acceptedCurrency) {
+      // Legacy requests (no snapshot): money-gate only (design §8) — acceptance
+      // never stores 0/missing money.
+      throw new BadRequestException(
+        "Cannot accept: request has no valid commercial money (accepted price/currency missing)",
+      );
+    }
     const updated = await this.prisma.request.update({
       where: { id: requestId },
       data: {
         status: "CUSTOMER_ACCEPTED",
         customerAcceptedAt: now,
         customerDecision: "ACCEPTED",
-        confirmedPrice: request.supplierPriceProposal ?? request.displayedPrice,
-        confirmedCurrency: request.displayedCurrency,
+        confirmedPrice: acceptedMoney,
+        confirmedCurrency: acceptedCurrency,
+        ...(frozenSnapshot ? { commercialSnapshot: frozenSnapshot as unknown as Prisma.InputJsonValue } : {}),
         // Product-less: pin/snapshot НЕ трогаем (undefined = no-op) — сохраняем
         // замороженный при создании tour-pin и исходный (или null) snapshot.
         ...(product
@@ -852,6 +1020,10 @@ export class RequestService {
           customerAcceptedAt: existing.customerAcceptedAt,
           pinnedRequirements: existing.pinnedRequirements as unknown as Record<string, string> | null,
           travelerCount: existing.travelerCount,
+          // Supplier Markup Phase 4 §4.6: verbatim propagation frozen
+          // commercial snapshot → Order (immutable; MarkupRule change не
+          // пересчитывает принятые деньги). Legacy без snapshot → null.
+          commercialSnapshot: existing.commercialSnapshot as unknown as Record<string, unknown> | null,
         },
         actor,
       });
@@ -1061,7 +1233,19 @@ export class RequestService {
     const prod = productMap?.get(r.productId);
     const part = partnerMap?.get(r.partnerId);
     const customerName = cust ? `${cust.firstName ?? ""} ${cust.lastName ?? ""}`.trim() : null;
-    const productName = prod?.title ?? null;
+    // «Услуга» cell must never be a dash for supplier-created requests: product
+    // table title (when linked) → frozen productSnapshot → pinned hotel name.
+    const pinned = (r.pinnedRequirements ?? null) as Record<string, any> | null;
+    const snap = (r.productSnapshot ?? null) as Record<string, any> | null;
+    const commercial = (r.commercialSnapshot ?? null) as Record<string, any> | null;
+    const productName = prod?.title ?? snap?.productTitle ?? pinned?.hotel ?? null;
+    const productCode = prod?.code ?? snap?.productCode ?? null;
+    // «Услуга» type (тур / отель / авиабилет): frozen in the snapshots at
+    // creation; raw supplier values («tours», «TOUR»…) normalized on the client.
+    const serviceType = snap?.productType ?? snap?.type ?? (typeof commercial?.serviceType === "string" ? commercial.serviceType : null) ?? null;
+    // «Поставщик» cell: supplier code pinned at creation (tour/flight requests),
+    // commercial snapshot as fallback. partner* stays the B2B partner, separate.
+    const supplierCode = pinned?.supplierCode ?? commercial?.supplierCode ?? snap?.supplierCode ?? null;
     const partnerName = part?.name ?? null;
     return {
       id: r.id,
@@ -1073,10 +1257,20 @@ export class RequestService {
       customerCode: cust?.code ?? null,
       productId: r.productId,
       productName,
-      productCode: prod?.code ?? null,
+      productCode,
+      serviceType,
       partnerId: r.partnerId,
       partnerName,
       partnerCode: part?.code ?? null,
+      supplierCode,
+      // Selected-service parameters (Phase 4): frozen in pinnedRequirements at
+      // creation — nights, party composition, country of stay, city.
+      nights: typeof pinned?.nights === "number" ? pinned.nights : null,
+      adults: typeof pinned?.adults === "number" ? pinned.adults : null,
+      children: typeof pinned?.children === "number" ? pinned.children : null,
+      country: typeof pinned?.country === "string" && pinned.country ? pinned.country : null,
+      destination: typeof pinned?.destination === "string" && pinned.destination ? pinned.destination : null,
+      departureCity: typeof pinned?.departureCity === "string" && pinned.departureCity ? pinned.departureCity : null,
       status: r.status,
       requestedServiceDate: r.requestedServiceDate?.toISOString() ?? null,
       quantity: r.quantity,
@@ -1085,6 +1279,9 @@ export class RequestService {
       productSnapshot: r.productSnapshot ?? null,
       displayedPrice: r.displayedPrice?.toString() ?? null,
       displayedCurrency: r.displayedCurrency,
+      // Supplier Markup Phase 3 (§20): frozen commercial facts (null until the
+      // pricing boundary writes it / legacy requests).
+      commercialSnapshot: r.commercialSnapshot ?? null,
       confirmedPrice: r.confirmedPrice?.toString() ?? null,
       confirmedCurrency: r.confirmedCurrency,
       supplierResponseDeadline: r.supplierResponseDeadline?.toISOString() ?? null,

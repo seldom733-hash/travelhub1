@@ -105,6 +105,9 @@ function SearchResultsInner() {
   // to none (or resolution failed); string[] = suppliers that will be queried.
   const [resolvedSuppliers, setResolvedSuppliers] = useState<string[] | null>(null);
   const [searchId, setSearchId] = useState("");
+  // Departure city of the active live search — threaded to the offer card so
+  // the request re-check/create contract carries the full geography context.
+  const [liveDepartureCity, setLiveDepartureCity] = useState<string | undefined>(undefined);
 
   const [result, setResult] = useState<PublicListResult | null>(null);
   const [error, setError] = useState("");
@@ -267,6 +270,7 @@ function SearchResultsInner() {
         hotel: params.hotel || undefined,
         meal: params.meal || undefined,
       };
+      setLiveDepartureCity(liveQuery.departureCity);
       // Fast, search-free resolution of "who will answer this direction" — it
       // drives the loading states (Определяем поставщиков… → Найдены
       // поставщики: …) while the real search runs in parallel below.
@@ -372,6 +376,7 @@ function SearchResultsInner() {
               loading={loading || liveLoading}
               error={error}
               resolvedSuppliers={resolvedSuppliers}
+              departureCity={liveDepartureCity}
             />
           </div>
         )}

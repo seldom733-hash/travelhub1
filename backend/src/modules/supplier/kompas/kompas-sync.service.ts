@@ -7,6 +7,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { KompasSupplierAdapter } from "./kompas.adapter";
+import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import type { SupplierOffer } from "../supplier.types";
 
 export interface KompasSyncResult {
@@ -42,6 +43,7 @@ export class KompasSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly kompas: KompasSupplierAdapter,
+    private readonly pricing: SupplierPricingService,
   ) {}
 
   async getKompasPartner(): Promise<{ id: string } | null> {
@@ -197,10 +199,21 @@ export class KompasSyncService {
         const productCode = `KOMPAS-${tourIncValue}-${hotelKey}`;
 
         const validOffers = offers.filter((o) => o.price.amount > 0);
-        const minPrice = validOffers.length > 0
+        let minPrice = validOffers.length > 0
           ? Math.min(...validOffers.map((o) => o.price.amount))
           : 0;
         const currency = validOffers[0]?.price.currency ?? "USD";
+        // Markup boundary (§9): Tariff/startingPrice are customer-facing —
+        // write the PUBLIC price. Offers already priced by another boundary
+        // pass through untouched (NO DOUBLE MARKUP).
+        if (minPrice > 0 && !offers.some((o) => o.pricing)) {
+          minPrice = await this.pricing.publicAmountFor(
+            minPrice,
+            currency,
+            this.kompas.code,
+            "tours",
+          );
+        }
 
         const rooms = Array.from(new Set(offers.map((o) => o.room).filter((r): r is string => !!r)));
         const meals = Array.from(new Set(offers.map((o) => o.meal).filter((m): m is string => !!m)));

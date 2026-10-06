@@ -18,6 +18,7 @@ import type {
   PriceCalendarResult,
   SupplierGeoOption,
 } from "../supplier.types";
+import { priceUnavailable } from "../supplier.types";
 
 /**
  * KazUnion adapter (online.kazunion.com) — SAMO platform like Summertour,
@@ -190,6 +191,61 @@ export class KazunionAdapter implements SupplierAdapter {
     return state;
   }
 
+  /**
+   * State resolution for search/refresh (§4.8 Request Modal re-check): the
+   * re-check rebuilds the query from the offer, which may carry no
+   * country/destination — hotel-scoped calendars resolve STATEINC without
+   * them, so search must too. Mirrors the calendar fallbacks: explicit
+   * country/destination → program STATEINC memory → hotel dictionary scan.
+   * Nothing resolves → original UNSUPPORTED error (mapped to 400).
+   */
+  private async resolveSearchState(
+    query: SupplierSearchQuery,
+    townFrom: string,
+  ): Promise<{ value: string; name: string }> {
+    const candidate = query.country ?? query.destination;
+    if (candidate) {
+      try {
+        return await this.resolveState(candidate, townFrom);
+      } catch (err) {
+        // The re-check may carry a resort label the state dictionary does not
+        // know — fall through to the program/hotel fallbacks instead of 400.
+        this.logger.warn(
+          `KazUnion: state "${candidate}" unresolvable — falling back to program/hotel scan: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    if (query.tourIncValue) {
+      const remembered = this.programState.get(query.tourIncValue);
+      if (remembered) {
+        const states = await this.http.discoverStates(townFrom);
+        const name = states.find((s) => s.value === remembered)?.name ?? remembered;
+        return { value: remembered, name };
+      }
+    }
+
+    if (query.hotelExternalId) {
+      const states = await this.http.discoverStates(townFrom);
+      for (const st of states) {
+        try {
+          // Dictionary cache makes this cheap after the first state.
+          const dict = await this.http.fetchDictionary(townFrom, st.value);
+          if (dict.hotels.some((h) => String(h.id) === String(query.hotelExternalId))) {
+            this.logger.log(
+              `KazUnion: resolved state ${st.name} for hotel ${query.hotelExternalId} (query has no country/destination)`,
+            );
+            return st;
+          }
+        } catch (err) {
+          this.logger.warn(`KazUnion: state scan ${st.value} failed: ${(err as Error).message}`);
+        }
+      }
+    }
+
+    throw new Error("KazUnion: UNSUPPORTED query — country/destination is required");
+  }
+
   // ── Sync discovery ────────────────────────────────────────────────────
 
   /** Countries + programs from Baku (sync entry point). */
@@ -242,7 +298,7 @@ export class KazunionAdapter implements SupplierAdapter {
   async search(query: SupplierSearchQuery): Promise<SupplierOffer[]> {
     const start = Date.now();
     const townFrom = this.resolveTown(query.departureCity);
-    const state = await this.resolveState(query.country ?? query.destination, townFrom);
+    const state = await this.resolveSearchState(query, townFrom);
 
     let programs: KazunionProgram[];
     if (query.tourIncValue) {
@@ -324,37 +380,20 @@ export class KazunionAdapter implements SupplierAdapter {
   async getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail> {
     const offers = await this.search({ ...ref.searchContext, adults: ref.searchContext.adults ?? 2 });
     const m = offers.find((o) => o.externalOfferId === ref.externalOfferId);
-    if (m) return { ...m };
-    return {
-      supplierCode: this.code,
-      externalOfferId: ref.externalOfferId,
-      externalClaim: ref.externalClaim,
-      hotel: ref.searchContext.hotel ?? "",
-      departureDate: ref.searchContext.departureDateFrom ?? "",
-      nights: ref.searchContext.nightsFrom ?? 0,
-      adults: ref.searchContext.adults ?? 2,
-      children: ref.searchContext.children ?? 0,
-      childAges: ref.searchContext.childAges ?? [],
-      price: { amount: 0, currency: "USD", fetchedAt: new Date(), expiresAt: new Date(), queryHash: "", source: this.code },
-      availability: "NOT_AVAILABLE",
-      fetchedAt: new Date(),
-      expiresAt: new Date(),
-    };
+    if (!m) {
+      // §5.5: no synthetic zero snapshot — established PRICE_UNAVAILABLE model.
+      priceUnavailable(`KAZUNION offer ${ref.externalOfferId} not found for the original search context`);
+    }
+    return { ...m };
   }
 
   async refreshPrice(ref: SupplierOfferRef): Promise<SupplierPriceSnapshot> {
     const offers = await this.search({ ...ref.searchContext, adults: ref.searchContext.adults ?? 2 });
     const m = offers.find((o) => o.externalOfferId === ref.externalOfferId);
-    return m
-      ? m.price
-      : {
-          amount: 0,
-          currency: "USD",
-          fetchedAt: new Date(),
-          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-          queryHash: JSON.stringify(ref.searchContext),
-          source: this.code,
-        };
+    if (!m) {
+      priceUnavailable(`KAZUNION offer ${ref.externalOfferId} no longer in search results`);
+    }
+    return m.price;
   }
 
   async refreshAvailability(ref: SupplierOfferRef): Promise<SupplierAvailabilitySnapshot> {

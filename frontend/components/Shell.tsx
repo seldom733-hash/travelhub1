@@ -55,6 +55,7 @@ export const NAV_GROUPS: NavGroup[] = [
     headingKey: "nav.group.finance",
     items: [
       { href: "/app/payments", icon: "💳", labelKey: "nav.payments", permission: "finance.payment.read" },
+      { href: "/app/pricing/markup", icon: "％", labelKey: "nav.markup_matrix", permission: "pricing.markup.read" },
     ],
   },
   {

@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
+import { FlightSupplierRegistry } from "./flight-supplier.registry";
 import { SupplierOfferService } from "./supplier-offer.service";
 import type { SupplierSearchQuery, SupplierOffer } from "./supplier.types";
 
@@ -194,6 +195,7 @@ export class SupplierAggregatorService {
     private readonly registry: SupplierAdapterRegistry,
     private readonly offerService: SupplierOfferService,
     private readonly prisma: PrismaService,
+    private readonly flightRegistry: FlightSupplierRegistry,
   ) {}
 
   /** Normalize a supplier-neutral country (code or ru/en name) to ISO-2. */
@@ -379,11 +381,22 @@ export class SupplierAggregatorService {
   /**
    * Enabled supplier adapters OF THE GIVEN SERVICE (search-enabled), for the
    * search form's «Поставщики» picker. Deterministic order by code.
+   * Tours/hotels come from the tour adapter registry; flights come from the
+   * FlightSupplierRegistry (§4.7 — no frontend hardcode of flight options).
    */
   listSuppliersOfService(serviceType: SupplierServiceType): Array<{
     code: string;
     name: string;
   }> {
+    if (serviceType === "flights") {
+      return this.flightRegistry
+        .list()
+        .map((code) => {
+          const supplier = this.flightRegistry.get(code);
+          return { code, name: supplier.name || code };
+        })
+        .sort((x, y) => x.code.localeCompare(y.code));
+    }
     return this.registry
       .getEntries()
       .filter(({ adapter, config }) => {

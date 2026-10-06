@@ -8,6 +8,7 @@ import {
   type SupplierPriceCalendarEntryOffer,
   type SupplierPriceCalendarEntry,
 } from "@/lib/supplier-api";
+import { useSupplierOptions, supplierLabel } from "@/lib/supplier-registry";
 
 /**
  * TourDetail — live KOMPAS integration with left-side tour selection panel.
@@ -35,6 +36,12 @@ export default function TourDetail({
   const [selectedEntry, setSelectedEntry] = useState<SupplierPriceCalendarEntry | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Supplier of THIS product: attribute first, registry fallback (§4.7 — no
+  // hardcoded supplier default). The calendar only renders once resolved.
+  const tourSuppliers = useSupplierOptions("tours");
+  const supplierCode =
+    (attributes?.supplierCode as string | undefined) || tourSuppliers[0]?.code || "";
+
   // Filter state
   const [departureCity, setDepartureCity] = useState(
     (attributes?.departureCity as string) ?? "1411",
@@ -59,7 +66,7 @@ export default function TourDetail({
 
   // Build calendar query — dates are derived per-month inside MonthlyCalendar; only context here.
   const calendarQuery = {
-    supplierCode: ((attributes?.supplierCode as string) ?? "KOMPAS") as "KOMPAS" | "SUMMERTOUR" | "KAZUNION" | "ANEX",
+    supplierCode,
     hotelExternalId,
     hotel: cleanHotelName,
     destination,
@@ -209,12 +216,29 @@ export default function TourDetail({
 
           </div>
 
+          {/* Phase 4: explicit guidance — how to submit a request from this card */}
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
+            <h3 className="text-sm font-semibold text-slate-800">
+              {t("tour.howto_title", locale)}
+            </h3>
+            <ol className="mt-2 list-decimal list-inside space-y-1 text-xs leading-relaxed text-slate-600">
+              <li>{t("tour.howto_step1", locale)}</li>
+              <li>{t("tour.howto_step2", locale)}</li>
+              <li>{t("tour.howto_step3", locale)}</li>
+            </ol>
+          </div>
+
           {/* Monthly Calendar — monthly cache, lastUpdated + Обновить цены */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <h3 className="mb-3 text-sm font-semibold text-slate-800">
               {t("tour.calendar_title", locale) ?? "Календарь цен"}
             </h3>
-            <MonthlyCalendar query={calendarQuery} onSelect={handleCalendarSelect} />
+            {supplierCode ? (
+              <MonthlyCalendar query={calendarQuery} onSelect={handleCalendarSelect} />
+            ) : null}
+            <p className="mt-3 text-xs text-slate-500">
+              {t("tour.calendar_hint", locale)}
+            </p>
           </div>
         </div>
 
@@ -232,15 +256,9 @@ export default function TourDetail({
             {destination && (
               <p className="mt-1 text-sm text-slate-500">📍 {destination}</p>
             )}
-            {hotelExternalId && (
+            {hotelExternalId && supplierCode && (
               <p className="mt-1 text-xs text-slate-400">
-                  {((attributes?.supplierCode as string) ?? "KOMPAS") === "SUMMERTOUR"
-                    ? `Summer ID: ${hotelExternalId}`
-                    : (attributes?.supplierCode as string) === "KAZUNION"
-                      ? `KazUnion ID: ${hotelExternalId}`
-                      : (attributes?.supplierCode as string) === "ANEX"
-                        ? `ANEX ID: ${hotelExternalId}`
-                        : `KOMPAS ID: ${hotelExternalId}`}
+                {supplierLabel(tourSuppliers, supplierCode)} ID: {hotelExternalId}
               </p>
             )}
           </div>
@@ -289,10 +307,13 @@ export default function TourDetail({
       {modalOpen && selectedEntry && (
         <OfferModal
           date={selectedEntry.date}
+          tour={title}
           offers={selectedEntry.offers}
+          supplierCode={supplierCode}
           summary={{
             departureCity: departureCity === "1411" ? "Баку (GYD)" : departureCity,
             destination,
+            country: (attributes?.country as string) || undefined,
             adults,
             children,
             childAges,

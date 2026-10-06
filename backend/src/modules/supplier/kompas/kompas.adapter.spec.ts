@@ -399,3 +399,34 @@ describe("KompasSupplierAdapter", () => {
     });
   });
 });
+
+
+// ── Phase 5 §5.5/5.7 — amount:0 fallback elimination ──────────────────────
+
+describe("KompasSupplierAdapter — no amount:0 fallbacks (§5.5/§5.7)", () => {
+  it("getOffer: not found → PRICE_UNAVAILABLE (no zero-snapshot synth)", async () => {
+    const a = new KompasSupplierAdapter();
+    (a as any).search = jest.fn().mockResolvedValue([]);
+
+    await expect(
+      a.getOffer({
+        supplierCode: "KOMPAS",
+        externalOfferId: "MISSING",
+        searchContext: { service: "tours", adults: 2 },
+      }),
+    ).rejects.toThrow(/PRICE_UNAVAILABLE/);
+  });
+
+  it("refreshPrice: not found → PRICE_UNAVAILABLE (no zero-snapshot synth)", async () => {
+    const a = new KompasSupplierAdapter();
+    (a as any).search = jest.fn().mockResolvedValue([]);
+
+    await expect(
+      a.refreshPrice({
+        supplierCode: "KOMPAS",
+        externalOfferId: "MISSING",
+        searchContext: { service: "tours", adults: 2 },
+      }),
+    ).rejects.toThrow(/PRICE_UNAVAILABLE/);
+  });
+});

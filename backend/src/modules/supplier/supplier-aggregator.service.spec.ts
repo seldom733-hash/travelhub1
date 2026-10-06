@@ -1,5 +1,6 @@
 import { SupplierAggregatorService } from "./supplier-aggregator.service";
 import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
+import { FlightSupplierRegistry } from "./flight-supplier.registry";
 import { SupplierOfferService } from "./supplier-offer.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { SupplierSearchQuery, SupplierOffer } from "./supplier.types";
@@ -40,6 +41,10 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     supplierGeoLink: { findMany: jest.Mock };
     geoCity: { findUnique: jest.Mock };
     geoResort: { findUnique: jest.Mock };
+  };
+  let mockFlightRegistry: {
+    list: jest.Mock;
+    get: jest.Mock;
   };
 
   const adapter = (code: string) =>
@@ -102,10 +107,21 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
       geoResort: { findUnique: jest.fn().mockResolvedValue(null) },
     };
 
+    mockFlightRegistry = {
+      list: jest.fn(() => ["AZAL", "AVIASALES"]),
+      get: jest.fn((code: string) => ({
+        code,
+        name: code === "AVIASALES" ? "Aviasales" : code,
+        search: () => Promise.resolve({} as never),
+        calendar: () => Promise.resolve({} as never),
+      })),
+    };
+
     aggregator = new SupplierAggregatorService(
       mockRegistry,
       mockOfferService as unknown as SupplierOfferService,
       mockPrisma as unknown as PrismaService,
+      mockFlightRegistry as unknown as FlightSupplierRegistry,
     );
   });
 
@@ -399,5 +415,58 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     const resolved = await aggregator.resolveSuppliers("tours", baseQuery);
 
     expect(resolved).toEqual(["KOMPAS"]);
+  });
+});
+
+describe("SupplierAggregatorService.listSuppliersOfService (§4.7 registry SSOT)", () => {
+  let aggregator: SupplierAggregatorService;
+  let mockFlightRegistry: { list: jest.Mock; get: jest.Mock };
+
+  beforeEach(() => {
+    const config = (code: string) => ({
+      code,
+      name: code,
+      enabled: true,
+      searchEnabled: true,
+    });
+    const entries = () =>
+      ["KOMPAS", "SUMMERTOUR"].map((code) => ({
+        adapter: { code, name: code, enabled: true } as never,
+        config: config(code) as never,
+      }));
+    const mockRegistry = {
+      getEntries: entries,
+    } as unknown as SupplierAdapterRegistry;
+    mockFlightRegistry = {
+      list: jest.fn(() => ["AVIASALES", "AZAL"]),
+      get: jest.fn((code: string) => ({
+        code,
+        name: code === "AVIASALES" ? "Aviasales" : "AZAL",
+        search: () => Promise.resolve({} as never),
+        calendar: () => Promise.resolve({} as never),
+      })),
+    };
+    aggregator = new SupplierAggregatorService(
+      mockRegistry,
+      {} as unknown as SupplierOfferService,
+      {} as unknown as PrismaService,
+      mockFlightRegistry as unknown as FlightSupplierRegistry,
+    );
+  });
+
+  it("flights come from FlightSupplierRegistry ({code,name}, sorted by code)", () => {
+    expect(aggregator.listSuppliersOfService("flights")).toEqual([
+      { code: "AVIASALES", name: "Aviasales" },
+      { code: "AZAL", name: "AZAL" },
+    ]);
+    expect(mockFlightRegistry.list).toHaveBeenCalledTimes(1);
+  });
+
+  it("tours come from the tour adapter registry (unchanged)", () => {
+    expect(aggregator.listSuppliersOfService("tours")).toEqual([
+      { code: "KOMPAS", name: "KOMPAS" },
+      { code: "SUMMERTOUR", name: "SUMMERTOUR" },
+    ]);
+    expect(mockFlightRegistry.list).not.toHaveBeenCalled();
   });
 });

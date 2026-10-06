@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { airlineNameOf, routeChain } from "@/lib/flight-api";
 import type { FlightFare, FlightOffer, FlightSegment } from "@/lib/flight-api";
+import { useSupplierLabels } from "@/lib/supplier-registry";
 
 interface FlightResultsProps {
   flights: FlightOffer[];
@@ -61,8 +62,9 @@ function getLowestFare(flight: FlightOffer): FlightFare | undefined {
     )[0];
 }
 
-function supplierOf(offer?: FlightOffer): string {
-  return offer?.source || "AZAL";
+function supplierOf(offer: FlightOffer | undefined, labels: Record<string, string>): string {
+  const source = offer?.source;
+  return source ? labels[source] ?? source : "—";
 }
 
 /**
@@ -142,6 +144,7 @@ export default function FlightResults({
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [familyFilter, setFamilyFilter] = useState<string>("ALL");
+  const supplierLabels = useSupplierLabels("flights");
   if (loading) {
     return (
       <div className="space-y-4">
@@ -313,7 +316,7 @@ export default function FlightResults({
                   {hasInbound && <td className="px-2 py-2 text-white">{r.inFare ? `${fareAmount(r.inFare)} ${fareCurrency(r.inFare)}` : ""}</td>}
                   {hasInbound && <td className="px-2 py-2 text-neutral-300">{formatDuration(totalMins)}</td>}
                   <td className="px-2 py-2 text-white">{r.fareFamily} {baggage} {hand}</td>
-                  <td className="px-2 py-2 text-neutral-300">{supplierOf(r.out)}</td>
+                  <td className="px-2 py-2 text-neutral-300">{supplierOf(r.out, supplierLabels)}</td>
                   <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.adults ?? 1}</td>
                   <td className="px-2 py-2 text-white text-center">{r.out.requested?.passengers?.children ?? 0}</td>
                   <td className="px-2 py-2 font-bold text-white">{r.total} {r.currency}</td>
@@ -347,14 +350,14 @@ export default function FlightResults({
         const isOWLeg = flight.optionId?.endsWith("_OW_OUT") || flight.optionId?.endsWith("_OW_IN");
         return (
           <article
-            key={flight.optionId ?? `${flight.optionSetId ?? "azal"}-${index}`}
+            key={flight.optionId ?? `${flight.optionSetId ?? "flight"}-${index}`}
             className={`rounded-2xl border border-white/10 bg-white/[0.03] ${isOWLeg ? "p-3" : "p-5"}`}
           >
             <div className={`flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between ${isOWLeg ? "text-[13px]" : ""}`}>
               <div className="flex-1">
                 <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
                   <span className="rounded-full bg-white/10 px-3 py-1 font-medium text-white">
-                    {supplierOf(flight)}
+                    {supplierOf(flight, supplierLabels)}
                   </span>
                   {first?.flightNumber && (
                     <span className="text-neutral-500">{first.flightNumber}</span>

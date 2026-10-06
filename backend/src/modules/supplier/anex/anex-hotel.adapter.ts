@@ -11,6 +11,7 @@ import type {
   PriceCalendarQuery,
   PriceCalendarResult,
 } from "../supplier.types";
+import { priceUnavailable } from "../supplier.types";
 import {
   AnexProvider,
   addDays,
@@ -169,7 +170,9 @@ export class AnexHotelAdapter implements SupplierAdapter {
 
   async search(query: SupplierSearchQuery): Promise<SupplierOffer[]> {
     const start = Date.now();
-    const state = await this.provider.resolveHotelState(query.country ?? query.destination);
+    const state = await this.provider.resolveHotelStateFlexible(
+      query.country ?? query.destination,
+    );
 
     const checkIn = query.departureDateFrom ?? toIsoDate(new Date());
     const lo = Math.max(NIGHTS_MIN, Math.min(query.nightsFrom ?? 7, query.nightsTo ?? query.nightsFrom ?? 7));
@@ -200,11 +203,17 @@ export class AnexHotelAdapter implements SupplierAdapter {
       filtered = filtered.filter((r) => starIds.has(String(r.groupStarInc ?? "")));
     }
 
-    const offers = filtered.map((r) => this.normalize(r, query, state));
+    // §5.7: rows without a positive supplier price are dropped before
+    // normalization — `amount: 0` must never be synthesized as a valid price.
+    const pricedRows = filtered.filter((r) => this.rowPrice(r) !== null);
+    const offers = pricedRows.map((r) => this.normalize(r, query, state));
     this.logger.log(
       `ANEX hotels ${state.name} ${checkIn} ${lo}-${hi}n: ${rows.length} rows → ` +
         `${offers.length} offers in ${Date.now() - start}ms` +
-        (droppedOccupancy > 0 ? ` (${droppedOccupancy} occupancy dropped)` : ""),
+        (droppedOccupancy > 0 ? ` (${droppedOccupancy} occupancy dropped)` : "") +
+        (filtered.length - pricedRows.length > 0
+          ? ` (${filtered.length - pricedRows.length} priceless rows dropped)`
+          : ""),
     );
     return offers;
   }
@@ -435,44 +444,17 @@ export class AnexHotelAdapter implements SupplierAdapter {
     const offers = await this.search({ ...ref.searchContext, adults: ref.searchContext.adults ?? 2 });
     const m = offers.find((o) => o.externalOfferId === ref.externalOfferId);
     if (m) return { ...m };
-    return {
-      supplierCode: this.code,
-      service: "hotels",
-      externalOfferId: ref.externalOfferId,
-      externalClaim: ref.externalClaim,
-      hotel: ref.searchContext.hotel ?? "",
-      departureDate: ref.searchContext.departureDateFrom ?? "",
-      nights: ref.searchContext.nightsFrom ?? 0,
-      adults: ref.searchContext.adults ?? 2,
-      children: ref.searchContext.children ?? 0,
-      childAges: ref.searchContext.childAges ?? [],
-      price: {
-        amount: 0,
-        currency: "AZN",
-        fetchedAt: new Date(),
-        expiresAt: new Date(),
-        queryHash: "",
-        source: this.code,
-      },
-      availability: "NOT_AVAILABLE",
-      fetchedAt: new Date(),
-      expiresAt: new Date(),
-    };
+    // §5.5: no synthetic zero snapshot — established PRICE_UNAVAILABLE model.
+    priceUnavailable(`ANEX-HOTEL offer ${ref.externalOfferId} not found for the original search context`);
   }
 
   async refreshPrice(ref: SupplierOfferRef): Promise<SupplierPriceSnapshot> {
     const offers = await this.search({ ...ref.searchContext, adults: ref.searchContext.adults ?? 2 });
     const m = offers.find((o) => o.externalOfferId === ref.externalOfferId);
-    return m
-      ? m.price
-      : {
-          amount: 0,
-          currency: "AZN",
-          fetchedAt: new Date(),
-          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-          queryHash: JSON.stringify(ref.searchContext),
-          source: this.code,
-        };
+    if (!m) {
+      priceUnavailable(`ANEX-HOTEL offer ${ref.externalOfferId} no longer in search results`);
+    }
+    return m.price;
   }
 
   async refreshAvailability(ref: SupplierOfferRef): Promise<SupplierAvailabilitySnapshot> {
@@ -512,6 +494,12 @@ export class AnexHotelAdapter implements SupplierAdapter {
 
   // ── Normalization (hotel-specific mapping) ────────────────────────────
 
+  /** Positive supplier price for a row, or null when absent/non-positive (§5.7). */
+  private rowPrice(row: AnexHotelPriceRow): number | null {
+    const p = row.converted_price ?? row.price;
+    return typeof p === "number" && Number.isFinite(p) && p > 0 ? p : null;
+  }
+
   private offerIdOf(row: AnexHotelPriceRow): string {
     if (row.cat_Claim) return row.cat_Claim;
     return [
@@ -538,6 +526,10 @@ export class AnexHotelAdapter implements SupplierAdapter {
   ): SupplierOffer {
     const now = new Date();
     const departureDate = (raw.checkIn ?? "").slice(0, 10);
+    const amount = this.rowPrice(raw);
+    if (amount === null) {
+      priceUnavailable(`ANEX-HOTEL search offer ${this.offerIdOf(raw)} has no valid supplier price`);
+    }
     return {
       supplierCode: this.code,
       service: "hotels",
@@ -560,7 +552,9 @@ export class AnexHotelAdapter implements SupplierAdapter {
         // converted_price is the total in the requested currency
         // (CURRENCY=26 → AZN); plain `price` is in the hotel's own currency
         // (USD/EUR, verified by constant ratios 1.7055 / 1.964).
-        amount: raw.converted_price ?? raw.price ?? 0,
+        // §5.7: missing/non-positive values are filtered upstream (search) and
+        // fail closed here — `amount: 0` is never a valid price.
+        amount,
         currency: "AZN",
         fetchedAt: now,
         expiresAt: new Date(now.getTime() + 5 * 60 * 1000),

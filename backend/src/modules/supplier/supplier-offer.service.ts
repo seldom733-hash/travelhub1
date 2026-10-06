@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { SupplierCacheService } from "./cache/supplier-cache.service";
 import { SupplierResilienceService } from "./resilience/supplier-resilience.service";
+import { SupplierPricingService } from "../pricing/supplier-pricing.service";
 import type {
   SupplierSearchQuery,
   SupplierOffer,
@@ -21,6 +22,13 @@ import type {
  * Context-aware cache: query hash + page = cache key.
  * Request coalescing: duplicate queries share in-flight request.
  * Schema drift detection: validate response before caching.
+ *
+ * Supplier Markup (STRICT PROMPT §9): THIS service is the single pricing
+ * boundary for tours/hotels reads (search / getOffer / refreshPrice /
+ * price calendar). Caches store RAW supplier data; the public price is
+ * applied on every return path via SupplierPricingService — every consumer
+ * (aggregator, public + authenticated controllers, captcha resume) sees the
+ * same public amount exactly once (NO DOUBLE MARKUP).
  */
 @Injectable()
 export class SupplierOfferService {
@@ -30,6 +38,7 @@ export class SupplierOfferService {
     private readonly registry: SupplierAdapterRegistry,
     private readonly cache: SupplierCacheService,
     private readonly resilience: SupplierResilienceService,
+    private readonly pricing: SupplierPricingService,
   ) {}
 
   // ── Search ──────────────────────────────────────────────────────────
@@ -110,6 +119,7 @@ export class SupplierOfferService {
     // still share it) — swallow its late rejection so it cannot surface as an
     // unhandled rejection.
     searchPromise.catch(() => {});
+    let offers: SupplierOffer[];
     if (config.timeoutMs > 0) {
       let timer: NodeJS.Timeout | undefined;
       const timeout = new Promise<never>((_, reject) => {
@@ -119,12 +129,16 @@ export class SupplierOfferService {
         );
       });
       try {
-        return await Promise.race([searchPromise, timeout]);
+        offers = await Promise.race([searchPromise, timeout]);
       } finally {
         clearTimeout(timer);
       }
+    } else {
+      offers = await searchPromise;
     }
-    return searchPromise;
+    // Pricing boundary: public amount + §20 pricing block (raw offers stay
+    // in the cache — a rule change is reflected on the next call).
+    return this.pricing.applyToOffers(offers, supplierCode, query.service ?? "tours");
   }
 
   // ── Get Detail ──────────────────────────────────────────────────────
@@ -151,7 +165,7 @@ export class SupplierOfferService {
     const cached = this.cache.getDetail(cacheKey);
     if (cached) {
       this.metrics.cacheHit++;
-      return cached;
+      return this.pricing.applyToOffer(cached, ref.supplierCode, ref.searchContext.service ?? "tours");
     }
     this.metrics.cacheMiss++;
 
@@ -168,7 +182,7 @@ export class SupplierOfferService {
 
       this.cache.setDetail(cacheKey, detail);
       this.resilience.recordSuccess(ref.supplierCode);
-      return detail;
+      return this.pricing.applyToOffer(detail, ref.supplierCode, ref.searchContext.service ?? "tours");
     } catch (err) {
       this.resilience.recordFailure(ref.supplierCode);
       throw err;
@@ -198,7 +212,7 @@ export class SupplierOfferService {
     const cached = this.cache.getPrice(cacheKey);
     if (cached) {
       this.metrics.cacheHit++;
-      return cached;
+      return this.priceBoundary(cached, ref.supplierCode, ref.searchContext.service ?? "tours");
     }
     this.metrics.cacheMiss++;
 
@@ -206,7 +220,21 @@ export class SupplierOfferService {
     this.cache.setPrice(cacheKey, snapshot);
     this.metrics.priceRefresh++;
 
-    return snapshot;
+    return this.priceBoundary(snapshot, ref.supplierCode, ref.searchContext.service ?? "tours");
+  }
+
+  /**
+   * Re-check pricing boundary: zero/negative supplier price can never become
+   * commercial money (Gate E) → PRICE_UNAVAILABLE, otherwise public amount +
+   * §20 pricing block.
+   */
+  private priceBoundary(snapshot: SupplierPriceSnapshot, supplierCode: string, serviceType: string): Promise<SupplierPriceSnapshot> {
+    if (typeof snapshot.amount !== "number" || !(snapshot.amount > 0)) {
+      throw new Error(
+        `PRICE_UNAVAILABLE: ${supplierCode} re-check returned no valid price (amount=${snapshot.amount})`,
+      );
+    }
+    return this.pricing.applyToPriceSnapshot(snapshot, supplierCode, serviceType);
   }
 
   // ── Refresh Availability ────────────────────────────────────────────
@@ -237,8 +265,8 @@ export class SupplierOfferService {
   // ── Price Calendar ────────────────────────────────────────────────
 
   async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult> {
-    const adapter = this.registry.get(query.supplierCode);
-    const config = this.registry.getConfig(query.supplierCode);
+    const adapter = this.registry.get(query.supplierCode, query.service);
+    const config = this.registry.getConfig(query.supplierCode, query.service);
 
     if (!adapter.enabled || !config.searchEnabled) {
       throw new Error(`Supplier ${query.supplierCode} search is disabled`);
@@ -268,7 +296,7 @@ export class SupplierOfferService {
       tourIncValues: query.tourIncValues ?? (query.tourIncValue ? [query.tourIncValue] : []),
     })}`;
 
-    return this.resilience.coalesce(calendarKey, async () => {
+    const result = (await this.resilience.coalesce(calendarKey, async () => {
       // Check cache (reuse search cache with calendar prefix)
       const cached = this.cache.getSearch(calendarKey);
       if (cached) {
@@ -311,7 +339,24 @@ export class SupplierOfferService {
       } finally {
         this.resilience.decrementInflight(query.supplierCode);
       }
-    }) as Promise<PriceCalendarResult>;
+    })) as PriceCalendarResult;
+    // Pricing boundary: applied OUTSIDE the coalesce so raw cache entries
+    // (fresh and cached alike) get the public price exactly once.
+    return this.pricing.applyToCalendar(
+      result,
+      query.supplierCode,
+      this.calendarServiceType(query),
+    );
+  }
+
+  /** Service category of a calendar query — mirrors the adapter actually serving it. */
+  private calendarServiceType(query: PriceCalendarQuery): string {
+    if (query.service) return query.service;
+    try {
+      return this.registry.getConfig(query.supplierCode).serviceTypes?.[0] ?? "tours";
+    } catch {
+      return "tours";
+    }
   }
 
   // ── Schema Validation ───────────────────────────────────────────────

@@ -10,6 +10,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { SupplierOfferService } from "../supplier-offer.service";
 import { SummertourNewAdapter } from "./summertour-new.adapter";
+import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import type { SupplierSearchQuery, SupplierOffer } from "../supplier.types";
 
 export interface SyncResult {
@@ -87,6 +88,7 @@ export class SummerSyncService {
     private readonly prisma: PrismaService,
     private readonly offerService: SupplierOfferService,
     private readonly summertour: SummertourNewAdapter,
+    private readonly pricing: SupplierPricingService,
   ) {}
 
   /**
@@ -392,10 +394,20 @@ export class SummerSyncService {
 
     // Find minimum price across all offers
     const validOffers = offers.filter((o) => o.price.amount > 0);
-    const minPrice = validOffers.length > 0
+    let minPrice = validOffers.length > 0
       ? Math.min(...validOffers.map((o) => o.price.amount))
       : 0;
     const currency = validOffers[0]?.price.currency ?? "USD";
+    // Markup boundary (§9): Tariff/startingPrice are customer-facing —
+    // write the PUBLIC price (already-priced feeds pass through).
+    if (minPrice > 0 && !offers.some((o) => o.pricing)) {
+      minPrice = await this.pricing.publicAmountFor(
+        minPrice,
+        currency,
+        this.summertour.code,
+        "tours",
+      );
+    }
 
     // Build title
     const title = this.buildTitle(identity);

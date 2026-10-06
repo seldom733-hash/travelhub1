@@ -2204,6 +2204,15 @@ model Order {
   /// commission-контекста (no-commission канал / NO_POLICY / legacy) — честно,
   /// без backfill и без live policy lookup. Immutable после создания.
   commissionSnapshot    Json?
+  /// ── Supplier Markup (STRICT PROMPT Phase 4 §4.6) — Request → Order
+  /// commercial snapshot propagation ──
+  /// Verbatim копия frozen Request.commercialSnapshot на момент конверсии
+  /// (supplierPrice/supplierCurrency, markup, publicPrice, discount,
+  /// customerFinalPrice/customerCurrency, priceSource, customerAcceptedAt,
+  /// freshness TTL). Immutable после создания (Gate G): позднейший MarkupRule
+  /// change НЕ пересчитывает принятые деньги. NULL = legacy/consumer-пути
+  /// (OrderRequested bootstrap) без commercial snapshot.
+  commercialSnapshot    Json?
 
   // ── Step 2.5A — Order Temporal Contract (business milestones) ──
   /// Момент подачи/входа заказа в систему (OrderRequested consumer ИЛИ
@@ -2403,6 +2412,13 @@ model Request {
   /// legacy заявка (до D3): при customerAccept замораживается из quantity
   /// (единственное прежнее count-представление; DB default 1 = 1 гость).
   travelerCount      Int?
+  /// Supplier Markup (STRICT PROMPT §20): frozen commercial snapshot —
+  /// supplier/markup/public/final price, source, freshness timestamps.
+  /// Working state written by the pricing boundary at request creation;
+  /// FROZEN at customerAccept (customerAcceptedAt + customerFinalPrice set,
+  /// then immutable — Gate F). NULL = legacy/staff requests without a
+  /// supplier-priced basis (acceptance money gate still applies).
+  commercialSnapshot Json?
   /// D3: frozen effective traveler requirements, ЗАМОРОЖЕННЫЕ на customerAccept
   /// (acceptance boundary; та же транзакция). Consumer/конвертация НЕ читает
   /// mutable Product позже — acceptance→pin race невозможен (§7). NULL = legacy.
@@ -4553,6 +4569,72 @@ model CommissionPolicyHistory {
   createdAt DateTime         @default(now())
 
   @@index([policyId])
+  @@schema("finance")
+}
+
+/// MarkupRule (MKR-*) — TravelHUB supplier markup master data (Supplier Markup,
+/// SUPPLIER_MARKUP_IMPLEMENTATION_DESIGN §3 / STRICT PROMPT §6). ОТДЕЛЬНАЯ
+/// концепция от CommissionPolicy (Gate B): наценка платформы на supplier live
+/// price, НЕ seller commission. Matching key: supplierCode + serviceType —
+/// runtime registry SSOT (SupplierAdapterRegistry + FlightSupplierRegistry);
+/// supplierCode/serviceType хранятся как строки (новый registered supplier /
+/// capability расширяет матрицу БЕЗ миграции — Gate A). Lifecycle
+/// DRAFT → ACTIVE → ARCHIVED (CAS; ≤1 ACTIVE с пересекающимся effective-окном
+/// на key — pg_advisory_xact_lock в сервисе). rate: десятичная доля
+/// 0 ≤ rate < 1 (0.05 = 5%), явный «0» допустим и отличим от NOT_CONFIGURED
+/// (нет активной rule → runtime 0%). Ставки — master data, не константы.
+model MarkupRule {
+  id            String          @id @default(uuid())
+  code          String          @unique // MKR-00000001
+  /// Ключ capability-матрицы: точное совпадение с registry supplier code
+  /// (SUMMERTOUR/KOMPAS/ANEX/KAZUNION/AZAL/AVIASALES/...).
+  supplierCode  String
+  /// Ключ capability-матрицы: registry service type (tours | hotels | flights
+  /// и будущие). Строка, не enum — динамическое расширение Gate A.
+  serviceType   String
+  /// Десятичная доля 0 ≤ rate < 1 (0.05 = 5%), ≤ 6 знаков.
+  rate          Decimal         @db.Decimal(18, 6)
+  status        MarkupRuleStatus @default(DRAFT)
+  /// Server-owned; +1 на draft-итерацию; expectedVersion → stale-update 409.
+  version       Int             @default(1)
+  /// Действует, пока effectiveFrom <= now < effectiveTo (NULL = open-ended).
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  history MarkupRuleHistory[]
+
+  @@index([supplierCode, serviceType, status])
+  @@index([effectiveFrom])
+  @@schema("finance")
+}
+
+/// MarkupRuleHistory — audit by default + version-репродукция состояния rule
+/// (frozen snapshot в Request ссылается (code, version), без live lookup).
+model MarkupRuleHistory {
+  id        String     @id @default(uuid())
+  ruleId    String
+  rule      MarkupRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  action    String
+  /// Версия, к которой относится этот снапшот состояния.
+  version   Int
+  /// Полное состояние rule на этой версии.
+  fields    Json?
+  actorId   String?
+  actorName String?
+  comment   String?
+  createdAt DateTime   @default(now())
+
+  @@index([ruleId])
+  @@schema("finance")
+}
+
+enum MarkupRuleStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+
   @@schema("finance")
 }
 

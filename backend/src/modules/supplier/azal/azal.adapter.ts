@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { AzalHttpService } from "./azal.http.service";
 import type {
   AzalCalendarRequest,
@@ -36,6 +36,7 @@ import type {
 export class AzalAdapter implements FlightSupplier {
   readonly code = "AZAL";
   readonly name = "AZAL";
+  private readonly logger = new Logger(AzalAdapter.name);
 
   constructor(private readonly http: AzalHttpService) {}
 
@@ -87,7 +88,7 @@ export class AzalAdapter implements FlightSupplier {
       }
       // AZAL returns neighbouring-day flights when the requested date has no
       // seats. Never fall back to another date — report the RT search as empty.
-      console.log(
+      this.logger.log(
         `[AZAL RT EMPTY] ${query.from}->${query.to} departure=${query.departureDate} return=${query.returnDate} outboundFlights=${outbound.flights.length} inboundFlights=${inbound.flights.length}`,
       );
       return {
@@ -119,7 +120,7 @@ export class AzalAdapter implements FlightSupplier {
       return typeof departure === "string" && departure.slice(0, 10) === query.departureDate;
     });
     if (flightsOnDate.length !== result.flights.length) {
-      console.log(
+      this.logger.log(
         `[AZAL DATE FILTER] ${query.from}->${query.to} requested=${query.departureDate} kept=${flightsOnDate.length} of ${result.flights.length} (neighbouring-day results dropped)`,
       );
     }
