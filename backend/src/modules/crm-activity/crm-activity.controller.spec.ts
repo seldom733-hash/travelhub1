@@ -20,6 +20,7 @@ function makeActor(overrides: Partial<AuthUser> = {}): AuthUser {
     id: 'user-1',
     code: 'USR-001',
     username: 'admin',
+    phone: null,
     email: 'admin@test.com',
     fullName: 'Admin User',
     status: 'ACTIVE' as any,

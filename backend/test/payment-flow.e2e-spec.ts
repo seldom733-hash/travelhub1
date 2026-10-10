@@ -1,41 +1,40 @@
 /**
- * E2E PHASE 2 STEP 2.12 — Payment Flow (provider-neutral Payment runtime).
+ * E2E PHASE 2 STEP 2.12 → MULTI/PARTIAL PAYMENTS — Payment Flow.
  *
  * Доказывает canonical Payment contract:
  *  1. Payment — Finance-owned (PAY-*): создание ТОЛЬКО finance.payment.write;
- *     деньги — frozen Order snapshot verbatim (amount/currency), НЕ из
- *     mutable Catalog (reprice-proof);
+ *     currency — frozen Order snapshot verbatim (reprice-proof); amount —
+ *     клиентский ввод, ограничен due-guard 0 < amount <= due;
  *  2. единственный state-machine authority: PENDING → CAPTURED (paidAt) |
  *     FAILED (failedAt) | CANCELLED (cancelledAt); AUTHORIZED/REFUNDED —
  *     reserved vocabulary (2.12B/2.13); первый milestone wins;
  *  3. Order projection (paymentStatus/paidAmount) — Order-owned subscriber на
  *     PaymentCaptured (Finance НЕ пишет order.* напрямую);
- *  4. cardinality: один активный Payment на Order (isActivePayment partial
- *     unique); FAILED/CANCELLED → attempt 2 легален; CAPTURED → overpayment
- *     409; idempotent retry → существующий факт; concurrent → один факт;
- *  5. mass assignment: forged money/status/milestones → 422;
+ *  4. cardinality (MULTI/PARTIAL): НЕОГРАНИЧЕННОЕ число Payment на Order;
+ *     one-active индекс снят; переплата — транзакционный due-guard (422);
+ *     idempotency — внешний Idempotency-Key replay; concurrent create —
+ *     один проходит (≤ due), проигравший 422, без raw 500;
+ *  5. mass assignment: forged status/currency/milestones/version → 422
+ *     (amount — whitelisted + server-validated, не forged);
  *  6. boundaries: 0 Ledger/ProviderFee/Settlement/Payout/Refund/Invoice/
  *     Commission/CommissionAccrual auto-post; Booking не тронуты;
  *  7. события PaymentCreated/Captured/Failed/Cancelled (correlation/causation);
  *  8. RBAC: 401/403/404; PII-free DTO.
  *
  * Traceability (Prompt §39 negative / §40 positive):
- *  1-30 negative: 401 (T9), 403 (T9), 404 (T10), forged amount/currency/status/
- *  milestones → 422 (T4), malformed decimal/unsupported currency — server-copied
- *  (не forgeable; money authority — Order snapshot, T1/T2), amount mismatch —
- *  невозможен (нет клиентского amount), Product price change после freeze →
- *  Payment держит frozen (T2), duplicate create → no-op (T6), concurrent
- *  duplicate → один факт + 409 (T7), divergent replay — нет payload-сравнения
- *  (create идемпотентен по активному Payment; repeat transition → 409 T8),
- *  duplicate provider event — N/A (2.12B webhook deferred, §35: 0 активных
- *  webhook-путей), unknown P2002 — unit, invalid transition → 409 (T8),
- *  terminal retry → 409 (T8), success-vs-failure race — CAS детерминизм (T8 +
- *  unit), no direct Order write (T3 — проекция через событие), no direct
- *  Booking write (T11), no repricing (T2), no Refund/CommissionAccrual/
- *  Settlement/Payout/ProviderFee/Ledger (T11), no PII/PCI (T12), no raw 500 (T7).
- *  1-17 positive: canonical create (T1), canonical code (T1), frozen money
+ *  1-30 negative: 401 (T9), 403 (T9), 404 (T10), forged status/currency/
+ *  milestones → 422 (T4); amount > due / формат → 422 (multi-partial e2e);
+ *  money authority — Order snapshot + due-guard (T1/T2), Product price change
+ *  после freeze → Payment держит frozen (T2), same-key replay → один факт
+ *  (T6), concurrent → ровно один успешный create, второй 422 (T7), divergent
+ *  replay same key → controlled 4xx (T6), invalid transition → 409 (T8),
+ *  terminal retry → 409 (T8), overpayment после CAPTURED → 422 (T8),
+ *  no direct Order write (T3 — проекция через событие), no direct Booking
+ *  write (T11), no repricing (T2), no Refund/CommissionAccrual/Settlement/
+ *  Payout/ProviderFee/Ledger (T11), no PII/PCI (T12), no raw 500 (T7).
+ *  1-17 positive: canonical create (T1), canonical code (T1), frozen currency
  *  verbatim (T1), initial status PENDING (T1), lifecycle transitions (T5),
- *  first-only milestones (T5), identical replay (T6), concurrent one fact (T7),
+ *  first-only milestones (T5), same-key replay (T6), concurrent one fact (T7),
  *  correct events (T5), correlation/causation (T5), own-scope Buyer — N/A
  *  (Buyer payment deferred, §31 — не экспонирован), FINANCE/ADMIN behavior
  *  (T9), Order projection (T3), legacy — N/A (Payment runtime новый; миграция
@@ -68,6 +67,7 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
 
   const created: {
     users: string[];
+    partners: string[];
     products: string[];
     quotes: string[];
     checkouts: string[];
@@ -75,7 +75,7 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
     orders: string[];
     bookings: string[];
     payments: string[];
-  } = { users: [], products: [], quotes: [], checkouts: [], sales: [], orders: [], bookings: [], payments: [] };
+  } = { users: [], partners: [], products: [], quotes: [], checkouts: [], sales: [], orders: [], bookings: [], payments: [] };
 
   const login = async (username: string, password: string): Promise<Session> => {
     const res = await request(app.getHttpServer()).post("/api/v1/auth/login").send({ username, password }).expect(200);
@@ -97,10 +97,14 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
   const futureDate = (days = 30) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
   const futureIso = (days = 30) => new Date(Date.now() + days * 86400000).toISOString();
 
-  /** Полная canonical цепочка до Order (frozen money snapshot, как 2.11 e2e). */
+  /** Полная canonical цепочка до Order (frozen money snapshot, как 2.11 e2e).
+   *  Step 3.6B: commercial Product требует Partner-владельца (platform actors
+   *  без ownerless → 403) — создаём Partner напрямую (harness-only). */
   const buildOrder = async (sm: Session, tag: string, price: number, opts: { buyerRequest?: boolean } = {}): Promise<{ orderId: string; orderCode: string; amount: string; currency: string }> => {
     const smAgent = agent(sm.accessToken);
-    const prod = (await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Pay ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] }).expect(201)).body.product as { id: string };
+    const partner = await prisma.partner.create({ data: { code: `PF${stamp}${payKeySeq++}`, name: `PayFlow Partner ${tag}` } });
+    created.partners.push(partner.id);
+    const prod = (await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Pay ${tag} ${stamp}`, partnerId: partner.id, tariffs: [{ name: "Std", price }] }).expect(201)).body.product as { id: string };
     created.products.push(prod.id);
     const tariff = await prisma.tariff.findFirstOrThrow({ where: { productId: prod.id } });
     const date = futureDate();
@@ -125,13 +129,15 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
   };
 
   // Step 2.12H: payment.create — защищённая операция; Idempotency-Key обязателен.
-  // Каждый вызов — НОВЫЙ ключ (новый запрос); intentional retry-тесты (T6/T8)
-  // полагаются на business idempotency (один активный Payment на Order).
+  // Каждый вызов — НОВЫЙ ключ (новый факт; бизнес-level active-noop снят —
+  // MULTI/PARTIAL). intentional retry-тесты используют ТОТ ЖЕ ключ (T6).
   let payKeySeq = 0;
   const nextPayKey = () => `e2e-payflow-${Date.now()}-${++payKeySeq}`;
+  // Step 3.6C.1: reason ОБЯЗАТЕЛЕН для manual payment initiation (DTO 400 без
+  // него) — default для всех вызовов, тесты переопределяют своим body.
   const createPayment = (fin: Session, orderId: string, body: Record<string, unknown> = {}) => {
     const a = agent(fin.accessToken);
-    return a.post("/api/v1/finance/payments").set("Idempotency-Key", nextPayKey()).send({ orderId, ...body });
+    return a.post("/api/v1/finance/payments").set("Idempotency-Key", nextPayKey()).send({ orderId, reason: "e2e manual payment", ...body });
   };
 
   beforeAll(async () => {
@@ -176,6 +182,7 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
     await prisma.checkoutIntent.deleteMany({ where: { id: { in: created.checkouts } } });
     await prisma.quote.deleteMany({ where: { id: { in: created.quotes } } });
     await prisma.product.deleteMany({ where: { id: { in: created.products } } });
+    if (created.partners.length > 0) await prisma.partner.deleteMany({ where: { id: { in: created.partners } } });
     await prisma.user.deleteMany({ where: { id: { in: created.users } } });
     await app.close();
   });
@@ -252,14 +259,13 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
     expect(ev.correlationId).not.toBeNull();
   });
 
-  // ── 4. mass assignment: forged money/status/milestones → 422 ────────────────
+  // ── 4. mass assignment: forged server-owned поля → 422 ─────────────────────
 
-  it("T4. forged server-owned поля на create (amount/currency/status/milestones/version) → 422", async () => {
+  it("T4. forged server-owned поля на create (currency/status/milestones/version) → 422; amount — whitelisted, не forged", async () => {
     const sm = await createStaff("s12_sm4", RoleCode.SALES_MANAGER);
     const fin = await createStaff("s12_fin4", RoleCode.FINANCE);
     const { orderId } = await buildOrder(sm, "pay_t4", 60);
     for (const forged of [
-      { amount: "1" },
       { currency: "RUB" },
       { status: "CAPTURED" },
       { paidAt: "2026-08-14T00:00:00.000Z" },
@@ -269,6 +275,8 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
     ]) {
       await createPayment(fin, orderId, forged).expect(422);
     }
+    // `amount` больше НЕ forged-поле (MULTI/PARTIAL §4): клиентский ввод,
+    // сервер-валидируемый (0 < amount <= due) — см. multi-partial e2e.
     // Контроль: ни один forged create не создал Payment.
     expect(await prisma.payment.count({ where: { orderId } })).toBe(0);
   });
@@ -308,44 +316,51 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
     expect(orderRow.paymentStatus).toBe("UNPAID");
   });
 
-  // ── 6. idempotent retry: duplicate create → существующий факт ───────────────
+  // ── 6. idempotency: same-key replay → один факт (внешний Idempotency-Key) ──
 
-  it("T6. identical retry create → существующий активный Payment (no-op, один факт)", async () => {
+  it("T6. same Idempotency-Key replay → один и тот же Payment (нет второго факта); divergent same key → controlled 4xx", async () => {
     const sm = await createStaff("s12_sm6", RoleCode.SALES_MANAGER);
     const fin = await createStaff("s12_fin6", RoleCode.FINANCE);
     const { orderId } = await buildOrder(sm, "pay_t6", 70);
-    const first = (await createPayment(fin, orderId).expect(201)).body as { id: string; code: string };
+    const a = agent(fin.accessToken);
+    const key = nextPayKey();
+    const first = (await a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }).expect(201)).body as { id: string; code: string };
     created.payments.push(first.id);
-    const second = (await createPayment(fin, orderId).expect(201)).body as { id: string; code: string };
+    const second = (await a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }).expect(201)).body as { id: string; code: string };
     expect(second.id).toBe(first.id);
+    expect(await prisma.payment.count({ where: { orderId } })).toBe(1);
+    // Divergent replay: тот же ключ, другой body → контролируемый 4xx (не 201).
+    const divergent = await a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment", amount: "10" });
+    expect(divergent.status).toBeGreaterThanOrEqual(400);
+    expect(divergent.status).toBeLessThan(500);
     expect(await prisma.payment.count({ where: { orderId } })).toBe(1);
   });
 
-  // ── 7. concurrent duplicate create → один факт, контролируемый 409 ──────────
+  // ── 7. concurrent create (разные ключи) → ровно один ≤ due проходит ────────
 
-  it("T7. concurrent duplicate create → ровно один факт; проигравший — controlled 409 (не raw 500)", async () => {
+  it("T7. concurrent create (разные ключи) → ровно один 201; проигравший — controlled 4xx (due-guard, не raw 500)", async () => {
     const sm = await createStaff("s12_sm7", RoleCode.SALES_MANAGER);
     const fin = await createStaff("s12_fin7", RoleCode.FINANCE);
     const { orderId } = await buildOrder(sm, "pay_t7", 55);
     const a = agent(fin.accessToken);
     const [r1, r2] = await Promise.all([
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", nextPayKey()).send({ orderId }),
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", nextPayKey()).send({ orderId }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", nextPayKey()).send({ orderId, reason: "e2e manual payment" }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", nextPayKey()).send({ orderId, reason: "e2e manual payment" }),
     ]);
-    const statuses = [r1.status, r2.status].sort();
-    // 201 + 409 (или 201+201 в случае последовательного no-op — но параллельно
-    // один обязан проиграть partial unique: детерминированный победитель).
-    expect(statuses).toContain(201);
-    const errors = [r1.status, r2.status].filter((s) => s >= 400);
-    for (const s of errors) expect(s).toBeLessThan(500); // controlled, без raw 500
+    const statuses = [r1.status, r2.status];
+    // Без amount оба претендуют на весь due (55) — под advisory lock'ом
+    // последовательно: первый забирает остаток, второй получает 422
+    // (no remaining amount due). Ровно один 201.
+    expect(statuses.filter((s) => s === 201)).toHaveLength(1);
+    for (const s of [r1.status, r2.status].filter((s) => s >= 400)) expect(s).toBeLessThan(500); // controlled, без raw 500
     expect(await prisma.payment.count({ where: { orderId } })).toBe(1);
     const winner = [r1, r2].find((r) => r.status === 201);
     created.payments.push((winner!.body as { id: string }).id);
   });
 
-  // ── 8. invalid/repeat transitions → 409 (terminal protection) ───────────────
+  // ── 8. invalid/repeat transitions → 409; overpayment → 422 ─────────────────
 
-  it("T8. повторный confirm → 409; confirm после fail → 409; overpayment после CAPTURED → no-op (второй Payment не создаётся)", async () => {
+  it("T8. повторный confirm → 409; confirm после fail → 409; overpayment create после CAPTURED → 422 (due=0)", async () => {
     const sm = await createStaff("s12_sm8", RoleCode.SALES_MANAGER);
     const fin = await createStaff("s12_fin8", RoleCode.FINANCE);
     const { orderId } = await buildOrder(sm, "pay_t8", 45);
@@ -356,12 +371,10 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
     // Повторный confirm → 409 (terminal retry controlled).
     await agent(fin.accessToken).post(`/api/v1/finance/payments/${pay.code}/confirm`).expect(409);
     await agent(fin.accessToken).post(`/api/v1/finance/payments/${pay.code}/fail`).expect(409);
-    // Overpayment: после CAPTURED повторный create — idempotent no-op
-    // (identical retry = same effect, конвенция Ledger): возвращает СУЩЕСТВУЮЩИЙ
-    // Payment, второй строки НЕ создаётся (isActivePayment partial unique —
-    // overpayment protection на DB-уровне).
-    const dup = (await createPayment(fin, orderId).expect(201)).body as { id: string };
-    expect(dup.id).toBe(pay.id);
+    // Overpayment (MULTI/PARTIAL): заказ оплачен полностью (45/45) → новый
+    // create (явный amount и default) → 422 due-guard, второй строки НЕ создаётся.
+    await createPayment(fin, orderId, { amount: "10" }).expect(422);
+    await createPayment(fin, orderId).expect(422);
     expect(await prisma.payment.count({ where: { orderId } })).toBe(1);
   });
 

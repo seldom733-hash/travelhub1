@@ -31,6 +31,7 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { Prisma, RoleCode } from "../src/generated/prisma/client";
 
 const FUTURE = (days = 30) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+const PAST = (years = 30) => new Date(Date.now() - years * 365 * 86400000).toISOString().slice(0, 10);
 
 interface Session {
   accessToken: string;
@@ -135,7 +136,16 @@ describe("Phase 3 Pre-Step 3.12 D4 — Representative Commerce Chains (e2e)", ()
     return customer.id;
   };
 
-  const persona = (n: number) => ({ firstName: `Чейн${n}`, lastName: "Представительный" });
+  // §2: Request-стадия собирает только FIO+DOB.
+  const persona = (n: number) => ({ firstName: `Чейн${n}`, lastName: "Представительный", birthDate: PAST(30 + n) });
+
+  // §4: Order-стадия — гражданство/серия/номер/срок (TOUR §3 REQUIRED).
+  const passport = (n: number) => ({
+    citizenship: "RU",
+    passportSeries: "RU",
+    passportNumber: `RU100000${n}`,
+    passportExpiry: FUTURE(1000 + n),
+  });
 
   /**
    * Deterministic chain builder — canonical Request → Booking CONFIRMED.
@@ -155,6 +165,7 @@ describe("Phase 3 Pre-Step 3.12 D4 — Representative Commerce Chains (e2e)", ()
         requestedServiceDate: FUTURE(30),
         quantity: 2,
         travelerCount: 2,
+        travelers: [persona(1), persona(2)],
         displayedPrice: 340,
         displayedCurrency: "USD",
       })
@@ -172,7 +183,7 @@ describe("Phase 3 Pre-Step 3.12 D4 — Representative Commerce Chains (e2e)", ()
     for (let i = 0; i < travelersRes.travelers.length; i++) {
       await agent(op.accessToken)
         .patch(`/api/v1/orders/${orderId}/travelers/${travelersRes.travelers[i].id}`)
-        .send(persona(i + 1))
+        .send({ ...persona(i + 1), ...passport(i + 1) })
         .expect(200);
     }
     await agent(op.accessToken).post(`/api/v1/orders/${orderId}/final-confirm`).send({}).expect(201);

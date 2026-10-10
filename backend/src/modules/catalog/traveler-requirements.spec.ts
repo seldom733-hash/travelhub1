@@ -1,6 +1,7 @@
 import {
   validateTravelerRequirements,
   getEffectiveTravelerRequirements,
+  getPinnedRequirementsShape,
   getDefaultTravelerRequirements,
   isTravelerRequirementState,
   isTravelerField,
@@ -110,13 +111,16 @@ describe("Traveler Requirements (D2)", () => {
   // ── ProductType Defaults ──────────────────────────────────────────────────
 
   describe("getDefaultTravelerRequirements", () => {
-    it("returns TOUR defaults for TOUR", () => {
+    it("returns TOUR defaults for TOUR (two-stage §3)", () => {
       const defaults = getDefaultTravelerRequirements("TOUR");
       expect(defaults.firstName).toBe("REQUIRED");
       expect(defaults.lastName).toBe("REQUIRED");
-      expect(defaults.birthDate).toBe("OPTIONAL");
-      expect(defaults.citizenship).toBe("NOT_REQUESTED");
-      expect(defaults.passportNumber).toBe("NOT_REQUESTED");
+      expect(defaults.birthDate).toBe("REQUIRED");
+      expect(defaults.citizenship).toBe("REQUIRED");
+      expect(defaults.gender).toBe("NOT_REQUESTED");
+      expect(defaults.passportSeries).toBe("REQUIRED");
+      expect(defaults.passportNumber).toBe("REQUIRED");
+      expect(defaults.passportExpiry).toBe("REQUIRED");
     });
 
     it("returns FLIGHT defaults (more strict)", () => {
@@ -175,10 +179,12 @@ describe("Traveler Requirements (D2)", () => {
     it("returns TOUR-like defaults for unknown types", () => {
       const defaults = getDefaultTravelerRequirements("UNKNOWN_TYPE");
       expect(defaults.firstName).toBe("REQUIRED");
-      expect(defaults.passportNumber).toBe("NOT_REQUESTED");
+      expect(defaults.birthDate).toBe("REQUIRED");
+      expect(defaults.passportSeries).toBe("REQUIRED");
+      expect(defaults.passportNumber).toBe("REQUIRED");
     });
 
-    it("always returns all 7 fields", () => {
+    it("always returns all 8 fields", () => {
       const defaults = getDefaultTravelerRequirements("TOUR");
       expect(Object.keys(defaults).sort()).toEqual(
         [...TRAVELER_FIELDS].sort(),
@@ -241,7 +247,7 @@ describe("Traveler Requirements (D2)", () => {
       expect(result.birthDate).toBe("REQUIRED");
     });
 
-    it("returns all 7 fields regardless of partial override", () => {
+    it("returns all 8 fields regardless of partial override", () => {
       const result = getEffectiveTravelerRequirements("TOUR", {
         firstName: "OPTIONAL",
       });
@@ -302,7 +308,7 @@ describe("Traveler Requirements (D2)", () => {
 
     it("documents group covers citizenship/passport", () => {
       expect(TRAVELER_FIELD_GROUPS.documents.fields).toEqual(
-        ["citizenship", "passportNumber", "passportExpiry"],
+        ["citizenship", "passportSeries", "passportNumber", "passportExpiry"],
       );
     });
 
@@ -318,8 +324,8 @@ describe("Traveler Requirements (D2)", () => {
   // ── Field Catalog ─────────────────────────────────────────────────────────
 
   describe("Field Catalog", () => {
-    it("contains exactly 7 fields", () => {
-      expect(TRAVELER_FIELDS.length).toBe(7);
+    it("contains exactly 8 fields", () => {
+      expect(TRAVELER_FIELDS.length).toBe(8);
     });
 
     it("includes all expected fields", () => {
@@ -328,8 +334,52 @@ describe("Traveler Requirements (D2)", () => {
       expect(TRAVELER_FIELDS).toContain("birthDate");
       expect(TRAVELER_FIELDS).toContain("citizenship");
       expect(TRAVELER_FIELDS).toContain("gender");
+      expect(TRAVELER_FIELDS).toContain("passportSeries");
       expect(TRAVELER_FIELDS).toContain("passportNumber");
       expect(TRAVELER_FIELDS).toContain("passportExpiry");
+    });
+  });
+
+  // ── Pinned-shape diagnostics (DATA-SHAPE FIX §11, P2) ─────────────────────
+
+  describe("getPinnedRequirementsShape", () => {
+    it("canonical TravelerFullRequirements → traveler_requirements", () => {
+      expect(
+        getPinnedRequirementsShape({
+          firstName: "REQUIRED",
+          lastName: "REQUIRED",
+          birthDate: "OPTIONAL",
+          citizenship: "NOT_REQUESTED",
+          gender: "NOT_REQUESTED",
+          passportNumber: "NOT_REQUESTED",
+          passportExpiry: "NOT_REQUESTED",
+        }),
+      ).toBe("traveler_requirements");
+      // …even a partial map is traveler-shaped (≥1 known field)
+      expect(getPinnedRequirementsShape({ firstName: "REQUIRED" })).toBe("traveler_requirements");
+    });
+
+    it("legacy tour/flight offer snapshot → offer_snapshot (the defect this fix repairs)", () => {
+      expect(
+        getPinnedRequirementsShape({
+          supplierCode: "KAZUNION",
+          externalOfferId: "35000",
+          hotel: "Rixos",
+          room: "DBL",
+          meal: "AI",
+          nights: 7,
+          adults: 2,
+        }),
+      ).toBe("offer_snapshot");
+    });
+
+    it("null / empty / unrelated object → unknown (no false positives)", () => {
+      expect(getPinnedRequirementsShape(null)).toBe("unknown");
+      expect(getPinnedRequirementsShape(undefined)).toBe("unknown");
+      expect(getPinnedRequirementsShape({})).toBe("unknown");
+      expect(getPinnedRequirementsShape([])).toBe("unknown");
+      expect(getPinnedRequirementsShape("REQUIRED")).toBe("unknown");
+      expect(getPinnedRequirementsShape({ doc: "passport" })).toBe("unknown");
     });
   });
 });

@@ -135,7 +135,8 @@ export class SupplierAggregatorService {
   /**
    * Verified capability matrix for tour suppliers (from adapter docs/specs).
    * KOMPAS: mapStateInc covers ~23 countries, nights 3–14 (adapter rejects
-   * outside the range), adults 1–4 / children 0–1 per verified context.
+   * outside the range); multi-child ages travel as the confirmed AGES CSV
+   * (owner capture: AGES=1,6,7).
    * SUMMERTOUR: STATEINC=9 (Turkey) hardcoded in the request builder,
    * nights unrestricted at adapter level.
    * KAZUNION: STATEINC dictionary discovered from the Baku form (8 countries),
@@ -159,17 +160,17 @@ export class SupplierAggregatorService {
       nights: { min: 3, max: 15 },
     },
     // ANEX (webapi.anextour.az): 21 countries from Baku (verified live from
-    // /samo/searchtour/States), nights 2–28 (Nights dictionary), children
-    // limited to 1 — the AGES param only accepts a single child age.
+    // /samo/searchtour/States), nights 2–28 (Nights dictionary). Multi-child
+    // is supported — owner-supplied real request: ADULT=2 CHILD=3
+    // AGES=1,6,13 (the AGES CSV carries every child age), so no children cap.
     ANEX: {
       countries: [
         "TR", "EG", "AE", "TH", "LK", "AT", "GE", "IN", "ID", "ES", "IT",
         "KZ", "CN", "MU", "MY", "MV", "SC", "SG", "UZ", "FR", "QA",
       ],
       nights: { min: 2, max: 28 },
-      children: { max: 1 },
       // Hotels (AnexHotelAdapter, verified live): stay nights 1..30 and the
-      // AGES csv accepts several children — override the tour bounds.
+      // AGES csv accepts several children - override the tour bounds.
       // countries is a FULL override (supports() merges {...base, ...svc}):
       // hotels use a separate upstream dictionary /samo/searchhotel/States
       // (52 countries — AZ, CH, KE, RU, GR, CY, JP… — verified live), while

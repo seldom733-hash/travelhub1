@@ -210,17 +210,21 @@ export class OrderSubscribers implements OnModuleInit {
   }
 
   /**
-   * Step 2.12 — Order payment projection (PaymentCaptured consumer).
+   * Step 2.12 → MULTI/PARTIAL PAYMENTS (§4) — Order payment projection
+   * (PaymentCaptured consumer).
    *
    * Payment — Finance-owned; Order НЕ пишет finance.*. Здесь Order-owned
-   * subscriber проецирует факт оплаты на СВОИ поля: paymentStatus = PAID,
-   * paidAmount = frozen amount (из payload, Decimal string — self-sufficient,
-   * без чтения finance.*). Идемпотентность: InboxEvent; повторная доставка
-   * (или второй PaymentCaptured для того же заказа — невозможен: 1 активный
-   * Payment на Order) → no-op. CAS по version: конкурентные обновления Order
-   * не перезаписываются молча. Financial факт фиксируется независимо от
-   * lifecycle Order (деньги получены); refund — 2.13. Без result-event
-   * (проекция Order-owned; потребителей нет).
+   * subscriber проецирует факт оплаты на СВОИ поля: paidAmount += frozen
+   * amount из payload (Decimal string — self-sufficient, без чтения finance.*);
+   * paymentStatus пересчитывается: UNPAID (0), PARTIALLY_PAID (0 < paid <
+   * total), PAID (paid ≥ total), REFUNDED (refunded ≥ paid при paid > 0).
+   * Раньше второй PaymentCaptured для уже PAID заказа был no-op (один Payment
+   * на Order) — теперь НЕТ: каждый captured payment накапливается. Приёмка:
+   * правильный final state достигается при 1300 → 300/500/400/100 → PAID.
+   * Идемпотентность: InboxEvent (повторная доставка → no-op). CAS по version
+   * с retry-loop: конкурентные обновления Order не перезаписываются молча.
+   * Financial факт фиксируется независимо от lifecycle Order (деньги получены);
+   * refund — 2.13. Без result-event (проекция Order-owned; потребителей нет).
    */
   private async onPaymentCaptured(ev: OutboxEnvelope): Promise<void> {
     const p = ev.payload as unknown as PaymentEventPayload;
@@ -231,16 +235,10 @@ export class OrderSubscribers implements OnModuleInit {
       await this.prisma.$transaction(async (tx) => {
         if (await tx.inboxEvent.findUnique({ where: { consumerId_eventId: { consumerId: ORDER_PAYMENT_CONSUMER_ID, eventId: ev.id } } })) return;
 
-        const order = await tx.order.findUnique({ where: { id: p.orderId } });
+        let order = await tx.order.findUnique({ where: { id: p.orderId } });
         if (!order) {
           // Order отсутствует — проекция невозможна; отметить обработанным,
           // чтобы повторная доставка не создавала вечный retry.
-          await tx.inboxEvent.create({ data: { consumerId: ORDER_PAYMENT_CONSUMER_ID, eventId: ev.id } });
-          return;
-        }
-
-        // Уже PAID (идентичный replay / другой captured payment) → no-op.
-        if (order.paymentStatus === "PAID") {
           await tx.inboxEvent.create({ data: { consumerId: ORDER_PAYMENT_CONSUMER_ID, eventId: ev.id } });
           return;
         }
@@ -256,27 +254,50 @@ export class OrderSubscribers implements OnModuleInit {
           throw new Error(`[order-payment] negative amount in PaymentCaptured for ${p.paymentId}`);
         }
 
-        const updatedRows = await tx.order.updateMany({
-          where: { id: order.id, version: order.version },
-          data: {
-            paymentStatus: "PAID",
-            paidAmount: amount,
-            version: { increment: 1 },
-          },
-        });
-        if (updatedRows.count === 1) {
-          await tx.orderHistory.create({
+        // MULTI/PARTIAL §4: накопление paidAmount (часть общей суммы платежей)
+        // + пересчёт статуса; CAS retry при конкурентных обновлениях Order.
+        let staleOrder = order;
+        let applied = false;
+        for (let attempt = 0; attempt < 5 && !applied; attempt++) {
+          const fresh = attempt === 0 ? staleOrder : await tx.order.findUnique({ where: { id: p.orderId } });
+          if (!fresh) break;
+          const newPaid = fresh.paidAmount.add(amount);
+          const nextStatus =
+            newPaid.lessThanOrEqualTo(0)
+              ? "UNPAID"
+              : fresh.refundedAmount.greaterThanOrEqualTo(newPaid)
+                ? "REFUNDED"
+                : newPaid.greaterThanOrEqualTo(fresh.amount)
+                  ? "PAID"
+                  : "PARTIALLY_PAID";
+          const updatedRows = await tx.order.updateMany({
+            where: { id: fresh.id, version: fresh.version },
             data: {
-              orderId: order.id,
-              action: "payment_captured",
-              source: "SYSTEM",
-              from: "UNPAID",
-              to: "PAID",
-              actorId: null,
-              actorName: "Система",
-              comment: `Оплата получена (${p.code}): ${p.amount} ${p.currency}`,
+              paidAmount: newPaid,
+              paymentStatus: nextStatus,
+              version: { increment: 1 },
             },
           });
+          if (updatedRows.count === 1) {
+            await tx.orderHistory.create({
+              data: {
+                orderId: fresh.id,
+                action: "payment_captured",
+                source: "SYSTEM",
+                from: fresh.paymentStatus,
+                to: nextStatus,
+                actorId: null,
+                actorName: "Система",
+                comment: `Оплата получена (${p.code}): ${p.amount} ${p.currency}`,
+              },
+            });
+            applied = true;
+          } else {
+            staleOrder = fresh; // конкурентное обновление — перечитать и повторить
+          }
+        }
+        if (!applied) {
+          throw new Error(`[order-payment] CAS conflict applying PaymentCaptured for ${p.paymentId}`);
         }
 
         await tx.inboxEvent.create({ data: { consumerId: ORDER_PAYMENT_CONSUMER_ID, eventId: ev.id } });
@@ -288,18 +309,19 @@ export class OrderSubscribers implements OnModuleInit {
   }
 
   /**
-   * Step 2.13 — Order refund projection (RefundProcessed consumer).
+   * Step 2.13 → MULTI/PARTIAL PAYMENTS (§4) — Order refund projection
+   * (RefundProcessed consumer).
    *
    * Refund — Finance-owned; Order НЕ пишет finance.*. Order-owned subscriber
    * проецирует факт возврата на СВОИ поля: refundedAmount += frozen amount,
-   * paymentStatus → REFUNDED при полном возврате (refundedAmount >= paidAmount),
-   * иначе остаётся PAID (частичный возврат; over-refund невозможен — guard на
-   * Refund-уровне, refundable = payment.amount − refunded). paidAmount —
-   * исторический факт «деньги получены» НЕ переписывается. Идемпотентность:
-   * InboxEvent; повторная доставка → no-op. CAS по version: конкурентные
-   * обновления Order не перезаписываются молча. Без result-event (проекция
-   * Order-owned; потребителей нет). RefundCreated/Approved/Failed НЕ
-   * проецируются (деньги ещё не возвращены / возврат не состоялся).
+   * paymentStatus пересчитывается: REFUNDED (refunded ≥ paid при paid > 0),
+   * иначе PAID/PARTIALLY_PAID по paid vs total (частичная оплата + частичный
+   * возврат → PARTIALLY_PAID), UNPAID при paid = 0. paidAmount — исторический
+   * факт «деньги получены» НЕ переписывается. Идемпотентность: InboxEvent;
+   * повторная доставка → no-op. CAS по version: конкурентные обновления Order
+   * не перезаписываются молча. Без result-event (проекция Order-owned;
+   * потребителей нет). RefundCreated/Approved/Failed НЕ проецируются (деньги
+   * ещё не возвращены / возврат не состоялся).
    */
   private async onRefundProcessed(ev: OutboxEnvelope): Promise<void> {
     const p = ev.payload as unknown as RefundEventPayload;
@@ -331,10 +353,19 @@ export class OrderSubscribers implements OnModuleInit {
 
         const nextRefunded = order.refundedAmount.add(amount);
         // Over-refund невозможен (Refund-guard: refundable = payment.amount −
-        // refunded; payment.amount == Order.paidAmount) — defensively: не даём
-        // проекции уйти в отрицательную truth.
+        // refunded) — defensively: не даём проекции уйти в отрицательную truth.
         const refunded = nextRefunded.greaterThan(order.paidAmount) ? order.paidAmount : nextRefunded;
-        const targetStatus = refunded.greaterThanOrEqualTo(order.paidAmount) ? "REFUNDED" : "PAID";
+        // MULTI/PARTIAL §4: статус после возврата — четырёхзначная шкала.
+        // Частичная оплата + частичный возврат → PARTIALLY_PAID (раньше
+        // дихотомия REFUNDED/PAID неверно помечала такой заказ PAID).
+        const targetStatus =
+          order.paidAmount.lessThanOrEqualTo(0)
+            ? "UNPAID"
+            : refunded.greaterThanOrEqualTo(order.paidAmount)
+              ? "REFUNDED"
+              : order.paidAmount.greaterThanOrEqualTo(order.amount)
+                ? "PAID"
+                : "PARTIALLY_PAID";
         const fromStatus = order.paymentStatus;
 
         const updatedRows = await tx.order.updateMany({

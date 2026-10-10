@@ -23,9 +23,12 @@ export interface SummerSearchRequest {
   NIGHTS_TILL?: string;
   ADULT?: string;
   CHILD?: string;
-  AGE1?: string;
-  AGE2?: string;
-  AGE3?: string;
+  /**
+   * Confirmed supplier contract (owner-supplied real request):
+   * `ADULT=12&CHILD=3&AGES=2,6,12` — ONE comma-separated AGES param with
+   * every child age. Do NOT use AGE1/AGE2/AGE3 on the active XHR.
+   */
+  AGES?: string;
   MEALS_ANY: string;
   MEALS?: string;
   ROOMS_ANY: string;
@@ -107,9 +110,7 @@ export function buildSummerSearchRequest(query: {
   if (query.adults) req.ADULT = String(query.adults);
   if (query.children !== undefined) req.CHILD = String(query.children);
   const ages = query.childAges ?? [];
-  if (ages[0] !== undefined) req.AGE1 = String(ages[0]);
-  if (ages[1] !== undefined) req.AGE2 = String(ages[1]);
-  if (ages[2] !== undefined) req.AGE3 = String(ages[2]);
+  if (ages.length) req.AGES = ages.join(",");
   return req;
 }
 
@@ -137,6 +138,9 @@ export function buildSummerXhrUrl(req: SummerSearchRequest): string {
   if (req.NIGHTS_TILL) p.set("NIGHTS_TILL", req.NIGHTS_TILL);
   if (req.ADULT) p.set("ADULT", req.ADULT);
   if (req.CHILD) p.set("CHILD", req.CHILD);
+  // Confirmed AGES contract — the audit gap was exactly here: the ages were
+  // built into the request but never serialized into the active XHR URL.
+  if (req.AGES) p.set("AGES", req.AGES);
   p.set("CURRENCY", req.CURRENCY);
   p.set("MEALS_ANY", req.MEALS_ANY);
   p.set("MEALS", req.MEALS ?? "");

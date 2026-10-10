@@ -89,6 +89,8 @@ class BookingActionDto {
       "complete",
       "cancel",
       "problem",
+      // Stage 2 (Booking → Order): round-trip возврата в заказ.
+      "returnToOrder",
     ] as const,
   )
   action!: BookingAction;
@@ -102,14 +104,17 @@ class BookingActionDto {
 }
 
 /**
- * Права команд Booking (RBAC Matrix §4) — Step 2.9: новые действия мапятся на
- * существующие каталоговые права (никаких новых permissions/ролей не вводится):
+ *  Права команд Booking (RBAC Matrix §4) — Step 2.9: большинство действий
+ *  мапятся на существующие каталоговые права; Stage 2 добавил ЕДИНСТВЕННОЕ
+ *  новое granular-право (Q7):
  *  - supplier-processing (prepare/send) → booking.send_supplier;
  *  - confirmation lifecycle (requestClarification/resume/confirm/reject/service/complete/problem)
  *    → booking.confirm;
  *  - change (requestChange/resolveChange) → booking.request_change;
- *  - cancellation (requestCancellation/cancel) → booking.cancel.
- * BUYER/PARTNER/MODERATOR этих прав не имеют (matrix §4) → 403 (Step 2.9 §26).
+ *  - cancellation (requestCancellation/cancel) → booking.cancel;
+ *  - Stage 2 (Booking → Order): returnToOrder → booking.return_to_order
+ *    (Q7: НОВОЕ granular-право — возврат round-trip, не отмена поставщику).
+ * BUYER/PARTNER/MODERATOR/SALES_MANAGER этих прав не имеют (matrix §4) → 403 (Step 2.9 §26).
  */
 const ACTION_PERMISSIONS: Record<BookingAction, string> = {
   prepare: "booking.send_supplier",
@@ -125,6 +130,8 @@ const ACTION_PERMISSIONS: Record<BookingAction, string> = {
   complete: "booking.confirm",
   cancel: "booking.cancel",
   problem: "booking.confirm",
+  // Stage 2 (Q7): granular-право возврата в заказ (отдельно от booking.cancel).
+  returnToOrder: "booking.return_to_order",
 };
 
 /**
@@ -226,6 +233,6 @@ export class BookingController {
     // assertNoForbiddenKeys, как в Sales/Reverse/Catalog/Order), а не
     // silent-strip через whitelist. Команда принимает ТОЛЬКО `action`.
     assertNoForbiddenKeys(req.body, BOOKING_ACTION_FORBIDDEN_KEYS);
-    return this.bookings.bookingAction(id, dto.action, actor.username, dto.reason ?? null);
+    return this.bookings.bookingAction(id, dto.action, actor.username, dto.reason ?? null, actor.id);
   }
 }

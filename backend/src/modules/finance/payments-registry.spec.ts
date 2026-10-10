@@ -138,7 +138,9 @@ interface RegistryConfig {
   statusGroups?: Array<{ status: PaymentStatus; count: number }>;
   refundGroups?: Array<{ status: RefundStatus; count: number }>;
   currencyGroups?: Array<{ currency: string; count: number; amount: string }>;
-  orderRefs?: Array<{ id: string; referenceNumber: string }>;
+  orderRefs?: Array<{ id: string; referenceNumber: string; amount?: Prisma.Decimal }>;
+  // MULTI/PARTIAL §7: PaymentHistory action='created' rows → acceptedBy.
+  createdHistory?: Array<{ paymentId: string; actorName: string | null }>;
 }
 
 type PrismaMethod = jest.Mock;
@@ -159,12 +161,19 @@ function makeRegistryService(cfg: RegistryConfig) {
       findMany: jest.fn(),
       groupBy: jest.fn(),
     },
+    paymentHistory: {
+      findMany: jest.fn(),
+    },
   };
 
-  // Channel order-id resolution.
+  // Channel order-id resolution (батч-энричмент list() читает также amount).
   (prisma.order.findMany as PrismaMethod).mockImplementation((args: any) => {
     if (args?.select?.referenceNumber) {
-      return Promise.resolve(cfg.orderRefs ?? []);
+      return Promise.resolve(
+        (cfg.orderRefs ?? []).map((r) =>
+          args.select.amount ? { ...r, amount: r.amount ?? new Prisma.Decimal("1000") } : r,
+        ),
+      );
     }
     if (args?.where?.OR) {
       return Promise.resolve((cfg.searchOrderIds ?? []).map((id) => ({ id })));
@@ -205,6 +214,9 @@ function makeRegistryService(cfg: RegistryConfig) {
 
   (prisma.refund.findMany as PrismaMethod).mockImplementation(() =>
     Promise.resolve((cfg.refundStatusPaymentIds ?? []).map((id) => ({ paymentId: id }))),
+  );
+  (prisma.paymentHistory.findMany as PrismaMethod).mockImplementation(() =>
+    Promise.resolve(cfg.createdHistory ?? []),
   );
   (prisma.refund.groupBy as PrismaMethod).mockImplementation(() =>
     Promise.resolve((cfg.refundGroups ?? []).map((g) => ({ status: g.status, _count: { status: g.count } }))),
@@ -269,6 +281,8 @@ describe("UI-C1.2E — PaymentService payments registry list()", () => {
       refundGroups: [{ status: RefundStatus.REQUESTED, count: 1 }],
       currencyGroups: [{ currency: "USD", count: 9, amount: "1100.00" }],
       items: [mkPaymentRow()],
+      orderRefs: [{ id: "o1", referenceNumber: "ORD-REF-1" }],
+      createdHistory: [{ paymentId: "pay-1", actorName: "Alice Smith" }],
       baseTotal: 9,
       tableTotal: 9,
       basePaymentIds: ["p1"],
@@ -283,6 +297,14 @@ describe("UI-C1.2E — PaymentService payments registry list()", () => {
     expect(res.aggregates.refundStatus[RefundStatus.REQUESTED]).toBe(1);
     expect(res.aggregates.refundStatus[RefundStatus.PROCESSED]).toBe(0);
     expect(res.aggregates.currency).toEqual([{ currency: "USD", count: 9, amount: "1100" }]);
+    // MULTI/PARTIAL §7: каждая строка несёт orderAmount/ordinal/remainingAfter/acceptedBy.
+    expect(res.items[0]).toMatchObject({
+      orderReference: "ORD-REF-1",
+      orderAmount: "1000",
+      ordinal: 1,
+      remainingAfter: "850", // 1000 − 150 (CAPTURED)
+      acceptedBy: "Alice Smith",
+    });
   });
 
   it("keeps overview aggregates stable while a paymentStatus KPI filter narrows only the table", async () => {

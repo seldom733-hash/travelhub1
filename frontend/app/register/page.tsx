@@ -6,12 +6,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PublicLayout from "@/components/PublicLayout";
 import { accountApi } from "@/lib/account-api";
 import { auth } from "@/lib/api";
+import { COUNTRY_NAMES } from "@/lib/locations";
 import { postLoginTarget, safeNextPath } from "@/lib/routes";
 import { t, useLocale } from "@/lib/i18n";
 
 /**
- * PHASE 1 STEP 1.9 §4/§7 — публичная self-registration BUYER.
+ * PHASE 1 STEP 1.9 §4/§7 + M4.3 §15-16 — публичная self-registration BUYER.
  * - создаёт ТОЛЬКО BUYER (backend игнорирует/отклоняет любые forged role);
+ * - M4.3: country + phone — phone-first identity; сервер нормализует phone в
+ *   canonical E.164 (loginPhone) по registration country (default AZ), дубликаты
+ *   телефона/email → 409; клиентская проверка только грубая (сервер авторитетен);
  * - после регистрации пользователь автоматически залогинен (accessToken) и
  *   возвращается к исходному public контексту через safe ?next= (postLoginTarget);
  * - locale сохраняется (LocaleProvider/localStorage) через auth roundtrip;
@@ -29,6 +33,10 @@ function RegisterPageInner() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  // M4.3: регистрационная страна (ISO alpha-2, справочник COUNTRY_NAMES) +
+  // телефон (нормализация/валидация — на сервере).
+  const [country, setCountry] = useState("AZ");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
@@ -41,9 +49,26 @@ function RegisterPageInner() {
       setError(t("register.password_mismatch", locale));
       return;
     }
+    // Грубая клиентская проверка (сервер повторяет авторитетно): ≥9 цифр.
+    const digits = phone.replace(/\D/g, "");
+    if (!digits) {
+      setError(t("register.phone_required", locale));
+      return;
+    }
+    if (digits.length < 9) {
+      setError(t("register.phone_invalid", locale));
+      return;
+    }
     setBusy(true);
     try {
-      const res = await accountApi.register({ email, password, firstName: firstName || undefined, lastName: lastName || undefined });
+      const res = await accountApi.register({
+        email,
+        password,
+        firstName: firstName || undefined,
+        lastName: lastName || undefined,
+        country,
+        phone,
+      });
       auth.setToken(res.accessToken);
       // BUYER → public return context (products/search/category) / /account deep-link,
       // иначе /account (Buyer Cabinet home, Step 1.13).
@@ -106,6 +131,44 @@ function RegisterPageInner() {
               placeholder="you@example.com"
             />
 
+            <div className="mb-4 grid grid-cols-[1fr_1.4fr] gap-3">
+              <div>
+                <label htmlFor="reg-country" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+                  {t("register.country", locale)}
+                </label>
+                <select
+                  id="reg-country"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  autoComplete="country"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                >
+                  {Object.keys(COUNTRY_NAMES).map((code) => (
+                    <option key={code} value={code}>
+                      {COUNTRY_NAMES[code][locale]} ({code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="reg-phone" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+                  {t("register.phone", locale)}
+                </label>
+                <input
+                  id="reg-phone"
+                  type="tel"
+                  inputMode="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  autoComplete="tel"
+                  required
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                  placeholder="+994 50 000 00 00"
+                />
+              </div>
+            </div>
+            <p className="-mt-2 mb-4 text-xs text-slate-400">{t("register.phone_hint", locale)}</p>
+
             <label htmlFor="reg-pass" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
               {t("auth.password_label", locale)}
             </label>
@@ -139,7 +202,7 @@ function RegisterPageInner() {
 
             <button
               type="submit"
-              disabled={busy || !email || password.length < 8}
+              disabled={busy || !email || !phone || password.length < 8}
               className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? t("register.busy", locale) : t("register.submit", locale)}

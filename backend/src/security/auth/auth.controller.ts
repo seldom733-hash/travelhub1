@@ -4,7 +4,8 @@ import { AuthService, type LoginResult } from "./auth.service";
 import { CurrentUser, Public } from "./decorators";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 import { SecurityService } from "../security.service";
-import { LoginThrottleService } from "../../shared/login-throttle.service";
+import { ActivationService } from "../activation.service";
+import { LoginThrottleService, normalizeLoginKey } from "../../shared/login-throttle.service";
 import { assertNoForbiddenKeys, REGISTER_FORBIDDEN_KEYS } from "../../shared/field-validation";
 import { ApplicantType } from "../../generated/prisma/enums";
 import type { AuthedRequest } from "./jwt-auth.guard";
@@ -16,6 +17,12 @@ import type { Request, Response } from "express";
  * Роль НЕ принимается (всегда BUYER); role/partnerId/customerId/permissions/…
  * из body — явный 422 (ValidationPipe whitelist всё равно срезал бы их, но
  * требование clarification — явное отклонение forged полей).
+ *
+ * M4.3 §15 (ADR-0016): country + phone — phone-first identity. Оба поля
+ * опциональны в API (legacy-совместимость 42+ существующих контрактов);
+ * фронтенд buyer-registration ВСЕГДА отправляет оба. При наличии — строгая
+ * валидация в сервисе (2-letter ISO country; phone нормализуется в canonical
+ * E.164 с country как default region, невалидный номер → 422).
  */
 class RegisterDto {
   @IsOptional()
@@ -47,14 +54,37 @@ class RegisterDto {
   @IsString()
   @MaxLength(200)
   fullName?: string;
+
+  /** M4.3: ISO-3166 alpha-2 (валидация строго в сервисе: ^[A-Z]{2}$). */
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(3)
+  country?: string;
+
+  /** M4.3: телефон в любом поддерживаемом формате (нормализация → E.164). */
+  @IsOptional()
+  @IsString()
+  @MinLength(5)
+  @MaxLength(30)
+  phone?: string;
 }
 
 class LoginDto {
+  /** M4.3 §12: identifier — canonical phone (phone-first) ИЛИ legacy username. */
   @IsString()
   username!: string;
 
   @IsString()
   password!: string;
+}
+
+/** M4.3 §19: consume activation token (public; throttled per IP). */
+class ActivateDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(300)
+  token!: string;
 }
 
 /**
@@ -152,6 +182,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly security: SecurityService,
     private readonly throttle: LoginThrottleService,
+    private readonly activation: ActivationService,
   ) {}
 
   @Public()
@@ -196,9 +227,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post("login")
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<LoginResult> {
-    // Step 2.17: brute-force защита — sliding window per `username|ip`.
+    // Step 2.17: brute-force защита — sliding window per `identifier|ip`.
+    // M4.3 §13: identifier нормализуется (canonical E.164 для телефона,
+    // lowercase для username) — ротация формата записи НЕ обходит окно.
     // Успешный вход сбрасывает окно. Ограничение: in-memory per-instance.
-    const throttleKey = `${dto.username.toLowerCase()}|${req.ip ?? "unknown"}`;
+    const throttleKey = `${normalizeLoginKey(dto.username)}|${req.ip ?? "unknown"}`;
     this.throttle.check(throttleKey);
     const result = await this.auth.login(dto.username, dto.password);
     this.throttle.reset(throttleKey);
@@ -207,6 +240,23 @@ export class AuthController {
     // API-клиентов/e2e. Body всё ещё возвращает accessToken (legacy контракт,
     // используется e2e и API-клиентами).
     this.setSessionCookie(res, result.accessToken);
+    return result;
+  }
+
+  /**
+   * M4.3 §19 (option B) — consume activation token (public).
+   * Mechanics: single-use + expiry + SHA-256 storage; отказы неотличимы
+   * (401 без enumeration); throttled per IP (защита перебора). Delivery
+   * отложена — зависимость задокументирована в M4-IMPLEMENTATION-REPORT.
+   */
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post("activate")
+  async activate(@Body() dto: ActivateDto, @Req() req: Request): Promise<{ ok: true; userId: string }> {
+    const throttleKey = `activation|${req.ip ?? "unknown"}`;
+    this.throttle.check(throttleKey);
+    const result = await this.activation.consume(dto.token);
+    this.throttle.reset(throttleKey);
     return result;
   }
 

@@ -2,8 +2,13 @@
  * PHASE 3 PRE-STEP 3.12 — REMEDIATION ROUND 1
  * Real concurrency test for ReferenceNumberService allocation.
  *
- * Uses raw pg client to simulate concurrent Hi/Lo block allocation
- * against events.BusinessSequence table.
+ * Uses raw pg client to validate atomic increment +1 allocation against
+ * events.BusinessSequence (сплошная последовательность; аудит нумераций —
+ * Hi/Lo-блочная аллокация удалена).
+ *
+ * Аллокации идут в ИЗОЛИРОВАННОМ ключевом пространстве
+ * REFSEQ:CONCURRENCY-TEST:* — тест не трогает видимые бизнес-счётчики
+ * (иначе каждый прогон сжигал бы хвосты в живых последовательностях).
  *
  * Required by §9 of the remediation contract.
  */
@@ -11,7 +16,6 @@ import { Pool } from "pg";
 
 const CONCURRENCY = 20;
 const ALLOCATIONS_PER_WORKER = 10;
-const BLOCK_SIZE = 100;
 const DATABASE_URL = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/travelhub1";
 
 describe("ReferenceNumberService — Concurrency Safety (Real DB)", () => {
@@ -26,7 +30,7 @@ describe("ReferenceNumberService — Concurrency Safety (Real DB)", () => {
   });
 
   /**
-   * Simulate Hi/Lo block allocation using raw pg.
+   * Simulate contiguous allocation using raw pg (как в сервисе).
    * Each worker independently allocates from BusinessSequence with atomic upsert.
    */
   async function allocateConcurrently(
@@ -35,17 +39,16 @@ describe("ReferenceNumberService — Concurrency Safety (Real DB)", () => {
     concurrency: number,
     allocationsPerWorker: number,
   ): Promise<string[]> {
-    const seqPrefix = `REFSEQ:${prefix}:${typeCode}`;
+    // Изолированное ключевое пространство теста (не видимые бизнес-счётчики).
+    const seqPrefix = `REFSEQ:CONCURRENCY-TEST:${prefix}:${typeCode}`;
 
     async function allocateOne(): Promise<string> {
-      // Simulate Hi/Lo: claim a block atomically, then generate from block
-      // In this simplified version, we use atomic pg advisory lock + sequence
       const client = await pool.connect();
       try {
         // Use advisory lock per-prefix to serialize claims
         await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [seqPrefix]);
 
-        // Atomic upsert: increment by 1 (simplified — real service uses block of 100)
+        // Atomic upsert: increment by 1 (как в сервисе — сплошная последовательность)
         const result = await client.query(
           `INSERT INTO "events"."BusinessSequence" ("prefix", "value")
            VALUES ($1, 1)

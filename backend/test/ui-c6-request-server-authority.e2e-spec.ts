@@ -161,6 +161,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -193,6 +194,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -223,6 +225,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -254,6 +257,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -290,6 +294,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -320,6 +325,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -347,6 +353,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -371,6 +378,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -401,6 +409,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -431,6 +440,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -467,6 +477,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -504,6 +515,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -540,6 +552,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -575,6 +588,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -622,6 +636,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -644,6 +659,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -667,6 +683,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -715,6 +732,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -748,6 +766,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -789,6 +808,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -821,6 +841,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })
@@ -849,6 +870,7 @@ describe("UI-C6 — Request Server-Authority Remediation (e2e)", () => {
         partnerId: seller.partnerId,
         requestedServiceDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         travelerCount: 1,
+        travelers: [{ firstName: "UI", lastName: "Traveler", birthDate: "1990-01-01" }],
         displayedPrice: 100,
         displayedCurrency: "USD",
       })

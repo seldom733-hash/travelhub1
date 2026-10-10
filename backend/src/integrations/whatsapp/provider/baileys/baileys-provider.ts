@@ -95,6 +95,14 @@ const LID_RETRY_MS = 5 * 60_000;
 const PHONE_PROBE_CHUNK = 50;
 /** Таймаут скачивания входящего медиа. */
 const MEDIA_DOWNLOAD_TIMEOUT_MS = 30_000;
+/**
+ * Watchdog зомби-соединения: после сна/гибернации машины WS-транспорт может
+ * умереть молча (нет ни frames, ни connection.update close) — статус навсегда
+ * остаётся CONNECTED, входящие не доставляются. Liveness = ЛЮБОЙ входящий
+ * кадр WS (Baileys keepalive отвечает ~каждые 30 c) или любое событие ev.
+ */
+const WATCHDOG_INTERVAL_MS = 60_000;
+const WATCHDOG_STALE_MS = 5 * 60_000;
 /** Типы сообщений, у которых есть файл для скачивания. */
 const MEDIA_TYPES: ReadonlySet<WhatsAppInboundProviderMessage["type"]> = new Set([
   "image",
@@ -124,6 +132,10 @@ export interface BaileysProviderOptions {
    * loadBaileys().
    */
   readonly loadModule?: () => Promise<BaileysModuleLike>;
+  /** Тестовый оверрайд интервала проверки watchdog'а (прод: 60 c). */
+  readonly watchdogIntervalMs?: number;
+  /** Тестовый оверрайд порога тишины watchdog'а (прод: 5 мин). */
+  readonly watchdogStaleMs?: number;
 }
 
 function extractStatusCode(error?: Error): number | null {
@@ -246,6 +258,12 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
   private stopping = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
+  /** Watchdog зомби-соединения: периодический контроль liveness. */
+  private watchdogTimer: NodeJS.Timeout | null = null;
+  /** Момент последней активности живого сокета (входящий кадр/событие). */
+  private lastSocketActivityAt: number | null = null;
+  private readonly watchdogIntervalMs: number;
+  private readonly watchdogStaleMs: number;
 
   private readonly evidence = new Map<string, { status: WhatsAppDeliveryStatus; observedAt: Date }>();
   private readonly stateListeners = new Set<Listener<WhatsAppConnectionSnapshot>>();
@@ -262,6 +280,8 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
     this.getFencingToken = options.getFencingToken;
     this.socketStarter = options.socketStarter;
     this.loadModule = options.loadModule ?? loadBaileys;
+    this.watchdogIntervalMs = options.watchdogIntervalMs ?? WATCHDOG_INTERVAL_MS;
+    this.watchdogStaleMs = options.watchdogStaleMs ?? WATCHDOG_STALE_MS;
     this.authStore = new AuthStateStore({
       sessionPath: options.config.sessionPath,
       encryptionKeyMaterial: options.config.authEncryptionKey,
@@ -340,6 +360,7 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
             generateHighQualityLinkPreview: false,
           });
       this.wireEvents(this.socket);
+      this.ensureWatchdog();
       // §6.2: свежая сессия ждёт QR (INITIALIZING → QR_REQUIRED), существующая
       // сразу идёт CONNECTING → CONNECTED.
       if (this.state === "INITIALIZING" && this.adapter.loadedExistingSession) {
@@ -356,13 +377,36 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
 
   private wireEvents(socket: BaileysSocketLike): void {
     socket.ev.on("creds.update", (update: Record<string, unknown>) => {
+      this.touchSocketActivity();
       this.adapter?.saveCreds(update);
     });
-    socket.ev.on("connection.update", (update) => this.onConnectionUpdate(update));
-    socket.ev.on("messages.upsert", (upsert) => this.onMessagesUpsert(upsert.messages));
-    socket.ev.on("messages.update", (updates) => this.onMessagesUpdate(updates));
-    socket.ev.on("contacts.upsert", (contacts) => this.onContactsUpsert(contacts));
-    socket.ev.on("chats.phoneNumberShare", (data) => this.onPhoneNumberShare(data));
+    socket.ev.on("connection.update", (update) => {
+      this.touchSocketActivity();
+      this.onConnectionUpdate(update);
+    });
+    socket.ev.on("messages.upsert", (upsert) => {
+      this.touchSocketActivity();
+      this.onMessagesUpsert(upsert.messages);
+    });
+    socket.ev.on("messages.update", (updates) => {
+      this.touchSocketActivity();
+      this.onMessagesUpdate(updates);
+    });
+    socket.ev.on("contacts.upsert", (contacts) => {
+      this.touchSocketActivity();
+      this.onContactsUpsert(contacts);
+    });
+    socket.ev.on("chats.phoneNumberShare", (data) => {
+      this.touchSocketActivity();
+      this.onPhoneNumberShare(data);
+    });
+    // Watchdog: первичный liveness-сигнал — ЛЮБОЙ входящий WS-кадр
+    // (Baileys keepalive даёт кадры ~каждые 30 c). Опционально: у
+    // test-fakes поля ws может не быть — тогда работают события ev.
+    const rawWs = (socket as unknown as { ws?: { on?: (event: string, cb: () => void) => void } }).ws;
+    if (typeof rawWs?.on === "function") {
+      rawWs.on("message", () => this.touchSocketActivity());
+    }
   }
 
   private onConnectionUpdate(update: BaileysConnectionUpdateLike): void {
@@ -382,6 +426,10 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
         this.connectedAt = new Date();
         this.phone = this.parsePhone(this.socket?.user?.id);
         this.reconnectAttempts = 0;
+        // Точка отсчёта liveness: watchdog считает тишину от последнего
+        // успешного open (первый кадр придёт сразу после handshake).
+        this.touchSocketActivity();
+        this.ensureWatchdog();
       } else if (update.connection === "close") {
         void this.handleClose(update.lastDisconnect?.error);
       }
@@ -504,6 +552,44 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
   private cancelReconnectTimer(): void {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+  }
+
+  /** Любая входящая активность живого сокета (кадр WS или событие ev). */
+  private touchSocketActivity(): void {
+    this.lastSocketActivityAt = Date.now();
+  }
+
+  /** Watchdog живёт всё время работы провайдера; без CONNECTED — no-op. */
+  private ensureWatchdog(): void {
+    if (this.watchdogTimer || this.stopping) return;
+    this.watchdogTimer = setInterval(() => this.checkStaleConnection(), this.watchdogIntervalMs);
+    this.watchdogTimer.unref?.();
+  }
+
+  private cancelWatchdog(): void {
+    if (this.watchdogTimer) clearInterval(this.watchdogTimer);
+    this.watchdogTimer = null;
+  }
+
+  /**
+   * Зомби-соединение: state === CONNECTED, но от сокета ни кадра, ни события
+   * дольше порога (типичный сценарий — сон/гибернация машины: WS умирает
+   * молча, без connection.update close). Разрываем принудительно и
+   * переключаемся на штатный auto-reconnect.
+   */
+  private checkStaleConnection(): void {
+    if (this.stopping || this.state !== "CONNECTED") return;
+    const last = this.lastSocketActivityAt;
+    if (last === null) return;
+    const idleMs = Date.now() - last;
+    if (idleMs < this.watchdogStaleMs) return;
+    console.warn("[whatsapp] stale connection detected — forcing reconnect", {
+      idleMs,
+      thresholdMs: this.watchdogStaleMs,
+    });
+    this.detachSocket();
+    this.transition("RECONNECTING");
+    this.scheduleReconnect();
   }
 
   private onMessagesUpsert(messages: BaileysMessageLike[]): void {
@@ -840,6 +926,7 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
   /** Graceful shutdown: сокет закрывается, auth-state сбрасывается на диск. */
   async stop(reason = "shutdown"): Promise<void> {
     this.cancelReconnectTimer();
+    this.cancelWatchdog();
     const wasActive = !this.stopping;
     this.stopping = true;
     try {
@@ -864,6 +951,7 @@ export class BaileysWhatsAppProvider implements WhatsAppProvider {
   /** Удалённый logout: сессия уничтожается на сервере и на диске. */
   async logout(): Promise<void> {
     this.cancelReconnectTimer();
+    this.cancelWatchdog();
     this.stopping = true;
     try {
       if (this.socket) {

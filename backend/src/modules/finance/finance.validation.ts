@@ -344,6 +344,29 @@ export function validateRefundAmount(amount: string): string {
 }
 
 /**
+ * MULTI/PARTIAL PAYMENTS (TRAVELHUB_MULTI_PARTIAL §4) — Payment amount:
+ * > 0, до 2 знаков (DECIMAL(12,2) контракт), строковый Decimal без float.
+ * Server-validated (клиент передаёт желаемую сумму, сервер дополнительно
+ * валидирует 0 < amount <= due внутри due-guard — capacity guard в
+ * PaymentService.createPayment, транзакционно под pg_advisory_xact_lock).
+ * Шаблон: validateRefundAmount (Step 2.13).
+ */
+export function validatePaymentAmount(amount: string): string {
+  if (typeof amount !== "string" || amount.trim().length === 0) {
+    throw new ValidationDomainError("payment amount must be a positive decimal number");
+  }
+  const d = Number(amount);
+  if (!Number.isFinite(d) || d <= 0) {
+    throw new ValidationDomainError("payment amount must be a positive decimal number");
+  }
+  const parts = amount.split(".");
+  if (parts.length === 2 && parts[1].length > 2) {
+    throw new ValidationDomainError("payment amount supports at most 2 decimal places (DECIMAL(12,2) contract)");
+  }
+  return amount;
+}
+
+/**
  * Step 2.13A — Dispute amount: > 0, до 2 знаков (DECIMAL(12,2) контракт),
  * строковый Decimal без float. Server-validated (клиент запрашивает сумму,
  * сервер валидирует ≤ payment.amount отдельно — capacity guard в
@@ -447,15 +470,17 @@ export function assertValidRange(validFrom: string, validTo: string | undefined,
 
 /**
  * Server-owned Payment поля — громкий 422 при forged-вводе (mass assignment
- * HARD GATE §32): id/code/status/amount/currency/customerId/partnerId/
+ * HARD GATE §32): id/code/status/currency/customerId/partnerId/
  * milestones/version/timestamps/providerRef/isActivePayment. Клиент передаёт
- * ТОЛЬКО orderId (+ опциональный paymentMethod) — деньги и статус серверные.
+ * ТОЛЬКО orderId (+ опциональные paymentMethod и amount) — валюта и статус
+ * серверные. `amount` ИЗВЛЕЧЁН из forbidden-списка (MULTI/PARTIAL §4):
+ * клиентский ввод суммы валидируется отдельно (validatePaymentAmount +
+ * due-guard «0 < amount <= due» в PaymentService.createPayment).
  */
 export const PAYMENT_CREATE_FORBIDDEN_KEYS = [
   "id",
   "code",
   "status",
-  "amount",
   "currency",
   "customerId",
   "partnerId",
@@ -467,10 +492,16 @@ export const PAYMENT_CREATE_FORBIDDEN_KEYS = [
   "failedAt",
   "cancelledAt",
   "isActivePayment",
+  // Server-owned ключ бизнес-идемпотентности (MULTI/PARTIAL §13): проставляет
+  // только IdempotencyInterceptor; forged в body → 422 (как остальные server-owned).
+  "idempotencySlotKey",
 ] as const;
 
 /** Create Payment: orderId обязателен; paymentMethod — опциональный descriptive
- *  label (manual/provider-neutral, ≤64, без PII/секретов; НЕ authority). */
+ *  label (manual/provider-neutral, ≤64, без PII/секретов; НЕ authority);
+ *  amount — опциональная строковая сумма (MULTI/PARTIAL §4): при отсутствии
+ *  сервер берёт весь текущий остаток к оплате (due), при наличии —
+ *  валидируется 0 < amount <= due (validatePaymentAmount + due-guard). */
 export class CreatePaymentDto {
   @IsString()
   @MinLength(1)
@@ -482,6 +513,15 @@ export class CreatePaymentDto {
   @MinLength(1)
   @MaxLength(64)
   paymentMethod?: string;
+
+  // MULTI/PARTIAL §4: опциональная сумма платежа (строковый Decimal, ≤32 —
+  // как CreateRefundDto.amount); формат >0/≤2dp проверяет validatePaymentAmount,
+  // ≤ due — transaction-safe due-guard в PaymentService.createPayment.
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  amount?: string;
 
   // Step 3.6C.1: mandatory reason for manual/offline payment initiation.
   // System/provider-initiated payments do not require reason (they bypass this DTO).

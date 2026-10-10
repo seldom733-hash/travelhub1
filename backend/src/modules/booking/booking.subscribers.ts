@@ -10,6 +10,11 @@ import { deriveServiceEndsAt, deriveServiceStartsAt, deriveServiceTimeType } fro
 // Step 2.11: canonical frozen money fact validation (платформенный денежный
 // контракт DECIMAL(12,2)/half-up — single source of truth, как finance.money).
 import { validateFrozenMoneyFact } from "../sales/sales.money";
+import { ValidationDomainError } from "../../shared/errors";
+import type { TravelerFullRequirements } from "../catalog/traveler-requirements";
+// §14: document validation (passportExpiry против дат поездки) — точка 3
+// «before Booking/supplier submission».
+import { resolveTripDates, validateTravelersPassportExpiry } from "../order/passport-expiry";
 
 const CONSUMER_ID = "booking-requested-consumer";
 const ORDER_CANCELLED_CONSUMER_ID = "booking-order-cancelled-consumer";
@@ -37,8 +42,10 @@ const BOOKING_ACTIVE: BookingStatus[] = [
  *  - Passenger создаётся из подтверждённых (COMPLETE) OrderTraveler;
  *  - результат фиксируется событием BookingCreated (лента, causationId → BookingRequested).
  *
- * Идемпотентность: events.InboxEvent + проверка существующих броней заказа.
- * Consumer НЕ пишет в таблицы order.* — только читает их (READ-only).
+ * Идемпотентность: events.InboxEvent + per-item occupancy (Stage 2, Q9):
+ * занятые частичным unique-индексом OrderItem пропускаются, свободные
+ * (после returnToOrder) получают новую Booking; terminal-бронь item
+ * освобождает. Consumer НЕ пишет в таблицы order.* — только читает их (READ-only).
  *
  * Step 2.9 §15 (compensation, гонка Order-cancel vs Booking-create): если на
  * момент создания Order уже CANCELLED (OrderCancelled обработан раньше
@@ -87,19 +94,58 @@ export class BookingSubscribers implements OnModuleInit {
           return;
         }
 
-        // Защита от дублей (дополнительно к inbox): брони уже созданы — пропуск.
-        const existing = await tx.booking.count({ where: { orderId: order.id } });
-        if (existing > 0) {
+        // Stage 2 (Q9): per-item occupancy вместо order-level «existing > 0».
+        // Частичный индекс Booking_orderItemId_key (status <> CANCELLED AND
+        // rejectedAt IS NULL) решает, какой OrderItem «занят»: активная/COMPLETED
+        // бронь занимает свой item; CANCELLED/SUPPLIER_REJECTED — освобождает.
+        // Повторный send (после returnToOrder) → свободные items получают B2,
+        // занятые пропускаются. Legacy-бронь (orderItemId NULL) активна →
+        // принадлежность неизвестна → консервативный skip-all. Отменённый заказ
+        // с уже созданными бронями → skip-all (как раньше: без воскрешений).
+        const existing = await tx.booking.findMany({
+          where: { orderId: order.id },
+          select: { orderItemId: true, status: true, rejectedAt: true },
+        });
+        if (order.status === "CANCELLED" && existing.length > 0) {
+          await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
+          return;
+        }
+        const occupying = existing.filter((b) => b.status !== "CANCELLED" && b.rejectedAt === null);
+        if (occupying.some((b) => b.orderItemId === null)) {
+          await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
+          return;
+        }
+        const occupiedItemIds = new Set(occupying.map((b) => b.orderItemId).filter((x): x is string => x !== null));
+        const freeItems = order.items.filter((item) => !occupiedItemIds.has(item.id));
+        if (freeItems.length === 0) {
           await tx.inboxEvent.create({ data: { consumerId: CONSUMER_ID, eventId: ev.id } });
           return;
         }
 
         const readyTravelers = order.travelers.filter((t) => t.dataCompleteness === "COMPLETE");
+
+        // §14 точка 3: document validation перед Booking/supplier submission.
+        // BLOCK → throw до каких-либо записей: транзакция откатывается, событие
+        // остаётся необработанным → FAILED (честный отказ, как defensive throw
+        // validateFrozenMoneyFact ниже). WARNING — не блокирует (§15: UI).
+        const pinnedReqs = order.pinnedRequirements as TravelerFullRequirements | null;
+        const expiryCheck = validateTravelersPassportExpiry(
+          readyTravelers,
+          resolveTripDates(order),
+          { requireExpiry: pinnedReqs?.passportExpiry === "REQUIRED" },
+        );
+        if (expiryCheck.status === "BLOCK") {
+          const bad = expiryCheck.verdicts.find((v) => v.status === "BLOCK");
+          throw new ValidationDomainError(
+            `Order ${order.code}: passport validation failed before booking submission for traveler ${bad?.travelerId ?? "?"} — ${bad?.message ?? ""}`,
+          );
+        }
+
         const created: { id: string; code: string }[] = [];
 
         // Step 2.11: defensive consistency — каждый копируемый money fact
         // (amount + currency) валиден до записи (Decimal ≥ 0, ≤2dp, ISO 4217).
-        for (const item of order.items) {
+        for (const item of freeItems) {
           validateFrozenMoneyFact(item.amount, item.currency, "booking money fact");
         }
 
@@ -128,16 +174,19 @@ export class BookingSubscribers implements OnModuleInit {
         const initialStatus: BookingStatus = compensated ? "CANCELLED" : "NEW";
         const bornCancelledAt = compensated ? new Date() : null;
 
-        for (const item of order.items) {
+        for (const item of freeItems) {
           const code = await this.ids.nextCode(tx, "BKG");
           // Shared Commerce Sequence: derive Booking ref from Order's commerceSequence.
           const bookingRefNum = order.commerceSequence
             ? this.refNum.commerceBookingRef(order.commerceSequence)
             : await this.generateBookingReferenceNumber(tx, order, item);
           // Step 2.8: canonical cardinality 1 OrderItem → 1 Booking. orderItemId
-          // (DB-level @unique) — надёжная защита от logically-duplicate
-          // BookingRequested (разный eventId, тот же Order) и от concurrent
-          // доставки; legacy Booking (до 2.8) — NULL без backfill.
+          // (частичный unique — status <> CANCELLED AND rejectedAt IS NULL,
+          // Stage 2) — надёжная защита от logically-duplicate BookingRequested
+          // (разный eventId, тот же Order) и от concurrent доставок: активная
+          // бронь занимает item (P2002 → isUniqueViolation → no-op, повтор —
+          // skip по occupancy); terminal-бронь освобождает item для повторного
+          // send (Q9). Legacy Booking (до 2.8) — NULL без backfill.
           const itemServiceDate = item.serviceDate ?? order.serviceDate;
           const booking = await tx.booking.create({
             data: {
@@ -194,8 +243,8 @@ export class BookingSubscribers implements OnModuleInit {
 
           // D3 §11 — Passenger получает данные из confirmed OrderTraveler
           // (НЕ из Customer, НЕ из mutable Product requirements); никакие
-          // поля не фабрикуются. passportExpiry переносится из OrderTraveler
-          // (полный snapshot подтверждённых данных, D3).
+          // поля не фабрикуются. passportSeries/passportExpiry переносятся из
+          // OrderTraveler (полный snapshot подтверждённых данных, D3).
           for (const t of readyTravelers) {
             await tx.passenger.create({
               data: {
@@ -205,6 +254,7 @@ export class BookingSubscribers implements OnModuleInit {
                 birthDate: t.birthDate,
                 citizenship: t.citizenship,
                 gender: t.gender,
+                passportSeries: t.passportSeries,
                 passportNumber: t.passportNumber,
                 passportExpiry: t.passportExpiry,
               },

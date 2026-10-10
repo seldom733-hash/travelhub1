@@ -30,6 +30,21 @@ export class AppExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    // M5: потеря/конфликт аренды WhatsApp-сессии (self-fencing, чужой
+    // владелец) → 409: состояние гонки, повтор возможен позже. Проверка по
+    // name — чтобы shared не импортировал feature-модуль integrations.
+    if (
+      typeof exception === "object" &&
+      exception !== null &&
+      (exception as { name?: unknown }).name === "WhatsAppLeaseError"
+    ) {
+      const message = exception instanceof Error ? exception.message : "WhatsApp session lease conflict";
+      res.status(HttpStatus.CONFLICT).json(
+        withRequestId({ statusCode: HttpStatus.CONFLICT, message }),
+      );
+      return;
+    }
+
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const body = exception.getResponse();

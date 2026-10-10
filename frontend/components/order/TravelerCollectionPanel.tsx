@@ -31,14 +31,32 @@ export interface TravelerCollectionView {
     birthDate: string | null;
     citizenship: string | null;
     gender: string | null;
+    passportSeries: string | null;
     passportNumber: string | null;
     passportExpiry: string | null;
     dataCompleteness: string;
   }>;
+  /**
+   * §15: server-authoritative вердикт document validation (passportExpiry).
+   * null — PII-gate: без права на паспортные данные предупреждение не показывается.
+   */
+  passportExpiry: {
+    status: "OK" | "WARNING" | "BLOCK";
+    verdicts: Array<{ travelerId: string | null; code: string; message: string; passportExpiry: string | null }>;
+  } | null;
 }
 
 /** Канонический порядок полей (совпадает с backend TRAVELER_FIELDS). */
-const FIELD_ORDER = ["firstName", "lastName", "birthDate", "citizenship", "gender", "passportNumber", "passportExpiry"] as const;
+const FIELD_ORDER = [
+  "firstName",
+  "lastName",
+  "birthDate",
+  "citizenship",
+  "gender",
+  "passportSeries",
+  "passportNumber",
+  "passportExpiry",
+] as const;
 type Field = (typeof FIELD_ORDER)[number];
 
 const DATE_FIELDS: Field[] = ["birthDate", "passportExpiry"];
@@ -82,6 +100,7 @@ export default function TravelerCollectionPanel({ orderId }: { orderId: string }
           birthDate: toDateInput(tr.birthDate),
           citizenship: tr.citizenship ?? "",
           gender: tr.gender ?? "",
+          passportSeries: tr.passportSeries ?? "",
           passportNumber: tr.passportNumber ?? "",
           passportExpiry: toDateInput(tr.passportExpiry),
         };
@@ -212,6 +231,15 @@ export default function TravelerCollectionPanel({ orderId }: { orderId: string }
             const draft = drafts[tr.id] ?? {};
             const dirty = isDirty(tr.id);
             const complete = tr.dataCompleteness === "COMPLETE";
+            // §15: предупреждение document validation (server verdict; WARNING
+            // не блокирует, BLOCK — сервер всё равно отклонит сохранение).
+            const verdict = view.passportExpiry?.verdicts.find((v) => v.travelerId === tr.id);
+            const passportHint =
+              verdict?.code === "EXPIRED"
+                ? { tone: "block" as const, key: "d3.passport_expired_hint" }
+                : verdict?.code === "EXPIRING_WITHIN_MARGIN"
+                  ? { tone: "warn" as const, key: "d3.passport_expiring_hint" }
+                  : null;
             return (
               <div key={tr.id} className="rounded-lg border border-slate-200 bg-white p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -226,6 +254,15 @@ export default function TravelerCollectionPanel({ orderId }: { orderId: string }
                     {complete ? t("d3.complete_badge", locale) : t("d3.incomplete_badge", locale)}
                   </span>
                 </div>
+                {passportHint && (
+                  <div
+                    className={`mt-3 rounded-lg px-3 py-2 text-xs ${
+                      passportHint.tone === "block" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {t(passportHint.key, locale)}
+                  </div>
+                )}
                 <div className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                   {fieldsFor.map((f) => {
                     const state = pinned[f];

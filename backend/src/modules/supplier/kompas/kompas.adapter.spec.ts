@@ -1,4 +1,4 @@
-import { KompasSupplierAdapter } from "./kompas.adapter";
+import { KompasSupplierAdapter, applyKompasAgesParam } from "./kompas.adapter";
 
 describe("KompasSupplierAdapter", () => {
   let adapter: KompasSupplierAdapter;
@@ -59,6 +59,9 @@ describe("KompasSupplierAdapter", () => {
       expect(result.externalClaim).toBe("cat-claim-123");
       expect(result.hotel).toBe("Rixos Premium Tekirova");
       expect(result.hotelExternalId).toBe("2807");
+      // Hotel Identity contract (§9.2): the ADAPTER owns the mapping
+      // supplier-native hotelKey → platform hotelExternalId.
+      expect(result.rawMetadata?.hotelKey).toBe("2807");
       expect(result.departureDate).toBe("2026-09-19");
       expect(result.nights).toBe(7);
       expect(result.room).toBe("STANDARD ROOM / DBL");
@@ -428,5 +431,42 @@ describe("KompasSupplierAdapter — no amount:0 fallbacks (§5.5/§5.7)", () => 
         searchContext: { service: "tours", adults: 2 },
       }),
     ).rejects.toThrow(/PRICE_UNAVAILABLE/);
+  });
+});
+
+// ── Confirmed AGES contract (owner-supplied real request) ──────────────────
+// ADULT=2 CHILD=3 AGES=1,6,7 — the supplier-facing PRICES URL must carry
+// the full canonical childAges list as ONE CSV param (network-layer rewrite
+// used by both the search() and searchReusePage() interceptors).
+
+describe("applyKompasAgesParam — supplier-facing AGES mapping", () => {
+  it("appends AGES=1,6,7 when the native request has no AGES yet", () => {
+    const url = applyKompasAgesParam(
+      "https://kompas.tl/search_tour?samo_action=PRICES&ADULT=2&CHILD=3",
+      [1, 6, 7],
+    );
+    expect(url).toContain("ADULT=2");
+    expect(url).toContain("CHILD=3");
+    expect(url).toContain("AGES=1,6,7");
+  });
+
+  it("replaces a stale/native AGES value instead of duplicating the param", () => {
+    const url = applyKompasAgesParam(
+      "https://kompas.tl/search_tour?samo_action=PRICES&AGES=0&CHILD=3",
+      [1, 6, 7],
+    );
+    expect(url.match(/AGES=/g)).toHaveLength(1);
+    expect(url).toContain("AGES=1,6,7");
+    expect(url).not.toContain("AGE1=");
+  });
+
+  it("preserves canonical ordering (composition order, not sorted)", () => {
+    const url = applyKompasAgesParam("https://x?samo_action=PRICES", [7, 6, 1]);
+    expect(url).toContain("AGES=7,6,1");
+  });
+
+  it("returns the URL untouched when there are no child ages", () => {
+    const url = "https://x?samo_action=PRICES&ADULT=2&CHILD=0";
+    expect(applyKompasAgesParam(url, [])).toBe(url);
   });
 });

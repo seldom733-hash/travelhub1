@@ -1,4 +1,4 @@
-import { auth } from "./api";
+import { auth, api } from "./api";
 
 /**
  * M3 §19/§22/§25 — операционный WhatsApp Inbox (клиентская часть).
@@ -12,6 +12,8 @@ export type WhatsAppMatchingStatus = "UNMATCHED" | "MATCHED" | "AMBIGUOUS";
 
 export interface WhatsAppConversationRow {
   id: string;
+  /** M5: номер, через который пришло/ушло сообщение (accountId диалога). */
+  accountId: string | null;
   remoteJid: string;
   canonicalPhone: string | null;
   matchingStatus: WhatsAppMatchingStatus;
@@ -23,6 +25,44 @@ export interface WhatsAppConversationRow {
   suppressed: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * M5 multi-number: строка списка номеров (GET /whatsapp/sessions).
+ * `status` — live-снимок состояния конкретного номера.
+ */
+export interface WhatsAppSessionStatus {
+  enabled: boolean;
+  provider: string;
+  state: string;
+  phone: string | null;
+  connectedAt: string | null;
+  lastDisconnectedAt: string | null;
+  lastError: string | null;
+  instanceId: string | null;
+  hasQr: boolean;
+  autoConnect: boolean;
+}
+
+export interface WhatsAppSessionAccount {
+  id: string;
+  provider: string;
+  state: string;
+  label: string | null;
+  phone: string | null;
+  connectedAt: string | null;
+  lastDisconnectedAt: string | null;
+  lastError: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  status: WhatsAppSessionStatus;
+}
+
+/** M5: список номеров (включая архивные — они видны только для чтения). */
+export async function fetchWhatsAppSessions(): Promise<WhatsAppSessionAccount[]> {
+  const data = await api.get<{ accounts: WhatsAppSessionAccount[] }>("/whatsapp/sessions");
+  return data.accounts ?? [];
 }
 
 export interface WhatsAppCustomerRef {
@@ -56,6 +96,8 @@ export interface WhatsAppTimelineItem {
   providerMessageId: string | null;
   /** M3+: вложение — имя файла/размер (null у текста). */
   mediaFilename: string | null;
+  /** M5: mime вложения — различаем аудио (инлайн-плеер) и прочие файлы. */
+  mediaMime: string | null;
   mediaSize: number | null;
   hasMedia: boolean;
   /** Integration lifecycle (M0-05): null у inbound. */
@@ -159,6 +201,21 @@ export async function uploadWhatsAppFile(file: File): Promise<WhatsAppUploadResu
 /** Прямая ссылка на вложение (cookie-сессия браузера, скачивание/просмотр). */
 export function whatsappMediaUrl(origin: "inbound" | "outbound", id: string): string {
   return `/api/v1/whatsapp/media/${origin}/${encodeURIComponent(id)}`;
+}
+
+/**
+ * §10 LID→PN: ручной бинд номера собеседника к lid-диалогу («Привязать Lid
+ * к номеру») — до определения Customer. Возвращает обновлённый detail
+ * (canonicalPhone заполнен → UI показывает номер вместо lid-адреса).
+ */
+export async function bindWhatsAppConversationPhone(
+  conversationId: string,
+  phone: string,
+): Promise<WhatsAppConversationDetail> {
+  return api.post<WhatsAppConversationDetail>(
+    `/whatsapp/conversations/${encodeURIComponent(conversationId)}/phone`,
+    { phone },
+  );
 }
 
 /**

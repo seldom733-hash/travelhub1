@@ -3,6 +3,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { SecurityService } from "./security.service";
 import { AuthService } from "./auth/auth.service";
 import { AuthController } from "./auth/auth.controller";
+import { ActivationService } from "./activation.service";
 import { UsersController } from "./users.controller";
 import { AccountService } from "./account/account.service";
 import { AccountController } from "./account/account.controller";
@@ -38,7 +39,7 @@ import { PermissionsGuard } from "./auth/permissions.guard";
     DocumentsModule,
   ],
   controllers: [AuthController, UsersController, AccountController, PartnerOnboardingController],
-  providers: [SecurityService, AuthService, AccountService, PartnerOnboardingService, JwtAuthGuard, PermissionsGuard, LoginThrottleService],
-  exports: [SecurityService, AuthService, JwtAuthGuard, PermissionsGuard, LoginThrottleService],
+  providers: [SecurityService, AuthService, ActivationService, AccountService, PartnerOnboardingService, JwtAuthGuard, PermissionsGuard, LoginThrottleService],
+  exports: [SecurityService, AuthService, ActivationService, JwtAuthGuard, PermissionsGuard, LoginThrottleService],
 })
 export class SecurityModule {}

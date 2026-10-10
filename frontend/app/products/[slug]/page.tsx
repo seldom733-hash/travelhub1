@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import PublicLayout from "@/components/PublicLayout";
 import MediaGallery from "@/components/public/MediaGallery";
+import GuestCheckoutForm from "@/components/public/GuestCheckoutForm";
 import Price from "@/components/public/Price";
 import { PublicErrorState, PublicNotFound } from "@/components/public/PublicStates";
 import { PdpSkeleton } from "@/components/public/Skeletons";
@@ -258,6 +259,9 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           )}
           <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{t("pdp.cta_placeholder", locale)}</p>
         </div>
+
+        {/* M4.5 §23: anonymous guest checkout (onboarding → Request). */}
+        <GuestCheckoutForm productId={p.id} />
 
         {p.tariffs.length > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm">

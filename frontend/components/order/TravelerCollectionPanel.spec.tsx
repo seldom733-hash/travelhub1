@@ -44,11 +44,13 @@ function makeView(overrides: Partial<TravelerCollectionView> = {}): TravelerColl
         birthDate: null,
         citizenship: null,
         gender: null,
+        passportSeries: null,
         passportNumber: null,
         passportExpiry: null,
         dataCompleteness: "INCOMPLETE",
       },
     ],
+    passportExpiry: { status: "OK", verdicts: [] },
     ...overrides,
   };
 }
@@ -92,7 +94,7 @@ describe("TravelerCollectionPanel (D3)", () => {
       travelerCount: 2,
       travelers: [
         { ...makeView().travelers[0] },
-        { id: "t2", firstName: "Пётр", lastName: "Петров", birthDate: null, citizenship: null, gender: null, passportNumber: null, passportExpiry: null, dataCompleteness: "INCOMPLETE" },
+        { id: "t2", firstName: "Пётр", lastName: "Петров", birthDate: null, citizenship: null, gender: null, passportSeries: null, passportNumber: null, passportExpiry: null, dataCompleteness: "INCOMPLETE" },
       ],
     });
     apiMock.get.mockResolvedValue(view);
@@ -175,5 +177,65 @@ describe("TravelerCollectionPanel (D3)", () => {
     expect(screen.getByText("Ad")).toBeTruthy();
     expect(screen.getByText("Soyad")).toBeTruthy();
     r.unmount();
+  });
+
+  // ── §3/§15: passportSeries field + document validation warning ────────────
+
+  it("passportSeries рендерится когда pinned REQUIRED и участвует в save", async () => {
+    view = makeView({
+      pinnedRequirements: {
+        firstName: "REQUIRED",
+        lastName: "REQUIRED",
+        birthDate: "REQUIRED",
+        citizenship: "REQUIRED",
+        gender: "NOT_REQUESTED",
+        passportSeries: "REQUIRED",
+        passportNumber: "REQUIRED",
+        passportExpiry: "REQUIRED",
+      },
+    });
+    apiMock.get.mockResolvedValue(view);
+    renderWithLocale();
+    await waitFor(() => expect(screen.getByText("Серия паспорта")).toBeTruthy());
+    const seriesInput = screen.getByLabelText(/Серия паспорта/) as HTMLInputElement;
+    fireEvent.change(seriesInput, { target: { value: "RU" } });
+    fireEvent.click(screen.getByText("Сохранить"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+    expect(apiMock.patch).toHaveBeenCalledWith(
+      "/orders/order-1/travelers/t1",
+      expect.objectContaining({ passportSeries: "RU" }),
+    );
+  });
+
+  it("§15: server verdict EXPIRED → блокирующее предупреждение; EXPIRING_WITHIN_MARGIN → предупреждение", async () => {
+    view = makeView({
+      passportExpiry: {
+        status: "BLOCK",
+        verdicts: [{ travelerId: "t1", code: "EXPIRED", message: "Passport expires before trip end", passportExpiry: "2026-01-01" }],
+      },
+    });
+    apiMock.get.mockResolvedValue(view);
+    let r = renderWithLocale();
+    await waitFor(() => expect(screen.getByText(/истекает до конца поездки/i)).toBeTruthy());
+    r.unmount();
+
+    view = makeView({
+      passportExpiry: {
+        status: "WARNING",
+        verdicts: [{ travelerId: "t1", code: "EXPIRING_WITHIN_MARGIN", message: "soon", passportExpiry: "2026-12-01" }],
+      },
+    });
+    apiMock.get.mockResolvedValue(view);
+    renderWithLocale();
+    await waitFor(() => expect(screen.getByText(/вскоре после окончания поездки/i)).toBeTruthy());
+  });
+
+  it("§15: без вердикта (PII-gate / OK) предупреждений нет", async () => {
+    view = makeView({ passportExpiry: null });
+    apiMock.get.mockResolvedValue(view);
+    renderWithLocale();
+    await waitFor(() => expect(screen.getByDisplayValue("Иван")).toBeTruthy());
+    expect(screen.queryByText(/истекает до конца поездки/i)).toBeNull();
+    expect(screen.queryByText(/вскоре после окончания поездки/i)).toBeNull();
   });
 });

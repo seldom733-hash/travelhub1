@@ -1,7 +1,7 @@
 import * as fsp from "fs/promises";
 import * as os from "os";
 import * as path from "path";
-import { WhatsAppMediaStorage, sanitizeFilename } from "./whatsapp-media.storage";
+import { WhatsAppMediaStorage, extensionForMime, sanitizeFilename } from "./whatsapp-media.storage";
 
 describe("sanitizeFilename (M3+)", () => {
   it("убирает пути и спецсимволы, сохраняет расширение", () => {
@@ -101,6 +101,68 @@ describe("WhatsAppMediaStorage", () => {
     await expect(
       storage.saveInbound("3EB0EMPTY", { filename: null, mimetype: null, size: 0, bytes: new Uint8Array(0) }),
     ).resolves.toBeNull();
+  });
+
+  it("saveInbound: без stanza-имени синтезирует имя из mimetype+type (M5: голосовое без расширения)", async () => {
+    const storage = new WhatsAppMediaStorage(dir);
+
+    const voice = await storage.saveInbound("3EB0VOICE", {
+      filename: null,
+      mimetype: "audio/ogg; codecs=opus",
+      size: 3,
+      type: "audio",
+      bytes: new Uint8Array([1, 2, 3]),
+    });
+    expect(voice).toMatchObject({
+      filename: "voice.ogg",
+      relativePath: path.posix.join("inbound", "3EB0VOICE", "voice.ogg"),
+    });
+    expect(Array.from((await storage.readRelative(voice!.relativePath))!)).toEqual([1, 2, 3]);
+
+    const image = await storage.saveInbound("3EB0IMG", {
+      filename: null,
+      mimetype: "image/jpeg",
+      size: 1,
+      type: "image",
+      bytes: new Uint8Array([9]),
+    });
+    expect(image!.filename).toBe("image.jpg");
+
+    const namedNoExt = await storage.saveInbound("3EB0DOC", {
+      filename: "report",
+      mimetype: "application/pdf",
+      size: 1,
+      type: "document",
+      bytes: new Uint8Array([9]),
+    });
+    expect(namedNoExt!.filename).toBe("report.pdf");
+
+    const namedWithExt = await storage.saveInbound("3EB0DOC2", {
+      filename: "report.pdf",
+      mimetype: "application/pdf",
+      size: 1,
+      type: "document",
+      bytes: new Uint8Array([9]),
+    });
+    expect(namedWithExt!.filename).toBe("report.pdf");
+
+    const unknown = await storage.saveInbound("3EB0UNK", {
+      filename: null,
+      mimetype: "application/x-weird",
+      size: 1,
+      type: "document",
+      bytes: new Uint8Array([9]),
+    });
+    expect(unknown!.filename).toBe("file");
+  });
+
+  it("extensionForMime: параметры/регистр отбрасываются, неизвестный → null", () => {
+    expect(extensionForMime("audio/ogg; codecs=opus")).toBe("ogg");
+    expect(extensionForMime("AUDIO/MPEG")).toBe("mp3");
+    expect(extensionForMime("image/svg+xml")).toBe("svg");
+    expect(extensionForMime("application/x-weird")).toBeNull();
+    expect(extensionForMime(null)).toBeNull();
+    expect(extensionForMime("garbage")).toBeNull();
   });
 
   it("readRelative: traversal/absolute пути отклоняются (выход за rootDir)", async () => {

@@ -4,11 +4,13 @@
  * Доказательства для VERDICT A:
  *   1. storefrontCode production-path concurrency (≥20 parallel creations)
  *   2. storefrontCode non-reuse (delete/recreate semantics)
- *   3. Multi-instance/block-claim safety (independent allocator instances)
+ *   3. multi-instance counter safety (независимые инстансы аллокатора)
  *   4. BusinessSequence monotonic advancement
  *
  * Production path: POST /api/v1/partner/storefront
- *   → StorefrontService.createOwn → IdsService.nextStorefrontCode → BusinessSequence Hi/Lo
+ *   → StorefrontService.createOwn → IdsService.nextStorefrontCode / nextCode
+ *     → BusinessSequence атомарный increment +1 (сплошная последовательность;
+ *       аудит нумераций — Hi/Lo-блочная аллокация удалена)
  *
  * storefrontCode NOT in API response (StorefrontView) — read from DB after creation.
  *
@@ -271,10 +273,10 @@ describe("Phase 3 Pre-Step 3.12 — storefrontCode Concurrency Evidence (Round 2
     });
   });
 
-  // ── Multi-Instance / Block-Claim Safety ────────────────────────────────
+  // ── Multi-Instance / Counter Safety ────────────────────────────────────
 
-  describe("Multi-Instance / Block-Claim Safety", () => {
-    it("BusinessSequence uses Hi/Lo block allocation with DB atomicity", async () => {
+  describe("Multi-Instance / Counter Safety", () => {
+    it("BusinessSequence: ровно +1 на каждое создание на ОБОИХ счётчиках (SF и SFPUB разведены, без блоков)", async () => {
       const sfRow = await prisma.businessSequence.findUnique({
         where: { prefix: "SF" },
       });
@@ -283,6 +285,9 @@ describe("Phase 3 Pre-Step 3.12 — storefrontCode Concurrency Evidence (Round 2
       expect(sfRow!.value).toBeGreaterThan(0);
 
       const valueBefore = sfRow!.value;
+      const pubBefore = await prisma.businessSequence
+        .findUnique({ where: { prefix: "SFPUB" } })
+        .then((r) => r?.value ?? 0);
 
       const token = await setupPartner(`block${stamp}`);
       const a = makeAgent(token);
@@ -294,24 +299,49 @@ describe("Phase 3 Pre-Step 3.12 — storefrontCode Concurrency Evidence (Round 2
       const sfRowAfter = await prisma.businessSequence.findUnique({
         where: { prefix: "SF" },
       });
+      const pubAfter = await prisma.businessSequence
+        .findUnique({ where: { prefix: "SFPUB" } })
+        .then((r) => r?.value ?? 0);
 
-      expect(sfRowAfter!.value).toBeGreaterThanOrEqual(valueBefore);
+      // Сплошная аллокация: каждая строка выросла ровно на 1 — «блоков» нет.
+      expect(sfRowAfter!.value).toBe(valueBefore + 1);
+      expect(pubAfter).toBe(pubBefore + 1);
 
-      console.log(`\n── Block-Claim / BusinessSequence Evidence ──`);
-      console.log(`SF prefix row value before: ${valueBefore}`);
-      console.log(`SF prefix row value after:  ${sfRowAfter!.value}`);
-      console.log(`Incremented (block):        ${sfRowAfter!.value >= valueBefore}`);
+      console.log(`\n── Contiguous Counter Evidence (+1, no block claims) ──`);
+      console.log(`SF    before/after: ${valueBefore} → ${sfRowAfter!.value}`);
+      console.log(`SFPUB before/after: ${pubBefore} → ${pubAfter}`);
     });
 
-    it("process-local claim gate does NOT determine global correctness (architectural evidence)", async () => {
-      const blockSize = Number(process.env.BUSINESS_SEQUENCE_BLOCK_SIZE ?? 100);
-      expect(blockSize).toBeGreaterThan(0);
+    it("storefrontCode зеркалит счётчик SFPUB: публичная нумерация сплошная, без интерлива с SF-code", async () => {
+      const pubBefore = await prisma.businessSequence
+        .findUnique({ where: { prefix: "SFPUB" } })
+        .then((r) => r?.value ?? 0);
 
-      console.log(`\n── Multi-Instance Safety Architecture ──`);
-      console.log(`BusinessSequence block size: ${blockSize}`);
-      console.log(`Global correctness boundary: DB atomic upsert (seqClient.$transaction)`);
-      console.log(`Process-local gate: optimization only (Hi/Lo claim serialization)`);
-      console.log(`Multi-instance safe: YES — independent cache/claims per process, shared DB counter`);
+      const token = await setupPartner(`pubcode${stamp}`);
+      const a = makeAgent(token);
+      const createdRow = (
+        await a
+          .post("/api/v1/partner/storefront")
+          .send({ slug: `sf-pubcode-${stamp}`, businessName: "PubCode Test" })
+          .expect(201)
+      ).body as { id: string };
+
+      const pubAfter = await prisma.businessSequence
+        .findUnique({ where: { prefix: "SFPUB" } })
+        .then((r) => r?.value ?? 0);
+      expect(pubAfter).toBe(pubBefore + 1);
+
+      const row = await prisma.partnerStorefront.findUnique({
+        where: { id: createdRow.id },
+        select: { storefrontCode: true, code: true },
+      });
+      // Публичный код = SF + ровно значение SFPUB (не чётные/промежуточные).
+      expect(row!.storefrontCode).toBe(`SF${String(pubAfter).padStart(3, "0")}`);
+      // Внутренний code — независимая последовательность SF-0000000N.
+      expect(row!.code).toMatch(/^SF-\d{8}$/);
+
+      console.log(`\n── StorefrontCode ↔ SFPUB Mirror Evidence ──`);
+      console.log(`SFPUB value: ${pubAfter}, storefrontCode: ${row!.storefrontCode}, code: ${row!.code}`);
     });
   });
 

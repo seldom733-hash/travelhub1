@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "../../generated/prisma/client";
 import type { OrderStatus } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -12,22 +12,29 @@ import {
 } from "../../eventbus/domain-events";
 import { buildSortClause, type SortDirection } from '../../shared/sort';
 import { overviewOrderWhere } from "./order-kpi-scope";
+import { resolveTripDates, validatePassportExpiry, validateTravelersPassportExpiry, type PassportExpiryStatus } from "./passport-expiry";
 import { IdsService } from "../../shared/ids.service";
 import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
+// Stage 2 fix (Bug 2): терминальный список Booking — shared source of truth
+// (booking-сторона владеет lifecycle; Order-сторона только читает конвенцию).
+import { BOOKING_TERMINAL } from "../booking/booking.service";
 import { parseDateParam } from "../../shared/date-param";
-import { redactTravelersPii, type TravelerViewer } from "../../shared/pii";
+import { canViewTravelerPii, redactTravelersPii, type TravelerViewer } from "../../shared/pii";
 import { isDateOnly } from "../../shared/date-only";
 import { isIanaTimeZone, isLocalTime } from "../../shared/service-time";
 import { isDeniedStorefrontScope, PARTNER_STOREFRONT_SOURCE } from "../../shared/sales-scope";
 import { diffAuditFields, type AuditFieldChange, type AuditSource } from "../../shared/audit";
-import { PaymentPrepaymentType, PaymentScheme, QuoteDiscountType, SalesAcquisitionSource } from "../../generated/prisma/enums";
+import { SecurityService } from "../../security/security.service";
+import { PaymentPrepaymentType, PaymentScheme, PaymentStatus, QuoteDiscountType, SalesAcquisitionSource } from "../../generated/prisma/enums";
 import {
   getEffectiveTravelerRequirements,
+  getPinnedRequirementsShape,
   isTravelerField,
   type TravelerField,
   type TravelerFullRequirements,
 } from "../catalog/traveler-requirements";
+import { assertRequestTravelersMatchCount } from "./request-travelers";
 
 /**
  * D4 §10/§21 — Platform Marketplace read/command scope.
@@ -49,6 +56,7 @@ const TRAVELER_AUDIT_FIELDS = [
   "birthDate",
   "citizenship",
   "gender",
+  "passportSeries",
   "passportNumber",
   "passportExpiry",
 ] as const;
@@ -59,6 +67,7 @@ export interface TravelerUpdateInput {
   birthDate?: string;
   citizenship?: string;
   gender?: string;
+  passportSeries?: string;
   passportNumber?: string;
   passportExpiry?: string;
 }
@@ -70,6 +79,7 @@ export interface TravelerCollectInput {
   birthDate?: string;
   citizenship?: string;
   gender?: string;
+  passportSeries?: string;
   passportNumber?: string;
   passportExpiry?: string;
 }
@@ -84,7 +94,8 @@ export type OrderAction =
   | "close"
   | "cancel"
   | "problem"
-  | "suspend";
+  | "suspend"
+  | "returnToRequest";
 
 const ACTIVE_STATUSES: OrderStatus[] = [
   "NEW",
@@ -102,12 +113,21 @@ const TRANSITIONS: Record<string, { from: OrderStatus[]; to: OrderStatus }> = {
   markWaitingData: { from: ["IN_PROCESSING"], to: "WAITING_FOR_DATA" },
   resumeProcessing: { from: ["WAITING_FOR_DATA"], to: "IN_PROCESSING" },
   confirm: { from: ["IN_PROCESSING", "WAITING_FOR_DATA"], to: "READY_FOR_BOOKING" },
-  send: { from: ["READY_FOR_BOOKING"], to: "SENT_TO_BOOKING" },
+  // Stage 2 (Booking → Order, follow-up): повторная отправка после возврата
+  // брони — из PARTIALLY_FULFILLED (свободные items, Q9). Спец-gate в
+  // orderAction: 409, если СВОБОДНЫХ items нет (все заняты активными бронями).
+  send: { from: ["READY_FOR_BOOKING", "PARTIALLY_FULFILLED"], to: "SENT_TO_BOOKING" },
   complete: { from: ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED"], to: "FULFILLED" },
   close: { from: ["FULFILLED", "READY_TO_CLOSE"], to: "CLOSED" },
   cancel: { from: ACTIVE_STATUSES, to: "CANCELLED" },
   problem: { from: ACTIVE_STATUSES.filter((s) => s !== "PROBLEM"), to: "PROBLEM" },
   suspend: { from: ACTIVE_STATUSES.filter((s) => s !== "SUSPENDED"), to: "SUSPENDED" },
+  // Stage 1 (Order → Request, только назад): тот же active-диапазон, что и
+  // cancel (Order уходит в CANCELLED), но со спец-guards в orderAction:
+  // linked Request обязан существовать и быть CONVERTED; АКТИВНЫХ bookings
+  // нет (терминальные/возвращённые Booking не блокируют — Stage 2 fix),
+  // payments/refunds отсутствуют.
+  returnToRequest: { from: ACTIVE_STATUSES, to: "CANCELLED" },
 };
 
 const ORDER_SORT_ALLOWLIST: Record<string, string> = {
@@ -132,6 +152,7 @@ const ACTION_LABELS: Record<OrderAction, string> = {
   cancel: "Заказ отменён",
   problem: "Заказ помечен проблемным",
   suspend: "Заказ приостановлен",
+  returnToRequest: "Заказ возвращён в заявку",
 };
 
 /** Права, необходимые для каждой команды жизненного цикла Order (RBAC Matrix §4). */
@@ -146,6 +167,7 @@ export const ACTION_PERMISSIONS: Record<OrderAction, string> = {
   cancel: "order.cancel",
   problem: "order.edit_noncritical",
   suspend: "order.suspend",
+  returnToRequest: "order.cancel",
 };
 
 /**
@@ -167,6 +189,10 @@ export function computeAvailableOrderActions(
     travelers?: Array<{ dataCompleteness: string }>;
   },
   granted: readonly string[],
+  /** Stage 2 fix (Bug 2): число АКТИВНЫХ blocking Booking (терминальные/
+   *  возвращённые не считаются). > 0 → returnToRequest скрыт (проекция
+   *  согласована с guard в orderAction — один и тот же терминальный список). */
+  activeBlockingBookings = 0,
 ): OrderAction[] {
   const d3Scope = (order.travelerCount ?? 0) > 0 && order.termsAcceptedAt !== null;
   const actions: OrderAction[] = [];
@@ -174,6 +200,9 @@ export function computeAvailableOrderActions(
     const t = TRANSITIONS[action];
     if (!t.from.includes(order.status)) continue;
     if (!granted.includes(ACTION_PERMISSIONS[action])) continue;
+    // Stage 2 fix (Bug 2): блокирует только реально активный Booking;
+    // исторический (returned/cancelled) не должен прятать кнопку.
+    if (action === "returnToRequest" && activeBlockingBookings > 0) continue;
     // D3 traveler gate (как в orderAction): confirm/send требуют finalConfirmedAt.
     if (d3Scope && !order.finalConfirmedAt && (action === "confirm" || action === "send")) continue;
     // confirm требует полные данные всех туристов (как в orderAction).
@@ -360,11 +389,14 @@ function assertOrderMoney(v: string | null | undefined, label: string): void {
  */
 @Injectable()
 export class OrderService {
+  private readonly logger = new Logger(OrderService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly ids: IdsService,
     private readonly eventBus: EventBusService,
     private readonly refNum: ReferenceNumberService,
+    private readonly security: SecurityService,
   ) {}
 
   /**
@@ -616,7 +648,7 @@ export class OrderService {
          *  (verbatim → Order.commercialSnapshot; immutable, Gate G). */
         commercialSnapshot: Record<string, unknown> | null;
       };
-      actor: { id: string; username: string } | null;
+      actor: { id: string | null; username: string } | null;
       orderRequestedEventId?: string | null;
       correlationId?: string | null;
       causationId?: string | null;
@@ -733,19 +765,36 @@ export class OrderService {
       },
     });
 
-    // D3 OrderTraveler placeholders: frozen count строк (position 1..N),
-    // имена пустые — D3 collection (Order Traveler UI/API) заполняет их после
-    // создания Order (Request party names не собираются pre-Order; count frozen).
-    for (let pos = 1; pos <= r.travelerCount; pos++) {
+    // Two-stage §10/§11: RequestTraveler (FIO + birthDate) → OrderTraveler.
+    // НЕ заглушки: состав копируется по position, §10-инвариант (точное
+    // соответствие travelerCount) проверяется ДО записи — иначе безопасный
+    // отказ, а не «пустые» туристы в Order. Passport/identity появляются только
+    // Order-стадией (§2.3), поэтому их здесь ещё нет.
+    const requestTravelers = await tx.requestTraveler.findMany({
+      where: { requestId: r.id },
+      orderBy: { position: "asc" },
+    });
+    assertRequestTravelersMatchCount(requestTravelers, r.travelerCount);
+
+    // dataCompleteness — canonical логика D4 REMEDIATION F6 (те же REQUIRED-
+    // поля pinned, что и в traveler-мутациях): FIO+birthDate всегда есть,
+    // остальные Order-стадии ещё не заполнены → INCOMPLETE по pinned.
+    const pinnedForCompleteness = (r.pinnedRequirements ?? null) as TravelerFullRequirements | null;
+    for (const rt of requestTravelers) {
+      const completenessValues: Partial<Record<TravelerField, string | Date | null | undefined>> = {
+        firstName: rt.firstName,
+        lastName: rt.lastName,
+        birthDate: rt.birthDate,
+      };
       await tx.orderTraveler.create({
         data: {
           orderId: order.id,
           customerId: r.customerId,
-          position: pos,
-          firstName: "",
-          lastName: "",
-          birthDate: null,
-          dataCompleteness: "INCOMPLETE",
+          position: rt.position,
+          firstName: rt.firstName,
+          lastName: rt.lastName,
+          birthDate: rt.birthDate,
+          dataCompleteness: this.computeTravelerCompleteness(pinnedForCompleteness, completenessValues),
           version: 1,
         },
       });
@@ -1137,7 +1186,12 @@ export class OrderService {
 
     // D5 §6/§8: server-authoritative available actions (state machine + gates +
     // granular permissions). Frontend рендерит ТОЛЬКО этот список.
-    const availableActions = computeAvailableOrderActions(order, grantedPermissions);
+    // Stage 2 fix (Bug 2): returnToRequest дополнительно gated по числу
+    // АКТИВНЫХ blocking Booking (терминальные/возвращённые не блокируют).
+    const activeBlockingBookings = await this.prisma.booking.count({
+      where: { orderId: order.id, status: { notIn: BOOKING_TERMINAL } },
+    });
+    const availableActions = computeAvailableOrderActions(order, grantedPermissions, activeBlockingBookings);
 
     // D5 §11: Request→Order canonical relation (Request.convertedOrderId).
     const linkedRequest = await this.prisma.request.findFirst({
@@ -1160,6 +1214,14 @@ export class OrderService {
     const refundedAmt = new Prisma.Decimal(order.refundedAmount ?? 0);
     const dueAmount = Prisma.Decimal.max(new Prisma.Decimal(0), totalAmt.minus(paidAmt));
     const refundableAmount = Prisma.Decimal.max(new Prisma.Decimal(0), paidAmt.minus(refundedAmt));
+    // MULTI/PARTIAL: резерв активных платежей (PENDING/AUTHORIZED) — CREATE
+    // доступно available = due − reserved (зеркало due-guard payment.service).
+    // canonical dueAmount НЕ меняется (prompt §5: paid только CAPTURED).
+    const reservedAgg = await this.prisma.payment.aggregate({
+      where: { orderId: order.id, status: { in: [PaymentStatus.PENDING, PaymentStatus.AUTHORIZED] } },
+      _sum: { amount: true },
+    });
+    const reservedAmount = new Prisma.Decimal(reservedAgg._sum.amount ?? 0);
     return {
       ...order,
       travelers: redactTravelersPii(order.travelers ?? [], viewer),
@@ -1167,6 +1229,7 @@ export class OrderService {
       partnerDisplayName: partnerDisplay?.displayName ?? null,
       availableActions,
       dueAmount: dueAmount.toString(),
+      reservedAmount: reservedAmount.toString(),
       refundableAmount: refundableAmount.toString(),
       linkedRequest: linkedRequest ?? null,
       linkedBooking: linkedBooking ?? null,
@@ -1299,6 +1362,8 @@ export class OrderService {
       select: {
         id: true, code: true, termsAcceptedAt: true, finalConfirmedAt: true,
         acquisitionSource: true, pinnedRequirements: true,
+        // §14: date-only факты поездки для document validation (passportExpiry).
+        serviceDate: true, items: { select: { serviceDate: true } },
       },
     });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
@@ -1346,9 +1411,24 @@ export class OrderService {
           birthDate: t.birthDate ? new Date(t.birthDate) : existing[i].birthDate,
           citizenship: t.citizenship ?? existing[i].citizenship,
           gender: t.gender ?? existing[i].gender,
+          passportSeries: t.passportSeries ?? existing[i].passportSeries,
           passportNumber: t.passportNumber ?? existing[i].passportNumber,
           passportExpiry: t.passportExpiry ? new Date(t.passportExpiry) : existing[i].passportExpiry,
         };
+        // §14 точка 1: document validation при вводе/изменении документа
+        // (bulk-путь — тот же гейт, что single PATCH travelers/:id): блокируем
+        // только присутствующий, но негодный срок; частичный save остаётся
+        // возможным (полнота — D3-гейт, §14 не дублирует его).
+        const expiryCheck = validatePassportExpiry({
+          passportExpiry: values.passportExpiry as Date | null,
+          ...resolveTripDates({ serviceDate: order.serviceDate, items: order.items }),
+          requireExpiry: false,
+        });
+        if (expiryCheck.status === "BLOCK") {
+          throw new ValidationDomainError(
+            `Order ${order.code}: passport validation failed for traveler[${existing[i].position}] — ${expiryCheck.message}`,
+          );
+        }
         const prev: Record<string, unknown> = { ...existing[i] };
         const next: Record<string, unknown> = { ...existing[i], ...values };
         // D5 Entity Change Audit: field-level diff в структурированной (PII-safe)
@@ -1365,6 +1445,7 @@ export class OrderService {
             birthDate: values.birthDate as Date | null,
             citizenship: values.citizenship as string | null,
             gender: values.gender as string | null,
+            passportSeries: values.passportSeries as string | null,
             passportNumber: values.passportNumber as string | null,
             passportExpiry: values.passportExpiry as Date | null,
             dataCompleteness: this.computeTravelerCompleteness(pinned, values),
@@ -1392,7 +1473,14 @@ export class OrderService {
   }
 
   /** Команда жизненного цикла (переход статуса). */
-  async orderAction(orderId: string, action: OrderAction, actor?: string, reason?: string | null, source?: AuditSource) {
+  async orderAction(
+    orderId: string,
+    action: OrderAction,
+    actor?: string,
+    reason?: string | null,
+    source?: AuditSource,
+    actorId?: string,
+  ) {
     const transition = TRANSITIONS[action];
     if (!transition) throw new ValidationDomainError(`Unknown action: ${action}`);
 
@@ -1416,6 +1504,52 @@ export class OrderService {
       }
       if (!transition.from.includes(order.status)) {
         throw new ConflictError(`Cannot ${action} order ${order.code} from status ${order.status}`);
+      }
+
+      // Stage 1 (Order → Request): guards «назад» — только pre-send данные.
+      //  1) Order обязан быть создан из Request (linked Request существует);
+      //  2) Request в состоянии CONVERTED (канонический post-convert);
+      //  3) АКТИВНЫХ bookings нет — исторический (returned/cancelled, terminal
+      //     по BOOKING_TERMINAL) Booking НЕ блокирует (Stage 2 fix: Bug 2);
+      //  4) payments/refunds отсутствуют (финансовые операции откладываются).
+      // Повторный вызов уже возвращённого Order ловится штатным from-списком
+      // (CANCELLED ∉ from) → ConflictError 409 — идемпотентность «отклонением».
+      let linkedRequestId: string | null = null;
+      let linkedRequestCode: string | null = null;
+      if (action === "returnToRequest") {
+        const linked = await tx.request.findFirst({
+          where: { convertedOrderId: orderId },
+          select: { id: true, code: true, status: true },
+        });
+        if (!linked) {
+          throw new ConflictError(`Order ${order.code} has no linked Request; return to Request impossible`);
+        }
+        if (linked.status !== "CONVERTED") {
+          throw new ConflictError(
+            `Linked Request ${linked.code} is ${linked.status}; return to Request requires CONVERTED`,
+          );
+        }
+        // Stage 2 fix (Bug 2): block только реально активные Booking
+        // (status ∉ BOOKING_TERMINAL — тот же терминальный список, что у
+        // агрегации Order в applyReturnToOrder). Cases A/C (все
+        // returned/cancelled) → ALLOW; Case B (хотя бы один активный) → BLOCK.
+        const activeBlockingBookings = await tx.booking.count({
+          where: { orderId, status: { notIn: BOOKING_TERMINAL } },
+        });
+        if (activeBlockingBookings > 0) {
+          throw new ConflictError(
+            `Order ${order.code} has ${activeBlockingBookings} active booking(s); return to Request requires Booking→Order design pass`,
+          );
+        }
+        const paymentCount = await tx.payment.count({ where: { orderId } });
+        const refundCount = await tx.refund.count({ where: { orderId } });
+        if (paymentCount > 0 || refundCount > 0) {
+          throw new ConflictError(
+            `Order ${order.code} has ${paymentCount} payment(s) and ${refundCount} refund(s); financial operations are out of scope for return to Request`,
+          );
+        }
+        linkedRequestId = linked.id;
+        linkedRequestCode = linked.code;
       }
 
       // D3 SR R3 (Booking eligibility, hard §16): traveler-bearing D3 Order
@@ -1442,6 +1576,32 @@ export class OrderService {
         }
       }
 
+      // Stage 2 (Booking → Order, Q9): gate повторного send. Команда разрешена
+      // из READY_FOR_BOOKING и PARTIALLY_FULFILLED, но только если есть хотя бы
+      // один СВОБОДНЫЙ OrderItem (без занимающей брони). Занимающий предикат
+      // зеркалит частичный уникальный индекс Booking_orderItemId_key
+      // (status <> CANCELLED AND rejectedAt IS NULL): активная/COMPLETED бронь
+      // занимает item; CANCELLED/SUPPLIER_REJECTED — нет. Legacy-бронь
+      // (orderItemId NULL) активна → принадлежность item неизвестна →
+      // консервативный запрет (никаких «угадываний»).
+      if (action === "send") {
+        const items = await tx.orderItem.findMany({ where: { orderId }, select: { id: true } });
+        if (items.length > 0) {
+          const occupying = await tx.booking.findMany({
+            where: { orderId, status: { not: "CANCELLED" }, rejectedAt: null },
+            select: { orderItemId: true },
+          });
+          const legacyActive = occupying.some((b) => b.orderItemId === null);
+          const occupiedIds = new Set(occupying.map((b) => b.orderItemId).filter((x): x is string => x !== null));
+          const free = items.filter((i) => !occupiedIds.has(i.id));
+          if (legacyActive || free.length === 0) {
+            throw new ConflictError(
+              `Order ${order.code} has no free order item to book (active booking exists); return the booking to the order first`,
+            );
+          }
+        }
+      }
+
       // Optimistic concurrency (Step 1.14 §19): переход применяется только если
       // статус/версия не изменились с момента чтения. Два concurrent/retry вызова
       // одного перехода → ровно ОДИН выигрывает, остальные получают ConflictError,
@@ -1458,7 +1618,7 @@ export class OrderService {
       if (action === "confirm") data.confirmedAt = milestoneNow;
       else if (action === "complete") data.fulfilledAt = milestoneNow;
       else if (action === "close") data.closedAt = milestoneNow;
-      else if (action === "cancel") data.cancelledAt = milestoneNow;
+      else if (action === "cancel" || action === "returnToRequest") data.cancelledAt = milestoneNow;
       const updatedRows = await tx.order.updateMany({
         where: { id: orderId, status: order.status, version: order.version },
         data,
@@ -1483,6 +1643,56 @@ export class OrderService {
           comment: reason ? `${ACTION_LABELS[action]}: ${reason}` : ACTION_LABELS[action],
         },
       });
+
+      // Stage 1 (Order → Request): реактивация СУЩЕСТВУЮЩЕЙ Request в той же
+      // транзакции, что и CAS Order → CANCELLED (атомарный round-trip).
+      //  - convertedOrderId/convertedAt НЕ трогаем: связь Request ↔ Order
+      //    сохраняется (Order остаётся исторической стадией со своим link);
+      //  - customerId/commerceSequence неприкосновенны (никаких insert/create
+      //    по Request — только status-version CAS, как в convert-цепочке);
+      //  - concurrent-claimer (другая команда изменила Request) → ConflictError
+      //    → полный rollback: Order остаётся активным, ничего не «половинчато».
+      if (action === "returnToRequest" && linkedRequestId && linkedRequestCode) {
+        const reactivated = await tx.request.updateMany({
+          where: { id: linkedRequestId, status: "CONVERTED" },
+          data: { status: "CHECKING", version: { increment: 1 } },
+        });
+        if (reactivated.count !== 1) {
+          throw new ConflictError(
+            `Request ${linkedRequestCode} was concurrently modified; retry returnToRequest for order ${order.code}`,
+          );
+        }
+        await tx.requestHistory.create({
+          data: {
+            requestId: linkedRequestId,
+            action: "returned_from_order",
+            from: "CONVERTED",
+            to: "CHECKING",
+            actorId: actorId ?? null,
+            actorName: actor ?? null,
+            comment: reason
+              ? `Возвращена из заказа ${order.code}: ${reason}`
+              : `Возвращена из заказа ${order.code}`,
+          },
+        });
+        await this.security.audit(tx, {
+          userId: actorId ?? null,
+          username: actor ?? null,
+          action: "order.returned_to_request",
+          resource: "Order",
+          resourceId: orderId,
+          details: {
+            orderCode: order.code,
+            orderFrom: order.status,
+            orderTo: transition.to,
+            requestId: linkedRequestId,
+            requestCode: linkedRequestCode,
+            requestFrom: "CONVERTED",
+            requestTo: "CHECKING",
+            reason: reason ?? null,
+          },
+        });
+      }
 
       // Step 1.15: correlation/causation НЕ указываются явно — они наследуются
       // из request context (correlation = requestId HTTP-команды, causation = null).
@@ -1543,6 +1753,19 @@ export class OrderService {
           });
           break;
         }
+        case "returnToRequest": {
+          // Один временной факт «Order ушёл в CANCELLED» — тот же canonical
+          // OrderCancelled, что и cancel: BookingSubscribers компенсирует
+          // активные bookings (guards выше гарантируют их отсутствие → no-op),
+          // никаких двойных/лишних доменных фактов не добавляется.
+          await this.eventBus.emit(tx, {
+            aggregateType: "Order",
+            aggregateId: orderId,
+            eventType: DomainEvents.OrderCancelled,
+            payload: { orderId, code: order.code, customerId: order.customerId } as OrderRefPayload,
+          });
+          break;
+        }
         default: {
           await this.eventBus.emit(tx, {
             aggregateType: "Order",
@@ -1581,10 +1804,25 @@ export class OrderService {
       birthDate: Date | null;
       citizenship: string | null;
       gender: string | null;
+      passportSeries: string | null;
       passportNumber: string | null;
       passportExpiry: Date | null;
       dataCompleteness: string;
     }>;
+    /**
+     * §15: server-authoritative вердикт document validation (passportExpiry).
+     * null — зритель без права на паспортные данные (PII-gate §16): статус
+     * документа не утекает тем, кто не видит сам документ.
+     */
+    passportExpiry: {
+      status: PassportExpiryStatus;
+      verdicts: Array<{
+        travelerId: string | null;
+        code: string;
+        message: string;
+        passportExpiry: string | null;
+      }>;
+    } | null;
   }> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -1596,11 +1834,14 @@ export class OrderService {
         travelerDataCompletedAt: true,
         finalConfirmedAt: true,
         travelerCount: true,
+        // §15: date-only факты поездки нужны для document validation verdict.
+        serviceDate: true,
+        items: { select: { serviceDate: true } },
         travelers: {
           orderBy: [{ position: "asc" }, { id: "asc" }],
           select: {
             id: true, firstName: true, lastName: true, birthDate: true,
-            citizenship: true, gender: true, passportNumber: true, passportExpiry: true,
+            citizenship: true, gender: true, passportSeries: true, passportNumber: true, passportExpiry: true,
             dataCompleteness: true,
           },
         },
@@ -1612,6 +1853,29 @@ export class OrderService {
     if (viewer && order.acquisitionSource === PLATFORM_SCOPE_DENIED_SOURCE) {
       throw new NotFoundError(`Order ${orderId} not found`);
     }
+    // Data-shape fix §11 (P2 hardening): a malformed pin (legacy offer snapshot
+    // written into pinnedRequirements by the pre-fix producer) renders an EMPTY
+    // traveler form — surface a visible diagnostic instead of failing silently.
+    // Detection only: no gate, API or UI semantics change.
+    const pinShape = getPinnedRequirementsShape(order.pinnedRequirements);
+    if (order.pinnedRequirements != null && pinShape !== "traveler_requirements") {
+      this.logger.warn(
+        `Order ${order.id}: pinnedRequirements shape="${pinShape}" ` +
+          `(expected traveler_requirements) — TravelerCollectionPanel would render no input fields`,
+      );
+    }
+    // §15: server-authoritative вердикт document validation (passportExpiry).
+    // PII-gate §16: зритель без права на паспортные данные получает null —
+    // статус документа не утекает тому, кто не видит сам документ.
+    const expiryCheck =
+      viewer && canViewTravelerPii(viewer.role)
+        ? validateTravelersPassportExpiry(
+            order.travelers ?? [],
+            resolveTripDates({ serviceDate: order.serviceDate, items: order.items }),
+            { requireExpiry: (order.pinnedRequirements as TravelerFullRequirements | null)?.passportExpiry === "REQUIRED" },
+          )
+        : null;
+
     return {
       // D3 §3: pinned snapshot — immutable, server-owned (read-only for client).
       pinnedRequirements: order.pinnedRequirements as TravelerFullRequirements | null,
@@ -1622,6 +1886,18 @@ export class OrderService {
       // Step 1.17: field-level PII redaction — passport/birthDate виден только
       // OPERATOR/ADMIN (тот же контракт, что listOrders/getOrder; D3 §16).
       travelers: redactTravelersPii(order.travelers ?? [], viewer),
+      // §15: данные для предупреждения UI (см. TravelerCollectionPanel).
+      passportExpiry: expiryCheck
+        ? {
+            status: expiryCheck.status,
+            verdicts: expiryCheck.verdicts.map((v) => ({
+              travelerId: v.travelerId,
+              code: v.code,
+              message: v.message,
+              passportExpiry: v.passportExpiry,
+            })),
+          }
+        : null,
     };
   }
 
@@ -1652,6 +1928,8 @@ export class OrderService {
         id: true, code: true, termsAcceptedAt: true, pinnedRequirements: true,
         travelerCount: true, travelerDataCompletedAt: true, finalConfirmedAt: true,
         acquisitionSource: true,
+        // §14: date-only факты поездки для document validation (passportExpiry).
+        serviceDate: true, items: { select: { serviceDate: true } },
       },
     });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
@@ -1734,9 +2012,24 @@ export class OrderService {
         birthDate: merged("birthDate"),
         citizenship: merged("citizenship"),
         gender: merged("gender"),
+        passportSeries: merged("passportSeries"),
         passportNumber: merged("passportNumber"),
         passportExpiry: merged("passportExpiry"),
       };
+
+      // §14 точка 1: document validation при вводе/изменении документа.
+      // BLOCK только для ПРИСУТСТВУЮЩЕГО, но негодного срока (истекает до конца
+      // поездки). Отсутствие поля — это D3-полнота (REQUIRED-гейт ниже), а не
+      // document validation: частичный save (INCOMPLETE) должен оставаться
+      // возможным. WARNING не блокирует (выводится UI, §15).
+      const expiryCheck = validatePassportExpiry({
+        passportExpiry: finalValues.passportExpiry as Date | null,
+        ...resolveTripDates({ serviceDate: order.serviceDate, items: order.items }),
+        requireExpiry: false,
+      });
+      if (expiryCheck.status === "BLOCK") {
+        throw new ValidationDomainError(`Order ${order.code}: passport validation failed — ${expiryCheck.message}`);
+      }
 
       const updated = await tx.orderTraveler.update({
         where: { id: travelerId },
@@ -1746,6 +2039,7 @@ export class OrderService {
           birthDate: merged("birthDate") as Date | null,
           citizenship: merged("citizenship") as string | null,
           gender: merged("gender") as string | null,
+          passportSeries: merged("passportSeries") as string | null,
           passportNumber: merged("passportNumber") as string | null,
           passportExpiry: merged("passportExpiry") as Date | null,
           dataCompleteness: this.computeTravelerCompleteness(pinned, finalValues),
@@ -1792,7 +2086,7 @@ export class OrderService {
   async validateTravelerCompletion(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { travelers: true },
+      include: { travelers: true, items: { select: { serviceDate: true } } },
     });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
 
@@ -1806,11 +2100,28 @@ export class OrderService {
     }
 
     const pinned = order.pinnedRequirements as TravelerFullRequirements | null;
+    // §14: document validation — НЕ-BLOCKING информационный слой для UI (§15).
+    // D3-гейт `complete`/`reason` НЕ ослабляется и НЕ ужесточается этим полем.
+    const expiryCheck = validateTravelersPassportExpiry(
+      order.travelers,
+      resolveTripDates({ serviceDate: order.serviceDate, items: order.items }),
+      { requireExpiry: pinned?.passportExpiry === "REQUIRED" },
+    );
+    const passportExpiry = {
+      status: expiryCheck.status,
+      verdicts: expiryCheck.verdicts.map((v) => ({
+        travelerId: v.travelerId,
+        code: v.code,
+        message: v.message,
+        passportExpiry: v.passportExpiry,
+      })),
+    };
     if (!pinned) {
       return {
         complete: false,
         reason: "pinned traveler requirements missing (legacy order outside D3 flow)",
         travelerDataCompletedAt: null,
+        passportExpiry,
       };
     }
 
@@ -1820,6 +2131,7 @@ export class OrderService {
         complete: false,
         reason: `Expected ${order.travelerCount} travelers, have ${order.travelers.length}`,
         travelerDataCompletedAt: null,
+        passportExpiry,
       };
     }
 
@@ -1839,6 +2151,7 @@ export class OrderService {
         complete: false,
         reason: `${missing.length} required field(s) missing: ${missing.slice(0, 5).join("; ")}`,
         travelerDataCompletedAt: null,
+        passportExpiry,
       };
     }
 
@@ -1849,6 +2162,7 @@ export class OrderService {
         complete: false,
         reason: `${flagIncomplete.length} traveler(s) have incomplete data`,
         travelerDataCompletedAt: null,
+        passportExpiry,
       };
     }
 
@@ -1859,10 +2173,10 @@ export class OrderService {
         where: { id: orderId },
         data: { travelerDataCompletedAt: now },
       });
-      return { complete: true, reason: null, travelerDataCompletedAt: now };
+      return { complete: true, reason: null, travelerDataCompletedAt: now, passportExpiry };
     }
 
-    return { complete: true, reason: null, travelerDataCompletedAt: order.travelerDataCompletedAt };
+    return { complete: true, reason: null, travelerDataCompletedAt: order.travelerDataCompletedAt, passportExpiry };
   }
 
   /**
@@ -1878,7 +2192,7 @@ export class OrderService {
   async finalConfirm(orderId: string, actor?: string, source?: AuditSource) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { travelers: true },
+      include: { travelers: true, items: { select: { serviceDate: true } } },
     });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
 
@@ -1911,6 +2225,21 @@ export class OrderService {
       if (!completion.complete) {
         throw new ValidationDomainError(`Order ${order.code}: traveler data not complete — ${completion.reason}`);
       }
+    }
+
+    // §14 точка 2: document validation перед финальным подтверждением.
+    // BLOCK → отказ; WARNING не блокирует (выводится UI, §15). D3-гейты выше
+    // сохраняют приоритет ошибок (§4 «Do not weaken existing D3 gates»).
+    const expiryCheck = validateTravelersPassportExpiry(
+      order.travelers,
+      resolveTripDates({ serviceDate: order.serviceDate, items: order.items }),
+      { requireExpiry: (order.pinnedRequirements as TravelerFullRequirements).passportExpiry === "REQUIRED" },
+    );
+    if (expiryCheck.status === "BLOCK") {
+      const bad = expiryCheck.verdicts.find((v) => v.status === "BLOCK");
+      throw new ValidationDomainError(
+        `Order ${order.code}: passport validation failed for traveler ${bad?.travelerId ?? "?"} — ${bad?.message ?? ""}`,
+      );
     }
 
     // D3 §19: duplicate final confirm → reject (не создаёт дубль Order).

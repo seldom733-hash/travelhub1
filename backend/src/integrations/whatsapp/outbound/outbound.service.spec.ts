@@ -289,13 +289,39 @@ function createService(
       path.join(os.tmpdir(), `wa-out-spec-${Date.now()}-${Math.random().toString(36).slice(2)}`),
   } as unknown as WhatsAppConfig;
   const provider = options.provider === undefined ? new FakeProvider() : options.provider;
+  // M5: реестр-фейк — один primary-номер acc-1; provider: null = kill-switch
+  // (реальный реестр бросает тот же DomainError 503 из ensureContext).
+  const ctx = {
+    accountId: "acc-1",
+    provider,
+    ownership,
+    sessionPath: path.join(os.tmpdir(), "wa-out-spec-session"),
+    placeholder: false,
+  };
+  const registry = {
+    ensureContext: async (_accountId?: string) => {
+      if (!provider) {
+        throw new DomainError("WhatsApp integration is disabled (WHATSAPP_ENABLED=false)", 503);
+      }
+      return ctx;
+    },
+    get: () => (provider ? ctx : null),
+    ensurePrimaryAccountId: async () => {
+      if (db.account) return String(db.account["id"]);
+      db.account = { id: "acc-1", provider: "mock", createdAt: new Date() };
+      return "acc-1";
+    },
+    onDeliveryUpdate: (cb: (accountId: string, update: WhatsAppDeliveryUpdate) => void) => {
+      if (!provider) return () => undefined;
+      return provider.onDeliveryUpdate((update) => cb("acc-1", update));
+    },
+  };
   const service = new WhatsAppOutboundService(
     prisma as never,
     ids as never,
     security as never,
-    ownership as never,
     config,
-    (provider ?? null) as never,
+    registry as never,
   );
   return { service, provider: provider as FakeProvider | null, prisma };
 }
@@ -774,6 +800,98 @@ describe("WhatsAppOutboundService (M2)", () => {
       expect(db.conversations).toHaveLength(1);
       expect(db.conversations[0]["customerId"]).toBe("cus-other");
       expect(db.outbound[0]["conversationId"]).toBe("conv-existing");
+    });
+  });
+
+  describe("LID-адресация (§10): отправка без разрешённого номера", () => {
+    const LID_JID = "157848755548268@lid";
+
+    function seedConversation(db: FakeDb, overrides: Row = {}): void {
+      db.conversations.push({
+        id: "conv-lid",
+        accountId: "acc-1",
+        remoteJid: LID_JID,
+        canonicalPhone: null,
+        customerId: null,
+        matchingStatus: "UNMATCHED",
+        matchedAt: null,
+        lastMessageAt: null,
+        lastMessagePreview: null,
+        lastReadAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...overrides,
+      });
+    }
+
+    it("lid-диалог без customerId/phone → отправка по lid-JID самого диалога", async () => {
+      const db = createFakeDb();
+      seedConversation(db);
+      const provider = new FakeProvider();
+      const { service } = createService(db, { provider });
+
+      const result = await service.sendManual(
+        { conversationId: "conv-lid", text: "привет" },
+        actor,
+        "op-lid-1",
+      );
+
+      expect(result.status).toBe("SENT");
+      expect(provider.sent).toHaveLength(1);
+      expect(provider.sent[0]!.recipientJid).toBe(LID_JID);
+      const row = db.outbound[0]!;
+      expect(row["recipientJid"]).toBe(LID_JID);
+      expect(row["recipientPhone"]).toBeNull(); // номер не угадывается
+      expect(row["conversationId"]).toBe("conv-lid");
+      const conv = db.conversations[0]!;
+      expect(conv["canonicalPhone"]).toBeNull(); // fillConversation не затирает
+      expect(conv["lastMessagePreview"]).toBe("привет");
+      expect(db.communications[0]!["contextId"]).toBeNull();
+      expect(db.audits.some((a) => a["action"] === "whatsapp.send")).toBe(true);
+    });
+
+    it("lid-диалог с привязанным customerId → контекст Communication = CUSTOMER, отправка всё равно по lid", async () => {
+      const db = createFakeDb({ customer: { id: "cus-lid", phone: VALID_PHONE } });
+      seedConversation(db, { customerId: "cus-lid", matchingStatus: "MATCHED" });
+      const provider = new FakeProvider();
+      const { service } = createService(db, { provider });
+
+      const result = await service.sendManual(
+        { conversationId: "conv-lid", text: "по делу" },
+        actor,
+        "op-lid-2",
+      );
+
+      expect(result.status).toBe("SENT");
+      expect(provider.sent[0]!.recipientJid).toBe(LID_JID);
+      expect(db.communications[0]!["contextType"]).toBe("CUSTOMER");
+      expect(db.communications[0]!["contextId"]).toBe("cus-lid");
+      expect(db.conversations[0]!["canonicalPhone"]).toBeNull();
+    });
+
+    it("обычный (не lid) диалог без customerId/phone → 422 «Either customerId or phone is required» — lid-ветка guard не обходит", async () => {
+      const db = createFakeDb();
+      seedConversation(db, { id: "conv-pn", remoteJid: "994501112233@s.whatsapp.net" });
+      const provider = new FakeProvider();
+      const { service } = createService(db, { provider });
+
+      await expect(
+        service.sendManual({ conversationId: "conv-pn", text: "x" }, actor, "op-lid-3"),
+      ).rejects.toThrow("Either customerId or phone is required");
+      expect(db.outbound).toHaveLength(0);
+      expect(provider.sent).toHaveLength(0);
+    });
+
+    it("lid-диалог + явный phone → классический mismatch-422 (корректный путь — link диалога)", async () => {
+      const db = createFakeDb();
+      seedConversation(db);
+      const provider = new FakeProvider();
+      const { service } = createService(db, { provider });
+
+      await expect(
+        service.sendManual({ conversationId: "conv-lid", phone: VALID_PHONE, text: "x" }, actor, "op-lid-4"),
+      ).rejects.toThrow("does not match");
+      expect(db.outbound).toHaveLength(0);
     });
   });
 

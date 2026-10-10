@@ -9,6 +9,7 @@ describe("shared/pii — field-level redaction traveler/passenger", () => {
     birthDate: new Date("1990-05-01"),
     citizenship: "AZ",
     gender: "male",
+    passportSeries: "AB",
     passportNumber: "AB1234567",
     passportExpiry: new Date("2030-01-01"),
     dataCompleteness: "COMPLETE",
@@ -24,6 +25,7 @@ describe("shared/pii — field-level redaction traveler/passenger", () => {
   it("остальные staff-роли получают redacted projection (PII → null, имена сохранены)", () => {
     for (const role of [RoleCode.SALES_MANAGER, RoleCode.FINANCE, RoleCode.ANALYST, RoleCode.MARKETER, RoleCode.DIRECTOR, RoleCode.MODERATOR]) {
       const out = redactTravelerPii(traveler, { role });
+      expect(out.passportSeries).toBeNull();
       expect(out.passportNumber).toBeNull();
       expect(out.passportExpiry).toBeNull();
       expect(out.birthDate).toBeNull();
@@ -58,6 +60,11 @@ describe("shared/pii — field-level redaction traveler/passenger", () => {
   });
 
   it("список PII-полей покрывает паспортные данные и DOB", () => {
-    expect(TRAVELER_PII_FIELDS).toEqual(["passportNumber", "passportExpiry", "birthDate"]);
+    expect(TRAVELER_PII_FIELDS).toEqual([
+      "passportSeries",
+      "passportNumber",
+      "passportExpiry",
+      "birthDate",
+    ]);
   });
 });

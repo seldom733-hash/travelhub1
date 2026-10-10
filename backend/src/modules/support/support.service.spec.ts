@@ -21,6 +21,7 @@ describe('SupportService', () => {
     id: 'user-001',
     code: 'USR-00000001',
     username: 'admin',
+    phone: null,
     email: 'admin@test.com',
     fullName: 'Admin User',
     status: 'ACTIVE' as any,

@@ -21,6 +21,20 @@ import { WhatsAppAuthStateError } from "./auth-state-store";
 import { WhatsAppNotConnectedError, WhatsAppMessageSendError } from "../whatsapp-errors";
 import type { WhatsAppConnectionState } from "../../../../generated/prisma/enums";
 
+/** Минимальный фейк WS-транспорта (Baileys `socket.ws`): кадры/события. */
+class FakeWs {
+  private handlers = new Map<string, Set<() => void>>();
+
+  on(event: string, cb: () => void): void {
+    if (!this.handlers.has(event)) this.handlers.set(event, new Set());
+    this.handlers.get(event)!.add(cb);
+  }
+
+  emit(event: string): void {
+    for (const cb of this.handlers.get(event) ?? []) cb();
+  }
+}
+
 class FakeEv implements Partial<BaileysEventEmitterLike> {
   private handlers = new Map<string, Set<(payload: never) => void>>();
 
@@ -45,6 +59,8 @@ class FakeEv implements Partial<BaileysEventEmitterLike> {
 class FakeSocket implements BaileysSocketLike {
   readonly ev = new FakeEv() as unknown as BaileysEventEmitterLike;
   readonly fakeEv = new FakeEv();
+  /** WS-транспорт (в проде Baileys кладёт сюда кадровые события). */
+  readonly ws = new FakeWs();
   user: { id?: string } | null = { id: "994501234567:12@s.whatsapp.net" };
   relayCalls: Array<{ jid: string; content: Record<string, unknown>; messageId: string }> = [];
   relayBehavior: "ok" | "reject" | "hang" = "ok";
@@ -1115,5 +1131,81 @@ describe("Baileys runtime import (A-25, реальный Node-процесс)", 
     expect(out.messageId).toMatch(/^3EB0[0-9A-F]{36}$/);
     expect(out.messageId).toHaveLength(40);
     expect(out.ubuntu).toEqual(["Ubuntu", "Chrome", "22.04.4"]);
+  });
+});
+
+describe("BaileysWhatsAppProvider: watchdog зомби-соединения", () => {
+  function createWatchdogHarness(watchdogIntervalMs: number, watchdogStaleMs: number) {
+    const tmpDir = path.join(
+      os.tmpdir(),
+      `travelhub-wa-wd-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const socket = new FakeSocket();
+    const provider = new BaileysWhatsAppProvider({
+      config: buildConfig(tmpDir),
+      instanceId: "test-host:1:wd",
+      getFencingToken: () => 7,
+      socketStarter: () => socket,
+      loadModule: async () => STUB_MODULE,
+      watchdogIntervalMs,
+      watchdogStaleMs,
+    });
+    return { provider, socket, tmpDir };
+  }
+
+  it("CONNECTED без входящих кадров/событий дольше порога → принудительный reconnect", async () => {
+    const h = createWatchdogHarness(20, 120);
+    try {
+      await h.provider.start();
+      h.socket.emit("connection.update", { connection: "open" });
+      await waitFor(() => h.provider.getSnapshot().state === "CONNECTED", "connected");
+
+      // Тишина: ни WS-кадров, ни ev-событий дольше watchdogStaleMs.
+      await waitFor(
+        () => ["RECONNECTING", "DISCONNECTED", "INITIALIZING", "CONNECTING"].includes(h.provider.getSnapshot().state),
+        "forced reconnect",
+        5_000,
+      );
+      expect(h.socket.ended).toBe(true);
+    } finally {
+      await h.provider.stop("test done");
+    }
+  });
+
+  it("активный сокет (WS-кадры keepalive) реконнект не запускает", async () => {
+    const h = createWatchdogHarness(20, 150);
+    try {
+      await h.provider.start();
+      h.socket.emit("connection.update", { connection: "open" });
+      await waitFor(() => h.provider.getSnapshot().state === "CONNECTED", "connected");
+
+      const start = Date.now();
+      while (Date.now() - start < 400) {
+        h.socket.ws.emit("message");
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      expect(h.provider.getSnapshot().state).toBe("CONNECTED");
+      expect(h.socket.ended).toBe(false);
+    } finally {
+      await h.provider.stop("test done");
+    }
+  });
+
+  it("ev-события тоже считаются liveness (fallback, когда ws-кадров нет)", async () => {
+    const h = createWatchdogHarness(20, 150);
+    try {
+      await h.provider.start();
+      h.socket.emit("connection.update", { connection: "open" });
+      await waitFor(() => h.provider.getSnapshot().state === "CONNECTED", "connected");
+
+      const start = Date.now();
+      while (Date.now() - start < 400) {
+        h.socket.emit("messages.update", []);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      expect(h.provider.getSnapshot().state).toBe("CONNECTED");
+    } finally {
+      await h.provider.stop("test done");
+    }
   });
 });

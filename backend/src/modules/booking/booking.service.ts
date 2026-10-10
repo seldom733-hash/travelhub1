@@ -2,13 +2,16 @@ import { Injectable } from "@nestjs/common";
 import type { BookingStatus, OrderStatus, Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
-import { DomainEvents, type BookingEventPayload } from "../../eventbus/domain-events";
+import { DomainEvents, type BookingEventPayload, type CommissionReversedPayload } from "../../eventbus/domain-events";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { parseDateParam } from "../../shared/date-param";
 import { BookingQueryService } from "./booking-query.service";
 import { overviewBookingWhere } from "./booking-kpi-scope";
 import { buildSortClause } from '../../shared/sort';
 import { isDeniedStorefrontScope } from "../../shared/sales-scope";
+// Stage 2 (Booking → Order): AuditLog контракт booking.returned_to_order
+// (SecurityModule @Global — импорт модуля не нужен).
+import { SecurityService } from "../../security/security.service";
 
 export type BookingAction =
   | "prepare"
@@ -23,7 +26,9 @@ export type BookingAction =
   | "requestCancellation"
   | "complete"
   | "cancel"
-  | "problem";
+  | "problem"
+  // Stage 2 (Booking → Order): возврат брони в заказ — round-trip-команда.
+  | "returnToOrder";
 
 /**
  * Step 2.9 — canonical Booking lifecycle (Screen Design codes verbatim: NEW,
@@ -67,6 +72,28 @@ const TRANSITIONS: Record<BookingAction, { from: BookingStatus[]; to: BookingSta
   // `problem` — исключает PROBLEM): повторный problem с PROBLEM → 409, без
   // шумной self-transition history/события.
   problem: { from: ACTIVE.filter((s) => s !== "PROBLEM"), to: "PROBLEM" },
+  // Stage 2 (Booking → Order, Q2): ОДНА команда `returnToOrder`.
+  //  - direct (NEW..NEEDS_CLARIFICATION + PROBLEM) → бронь терминализируется
+  //    в CANCELLED (to-значение ниже — прямая ветка);
+  //  - phase-2 (CANCELLED/SUPPLIER_REJECTED, уже терминальны) → статус брони
+  //    НЕ меняется (возврат — агрегатная операция над Order);
+  //  - CONFIRMED/IN_SERVICE/CANCELLATION_REQUESTED/CHANGE_REQUESTED → 409
+  //    «сначала подтверждённая отмена»; COMPLETED → 409 (никогда не возвращается).
+  // Спец-guards/матрица — в applyReturnToOrder (bookingAction ветвится ДО
+  // generic-пути); from-список управляет только серверной проекцией.
+  returnToOrder: {
+    from: [
+      "NEW",
+      "PREPARING_REQUEST",
+      "SENT_TO_SUPPLIER",
+      "AWAITING_CONFIRMATION",
+      "NEEDS_CLARIFICATION",
+      "PROBLEM",
+      "CANCELLED",
+      "SUPPLIER_REJECTED",
+    ],
+    to: "CANCELLED",
+  },
 };
 
 /**
@@ -78,6 +105,42 @@ const TRANSITIONS: Record<BookingAction, { from: BookingStatus[]; to: BookingSta
  * Cross-domain READ (ADR-0001) — Order таблицы не пишутся.
  */
 const ORDER_TERMINAL_GUARD: OrderStatus[] = ["CANCELLED", "CLOSED"];
+
+// ── Stage 2 (Booking → Order): матрица возврата + агрегат Order ──────────────
+
+/** Q2: direct-ветка — бронь ещё не подтверждена поставщиком (или проблемна) →
+ *  возврат терминализирует бронь (CANCELLED) без фазы отмены у поставщика. */
+const RETURN_DIRECT: BookingStatus[] = [
+  "NEW",
+  "PREPARING_REQUEST",
+  "SENT_TO_SUPPLIER",
+  "AWAITING_CONFIRMATION",
+  "NEEDS_CLARIFICATION",
+  "PROBLEM",
+];
+
+/** Q2: phase-2 — бронь уже терминальна, возврат = только агрегат Order
+ *  (статус брони не меняется; повтор при «ничего не меняется» → 409). */
+const RETURN_PHASE2: BookingStatus[] = ["CANCELLED", "SUPPLIER_REJECTED"];
+
+/** Q2: подтверждённые состояния — двухфазный кейс: сначала подтверждённая
+ *  отмена (requestCancellation → cancel), затем возврат. Здесь — явный 409. */
+const RETURN_PHASE2_ACTIVE: BookingStatus[] = [
+  "CONFIRMED",
+  "IN_SERVICE",
+  "CANCELLATION_REQUESTED",
+  "CHANGE_REQUESTED",
+];
+
+/** Терминальные брони (конвенция TERMINAL_BOOKING_STATUSES) — НЕ считаются
+ *  активными при агрегации Order после возврата. COMPLETED занимает item.
+ *  Exported: Order → Request guard/projection используют ТОТ ЖЕ терминальный
+ *  список (shared source of truth, Stage 2 fix — «блокирует только активный»). */
+export const BOOKING_TERMINAL: BookingStatus[] = ["COMPLETED", "CANCELLED", "SUPPLIER_REJECTED"];
+
+/** Q1: from-список Order для возврата — рабочие стадии Booking-цепочки,
+ *  включая PROBLEM (решение владельца: PROBLEM recovery через returnToOrder). */
+const ORDER_RETURNABLE: OrderStatus[] = ["SENT_TO_BOOKING", "PARTIALLY_FULFILLED", "PROBLEM"];
 
 const ACTION_LABELS: Record<BookingAction, string> = {
   prepare: "Запрос готовится к отправке поставщику",
@@ -93,6 +156,7 @@ const ACTION_LABELS: Record<BookingAction, string> = {
   complete: "Бронирование завершено",
   cancel: "Бронирование отменено",
   problem: "Бронирование помечено проблемным",
+  returnToOrder: "Бронирование возвращено в заказ",
 };
 
 /**
@@ -104,7 +168,7 @@ const ACTION_LABELS: Record<BookingAction, string> = {
  * consumer-ы НЕ реализуют независимые переходы; compensation-консьюмер
  * OrderCancelled использует те же guards/CAS (см. booking.subscribers.ts).
  */
-const ACTION_PERMISSIONS: Record<BookingAction, string> = {
+export const ACTION_PERMISSIONS: Record<BookingAction, string> = {
   prepare: "booking.send_supplier",
   send: "booking.send_supplier",
   requestClarification: "booking.confirm",
@@ -118,10 +182,12 @@ const ACTION_PERMISSIONS: Record<BookingAction, string> = {
   complete: "booking.confirm",
   cancel: "booking.cancel",
   problem: "booking.confirm",
+  // Stage 2 (Q7): granular-право возврата в заказ (отдельно от booking.cancel).
+  returnToOrder: "booking.return_to_order",
 };
 
 export function computeAvailableBookingActions(
-  booking: { status: BookingStatus; orderId: string },
+  booking: { status: BookingStatus; orderId: string; returnedToOrder?: boolean },
   granted: readonly string[],
 ): BookingAction[] {
   const actions: BookingAction[] = [];
@@ -129,6 +195,11 @@ export function computeAvailableBookingActions(
     const t = TRANSITIONS[action];
     if (!t.from.includes(booking.status)) continue;
     if (!granted.includes(ACTION_PERMISSIONS[action])) continue;
+    // Stage 2 fix (Bug 1): уже возвращённая бронь (history-факт
+    // returned_to_order) НЕ предлагает returnToOrder — терминальный статус
+    // (CANCELLED/SUPPLIER_REJECTED) сам по себе не различает «отменена» и
+    // «возвращена». Список всё ещё server-authoritative: frontend рендерит только его.
+    if (action === "returnToOrder" && booking.returnedToOrder) continue;
     actions.push(action);
   }
   return actions;
@@ -148,6 +219,7 @@ export class BookingService {
     private readonly prisma: PrismaService,
     private readonly eventBus: EventBusService,
     private readonly query: BookingQueryService,
+    private readonly security: SecurityService,
   ) {}
 
   /**
@@ -436,8 +508,19 @@ export class BookingService {
 
   async getBooking(id: string, viewer?: import("../../shared/pii").TravelerViewer, grantedPermissions: string[] = []) {
     const booking = await this.query.getById(id, viewer);
-    // D6: server-authoritative available actions (state machine + RBAC + Order terminal guard)
-    const availableActions = computeAvailableBookingActions(booking, grantedPermissions);
+    // D6: server-authoritative available actions (state machine + RBAC + Order terminal guard).
+    // Stage 2 fix (Bug 1): источник правды «уже возвращена» — history-факт
+    // returned_to_order (пишется applyReturnToOrder; без schema-изменений).
+    // Запрашивается только для терминальных кандидатов phase-2, где статус
+    // (CANCELLED/SUPPLIER_REJECTED) неотличим «отменена» vs «возвращена».
+    const returnedToOrder =
+      booking.status === "CANCELLED" || booking.status === "SUPPLIER_REJECTED"
+        ? (await this.prisma.bookingHistory.findFirst({
+            where: { bookingId: booking.id, action: "returned_to_order" },
+            select: { id: true },
+          })) !== null
+        : false;
+    const availableActions = computeAvailableBookingActions({ ...booking, returnedToOrder }, grantedPermissions);
     return { ...booking, availableActions };
   }
 
@@ -451,8 +534,16 @@ export class BookingService {
     return { items, total: items.length, page: 1, pageSize: 100 };
   }
 
-  /** Команда жизненного цикла бронирования. */
-  async bookingAction(bookingId: string, action: BookingAction, actor?: string, reason?: string | null) {
+  /** Команда жизненного цикла бронирования.
+   *  Stage 2: `returnToOrder` ветвится в applyReturnToOrder (собственная
+   *  матрица/guards/order-агрегат; generic CAS-путь не используется). */
+  async bookingAction(
+    bookingId: string,
+    action: BookingAction,
+    actor?: string,
+    reason?: string | null,
+    actorId?: string,
+  ) {
     const transition = TRANSITIONS[action];
     if (!transition) throw new ValidationDomainError(`Unknown action: ${action}`);
 
@@ -465,6 +556,10 @@ export class BookingService {
       // партнёра (Partner Workspace), вне Platform Marketplace контракта.
       if (booking.acquisitionSource === "PARTNER_STOREFRONT") {
         throw new NotFoundError(`Booking ${bookingId} not found`);
+      }
+      // Stage 2 (Booking → Order): round-trip-команда со спец-матрицей.
+      if (action === "returnToOrder") {
+        return this.applyReturnToOrder(tx, booking, actor, reason ?? null, actorId);
       }
       if (!transition.from.includes(booking.status)) {
         throw new ConflictError(`Cannot ${action} booking ${booking.code} from status ${booking.status}`);
@@ -629,5 +724,283 @@ export class BookingService {
 
     await this.eventBus.publishPending();
     return result;
+  }
+
+  /**
+   * Stage 2 (Booking → Order, Q1–Q9) — round-trip «бронь возвращается в заказ».
+   *
+   * Оркестрация в booking.service (зеркало Stage 1, но «наоборот»): booking-домен
+   * владеет booking-CAS, Order-переход — атомарный в той же транзакции
+   * (prisma-only cross-domain write, прецедент Stage 1 order.service → Request).
+   *
+   * Матрица (Q2):
+   *  - direct (RETURN_DIRECT): бронь → CANCELLED (CAS + cancelledAt milestone);
+   *  - PROBLEM — direct только если бронь никогда не была CONFIRMED/IN_SERVICE;
+   *  - phase-2 (CANCELLED/SUPPLIER_REJECTED): статус брони не меняется;
+   *  - CONFIRMED/IN_SERVICE/CANCELLATION_REQUESTED/CHANGE_REQUESTED → 409
+   *    «сначала подтверждённая отмена»; COMPLETED → 409 (никогда не возвращается).
+   *
+   * Guards ДО мутаций: storefront 404 (выше); order-terminal (CANCELLED/CLOSED)
+   * → 409; order from-список SENT_TO_BOOKING|PARTIALLY_FULFILLED|PROBLEM → 409;
+   * payments AUTHORIZED/CAPTURED → 409 «сначала refund» (Q4, без auto-refund,
+   * OrderPaymentStatus не трогается); Q3 — модели cancellation fee в кодовой
+   * базе нет (vacuous guard, задокументирован).
+   *
+   * Агрегат (Q1/Q5): активных броней после возврата > 0 → PARTIALLY_FULFILLED,
+   * иначе → READY_FOR_BOOKING; Order CAS (id+status+version); phase-2 повтор,
+   * где «ничего не меняется» → 409 (идемпотентность отказом).
+   *
+   * События: BookingCancelled (только direct-переход), OrderStatusChanged
+   * (только при фактическом изменении статуса Order), CommissionReversed
+   * (Q8, факт-событие, 0 consumer-ов). BookingStatusChanged НЕ эмитится
+   * (canonical возврат — BookingCancelled).
+   */
+  private async applyReturnToOrder(
+    tx: Prisma.TransactionClient,
+    booking: {
+      id: string;
+      code: string;
+      status: BookingStatus;
+      version: number;
+      orderId: string;
+      productId: string;
+      acquisitionSource: string | null;
+      cancelledAt: Date | null;
+    },
+    actor?: string,
+    reason?: string | null,
+    actorId?: string,
+  ) {
+    const status = booking.status;
+    const direct = RETURN_DIRECT.includes(status);
+    const phase2 = RETURN_PHASE2.includes(status);
+
+    // ── 1. Матрица возврата (Q2) ────────────────────────────────────────────
+    if (!direct && !phase2) {
+      if (RETURN_PHASE2_ACTIVE.includes(status)) {
+        throw new ConflictError(
+          `Cannot returnToOrder booking ${booking.code} from status ${status}: сначала подтверждённая отмена (requestCancellation → cancel), затем возврат в заказ`,
+        );
+      }
+      throw new ConflictError(`Cannot returnToOrder booking ${booking.code} from status ${status}`);
+    }
+    if (status === "PROBLEM") {
+      const everConfirmed = await tx.bookingHistory.findFirst({
+        where: { bookingId: booking.id, to: { in: ["CONFIRMED", "IN_SERVICE"] } },
+        select: { id: true },
+      });
+      if (everConfirmed) {
+        throw new ConflictError(
+          `Cannot returnToOrder booking ${booking.code}: подтверждённая бронь требует подтверждённой отмены (history CONFIRMED/IN_SERVICE)`,
+        );
+      }
+    }
+
+    // ── 2. Order guards (READ-only) ─────────────────────────────────────────
+    const order = await tx.order.findUnique({
+      where: { id: booking.orderId },
+      select: { id: true, code: true, status: true, version: true },
+    });
+    if (!order) throw new NotFoundError(`Order ${booking.orderId} not found for booking ${booking.code}`);
+    if (ORDER_TERMINAL_GUARD.includes(order.status)) {
+      throw new ConflictError(`Cannot returnToOrder booking ${booking.code}: order ${order.code} is ${order.status}`);
+    }
+    // Stage 2 fix (Bug 1, AC-2): повтор — по ТОМУ ЖЕ history-факту, что и
+    // availableActions (returned_to_order): уже возвращённая бронь → 409
+    // «already returned» независимо от того, сдвинулся ли Order с целевого
+    // статуса (например, повторная отправка после возврата).
+    const alreadyReturned = await tx.bookingHistory.findFirst({
+      where: { bookingId: booking.id, action: "returned_to_order" },
+      select: { id: true },
+    });
+    if (alreadyReturned) {
+      throw new ConflictError(`Booking ${booking.code} is already returned; order ${order.code} stays ${order.status}`);
+    }
+    // Phase-2 идемпотентность (повтор, «ничего не меняется») — ДО from-списка:
+    // заказ уже возвратился (нет активных броней / статус совпадает с целевым)
+    // → «already returned», а не «expected from-статус».
+    if (phase2) {
+      const activeNow = await tx.booking.count({
+        where: { orderId: order.id, status: { notIn: BOOKING_TERMINAL } },
+      });
+      const targetNow: OrderStatus = activeNow > 0 ? "PARTIALLY_FULFILLED" : "READY_FOR_BOOKING";
+      if (targetNow === order.status) {
+        throw new ConflictError(`Booking ${booking.code} is already returned; order ${order.code} stays ${order.status}`);
+      }
+    }
+    if (!ORDER_RETURNABLE.includes(order.status)) {
+      throw new ConflictError(
+        `Cannot returnToOrder booking ${booking.code}: order ${order.code} is ${order.status} (expected ${ORDER_RETURNABLE.join("/")})`,
+      );
+    }
+
+    // ── 3. Q4: деньги-гвард — 409 «сначала refund»; никаких auto-refund ────
+    const heldPayments = await tx.payment.count({
+      where: { orderId: order.id, status: { in: ["AUTHORIZED", "CAPTURED"] } },
+    });
+    if (heldPayments > 0) {
+      throw new ConflictError(
+        `Cannot returnToOrder booking ${booking.code}: order ${order.code} has ${heldPayments} authorized/captured payment(s); refund first`,
+      );
+    }
+
+    // ── 4. Booking CAS (direct) — терминализируем ДО агрегации Order ───────
+    const now = new Date();
+    let bookingTo: BookingStatus = status;
+    if (direct) {
+      bookingTo = "CANCELLED";
+      const rows = await tx.booking.updateMany({
+        where: { id: booking.id, status, version: booking.version },
+        data: { status: "CANCELLED", version: { increment: 1 }, cancelledAt: booking.cancelledAt ?? now },
+      });
+      if (rows.count !== 1) {
+        throw new ConflictError(`Booking ${booking.code} was concurrently modified; retry returnToOrder`);
+      }
+    }
+
+    // ── 5. Агрегат Order (Q1/Q5): активных > 0 → PARTIALLY_FULFILLED ────────
+    const activeAfter = await tx.booking.count({
+      where: { orderId: order.id, status: { notIn: BOOKING_TERMINAL } },
+    });
+    const target: OrderStatus = activeAfter > 0 ? "PARTIALLY_FULFILLED" : "READY_FOR_BOOKING";
+    const orderChanged = target !== order.status;
+    if (orderChanged) {
+      const rows = await tx.order.updateMany({
+        where: { id: order.id, status: order.status, version: order.version },
+        data: { status: target, version: { increment: 1 }, updatedBy: actor ?? null },
+      });
+      if (rows.count !== 1) {
+        throw new ConflictError(`Order ${order.code} was concurrently modified; retry returnToOrder`);
+      }
+    }
+
+    // ── 6. Immutable history ────────────────────────────────────────────────
+    await tx.bookingHistory.create({
+      data: {
+        bookingId: booking.id,
+        action: "returned_to_order",
+        from: status,
+        to: bookingTo,
+        actorId: actorId ?? null,
+        actorName: actor ?? null,
+        comment: reason ? `Возвращена в заказ ${order.code}: ${reason}` : `Возвращена в заказ ${order.code}`,
+      },
+    });
+    if (orderChanged) {
+      await tx.orderHistory.create({
+        data: {
+          orderId: order.id,
+          action: "returnFromBooking",
+          from: order.status,
+          to: target,
+          source: "API",
+          actorId: actorId ?? null,
+          actorName: actor ?? null,
+          comment: reason
+            ? `Возвращена из бронирования ${booking.code}: ${reason}`
+            : `Возвращена из бронирования ${booking.code}`,
+        },
+      });
+    }
+
+    // ── 7. Q6: PII поставщику не отзывается/не удаляется — факт передачи
+    // фиксируется history/audit (выше). Никаких delete по Passenger/
+    // Booking (durable history). ─────────────────────────────────────────────
+    // §5.2: defensive release удержания (продьюсеров Reservation сегодня нет;
+    // CAS HELD → RELEASED, идемпотентно).
+    await tx.reservation.updateMany({
+      where: { bookingId: booking.id, status: "HELD" },
+      data: { status: "RELEASED" },
+    });
+
+    // ── 8. Q8: CommissionReversed — CAS только из ACCRUED, ledger не трогаем ─
+    let commissionReversed: { id: string; code: string } | null = null;
+    const commission = await tx.commission.findUnique({ where: { orderId: order.id } });
+    if (commission && commission.status === "ACCRUED") {
+      const rows = await tx.commission.updateMany({
+        where: { id: commission.id, status: "ACCRUED", version: commission.version },
+        data: { status: "REVERSED", version: { increment: 1 } },
+      });
+      if (rows.count === 1) {
+        commissionReversed = { id: commission.id, code: commission.code };
+        const accrual = await tx.commissionAccrual.findUnique({ where: { sourceCommissionId: commission.id } });
+        if (accrual && accrual.status === "ACCRUED") {
+          await tx.commissionAccrual.updateMany({
+            where: { id: accrual.id, status: "ACCRUED", version: accrual.version },
+            data: { status: "REVERSED", version: { increment: 1 } },
+          });
+        }
+        await this.eventBus.emitResult(tx, {
+          aggregateType: "Commission",
+          aggregateId: commission.id,
+          eventType: DomainEvents.CommissionReversed,
+          payload: {
+            commissionId: commission.id,
+            commissionCode: commission.code,
+            accrualId: accrual?.id ?? null,
+            orderId: order.id,
+            orderCode: order.code,
+            partnerId: commission.partnerId,
+            amount: commission.amount.toString(),
+            currency: commission.currency,
+            bookingId: booking.id,
+            bookingCode: booking.code,
+          } as CommissionReversedPayload,
+        });
+      }
+    }
+
+    // ── 9. AuditLog (контракт Stage 1: order.returned_to_request) ───────────
+    await this.security.audit(tx, {
+      userId: actorId ?? null,
+      username: actor ?? null,
+      action: "booking.returned_to_order",
+      resource: "Booking",
+      resourceId: booking.id,
+      details: {
+        bookingCode: booking.code,
+        bookingFrom: status,
+        bookingTo,
+        orderId: order.id,
+        orderCode: order.code,
+        orderFrom: order.status,
+        orderTo: orderChanged ? target : order.status,
+        activeBookingsAfter: activeAfter,
+        commissionReversedId: commissionReversed?.id ?? null,
+        reason: reason ?? null,
+      },
+    });
+
+    // ── 10. События (в одной tx; publishPending снаружи bookingAction) ──────
+    if (direct) {
+      await this.eventBus.emit(tx, {
+        aggregateType: "Booking",
+        aggregateId: booking.id,
+        eventType: DomainEvents.BookingCancelled,
+        payload: {
+          bookingId: booking.id,
+          code: booking.code,
+          orderId: booking.orderId,
+          productId: booking.productId,
+          reason: reason ?? "Возврат в заказ",
+        } as BookingEventPayload,
+      });
+    }
+    if (orderChanged) {
+      await this.eventBus.emit(tx, {
+        aggregateType: "Order",
+        aggregateId: order.id,
+        eventType: DomainEvents.OrderStatusChanged,
+        payload: {
+          from: order.status,
+          to: target,
+          actor,
+          orderId: order.id,
+          code: order.code,
+        } as unknown as Prisma.InputJsonValue,
+      });
+    }
+
+    return { ...booking, status: bookingTo, version: direct ? booking.version + 1 : booking.version };
   }
 }

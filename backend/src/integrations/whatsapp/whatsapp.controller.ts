@@ -34,9 +34,10 @@ import { CurrentUser, RequirePermissions } from "../../security/auth/decorators"
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 import { Idempotent } from "../../shared/idempotency/idempotency.decorator";
 import { assertNoForbiddenKeys } from "../../shared/field-validation";
-import { NotFoundError, TooManyRequestsError, ValidationDomainError } from "../../shared/errors";
+import { NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { WHATSAPP_CONFIG } from "./whatsapp.tokens";
 import type { WhatsAppConfig } from "./whatsapp.config";
+import { QrRateLimiter } from "./qr-rate-limit";
 import { WhatsAppSessionRuntimeService } from "./session/session-runtime.service";
 import { WhatsAppOutboundService, type WhatsAppRecoverAction } from "./outbound/outbound.service";
 import { WhatsAppInboundService } from "./inbound/inbound.service";
@@ -141,15 +142,16 @@ class MessagesQueryDto {
 @Controller("whatsapp")
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class WhatsAppController {
-  private readonly qrHits = new Map<string, number[]>();
+  private readonly qrLimiter: QrRateLimiter;
   private readonly media: WhatsAppMediaStorage;
 
   constructor(
-    @Inject(WHATSAPP_CONFIG) private readonly config: WhatsAppConfig,
+    @Inject(WHATSAPP_CONFIG) config: WhatsAppConfig,
     private readonly runtime: WhatsAppSessionRuntimeService,
     private readonly outbound: WhatsAppOutboundService,
     private readonly inbound: WhatsAppInboundService,
   ) {
+    this.qrLimiter = new QrRateLimiter(config);
     this.media = new WhatsAppMediaStorage(config.mediaDir ?? ".whatsapp-media");
   }
 
@@ -161,10 +163,10 @@ export class WhatsAppController {
 
   @Get("qr")
   @RequirePermissions("whatsapp.session.admin")
-  qr(@CurrentUser() actor: AuthedRequest["user"]) {
-    this.assertQrRateLimit(actor.id);
+  async qr(@CurrentUser() actor: AuthedRequest["user"]) {
+    this.qrLimiter.hit(actor.id);
     // QR возвращается ТОЛЬКО здесь: без логирования, без audit, без записи в БД.
-    return { qr: this.runtime.getQr() };
+    return { qr: await this.runtime.getQr() };
   }
 
   @Post("connect")
@@ -288,28 +290,5 @@ export class WhatsAppController {
       );
     }
     return this.outbound.recover(id, dto.action as WhatsAppRecoverAction, { confirm: dto.confirm }, actor);
-  }
-
-  /**
-   * Rate-limit GET /qr (§6.4): скользящее окно per-user
-   * (WHATSAPP_QR_RATE_LIMIT_MAX / _WINDOW_MS).
-   */
-  private assertQrRateLimit(userId: string): void {
-    const now = Date.now();
-    const windowStart = now - this.config.qrRateLimit.windowMs;
-    const hits = (this.qrHits.get(userId) ?? []).filter((at) => at > windowStart);
-    if (hits.length >= this.config.qrRateLimit.max) {
-      this.qrHits.set(userId, hits);
-      throw new TooManyRequestsError("QR endpoint rate limit exceeded, retry later");
-    }
-    hits.push(now);
-    this.qrHits.set(userId, hits);
-    if (this.qrHits.size > 10_000) {
-      // Грубая защита памяти: выкидываем самые старые окна.
-      const cutoff = now - this.config.qrRateLimit.windowMs * 2;
-      for (const [key, timestamps] of this.qrHits) {
-        if (timestamps.every((at) => at <= cutoff)) this.qrHits.delete(key);
-      }
-    }
   }
 }

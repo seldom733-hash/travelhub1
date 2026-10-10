@@ -97,6 +97,17 @@ describe("WhatsAppInboundService (M3)", () => {
       onInbound,
       ...(options.findPhoneByLid ? { findPhoneByLid: options.findPhoneByLid } : {}),
     } as unknown as WhatsAppProvider;
+    // M5: сервис подписан на hub реестра; get(provider) отдаёт контекст номера.
+    const registry = {
+      onInbound,
+      get: () => ({
+        accountId: "acc-1",
+        provider,
+        ownership: null,
+        sessionPath: "",
+        placeholder: false,
+      }),
+    };
     const config = {
       enabled: options.enabled ?? true,
       provider: "mock",
@@ -120,7 +131,7 @@ describe("WhatsAppInboundService (M3)", () => {
       { nextCode: jest.fn() } as never,
       { audit: jest.fn() } as never,
       config,
-      provider,
+      registry as never,
     );
     if (options.process) {
       jest.spyOn(service, "processInbound").mockImplementation(options.process);
@@ -294,7 +305,18 @@ describe("WhatsAppInboundService M3: media (файл WA→local)", () => {
         findUnique: jest.fn(async () => inboundRow),
       },
     };
-    const provider = { onInbound: jest.fn(() => jest.fn()) } as unknown as WhatsAppProvider;
+    const onInboundMock = jest.fn(() => jest.fn());
+    const provider = { onInbound: onInboundMock } as unknown as WhatsAppProvider;
+    const registry = {
+      onInbound: onInboundMock,
+      get: () => ({
+        accountId: "acc-1",
+        provider,
+        ownership: null,
+        sessionPath: "",
+        placeholder: false,
+      }),
+    };
     const config = {
       enabled: true,
       provider: "mock",
@@ -306,7 +328,7 @@ describe("WhatsAppInboundService M3: media (файл WA→local)", () => {
       { nextCode: jest.fn(async () => "CML-1") } as never,
       { audit: jest.fn() } as never,
       config,
-      provider,
+      registry as never,
     );
     return {
       service,
@@ -374,6 +396,32 @@ describe("WhatsAppInboundService M3: media (файл WA→local)", () => {
     expect(h.comms[0]!["body"]).toBe("");
     expect(h.convUpdates[0]!["lastMessagePreview"]).toBe("image");
     await expect(fsp.access(path.join(mediaDir, "inbound"))).rejects.toThrow();
+  });
+
+  it("audio с байтами без stanza-имени → voice.ogg на диске, имя в БД (M5: не файл без расширения)", async () => {
+    const mediaDir = freshMediaDir();
+    const h = makePipeline(mediaDir);
+
+    const result = await h.service.processInbound(
+      makeMessage({
+        type: "audio",
+        text: null,
+        media: { filename: null, mimetype: "audio/ogg; codecs=opus", size: 512, bytes: new Uint8Array([7, 7, 7]) },
+      }),
+    );
+
+    expect(result).toMatchObject({ outcome: "persisted", processingStatus: "PROCESSED" });
+    expect(h.created[0]).toMatchObject({
+      mediaFilename: "voice.ogg",
+      mediaMime: "audio/ogg; codecs=opus",
+      mediaSize: 512,
+      messageType: "audio",
+      mediaPath: path.posix.join("inbound", "IN-1", "voice.ogg"),
+    });
+    const onDisk = await fsp.readFile(path.join(mediaDir, "inbound", "IN-1", "voice.ogg"));
+    expect(Array.from(onDisk)).toEqual([7, 7, 7]);
+    expect(h.comms[0]!["body"]).toBe("");
+    expect(h.convUpdates[0]!["lastMessagePreview"]).toBe("audio");
   });
 
   it("getMedia: строка с mediaPath → {filename,mimetype,mediaPath}; строка без файла → null", async () => {

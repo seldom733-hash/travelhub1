@@ -1,12 +1,17 @@
 /**
- * PHASE 2 STEP 2.12 — PaymentService unit tests (state guards, frozen money,
- * idempotency, milestones). DB-race/инварианты, дополняющие e2e:
- *  - frozen money: amount/currency серверные из Order snapshot verbatim;
+ * PHASE 2 STEP 2.12 → MULTI/PARTIAL PAYMENTS — PaymentService unit tests
+ * (state guards, frozen money, idempotency, milestones). DB-race/инварианты,
+ * дополняющие e2e:
+ *  - frozen money: currency серверное из Order snapshot verbatim; amount —
+ *    клиентский ввод, ограничен due-guard (0 < amount <= due);
  *  - state machine: единственный authority, from-guard PENDING, повторный
- *    переход → 409, первый milestone wins;
- *  - idempotency: identical retry → существующий активный Payment (no-op);
- *    P2002 (Payment_one_active_per_order) → controlled 409, НЕ raw 500;
- *  - validation: unknown Order → NotFound; CANCELLED/CLOSED Order → 422.
+ *    переход → 409, первый milestone wins; confirm → overpayment guard;
+ *  - idempotency: ВНЕШНИЙ Idempotency-Key (interceptor); бизнес-level
+ *    active-noop снят — новый create = новый факт; P2002 не глотается;
+ *    MULTI/PARTIAL §13: per-slot бизнес-идемпотентность (тот же слот →
+ *    тот же Payment; P2002 на слоте → существующий Payment, не raw 500);
+ *  - validation: unknown Order → NotFound; CANCELLED/CLOSED Order → 422;
+ *    amount > due / формат → 422.
  */
 import { Prisma } from "../../generated/prisma/client";
 import { PaymentStatus } from "../../generated/prisma/enums";
@@ -19,10 +24,11 @@ import type { EventBusService } from "../../eventbus/eventbus.service";
 
 interface PrismaStub {
   order: { findUnique: jest.Mock };
-  payment: { findFirst: jest.Mock; findUnique: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
+  payment: { findFirst: jest.Mock; findUnique: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock; aggregate: jest.Mock };
   paymentHistory: { create: jest.Mock };
   operationalNote: { create: jest.Mock };
   $transaction: jest.Mock;
+  $executeRaw: jest.Mock;
 }
 
 const ACTOR = { id: "u1", username: "fin1" };
@@ -60,13 +66,15 @@ function makePrismaStub(): PrismaStub {
     payment: {
       findFirst: jest.fn().mockResolvedValue(null),
       findUnique: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockResolvedValue({ ...PAYMENT_ROW, createdAt: new Date() }),
+      create: jest.fn().mockImplementation((args: any) => Promise.resolve({ ...PAYMENT_ROW, ...args.data, createdAt: new Date() })),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       findUniqueOrThrow: jest.fn().mockResolvedValue(PAYMENT_ROW),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
     },
     paymentHistory: { create: jest.fn().mockResolvedValue({ id: "h1" }) },
     operationalNote: { create: jest.fn().mockImplementation((args: any) => Promise.resolve({ id: "note-1", ...args.data })) },
     $transaction: jest.fn(),
+    $executeRaw: jest.fn().mockResolvedValue(0),
   };
   prisma.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
   return prisma;
@@ -113,6 +121,53 @@ describe("PaymentService (Step 2.12)", () => {
       await expect(service.createPayment({ orderId: "nope", reason: "manual" }, ACTOR)).rejects.toThrow(NotFoundError);
     });
 
+    it("MULTI/PARTIAL §13: тот же idempotencySlotKey → возвращает существующий Payment (без create — бизнес-идемпотентность)", async () => {
+      const prisma = makePrismaStub();
+      const existing = { ...PAYMENT_ROW, idempotencySlotKey: "slot-1" };
+      prisma.payment.findUnique.mockResolvedValue(existing);
+      const service = makeService(prisma);
+      const result = await service.createPayment({ orderId: "ord-1", reason: "manual" }, ACTOR, "slot-1");
+      expect(result.id).toBe("pay-1");
+      expect(result.status).toBe("PENDING");
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("MULTI/PARTIAL §13: незнакомый/null слот → штатный create; slotKey проставляется в строке Payment", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      const result = await service.createPayment({ orderId: "ord-1", reason: "manual" }, ACTOR, "slot-2");
+      expect(prisma.payment.findUnique).toHaveBeenCalledWith({ where: { idempotencySlotKey: "slot-2" } });
+      expect(prisma.payment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ idempotencySlotKey: "slot-2" }),
+        }),
+      );
+      expect(result.status).toBe("PENDING");
+      // Вне HTTP-idempotency-контекста слота нет.
+      await service.createPayment({ orderId: "ord-1", reason: "manual" }, ACTOR);
+      expect(prisma.payment.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ idempotencySlotKey: null }) }),
+      );
+    });
+
+    it("P2002 на Payment_idempotencySlotKey_key (гонка executor'ов одного слота) → существующий Payment, не raw 500", async () => {
+      const prisma = makePrismaStub();
+      const existing = { ...PAYMENT_ROW, idempotencySlotKey: "slot-3" };
+      prisma.payment.findUnique
+        .mockResolvedValueOnce(null) // первый lookup: ещё не создан
+        .mockResolvedValueOnce(existing); // после P2002: уже создан конкурентом
+      prisma.payment.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError("Unique constraint failed on idempotencySlotKey", {
+          code: "P2002",
+          clientVersion: "7.9.1",
+        }),
+      );
+      const service = makeService(prisma);
+      const result = await service.createPayment({ orderId: "ord-1", reason: "manual" }, ACTOR, "slot-3");
+      expect(result.id).toBe("pay-1");
+    });
+
     it("CANCELLED/CLOSED Order → ValidationDomainError 422 (обязательство не подлежит оплате)", async () => {
       for (const status of ["CANCELLED", "CLOSED"]) {
         const prisma = makePrismaStub();
@@ -122,20 +177,114 @@ describe("PaymentService (Step 2.12)", () => {
       }
     });
 
-    it("identical retry: активный Payment уже существует → no-op (существующий факт)", async () => {
+    it("multi: активный Payment НЕ блокирует новый create (due-guard вместо one-active)", async () => {
       const prisma = makePrismaStub();
       prisma.payment.findFirst.mockResolvedValue({ ...PAYMENT_ROW, createdAt: new Date() });
       const service = makeService(prisma);
-      const result = await service.createPayment({ orderId: "ord-1", reason: "manual" }, ACTOR);
-      expect(result.code).toBe("PAY-00000001");
+      // paid=0 (CAPTURED/REFUNDED нет), reserved=0 (PENDING нет) → due=150.
+      prisma.payment.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: null } })
+        .mockResolvedValueOnce({ _sum: { amount: null } });
+      const result = await service.createPayment({ orderId: "ord-1", amount: "50", reason: "manual" }, ACTOR);
+      expect(result.amount).toBe("50");
+      expect(prisma.payment.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("amount без значения → берётся весь текущий остаток (due = total − paid − reserved)", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      prisma.payment.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("50") } }) // paid
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("30") } }); // reserved (PENDING)
+      await service.createPayment({ orderId: "ord-1", reason: "manual" }, ACTOR);
+      // 150 − 50 − 30 = 70
+      expect(prisma.payment.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ amount: new Prisma.Decimal("70") }) }),
+      );
+    });
+
+    it("amount > due → ValidationDomainError 422 (переплата невозможна)", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      prisma.payment.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("100") } }) // paid
+        .mockResolvedValueOnce({ _sum: { amount: null } }); // reserved
+      await expect(service.createPayment({ orderId: "ord-1", amount: "51", reason: "manual" }, ACTOR)).rejects.toThrow(ValidationDomainError);
       expect(prisma.payment.create).not.toHaveBeenCalled();
     });
 
-    it("P2002 (Payment_one_active_per_order) → controlled ConflictError 409, НЕ raw 500", async () => {
+    it("полностью оплаченный заказ (due=0) → ValidationDomainError 422", async () => {
       const prisma = makePrismaStub();
-      prisma.payment.create.mockRejectedValue({ code: "P2002", meta: { target: ["Payment_one_active_per_order"] } });
       const service = makeService(prisma);
-      await expect(service.createPayment({ orderId: "ord-1", reason: "manual" }, ACTOR)).rejects.toThrow(ConflictError);
+      prisma.payment.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("150") } }) // paid (call 1)
+        .mockResolvedValueOnce({ _sum: { amount: null } }) // reserved (call 1)
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("150") } }) // paid (call 2)
+        .mockResolvedValueOnce({ _sum: { amount: null } }); // reserved (call 2)
+      await expect(service.createPayment({ orderId: "ord-1", amount: "10", reason: "manual" }, ACTOR)).rejects.toThrow(ValidationDomainError);
+      await expect(service.createPayment({ orderId: "ord-1", reason: "manual" }, ACTOR)).rejects.toThrow(ValidationDomainError);
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it("available=0 из-за РЕЗЕРВА (paid=0) → 422 '(reserved by active payments)', не '(fully paid)'", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      prisma.payment.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: null } }) // paid = 0
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("150") } }); // reserved = PENDING 150
+      const err = await service
+        .createPayment({ orderId: "ord-1", amount: "10", reason: "manual" }, ACTOR)
+        .then(() => null, (e: unknown) => e);
+      expect(err).toBeInstanceOf(ValidationDomainError);
+      expect(String((err as Error).message)).toContain("exceeds remaining due 0");
+      expect(String((err as Error).message)).toContain("reserved by active payments");
+      expect(String((err as Error).message)).not.toContain("fully paid");
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it("available=0 из-за резерва, amount не задан → 422 '(reserved by active payments)' в no-amount ветке", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      prisma.payment.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: null } }) // paid = 0
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("150") } }); // reserved = 150
+      const err = await service
+        .createPayment({ orderId: "ord-1", reason: "manual" }, ACTOR)
+        .then(() => null, (e: unknown) => e);
+      expect(err).toBeInstanceOf(ValidationDomainError);
+      expect(String((err as Error).message)).toContain("no remaining amount due");
+      expect(String((err as Error).message)).toContain("reserved by active payments");
+      expect(prisma.payment.create).not.toHaveBeenCalled();
+    });
+
+    it("available=0 из-за ПОЛНОЙ оплаты → '(fully paid)' (ветка различает paid vs reserved)", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      prisma.payment.aggregate
+        .mockResolvedValueOnce({ _sum: { amount: new Prisma.Decimal("150") } }) // paid = 150 ≥ amount
+        .mockResolvedValueOnce({ _sum: { amount: null } }); // reserved = 0
+      const err = await service
+        .createPayment({ orderId: "ord-1", amount: "10", reason: "manual" }, ACTOR)
+        .then(() => null, (e: unknown) => e);
+      expect(err).toBeInstanceOf(ValidationDomainError);
+      expect(String((err as Error).message)).toContain("order is fully paid");
+      expect(String((err as Error).message)).not.toContain("reserved by active payments");
+    });
+
+    it("некорректный формат amount (0 / отрицательный / >2 знаков) → 422 ДО транзакции", async () => {
+      const prisma = makePrismaStub();
+      const service = makeService(prisma);
+      for (const amount of ["0", "-5", "10.123"]) {
+        await expect(service.createPayment({ orderId: "ord-1", amount, reason: "manual" }, ACTOR)).rejects.toThrow(ValidationDomainError);
+      }
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("P2002 не глотается: известный one-active индекс снят, unique-violation пробрасывается как есть", async () => {
+      const prisma = makePrismaStub();
+      prisma.payment.create.mockRejectedValue({ code: "P2002", meta: { target: ["Payment_referenceNumber_key"] } });
+      const service = makeService(prisma);
+      await expect(service.createPayment({ orderId: "ord-1", reason: "manual" }, ACTOR)).rejects.toMatchObject({ code: "P2002" });
     });
 
     // ── Phase 3 Round 2D.1: initialNote integration ──────────────────────

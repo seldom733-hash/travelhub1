@@ -8,6 +8,13 @@ import { setRequestActor } from "../../shared/request-context";
 
 export interface AuthedRequest extends Request {
   user: AuthUser;
+  /**
+   * SlotKey текущего @Idempotent-запроса (digest scope+operation+clientKey).
+   * Проставляет ТОЛЬКО IdempotencyInterceptor (никогда — из body): бизнес-слой
+   * использует его как server-owned ключ бизнес-идемпотентности (payment.create:
+   * тот же слот → тот же Payment, MULTI/PARTIAL §13 / 2.12H crash window 3).
+   */
+  idempotencySlotKey?: string;
 }
 
 @Injectable()

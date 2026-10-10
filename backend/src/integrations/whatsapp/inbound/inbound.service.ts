@@ -3,12 +3,12 @@ import {
   Injectable,
   OnApplicationBootstrap,
   OnApplicationShutdown,
-  Optional,
 } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { SecurityService } from "../../../security/security.service";
 import { normalizePhoneE164 } from "../../../shared/phone/phone";
+import { resolveCustomerByPhone } from "../../../shared/customer-resolver/customer-resolver";
 import { getRequestContext } from "../../../shared/request-context";
 import { uniqueConstraintNames } from "../../../shared/prisma-errors";
 import type { Prisma } from "../../../generated/prisma/client";
@@ -16,14 +16,14 @@ import type {
   WhatsAppInboundProcessingStatus,
   WhatsAppMatchingStatus,
 } from "../../../generated/prisma/enums";
-import { WHATSAPP_CONFIG, WHATSAPP_PROVIDER } from "../whatsapp.tokens";
+import { WHATSAPP_CONFIG } from "../whatsapp.tokens";
 import type { WhatsAppConfig } from "../whatsapp.config";
 import { WhatsAppMediaStorage } from "../media/whatsapp-media.storage";
 import type {
   WhatsAppInboundMedia,
   WhatsAppInboundProviderMessage,
-  WhatsAppProvider,
 } from "../provider/whatsapp-provider";
+import { WhatsAppSessionRegistryService } from "../session/session-registry.service";
 
 /**
  * M3 «Inbound & Chat» (промпт M3 §5–§12): приём входящих событий провайдера.
@@ -91,27 +91,13 @@ export function extractCanonicalPhone(
   return null;
 }
 
-/** Нормализация на лету: все Customer.phone сверяются в E.164 в памяти
- * (read-only, без индексов/backfill — §10; v1: полный scan, объём CRM мал). */
-export async function findCustomerIdsByCanonicalPhone(
-  tx: Prisma.TransactionClient,
-  canonicalPhone: string,
-  defaultRegion: string,
-): Promise<string[]> {
-  const rows = await tx.customer.findMany({
-    where: { phone: { not: null } },
-    select: { id: true, phone: true },
-  });
-  return rows
-    .filter((row) => normalizePhoneE164(row.phone, defaultRegion) === canonicalPhone)
-    .map((row) => row.id);
-}
-
 @Injectable()
 export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplicationShutdown {
-  private readonly provider: WhatsAppProvider | null;
   private readonly media: WhatsAppMediaStorage;
   private unsubscribeInbound: (() => void) | null = null;
+  /** Repair-проход через 15s: таймер держим, чтобы снимать на shutdown (иначе
+   *  стрельнёт уже после закрытия приложения/дропа suite-БД в e2e). */
+  private repairTimer: ReturnType<typeof setTimeout> | null = null;
   /** FIFO-очередь: события применяются в порядке emission (как в runtime). */
   private queue: Promise<void> = Promise.resolve();
 
@@ -120,31 +106,79 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
     private readonly ids: IdsService,
     private readonly security: SecurityService,
     @Inject(WHATSAPP_CONFIG) private readonly config: WhatsAppConfig,
-    @Optional() @Inject(WHATSAPP_PROVIDER) provider: WhatsAppProvider | null,
+    // M5: подписка на hub реестра — события всех номеров с accountId.
+    private readonly registry: WhatsAppSessionRegistryService,
   ) {
-    this.provider = provider;
     this.media = new WhatsAppMediaStorage(config.mediaDir ?? ".whatsapp-media");
   }
 
   onApplicationBootstrap(): void {
-    if (!this.config.enabled || !this.provider) return;
-    this.unsubscribeInbound = this.provider.onInbound((message) => {
+    if (!this.config.enabled) return;
+    this.unsubscribeInbound = this.registry.onInbound((accountId, message) => {
       // Обработчик события не должен ронять провайдерный event-loop (§5);
       // FIFO-очередь сохраняет порядок emission.
       this.queue = this.queue.then(async () => {
         try {
-          await this.processInbound(message);
+          await this.processInbound(message, accountId);
         } catch (error) {
           console.error("[whatsapp] inbound processing failed", {
+            accountId,
             providerMessageId: message.providerMessageId,
             error: error instanceof Error ? error.message : "unknown",
           });
         }
       });
     });
+    // Repair-проход: диалоги, зависшие в UNMATCHED без номера, у которых
+    // номер восстановим из их собственной истории (senderPn прошлых сообщений).
+    this.repairTimer = setTimeout(() => void this.repairUnmatchedConversations(), 15_000);
+    this.repairTimer.unref?.();
+  }
+
+  /**
+   * Разовый ремонт: для UNMATCHED-диалогов без canonicalPhone ищем последний
+   * известный senderPn в истории сообщений этого же диалога и дозаполняем
+   * диалог + пробуем сматчить Customer. Read-only для Customer (resolver).
+   */
+  private async repairUnmatchedConversations(): Promise<void> {
+    try {
+      const rows = await this.prisma.whatsAppConversation.findMany({
+        where: { matchingStatus: "UNMATCHED", canonicalPhone: null },
+        select: { id: true, accountId: true, remoteJid: true },
+        take: 200,
+      });
+      for (const row of rows) {
+        const phone = await this.recoverPhoneFromHistory(row.remoteJid, row.accountId);
+        if (!phone) continue;
+        await this.prisma.$transaction(async (tx) => {
+          const match = await this.matchCustomer(tx, row.accountId, row.remoteJid, phone);
+          await tx.whatsAppConversation.update({
+            where: { id: row.id },
+            data: {
+              canonicalPhone: phone,
+              ...(match.status === "MATCHED" && match.customerId
+                ? { customerId: match.customerId, matchingStatus: "MATCHED", matchedAt: new Date() }
+                : match.status === "AMBIGUOUS"
+                  ? { matchingStatus: "AMBIGUOUS" }
+                  : {}),
+            },
+          });
+          if (match.status === "MATCHED" && match.customerId) {
+            await this.linkContact(tx, row.accountId, row.remoteJid, phone, match.customerId, match.source);
+          }
+        });
+        console.log("[whatsapp] conversation repaired", { remoteJid: row.remoteJid, phone });
+      }
+    } catch (error) {
+      console.error("[whatsapp] conversation repair failed", {
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    }
   }
 
   onApplicationShutdown(): void {
+    if (this.repairTimer) clearTimeout(this.repairTimer);
+    this.repairTimer = null;
     this.unsubscribeInbound?.();
     this.unsubscribeInbound = null;
   }
@@ -152,17 +186,29 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
   /**
    * Синхронная обработка одного события (§5); используется подпиской выше
    * и тестами напрямую (await → результат детерминирован).
+   * M5: accountId приходит из hub-события; без него (прямой вызов/тесты) —
+   * fallback на singleton-строку v1 (ensureAccountId).
    */
-  async processInbound(message: WhatsAppInboundProviderMessage): Promise<InboundProcessResult> {
+  async processInbound(
+    message: WhatsAppInboundProviderMessage,
+    accountIdOverride?: string,
+  ): Promise<InboundProcessResult> {
     const providerMessageId = message.providerMessageId?.trim();
     const remoteJid = message.remoteJid?.trim();
     if (!providerMessageId || !remoteJid) return { outcome: "invalid" };
 
-    const accountId = await this.ensureAccountId();
+    const accountId = accountIdOverride ?? (await this.ensureAccountId());
     let canonicalPhone = extractCanonicalPhone(message, this.config.defaultPhoneRegion);
     if (canonicalPhone === null) {
       // LID-маскировка: номер не в stanza — сверяем CRM-кандидатов (pn→lid).
-      canonicalPhone = await this.resolveLidViaCrm(remoteJid);
+      canonicalPhone = await this.resolveLidViaCrm(remoteJid, accountId);
+    }
+    if (canonicalPhone === null) {
+      // Восстановление из истории: stanza пришла без sender_pn, но другие
+      // сообщения ЭТОГО ЖЕ диалога (того же аккаунта) его несли — берём
+      // последний известный номер (M5: восстановление после рестарта
+      // провайдера, когда lidCache пуст, а диалог уже был определён).
+      canonicalPhone = await this.recoverPhoneFromHistory(remoteJid, accountId);
     }
     const bodyText = (message.text ?? "").trim();
     // M3+: файл — метаданные stanza (filename/mimetype/size) + байты.
@@ -179,7 +225,8 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
           ? mediaMeta.filename ?? message.type
           : "";
     const processingStatus: WhatsAppInboundProcessingStatus = supported ? "PROCESSED" : "SKIPPED";
-    const mediaPath = await this.saveInboundMedia(providerMessageId, mediaMeta);
+    const mediaFile = await this.saveInboundMedia(providerMessageId, mediaMeta, message.type);
+    const mediaPath = mediaFile?.relativePath ?? null;
 
     // §8: echo известного outbound → связываем, ВТОРАЯ копия не создаётся.
     const knownOutbound = message.fromMe
@@ -205,7 +252,7 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
             occurredAt: message.occurredAt,
             messageType: message.type,
             text: bodyText.length > 0 ? bodyText : null,
-            mediaFilename: hasMediaFile ? mediaMeta.filename : null,
+            mediaFilename: hasMediaFile ? (mediaFile?.filename ?? mediaMeta.filename) : null,
             mediaMime: hasMediaFile ? mediaMeta.mimetype : null,
             mediaSize: hasMediaFile ? mediaMeta.size : null,
             mediaPath,
@@ -358,11 +405,14 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
   /**
    * M3+: байты входящего файла → WHATSAPP_MEDIA_DIR/inbound/<id>/<file>.
    * Сбой записи НЕ роняет сообщение (метаданные stanza сохраняются).
+   * M5: возвращает имя файла, реально записанное на диск (синтез из
+   * mimetype для голосовых/медиа без stanza-имени).
    */
   private async saveInboundMedia(
     providerMessageId: string,
     media: WhatsAppInboundMedia | null,
-  ): Promise<string | null> {
+    type: string,
+  ): Promise<{ filename: string; relativePath: string } | null> {
     if (!media || !media.bytes || media.bytes.length === 0) return null;
     const bytes = media.bytes;
     try {
@@ -370,9 +420,10 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
         filename: media.filename,
         mimetype: media.mimetype,
         size: media.size,
+        type,
         bytes,
       });
-      return saved?.relativePath ?? null;
+      return saved ? { filename: saved.filename, relativePath: saved.relativePath } : null;
     } catch (error) {
       console.warn("[whatsapp] inbound media save failed", {
         providerMessageId,
@@ -410,11 +461,13 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
   /**
    * §10 LID→PN: WhatsApp маскирует номера (`…@lid`); обратного резолва на
    * сервере нет — сверяем CRM-номера через provider.findPhoneByLid (pn→lid).
-   * Опционально (mock/Cloud API без capability) → null.
+   * M5: используется провайдер НОМЕРА, принявшего событие. Опционально
+   * (mock/Cloud API без capability) → null.
    */
-  private async resolveLidViaCrm(remoteJid: string): Promise<string | null> {
+  private async resolveLidViaCrm(remoteJid: string, accountId: string): Promise<string | null> {
     if (!remoteJid.endsWith("@lid")) return null;
-    if (typeof this.provider?.findPhoneByLid !== "function") return null;
+    const provider = this.registry.get(accountId)?.provider;
+    if (typeof provider?.findPhoneByLid !== "function") return null;
     const rows = await this.prisma.customer.findMany({
       where: { phone: { not: null } },
       select: { phone: true },
@@ -425,10 +478,35 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
       if (normalized && !candidates.includes(normalized)) candidates.push(normalized);
     }
     if (candidates.length === 0) return null;
-    return this.provider.findPhoneByLid(remoteJid, candidates);
+    return provider.findPhoneByLid(remoteJid, candidates);
   }
 
-  /** §4: (accountId, remoteJid) — якорь диалога; customerId не затирается. */
+  /**
+   * Восстановление канонического номера из истории диалога: если текущая
+   * stanza пришла без sender_pn (Baileys маскирует номер не всегда одинаково),
+   * но ранее в этом же диалоге (тот же accountId + remoteJid) номер уже
+   * фиксировался — переиспользуем последний известный. Группы/broadcast
+   * исключены: у них номера участников не якорь диалога (§4).
+   */
+  private async recoverPhoneFromHistory(remoteJid: string, accountId: string): Promise<string | null> {
+    if (remoteJid.endsWith("@g.us") || remoteJid === "status@broadcast") return null;
+    const row = await this.prisma.whatsAppInboundMessage.findFirst({
+      where: { accountId, remoteJid, senderPn: { not: null } },
+      orderBy: { occurredAt: "desc" },
+      select: { senderPn: true },
+    });
+    if (!row?.senderPn) return null;
+    const bare = row.senderPn.split("@")[0].split(":")[0];
+    const recovered = normalizePhoneE164(bare, this.config.defaultPhoneRegion);
+    if (recovered) {
+      console.log("[whatsapp] phone recovered from history", { remoteJid, phone: recovered });
+    }
+    return recovered;
+  }
+
+  /** §4: (accountId, remoteJid) — якорь диалога; customerId не затирается.
+   *  Номер дозаполняется, если диалог был создан без него (LID-маскировка),
+   *  а номер позже восстановлен (stanza/история/CRM-резолв). */
   private async ensureConversation(
     tx: Prisma.TransactionClient,
     accountId: string,
@@ -451,14 +529,15 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
         matchedAt: customerId ? new Date() : null,
       },
       update: canonicalPhone ? { canonicalPhone } : {},
-      select: { id: true, customerId: true, matchingStatus: true },
+      select: { id: true, customerId: true, matchingStatus: true, canonicalPhone: true },
     });
   }
 
   /**
-   * §10: сопоставление канонического телефона с crm.Customer (read-only
-   * нормализация, никаких индексов/backfill): 0 → UNMATCHED, 1 → MATCHED,
-   * >1 → AMBIGUOUS. Быстрый путь — уже существующая связь WhatsAppContact.
+   * §10: сопоставление канонического телефона с crm.Customer (read-only):
+   * 0 → UNMATCHED, 1 → MATCHED, >1 → AMBIGUOUS. Быстрый путь — уже
+   * существующая связь WhatsAppContact; ветка телефона (M4.2) делегирована
+   * общему channel-independent Customer Resolver (shared/customer-resolver).
    */
   private async matchCustomer(
     tx: Prisma.TransactionClient,
@@ -479,12 +558,8 @@ export class WhatsAppInboundService implements OnApplicationBootstrap, OnApplica
     }
     if (!canonicalPhone) return { customerId: null, status: "UNMATCHED", source: "phone" };
 
-    const matches = await findCustomerIdsByCanonicalPhone(tx, canonicalPhone, this.config.defaultPhoneRegion);
-    if (matches.length === 1) {
-      return { customerId: matches[0], status: "MATCHED", source: "phone" };
-    }
-    if (matches.length > 1) return { customerId: null, status: "AMBIGUOUS", source: "phone" };
-    return { customerId: null, status: "UNMATCHED", source: "phone" };
+    const resolved = await resolveCustomerByPhone(tx, canonicalPhone, this.config.defaultPhoneRegion);
+    return { customerId: resolved.customerId, status: resolved.status, source: "phone" };
   }
 
   /** §24: связь JID ↔ Customer (входящая авто-связка, source=AUTO). */

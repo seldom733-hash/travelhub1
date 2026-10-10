@@ -26,6 +26,9 @@ import OperationalNotes from "@/components/OperationalNotes";
 import { useLocale, t, formatPrice, LOCALE_TAGS, type Locale } from "@/lib/i18n";
 import { bookingActionLabel } from "@/lib/commerce-history-labels";
 import { useCurrentUser } from "@/lib/use-user";
+import { useCan } from "@/lib/use-can";
+import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
+import PaymentsTable, { buildPaymentsTableRows, type PaymentsTableRow } from "@/components/finance/PaymentsTable";
 
 interface BookingDetail {
   id: string;
@@ -135,6 +138,16 @@ export default function BookingDetailPage() {
   const [executing, setExecuting] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Prompt §5: + Создать платеж из Booking detail. Payment принадлежит Order —
+  // payload строится из linkedOrder.id (bookingId НИКОГДА не отправляется).
+  const canCreatePayment = useCan("finance.payment.create");
+  const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
+
+  // MULTI/PARTIAL §7: платежи linked Order в Booking detail (permission-tolerant:
+  // 403/404 на financial-history → таблица просто не показывается, страница живёт).
+  const [orderPaymentRows, setOrderPaymentRows] = useState<PaymentsTableRow[]>([]);
+  const [paymentsUnavailable, setPaymentsUnavailable] = useState(false);
+
   const loadBooking = useCallback(async () => {
     try {
       setLoading(true);
@@ -160,6 +173,32 @@ export default function BookingDetailPage() {
   }, [id]);
 
   useEffect(() => { void loadBooking(); }, [loadBooking]);
+
+  // Payments linked-Order: повторяем после каждого loadBooking (action/create).
+  useEffect(() => {
+    if (!booking?.orderId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get<{ payments: { payments: Array<{ id: string; code: string; status: string; amount: string; currency: string; paymentMethod?: string | null; referenceNumber?: string | null; createdAt: string }>; history: Array<{ paymentId: string; action: string; actorName: string | null }> } }>(
+          `/orders/${booking.orderId}/financial-history`,
+        );
+        if (cancelled) return;
+        const total = booking.financialSummary?.totalAmount ?? booking.amount;
+        setOrderPaymentRows(
+          buildPaymentsTableRows({
+            payments: res.payments.payments ?? [],
+            history: res.payments.history ?? [],
+            orderTotal: total,
+          }),
+        );
+        setPaymentsUnavailable(false);
+      } catch {
+        if (!cancelled) setPaymentsUnavailable(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [booking]);
 
   // UI-C9: action errors surface in an inline header banner — the page content
   // and its centered load/not-found state remain untouched.
@@ -260,6 +299,21 @@ export default function BookingDetailPage() {
                 <span>{t("crm.detail.payment_status", locale)}: <StatusBadge status={activePayment.status ?? ""} /></span>
               </div>
             )}
+            {!paymentsUnavailable && orderPaymentRows.length > 0 && (
+              <div className="mt-3 border-t border-slate-100 pt-3" data-testid="booking-payments-table">
+                <PaymentsTable rows={orderPaymentRows} locale={locale} onActionCompleted={() => void loadBooking()} />
+              </div>
+            )}
+            {canCreatePayment && (
+              <button
+                type="button"
+                data-testid="booking-create-payment-button"
+                onClick={() => setCreatePaymentOpen(true)}
+                className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              >
+                {t("payments.create.button", locale)}
+              </button>
+            )}
           </EntitySectionCard>
 
           {booking.passengers && booking.passengers.length > 0 && (
@@ -345,6 +399,25 @@ export default function BookingDetailPage() {
           />
         </EntityDetailWide>
       </EntityDetailLayout>
+
+      {/* + Создать платеж — контекст Booking, orderId = linkedOrder.id (prompt §5) */}
+      <CreatePaymentForm
+        open={createPaymentOpen}
+        onClose={() => setCreatePaymentOpen(false)}
+        presetOrder={{
+          id: booking.linkedOrder?.id ?? booking.orderId,
+          label:
+            booking.linkedOrder?.referenceNumber ??
+            booking.orderReference ??
+            booking.orderCode,
+          amount: financialSummary?.totalAmount ?? booking.amount,
+          currency: financialSummary?.currency ?? booking.currency,
+        }}
+        onCreated={() => {
+          // AC-13: обновить financialSummary / activePayment (из detail-эндпоинта)
+          void loadBooking();
+        }}
+      />
     </EntityDetailShell>
   );
 }

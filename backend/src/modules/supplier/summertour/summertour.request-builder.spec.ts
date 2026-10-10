@@ -56,3 +56,81 @@ describe("Summertour TOWNS precision (request builder)", () => {
     expect(url).toContain("TOWNS_ANY=0");
   });
 });
+
+/**
+ * Confirmed supplier contract (owner-supplied real request):
+ * `ADULT=12&CHILD=3&AGES=2,6,12` — ONE comma-separated AGES param.
+ * Locks the audit gap: ages used to be built (AGE1-3) but NEVER serialized
+ * into the active XHR URL. The active path must now carry AGES and must NOT
+ * carry AGE1/AGE2/AGE3.
+ */
+describe("Summertour AGES contract (request builder)", () => {
+  it("builds AGES=<csv> for every child (children=3 → AGES=2,6,12)", () => {
+    const req = buildSummerSearchRequest({
+      tourIncValue: "229",
+      adults: 2,
+      children: 3,
+      childAges: [2, 6, 12],
+    });
+    expect(req.ADULT).toBe("2");
+    expect(req.CHILD).toBe("3");
+    expect(req.AGES).toBe("2,6,12");
+  });
+
+  it("serializes AGES into the active PRICES XHR URL (the former lost-age gap)", () => {
+    const req = buildSummerSearchRequest({
+      tourIncValue: "229",
+      adults: 2,
+      children: 3,
+      childAges: [2, 6, 12],
+    });
+    const url = buildSummerXhrUrl(req);
+    expect(url).toContain("ADULT=2");
+    expect(url).toContain("CHILD=3");
+    expect(url).toMatch(/AGES=2(%2C|,)6(%2C|,)12/);
+  });
+
+  it("does NOT emit AGE1/AGE2/AGE3 anywhere on the active XHR", () => {
+    const req = buildSummerSearchRequest({
+      tourIncValue: "229",
+      adults: 2,
+      children: 3,
+      childAges: [2, 6, 12],
+    });
+    const url = buildSummerXhrUrl(req);
+    expect(url).not.toContain("AGE1=");
+    expect(url).not.toContain("AGE2=");
+    expect(url).not.toContain("AGE3=");
+    const legacy = req as unknown as Record<string, unknown>;
+    expect(legacy.AGE1).toBeUndefined();
+    expect(legacy.AGE2).toBeUndefined();
+    expect(legacy.AGE3).toBeUndefined();
+  });
+
+  it("preserves the canonical age ordering (composition order, not sorted)", () => {
+    const req = buildSummerSearchRequest({
+      tourIncValue: "229",
+      children: 3,
+      childAges: [12, 2, 6],
+    });
+    expect(req.AGES).toBe("12,2,6");
+  });
+
+  it("emits AGES for a single child and omits it when there are no children", () => {
+    const one = buildSummerSearchRequest({ tourIncValue: "229", children: 1, childAges: [5] });
+    expect(one.AGES).toBe("5");
+    expect(buildSummerXhrUrl(one)).toMatch(/AGES=5/);
+
+    const none = buildSummerSearchRequest({ tourIncValue: "229", children: 0, childAges: [] });
+    expect(none.AGES).toBeUndefined();
+    expect(buildSummerXhrUrl(none)).not.toContain("AGES=");
+  });
+
+  it("refresh/recheck reuses the same builder → same composition on the wire", () => {
+    // refreshPrice (summertour-new.adapter) and rebuildCaptchaAction both
+    // rebuild via buildSummerSearchRequest(searchContext) + buildSummerXhrUrl.
+    const searchContext = { adults: 2, children: 3, childAges: [2, 6, 12] };
+    const url = buildSummerXhrUrl(buildSummerSearchRequest({ tourIncValue: "229", ...searchContext }));
+    expect(url).toMatch(/AGES=2(%2C|,)6(%2C|,)12/);
+  });
+});

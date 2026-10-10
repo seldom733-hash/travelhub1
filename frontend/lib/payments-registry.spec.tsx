@@ -11,6 +11,8 @@ function read(rel: string): string {
 
 // Normalize line endings so multi-line substring assertions hold on Windows (CRLF) files.
 const PAGE = read("app/app/payments/page.tsx").replace(/\r\n/g, "\n");
+// Shared 7-column payments table (registry + Order + Booking).
+const TABLE = read("components/finance/PaymentsTable.tsx").replace(/\r\n/g, "\n");
 const LOCALES = ["ru", "az", "en"] as const;
 
 /** Canonical PaymentStatus — exactly 6 (source: backend payments-registry). */
@@ -139,10 +141,12 @@ describe("UI-C1.2F.1F — Payments table-header filters (shared foundation)", ()
   it("4. PaymentStatus header filter present in the sortable Статус column (shared TableHeaderFilter)", () => {
     expect(PAGE).toContain('import TableHeaderFilter, { type FilterOption } from "@/components/TableHeaderFilter";');
     expect(PAGE).toContain('id="payments-filter-status"');
-    expect(PAGE).toContain("field=\"status\"");
-    expect(PAGE).toContain("filterSlot={");
     expect(PAGE).toContain("options={buildPaymentFilterOptions(locale)}");
     expect(PAGE).toContain('ariaLabel={t("finance.filter.all_statuses", locale)}');
+    expect(PAGE).toContain("onChange={applyPaymentStatus}");
+    // sortable column + filter slot живут в общем PaymentsTable (единый 7-колоночный контракт)
+    expect(TABLE).toContain('field="status"');
+    expect(TABLE).toContain("filterSlot={statusHeaderExtra}");
   });
 
   it("5. RefundStatus — NO invented header filter (audit-first: no refund column exists in the actual table)", () => {
@@ -207,12 +211,17 @@ describe("UI-C1.2F.1F — URL authority / page reset / coexistence / deep-link c
     expect(region).toContain('updateUrl({ sortBy: field, sortDirection: direction, page: undefined })');
   });
 
-  it("sortBy/sortDirection convention + existing sortable columns preserved", () => {
+  it("sortBy/sortDirection convention + sortable columns of the unified 7-col contract", () => {
     expect(PAGE).toContain('qs.set("sortBy", sortBy)');
     expect(PAGE).toContain('qs.set("sortDirection", sortDirection)');
-    for (const f of ["code", "createdAt", "amount", "status", "paidAt"]) {
-      expect(PAGE).toContain(`field="${f}"`);
+    for (const f of ["createdAt", "amount", "status"]) {
+      expect(TABLE).toContain(`field="${f}"`);
     }
+    // legacy sortable-колонки code/paidAt заменены единым контрактом №/Дата/Сумма/…
+    expect(PAGE).not.toContain('field="code"');
+    expect(PAGE).not.toContain('field="paidAt"');
+    expect(TABLE).not.toContain('field="code"');
+    expect(TABLE).not.toContain('field="paidAt"');
   });
 
   it("Total is not a full registry Reset — clears KPI dims only, preserves period/search/sort", () => {
@@ -352,13 +361,20 @@ describe("UI-C1.2F — shell / period / tab / table composition preserved", () =
     expect(PAGE).toContain("UI-C1.2F.1B: Local date controls removed");
   });
 
-  it("actual table column model — code/createdAt/amount/currency/status/method/order/paidAt/providerRef", () => {
+  it("actual table column model — №/Дата/Сумма/Остаток/Форма оплаты/Статус/Кто принял (7-col)", () => {
     for (const key of [
-      "payments.col.code", "payments.col.created", "payments.col.amount", "payments.col.currency",
-      "payments.col.status", "payments.col.method", "payments.col.order", "payments.col.paid_at",
-      "payments.col.provider_ref",
+      "payments.table.col_ordinal", "payments.table.col_date", "payments.col.amount",
+      "payments.col.remaining", "payments.table.col_method", "payments.col.status",
+      "payments.col.accepted_by",
     ]) {
-      expect(PAGE).toContain(`t("${key}", locale)`);
+      expect(TABLE).toContain(`t("${key}", locale)`);
+    }
+    // legacy-колонки удалены из реестра (код/валюта живут внутри ячеек)
+    for (const legacy of [
+      "payments.col.code", "payments.col.created", "payments.col.currency",
+      "payments.col.order", "payments.col.paid_at", "payments.col.provider_ref",
+    ]) {
+      expect(PAGE).not.toContain(`t("${legacy}", locale)`);
     }
     expect(PAGE).not.toContain("payments.col.refund");
   });

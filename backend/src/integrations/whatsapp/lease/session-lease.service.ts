@@ -9,16 +9,28 @@ import { WhatsAppSessionError } from "../provider/whatsapp-errors";
 /**
  * M2: WhatsAppSessionLease — single-owner аренда сессии (D2/I13, решение
  * владельца M2): instanceId, fencingToken, heartbeat, expiresAt, CAS-продление,
- * self-fencing. Строка singleton (`key="whatsapp"`) живёт в БД и переживает
- * рестарты; fencingToken МОНОТОННО растёт при каждой смене владельца и НИКОГДА
- * не уменьшается (release не удаляет строку).
+ * self-fencing. Строка аренды живёт в БД и переживает рестарты; fencingToken
+ * МОНОТОННО растёт при каждой смене владельца и НИКОГДА не уменьшается
+ * (release не удаляет строку).
+ *
+ * M5 multi-number: ключ аренды — per-account (`whatsapp:<accountId>`),
+ * по одному ключу на номер. Старый singleton-ключ "whatsapp" не
+ * используется: строка переносится на primary-номер в bootstrap реестра
+ * (см. `migrateLegacyLeaseRow`), чтобы fencing-токен primary продолжал
+ * монотонно расти и auth-state на диске не отвергал записи как зомби.
  *
  * CAS-семантика: все смены владельца/продления — updateMany с условием на
  * текущего владельца/токен; 0 затронутых строк = проигранная гонка/потеря
  * аренды (отказ, без «победы по времени»).
  */
 
+/** Legacy singleton-ключ v1 (больше не используется; строка истекает сама). */
 export const WHATSAPP_LEASE_KEY = "whatsapp";
+
+/** M5: per-account ключ аренды (один номер = один lease-row). */
+export function whatsappLeaseKey(accountId: string): string {
+  return `whatsapp:${accountId}`;
+}
 
 export type WhatsAppLeaseErrorCode = "not_owner" | "lease_lost" | "contention";
 
@@ -93,13 +105,13 @@ export class WhatsAppSessionLeaseService {
   }
 
   /**
-   * Перехват/продление аренды для ЭТОГО инстанса:
+   * Перехват/продление аренды для ЭТОГО инстанса (ключ — per-account):
    *  - строки нет → create (токен 1);
    *  - свой tenant → CAS-продление (токен не меняется);
    *  - чужая, но истёкшая → CAS-перехват с fencingToken+1;
    *  - чужая живая → not_owner.
    */
-  async acquire(): Promise<LeaseHandle> {
+  async acquire(key: string): Promise<LeaseHandle> {
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -107,12 +119,12 @@ export class WhatsAppSessionLeaseService {
           const now = new Date();
           const expiresAt = new Date(now.getTime() + this.ttlMs);
           const existing = await tx.whatsAppSessionLease.findUnique({
-            where: { key: WHATSAPP_LEASE_KEY },
+            where: { key },
           });
           if (!existing) {
             const row = await tx.whatsAppSessionLease.create({
               data: {
-                key: WHATSAPP_LEASE_KEY,
+                key,
                 instanceId: this.instanceId,
                 fencingToken: 1,
                 heartbeatAt: now,
@@ -123,7 +135,7 @@ export class WhatsAppSessionLeaseService {
           }
           if (existing.instanceId === this.instanceId) {
             const updated = await tx.whatsAppSessionLease.updateMany({
-              where: { key: WHATSAPP_LEASE_KEY, instanceId: this.instanceId, fencingToken: existing.fencingToken },
+              where: { key, instanceId: this.instanceId, fencingToken: existing.fencingToken },
               data: { heartbeatAt: now, expiresAt },
             });
             if (updated.count === 0) throw new WhatsAppLeaseError("contention", "Lease renewal CAS lost");
@@ -133,7 +145,7 @@ export class WhatsAppSessionLeaseService {
             // Перехват истёкшей аренды: токен растёт монотонно (fencing).
             const updated = await tx.whatsAppSessionLease.updateMany({
               where: {
-                key: WHATSAPP_LEASE_KEY,
+                key,
                 instanceId: existing.instanceId,
                 fencingToken: existing.fencingToken,
               },
@@ -174,12 +186,12 @@ export class WhatsAppSessionLeaseService {
    * CAS-продление (heartbeat): только текущий владелец с актуальным токеном
    * и неистёкшей арендой. 0 строк = потеря аренды → self-fencing.
    */
-  async renew(handle: LeaseHandle): Promise<LeaseHandle> {
+  async renew(key: string, handle: LeaseHandle): Promise<LeaseHandle> {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.ttlMs);
     const updated = await this.prisma.whatsAppSessionLease.updateMany({
       where: {
-        key: WHATSAPP_LEASE_KEY,
+        key,
         instanceId: handle.instanceId,
         fencingToken: handle.fencingToken,
         expiresAt: { gt: now },
@@ -199,18 +211,18 @@ export class WhatsAppSessionLeaseService {
    * Освобождение аренды (graceful shutdown/disconnect). Строка сохраняется
    * (токен монотонен), expiresAt переводится в прошлое → перехват возможен.
    */
-  async release(handle: LeaseHandle): Promise<void> {
+  async release(key: string, handle: LeaseHandle): Promise<void> {
     const now = new Date();
     await this.prisma.whatsAppSessionLease.updateMany({
-      where: { key: WHATSAPP_LEASE_KEY, instanceId: handle.instanceId, fencingToken: handle.fencingToken },
+      where: { key, instanceId: handle.instanceId, fencingToken: handle.fencingToken },
       data: { heartbeatAt: now, expiresAt: now },
     });
   }
 
   /** Текущий владелец аренды (для status/диагностики). */
-  async getOwner(): Promise<LeaseOwnerView | null> {
+  async getOwner(key: string): Promise<LeaseOwnerView | null> {
     const row = await this.prisma.whatsAppSessionLease.findUnique({
-      where: { key: WHATSAPP_LEASE_KEY },
+      where: { key },
     });
     if (!row) return null;
     return {
@@ -226,9 +238,9 @@ export class WhatsAppSessionLeaseService {
    * Fencing-проверка перед изменением lifecycle/auth/outbound state:
    * инстанс обязан быть владельцем со СВЕЖИМ (не истёкшим) токеном.
    */
-  async assertOwnership(handle: LeaseHandle): Promise<void> {
+  async assertOwnership(key: string, handle: LeaseHandle): Promise<void> {
     const row = await this.prisma.whatsAppSessionLease.findUnique({
-      where: { key: WHATSAPP_LEASE_KEY },
+      where: { key },
     });
     const now = Date.now();
     if (

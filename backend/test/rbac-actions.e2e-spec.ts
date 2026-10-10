@@ -47,6 +47,9 @@ const BOOKING_ACTIONS = [
   "complete",
   "cancel",
   "problem",
+  // Stage 2 (Q7): granular-право возврата в заказ — тоже закрыто для
+  // BUYER/SALES_MANAGER (оператор-only, как и остальные lifecycle-команды).
+  "returnToOrder",
 ] as const;
 /** Права, которых не должно быть у BUYER/SALES_MANAGER. */
 const ACTION_PERMS = [
@@ -58,6 +61,7 @@ const ACTION_PERMS = [
   "booking.send_supplier",
   "booking.confirm",
   "booking.cancel",
+  "booking.return_to_order",
 ];
 
 describe("Phase 2 — RBAC: действия Order/Booking закрыты по правам (e2e)", () => {

@@ -1,11 +1,5 @@
 ﻿import { randomBytes } from "crypto";
-import {
-  Inject,
-  Injectable,
-  OnApplicationBootstrap,
-  OnApplicationShutdown,
-  Optional,
-} from "@nestjs/common";
+import { Inject, Injectable, OnApplicationBootstrap, OnApplicationShutdown } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { SecurityService } from "../../../security/security.service";
@@ -14,7 +8,7 @@ import { normalizePhoneE164 } from "../../../shared/phone/phone";
 import { getRequestContext } from "../../../shared/request-context";
 import type { WhatsAppOutboundStatus } from "../../../generated/prisma/enums";
 import type { Prisma } from "../../../generated/prisma/client";
-import { WHATSAPP_CONFIG, WHATSAPP_PROVIDER } from "../whatsapp.tokens";
+import { WHATSAPP_CONFIG } from "../whatsapp.tokens";
 import type { WhatsAppConfig } from "../whatsapp.config";
 import type {
   WhatsAppDeliveryUpdate,
@@ -23,7 +17,8 @@ import type {
 } from "../provider/whatsapp-provider";
 import { WhatsAppProviderError, WhatsAppMessageSendError } from "../provider/whatsapp-errors";
 import { WhatsAppMediaStorage, type StagedUpload } from "../media/whatsapp-media.storage";
-import { WhatsAppSessionOwnershipService } from "../ownership/session-ownership.service";
+import type { WhatsAppSessionContext } from "../session/session-registry.service";
+import { WhatsAppSessionRegistryService } from "../session/session-registry.service";
 import {
   assertOutboundTransition,
   receiptEligibleTarget,
@@ -98,7 +93,6 @@ const CRASH_SCAN_INTERVAL_MS = 60_000;
 
 @Injectable()
 export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplicationShutdown {
-  private readonly provider: WhatsAppProvider | null;
   private readonly media: WhatsAppMediaStorage;
   private crashTimer: NodeJS.Timeout | null = null;
   private unsubscribeDelivery: (() => void) | null = null;
@@ -107,17 +101,17 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
     private readonly prisma: PrismaService,
     private readonly ids: IdsService,
     private readonly security: SecurityService,
-    private readonly ownership: WhatsAppSessionOwnershipService,
     @Inject(WHATSAPP_CONFIG) private readonly config: WhatsAppConfig,
-    @Optional() @Inject(WHATSAPP_PROVIDER) provider: WhatsAppProvider | null,
+    // M5: per-account контексты (провайдер/ownership) — из реестра сессий.
+    private readonly registry: WhatsAppSessionRegistryService,
   ) {
-    this.provider = provider;
     this.media = new WhatsAppMediaStorage(config.mediaDir ?? ".whatsapp-media");
   }
 
   onApplicationBootstrap(): void {
-    if (!this.config.enabled || !this.provider) return;
-    this.unsubscribeDelivery = this.provider.onDeliveryUpdate((update) => {
+    if (!this.config.enabled) return;
+    // Receipt-и приходят со всех номеров; providerMessageId уникален глобально.
+    this.unsubscribeDelivery = this.registry.onDeliveryUpdate((_accountId, update) => {
       void this.applyReceipt(update);
     });
     void this.recoverStaleSending();
@@ -158,10 +152,15 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
     if (!operationKey || operationKey.trim() === "") {
       throw new ValidationDomainError("operationKey (Idempotency-Key) is required");
     }
-    const recipient = await this.resolveRecipient(input);
+    // LID-адресация (§10): явный lid-диалог без customerId/phone → отправка
+    // по lid-JID самого диалога; иначе — классический резолв получателя.
+    const lidRecipient = await this.resolveLidRecipient(input);
+    const recipient = lidRecipient ? lidRecipient.recipient : await this.resolveRecipient(input);
 
     // M3 §22: opt-out gate — подавленный номер не отправляется (audit без PII).
-    if (await this.isSuppressed(recipient.canonicalPhone)) {
+    // LID-диалог: canonicalPhone неизвестен — проверять не по чему (opt-out
+    // по STOP-ключевому слову обрабатывается на входе).
+    if (recipient.canonicalPhone !== null && (await this.isSuppressed(recipient.canonicalPhone))) {
       await this.security.audit(undefined, {
         userId: actor.id,
         username: actor.username ?? null,
@@ -173,22 +172,33 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
       throw new ConflictError("Recipient opted out of WhatsApp messages (suppressed)");
     }
 
-    if (!this.provider) {
-      throw new DomainError("WhatsApp integration is disabled (WHATSAPP_ENABLED=false)", 503);
-    }
-    const snapshot = this.provider.getSnapshot();
+    // M5: номер отправки — явный диалог (accountId диалога), иначе primary.
+    const recipientJid = lidRecipient
+      ? lidRecipient.recipientJid
+      : `${recipient.canonicalPhone!.replace(/^\+/, "")}@s.whatsapp.net`;
+    // M3 §19: явный conversationId проверяется ДО транзакции (соответствие
+    // получателю); его accountId и есть номер отправки.
+    const explicitConversation = input.conversationId
+      ? await this.validateExplicitConversation(input.conversationId, recipient, recipientJid)
+      : null;
+    const accountId = explicitConversation
+      ? explicitConversation.accountId
+      : await this.registry.ensurePrimaryAccountId();
+
+    // Per-account контекст: фича выключена → 503; номер архивирован/удалён
+    // → 409/404. Провайдер/ownership конкретного номера, не singleton.
+    const ctx = await this.registry.ensureContext(accountId);
+    const snapshot = ctx.provider.getSnapshot();
     if (snapshot.state !== "CONNECTED") {
       throw new ConflictError(`WhatsApp is not connected (state=${snapshot.state})`);
     }
-    if (staged && !this.provider.capabilities.media.includes("document")) {
+    if (staged && !ctx.provider.capabilities.media.includes("document")) {
       throw new DomainError("WhatsApp provider does not support media send", 503);
     }
-    // Fencing: только владелец lease может менять outbound state.
-    const handle = await this.ownership.assertActive();
+    // Fencing: только владелец lease НОМЕРА может менять outbound state.
+    const handle = await ctx.ownership.assertActive();
 
     const providerMessageId = generateProviderMessageId();
-    const recipientJid = `${recipient.canonicalPhone.replace(/^\+/, "")}@s.whatsapp.net`;
-    const accountId = await this.ensureAccountId();
 
     // M3+: staged-загрузка переносится на постоянное место ДО транзакции
     // (mediaPath известен и пишется в outbound-строку вместе с creation).
@@ -196,11 +206,6 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
     if (staged && !mediaFile) {
       throw new NotFoundError("Uploaded file not found (uploadId)");
     }
-
-    // M3 §19: явный диалог проверяется ДО транзакции (соответствие получателю).
-    const explicitConversation = input.conversationId
-      ? await this.validateExplicitConversation(input.conversationId, recipient, recipientJid)
-      : null;
 
     const created = await this.prisma.$transaction(async (tx) => {
       const conversation = explicitConversation
@@ -276,7 +281,7 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
       return { outboundId: outbound.id, communicationCode: communication.code };
     });
 
-    const finalState = await this.executeSend(created.outboundId, text, recipientJid);
+    const finalState = await this.executeSend(accountId, created.outboundId, text, recipientJid);
     return {
       outboundId: created.outboundId,
       communicationCode: created.communicationCode,
@@ -346,9 +351,11 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
     options: { confirm?: boolean },
     actor: ActorRef,
   ): Promise<OutboundRecoverResult> {
-    await this.ownership.assertActive();
     const row = await this.prisma.whatsAppOutboundMessage.findUnique({ where: { id: outboundId } });
     if (!row) throw new NotFoundError(`WhatsApp outbound message ${outboundId} not found`);
+    // M5: fencing по номеру строки; архивный номер → 409 (операции заморожены).
+    const ctx = await this.registry.ensureContext(row.accountId);
+    await ctx.ownership.assertActive();
     if (row.status !== "UNKNOWN") {
       throw new ConflictError(
         `Recovery actions are defined for UNKNOWN messages only (current status: ${row.status})`,
@@ -357,7 +364,7 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
 
     switch (action) {
       case "reconcile":
-        return this.reconcile(row, actor);
+        return this.reconcile(row, actor, ctx);
       case "mark-failed":
         return this.markFailed(row.id, actor);
       case "retry-anyway":
@@ -366,7 +373,7 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
             "retry-anyway requires explicit confirmation (confirm=true): duplicate delivery is possible",
           );
         }
-        return this.retryAnyway(row.id, actor);
+        return this.retryAnyway(row.id, actor, ctx);
       default:
         throw new ValidationDomainError(`Unknown recovery action: ${String(action)}`);
     }
@@ -408,6 +415,34 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
 
   // ── internals ─────────────────────────────────────────────────────────────
 
+  /**
+   * LID-адресация (§10): WhatsApp маскирует номера (`…@lid`), обратного
+   * резолва сервер не отдаёт. Если у явного диалога номер не разрешён и
+   * клиент не передал customerId/phone — получателем служит сам lid-JID
+   * диалога (Baileys шлёт на lid напрямую). Никакого произвольного
+   * «угадывания» получателя: только существующий conversationId.
+   */
+  private async resolveLidRecipient(input: SendManualInput): Promise<{
+    recipientJid: string;
+    recipient: { canonicalPhone: null; customerId: string | null };
+  } | null> {
+    if (!input.conversationId) return null;
+    const hasCustomer = typeof input.customerId === "string" && input.customerId.trim() !== "";
+    const hasPhone = typeof input.phone === "string" && input.phone.trim() !== "";
+    // Явный получатель важнее — уходим в классический путь (существующая
+    // валидация соответствия диалога, включая 422-mismatch для lid-диалога).
+    if (hasCustomer || hasPhone) return null;
+    const conversation = await this.prisma.whatsAppConversation.findUnique({
+      where: { id: input.conversationId },
+      select: { remoteJid: true, customerId: true },
+    });
+    if (!conversation || !conversation.remoteJid.endsWith("@lid")) return null;
+    return {
+      recipientJid: conversation.remoteJid,
+      recipient: { canonicalPhone: null, customerId: conversation.customerId },
+    };
+  }
+
   private async resolveRecipient(input: SendManualInput): Promise<{
     canonicalPhone: string;
     customerId: string | null;
@@ -441,17 +476,6 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
     return { canonicalPhone: canonical, customerId: null };
   }
 
-  /** v1: одна singleton-строка WhatsAppAccount (dedicated number). */
-  private async ensureAccountId(): Promise<string> {
-    const existing = await this.prisma.whatsAppAccount.findFirst({ select: { id: true } });
-    if (existing) return existing.id;
-    const created = await this.prisma.whatsAppAccount.create({
-      data: { provider: this.config.provider },
-      select: { id: true },
-    });
-    return created.id;
-  }
-
   /** M3 §22: проверка opt-out по каноническому телефону (D9 suppression). */
   private async isSuppressed(canonicalPhone: string): Promise<boolean> {
     const row = await this.prisma.whatsAppSuppression.findUnique({
@@ -461,15 +485,16 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
     return row !== null;
   }
 
-  /** M3 §19: явный conversationId должен соответствовать получателю. */
+  /** M3 §19: явный conversationId должен соответствовать получателю.
+   *  M5: возвращает accountId — номер, с которого уйдёт сообщение. */
   private async validateExplicitConversation(
     conversationId: string,
-    recipient: { canonicalPhone: string; customerId: string | null },
+    recipient: { canonicalPhone: string | null; customerId: string | null },
     recipientJid: string,
-  ): Promise<{ id: string; canonicalPhone: string | null; customerId: string | null }> {
+  ): Promise<{ id: string; accountId: string; canonicalPhone: string | null; customerId: string | null }> {
     const conversation = await this.prisma.whatsAppConversation.findUnique({
       where: { id: conversationId },
-      select: { id: true, remoteJid: true, canonicalPhone: true, customerId: true },
+      select: { id: true, accountId: true, remoteJid: true, canonicalPhone: true, customerId: true },
     });
     if (!conversation) {
       throw new NotFoundError(`WhatsApp conversation ${conversationId} not found`);
@@ -489,7 +514,7 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
   private async fillConversation(
     tx: Prisma.TransactionClient,
     conversationId: string,
-    recipient: { canonicalPhone: string; customerId: string | null },
+    recipient: { canonicalPhone: string | null; customerId: string | null },
   ): Promise<{ id: string }> {
     const current = await tx.whatsAppConversation.findUnique({
       where: { id: conversationId },
@@ -499,7 +524,8 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
       throw new NotFoundError(`WhatsApp conversation ${conversationId} not found`);
     }
     const needsCustomer = !current.customerId && recipient.customerId !== null;
-    const needsPhone = current.canonicalPhone === null;
+    // LID-диалог: recipient.canonicalPhone = null — телефон не затираем.
+    const needsPhone = current.canonicalPhone === null && recipient.canonicalPhone !== null;
     if (!needsCustomer && !needsPhone) return current;
     return tx.whatsAppConversation.update({
       where: { id: conversationId },
@@ -523,7 +549,7 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
     tx: Prisma.TransactionClient,
     accountId: string,
     recipientJid: string,
-    recipient: { canonicalPhone: string; customerId: string | null },
+    recipient: { canonicalPhone: string | null; customerId: string | null },
   ): Promise<{ id: string }> {
     const existing = await tx.whatsAppConversation.findUnique({
       where: { accountId_remoteJid: { accountId, remoteJid: recipientJid } },
@@ -564,15 +590,15 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
    * CAS-pipeline CREATED → QUEUED → SENDING → SENT | FAILED_* | UNKNOWN.
    * Повторный вызов перезапускает отправку только из QUEUED/SENDING-путей,
    * защищённых CAS по текущему статусу (гонки исключены).
+   * M5: контекст (провайдер/ownership) — по accountId строки.
    */
   private async executeSend(
+    accountId: string,
     outboundId: string,
     text: string,
     recipientJid: string,
   ): Promise<{ status: WhatsAppOutboundStatus; providerMessageId: string }> {
-    if (!this.provider) {
-      throw new DomainError("WhatsApp integration is disabled (WHATSAPP_ENABLED=false)", 503);
-    }
+    const ctx = await this.registry.ensureContext(accountId); // disabled → 503
 
     const queued = await this.prisma.whatsAppOutboundMessage.updateMany({
       where: { id: outboundId, status: "CREATED" },
@@ -591,7 +617,7 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
       }
     }
 
-    const handle = await this.ownership.assertActive();
+    const handle = await ctx.ownership.assertActive();
     const sending = await this.prisma.whatsAppOutboundMessage.updateMany({
       where: { id: outboundId, status: "QUEUED" },
       data: { status: "SENDING", attempts: { increment: 1 }, fencingToken: handle.fencingToken },
@@ -609,7 +635,7 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
     try {
       // M3+: файл читается с диска на каждой отправке (в т.ч. retry-anyway).
       const media = row.mediaPath ? await this.readOutboundMedia(row) : null;
-      const result = await this.provider.send({
+      const result = await ctx.provider.send({
         recipientJid,
         text,
         media,
@@ -697,16 +723,17 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
     }
   }
 
-  /** Reconcile: evidence из БД-колонок, затем из провайдерной сессии. */
+  /** Reconcile: evidence из БД-колонок, затем из провайдерной сессии НОМЕРА. */
   private async reconcile(
     row: { id: string; status: WhatsAppOutboundStatus; providerMessageId: string | null; sentAt: Date | null; deliveredAt: Date | null; readAt: Date | null },
     actor: ActorRef,
+    ctx: WhatsAppSessionContext,
   ): Promise<OutboundRecoverResult> {
     let target = reconcileTargetFromEvidence(row);
     let source: "db" | "provider" = "db";
 
-    if (!target && this.provider && row.providerMessageId) {
-      const evidence = await this.provider.reconcile(row.providerMessageId);
+    if (!target && row.providerMessageId) {
+      const evidence = await ctx.provider.reconcile(row.providerMessageId);
       if (evidence) {
         target = evidence.status === "read" ? "READ" : evidence.status === "delivered" ? "DELIVERED" : "SENT";
         source = "provider";
@@ -780,10 +807,11 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
     return { outboundId, action: "mark-failed", status: "FAILED_PERMANENT", recovered: true };
   }
 
-  private async retryAnyway(outboundId: string, actor: ActorRef): Promise<OutboundRecoverResult> {
-    if (!this.provider) {
-      throw new DomainError("WhatsApp integration is disabled (WHATSAPP_ENABLED=false)", 503);
-    }
+  private async retryAnyway(
+    outboundId: string,
+    actor: ActorRef,
+    ctx: WhatsAppSessionContext,
+  ): Promise<OutboundRecoverResult> {
     const row = await this.prisma.whatsAppOutboundMessage.findUnique({ where: { id: outboundId } });
     if (!row || row.status !== "UNKNOWN") {
       throw new ConflictError("Retry anyway is defined for UNKNOWN messages only");
@@ -799,7 +827,7 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
       throw new ConflictError("Communication for outbound message is missing");
     }
 
-    const handle = await this.ownership.assertActive();
+    const handle = await ctx.ownership.assertActive();
     const newProviderMessageId = generateProviderMessageId();
     const updated = await this.prisma.whatsAppOutboundMessage.updateMany({
       where: { id: outboundId, status: "UNKNOWN" },
@@ -827,7 +855,7 @@ export class WhatsAppOutboundService implements OnApplicationBootstrap, OnApplic
       },
     });
 
-    const finalState = await this.executeSend(outboundId, communication.body, row.recipientJid);
+    const finalState = await this.executeSend(ctx.accountId, outboundId, communication.body, row.recipientJid);
     return { outboundId, action: "retry-anyway", status: finalState.status, recovered: true };
   }
 }

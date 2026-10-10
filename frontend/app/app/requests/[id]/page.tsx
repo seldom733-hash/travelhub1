@@ -79,6 +79,10 @@ interface RequestDetail {
   createdAt: string | null;
   updatedAt: string | null;
   version: number;
+  /** Two-stage §4: состав туристов Request-стадии (FIO + birthDate только). */
+  travelers?: Array<{ id: string; position: number; firstName: string; lastName: string; birthDate: string | null }>;
+  travelersExpected?: number | null;
+  travelersReady?: boolean;
   convertedOrder?: {
     id: string;
     referenceNumber: string;
@@ -197,6 +201,62 @@ export default function RequestDetailPage() {
   const runAction = (action: string) => {
     void runPost(`/requests/${id}/${action}`);
   };
+
+  // ── Two-stage §4: состав туристов Request-стадии (FIO + birthDate) ────────
+  const [travelerForm, setTravelerForm] = useState({ firstName: "", lastName: "", birthDate: "" });
+  const [travelerEditing, setTravelerEditing] = useState<string | "new" | null>(null);
+  const [travelerBusy, setTravelerBusy] = useState(false);
+  const [travelerError, setTravelerError] = useState<string | null>(null);
+
+  function startTravelerEdit(row?: { id: string; firstName: string; lastName: string; birthDate: string | null }) {
+    setTravelerError(null);
+    setTravelerEditing(row ? row.id : "new");
+    setTravelerForm({
+      firstName: row?.firstName ?? "",
+      lastName: row?.lastName ?? "",
+      birthDate: row?.birthDate ? row.birthDate.slice(0, 10) : "",
+    });
+  }
+
+  async function saveTraveler() {
+    const firstName = travelerForm.firstName.trim();
+    const lastName = travelerForm.lastName.trim();
+    const birthDate = travelerForm.birthDate;
+    if (!firstName || !lastName || !birthDate) {
+      setTravelerError(t("reqflow.traveler_required_fields", locale));
+      return;
+    }
+    setTravelerBusy(true);
+    setTravelerError(null);
+    try {
+      const body = { firstName, lastName, birthDate };
+      if (travelerEditing && travelerEditing !== "new") {
+        await api.patch(`/requests/${id}/travelers/${travelerEditing}`, body);
+      } else {
+        await api.post(`/requests/${id}/travelers`, body);
+      }
+      await loadRequest();
+      setTravelerEditing(null);
+      setTravelerForm({ firstName: "", lastName: "", birthDate: "" });
+    } catch (err: any) {
+      setTravelerError(err.message || t("reqflow.traveler_save_failed", locale));
+    } finally {
+      setTravelerBusy(false);
+    }
+  }
+
+  async function removeTraveler(travelerId: string) {
+    setTravelerBusy(true);
+    setTravelerError(null);
+    try {
+      await api.del(`/requests/${id}/travelers/${travelerId}`);
+      await loadRequest();
+    } catch (err: any) {
+      setTravelerError(err.message || t("reqflow.traveler_save_failed", locale));
+    } finally {
+      setTravelerBusy(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -320,6 +380,154 @@ export default function RequestDetailPage() {
               } />
             </EntityFieldGrid>
           </EntitySectionCard>          {/* Actions moved to the canonical header actions slot (UI-C7 / RequestActionBar). */}
+
+          {/* Two-stage §4: ДАННЫЕ ТУРИСТОВ — Request-стадия (FIO + birthDate;
+              документы/паспорт собираются на Order-стадии §3, здесь их НЕТ). */}
+          <EntitySectionCard title={t("reqflow.travelers_section", locale)}>
+            {(() => {
+              const rows = r.travelers ?? [];
+              const expected = r.travelersExpected ?? rows.length;
+              const ready = r.travelersReady === true;
+              const closed = Boolean(r.convertedOrderId) || r.status === "CONVERTED" || r.status === "REJECTED";
+              // UI-C7: клиент НЕ считает права (server-authoritative): состав
+              // открыт по статусу заявки, права проверяет сервер (403 → сообщение).
+              const travelersEditable = !closed;
+              const inputCls =
+                "w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-slate-300";
+              return (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="text-slate-500">{ti("reqflow.travelers_progress", locale, { n: rows.length, m: expected })}</span>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 font-medium ${
+                        ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {t(ready ? "reqflow.travelers_ready" : "reqflow.travelers_incomplete", locale)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400">{t("reqflow.travelers_hint", locale)}</p>
+
+                  {rows.length > 0 && (
+                    <div className="divide-y divide-slate-100">
+                      {rows.map((tr, i) => (
+                        <div key={tr.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                          <div className="text-sm text-gray-700">
+                            <span className="mr-2 font-mono text-[10px] text-slate-400">#{i + 1}</span>
+                            {tr.lastName} {tr.firstName}
+                            <span className="ml-2 text-xs text-gray-400">
+                              {tr.birthDate ? fmtDate(tr.birthDate) : "—"}
+                            </span>
+                          </div>
+                          {travelersEditable && travelerEditing !== tr.id && (
+                            <div className="flex gap-3">
+                              <button
+                                type="button"
+                                disabled={travelerBusy}
+                                onClick={() => startTravelerEdit(tr)}
+                                className="text-xs text-blue-600 hover:underline disabled:opacity-40"
+                              >
+                                {t("reqflow.traveler_edit", locale)}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={travelerBusy}
+                                onClick={() => void removeTraveler(tr.id)}
+                                className="text-xs text-red-600 hover:underline disabled:opacity-40"
+                              >
+                                {t("reqflow.traveler_delete", locale)}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {rows.length === 0 && (
+                    <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                      {t("reqflow.progress.awaiting", locale)}
+                    </div>
+                  )}
+
+                  {travelersEditable && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                      {travelerEditing ? (
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <label className="block text-xs">
+                            <span className="mb-1 block text-slate-500">{t("reqflow.traveler_first_name", locale)} *</span>
+                            <input
+                              type="text"
+                              className={inputCls}
+                              value={travelerForm.firstName}
+                              onChange={(e) => setTravelerForm((f) => ({ ...f, firstName: e.target.value }))}
+                            />
+                          </label>
+                          <label className="block text-xs">
+                            <span className="mb-1 block text-slate-500">{t("reqflow.traveler_last_name", locale)} *</span>
+                            <input
+                              type="text"
+                              className={inputCls}
+                              value={travelerForm.lastName}
+                              onChange={(e) => setTravelerForm((f) => ({ ...f, lastName: e.target.value }))}
+                            />
+                          </label>
+                          <label className="block text-xs">
+                            <span className="mb-1 block text-slate-500">{t("reqflow.traveler_birth_date", locale)} *</span>
+                            <input
+                              type="date"
+                              className={inputCls}
+                              value={travelerForm.birthDate}
+                              onChange={(e) => setTravelerForm((f) => ({ ...f, birthDate: e.target.value }))}
+                            />
+                          </label>
+                          <div className="flex gap-2 sm:col-span-3">
+                            <button
+                              type="button"
+                              disabled={travelerBusy}
+                              onClick={() => void saveTraveler()}
+                              className="rounded-lg bg-slate-800 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-40"
+                            >
+                              {t("reqflow.traveler_save", locale)}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={travelerBusy}
+                              onClick={() => {
+                                setTravelerEditing(null);
+                                setTravelerError(null);
+                              }}
+                              className="rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                            >
+                              {t("reqflow.traveler_cancel", locale)}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={travelerBusy}
+                          onClick={() => startTravelerEdit()}
+                          className="rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                        >
+                          + {t("reqflow.traveler_add", locale)}
+                        </button>
+                      )}
+                      {travelerError && (
+                        <div className="mt-2 rounded bg-red-50 px-3 py-2 text-xs text-red-600">{travelerError}</div>
+                      )}
+                    </div>
+                  )}
+
+                  {closed && (
+                    <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                      {t("reqflow.travelers_locked", locale)}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </EntitySectionCard>
 
           {/* SECONDARY: supplier / proposal / decision */}
           <EntitySectionCard title={t("requests.supplier", locale)}>

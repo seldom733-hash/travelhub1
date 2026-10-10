@@ -96,6 +96,8 @@ export interface OwnProfileResult {
     id: string;
     code: string;
     username: string;
+    /** M4.3 (ADR-0016): canonical E.164 login identity (phone-first); null — legacy. */
+    phone: string | null;
     email: string | null;
     fullName: string | null;
     status: string;
@@ -160,6 +162,7 @@ export class AccountService {
         id: user.id,
         code: user.code,
         username: user.username,
+        phone: user.loginPhone,
         email: user.email,
         fullName: user.fullName,
         status: user.status,
@@ -322,6 +325,12 @@ export class AccountService {
       const business: { firstName?: string; lastName?: string; phone?: string } = {};
       if (input.firstName !== undefined) business.firstName = input.firstName;
       if (input.lastName !== undefined) business.lastName = input.lastName;
+      // M4.3 §20 (phone change): это CRM contact phone (бизнес-поле Customer),
+      // НЕ login identity. User.loginPhone здесь НЕ меняется — прямая
+      // unverified-замена запрещена. Extension point для будущего phone change:
+      // authenticated session → verify new phone → uniqueness/conflict →
+      // update loginPhone → invalidate sessions → audit (реализация — после
+      // delivery-провайдера верификации; см. M4-IMPLEMENTATION-REPORT §Phone change).
       if (input.phone !== undefined) business.phone = input.phone;
       if (Object.keys(business).length > 0) {
         await this.crm.updateCustomer(user.customerId, business, userId);

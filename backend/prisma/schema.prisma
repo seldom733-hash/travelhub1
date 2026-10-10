@@ -1886,6 +1886,10 @@ model Customer {
   companyName String?
   email       String       @unique
   phone       String?
+  /// M4 (ADR-0016): canonical E.164 нормализация phone (shared/phone).
+  /// НЕ unique: реальные данные содержат дубликаты (audit §3.2; 2 группы в dev)
+  /// → resolver возвращает AMBIGUOUS, unique-ограничение отложено до M4.6.
+  phoneCanonical String?
   status      EntityStatus @default(ACTIVE)
   version     Int          @default(1)
   createdAt   DateTime     @default(now())
@@ -1896,6 +1900,7 @@ model Customer {
   partnerRelations PartnerCustomerRelation[] // Step 3.5B
 
   @@index([status])
+  @@index([phoneCanonical])
   @@schema("crm")
 }
 
@@ -2300,6 +2305,9 @@ model OrderTraveler {
   birthDate        DateTime?
   citizenship      String?
   gender           String?
+  /// Two-stage traveler model §2.3: серия паспорта (Order-stage document data).
+  /// NULL = данные ещё не введены. Не удалять/не путать с gender.
+  passportSeries   String?
   passportNumber   String?
   passportExpiry   DateTime?
   dataCompleteness TravelerDataCompleteness @default(INCOMPLETE)
@@ -2444,11 +2452,38 @@ model Request {
   version   Int      @default(1)
 
   history RequestHistory[]
+  /// Two-stage traveler model §2.1: туристы собираются на Request-стадии
+  /// (FIO + birthDate). Request 1 → N RequestTraveler. OrderTraveler на
+  /// Request-стадии НЕ используется.
+  travelers RequestTraveler[]
 
   @@index([status])
   @@index([customerId])
   @@index([partnerId])
   @@index([commerceSequence])
+  @@schema("order")
+}
+
+/// Two-stage traveler model §2.1/§2.2 — минимальный состав туриста на
+/// Request-стадии: FIO + birthDate (REQUIRED). Эти данные участвуют в
+/// travelerCount, составе взрослых/детей (по существующим supplier/product
+/// правилам) и переносятся в OrderTraveler при Request → Order.
+/// Passport/identity-данные НЕ хранятся здесь — только на Order-стадии.
+model RequestTraveler {
+  id        String   @id @default(uuid())
+  requestId String
+  request   Request  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  /// 1-based позиция, детерминированный порядок (зеркало OrderTraveler.position).
+  position  Int      @default(0)
+  firstName String
+  lastName  String
+  birthDate DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([requestId, position])
+  @@index([requestId])
   @@schema("order")
 }
 
@@ -2528,10 +2563,13 @@ model Booking {
   commerceSequence  String?
   orderId           String // ссылка на Order, без FK
   productId         String // ссылка на Catalog, без FK
-  /// Step 2.8: canonical linkage OrderItem ↔ Booking (1 OrderItem → ≤1 Booking,
-  /// DB-level unique; consumer BookingRequested заполняет из order.items).
+  /// Step 2.8: canonical linkage OrderItem ↔ Booking. DB-level cardinality —
+  /// PARTIAL unique (см. @@unique ниже): активная Booking занимает OrderItem.
+  /// Stage 2 (Q9, Booking → Order): после возврата брони в заказ (CANCELLED /
+  /// SUPPLIER_REJECTED) OrderItem снова свободен — повторный send создаёт
+  /// НОВУЮ Booking (B2) по тому же item; старая бронь никогда не удаляется.
   /// NULL — legacy Booking, созданные до Step 2.8 (без backfill).
-  orderItemId       String?                @unique
+  orderItemId       String?
   status            BookingStatus          @default(NEW)
   amount            Decimal                @default(0) @db.Decimal(12, 2)
   /// Step 2.11 (Pricing & Financial Snapshot): frozen money fact — валюта,
@@ -2590,6 +2628,16 @@ model Booking {
 
   @@index([orderId])
   @@index([status])
+  @@index([orderItemId])
+  /// Stage 2 (Q9): partial unique — «1 OrderItem → ≤1 занимающей Booking».
+  /// Предел: status <> 'CANCELLED' AND rejectedAt IS NULL — Prisma @@unique
+  /// where допускает только eq/not (не NOT IN), поэтому две колонки:
+  /// отмена (любой путь CANCELLED) и reject (rejectedAt milestone first-only,
+  /// SUPPLIER_REJECTED терминален) освобождают item для повторного send (B2);
+  /// COMPLETED занимает (Q9: исполненный item не переотправляется).
+  /// Имя сохранено (Booking_orderItemId_key): P2002-контракт
+  /// booking-requested-consumer (isUniqueViolation) и e2e-инвариант не меняются.
+  @@unique([orderItemId], where: { status: { not: "CANCELLED" }, rejectedAt: null }, map: "Booking_orderItemId_key")
   @@schema("booking")
 }
 
@@ -2629,6 +2677,7 @@ model Passenger {
   birthDate      DateTime?
   citizenship    String?
   gender         String?
+  passportSeries String?
   passportNumber String?
   passportExpiry DateTime?
 
@@ -2893,6 +2942,11 @@ model User {
   id           String     @id @default(uuid())
   code         String     @unique // USR-00000001
   username     String     @unique
+  /// M4 (ADR-0016): основной login identity — canonical E.164. Nullable до
+  /// backfill; legacy username остаётся transitional compatibility identifier.
+  loginPhone   String?    @unique
+  /// M4: ISO-country регистрации (phone-first onboarding); contact-атрибут.
+  country      String?
   email        String?    @unique
   passwordHash String
   fullName     String?
@@ -2914,6 +2968,7 @@ model User {
 
   auditLogs           AuditLog[]
   partnerApplications PartnerApplication[]
+  activationTokens    ActivationToken[]
   workspaceLayouts    UserWorkspaceLayout[]
   createdCampaigns    Campaign[]
   createdAudiences    CampaignAudience[]
@@ -2921,6 +2976,26 @@ model User {
 
   @@index([roleId])
   @@index([status])
+  @@schema("security")
+}
+
+/// M4.3 (ADR-0016, option B): activation token mechanics БЕЗ delivery-
+/// провайдера (§19). Issue возвращает plaintext ОДИН раз в ответе; в БД
+/// хранится только SHA-256 hash; consume — single-use (usedAt) + expiry.
+/// Секреты никогда не логируются. Delivery (SMS/email/WhatsApp-ссылка)
+/// отложена: точный dependency задокументирован в M4-IMPLEMENTATION-REPORT.
+model ActivationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  /// Кто выдал (actor userId); null — system. Для аудита без plaintext.
+  issuedBy  String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
   @@schema("security")
 }
 
@@ -4118,24 +4193,30 @@ model Payment {
   paidAt          DateTime?
   failedAt        DateTime?
   cancelledAt     DateTime?
-  /// Step 2.12 cardinality (CRITICAL §6): managed projection «Payment блокирует
-  /// второй Payment того же Order». true для PENDING/AUTHORIZED/CAPTURED/
-  /// REFUNDED (overpayment protection — после успеха/возврата повторная оплата
-  /// запрещена); false для FAILED/CANCELLED (повторная инициация — attempt 2 —
-  /// легальна). Server-owned, устанавливается атомарно с CAS-переходом статуса
+  /// Step 2.12 cardinality → MULTI/PARTIAL PAYMENTS (TRAVELHUB_MULTI_PARTIAL
+  /// §3): managed per-payment projection «Payment остаётся активным, пока не
+  /// терминален». true для PENDING/AUTHORIZED/CAPTURED/REFUNDED; false для
+  /// FAILED/CANCELLED (повторная инициация — attempt 2 — легальна).
+  /// Server-owned, устанавливается атомарно с CAS-переходом статуса
   /// (PaymentService — единственный writer; инвариант: isActivePayment ==
   /// status NOT IN (FAILED, CANCELLED); никогда не дрейфует от status).
-  /// Паттерн: ModerationSubmission.isActiveSubmission (managed boolean +
-  /// partial unique index). DB-level инвариант: ≤1 активный Payment на Order —
-  /// overpayment protection + детерминизм concurrent duplicate create
-  /// (P2002 → controlled 409, один факт). 2.12F (partial/installments)
-  /// переработает этот индекс в своей аддитивной миграции (документировано) —
-  /// будущие approved semantics не блокируются (Prompt §6).
+  /// Cardinality: БЕЗ ограничения «один активный Payment на Order» — partial
+  /// unique "Payment_one_active_per_order" снят миграцией
+  /// 20261009100000_multi_partial_payments; переплату ограничивает
+  /// transaction-safe due-guard (0 < amount <= due) в PaymentService.
   isActivePayment Boolean   @default(true)
+
+  /// MULTI/PARTIAL §13 (2.12H crash window 3) — бизнес-идемпотентность
+  /// payment.create НА УРОВНЕ СЛОТА: IdempotencyInterceptor проставляет slotKey
+  /// (digest scope+operation+clientKey), retry того же create request после
+  /// stale-crash возвращает УЖЕ созданный Payment (без дубликата). Разные
+  /// легальные платежи (другой Idempotency-Key) — отдельные записи: multi/partial
+  /// cardinality не затронута. Server-owned: значение приходит из interceptor,
+  /// не из body (PAYMENT_CREATE_FORBIDDEN_KEYS — forged → 422).
+  idempotencySlotKey String? @unique
 
   history PaymentHistory[]
 
-  @@unique([orderId], where: { isActivePayment: true }, map: "Payment_one_active_per_order")
   @@index([orderId])
   @@index([customerId])
   @@index([partnerId])
@@ -4387,6 +4468,10 @@ enum CommissionStatus {
   ACCRUED
   INVOICED
   PAID
+  /// Stage 2 (Booking → Order, Q8): reversal после возврата брони в заказ.
+  /// CAS-переход ТОЛЬКО из ACCRUED (никогда из INVOICED/PAID); ledger не
+  /// переписывается — факт фиксируется событием CommissionReversed.
+  REVERSED
 
   @@schema("finance")
 }
@@ -4440,6 +4525,9 @@ enum CommissionAccrualStatus {
   ACCRUED
   INVOICED
   COLLECTED
+  /// Stage 2 (Booking → Order, Q8): receivable отменяется вместе с Commission
+  /// (CAS только из ACCRUED); никаких молчаливых ledger-записей.
+  REVERSED
 
   @@schema("finance")
 }
@@ -5614,18 +5702,24 @@ enum WhatsAppInboundProcessingStatus {
   @@schema("whatsapp")
 }
 
-/// Platform WhatsApp-аккаунт компании (v1: одна строка — dedicated number,
-/// решение владельца №6).
+/// Platform WhatsApp-аккаунт компании. M5 multi-number: несколько строк
+/// (одна на номер); v1-синглтон сохраняется де-факто как первая активная
+/// строка. archivedAt — soft-archive: история номера (диалоги/сообщения)
+/// сохраняется, строка не удаляется.
 model WhatsAppAccount {
   id                 String                    @id @default(uuid())
   /// Провайдер: "baileys" (закреплён M0-04); "cloud_api" — future extension point.
   provider           String                    @default("baileys")
   state              WhatsAppConnectionState   @default(DISCONNECTED)
+  /// Человекочитаемое имя сессии в UI (null → phone / «Номер N»).
+  label              String?
   /// Канонический номер аккаунта в E.164 (nullable до pairing).
   phone              String?
   connectedAt        DateTime?
   lastDisconnectedAt DateTime?
   lastError          String?
+  /// M5: soft-archive номера (не-null = отключён; история остаётся).
+  archivedAt         DateTime?
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
 

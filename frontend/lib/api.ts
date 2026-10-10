@@ -42,6 +42,8 @@ export interface AuthUser {
   id: string;
   code: string;
   username: string;
+  /** M4.3 (ADR-0016): canonical E.164 login identity (phone-first); null — legacy-аккаунт без backfill. */
+  phone: string | null;
   email: string | null;
   fullName: string | null;
   role: string;
@@ -50,6 +52,20 @@ export interface AuthUser {
   partnerId: string | null;
   customerId: string | null;
   permissions: string[];
+}
+
+/**
+ * Status-aware HTTP error (используется, когда вызывающему коду нужен
+ * statusCode — например, payment create: 403/404/409/422). Расширяет Error,
+ * поэтому существующие `catch (e) { (e as Error).message }` продолжают работать.
+ */
+export class HttpError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
 }
 
 async function handle<T>(res: Response): Promise<T> {
@@ -70,7 +86,7 @@ async function handle<T>(res: Response): Promise<T> {
     } catch {
       /* ignore */
     }
-    throw new Error(message);
+    throw new HttpError(message, res.status);
   }
   return (await res.json()) as T;
 }
@@ -87,9 +103,9 @@ const fetchOptions = (extra?: Record<string, string>): RequestInit => {
 
 export const api = {
   get: <T>(path: string): Promise<T> => fetch(`${BASE}${path}`, fetchOptions()).then((r) => handle<T>(r)),
-  post: <T>(path: string, body?: unknown): Promise<T> =>
+  post: <T>(path: string, body?: unknown, headers?: Record<string, string>): Promise<T> =>
     fetch(`${BASE}${path}`, {
-      ...fetchOptions({ "Content-Type": "application/json" }),
+      ...fetchOptions({ "Content-Type": "application/json", ...(headers ?? {}) }),
       method: "POST",
       body: body ? JSON.stringify(body) : undefined,
     }).then((r) => handle<T>(r)),

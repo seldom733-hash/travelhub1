@@ -44,6 +44,17 @@ interface Seller {
 }
 
 const FUTURE = (days = 30) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+const PAST = (years = 30) => new Date(Date.now() - years * 365 * 86400000).toISOString().slice(0, 10);
+
+// §2: Request-стадия (FIO+DOB).
+const requestTraveler = (index: number, firstName: string, lastName: string) => ({ firstName, lastName, birthDate: PAST(25 + index) });
+// §4: Order-стадия — гражданство/серия/номер/срок (TOUR §3 REQUIRED).
+const orderPassport = (index: number) => ({
+  citizenship: "RU",
+  passportSeries: "RU",
+  passportNumber: `RU10000${String(index).padStart(3, "0")}`,
+  passportExpiry: FUTURE(1000 + index),
+});
 
 describe("Phase 3 Pre-Step 3.12 D3 — Request Flow Integration (e2e)", () => {
   let app: INestApplication;
@@ -223,6 +234,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Request Flow Integration (e2e)", () => {
       requestedServiceDate: FUTURE(),
       quantity: 2,
       travelerCount: 2,
+      travelers: [requestTraveler(1, "Иван", "Иванов"), requestTraveler(2, "Пётр", "Петров")],
       displayedPrice: 1000,
       displayedCurrency: "AZN",
     }).expect(201)).body as { id: string; commerceSequence: string; referenceNumber: string; travelerCount: number };
@@ -296,12 +308,13 @@ describe("Phase 3 Pre-Step 3.12 D3 — Request Flow Integration (e2e)", () => {
     expect(await prisma.booking.count({ where: { orderId: order.id } })).toBe(0);
 
     // ── Traveler collection (shared D3 contract) — REQUIRED gate + completion ──
-    // firstName/lastName REQUIRED — пустые placeholders → final confirm denied.
+    // FIO+DOB скопированы из Request, но Order-стадия §4 (гражданство/серия/номер/
+    // срок) ещё не заполнена → final confirm denied.
     await finalConfirm(op.accessToken, orderId).expect(422);
 
-    // Заполняем обоих туристов (имена + citizenship OPTIONAL по policy A).
-    await patchTraveler(op.accessToken, orderId, travelers[0].id, { firstName: "Иван", lastName: "Иванов" }).expect(200);
-    await patchTraveler(op.accessToken, orderId, travelers[1].id, { firstName: "Пётр", lastName: "Петров" }).expect(200);
+    // Заполняем Order-стадию обоих туристов (citizenship OPTIONAL по policy A).
+    await patchTraveler(op.accessToken, orderId, travelers[0].id, { firstName: "Иван", lastName: "Иванов", ...orderPassport(1) }).expect(200);
+    await patchTraveler(op.accessToken, orderId, travelers[1].id, { firstName: "Пётр", lastName: "Петров", ...orderPassport(2) }).expect(200);
     await patchTraveler(op.accessToken, orderId, travelers[1].id, { citizenship: "AZ" }).expect(200); // OPTIONAL → сохраняется
     const bad = await prisma.orderTraveler.findUniqueOrThrow({ where: { id: travelers[0].id } });
     expect(bad.firstName).toBe("Иван");
@@ -339,6 +352,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Request Flow Integration (e2e)", () => {
       partnerId: seller.partnerId,
       requestedServiceDate: FUTURE(),
       travelerCount: 1,
+      travelers: [requestTraveler(1, "Анна", "Идемпотентная")],
       displayedPrice: 100,
       displayedCurrency: "USD",
     }).expect(201)).body as { id: string };
@@ -360,6 +374,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Request Flow Integration (e2e)", () => {
       partnerId: seller.partnerId,
       requestedServiceDate: FUTURE(),
       travelerCount: 1,
+      travelers: [requestTraveler(2, "Борис", "Конкурентный")],
       displayedPrice: 100,
       displayedCurrency: "USD",
     }).expect(201)).body as { id: string };
@@ -380,7 +395,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Request Flow Integration (e2e)", () => {
 
   // ── §10: invalid states cannot convert ────────────────────────────────────
 
-  it("3. NEW / legacy accepted (без D3 snapshot) → conversion denied; accept без Product → 400", async () => {
+  it("3. NEW / legacy accepted (без D3 snapshot) → conversion denied; accept без Product → 201 (product-less contract)", async () => {
     const seller = await createApprovedSeller("gate");
     const op = await createStaff("d3rf_op3", RoleCode.OPERATOR);
     const customerId = await createCustomer("Gate");
@@ -393,6 +408,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Request Flow Integration (e2e)", () => {
       partnerId: seller.partnerId,
       requestedServiceDate: FUTURE(),
       travelerCount: 1,
+      travelers: [requestTraveler(1, "Свежий", "Заявитель")],
       displayedPrice: 100,
       displayedCurrency: "USD",
     }).expect(201)).body as { id: string };
@@ -406,6 +422,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Request Flow Integration (e2e)", () => {
       partnerId: seller.partnerId,
       requestedServiceDate: FUTURE(),
       travelerCount: 1,
+      travelers: [requestTraveler(2, "Отклонённый", "Заявитель")],
       displayedPrice: 100,
       displayedCurrency: "USD",
     }).expect(201)).body as { id: string };
@@ -434,18 +451,24 @@ describe("Phase 3 Pre-Step 3.12 D3 — Request Flow Integration (e2e)", () => {
     created.requests.push(legacy.id);
     await convert(op.accessToken, legacy.id).expect(409);
 
-    // Accept без продукта (нет resolvable Product для pin) → 400.
+    // Accept без продукта → 201: контракт D3 §7 ("нет resolvable Product →
+    // 400") superseded коммитом f68a1a5 (product-less flow): manual/guest
+    // заявки без productId штатно проходят acceptance (pin/snapshot не
+    // перезаписываются). Согласовано с m4-guest-checkout (product-less
+    // customer-accept → 201). Каталог-политика требований неприменима —
+    // ровно тот случай, который раньше давал 400.
     const noProduct = (await makeRequest(op.accessToken, {
       customerId,
       partnerId: seller.partnerId,
       requestedServiceDate: FUTURE(),
       travelerCount: 1,
+      travelers: [requestTraveler(3, "Без", "Продукта")],
       displayedPrice: 100,
       displayedCurrency: "USD",
     }).expect(201)).body as { id: string };
     created.requests.push(noProduct.id);
     await confirmPrice(op.accessToken, noProduct.id).expect(201);
-    await customerAccept(op.accessToken, noProduct.id).expect(400);
+    await customerAccept(op.accessToken, noProduct.id).expect(201);
   });
 
   // ── §18: RBAC / tenant isolation ──────────────────────────────────────────
@@ -461,6 +484,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Request Flow Integration (e2e)", () => {
       partnerId: seller.partnerId,
       requestedServiceDate: FUTURE(),
       travelerCount: 1,
+      travelers: [requestTraveler(4, "Секретный", "Заявитель")],
       displayedPrice: 100,
       displayedCurrency: "USD",
     }).expect(201)).body as { id: string };

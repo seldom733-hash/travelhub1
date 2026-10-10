@@ -22,7 +22,14 @@ const ACTION_UI: Record<string, { labelKey: string; cls: string; confirmKey?: st
   close: { labelKey: "order.action_short.close", cls: "bg-slate-700 hover:bg-slate-800", confirmKey: "order.action_confirm.close" },
   cancel: { labelKey: "order.action_short.cancel", cls: "bg-red-600 hover:bg-red-700", confirmKey: "order.action_confirm.cancel" },
   problem: { labelKey: "order.action_short.problem", cls: "bg-orange-700 hover:bg-orange-800" },
-  suspend: { labelKey: "order.action_short.suspend", cls: "bg-slate-700 hover:bg-slate-800" },
+  suspend: { labelKey: "order.action_short.suspend", cls: "bg-slate-600 hover:bg-slate-700" },
+  // Stage 1 (Order → Request): сервер-авторитетная проекция отдаёт команду
+  // только из active-статуса и при granular-праве order.cancel.
+  returnToRequest: {
+    labelKey: "order.action_short.returnToRequest",
+    cls: "bg-rose-700 hover:bg-rose-800",
+    confirmKey: "order.action_confirm.returnToRequest",
+  },
 };
 
 export default function OrderActionBar({

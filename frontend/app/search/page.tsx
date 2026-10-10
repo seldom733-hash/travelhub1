@@ -153,10 +153,16 @@ function SearchResultsInner() {
       const adults = Math.max(1, Number(params.adults) || 1);
       const children = Math.max(0, Number(params.children) || 0);
       const infants = Math.max(0, Number(params.infants) || 0);
+      // F1 (owner-confirmed CARRY CHILD AGES): the flight composition carries
+      // the child ages as transport data — parsed from the URL the search form
+      // already writes (HeroSearch/CompactSearch `childAges=…`).
+      const childAges = params.childAges
+        ? params.childAges.split(",").map(Number).filter((n) => !Number.isNaN(n))
+        : undefined;
       const returnDate = params.returnDate || params.return || undefined;
       const tariff = params.tariff || "ALL";
       const supplier = params.supplier || "ALL";
-      const dedupKey = `${from}-${to}-${departureDate}-${tripType}-${adults}-${children}-${infants}-${returnDate}-${tariff}-${supplier}`;
+      const dedupKey = `${from}-${to}-${departureDate}-${tripType}-${adults}-${children}-${infants}-${childAges?.join(",") ?? ""}-${returnDate}-${tariff}-${supplier}`;
       const requestId = ++flightRequestIdRef.current;
 
       setLoading(true);
@@ -190,6 +196,7 @@ function SearchResultsInner() {
             adults,
             children,
             infants,
+            ...(childAges && childAges.length ? { childAges: childAges.slice(0, children) } : {}),
           },
           ...(returnDate ? { returnDate } : {}),
           ...(supplier !== "ALL" ? { supplier } : {}),

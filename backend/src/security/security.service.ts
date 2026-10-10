@@ -11,6 +11,7 @@ import {
 import { RoleCode, UserStatus } from "../generated/prisma/enums";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../shared/errors";
 import { normalizeEmail } from "../shared/field-validation";
+import { normalizePhoneE164 } from "../shared/phone/phone";
 import { buildSortClause } from '../shared/sort';
 import { getRequestContext } from "../shared/request-context";
 import type { Prisma } from "../generated/prisma/client";
@@ -439,6 +440,70 @@ export class SecurityService implements OnModuleInit {
     return { scanned: buyers.length, linked, created, skippedNoEmail, brokenRefs, dryRun };
   }
 
+  /**
+   * M4.1 (ADR-0016 §2.9) — явная idempotent backfill-команда: loginPhone из
+   * канонического телефона связанного Customer. Правила (решение владельца):
+   *  - phone НЕ выдумывается: только Customer.phone через User.customerId;
+   *  - нормализация — shared/phone; невалидный → пропуск (skippedNoPhone);
+   *  - loginPhone уже установлен → не трогаем (никогда не перезаписывать);
+   *  - canonical уже занят другим User → conflict, пропуск (без мержа);
+   *  - dryRun → только чтения и отчёт.
+   */
+  async backfillLoginPhones(dryRun = false): Promise<{
+    scanned: number;
+    updated: number;
+    skippedNoCustomer: number;
+    skippedNoPhone: number;
+    conflicts: { loginPhone: string; ownerUsername: string; attemptedUsername: string }[];
+    dryRun: boolean;
+  }> {
+    const users = await this.prisma.user.findMany({
+      select: { id: true, username: true, loginPhone: true, customerId: true },
+    });
+    const taken = new Map<string, string>(); // loginPhone -> owner username
+    for (const u of users) {
+      if (u.loginPhone) taken.set(u.loginPhone, u.username);
+    }
+    let updated = 0;
+    let skippedNoCustomer = 0;
+    let skippedNoPhone = 0;
+    const conflicts: { loginPhone: string; ownerUsername: string; attemptedUsername: string }[] = [];
+    for (const u of users) {
+      if (u.loginPhone) continue; // never overwrite
+      if (!u.customerId) {
+        skippedNoCustomer += 1;
+        continue;
+      }
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: u.customerId },
+        select: { phoneCanonical: true, phone: true },
+      });
+      if (!customer) {
+        skippedNoCustomer += 1;
+        continue;
+      }
+      const canonical = customer.phoneCanonical ?? normalizePhoneE164(customer.phone);
+      if (!canonical) {
+        skippedNoPhone += 1;
+        continue;
+      }
+      const owner = taken.get(canonical);
+      if (owner && owner !== u.username) {
+        conflicts.push({ loginPhone: canonical, ownerUsername: owner, attemptedUsername: u.username });
+        continue;
+      }
+      taken.set(canonical, u.username);
+      updated += 1;
+      if (!dryRun) {
+        await this.prisma.user.update({ where: { id: u.id }, data: { loginPhone: canonical } });
+      }
+    }
+    if (!dryRun && updated > 0) {
+      this.logger.log(`loginPhone backfill: scanned=${users.length} updated=${updated} conflicts=${conflicts.length}`);
+    }
+    return { scanned: users.length, updated, skippedNoCustomer, skippedNoPhone, conflicts, dryRun };
+  }
+
   /** Создание пользователя персонала (ADMIN). */
   async createStaff(input: {
     username: string;
@@ -553,6 +618,7 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   "booking.confirm": "Подтверждение/отклонение бронирования",
   "booking.request_change": "Запрос изменения бронирования",
   "booking.cancel": "Отмена бронирования",
+  "booking.return_to_order": "Возврат бронирования в заказ (Booking → Order round-trip)",
   "sales.lead.read": "Чтение лидов",
   "sales.lead.write": "Управление лидами",
   "sales.opportunity.read": "Чтение сделок",

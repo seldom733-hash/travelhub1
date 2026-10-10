@@ -45,6 +45,8 @@ export function computeRequestAvailableActions(
     customerAcceptedAt: Date | null;
     pinnedRequirements: unknown;
     travelerCount: number | null;
+    /** Two-stage §6: true = RequestTraveler заполнены и сходятся с travelerCount. */
+    travelersReady?: boolean;
     productSnapshot: unknown;
     // Supplier Markup Phase 3 (design §8): convert-gate mirrors the Order
     // conversion money gate (order.service: confirmed ?? displayed > 0 + currency).
@@ -70,6 +72,11 @@ export function computeRequestAvailableActions(
     request.travelerCount != null &&
     request.productSnapshot != null;
 
+  // Two-stage traveler model §6: готовность = состав туристов заполнен и
+  // совпадает с travelerCount. Read-projection (execution гейт — авторитетен
+  // в customerAccept/convertRequestToOrder). Не передано (unit-прогнозы) → true.
+  const travelersReady = request.travelersReady ?? true;
+
   // Money gate order mirrors convertRequestToOrder (order.service:658-661):
   // accepted money = confirmed ?? displayed; currency likewise.
   const convertMoney = request.confirmedPrice ?? request.displayedPrice;
@@ -87,16 +94,19 @@ export function computeRequestAvailableActions(
     unavailable: canEdit && (request.status === "NEW" || request.status === "CHECKING"),
     customerAccept:
       canEdit &&
+      travelersReady &&
       withinCustomerAcceptWindow &&
-      (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED") &&
-      request.convertedOrderId === null,
-    customerDecline: canEdit &&
-      (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED") &&
-      request.convertedOrderId === null,
-    // Phase 3 (design §8): convert-gate зеркалит money gate (order.service) —
-    // без валидных принятых денег convert=false.
+      (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED"),
+    customerDecline: canEdit && (request.status === "PRICE_CHANGED" || request.status === "CONFIRMED"),
+    // Stage 1 (Order → Request): convert-gate зеркалит execution (status
+    // CUSTOMER_ACCEPTED + отсутствие конверсионного link: повторная
+    // конвертация вернувшейся заявки блокируется 409 — один Order на
+    // commerce chain). customerAccept/Decline без link-условия — execution
+    // status-only (возврат не ломает supplier/customer цикл).
+    // Phase 3: + деньги (design §8) — без валидных денег convert=false.
     convert:
       canEdit &&
+      travelersReady &&
       hasD3AcceptSnapshot &&
       hasAcceptedMoney &&
       request.status === "CUSTOMER_ACCEPTED" &&
@@ -162,6 +172,14 @@ export function hasD3AcceptSnapshot(request: {
   );
 }
 
+
+import {
+  assertRequestTravelerPosition,
+  computeRequestTravelersReadiness,
+  normalizeRequestTravelerInput,
+  type RequestTravelerInput,
+} from "./request-travelers";
+
 import { OrderService } from "./order.service";
 import { Prisma } from "../../generated/prisma/client";
 import { assertValidRequestSort, buildRequestOrderBy } from "./request-sort";
@@ -173,7 +191,8 @@ const DEFAULT_SUPPLIER_SLA_HOURS = 24;
 const DEFAULT_CUSTOMER_TTL_HOURS = 48;
 
 interface Actor {
-  id: string;
+  /** M4.5: null = system/guest-каналы (audit userId FK → null; history — nullable). */
+  id: string | null;
   username: string;
 }
 
@@ -187,6 +206,11 @@ interface CreateRequestDto {
   travelerCount?: number;
   displayedPrice?: number;
   displayedCurrency?: string;
+  /**
+   * Two-stage §4: состав Request-стадии (FIO + birthDate). Если указан без
+   * travelerCount — размер партии выводится из длины массива.
+   */
+  travelers?: RequestTravelerInput[];
 }
 
 interface ListRequestQuery {
@@ -231,6 +255,23 @@ export class RequestService {
       throw new BadRequestException("quantity must be a positive integer");
     }
 
+    // Two-stage §4/§6: состав Request-стадии валидируется целиком при создании
+    // (FIO + birthDate REQUIRED; count-несоответствие → 422, а не «тихая» правка).
+    const requestTravelers =
+      dto.travelers && dto.travelers.length > 0
+        ? dto.travelers.map((t) => normalizeRequestTravelerInput(t ?? {}))
+        : [];
+    let travelerCount = dto.travelerCount ?? null;
+    if (requestTravelers.length > 0) {
+      if (travelerCount == null) {
+        travelerCount = requestTravelers.length;
+      } else if (travelerCount !== requestTravelers.length) {
+        throw new BadRequestException(
+          `travelerCount (${travelerCount}) must match travelers.length (${requestTravelers.length})`,
+        );
+      }
+    }
+
     const commerceSequence = await this.refNum.nextCommerceSequence(null as any);
     const referenceNumber = this.refNum.commerceRequestRef(commerceSequence);
     const code = await this.ids.nextCode(null as any, "REQ");
@@ -266,7 +307,7 @@ export class RequestService {
         status: "NEW",
         requestedServiceDate: dto.requestedServiceDate ? new Date(dto.requestedServiceDate) : null,
         quantity: dto.quantity ?? 1,
-        travelerCount: dto.travelerCount ?? null,
+        travelerCount,
         productSnapshot: productSnapshot ? (productSnapshot as Prisma.InputJsonValue) : Prisma.JsonNull,
         displayedPrice: dto.displayedPrice != null ? dto.displayedPrice as any : null,
         displayedCurrency: dto.displayedCurrency ?? null,
@@ -301,13 +342,26 @@ export class RequestService {
       },
     });
 
+    // Two-stage §4: состав Request-стадии (FIO + birthDate) — позиции 1..N.
+    if (requestTravelers.length > 0) {
+      await this.prisma.requestTraveler.createMany({
+        data: requestTravelers.map((t, index) => ({
+          requestId: request.id,
+          position: index + 1,
+          firstName: t.firstName,
+          lastName: t.lastName,
+          birthDate: new Date(`${t.birthDate}T00:00:00.000Z`),
+        })),
+      });
+    }
+
     await this.security.audit(null as any, {
       userId: actor.id,
       username: actor.username,
       action: "request.created",
       resource: "Request",
       resourceId: request.id,
-      details: { code: request.code, referenceNumber: request.referenceNumber, commerceSequence, travelerCount: dto.travelerCount ?? null },
+      details: { code: request.code, referenceNumber: request.referenceNumber, commerceSequence, travelerCount },
     });
 
     return this.requestDto(request);
@@ -419,15 +473,253 @@ export class RequestService {
   /**
    * Get Request detail.
    */
+  // ── Two-stage traveler model §4 — Request travelers CRUD ─────────────────
+
+  /** Ожидаемый состав: явный travelerCount, иначе quantity (legacy). */
+  private expectedTravelerCount(request: { travelerCount: number | null; quantity: number }): number {
+    return request.travelerCount ?? request.quantity;
+  }
+
+  /** §4: редактирование состава запрещено после конвертации/отклонения. */
+  private assertTravelersEditable(request: { id: string; status: string }): void {
+    if (request.status === "CONVERTED") {
+      throw new ConflictException(
+        `Request ${request.id} travelers are immutable after conversion (status CONVERTED)`,
+      );
+    }
+    if (request.status === "REJECTED") {
+      throw new ConflictException(
+        `Request ${request.id} travelers are immutable in status REJECTED`,
+      );
+    }
+  }
+
+  private async findRequestOrThrow(requestId: string) {
+    const request = await this.prisma.request.findUnique({ where: { id: requestId } });
+    if (!request) throw new NotFoundException(`Request ${requestId} not found`);
+    return request;
+  }
+
+  private requestTravelerDto(row: {
+    id: string;
+    requestId: string;
+    position: number;
+    firstName: string;
+    lastName: string;
+    birthDate: Date;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      id: row.id,
+      requestId: row.requestId,
+      position: row.position,
+      firstName: row.firstName,
+      lastName: row.lastName,
+      birthDate: row.birthDate.toISOString(),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  /** §4: GET request travelers — список + server-authoritative readiness. */
+  async getRequestTravelers(requestId: string): Promise<Record<string, unknown>> {
+    const request = await this.findRequestOrThrow(requestId);
+    const travelers = await this.prisma.requestTraveler.findMany({
+      where: { requestId },
+      orderBy: { position: "asc" },
+    });
+    const expected = this.expectedTravelerCount(request);
+    return {
+      requestId: request.id,
+      referenceNumber: request.referenceNumber,
+      status: request.status,
+      travelerCount: expected,
+      count: travelers.length,
+      ready: computeRequestTravelersReadiness(travelers, expected),
+      travelers: travelers.map((t) => this.requestTravelerDto(t)),
+    };
+  }
+
+  private async recordTravelerHistory(
+    requestId: string,
+    action: string,
+    comment: string,
+    actor: Actor,
+    request: { status: string },
+  ): Promise<void> {
+    await this.prisma.requestHistory.create({
+      data: {
+        requestId,
+        action,
+        from: request.status,
+        to: request.status,
+        actorId: actor.id,
+        actorName: actor.username,
+        comment,
+      },
+    });
+  }
+
+  /** §4: POST — создать туриста Request-стадии (FIO + birthDate). */
+  async createRequestTraveler(
+    requestId: string,
+    input: RequestTravelerInput,
+    actor: Actor,
+  ): Promise<Record<string, unknown>> {
+    const request = await this.findRequestOrThrow(requestId);
+    this.assertTravelersEditable(request);
+
+    const normalized = normalizeRequestTravelerInput(input);
+    const expected = this.expectedTravelerCount(request);
+    const existing = await this.prisma.requestTraveler.findMany({
+      where: { requestId },
+      orderBy: { position: "asc" },
+    });
+    if (existing.length >= expected) {
+      throw new ValidationDomainError(
+        `traveler count limit reached: travelerCount=${expected}, already added=${existing.length}`,
+      );
+    }
+    const requestedPosition = assertRequestTravelerPosition(input.position, expected);
+    const nextPosition =
+      requestedPosition ?? existing.reduce((max, t) => Math.max(max, t.position), 0) + 1;
+
+    let created: Awaited<ReturnType<PrismaService["requestTraveler"]["create"]>>;
+    try {
+      created = await this.prisma.requestTraveler.create({
+        data: {
+          requestId,
+          position: nextPosition,
+          firstName: normalized.firstName,
+          lastName: normalized.lastName,
+          birthDate: new Date(`${normalized.birthDate}T00:00:00.000Z`),
+        },
+      });
+    } catch (err) {
+      if ((err as { code?: string }).code === "P2002") {
+        throw new ConflictException(
+          `Request ${requestId}: position ${nextPosition} is already taken`,
+        );
+      }
+      throw err;
+    }
+
+    await this.recordTravelerHistory(requestId,
+      "traveler_added",
+      `Добавлен турист ${created.position} (${normalized.lastName} ${normalized.firstName})`,
+      actor,
+      request,
+    );
+    return this.requestTravelerDto(created);
+  }
+
+  /** §4: PATCH — изменить туриста Request-стадии. */
+  async updateRequestTraveler(
+    requestId: string,
+    travelerId: string,
+    input: RequestTravelerInput,
+    actor: Actor,
+  ): Promise<Record<string, unknown>> {
+    const request = await this.findRequestOrThrow(requestId);
+    this.assertTravelersEditable(request);
+
+    const existing = await this.prisma.requestTraveler.findFirst({
+      where: { id: travelerId, requestId },
+    });
+    if (!existing) throw new NotFoundException(`RequestTraveler ${travelerId} not found`);
+
+    const normalized = normalizeRequestTravelerInput({
+      firstName: input.firstName !== undefined ? input.firstName : existing.firstName,
+      lastName: input.lastName !== undefined ? input.lastName : existing.lastName,
+      birthDate:
+        input.birthDate !== undefined ? input.birthDate : existing.birthDate.toISOString().slice(0, 10),
+    });
+    const expected = this.expectedTravelerCount(request);
+    const requestedPosition = assertRequestTravelerPosition(input.position, expected);
+
+    let updated: Awaited<ReturnType<PrismaService["requestTraveler"]["update"]>>;
+    try {
+      updated = await this.prisma.requestTraveler.update({
+        where: { id: travelerId },
+        data: {
+          firstName: normalized.firstName,
+          lastName: normalized.lastName,
+          birthDate: new Date(`${normalized.birthDate}T00:00:00.000Z`),
+          ...(requestedPosition != null ? { position: requestedPosition } : {}),
+        },
+      });
+    } catch (err) {
+      if ((err as { code?: string }).code === "P2002") {
+        throw new ConflictException(`Request ${requestId}: position ${requestedPosition} is already taken`);
+      }
+      throw err;
+    }
+
+    await this.recordTravelerHistory(requestId,
+      "traveler_updated",
+      `Изменён турист ${updated.position} (${updated.lastName} ${updated.firstName})`,
+      actor,
+      request,
+    );
+    return this.requestTravelerDto(updated);
+  }
+
+  /** §4: DELETE — убрать туриста (разрешено только до конвертации/отклонения). */
+  async deleteRequestTraveler(requestId: string, travelerId: string, actor: Actor): Promise<Record<string, unknown>> {
+    const request = await this.findRequestOrThrow(requestId);
+    this.assertTravelersEditable(request);
+
+    const existing = await this.prisma.requestTraveler.findFirst({
+      where: { id: travelerId, requestId },
+    });
+    if (!existing) throw new NotFoundException(`RequestTraveler ${travelerId} not found`);
+
+    await this.prisma.requestTraveler.delete({ where: { id: travelerId } });
+    await this.recordTravelerHistory(requestId,
+      "traveler_removed",
+      `Удалён турист ${existing.position} (${existing.lastName} ${existing.firstName})`,
+      actor,
+      request,
+    );
+    return { id: existing.id, requestId, deleted: true };
+  }
+
+  /** §6: readiness-гейт для acceptance/conversion (execution authority). */
+  private async assertTravelersReadyForCommercialStep(request: {
+    id: string;
+    travelerCount: number | null;
+    quantity: number;
+  }): Promise<void> {
+    const travelers = await this.prisma.requestTraveler.findMany({
+      where: { requestId: request.id },
+      orderBy: { position: "asc" },
+    });
+    const expected = this.expectedTravelerCount(request);
+    if (travelers.length !== expected) {
+      throw new ValidationDomainError(
+        `traveler count mismatch: travelerCount=${expected}, RequestTraveler=${travelers.length}; request is not ready`,
+      );
+    }
+    if (!computeRequestTravelersReadiness(travelers, expected)) {
+      throw new ValidationDomainError(
+        "request travelers are incomplete: firstName/lastName/birthDate are required for every traveler",
+      );
+    }
+  }
+
   async getRequest(id: string, grantedPermissions: readonly string[] = []): Promise<Record<string, unknown>> {
     const request = await this.prisma.request.findUnique({ where: { id } });
     if (!request) throw new NotFoundException(`Request ${id} not found`);
 
     // Fetch related entities
-    const [customer, product, partner] = await Promise.all([
+    const [customer, product, partner, requestTravelers] = await Promise.all([
       request.customerId ? this.prisma.customer.findUnique({ where: { id: request.customerId }, select: { firstName: true, lastName: true, code: true, email: true, phone: true } }) : null,
       request.productId ? this.prisma.product.findUnique({ where: { id: request.productId }, select: { title: true, code: true, type: true } }) : null,
       request.partnerId ? this.prisma.partner.findUnique({ where: { id: request.partnerId }, select: { name: true, code: true, countryCode: true } }) : null,
+      // Two-stage §4: состав Request-стадии (FIO + birthDate) — только в detail,
+      // не в list (PII не должен попадать в массовую выборку/export).
+      this.prisma.requestTraveler.findMany({ where: { requestId: id }, orderBy: { position: "asc" } }),
     ]);
 
     const customerMap = customer ? new Map([[request.customerId!, customer]]) : new Map();
@@ -439,6 +731,13 @@ export class RequestService {
     dto.customerPhone = customer?.phone ?? null;
     dto.productType = product?.type ?? null;
     dto.partnerCountry = partner?.countryCode ?? null;
+
+    // Two-stage §4/§6: server-authoritative состав + readiness. UI (и
+    // availableActions ниже) читают ЭТОТ результат, а не считают сами.
+    const expectedTravelers = this.expectedTravelerCount(request);
+    dto.travelers = requestTravelers.map((t) => this.requestTravelerDto(t));
+    dto.travelersExpected = expectedTravelers;
+    dto.travelersReady = computeRequestTravelersReadiness(requestTravelers, expectedTravelers);
 
     // UI-C6: server-authoritative action availability projection.
     // Controller passes the actor's granted permissions explicitly.
@@ -469,6 +768,7 @@ export class RequestService {
         customerAcceptedAt: request.customerAcceptedAt,
         pinnedRequirements: request.pinnedRequirements,
         travelerCount: request.travelerCount ?? null,
+        travelersReady: dto.travelersReady === true,
         productSnapshot: projectionProductSnapshot,
         confirmedPrice: request.confirmedPrice,
         confirmedCurrency: request.confirmedCurrency,
@@ -781,6 +1081,11 @@ export class RequestService {
       throw new BadRequestException("Customer action deadline has expired");
     }
 
+    // Two-stage §6 (execution authority): acceptance — коммерческий шаг, он
+    // требует ПОЛНОГО состава Request-стадии (FIO + birthDate на каждого).
+    // Readiness пересчитывается здесь же, а не берётся из клиента.
+    await this.assertTravelersReadyForCommercialStep(request);
+
     // D3 §7: pin effective requirements в acceptance boundary. Продукт читается
     // ТОЛЬКО здесь (одна транзакция с acceptance) — позже не перечитывается.
     // Product-less запросы (публичные supplier-инквairi из create-request:
@@ -857,6 +1162,11 @@ export class RequestService {
           ? {
               pinnedRequirements: pinnedRequirements as Prisma.InputJsonValue,
               productSnapshot: {
+                // Data-shape fix §6: identity refresh (product как принят сейчас)
+                // НЕ должен затирать offer-facts, замороженные при создании
+                // (productSnapshot.offer) — merge существующего snapshot,
+                // identity-ключи перезаписываются как и раньше.
+                ...((request.productSnapshot ?? {}) as Record<string, unknown>),
                 productId: product.id,
                 productCode: product.code,
                 productTitle: product.title,
@@ -983,6 +1293,19 @@ export class RequestService {
       }
     }
 
+    // Stage 1 (Order → Request): вернувшаяся заявка снова проходит supplier-
+    // цикл и принимается клиентом (CUSTOMER_ACCEPTED + convertedOrderId = O1),
+    // но ПОВТОРНАЯ конвертация запрещена явным 409: Order.referenceNumber =
+    // MKT-ORD-{commerceSequence} @unique фиксирует инвариант «один Order на
+    // commerce chain» — без этого гейта повторный convert падал бы P2002 (500).
+    // Multi-order forward (новый Order поверх истории) — Booking→Order design pass.
+    if (existing.convertedOrderId) {
+      throw new ConflictException(
+        `Request ${requestId} was already converted to order ${existing.convertedOrderId}; ` +
+          `re-conversion is not supported (one Order per commerce sequence)`,
+      );
+    }
+
     // Гейт конверсии: только принятая заявка (валидные supplier/current terms).
     if (existing.status !== "CUSTOMER_ACCEPTED") {
       throw new ConflictException(
@@ -994,6 +1317,11 @@ export class RequestService {
         `Request ${requestId} has no D3 acceptance snapshot (customerAcceptedAt/travelerCount); conversion rejected`,
       );
     }
+
+    // Two-stage §6/§10 (execution authority): конвертация копирует
+    // RequestTraveler → OrderTraveler, поэтому состав обязан быть полным и
+    // согласованным с travelerCount уже СЕЙЧАС (иначе §10-инвариант невозможен).
+    await this.assertTravelersReadyForCommercialStep(existing);
 
     // Заявка без productId конвертируется в заказ без продуктовой привязки
     // (ограничение снято): productSnapshot может быть null → OrderItem получает
@@ -1251,19 +1579,27 @@ export class RequestService {
     const prod = productMap?.get(r.productId);
     const part = partnerMap?.get(r.partnerId);
     const customerName = cust ? `${cust.firstName ?? ""} ${cust.lastName ?? ""}`.trim() : null;
-    // «Услуга» cell must never be a dash for supplier-created requests: product
-    // table title (when linked) → frozen productSnapshot → pinned hotel name.
     const pinned = (r.pinnedRequirements ?? null) as Record<string, any> | null;
     const snap = (r.productSnapshot ?? null) as Record<string, any> | null;
     const commercial = (r.commercialSnapshot ?? null) as Record<string, any> | null;
-    const productName = prod?.title ?? snap?.productTitle ?? pinned?.hotel ?? null;
+    // Data-shape fix §6: offer/search facts are frozen in productSnapshot.offer
+    // (canonical location, producer-written at creation). `pinned` fallback
+    // keeps LEGACY rows — до фикса producer писал offer-snapshot в
+    // pinnedRequirements — рендерящимися идентично.
+    const offer = (snap?.offer ?? null) as Record<string, any> | null;
+    const pick = (key: string): unknown => offer?.[key] ?? pinned?.[key];
+    const asNum = (v: unknown): number | null => (typeof v === "number" ? v : null);
+    const asStr = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+    // «Услуга» cell must never be a dash for supplier-created requests: product
+    // table title (when linked) → frozen productSnapshot → offer/pinned hotel name.
+    const productName = prod?.title ?? snap?.productTitle ?? asStr(offer?.hotel) ?? asStr(pinned?.hotel) ?? null;
     const productCode = prod?.code ?? snap?.productCode ?? null;
     // «Услуга» type (тур / отель / авиабилет): frozen in the snapshots at
     // creation; raw supplier values («tours», «TOUR»…) normalized on the client.
     const serviceType = snap?.productType ?? snap?.type ?? (typeof commercial?.serviceType === "string" ? commercial.serviceType : null) ?? null;
     // «Поставщик» cell: supplier code pinned at creation (tour/flight requests),
     // commercial snapshot as fallback. partner* stays the B2B partner, separate.
-    const supplierCode = pinned?.supplierCode ?? commercial?.supplierCode ?? snap?.supplierCode ?? null;
+    const supplierCode = pinned?.supplierCode ?? commercial?.supplierCode ?? offer?.supplierCode ?? snap?.supplierCode ?? null;
     const partnerName = part?.name ?? null;
     return {
       id: r.id,
@@ -1281,14 +1617,14 @@ export class RequestService {
       partnerName,
       partnerCode: part?.code ?? null,
       supplierCode,
-      // Selected-service parameters (Phase 4): frozen in pinnedRequirements at
-      // creation — nights, party composition, country of stay, city.
-      nights: typeof pinned?.nights === "number" ? pinned.nights : null,
-      adults: typeof pinned?.adults === "number" ? pinned.adults : null,
-      children: typeof pinned?.children === "number" ? pinned.children : null,
-      country: typeof pinned?.country === "string" && pinned.country ? pinned.country : null,
-      destination: typeof pinned?.destination === "string" && pinned.destination ? pinned.destination : null,
-      departureCity: typeof pinned?.departureCity === "string" && pinned.departureCity ? pinned.departureCity : null,
+      // Selected-service parameters (Phase 4 / data-shape fix §6): frozen at
+      // creation — canonical location productSnapshot.offer, pinned = legacy rows.
+      nights: asNum(pick("nights")),
+      adults: asNum(pick("adults")),
+      children: asNum(pick("children")),
+      country: asStr(pick("country")),
+      destination: asStr(pick("destination")),
+      departureCity: asStr(pick("departureCity")),
       status: r.status,
       requestedServiceDate: r.requestedServiceDate?.toISOString() ?? null,
       quantity: r.quantity,

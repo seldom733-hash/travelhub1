@@ -718,4 +718,72 @@ describe("M3 — WhatsApp Inbound & Chat (e2e, mock provider)", () => {
     expect(all.length).toBeGreaterThanOrEqual(2);
     expect(all.every((row) => !(row.createdAt > blocked[0]!.createdAt))).toBe(true);
   });
+
+  // ── 13. §10 LID→PN: ручной бинд номера ────────────────────────────────────
+
+  it("13. §10 «Привязать Lid к номеру»: lid-диалог → бинд → номер вместо lid; 422/409/403", async () => {
+    const account = await prisma.whatsAppAccount.findFirstOrThrow();
+    const lidJid = `900${Date.now()}@lid`;
+    const lidJidOther = `901${Date.now()}@lid`;
+    const lidConv = await prisma.whatsAppConversation.create({
+      data: { accountId: account.id, remoteJid: lidJid },
+    });
+    const lidConvOther = await prisma.whatsAppConversation.create({
+      data: { accountId: account.id, remoteJid: lidJidOther },
+    });
+    const BIND_PHONE = "+994509998877";
+
+    // BUYER без whatsapp.manage → 403.
+    await request(app.getHttpServer())
+      .post(`/api/v1/whatsapp/conversations/${lidConv.id}/phone`)
+      .set("Authorization", `Bearer ${buyerToken}`)
+      .send({ phone: BIND_PHONE })
+      .expect(403);
+
+    // Невалидный номер → 422, диалог не изменён.
+    await operatorAgent
+      .post(`/api/v1/whatsapp/conversations/${lidConv.id}/phone`)
+      .send({ phone: "not-a-phone" })
+      .expect(422);
+
+    // Бинд → 200: canonicalPhone заполнен, customerId НЕ назначен (до Customer).
+    const bound = await operatorAgent
+      .post(`/api/v1/whatsapp/conversations/${lidConv.id}/phone`)
+      .send({ phone: "050 999 88 77" }) // локальный AZ → +994509998877
+      .expect(200);
+    expect(bound.body.canonicalPhone).toBe(BIND_PHONE);
+    expect(bound.body.remoteJid).toBe(lidJid); // lid остаётся адресом JID
+    expect(bound.body.customerId).toBeNull();
+
+    // Список: вместо «номер не определён» — привязанный номер.
+    const list = await operatorAgent.get("/api/v1/whatsapp/conversations?limit=100").expect(200);
+    const row = list.body.find((r: { id: string }) => r.id === lidConv.id);
+    expect(row.canonicalPhone).toBe(BIND_PHONE);
+
+    // Повторный бинд (диалог уже с номером) → 409.
+    await operatorAgent
+      .post(`/api/v1/whatsapp/conversations/${lidConv.id}/phone`)
+      .send({ phone: "+994501234000" })
+      .expect(409);
+
+    // Номер занят другим диалогом → 409.
+    await operatorAgent
+      .post(`/api/v1/whatsapp/conversations/${lidConvOther.id}/phone`)
+      .send({ phone: BIND_PHONE })
+      .expect(409);
+
+    // Contact обновлён (MANUAL), audit без PII.
+    const contact = await prisma.whatsAppContact.findUniqueOrThrow({
+      where: { accountId_jid: { accountId: account.id, jid: lidJid } },
+    });
+    expect(contact.canonicalPhone).toBe(BIND_PHONE);
+    expect(contact.linkSource).toBe("MANUAL");
+
+    const audits = await prisma.auditLog.findMany({
+      where: { action: "whatsapp.phone_bound", createdAt: { gte: startedAt } },
+    });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]!.resourceId).toBe(lidConv.id);
+    expect(JSON.stringify(audits[0]!.details ?? {})).not.toContain("9998877");
+  });
 });

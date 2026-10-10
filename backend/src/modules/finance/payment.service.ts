@@ -13,17 +13,22 @@
  *    Sales НЕ пишут finance.Payment (никаких cross-domain writes);
  *  - payable source — frozen Order snapshot (Order.amount/currency verbatim,
  *    immutable; НИКАКОГО reprice из mutable Catalog/Tax/FX — §12/§43);
- *  - cardinality: один Payment на Order (isActivePayment partial unique,
- *    DB-level); FAILED/CANCELLED — повторная инициация (attempt 2) легальна;
- *    CAPTURED/REFUNDED блокируют (overpayment protection); 2.12F снимет
- *    индекс в своей миграции (документировано);
+ *  - cardinality (MULTI/PARTIAL PAYMENTS §3): БЕЗ ограничения «один Payment
+ *    на Order» — частичный unique "Payment_one_active_per_order" снят
+ *    миграцией 20261009100000_multi_partial_payments. Один Order может иметь
+ *    неограниченное число Payment-записей; каждая со СВОЕЙ суммой
+ *    (0 < amount <= due, transaction-safe due-guard под advisory lock);
+ *    FAILED/CANCELLED не влияют на остаток (повторная инициация легальна);
  *  - status machine (единственный authority): PENDING → CAPTURED (paidAt) |
  *    FAILED (failedAt) | CANCELLED (cancelledAt). AUTHORIZED/REFUNDED —
  *    reserved vocabulary (producer: 2.12B PSP authorize / 2.13 refund);
  *    capturedAt/authorizedAt milestones — DEFER (2.12B);
- *  - idempotency: identical create retry → существующий активный Payment
- *    (no-op); concurrent duplicate → P2002 (Payment_one_active_per_order) →
- *    controlled 409, один факт; неизвестный P2002 не глотается;
+ *  - idempotency (§5): внешний Idempotency-Key (Idempotent interceptor,
+ *    fingerprint replay) — тот же ключ+body → replay существующего факта;
+ *    бизнес-level «active payment no-op» СНЯТ (мульти-платежи — каждый create
+ *    с новым ключом = новый факт); конкурентные create сериализуются
+ *    pg_advisory_xact_lock на Order, сумма одобренных ≤ due проверяется
+ *    транзакционно; неизвестный P2002 не глотается;
  *  - 0 side effects: без LedgerTransaction/ProviderFee/Settlement/Payout/
  *    Refund/Invoice/CommissionAccrual auto-post (boundaries §22–§25);
  *  - события: PaymentCreated/PaymentCaptured/PaymentFailed/PaymentCancelled
@@ -48,15 +53,12 @@ import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { SecurityService } from "../../security/security.service";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { parseDateParam as parseRegistryDateParam } from "../../shared/date-param";
-import { uniqueConstraintNames } from "../../shared/prisma-errors";
 import { getRequestContext } from "../../shared/request-context";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type PaymentEventPayload } from "../../eventbus/domain-events";
 import { validateFrozenMoneyFact } from "../sales/sales.money";
 import { normalizeInitialNote } from "../operational-notes/operational-notes.types";
-
-/** Cardinality partial unique index (schema): ≤1 активный Payment на Order. */
-const PAYMENT_ONE_ACTIVE_PER_ORDER = "Payment_one_active_per_order";
+import { validatePaymentAmount } from "./finance.validation";
 
 /** Статусы, НЕ блокирующие новую инициацию (attempt 2). */
 const REINITIABLE: PaymentStatus[] = ["FAILED", "CANCELLED"];
@@ -83,12 +85,32 @@ export class PaymentService {
 
   /**
    * Инициация Payment для Order (Finance command, finance.payment.write).
-   * Деньги — frozen Order snapshot verbatim (amount/currency); frontend НЕ
-   * источник цены (forged money → 422 forbidden keys). Idempotent: повторный
-   * create с активным Payment → существующий факт (no-op, identical retry =
-   * same effect); concurrent duplicate → P2002 → controlled 409.
+   * MULTI/PARTIAL (§4): клиент может указать amount (строковый Decimal) —
+   * сервер валидирует 0 < amount <= due (validatePaymentAmount + due-guard)
+   * ТРАНЗАКЦИОННО под pg_advisory_xact_lock(order-payments:{orderId}):
+   * конкурентные create/confirm сериализуются, переплата невозможна. Без
+   * amount — берётся весь текущий остаток (available = order.amount −
+   * Σ(CAPTURED,REFUNDED) − Σ(PENDING,AUTHORIZED)). Деньги — frozen Order
+   * snapshot verbatim (currency); frontend НЕ источник валюты (forged → 422).
+   * Idempotency: ВНЕШНИЙ Idempotency-Key (Idempotent interceptor replay);
+   * бизнес-level active-noop снят — каждый create с новым ключом = новый факт.
    */
-  async createPayment(input: { orderId: string; paymentMethod?: string | null; reason?: string | null; initialNote?: string }, actor: Actor): Promise<Record<string, unknown>> {
+  async createPayment(
+    input: { orderId: string; amount?: string | null; paymentMethod?: string | null; reason?: string | null; initialNote?: string },
+    actor: Actor,
+    idempotencySlotKey?: string | null,
+  ): Promise<Record<string, unknown>> {
+    // MULTI/PARTIAL §13 (2.12H crash window 3) — бизнес-идемпотентность по слоту:
+    // retry того же create request (stale IN_PROGRESS → CAS takeover → re-execute)
+    // возвращает УЖЕ созданный этим же request'ом Payment — без дубликата и без
+    // active-noop (он несовместим с multi/partial: легальные повторные платежи на
+    // один Order — норма). Скоуп строго per-slot (Idempotency-Key): другой ключ →
+    // findUnique не находит строку → штатный create. Server-owned ключ пишет
+    // ТОЛЬКО IdempotencyInterceptor (из body его подставить нельзя).
+    if (idempotencySlotKey) {
+      const existing = await this.prisma.payment.findUnique({ where: { idempotencySlotKey } });
+      if (existing) return this.paymentDto(existing);
+    }
     const orderId = input.orderId.trim();
     if (!orderId) throw new ValidationDomainError("orderId is required");
     const paymentMethod = input.paymentMethod ? input.paymentMethod.trim() : null;
@@ -101,11 +123,19 @@ export class PaymentService {
       throw new ValidationDomainError("reason is required for manual payment initiation");
     }
 
+    // MULTI/PARTIAL §4: pre-tx валидация формата суммы (>0, ≤2dp) — до транзакции,
+    // как validateRefundAmount в RefundService.
+    const requestedAmount = input.amount != null && String(input.amount).trim().length > 0
+      ? validatePaymentAmount(String(input.amount).trim())
+      : null;
+
     // Phase 3 Round 2D.1: validate initialNote BEFORE transaction (pre-tx validation)
     // so >5000 rejection prevents Payment creation entirely.
     const noteText = normalizeInitialNote(input.initialNote);
 
     // READ-only cross-context read (ADR-0001): Order — owner обязательства.
+    // Предварительная проверка (fast 404 / not-payable); авторитетная проверка
+    // due выполняется внутри транзакции под advisory lock (свежая перечитка).
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
     if (ORDER_NOT_PAYABLE.includes(order.status)) {
@@ -116,41 +146,91 @@ export class PaymentService {
     // источника (Order snapshot). Валидация — платформенный контракт sales.money.
     validateFrozenMoneyFact(order.amount, order.currency, "payment money fact");
 
-    const emitPayload = (paymentId: string, code: string): PaymentEventPayload => ({
-      paymentId,
-      code,
-      orderId: order.id,
-      customerId: order.customerId,
-      amount: order.amount.toString(),
-      currency: order.currency,
-      method: paymentMethod,
-    });
-
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Idempotent retry: активный Payment уже существует → no-op.
-        const existing = await tx.payment.findFirst({
-          where: { orderId: order.id, isActivePayment: true },
+        // MULTI/PARTIAL §4 (CRITICAL): сериализация create/confirm по Order —
+        // конкурентные create и capture не могут вместе превысить due
+        // (advisory xact lock освобождается на commit/rollback tx; проект-паттерн
+        // atomic capacity — как в RefundService.createRefund).
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`order-payments:${order.id}`}))`;
+
+        // Авторитетная перечитка Order под lock (due-guard на свежем состоянии).
+        const fresh = await tx.order.findUnique({ where: { id: order.id } });
+        if (!fresh) throw new NotFoundError(`Order ${orderId} not found`);
+        if (ORDER_NOT_PAYABLE.includes(fresh.status)) {
+          throw new ValidationDomainError(`Order ${fresh.code} is ${fresh.status}; payment cannot be initiated`);
+        }
+
+        // Денежный остаток: paid = Σ(CAPTURED, REFUNDED), reserved = Σ(PENDING,
+        // AUTHORIZED); FAILED/CANCELLED не участвуют (повторная инициация).
+        const paidAgg = await tx.payment.aggregate({
+          where: { orderId: fresh.id, status: { in: [PaymentStatus.CAPTURED, PaymentStatus.REFUNDED] } },
+          _sum: { amount: true },
         });
-        if (existing) return this.paymentDto(existing);
+        const reservedAgg = await tx.payment.aggregate({
+          where: { orderId: fresh.id, status: { in: [PaymentStatus.PENDING, PaymentStatus.AUTHORIZED] } },
+          _sum: { amount: true },
+        });
+        const paidSum = paidAgg._sum.amount ?? new Prisma.Decimal(0);
+        const reservedSum = reservedAgg._sum.amount ?? new Prisma.Decimal(0);
+        const available = new Prisma.Decimal(fresh.amount).minus(paidSum).minus(reservedSum);
+
+        // due-guard: 0 < amount <= available; без amount — весь остаток.
+        let effectiveAmount: Prisma.Decimal;
+        if (requestedAmount != null) {
+          const candidate = new Prisma.Decimal(requestedAmount);
+          if (candidate.greaterThan(available)) {
+            throw new ValidationDomainError(
+              `payment amount ${requestedAmount} exceeds remaining due ${available.toString()} for order ${fresh.code}` +
+                (available.lte(0)
+                  ? paidSum.gte(fresh.amount)
+                    ? " (order is fully paid)"
+                    : " (remaining due reserved by active payments)"
+                  : ""),
+            );
+          }
+          effectiveAmount = candidate;
+        } else {
+          if (available.lte(0)) {
+            throw new ValidationDomainError(
+              `order ${fresh.code} has no remaining amount due ` +
+                (paidSum.gte(fresh.amount) ? "(fully paid)" : "(reserved by active payments)"),
+            );
+          }
+          effectiveAmount = available;
+        }
+
+        const emitPayload = (paymentId: string, code: string): PaymentEventPayload => ({
+          paymentId,
+          code,
+          orderId: fresh.id,
+          customerId: fresh.customerId,
+          amount: effectiveAmount.toString(),
+          currency: fresh.currency,
+          method: paymentMethod,
+        });
 
         const code = await this.ids.nextCode(tx, "PAY");
         // Shared Commerce Sequence: derive Payment ref from Order's commerceSequence.
-        const { referenceNumber, paymentOrdinal } = await this.generateCommercePaymentRef(tx, order);
+        const { referenceNumber, paymentOrdinal } = await this.generateCommercePaymentRef(tx, fresh);
         const created = await tx.payment.create({
           data: {
             code,
             referenceNumber,
-            commerceSequence: order.commerceSequence ?? null,
+            commerceSequence: fresh.commerceSequence ?? null,
             paymentOrdinal,
-            orderId: order.id,
-            customerId: order.customerId ?? null,
-            amount: order.amount,
-            currency: order.currency,
+            orderId: fresh.id,
+            customerId: fresh.customerId ?? null,
+            amount: effectiveAmount,
+            currency: fresh.currency,
             status: PaymentStatus.PENDING,
             paymentMethod,
             isActivePayment: true,
             version: 1,
+            // MULTI/PARTIAL §13: связка «слот → платёж» для бизнес-идемпотентности
+            // (retry того же request возвращает этот же Payment; null — вне
+            // HTTP-idempotency-контекста, например system/provider-создание).
+            idempotencySlotKey: idempotencySlotKey ?? null,
           },
         });
         await tx.paymentHistory.create({
@@ -160,7 +240,7 @@ export class PaymentService {
             to: PaymentStatus.PENDING,
             actorId: actor.id,
             actorName: actor.username,
-            comment: reason ? `Платёж инициирован по заказу ${order.code}: ${reason}` : `Платёж инициирован по заказу ${order.code}`,
+            comment: reason ? `Платёж инициирован по заказу ${fresh.code}: ${reason}` : `Платёж инициирован по заказу ${fresh.code}`,
           },
         });
         await this.security.audit(tx, {
@@ -169,7 +249,7 @@ export class PaymentService {
           action: "finance.payment.created",
           resource: "Payment",
           resourceId: created.id,
-          details: { code: created.code, orderId: order.id, amount: order.amount.toString(), currency: order.currency },
+          details: { code: created.code, orderId: fresh.id, amount: effectiveAmount.toString(), currency: fresh.currency },
         });
         await this.eventBus.emit(tx, {
           aggregateType: "Payment",
@@ -195,10 +275,16 @@ export class PaymentService {
         return this.paymentDto(created);
       });
     } catch (err) {
-      // Concurrent duplicate create: оба прошли проверку isActivePayment,
-      // один проиграл partial unique → controlled 409 (один факт, без raw 500).
-      if (uniqueConstraintNames(err).includes(PAYMENT_ONE_ACTIVE_PER_ORDER)) {
-        throw new ConflictError(`A payment is already active for order ${order.code}`);
+      // Backstop: P2002 на Payment_idempotencySlotKey_key — гонка двух executor'ов
+      // одного слота (теоретически недостижимо: stale takeover — CAS, winner один).
+      // Бизнес-идемпотентность: возвращаем уже созданный Payment, НЕ raw 500.
+      if (
+        idempotencySlotKey &&
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002"
+      ) {
+        const existing = await this.prisma.payment.findUnique({ where: { idempotencySlotKey } });
+        if (existing) return this.paymentDto(existing);
       }
       throw err;
     } finally {
@@ -260,7 +346,9 @@ export class PaymentService {
    * переход → controlled 409 (terminal protection, конвенция completeSale).
    * Milestone + history + outbox атомарно с переходом. isActivePayment
    * обновляется атомарно (false для FAILED/CANCELLED — attempt 2 легален;
-   * true для CAPTURED — overpayment protection).
+   * true для CAPTURED). MULTI/PARTIAL §4: перед CAPTURED — overpayment guard
+   * под pg_advisory_xact_lock(order-payments:{orderId}) — Σ(CAPTURED/REFUNDED
+   * остальных) + amount ≤ order.amount (переплата невозможна, 422).
    */
   private async transition(
     code: string,
@@ -283,6 +371,29 @@ export class PaymentService {
 
     const now = new Date();
     const result = await this.prisma.$transaction(async (tx) => {
+      // MULTI/PARTIAL §4 (CRITICAL): capture уменьшает остаток → сериализуемся
+      // с create/другими confirm по Order тем же advisory lock'ом.
+      if (to === PaymentStatus.CAPTURED) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`order-payments:${payment.orderId}`}))`;
+        const order = await tx.order.findUnique({ where: { id: payment.orderId } });
+        if (order) {
+          const others = await tx.payment.aggregate({
+            where: {
+              orderId: payment.orderId,
+              status: { in: [PaymentStatus.CAPTURED, PaymentStatus.REFUNDED] },
+              id: { not: payment.id },
+            },
+            _sum: { amount: true },
+          });
+          const capturedSum = others._sum.amount ?? new Prisma.Decimal(0);
+          if (capturedSum.add(payment.amount).greaterThan(order.amount)) {
+            throw new ValidationDomainError(
+              `payment amount ${payment.amount.toString()} exceeds remaining due for order ${order.code} ` +
+                `(overpayment protection: captured ${capturedSum.toString()} + this ${payment.amount.toString()} > total ${order.amount.toString()})`,
+            );
+          }
+        }
+      }
       const updatedRows = await tx.payment.updateMany({
         where: { id: payment.id, status: PaymentStatus.PENDING, version: payment.version },
         data: {
@@ -444,13 +555,70 @@ export class PaymentService {
 
     const rows = items.map((r) => this.paymentDto(r));
     // Enrich each row with its canonical Order reference (single batched read —
-    // no N+1). Booking registry precedent.
+    // no N+1). Booking registry precedent. MULTI/PARTIAL §7: каждая строка
+    // несёт orderAmount + хронологический № (per-order 1..N) + Остаток после
+    // строки (total − Σ CAPTURED/REFUNDED по заказу на момент строки) +
+    // acceptedBy (PaymentHistory action='created', кто принял платёж).
     const rowOrderIds = [...new Set(items.map((p) => p.orderId).filter(Boolean))] as string[];
-    const orders = rowOrderIds.length > 0
-      ? await this.prisma.order.findMany({ where: { id: { in: rowOrderIds } }, select: { id: true, referenceNumber: true } })
-      : [];
+    const rowPaymentIds = items.map((p) => p.id);
+    const [orders, allOrderPayments, createdHistories] = await Promise.all([
+      rowOrderIds.length > 0
+        ? this.prisma.order.findMany({ where: { id: { in: rowOrderIds } }, select: { id: true, referenceNumber: true, amount: true } })
+        : Promise.resolve([]),
+      rowOrderIds.length > 0
+        ? this.prisma.payment.findMany({
+            where: { orderId: { in: rowOrderIds } },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: { id: true, orderId: true, amount: true, status: true },
+          })
+        : Promise.resolve([]),
+      rowPaymentIds.length > 0
+        ? this.prisma.paymentHistory.findMany({
+            where: { paymentId: { in: rowPaymentIds }, action: "created" },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: { paymentId: true, actorName: true },
+          })
+        : Promise.resolve([]),
+    ]);
     const orderRefMap = new Map(orders.map((o) => [o.id, o.referenceNumber]));
-    const enriched = rows.map((row) => ({ ...row, orderReference: orderRefMap.get(row.orderId as string) ?? null }));
+    const orderAmountMap = new Map(orders.map((o) => [o.id, o.amount.toString()]));
+    const orderTotalMap = new Map(orders.map((o) => [o.id, new Prisma.Decimal(o.amount)]));
+
+    // Хронологический № + Остаток после строки — по ВСЕМ Payment'ам заказа
+    // (не только page-страницы), накопление в порядке createdAt.
+    const statsByPayment = new Map<string, { ordinal: number; remainingAfter: string }>();
+    const runningByOrder = new Map<string, { count: number; paid: Prisma.Decimal }>();
+    for (const p of allOrderPayments) {
+      const acc = runningByOrder.get(p.orderId) ?? { count: 0, paid: new Prisma.Decimal(0) };
+      acc.count += 1;
+      if (p.status === PaymentStatus.CAPTURED || p.status === PaymentStatus.REFUNDED) {
+        acc.paid = acc.paid.add(p.amount);
+      }
+      runningByOrder.set(p.orderId, acc);
+      const total = orderTotalMap.get(p.orderId);
+      const remaining = total ? total.minus(acc.paid) : null;
+      statsByPayment.set(p.id, {
+        ordinal: acc.count,
+        remainingAfter: remaining && !remaining.isNegative() ? remaining.toString() : "0",
+      });
+    }
+
+    const acceptedByMap = new Map<string, string | null>();
+    for (const h of createdHistories) {
+      if (!acceptedByMap.has(h.paymentId)) acceptedByMap.set(h.paymentId, h.actorName);
+    }
+
+    const enriched = rows.map((row) => {
+      const stats = statsByPayment.get(row.id as string);
+      return {
+        ...row,
+        orderReference: orderRefMap.get(row.orderId as string) ?? null,
+        orderAmount: orderAmountMap.get(row.orderId as string) ?? null,
+        ordinal: stats?.ordinal ?? null,
+        remainingAfter: stats?.remainingAfter ?? null,
+        acceptedBy: acceptedByMap.get(row.id as string) ?? null,
+      };
+    });
 
     return { items: enriched, total: tableTotal, page, pageSize, hasMore: page * pageSize < tableTotal, aggregates };
   }

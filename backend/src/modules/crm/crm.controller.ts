@@ -9,6 +9,7 @@ import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
+import { SecurityService } from "../../security/security.service";
 import { VALID_LEAD_SOURCES } from "./crm-lead-source.constants";
 
 /** Validate leadSource against canonical values. Null/undefined = allowed. */
@@ -167,12 +168,39 @@ class CreateSupplierDto {
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller()
 export class CrmController {
-  constructor(private readonly crm: CrmService) {}
+  constructor(
+    private readonly crm: CrmService,
+    private readonly security: SecurityService,
+  ) {}
 
   @Post("customers")
   @RequirePermissions("crm.customer.write")
   createCustomer(@Body() dto: CreateCustomerDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.crm.createCustomer(dto, actor.username);
+  }
+
+  /**
+   * M4.1 (ADR-0016) — явная idempotent backfill-команда phoneCanonical из
+   * phone (CRM-owned). dry-run/report + аудит; конфликты (один canonical у
+   * нескольких Customer) — только в отчёте, никакого auto-merge.
+   */
+  @Post("customers/reconcile-phone-canonical")
+  @RequirePermissions("settings.write")
+  async reconcilePhoneCanonical(
+    @Body() dto: { dryRun?: boolean },
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    const dryRun = dto?.dryRun ?? false;
+    const result = await this.crm.backfillPhoneCanonical(dryRun);
+    await this.security.audit(undefined, {
+      userId: actor.id,
+      username: actor.username,
+      action: dryRun ? "customer.phone_canonical_backfill_dryrun" : "customer.phone_canonical_backfill",
+      resource: "Customer",
+      resourceId: null,
+      details: result as unknown as Record<string, unknown>,
+    });
+    return result;
   }
 
   @Get("customers")

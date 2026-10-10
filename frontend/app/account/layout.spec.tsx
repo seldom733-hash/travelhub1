@@ -30,6 +30,7 @@ function buyerUser(overrides: Partial<AuthUser> = {}): AuthUser {
     id: "u1",
     code: "USR-00000001",
     username: "buyer",
+    phone: null,
     email: "buyer@test.local",
     fullName: "Покупатель Тестов",
     role: "BUYER",

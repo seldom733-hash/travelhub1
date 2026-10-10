@@ -1,4 +1,5 @@
 import { CrmService } from './crm.service';
+import { ConflictError } from '../../shared/errors';
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Step 3.5C — CRM Intake Service Unit Tests
@@ -72,6 +73,14 @@ function buildMockPrisma(store: MockStore) {
       if (where?.customerId) items = items.filter((d) => d.customerId === where.customerId);
       if (where?.sellerPartnerId) items = items.filter((d) => d.sellerPartnerId === where.sellerPartnerId);
       if (where?.partnerId) items = items.filter((d) => d.partnerId === where.partnerId);
+      // M4.2 resolver lookup (shared/customer-resolver): phoneCanonical shape.
+      if (where?.phoneCanonical !== undefined) {
+        items = items.filter((d) =>
+          where.phoneCanonical === null
+            ? (d.phoneCanonical ?? null) === null && (d.phone ?? null) !== null
+            : d.phoneCanonical === where.phoneCanonical,
+        );
+      }
       if (take) items = items.slice(skip ?? 0, (skip ?? 0) + take);
       return items;
     }),
@@ -87,7 +96,10 @@ function buildMockPrisma(store: MockStore) {
 
   const prisma = {
     $transaction: jest.fn(async (fn: any) => {
-      const tx: any = {};
+      const tx: any = {
+        // M4.6 advisory lock (pg_advisory_xact_lock) — no-op в mock.
+        $queryRaw: jest.fn(async () => []),
+      };
       const tables: [string, string][] = [
         ['Customer', 'customer'], ['Partner', 'partner'],
         ['PartnerCustomerRelation', 'partnerCustomerRelation'],
@@ -282,6 +294,45 @@ describe('Step 3.5C — CRM Intake Service', () => {
       await expect(
         service.intakePartnerCustomer({ partnerId: 'partner-a' }, { email: 'test@example.com' }, 'user1'),
       ).rejects.toThrow('Storefront Pro');
+    });
+  });
+
+  describe('M4.2 — duplicate-phone guard (ADR-0016)', () => {
+    it('platformIntake: canonical phone owned by existing customer → ConflictError, no duplicate', async () => {
+      const { service, store } = buildService();
+      store.insert('Customer', { id: 'c-exist', email: 'owner@example.com', phone: '+994501111111', phoneCanonical: '+994501111111' });
+      await expect(
+        service.platformIntakeCustomer('partner-a', { email: 'new@example.com', phone: '0501111111' }, 'admin'),
+      ).rejects.toThrow(ConflictError);
+      expect(store.findMany('Customer', (d) => d.email === 'new@example.com')).toHaveLength(0);
+      expect(store.count('Customer')).toBe(1);
+    });
+
+    it('platformIntake: phone not owned → created (no false-positive)', async () => {
+      const { service, store } = buildService();
+      store.insert('Customer', { id: 'c-exist', email: 'owner@example.com', phone: '+994501111111', phoneCanonical: '+994501111111' });
+      const r = await service.platformIntakeCustomer('partner-a', { email: 'new@example.com', phone: '0502222222' }, 'admin');
+      expect(r.customerCreated).toBe(true);
+      const created = store.findMany('Customer', (d) => d.email === 'new@example.com');
+      expect(created).toHaveLength(1);
+      expect(created[0].phoneCanonical).toBe('+994502222222');
+    });
+
+    it('platformIntake: email reuse path unchanged — same email reuses customer even with phone', async () => {
+      const { service, store } = buildService();
+      await service.platformIntakeCustomer('partner-a', { email: 'first@example.com', phone: '+994501111111' }, 'admin');
+      const r2 = await service.platformIntakeCustomer('partner-a', { email: 'first@example.com', phone: '+994501111111' }, 'admin');
+      expect(r2.customerCreated).toBe(false);
+      expect(store.count('Customer')).toBe(1);
+    });
+
+    it('intakePartnerCustomer (PRO): canonical phone owned → ConflictError', async () => {
+      const { service, store } = buildProService();
+      store.insert('Customer', { id: 'c-exist', email: 'owner@example.com', phone: '+994501111111', phoneCanonical: '+994501111111' });
+      await expect(
+        service.intakePartnerCustomer({ partnerId: 'partner-a' }, { email: 'new@example.com', phone: '+994501111111' }, 'user1'),
+      ).rejects.toThrow(ConflictError);
+      expect(store.count('Customer')).toBe(1);
     });
   });
 });

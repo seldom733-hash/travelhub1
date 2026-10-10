@@ -15,8 +15,12 @@ import LocaleSelector from "@/components/public/LocaleSelector";
  *  - BUYER → ?next= public Marketplace-путь (/products/*, /search*, /categories/*)
  *    ИЛИ /account/* deep-link (Buyer Cabinet, Step 1.13); без next — /account
  *    (никогда /app/*, /partner/*).
- * ?next= валидируется safeNextPath (анти-open-redirect).
+ * ?next= валидируется safeNextPath (anti-open-redirect).
  * RU/AZ/EN (Step 1.9 §16): UI-ярлыки локализованы, locale сохраняется (localStorage).
+ * M4.3 §14: phone-first identifier — единое поле принимает canonical/любой формат
+ * телефона (сервер приводит к E.164 → loginPhone) ИЛИ legacy username (staff/admin
+ * compat). Email НЕ является login identity. Payload-ключ остаётся `username`
+ * (LoginDto contract), значение — phone или login.
  */
 function LoginPageInner() {
   const router = useRouter();
@@ -77,14 +81,16 @@ function LoginPageInner() {
         </div>
 
         <form onSubmit={(e) => void submit(e)} className="rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-xl">
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("auth.username_label", locale)}</label>
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("auth.phone_login_label", locale)}</label>
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
-            className="mb-4 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
-            placeholder="admin"
+            inputMode="text"
+            className="mb-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
+            placeholder="+994 50 000 00 00"
           />
+          <p className="mb-4 text-xs leading-relaxed text-slate-500">{t("auth.phone_login_hint", locale)}</p>
 
           <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("auth.password_label", locale)}</label>
           <input

@@ -27,6 +27,9 @@ import OrderActionBar from "@/components/order/OrderActionBar";
 import { useLocale, t, formatPrice, LOCALE_TAGS, type Locale } from "@/lib/i18n";
 import { orderActionLabel } from "@/lib/commerce-history-labels";
 import { useCurrentUser } from "@/lib/use-user";
+import { useCan } from "@/lib/use-can";
+import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
+import PaymentsTable, { buildPaymentsTableRows } from "@/components/finance/PaymentsTable";
 
 interface OrderDetail {
   id: string;
@@ -112,9 +115,14 @@ export default function OrderDetailPage() {
   const [history, setHistory] = useState<HistoryPage>({ items: [], total: 0, page: 0, pageSize: 20 });
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [finHistory, setFinHistory] = useState<{ payments: Array<{ id: string; code: string; status: string; amount: string; currency: string; paidAt: string | null; failedAt: string | null; cancelledAt: string | null; createdAt: string }>; refunds: Array<{ id: string; code: string; status: string; amount: string; currency: string; reason: string | null; requestedAt: string | null; approvedAt: string | null; processedAt: string | null; failedAt: string | null; createdAt: string }> }>({ payments: [], refunds: [] });
+  const [finHistory, setFinHistory] = useState<{ payments: Array<{ id: string; code: string; status: string; amount: string; currency: string; paidAt: string | null; failedAt: string | null; cancelledAt: string | null; createdAt: string }>; paymentsHistory: Array<{ id: string; paymentId: string; action: string; actorName: string | null; createdAt: string }>; refunds: Array<{ id: string; code: string; status: string; amount: string; currency: string; reason: string | null; requestedAt: string | null; approvedAt: string | null; processedAt: string | null; failedAt: string | null; createdAt: string }> }>({ payments: [], paymentsHistory: [], refunds: [] });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [finHistoryLoading, setFinHistoryLoading] = useState(false);
+
+  // Prompt §4: + Создать платеж из Order detail (RBAC finance.payment.create);
+  // orderId фиксирован — текущий Order заменить нельзя.
+  const canCreatePayment = useCan("finance.payment.create");
+  const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
 
   const loadOrder = useCallback(async () => {
     try {
@@ -151,14 +159,20 @@ export default function OrderDetailPage() {
   const loadFinHistory = useCallback(async () => {
     setFinHistoryLoading(true);
     try {
-      const res = await api.get<{ payments: { payments: typeof finHistory.payments; history: unknown[] }; refunds: { refunds: typeof finHistory.refunds; history: unknown[] } }>(`/orders/${id}/financial-history`);
-      setFinHistory({ payments: res.payments.payments ?? [], refunds: res.refunds.refunds ?? [] });
+      const res = await api.get<{ payments: { payments: typeof finHistory.payments; history: typeof finHistory.paymentsHistory }; refunds: { refunds: typeof finHistory.refunds; history: unknown[] } }>(`/orders/${id}/financial-history`);
+      setFinHistory({ payments: res.payments.payments ?? [], paymentsHistory: res.payments.history ?? [], refunds: res.refunds.refunds ?? [] });
     } catch {
       // financial history does not block the page
     } finally {
       setFinHistoryLoading(false);
     }
   }, [id]);
+
+  // Prompt §4: после создания платежа — обновить финансовую историю/данные Order.
+  const handlePaymentCreated = useCallback(() => {
+    void loadFinHistory();
+    void loadOrder();
+  }, [loadFinHistory, loadOrder]);
 
   useEffect(() => {
     void loadOrder();
@@ -261,6 +275,16 @@ export default function OrderDetailPage() {
               <EntityFinanceCell label={t("finance.refundable_amount", locale)} value={formatPrice(order.refundableAmount, order.currency, locale)} tone="info" />
               <EntityFinanceCell label={t("crm.detail.payment_status", locale) || "Статус оплаты"} value={<StatusBadge status={order.paymentStatus} />} tone="neutral" />
             </div>
+            {canCreatePayment && (
+              <button
+                type="button"
+                data-testid="order-create-payment-button"
+                onClick={() => setCreatePaymentOpen(true)}
+                className="mt-3 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              >
+                {t("payments.create.button", locale)}
+              </button>
+            )}
           </EntitySectionCard>
 
           {order.items && order.items.length > 0 && (
@@ -351,31 +375,48 @@ export default function OrderDetailPage() {
             {!finHistoryLoading && finHistory.payments.length === 0 && finHistory.refunds.length === 0 && (
               <div className="text-xs text-slate-400">{t("finance.no_history", locale) || "Нет финансовых событий"}</div>
             )}
-            <div className="space-y-2">
-              {finHistory.payments.map((p) => (
-                <EntityRow key={p.id} className="justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-slate-400">{p.code}</span>
-                    <StatusBadge status={p.status} />
-                    <span className="text-slate-600">{formatPrice(p.amount, p.currency, locale)}</span>
-                  </div>
-                  <span className="text-slate-400">{formatTs(p.paidAt ?? p.failedAt ?? p.cancelledAt ?? p.createdAt, locale)}</span>
-                </EntityRow>
-              ))}
-              {finHistory.refunds.map((r) => (
-                <EntityRow key={r.id} className="justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-slate-400">{r.code}</span>
-                    <StatusBadge status={r.status} />
-                    <span className="text-red-600">{formatPrice(r.amount, r.currency, locale)}</span>
-                    {r.reason && <span className="text-slate-400">({r.reason})</span>}
-                  </div>
-                  <span className="text-slate-400">{formatTs(r.processedAt ?? r.approvedAt ?? r.requestedAt ?? r.createdAt, locale)}</span>
-                </EntityRow>
-              ))}
-            </div>
+            {!finHistoryLoading && finHistory.payments.length > 0 && (
+              <PaymentsTable
+                rows={buildPaymentsTableRows({
+                  payments: finHistory.payments,
+                  history: finHistory.paymentsHistory,
+                  orderTotal: order.amount,
+                })}
+                locale={locale}
+                onActionCompleted={handlePaymentCreated}
+              />
+            )}
+            {finHistory.refunds.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {finHistory.refunds.map((r) => (
+                  <EntityRow key={r.id} className="justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] text-slate-400">{r.code}</span>
+                      <StatusBadge status={r.status} />
+                      <span className="text-red-600">{formatPrice(r.amount, r.currency, locale)}</span>
+                      {r.reason && <span className="text-slate-400">({r.reason})</span>}
+                    </div>
+                    <span className="text-slate-400">{formatTs(r.processedAt ?? r.approvedAt ?? r.requestedAt ?? r.createdAt, locale)}</span>
+                  </EntityRow>
+                ))}
+              </div>
+            )}
           </EntitySectionCard>
         </EntityDetailWide>
       </EntityDetailLayout>
-    </EntityDetailShell>  );
+
+      {/* + Создать платеж — фиксированный контекст текущего Order (prompt §4) */}
+      <CreatePaymentForm
+        open={createPaymentOpen}
+        onClose={() => setCreatePaymentOpen(false)}
+        presetOrder={{
+          id: order.id,
+          label: order.referenceNumber,
+          amount: order.amount,
+          currency: order.currency,
+        }}
+        onCreated={handlePaymentCreated}
+      />
+    </EntityDetailShell>
+  );
 }

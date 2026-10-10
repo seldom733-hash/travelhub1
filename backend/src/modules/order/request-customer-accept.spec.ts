@@ -69,11 +69,27 @@ interface Harness {
     request: { findUnique: jest.Mock; update: jest.Mock };
     product: { findUnique: jest.Mock };
     requestHistory: { create: jest.Mock };
+    requestTraveler: { findMany: jest.Mock };
   };
   security: { audit: jest.Mock };
 }
 
-function makeHarness(row: Record<string, unknown>): Harness {
+/** Two-stage §6: базовый «готовый» состав Request-стадии (FIO + birthDate). */
+function readyTravelers(count = 1) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `t${i + 1}`,
+    requestId: "r1",
+    position: i + 1,
+    firstName: `IVAN${i + 1}`,
+    lastName: `IVANOV${i + 1}`,
+    birthDate: new Date("1990-01-01T00:00:00.000Z"),
+  }));
+}
+
+function makeHarness(
+  row: Record<string, unknown>,
+  travelers: Record<string, unknown>[] = readyTravelers(),
+): Harness {
   const prisma = {
     request: {
       findUnique: jest.fn().mockResolvedValue(row),
@@ -81,6 +97,7 @@ function makeHarness(row: Record<string, unknown>): Harness {
     },
     product: { findUnique: jest.fn().mockResolvedValue(null) },
     requestHistory: { create: jest.fn().mockResolvedValue({}) },
+    requestTraveler: { findMany: jest.fn().mockResolvedValue(travelers) },
   };
   const security = { audit: jest.fn().mockResolvedValue(undefined) };
   const service = new RequestService(
@@ -237,5 +254,137 @@ describe("customerAccept — commercial acceptance gate (Phase 3 §13)", () => {
     await expect(h.service.customerAccept("r1", ACTOR)).rejects.toBeInstanceOf(
       ValidationDomainError,
     );
+  });
+});
+
+/**
+ * TRAVELHUB_TRAVELER_REQUIREMENTS_DATA_SHAPE_FIX §8 — «do not reintroduce the
+ * bug at acceptance»:
+ *  - product-less tour request: creation-time pin (canonical TravelerFullRequirements)
+ *    is PRESERVED — no second rewrite, no masking of the producer;
+ *  - product-backed request: existing rewrite semantics stay (effective
+ *    requirements from the Product), but the product snapshot MERGE keeps the
+ *    offer facts frozen at creation (productSnapshot.offer) — §6 no data loss.
+ */
+describe("customerAccept — data-shape fix §8 (pin preservation / snapshot merge)", () => {
+  // Two-stage §3: canonical TOUR pin (birthDate/passport-поля REQUIRED).
+  const TRAVELER_PIN = {
+    firstName: "REQUIRED",
+    lastName: "REQUIRED",
+    birthDate: "REQUIRED",
+    citizenship: "REQUIRED",
+    gender: "NOT_REQUESTED",
+    passportSeries: "REQUIRED",
+    passportNumber: "REQUIRED",
+    passportExpiry: "REQUIRED",
+  };
+
+  it("product-less tour request: creation-time traveler pin + offer snapshot are untouched", async () => {
+    const h = makeHarness(
+      requestRow({
+        productId: null,
+        pinnedRequirements: { ...TRAVELER_PIN },
+        productSnapshot: {
+          productTitle: "Rixos",
+          productType: "TOUR",
+          offer: { hotel: "Rixos", nights: 7, supplierCode: "KOMPAS" },
+        },
+      }),
+    );
+
+    await h.service.customerAccept("r1", ACTOR);
+
+    const data = updateData(h);
+    expect(data.status).toBe("CUSTOMER_ACCEPTED");
+    // Product-less: pin/snapshot НЕ трогаем (undefined = no-op) — фиксированный
+    // при создании канонический traveler-pin сохраняется как есть.
+    expect("pinnedRequirements" in data).toBe(false);
+    expect("productSnapshot" in data).toBe(false);
+    expect(h.prisma.product.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("product-backed: pin = effective requirements; productSnapshot.offer survives the identity refresh", async () => {
+    const h = makeHarness(
+      requestRow({
+        productId: "p1",
+        pinnedRequirements: { ...TRAVELER_PIN },
+        productSnapshot: {
+          productTitle: "Rixos",
+          productType: "TOUR",
+          offer: { hotel: "Rixos", nights: 7, supplierCode: "KOMPAS" },
+        },
+      }),
+    );
+    h.prisma.product.findUnique.mockResolvedValue({
+      id: "p1",
+      code: "PRD-1",
+      title: "Rixos",
+      type: "TOUR",
+      travelerRequirements: { passportNumber: "OPTIONAL" },
+    });
+
+    await h.service.customerAccept("r1", ACTOR);
+
+    const data = updateData(h);
+    expect(data.pinnedRequirements).toEqual({ ...TRAVELER_PIN, passportNumber: "OPTIONAL" });
+    expect(data.productSnapshot).toMatchObject({
+      productId: "p1",
+      productCode: "PRD-1",
+      productTitle: "Rixos",
+      productType: "TOUR",
+      // §6: offer facts are NOT deleted by the acceptance rewrite (merge).
+      offer: { hotel: "Rixos", nights: 7, supplierCode: "KOMPAS" },
+    });
+  });
+});
+
+describe("customerAccept — two-stage traveler readiness gate (§6)", () => {
+  it("ready composition (FIO + birthDate, count == travelerCount) → accepted", async () => {
+    const h = makeHarness(requestRow({ travelerCount: 1 }), readyTravelers(1));
+
+    await h.service.customerAccept("r1", ACTOR);
+
+    expect(h.prisma.request.update).toHaveBeenCalledTimes(1);
+    expect(updateData(h).status).toBe("CUSTOMER_ACCEPTED");
+  });
+
+  it("count mismatch (travelerCount=2, rows=1) → 422, request not updated", async () => {
+    const h = makeHarness(requestRow({ travelerCount: 2 }), readyTravelers(1));
+
+    await expect(h.service.customerAccept("r1", ACTOR)).rejects.toThrow(
+      /traveler count mismatch/,
+    );
+    expect(h.prisma.request.update).not.toHaveBeenCalled();
+    expect(h.prisma.requestHistory.create).not.toHaveBeenCalled();
+  });
+
+  it("empty composition (no RequestTraveler rows) → 422, request not updated", async () => {
+    const h = makeHarness(requestRow({ travelerCount: 1 }), []);
+
+    await expect(h.service.customerAccept("r1", ACTOR)).rejects.toThrow(
+      /traveler count mismatch/,
+    );
+    expect(h.prisma.request.update).not.toHaveBeenCalled();
+  });
+
+  it("incomplete traveler (missing birthDate) → 422 «incomplete», request not updated", async () => {
+    const h = makeHarness(requestRow({ travelerCount: 1 }), [
+      { id: "t1", requestId: "r1", position: 1, firstName: "IVAN", lastName: "IVANOV", birthDate: null },
+    ]);
+
+    await expect(h.service.customerAccept("r1", ACTOR)).rejects.toThrow(
+      /travelers are incomplete/,
+    );
+    expect(h.prisma.request.update).not.toHaveBeenCalled();
+  });
+
+  it("readiness is checked BEFORE the money gate (422 traveller error, not money error)", async () => {
+    const zero = { ...workingSnapshot(), supplierPrice: 0 };
+    const h = makeHarness(requestRow({ commercialSnapshot: zero, travelerCount: 1 }), []);
+
+    await expect(h.service.customerAccept("r1", ACTOR)).rejects.toThrow(
+      /traveler count mismatch/,
+    );
+    expect(h.prisma.request.update).not.toHaveBeenCalled();
   });
 });

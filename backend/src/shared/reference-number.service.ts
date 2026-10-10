@@ -11,8 +11,14 @@ import { PrismaService } from "../prisma/prisma.service";
  *   Storefront:   {SF_CODE}-{TYPE}-{SEQ}
  *   SaaS:         SAAS-{SF_CODE}-{TYPE}-{SEQ}
  *
- * Concurrency safety: uses Hi/Lo block allocation on BusinessSequence
- * (same mechanism as IdsService for code generation).
+ * Concurrency safety / СПЛОШНАЯ последовательность (Owner Decision, аудит
+ * нумераций): Hi/Lo-блочная аллокация УДАЛЕНА. Каждая аллокация = ровно один
+ * атомарный upsert `value += 1` на строке BusinessSequence (ключ REFSEQ:{key}),
+ * исполняемый на клиенте, переданном вызывающим: доменная tx → инкремент в её
+ * рамках (rollback возвращает номер), без tx (legacy `null`-вызовы) →
+ * autocommit на глобальном клиенте. Хвосты блоков не сжигаются, кэша/claim-
+ * гейтов/in-memory состояния нет — перезапуск процесса последовательность
+ * не ломает. См. подробности компромисса в ids.service.ts.
  *
  * Reference numbers are:
  *   - immutable after creation
@@ -24,31 +30,22 @@ import { PrismaService } from "../prisma/prisma.service";
 export class ReferenceNumberService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private readonly blockSize = Number(
-    process.env.REFERENCE_SEQUENCE_BLOCK_SIZE ?? 100,
-  );
-  private readonly cache = new Map<
-    string,
-    { next: number; end: number }
-  >();
-  private readonly claims = new Map<string, Promise<unknown>>();
-
   /**
    * Generate a reference number for a business object.
    *
-   * @param tx       - Transaction client (for compatibility with callers)
+   * @param tx       - Transaction client домена (аллокация в его рамках); null → глобальный клиент.
    * @param prefix   - Namespace prefix: "MKT", "SAAS", or storefront code (e.g. "SF001")
    * @param typeCode - Object type: "ORD", "BKG", "PAY", "REF", "INV", "REQ"
    * @param digits   - Sequence digits (default 8: 00000001..99999999)
    */
   async nextReferenceNumber(
-    _tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient | null,
     prefix: string,
     typeCode: string,
     digits = 8,
   ): Promise<string> {
     const seqKey = `REF:${prefix}:${typeCode}`;
-    const value = await this.allocate(seqKey);
+    const value = await this.allocate(tx, seqKey);
     return `${prefix}-${typeCode}-${String(value).padStart(digits, "0")}`;
   }
 
@@ -56,7 +53,7 @@ export class ReferenceNumberService {
    * Marketplace reference: MKT-{TYPE}-{SEQ}
    */
   async nextMarketplaceReference(
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient | null,
     typeCode: string,
   ): Promise<string> {
     return this.nextReferenceNumber(tx, "MKT", typeCode);
@@ -66,7 +63,7 @@ export class ReferenceNumberService {
    * Storefront commerce reference: {SF_CODE}-{TYPE}-{SEQ}
    */
   async nextStorefrontReference(
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient | null,
     storefrontCode: string,
     typeCode: string,
   ): Promise<string> {
@@ -77,7 +74,7 @@ export class ReferenceNumberService {
    * SaaS reference: SAAS-{SF_CODE}-{TYPE}-{SEQ}
    */
   async nextSaasReference(
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient | null,
     storefrontCode: string,
     typeCode: string,
   ): Promise<string> {
@@ -92,9 +89,9 @@ export class ReferenceNumberService {
    * All entities in one commerce chain share the same root number.
    */
   async nextCommerceSequence(
-    _tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient | null,
   ): Promise<string> {
-    const value = await this.allocate("REFSEQ:COMMERCE:ROOT");
+    const value = await this.allocate(tx, "REFSEQ:COMMERCE:ROOT");
     return String(value).padStart(8, "0");
   }
 
@@ -133,47 +130,24 @@ export class ReferenceNumberService {
    * For objects that don't belong to a shared commerce chain.
    */
   async nextIndependentMarketplaceReference(
-    tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient | null,
     typeCode: string,
   ): Promise<string> {
     return this.nextReferenceNumber(tx, "MKT", typeCode);
   }
 
-  /**
-   * Hi/Lo block allocation for sequence numbers.
-   * Same concurrency-safe mechanism as IdsService.
-   */
-  private allocate(key: string): Promise<number> {
-    const block = this.cache.get(key);
-    if (block && block.next <= block.end) {
-      return Promise.resolve(block.next++);
-    }
-
-    const prior = this.claims.get(key) ?? Promise.resolve();
-    const run = prior.then(async () => {
-      const again = this.cache.get(key);
-      if (again && again.next <= again.end) {
-        return again.next++;
-      }
-
-      const prefix = `REFSEQ:${key}`;
-      const claimed = await this.prisma.seqClient.$transaction((tx) =>
-        tx.businessSequence.upsert({
-          where: { prefix },
-          update: { value: { increment: this.blockSize } },
-          create: { prefix, value: this.blockSize },
-        }),
-      );
-
-      const fresh = {
-        next: claimed.value - this.blockSize + 1,
-        end: claimed.value,
-      };
-      this.cache.set(key, fresh);
-      return fresh.next++;
+  /** Атомарный increment +1 по строке REFSEQ:{key}. Прямой, без кэша/блоков:
+   *  один вызов = ровно один следующий номер (сплошная последовательность). */
+  private async allocate(tx: Prisma.TransactionClient | null, key: string): Promise<number> {
+    const client = (tx && typeof (tx as { businessSequence?: unknown }).businessSequence !== "undefined"
+      ? tx
+      : this.prisma) as unknown as Prisma.TransactionClient;
+    const prefix = `REFSEQ:${key}`;
+    const record = await client.businessSequence.upsert({
+      where: { prefix },
+      update: { value: { increment: 1 } },
+      create: { prefix, value: 1 },
     });
-
-    this.claims.set(key, run.catch(() => undefined));
-    return run;
+    return record.value;
   }
 }

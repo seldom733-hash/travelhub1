@@ -34,6 +34,10 @@ class TravelerDto {
 
   @IsOptional()
   @IsString()
+  passportSeries?: string;
+
+  @IsOptional()
+  @IsString()
   passportNumber?: string;
 
   @IsOptional()
@@ -65,6 +69,10 @@ class TravelerCollectDto {
 
   @IsOptional()
   @IsString()
+  passportSeries?: string;
+
+  @IsOptional()
+  @IsString()
   passportNumber?: string;
 
   @IsOptional()
@@ -73,7 +81,19 @@ class TravelerCollectDto {
 }
 
 class OrderActionDto {
-  @IsEnum(["process", "markWaitingData", "resumeProcessing", "confirm", "send", "complete", "close", "cancel", "problem", "suspend"] as const)
+  @IsEnum([
+    "process",
+    "markWaitingData",
+    "resumeProcessing",
+    "confirm",
+    "send",
+    "complete",
+    "close",
+    "cancel",
+    "problem",
+    "suspend",
+    "returnToRequest",
+  ] as const)
   action!: OrderAction;
 
   // Step 3.6C.1: mandatory reason for Platform support transitions.
@@ -283,7 +303,14 @@ export class OrderController {
     assertNoForbiddenKeys(req.body, ORDER_ACTION_FORBIDDEN_KEYS);
     // D5-R1: extract trusted audit source from client header (spoofing-protected).
     const auditSource = validateClientSource(req.headers["x-audit-source"] as string | undefined);
-    return this.orders.orderAction(id, dto.action, actor.username, dto.reason ?? null, auditSource ?? undefined);
+    return this.orders.orderAction(
+      id,
+      dto.action,
+      actor.username,
+      dto.reason ?? null,
+      auditSource ?? undefined,
+      actor.id,
+    );
   }
 
   // ── D3: Traveler Collection + Order/Booking Population ──

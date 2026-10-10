@@ -1,0 +1,13 @@
+-- TRAVELHUB_MULTI_PARTIAL_PAYMENTS §3 — Unlimited payments per Order.
+--
+-- Снимает DB-ограничение «≤1 активный Payment на Order» (partial unique),
+-- заявлённое к переработке ещё в Step 2.12 (schema-комментарий 2.12F):
+-- один Order может иметь неограниченное количество Payment-записей, каждая
+-- со своей суммой; погашение идёт суммой подтверждённых (CAPTURED/REFUNDED)
+-- платежей (Order.paidAmount accumulation), защита от переплаты —
+-- transaction-safe due-guard в PaymentService (pg_advisory_xact_lock на Order),
+-- НЕ DB-уникальность. История Payment/PaymentHistory не удаляется.
+--
+-- Поле isActivePayment и его инвариант (isActivePayment == status NOT IN
+-- (FAILED, CANCELLED)) сохраняются без изменений.
+DROP INDEX "finance"."Payment_one_active_per_order";

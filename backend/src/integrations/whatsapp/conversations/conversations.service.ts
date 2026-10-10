@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { SecurityService } from "../../../security/security.service";
-import { NotFoundError, ValidationDomainError } from "../../../shared/errors";
+import { ConflictError, NotFoundError, ValidationDomainError } from "../../../shared/errors";
 import type { Prisma } from "../../../generated/prisma/client";
 import type {
   BookingStatus,
@@ -12,8 +12,14 @@ import type {
 } from "../../../generated/prisma/enums";
 import { WHATSAPP_CONFIG } from "../whatsapp.tokens";
 import type { WhatsAppConfig } from "../whatsapp.config";
-import { findCustomerIdsByCanonicalPhone } from "../inbound/inbound.service";
+import {
+  findCustomerIdsByCanonicalPhone,
+  resolveCustomer,
+} from "../../../shared/customer-resolver/customer-resolver";
 import { normalizePhoneE164 } from "../../../shared/phone/phone";
+import { normalizeEmail } from "../../../shared/field-validation";
+import { CrmService } from "../../../modules/crm/crm.service";
+import { ActivationService } from "../../../security/activation.service";
 
 /**
  * M3 «Inbound & Chat» (§13/§14/§18/§24/§25): операции диалогов.
@@ -38,6 +44,8 @@ export interface ResolvedContext {
 
 export interface ConversationListRow {
   readonly id: string;
+  /** M5: номер, которому принадлежит диалог (бейдж/фильтр в инбоксе). */
+  readonly accountId: string;
   readonly remoteJid: string;
   readonly canonicalPhone: string | null;
   readonly matchingStatus: WhatsAppMatchingStatus;
@@ -64,6 +72,26 @@ export interface ConversationDetail extends ConversationListRow {
   readonly context: ResolvedContext | null;
 }
 
+/** M4.4 §18: вход onboarding первого контакта WhatsApp (collect → re-resolve → create/reuse). */
+export interface OnboardCustomerInput {
+  /** Обязательная контактная информация: email — unique-ключ Customer (§18). */
+  readonly email: string;
+  readonly firstName?: string;
+  readonly lastName?: string;
+  /** Override канонического телефона; по умолчанию — conversation.canonicalPhone. */
+  readonly phone?: string;
+  /** Опциональная активация существующего User (механика §19; без регистрации). */
+  readonly activateUser?: boolean;
+}
+
+export interface OnboardCustomerResult {
+  readonly conversation: ConversationDetail;
+  readonly customerId: string;
+  readonly created: boolean;
+  readonly user: { readonly id: string; readonly status: string } | null;
+  readonly activation: { readonly token: string; readonly expiresAt: string } | null;
+}
+
 export interface TimelineItem {
   readonly id: string;
   readonly origin: "inbound" | "outbound";
@@ -75,6 +103,8 @@ export interface TimelineItem {
   readonly providerMessageId: string | null;
   /** M3+: вложение (файл) — имя/размер для чипа в ленте. */
   readonly mediaFilename: string | null;
+  /** M5: mime вложения — фронт различает аудио/видео/документ. */
+  readonly mediaMime: string | null;
   readonly mediaSize: number | null;
   readonly hasMedia: boolean;
   /** Только для outbound: integration lifecycle (M0-05) + receipt-факты. */
@@ -106,16 +136,23 @@ export class WhatsAppConversationsService {
     private readonly prisma: PrismaService,
     private readonly security: SecurityService,
     @Inject(WHATSAPP_CONFIG) private readonly config: WhatsAppConfig,
+    private readonly crm: CrmService,
+    private readonly activation: ActivationService,
   ) {}
 
-  /** §25 list: сортировка по последнему сообщению, unread = входящие новее lastReadAt. */
+  /** §25 list: сортировка по последнему сообщению, unread = входящие новее lastReadAt.
+   *  M5: accountId — фильтр по номеру (undefined → все номера, архив включён). */
   async list(
     limit = 50,
     matchingStatus?: WhatsAppMatchingStatus,
+    accountId?: string,
   ): Promise<ConversationListRow[]> {
     const take = Math.min(Math.max(Math.trunc(limit), 1), 100);
     const rows = await this.prisma.whatsAppConversation.findMany({
-      where: matchingStatus ? { matchingStatus } : {},
+      where: {
+        ...(accountId ? { accountId } : {}),
+        ...(matchingStatus ? { matchingStatus } : {}),
+      },
       orderBy: { lastMessageAt: { sort: "desc", nulls: "last" } },
       take,
     });
@@ -217,6 +254,7 @@ export class WhatsAppConversationsService {
         communicationCode: comm?.code ?? null,
         providerMessageId: row.providerMessageId,
         mediaFilename: row.mediaFilename,
+        mediaMime: row.mediaMime,
         mediaSize: row.mediaSize,
         hasMedia: row.mediaMime !== null || row.mediaPath !== null || row.mediaFilename !== null,
         status: null,
@@ -238,6 +276,7 @@ export class WhatsAppConversationsService {
         communicationCode: comm?.code ?? null,
         providerMessageId: row.providerMessageId,
         mediaFilename: row.mediaFilename,
+        mediaMime: row.mediaMime,
         mediaSize: row.mediaSize,
         hasMedia: row.mediaMime !== null || row.mediaPath !== null || row.mediaFilename !== null,
         status: row.status,
@@ -351,6 +390,284 @@ export class WhatsAppConversationsService {
     return this.detail(conversationId);
   }
 
+  /**
+   * §10 LID→PN: ручной бинд номера собеседника к lid-диалогу («Привязать Lid
+   * к номеру») — оператор вводит номер ДО определения Customer. Диалог после
+   * бинда показывает номер (peerLabel), Customer НЕ создаётся и НЕ связывается
+   * автоматически (link-customer остаётся отдельной операцией).
+   *
+   * Правила:
+   *  - только диалоги, у которых номер не разрешён: canonicalPhone=null И
+   *    remoteJid заканчивается на @lid (иначе 409 — номер уже известен);
+   *  - номер нормализуется в E.164 shared-нормализатором; невалидный → 422;
+   *  - 409, если номер уже привязан к ДРУГОМУ диалогу того же аккаунта;
+   *  - WhatsAppContact обновляется (linkSource=MANUAL); matchingStatus,
+   *    customerId и история НЕ меняются;
+   *  - audit `whatsapp.phone_bound` (без PII в details).
+   */
+  async bindPhone(
+    conversationId: string,
+    phone: string,
+    actor: { id: string; username?: string | null },
+  ): Promise<ConversationDetail> {
+    const conversation = await this.prisma.whatsAppConversation.findUnique({
+      where: { id: conversationId },
+    });
+    if (!conversation) {
+      throw new NotFoundError(`WhatsApp conversation ${conversationId} not found`);
+    }
+    if (conversation.canonicalPhone !== null) {
+      throw new ConflictError("Conversation already has a resolved phone number");
+    }
+    if (!conversation.remoteJid.endsWith("@lid")) {
+      throw new ConflictError("Conversation is not a LID conversation");
+    }
+
+    const canonicalPhone = normalizePhoneE164(phone, this.config.defaultPhoneRegion);
+    if (!canonicalPhone) {
+      throw new ValidationDomainError("Phone number is not a valid E.164 number");
+    }
+
+    const duplicate = await this.prisma.whatsAppConversation.findFirst({
+      where: {
+        accountId: conversation.accountId,
+        canonicalPhone,
+        id: { not: conversationId },
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new ConflictError("Phone number is already bound to another conversation");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.whatsAppConversation.update({
+        where: { id: conversationId },
+        data: { canonicalPhone },
+      });
+      await tx.whatsAppContact.upsert({
+        where: { accountId_jid: { accountId: conversation.accountId, jid: conversation.remoteJid } },
+        create: {
+          accountId: conversation.accountId,
+          jid: conversation.remoteJid,
+          canonicalPhone,
+          linkSource: "MANUAL",
+        },
+        update: { canonicalPhone, linkSource: "MANUAL" },
+      });
+
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username ?? null,
+        action: "whatsapp.phone_bound",
+        resource: "WhatsAppConversation",
+        resourceId: conversationId,
+        details: { fromLid: true, manual: true },
+      });
+    });
+
+    return this.detail(conversationId);
+  }
+
+  /**
+   * M4.2 — unlink: ручное снятие связи Customer ↔ диалог (аддитивный
+   * endpoint, `whatsapp.manage` + audit §24-стиля).
+   *
+   * Правила:
+   *  - снимается связь диалога (customerId=null, matchedAt=null) И контактная
+   *    связь WhatsAppContact.customerId — иначе fast-path авто-связки на
+   *    следующем входящем сообщении вернул бы её немедленно;
+   *  - matchingStatus пересчитывается по текущему canonicalPhone через общий
+   *    resolver: >1 владельцев → AMBIGUOUS, иначе UNMATCHED;
+   *  - история НЕ переписывается: прошлые Communication-указатели
+   *    (contextType=CUSTOMER) и строки inbound/outbound остаются как есть
+   *    (M3 link/unlink — только связь, не правка истории);
+   *  - audit `whatsapp.customer_unlinked` с actor и old/new state (без PII);
+   *  - идемпотентно: уже разъединённый диалог → no-op + detail;
+   *  - ограничение (M3 semantics frozen): следующее входящее сообщение с
+   *    валидным каноническим телефоном МОЖЕТ заново автоматически связать
+   *    диалог (0/1 → MATCHED) — unlink отменяет текущую связь, а не вечный
+   *    запрет phone-матчинга (permanent-запрет — отдельное решение M4.6+).
+   */
+  async unlinkCustomer(
+    conversationId: string,
+    actor: { id: string; username?: string | null },
+  ): Promise<ConversationDetail> {
+    const conversation = await this.prisma.whatsAppConversation.findUnique({
+      where: { id: conversationId },
+    });
+    if (!conversation) {
+      throw new NotFoundError(`WhatsApp conversation ${conversationId} not found`);
+    }
+    if (conversation.customerId === null) return this.detail(conversationId); // идемпотентный no-op
+
+    let nextStatus: WhatsAppMatchingStatus = "UNMATCHED";
+    if (conversation.canonicalPhone) {
+      const owners = await findCustomerIdsByCanonicalPhone(
+        this.prisma,
+        conversation.canonicalPhone,
+        this.config.defaultPhoneRegion,
+      );
+      if (owners.length > 1) nextStatus = "AMBIGUOUS";
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.whatsAppConversation.update({
+        where: { id: conversationId },
+        data: { customerId: null, matchingStatus: nextStatus, matchedAt: null },
+      });
+      await tx.whatsAppContact.updateMany({
+        where: {
+          accountId: conversation.accountId,
+          jid: conversation.remoteJid,
+          customerId: { not: null },
+        },
+        data: { customerId: null },
+      });
+
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username ?? null,
+        action: "whatsapp.customer_unlinked",
+        resource: "WhatsAppConversation",
+        resourceId: conversationId,
+        details: {
+          fromCustomerId: conversation.customerId,
+          fromMatchingStatus: conversation.matchingStatus,
+          toMatchingStatus: nextStatus,
+        },
+      });
+    });
+
+    return this.detail(conversationId);
+  }
+
+  /**
+   * M4.4 §18 — WhatsApp first contact onboarding:
+   *
+   *   UNMATCHED → collect required info → re-resolve (общий resolver) →
+   *   create/reuse Customer → link диалога → optionally activate User.
+   *
+   * Правила (§10/§18, owner decision option B):
+   *  - re-resolve — общий channel-independent resolver (не WhatsApp-копия):
+   *    phone (conversation.canonicalPhone или override) + email (обязательный
+   *    unique-ключ Customer); 0 → create, 1 → reuse, >1 → AMBIGUOUS → 409
+   *    (ручной выбор через link-customer, никогда не auto-merge);
+   *  - creation — CRM-owned (CrmService.createCustomer: code-sequence, history,
+   *    CustomerCreated event, M4.2 duplicate-гарды) — WhatsApp не пишет в crm.*
+   *    напрямую;
+   *  - ручной link уважается: диалог уже связанный с ДРУГИМ customer → 409
+   *    (unlink вручную, затем onboarding);
+   *  - активация опциональна и только для СУЩЕСТВУЮЩЕГО User с loginPhone =
+   *    canonical phone (§18 «optionally activate User»): механика токена §19
+   *    (issue → operator передаёт out-of-band, delivery отложен). Website-
+   *    регистрация НЕ форсируется, пароли НЕ изобретаются (user не создаётся);
+   *  - audit `whatsapp.customer_onboarded` (метаданные, без PII/секретов);
+   *  - история диалога не переписывается (linkCustomer — pointer-бэкфилл §14).
+   */
+  async onboardCustomer(
+    conversationId: string,
+    input: OnboardCustomerInput,
+    actor: { id: string; username?: string | null },
+  ): Promise<OnboardCustomerResult> {
+    const conversation = await this.prisma.whatsAppConversation.findUnique({
+      where: { id: conversationId },
+    });
+    if (!conversation) {
+      throw new NotFoundError(`WhatsApp conversation ${conversationId} not found`);
+    }
+
+    // Телефон первого контакта: override или номер диалога; без номера —
+    // не угадываем (только collected email не является ключом телефона).
+    const phone = normalizePhoneE164(
+      input.phone ?? conversation.canonicalPhone,
+      this.config.defaultPhoneRegion,
+    );
+    if (!phone) {
+      throw new ValidationDomainError(
+        "Phone number is required for onboarding (conversation has no canonical phone)",
+      );
+    }
+
+    // Re-resolve общим resolver после collected информации (§18).
+    const resolved = await resolveCustomer(
+      this.prisma,
+      { phone, email: input.email },
+      this.config.defaultPhoneRegion,
+    );
+    if (resolved.status === "AMBIGUOUS") {
+      // Без PII в сообщении: ручной выбор через link-customer (§25).
+      throw new ConflictError("Multiple customers match this phone — choose manually");
+    }
+    if (conversation.customerId !== null && conversation.customerId !== resolved.customerId) {
+      throw new ConflictError("Conversation is already linked to a different customer — unlink first");
+    }
+
+    let customerId = resolved.customerId;
+    let created = false;
+    if (customerId === null) {
+      const result = await this.crm.createCustomer(
+        {
+          type: "PERSON",
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: normalizeEmail(input.email),
+          phone,
+        },
+        actor.username ?? undefined,
+      );
+      customerId = result.customer.id;
+      created = true;
+    }
+
+    // Link: contact upsert + pointer-бэкфилл истории + audit customer_linked.
+    if (conversation.customerId !== customerId) {
+      await this.linkCustomer(conversationId, customerId, actor);
+    }
+
+    // Опциональная активация СУЩЕСТВУЮЩЕГО User (loginPhone = canonical phone).
+    // User не создаётся: нет доставки/пароля (option B), регистрация не форсируется.
+    let user: { readonly id: string; readonly status: string } | null = null;
+    let activation: { readonly token: string; readonly expiresAt: string } | null = null;
+    const loginUser = await this.prisma.user.findUnique({
+      where: { loginPhone: phone },
+      select: { id: true, status: true },
+    });
+    if (loginUser) {
+      user = { id: loginUser.id, status: loginUser.status };
+      if (input.activateUser && loginUser.status !== "ACTIVE") {
+        const issued = await this.activation.issue(loginUser.id, {
+          id: actor.id,
+          username: actor.username ?? "system",
+        });
+        activation = { token: issued.token, expiresAt: issued.expiresAt.toISOString() };
+      }
+    }
+
+    await this.security.audit(undefined, {
+      userId: actor.id,
+      username: actor.username ?? null,
+      action: "whatsapp.customer_onboarded",
+      resource: "WhatsAppConversation",
+      resourceId: conversationId,
+      details: {
+        customerId,
+        created,
+        resolvedSource: resolved.source,
+        userId: user?.id ?? null,
+        activationIssued: activation !== null,
+      },
+    });
+
+    return {
+      conversation: await this.detail(conversationId),
+      customerId,
+      created,
+      user,
+      activation,
+    };
+  }
+
   /** §25 read: база непрочитанных (unread count §18). */
   async markRead(conversationId: string): Promise<{ lastReadAt: Date }> {
     const exists = await this.prisma.whatsAppConversation.findUnique({
@@ -435,7 +752,10 @@ export class WhatsAppConversationsService {
     const request = await this.prisma.request.findFirst({
       where: {
         customerId,
-        convertedOrderId: null,
+        // Stage 1 (Order → Request): активная заявка с link (returned из
+        // Order) снова становится текущим контекстом переписки. CONVERTED
+        // отфильтрован статусом (терминальный для коммуникации), поэтому
+        // link-фильтр `convertedOrderId: null` больше не нужен.
         status: { notIn: [...TERMINAL_REQUEST_STATUSES] },
       },
       select: { id: true, code: true, status: true },
@@ -451,6 +771,7 @@ export class WhatsAppConversationsService {
 
   private async toListRow(row: {
     id: string;
+    accountId: string;
     remoteJid: string;
     canonicalPhone: string | null;
     matchingStatus: WhatsAppMatchingStatus;
@@ -477,6 +798,7 @@ export class WhatsAppConversationsService {
       : false;
     return {
       id: row.id,
+      accountId: row.accountId,
       remoteJid: row.remoteJid,
       canonicalPhone: row.canonicalPhone,
       matchingStatus: row.matchingStatus,

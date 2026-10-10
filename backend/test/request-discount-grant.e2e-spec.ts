@@ -119,6 +119,20 @@ describe("Supplier Markup Phase 4 §4.3 — Live Sales discount grant (e2e)", ()
       },
     });
     created.requests.push(row.id);
+    // Two-stage §6: readiness-гейт acceptance требует RequestTraveler, сходящийся
+    // с travelerCount (quantity=1 → ровно один турист FIO+DOB).
+    const expected = typeof overrides.travelerCount === "number" ? overrides.travelerCount : (overrides.quantity as number) ?? 1;
+    for (let position = 1; position <= expected; position += 1) {
+      await prisma.requestTraveler.create({
+        data: {
+          requestId: row.id,
+          position,
+          firstName: "Сид",
+          lastName: `Тестов${position}`,
+          birthDate: new Date("1990-01-01T00:00:00.000Z"),
+        },
+      });
+    }
     return { id: row.id, code: row.code };
   };
 
@@ -154,6 +168,7 @@ describe("Supplier Markup Phase 4 §4.3 — Live Sales discount grant (e2e)", ()
       await prisma.auditLog.deleteMany({ where: { resourceId: { in: created.rules } } });
     }
     if (created.requests.length > 0) {
+      await prisma.requestTraveler.deleteMany({ where: { requestId: { in: created.requests } } });
       await prisma.requestHistory.deleteMany({ where: { requestId: { in: created.requests } } });
       await prisma.auditLog.deleteMany({ where: { resourceId: { in: created.requests } } });
       await prisma.request.deleteMany({ where: { id: { in: created.requests } } });

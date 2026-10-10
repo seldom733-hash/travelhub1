@@ -149,6 +149,24 @@ export default function AccountProfilePage() {
           </div>
         )}
 
+        {/* M4.3: login identity (User.loginPhone) — read-only display; смена
+            телефона входа отложена (§20: verification flow, support path). */}
+        <div>
+          <label htmlFor="p-login-phone" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+            {t("account.field.login_phone", locale)}
+          </label>
+          <input
+            id="p-login-phone"
+            value={profile.user.phone ?? ""}
+            readOnly
+            disabled
+            autoComplete="tel"
+            className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 outline-none"
+            placeholder={profile.user.phone ? undefined : t("account.login_phone_missing", locale)}
+          />
+          <p className="mt-1 text-xs text-slate-400">{t("account.login_phone_hint", locale)}</p>
+        </div>
+
         {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-600">{error}</div>}
         {saved && <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">{t("account.saved", locale)}</div>}
 

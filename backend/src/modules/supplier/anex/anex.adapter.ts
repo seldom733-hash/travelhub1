@@ -269,7 +269,13 @@ export class AnexAdapter implements SupplierAdapter {
         FREIGHT: "1",
         ADULT: params.adults,
         CHILD: params.children,
-        AGES: params.children > 0 ? String(params.childAges?.[0] ?? 0) : "",
+        // Confirmed supplier contract (owner-supplied real request):
+        // AGES=<comma-separated ages of ALL children> (AGES=1,6,13) — same
+        // CSV shape the Anex Hotels endpoint takes (anex-hotel.adapter).
+        // Driven by the CHILD count; shorter age lists pad with 0 there too.
+        AGES: params.children > 0
+          ? Array.from({ length: params.children }, (_, i) => params.childAges?.[i] ?? 0).join(",")
+          : "",
         CHECKIN_BEG: toCompactDate(params.checkInBeg),
         CHECKIN_END: toCompactDate(params.checkInEnd),
         // Empty bounds are REQUIRED: without COSTMIN/COSTMAX the API answers

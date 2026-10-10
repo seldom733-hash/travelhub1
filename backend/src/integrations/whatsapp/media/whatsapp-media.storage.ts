@@ -26,6 +26,70 @@ export interface SavedMediaFile {
 const FILENAME_MAX = 120;
 const UPLOAD_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** M5: mimetype → расширение для входящих без stanza-имени (голос/картинки/видео). */
+const MIME_EXTENSIONS: Readonly<Record<string, string>> = {
+  "audio/ogg": "ogg",
+  "audio/opus": "ogg",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/aac": "aac",
+  "audio/flac": "flac",
+  "audio/wav": "wav",
+  "audio/webm": "webm",
+  "audio/amr": "amr",
+  "audio/x-m4a": "m4a",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "image/bmp": "bmp",
+  "image/svg+xml": "svg",
+  "video/mp4": "mp4",
+  "video/3gpp": "3gp",
+  "video/webm": "webm",
+  "video/quicktime": "mov",
+  "application/pdf": "pdf",
+};
+
+/** Расширение из mimetype (параметры вида `; codecs=opus` отбрасываются). */
+export function extensionForMime(mimetype: string | null | undefined): string | null {
+  const base = (mimetype ?? "").split(";")[0].trim().toLowerCase();
+  return MIME_EXTENSIONS[base] ?? null;
+}
+
+const STEM_BY_TYPE: Readonly<Record<string, string>> = {
+  audio: "voice",
+  image: "image",
+  video: "video",
+  sticker: "sticker",
+};
+
+function hasExtension(name: string): boolean {
+  return /\.[A-Za-z0-9]{1,12}$/.test(name);
+}
+
+/**
+ * Имя файла входящего: stanza-имя, если есть; иначе синтез из
+ * messageType + mimetype (`voice.ogg`/`image.jpg`), иначе legacy `file`
+ * без расширения. M5: аудио-сообщения приходят без fileName в stanza.
+ */
+function inboundFilename(media: {
+  readonly filename?: string | null;
+  readonly mimetype?: string | null;
+  readonly type?: string | null;
+}): string {
+  const provided = media.filename ? sanitizeFilename(media.filename) : "";
+  const ext = extensionForMime(media.mimetype);
+  if (provided && provided !== "file") {
+    return hasExtension(provided) || !ext ? provided : `${provided}.${ext}`;
+  }
+  if (provided === "file" && !ext) return "file";
+  const stem = (media.type ? STEM_BY_TYPE[media.type] : undefined) ?? "file";
+  return ext ? `${stem}.${ext}` : "file";
+}
+
 /** Безопасное имя файла: без путей, без control/спецсимволов, ≤120 символов. */
 export function sanitizeFilename(raw: string): string {
   const base = raw.split(/[\\/]/).pop() ?? "";
@@ -109,11 +173,18 @@ export class WhatsAppMediaStorage {
 
   async saveInbound(
     providerMessageId: string,
-    media: { filename?: string | null; mimetype?: string | null; size?: number | null; bytes: Uint8Array },
+    media: {
+      filename?: string | null;
+      mimetype?: string | null;
+      size?: number | null;
+      /** Тип сообщения провайдера (text/image/video/audio/document/sticker). */
+      type?: string | null;
+      bytes: Uint8Array;
+    },
   ): Promise<SavedMediaFile | null> {
     if (!media.bytes || media.bytes.length === 0) return null;
     const dirName = safeDirSegment(providerMessageId);
-    const filename = sanitizeFilename(media.filename ?? "file");
+    const filename = inboundFilename(media);
     const dir = path.join(this.rootDir, "inbound", dirName);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, filename), media.bytes);

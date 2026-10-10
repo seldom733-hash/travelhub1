@@ -67,6 +67,15 @@ interface SaleCtx {
 const FUTURE = (days = 30) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
 const PAST = (years = 30) => new Date(Date.now() - years * 365 * 86400000).toISOString().slice(0, 10);
 
+// §3: TOUR/FLIGHT REQUIRED на Order-стадии — citizenship/passportSeries/passportNumber/passportExpiry.
+// Эти поля нужны, чтобы оператор мог довести checkout-турриста до dataCompleteness=COMPLETE.
+const PASSPORT_REQUIRED = (passportNumber: string) => ({
+  citizenship: "RU",
+  passportSeries: "RU",
+  passportNumber,
+  passportExpiry: FUTURE(1000),
+});
+
 describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Population (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -303,11 +312,12 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     const pinned = order.pinnedRequirements as Record<string, string>;
     expect(pinned.firstName).toBe("REQUIRED");
     expect(pinned.lastName).toBe("REQUIRED");
-    expect(pinned.birthDate).toBe("OPTIONAL");
-    expect(pinned.citizenship).toBe("NOT_REQUESTED");
+    expect(pinned.birthDate).toBe("REQUIRED");
+    expect(pinned.citizenship).toBe("REQUIRED");
     expect(pinned.gender).toBe("NOT_REQUESTED");
-    expect(pinned.passportNumber).toBe("NOT_REQUESTED");
-    expect(pinned.passportExpiry).toBe("NOT_REQUESTED");
+    expect(pinned.passportSeries).toBe("REQUIRED");
+    expect(pinned.passportNumber).toBe("REQUIRED");
+    expect(pinned.passportExpiry).toBe("REQUIRED");
 
     // API отдаёт тот же snapshot (DB = API).
     const op = await createStaff("d3_pinop", RoleCode.OPERATOR);
@@ -361,7 +371,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
   it("3. NOT_REQUESTED поля не сохраняются; частичный save персистится (resume); invalid date → 422", async () => {
     const seller = await createApprovedSeller("min");
     const sm = await createStaff("d3_min", RoleCode.SALES_MANAGER);
-    const fx = await createProduct(seller, "d3_min"); // TOUR: citizenship/passport NOT_REQUESTED
+    const fx = await createProduct(seller, "d3_min", { type: "EXCURSION" }); // EXCURSION: citizenship/passport NOT_REQUESTED
     const ctx = await makeReadySale(sm.accessToken, fx, {
       travelers: [{ firstName: "Иван", lastName: "Иванов" }],
     });
@@ -384,7 +394,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     };
     expect(view.travelers).toHaveLength(1);
     expect(view.travelers[0].birthDate?.slice(0, 10)).toBe(PAST());
-    // TOUR: firstName/lastName REQUIRED уже присутствуют из checkout → COMPLETE.
+    // EXCURSION: firstName/lastName REQUIRED уже присутствуют из checkout → COMPLETE.
     expect(view.travelers[0].dataCompleteness).toBe("COMPLETE");
 
     // Invalid date → 422 (формат YYYY-MM-DD, server-side).
@@ -397,7 +407,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     const seller = await createApprovedSeller("mt");
     const sm = await createStaff("d3_mt", RoleCode.SALES_MANAGER);
     const fx = await createProduct(seller, "d3_mt", {
-      type: "FLIGHT", // REQUIRED: firstName/lastName/birthDate/citizenship/passportNumber/passportExpiry
+      type: "FLIGHT", // REQUIRED: firstName/lastName/birthDate/citizenship/passportSeries/passportNumber/passportExpiry
     });
     const ctx = await makeReadySale(sm.accessToken, fx, {
       travelers: [
@@ -419,6 +429,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     // Traveler1: все REQUIRED заполнены → COMPLETE.
     await patchTraveler(op.accessToken, order.id, t1.id, {
       citizenship: "RU",
+      passportSeries: "RU",
       passportNumber: "RU1000001",
       passportExpiry: FUTURE(1000),
     }).expect(200);
@@ -426,6 +437,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     // Traveler2: passportExpiry (REQUIRED для FLIGHT) отсутствует → INCOMPLETE.
     await patchTraveler(op.accessToken, order.id, t2.id, {
       citizenship: "AZ",
+      passportSeries: "AZ",
       passportNumber: "AZ2000002",
     }).expect(200);
     let t2row = await prisma.orderTraveler.findUniqueOrThrow({ where: { id: t2.id } });
@@ -494,7 +506,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     const op = await createStaff("d3_conop", RoleCode.OPERATOR);
     const traveler = await prisma.orderTraveler.findFirstOrThrow({ where: { orderId: order.id } });
     // Данные туриста сохраняются (collection flow) → traveler COMPLETE.
-    await patchTraveler(op.accessToken, order.id, traveler.id, { birthDate: PAST() }).expect(200);
+    await patchTraveler(op.accessToken, order.id, traveler.id, { birthDate: PAST(), ...PASSPORT_REQUIRED("RU1000005") }).expect(200);
     await validateCompletion(op.accessToken, order.id).expect(201);
 
     const results = await Promise.allSettled([finalConfirm(op.accessToken, order.id), finalConfirm(op.accessToken, order.id)]);
@@ -606,7 +618,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     const op = await createStaff("d3_sreligop", RoleCode.OPERATOR);
     // Данные собраны (COMPLETE), НО final confirmation ещё не выполнена.
     const traveler = await prisma.orderTraveler.findFirstOrThrow({ where: { orderId: order.id } });
-    await patchTraveler(op.accessToken, order.id, traveler.id, { birthDate: PAST() }).expect(200);
+    await patchTraveler(op.accessToken, order.id, traveler.id, { birthDate: PAST(), ...PASSPORT_REQUIRED("RU1000009") }).expect(200);
 
     // process — операционная обработка возможна (Order существует как commerce root).
     await orderAction(op.accessToken, order.id, "process").expect(200);
@@ -661,7 +673,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     const order = await orderFor(ctx.sale.id);
     const op = await createStaff("d3_dupop", RoleCode.OPERATOR);
     const traveler = await prisma.orderTraveler.findFirstOrThrow({ where: { orderId: order.id } });
-    await patchTraveler(op.accessToken, order.id, traveler.id, { birthDate: PAST() }).expect(200);
+    await patchTraveler(op.accessToken, order.id, traveler.id, { birthDate: PAST(), ...PASSPORT_REQUIRED("RU1000008") }).expect(200);
     await validateCompletion(op.accessToken, order.id).expect(201);
 
     await finalConfirm(op.accessToken, order.id).expect(201);
@@ -686,7 +698,7 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
       await complete(sm.accessToken, ctx.sale.code, 1).expect(201);
       const order = await orderFor(ctx.sale.id);
       const traveler = await prisma.orderTraveler.findFirstOrThrow({ where: { orderId: order.id } });
-      await patchTraveler(op.accessToken, order.id, traveler.id, { birthDate: PAST() }).expect(200);
+      await patchTraveler(op.accessToken, order.id, traveler.id, { birthDate: PAST(), ...PASSPORT_REQUIRED(`RU${tag.toUpperCase()}01`) }).expect(200);
       await validateCompletion(op.accessToken, order.id).expect(201);
       await finalConfirm(op.accessToken, order.id).expect(201);
       await orderAction(op.accessToken, order.id, "process").expect(200);
@@ -727,5 +739,76 @@ describe("Phase 3 Pre-Step 3.12 D3 — Traveler Collection + Order/Booking Popul
     };
     expect(resB.total).toBe(1);
     expect(resB.items[0].orderId).toBe(orderB.id);
+  });
+
+  // ── §14: PASSPORT EXPIRY DOCUMENT VALIDATION — 3 точки входа + §15 данные ──
+
+  it("§14. passport expiry: BLOCK при вводе, BLOCK при final-confirm, BLOCK при Booking; WARNING не блокирует", async () => {
+    const seller = await createApprovedSeller("expiry");
+    const sm = await createStaff("d3_exp", RoleCode.SALES_MANAGER);
+    const op = await createStaff("d3_expop", RoleCode.OPERATOR);
+    const fx = await createProduct(seller, "d3_exp"); // TOUR → passportExpiry REQUIRED (§3)
+    const ctx = await makeReadySale(sm.accessToken, fx, {
+      travelers: [{ firstName: "Пётр", lastName: "Сроков", birthDate: PAST() }],
+    });
+    await complete(sm.accessToken, ctx.sale.code, 1).expect(201);
+    const order = await orderFor(ctx.sale.id); // serviceDate = FUTURE() (+30 дней)
+    const traveler = await prisma.orderTraveler.findFirstOrThrow({ where: { orderId: order.id } });
+
+    const EXPIRED = PAST(1); // ~год назад → раньше trip end (+30d) → BLOCK
+    const EXPIRING_SOON = FUTURE(45); // trip end + 15d → внутри margin (183d) → WARNING
+    const VALID = FUTURE(600); // trip end + 570d → OK
+    const base = {
+      firstName: "Пётр",
+      lastName: "Сроков",
+      birthDate: PAST(),
+      citizenship: "RU",
+      passportSeries: "RU",
+      passportNumber: "RU1000014",
+    };
+
+    // Точка 1 (ввод/изменение документа): истёкший срок → 422, НЕ сохранено.
+    const blocked = await patchTraveler(op.accessToken, order.id, traveler.id, { ...base, passportExpiry: EXPIRED }).expect(422);
+    expect(blocked.body.message).toContain("passport validation failed");
+    const afterBlock = await prisma.orderTraveler.findUniqueOrThrow({ where: { id: traveler.id } });
+    expect(afterBlock.passportExpiry).toBeNull();
+    expect(afterBlock.dataCompleteness).toBe("INCOMPLETE");
+
+    // Точка 1: срок в пределах margin → сохраняется (только WARNING, не блок).
+    await patchTraveler(op.accessToken, order.id, traveler.id, { ...base, passportExpiry: EXPIRING_SOON }).expect(200);
+
+    // §15: validate-completion отдаёт вердикт (non-blocking слой для UI).
+    const warnView = (await validateCompletion(op.accessToken, order.id).expect(201)).body as {
+      complete: boolean;
+      passportExpiry: { status: string; verdicts: Array<{ code: string; passportExpiry: string | null }> };
+    };
+    expect(warnView.complete).toBe(true);
+    expect(warnView.passportExpiry.status).toBe("WARNING");
+    expect(warnView.passportExpiry.verdicts[0].code).toBe("EXPIRING_WITHIN_MARGIN");
+    expect(warnView.passportExpiry.verdicts[0].passportExpiry).toBe(EXPIRING_SOON);
+
+    // Точка 2 (final-confirm): срок устарел к моменту подтверждения → 422.
+    await prisma.orderTraveler.update({ where: { id: traveler.id }, data: { passportExpiry: new Date(EXPIRED) } });
+    const fcBlocked = await finalConfirm(op.accessToken, order.id).expect(422);
+    expect(fcBlocked.body.message).toContain("passport validation failed");
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: order.id } })).finalConfirmedAt).toBeNull();
+
+    // Гейт не «липкий»: валидный срок → final-confirm проходит.
+    await prisma.orderTraveler.update({ where: { id: traveler.id }, data: { passportExpiry: new Date(VALID) } });
+    await finalConfirm(op.accessToken, order.id).expect(201);
+
+    // Точка 3 (before Booking/supplier submission): истёкший паспорт →
+    // consumer BookingRequested отказывает, событие → FAILED, Booking не создан.
+    await prisma.orderTraveler.update({ where: { id: traveler.id }, data: { passportExpiry: new Date(EXPIRED) } });
+    await orderAction(op.accessToken, order.id, "process").expect(200);
+    await orderAction(op.accessToken, order.id, "confirm").expect(200);
+    await orderAction(op.accessToken, order.id, "send").expect(200);
+    expect(await prisma.booking.count({ where: { orderId: order.id } })).toBe(0);
+    const failed = await prisma.outboxEvent.findFirstOrThrow({
+      where: { aggregateId: order.id, eventType: "BookingRequested" },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(failed.status).toBe("FAILED");
+    expect(failed.error ?? "").toContain("passport validation failed");
   });
 });

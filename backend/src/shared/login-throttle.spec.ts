@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { LoginThrottleService } from "./login-throttle.service";
+import { LoginThrottleService, normalizeLoginKey } from "./login-throttle.service";
 import { TooManyRequestsError } from "./errors";
 
 /**
@@ -71,5 +71,38 @@ describe("Step 2.17 — LoginThrottleService", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+/**
+ * M4.3 §13 — normalizeLoginKey: ротация формата записи телефона НЕ обходит
+ * throttle-окно (все форматы одного номера → один canonical-ключ); username —
+ * lowercase (прежнее поведение); невалидный/не-телефон → литерал lowercase.
+ */
+describe("M4.3 §13 — normalizeLoginKey", () => {
+  it("все форматы одного номера схлопываются в один canonical-ключ", () => {
+    const canonical = normalizeLoginKey("+994 50 111 22 33");
+    expect(canonical).toBe("+994501112233");
+    expect(normalizeLoginKey("050 111 22 33")).toBe(canonical);
+    expect(normalizeLoginKey("994501112233")).toBe(canonical);
+    expect(normalizeLoginKey("00994501112233")).toBe(canonical);
+    expect(normalizeLoginKey("  +994501112233  ")).toBe(canonical);
+    expect(normalizeLoginKey("050-111-22-33")).toBe(canonical);
+  });
+
+  it("username нормализуется в lowercase (прежнее поведение ключа)", () => {
+    expect(normalizeLoginKey("Admin")).toBe("admin");
+    expect(normalizeLoginKey("Seldom733@Example.com")).toBe("seldom733@example.com");
+  });
+
+  it("невалидный телефон-литерал не рушит ключ (lowercase-литерал)", () => {
+    expect(normalizeLoginKey("not-a-phone")).toBe("not-a-phone");
+    expect(normalizeLoginKey("")).toBe("");
+    expect(normalizeLoginKey("123")).toBe("123"); // слишком короткий — не номер
+  });
+
+  it("телефон и username одного аккаунта — разные identifier-классы (документированное ограничение)", () => {
+    // Разные ключи: это осознанное ограничение §13 (IP остаётся в ключе).
+    expect(normalizeLoginKey("+994501112233")).not.toBe(normalizeLoginKey("user@example.com"));
   });
 });

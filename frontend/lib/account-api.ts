@@ -17,6 +17,10 @@ export interface RegisterInput {
   password: string;
   firstName?: string;
   lastName?: string;
+  /** M4.3 §15: ISO-3166 alpha-2 регистрационная страна (нормализация phone). */
+  country?: string;
+  /** M4.3 §15: телефон — сервер нормализует в canonical E.164 (loginPhone). */
+  phone?: string;
 }
 
 export interface RegisterResult {
@@ -38,6 +42,8 @@ export interface OwnProfile {
     id: string;
     code: string;
     username: string;
+    /** M4.3: canonical E.164 login identity (phone-first); null — legacy. */
+    phone: string | null;
     email: string | null;
     fullName: string | null;
     status: string;

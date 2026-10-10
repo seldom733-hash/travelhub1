@@ -5,6 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { api } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
 import { useLocale, t, type Locale } from "@/lib/i18n";
+import { fetchWhatsAppSessions, type WhatsAppSessionAccount } from "@/lib/whatsapp";
 
 /**
  * Настройки → Интеграции → WhatsApp (ADR M0-02 §Frontend).
@@ -13,6 +14,11 @@ import { useLocale, t, type Locale } from "@/lib/i18n";
  * QR-код (polling 3 c, рендер на клиенте), явный номер подключённого аккаунта.
  * Скрытая часть UI — по useCan/серверу: qr/connect/disconnect требуют
  * whatsapp.session.admin (403 отдаёт бэкенд).
+ *
+ * M5 multi-number: секция «Номера» — список всех номеров (GET /whatsapp/sessions),
+ * добавление нового, connect/disconnect/archive per-id; QR конкретного номера
+ * опрашивается только в состоянии QR_REQUIRED. Архивация подтверждается и
+ * сохраняет историю диалогов (бэкенд: POST /whatsapp/sessions/:id/archive).
  */
 
 type SessionState =
@@ -75,6 +81,15 @@ export default function WhatsAppIntegrationPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"connect" | "disconnect" | null>(null);
 
+  // M5: список номеров + действия по конкретному номеру.
+  const [sessions, setSessions] = useState<WhatsAppSessionAccount[]>([]);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const [newLabel, setNewLabel] = useState("");
+  const [sessionBusy, setSessionBusy] = useState<string | null>(null);
+  const [createBusy, setCreateBusy] = useState(false);
+  const [qrSessionId, setQrSessionId] = useState<string | null>(null);
+  const [sessionQr, setSessionQr] = useState<string | null>(null);
+
   const loadStatus = useCallback(async () => {
     try {
       const s = await api.get<WhatsAppStatus>("/whatsapp/status");
@@ -85,11 +100,24 @@ export default function WhatsAppIntegrationPage() {
     }
   }, [locale]);
 
+  const loadSessions = useCallback(async () => {
+    try {
+      setSessions(await fetchWhatsAppSessions());
+      setSessionsError(null);
+    } catch (err) {
+      setSessionsError(errMessage(err, locale));
+    }
+  }, [locale]);
+
   useEffect(() => {
     void loadStatus();
-    const id = setInterval(() => void loadStatus(), 2500);
+    void loadSessions();
+    const id = setInterval(() => {
+      void loadStatus();
+      void loadSessions();
+    }, 2500);
     return () => clearInterval(id);
-  }, [loadStatus]);
+  }, [loadStatus, loadSessions]);
 
   // QR опрашиваем только в состоянии, где он может быть (rate-limit 10/10 c).
   const qrLive = status?.state === "QR_REQUIRED" || (status?.state === "CONNECTING" && !!status?.hasQr);
@@ -126,6 +154,87 @@ export default function WhatsAppIntegrationPage() {
       setError(errMessage(err, locale));
     } finally {
       setBusy(null);
+    }
+  }
+
+  // ── M5: действия по конкретному номеру ────────────────────────────────────
+
+  const qrSession = sessions.find((s) => s.id === qrSessionId) ?? null;
+  const sessionQrLive =
+    qrSessionId !== null &&
+    (qrSession?.status.state === "QR_REQUIRED" ||
+      (qrSession?.status.state === "CONNECTING" && qrSession?.status.hasQr === true));
+
+  // QR конкретного номера: polling только в состоянии, где он может быть.
+  useEffect(() => {
+    if (!sessionQrLive || !qrSessionId) {
+      setSessionQr(null);
+      return;
+    }
+    let stopped = false;
+    const loadQr = async () => {
+      try {
+        const r = await api.get<{ qr: string | null }>(`/whatsapp/sessions/${qrSessionId}/qr`);
+        if (!stopped && r.qr) setSessionQr(r.qr);
+      } catch {
+        /* 429 rate-limit / нет QR — ждём следующий цикл */
+      }
+    };
+    void loadQr();
+    const id = setInterval(() => void loadQr(), 3000);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [sessionQrLive, qrSessionId]);
+
+  async function actSession(id: string, kind: "connect" | "disconnect") {
+    setSessionBusy(`${id}:${kind}`);
+    setError(null);
+    try {
+      await api.post(`/whatsapp/sessions/${id}/${kind}`, { confirm: true });
+      if (kind === "connect") {
+        setQrSessionId(id);
+        setSessionQr(null);
+      } else if (qrSessionId === id) {
+        setQrSessionId(null);
+      }
+      await loadSessions();
+      await loadStatus();
+    } catch (err) {
+      setError(errMessage(err, locale));
+    } finally {
+      setSessionBusy(null);
+    }
+  }
+
+  async function archiveSession(id: string) {
+    if (!window.confirm(t("wa_int.sessions.archive_confirm", locale))) return;
+    setSessionBusy(`${id}:archive`);
+    setError(null);
+    try {
+      await api.post(`/whatsapp/sessions/${id}/archive`, { confirm: true });
+      if (qrSessionId === id) setQrSessionId(null);
+      await loadSessions();
+      await loadStatus();
+    } catch (err) {
+      setError(errMessage(err, locale));
+    } finally {
+      setSessionBusy(null);
+    }
+  }
+
+  async function createSession() {
+    setCreateBusy(true);
+    setError(null);
+    try {
+      await api.post("/whatsapp/sessions", { label: newLabel });
+      setNewLabel("");
+      await loadSessions();
+    } catch (err) {
+      setError(errMessage(err, locale));
+    } finally {
+      setCreateBusy(false);
     }
   }
 
@@ -240,6 +349,144 @@ export default function WhatsAppIntegrationPage() {
             )}
           </div>
           <div className="mt-3 text-center text-xs text-slate-400">{t("wa_int.qr_refresh", locale)}</div>
+        </div>
+      )}
+
+      {/* ── M5: все номера (multi-number) ────────────────────────────────── */}
+      {status?.enabled && (
+        <div className="rounded-xl border border-slate-200 bg-white p-5" data-testid="sessions-block">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-base font-bold text-slate-900">{t("wa_int.sessions.title", locale)}</div>
+              <p className="mt-1 max-w-xl text-sm text-slate-500">{t("wa_int.sessions.hint", locale)}</p>
+              <p className="mt-1 text-xs text-slate-400">{t("wa_int.sessions.primary_hint", locale)}</p>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                maxLength={64}
+                placeholder={t("wa_int.sessions.label_placeholder", locale)}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400"
+                data-testid="session-label-input"
+              />
+              <button
+                type="button"
+                onClick={() => void createSession()}
+                disabled={createBusy}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                data-testid="btn-add-session"
+              >
+                {t("wa_int.sessions.add", locale)}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {sessions.length === 0 ? (
+              <p className="py-2 text-sm text-slate-400" data-testid="sessions-empty">
+                {t("wa_int.sessions.empty", locale)}
+              </p>
+            ) : (
+              sessions.map((s) => {
+                const archived = s.archivedAt !== null;
+                const state = s.status.state;
+                const badge = STATE_BADGE[state] ?? STATE_BADGE.DISCONNECTED;
+                const busyKey = sessionBusy?.startsWith(`${s.id}:`) === true;
+                const connecting = state === "CONNECTING" || state === "INITIALIZING";
+                return (
+                  <div
+                    key={s.id}
+                    className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3"
+                    data-testid={`session-row-${s.id}`}
+                  >
+                    <div className="min-w-[180px] flex-1">
+                      <div className="text-sm font-semibold text-slate-800">
+                        {s.label ?? s.id.slice(0, 8)}
+                        {state === "CONNECTED" && s.phone && (
+                          <span className="ml-2 font-mono text-xs font-normal text-emerald-700" dir="ltr">
+                            {s.phone}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400">{s.id}</div>
+                    </div>
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${badge}`}
+                      data-testid={`session-state-${s.id}`}
+                    >
+                      {t(`wa_int.state.${state}`, locale) === `wa_int.state.${state}`
+                        ? state
+                        : t(`wa_int.state.${state}`, locale)}
+                    </span>
+                    {archived && (
+                      <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                        {t("wa_int.sessions.archived", locale)}
+                      </span>
+                    )}
+                    {!archived && (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void actSession(s.id, "connect")}
+                          disabled={busyKey || state === "CONNECTED" || connecting}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          data-testid={`btn-session-connect-${s.id}`}
+                        >
+                          {t("wa_int.connect", locale)}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void actSession(s.id, "disconnect")}
+                          disabled={busyKey || (state !== "CONNECTED" && state !== "QR_REQUIRED" && !connecting)}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                          data-testid={`btn-session-disconnect-${s.id}`}
+                        >
+                          {t("wa_int.disconnect", locale)}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void archiveSession(s.id)}
+                          disabled={busyKey}
+                          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+                          data-testid={`btn-session-archive-${s.id}`}
+                        >
+                          {t("wa_int.sessions.archive", locale)}
+                        </button>
+                      </div>
+                    )}
+                    {qrSessionId === s.id && !archived && (
+                      <button
+                        type="button"
+                        onClick={() => setQrSessionId(null)}
+                        className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-500 hover:bg-slate-50"
+                      >
+                        ✕ QR
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* QR конкретного номера (polling 3 c, rate-limit 10/10 c) */}
+          {sessionQrLive && qrSessionId && (
+            <div className="mt-4 rounded-lg border border-slate-100 bg-white p-4" data-testid="session-qr-block">
+              <div className="text-sm font-bold text-slate-900">{t("wa_int.qr_title", locale)}</div>
+              <p className="mt-1 text-xs text-slate-500">{t("wa_int.qr_hint", locale)}</p>
+              <div className="mt-3 flex justify-center">
+                {sessionQr ? (
+                  <QRCodeSVG value={sessionQr} size={224} level="M" data-testid="session-qr-code" />
+                ) : (
+                  <div className="flex h-[224px] w-[224px] items-center justify-center text-sm text-slate-400">
+                    {t("wa_int.connecting_wait", locale)}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -63,6 +63,23 @@ const BAKU_TOWNFROMINC = "1411";
 const KOMPAS_NIGHTS_MIN = 3;
 const KOMPAS_NIGHTS_MAX = 14;
 
+/**
+ * Confirmed supplier contract (owner-supplied real request): the child
+ * composition travels as ONE comma-separated param — `AGES=1,6,7` — on the
+ * native `samo_action=PRICES` request. The form's AGE1..AGE3 selects stay the
+ * internal representation for ≤3 children; this network-layer rewrite
+ * guarantees the supplier-facing URL always carries the full canonical list
+ * (any child count, original ordering). KOMPAS-specific — not shared with
+ * other suppliers.
+ */
+export function applyKompasAgesParam(url: string, childAges: number[]): string {
+  if (!childAges.length) return url;
+  const csv = childAges.join(",");
+  return /AGES=/.test(url)
+    ? url.replace(/AGES=[^&]*/g, `AGES=${csv}`)
+    : `${url}${url.includes("?") && !url.endsWith("?") ? "&" : ""}AGES=${csv}`;
+}
+
 @Injectable()
 export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
   readonly code = "KOMPAS";
@@ -522,6 +539,11 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
             : `${url}&STARS_ANY=0`;
           this.logger.log(`KOMPAS PRICES: hotel category filter STARS=${starsVal}`);
         }
+        // §AGES: canonical childAges → supplier-facing AGES=<csv> (confirmed
+        // contract, owner capture: AGES=1,6,7). Runs for every PRICES request
+        // on this page (search + pagination), independent of the form's
+        // AGE1..AGE3 selects.
+        url = applyKompasAgesParam(url, query.childAges ?? []);
         if (routeDates) {
           url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`)
                    .replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
@@ -1387,6 +1409,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           ? url.replace(/STARS_ANY=\d+/g, "STARS_ANY=0")
           : `${url}&STARS_ANY=0`;
       }
+      // §AGES: same confirmed canonical mapping as the main search() route —
+      // the reuse/refresh path must not lose multi-child ages either.
+      url = applyKompasAgesParam(url, query.childAges ?? []);
       if (routeDates) url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`).replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
       if (!url.includes("FREIGHT=")) url += "&FREIGHT=1"; else url = url.replace(/FREIGHT=\d+/g, "FREIGHT=1");
       if (!url.includes("FILTER=")) url += "&FILTER=1"; else url = url.replace(/FILTER=\d+/g, "FILTER=1");

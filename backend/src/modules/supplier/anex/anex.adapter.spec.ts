@@ -250,3 +250,111 @@ describe("AnexAdapter — no amount:0 fallbacks (§5.5/§5.7)", () => {
     expect(out.entries[0].offers?.[0]?.price).toBe(1000);
   });
 });
+
+// ── Hotel Identity contract (HOTEL_IDENTITY_AUDIT_REPORT §9.4) ─────────────
+// ANEX native hotel identifier = hotelInc; the adapter owns the mapping
+// hotelInc → platform hotelExternalId. There MUST be no expectation that
+// ANEX has a `hotelKey` (SAMO-family native name).
+
+describe("AnexAdapter — supplier-native identity mapping (hotelInc → hotelExternalId)", () => {
+  it("normalizeRow maps raw.hotelInc → SupplierOffer.hotelExternalId", () => {
+    const { adapter, provider } = makeAdapter();
+    provider.resolveStateFlexible.mockResolvedValue(TURKEY);
+
+    const raw = {
+      hotelInc: 23788,
+      hotelName: "Movenpick Living Istanbul",
+      checkIn: "2026-10-24",
+      nights: 6,
+      cat_Claim: "CLAIM-1",
+      price: 1000,
+    };
+    provider.fetchJson.mockResolvedValue([{ prices: [raw], result: { pageCount: 1 } }]);
+
+    return adapter.search(QUERY).then((offers) => {
+      expect(offers).toHaveLength(1);
+      expect(offers[0].hotelExternalId).toBe("23788");
+    });
+  });
+
+  it("reverse mapping: query.hotelExternalId filters rows by native hotelInc", async () => {
+    const { adapter, provider } = makeAdapter();
+    provider.resolveStateFlexible.mockResolvedValue(TURKEY);
+
+    const row = (hotelInc: number) => ({
+      hotelInc,
+      hotelName: "Movenpick Living Istanbul",
+      checkIn: "2026-10-24",
+      nights: 6,
+      cat_Claim: `CLAIM-${hotelInc}`,
+      price: 1000,
+    });
+    provider.fetchJson.mockResolvedValue([
+      { prices: [row(23788), row(99999)], result: { pageCount: 1 } },
+    ]);
+
+    const offers = await adapter.search(QUERY); // hotelExternalId: "23788"
+    expect(offers).toHaveLength(1);
+    expect(offers[0].hotelExternalId).toBe("23788");
+  });
+});
+
+// ── Confirmed AGES contract (owner-supplied real request) ──────────────────
+// ADULT=2 CHILD=3 AGES=1,6,13 — the supplier takes the CSV of ALL child
+// ages. Locks the audit fix: the mapping used to truncate to childAges[0].
+
+describe("AnexAdapter — AGES multi-child mapping (confirmed contract)", () => {
+  const MULTI: SupplierSearchQuery = {
+    ...QUERY,
+    children: 3,
+    childAges: [1, 6, 13],
+  };
+
+  it("sends every child age as one CSV (AGES=1,6,13), not only the first", async () => {
+    const { adapter, provider } = makeAdapter();
+    provider.resolveStateFlexible.mockResolvedValue(TURKEY);
+
+    await adapter.search(MULTI);
+
+    expect(provider.fetchJson).toHaveBeenCalledWith(
+      "/search",
+      expect.objectContaining({ ADULT: 2, CHILD: 3, AGES: "1,6,13" }),
+    );
+  });
+
+  it("single child → AGES=<age>", async () => {
+    const { adapter, provider } = makeAdapter();
+    provider.resolveStateFlexible.mockResolvedValue(TURKEY);
+
+    await adapter.search({ ...QUERY, children: 1, childAges: [7] });
+
+    expect(provider.fetchJson).toHaveBeenCalledWith(
+      "/search",
+      expect.objectContaining({ CHILD: 1, AGES: "7" }),
+    );
+  });
+
+  it("zero children → empty AGES (no ages invented)", async () => {
+    const { adapter, provider } = makeAdapter();
+    provider.resolveStateFlexible.mockResolvedValue(TURKEY);
+
+    await adapter.search(QUERY);
+
+    expect(provider.fetchJson).toHaveBeenCalledWith(
+      "/search",
+      expect.objectContaining({ CHILD: 0, AGES: "" }),
+    );
+  });
+
+  it("CSV length follows the CHILD count (parity with the Anex Hotels AGES contract)", async () => {
+    const { adapter, provider } = makeAdapter();
+    provider.resolveStateFlexible.mockResolvedValue(TURKEY);
+
+    await adapter.search({ ...QUERY, children: 3, childAges: [1] });
+
+    expect(provider.fetchJson).toHaveBeenCalledWith(
+      "/search",
+      expect.objectContaining({ CHILD: 3, AGES: "1,0,0" }),
+    );
+  });
+});

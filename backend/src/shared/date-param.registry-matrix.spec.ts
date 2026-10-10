@@ -67,6 +67,7 @@ function makeOrderService(prisma: Record<string, any>): OrderService {
     { nextCode: jest.fn(), nextOrderNumber: jest.fn() } as unknown as IdsService,
     { emit: jest.fn(), publishPending: jest.fn(), publishEvent: jest.fn() } as unknown as EventBusService,
     {} as unknown as ReferenceNumberService,
+    { audit: jest.fn() } as unknown as SecurityService,
   );
 }
 
@@ -75,6 +76,7 @@ function makeBookingService(prisma: Record<string, any>): BookingService {
     prisma as unknown as PrismaService,
     { emit: jest.fn(), publishPending: jest.fn(), publishEvent: jest.fn() } as unknown as EventBusService,
     {} as unknown as BookingQueryService,
+    { audit: jest.fn() } as unknown as SecurityService,
   );
 }
 

@@ -90,6 +90,48 @@ describe("requestDto — requests table data contract (Phase 4)", () => {
     expect(dto.partnerName).toBeNull();
   });
 
+  it("data-shape fix §6: canonical traveler pin + productSnapshot.offer → supplier + params still exposed", () => {
+    // Post-fix producer: pin = TravelerFullRequirements (никаких offer-фактов),
+    // offer-факты заморожены в productSnapshot.offer — ячейки реестра
+    // «Поставщик»/«Услуга»/параметры обязаны рендериться как раньше.
+    const dto = dtoOf({
+      ...TOUR_ROW,
+      pinnedRequirements: {
+        firstName: "REQUIRED",
+        lastName: "REQUIRED",
+        birthDate: "OPTIONAL",
+        citizenship: "NOT_REQUESTED",
+        gender: "NOT_REQUESTED",
+        passportNumber: "NOT_REQUESTED",
+        passportExpiry: "NOT_REQUESTED",
+      },
+      productSnapshot: {
+        productTitle: "Rixos Dubai",
+        productType: "TOUR",
+        offer: {
+          supplierCode: "KAZUNION",
+          hotel: "Rixos Dubai",
+          nights: 7,
+          adults: 2,
+          children: 0,
+          country: "Turkey",
+          destination: "Antalya",
+          departureCity: "Baku",
+        },
+      },
+    });
+
+    expect(dto.supplierCode).toBe("KAZUNION");
+    expect(dto.productName).toBe("Rixos Dubai");
+    expect(dto.serviceType).toBe("TOUR");
+    expect(dto.nights).toBe(7);
+    expect(dto.adults).toBe(2);
+    expect(dto.children).toBe(0);
+    expect(dto.country).toBe("Turkey");
+    expect(dto.destination).toBe("Antalya");
+    expect(dto.departureCity).toBe("Baku");
+  });
+
   it("product table title wins over the snapshot; partner maps render alongside supplier", () => {
     const productMap = new Map([
       ["p1", { id: "p1", code: "PRD-1", title: "Catalog title" }],

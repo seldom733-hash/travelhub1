@@ -321,12 +321,15 @@ export class FinanceController {
   // Step 2.12H: payment-initiation boundary — защищённая операция (external
   // Idempotency-Key обязателен; retry/replay/divergent — контракт 2.12H).
   @Idempotent("payment.create")
-  async createPayment(@Req() req: Request, @CurrentUser() actor: AuthedRequest["user"], @Body() dto: CreatePaymentDto) {
+  async createPayment(@Req() req: AuthedRequest, @CurrentUser() actor: AuthedRequest["user"], @Body() dto: CreatePaymentDto) {
     // raw req.body — forged server-owned поля (money/status/milestones/...) → 422.
     assertNoForbiddenKeys(req.body, PAYMENT_CREATE_FORBIDDEN_KEYS);
     return this.payments.createPayment(
-      { orderId: dto.orderId, paymentMethod: dto.paymentMethod ?? null, reason: dto.reason ?? null, initialNote: dto.initialNote },
+      { orderId: dto.orderId, amount: dto.amount ?? null, paymentMethod: dto.paymentMethod ?? null, reason: dto.reason ?? null, initialNote: dto.initialNote },
       { id: actor.id, username: actor.username },
+      // SlotKey ставит ТОЛЬКО IdempotencyInterceptor (server-owned) — бизнес-
+      // идемпотентность payment.create (MULTI/PARTIAL §13 / 2.12H window 3).
+      req.idempotencySlotKey ?? null,
     );
   }
 

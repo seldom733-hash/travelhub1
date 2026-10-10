@@ -1,10 +1,17 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { isEmail } from "class-validator";
 import { Prisma } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { IdsService } from "../../shared/ids.service";
 import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { SupplierOfferService } from "./supplier-offer.service";
 import { buildWorkingSnapshot } from "../pricing/commercial-snapshot";
+import { getEffectiveTravelerRequirements } from "../catalog/traveler-requirements";
+import { CrmService } from "../crm/crm.service";
+import { resolveCustomer } from "../../shared/customer-resolver/customer-resolver";
+import { normalizePhoneE164 } from "../../shared/phone/phone";
+import { normalizeEmail } from "../../shared/field-validation";
+import { ConflictError, ValidationDomainError } from "../../shared/errors";
 import type { SupplierSearchQuery } from "./supplier.types";
 
 /**
@@ -27,6 +34,7 @@ export class TourRequestService {
     private readonly ids: IdsService,
     private readonly refNum: ReferenceNumberService,
     private readonly offerService: SupplierOfferService,
+    private readonly crm: CrmService,
   ) {}
 
   async createTourRequest(dto: {
@@ -48,7 +56,59 @@ export class TourRequestService {
     country?: string;
     tourIncValue?: string;
     tourIncName?: string;
+    customer?: {
+      phone?: string;
+      email?: string;
+      country?: string;
+      firstName?: string;
+      lastName?: string;
+    };
   }) {
+    // §4.8 (4.8.8/4.8.9): traveler identity — same contract as guest checkout
+    // (invalid phone → 422, invalid email → 422, E.164 with region hint).
+    // Validated BEFORE the supplier re-check: invalid input never spends a
+    // supplier call nor issues a captcha challenge. Resolution links the
+    // request to a Customer (reuse by phone/email, create when unmatched).
+    let customerId: string | null = null;
+    if (dto.customer) {
+      const region = dto.customer.country?.trim().toUpperCase() || undefined;
+      const phone = normalizePhoneE164(dto.customer.phone ?? "", region);
+      if (!phone) {
+        throw new ValidationDomainError("Invalid phone number");
+      }
+      const rawEmail = dto.customer.email?.trim() ?? "";
+      if (rawEmail !== "" && !isEmail(rawEmail)) {
+        throw new ValidationDomainError("Invalid email address");
+      }
+      const resolved = await resolveCustomer(this.prisma, {
+        phone,
+        email: rawEmail !== "" ? rawEmail : undefined,
+      });
+      if (resolved.status === "AMBIGUOUS") {
+        throw new ConflictError(
+          "Phone number matches multiple customer records — manual selection required",
+        );
+      }
+      if (resolved.customerId !== null) {
+        customerId = resolved.customerId;
+      } else if (rawEmail !== "") {
+        // Platform invariant: Customer.email is NOT NULL UNIQUE — a customer
+        // can only be created with a (validated) email; without one the
+        // request stays unlinked (legacy public flow) instead of writing
+        // fake identity data.
+        const created = await this.crm.createCustomer(
+          {
+            type: "PERSON",
+            firstName: dto.customer.firstName,
+            lastName: dto.customer.lastName,
+            email: normalizeEmail(rawEmail),
+            phone,
+          },
+          "public-request",
+        );
+        customerId = created.customer.id;
+      }
+    }
 
     // Server-authoritative price: re-verify the offer with the supplier and
     // run the markup boundary (public amount + §20 pricing block).
@@ -89,22 +149,49 @@ export class TourRequestService {
     const commerceSequence = await this.refNum.nextCommerceSequence(null as any);
     const referenceNumber = this.refNum.commerceRequestRef(commerceSequence);
 
-    // Find the product by hotelExternalId if available
+    // Hotel Identity Fix A (HOTEL_IDENTITY_AUDIT_REPORT §13): supplier-scoped
+    // Product resolution by the PLATFORM transport id (dto.hotelExternalId).
     let productId: string | null = null;
     let productCode: string | null = null;
     let productTitle: string | null = null;
+    // Data-shape fix §5/§7: Product-level travelerRequirements ride the SAME
+    // resolution (no second Product read). null = product-less request → the
+    // canonical TOUR defaults still apply (requirements ≠ Product prerequisite).
+    let productTravelerRequirements: unknown = null;
 
+    // Catalog identity is supplier-native (SAMO family stores attributes.hotelKey;
+    // a legacy/alternative Product may store attributes.hotelExternalId) — the
+    // read-side lookup maps the platform concept onto both stored shapes.
+    // supplierCode guard is MANDATORY: numeric hotel ids are supplier-scoped
+    // (SUMMERTOUR "1144" and KAZUNION "1144" are different hotels).
     if (dto.hotelExternalId) {
+      const productWhere: Prisma.ProductWhereInput = dto.supplierCode
+        ? {
+            AND: [
+              { attributes: { path: ["supplierCode"], equals: dto.supplierCode } },
+              {
+                OR: [
+                  { attributes: { path: ["hotelExternalId"], equals: dto.hotelExternalId } },
+                  { attributes: { path: ["hotelKey"], equals: dto.hotelExternalId } },
+                ],
+              },
+            ],
+          }
+        : {
+            OR: [
+              { attributes: { path: ["hotelExternalId"], equals: dto.hotelExternalId } },
+              { attributes: { path: ["hotelKey"], equals: dto.hotelExternalId } },
+            ],
+          };
       const product = await (this.prisma as any).product.findFirst({
-        where: {
-          attributes: { path: ["hotelExternalId"], equals: dto.hotelExternalId },
-        },
-        select: { id: true, code: true, title: true },
+        where: productWhere,
+        select: { id: true, code: true, title: true, travelerRequirements: true },
       });
       if (product) {
         productId = product.id;
         productCode = product.code;
         productTitle = product.title;
+        productTravelerRequirements = product.travelerRequirements ?? null;
       }
     }
 
@@ -125,9 +212,23 @@ export class TourRequestService {
         })
       : null;
 
+    // ── Traveler requirements data-shape fix (STRICT PROMPT §5/§6) ──────────
+    // pinnedRequirements is SEMANTICALLY dedicated to TravelerFullRequirements
+    // (TravelerCollectionPanel → completeness engine → Order→Booking gates).
+    // The offer/search snapshot NEVER belongs here — it moves to
+    // productSnapshot.offer below (existing JSON snapshot, no new column).
+    //
+    // §4: canonical resolver (Product override > TOUR default) — never a
+    // hand-written default object. §7: works with productId = null.
+    const pinnedRequirements = JSON.parse(
+      JSON.stringify(getEffectiveTravelerRequirements("TOUR", productTravelerRequirements)),
+    ) as Prisma.InputJsonValue;
+
+    // §6: offer/search facts preserved verbatim (не удалены, не переименованы)
+    // в существующем product snapshot («как подан», frozen at creation).
     // Json-поля: Prisma принимает только JsonNull/DbNull вместо null, а
     // undefined внутри Json-объекта не сериализуется — собираем без дыр.
-    const pinnedRequirements = JSON.parse(
+    const offerSnapshot = JSON.parse(
       JSON.stringify({
         supplierCode: dto.supplierCode,
         externalOfferId: dto.externalOfferId,
@@ -144,14 +245,14 @@ export class TourRequestService {
         departureCity: dto.departureCity,
         country: dto.country ?? null,
       }),
-    ) as Prisma.InputJsonValue;
+    ) as Record<string, unknown>;
 
     const request = await (this.prisma as any).request.create({
       data: {
         code,
         commerceSequence,
         referenceNumber,
-        customerId: null,
+        customerId,
         productId,
         partnerId: null,
         status: "NEW",
@@ -168,6 +269,9 @@ export class TourRequestService {
           productTitle: productTitle ?? dto.hotel ?? null,
           productType: "TOUR",
           type: "TOUR",
+          // §6: offer facts live in the product snapshot (existing JSON
+          // location), NOT in pinnedRequirements.
+          offer: offerSnapshot,
         } as Prisma.InputJsonValue,
         displayedPrice,
         displayedCurrency,

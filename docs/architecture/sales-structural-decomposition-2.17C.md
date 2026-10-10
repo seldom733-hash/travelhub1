@@ -370,7 +370,7 @@ module).
 | `expectedVersion` param (Checkout commands) | checkout mutations + `completeSale` | exact client contract |
 | Unique constraints (Sale.checkoutIntentId, Sale.quoteId, Opportunity.proposalId) | `createSale` P2002→409 mapping; Reverse proposal conversion | controlled 409, never raw 500 |
 | Read-like CAS (`updateMany` empty data) | `revalidateCheckoutIntent` | row-lock without version increment — must be preserved exactly |
-| Sequence allocation | `ids.nextCode(tx)` BusinessSequence (Hi/Lo block allocation, Step 2.17B remediation) | atomic in-tx code alloc |
+| Sequence allocation | `ids.nextCode(tx)` BusinessSequence (per-allocation atomic upsert increment +1, contiguous; аудит нумераций — Hi/Lo блочная аллокация удалена) | atomic in-tx code alloc |
 | Event idempotency | outbox `retryable` + Inbox dedup (consumer side) | at-least-once; no delivery semantics change |
 | External API idempotency (`Idempotency-Key`) | Payment domain (not Sales) | Sales does not introduce new touchpoints; completeSale stays CAS-based |
 

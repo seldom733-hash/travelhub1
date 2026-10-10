@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import { useLocale, t, ti, LOCALE_TAGS, type Locale } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 import {
+  bindWhatsAppConversationPhone,
+  fetchWhatsAppSessions,
   sendWhatsAppMessage,
   uploadWhatsAppFile,
   whatsappMediaUrl,
@@ -12,6 +14,7 @@ import {
   type WhatsAppConversationRow,
   type WhatsAppCustomerRef,
   type WhatsAppMatchingStatus,
+  type WhatsAppSessionAccount,
   type WhatsAppTimelineItem,
   type WhatsAppUploadResult,
 } from "@/lib/whatsapp";
@@ -54,11 +57,10 @@ function fmtBytes(size: number): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** LID-адресация: canonicalPhone ещё не получен — не показываем сырой `@lid`. */
-function peerLabel(canonicalPhone: string | null, remoteJid: string, locale: Locale): string {
-  if (canonicalPhone) return canonicalPhone;
-  if (remoteJid.includes("@lid")) return t("whatsapp.unknown_phone", locale);
-  return remoteJid;
+/** LID-адресация: canonicalPhone не разрешён — показываем lid-адрес диалога
+ *  (§10): оператору нужен идентификатор собеседника, отправка идёт по нему же. */
+function peerLabel(canonicalPhone: string | null, remoteJid: string): string {
+  return canonicalPhone || remoteJid;
 }
 
 function badgeClass(status: WhatsAppMatchingStatus): string {
@@ -75,6 +77,13 @@ function MatchingBadge({ status, locale }: { status: WhatsAppMatchingStatus; loc
   );
 }
 
+/** M5: подпись номера в бейдже/фильтре (label, иначе короткий id). */
+function accountLabel(accounts: WhatsAppSessionAccount[], id: string): string {
+  const account = accounts.find((a) => a.id === id);
+  if (account?.label) return account.label;
+  return id.slice(0, 6);
+}
+
 export default function WhatsappInboxPage() {
   const locale = useLocale();
   const canSend = useCan("whatsapp.send");
@@ -84,6 +93,10 @@ export default function WhatsappInboxPage() {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+
+  // M5: номера (для фильтра и бейджей); accountId="ALL" — все номера.
+  const [accounts, setAccounts] = useState<WhatsAppSessionAccount[]>([]);
+  const [accountId, setAccountId] = useState<string>("ALL");
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<WhatsAppConversationDetail | null>(null);
@@ -105,11 +118,21 @@ export default function WhatsappInboxPage() {
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkOk, setLinkOk] = useState<string | null>(null);
 
+  // §10 LID→PN: ручной бинд номера к lid-диалогу («Привязать Lid к номеру»).
+  const [bindOpen, setBindOpen] = useState(false);
+  const [bindPhone, setBindPhone] = useState("");
+  const [bindBusy, setBindBusy] = useState(false);
+  const [bindError, setBindError] = useState<string | null>(null);
+  const [bindOk, setBindOk] = useState<string | null>(null);
+
   const threadRef = useRef<HTMLDivElement | null>(null);
 
   const loadList = useCallback(async () => {
     try {
-      const qs = filter === "ALL" ? "" : `?matchingStatus=${filter}`;
+      const params = new URLSearchParams();
+      if (filter !== "ALL") params.set("matchingStatus", filter);
+      if (accountId !== "ALL") params.set("accountId", accountId);
+      const qs = params.toString() ? `?${params.toString()}` : "";
       const data = await api.get<WhatsAppConversationRow[]>(`/whatsapp/conversations${qs}`);
       setRows(data);
       setListError(null);
@@ -118,7 +141,22 @@ export default function WhatsappInboxPage() {
     } finally {
       setListLoading(false);
     }
-  }, [filter, locale]);
+  }, [filter, accountId, locale]);
+
+  // M5: номера для фильтра/бейджей (один раз; права whatsapp.read есть у инбокса).
+  useEffect(() => {
+    let stopped = false;
+    void fetchWhatsAppSessions()
+      .then((list) => {
+        if (!stopped) setAccounts(list);
+      })
+      .catch(() => {
+        /* без номеров фильтр просто не показывается */
+      });
+    return () => {
+      stopped = true;
+    };
+  }, []);
 
   const loadThread = useCallback(
     async (id: string, opts?: { silent?: boolean }) => {
@@ -180,6 +218,10 @@ export default function WhatsappInboxPage() {
     setLinkResults(null);
     setLinkError(null);
     setLinkOk(null);
+    setBindOpen(false);
+    setBindPhone("");
+    setBindError(null);
+    setBindOk(null);
     void loadThread(id);
   };
 
@@ -261,6 +303,29 @@ export default function WhatsappInboxPage() {
     }
   }
 
+  // §10 LID→PN: бинд введённого номера к lid-диалогу; detail/list перезапрашиваются,
+  // чтобы в списке и заголовке вместо lid-адреса высветился номер.
+  async function bindPhoneSubmit() {
+    if (!detail) return;
+    const phone = bindPhone.trim();
+    if (!phone) return;
+    setBindBusy(true);
+    setBindError(null);
+    setBindOk(null);
+    try {
+      const d = await bindWhatsAppConversationPhone(detail.id, phone);
+      setDetail(d);
+      setBindOpen(false);
+      setBindPhone("");
+      setBindOk(t("whatsapp.bind_phone_done", locale));
+      await loadList();
+    } catch (err) {
+      setBindError(errMessage(err, locale));
+    } finally {
+      setBindBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between gap-4">
@@ -288,7 +353,7 @@ export default function WhatsappInboxPage() {
               {t("whatsapp.list_title", locale)}
             </span>
           </div>
-          <div className="flex flex-wrap gap-1 border-b border-slate-100 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-1 border-b border-slate-100 px-3 py-2">
             {FILTERS.map((f) => (
               <button
                 key={f}
@@ -303,6 +368,23 @@ export default function WhatsappInboxPage() {
                 {t(f === "ALL" ? "whatsapp.filter.all" : `whatsapp.filter.${f}`, locale)}
               </button>
             ))}
+            {/* M5: фильтр по номеру (только когда номеров больше одного). */}
+            {accounts.length > 1 && (
+              <select
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+                className="ml-auto max-w-[130px] rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600"
+                data-testid="account-filter"
+              >
+                <option value="ALL">{t("whatsapp.account.all", locale)}</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label ?? a.id.slice(0, 6)}
+                    {a.archivedAt ? ` · ${t("wa_int.sessions.archived", locale)}` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="thin-scroll max-h-[70vh] min-h-[260px] overflow-y-auto divide-y divide-slate-50">
             {listLoading && rows.length === 0 ? (
@@ -341,7 +423,7 @@ export default function WhatsappInboxPage() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-medium text-slate-800">
-                        {peerLabel(row.canonicalPhone, row.remoteJid, locale)}
+                        {peerLabel(row.canonicalPhone, row.remoteJid)}
                       </span>
                       <span className="shrink-0 text-[10px] text-slate-400">
                         {fmtTime(row.lastMessageAt, locale)}
@@ -352,6 +434,16 @@ export default function WhatsappInboxPage() {
                       {row.suppressed && (
                         <span className="rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">
                           STOP
+                        </span>
+                      )}
+                      {/* M5: номер, с которого пришло/ушло сообщение. */}
+                      {accounts.length > 1 && row.accountId && (
+                        <span
+                          title={accountLabel(accounts, row.accountId)}
+                          className="max-w-[80px] truncate rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600"
+                          data-testid="conversation-account-badge"
+                        >
+                          {accountLabel(accounts, row.accountId)}
                         </span>
                       )}
                     </div>
@@ -387,7 +479,7 @@ export default function WhatsappInboxPage() {
               <header className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-slate-800">
-                    {peerLabel(detail.canonicalPhone, detail.remoteJid, locale)}
+                    {peerLabel(detail.canonicalPhone, detail.remoteJid)}
                   </div>
                   <div className="truncate text-[11px] text-slate-400">
                     {detail.customer ? detail.customer.code : t("whatsapp.customer.none", locale)}
@@ -401,6 +493,72 @@ export default function WhatsappInboxPage() {
               {detail.suppressed && (
                 <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs font-medium text-red-600">
                   {t("whatsapp.suppressed", locale)}
+                </div>
+              )}
+
+              {/* §10 LID→PN: бинд номера к lid-диалогу — только пока номер не разрешён. */}
+              {detail.canonicalPhone === null && detail.remoteJid.endsWith("@lid") && (
+                <div className="border-b border-slate-100 bg-amber-50 px-4 py-2">
+                  {!bindOpen ? (
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBindOpen(true);
+                          setBindError(null);
+                          setBindOk(null);
+                        }}
+                        disabled={!canManage}
+                        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {t("whatsapp.bind_phone", locale)}
+                      </button>
+                      {!canManage && (
+                        <span className="text-[11px] text-amber-700">
+                          {t("whatsapp.bind_phone_no_permission", locale)}
+                        </span>
+                      )}
+                      {bindOk && <span className="text-[11px] font-medium text-emerald-700">{bindOk}</span>}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={bindPhone}
+                        onChange={(e) => setBindPhone(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && bindPhone.trim() && !bindBusy) void bindPhoneSubmit();
+                          if (e.key === "Escape") {
+                            setBindOpen(false);
+                            setBindPhone("");
+                            setBindError(null);
+                          }
+                        }}
+                        placeholder={t("whatsapp.bind_phone_placeholder", locale)}
+                        className="min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-xs outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void bindPhoneSubmit()}
+                        disabled={bindBusy || bindPhone.trim() === ""}
+                        className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {t("whatsapp.bind_phone_ok", locale)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBindOpen(false);
+                          setBindPhone("");
+                          setBindError(null);
+                        }}
+                        className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100"
+                      >
+                        {t("whatsapp.bind_phone_cancel", locale)}
+                      </button>
+                    </div>
+                  )}
+                  {bindError && <p className="mt-1 text-[11px] text-red-600">{bindError}</p>}
                 </div>
               )}
 
@@ -436,24 +594,34 @@ export default function WhatsappInboxPage() {
                           <div className="whitespace-pre-wrap break-words">
                             {item.body ?? (item.messageType !== "text" ? `[${item.messageType}]` : "")}
                           </div>
-                          {item.hasMedia && (
-                            <a
-                              href={whatsappMediaUrl(item.origin, item.id)}
-                              download
-                              className={`mt-1 flex max-w-full items-center gap-2 rounded-lg border px-2 py-1 text-xs font-medium ${
-                                outbound
-                                  ? "border-white/30 bg-white/15 text-white hover:bg-white/25"
-                                  : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                              }`}
-                            >
-                              <span className="truncate">
-                                {item.mediaFilename ?? t("whatsapp.file", locale)}
-                              </span>
-                              {item.mediaSize !== null && (
-                                <span className="shrink-0 opacity-70">{fmtBytes(item.mediaSize)}</span>
-                              )}
-                            </a>
-                          )}
+                          {item.hasMedia &&
+                            (item.messageType === "audio" ||
+                            (item.mediaMime?.startsWith("audio/") ?? false) ? (
+                              <audio
+                                data-testid="audio-player"
+                                controls
+                                preload="metadata"
+                                className="mt-1 block w-full max-w-[240px]"
+                                src={whatsappMediaUrl(item.origin, item.id)}
+                              />
+                            ) : (
+                              <a
+                                href={whatsappMediaUrl(item.origin, item.id)}
+                                download
+                                className={`mt-1 flex max-w-full items-center gap-2 rounded-lg border px-2 py-1 text-xs font-medium ${
+                                  outbound
+                                    ? "border-white/30 bg-white/15 text-white hover:bg-white/25"
+                                    : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                }`}
+                              >
+                                <span className="truncate">
+                                  {item.mediaFilename ?? t("whatsapp.file", locale)}
+                                </span>
+                                {item.mediaSize !== null && (
+                                  <span className="shrink-0 opacity-70">{fmtBytes(item.mediaSize)}</span>
+                                )}
+                              </a>
+                            ))}
                           <div
                             className={`mt-1 flex flex-wrap items-center gap-2 text-[10px] ${
                               outbound ? "text-blue-100" : "text-slate-400"

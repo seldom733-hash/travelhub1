@@ -30,6 +30,7 @@ export const TRAVELER_FIELDS = [
   "birthDate",
   "citizenship",
   "gender",
+  "passportSeries",
   "passportNumber",
   "passportExpiry",
 ] as const;
@@ -85,14 +86,19 @@ export function validateTravelerRequirements(raw: unknown): TravelerRequirements
 // ── ProductType Defaults ────────────────────────────────────────────────────
 // Deterministic defaults per ProductType when Product.travelerRequirements is NULL.
 
+// Two-stage traveler model §3 (OWNER DECISION): TOUR-состав фиксирован.
+// Request-стадия: firstName/lastName/birthDate REQUIRED.
+// Order-стадия: + citizenship/passportSeries/passportNumber/passportExpiry REQUIRED.
+// gender остаётся в модели (не удалять), но для TOUR — NOT_REQUESTED.
 const DEFAULTS_TOUR: TravelerFullRequirements = {
   firstName: "REQUIRED",
   lastName: "REQUIRED",
-  birthDate: "OPTIONAL",
-  citizenship: "NOT_REQUESTED",
+  birthDate: "REQUIRED",
+  citizenship: "REQUIRED",
   gender: "NOT_REQUESTED",
-  passportNumber: "NOT_REQUESTED",
-  passportExpiry: "NOT_REQUESTED",
+  passportSeries: "REQUIRED",
+  passportNumber: "REQUIRED",
+  passportExpiry: "REQUIRED",
 };
 
 const DEFAULTS_FLIGHT: TravelerFullRequirements = {
@@ -101,6 +107,7 @@ const DEFAULTS_FLIGHT: TravelerFullRequirements = {
   birthDate: "REQUIRED",
   citizenship: "REQUIRED",
   gender: "NOT_REQUESTED",
+  passportSeries: "REQUIRED",
   passportNumber: "REQUIRED",
   passportExpiry: "REQUIRED",
 };
@@ -111,6 +118,7 @@ const DEFAULTS_TRAIN: TravelerFullRequirements = {
   birthDate: "OPTIONAL",
   citizenship: "NOT_REQUESTED",
   gender: "NOT_REQUESTED",
+  passportSeries: "NOT_REQUESTED",
   passportNumber: "NOT_REQUESTED",
   passportExpiry: "NOT_REQUESTED",
 };
@@ -121,6 +129,7 @@ const DEFAULTS_TRANSFER: TravelerFullRequirements = {
   birthDate: "NOT_REQUESTED",
   citizenship: "NOT_REQUESTED",
   gender: "NOT_REQUESTED",
+  passportSeries: "NOT_REQUESTED",
   passportNumber: "NOT_REQUESTED",
   passportExpiry: "NOT_REQUESTED",
 };
@@ -131,6 +140,7 @@ const DEFAULTS_EXCURSION: TravelerFullRequirements = {
   birthDate: "OPTIONAL",
   citizenship: "NOT_REQUESTED",
   gender: "NOT_REQUESTED",
+  passportSeries: "NOT_REQUESTED",
   passportNumber: "NOT_REQUESTED",
   passportExpiry: "NOT_REQUESTED",
 };
@@ -141,6 +151,7 @@ const DEFAULTS_HOTEL: TravelerFullRequirements = {
   birthDate: "OPTIONAL",
   citizenship: "OPTIONAL",
   gender: "NOT_REQUESTED",
+  passportSeries: "NOT_REQUESTED",
   passportNumber: "NOT_REQUESTED",
   passportExpiry: "NOT_REQUESTED",
 };
@@ -151,6 +162,7 @@ const DEFAULTS_SANATORIUM: TravelerFullRequirements = {
   birthDate: "REQUIRED",
   citizenship: "OPTIONAL",
   gender: "OPTIONAL",
+  passportSeries: "OPTIONAL",
   passportNumber: "OPTIONAL",
   passportExpiry: "OPTIONAL",
 };
@@ -161,6 +173,7 @@ const DEFAULTS_GUIDE: TravelerFullRequirements = {
   birthDate: "NOT_REQUESTED",
   citizenship: "NOT_REQUESTED",
   gender: "NOT_REQUESTED",
+  passportSeries: "NOT_REQUESTED",
   passportNumber: "NOT_REQUESTED",
   passportExpiry: "NOT_REQUESTED",
 };
@@ -171,6 +184,7 @@ const DEFAULTS_PHOTOGRAPHER: TravelerFullRequirements = {
   birthDate: "NOT_REQUESTED",
   citizenship: "NOT_REQUESTED",
   gender: "NOT_REQUESTED",
+  passportSeries: "NOT_REQUESTED",
   passportNumber: "NOT_REQUESTED",
   passportExpiry: "NOT_REQUESTED",
 };
@@ -234,6 +248,51 @@ export function getEffectiveTravelerRequirements(
   return result;
 }
 
+// ── Pinned-shape diagnostics (TRAVELHUB_TRAVELER_REQUIREMENTS_DATA_SHAPE_FIX §11) ──
+
+/** Canonical offer-snapshot keys — pre-fix producers stored these in the pin. */
+const OFFER_SNAPSHOT_KEYS = [
+  "supplierCode",
+  "externalOfferId",
+  "hotel",
+  "hotelExternalId",
+  "departureDate",
+  "nights",
+  "adults",
+  "children",
+  "childAges",
+  "room",
+  "meal",
+  "destination",
+  "departureCity",
+  "country",
+] as const;
+
+export type PinnedRequirementsShape = "traveler_requirements" | "offer_snapshot" | "unknown";
+
+/**
+ * Classifies a stored `pinnedRequirements` value.
+ *
+ * DETECTION ONLY (data-shape fix §11, P2): it never changes gates, API or UI —
+ * it exists so a malformed pin (legacy tour/flight offer snapshot written into
+ * the pin before the producer fix) surfaces as a visible diagnostic instead of
+ * silently rendering an empty traveler form.
+ *
+ *  - "traveler_requirements": canonical TravelerFullRequirements (≥1 known field);
+ *  - "offer_snapshot": offer/search facts, NO traveler keys;
+ *  - "unknown": null / empty / unrecognized object.
+ */
+export function getPinnedRequirementsShape(pin: unknown): PinnedRequirementsShape {
+  if (pin === null || pin === undefined || typeof pin !== "object" || Array.isArray(pin)) {
+    return "unknown";
+  }
+  const record = pin as Record<string, unknown>;
+  const keys = Object.keys(record);
+  if (keys.length === 0) return "unknown";
+  if (keys.some((k) => isTravelerField(k))) return "traveler_requirements";
+  return OFFER_SNAPSHOT_KEYS.some((k) => k in record) ? "offer_snapshot" : "unknown";
+}
+
 // ── Label Helpers (for API / UI) ────────────────────────────────────────────
 
 export const REQUIREMENT_STATE_LABELS: Record<TravelerRequirementState, Record<string, string>> = {
@@ -280,6 +339,11 @@ export const TRAVELER_FIELD_LABELS: Record<TravelerField, Record<string, string>
     az: "Cins",
     en: "Gender",
   },
+  passportSeries: {
+    ru: "Серия паспорта",
+    az: "Pasport seriyası",
+    en: "Passport series",
+  },
   passportNumber: {
     ru: "Номер паспорта",
     az: "Passport nömrəsi",
@@ -299,6 +363,6 @@ export const TRAVELER_FIELD_GROUPS = {
   },
   documents: {
     label: { ru: "Документы", az: "Sənədlər", en: "Documents" },
-    fields: ["citizenship", "passportNumber", "passportExpiry"] as TravelerField[],
+    fields: ["citizenship", "passportSeries", "passportNumber", "passportExpiry"] as TravelerField[],
   },
 };

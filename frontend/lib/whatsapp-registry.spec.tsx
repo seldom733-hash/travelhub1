@@ -24,6 +24,7 @@ const REQUIRED_KEYS = [
   "whatsapp.filter.UNMATCHED",
   "whatsapp.filter.MATCHED",
   "whatsapp.filter.AMBIGUOUS",
+  "whatsapp.account.all",
   "whatsapp.badge.UNMATCHED",
   "whatsapp.badge.MATCHED",
   "whatsapp.badge.AMBIGUOUS",
@@ -59,6 +60,12 @@ const REQUIRED_KEYS = [
   "whatsapp.link_none",
   "whatsapp.link_no_permission",
   "whatsapp.linked_ok",
+  "whatsapp.bind_phone",
+  "whatsapp.bind_phone_placeholder",
+  "whatsapp.bind_phone_ok",
+  "whatsapp.bind_phone_cancel",
+  "whatsapp.bind_phone_done",
+  "whatsapp.bind_phone_no_permission",
   "whatsapp.error",
   "whatsapp.outstatus.CREATED",
   "whatsapp.outstatus.QUEUED",
@@ -103,12 +110,21 @@ describe("M3 UI registry — WhatsApp Inbox (§25)", () => {
     expect(PAGE).toContain("/read");
     expect(PAGE).toContain("/customer");
     expect(PAGE).toContain("/whatsapp/customer-search");
+    // §10 LID→PN: бинд номера к lid-диалогу.
+    expect(PAGE).toContain("bindWhatsAppConversationPhone");
+    expect(PAGE).toContain('canonicalPhone === null && detail.remoteJid.endsWith("@lid")');
+    expect(LIB).toContain("/phone");
+    expect(LIB).toContain("bindWhatsAppConversationPhone");
     expect(PAGE).toContain("sendWhatsAppMessage");
     expect(PAGE).toContain('useCan("whatsapp.send")');
     expect(PAGE).toContain('useCan("whatsapp.manage")');
     // §18: опрос непрочитанных.
     expect(PAGE).toContain("setInterval");
-    expect(PAGE).toContain("matchingStatus=");
+    expect(PAGE).toContain('params.set("matchingStatus"');
+    // M5: фильтр по номеру + список номеров для бейджей.
+    expect(PAGE).toContain('params.set("accountId"');
+    expect(PAGE).toContain("fetchWhatsAppSessions");
+    expect(LIB).toContain("/whatsapp/sessions");
   });
 
   it("lib: отправка идёт с Idempotency-Key (§26) через POST /whatsapp/messages", () => {

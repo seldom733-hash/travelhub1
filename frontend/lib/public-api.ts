@@ -273,3 +273,50 @@ export const publicStorefrontApi = {
     return http<PublicProductDetail>(`/storefronts/${encodeURIComponent(slug)}/products/${encodeURIComponent(productSlug)}`);
   },
 };
+
+/* ------------------------------------------------------------------ *
+ * M4.5 §23 — GUEST CHECKOUT (anonymous onboarding → Request).
+ * POST /api/v1/checkout/guest — @Public endpoint (без Authorization
+ * по конструкции; тот же rewrite /api/v1/*, что и авторизованные API).
+ * ------------------------------------------------------------------ */
+
+export interface GuestCheckoutInput {
+  /** Опционально: привязка заявки к продукту (productSnapshot на сервере). */
+  productId?: string;
+  email: string;
+  phone: string;
+  /** 2-letter ISO country — регион нормализации телефона на сервере. */
+  country?: string;
+  firstName?: string;
+  lastName?: string;
+  travelerCount?: number;
+}
+
+export interface GuestCheckoutResult {
+  customer: { id: string; created: boolean };
+  request: { id: string; code: string; referenceNumber: string; status: string; customerId: string | null };
+  resolvedSource: "phone" | "email" | "user" | "none";
+}
+
+/**
+ * Гостевой checkout: сервер сам резолвит/создаёт Customer (resolver) и
+ * создаёт Request. Цену клиент НЕ передаёт (checkout — не источник цены).
+ */
+export async function guestCheckout(input: GuestCheckoutInput): Promise<GuestCheckoutResult> {
+  const res = await fetch("/api/v1/checkout/guest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = (await res.json()) as { message?: string };
+      if (body?.message) message = body.message;
+    } catch {
+      /* ignore */
+    }
+    throw new PublicApiError(message, res.status);
+  }
+  return (await res.json()) as GuestCheckoutResult;
+}

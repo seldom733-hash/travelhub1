@@ -7,6 +7,9 @@ import { IdsService } from "../../shared/ids.service";
 import { ConflictError, NotFoundError } from "../../shared/errors";
 import { parseDateParam } from "../../shared/date-param";
 import { normalizeEmail } from "../../shared/field-validation";
+import { normalizePhoneE164 } from "../../shared/phone/phone";
+import { findCustomerIdsByCanonicalPhone } from "../../shared/customer-resolver/customer-resolver";
+import { isUniqueViolation } from "../../shared/prisma-errors";
 import { normalizeInitialNote } from "../operational-notes/operational-notes.types";
 
 import { buildSortClause, type SortDirection } from '../../shared/sort';
@@ -85,28 +88,85 @@ export class CrmService {
     private readonly eventBus: EventBusService,
   ) {}
 
+  // ── M4.6 (§11) identity-race hardening ────────────────────────────────────
+
+  /**
+   * M4.6 (§11, ADR-0016): advisory-lock сериализация конкурентного создания
+   * Customer по identity-ключам (canonical phone, email). Все 4 creation-path
+   * делают check-then-create; без лока две параллельные транзакции проходят
+   * проверку одновременно → дубль владельца телефона либо raw P2002 (HTTP 500).
+   * pg_advisory_xact_lock удерживается до конца tx: второй транзактор ждёт
+   * первый и, прочитав закоммиченную строку после захвата лока, уходит в
+   * штатную ветку conflict/reuse. Порядок захвата фиксирован (phone → email),
+   * чтобы исключить lock-order deadlock.
+   */
+  private async lockCustomerIdentityKeys(
+    tx: Prisma.TransactionClient,
+    keys: { email?: string | null; canonicalPhone?: string | null },
+  ): Promise<void> {
+    // `IS NULL` → boolean-результат (void-столбец не десериализуется в Prisma);
+    // выражение вычисляется обязательно — лок захватывается до выхода из SELECT.
+    if (keys.canonicalPhone) {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('crm.customer.phone'), hashtext(${keys.canonicalPhone})) IS NULL AS locked`;
+    }
+    if (keys.email) {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('crm.customer.email'), hashtext(${keys.email})) IS NULL AS locked`;
+    }
+  }
+
+  /**
+   * M4.6 (§11): «Do not return HTTP 500 for an expected concurrent identity
+   * race» — unique violation (P2002: email/phone/code collision, просочившийся
+   * мимо advisory-лока) превращается в контролируемый ConflictError → 409.
+   */
+  private rethrowIdentityRace(error: unknown): never {
+    if (isUniqueViolation(error)) {
+      throw new ConflictError("Concurrent identity race — record already exists");
+    }
+    throw error;
+  }
+
   // ── Customer ───────────────────────────────────────────────────────────────
 
   async createCustomer(input: CreateCustomerInput, actor?: string) {
     const result = await this.prisma.$transaction(async (tx) => {
+      const canonicalPhone = normalizePhoneE164(input.phone);
+      // M4.6: лок ДО проверок — check-then-create атомарен относительно
+      // конкурентных созданий с теми же identity-ключами.
+      await this.lockCustomerIdentityKeys(tx, { email: input.email, canonicalPhone });
+
       const existing = await tx.customer.findUnique({ where: { email: input.email }, select: { id: true } });
       if (existing) throw new ConflictError(`Customer with email ${input.email} already exists`);
 
+      // M4.2 (ADR-0016): duplicate-prevention guard по canonical телефону —
+      // явное создание НЕ должно плодить второго владельца номера (reject,
+      // не link: staff-команда create — это новый record, существующий
+      // ищется через поиск/link, слияние невозможно по построению).
+      if (canonicalPhone) {
+        const phoneOwners = await findCustomerIdsByCanonicalPhone(tx, canonicalPhone);
+        if (phoneOwners.length > 0) {
+          throw new ConflictError(`Customer with phone ${input.phone} already exists`);
+        }
+      }
+
       const code = await this.ids.nextCode(tx, "CUS");
-      const customer = await tx.customer.create({
-        data: {
-          code,
-          type: input.type ?? "PERSON",
-          firstName: input.firstName ?? null,
-          lastName: input.lastName ?? null,
-          companyName: input.companyName ?? null,
-          email: input.email,
-          phone: input.phone ?? null,
-          status: "ACTIVE",
-          version: 1,
-        },
-        select: { id: true, code: true, type: true, firstName: true, lastName: true, companyName: true, email: true, status: true },
-      });
+      const customer = await tx
+        .customer.create({
+          data: {
+            code,
+            type: input.type ?? "PERSON",
+            firstName: input.firstName ?? null,
+            lastName: input.lastName ?? null,
+            companyName: input.companyName ?? null,
+            email: input.email,
+            phone: input.phone ?? null,
+            phoneCanonical: canonicalPhone,
+            status: "ACTIVE",
+            version: 1,
+          },
+          select: { id: true, code: true, type: true, firstName: true, lastName: true, companyName: true, email: true, status: true },
+        })
+        .catch((error) => this.rethrowIdentityRace(error));
 
       await tx.customerHistory.create({
         data: {
@@ -281,6 +341,7 @@ export class CrmService {
           lastName: input.lastName !== undefined ? input.lastName : existing.lastName,
           companyName: input.companyName !== undefined ? input.companyName : existing.companyName,
           phone: input.phone !== undefined ? input.phone : existing.phone,
+          ...(input.phone !== undefined ? { phoneCanonical: normalizePhoneE164(input.phone) } : {}),
           status: input.status ?? existing.status,
           version: { increment: 1 },
         },
@@ -322,13 +383,16 @@ export class CrmService {
   /**
    * Step 1.9 — CRM-owned application command для BUYER identity link.
    *
-   * create-or-link crm.Customer по КАНОНИЧЕСКОМУ ключу (нормализованный email,
-   * Customer.email @unique):
-   *  - существует однозначный Customer с таким email → reuse (link), НЕ merge;
-   *  - нет → создать ровно одного Customer;
+   * create-or-link crm.Customer по каноническому ключу:
+   *  - email (нормализованный, Customer.email @unique) → reuse (link), НЕ merge;
+   *  - M4.2 (ADR-0016): телефон (canonical E.164) — resolver-ключ: однозначное
+   *    совпадение при новом email → reuse существующего Customer (link, не
+   *    дубликат); >1 совпадений → ConflictError (AMBIGUOUS, никакого
+   *    auto-merge/auto-pick); email-ключ с конфликтующим телефоном →
+   *    ConflictError (детерминированный отказ вместо тихого выбора);
    *  - retry/повтор регистрации никогда не создаёт дубликат (unique + reuse);
-   *  - НЕМБИГУОЗНЫЙ legacy match НЕ merge'ится автоматически (только email
-   *    считаем deterministic; имя/телефон не являются ключом связи);
+   *  - ФИО/имя НЕ являются ключом связи (verification-only, M4.2: одинаковое
+   *    ФИО при разных номерах не мержится — no auto-merge by construction);
    *  - работает в транзакции вызывающего (tx): вся orchestration регистрации
    *    (User + Customer + link) атомарна, иначе регистрация падает целиком.
    *
@@ -340,25 +404,55 @@ export class CrmService {
     input: EnsureBuyerCustomerInput,
   ): Promise<{ customerId: string; created: boolean }> {
     const email = normalizeEmail(input.email);
+    const canonicalPhone = normalizePhoneE164(input.phone);
+    // M4.6: лок ДО проверок — конкурентная регистрация с теми же ключами
+    // сериализуется, второй транзактор видит закоммиченную строку.
+    await this.lockCustomerIdentityKeys(tx, { email, canonicalPhone });
 
     // Deterministic reuse: ровно один Customer на email (unique constraint).
     const existing = await tx.customer.findUnique({ where: { email }, select: { id: true } });
-    if (existing) return { customerId: existing.id, created: false };
+
+    // M4.2 (ADR-0016): телефон — ключ резолва. Тот же общий lookup, что в
+    // WhatsApp/CRM (0/1/>1 по каноническому E.164, включая legacy-строки).
+    const phoneIds = canonicalPhone ? await findCustomerIdsByCanonicalPhone(tx, canonicalPhone) : [];
+
+    if (existing) {
+      // Email найден, но телефон указывает на другого/неоднозначного
+      // владельца — детерминированный конфликт, никакого тихого выбора.
+      if (phoneIds.length > 0 && !phoneIds.includes(existing.id)) {
+        if (phoneIds.length === 1) {
+          throw new ConflictError("Phone belongs to another customer");
+        }
+        throw new ConflictError("Phone matches multiple customers (AMBIGUOUS)");
+      }
+      return { customerId: existing.id, created: false };
+    }
+
+    // Resolve-before-create: телефон однозначно нашёл существующего
+    // Customer → reuse (link), не дубликат. >1 → AMBIGUOUS → отказ
+    // (не auto-merge, не auto-pick, не создание третьего дубля).
+    if (phoneIds.length === 1) return { customerId: phoneIds[0], created: false };
+    if (phoneIds.length > 1) {
+      throw new ConflictError("Phone matches multiple customers (AMBIGUOUS)");
+    }
 
     const code = await this.ids.nextCode(tx, "CUS");
-    const customer = await tx.customer.create({
-      data: {
-        code,
-        type: "PERSON",
-        firstName: input.firstName ?? null,
-        lastName: input.lastName ?? null,
-        email,
-        phone: input.phone ?? null,
-        status: "ACTIVE",
-        version: 1,
-      },
-      select: { id: true, code: true },
-    });
+    const customer = await tx
+      .customer.create({
+        data: {
+          code,
+          type: "PERSON",
+          firstName: input.firstName ?? null,
+          lastName: input.lastName ?? null,
+          email,
+          phone: input.phone ?? null,
+          phoneCanonical: canonicalPhone,
+          status: "ACTIVE",
+          version: 1,
+        },
+        select: { id: true, code: true },
+      })
+      .catch((error) => this.rethrowIdentityRace(error));
 
     await tx.customerHistory.create({
       data: {
@@ -383,6 +477,55 @@ export class CrmService {
     });
 
     return { customerId: customer.id, created: true };
+  }
+
+  /**
+   * M4.1 (ADR-0016) — явная idempotent backfill-команда: phoneCanonical из phone.
+   * CRM-owned (пишет crm.Customer). Правила:
+   *  - нормализация — shared/phone (единственный E.164-канон);
+   *  - невалидный/отсутствующий phone → phoneCanonical=null (не угадывать);
+   *  - одинаковый canonical у нескольких Customer → ВСЕМ записываем значение,
+   *    группа попадает в отчёт conflicts (реальные дубли dev-данных) — никакого
+   *    auto-merge; resolution через resolver AMBIGUOUS + manual path;
+   *  - dryRun=true → только чтения и отчёт.
+   */
+  async backfillPhoneCanonical(dryRun = false): Promise<{
+    scanned: number;
+    updated: number;
+    invalid: number;
+    conflicts: { canonicalPhone: string; customerIds: string[] }[];
+    dryRun: boolean;
+  }> {
+    const customers = await this.prisma.customer.findMany({
+      select: { id: true, code: true, phone: true, phoneCanonical: true },
+    });
+    let updated = 0;
+    let invalid = 0;
+    const canonMap = new Map<string, string[]>();
+    for (const c of customers) {
+      const canonical = normalizePhoneE164(c.phone);
+      if (!canonical) {
+        invalid += 1;
+        if (!dryRun && c.phoneCanonical !== null) {
+          await this.prisma.customer.update({ where: { id: c.id }, data: { phoneCanonical: null } });
+          updated += 1;
+        }
+        continue;
+      }
+      const ids = canonMap.get(canonical) ?? [];
+      ids.push(c.id);
+      canonMap.set(canonical, ids);
+      if (c.phoneCanonical !== canonical) {
+        updated += 1;
+        if (!dryRun) {
+          await this.prisma.customer.update({ where: { id: c.id }, data: { phoneCanonical: canonical } });
+        }
+      }
+    }
+    const conflicts = [...canonMap.entries()]
+      .filter(([, ids]) => ids.length > 1)
+      .map(([canonicalPhone, customerIds]) => ({ canonicalPhone, customerIds }));
+    return { scanned: customers.length, updated, invalid, conflicts, dryRun };
   }
 
   /**
@@ -1510,6 +1653,9 @@ export class CrmService {
     const email = normalizeEmail(input.email);
 
     return this.prisma.$transaction(async (tx) => {
+      const canonicalPhone = normalizePhoneE164(input.phone);
+      // M4.6: лок ДО проверок (см. lockCustomerIdentityKeys).
+      await this.lockCustomerIdentityKeys(tx, { email, canonicalPhone });
       let customerId: string;
       let customerCreated = false;
 
@@ -1517,21 +1663,35 @@ export class CrmService {
       if (existing) {
         customerId = existing.id;
       } else {
+        // M4.2 (ADR-0016): duplicate-prevention guard по canonical телефону —
+        // email-keyed reuse остаётся (выше), но новый Customer с телефоном,
+        // уже принадлежащим существующему клиенту, не создаётся (reject:
+        // staff переиспользует существующего клиента явно, никакого
+        // автослияния/автоподстановки чужого email).
+        if (canonicalPhone) {
+          const phoneOwners = await findCustomerIdsByCanonicalPhone(tx, canonicalPhone);
+          if (phoneOwners.length > 0) {
+            throw new ConflictError("Customer with this phone already exists");
+          }
+        }
         const code = await this.ids.nextCode(tx, "CUS");
-        const customer = await tx.customer.create({
-          data: {
-            code,
-            type: input.companyName ? "COMPANY" : "PERSON",
-            firstName: input.firstName ?? null,
-            lastName: input.lastName ?? null,
-            companyName: input.companyName ?? null,
-            email,
-            phone: input.phone ?? null,
-            status: "ACTIVE",
-            version: 1,
-          },
-          select: { id: true, code: true },
-        });
+        const customer = await tx
+          .customer.create({
+            data: {
+              code,
+              type: input.companyName ? "COMPANY" : "PERSON",
+              firstName: input.firstName ?? null,
+              lastName: input.lastName ?? null,
+              companyName: input.companyName ?? null,
+              email,
+              phone: input.phone ?? null,
+              phoneCanonical: canonicalPhone,
+              status: "ACTIVE",
+              version: 1,
+            },
+            select: { id: true, code: true },
+          })
+          .catch((error) => this.rethrowIdentityRace(error));
         customerId = customer.id;
         customerCreated = true;
 
@@ -1696,6 +1856,9 @@ export class CrmService {
     const email = normalizeEmail(input.email);
 
     return this.prisma.$transaction(async (tx) => {
+      const canonicalPhone = normalizePhoneE164(input.phone);
+      // M4.6: лок ДО проверок (см. lockCustomerIdentityKeys).
+      await this.lockCustomerIdentityKeys(tx, { email, canonicalPhone });
       let customerId: string;
       let customerCreated = false;
 
@@ -1703,21 +1866,32 @@ export class CrmService {
       if (existing) {
         customerId = existing.id;
       } else {
+        // M4.2 (ADR-0016): duplicate-prevention guard по canonical телефону
+        // (см. intakePartnerCustomer) — reject без автослияния.
+        if (canonicalPhone) {
+          const phoneOwners = await findCustomerIdsByCanonicalPhone(tx, canonicalPhone);
+          if (phoneOwners.length > 0) {
+            throw new ConflictError("Customer with this phone already exists");
+          }
+        }
         const code = await this.ids.nextCode(tx, "CUS");
-        const customer = await tx.customer.create({
-          data: {
-            code,
-            type: input.companyName ? "COMPANY" : "PERSON",
-            firstName: input.firstName ?? null,
-            lastName: input.lastName ?? null,
-            companyName: input.companyName ?? null,
-            email,
-            phone: input.phone ?? null,
-            status: "ACTIVE",
-            version: 1,
-          },
-          select: { id: true, code: true },
-        });
+        const customer = await tx
+          .customer.create({
+            data: {
+              code,
+              type: input.companyName ? "COMPANY" : "PERSON",
+              firstName: input.firstName ?? null,
+              lastName: input.lastName ?? null,
+              companyName: input.companyName ?? null,
+              email,
+              phone: input.phone ?? null,
+              phoneCanonical: canonicalPhone,
+              status: "ACTIVE",
+              version: 1,
+            },
+            select: { id: true, code: true },
+          })
+          .catch((error) => this.rethrowIdentityRace(error));
         customerId = customer.id;
         customerCreated = true;
 

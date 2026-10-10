@@ -99,7 +99,8 @@ export const ORDER_ACTION_FORBIDDEN_KEYS = [
 
 /**
  * `PATCH /orders/:id/travelers` принимает ТОЛЬКО traveler-поля обновления
- * (firstName/lastName/birthDate/citizenship/gender/passportNumber). Все
+ * (firstName/lastName/birthDate/citizenship/gender/passportSeries/passportNumber/
+ * passportExpiry). Все
  * server-owned ключи OrderTraveler (identity, orderId/customerId, derived
  * dataCompleteness, version, timestamps, actor/correlation, history) → 422.
  */

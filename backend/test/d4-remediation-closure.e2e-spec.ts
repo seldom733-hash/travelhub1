@@ -30,6 +30,7 @@ import { PrismaService } from "../src/prisma/prisma.service";
 import { Prisma, RoleCode } from "../src/generated/prisma/client";
 
 const FUTURE = (days = 30) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+const PAST = (years = 30) => new Date(Date.now() - years * 365 * 86400000).toISOString().slice(0, 10);
 
 interface Session {
   accessToken: string;
@@ -284,6 +285,10 @@ describe("Phase 3 Pre-Step 3.12 D4 — Strict Review Remediation Closure (e2e)",
         requestedServiceDate: FUTURE(30),
         quantity: 2,
         travelerCount: 2,
+        travelers: [
+          { firstName: "Чейн1", lastName: "Представительный", birthDate: PAST(31) },
+          { firstName: "Чейн2", lastName: "Представительный", birthDate: PAST(32) },
+        ],
         displayedPrice: 340,
         displayedCurrency: "USD",
       })
@@ -301,7 +306,14 @@ describe("Phase 3 Pre-Step 3.12 D4 — Strict Review Remediation Closure (e2e)",
     for (let i = 0; i < travelersRes.travelers.length; i++) {
       await agent(op.accessToken)
         .patch(`/api/v1/orders/${orderId}/travelers/${travelersRes.travelers[i].id}`)
-        .send({ firstName: `Чейн${i + 1}`, lastName: "Представительный" })
+        .send({
+          firstName: `Чейн${i + 1}`,
+          lastName: "Представительный",
+          citizenship: "RU",
+          passportSeries: "RU",
+          passportNumber: `RU10000${i + 1}`,
+          passportExpiry: FUTURE(1000 + i),
+        })
         .expect(200);
     }
     await agent(op.accessToken).post(`/api/v1/orders/${orderId}/final-confirm`).send({}).expect(201);
@@ -690,6 +702,12 @@ describe("Phase 3 Pre-Step 3.12 D4 — Strict Review Remediation Closure (e2e)",
         })
         .expect(201)).body as { id: string };
       created.requests.push(req.id);
+
+      // UI-C6 (25c8b73): customerDecline детерминированно принимает только
+      // PRICE_CHANGED/CONFIRMED — NEW → 400. Спецификация (ccf0604, Sep 3)
+      // написана ДО этого контракта; переводим заявку в CONFIRMED перед decline
+      // (decline-контракт ui-c6 не ослабляется).
+      await agent(op.accessToken).post(`/api/v1/requests/${req.id}/confirm-price`).send({}).expect(201);
 
       await agent(op.accessToken).post(`/api/v1/requests/${req.id}/customer-decline`).send({}).expect(201);
       const declined = await prisma.request.findUniqueOrThrow({ where: { id: req.id } });

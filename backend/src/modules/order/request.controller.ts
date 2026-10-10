@@ -1,10 +1,34 @@
-import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, UseGuards } from "@nestjs/common";
 import { Response } from "express";
 import { RequestService } from "./request.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "../../security/auth/decorators";
 import { ExportService } from "../shared/export/export.service";
+import { assertNoForbiddenKeys } from "../../shared/field-validation";
+
+/**
+ * Two-stage §4: RequestTraveler — только FIO + birthDate. Клиент НЕ может
+ * задать server-owned поля (id/requestId/timestamps) — явный 422 вместо
+ * silent-strip (масс-назначение как loud failure, см. field-validation).
+ */
+const REQUEST_TRAVELER_FORBIDDEN_KEYS = [
+  "id",
+  "requestId",
+  "createdAt",
+  "updatedAt",
+  "createdBy",
+  "status",
+  "orderId",
+  "guestId",
+] as const;
+
+interface RequestTravelerBody {
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  position?: number;
+}
 
 /**
  * Request Center (order.Request) — платформенный центр.
@@ -175,6 +199,47 @@ export class RequestController {
     return this.requestService.getRequestHistory(id);
   }
 
+  // ── Two-stage §4: RequestTraveler (FIO + birthDate) ──────────────────────
+
+  @Get(":id/travelers")
+  @RequirePermissions("order.read")
+  travelers(@Param("id") id: string) {
+    return this.requestService.getRequestTravelers(id);
+  }
+
+  @Post(":id/travelers")
+  @RequirePermissions("order.edit_noncritical")
+  createTraveler(
+    @CurrentUser() user: any,
+    @Param("id") id: string,
+    @Body() body: RequestTravelerBody,
+  ) {
+    assertNoForbiddenKeys(body, REQUEST_TRAVELER_FORBIDDEN_KEYS);
+    return this.requestService.createRequestTraveler(id, body, { id: user.id, username: user.username });
+  }
+
+  @Patch(":id/travelers/:travelerId")
+  @RequirePermissions("order.edit_noncritical")
+  updateTraveler(
+    @CurrentUser() user: any,
+    @Param("id") id: string,
+    @Param("travelerId") travelerId: string,
+    @Body() body: RequestTravelerBody,
+  ) {
+    assertNoForbiddenKeys(body, REQUEST_TRAVELER_FORBIDDEN_KEYS);
+    return this.requestService.updateRequestTraveler(id, travelerId, body, { id: user.id, username: user.username });
+  }
+
+  @Delete(":id/travelers/:travelerId")
+  @RequirePermissions("order.edit_noncritical")
+  deleteTraveler(
+    @CurrentUser() user: any,
+    @Param("id") id: string,
+    @Param("travelerId") travelerId: string,
+  ) {
+    return this.requestService.deleteRequestTraveler(id, travelerId, { id: user.id, username: user.username });
+  }
+
   @Post()
   @RequirePermissions("order.edit_noncritical")
   create(
@@ -189,6 +254,8 @@ export class RequestController {
       travelerCount?: number;
       displayedPrice?: number;
       displayedCurrency?: string;
+      /** Two-stage §4: FIO + birthDate состав; задаёт travelerCount, если тот не указан. */
+      travelers?: RequestTravelerBody[];
     },
   ) {
     return this.requestService.createRequest(body, { id: user.id, username: user.username });

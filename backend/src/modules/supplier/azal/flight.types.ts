@@ -12,6 +12,15 @@ export interface FlightPassengerCount {
   adults: number;
   children: number;
   infants: number;
+  /**
+   * F1 = CARRY CHILD AGES (owner-confirmed): a data/transport field only.
+   * Carried through the search body, the fresh re-search and
+   * `pinnedRequirements` so the composition of record survives — TravelHUB
+   * never calculates a price from it, and no flight supplier receives it
+   * until its own age/DOB contract is confirmed (AZAL DOB is NOT confirmed;
+   * `childrenDatesOfBirth` stays null).
+   */
+  childAges?: number[];
 }
 
 export interface FlightSearchQuery {

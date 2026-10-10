@@ -7,6 +7,8 @@ export interface FlightSearchRequest {
     adults: number;
     children: number;
     infants: number;
+    /** F1 (owner-confirmed): carried as data only — never priced client-side. */
+    childAges?: number[];
   };
   returnDate?: string;
   isStudent?: boolean;

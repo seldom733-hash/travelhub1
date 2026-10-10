@@ -9,7 +9,8 @@ import BookingActionBar from "@/components/booking/BookingActionBar";
 import RequestActionBar from "@/components/request/RequestActionBar";
 import { t } from "./i18n";
 
-// UI-C9: canonical 13 BookingAction identifiers (backend booking.service.ts).
+// UI-C9: canonical 14 BookingAction identifiers (backend booking.service.ts,
+// Step 2.9 + Stage 2 returnToOrder).
 const ALL_BOOKING_ACTIONS: string[] = [
   "prepare",
   "send",
@@ -24,6 +25,7 @@ const ALL_BOOKING_ACTIONS: string[] = [
   "complete",
   "cancel",
   "problem",
+  "returnToOrder",
 ];
 
 const ROOT = process.cwd();
@@ -330,6 +332,40 @@ describe("R2 Detail Visual System Parity — action authority not moved client-s
     expect(busyButton.getAttribute("aria-busy")).toBe("true");
   });
 
+  it("Stage 1: returnToRequest кнопка — из сервер-проекции, с confirm и локализацией ru/az/en", () => {
+    const bar = read("components/order/OrderActionBar.tsx");
+    expect(bar).toContain("returnToRequest");
+    expect(bar).toContain("order.action_short.returnToRequest");
+
+    for (const key of [
+      "order.action_short.returnToRequest",
+      "order.action_confirm.returnToRequest",
+      "order.action.returnToRequest",
+      "request.action.returned_from_order",
+    ]) {
+      for (const locale of ["ru", "az", "en"] as const) {
+        expect(t(key, locale)).not.toBe(key);
+      }
+    }
+
+    const onRun = vi.fn();
+    const originalConfirm = window.confirm;
+    try {
+      (window as unknown as { confirm: unknown }).confirm = vi.fn(() => true);
+      render(<OrderActionBar actions={["returnToRequest"]} busyAction={null} onRun={onRun} />);
+      fireEvent.click(screen.getByRole("button", { name: "Вернуть в заявку" }));
+      expect(onRun).toHaveBeenCalledWith("returnToRequest");
+
+      (window as unknown as { confirm: unknown }).confirm = vi.fn(() => false);
+      const onRun2 = vi.fn();
+      render(<OrderActionBar actions={["returnToRequest"]} busyAction={null} onRun={onRun2} />);
+      fireEvent.click(screen.getAllByRole("button", { name: "Вернуть в заявку" }).at(-1)!);
+      expect(onRun2).not.toHaveBeenCalled(); // отмена в confirm-диалоге
+    } finally {
+      (window as unknown as { confirm: unknown }).confirm = originalConfirm;
+    }
+  });
+
   it("Booking action availability stays server-authoritative (availableActions from API)", () => {
     const bkg = read("app/app/bookings/[id]/page.tsx");
     // UI-C9: the projection is passed verbatim to BookingActionBar — no local recompute.
@@ -338,7 +374,7 @@ describe("R2 Detail Visual System Parity — action authority not moved client-s
     expect(bkg).toContain("api.patch(`/bookings/${booking.id}`");
   });
 
-  it("BookingActionBar consumes only the server projection (UI-C9): all 13 actions, stable ordering, accessible busy state", () => {
+  it("BookingActionBar consumes only the server projection (UI-C9): all 14 actions, stable ordering, accessible busy state", () => {
     const bar = read("components/booking/BookingActionBar.tsx");
     expect(bar).toContain("actions: string[]");
     expect(bar).not.toContain("booking.status");
@@ -358,7 +394,7 @@ describe("R2 Detail Visual System Parity — action authority not moved client-s
     const onRun = vi.fn();
     render(<BookingActionBar actions={ALL_BOOKING_ACTIONS} busyAction={null} onRun={onRun} />);
     const buttons = screen.getAllByRole("button");
-    // All 13 identifiers render, in projection order (ordering stability).
+    // All 14 identifiers render, in projection order (ordering stability).
     expect(buttons.map((b) => b.textContent)).toEqual(
       ALL_BOOKING_ACTIONS.map((a) => t(`booking.action_short.${a}`, "ru")),
     );

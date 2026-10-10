@@ -88,6 +88,9 @@ export const PERMISSIONS = {
   "booking.confirm": "Подтверждение/отклонение бронирования",
   "booking.request_change": "Запрос изменения бронирования",
   "booking.cancel": "Отмена бронирования",
+  // Stage 2 (Booking → Order, Q7): возврат брони в заказ — ОТДЕЛЬНОЕ право
+  // (не booking.cancel): round-trip-операция, а не отмена поставщику.
+  "booking.return_to_order": "Возврат бронирования в заказ",
 
   // ── Sales (Phase 2, каталог прав зарезервирован) ─────────────────────
   "sales.lead.read": "Чтение лидов",
@@ -637,6 +640,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "booking.confirm",
     "booking.request_change",
     "booking.cancel",
+    // Stage 2 (Booking → Order): OPERATOR выполняет round-trip возврата
+    // (зеркало booking.cancel; ADMIN — по ALL_PERMISSIONS convention).
+    "booking.return_to_order",
     "support.read",
     "support.write",
     // Step 3.10: OPERATOR gets full support case CRUD + assignment

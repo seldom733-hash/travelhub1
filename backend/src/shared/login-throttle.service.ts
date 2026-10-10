@@ -1,11 +1,32 @@
 import { Injectable } from "@nestjs/common";
 import { TooManyRequestsError } from "./errors";
+import { normalizePhoneE164 } from "./phone/phone";
+
+/**
+ * M4.3 §13 — нормализованный ключ throttle-окна (identifier-часть).
+ *
+ * Phone-first login: canonical E.164 схлопывает ВСЕ форматы записи одного
+ * номера (`050 111 22 33`, `+994501112233`, `994501112233`, с разделителями)
+ * в ОДИН ключ — ротация формата записи не обходит окно. Legacy username —
+ * lowercase (прежнее поведение `username.toLowerCase()`). Email НЕ является
+ * login identity и отдельного пути не получает: email-ввод трактуется как
+ * username-литерал (legacy compatibility).
+ *
+ * Ограничение (документировано): identifier-классы (phone vs username) —
+ * разные ключи; IP входит в ключ (прежняя модель `identifier|ip`).
+ */
+export function normalizeLoginKey(identifier: string): string {
+  const trimmed = (identifier ?? "").trim();
+  const canonical = normalizePhoneE164(trimmed);
+  return (canonical ?? trimmed).toLowerCase();
+}
 
 /**
  * Step 2.17 — минимальный login rate limiter (in-memory, single-instance).
  *
  * Закрывает: brute-force по паролю на /auth/login (ранее — без ограничений).
- * Sliding window per key `username|ip`: MAX_ATTEMPTS попыток за WINDOW_MS.
+ * Sliding window per key `normalizeLoginKey(identifier)|ip`: MAX_ATTEMPTS
+ * попыток за WINDOW_MS.
  * Превышение → 429 TooManyRequestsError (controlled).
  *
  * ОГРАНИЧЕНИЕ (документированное, §report): in-memory состояние per-instance —

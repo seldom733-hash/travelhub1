@@ -2,6 +2,7 @@ import { Inject, Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import type { WhatsAppConfig } from "../whatsapp.config";
 import { WHATSAPP_CONFIG } from "../whatsapp.tokens";
 import {
+  WHATSAPP_LEASE_KEY,
   WhatsAppLeaseError,
   WhatsAppSessionLeaseService,
   type LeaseHandle,
@@ -15,6 +16,10 @@ import {
  * инстанс помечает себя НЕ владельцем, останавливает heartbeat и оповещает
  * слушателей (runtime гасит провайдера). Все операции, меняющие lifecycle/
  * auth/outbound state, обязаны пройти assertActive() → assertOwnership().
+ *
+ * M5 multi-number: инстанс создаётся РЕЕСТРОМ на каждый номер со своим
+ * ключом аренды (`whatsapp:<accountId>`); дефолтный ключ — legacy singleton
+ * (для одиночных юнит-тестов).
  */
 @Injectable()
 export class WhatsAppSessionOwnershipService implements OnApplicationShutdown {
@@ -26,6 +31,7 @@ export class WhatsAppSessionOwnershipService implements OnApplicationShutdown {
   constructor(
     private readonly lease: WhatsAppSessionLeaseService,
     @Inject(WHATSAPP_CONFIG) private readonly config: WhatsAppConfig,
+    private readonly key: string = WHATSAPP_LEASE_KEY,
   ) {}
 
   /** Текущая аренда (null — не приобреталась/освобождена). */
@@ -50,14 +56,14 @@ export class WhatsAppSessionOwnershipService implements OnApplicationShutdown {
   async ensureOwnership(): Promise<LeaseHandle> {
     if (this.handle && !this.lostFlag) {
       try {
-        await this.lease.assertOwnership(this.handle);
+        await this.lease.assertOwnership(this.key, this.handle);
         return this.handle;
       } catch {
         // Аренда перехвачена/истекла между heartbeat-ами → переприобретение.
         this.markLost("ownership assertion failed");
       }
     }
-    const handle = await this.lease.acquire();
+    const handle = await this.lease.acquire(this.key);
     this.handle = handle;
     this.lostFlag = false;
     this.startHeartbeat();
@@ -76,7 +82,7 @@ export class WhatsAppSessionOwnershipService implements OnApplicationShutdown {
         "This instance does not own the WhatsApp session lease (self-fenced)",
       );
     }
-    await this.lease.assertOwnership(this.handle);
+    await this.lease.assertOwnership(this.key, this.handle);
     return this.handle;
   }
 
@@ -86,7 +92,7 @@ export class WhatsAppSessionOwnershipService implements OnApplicationShutdown {
     const handle = this.handle;
     this.handle = null;
     this.lostFlag = false;
-    if (handle) await this.lease.release(handle);
+    if (handle) await this.lease.release(this.key, handle);
   }
 
   /** Подписка на потерю аренды (self-fencing event). */
@@ -120,7 +126,7 @@ export class WhatsAppSessionOwnershipService implements OnApplicationShutdown {
   private async tick(): Promise<void> {
     if (!this.handle || this.lostFlag) return;
     try {
-      this.handle = await this.lease.renew(this.handle);
+      this.handle = await this.lease.renew(this.key, this.handle);
     } catch (error) {
       const reason =
         error instanceof WhatsAppLeaseError

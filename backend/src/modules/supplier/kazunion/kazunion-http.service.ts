@@ -614,9 +614,12 @@ export class KazunionHttpService {
       _: String(Date.now()),
     };
 
+    // Confirmed supplier contract (owner-supplied real request):
+    // AGES=<comma-separated ages of ALL children> (AGES=4,6,8) — no
+    // AGE1..AGE4 split and no four-age ceiling on the supplier-facing param.
     const ages = params.childAges ?? [];
-    for (let i = 0; i < Math.min(ages.length, 4); i++) {
-      p[`AGE${i + 1}`] = String(ages[i]);
+    if (ages.length) {
+      p.AGES = ages.join(",");
     }
 
     // Empty values are kept (HOTELS=, STARS=, ROOMS= …) — mirrors the native request.

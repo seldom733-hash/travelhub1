@@ -11,11 +11,12 @@ import { t, useLocale } from "@/lib/i18n";
  * Этот компонент — только render-маппинг (label/цвет/busy); никаких
  * status-матриц, permission-проверок или lifecycle-правил.
  *
- * Канонические 13 BookingAction-идентификаторов (backend Step 2.9):
+ * Канонические 14 BookingAction-идентификаторов (backend Step 2.9 + Stage 2):
  * prepare, send, requestClarification, resume, confirm, reject, service,
- * requestChange, resolveChange, requestCancellation, complete, cancel, problem.
+ * requestChange, resolveChange, requestCancellation, complete, cancel, problem,
+ * returnToOrder.
  */
-const ACTION_UI: Record<string, { labelKey: string; cls: string }> = {
+const ACTION_UI: Record<string, { labelKey: string; cls: string; confirmKey?: string }> = {
   prepare: { labelKey: "booking.action_short.prepare", cls: "bg-sky-600 hover:bg-sky-700" },
   send: { labelKey: "booking.action_short.send", cls: "bg-blue-600 hover:bg-blue-700" },
   requestClarification: { labelKey: "booking.action_short.requestClarification", cls: "bg-slate-500 hover:bg-slate-600" },
@@ -29,6 +30,14 @@ const ACTION_UI: Record<string, { labelKey: string; cls: string }> = {
   complete: { labelKey: "booking.action_short.complete", cls: "bg-green-700 hover:bg-green-800" },
   cancel: { labelKey: "booking.action_short.cancel", cls: "bg-red-600 hover:bg-red-700" },
   problem: { labelKey: "booking.action_short.problem", cls: "bg-amber-600 hover:bg-amber-700" },
+  // Stage 2 (Booking → Order, Q1/Q2): round-trip-команда — сервер-авторитетная
+  // проекция отдаёт её только из direct/phase-2 матрицы и при granular-праве
+  // booking.return_to_order. Разрушающая (CANCELLED + Order status change) → confirm.
+  returnToOrder: {
+    labelKey: "booking.action_short.returnToOrder",
+    cls: "bg-rose-700 hover:bg-rose-800",
+    confirmKey: "booking.action_confirm.returnToOrder",
+  },
 };
 
 export default function BookingActionBar({
@@ -56,7 +65,10 @@ export default function BookingActionBar({
             key={action}
             disabled={busyAction !== null}
             aria-busy={busy}
-            onClick={() => onRun(action)}
+            onClick={() => {
+              if (ui.confirmKey && !window.confirm(t(ui.confirmKey, locale))) return;
+              onRun(action);
+            }}
             className={`rounded-lg px-3 py-2 text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${ui.cls}`}
           >
             {busy ? t("booking.action.busy", locale) : t(ui.labelKey, locale)}

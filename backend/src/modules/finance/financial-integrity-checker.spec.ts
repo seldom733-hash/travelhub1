@@ -5,12 +5,12 @@
  * Inspects authoritative DB state and emits structured verdicts.
  *
  * Checks:
- *   1. No duplicate Payment per protected business key (one active per Order)
+ *   1. Payment cardinality: one-active constraint снят (MULTI/PARTIAL), due-guard
  *   2. No duplicate Commission per Order
  *   3. No duplicate CommissionAccrual per source Commission
  *   4. No orphan LedgerTransaction (source must exist)
  *   5. Currency consistency across related financial facts
- *   6. Amount consistency (Payment.amount == Order.total where applicable)
+ *   6. Amount consistency (Payment.amount <= due, frozen at creation)
  *   7. Commission amount == frozen snapshot amount
  *   8. Decimal exactness (no JS float contamination)
  *   9. Frozen monetary facts immutable
@@ -29,13 +29,15 @@ import {
 describe("Financial Integrity Reconciliation Checker (Step 2.18A)", () => {
 
   describe("1. Payment one-active-per-order invariant", () => {
-    it("DB constraint Payment_one_active_per_order prevents duplicate active Payment", () => {
-      // The schema defines:
-      // @@unique([orderId], where: { isActivePayment: true }, map: "Payment_one_active_per_order")
-      // This is a DB-level guard — duplicate active Payment → P2002 → controlled 409
-      // Schema verification: the constraint exists in schema.prisma
-      // Verified by grep: @@unique([orderId], where: { isActivePayment: true })
-      expect(true).toBe(true); // schema constraint verified by e2e tests
+    it("one-active индекс СНЯТ (MULTI/PARTIAL): не более одного активного Payment больше НЕ DB-инвариант", () => {
+      // Было: @@unique([orderId], where: { isActivePayment: true }, map:
+      // "Payment_one_active_per_order"). Снято миграцией
+      // 20261009100000_multi_partial_payments — один Order может иметь
+      // неограниченное число Payment-записей (мульти/частичные платежи).
+      // Защита от переплаты теперь транзакционная: due-guard
+      // (0 < amount <= due) под pg_advisory_xact_lock в PaymentService;
+      // e2e-проверки — test/multi-partial-payments.e2e-spec.ts.
+      expect(true).toBe(true); // due-guard verified by e2e tests
     });
 
     it("Payment.status enum is exhaustive and finite", () => {
@@ -139,9 +141,11 @@ describe("Financial Integrity Reconciliation Checker (Step 2.18A)", () => {
   });
 
   describe("6. Frozen monetary facts", () => {
-    it("Payment.amount is frozen from Order.total at creation time", () => {
-      // createPayment: amount = order.total (verbatim copy, no re-computation)
-      // After freeze, Order.total mutation does NOT retroactively change Payment.amount
+    it("Payment.amount is frozen at creation (клиентская сумма, ≤ due; НЕ копия Order.total)", () => {
+      // MULTI/PARTIAL §4: amount = клиентский ввод, валидированный
+      // 0 < amount <= due (validatePaymentAmount + due-guard); без amount —
+      // весь текущий остаток. После freeze изменения Order.total НЕ меняют
+      // Payment.amount; due-guard сериализован advisory lock'ом.
     });
 
     it("Commission.amount is frozen from frozen snapshot at Order creation", () => {

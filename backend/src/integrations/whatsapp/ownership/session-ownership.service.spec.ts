@@ -65,11 +65,25 @@ describe("WhatsAppSessionOwnershipService (M2)", () => {
     await expect(service.assertActive()).rejects.toThrow(WhatsAppLeaseError);
     await service.ensureOwnership();
     await expect(service.assertActive()).resolves.toMatchObject({ fencingToken: 1 });
-    expect(fake.assertOwnership).toHaveBeenCalledWith({
+    expect(fake.assertOwnership).toHaveBeenCalledWith("whatsapp", {
       instanceId: "fake-instance",
       fencingToken: 1,
       expiresAt: expect.any(Date),
     });
+  });
+
+  it("M5: per-account ключ аренды пробрасывается во все вызовы lease", async () => {
+    const keyed = new WhatsAppSessionOwnershipService(asLease(fake), config(), "whatsapp:acc-1");
+    try {
+      await keyed.ensureOwnership();
+      expect(fake.acquire).toHaveBeenCalledWith("whatsapp:acc-1");
+      await keyed.assertActive();
+      expect(fake.assertOwnership).toHaveBeenLastCalledWith("whatsapp:acc-1", expect.anything());
+      await keyed.release();
+      expect(fake.release).toHaveBeenCalledWith("whatsapp:acc-1", expect.anything());
+    } finally {
+      await keyed.onApplicationShutdown();
+    }
   });
 
   it("self-fencing: неудачный heartbeat → владение снято, assertActive падает", async () => {

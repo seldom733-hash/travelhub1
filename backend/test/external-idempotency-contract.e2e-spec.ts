@@ -55,7 +55,8 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
     sales: string[];
     orders: string[];
     payments: string[];
-  } = { users: [], products: [], quotes: [], checkouts: [], sales: [], orders: [], payments: [] };
+    partners: string[];
+  } = { users: [], products: [], quotes: [], checkouts: [], sales: [], orders: [], payments: [], partners: [] };
 
   const login = async (username: string, password: string): Promise<Session> => {
     const res = await request(app.getHttpServer()).post("/api/v1/auth/login").send({ username, password }).expect(200);
@@ -77,10 +78,15 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
   const futureDate = (days = 30) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
   const futureIso = (days = 30) => new Date(Date.now() + days * 86400000).toISOString();
 
+  let buildSeq = 0;
   /** Полная canonical цепочка до Order (frozen money snapshot, как 2.11/2.12 e2e). */
   const buildOrder = async (sm: Session, tag: string, price: number): Promise<{ orderId: string; orderCode: string }> => {
     const smAgent = agent(sm.accessToken);
-    const prod = (await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Idem ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] }).expect(201)).body.product as { id: string };
+    // Step 3.6B: POST /products platform-актором без owner → 403 — партнёрский
+    // harness (как в payment-flow): Partner напрямую + partnerId в body.
+    const partner = await prisma.partner.create({ data: { code: `IDM${stamp}${buildSeq++}`, name: `Idem Partner ${tag}` } });
+    created.partners.push(partner.id);
+    const prod = (await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Idem ${tag} ${stamp}`, partnerId: partner.id, tariffs: [{ name: "Std", price }] }).expect(201)).body.product as { id: string };
     created.products.push(prod.id);
     const tariff = await prisma.tariff.findFirstOrThrow({ where: { productId: prod.id } });
     const date = futureDate();
@@ -103,9 +109,11 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
     return { orderId: order.id, orderCode: order.code };
   };
 
+  // Step 3.6C.1: reason ОБЯЗАТЕЛЕН для manual payment initiation (DTO 400) —
+  // default для всех вызовов, тесты переопределяют своим body.
   const createPayment = (fin: Session, orderId: string, key: string, body: Record<string, unknown> = {}) => {
     const a = agent(fin.accessToken);
-    return a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, ...body });
+    return a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment", ...body });
   };
 
   const slotCount = async (scopeId: string, key: string) =>
@@ -152,6 +160,7 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
     await prisma.checkoutIntent.deleteMany({ where: { id: { in: created.checkouts } } });
     await prisma.quote.deleteMany({ where: { id: { in: created.quotes } } });
     await prisma.product.deleteMany({ where: { id: { in: created.products } } });
+    await prisma.partner.deleteMany({ where: { id: { in: created.partners } } });
     await prisma.user.deleteMany({ where: { id: { in: created.users } } });
     await app.close();
   });
@@ -160,7 +169,7 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
     const fin = await createStaff("h_fin1", RoleCode.FINANCE);
     const sm = await createStaff("h_sm1", RoleCode.SALES_MANAGER);
     const { orderId } = await buildOrder(sm, "idem_t1", 150);
-    const res = await agent(fin.accessToken).post("/api/v1/finance/payments").send({ orderId });
+    const res = await agent(fin.accessToken).post("/api/v1/finance/payments").send({ orderId, reason: "e2e manual payment" });
     expect(res.status).toBe(400);
     expect(await paymentCount(orderId)).toBe(0);
   });
@@ -243,8 +252,8 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
     const key = `e2e-t7-${stamp}`;
     const a = agent(fin.accessToken);
     const [r1, r2] = await Promise.all([
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }),
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }),
     ]);
     expect(r1.status).toBeLessThan(500);
     expect(r2.status).toBeLessThan(500);
@@ -266,8 +275,8 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
     const key = `e2e-t8-${stamp}`;
     const a = agent(fin.accessToken);
     const [r1, r2] = await Promise.all([
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId: orderA }),
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId: orderB }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId: orderA, reason: "e2e manual payment" }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId: orderB, reason: "e2e manual payment" }),
     ]);
     const statuses = [r1.status, r2.status].sort();
     expect(statuses).toContain(201);
@@ -298,7 +307,7 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
         .post("/api/v1/finance/payments")
         .set("Authorization", `Bearer ${fin.accessToken}`)
         .set("Idempotency-Key", key)
-        .send({ orderId })
+        .send({ orderId, reason: "e2e manual payment" })
         .expect(201);
       expect((res.body as { id: string }).id).toBe(first.id); // DB-backed replay
     } finally {
@@ -332,7 +341,7 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
     const first = (await createPayment(fin, orderId, key).expect(201)).body as { id: string };
     created.payments.push(first.id);
     // Анонимный запрос с тем же key — 401 ДО слота (guards раньше interceptor-а).
-    await request(app.getHttpServer()).post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }).expect(401);
+    await request(app.getHttpServer()).post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }).expect(401);
     expect(await paymentCount(orderId)).toBe(1);
   });
 
@@ -382,9 +391,9 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
     const { orderId } = await buildOrder(sm, "idem_t15", 40);
     const key = `e2e-t15-${stamp}`;
     const a = agent(fin.accessToken);
-    const first = await a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }).expect(201);
+    const first = await a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }).expect(201);
     created.payments.push((first.body as { id: string }).id);
-    const replay = await a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }).expect(201);
+    const replay = await a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }).expect(201);
     expect(replay.headers["set-cookie"]).toBeUndefined();
     expect((replay.body as { id: string }).id).toBe((first.body as { id: string }).id);
   });
@@ -450,9 +459,9 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
     const key = `e2e-t19-${stamp}`;
     const a = agent(fin.accessToken);
     const results = await Promise.all([
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }),
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }),
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }),
     ]);
     for (const r of results) {
       expect(r.status).toBeLessThan(500); // никогда raw 500
@@ -556,8 +565,8 @@ describe("Phase 2 Step 2.12H — External API Idempotency Contract (e2e)", () =>
 
     const a = agent(fin.accessToken);
     const [r1, r2] = await Promise.all([
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }),
-      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }),
+      a.post("/api/v1/finance/payments").set("Idempotency-Key", key).send({ orderId, reason: "e2e manual payment" }),
     ]);
     for (const r of [r1, r2]) {
       expect(r.status).toBeLessThan(500); // никогда raw 500

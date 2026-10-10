@@ -113,11 +113,14 @@ export class BookingQueryService {
       }
     }
 
-    // D7: fetch active Payment reference if exists
+    // D7: fetch active Payment reference if exists. MULTI/PARTIAL: у заказа
+    // может быть несколько активных Payment'ов — показываем самый свежий
+    // (последняя инициация).
     let activePayment: Record<string, unknown> | null = null;
     if (booking.orderId) {
       const payment = await this.prisma.payment.findFirst({
         where: { orderId: booking.orderId, isActivePayment: true },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         select: {
           id: true, code: true, referenceNumber: true, status: true,
           amount: true, currency: true, paymentMethod: true, providerRef: true,

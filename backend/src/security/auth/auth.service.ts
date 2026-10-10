@@ -9,6 +9,7 @@ import { PartnerOnboardingService } from "../partner/partner-onboarding.service"
 import { ApplicantType, RoleCode, UserStatus } from "../../generated/prisma/enums";
 import { ConflictError, ValidationDomainError } from "../../shared/errors";
 import { normalizeEmail } from "../../shared/field-validation";
+import { DEFAULT_PHONE_REGION, normalizePhoneE164 } from "../../shared/phone/phone";
 import type { Prisma } from "../../generated/prisma/client";
 import type { Request } from "express";
 
@@ -16,6 +17,8 @@ export interface AuthUser {
   id: string;
   code: string;
   username: string;
+  /** M4.3 (ADR-0016): canonical E.164 login identity; null — legacy-аккаунт без backfill. */
+  phone: string | null;
   email: string | null;
   fullName: string | null;
   status: UserStatus;
@@ -58,6 +61,17 @@ export class AuthService {
    *   → audit
    * Провал CRM-шага откатывает ВСЁ (нет ACTIVE BUYER с customerId=null).
    * Retry идемпотентен: Customer.email @unique + reuse → дубликат невозможен.
+   *
+   * M4.3 §15 (ADR-0016): phone-first flow —
+   *   country/phone валидируются и нормализуются ДО персистентности
+   *   → ensureCustomerForBuyer (Customer Resolver: reuse по canonical телефону)
+   *   → loginPhone = canonical phone (+ country в User).
+   * Дубликат телефона другого User → ConflictError ДО создания («не тихо
+   * сбрасываем пароль» чужого аккаунта); дубликат email/username — прежние
+   * ConflictError. Forbidden-поля (role/permissions/customerId/partnerId/…)
+   * отсекаются assertNoForbiddenKeys в controller (REGISTER_FORBIDDEN_KEYS).
+   * phone/country опциональны в API (legacy-совместимость; фронтенд всегда
+   * шлёт оба поля) — при наличии валидируются строго.
    */
   async register(input: {
     username?: string;
@@ -66,6 +80,13 @@ export class AuthService {
     firstName?: string;
     lastName?: string;
     fullName?: string;
+    /** M4.2 (ADR-0016): опциональный телефон — resolve-before-create в CRM
+     * (существующий Customer по canonical телефону переиспользуется, link,
+     * не дубликат). M4.3: DTO-валидация, нормализация, loginPhone. */
+    phone?: string;
+    /** M4.3 §15: ISO-3166 alpha-2 регистрационная страна (нормализуется к
+     * uppercase; используется и как default region для нормализации phone). */
+    country?: string;
   }): Promise<LoginResult> {
     if (input.password.length < 8) {
       throw new ValidationDomainError("Password must be at least 8 characters");
@@ -78,10 +99,34 @@ export class AuthService {
       throw new ValidationDomainError("Username must be at least 3 characters");
     }
 
+    // M4.3 §15: country/phone — валидация + нормализация ДО персистентности.
+    let country: string | null = null;
+    if (input.country !== undefined && input.country !== null) {
+      country = input.country.trim().toUpperCase();
+      if (!/^[A-Z]{2}$/.test(country)) {
+        throw new ValidationDomainError("Country must be a 2-letter ISO code");
+      }
+    }
+    let canonicalPhone: string | null = null;
+    if (input.phone !== undefined && input.phone !== null) {
+      // Регион нормализации: явная страна, иначе платформенный default (AZ).
+      canonicalPhone = normalizePhoneE164(input.phone, country ?? DEFAULT_PHONE_REGION);
+      if (!canonicalPhone) {
+        throw new ValidationDomainError("Invalid phone number");
+      }
+    }
+
     const existing = await this.prisma.user.findUnique({ where: { username } });
     if (existing) throw new ConflictError(`Username '${username}' already taken`);
     const emailDup = await this.prisma.user.findUnique({ where: { email } });
     if (emailDup) throw new ConflictError("Email already registered");
+    // M4.3: loginPhone @unique — гонка двух регистраций с одним телефоном
+    // детерминированно ловится P2002-пре-чеком здесь, а не 500 (race-покрытие
+    // advisory-lock — M4.6 §30).
+    if (canonicalPhone) {
+      const phoneDup = await this.prisma.user.findUnique({ where: { loginPhone: canonicalPhone } });
+      if (phoneDup) throw new ConflictError("Phone already registered");
+    }
 
     const fullName = input.fullName ?? ((`${input.firstName ?? ""} ${input.lastName ?? ""}`.trim()) || null);
     const role = await this.prisma.role.findUniqueOrThrow({ where: { code: RoleCode.BUYER } });
@@ -98,15 +143,21 @@ export class AuthService {
           fullName,
           status: UserStatus.ACTIVE,
           roleId: role.id,
+          loginPhone: canonicalPhone,
+          country,
         },
         select: { id: true, code: true, username: true, email: true, fullName: true, status: true },
       });
 
       // CRM-owned command: create-or-link Customer (в транзакции регистрации).
+      // M4.2: phone передаётся в resolver-шаг ensureCustomerForBuyer —
+      // однозначный canonical телефон переиспользует существующего Customer.
+      // M4.3: передаётся уже нормализованный canonical phone (не raw).
       const { customerId } = await this.crm.ensureCustomerForBuyer(tx, {
         email,
         firstName: input.firstName,
         lastName: input.lastName,
+        phone: canonicalPhone ?? input.phone,
         actorUserId: user.id,
       });
 
@@ -119,7 +170,7 @@ export class AuthService {
         action: "auth.register",
         resource: "User",
         resourceId: user.id,
-        details: { customerId },
+        details: { customerId, loginPhone: canonicalPhone, country },
       });
 
       return user;
@@ -231,20 +282,44 @@ export class AuthService {
     return this.login(created.username, input.password);
   }
 
-  /** Вход: проверка пароля, выдача JWT. */
-  async login(username: string, password: string): Promise<LoginResult> {
-    const raw = (username ?? "").trim();
+  /**
+   * Вход: проверка пароля, выдача JWT.
+   *
+   * M4.3 §12 — задокументированный lookup-приоритет (без перекрёстной
+   * неоднозначности):
+   *   1. canonical phone → User.loginPhone (phone-first identity);
+   *   2. legacy username → точное совпадение, затем lowercase (compatibility).
+   * Email НЕ является login identity: email-ввод работает только как legacy
+   * username-равенство (историческое поведение username=email при регистрации),
+   * НОВЫЙ email-lookup не вводится. Если canonical-телефон не найден среди
+   * loginPhone — fallback на username-путь сохраняет legacy-совместимость
+   * (username, буквально совпадающий со строкой телефона).
+   */
+  async login(identifier: string, password: string): Promise<LoginResult> {
+    const raw = (identifier ?? "").trim();
     // Case-insensitive lookup: email-логины регистронезависимы (Seldom733@… = seldom733@…).
     // Приоритет — точное совпадение; при промахе — поиск в нижнем регистре.
-    let user = await this.prisma.user.findUnique({
-      where: { username: raw },
-      include: { role: true },
-    });
-    if (!user && raw.toLowerCase() !== raw) {
-      user = await this.prisma.user.findFirst({
-        where: { username: raw.toLowerCase() },
+    const canonicalPhone = normalizePhoneE164(raw);
+    let loginVia: "loginPhone" | "username" = "username";
+    let user = canonicalPhone
+      ? await this.prisma.user.findUnique({
+          where: { loginPhone: canonicalPhone },
+          include: { role: true },
+        })
+      : null;
+    if (user) {
+      loginVia = "loginPhone";
+    } else {
+      user = await this.prisma.user.findUnique({
+        where: { username: raw },
         include: { role: true },
       });
+      if (!user && raw.toLowerCase() !== raw) {
+        user = await this.prisma.user.findFirst({
+          where: { username: raw.toLowerCase() },
+          include: { role: true },
+        });
+      }
     }
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       throw new UnauthorizedException("Invalid username or password");
@@ -260,6 +335,9 @@ export class AuthService {
       action: "auth.login",
       resource: "User",
       resourceId: user.id,
+      // M4.3 §33: наблюдаемость phone-first входа (без PII телефона в details —
+      // только путь идентификации; сам canonical телефон не логируется).
+      details: { via: loginVia },
     });
 
     return this.buildSession(user);
@@ -340,6 +418,7 @@ export class AuthService {
     id: string;
     code: string;
     username: string;
+    loginPhone: string | null;
     email: string | null;
     fullName: string | null;
     status: UserStatus;
@@ -359,6 +438,7 @@ export class AuthService {
     id: string;
     code: string;
     username: string;
+    loginPhone: string | null;
     email: string | null;
     fullName: string | null;
     status: UserStatus;
@@ -371,6 +451,7 @@ export class AuthService {
       id: user.id,
       code: user.code,
       username: user.username,
+      phone: user.loginPhone,
       email: user.email,
       fullName: user.fullName,
       status: user.status,

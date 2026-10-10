@@ -30,7 +30,8 @@
  *  - milestones (2.10C DEFER → 2.13): requestedAt/approvedAt/processedAt/
  *    failedAt — server-owned UTC, первый wins, без backfill;
  *  - Payment НЕ мутируется (остаётся CAPTURED; REFUNDED reserved unreachable —
- *    partial refund делает одиночный Payment.REFUNDED семантически неверным);
+ *    partial refund делает Payment.REFUNDED семантически неверным; при
+ *    MULTI/PARTIAL оплатах это каждый отдельный Payment в составе заказа);
  *  - 0 side effects: без LedgerTransaction/ProviderFee/Settlement/Payout/
  *    Invoice/CommissionAccrual auto-post (boundaries §25–§29);
  *  - события: RefundCreated/RefundApproved/RefundProcessed/RefundFailed

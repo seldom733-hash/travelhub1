@@ -96,6 +96,10 @@ export const DomainEvents = {
   // создаются в 2.12E (0 consumer-ов). Policy-событий НЕТ (master data +
   // AuditLog/History).
   CommissionAccrued: "CommissionAccrued",
+  // Stage 2 (Booking → Order, Q8): CommissionReversed — идемпотентный факт
+  // отмены ещё ACCRUED Commission/Accrual при возврате брони в заказ
+  // (CAS ACCRUED → REVERSED; ledger НЕ переписывается; 0 consumer-ов).
+  CommissionReversed: "CommissionReversed",
 } as const;
 
 export type DomainEventType = (typeof DomainEvents)[keyof typeof DomainEvents];
@@ -431,4 +435,30 @@ export interface CommissionAccruedPayload {
   baseCurrency: string;
   /** Frozen business instant селекции policy (Quote ISSUE, ISO 8601). */
   selectedAt: string;
+}
+
+/**
+ * Stage 2 (Booking → Order, Q8) — CommissionReversed.
+ * Идемпотентный доменный факт отмены commission: эмитится ТОЛЬКО если
+ * Commission был ACCRUED и CAS-переход ACCRUED → REVERSED выиграл (ровно один
+ * факт; повторный возврат не создаёт второй). Ledger НЕ переписывается —
+ * reversal-механики в кодовой базе нет (Stage B1 closure: deferred).
+ * PII-free: canonical refs + frozen money fact.
+ */
+export interface CommissionReversedPayload {
+  /** Commission (CMS-*, canonical earned-факт). */
+  commissionId: string;
+  commissionCode: string;
+  /** CommissionAccrual (CAA-*, receivable), если существовал. */
+  accrualId: string | null;
+  orderId: string;
+  orderCode: string;
+  /** Frozen sellerPartnerId (ref crm.Partner, без FK). */
+  partnerId: string;
+  /** Frozen earned amount (Decimal string, DECIMAL(12,2)). */
+  amount: string;
+  currency: string;
+  /** Бронь, инициировавшая возврат (round-trip Booking → Order). */
+  bookingId: string;
+  bookingCode: string;
 }

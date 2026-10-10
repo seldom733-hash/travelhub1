@@ -69,10 +69,12 @@ launch requirement ≠ future scaling target`. Exploratory localhost results
   событий между циклами → гейт backlog ≤100 был математически невыполним; 500ms даёт
   50 событий между idle-циклами. Адаптивный self-scheduling drain: busy → 100ms backoff,
   первый цикл сразу после boot) unless a scenario explicitly varies them and records it.
-- Backend pool: `DATABASE_POOL_SIZE` (default 20; pg.Pool default max=10 сериализовал
-  50-way конкуренцию — Step 2.17B remediation) + выделенный `seqClient` (3, конфиг
-  `DATABASE_SEQ_POOL_SIZE`); `BUSINESS_SEQUENCE_BLOCK_SIZE` (default 100) — Hi/Lo блочная
-  аллокация BusinessSequence (row-lock конвой на общем prefix-row устранён).
+- Backend pool: `DATABASE_POOL_SIZE` (default 20) + `seqClient` (3, конфиг
+  `DATABASE_SEQ_POOL_SIZE`, выделенный клиент Prisma). Аудит нумераций: Hi/Lo
+  блочная аллокация BusinessSequence и переменная `BUSINESS_SEQUENCE_BLOCK_SIZE`
+  УДАЛЕНЫ — теперь сплошная последовательность: каждый код = один атомарный
+  upsert `value += 1` в доменной транзакции (`src/shared/ids.service.ts`,
+  `src/shared/reference-number.service.ts`); аллокаторы seqClient не используют.
   Бюджет 2 app + 2 worker: 4 × (20 + 3) = 92 < PG max_connections=100.
 - MinIO/S3 up if media-bearing scenarios run (public media, storefront assets).
 - Harness: `backend/src/perf/run.ts` (dependency-free; `npm run perf:run`). No third-party

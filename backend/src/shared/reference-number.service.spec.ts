@@ -1,23 +1,18 @@
 import { ReferenceNumberService } from "./reference-number.service";
 
-/** Prisma mock — only BusinessSequence upsert needed for allocator. */
+/** Prisma mock — only BusinessSequence upsert needed for allocator.
+ *  Аудит нумераций: Hi/Lo удалён — allocator делает один upsert increment +1
+ *  на ГЛОБАЛЬНОМ клиенте (legacy `null`-tx вызовы в этой спеке). */
 function makePrismaMock() {
   const seq = new Map<string, number>();
   return {
-    seqClient: {
-      $transaction: jest.fn(async (fn: (tx: any) => Promise<any>) => {
-        const tx = {
-          businessSequence: {
-            upsert: jest.fn(async (args: any) => {
-              const prefix = args.where.prefix;
-              const current = seq.get(prefix) ?? 0;
-              const newVal = current + args.update.value.increment;
-              seq.set(prefix, newVal);
-              return { prefix, value: newVal };
-            }),
-          },
-        };
-        return fn(tx);
+    businessSequence: {
+      upsert: jest.fn(async (args: any) => {
+        const prefix = args.where.prefix;
+        const current = seq.get(prefix);
+        const newVal = current === undefined ? args.create.value : current + args.update.value.increment;
+        seq.set(prefix, newVal);
+        return { prefix, value: newVal };
       }),
     },
   } as any;
@@ -180,35 +175,38 @@ describe("ReferenceNumberService — Tenant-Scoped Reference Number Contract", (
     });
   });
 
-  // ── Block allocation ──────────────────────────────────────────────────
+  // ── Сплошная аллокация (аудит нумераций: Hi/Lo удалён) ───────────────
 
-  describe("Hi/Lo block allocation", () => {
-    it("allocates from block without hitting DB each time", async () => {
-      // First call triggers block claim
+  describe("Сплошная аллокация (без Hi/Lo-блоков)", () => {
+    it("каждый вызов = ровно один upsert increment +1 (нет кэша блоков)", async () => {
       const r1 = await service.nextMarketplaceReference(null as any, "ORD");
       expect(r1).toBe("MKT-ORD-00000001");
+      expect(prisma.businessSequence.upsert).toHaveBeenCalledTimes(1);
+      expect(prisma.businessSequence.upsert.mock.calls[0][0].update.value.increment).toBe(1);
 
-      // Next 99 calls should come from cache (no additional DB calls)
-      for (let i = 2; i <= 100; i++) {
+      const r2 = await service.nextMarketplaceReference(null as any, "ORD");
+      expect(r2).toBe("MKT-ORD-00000002");
+      expect(prisma.businessSequence.upsert).toHaveBeenCalledTimes(2);
+    });
+
+    it("101 аллокация строго подряд: 1..101, ровно 101 upsert — «хвост блока» не сгорает", async () => {
+      for (let i = 1; i <= 101; i++) {
         const r = await service.nextMarketplaceReference(null as any, "ORD");
         expect(r).toBe(`MKT-ORD-${String(i).padStart(8, "0")}`);
       }
-
-      // Only 1 DB call (block size = 100)
-      expect(prisma.seqClient.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.businessSequence.upsert).toHaveBeenCalledTimes(101);
+      // Ни один инкремент не больше 1.
+      for (const call of prisma.businessSequence.upsert.mock.calls) {
+        expect(call[0].update.value.increment).toBe(1);
+      }
     });
 
-    it("claims new block after exhausting current block", async () => {
-      // Exhaust first block (100)
-      for (let i = 1; i <= 100; i++) {
-        await service.nextMarketplaceReference(null as any, "ORD");
-      }
-      expect(prisma.seqClient.$transaction).toHaveBeenCalledTimes(1);
-
-      // 101st call triggers new block
-      const r = await service.nextMarketplaceReference(null as any, "ORD");
-      expect(r).toBe("MKT-ORD-00000101");
-      expect(prisma.seqClient.$transaction).toHaveBeenCalledTimes(2);
+    it("перезапуск не влияет: новая инстанция продолжает последовательность", async () => {
+      await service.nextMarketplaceReference(null as any, "ORD");
+      await service.nextMarketplaceReference(null as any, "ORD");
+      const fresh = new ReferenceNumberService(prisma);
+      const r = await fresh.nextMarketplaceReference(null as any, "ORD");
+      expect(r).toBe("MKT-ORD-00000003");
     });
   });
 

@@ -40,6 +40,7 @@ import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../validation-pipe";
 import { IDEMPOTENT_KEY, validateIdempotencyKeyHeader } from "./idempotency.constants";
 import { deriveRequestFingerprint } from "./idempotency.fingerprint";
 import { IdempotencyService } from "./idempotency.service";
+import { deriveSlotKey } from "./idempotency.slot-key";
 
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {
@@ -77,6 +78,12 @@ export class IdempotencyInterceptor implements NestInterceptor {
       (request.params ?? {}) as Record<string, string>,
       validatedBody,
     );
+
+    // Бизнес-идемпотентность по слоту (2.12H crash window 3, MULTI/PARTIAL §13):
+    // хендлер/сервис видит ТОТ ЖЕ slotKey, что и эта операция — payment.create
+    // возвращает уже созданный Payment при stale-crash re-execution (без дубля).
+    // Значение вычисляется сервером (scope+operation+clientKey), из body не берётся.
+    request.idempotencySlotKey = deriveSlotKey({ type: "USER", id: user.id }, operation, clientKey);
 
     const result = await this.idempotency.execute({
       scope: { type: "USER", id: user.id },

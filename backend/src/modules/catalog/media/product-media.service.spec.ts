@@ -13,6 +13,7 @@ const PARTNER: AuthUser = {
   id: "u-partner",
   code: "USR-00000009",
   username: "partner1",
+  phone: null,
   email: null,
   fullName: null,
   status: "ACTIVE",

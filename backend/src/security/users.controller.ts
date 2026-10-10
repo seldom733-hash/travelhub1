@@ -5,6 +5,7 @@ import { Type } from "class-transformer";
 import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
 import { RoleCode, UserStatus } from "../generated/prisma/enums";
 import { SecurityService } from "./security.service";
+import { ActivationService } from "./activation.service";
 import { JwtAuthGuard } from "./auth/jwt-auth.guard";
 import { PermissionsGuard } from "./auth/permissions.guard";
 import { CurrentUser, RequirePermissions } from "./auth/decorators";
@@ -113,7 +114,10 @@ class ReconcileBuyersDto {
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller("users")
 export class UsersController {
-  constructor(private readonly security: SecurityService) {}
+  constructor(
+    private readonly security: SecurityService,
+    private readonly activation: ActivationService,
+  ) {}
 
   @Get()
   @RequirePermissions("settings.write")
@@ -188,6 +192,18 @@ export class UsersController {
   }
 
   /**
+   * M4.3 §19 (option B) — выдать activation token (single-use, 24h, hash в БД).
+   * Plaintext возвращается ТОЛЬКО в этом ответе (один раз) и не логируется;
+   * оператор может передать ссылку вручную, пока delivery-провайдер отложен
+   * (dependency задокументирована в M4-IMPLEMENTATION-REPORT).
+   */
+  @Post(":id/activation-token")
+  @RequirePermissions("settings.write")
+  async issueActivationToken(@Param("id") id: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.activation.issue(id, { id: actor.id, username: actor.username });
+  }
+
+  /**
    * Step 1.9 (review) — явная idempotent migration/repair command для legacy
    * BUYER без валидного customerId. НЕ startup backfill: вызывается оператором
    * (ADMIN) явно, с dry-run/report и аудитом результата.
@@ -204,6 +220,30 @@ export class UsersController {
       userId: actor.id,
       username: actor.username,
       action: dryRun ? "user.buyer_customer_repair_dryrun" : "user.buyer_customer_repair",
+      resource: "User",
+      resourceId: null,
+      details: result,
+    });
+    return result;
+  }
+
+  /**
+   * M4.1 (ADR-0016) — явная idempotent backfill-команда loginPhone из
+   * канонического телефона Customer. dry-run/report + аудит (как Step 1.9).
+   * Конфликты (canonical занят) → отчёт, без перезаписи и без мержа.
+   */
+  @Post("reconcile-login-phones")
+  @RequirePermissions("settings.write")
+  async reconcileLoginPhones(
+    @Body() dto: ReconcileBuyersDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    const dryRun = dto.dryRun ?? false;
+    const result = await this.security.backfillLoginPhones(dryRun);
+    await this.security.audit(undefined, {
+      userId: actor.id,
+      username: actor.username,
+      action: dryRun ? "user.login_phone_backfill_dryrun" : "user.login_phone_backfill",
       resource: "User",
       resourceId: null,
       details: result,

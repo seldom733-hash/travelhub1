@@ -242,6 +242,26 @@ describe("AzalController — markup + server-authoritative /request (Phase 2 §1
       expect(second.status).toBe("NEW");
     });
 
+    it("F1 CARRY CHILD AGES: passengers.childAges travels into pinnedRequirements (data only — no AZAL DOB)", async () => {
+      const h = makeController([OW_FLIGHT()]);
+
+      await h.controller.createRequest(
+        requestBody({
+          passengers: { adults: 2, children: 3, infants: 0, childAges: [2, 6, 12] },
+        }) as never,
+      );
+
+      const data = h.prisma.request.create.mock.calls[0][0].data;
+      // The composition of record survives on the request row …
+      expect(data.pinnedRequirements.passengers.childAges).toEqual([2, 6, 12]);
+      expect(data.pinnedRequirements.passengers.adults).toBe(2);
+      // … while AZAL's supplier contract stays counts-only: no DOB field is
+      // ever populated by the controller (childrenDatesOfBirth stays null in
+      // the AZAL http body) and no price is derived from ages in TravelHUB.
+      expect(data.travelerCount).toBe(2);
+      expect(JSON.stringify(data.pinnedRequirements)).not.toContain("childrenDatesOfBirth");
+    });
+
     it("stale/foreign segment keys → PRICE_UNAVAILABLE 400 (client price rejected)", async () => {
       const h = makeController([OW_FLIGHT()]);
 

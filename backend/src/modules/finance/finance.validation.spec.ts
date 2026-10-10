@@ -5,10 +5,12 @@ import "reflect-metadata";
 import {
   assertValidRange,
   FINANCE_MASTER_FORBIDDEN_KEYS,
+  PAYMENT_CREATE_FORBIDDEN_KEYS,
   validateCountryIso,
   validateIsoCode,
   validateLedgerAmount,
   validateOccurredAt,
+  validatePaymentAmount,
   validateRate,
   validateTaxRate,
 } from "./finance.validation";
@@ -147,5 +149,40 @@ describe("finance.validation — ledger occurredAt (Step 2.10C)", () => {
 describe("finance.validation — forbidden keys", () => {
   it("protects all server-owned fields", () => {
     expect(FINANCE_MASTER_FORBIDDEN_KEYS).toEqual(expect.arrayContaining(["id", "code", "createdAt", "updatedAt", "version"]));
+  });
+});
+
+// MULTI/PARTIAL PAYMENTS (§4): клиентская сумма платежа.
+describe("finance.validation — payment amount (MULTI/PARTIAL)", () => {
+  it("validatePaymentAmount: положительный decimal, до 2 знаков — принимается", () => {
+    expect(validatePaymentAmount("300")).toBe("300");
+    expect(validatePaymentAmount("300.00")).toBe("300.00");
+    expect(validatePaymentAmount("0.01")).toBe("0.01");
+    expect(validatePaymentAmount("12345.99")).toBe("12345.99");
+  });
+
+  it("validatePaymentAmount: 0 / отрицательный / не-число / пусто → 422", () => {
+    expect(() => validatePaymentAmount("0")).toThrow(ValidationDomainError);
+    expect(() => validatePaymentAmount("-1")).toThrow(ValidationDomainError);
+    expect(() => validatePaymentAmount("-0.01")).toThrow(ValidationDomainError);
+    expect(() => validatePaymentAmount("abc")).toThrow(ValidationDomainError);
+    expect(() => validatePaymentAmount("")).toThrow(ValidationDomainError);
+    expect(() => validatePaymentAmount("   ")).toThrow(ValidationDomainError);
+    expect(() => validatePaymentAmount("Infinity")).toThrow(ValidationDomainError);
+  });
+
+  it("validatePaymentAmount: более 2 знаков после запятой → 422 (DECIMAL(12,2))", () => {
+    expect(() => validatePaymentAmount("10.123")).toThrow(ValidationDomainError);
+    expect(() => validatePaymentAmount("10.001")).toThrow(ValidationDomainError);
+  });
+
+  it("amount ИЗВЛЕЧЁН из forbidden-списка create Payment; валюта/статус/милstones под защитой", () => {
+    expect(PAYMENT_CREATE_FORBIDDEN_KEYS).not.toContain("amount");
+    expect(PAYMENT_CREATE_FORBIDDEN_KEYS).toEqual(
+      expect.arrayContaining(["status", "currency", "id", "code", "paidAt", "isActivePayment", "providerRef"]),
+    );
+    // MULTI/PARTIAL §13: per-slot ключ бизнес-идемпотентности — server-owned
+    // (проставляет только IdempotencyInterceptor), forged в body → 422.
+    expect(PAYMENT_CREATE_FORBIDDEN_KEYS).toContain("idempotencySlotKey");
   });
 });

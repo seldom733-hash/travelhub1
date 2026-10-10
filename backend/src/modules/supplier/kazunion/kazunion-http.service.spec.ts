@@ -210,3 +210,49 @@ describe("KazunionHttpService", () => {
     });
   });
 });
+
+// ── Confirmed AGES contract (owner-supplied real request) ──────────────────
+// ADULT=2 CHILD=3 AGES=4,6,8 — ONE comma-separated param with every child
+// age; the former AGE1..AGE4 split (and its 4-age ceiling) is gone.
+
+describe("KazunionHttpService — AGES param (confirmed contract)", () => {
+  const service = new KazunionHttpService();
+  const base = {
+    stateInc: "6",
+    tourInc: "2791",
+    checkInBeg: "2026-10-05",
+    checkInEnd: "2026-10-12",
+  };
+
+  const buildUrl = (params: Record<string, unknown>, page = 1): string =>
+    (service as unknown as { buildPricesUrl: (p: unknown, page: number) => string })
+      .buildPricesUrl(params, page);
+
+  it("serializes childAges as AGES=<csv> (AGES=4,6,8)", () => {
+    const url = buildUrl({ ...base, adults: 2, children: 3, childAges: [4, 6, 8] });
+    expect(url).toContain("ADULT=2");
+    expect(url).toContain("CHILD=3");
+    expect(url).toContain(`AGES=${encodeURIComponent("4,6,8")}`);
+  });
+
+  it("carries MORE than four ages — no AGE1..AGE4 ceiling on the wire", () => {
+    const url = buildUrl({
+      ...base,
+      children: 6,
+      childAges: [1, 2, 3, 4, 5, 6],
+    });
+    expect(url).toContain(`AGES=${encodeURIComponent("1,2,3,4,5,6")}`);
+    expect(url).not.toContain("AGE1=");
+    expect(url).not.toContain("AGE4=");
+  });
+
+  it("preserves canonical ordering (composition order, not sorted)", () => {
+    const url = buildUrl({ ...base, children: 3, childAges: [8, 4, 6] });
+    expect(url).toContain(`AGES=${encodeURIComponent("8,4,6")}`);
+  });
+
+  it("omits AGES entirely for a no-children composition", () => {
+    const url = buildUrl({ ...base, adults: 2, children: 0, childAges: [] });
+    expect(url).not.toContain("AGES=");
+  });
+});
