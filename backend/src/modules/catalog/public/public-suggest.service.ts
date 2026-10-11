@@ -38,6 +38,7 @@ export class PublicSuggestService {
       title: string;
       description: string | null;
       slug: string;
+      code: string;
       categoryTitle: string | null;
       thumbnailStorageKey: string | null;
     }>>(Prisma.sql`
@@ -46,6 +47,7 @@ export class PublicSuggestService {
         p."title",
         p."description",
         p."slug",
+        p."code",
         c."title" AS "categoryTitle",
         m."thumbnailStorageKey"
       FROM catalog."Product" p
@@ -65,7 +67,8 @@ export class PublicSuggestService {
       name: r.title,
       subtitle: r.categoryTitle ?? undefined,
       imageUrl: r.thumbnailStorageKey ? `/api/v1/public/media/${r.id}/thumb` : undefined,
-      href: `/products/${r.slug}`,
+      // Нейтральные URL: саджест ведёт на PRD-код, slug-ссылки мертвы (404).
+      href: `/products/${r.code}`,
     }));
   }
 

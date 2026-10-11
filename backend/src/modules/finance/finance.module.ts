@@ -10,6 +10,11 @@ import { PaymentService } from "./payment.service";
 import { PaymentProviderModule } from "./provider/payment-provider.module";
 import { RefundService } from "./refund.service";
 import { SettlementService } from "./settlement.service";
+import { SupplierFxRateService } from "./supplier-fx-rate.service";
+import { SupplierObligationService } from "./supplier-obligation.service";
+import { SupplierObligationConsumer } from "./supplier-obligation.consumer";
+import { FinanceOverviewService } from "./finance-overview.service";
+import { LedgerPostingConsumer } from "./ledger-posting.consumer";
 
 /**
  * PHASE 2 STEP 2.10 — Finance Domain Foundation (новый bounded context, finance.*).
@@ -28,10 +33,12 @@ import { SettlementService } from "./settlement.service";
 @Module({
   imports: [PaymentProviderModule],
   controllers: [FinanceController],
-  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer],
+  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer, SupplierFxRateService, SupplierObligationService, SupplierObligationConsumer, FinanceOverviewService, LedgerPostingConsumer],
   /** Step 2.12E: CommissionPolicyService экспортируется для Sales/Order
    *  freeze-time read (ADR-0013 D1: read by Sales/Order at freeze boundary,
-   *  READ-only cross-domain). CommissionService/Consumer — Finance-internal. */
-  exports: [CommissionPolicyService, CommissionService, FinanceService, PaymentProviderModule],
+   *  READ-only cross-domain). CommissionService/Consumer — Finance-internal.
+   *  UNIFIED FINANCE CENTER Phase 1: SupplierFxRateService экспортируется для
+   *  Supplier/Pricing FX-интеграции (convert-then-markup, strict money-пути). */
+  exports: [CommissionPolicyService, CommissionService, FinanceService, PaymentProviderModule, SupplierFxRateService],
 })
 export class FinanceModule {}

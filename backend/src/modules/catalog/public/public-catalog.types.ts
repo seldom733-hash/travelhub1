@@ -71,6 +71,8 @@ export type PublicSellerVisibilityMode = "ANONYMOUS" | "VERIFIED_ALIAS" | "PUBLI
 export interface PublicSeller {
   /** Стабильный публичный id (SELL-*), НЕ partnerId. */
   publicId: string;
+  /** CRM Partner.code (PAR-*) — код поставщика для отображения на карточке. */
+  partnerCode: string | null;
   /** Отображаемое имя по visibilityMode; null для ANONYMOUS (generic label). */
   displayName: string | null;
   visibilityMode: PublicSellerVisibilityMode;
@@ -91,6 +93,8 @@ export interface PublicSeller {
  */
 export interface PublicProductCard {
   id: string;
+  /** Каталожный код продукта (PRD-*) — используется в публичных ссылках /products/PRD-*. */
+  code: string;
   slug: string;
   title: string;
   /** Производное представление description (усечённое, детерминированное). */

@@ -9,7 +9,7 @@
  * Mass-assignment: server-owned поля (id/code/createdAt/updatedAt/version)
  * запрещены громко (422, project convention loud-forbidden-key) — не silent strip.
  */
-import { IsBoolean, IsEnum, IsISO8601, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
+import { IsBoolean, IsEnum, IsISO8601, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
 import { Type } from "class-transformer";
 import { ValidationDomainError } from "../../shared/errors";
 import { Prisma } from "../../generated/prisma/client";
@@ -220,7 +220,236 @@ export class UpdateTaxRuleDto {
   isActive?: boolean;
 }
 
-// ── Pure validators (unit-testable) ───────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED FINANCE CENTER Phase 1 — SupplierFxRate (supplier-specific «1 = N AZN»)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * SupplierFxRate write DTO: client передаёт supplierCode + sourceCurrencyIso +
+ * rate. Server-owned поля (id/code/targetCurrencyIso/updatedBy-поля/timestamps)
+ * запрещены громко — конвенция FINANCE_MASTER_FORBIDDEN_KEYS.
+ * targetCurrencyIso API-фиксирован на "AZN" (storage-расширяемость не
+ * означает открытый V1 API — валидация в сервисе).
+ */
+export class SetSupplierFxRateDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  supplierCode!: string;
+
+  /** ISO 4217 source (валюта поставщика): ровно 3 заглавные. */
+  @IsString()
+  @Length(3, 3)
+  sourceCurrencyIso!: string;
+
+  /** «1 sourceCurrency = rate AZN»: > 0, ≤ 6 знаков (validateRate). */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  rate!: string;
+}
+
+/** Whitelist-query для чтения текущих курсов (фильтры опциональны). */
+export class SupplierFxRateListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  supplierCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  sourceCurrencyIso?: string;
+}
+
+/** Whitelist-query для чтения истории (по коду курса или паре supplier+source). */
+export class SupplierFxRateHistoryQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  code?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  supplierCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  sourceCurrencyIso?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+}
+
+/** Валидация supplier FX rate: > 0, ≤ 6 знаков (reuse validateRate контракта).
+ *  AZN→AZN отклоняется (всегда 1, без строки) — гейт в сервисе. */
+export function validateSupplierFxRate(rate: string): string {
+  return validateRate(rate);
+}
+
+// ── SupplierObligation / SupplierPayout (UNIFIED FINANCE CENTER Phase 2) ────
+
+/** Whitelist-query для чтения обязательств (фильтры опциональны). */
+export class ObligationListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  supplierCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  orderId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  pageSize?: number;
+}
+
+/** Whitelist-query для чтения исходящих платежей (фильтры опциональны). */
+export class SupplierPayoutListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  obligationCode?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  pageSize?: number;
+}
+
+/** Денежное значение (decimal-строка, > 0 валидируется в сервисе). */
+const DECIMAL_RE = /^\d+(\.\d{1,6})?$/;
+
+/** DTO частичной выплаты поставщику (server валидирует суммы/курс).
+ *  obligationCode берётся из path-param (не из body) → необязательное поле
+ *  DTO; forged body obligationCode отклоняется assertNoForbiddenKeys → 422. */
+export class CreateSupplierPayoutDto {
+  /** Фактическое движение (банковский rail): > 0, ≤ 6 знаков после точки. */
+  @IsString()
+  @Matches(DECIMAL_RE)
+  @MaxLength(32)
+  amount!: string;
+
+  /** ISO 4217 фактического движения. */
+  @IsString()
+  @Length(3, 3)
+  currency!: string;
+
+  /** AZN-аллокация обязательства; опциональна (сервер считает при совпадении
+   *  валюты + fxRate); обязательна при валютной несовместимости. */
+  @IsOptional()
+  @IsString()
+  @Matches(DECIMAL_RE)
+  @MaxLength(32)
+  aznAmount?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  fxRate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  method?: string;
+
+  /** Ключ идемпотентности внешнего rail (replay → no-op; divergent → 409). */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  providerRef?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  occurredAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  evidenceUrl?: string;
+}
+
+/** DTO корректировки суммы обязательства (только unpaid; audit). */
+export class AdjustObligationDto {
+  @IsString()
+  @Matches(DECIMAL_RE)
+  @MaxLength(32)
+  newAznAmount!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(DECIMAL_RE)
+  @MaxLength(32)
+  newSourceAmount?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+/** DTO отмены обязательства (только unpaid; audit). */
+export class CancelObligationDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+/** Whitelist-query для сводных KPI (диапазон дат опционален). */
+export class FinanceOverviewQueryDto {
+  @IsOptional()
+  @IsISO8601()
+  from?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  to?: string;
+}
+
+/** Pure validators (unit-testable) ─────────────────────────────────────────── */
 
 /** Валидация ISO 4217 (3 заглавные). */
 export function validateIsoCode(iso: string, label = "isoCode"): string {

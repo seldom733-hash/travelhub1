@@ -54,8 +54,11 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     headingKey: "nav.group.finance",
     items: [
+      { href: "/app/finance/overview", icon: "📉", labelKey: "nav.finance_overview", permission: "finance.overview.read" },
       { href: "/app/payments", icon: "💳", labelKey: "nav.payments", permission: "finance.payment.read" },
+      { href: "/app/finance/obligations", icon: "📤", labelKey: "nav.supplier_obligations", permission: "finance.obligation.read" },
       { href: "/app/pricing/markup", icon: "％", labelKey: "nav.markup_matrix", permission: "pricing.markup.read" },
+      { href: "/app/finance/fx-rates", icon: "💱", labelKey: "nav.fx_rates", permission: "finance.fx_rate.read" },
     ],
   },
   {

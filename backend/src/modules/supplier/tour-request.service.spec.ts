@@ -41,14 +41,17 @@ const DTO = {
 function snapshot(overrides: Partial<SupplierPriceSnapshot> = {}): SupplierPriceSnapshot {
   return {
     amount: 1050,
-    currency: "USD",
+    // UNIFIED FINANCE CENTER Phase 1: recheck возвращает AZN (management
+    // currency; USD-источник конвертируется на pricing-границе или gate
+    // блокирует request при отсутствии курса).
+    currency: "AZN",
     fetchedAt: new Date(),
     expiresAt: new Date(),
     queryHash: "h",
     source: "KOMPAS",
     pricing: {
       supplierAmount: 1000,
-      currency: "USD",
+      currency: "AZN",
       markupRate: "0.05",
       markupAmount: 50,
       publicAmount: 1050,
@@ -78,7 +81,7 @@ function makeHarness(): Harness {
         referenceNumber: "R-1",
         status: "NEW",
         displayedPrice: 1050,
-        displayedCurrency: "USD",
+        displayedCurrency: "AZN",
         createdAt: new Date(),
       }),
     },
@@ -137,7 +140,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
 
     const data = h.prisma.request.create.mock.calls[0][0].data;
     expect(data.displayedPrice).toBe(1050);
-    expect(data.displayedCurrency).toBe("USD");
+    expect(data.displayedCurrency).toBe("AZN");
     expect(data.displayedPrice).not.toBe(999999);
 
     expect(out.displayedPrice).toBe(1050);
@@ -342,7 +345,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     expect(data.productId).toBeNull();
     // «Подтв. цена» = server-authoritative re-check right after service selection
     expect(data.confirmedPrice).toBe(1050);
-    expect(data.confirmedCurrency).toBe("USD");
+    expect(data.confirmedCurrency).toBe("AZN");
   });
 
   it("Phase 3 §20: working commercial snapshot frozen at creation from the recheck pricing block", async () => {
@@ -358,7 +361,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
       supplierCode: "KOMPAS",
       serviceType: "tours",
       supplierPrice: 1000,
-      supplierCurrency: "USD",
+      supplierCurrency: "AZN",
       markupRate: "0.05",
       markupAmount: 50,
       markupRuleCode: "MKR-00000001",
@@ -367,7 +370,7 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
       individualDiscount: false,
       discountAmount: 0,
       customerFinalPrice: 1050,
-      customerCurrency: "USD",
+      customerCurrency: "AZN",
       priceSource: "PUBLIC",
       supplierPriceFetchedAt: fetchedAt.toISOString(),
       supplierPriceExpiresAt: expiresAt.toISOString(),
@@ -390,9 +393,74 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     // Product rule: «Подтв. цена» = принята́я цена витрины at card creation —
     // frozen unconditionally (money-gate sees confirmed === displayed anyway).
     expect(data.confirmedPrice).toBe(1050);
-    expect(data.confirmedCurrency).toBe("USD");
+    expect(data.confirmedCurrency).toBe("AZN");
     // …but the productSnapshot is still written for the «Услуга» cell
     expect(data.productSnapshot).toMatchObject({ productTitle: "Rixos", productType: "TOUR" });
+  });
+
+  it("Phase 1 FX strict gate: recheck в USD без fx-блока → controlled error (никогда не заявить AZN)", async () => {
+    const h = makeHarness();
+    const raw = snapshot();
+    // Поставщик вернул USD-деньги без fx-блока — курса нет, конвертировать
+    // нечем. Никогда не подменять 1 и не писать snapshot как AZN.
+    raw.currency = "USD";
+    raw.pricing = {
+      supplierAmount: 1000,
+      currency: "USD",
+      markupRate: "0.05",
+      markupAmount: 50,
+      publicAmount: 1050,
+      markupRuleCode: "MKR-00000001",
+      markupRuleVersion: 1,
+      configurationState: "CONFIGURED",
+      calculatedAt: new Date().toISOString(),
+    };
+    h.offerService.refreshPrice.mockResolvedValue(raw);
+
+    await expect(h.service.createTourRequest(DTO)).rejects.toThrow(/missing FX rate/);
+    expect(h.prisma.request.create).not.toHaveBeenCalled();
+  });
+
+  it("Phase 1 FX: recheck в USD с fx-блоком → snapshot frozen в AZN с SOURCE-фактами", async () => {
+    const h = makeHarness();
+    const raw = snapshot();
+    raw.currency = "AZN"; // snapshot-денежная цепочка в AZN после convert
+    raw.amount = 1785;
+    raw.pricing = {
+      supplierAmount: 1000, // SOURCE USD
+      currency: "USD",
+      publicCurrency: "AZN",
+      markupRate: "0.05",
+      markupAmount: 85, // 1700 × 5%
+      publicAmount: 1785,
+      markupRuleCode: "MKR-00000001",
+      markupRuleVersion: 1,
+      configurationState: "CONFIGURED",
+      calculatedAt: new Date().toISOString(),
+      fx: {
+        sourceAmount: 1000,
+        sourceCurrency: "USD",
+        rate: "1.7",
+        rateCode: "SFX-00000001",
+        aznAmount: 1700,
+        convertedAt: new Date("2026-10-10T00:00:00Z").toISOString(),
+      },
+    };
+    h.offerService.refreshPrice.mockResolvedValue(raw);
+
+    await h.service.createTourRequest(DTO);
+
+    const data = h.prisma.request.create.mock.calls[0][0].data;
+    expect(data.commercialSnapshot).toMatchObject({
+      supplierPrice: 1000, // SOURCE
+      supplierCurrency: "USD",
+      customerCurrency: "AZN",
+      publicPrice: 1785,
+      customerFinalPrice: 1785,
+      fx: { sourceAmount: 1000, sourceCurrency: "USD", rate: "1.7", aznAmount: 1700 },
+    });
+    expect(data.displayedPrice).toBe(1785);
+    expect(data.displayedCurrency).toBe("AZN");
   });
 
   it("legacy (no customer block) → request created unlinked, resolver untouched", async () => {

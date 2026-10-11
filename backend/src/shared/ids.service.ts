@@ -8,7 +8,7 @@ import { PrismaService } from "../prisma/prisma.service";
  * Бизнес-идентификаторы неизменяемы, генерируются ТОЛЬКО доменом-владельцем,
  * атомарным инкрементом счётчика (таблица events.BusinessSequence):
  *   PRD-* Product, ORD-* Order, BKG-* Booking, CUS-* Customer,
- *   CNT-* Contact, CAT-* Category, TRF-* Tariff, SUP-*, PAR-*, COM-*,
+ *   CNT-* Contact, CAT-* Category, TRF-* Tariff, SUP-*, PRN-*, COM-*,
  *   TH-YYYY-###### — пользовательский номер Order (последовательность по году).
  *
  * СПЛОШНАЯ (contiguous) последовательность — Owner Decision (Аудит нумераций):

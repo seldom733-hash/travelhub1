@@ -6,6 +6,7 @@ import { IdsService } from "../../shared/ids.service";
 import { ReferenceNumberService } from "../../shared/reference-number.service";
 import { SupplierOfferService } from "./supplier-offer.service";
 import { buildWorkingSnapshot } from "../pricing/commercial-snapshot";
+import { SupplierPricingService } from "../pricing/supplier-pricing.service";
 import { getEffectiveTravelerRequirements } from "../catalog/traveler-requirements";
 import { CrmService } from "../crm/crm.service";
 import { resolveCustomer } from "../../shared/customer-resolver/customer-resolver";
@@ -201,6 +202,12 @@ export class TourRequestService {
     // Supplier Markup Phase 3 (§20): working commercial snapshot frozen at
     // creation from the recheck pricing block (supplier price + TTL evidence).
     // Absent pricing block → legacy request (acceptance money-gate only).
+    // UNIFIED FINANCE CENTER Phase 1 (strict money-path FX gate): pricing-блок
+    // с валютой ≠ AZN обязан нести fx-блок (convert уже применён на boundary);
+    // нет курса → контролируемая ошибка до записи request (никогда silent 1).
+    if (recheck.pricing) {
+      SupplierPricingService.assertFxPresentForMoney(recheck.pricing, dto.supplierCode);
+    }
     const commercialSnapshot = recheck.pricing
       ? buildWorkingSnapshot({
           supplierCode: dto.supplierCode,

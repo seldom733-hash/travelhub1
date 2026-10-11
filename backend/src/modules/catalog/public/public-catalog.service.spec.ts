@@ -87,6 +87,8 @@ interface PrismaStub {
   categorySchema: { findFirst: jest.Mock };
   availability: { groupBy: jest.Mock };
   publicSellerProfile: { findMany: jest.Mock };
+  partner: { findMany: jest.Mock };
+  supplierFxRate: { findMany: jest.Mock };
   geoCountry: { findUnique: jest.Mock };
   geoCity: { findUnique: jest.Mock };
   geoResort: { findUnique: jest.Mock };
@@ -101,6 +103,8 @@ function makePrismaStub(overrides?: Record<string, unknown>): PrismaStub {
     categorySchema: { findFirst: jest.fn().mockResolvedValue(null) },
     availability: { groupBy: jest.fn().mockResolvedValue([]) },
     publicSellerProfile: { findMany: jest.fn().mockResolvedValue([]) },
+    partner: { findMany: jest.fn().mockResolvedValue([]) },
+    supplierFxRate: { findMany: jest.fn().mockResolvedValue([]) },
     geoCountry: { findUnique: jest.fn().mockResolvedValue(null) },
     geoCity: { findUnique: jest.fn().mockResolvedValue(null) },
     geoResort: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -126,6 +130,15 @@ function mockMatch(prisma: PrismaStub, ids: string[], total: number): void {
   prisma.$queryRaw
     .mockResolvedValueOnce(ids.map((id) => ({ id })))
     .mockResolvedValueOnce([{ total }]);
+}
+
+/** Курсы поставщика для витринных тестов: партнёр + строки USD/EUR→AZN. */
+function mockSupplierFx(prisma: PrismaStub, partnerId: string, partnerCode: string, usdRate: string, eurRate = "1.91"): void {
+  prisma.partner.findMany.mockResolvedValue([{ id: partnerId, code: partnerCode }]);
+  prisma.supplierFxRate.findMany.mockResolvedValue([
+    { supplierCode: partnerCode, sourceCurrencyIso: "USD", rate: new Prisma.Decimal(usdRate) },
+    { supplierCode: partnerCode, sourceCurrencyIso: "EUR", rate: new Prisma.Decimal(eurRate) },
+  ]);
 }
 
 /** Первый аргумент вызова $queryRaw как Prisma.Sql (strings/values). */
@@ -216,6 +229,7 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       // Step 1.11: seller-safe projection (ANONYMOUS → displayName=null, generic label).
       expect(card.seller).toEqual({
         publicId: "SELL-00000001",
+        partnerCode: null,
         displayName: null,
         visibilityMode: "ANONYMOUS",
         verified: true,
@@ -245,8 +259,40 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       expect(raw).not.toContain("X-Amz");
     });
 
-    it("ProductDraft N+1 не участвует: карточка отражает live N (draft не включён)", async () => {
+    it("витрина в AZN: тариф sync-поставщика в USD × курс поставщика (priceFrom + currency)", async () => {
       const prisma = makePrismaStub();
+      mockMatch(prisma, ["prod-1"], 1);
+      prisma.product.findMany.mockResolvedValue([PUBLISHED_PRODUCT]);
+      mockSupplierFx(prisma, "par-1", "PRN-00000002", "1.70");
+      const service = makeService(prisma);
+
+      const result = await service.listProducts({ page: 1, pageSize: 10 });
+      const card = result.items[0];
+
+      // min-тариф 100 USD × 1.7 → 170 AZN.
+      expect(card.priceFrom).toBe("170.00");
+      expect(card.currency).toBe("AZN");
+    });
+
+    it("витрина fail-open: нет курса поставщика → исходная валюта без изменений", async () => {
+      const prisma = makePrismaStub();
+      mockMatch(prisma, ["prod-1"], 1);
+      prisma.product.findMany.mockResolvedValue([PUBLISHED_PRODUCT]);
+      // Курсы есть, но только на EUR — USD-тариф не конвертируется.
+      prisma.partner.findMany.mockResolvedValue([{ id: "par-1", code: "PRN-00000002" }]);
+      prisma.supplierFxRate.findMany.mockResolvedValue([
+        { supplierCode: "PRN-00000002", sourceCurrencyIso: "EUR", rate: new Prisma.Decimal("1.91") },
+      ]);
+      const service = makeService(prisma);
+
+      const result = await service.listProducts({ page: 1, pageSize: 10 });
+      const card = result.items[0];
+
+      expect(card.priceFrom).toBe("100.00");
+      expect(card.currency).toBe("USD");
+    });
+
+    it("ProductDraft N+1 не участвует: карточка отражает live N (draft не включён)", async () => {      const prisma = makePrismaStub();
       mockMatch(prisma, ["prod-1"], 1);
       prisma.product.findMany.mockResolvedValue([PUBLISHED_PRODUCT]);
       const service = makeService(prisma);
@@ -412,6 +458,17 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       await expect(service.getProductDetail("missing")).rejects.toThrow(NotFoundError);
     });
 
+    it("нейтральные URL: PDP резолвится только по коду/id — slug в запросе отсутствует (старые страницы 404)", async () => {
+      const prisma = makePrismaStub();
+      prisma.product.findFirst.mockResolvedValue(PUBLISHED_PRODUCT);
+      const service = makeService(prisma);
+
+      await service.getProductDetail("PRD-00000001");
+      const where = prisma.product.findFirst.mock.calls[0][0].where;
+      expect(where.OR).toEqual([{ id: "PRD-00000001" }, { code: "PRD-00000001" }]);
+      expect(JSON.stringify(where)).not.toContain("slug");
+    });
+
     it("PDP mapper: без internal полей, media со СТАБИЛЬНЫМ delivery URL (FIX 1), tariffs/availability/provider", async () => {
       const prisma = makePrismaStub();
       prisma.product.findFirst.mockResolvedValue(PUBLISHED_PRODUCT);
@@ -419,7 +476,7 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       const storage = makeStorageStub();
       const service = makeService(prisma, storage);
 
-      const detail = await service.getProductDetail("tour-1");
+      const detail = await service.getProductDetail("PRD-00000001");
 
       expect(detail.product.title).toBe("Tour N");
       expect(detail.product.version).toBe(4);
@@ -438,6 +495,7 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       // Step 1.11: seller-safe projection вместо raw CRM provider.
       expect(detail.product.seller).toEqual({
         publicId: "SELL-00000001",
+        partnerCode: null,
         displayName: null,
         visibilityMode: "ANONYMOUS",
         verified: true,
@@ -464,6 +522,24 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       expect(raw).not.toContain("https://");
     });
 
+    it("PDP в AZN: priceFrom и каждый FIXED-тариф конвертируются курсом поставщика", async () => {
+      const prisma = makePrismaStub();
+      prisma.product.findFirst.mockResolvedValue(PUBLISHED_PRODUCT);
+      mockSupplierFx(prisma, "par-1", "PRN-00000002", "1.70");
+      const service = makeService(prisma);
+
+      const detail = await service.getProductDetail("PRD-00000001");
+
+      // 100 USD × 1.7 → 170 AZN; 150 USD × 1.7 → 255 AZN.
+      expect(detail.product.priceFrom).toBe("170.00");
+      expect(detail.product.currency).toBe("AZN");
+      expect(detail.product.tariffs).toHaveLength(2);
+      expect(detail.product.tariffs[0].price).toBe("255.00");
+      expect(detail.product.tariffs[0].currency).toBe("AZN");
+      expect(detail.product.tariffs[1].price).toBe("170.00");
+      expect(detail.product.tariffs[1].currency).toBe("AZN");
+    });
+
     it("Step 1.8B §22: POR-план видим как inquiry-only (price null, pricingMode POR), не входит в priceFrom; FIXED участвует", async () => {
       const prisma = makePrismaStub();
       prisma.product.findFirst.mockResolvedValue({
@@ -475,7 +551,7 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       });
       const service = makeService(prisma);
 
-      const detail = await service.getProductDetail("tour-1");
+      const detail = await service.getProductDetail("PRD-00000001");
 
       const tariffs = detail.product.tariffs;
       expect(tariffs).toHaveLength(2); // POR ВИДИМ (visibility ≠ bindability) — §22 fix
@@ -500,7 +576,7 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       });
       const service = makeService(prisma);
 
-      const detail = await service.getProductDetail("tour-1");
+      const detail = await service.getProductDetail("PRD-00000001");
       expect(detail.product.tariffs).toHaveLength(1); // видим
       expect(detail.product.priceFrom).toBeNull();
       expect(detail.product.currency).toBeNull();

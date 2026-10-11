@@ -45,6 +45,7 @@ function products(): PublicListResult {
     items: [
       {
         id: "p1",
+        code: "PRD-00000001",
         slug: "tour-baku",
         title: "Тур в Баку",
         shortDescription: "Выходные в Баку",

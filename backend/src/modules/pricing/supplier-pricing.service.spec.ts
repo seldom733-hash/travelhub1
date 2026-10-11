@@ -371,3 +371,158 @@ describe("SupplierPricingService — Phase 2 boundary helpers (§9)", () => {
     expect(out[0].pricing).toMatchObject({ supplierAmount: 1000, markupAmount: 100, publicAmount: 1100, markupRuleCode: "MKR-00000009" });
   });
 });
+
+// ── UNIFIED FINANCE CENTER Phase 1 — FX (convert-then-markup) ────────────────
+
+function makePricingWithFx(
+  findMock: jest.Mock,
+  resolveFx: jest.Mock,
+): SupplierPricingService {
+  const ruleService = {
+    resolve: findMock ?? jest.fn().mockResolvedValue({ found: false }),
+  } as unknown as MarkupRuleService;
+  const fxRates = { resolveSafe: resolveFx } as never;
+  return new SupplierPricingService(ruleService, fxRates);
+}
+
+const FX_USD = { rate: new Prisma.Decimal("1.70"), rateCode: "SFX-00000001" };
+
+describe("SupplierPricingService — FX convert-then-markup (Phase 1)", () => {
+  const configured5 = jest.fn().mockResolvedValue({
+    found: true,
+    rate: new Prisma.Decimal("0.05"),
+    ruleCode: "MKR-00000001",
+    ruleVersion: 1,
+  });
+
+  beforeEach(() => configured5.mockClear());
+
+  it("applyWithFx: 1000 USD × 1.70 → 1700 AZN, then 5% → public 1785 AZN; SOURCE preserved in fx", () => {
+    const svc = makePricingWithFx(configured5, jest.fn());
+    const { pricing, fxJson } = svc.applyWithFx(
+      { state: "CONFIGURED", rate: new Prisma.Decimal("0.05"), ruleCode: "MKR-00000001", ruleVersion: 1 },
+      1000,
+      "USD",
+      FX_USD,
+    );
+    expect(pricing.supplierPrice.toString()).toBe("1700"); // AZN cost base
+    expect(pricing.supplierCurrency).toBe("AZN");
+    expect(pricing.markupAmount.toString()).toBe("85"); // 1700 × 5%
+    expect(pricing.publicPrice.toString()).toBe("1785");
+    // decimal.js toString срезает хвостовые нули (канон платформы: rate.toString()).
+    expect(fxJson).toMatchObject({
+      sourceAmount: 1000,
+      sourceCurrency: "USD",
+      rate: "1.7",
+      rateCode: "SFX-00000001",
+      aznAmount: 1700,
+    });
+    expect(fxJson!.convertedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("applyWithFx: fx null → legacy same-currency behaviour (no fx block)", () => {
+    const svc = makePricingWithFx(configured5, jest.fn());
+    const { pricing, fxJson } = svc.applyWithFx(
+      { state: "CONFIGURED", rate: new Prisma.Decimal("0.05"), ruleCode: "MKR-00000001", ruleVersion: 1 },
+      1000,
+      "USD",
+      null,
+    );
+    expect(pricing.publicPrice.toString()).toBe("1050");
+    expect(pricing.supplierCurrency).toBe("USD");
+    expect(fxJson).toBeNull();
+  });
+
+  it("applyToOffer with fx: price → AZN, currency → AZN, pricing keeps SOURCE + fx block", async () => {
+    const svc = makePricingWithFx(configured5, jest.fn().mockResolvedValue(FX_USD));
+    const out = await svc.applyToOffer(makeOffer(), "SUMMERTOUR", "tours");
+    expect(out.price.amount).toBe(1785);
+    expect(out.price.currency).toBe("AZN");
+    expect(out.pricing).toMatchObject({
+      supplierAmount: 1000, // SOURCE
+      currency: "USD", // SOURCE
+      publicCurrency: "AZN",
+      markupAmount: 85,
+      publicAmount: 1785,
+      fx: { sourceAmount: 1000, sourceCurrency: "USD", rate: "1.7", aznAmount: 1700 },
+    });
+  });
+
+  it("applyToOffer without rate (fail-open browse): исходная валюта, fx отсутствует", async () => {
+    const svc = makePricingWithFx(configured5, jest.fn().mockResolvedValue(null));
+    const out = await svc.applyToOffer(makeOffer(), "SUMMERTOUR", "tours");
+    expect(out.price.amount).toBe(1050);
+    expect(out.price.currency).toBe("USD");
+    expect(out.pricing!.fx).toBeUndefined();
+    expect(out.pricing!.publicCurrency).toBeUndefined();
+  });
+
+  it("applyToPriceSnapshot with fx: amount → AZN", async () => {
+    const svc = makePricingWithFx(configured5, jest.fn().mockResolvedValue(FX_USD));
+    const out = await svc.applyToPriceSnapshot(makeSnapshot(), "SUMMERTOUR", "tours");
+    expect(out.amount).toBe(1785);
+    expect(out.currency).toBe("AZN");
+    expect(out.pricing!.fx!.aznAmount).toBe(1700);
+  });
+
+  it("applyToOffers: FX lookup once per distinct source currency", async () => {
+    const resolveFx = jest.fn().mockResolvedValue(FX_USD);
+    const svc = makePricingWithFx(configured5, resolveFx);
+    await svc.applyToOffers(
+      [makeOffer({ externalOfferId: "A" }), makeOffer({ externalOfferId: "B" })],
+      "SUMMERTOUR",
+      "tours",
+    );
+    expect(resolveFx).toHaveBeenCalledTimes(1);
+    expect(resolveFx).toHaveBeenCalledWith("SUMMERTOUR", "USD");
+  });
+
+  it("AZN-источник: fx-resolver не вызывается (identity без lookup)", async () => {
+    const resolveFx = jest.fn();
+    const svc = makePricingWithFx(configured5, resolveFx);
+    const out = await svc.applyToOffer(
+      makeOffer({ price: { ...makeOffer().price, currency: "AZN" } }),
+      "SUMMERTOUR",
+      "tours",
+    );
+    expect(resolveFx).not.toHaveBeenCalled();
+    expect(out.price.amount).toBe(1050);
+    expect(out.price.currency).toBe("AZN");
+  });
+
+  it("assertFxPresentForMoney: AZN-блок проходит; USD без fx → controlled error", () => {
+    const aznBlock = { currency: "AZN", publicAmount: 1050 } as never;
+    expect(() => SupplierPricingService.assertFxPresentForMoney(aznBlock, "KOMPAS")).not.toThrow();
+
+    const usdNoFx = { currency: "USD", publicAmount: 1050 } as never;
+    expect(() => SupplierPricingService.assertFxPresentForMoney(usdNoFx, "KOMPAS")).toThrow(/missing FX rate/);
+
+    const usdWithFx = {
+      currency: "USD",
+      publicAmount: 1785,
+      fx: { sourceAmount: 1000, sourceCurrency: "USD", rate: "1.7", rateCode: null, aznAmount: 1700, convertedAt: "2026-10-10T00:00:00Z" },
+    } as never;
+    expect(() => SupplierPricingService.assertFxPresentForMoney(usdWithFx, "KOMPAS")).not.toThrow();
+
+    // Нет pricing-блока — Gate E snapshot-билдера отвечает отдельно.
+    expect(() => SupplierPricingService.assertFxPresentForMoney(null, "KOMPAS")).not.toThrow();
+  });
+
+  it("toPricingJson с fx: SOURCE-факты поверх AZN-результата", () => {
+    const svc = makePricingWithFx(configured5, jest.fn());
+    const { pricing, fxJson } = svc.applyWithFx(
+      { state: "CONFIGURED", rate: new Prisma.Decimal("0.05"), ruleCode: "MKR-00000001", ruleVersion: 1 },
+      1000,
+      "USD",
+      FX_USD,
+    );
+    const json = svc.toPricingJson(pricing, fxJson);
+    expect(json).toMatchObject({
+      supplierAmount: 1000,
+      currency: "USD",
+      publicCurrency: "AZN",
+      markupAmount: 85,
+      publicAmount: 1785,
+    });
+  });
+});

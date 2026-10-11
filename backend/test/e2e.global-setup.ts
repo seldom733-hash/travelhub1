@@ -57,6 +57,22 @@ export default async function globalSetup(): Promise<void> {
     env: { ...process.env, DATABASE_URL: url, TEST_DATABASE_URL: url },
   });
 
+  // 2b. Seed core platform currencies (finance.Currency master data).
+  //     LedgerService validates the ISO-4217 snapshot against finance.Currency;
+  //     without these, every LedgerTransaction posting (Phase 5) would fail the
+  //     currency check. AZN/USD/EUR are the platform's core currencies (always
+  //     registered in production) — seeded once here, cloned into every suite.
+  await pgExec(
+    url,
+    `INSERT INTO "finance"."Currency" ("id", "code", "isoCode", "name", "symbol", "decimals", "isActive", "createdAt", "updatedAt")
+     VALUES
+       (gen_random_uuid(), 'CUR-00000001', 'AZN', 'Azerbaijani Manat', '₼', 2, true, now(), now()),
+       (gen_random_uuid(), 'CUR-00000002', 'USD', 'US Dollar', '$', 2, true, now(), now()),
+       (gen_random_uuid(), 'CUR-00000003', 'EUR', 'Euro', '€', 2, true, now(), now())
+     ON CONFLICT ("isoCode") DO NOTHING`,
+  );
+  process.stdout.write("[e2e] Core currencies (AZN/USD/EUR) seeded.\n");
+
   // 3. Create template database from the migrated test database.
   //    The template DB is used by e2e-isolated-env.ts for instant per-suite cloning.
   //    We connect via the maintenance DB (admin), not the template itself.

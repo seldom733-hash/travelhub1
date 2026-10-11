@@ -19,6 +19,8 @@
     "seed:geo": "ts-node src/seed/geo-seed.ts",
     "ingest:geo": "ts-node src/scripts/run-geo-ingest.ts",
     "seed:hotel-directory": "ts-node src/seed/hotel-directory-seed.ts",
+    "seed:fx-rates": "ts-node src/seed/fx-rates-seed.ts",
+    "reset:platform": "ts-node src/seed/reset-platform.ts",
     "start:dev": "powershell -ExecutionPolicy Bypass -File .\\start-azal-chrome.ps1 && npm run dev"
   },
   "dependencies": {

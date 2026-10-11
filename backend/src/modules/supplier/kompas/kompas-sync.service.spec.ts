@@ -6,16 +6,22 @@ const pricingMock = () =>
     publicAmountFor: jest.fn(async (price: number) => price),
   }) as any;
 
+/** Neutral PRD code generator mock (sync вставляет code=PRD-*, supplierRef=токен). */
+const idsMock = () =>
+  ({
+    nextCode: jest.fn(async (_tx: any, prefix: string) => `${prefix}-00000001`),
+  }) as any;
+
 describe("KompasSyncService", () => {
   describe("formatDate", () => {
     it("formats date as YYYY-MM-DD", () => {
-      const service = new KompasSyncService(null as any, null as any, null as any);
+      const service = new KompasSyncService(null as any, null as any, null as any, idsMock());
       const result = (service as any).formatDate(new Date(2026, 8, 19));
       expect(result).toBe("2026-09-19");
     });
 
     it("pads single-digit month and day", () => {
-      const service = new KompasSyncService(null as any, null as any, null as any);
+      const service = new KompasSyncService(null as any, null as any, null as any, idsMock());
       const result = (service as any).formatDate(new Date(2026, 0, 5));
       expect(result).toBe("2026-01-05");
     });
@@ -28,7 +34,7 @@ describe("KompasSyncService", () => {
           findFirst: jest.fn().mockResolvedValue(null),
         },
       };
-      const service = new KompasSyncService(mockPrisma as any, null as any, null as any);
+      const service = new KompasSyncService(mockPrisma as any, null as any, null as any, idsMock());
       const result = await service.runSync("p1");
       expect(result.errors).toContain("KOMPAS partner not found");
       expect(result.newCards).toBe(0);
@@ -41,7 +47,7 @@ describe("KompasSyncService", () => {
         },
         category: { findFirst: jest.fn().mockResolvedValue(null) },
       };
-      const service = new KompasSyncService(mockPrisma as any, null as any, null as any);
+      const service = new KompasSyncService(mockPrisma as any, null as any, null as any, idsMock());
       const result = await service.runSync("p1");
       expect(result.errors).toContain("Tours category not found");
     });
@@ -54,7 +60,7 @@ describe("KompasSyncService", () => {
         },
         category: { findFirst: jest.fn().mockResolvedValue({ id: "c1", slug: "tours" }) },
       };
-      const service = new KompasSyncService(mockPrisma as any, null as any, null as any);
+      const service = new KompasSyncService(mockPrisma as any, null as any, null as any, idsMock());
       const result = await service.runSync("p1");
       expect(result.errors).toContain("KOMPAS partner not found");
     });
@@ -70,7 +76,7 @@ describe("KompasSyncService", () => {
       const mockKompas = {
         discoverCountriesAndPrograms: jest.fn().mockRejectedValue(new Error("CAPTCHA blocked")),
       };
-      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock());
+      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock(), idsMock());
       const result = await service.runSync("p1");
       expect(result.errors[0]).toContain("Country/program discovery failed");
       expect(result.programsDiscovered).toBe(0);
@@ -87,7 +93,7 @@ describe("KompasSyncService", () => {
       const mockKompas = {
         discoverCountriesAndPrograms: jest.fn().mockResolvedValue([]),
       };
-      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock());
+      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock(), idsMock());
       const result = await service.runSync("p1");
       expect(result.offersReceived).toBe(0);
       expect(result.errors).toHaveLength(0);
@@ -141,7 +147,7 @@ describe("KompasSyncService", () => {
         search: jest.fn().mockResolvedValue(mockOffers),
       };
 
-      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock());
+      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock(), idsMock());
       const result = await service.runSync("p1");
 
       expect(result.programsDiscovered).toBe(1);
@@ -189,7 +195,7 @@ describe("KompasSyncService", () => {
         search: jest.fn().mockResolvedValue(mockOffers),
       };
 
-      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock());
+      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock(), idsMock());
       const result = await service.runSync("p1");
 
       expect(result.updatedCards).toBe(1);
@@ -232,7 +238,7 @@ describe("KompasSyncService", () => {
         search: jest.fn().mockResolvedValue(mockOffers),
       };
 
-      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock());
+      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock(), idsMock());
       const result = await service.runSync("p1");
 
       expect(result.unchangedCards).toBe(1);
@@ -281,7 +287,7 @@ describe("KompasSyncService", () => {
       const pricing = {
         publicAmountFor: jest.fn(async (price: number) => (price === 1000 ? 1050 : price)),
       };
-      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricing as any);
+      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricing as any, idsMock());
       const result = await service.runSync("p1");
 
       expect(pricing.publicAmountFor).toHaveBeenCalledWith(1000, "USD", "KOMPAS", "tours");
@@ -334,7 +340,7 @@ describe("KompasSyncService", () => {
         publicAmountFor: jest.fn(async (price: number) => (price === 900 ? 945 : price)),
       };
 
-      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricing as any);
+      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricing as any, idsMock());
       const result = await service.runSync("p1");
 
       // Supplier = 900 → markup 5% → PUBLIC 945 — ONE calculation at the
@@ -398,7 +404,7 @@ describe("KompasSyncService", () => {
         search: jest.fn().mockResolvedValue(mockOffers),
       };
 
-      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock());
+      const service = new KompasSyncService(mockPrisma as any, mockKompas as any, pricingMock(), idsMock());
       const result = await service.runSync("p1");
 
       expect(result.errors).toEqual([]);

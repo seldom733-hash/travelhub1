@@ -7,7 +7,7 @@ import { IdsService } from "../../../shared/ids.service";
 import { ReferenceNumberService } from "../../../shared/reference-number.service";
 import { FlightSupplierRegistry } from "../flight-supplier.registry";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
-import type { ResolvedMarkup } from "../../pricing/supplier-pricing.service";
+import type { FxRateInfo, ResolvedMarkup } from "../../pricing/supplier-pricing.service";
 import { buildWorkingSnapshot, type CommercialSnapshot } from "../../pricing/commercial-snapshot";
 import type { MarkupPricingJson } from "../../pricing/pricing.types";
 import type {
@@ -25,6 +25,37 @@ import type {
 /** Fare/price amounts this boundary is allowed to mark up (Gate E). */
 const isSellableAmount = (amount: number | null | undefined, currency: string | null | undefined): amount is number =>
   typeof amount === "number" && amount > 0 && !!currency;
+
+/** One RT-combine breakdown leg (adapters keep per-leg amount+currency). */
+interface MixedFareLeg {
+  amount: number;
+  currency: string;
+  base?: number | null;
+}
+
+/**
+ * Breakdown legs that MUST be converted per-leg: outbound+inbound present,
+ * sellable, and in DIFFERENT currencies (same-currency sums are exact and
+ * take the legacy single-convert path). Anything else → null (legacy path).
+ */
+function mixedBreakdownLegs(fare: FlightFare): { outbound: MixedFareLeg; inbound: MixedFareLeg } | null {
+  const breakdown = (fare.facilities as { priceBreakdown?: { outbound?: unknown; inbound?: unknown } } | null | undefined)
+    ?.priceBreakdown;
+  const read = (leg: unknown): MixedFareLeg | null => {
+    const l = leg as { amount?: unknown; currency?: unknown; base?: unknown } | null | undefined;
+    if (typeof l?.amount !== "number" || l.amount <= 0 || typeof l?.currency !== "string" || !l.currency) return null;
+    return {
+      amount: l.amount,
+      currency: l.currency,
+      base: typeof l?.base === "number" ? l.base : null,
+    };
+  };
+  const outbound = read(breakdown?.outbound);
+  const inbound = read(breakdown?.inbound);
+  if (!outbound || !inbound) return null;
+  if (outbound.currency.toUpperCase() === inbound.currency.toUpperCase()) return null;
+  return { outbound, inbound };
+}
 
 /**
  * AZAL flight API.
@@ -158,6 +189,12 @@ export class AzalController {
     // matched fare's pricing block; supplier price evidence = response
     // collectedAt, expires with the recent-search TTL (Gate I). No pricing
     // block (unpriced fare) → legacy request (acceptance money-gate only).
+    // UNIFIED FINANCE CENTER Phase 1 (strict money-path FX gate): pricing-блок
+    // с валютой ≠ AZN обязан нести fx-блок; нет курса → контролируемая ошибка
+    // до записи request (AZAL-источники обычно AZN → gate пропускает).
+    if (authoritative.pricing) {
+      SupplierPricingService.assertFxPresentForMoney(authoritative.pricing, authoritative.supplierCode);
+    }
     const commercialSnapshot: CommercialSnapshot | null = authoritative.pricing
       ? buildWorkingSnapshot({
           supplierCode: authoritative.supplierCode,
@@ -190,17 +227,27 @@ export class AzalController {
   async calendar(@Body() body: FlightCalendarRequest) {
     const result = await this.azal.calendar(body);
     // Markup boundary (§16): per-day min prices become PUBLIC (§9 — the same
-    // SupplierPricingService rule the search fan-out uses).
-    const resolution = await this.pricing.resolveSafe(result.source || "AZAL", "flights");
+    // SupplierPricingService rule the search fan-out uses). Phase 1 FX:
+    // курс источника → convert-then-markup (fail-open browse).
+    const source = result.source || "AZAL";
+    const resolution = await this.pricing.resolveSafe(source, "flights");
+    const fxByCurrency = new Map<string, FxRateInfo | null>();
+    const fxFor = async (currency: string | null | undefined): Promise<FxRateInfo | null> => {
+      if (!currency) return null;
+      if (!fxByCurrency.has(currency)) {
+        fxByCurrency.set(currency, await this.pricing.resolveFxSafe(source, currency));
+      }
+      return fxByCurrency.get(currency) ?? null;
+    };
     const prices: Record<string, FlightCalendarDay> = {};
     for (const [date, day] of Object.entries(result.prices ?? {})) {
       prices[date] = {
         ...day,
         outbound: day.outbound
-          ? { ...day.outbound, price: this.markupFlightPrice(day.outbound.price, resolution) }
+          ? { ...day.outbound, price: this.markupFlightPrice(day.outbound.price, resolution, await fxFor(day.outbound.price?.currency)) }
           : day.outbound,
         inbound: day.inbound
-          ? { ...day.inbound, price: this.markupFlightPrice(day.inbound.price, resolution) }
+          ? { ...day.inbound, price: this.markupFlightPrice(day.inbound.price, resolution, await fxFor(day.inbound.price?.currency)) }
           : day.inbound,
       };
     }
@@ -215,39 +262,113 @@ export class AzalController {
 
   // ── Markup boundary helpers (§16 / §9) ─────────────────────────────
 
-  /** Public price for one fare/price object — supplier price preserved in `pricing`. */
-  private markupFlightFare(fare: FlightFare, resolution: ResolvedMarkup): FlightFare {
+  /** Public price for one fare/price object — supplier price preserved in `pricing`.
+   *  Phase 1 FX: fx present → convert-then-markup (amount → AZN); нет fx → легаси.
+   *  Mixed-currency RT combine: breakdown legs in DIFFERENT currencies are each
+   *  converted to AZN by the supplier's own rate BEFORE summing
+   *  (x AZN + y USD × rate) — never added raw — then ONE markup on the AZN
+   *  total. Same-currency legs keep the adapter sum (exact) + single convert.
+   *  Any non-AZN leg without a rate → legacy whole-fare path (fail-open
+   *  browse; the money gate blocks commercial use of unconverted prices). */
+  private async markupFlightFare(
+    fare: FlightFare,
+    resolution: ResolvedMarkup,
+    fxFor: (currency: string | null | undefined) => Promise<FxRateInfo | null>,
+  ): Promise<FlightFare> {
     if (fare.pricing) return fare;
+    const legs = mixedBreakdownLegs(fare);
+    if (legs) {
+      const converted = await this.convertMixedLegsToAzn(legs, fxFor);
+      if (converted) {
+        const { pricing } = this.pricing.applyWithFx(resolution, converted.totalAzn, "AZN", null);
+        return {
+          ...fare,
+          total: { ...fare.total, amount: Number(pricing.publicPrice.toString()), currency: "AZN" },
+          base:
+            converted.baseAzn != null
+              ? { ...fare.base, amount: converted.baseAzn, currency: "AZN" }
+              : fare.base,
+          facilities: { ...fare.facilities, fxApplied: converted.fxApplied },
+          pricing: this.pricing.toPricingJson(pricing, null),
+        };
+      }
+    }
     const amount = fare.total?.amount;
     const currency = fare.total?.currency;
     // Gate E: zero/absent prices are not commercial money — left untouched.
     if (typeof amount !== "number" || amount <= 0 || !currency) return fare;
-    const pricing = this.pricing.apply(resolution, amount, currency);
+    const { pricing, fxJson } = this.pricing.applyWithFx(resolution, amount, currency, (await fxFor(currency)) ?? null);
     return {
       ...fare,
-      total: { ...fare.total, amount: Number(pricing.publicPrice.toString()) },
-      pricing: this.pricing.toPricingJson(pricing),
+      total: { ...fare.total, amount: Number(pricing.publicPrice.toString()), currency: fxJson ? "AZN" : currency },
+      pricing: this.pricing.toPricingJson(pricing, fxJson),
     };
   }
 
-  private markupFlightPrice(price: FlightPrice | undefined, resolution: ResolvedMarkup): FlightPrice | undefined {
+  /**
+   * Convert each mixed-currency breakdown leg to AZN with the supplier's own
+   * rate (cached per currency by the caller). Returns null when any non-AZN
+   * leg has no rate — caller falls back to the legacy whole-fare path.
+   */
+  private async convertMixedLegsToAzn(
+    legs: { outbound: MixedFareLeg; inbound: MixedFareLeg },
+    fxFor: (currency: string | null | undefined) => Promise<FxRateInfo | null>,
+  ): Promise<{
+    totalAzn: number;
+    baseAzn: number | null;
+    fxApplied: Record<string, { sourceCurrency: string; rate: string; rateCode: string | null } | null>;
+  } | null> {
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const distinct = [...new Set([legs.outbound.currency, legs.inbound.currency].map((c) => c.toUpperCase()))].filter(
+      (c) => c !== "AZN",
+    );
+    const rates = new Map<string, FxRateInfo>();
+    for (const cur of distinct) {
+      const fx = await fxFor(legs.outbound.currency.toUpperCase() === cur ? legs.outbound.currency : legs.inbound.currency);
+      if (!fx) return null;
+      rates.set(cur, fx);
+    }
+    const toAzn = (amount: number, currency: string): number => {
+      const cur = currency.toUpperCase();
+      if (cur === "AZN") return amount;
+      return r2(amount * Number(rates.get(cur)!.rate));
+    };
+    const fxApplied: Record<string, { sourceCurrency: string; rate: string; rateCode: string | null } | null> = {};
+    for (const [key, leg] of Object.entries(legs) as Array<[string, MixedFareLeg]>) {
+      const cur = leg.currency.toUpperCase();
+      fxApplied[key] =
+        cur === "AZN" ? null : { sourceCurrency: leg.currency, rate: rates.get(cur)!.rate.toString(), rateCode: rates.get(cur)!.rateCode };
+    }
+    const totalAzn = r2(toAzn(legs.outbound.amount, legs.outbound.currency) + toAzn(legs.inbound.amount, legs.inbound.currency));
+    const ob = legs.outbound.base;
+    const ib = legs.inbound.base;
+    const baseAzn = ob != null && ob > 0 && ib != null && ib > 0
+      ? r2(toAzn(ob, legs.outbound.currency) + toAzn(ib, legs.inbound.currency))
+      : null;
+    return { totalAzn, baseAzn, fxApplied };
+  }
+
+  private markupFlightPrice(price: FlightPrice | undefined, resolution: ResolvedMarkup, fx?: FxRateInfo | null): FlightPrice | undefined {
     if (!price || price.pricing) return price;
     const amount = price.amount;
     const currency = price.currency;
     if (typeof amount !== "number" || amount <= 0 || !currency) return price;
-    const pricing = this.pricing.apply(resolution, amount, currency);
+    const { pricing, fxJson } = this.pricing.applyWithFx(resolution, amount, currency, fx ?? null);
     return {
       ...price,
       amount: Number(pricing.publicPrice.toString()),
-      pricing: this.pricing.toPricingJson(pricing),
+      currency: fxJson ? "AZN" : currency,
+      pricing: this.pricing.toPricingJson(pricing, fxJson),
     };
   }
 
-  /** One resolve per supplier source — N fares share a single rule lookup. */
+  /** One resolve per supplier source — N fares share a single rule lookup.
+   *  FX — один lookup на (source, currency) (Map-кэш), convert-then-markup. */
   private async applyFlightMarkup<
     T extends { source?: string; fares?: FlightFare[] },
   >(flights: T[]): Promise<T[]> {
     const resolutions = new Map<string, ResolvedMarkup>();
+    const fxByPair = new Map<string, FxRateInfo | null>();
     const out: T[] = [];
     for (const flight of flights) {
       if (!flight.fares?.length) {
@@ -260,9 +381,21 @@ export class AzalController {
         resolution = await this.pricing.resolveSafe(source, "flights");
         resolutions.set(source, resolution);
       }
+      const fxFor = async (currency: string | null | undefined): Promise<FxRateInfo | null> => {
+        if (!currency) return null;
+        const pair = `${source}|${currency}`;
+        if (!fxByPair.has(pair)) {
+          fxByPair.set(pair, await this.pricing.resolveFxSafe(source, currency));
+        }
+        return fxByPair.get(pair) ?? null;
+      };
+      const marked = [];
+      for (const fare of flight.fares) {
+        marked.push(await this.markupFlightFare(fare, resolution, fxFor));
+      }
       out.push({
         ...flight,
-        fares: flight.fares.map((fare) => this.markupFlightFare(fare, resolution)),
+        fares: marked,
       });
     }
     return out;

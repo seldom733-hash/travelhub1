@@ -147,6 +147,22 @@ export const PERMISSIONS = {
   "finance.currency.manage": "Управление валютами",
   "finance.exchange_rate.manage": "Управление курсами",
   "finance.tax.manage": "Управление налогами",
+  // UNIFIED FINANCE CENTER Phase 1: supplier-specific FX rates «1 source = N AZN»
+  // (пара supplier × sourceCurrency). Read — просмотр текущих курсов и истории;
+  // manage — установка/изменение текущего курса (append-only history, admin UI).
+  "finance.fx_rate.read": "Чтение курсов поставщиков к AZN (SupplierFxRate)",
+  "finance.fx_rate.manage": "Управление курсами поставщиков к AZN (SupplierFxRate)",
+  // UNIFIED FINANCE CENTER Phase 2: supplier obligations + payouts. Read/write
+  // разделены: read — просмотр обязательств/выплат; obligation.manage —
+  // cancel/adjust; supplier_payout.manage — создание partial payout.
+  "finance.obligation.read": "Чтение обязательств поставщиков (SupplierObligation)",
+  "finance.obligation.manage": "Управление обязательствами поставщиков (cancel/adjust)",
+  "finance.supplier_payout.read": "Чтение выплат поставщикам (SupplierPayout)",
+  "finance.supplier_payout.manage": "Создание выплат поставщикам (SupplierPayout)",
+  // UNIFIED FINANCE CENTER Phase 3: сводные KPI (overview) Finance Center —
+  // read-only агрегаты обязательств/выплат/маржи/поступлений/долгов. Отдельный
+  // least-privilege: payment-read НЕ даёт overview; overview НЕ даёт payout-write.
+  "finance.overview.read": "Чтение сводных финансовых KPI (Finance Overview)",
   // Step 2.10A: LedgerTransaction read (Finance Center ledger view). Write —
   // только внутренний LedgerService (нет публичного write-эндпоинта).
   "finance.ledger.read": "Чтение LedgerTransaction (Finance Center)",
@@ -345,6 +361,15 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.provider_fee.read",
     "finance.settlement.read",
     "finance.payout.read",
+    // UNIFIED FINANCE CENTER Phase 1: DIRECTOR — read-only oversight курсов
+    // поставщиков (manage только FINANCE, зеркало finance.exchange_rate.*).
+    "finance.fx_rate.read",
+    // UNIFIED FINANCE CENTER Phase 2: DIRECTOR — read-only oversight
+    // обязательств/выплат поставщиков (manage/create только FINANCE).
+    "finance.obligation.read",
+    "finance.supplier_payout.read",
+    // UNIFIED FINANCE CENTER Phase 3: DIRECTOR — read-only overview KPI.
+    "finance.overview.read",
     // Supplier Markup (design §12): DIRECTOR — read-only oversight матрицы
     // наценок (manage только FINANCE, зеркало finance.commission.* грантов).
     "pricing.markup.read",
@@ -424,6 +449,18 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.provider_fee.read",
     "finance.settlement.read",
     "finance.payout.read",
+    // UNIFIED FINANCE CENTER Phase 1: FINANCE управляет курсами поставщиков
+    // (admin UI/API + history read).
+    "finance.fx_rate.read",
+    "finance.fx_rate.manage",
+    // UNIFIED FINANCE CENTER Phase 2: FINANCE — денежный authority по
+    // обязательствам/выплатам поставщиков (read + manage/create).
+    "finance.obligation.read",
+    "finance.obligation.manage",
+    "finance.supplier_payout.read",
+    "finance.supplier_payout.manage",
+    // UNIFIED FINANCE CENTER Phase 3: FINANCE — overview KPI.
+    "finance.overview.read",
     // Supplier Markup (design §12 / Gate J): FINANCE управляет MarkupRule.
     "pricing.markup.read",
     "pricing.markup.manage",
@@ -514,6 +551,15 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.provider_fee.read",
     "finance.settlement.read",
     "finance.payout.read",
+    // UNIFIED FINANCE CENTER Phase 1: ANALYST — read-only oversight курсов
+    // поставщиков (зеркало finance.exchange_rate.* грантов pricing.markup.read).
+    "finance.fx_rate.read",
+    // UNIFIED FINANCE CENTER Phase 2: ANALYST — read-only oversight
+    // обязательств/выплат поставщиков.
+    "finance.obligation.read",
+    "finance.supplier_payout.read",
+    // UNIFIED FINANCE CENTER Phase 3: ANALYST — read-only overview KPI.
+    "finance.overview.read",
     // Supplier Markup (design §12): ANALYST — read-only oversight матрицы.
     "pricing.markup.read",
     "support.read",

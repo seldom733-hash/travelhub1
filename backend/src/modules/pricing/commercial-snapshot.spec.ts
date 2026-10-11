@@ -213,3 +213,94 @@ describe("freeze (Gate F basis)", () => {
     expect(() => validateForAcceptance(frozen, frozen.customerFinalPrice, frozen.customerCurrency)).not.toThrow();
   });
 });
+
+// ── UNIFIED FINANCE CENTER Phase 1 — fx-ветвление snapshot-билдера ────────────
+
+const FX_BLOCK = {
+  sourceAmount: 1000,
+  sourceCurrency: "USD",
+  rate: "1.7",
+  rateCode: "SFX-00000001",
+  aznAmount: 1700,
+  convertedAt: "2026-10-10T00:00:00.000Z",
+};
+
+function workingFx(overrides: Partial<MarkupPricingJson> = {}): CommercialSnapshot {
+  return buildWorkingSnapshot({
+    supplierCode: "KOMPAS",
+    serviceType: "tours",
+    pricing: pricingBlock({
+      supplierAmount: 1000, // SOURCE USD
+      currency: "USD",
+      markupRate: "0.05",
+      markupAmount: 85, // 1700 × 5% в AZN
+      publicAmount: 1785,
+      publicCurrency: "AZN",
+      fx: FX_BLOCK,
+      ...overrides,
+    }),
+    supplierPriceFetchedAt: new Date("2026-10-10T00:00:00Z"),
+    supplierPriceExpiresAt: new Date("2026-10-10T00:15:00Z"),
+  });
+}
+
+describe("commercial snapshot — fx-ветвление (Phase 1)", () => {
+  it("markup-инвариант от fx.aznAmount: supplier SOURCE 1000 USD, public 1785 AZN, final = public", () => {
+    const s = workingFx();
+    expect(s.supplierPrice).toBe(1000); // SOURCE preserved
+    expect(s.supplierCurrency).toBe("USD");
+    expect(s.customerCurrency).toBe("AZN"); // publicCurrency из fx-ветки
+    expect(s.markupAmount).toBe(85);
+    expect(s.publicPrice).toBe(1785);
+    expect(s.customerFinalPrice).toBe(1785);
+    expect(s.fx).toMatchObject({ sourceAmount: 1000, sourceCurrency: "USD", rate: "1.7", aznAmount: 1700 });
+    expect(() => validateForAcceptance(s, s.customerFinalPrice, s.customerCurrency)).not.toThrow();
+  });
+
+  it("инвариант: publicPrice != fx.aznAmount + markup → REJECT (tampered snapshot)", () => {
+    // 1785 != 1700 + 84 — считать от SOURCE 1000 нельзя.
+    expect(() => workingFx({ publicAmount: 1785, markupAmount: 84 })).toThrow(/invalid public price/);
+    // Классическая ошибка: посчитать public от SOURCE: 1000 + 50 = 1050 ≠ 1700 + 85.
+    expect(() => workingFx({ publicAmount: 1050, markupAmount: 85 })).toThrow(/invalid public price/);
+  });
+
+  it("floor: final < fx.aznAmount → REJECT; discount не может продать ниже AZN-стоимости", () => {
+    const s = workingFx();
+    // final 1600 < aznAmount 1700 → REJECT (floor по AZN, не по SOURCE 1000).
+    expect(() => validateForAcceptance(s, 1600, "AZN")).toThrow(/final price < supplier price/);
+    // final 1700 == aznAmount → PASS (ровно на флооре).
+    expect(() => validateForAcceptance(s, 1700, "AZN")).not.toThrow();
+  });
+
+  it("acceptedCurrency валидируется форматно (requireCurrency: non-empty ≤16)", () => {
+    const s = workingFx();
+    expect(() => validateForAcceptance(s, 1785, "AZN")).not.toThrow();
+    expect(() => validateForAcceptance(s, 1785, "")).toThrow(/missing currency/);
+  });
+
+  it("individual discount применяется в AZN и не трогает publicPrice/fx", () => {
+    const s = applyIndividualDiscount(workingFx(), QuoteDiscountType.FIXED, "85");
+    expect(s.publicPrice).toBe(1785);
+    expect(s.customerFinalPrice).toBe(1700); // 1785 − 85 = 1700, ровно на флооре
+    expect(s.discountAmount).toBe(85);
+    expect(s.fx).toMatchObject(FX_BLOCK);
+    expect(() => validateForAcceptance(s, s.customerFinalPrice, s.customerCurrency)).not.toThrow();
+
+    // Ниже флоора — REJECT.
+    const tooDeep = applyIndividualDiscount(workingFx(), QuoteDiscountType.FIXED, "100");
+    expect(() => validateForAcceptance(tooDeep, tooDeep.customerFinalPrice, tooDeep.customerCurrency)).toThrow(
+      /final price < supplier price/,
+    );
+  });
+
+  it("frozen fx не мутирует: изменение курса после акцепта не трогает снапшот (append-only)", () => {
+    const frozen = freezeForAcceptance(workingFx(), 1785, "AZN", new Date("2026-10-11T12:00:00Z"));
+    expect(frozen.fx).toMatchObject(FX_BLOCK);
+    expect(frozen.customerFinalPrice).toBe(1785);
+    expect(frozen.customerCurrency).toBe("AZN");
+    // Снапшот — frozen value: новый курс (1.80) влияет только на будущие расчёты,
+    // здесь инвариант/floor проверяются по зафиксированному fx.aznAmount (1700).
+    expect(() => validateForAcceptance(frozen, frozen.customerFinalPrice, frozen.customerCurrency)).not.toThrow();
+    expect(() => validateForAcceptance(frozen, 1690, "AZN")).toThrow(/final price < supplier price/);
+  });
+});

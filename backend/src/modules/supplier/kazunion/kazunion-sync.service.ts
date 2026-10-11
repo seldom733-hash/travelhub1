@@ -9,6 +9,7 @@
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { IdsService } from "../../../shared/ids.service";
 import { KazunionAdapter, kazunionCountryCandidates, type KazunionSearchQuery } from "./kazunion.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import type { SupplierOffer } from "../supplier.types";
@@ -58,17 +59,21 @@ export class KazunionSyncService {
     private readonly prisma: PrismaService,
     private readonly kazunion: KazunionAdapter,
     private readonly pricing: SupplierPricingService,
+    private readonly ids: IdsService,
   ) {}
 
-  /** Find (or create) the KazUnion supplier partner. */
+  /** Find (or create) the KazUnion supplier partner under the unified PRN-* code scheme. */
   async getKazunionPartner(): Promise<{ id: string } | null> {
     const existing = await this.prisma.partner.findFirst({
-      where: { OR: [{ name: "KazUnion" }, { code: "PAR-KAZUNION" }] },
+      where: { name: "KazUnion" },
     });
     if (existing) return existing;
-    this.logger.log("KazUnion partner not found — creating PAR-KAZUNION");
+    // Unified supplier registry: create with a canonical PRN-* business code
+    // (no more hardcoded PAR-KAZUNION token).
+    const code = await this.ids.nextCode(null, "PRN");
+    this.logger.log(`KazUnion partner not found — creating ${code}`);
     return this.prisma.partner.create({
-      data: { code: "PAR-KAZUNION", name: "KazUnion", status: "ACTIVE" },
+      data: { code, name: "KazUnion", status: "ACTIVE" },
     });
   }
 
@@ -300,7 +305,7 @@ export class KazunionSyncService {
         };
 
         const existing = await this.prisma.product.findFirst({
-          where: { code: productCode },
+          where: { supplierRef: productCode },
         });
 
         if (existing) {
@@ -344,13 +349,14 @@ export class KazunionSyncService {
           const slug =
             `kazunion-${tourIncValue}-${hotelKey}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
           await this.prisma.$transaction(async (tx: any) => {
+            const prdCode = await this.ids.nextCode(tx, "PRD");
             const idResult = await tx.$queryRaw<{ id: string }[]>`
               INSERT INTO "catalog"."Product" (
-                "id", "code", "type", "title", "slug", "status", "version",
+                "id", "code", "supplierRef", "type", "title", "slug", "status", "version",
                 "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt",
                 "geoCountryId"
               ) VALUES (
-                gen_random_uuid(), ${productCode}, 'TOUR'::"catalog"."ProductType",
+                gen_random_uuid(), ${prdCode}, ${productCode}, 'TOUR'::"catalog"."ProductType",
                 ${`${hotelName} — ${tourIncName}`}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
                 ${ctx.toursCategoryId}, ${JSON.stringify(attributes)}::jsonb, ${ctx.partnerId},
                 now(), now(), now(),

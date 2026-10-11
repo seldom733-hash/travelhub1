@@ -64,6 +64,19 @@ const SECTION_KEY_GROUPS: Record<string, string[]> = {
   cancellation: ["cancellation", "cancel", "cancellationpolicy", "cancellation_policy", "refund", "refundpolicy"],
 };
 
+/**
+ * Внутренние supplier-native ключи, которые НИКОГДА не показываются покупателю
+ * на публичном PDP (покупатель не должен знать поставщика): API-токен
+ * (supplierCode) и собственные id/бренд поставщика (hotelKey, tourInc*).
+ * Нормализованные (без регистра/подчёркиваний) ключи.
+ */
+const HIDDEN_PDP_ATTR_KEYS = new Set([
+  "suppliercode",
+  "hotelkey",
+  "tourincvalue",
+  "tourincname",
+]);
+
 export interface AttributeSection {
   section: keyof typeof SECTION_KEY_GROUPS | "other";
   items: Array<{ key: string; label: string; value: string }>;
@@ -109,8 +122,10 @@ export function sectionsFor(
   for (const [key, rawValue] of Object.entries(attributes)) {
     const value = formatAttributeValue(rawValue);
     if (!value) continue;
-    const item = { key, label: humanizeKey(key), value };
     const nk = normKey(key);
+    // Скрыть supplier-native внутренние ключи (покупатель не видит поставщика).
+    if (HIDDEN_PDP_ATTR_KEYS.has(nk)) continue;
+    const item = { key, label: humanizeKey(key), value };
     // Сначала точное совпадение (safe), затем префикс — снижает ложную группировку.
     const exact = (Object.keys(SECTION_KEY_GROUPS) as Array<keyof typeof SECTION_KEY_GROUPS>).find((s) =>
       SECTION_KEY_GROUPS[s].some((k) => normKey(k) === nk),

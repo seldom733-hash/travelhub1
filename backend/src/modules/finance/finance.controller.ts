@@ -13,7 +13,7 @@
  * Payment/Refund/Invoice/Commission write-endpoints НЕ существуют в Step 2.10
  * (foundation, §15/§52) — агрегатные модели в схеме, создание — 2.12–2.14.
  */
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import type { Request, Response } from 'express';
 import { ExportService } from '../shared/export/export.service';
 import { CommissionPolicyService } from "./commission-policy.service";
@@ -24,6 +24,9 @@ import { LedgerService } from "./ledger.service";
 import { PaymentService } from "./payment.service";
 import { RefundService } from "./refund.service";
 import { SettlementService } from "./settlement.service";
+import { SupplierFxRateService } from "./supplier-fx-rate.service";
+import { SupplierObligationService } from "./supplier-obligation.service";
+import { FinanceOverviewService } from "./finance-overview.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
@@ -41,18 +44,27 @@ import {
   CreateExchangeRateDto,
   CreatePaymentDto,
   CreateRefundDto,
+  CreateSupplierPayoutDto,
   CreateTaxDto,
   CreateTaxRuleDto,
+  AdjustObligationDto,
+  CancelObligationDto,
   DISPUTE_CREATE_FORBIDDEN_KEYS,
   DisputeListQueryDto,
   FactListQueryDto,
   FINANCE_MASTER_FORBIDDEN_KEYS,
+  FinanceOverviewQueryDto,
   LedgerListQueryDto,
+  ObligationListQueryDto,
   PAYMENT_CREATE_FORBIDDEN_KEYS,
   PaymentListQueryDto,
   REFUND_CREATE_FORBIDDEN_KEYS,
   RefundListQueryDto,
   ResolveCommissionPolicyQueryDto,
+  SetSupplierFxRateDto,
+  SupplierFxRateHistoryQueryDto,
+  SupplierFxRateListQueryDto,
+  SupplierPayoutListQueryDto,
   UpdateCommissionPolicyDto,
   UpdateCurrencyDto,
   UpdateExchangeRateDto,
@@ -72,6 +84,9 @@ export class FinanceController {
     private readonly disputes: DisputeService,
     private readonly commissionPolicies: CommissionPolicyService,
     private readonly commissions: CommissionService,
+    private readonly fxRates: SupplierFxRateService,
+    private readonly obligations: SupplierObligationService,
+    private readonly overview: FinanceOverviewService,
   ) {}
 
   // ── Currency (finance.currency.manage) ──────────────────────────────────────
@@ -130,6 +145,128 @@ export class FinanceController {
   async updateExchangeRate(@Param("code") code: string, @Req() req: Request, @Body() dto: UpdateExchangeRateDto) {
     assertNoForbiddenKeys(req.body, FINANCE_MASTER_FORBIDDEN_KEYS);
     return this.finance.updateExchangeRate(code, dto);
+  }
+
+  // ── SupplierFxRate (UNIFIED FINANCE CENTER Phase 1) ───────────────────────
+  // supplier-specific «1 source = N AZN» (пара supplier × sourceCurrency).
+  // Read — finance.fx_rate.read (текущие курсы + история); write —
+  // finance.fx_rate.manage (upsert current + append-only history + audit).
+  // AZN→AZN всегда 1 (строка не хранится, reject при set).
+  // Изменение курса влияет только на будущее — frozen snapshot'ы не мутируют.
+
+  @Get("supplier-fx-rates")
+  @RequirePermissions("finance.fx_rate.read")
+  async listSupplierFxRates(@Query() query: SupplierFxRateListQueryDto) {
+    return this.fxRates.listCurrent({
+      supplierCode: query.supplierCode,
+      sourceCurrencyIso: query.sourceCurrencyIso,
+    });
+  }
+
+  @Get("supplier-fx-rates/history")
+  @RequirePermissions("finance.fx_rate.read")
+  async listSupplierFxRateHistory(@Query() query: SupplierFxRateHistoryQueryDto) {
+    return this.fxRates.listHistory(
+      {
+        code: query.code,
+        supplierCode: query.supplierCode,
+        sourceCurrencyIso: query.sourceCurrencyIso,
+      },
+      query.page ?? 1,
+      query.pageSize ?? 20,
+    );
+  }
+
+  // Supplier registry для FX-админки: единый список поставщиков (∪ уже
+  // настроенные), НЕ выводится из строк — дропдаун не пустеет при 0 курсах.
+  @Get("supplier-fx-rates/suppliers")
+  @RequirePermissions("finance.fx_rate.read")
+  async listSupplierFxRateSuppliers() {
+    return this.fxRates.listSuppliers();
+  }
+
+  @Get("supplier-fx-rates/:code")
+  @RequirePermissions("finance.fx_rate.read")
+  async getSupplierFxRate(@Param("code") code: string) {
+    return this.fxRates.getCurrentByCode(code);
+  }
+
+  @Post("supplier-fx-rates")
+  @RequirePermissions("finance.fx_rate.manage")
+  async setSupplierFxRate(@Req() req: Request, @Body() dto: SetSupplierFxRateDto, @CurrentUser() actor: { id: string; username: string }) {
+    // targetCurrencyIso — server-owned (V1 API фиксирует AZN, расширение
+    // storage не означает открытый API) → forged value 422, не тихий override.
+    assertNoForbiddenKeys(req.body, [...FINANCE_MASTER_FORBIDDEN_KEYS, "targetCurrencyIso"]);
+    return this.fxRates.setCurrent(dto, actor);
+  }
+
+  // ── SupplierObligation / SupplierPayout (UNIFIED FINANCE CENTER Phase 2) ──
+  // Read обязательств — finance.obligation.read; read выплат —
+  // finance.supplier_payout.read; частичная выплата/cancel/adjust —
+  // finance.obligation.manage / finance.supplier_payout.manage (FINANCE/ADMIN).
+
+  @Get("overview")
+  @RequirePermissions("finance.overview.read")
+  async getOverview(@Query() query: FinanceOverviewQueryDto) {
+    return this.overview.getOverview({ from: query.from, to: query.to });
+  }
+
+  @Get("obligations")
+  @RequirePermissions("finance.obligation.read")
+  async listObligations(@Query() query: ObligationListQueryDto) {
+    return this.obligations.listObligations(query);
+  }
+
+  @Get("obligations/:code")
+  @RequirePermissions("finance.obligation.read")
+  async getObligation(@Param("code") code: string) {
+    return this.obligations.getObligation(code);
+  }
+
+  @Post("obligations/:code/payouts")
+  @RequirePermissions("finance.supplier_payout.manage")
+  async createObligationPayout(
+    @Param("code") code: string,
+    @Req() req: Request,
+    @Body() dto: CreateSupplierPayoutDto,
+    @CurrentUser() actor: { id: string; username: string },
+  ) {
+    assertNoForbiddenKeys(req.body, [...FINANCE_MASTER_FORBIDDEN_KEYS, "obligationCode"]);
+    return this.obligations.createPayout({ ...dto, obligationCode: code }, actor);
+  }
+
+  @Post("obligations/:code/cancel")
+  @HttpCode(200)
+  @RequirePermissions("finance.obligation.manage")
+  async cancelObligation(
+    @Param("code") code: string,
+    @Body() dto: CancelObligationDto,
+    @CurrentUser() actor: { id: string; username: string },
+  ) {
+    return this.obligations.cancelObligation(code, dto.reason ?? null, actor);
+  }
+
+  @Post("obligations/:code/adjust")
+  @HttpCode(200)
+  @RequirePermissions("finance.obligation.manage")
+  async adjustObligation(
+    @Param("code") code: string,
+    @Req() req: Request,
+    @Body() dto: AdjustObligationDto,
+    @CurrentUser() actor: { id: string; username: string },
+  ) {
+    assertNoForbiddenKeys(req.body, [...FINANCE_MASTER_FORBIDDEN_KEYS, "obligationCode"]);
+    return this.obligations.adjustObligation(
+      code,
+      { newAznAmount: dto.newAznAmount, newSourceAmount: dto.newSourceAmount, reason: dto.reason ?? null },
+      actor,
+    );
+  }
+
+  @Get("payouts")
+  @RequirePermissions("finance.supplier_payout.read")
+  async listSupplierPayouts(@Query() query: SupplierPayoutListQueryDto) {
+    return this.obligations.listPayouts(query);
   }
 
   // ── Tax (finance.tax.manage) ────────────────────────────────────────────────

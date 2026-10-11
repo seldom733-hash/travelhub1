@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { IdsService } from "../../../shared/ids.service";
 import { SummertourNewAdapter } from "./summertour-new.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import type { SupplierSearchQuery, SupplierOffer } from "../supplier.types";
@@ -42,6 +43,7 @@ export class SummerBulkSyncService {
     private readonly prisma: PrismaService,
     private readonly summertour: SummertourNewAdapter,
     private readonly pricing: SupplierPricingService,
+    private readonly ids: IdsService,
   ) {}
 
   /**
@@ -283,16 +285,21 @@ export class SummerBulkSyncService {
 
     // Check if product exists
     const existing = await this.prisma.product.findUnique({
-      where: { code: productCode },
+      where: { supplierRef: productCode },
       select: { id: true, code: true, status: true, version: true },
     });
 
+    // Название карточки — ТОЛЬКО отель (hotelName от поставщика уже содержит
+    // курорт в скобках). Название программы (tourIncName) в title НЕ добавляем.
+    // Считаем до ветвления: update-ветка тоже переименовывает старые карточки.
+    const title = hotelName;
+
     if (existing) {
-      // Update attributes and tariff
+      // Update attributes, title (hotel-only naming) and tariff
       await this.prisma.$transaction(async (tx: any) => {
         await tx.product.update({
           where: { id: existing.id },
-          data: { attributes, updatedAt: new Date() },
+          data: { title, attributes, updatedAt: new Date() },
         });
 
         const tariff = await tx.tariff.findFirst({
@@ -312,15 +319,15 @@ export class SummerBulkSyncService {
 
     // Create new product
     const slug = this.buildSlug(tourIncValue, hotelKey, resort);
-    const title = resort ? `${hotelName} (${resort}) — ${tourIncName}` : `${hotelName} — ${tourIncName}`;
 
     await this.prisma.$transaction(async (tx: any) => {
+      const prdCode = await this.ids.nextCode(tx, "PRD");
       const idResult = await tx.$queryRaw<{ id: string }[]>`
         INSERT INTO "catalog"."Product" (
-          "id", "code", "type", "title", "slug", "status", "version",
+          "id", "code", "supplierRef", "type", "title", "slug", "status", "version",
           "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt"
         ) VALUES (
-          gen_random_uuid(), ${productCode}, 'TOUR'::"catalog"."ProductType",
+          gen_random_uuid(), ${prdCode}, ${productCode}, 'TOUR'::"catalog"."ProductType",
           ${title}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
           ${categoryId}, ${JSON.stringify(attributes)}::jsonb, ${partnerId},
           now(), now(), now()

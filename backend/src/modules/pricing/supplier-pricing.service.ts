@@ -21,12 +21,19 @@
  * либо вызвать apply() один раз, либо пробросить уже-рассчитанный результат
  * (pricing-блок) без повторного применения.
  *
- * Валюта (§22): FX нет — markup считается в валюте supplier-оффера,
- * publicPrice той же валюты.
+ * UNIFIED FINANCE CENTER Phase 1 (FX): supplier-specific курсы «1 source = N AZN».
+ * Порядок: convert supplier price → AZN, затем apply() markup в AZN
+ * (convert-then-markup; markup semantics НЕ меняются — % от cost base, cost base
+ * теперь AZN). Browse-границы — fail-open (нет курса → исходная валюта, fx-блок
+ * отсутствует, НИКОГДА не подставляется 1); money-пути (snapshot/acceptance)
+ * — strict (нет курса → контролируемая ошибка, см. assertFxPresentForMoney).
+ * AZN-источник — identity без lookup. Изменение курса не мутирует frozen
+ * snapshot'ы (upsert-in-place текущего курса).
  */
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { Prisma } from "../../generated/prisma/client";
 import { MoneyInput, toMoney2 } from "../sales/sales.money";
+import { SupplierFxRateService } from "../finance/supplier-fx-rate.service";
 import { ValidationDomainError } from "../../shared/errors";
 import { MarkupRuleService, MarkupRuleResolution } from "./markup-rule.service";
 import { validateServiceType, validateSupplierCode } from "./pricing.validation";
@@ -59,6 +66,16 @@ export interface MarkupPricingResult {
   pricingCalculatedAt: Date;
 }
 
+/** UNIFIED FINANCE CENTER Phase 1: минимальный FX-resolver-контракт
+ *  (структурно совместим с SupplierFxRateService.resolveSafe). */
+export interface FxRateInfo {
+  rate: Prisma.Decimal;
+  rateCode: string | null;
+}
+export interface FxRateResolver {
+  resolveSafe(supplierCode: string, sourceCurrencyIso: string): Promise<FxRateInfo | null>;
+}
+
 export const NOT_CONFIGURED: Readonly<ResolvedMarkup> = Object.freeze({
   state: "NOT_CONFIGURED" as const,
   rate: new Prisma.Decimal(0),
@@ -70,7 +87,19 @@ export const NOT_CONFIGURED: Readonly<ResolvedMarkup> = Object.freeze({
 export class SupplierPricingService {
   private readonly logger = new Logger(SupplierPricingService.name);
 
-  constructor(private readonly markupRules: MarkupRuleService) {}
+  constructor(
+    private readonly markupRules: MarkupRuleService,
+    /** UNIFIED FINANCE CENTER Phase 1: опциональный FX-resolver (Finance export).
+     *  @Inject по КЛАССУ обязателен: FxRateResolver — интерфейс, он стирается
+     *  в рантайме, и без явного токена Nest молча инжектил undefined (в проде
+     *  не конвертировалось НИЧЕГО). PricingModule уже импортирует FinanceModule
+     *  (цикла нет: finance не импортирует pricing). @Optional — только для
+     *  совместимости с legacy unit-тестами (ручная конструкция без резолвера
+     *  → fail-open no-FX, как раньше). */
+    @Optional() @Inject(SupplierFxRateService) private readonly fxRates?: FxRateResolver,
+  ) {}
+  /** Разовый warn, если browse-путь просит не-AZN без подключённого резолвера. */
+  private fxMissingWarned = false;
 
   /** Разрешить активное правило для key (supplierCode + serviceType) на instant. */
   async resolve(supplierCode: string, serviceType: string, at: Date = new Date()): Promise<ResolvedMarkup> {
@@ -151,9 +180,11 @@ export class SupplierPricingService {
     }
   }
 
-  /** JSON-safe breakdown для HTTP-ответов (никаких Decimal в теле ответа). */
-  toPricingJson(result: MarkupPricingResult): MarkupPricingJson {
-    return {
+  /** JSON-safe breakdown для HTTP-ответов (никаких Decimal в теле ответа).
+   *  fxJson present → supplier-факты перекрываются SOURCE-значениями, public
+   *  цепочка остаётся в AZN (publicCurrency = "AZN"), fx-блок прикладывается. */
+  toPricingJson(result: MarkupPricingResult, fxJson?: MarkupPricingJson["fx"] | null): MarkupPricingJson {
+    const base: MarkupPricingJson = {
       supplierAmount: Number(result.supplierPrice.toString()),
       currency: result.supplierCurrency,
       markupRate: result.markupRate.toString(),
@@ -164,30 +195,126 @@ export class SupplierPricingService {
       configurationState: result.configurationState,
       calculatedAt: result.pricingCalculatedAt.toISOString(),
     };
+    if (fxJson) {
+      return {
+        ...base,
+        // SOURCE-факты (immutable) поверх AZN-результата apply():
+        supplierAmount: fxJson.sourceAmount,
+        currency: fxJson.sourceCurrency,
+        publicCurrency: "AZN",
+        fx: fxJson,
+      };
+    }
+    return base;
+  }
+
+  // ── FX (UNIFIED FINANCE CENTER Phase 1) ─────────────────────────────────
+
+  /** Fail-open FX resolve (browse): курса нет → null (исходная валюта).
+   *  AZN-источник / fx-resolver не подключён → null (без конвертации).
+   *  Публичный: используется azal-границей (fares/prices) напрямую. */
+  async resolveFxSafe(supplierCode: string, currency: string): Promise<FxRateInfo | null> {
+    if (!this.fxRates) {
+      if (typeof currency === "string" && currency.trim().toUpperCase() !== "AZN" && !this.fxMissingWarned) {
+        this.fxMissingWarned = true;
+        this.logger.error(
+          `FX resolver is NOT wired (SupplierFxRateService not injected) — ${supplierCode}/${currency} left unconverted. ` +
+            `Проверьте @Inject в SupplierPricingService: молчаливый undefined отключает ВСЮ конвертацию в AZN.`,
+        );
+      }
+      return null;
+    }
+    if (typeof currency !== "string" || currency.trim().toUpperCase() === "AZN") return null;
+    try {
+      return await this.fxRates.resolveSafe(supplierCode, currency.trim());
+    } catch (err) {
+      this.logger.warn(
+        `FX resolve failed for ${supplierCode}/${currency} — falling back to no conversion: ${(err as Error).message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Convert-then-markup (Phase 1): fx present → supplier price × rate → AZN
+   * (half-up 2dp), затем apply() markup в AZN. fx absent → легаси-поведение
+   * (markup в исходной валюте, §22). Чистая функция от (resolution, amount,
+   * currency, fx) — без БД.
+   */
+  applyWithFx(
+    resolution: ResolvedMarkup,
+    sourceAmount: MoneyInput,
+    sourceCurrency: string,
+    fx: FxRateInfo | null,
+  ): { pricing: MarkupPricingResult; fxJson: MarkupPricingJson["fx"] | null } {
+    if (fx == null) {
+      return { pricing: this.apply(resolution, sourceAmount, sourceCurrency), fxJson: null };
+    }
+    const source = toMoney2(sourceAmount, "fx.sourceAmount");
+    const aznAmount = toMoney2(source.mul(fx.rate), "fx.aznAmount");
+    const pricing = this.apply(resolution, aznAmount, "AZN");
+    return {
+      pricing,
+      fxJson: {
+        sourceAmount: Number(source.toString()),
+        sourceCurrency,
+        rate: fx.rate.toString(),
+        rateCode: fx.rateCode,
+        aznAmount: Number(aznAmount.toString()),
+        convertedAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  /**
+   * Money-пути (request creation / acceptance): pricing-блок с валютой ≠ AZN
+   * обязан нести fx-блок (convert уже применён на boundary). Нет fx →
+   * контролируемая ошибка (никогда silent-substitute 1 или чужой курс).
+   * AZN-блок / отсутствие pricing (нет supplier-цены) — пропуск (Gate E
+   * snapshot-билдера отдельно отвечает за missing price).
+   */
+  static assertFxPresentForMoney(pricing: MarkupPricingJson | null | undefined, supplierCode: string): void {
+    if (pricing == null) return;
+    const currency = typeof pricing.currency === "string" ? pricing.currency.trim().toUpperCase() : "";
+    if (currency === "" || currency === "AZN") return;
+    if (!pricing.fx) {
+      throw new ValidationDomainError(
+        `missing FX rate: supplier "${supplierCode}" price is in ${pricing.currency} but no FX conversion to AZN was applied — configure a SupplierFxRate for this supplier before accepting the price commercially (never substitute 1 or another supplier's rate)`,
+      );
+    }
   }
 
   /**
    * Оффер из search-списка: price.amount → public, supplier price сохраняется
    * в pricing-блоке. Уже priced-оффер не трогаем (идемпотентность).
    * supplierPrice <= 0 / пустая валюта → apply() бросает (Gate E, fail-closed).
+   * Phase 1 FX: курс поставщика есть → convert-then-markup (price → AZN);
+   * нет → легаси (исходная валюта, fail-open browse).
    */
   async applyToOffer(
     offer: SupplierOffer,
     supplierCode: string,
     serviceType: string,
     resolution?: ResolvedMarkup,
+    fxOverride?: FxRateInfo | null,
   ): Promise<SupplierOffer> {
     if (offer.pricing) return offer;
     const res = resolution ?? (await this.resolveSafe(supplierCode, serviceType));
-    const pricing = this.apply(res, offer.price.amount, offer.price.currency);
+    const fx = fxOverride !== undefined ? fxOverride : await this.resolveFxSafe(supplierCode, offer.price.currency);
+    const { pricing, fxJson } = this.applyWithFx(res, offer.price.amount, offer.price.currency, fx);
     return {
       ...offer,
-      price: { ...offer.price, amount: Number(pricing.publicPrice.toString()) },
-      pricing: this.toPricingJson(pricing),
+      price: {
+        ...offer.price,
+        amount: Number(pricing.publicPrice.toString()),
+        currency: fxJson ? "AZN" : offer.price.currency,
+      },
+      pricing: this.toPricingJson(pricing, fxJson),
     };
   }
 
-  /** Весь список одним resolve (один поиск = один DB-lookup на supplier). */
+  /** Весь список одним resolve (один поиск = один DB-lookup на supplier).
+   *  FX — один lookup на distinct source-currency списка (кэш в Map). */
   async applyToOffers(
     offers: SupplierOffer[],
     supplierCode: string,
@@ -195,9 +322,16 @@ export class SupplierPricingService {
   ): Promise<SupplierOffer[]> {
     if (offers.length === 0) return offers;
     const resolution = await this.resolveSafe(supplierCode, serviceType);
+    const fxByCurrency = new Map<string, FxRateInfo | null>();
+    for (const offer of offers) {
+      const cur = offer.price.currency;
+      if (!fxByCurrency.has(cur)) {
+        fxByCurrency.set(cur, await this.resolveFxSafe(supplierCode, cur));
+      }
+    }
     const out: SupplierOffer[] = [];
     for (const offer of offers) {
-      out.push(await this.applyToOffer(offer, supplierCode, serviceType, resolution));
+      out.push(await this.applyToOffer(offer, supplierCode, serviceType, resolution, fxByCurrency.get(offer.price.currency) ?? null));
     }
     return out;
   }
@@ -205,6 +339,7 @@ export class SupplierPricingService {
   /**
    * Re-check snapshot (refreshPrice / captcha-resume): amount → public,
    * сырой supplier amount — в pricing-блоке. amount <= 0 → Gate E throw.
+   * Phase 1 FX: курс есть → convert-then-markup (amount → AZN, currency → AZN).
    */
   async applyToPriceSnapshot(
     snapshot: SupplierPriceSnapshot,
@@ -213,11 +348,13 @@ export class SupplierPricingService {
   ): Promise<SupplierPriceSnapshot> {
     if (snapshot.pricing) return snapshot;
     const resolution = await this.resolveSafe(supplierCode, serviceType);
-    const pricing = this.apply(resolution, snapshot.amount, snapshot.currency);
+    const fx = await this.resolveFxSafe(supplierCode, snapshot.currency);
+    const { pricing, fxJson } = this.applyWithFx(resolution, snapshot.amount, snapshot.currency, fx);
     return {
       ...snapshot,
       amount: Number(pricing.publicPrice.toString()),
-      pricing: this.toPricingJson(pricing),
+      currency: fxJson ? "AZN" : snapshot.currency,
+      pricing: this.toPricingJson(pricing, fxJson),
     };
   }
 
@@ -225,6 +362,7 @@ export class SupplierPricingService {
    * Price calendar: каждый offer-entry и сам entry.price считаются из
    * supplier-минимума ОДНИМ resolution (rate одинаков — монотонность
    * сохраняет argmin). entry.price === null (нет цены) — пропускается.
+   * Phase 1 FX: FX-resolve один на distinct currency (Map-кэш), convert-then-markup.
    */
   async applyToCalendar(
     result: PriceCalendarResult,
@@ -232,6 +370,14 @@ export class SupplierPricingService {
     serviceType: string,
   ): Promise<PriceCalendarResult> {
     const resolution = await this.resolveSafe(supplierCode, serviceType);
+    const fxByCurrency = new Map<string, FxRateInfo | null>();
+    const fxFor = async (currency: string | undefined | null): Promise<FxRateInfo | null> => {
+      if (!currency) return null;
+      if (!fxByCurrency.has(currency)) {
+        fxByCurrency.set(currency, await this.resolveFxSafe(supplierCode, currency));
+      }
+      return fxByCurrency.get(currency) ?? null;
+    };
     const entries: PriceCalendarEntry[] = [];
     for (const entry of result.entries) {
       if (entry.pricing) {
@@ -246,11 +392,13 @@ export class SupplierPricingService {
             offers.push(o);
             continue;
           }
-          const p = this.apply(resolution, o.price, o.currency);
+          const fx = await fxFor(o.currency);
+          const { pricing, fxJson } = this.applyWithFx(resolution, o.price, o.currency, fx);
           offers.push({
             ...o,
-            price: Number(p.publicPrice.toString()),
-            pricing: this.toPricingJson(p),
+            price: Number(pricing.publicPrice.toString()),
+            currency: fxJson ? "AZN" : o.currency,
+            pricing: this.toPricingJson(pricing, fxJson),
           });
         }
         next = { ...next, offers };
@@ -262,11 +410,13 @@ export class SupplierPricingService {
             `Calendar entry ${entry.date} of ${supplierCode} has a price without currency — left unpriced`,
           );
         } else {
-          const p = this.apply(resolution, entry.price, entry.currency);
+          const fx = await fxFor(entry.currency);
+          const { pricing, fxJson } = this.applyWithFx(resolution, entry.price, entry.currency, fx);
           next = {
             ...next,
-            price: Number(p.publicPrice.toString()),
-            pricing: this.toPricingJson(p),
+            price: Number(pricing.publicPrice.toString()),
+            currency: fxJson ? "AZN" : entry.currency,
+            pricing: this.toPricingJson(pricing, fxJson),
           };
         }
       }

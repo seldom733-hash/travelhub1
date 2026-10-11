@@ -565,7 +565,7 @@ describe("Phase 1 Step 1.5 — Public Catalog Read Foundation (e2e)", () => {
     const list = (await publicList().expect(200)).body as { items: Array<Record<string, unknown>> };
     const card = list.items.find((c) => c.id === product.id)!;
     expect(Object.keys(card).sort()).toEqual(
-      ["availabilitySummary", "category", "currency", "id", "priceFrom", "pricingUnit", "primaryImage", "seller", "publishedAt", "shortDescription", "slug", "title", "type"].sort(),
+      ["availabilitySummary", "category", "code", "currency", "headlineDepartureDate", "headlineNights", "hotelImage", "id", "meal", "priceFrom", "pricingUnit", "primaryImage", "publishedAt", "room", "seller", "shortDescription", "slug", "supplierCode", "title", "type"].sort(),
     );
   });
 

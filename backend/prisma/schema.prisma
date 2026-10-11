@@ -352,10 +352,15 @@ enum ModerationSubmissionStatus {
 /// без создания отдельных Product-сущностей/доменов на категорию.
 model Product {
   id          String        @id @default(uuid())
-  code        String        @unique // PRD-00000001
+  code        String        @unique // PRD-00000001 (нейтральный публичный идентификатор → URL /products/PRD-*)
   type        ProductType
   title       String
   slug        String        @unique
+  /// Supplier-native stable key (sync natural key, e.g. "KAZUNION-3548-4105").
+  /// Синк-сервисы матчат существующие карточки ПО ЭТОЙ колонке, а НЕ по code.
+  /// code остаётся нейтральным PRD-* (покупатель не видит поставщика). NULL у
+  /// ручных (manual) товаров.
+  supplierRef String?       @unique
   description String?
   status      ProductStatus @default(DRAFT)
   version     Int           @default(1)
@@ -1934,7 +1939,7 @@ model Company {
 
 model Partner {
   id        String       @id @default(uuid())
-  code      String       @unique // PAR-00000001
+  code      String       @unique // PRN-00000001
   companyId String?
   company   Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
   name      String
@@ -4742,6 +4747,54 @@ model Currency {
   @@schema("finance")
 }
 
+/// Supplier-specific FX rate (SFX-*) — admin-maintained «1 source = N AZN» для
+/// пары (supplier, sourceCurrency). UNIFIED FINANCE CENTER Phase 1: AZN —
+/// management/display currency; каждый поставщик может иметь СВОЙ курс USD→AZN.
+/// AZN→AZN всегда 1 (не хранится — resolver возвращает identity без lookup).
+/// Отсутствие строки = нет курса → контролируемая ошибка, НИКОГДА не silent 1.
+/// Изменение курса влияет ТОЛЬКО на будущие расчёты — замороженные snapshot'ы
+/// (Request/Order commercialSnapshot.fx) не переписываются.
+model SupplierFxRate {
+  id                String   @id @default(uuid())
+  code              String   @unique // SFX-00000001
+  supplierCode      String // registry token (SUMMERTOUR/KOMPAS/AZAL/...), без FK
+  sourceCurrencyIso String // ISO 4217 (USD, EUR, RUB, ...)
+  /// Management currency. V1 API принимает только AZN; колонка расширяема.
+  targetCurrencyIso String   @default("AZN")
+  /// «1 sourceCurrency = rate AZN» (Decimal, НЕ float), > 0, ≤ 6 знаков.
+  rate              Decimal  @db.Decimal(18, 6)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  /// Администратор, последним установивший курс (audit provenance).
+  updatedById       String?
+  updatedByName     String?
+
+  history SupplierFxRateHistory[]
+
+  /// Один ТЕКУЩИЙ курс на пару (supplier, source, target) — upsert-in-place.
+  @@unique([supplierCode, sourceCurrencyIso, targetCurrencyIso])
+  @@index([supplierCode])
+  @@schema("finance")
+}
+
+/// Append-only история курсов поставщика: old/new value, timestamp, admin.
+/// Финансовые факты НЕ переписываются — каждое изменение оставляет строку.
+model SupplierFxRateHistory {
+  id        String          @id @default(uuid())
+  rateId    String
+  rate      SupplierFxRate  @relation(fields: [rateId], references: [id], onDelete: Cascade)
+  action    String // CREATE | UPDATE
+  /// NULL только при CREATE (предыдущего курса не было).
+  oldRate   Decimal?        @db.Decimal(18, 6)
+  newRate   Decimal         @db.Decimal(18, 6)
+  changedAt DateTime        @default(now())
+  actorId   String?
+  actorName String?
+
+  @@index([rateId, changedAt])
+  @@schema("finance")
+}
+
 /// Курс валюты (FXR-*) — Finance master data. НЕ выполняет FX-конверсию
 /// (cross-currency settlement — вне 2.10; конверсия — 2.12A/2.14D).
 model ExchangeRate {
@@ -4940,6 +4993,94 @@ model Payout {
   /// Idempotency: один payout на source-факт.
   @@unique([sourceType, sourceId])
   @@index([sourceType, sourceId])
+  @@schema("finance")
+}
+
+/// UNIFIED FINANCE CENTER Phase 2 — SupplierObligation: сумма, которую платформа
+/// ДОЛЖНА поставщику за подтверждённую услугу/бронирование. Создаётся идемпотентно
+/// на событии BookingConfirmed (_supplier-obligation.consumer). ОТДЕЛЬНО от
+/// Payout (факт исходящего платежа) и Settlement. Append-only денежные факты:
+/// aznAmount/fxRate — замороженный снапшот на момент подтверждения (Gate:
+/// изменение текущего курса НЕ переписывает obligation). UNKNOWN (нет snapshot/
+/// курса) хранится как NULL, НИКОГДА как 0; payout в таком состоянии заблокирован.
+model SupplierObligation {
+  id              String    @id @default(uuid())
+  code            String    @unique // SBO-########
+  /// Канонический booking-триггер (одна obligation на booking=item/service).
+  bookingId       String    @unique
+  bookingCode     String?
+  orderId         String
+  orderCode       String?
+  orderItemId     String?
+  /// Registry-токен поставщика (KOMPAS/KAZUNION/... из commercialSnapshot).
+  supplierCode    String?
+  /// CRM Partner для отображения (PAR-*; resolve на read).
+  partnerId       String?
+  serviceType     String?
+  /// Замороженный исходной денежный факт (валюта поставщика).
+  sourceAmount    Decimal   @db.Decimal(18, 2)
+  sourceCurrency  String
+  /// Замороженный AZN management-эквивалент; NULL = UNKNOWN (нет курса/snapshot).
+  aznAmount       Decimal?  @db.Decimal(18, 2)
+  /// Применённый курс («1 source = rate AZN») — снапшот; NULL = UNKNOWN.
+  fxRate          Decimal?  @db.Decimal(18, 6)
+  fxRateCode      String?   // SFX-*
+  /// OPEN / PARTIALLY_PAID / CLOSED / CANCELLED / ADJUSTED.
+  status          String    @default("OPEN")
+  /// Оплаченная AZN-сумма (сумма aznAmount всех payout); всегда >= 0.
+  paidAmount      Decimal   @default(0) @db.Decimal(18, 2)
+  /// Остаток AZN (= aznAmount - paidAmount); NULL если aznAmount UNKNOWN.
+  remainingAmount Decimal?  @db.Decimal(18, 2)
+  /// Провенанс создания (BOOKING_CONFIRMED).
+  source          String    @default("BOOKING_CONFIRMED")
+  sourceEventId   String?
+  confirmedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  payouts         SupplierPayout[]
+
+  @@index([orderId])
+  @@index([status])
+  @@index([supplierCode])
+  @@index([partnerId])
+  @@schema("finance")
+}
+
+/// UNIFIED FINANCE CENTER Phase 2 — SupplierPayout: ФАКТ исходящего платежа
+/// поставщику (деньги реально ушли). Модель повторяет append-only/провенанс
+/// конвенции Payout, но добавляет partial-payment cardinality (НЕСКОЛЬКО payout
+/// на одну obligation) и providerRef-idempotency, несовместимые с
+/// @@unique([sourceType, sourceId]) существующего Payout (один payout на
+/// source-факт). Фактическое банковское движение amount/currency хранится
+/// ОТДЕЛЬНО от aznAmount (AZN management-эквивалент) — FX variance при
+/// расхождении курса фиксируется, замороженный obligation НЕ переписывается.
+model SupplierPayout {
+  id            String              @id @default(uuid())
+  code          String              @unique // SPO-########
+  obligationId  String
+  obligation    SupplierObligation  @relation(fields: [obligationId], references: [id])
+  /// Фактическое исходящее движение (> 0), реальная валюта банка/провайдера.
+  amount        Decimal             @db.Decimal(18, 2)
+  currency      String
+  /// AZN management-эквивалент этого payout (для декремента obligation.remaining).
+  aznAmount     Decimal             @db.Decimal(18, 2)
+  /// Фактический FX payout (если отличается от замороженного obligation.fxRate).
+  fxRate        Decimal?            @db.Decimal(18, 6)
+  /// aznAmount - (amount по замороженному obligation-курсу); FX variance.
+  fxVariance    Decimal?            @db.Decimal(18, 2)
+  method        String?
+  /// Внешний референс провайдера/банка — ключ идемпотентности replay.
+  providerRef   String?             @unique
+  occurredAt    DateTime
+  reason        String?
+  evidenceUrl   String?
+  correlationId String?
+  causationId   String?
+  actorType     String?
+  actorId       String?
+  createdAt     DateTime            @default(now())
+
+  @@index([obligationId])
   @@schema("finance")
 }
 

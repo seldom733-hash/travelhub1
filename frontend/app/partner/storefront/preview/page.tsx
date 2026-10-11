@@ -134,6 +134,7 @@ export default function StorefrontPreviewPage() {
 function toCard(p: PartnerProductListItem): PublicProductCard {
   return {
     id: p.id,
+    code: p.code,
     slug: p.slug,
     title: p.title,
     shortDescription: p.description ? (p.description.length > 180 ? p.description.slice(0, 179).trimEnd() + "…" : p.description) : null,

@@ -242,7 +242,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
 
           {user === null ? (
             <Link
-              href={`/login?next=${encodeURIComponent(`/products/${p.slug}`)}`}
+              href={`/login?next=${encodeURIComponent(`/products/${p.code}`)}`}
               onClick={() => fireMarketplaceCta(p.slug)}
               className="mt-4 block w-full rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-blue-500"
             >

@@ -23,6 +23,8 @@ export interface PublicCategory {
  */
 export interface PublicSeller {
   publicId: string;
+  /** CRM Partner.code (PAR-*) — код поставщика для отображения на карточке. */
+  partnerCode: string | null;
   displayName: string | null;
   visibilityMode: "ANONYMOUS" | "VERIFIED_ALIAS" | "PUBLIC_BRAND";
   verified: boolean;
@@ -56,6 +58,8 @@ export interface PublicMedia {
 
 export interface PublicProductCard {
   id: string;
+  /** Каталожный код продукта (PRD-*) — для публичных ссылок /products/PRD-*. */
+  code: string;
   slug: string;
   title: string;
   shortDescription: string | null;

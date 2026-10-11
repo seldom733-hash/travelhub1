@@ -15,6 +15,7 @@ vi.mock("next/link", () => ({
 function card(overrides: Partial<PublicProductCard> = {}): PublicProductCard {
   return {
     id: "p1",
+    code: "PRD-00000001",
     slug: "tour-1",
     title: "Тур на 5 дней",
     shortDescription: null,
@@ -34,14 +35,14 @@ function card(overrides: Partial<PublicProductCard> = {}): PublicProductCard {
 }
 
 describe("ProductCard (Step 1.7 §7)", () => {
-  it("рендерит категорию, title, цену (locale-aware) и CTA; ссылка на /products/:slug", () => {
+  it("рендерит категорию, title, цену (locale-aware) и CTA; ссылка на /products/:code", () => {
     render(<ProductCard card={card()} />);
     expect(screen.getByText("Tours")).toBeTruthy();
     expect(screen.getByText("Тур на 5 дней")).toBeTruthy();
     // ru-RU USD: «от 350,00 $» (Intl — неразрывный пробел перед символом).
     expect(screen.getByText(/от 350,00\s*\$/)).toBeTruthy();
     expect(screen.getByText("Подробнее")).toBeTruthy();
-    expect(screen.getByRole("link").getAttribute("href")).toBe("/products/tour-1");
+    expect(screen.getByRole("link").getAttribute("href")).toBe("/products/PRD-00000001");
   });
 
   it("без цены → «Цена по запросу», без 0", () => {
@@ -71,7 +72,7 @@ describe("ProductCard (Step 1.7 §7)", () => {
     render(
       <ProductCard
         card={card({
-          seller: { publicId: "SELL-00000001", displayName: null, visibilityMode: "ANONYMOUS", verified: true, memberSince: "2026-07-01T00:00:00Z", countryCode: "AZ", cityCode: null },
+          seller: { publicId: "SELL-00000001", partnerCode: "PAR-00000001", displayName: null, visibilityMode: "ANONYMOUS", verified: true, memberSince: "2026-07-01T00:00:00Z", countryCode: "AZ", cityCode: null },
         })}
       />,
     );
@@ -79,22 +80,23 @@ describe("ProductCard (Step 1.7 §7)", () => {
     const { container } = render(
       <ProductCard
         card={card({
-          seller: { publicId: "SELL-00000001", displayName: null, visibilityMode: "ANONYMOUS", verified: true, memberSince: "2026-07-01T00:00:00Z", countryCode: "AZ", cityCode: null },
+          seller: { publicId: "SELL-00000001", partnerCode: "PAR-00000001", displayName: null, visibilityMode: "ANONYMOUS", verified: true, memberSince: "2026-07-01T00:00:00Z", countryCode: "AZ", cityCode: null },
         })}
       />,
     );
     expect(container.innerHTML).not.toContain("RawBrand");
   });
 
-  it("VERIFIED_ALIAS/PUBLIC_BRAND → approved displayName", () => {
+  it("VERIFIED_ALIAS/PUBLIC_BRAND → partner code (PAR-*), никогда raw название", () => {
     render(
       <ProductCard
         card={card({
-          seller: { publicId: "SELL-00000002", displayName: "Smoke Travel", visibilityMode: "PUBLIC_BRAND", verified: true, memberSince: "2026-07-01T00:00:00Z", countryCode: "AZ", cityCode: "BAKU" },
+          seller: { publicId: "SELL-00000002", partnerCode: "PAR-00000002", displayName: "Smoke Travel", visibilityMode: "PUBLIC_BRAND", verified: true, memberSince: "2026-07-01T00:00:00Z", countryCode: "AZ", cityCode: "BAKU" },
         })}
       />,
     );
-    expect(screen.getByText("Smoke Travel")).toBeTruthy();
+    expect(screen.getByText("PAR-00000002")).toBeTruthy();
+    expect(screen.queryByText("Smoke Travel")).toBeNull();
     expect(screen.queryByText("Проверенный партнёр TravelHub")).toBeNull();
   });
 

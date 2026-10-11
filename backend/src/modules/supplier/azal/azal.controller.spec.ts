@@ -31,7 +31,7 @@ function segment(flightNumber: string, dep: string, arr: string, depAirport = "G
   };
 }
 
-function fare(family: string, amount: number, currency = "USD") {
+function fare(family: string, amount: number, currency = "AZN") {
   return {
     id: `FARE-${family}`,
     family,
@@ -125,7 +125,7 @@ interface Harness {
   ruleService: { resolve: jest.Mock };
 }
 
-function makeController(flights: any[], rate = "0.05"): Harness {
+function makeController(flights: any[], rate = "0.05", fxRates?: { resolveSafe: (code: string, cur: string) => Promise<{ rate: Prisma.Decimal; rateCode: string | null } | null> }): Harness {
   // One collectedAt shared by every search call: createRequest may invoke
   // search more than once, and per-call new Date() races the ms boundary
   // under full-suite load (snapshot vs results[0] comparison at §20).
@@ -159,7 +159,7 @@ function makeController(flights: any[], rate = "0.05"): Harness {
       ruleVersion: 1,
     }),
   } as unknown as MarkupRuleService;
-  const pricing = new SupplierPricingService(ruleService);
+  const pricing = new SupplierPricingService(ruleService, fxRates as never);
   const controller = new AzalController(
     azal as never,
     prisma as never,
@@ -203,7 +203,7 @@ describe("AzalController — markup + server-authoritative /request (Phase 2 §1
     it("zero/absent fare totals are not commercial money — left untouched (Gate E)", async () => {
       const flight = offer(
         [segment("J2123", "2026-11-01T08:00", "2026-11-01T11:00")],
-        [{ ...fare("ECONOMY", 0), total: { amount: 0, currency: "USD" } }],
+        [{ ...fare("ECONOMY", 0), total: { amount: 0, currency: "AZN" } }],
       );
       const h = makeController([flight]);
 
@@ -218,6 +218,115 @@ describe("AzalController — markup + server-authoritative /request (Phase 2 §1
       await h.controller.search(SEARCH_BODY as never);
       expect(h.ruleService.resolve).not.toHaveBeenCalled();
     });
+
+    it("mixed-currency RT combine: each leg converted by the supplier rate BEFORE summing (x + y*rate)", async () => {
+      // Adapter's raw combine: 100 AZN + 100 USD summed into 200 "AZN".
+      const rtFare = {
+        ...fare("ECONOMY", 200, "AZN"),
+        facilities: {
+          priceBreakdown: {
+            outbound: { amount: 100, currency: "AZN", base: 90 },
+            inbound: { amount: 100, currency: "USD", base: 90 },
+            total: { amount: 200, currency: "AZN" },
+          },
+        },
+      };
+      const flight = offer(
+        [
+          segment("J2123", "2026-11-01T08:00", "2026-11-01T11:00"),
+          segment("J2124", "2026-11-10T12:00", "2026-11-10T15:00", "IST", "GYD"),
+        ],
+        [rtFare],
+      );
+      const fxRates = {
+        resolveSafe: jest.fn(async (_code: string, cur: string) =>
+          cur === "USD" ? { rate: new Prisma.Decimal("1.7"), rateCode: "SFX-1" } : null,
+        ),
+      };
+      const h = makeController([flight], "0.05", fxRates);
+
+      const res = await h.controller.search(SEARCH_BODY as never);
+      const marked = (res.flights as any[])[0].fares[0];
+
+      // 100 AZN + 100 USD × 1.7 = 270 AZN supplier total, then 5% markup.
+      expect(marked.total).toMatchObject({ amount: 283.5, currency: "AZN" });
+      expect(marked.base).toMatchObject({ amount: 243, currency: "AZN" });
+      expect(marked.pricing).toBeDefined();
+      // Per-leg FX evidence kept on the fare; original legs untouched.
+      expect(marked.facilities.fxApplied).toMatchObject({
+        outbound: null,
+        inbound: { sourceCurrency: "USD", rate: "1.7", rateCode: "SFX-1" },
+      });
+      expect(marked.facilities.priceBreakdown.outbound).toMatchObject({ amount: 100, currency: "AZN" });
+      expect(marked.facilities.priceBreakdown.inbound).toMatchObject({ amount: 100, currency: "USD" });
+    });
+
+    it("mixed-currency RT combine without a leg rate → legacy whole-fare path (fail-open, no silent math)", async () => {
+      const rtFare = {
+        ...fare("ECONOMY", 200, "AZN"),
+        facilities: {
+          priceBreakdown: {
+            outbound: { amount: 100, currency: "AZN" },
+            inbound: { amount: 100, currency: "EUR" },
+            total: { amount: 200, currency: "AZN" },
+          },
+        },
+      };
+      const flight = offer(
+        [
+          segment("J2123", "2026-11-01T08:00", "2026-11-01T11:00"),
+          segment("J2124", "2026-11-10T12:00", "2026-11-10T15:00", "IST", "GYD"),
+        ],
+        [rtFare],
+      );
+      // USD-only rates: EUR leg has no rate.
+      const fxRates = {
+        resolveSafe: jest.fn(async (_code: string, cur: string) =>
+          cur === "USD" ? { rate: new Prisma.Decimal("1.7"), rateCode: "SFX-1" } : null,
+        ),
+      };
+      const h = makeController([flight], "0.05", fxRates);
+
+      const res = await h.controller.search(SEARCH_BODY as never);
+      const marked = (res.flights as any[])[0].fares[0];
+
+      // Legacy: raw sum marked up in the labeled currency, no fx evidence.
+      expect(marked.total).toMatchObject({ amount: 210, currency: "AZN" });
+      expect(marked.facilities.fxApplied).toBeUndefined();
+    });
+
+    it("same-currency legs keep the exact adapter sum + single convert", async () => {
+      const rtFare = {
+        ...fare("ECONOMY", 200, "USD"),
+        facilities: {
+          priceBreakdown: {
+            outbound: { amount: 100, currency: "USD" },
+            inbound: { amount: 100, currency: "USD" },
+            total: { amount: 200, currency: "USD" },
+          },
+        },
+      };
+      const flight = offer(
+        [
+          segment("J2123", "2026-11-01T08:00", "2026-11-01T11:00"),
+          segment("J2124", "2026-11-10T12:00", "2026-11-10T15:00", "IST", "GYD"),
+        ],
+        [rtFare],
+      );
+      const fxRates = {
+        resolveSafe: jest.fn(async (_code: string, cur: string) =>
+          cur === "USD" ? { rate: new Prisma.Decimal("1.7"), rateCode: "SFX-1" } : null,
+        ),
+      };
+      const h = makeController([flight], "0.05", fxRates);
+
+      const res = await h.controller.search(SEARCH_BODY as never);
+      const marked = (res.flights as any[])[0].fares[0];
+
+      // 200 USD × 1.7 = 340 AZN, then 5% markup; no per-leg evidence needed.
+      expect(marked.total).toMatchObject({ amount: 357, currency: "AZN" });
+      expect(marked.facilities.fxApplied).toBeUndefined();
+    });
   });
 
   describe("POST request — server-authoritative price", () => {
@@ -231,7 +340,7 @@ describe("AzalController — markup + server-authoritative /request (Phase 2 §1
       const createArgs = h.prisma.request.create.mock.calls.map((c: any[]) => c[0].data);
       expect(createArgs).toHaveLength(2);
       expect(createArgs[0].displayedPrice).toBe(1050);
-      expect(createArgs[0].displayedCurrency).toBe("USD");
+      expect(createArgs[0].displayedCurrency).toBe("AZN");
       expect(createArgs[1].displayedPrice).toBe(1050);
       // body.price (999999) never reached the request record
       expect(createArgs[0].displayedPrice).not.toBe(999999);
@@ -299,7 +408,7 @@ describe("AzalController — markup + server-authoritative /request (Phase 2 §1
         supplierCode: "AZAL",
         serviceType: "flights",
         supplierPrice: 1000,
-        supplierCurrency: "USD",
+        supplierCurrency: "AZN",
         markupRate: "0.05",
         markupAmount: 50,
         markupRuleCode: "MKR-00000001",
@@ -309,7 +418,7 @@ describe("AzalController — markup + server-authoritative /request (Phase 2 §1
         discountType: "NONE",
         discountAmount: 0,
         customerFinalPrice: 1050,
-        customerCurrency: "USD",
+        customerCurrency: "AZN",
         priceSource: "PUBLIC",
         customerAcceptedAt: null,
       });
@@ -353,7 +462,7 @@ describe("AzalController — markup + server-authoritative /request (Phase 2 §1
         supplierPrice: 1500,
         markupAmount: 75,
         publicPrice: 1575,
-        supplierCurrency: "USD",
+        supplierCurrency: "AZN",
         serviceType: "flights",
       });
     });

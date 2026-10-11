@@ -425,9 +425,9 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
     expect(await prisma.payment.count({ where: { orderId } })).toBe(2); // 1 CANCELLED + 1 PENDING
   });
 
-  // ── 11. boundaries: 0 finance side effects; Booking не тронуты ──────────────
+  // ── 11. boundaries: +1 Ledger (PAYMENT_CAPTURED); Booking не тронуты ────────
 
-  it("T11. Payment runtime создаёт 0 Ledger/ProviderFee/Settlement/Payout/Refund/Invoice/Commission/CommissionAccrual; Booking не тронуты", async () => {
+  it("T11. Payment runtime создаёт +1 Ledger (PAYMENT_CAPTURED, Phase 5), 0 ProviderFee/Settlement/Payout/Refund/Invoice/Commission/Accrual; Booking не тронуты", async () => {
     const sm = await createStaff("s12_sm11a", RoleCode.SALES_MANAGER);
     const fin = await createStaff("s12_fin11b", RoleCode.FINANCE);
     const { orderId } = await buildOrder(sm, "pay_t11", 35);
@@ -457,7 +457,15 @@ describe("Phase 2 Step 2.12 — Payment Flow (e2e)", () => {
       accruals: await prisma.commissionAccrual.count(),
       bookings: await prisma.booking.count({ where: { orderId } }),
     };
-    expect(after).toEqual(before);
+    // Phase 5: успешный capture публикует РОВНО ОДИН append-only ledger-факт
+    // (PAYMENT_CAPTURED, LedgerPostingConsumer). Остальные finance-побочные-
+    // эффекты Payment runtime по-прежнему 0; Booking не тронуты.
+    expect(after.ledger).toBe(before.ledger + 1);
+    const captureFact = await prisma.ledgerTransaction.findFirst({
+      where: { sourceType: "PAYMENT", sourceId: pay.id, type: "PAYMENT_CAPTURED" },
+    });
+    expect(captureFact).not.toBeNull();
+    expect({ ...after, ledger: before.ledger }).toEqual({ ...before, ledger: before.ledger });
   });
 
   // ── 12. PII-free DTO / secrets ──────────────────────────────────────────────

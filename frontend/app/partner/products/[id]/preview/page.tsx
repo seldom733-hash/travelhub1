@@ -70,7 +70,7 @@ export default function ProductPreviewPage() {
           {pt("partner.preview.back", locale)}
         </Link>
         {isPublic && (
-          <a href={`/products/${product.slug}`} target="_blank" rel="noreferrer" className="text-sm text-slate-500 hover:text-emerald-700">
+          <a href={`/products/${product.code}`} target="_blank" rel="noreferrer" className="text-sm text-slate-500 hover:text-emerald-700">
             {pt("partner.preview.open_public", locale)} ↗
           </a>
         )}

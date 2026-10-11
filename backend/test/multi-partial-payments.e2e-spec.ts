@@ -199,6 +199,17 @@ describe("MULTI/PARTIAL PAYMENTS (e2e, §16)", () => {
     expect(String(view.paidAmount)).toBe("300");
     expect(String(view.dueAmount)).toBe("1000");
 
+    // Phase 5 ledger: PaymentCaptured → PAYMENT_CAPTURED append-only fact
+    // (LedgerPostingConsumer). Факт движения: сумма/валюта = фактическая оплата.
+    const payRec = await prisma.payment.findUniqueOrThrow({ where: { id: p1.id } });
+    const captureLedger = await prisma.ledgerTransaction.findFirst({
+      where: { sourceType: "PAYMENT", sourceId: p1.id, type: "PAYMENT_CAPTURED" },
+    });
+    expect(captureLedger).not.toBeNull();
+    expect(captureLedger!.amount.toString()).toBe(payRec.amount.toString());
+    expect(captureLedger!.currency).toBe(payRec.currency);
+    expect(captureLedger!.sourceEventId).not.toBeNull();
+
     // Payment 500 (check 2).
     const p2 = (await createPayment(fin, orderId, { amount: "500", reason: "partial 2" }).expect(201)).body as { id: string; code: string; amount: string };
     created.payments.push(p2.id);

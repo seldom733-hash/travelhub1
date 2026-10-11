@@ -30,7 +30,7 @@ function HotelCard({ card }: { card: PublicProductCard }) {
 
   return (
     <Link
-      href={`/products/${card.slug}`}
+      href={`/products/${card.code}`}
       className="card-premium group relative overflow-hidden rounded-2xl bg-dark-card"
     >
       {/* Image */}

@@ -78,17 +78,19 @@ describe("Data-shape fix §15/§16 — public tour offer → traveler pin → D3
     orders: [],
   };
 
-  /** Hermetic supplier re-check (no network / no captcha). */
+  /** Hermetic supplier re-check (no network / no captcha).
+   *  UNIFIED FINANCE CENTER Phase 1: recheck pricing-block в AZN (management
+   *  currency; strict FX-гейт money-пути пропускает AZN-блоки). */
   const refreshPrice = jest.fn().mockResolvedValue({
     amount: 1050,
-    currency: "USD",
+    currency: "AZN",
     fetchedAt: new Date(),
     expiresAt: new Date(Date.now() + 15 * 60 * 1000),
     queryHash: "e2e-hash",
     source: "KOMPAS",
     pricing: {
       supplierAmount: 1000,
-      currency: "USD",
+      currency: "AZN",
       markupRate: "0.05",
       markupAmount: 50,
       publicAmount: 1050,

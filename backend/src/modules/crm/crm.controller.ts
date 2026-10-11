@@ -283,8 +283,8 @@ export class CrmController {
 
   @Post("partners")
   @RequirePermissions("crm.partner.write")
-  createPartner(@Body() dto: CreatePartnerDto) {
-    return this.crm.createPartner(dto.name, dto.companyId, dto.countryCode);
+  createPartner(@Body() dto: CreatePartnerDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.crm.createPartner(dto.name, dto.companyId, dto.countryCode, actor);
   }
 
   @Get("suppliers")
@@ -295,8 +295,8 @@ export class CrmController {
 
   @Post("suppliers")
   @RequirePermissions("crm.supplier.write")
-  createSupplier(@Body() dto: CreateSupplierDto) {
-    return this.crm.createSupplier(dto.name, dto.companyId);
+  createSupplier(@Body() dto: CreateSupplierDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.crm.createSupplier(dto.name, dto.companyId, actor);
   }
 
   // ── Step 3.5 — Partner List/Detail ──────────────────────────────────────

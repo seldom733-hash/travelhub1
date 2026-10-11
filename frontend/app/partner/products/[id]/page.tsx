@@ -166,7 +166,7 @@ export default function ProductDetailPage() {
       <div className="mb-6 flex flex-wrap gap-2">
         {product.status === "PUBLISHED" && (
           <a
-            href={`/products/${product.slug}`}
+            href={`/products/${product.code}`}
             target="_blank"
             rel="noreferrer"
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"

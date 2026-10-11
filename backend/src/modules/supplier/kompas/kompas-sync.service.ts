@@ -6,6 +6,7 @@
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { IdsService } from "../../../shared/ids.service";
 import { KompasSupplierAdapter } from "./kompas.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import type { SupplierOffer } from "../supplier.types";
@@ -44,6 +45,7 @@ export class KompasSyncService {
     private readonly prisma: PrismaService,
     private readonly kompas: KompasSupplierAdapter,
     private readonly pricing: SupplierPricingService,
+    private readonly ids: IdsService,
   ) {}
 
   async getKompasPartner(): Promise<{ id: string } | null> {
@@ -239,7 +241,7 @@ export class KompasSyncService {
         };
 
         const existing = await this.prisma.product.findFirst({
-          where: { code: productCode },
+          where: { supplierRef: productCode },
         });
 
         if (existing) {
@@ -284,13 +286,14 @@ export class KompasSyncService {
         } else {
           const slug = `kompas-${tourIncValue}-${hotelKey}`.toLowerCase().replace(/[^a-z0-9]+/g, "-");
           await this.prisma.$transaction(async (tx: any) => {
+          const prdCode = await this.ids.nextCode(tx, "PRD");
           const idResult = await tx.$queryRaw<{ id: string }[]>`
             INSERT INTO "catalog"."Product" (
-              "id", "code", "type", "title", "slug", "status", "version",
+              "id", "code", "supplierRef", "type", "title", "slug", "status", "version",
               "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt",
             "geoCountryId"
           ) VALUES (
-            gen_random_uuid(), ${productCode}, 'TOUR'::"catalog"."ProductType",
+            gen_random_uuid(), ${prdCode}, ${productCode}, 'TOUR'::"catalog"."ProductType",
             ${`${hotelName} — ${tourIncName}`}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
             ${toursCategory.id}, ${JSON.stringify(attributes)}::jsonb, ${kompasPartner.id},
             now(), now(), now(),

@@ -8,6 +8,7 @@
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { IdsService } from "../../../shared/ids.service";
 import { SupplierOfferService } from "../supplier-offer.service";
 import { SummertourNewAdapter } from "./summertour-new.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
@@ -89,6 +90,7 @@ export class SummerSyncService {
     private readonly offerService: SupplierOfferService,
     private readonly summertour: SummertourNewAdapter,
     private readonly pricing: SupplierPricingService,
+    private readonly ids: IdsService,
   ) {}
 
   /**
@@ -451,16 +453,16 @@ export class SummerSyncService {
 
     // Check if product already exists
     const existing = await this.prisma.product.findUnique({
-      where: { code: productCode },
+      where: { supplierRef: productCode },
       select: { id: true, code: true, status: true, version: true },
     });
 
     if (existing) {
-      // Update: refresh attributes and tariffs
+      // Update: refresh attributes, title (hotel-only naming) and tariffs
       await this.prisma.$transaction(async (tx: any) => {
         await tx.product.update({
           where: { id: existing.id },
-          data: { attributes, updatedAt: new Date() },
+          data: { title, attributes, updatedAt: new Date() },
         });
 
         // Update tariff price if changed
@@ -494,12 +496,13 @@ export class SummerSyncService {
 
     // Create new product
     const product = await this.prisma.$transaction(async (tx: any) => {
+      const prdCode = await this.ids.nextCode(tx, "PRD");
       const idResult = await tx.$queryRaw<{ id: string }[]>`
         INSERT INTO "catalog"."Product" (
-          "id", "code", "type", "title", "slug", "status", "version",
+          "id", "code", "supplierRef", "type", "title", "slug", "status", "version",
           "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt"
         ) VALUES (
-          gen_random_uuid(), ${productCode}, 'TOUR'::"catalog"."ProductType",
+          gen_random_uuid(), ${prdCode}, ${productCode}, 'TOUR'::"catalog"."ProductType",
           ${title}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
           ${categoryId}, ${JSON.stringify(attributes)}::jsonb, ${partnerId},
           now(), now(), now()
@@ -547,9 +550,13 @@ export class SummerSyncService {
 
   // ── Helpers ──────────────────────────────────────────────────────
 
+  /**
+   * Название карточки — ТОЛЬКО отель (hotelName от поставщика уже содержит
+   * курорт в скобках, напр. "HIMEROS BEACH HOTEL 3* (Сиде)"). Название
+   * программы (tourIncName) в title НЕ добавляем.
+   */
   private buildTitle(identity: NormalizedIdentity): string {
-    const resort = identity.resort ? ` (${identity.resort})` : "";
-    return `${identity.hotelName}${resort} — ${identity.tourIncName}`;
+    return identity.hotelName;
   }
 
   private buildSlug(tourIncValue: string, hotelKey: string, identity: NormalizedIdentity): string {

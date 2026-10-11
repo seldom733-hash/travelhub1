@@ -11,6 +11,8 @@ import { normalizePhoneE164 } from "../../shared/phone/phone";
 import { findCustomerIdsByCanonicalPhone } from "../../shared/customer-resolver/customer-resolver";
 import { isUniqueViolation } from "../../shared/prisma-errors";
 import { normalizeInitialNote } from "../operational-notes/operational-notes.types";
+import { DEFAULT_SUPPLIER_FX_RATES } from "../../shared/supplier-fx-defaults";
+import type { Actor } from "../finance/supplier-fx-rate.service";
 
 import { buildSortClause, type SortDirection } from '../../shared/sort';
 
@@ -584,7 +586,7 @@ export class CrmService {
       if (existing) return { partnerId: existing.id, created: false };
     }
 
-    const code = await this.ids.nextCode(tx, "PAR");
+    const code = await this.ids.nextCode(tx, "PRN");
     const partner = await tx.partner.create({
       data: {
         code,
@@ -614,6 +616,10 @@ export class CrmService {
         source: "partner_onboarding",
       } as PartnerEventPayload,
     });
+
+    // Авто-курсы нового поставщика (USD 1.7 / EUR 1.91 к AZN) — в той же
+    // транзакции, что и Partner (атомарность создания + ставок).
+    await this.seedDefaultFxRates(tx, partner.code);
 
     return { partnerId: partner.id, created: true };
   }
@@ -646,18 +652,78 @@ export class CrmService {
     return this.prisma.company.findMany({ orderBy: { name: "asc" } });
   }
 
-  async createPartner(name: string, companyId?: string, countryCode?: string) {
+  /**
+   * Создание поставщика/партнёра (PRN-*). Дефолтные курсы к AZN ставятся В
+   * ТОЙ ЖЕ транзакции — создание поставщика и ставок атомарно.
+   */
+  async createPartner(name: string, companyId?: string, countryCode?: string, actor?: Actor) {
     return this.prisma.$transaction(async (tx) => {
-      const code = await this.ids.nextCode(tx, "PAR");
-      return tx.partner.create({ data: { code, name, companyId: companyId ?? null, countryCode: countryCode ?? null, status: "ACTIVE" } });
+      const code = await this.ids.nextCode(tx, "PRN");
+      const partner = await tx.partner.create({ data: { code, name, companyId: companyId ?? null, countryCode: countryCode ?? null, status: "ACTIVE" } });
+      await this.seedDefaultFxRates(tx, partner.code, actor);
+      return partner;
     });
   }
 
-  async createSupplier(name: string, companyId?: string) {
+  async createSupplier(name: string, companyId?: string, actor?: Actor) {
     return this.prisma.$transaction(async (tx) => {
       const code = await this.ids.nextCode(tx, "SUP");
-      return tx.supplier.create({ data: { code, name, companyId: companyId ?? null, status: "ACTIVE" } });
+      const supplier = await tx.supplier.create({ data: { code, name, companyId: companyId ?? null, status: "ACTIVE" } });
+      await this.seedDefaultFxRates(tx, supplier.code, actor);
+      return supplier;
     });
+  }
+
+  /**
+   * Авто-курсы ТОЛЬКО ЧТО созданного поставщика: 1 USD = 1.7 AZN,
+   * 1 EUR = 1.91 AZN (DEFAULT_SUPPLIER_FX_RATES). Идемпотентно: строка уже
+   * есть → пропускаем (история не шумит). Пишется напрямую через tx (без
+   * SupplierFxRateService), чтобы не замкнуть цикл модулей
+   * SecurityModule → CrmModule → FinanceModule → SecurityService. AuditLog не
+   * пишется — установка системная, не действие админа; провенанс остаётся в
+   * SupplierFxRateHistory (actor = создавший поставщика).
+   */
+  private async seedDefaultFxRates(
+    tx: Prisma.TransactionClient,
+    supplierCode: string,
+    actor?: Actor,
+  ): Promise<void> {
+    // Управляющая валюта V1 зафиксирована (AZN) — как в SupplierFxRateService.
+    const TARGET = "AZN";
+    for (const [sourceCurrencyIso, rate] of DEFAULT_SUPPLIER_FX_RATES) {
+      const existing = await tx.supplierFxRate.findUnique({
+        where: {
+          supplierCode_sourceCurrencyIso_targetCurrencyIso: {
+            supplierCode,
+            sourceCurrencyIso,
+            targetCurrencyIso: TARGET,
+          },
+        },
+      });
+      if (existing) continue;
+      const code = await this.ids.nextCode(tx, "SFX");
+      const row = await tx.supplierFxRate.create({
+        data: {
+          code,
+          supplierCode,
+          sourceCurrencyIso,
+          targetCurrencyIso: TARGET,
+          rate,
+          updatedById: actor?.id ?? null,
+          updatedByName: actor?.username ?? null,
+        },
+      });
+      await tx.supplierFxRateHistory.create({
+        data: {
+          rateId: row.id,
+          action: "CREATE",
+          oldRate: null,
+          newRate: rate,
+          actorId: actor?.id ?? null,
+          actorName: actor?.username ?? null,
+        },
+      });
+    }
   }
 
   async listSuppliers() {

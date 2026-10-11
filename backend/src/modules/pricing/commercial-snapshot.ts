@@ -35,10 +35,32 @@ import type { MarkupPricingJson } from "./pricing.types";
 
 export type PriceSource = "PUBLIC" | "LIVE_SALES";
 
+/**
+ * UNIFIED FINANCE CENTER Phase 1: frozen FX conversion facts. When present,
+ * supplierPrice/supplierCurrency keep the ORIGINAL source amount/currency
+ * (immutable source facts) and markup/public/discount/final are denominated
+ * in AZN (management currency); invariant becomes
+ * publicPrice == fx.aznAmount + markupAmount and floor finalPrice >= fx.aznAmount.
+ * Absent for AZN-sourced prices (customerCurrency = supplierCurrency, legacy).
+ */
+export interface FxSnapshot {
+  sourceAmount: number;
+  sourceCurrency: string;
+  /** «1 sourceCurrency = rate AZN» as decimal string (≤6dp). */
+  rate: string;
+  /** SupplierFxRate.code (SFX-*) when available, null otherwise. */
+  rateCode: string | null;
+  /** Converted supplier cost in AZN (half-up 2dp). */
+  aznAmount: number;
+  /** ISO instant of the conversion. */
+  convertedAt: string;
+}
+
 export interface CommercialSnapshot {
   supplierCode: string;
   serviceType: string;
 
+  /** SOURCE supplier amount (original currency; see fx for conversion). */
   supplierPrice: number;
   supplierCurrency: string;
 
@@ -64,6 +86,12 @@ export interface CommercialSnapshot {
   supplierPriceExpiresAt: string | null;
   /** null until customerAccept freezes the snapshot (Gate F). */
   customerAcceptedAt: string | null;
+
+  /**
+   * Present iff supplier price was converted to AZN (supplier-specific FX rate).
+   * Source facts preserved; money chain (markup/public/final) in AZN.
+   */
+  fx?: FxSnapshot | null;
 }
 
 const iso = (value: string | Date | null | undefined): string | null =>
@@ -108,14 +136,31 @@ export function buildWorkingSnapshot(input: {
   if (rate.isNegative() || rate.greaterThanOrEqualTo(1)) {
     throw new ValidationDomainError(`invalid markup rate in pricing block: ${rate.toString()}`);
   }
-  if (!supplierPrice.plus(markupAmount).equals(publicPrice)) {
+
+  // UNIFIED FINANCE CENTER Phase 1: fx branch — invariant считается от
+  // сконвертированного AZN-стоимости (convert-then-markup), а не от
+  // SOURCE-суммы; customerCurrency — AZN (management currency).
+  const fx: FxSnapshot | null = p.fx
+    ? {
+        sourceAmount: toMoney2(p.fx.sourceAmount, "fx.sourceAmount").toNumber(),
+        sourceCurrency: requireCurrency(p.fx.sourceCurrency, "fx.sourceCurrency"),
+        rate: String(p.fx.rate),
+        rateCode: p.fx.rateCode ?? null,
+        aznAmount: toMoney2(p.fx.aznAmount, "fx.aznAmount").toNumber(),
+        convertedAt: iso(p.fx.convertedAt) ?? new Date().toISOString(),
+      }
+    : null;
+
+  const markupBase = fx != null ? toMoney2(fx.aznAmount, "fx.aznAmount") : supplierPrice;
+  if (!markupBase.plus(markupAmount).equals(publicPrice)) {
     throw new ValidationDomainError(
-      `invalid public price: publicPrice (${publicPrice}) != supplierPrice (${supplierPrice}) + markupAmount (${markupAmount})`,
+      `invalid public price: publicPrice (${publicPrice}) != ${fx != null ? "fx.aznAmount" : "supplierPrice"} (${markupBase}) + markupAmount (${markupAmount})`,
     );
   }
   if (publicPrice.lessThanOrEqualTo(0)) {
     throw new ValidationDomainError("invalid public price: must be greater than 0");
   }
+  const customerCurrency = fx != null ? (p.publicCurrency ?? "AZN") : supplierCurrency;
 
   return {
     supplierCode: input.supplierCode,
@@ -132,12 +177,13 @@ export function buildWorkingSnapshot(input: {
     discountValue: null,
     discountAmount: 0,
     customerFinalPrice: Number(publicPrice.toString()),
-    customerCurrency: supplierCurrency,
+    customerCurrency,
     priceSource: input.priceSource ?? "PUBLIC",
     pricingCalculatedAt: iso(p.calculatedAt) ?? new Date().toISOString(),
     supplierPriceFetchedAt: iso(input.supplierPriceFetchedAt),
     supplierPriceExpiresAt: iso(input.supplierPriceExpiresAt),
     customerAcceptedAt: null,
+    ...(fx != null ? { fx } : {}),
   };
 }
 
@@ -197,9 +243,14 @@ export function validateForAcceptance(
     throw new ValidationDomainError("invalid public price: must be greater than 0");
   }
   const markupAmount = toMoney2(snapshot.markupAmount ?? 0, "markupAmount");
-  if (!supplierPrice.plus(markupAmount).equals(publicPrice)) {
+
+  // UNIFIED FINANCE CENTER Phase 1: fx branch — invariant/floor считаются от
+  // сконвертированного AZN-стоимости (money chain в AZN при наличии fx).
+  const fx = snapshot.fx ?? null;
+  const markupBase = fx != null ? toMoney2(fx.aznAmount, "fx.aznAmount") : supplierPrice;
+  if (!markupBase.plus(markupAmount).equals(publicPrice)) {
     throw new ValidationDomainError(
-      `invalid public price: publicPrice (${publicPrice}) != supplierPrice (${supplierPrice}) + markupAmount (${markupAmount})`,
+      `invalid public price: publicPrice (${publicPrice}) != ${fx != null ? "fx.aznAmount" : "supplierPrice"} (${markupBase}) + markupAmount (${markupAmount})`,
     );
   }
 
@@ -230,10 +281,11 @@ export function validateForAcceptance(
     throw new ValidationDomainError("invalid final price: must be greater than 0");
   }
 
-  // Mandatory floor (§12 / design §14).
-  if (finalPrice.lessThan(supplierPrice)) {
+  // Mandatory floor (§12 / design §14): при fx — флоор по AZN-стоимости
+  // (markupBase), без fx — по SOURCE supplierPrice (легаси).
+  if (finalPrice.lessThan(markupBase)) {
     throw new ValidationDomainError(
-      `final price < supplier price: finalPrice (${finalPrice}) < supplierPrice (${supplierPrice})`,
+      `final price < supplier price: finalPrice (${finalPrice}) < ${fx != null ? "fx.aznAmount" : "supplierPrice"} (${markupBase})`,
     );
   }
 
@@ -242,9 +294,9 @@ export function validateForAcceptance(
     if (accepted.lessThanOrEqualTo(0)) {
       throw new ValidationDomainError("invalid final price: accepted money must be greater than 0");
     }
-    if (accepted.lessThan(supplierPrice)) {
+    if (accepted.lessThan(markupBase)) {
       throw new ValidationDomainError(
-        `final price < supplier price: accepted money (${accepted}) < supplierPrice (${supplierPrice})`,
+        `final price < supplier price: accepted money (${accepted}) < ${fx != null ? "fx.aznAmount" : "supplierPrice"} (${markupBase})`,
       );
     }
   }

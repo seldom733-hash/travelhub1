@@ -100,6 +100,15 @@ export const DomainEvents = {
   // отмены ещё ACCRUED Commission/Accrual при возврате брони в заказ
   // (CAS ACCRUED → REVERSED; ledger НЕ переписывается; 0 consumer-ов).
   CommissionReversed: "CommissionReversed",
+  // UNIFIED FINANCE CENTER Phase 5 — ledger posting source facts.
+  // SupplierPayoutCreated — исходящий платёж поставщику (деньги реально
+  // ушли; consumer — LedgerPostingConsumer, фиксирует в LedgerTransaction).
+  // ObligationAdjusted — явная корректировка AZN-суммы obligation (revaluation
+  // факт; consumer — LedgerPostingConsumer). Оба эмитятся Finance-производителем
+  // (supplier-obligation.service) в транзакции payout/adjust; retryable=true —
+  // durable retry ledger-проекции.
+  SupplierPayoutCreated: "SupplierPayoutCreated",
+  ObligationAdjusted: "ObligationAdjusted",
 } as const;
 
 export type DomainEventType = (typeof DomainEvents)[keyof typeof DomainEvents];
@@ -461,4 +470,47 @@ export interface CommissionReversedPayload {
   /** Бронь, инициировавшая возврат (round-trip Booking → Order). */
   bookingId: string;
   bookingCode: string;
+}
+
+/**
+ * UNIFIED FINANCE CENTER Phase 5 — SupplierPayoutCreated.
+ * Producer: Finance (createPayout, в транзакции payout). Consumer:
+ * LedgerPostingConsumer (LedgerTransaction, sourceType SUPPLIER_PAYOUT).
+ * PII-free: canonical refs + frozen money facts (верифицируется server-side).
+ */
+export interface SupplierPayoutCreatedPayload {
+  /** SupplierPayout (SPO-*, canonical cash-movement fact). */
+  payoutId: string;
+  payoutCode: string;
+  /** SupplierObligation (SBO-*), которую частично/полностью покрывает payout. */
+  obligationId: string;
+  obligationCode: string;
+  /** Фактическое исходящее движение (Decimal string, DECIMAL(18,2)). */
+  amount: string;
+  currency: string;
+  /** AZN management-эквивалент по frozen obligation fxRate (Decimal string). */
+  aznAmount: string;
+  /** Опциональный провайдерский/внутренний ref (opaque; идемпотентность). */
+  providerRef?: string | null;
+  /** Бизнес-время движения (ISO 8601; occurredAt payout). */
+  occurredAt: string;
+}
+
+/**
+ * UNIFIED FINANCE CENTER Phase 5 — ObligationAdjusted.
+ * Producer: Finance (adjustObligation, paidAmount == 0). Consumer:
+ * LedgerPostingConsumer (LedgerTransaction, sourceType OBLIGATION).
+ * Revaluation-факт: AZN-сумма обязательства изменена (не cash-movement —
+ * recorded как append-only ledger fact с типом OBLIGATION_ADJUSTED).
+ */
+export interface ObligationAdjustedPayload {
+  /** SupplierObligation (SBO-*), у которого изменена AZN-сумма. */
+  obligationId: string;
+  obligationCode: string;
+  /** До корректировки (Decimal string | null = UNKNOWN). */
+  previousAznAmount: string | null;
+  /** После корректировки (Decimal string; всегда известен — newAznAmount > 0). */
+  newAznAmount: string;
+  /** Опциональный business reason (descriptive; без PII). */
+  reason?: string | null;
 }

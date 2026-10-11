@@ -87,6 +87,9 @@ function todayStartUtc(): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
+/** Курсы поставщиков для витрины: partnerId → (sourceCurrencyIso → rate→AZN). */
+type SupplierFxByPartner = Map<string, Map<string, Prisma.Decimal>>;
+
 interface PublicProductRow {
   id: string;
   code: string;
@@ -307,10 +310,11 @@ export class PublicCatalogService {
 
     const availability = await this.availabilitySummaries(rows.map((r) => r.id));
     const sellers = await this.sellersOf(rows.map((r) => r.partnerId));
+    const fx = await this.supplierFxByPartner(rows.map((r) => r.partnerId));
 
     const items = await Promise.all(
       rows.map((r) =>
-        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null),
+        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, fx),
       ),
     );
 
@@ -320,8 +324,11 @@ export class PublicCatalogService {
   // ── Public Product detail (PDP, §5) ───────────────────────────────────────
 
   async getProductDetail(slugOrId: string): Promise<PublicProductDetail> {
+    // Нейтральные URL: marketplace-PDP резолвится ТОЛЬКО по PRD-коду (или id).
+    // Slug-ссылки вида /products/summer-… больше не открывают страницы (404) —
+    // старые slug-страницы тем самым удалены, весь публичный контур на кодах.
     const row = await this.prisma.product.findFirst({
-      where: { OR: [{ id: slugOrId }, { slug: slugOrId }], ...this.marketplaceWhere() },
+      where: { OR: [{ id: slugOrId }, { code: slugOrId }], ...this.marketplaceWhere() },
       include: this.productDetailInclude(),
     });
     // Единый 404: anonymous не узнаёт, что Product существует как DRAFT/IN_REVIEW
@@ -331,7 +338,8 @@ export class PublicCatalogService {
       throw new NotFoundError("Product not found");
     }
     const seller = row.partnerId ? ((await this.sellersOf([row.partnerId])).get(row.partnerId) ?? null) : null;
-    return this.toDetail(row, seller);
+    const fx = await this.supplierFxByPartner([row.partnerId]);
+    return this.toDetail(row, seller, fx);
   }
 
   // ── Public Partner Storefront (Phase 1 Step 1.12.1 §11/§12/§13) ──────────
@@ -433,9 +441,10 @@ export class PublicCatalogService {
     const typed = rows as unknown as PublicProductRow[];
     const availability = await this.availabilitySummaries(typed.map((r) => r.id));
     const sellers = await this.sellersOf(typed.map((r) => r.partnerId));
+    const fx = await this.supplierFxByPartner(typed.map((r) => r.partnerId));
     const items = await Promise.all(
       typed.map((r) =>
-        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null),
+        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, fx),
       ),
     );
     return { items, total, page, pageSize };
@@ -448,14 +457,15 @@ export class PublicCatalogService {
    */
   async getStorefrontProductDetail(partnerId: string, slugOrId: string): Promise<PublicProductDetail> {
     const row = await this.prisma.product.findFirst({
-      where: { OR: [{ id: slugOrId }, { slug: slugOrId }], partnerId, ...this.storefrontWhere() },
+      where: { OR: [{ id: slugOrId }, { slug: slugOrId }, { code: slugOrId }], partnerId, ...this.storefrontWhere() },
       include: this.productDetailInclude(),
     });
     if (!row || !PublicCatalogService.isPubliclyVisible(row.status, row.publishedAt)) {
       throw new NotFoundError("Product not found");
     }
     const seller = await this.sellerProjectionFor(partnerId);
-    return this.toDetail(row, seller);
+    const fx = await this.supplierFxByPartner([row.partnerId]);
+    return this.toDetail(row, seller, fx);
   }
 
   /**
@@ -509,7 +519,7 @@ export class PublicCatalogService {
    */
   async resolvePublicStorefrontProductForEvents(slug: string, partnerId: string, productSlug: string): Promise<string | null> {
     const row = await this.prisma.product.findFirst({
-      where: { OR: [{ id: productSlug }, { slug: productSlug }], partnerId, ...this.storefrontWhere() },
+      where: { OR: [{ id: productSlug }, { slug: productSlug }, { code: productSlug }], partnerId, ...this.storefrontWhere() },
       select: { id: true },
     });
     return row?.id ?? null;
@@ -533,7 +543,7 @@ export class PublicCatalogService {
    */
   async resolvePublicMarketplaceProductForEvents(productSlug: string): Promise<string | null> {
     const row = await this.prisma.product.findFirst({
-      where: { OR: [{ id: productSlug }, { slug: productSlug }], ...this.marketplaceWhere() },
+      where: { OR: [{ id: productSlug }, { slug: productSlug }, { code: productSlug }], ...this.marketplaceWhere() },
       select: { id: true },
     });
     return row?.id ?? null;
@@ -889,10 +899,25 @@ export class PublicCatalogService {
   }
 
   /** Маппинг детали (PDP) — общий для Marketplace и Storefront-контура. */
-  private toDetail(row: PublicProductRow, seller: PublicSeller | null): PublicProductDetail {
+  private toDetail(
+    row: PublicProductRow,
+    seller: PublicSeller | null,
+    fx: SupplierFxByPartner,
+  ): PublicProductDetail {
     const media = row.media.map((m) => this.toPublicMedia(m));
     const availability = this.toAvailabilitySummary(row.availability ?? []);
     const price = this.minTariff(row.tariffs);
+    const shown = price ? this.toDisplayPrice(price.amount, price.currency, row.partnerId, fx) : null;
+    // PDP-атрибуты sync-поставщиков несут startingPrice/currency в валюте
+    // поставщика (факт синка). Если витринная цена сконвертирована в AZN —
+    // подменяем и их, иначе PDP показывает «Currency USD / Starting price»
+    // рядом с ценой в AZN. Ключей нет (ручные товары) → не invent facts.
+    const converted = !!price && price.currency.toUpperCase() !== "AZN" && shown?.currency === "AZN";
+    const rawAttributes = (row.attributes ?? null) as Record<string, unknown> | null;
+    const attributes =
+      converted && rawAttributes && "startingPrice" in rawAttributes && "currency" in rawAttributes
+        ? { ...rawAttributes, startingPrice: Number(shown!.amount), currency: "AZN" }
+        : rawAttributes;
     return {
       product: {
         id: row.id,
@@ -902,20 +927,34 @@ export class PublicCatalogService {
         description: row.description,
         type: row.type as PublicProductDetail["product"]["type"],
         category: row.category ? this.toCategory(row.category) : null,
-        attributes: (row.attributes ?? null) as Record<string, unknown> | null,
-        tariffs: row.tariffs.map((t) => ({
-          id: t.id,
-          name: t.name,
+        attributes,
+        tariffs: row.tariffs.map((t) => {
           // §22: POR — inquiry-only offer; bindable цена не выводится (null),
           // но план видим (visibility отделён от цены/bindability).
-          price: t.pricingMode === "PRICE_ON_REQUEST" ? null : this.money(t.price),
-          currency: t.pricingMode === "PRICE_ON_REQUEST" ? null : t.currency,
-          validFrom: t.validFrom ? t.validFrom.toISOString() : null,
-          validTo: t.validTo ? t.validTo.toISOString() : null,
-          pricingMode: t.pricingMode as "FIXED" | "PRICE_ON_REQUEST",
-        })),
-        priceFrom: price?.amount ?? null,
-        currency: price?.currency ?? null,
+          if (t.pricingMode === "PRICE_ON_REQUEST") {
+            return {
+              id: t.id,
+              name: t.name,
+              price: null,
+              currency: null,
+              validFrom: t.validFrom ? t.validFrom.toISOString() : null,
+              validTo: t.validTo ? t.validTo.toISOString() : null,
+              pricingMode: t.pricingMode as "FIXED" | "PRICE_ON_REQUEST",
+            };
+          }
+          const shownTariff = this.toDisplayPrice(t.price, t.currency, row.partnerId, fx);
+          return {
+            id: t.id,
+            name: t.name,
+            price: shownTariff.amount,
+            currency: shownTariff.currency,
+            validFrom: t.validFrom ? t.validFrom.toISOString() : null,
+            validTo: t.validTo ? t.validTo.toISOString() : null,
+            pricingMode: t.pricingMode as "FIXED" | "PRICE_ON_REQUEST",
+          };
+        }),
+        priceFrom: shown?.amount ?? null,
+        currency: shown?.currency ?? null,
         pricingUnit: "unit",
         availability,
         seller,
@@ -942,12 +981,14 @@ export class PublicCatalogService {
     row: PublicProductRow,
     availability: PublicAvailabilitySummary | null,
     seller: PublicSeller | null,
+    fx: SupplierFxByPartner,
   ): PublicProductCard {
     const primary = row.media.find((m) => m.isPrimary) ?? row.media[0] ?? null;
     const primaryImage = primary
       ? { id: primary.id, thumbUrl: this.publicMediaUrl(primary.id, "thumb"), largeUrl: this.publicMediaUrl(primary.id, "large") }
       : null;
     const price = this.minTariff(row.tariffs);
+    const shown = price ? this.toDisplayPrice(price.amount, price.currency, row.partnerId, fx) : null;
     // Extract headline departure date and nights from the minimum tariff
     const headlineDepartureDate = price?.validFrom ? price.validFrom.toISOString().slice(0, 10) : null;
     let headlineNights: number | null = null;
@@ -957,14 +998,15 @@ export class PublicCatalogService {
     }
     return {
       id: row.id,
+      code: row.code,
       slug: row.slug,
       title: row.title,
       shortDescription: this.shorten(row.description),
       type: row.type as PublicProductCard["type"],
       category: row.category ? this.toCategory(row.category) : null,
       primaryImage,
-      priceFrom: price?.amount ?? null,
-      currency: price?.currency ?? null,
+      priceFrom: shown?.amount ?? null,
+      currency: shown?.currency ?? null,
       pricingUnit: "unit",
       headlineDepartureDate,
       headlineNights,
@@ -996,7 +1038,7 @@ export class PublicCatalogService {
    * Marketplace (позже). DATE-scope ADVANCE_BOOKING granularity — вне priceFrom
    * policy (documented: per-date granularity ниже «from N»).
    */
-  private minTariff(tariffs: PublicTariffRow[]): { amount: string; currency: string; validFrom: Date | null; name: string } | null {
+  private minTariff(tariffs: PublicTariffRow[]): { amount: Prisma.Decimal; currency: string; validFrom: Date | null; name: string } | null {
     const candidates: Array<{ price: Prisma.Decimal; currency: string; validFrom: Date | null; name: string }> = [];
     const today = todayStartUtc().getTime();
     const DAY_MS = 86_400_000;
@@ -1035,7 +1077,69 @@ export class PublicCatalogService {
     for (const c of candidates) {
       if (c.price.lessThan(best.price)) best = c;
     }
-    return { amount: this.money(best.price), currency: best.currency, validFrom: best.validFrom, name: best.name };
+    return { amount: best.price, currency: best.currency, validFrom: best.validFrom, name: best.name };
+  }
+
+  /**
+   * Курсы поставщиков для витрины: partnerId → (sourceCurrency → rate→AZN).
+   * Один batch на страницу (партнёры + строки курсов), без N+1. Пусто/ошибка →
+   * пустая карта (fail-open: цены показываются в исходной валюте).
+   */
+  private async supplierFxByPartner(partnerIds: Array<string | null>): Promise<SupplierFxByPartner> {
+    const empty: SupplierFxByPartner = new Map();
+    const distinct = [...new Set(partnerIds.filter((id): id is string => !!id))];
+    if (distinct.length === 0) return empty;
+    try {
+      const partners = await this.prisma.partner.findMany({
+        where: { id: { in: distinct } },
+        select: { id: true, code: true },
+      });
+      const codeById = new Map(partners.map((p) => [p.id, p.code] as const));
+      const codes = [...new Set([...codeById.values()])];
+      if (codes.length === 0) return empty;
+      const rates = await this.prisma.supplierFxRate.findMany({
+        where: { supplierCode: { in: codes }, targetCurrencyIso: "AZN" },
+        select: { supplierCode: true, sourceCurrencyIso: true, rate: true },
+      });
+      const byCode = new Map<string, Map<string, Prisma.Decimal>>();
+      for (const r of rates) {
+        const cur = r.sourceCurrencyIso.toUpperCase();
+        if (cur === "AZN") continue;
+        let per = byCode.get(r.supplierCode);
+        if (!per) {
+          per = new Map();
+          byCode.set(r.supplierCode, per);
+        }
+        per.set(cur, r.rate);
+      }
+      const out: SupplierFxByPartner = new Map();
+      for (const [id, code] of codeById) {
+        const per = byCode.get(code);
+        if (per) out.set(id, per);
+      }
+      return out;
+    } catch {
+      return empty;
+    }
+  }
+
+  /**
+   * Витринная цена в управляющей валюте (AZN): тариф sync-поставщика в USD/EUR
+   * умножается на курс ПОСТАВЩИКА из «Курсов поставщиков» (x + y*курс — здесь
+   * одна нога). AZN / нет партнёра / нет курса → исходная цена без изменений
+   * (fail-open browse; коммерческие пути gated отдельно).
+   */
+  private toDisplayPrice(
+    price: Prisma.Decimal,
+    currency: string,
+    partnerId: string | null,
+    fx: SupplierFxByPartner,
+  ): { amount: string; currency: string } {
+    const cur = (currency ?? "").toUpperCase();
+    if (!partnerId || cur === "" || cur === "AZN") return { amount: this.money(price), currency };
+    const rate = fx.get(partnerId)?.get(cur);
+    if (!rate) return { amount: this.money(price), currency };
+    return { amount: this.money(price.mul(rate)), currency: "AZN" };
   }
 
   /** Детерминированное денежное представление (Decimal(12,2) → "100.00"). */
@@ -1093,36 +1197,42 @@ export class PublicCatalogService {
   private async sellersOf(partnerIds: Array<string | null>): Promise<Map<string, PublicSeller>> {
     const unique = [...new Set(partnerIds.filter((id): id is string => Boolean(id)))];
     if (unique.length === 0) return new Map();
-    const profiles = await this.prisma.publicSellerProfile.findMany({
-      where: { partnerId: { in: unique } },
-    });
+    const [profiles, partners] = await Promise.all([
+      this.prisma.publicSellerProfile.findMany({ where: { partnerId: { in: unique } } }),
+      this.prisma.partner.findMany({ where: { id: { in: unique } }, select: { id: true, code: true } }),
+    ]);
+    const codeByPartner = new Map(partners.map((p) => [p.id, p.code]));
     const out = new Map<string, PublicSeller>();
     for (const p of profiles) {
       // HIDDEN (status) — идентичность не показывается; APPROVED — показываем по visibilityMode.
       if (p.status !== "APPROVED") continue;
-      out.set(p.partnerId, this.toPublicSeller(p));
+      out.set(p.partnerId, this.toPublicSeller(p, codeByPartner.get(p.partnerId) ?? null));
     }
     return out;
   }
 
   /** Seller-safe маппинг профиля по visibilityMode. Никаких raw CRM полей. */
-  private toPublicSeller(p: {
-    publicId: string;
-    partnerId: string;
-    status: string;
-    visibilityMode: string;
-    publicDisplayName: string | null;
-    countryCode: string | null;
-    cityCode: string | null;
-    verified: boolean;
-    memberSince: Date;
-  }): PublicSeller {
+  private toPublicSeller(
+    p: {
+      publicId: string;
+      partnerId: string;
+      status: string;
+      visibilityMode: string;
+      publicDisplayName: string | null;
+      countryCode: string | null;
+      cityCode: string | null;
+      verified: boolean;
+      memberSince: Date;
+    },
+    partnerCode: string | null,
+  ): PublicSeller {
     const mode = (["ANONYMOUS", "VERIFIED_ALIAS", "PUBLIC_BRAND"] as const).includes(p.visibilityMode as PublicSeller["visibilityMode"])
       ? (p.visibilityMode as PublicSeller["visibilityMode"])
       : "ANONYMOUS";
     const displayName = mode === "ANONYMOUS" ? null : (p.publicDisplayName ?? null);
     return {
       publicId: p.publicId,
+      partnerCode,
       displayName,
       visibilityMode: mode,
       verified: p.verified,

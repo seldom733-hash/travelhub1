@@ -66,7 +66,7 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
   // здесь только то, что реально отдаёт PublicProductCard.
   return (
     <Link
-      href={`/products/${card.slug}`}
+      href={`/products/${card.code}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-blue-500"
     >
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
@@ -95,11 +95,14 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
         <div className="line-clamp-2 font-bold text-slate-900 transition-colors group-hover:text-blue-600" title={card.title}>
           {card.title}
         </div>
-        {/* Step 1.11 §9: seller-safe projection — ANONYMOUS → generic label, никогда raw CRM name */}
+        {/* Партнёр: показываем ТОЛЬКО код (PAR-*), никогда raw CRM-название.
+            ANONYMOUS → generic label (приватность seller-safe сохранена). */}
         {card.seller && (
           <div className="flex items-center gap-1 text-[11px] text-slate-500">
             <span className="truncate">
-              {card.seller.visibilityMode === "ANONYMOUS" ? t("seller.anonymous_label", locale) : (card.seller.displayName ?? t("seller.anonymous_label", locale))}
+              {card.seller.visibilityMode === "ANONYMOUS"
+                ? t("seller.anonymous_label", locale)
+                : (card.seller.partnerCode ?? t("seller.anonymous_label", locale))}
             </span>
             {card.seller.verified && <span className="shrink-0 text-emerald-600" title={t("seller.verified_badge", locale)}>✓</span>}
           </div>

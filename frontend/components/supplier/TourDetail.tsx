@@ -8,7 +8,7 @@ import {
   type SupplierPriceCalendarEntryOffer,
   type SupplierPriceCalendarEntry,
 } from "@/lib/supplier-api";
-import { useSupplierOptions, supplierLabel } from "@/lib/supplier-registry";
+import { useSupplierOptions } from "@/lib/supplier-registry";
 
 /**
  * TourDetail — live KOMPAS integration with left-side tour selection panel.
@@ -255,11 +255,6 @@ export default function TourDetail({
             </h3>
             {destination && (
               <p className="mt-1 text-sm text-slate-500">📍 {destination}</p>
-            )}
-            {hotelExternalId && supplierCode && (
-              <p className="mt-1 text-xs text-slate-400">
-                {supplierLabel(tourSuppliers, supplierCode)} ID: {hotelExternalId}
-              </p>
             )}
           </div>
 
