@@ -224,6 +224,10 @@ export class KompasSyncService {
         const tourIncName = (offers[0].rawMetadata?.tourIncName as string) ?? "";
         // §1A: country from KOMPAS DOM stateKey, NOT from query
         const country = (offers[0].rawMetadata?.country as string) ?? "Unknown";
+        // §TITLE: единый формат «Отель (Страна)» для всех поставщиков.
+        // tourIncName у KOMPAS — generic-дескриптор («Динамический пакет из
+        // Баку»), в title не идёт, остаётся в attributes.tourIncName.
+        const title = `${hotelName} (${country})`;
 
         const attributes = {
           hotelName,
@@ -247,6 +251,13 @@ export class KompasSyncService {
         if (existing) {
           await this.prisma.$transaction(async (tx: any) => {
             const currentAttrs = existing.attributes as any;
+            // Self-heal unified title «Отель (Страна)» (чинит старые карточки).
+            if (existing.title !== title) {
+              await tx.product.update({
+                where: { id: existing.id },
+                data: { title },
+              });
+            }
             if (currentAttrs?.startingPrice !== minPrice) {
               await tx.product.update({
                 where: { id: existing.id },
@@ -294,7 +305,7 @@ export class KompasSyncService {
             "geoCountryId"
           ) VALUES (
             gen_random_uuid(), ${prdCode}, ${productCode}, 'TOUR'::"catalog"."ProductType",
-            ${`${hotelName} — ${tourIncName}`}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
+            ${title}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
             ${toursCategory.id}, ${JSON.stringify(attributes)}::jsonb, ${kompasPartner.id},
             now(), now(), now(),
             ${geoCountryId}

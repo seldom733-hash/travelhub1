@@ -11,6 +11,8 @@ import { SummerSyncService } from "./summertour/summer-sync.service";
 import { SummertourHttpService } from "./summertour/summertour-http.service";
 import { SummerBulkSyncService } from "./summertour/summer-bulk-sync.service";
 import { KompasSupplierAdapter } from "./kompas/kompas.adapter";
+import { KompasHotelAdapter } from "./kompas/kompas-hotel.adapter";
+import { KompasHotelSyncService } from "./kompas/kompas-hotel-sync.service";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
 import { KompasCaptchaStore } from "./kompas/kompas-captcha.store";
 import { KazunionHttpService } from "./kazunion/kazunion-http.service";
@@ -59,7 +61,9 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     SummerBulkSyncService,
     KompasCaptchaStore,
     KompasSupplierAdapter,
+    KompasHotelAdapter,
     KompasSyncService,
+    KompasHotelSyncService,
     KazunionHttpService,
     KazunionAdapter,
     KazunionSyncService,
@@ -79,6 +83,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
 		  registry: SupplierAdapterRegistry,
 		  summertour: SummertourNewAdapter,
 		  kompas: KompasSupplierAdapter,
+		  kompasHotel: KompasHotelAdapter,
 		  kazunion: KazunionAdapter,
           anex: AnexAdapter,
           anexHotel: AnexHotelAdapter,
@@ -131,6 +136,33 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           availabilityCacheTtlMs: 5 * 60 * 1000,
           detailCacheTtlMs: 24 * 60 * 60 * 1000,
           circuitBreakerThreshold: 10,
+          circuitBreakerOpenMs: 120_000,
+        });
+
+        // HOTELS category adapter of the SAME KOMPAS code (§2: Provider →
+        // Category-Adapter). Registered after tours so legacy service-less
+        // lookups keep resolving the tour adapter. Drives the SAMO
+        // `search_hotel` (stay-only, no departure city) via the shared
+        // Playwright machinery in KompasSupplierAdapter.searchHotelRows().
+        registry.register(kompasHotel, {
+          code: "KOMPAS",
+          name: "Kompas",
+          serviceTypes: ["hotels"],
+          enabled: true,
+          searchEnabled: true,
+          livePriceEnabled: true,
+          availabilityEnabled: true,
+          // Playwright browser (same class as the tour registration) but a
+          // single PRICES navigation per page — no 30-page pager fan-out, so
+          // the timeout stays well below the tour's 300s.
+          maxConcurrency: 2,
+          requestsPerMinute: 12,
+          timeoutMs: 180_000,
+          searchCacheTtlMs: 5 * 60 * 1000,
+          priceCacheTtlMs: 5 * 60 * 1000,
+          availabilityCacheTtlMs: 5 * 60 * 1000,
+          detailCacheTtlMs: 24 * 60 * 60 * 1000,
+          circuitBreakerThreshold: 5,
           circuitBreakerOpenMs: 120_000,
         });
 
@@ -218,6 +250,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
         SupplierAdapterRegistry,
         SummertourNewAdapter,
         KompasSupplierAdapter,
+        KompasHotelAdapter,
         KazunionAdapter,
         AnexAdapter,
         AnexHotelAdapter,
@@ -227,6 +260,6 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KazunionHttpService, KazunionAdapter, KazunionSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KompasHotelSyncService, KazunionHttpService, KazunionAdapter, KazunionSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, KompasHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
 })
 export class SupplierModule {}

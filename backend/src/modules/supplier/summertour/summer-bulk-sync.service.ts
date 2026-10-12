@@ -289,10 +289,11 @@ export class SummerBulkSyncService {
       select: { id: true, code: true, status: true, version: true },
     });
 
-    // Название карточки — ТОЛЬКО отель (hotelName от поставщика уже содержит
-    // курорт в скобках). Название программы (tourIncName) в title НЕ добавляем.
+    // Название карточки — единый формат «Отель (Страна)» (как у KOMPAS).
+    // hotelName от поставщика уже содержит курорт в скобках; Summertour
+    // обслуживает только Турцию. tourIncName в title НЕ добавляем.
     // Считаем до ветвления: update-ветка тоже переименовывает старые карточки.
-    const title = hotelName;
+    const title = `${hotelName} (Turkey)`;
 
     if (existing) {
       // Update attributes, title (hotel-only naming) and tariff

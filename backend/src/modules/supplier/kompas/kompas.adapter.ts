@@ -18,6 +18,9 @@ import { Injectable, Logger, OnModuleDestroy, Optional } from "@nestjs/common";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { KompasCaptchaRequiredException } from "./kompas-captcha.exception";
 import { KompasCaptchaStore } from "./kompas-captcha.store";
+import { execFile } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type {
   SupplierAdapter,
   SupplierSearchQuery,
@@ -78,6 +81,39 @@ export function applyKompasAgesParam(url: string, childAges: number[]): string {
   return /AGES=/.test(url)
     ? url.replace(/AGES=[^&]*/g, `AGES=${csv}`)
     : `${url}${url.includes("?") && !url.endsWith("?") ? "&" : ""}AGES=${csv}`;
+}
+
+/**
+ * One parsed `tr.price_info` row from a `/search_hotel` PRICES response.
+ * Field names mirror the DOM classes / class-key tokens on the row (see
+ * probe 2026-10-12): the row structure is identical to the tour search, but
+ * carries hotel-specific cells (hotel name + city, room, meal).
+ */
+export interface KompasHotelRawRow {
+  stateInc: string;
+  hotelKey: string;
+  tourKey: string;
+  spoKey: string;
+  mealKey: string;
+  roomKey: string;
+  nights: number;
+  checkIn: string; // YYYYMMDD
+  adults: number;
+  children: number;
+  /** Hotel display name (may already embed stars, e.g. «SIESTA BEACH HOTEL 3*»). */
+  hotelName: string;
+  /** City in parentheses after the hotel link (e.g. «(Бодрум)»), empty if absent. */
+  city: string;
+  /** Meal display text from the meal cell («RO», «BB», «ROOM ONLY»…). */
+  meal: string;
+  /** Room text from the room cell («Studio Room / DBL»), empty if absent. */
+  room: string;
+  /** Visible converted price (the number in data-converted-price-number). */
+  price: number;
+  /** Supplier currency code (data-currency_title, e.g. «USD»). */
+  currency: string;
+  /** hotel_redirect.php target — yields country/city/slug (/turkey/bodrum/hotel/). */
+  hotelHref: string;
 }
 
 @Injectable()
@@ -282,7 +318,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       // CAPTCHA check immediately after navigation — KOMPAS may show it before any filters.
       if (await this.isCaptchaPresent(page)) {
-        await this.createCaptchaChallengeAndThrow(page, context, "search", query);
+        await this.autoSolveCaptchaOrThrow(page, context, "search", query);
       }
 
       // Close popups
@@ -610,7 +646,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         }
         if (raced === "empty") {
           if (await this.isCaptchaPresent(page)) {
-            await this.createCaptchaChallengeAndThrow(page, context, "search", query);
+            await this.autoSolveCaptchaOrThrow(page, context, "search", query);
           }
           // Short grace: a just-delivered result set still has to render.
           const lateRows = await page
@@ -631,7 +667,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         // rendered (slow partition / anti-bot) or no PRICES went out at all —
         // legacy behavior: captcha check, re-submit, diagnostics.
         if (await this.isCaptchaPresent(page)) {
-          await this.createCaptchaChallengeAndThrow(page, context, "search", query);
+          await this.autoSolveCaptchaOrThrow(page, context, "search", query);
         }
         if (attempt < MAX_ROW_ATTEMPTS - 1) {
           await page.waitForTimeout(3_000);
@@ -678,7 +714,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       // CAPTCHA may also appear together with empty result (anti-bot HTML).
       if (await this.isCaptchaPresent(page)) {
-        await this.createCaptchaChallengeAndThrow(page, context, "search", query);
+        await this.autoSolveCaptchaOrThrow(page, context, "search", query);
       }
 
       await page.waitForTimeout(2_000);
@@ -839,6 +875,164 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       mimeType: this.inferMimeType(src),
     });
     throw new KompasCaptchaRequiredException(ch.challengeId, src, ch.mimeType);
+  }
+
+  // ── CAPTCHA OCR Auto-Solve (ported from Summertour, same SAMO engine) ──
+  //
+  // Best-effort unattended solve: capture the SAMO digit captcha, OCR it with
+  // scripts/kompas-captcha-ocr.py (ddddocr), POST one guess, retry on rotation.
+  // Runs BEFORE the human-in-the-loop path — on failure we fall back to
+  // createCaptchaChallengeAndThrow so the modal flow still works.
+
+  /** Rounds to attempt (fresh image each rejection). */
+  private static readonly CAPTCHA_SOLVE_ROUNDS = () =>
+    Number(process.env.KOMPAS_CAPTCHA_SOLVE_ROUNDS ?? "") || 4;
+
+  /**
+   * Try to auto-solve the SAMO captcha on the CURRENT page (same context).
+   * Returns true when the challenge is cleared; false → caller falls back to
+   * human-in-the-loop. Never throws.
+   */
+  private async autoSolveCaptcha(page: Page): Promise<boolean> {
+    const rounds = KompasSupplierAdapter.CAPTCHA_SOLVE_ROUNDS();
+    try {
+      for (let round = 1; round <= rounds; round++) {
+        if (!(await this.isCaptchaPresent(page))) return true; // already clear
+        let dataUri = await this.getCaptchaImageSrc(page);
+        if (!dataUri) dataUri = await this.captureCaptchaImage(page);
+        if (!dataUri) {
+          this.logger.warn(`[Kompas captcha] auto-solve round ${round}: image unavailable`);
+          break;
+        }
+        const file = this.dataUriToTempFile(dataUri);
+        if (!file) break;
+        const candidates = await this.ocrCaptcha(file);
+        if (candidates.length === 0) {
+          this.logger.warn(`[Kompas captcha] auto-solve round ${round}: OCR returned nothing`);
+          break;
+        }
+        const guess = candidates[0];
+        this.logger.log(`[Kompas captcha] auto-solve round ${round}/${rounds} guess=${guess}`);
+        const posted = await this.postCaptchaAnswerInline(page, guess);
+        if (!posted) {
+          this.logger.warn(`[Kompas captcha] auto-solve round ${round}: POST failed`);
+          break;
+        }
+        await page.waitForTimeout(1_500);
+        if (!(await this.isCaptchaPresent(page))) {
+          this.logger.log(`[Kompas captcha] auto-solved round ${round}/${rounds} guess=${guess}`);
+          return true;
+        }
+        this.logger.log(`[Kompas captcha] guess ${guess} rejected — code rotated`);
+      }
+    } catch (err) {
+      this.logger.warn(`Kompas auto captcha solve failed: ${(err as Error).message}`);
+    }
+    return false;
+  }
+
+  /**
+   * Checkpoint helper: attempt OCR auto-solve; on failure throw the
+   * human-in-the-loop challenge (existing behaviour preserved).
+   */
+  private async autoSolveCaptchaOrThrow(
+    page: Page,
+    context: BrowserContext,
+    operation: "search" | "priceCalendar" | "refreshPrice" | "refreshAvailability" | "getOffer",
+    originalQuery: SupplierSearchQuery | PriceCalendarQuery | SupplierOfferRef,
+  ): Promise<void> {
+    const solved = await this.autoSolveCaptcha(page);
+    if (solved) return;
+    await this.createCaptchaChallengeAndThrow(page, context, operation, originalQuery);
+  }
+
+  /** Fill #fcaptcha + submit #captchaForm inline (page-based, no store). */
+  private async postCaptchaAnswerInline(page: Page, answer: string): Promise<boolean> {
+    try {
+      const fcaptcha = page.locator("#fcaptcha");
+      if ((await fcaptcha.count()) > 0) {
+        await fcaptcha.fill(answer);
+      } else {
+        const alt = page.locator('input[name="fcaptcha"], input[name="captcha"], input[name="antibot"]');
+        if ((await alt.count()) === 0) return false;
+        await alt.first().fill(answer);
+      }
+      const submitted = await page
+        .evaluate(() => {
+          const form = document.querySelector("#captchaForm") as HTMLFormElement | null;
+          if (form) {
+            const ev = new Event("submit", { bubbles: true, cancelable: true });
+            const notCancelled = form.dispatchEvent(ev);
+            if (notCancelled) form.submit();
+            return true;
+          }
+          const btn = document.querySelector(
+            '#captchaForm button[type="submit"], #captchaForm input[type="submit"]',
+          ) as HTMLElement | null;
+          if (btn) {
+            btn.click();
+            return true;
+          }
+          return false;
+        })
+        .catch(() => false);
+      if (!submitted) {
+        const btn = page.locator('#captchaForm button[type="submit"], #captchaForm input[type="submit"]');
+        if ((await btn.count()) === 0) return false;
+        await btn.first().click({ force: true });
+      }
+      await page.waitForTimeout(2_000);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Screenshot #icaptcha as a data URI when its src is not directly usable. */
+  private async captureCaptchaImage(page: Page): Promise<string | null> {
+    try {
+      const el = page.locator("#icaptcha");
+      if ((await el.count()) === 0) return null;
+      const buf = await el.first().screenshot({ type: "png" });
+      return `data:image/png;base64,${buf.toString("base64")}`;
+    } catch {
+      return null;
+    }
+  }
+
+  /** OCR candidates via backend/scripts/kompas-captcha-ocr.py (ddddocr). */
+  private ocrCaptcha(imagePath: string): Promise<string[]> {
+    const script = path.resolve(process.cwd(), "scripts", "kompas-captcha-ocr.py");
+    if (!fs.existsSync(script)) return Promise.resolve([]);
+    const python = process.env.CAPTCHA_OCR_PYTHON || "python";
+    return new Promise((resolve) => {
+      execFile(python, [script, imagePath], { timeout: 60_000, windowsHide: true }, (err, stdout) => {
+        if (err) {
+          this.logger.warn(`Kompas OCR helper failed: ${err.message}`);
+          resolve([]);
+          return;
+        }
+        const candidates = (stdout || "")
+          .split(/\r?\n/)
+          .map((s) => s.replace(/[^0-9]/g, ""))
+          .filter((s) => s.length >= 1 && s.length <= 6);
+        resolve([...new Set(candidates)]);
+      });
+    });
+  }
+
+  /** Decode a captcha data URI into a temp file for the OCR helper. */
+  private dataUriToTempFile(dataUri: string): string | null {
+    const m = dataUri.match(/^data:([^;]+);base64,([\s\S]+)$/);
+    if (!m) return null;
+    try {
+      const ext = m[1].includes("png") ? "png" : m[1].includes("gif") ? "gif" : "jpg";
+      const file = path.resolve(process.cwd(), `.kompas-captcha-auto.${ext}`);
+      fs.writeFileSync(file, Buffer.from(m[2], "base64"));
+      return file;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -2256,6 +2450,8 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       "kenya": "139", "кения": "139", "ke": "139",
       "austria": "51", "австрия": "51", "at": "51",
       "seychelles": "77", "сейшелы": "77", "sc": "77",
+      "сейшельские острова": "77", "сейшельские о-ва": "77", "республика сейшелы": "77",
+      "seychelles islands": "77",
     };
     return stateIncMap[norm] ?? null;
   }
@@ -2273,7 +2469,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       "IND": "6", "ID": "11", "SL": "27", "GE": "30", "CH": "31",
       "SIN": "33", "MY": "12", "KZ": "7", "UZB": "14", "US": "22",
       "CHE": "59", "JP": "94", "MRU": "86", "TZ": "109", "QA": "111",
-      "KE": "139", "AUT": "51",
+      "KE": "139", "AUT": "51", "SEY": "77",
     };
     return prefixMap[prefix] ?? null;
   }
@@ -2316,6 +2512,223 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     } catch {
       return false;
     }
+  }
+
+  // ── HOTEL category search (search_hotel) ───────────────────────────
+  /**
+   * Fetch + parse raw hotel price rows from the `/search_hotel` SAMO search.
+   *
+   * Reuses the shared KOMPAS machinery (browser + anonymous `samo` session +
+   * captcha solve) from the tour path. Differences vs a tour search:
+   *  • endpoint is `search_hotel` (NOT `search_tour`);
+   *  • NO departure city (the hotel form has no TOWNFROMINC);
+   *  • TOURINC is always 0 (stay-only, no tour program);
+   *  • the PRICES response is captured RAW and parsed via DOMParser — a direct
+   *    PRICES action injects the table with `samo.jQuery().ehtml()` but does
+   *    NOT render rows into the live page DOM (verified 2026-10-12), so we
+   *    parse the response body instead of the DOM. 100 rows arrive inline in
+   *    the FIRST response per page (PRICEPAGE pagination).
+   *
+   * Additive: does not touch the tour `search()` flow.
+   */
+  async searchHotelRows(opts: {
+    stateInc: string;
+    checkInBeg: string; // YYYYMMDD
+    checkInEnd: string; // YYYYMMDD
+    nightsFrom: number;
+    nightsTo: number;
+    adults: number;
+    children: number;
+    childAges?: number[];
+    /** Restrict to a single KOMPAS hotel (hotelKey) when set. */
+    hotelExternalId?: string;
+    /** Pages to pull (PRICEPAGE 1..N). v1 default 1 (inline rows). */
+    maxPages?: number;
+  }): Promise<KompasHotelRawRow[]> {
+    const maxPages = Math.max(1, opts.maxPages ?? 1);
+    let browser: Browser | null = null;
+    let context: BrowserContext | null = null;
+    try {
+      browser = await this.getBrowser();
+      context = await browser.newContext({
+        userAgent:
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        locale: "ru-RU",
+      });
+      const page = await context.newPage();
+
+      // Establish the anonymous samo session on the hotel search page.
+      await page.goto(`${this.baseUrl}/search_hotel`, {
+        waitUntil: "networkidle",
+        timeout: 60_000,
+      });
+      await page
+        .waitForFunction(
+          () =>
+            typeof (window as unknown as { samo?: { page_ready?: boolean } }).samo !== "undefined" &&
+            (window as unknown as { samo: { page_ready?: boolean } }).samo.page_ready === true,
+          { timeout: 15_000 },
+        )
+        .catch(() => {});
+
+      if (await this.isCaptchaPresent(page)) {
+        await this.autoSolveCaptchaOrThrow(page, context, "search", {
+          service: "hotels",
+          country: opts.stateInc,
+        } as SupplierSearchQuery);
+      }
+      await page.evaluate(() => {
+        document.getElementById("samo_popup")?.remove();
+        document.getElementById("samo_popup_mini")?.remove();
+      });
+
+      // Capture each PRICES response body (raw) via route interception.
+      const rawPages: string[] = [];
+      await page.route("**samo_action=PRICES**", async (route) => {
+        try {
+          const response = await route.fetch();
+          rawPages.push(await response.text());
+          await route.fulfill({ response });
+        } catch {
+          await route.abort().catch(() => {});
+        }
+      });
+
+      const rows: KompasHotelRawRow[] = [];
+      for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
+        const url = this.buildHotelPricesUrl(opts, pageNo);
+        rawPages.length = 0;
+        await page.goto(url, { waitUntil: "networkidle", timeout: 45_000 }).catch(() => {});
+        await page.waitForTimeout(800);
+        const raw = rawPages[0];
+        if (!raw) break;
+        const pageRows = await this.parseHotelPricesRaw(page, raw, opts.stateInc);
+        if (!pageRows.length) break;
+        rows.push(...pageRows);
+      }
+
+      await page.unroute("**samo_action=PRICES**").catch(() => {});
+      return rows;
+    } finally {
+      await context?.close().catch(() => {});
+      // Browser is owned by the adapter (shared with tour path) — do NOT close it here.
+      void browser;
+    }
+  }
+
+  /** Build the raw PRICES URL for a hotel search (page = PRICEPAGE). */
+  private buildHotelPricesUrl(
+    opts: {
+      stateInc: string;
+      checkInBeg: string;
+      checkInEnd: string;
+      nightsFrom: number;
+      nightsTo: number;
+      adults: number;
+      children: number;
+      childAges?: number[];
+      hotelExternalId?: string;
+    },
+    page: number,
+  ): string {
+    const ages = opts.childAges?.length ? `&AGES=${opts.childAges.join(",")}` : "";
+    const hotels = opts.hotelExternalId
+      ? `&HOTELS_ANY=0&HOTELS=${encodeURIComponent(opts.hotelExternalId)}`
+      : "&HOTELS_ANY=1&HOTELS=";
+    const params =
+      `samo_action=PRICES` +
+      `&STATEINC=${encodeURIComponent(opts.stateInc)}` +
+      `&TOURINC=0` +
+      `&PROGRAMGROUPINC=0` +
+      `&CHECKIN_BEG=${encodeURIComponent(opts.checkInBeg)}` +
+      `&NIGHTS_FROM=${encodeURIComponent(opts.nightsFrom)}` +
+      `&CHECKIN_END=${encodeURIComponent(opts.checkInEnd)}` +
+      `&NIGHTS_TILL=${encodeURIComponent(opts.nightsTo)}` +
+      `&ADULT=${encodeURIComponent(opts.adults)}` +
+      `&CURRENCY=2` +
+      `&CHILD=${encodeURIComponent(opts.children)}` +
+      ages +
+      `&TOWNS_ANY=1&townssearch=0&TOWNS=` +
+      `&STARS_ANY=1&STARS=` +
+      hotels +
+      `&MEALS_ANY=1&MEALS=` +
+      `&ROOMS_ANY=1&ROOMS=` +
+      `&FILTER=1` +
+      `&MOMENT_CONFIRM=0` +
+      `&UFILTER=` +
+      `&HOTELTYPES=` +
+      `&PARTITION_PRICE=` +
+      `&PRICEPAGE=${page}` +
+      `&DYN_SEPARATE=1`;
+    return `${this.baseUrl}/search_hotel?${params}`;
+  }
+
+  /**
+   * Parse a raw PRICES response body into structured hotel rows. The response
+   * is a `<script>` that calls `samo.jQuery(...).ehtml(" <table class=res> ...rows... ")`;
+   * we extract the ehtml string, unescape it, and parse with DOMParser (in the
+   * page's JS context, which has DOMParser).
+   */
+  private async parseHotelPricesRaw(
+    page: Page,
+    raw: string,
+    stateInc: string,
+  ): Promise<KompasHotelRawRow[]> {
+    const parsed = await page.evaluate(
+      ({ rawText, state }) => {
+        const start = rawText.indexOf('.ehtml("');
+        if (start < 0) return [] as unknown[];
+        const strStart = start + '.ehtml("'.length;
+        const tableEnd = rawText.indexOf("<\\/table>", strStart);
+        if (tableEnd < 0) return [] as unknown[];
+        const closeQuote = rawText.indexOf('"', tableEnd);
+        const escaped = rawText.slice(strStart, closeQuote < 0 ? undefined : closeQuote);
+        const html = escaped
+          .replace(/\\u([0-9a-fA-F]{4})/g, (_m, h) => String.fromCharCode(parseInt(h, 16)))
+          .replace(/\\\//g, "/")
+          .replace(/\\n/g, "\n")
+          .replace(/\\"/g, '"')
+          .replace(/\\t/g, "\t");
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const toNum = (s: string | null | undefined): number => {
+          const n = Number(s);
+          return Number.isFinite(n) ? n : 0;
+        };
+        const rows = Array.from(doc.querySelectorAll("tr.price_info"));
+        return rows.map((row) => {
+          const cls = row.getAttribute("class") || "";
+          const cells = row.querySelectorAll("td");
+          const priceEl = row.querySelector("[data-cat-price]");
+          const hotelLink = row.querySelector(".link-hotel a");
+          const hotelName = hotelLink?.textContent?.trim() || "";
+          const linkHotelText = row.querySelector(".link-hotel")?.textContent?.trim() || "";
+          const cityMatch = linkHotelText.match(/\(([^)]+)\)\s*$/);
+          // cells[6]=meal, cells[7]=room (verified: [0]empty [1]date [2]program
+          // [3]nights [4]hotel [5]availability [6]meal [7]room … [11]price).
+          return {
+            stateInc: state,
+            hotelKey: cls.match(/hotelKey-(\d+)/)?.[1] || "",
+            tourKey: cls.match(/tourKey-(\d+)/)?.[1] || "",
+            spoKey: cls.match(/spoKey-(\d+)/)?.[1] || "",
+            mealKey: cls.match(/mealKey-(\d+)/)?.[1] || "",
+            roomKey: cls.match(/roomKey-(\d+)/)?.[1] || "",
+            nights: toNum(cls.match(/nights-(\d+)/)?.[1]),
+            checkIn: cls.match(/checkIn-(\d+)/)?.[1] || "",
+            adults: toNum(cls.match(/adult-(\d+)/)?.[1]),
+            children: toNum(cls.match(/child-(\d+)/)?.[1]),
+            hotelName,
+            city: cityMatch ? cityMatch[1] : "",
+            meal: cells[6]?.textContent?.trim() || "",
+            room: cells[7]?.textContent?.trim() || "",
+            price: toNum(priceEl?.getAttribute("data-converted-price-number")),
+            currency: priceEl?.getAttribute("data-currency_title") || "",
+            hotelHref: hotelLink?.getAttribute("href") || "",
+          };
+        });
+      },
+      { rawText: raw, state: stateInc },
+    );
+    return parsed as KompasHotelRawRow[];
   }
 
   // ── Browser Lifecycle ─────────────────────────────────────────────

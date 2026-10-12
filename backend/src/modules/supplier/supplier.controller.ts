@@ -6,6 +6,7 @@ import { SupplierResilienceService } from "./resilience/supplier-resilience.serv
 import { SummerSyncService } from "./summertour/summer-sync.service";
 import { SummerBulkSyncService } from "./summertour/summer-bulk-sync.service";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
+import { KompasHotelSyncService } from "./kompas/kompas-hotel-sync.service";
 import { KazunionSyncService } from "./kazunion/kazunion-sync.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
@@ -29,6 +30,7 @@ export class SupplierController {
     private readonly summerSync: SummerSyncService,
     private readonly summerBulkSync: SummerBulkSyncService,
     private readonly kompasSync: KompasSyncService,
+    private readonly kompasHotelSync: KompasHotelSyncService,
     private readonly kazunionSync: KazunionSyncService,
   ) {}
 
@@ -55,12 +57,51 @@ export class SupplierController {
 
   @Post("kompas/sync")
   @RequirePermissions("supplier.search.manage")
-  async kompasSyncEndpoint(@CurrentUser() actor: AuthedRequest["user"]) {
+  async kompasSyncEndpoint(
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Query("country") country?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("geoCountryCode") geoCountryCode?: string,
+  ) {
     const partner = await this.kompasSync["getKompasPartner"]();
     if (!partner) {
       throw new Error("KOMPAS partner not found — run partner seed first");
     }
-    return this.kompasSync.runSync(partner.id);
+    return this.kompasSync.runSync(partner.id, {
+      countryNameContains: country,
+      dateFrom,
+      dateTo,
+      geoCountryCode,
+    });
+  }
+
+  // ── KOMPAS Hotel Sync ─────────────────────────────────────────────
+
+  /**
+   * Import KOMPAS hotels (stay-only) as Product(type=HOTEL, accommodation).
+   * POST /supplier/kompas/hotel-sync?countryIsos=TR,AE&dateFrom=&dateTo=&nights=7&maxPages=40
+   * Default scope: curated top countries (TR, AE, EG, TH, MV, GE).
+   */
+  @Post("kompas/hotel-sync")
+  @RequirePermissions("supplier.search.manage")
+  async kompasHotelSyncEndpoint(
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Query("countryIsos") countryIsos?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("nights") nights?: string,
+    @Query("maxPages") maxPages?: string,
+  ) {
+    return this.kompasHotelSync.runSync({
+      countryIsos: countryIsos
+        ? countryIsos.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+        : undefined,
+      dateFrom,
+      dateTo,
+      nights: nights ? parseInt(nights, 10) : undefined,
+      maxPages: maxPages ? parseInt(maxPages, 10) : undefined,
+    });
   }
 
   // ── KazUnion Sync ─────────────────────────────────────────────────────

@@ -95,10 +95,8 @@ function SearchResultsInner() {
   // at search time, NOT the static catalog — tours (Summer + KOMPAS) and
   // hotels (ANEX hotels) share this path.
   const liveMode = (service === "tours" || service === "hotels") && searchParams.get("live") === "1";
-  // Услуги «Отели» как самостоятельные карточки пока нет (есть туры с отелями),
-  // поэтому поиск отелей без live=1 сразу показывает пустое состояние — без
-  // запроса к каталогу.
-  const hotelsStub = service === "hotels" && !liveMode;
+  // Поиск «Отелей» без live=1 идёт в каталог (категория accommodation) —
+  // импортированные Product(type=HOTEL) показываются как обычные карточки.
   const [liveResult, setLiveResult] = useState<AggregatedSearchResult | null>(null);
   const [liveLoading, setLiveLoading] = useState(false);
   // null = still resolving the supplier set for this direction; [] = resolved
@@ -239,16 +237,6 @@ function SearchResultsInner() {
     setFlightError(null);
     setFlightLoading(false);
 
-    // Заглушка «Пока нет доступных отелей»: отдельных карточек-отелей в
-    // каталоге нет — пропускаем любой поиск.
-    if (hotelsStub) {
-      setResult({ items: [], total: 0, page: 1, pageSize: 12 });
-      setLoading(false);
-      return () => {
-        alive = false;
-      };
-    }
-
     // Universal live search path (§3/§12): tours → Summer + KOMPAS +
     // ANEX in parallel, hotels → ANEX hotels.
     if (liveMode) {
@@ -348,7 +336,7 @@ function SearchResultsInner() {
       });
 
     return () => { alive = false; };
-  }, [service, q, sort, page, JSON.stringify(params), locale, liveMode, hotelsStub]);
+  }, [service, q, sort, page, JSON.stringify(params), locale, liveMode]);
 
   const totalPages = result ? Math.max(1, Math.ceil(result.total / 12)) : 1;
 
@@ -438,10 +426,7 @@ function SearchResultsInner() {
           <>
             {result.items.length === 0 ? (
               <div className="mt-12 text-center">
-                {hotelsStub ? (
-                  <p className="text-lg text-neutral-400">{t("search.no_hotels_yet", locale)}</p>
-                ) : (
-                  <>
+                <>
                     <p className="text-lg text-neutral-400">{t("search.empty_results", locale)}</p>
                     <p className="mt-2 text-sm text-neutral-500">{t("search.empty_results_hint", locale)}</p>
                     <div className="mt-6 flex items-center justify-center gap-3">
@@ -469,7 +454,6 @@ function SearchResultsInner() {
                       />
                     </div>
                   </>
-                )}
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

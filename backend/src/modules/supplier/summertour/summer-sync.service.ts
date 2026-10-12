@@ -551,12 +551,13 @@ export class SummerSyncService {
   // ── Helpers ──────────────────────────────────────────────────────
 
   /**
-   * Название карточки — ТОЛЬКО отель (hotelName от поставщика уже содержит
-   * курорт в скобках, напр. "HIMEROS BEACH HOTEL 3* (Сиде)"). Название
-   * программы (tourIncName) в title НЕ добавляем.
+   * Название карточки — единый формат «Отель (Страна)» (как у KOMPAS).
+   * hotelName от поставщика уже содержит курорт в скобках (напр.
+   * "HIMEROS BEACH HOTEL 3* (Сиде)"). Summertour обслуживает только Турцию
+   * (countryCode TR). Название программы (tourIncName) в title НЕ добавляем.
    */
   private buildTitle(identity: NormalizedIdentity): string {
-    return identity.hotelName;
+    return `${identity.hotelName} (Turkey)`;
   }
 
   private buildSlug(tourIncValue: string, hotelKey: string, identity: NormalizedIdentity): string {

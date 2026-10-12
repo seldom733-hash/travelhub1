@@ -5,6 +5,7 @@ import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { FlightSupplierRegistry } from "./flight-supplier.registry";
 import { SupplierOfferService } from "./supplier-offer.service";
 import type { SupplierSearchQuery, SupplierOffer } from "./supplier.types";
+import { KOMPAS_HOTEL_STATEINC_TO_ISO } from "./kompas/kompas-hotel-countries";
 
 /**
  * Capability descriptor for a tour supplier adapter.
@@ -149,6 +150,18 @@ export class SupplierAggregatorService {
         "MY", "KZ", "UZ", "US", "CH", "JP", "MU", "TZ", "QA", "KE", "AT", "SC",
       ],
       nights: { min: 3, max: 14 },
+      // Hotels (KompasHotelAdapter, verified live 2026-10-12): stay-only search
+      // via /search_hotel exposes a WIDER dictionary than the tour search
+      // because a stay needs no departure flight from Baku. countries is a
+      // FULL override (supports() merges {...base, ...svc}); stay nights 1..30.
+      // Derived from the hotel dictionary so the two never drift.
+      services: {
+        hotels: {
+          countries: [...new Set(Object.values(KOMPAS_HOTEL_STATEINC_TO_ISO))].sort(),
+          nights: { min: 1, max: 30 },
+          children: { max: 5 },
+        },
+      },
     },
     SUMMERTOUR: {
       countries: ["TR"],
