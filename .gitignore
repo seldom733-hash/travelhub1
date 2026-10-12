@@ -72,3 +72,6 @@ frontend/public/hotels/
 # WhatsApp runtime artifacts: Baileys session (secrets — NEVER commit) + media
 backend/.whatsapp-session/
 backend/.whatsapp-media/
+
+# local DB snapshot
+travelhub_test_dump.sql
