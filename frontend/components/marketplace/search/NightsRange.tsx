@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
 import { t, useLocale } from "@/lib/i18n";
-import { widestText } from "@/lib/measure-text";
+import { useWidestText } from "@/lib/measure-text";
 
 interface NightsRangeProps {
   /** id prefix — "tour-nights" / "hotel-nights" → -from / -to selects. */
@@ -32,17 +31,17 @@ export default function NightsRange({ idPrefix, from, to, options, onChange, com
 
   // Content-width: each select fits its longest possible value (2-digit
   // nights) plus the «от/до» prefix rendered inside the control + paddings.
-  const maxDigitPx = useMemo(() => {
-    const digits = widestText(options.map(String), compact ? 13 : 15);
-    const prefixes = widestText(
-      [t("search.nights_from", locale), t("search.nights_to", locale)],
-      compact ? 13 : 15,
-    );
-    // + left padding for prefix, + right padding, + native select caret /
-    // spinner breathing room (the caret overlaps the value if too tight).
-    const w = digits + prefixes + (compact ? 52 : 62);
-    return w > 0 ? w : 0;
-  }, [options, compact, locale]);
+  // useWidestText is SSR-safe (0 on server + hydration, measured after mount)
+  // — a direct widestText call inside useMemo would still diverge because the
+  // client re-measures with canvas and hydration compares the first render.
+  const digitPx = useWidestText(options.map(String), compact ? 13 : 15);
+  const prefixPx = useWidestText(
+    [t("search.nights_from", locale), t("search.nights_to", locale)],
+    compact ? 13 : 15,
+  );
+  // + left padding for prefix, + right padding, + native select caret /
+  // spinner breathing room (the caret overlaps the value if too tight).
+  const maxDigitPx = digitPx > 0 && prefixPx > 0 ? digitPx + prefixPx + (compact ? 52 : 62) : 0;
 
   const renderSelect = (kind: "from" | "to") => {
     const value = kind === "from" ? from : to;

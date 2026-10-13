@@ -2,8 +2,9 @@
 
 import { useMemo, useRef, useState } from "react";
 import { CaretDown, MapPin, X } from "@phosphor-icons/react";
-import { geoDisplayName, type GeoDirectoryEntry } from "@/lib/geo-api";
-import { widestText } from "@/lib/measure-text";
+import { geoDisplayName, type GeoDirectoryEntry, type GeoLocale } from "@/lib/geo-api";
+import { useWidestText } from "@/lib/measure-text";
+import { useLocale, t } from "@/lib/i18n";
 import { useClickOutside } from "./useClickOutside";
 
 interface DirectorySelectProps {
@@ -35,6 +36,7 @@ export default function DirectorySelect({
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<GeoDirectoryEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const locale = useLocale() as GeoLocale;
   const containerRef = useRef<HTMLDivElement>(null);
 
   const openDropdown = () => {
@@ -79,14 +81,17 @@ export default function DirectorySelect({
 
   // Content-width: the control is as wide as the longest display text it can
   // hold (longest geo name + « · CODE» suffix), with placeholder fallback.
-  const maxTextPx = useMemo(() => {
+  // useWidestText is SSR-safe (0 on server + hydration, measured after mount).
+  const widthLabels = useMemo(() => {
     const labels = (items ?? []).map(
-      (i) => `${geoDisplayName(i.names, i.code)} · ${i.code}`,
+      (i) => `${geoDisplayName(i.names, i.code, locale)} · ${i.code}`,
     );
-    if (labels.length === 0) return 0;
+    if (labels.length === 0) return [];
     labels.push(placeholder);
-    return widestText(labels);
-  }, [items, placeholder]);
+    return labels;
+  }, [items, placeholder, locale]);
+  const measuredPx = useWidestText(widthLabels);
+  const maxTextPx = measuredPx;
 
   return (
     <div ref={containerRef} className="relative" style={{ maxWidth: maxTextPx > 0 ? maxTextPx + 56 : undefined }}>
@@ -108,8 +113,8 @@ export default function DirectorySelect({
       >
         <MapPin size={14} weight="light" className="shrink-0 text-neutral-500" />
 
-        <span className={`min-w-0 flex-1 truncate text-[15px] ${value ? "text-white" : "text-neutral-500"}`}>
-          {value ? `${geoDisplayName(value.names, value.code)} · ${value.code}` : placeholder}
+        <span className={`min-w-0 flex-1 truncate text-right text-[15px] ${value ? "text-white" : "text-neutral-500"}`}>
+          {value ? `${geoDisplayName(value.names, value.code, locale)} · ${value.code}` : placeholder}
         </span>
 
         {value && !required ? (
@@ -128,7 +133,7 @@ export default function DirectorySelect({
               }
             }}
             className="text-neutral-500 hover:text-white"
-            aria-label="Очистить"
+            aria-label={t("search.clear", locale)}
           >
             <X size={14} />
           </span>
@@ -147,7 +152,7 @@ export default function DirectorySelect({
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={searchPlaceholder ?? "Поиск…"}
+              placeholder={searchPlaceholder ?? `${t("search.submit", locale)}…`}
               className="w-full rounded-lg border border-dark-border bg-dark-card px-3 py-2 text-[14px] text-white placeholder-neutral-500 outline-none focus:border-gold/50"
             />
           </div>
@@ -155,13 +160,13 @@ export default function DirectorySelect({
           <ul role="listbox" className="max-h-64 overflow-y-auto py-1">
             {loading && (
               <li className="px-3 py-4 text-center text-[14px] text-neutral-500">
-                Загрузка…
+                {t("search.searching", locale)}
               </li>
             )}
 
             {!loading && filtered.length === 0 && (
               <li className="px-3 py-4 text-center text-[14px] text-neutral-500">
-                Ничего не найдено
+                {t("search.no_results", locale)}
               </li>
             )}
 
@@ -179,9 +184,9 @@ export default function DirectorySelect({
                       {item.code.length > 6 ? item.code.slice(0, 6) : item.code}
                     </span>
 
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0 flex-1 text-right">
                       <span className="block truncate text-[15px] font-medium text-white">
-                        {geoDisplayName(item.names, item.code)}
+                        {geoDisplayName(item.names, item.code, locale)}
                       </span>
                     </span>
                   </button>

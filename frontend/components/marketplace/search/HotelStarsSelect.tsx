@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Buildings, CaretDown, X } from "@phosphor-icons/react";
 import { useLocale } from "@/lib/i18n";
-import { widestText } from "@/lib/measure-text";
+import { useWidestText } from "@/lib/measure-text";
 import { useClickOutside } from "./useClickOutside";
 
 export interface SupplierStarOption {
@@ -78,11 +78,13 @@ export default function HotelStarsSelect({
   };
 
   // Content-width: fits the widest plausible summary (top 3 labels + «…»).
-  const maxTextPx = useMemo(() => {
+  // useWidestText is SSR-safe (0 on server + hydration, measured after mount).
+  const widthLabels = useMemo(() => {
     const pool = (options ?? FALLBACK).map((o) => o.label);
     const sample = pool.slice(0, 4).join(", ") + ", …";
-    return widestText([sample]);
+    return [sample];
   }, [options]);
+  const maxTextPx = useWidestText(widthLabels);
 
   const label =
     selected.length > 0

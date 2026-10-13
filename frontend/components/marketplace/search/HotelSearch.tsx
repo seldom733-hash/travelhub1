@@ -195,7 +195,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
     onSearch({
       serviceType: "hotels",
       // Display name + geo codes (the live query's country/geoCity/geoResort).
-      toDestination: geoDisplayName(destination.names, destination.code),
+      toDestination: geoDisplayName(destination.names, destination.code, locale),
       toGeoCountry: toCountry?.code,
       toGeoCity: toCity?.code,
       toGeoResort: toResort?.code,
@@ -219,7 +219,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
       <DestinationPicker
         id="hotel-to"
         label={t("search.to", locale)}
-        placeholder="Куда"
+        placeholder={t("search.to", locale)}
         country={toCountry}
         city={toCity}
         resort={toResort}
@@ -324,7 +324,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
       <HelpFindButton
         context={{
           serviceType: "hotels",
-          toDestination: destination ? geoDisplayName(destination.names, destination.code) : "",
+          toDestination: destination ? geoDisplayName(destination.names, destination.code, locale) : "",
           toGeoCountry: toCountry?.code,
           toGeoCity: toCity?.code,
           toGeoResort: toResort?.code,

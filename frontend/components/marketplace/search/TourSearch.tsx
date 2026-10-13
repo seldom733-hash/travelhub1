@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarBlank, ArrowRight, Buildings, CaretDown, X } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import { todayISO, tomorrowISO } from "@/lib/dates";
-import { widestText } from "@/lib/measure-text";
+import { useWidestText } from "@/lib/measure-text";
 import type { SearchContext } from "@/lib/search-engine";
 import DirectorySelect from "./DirectorySelect";
 import DestinationPicker from "./DestinationPicker";
@@ -271,9 +271,10 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
   const canSubmit = Boolean(destination && startDate);
 
   // Content-width: each date input fits «00.00.0000» (xx.xx.xxxx).
-  const datePx = useMemo(() => widestText(["00.00.0000"]), []);
+  // useWidestText is SSR-safe (0 on server + hydration, measured after mount).
+  const datePx = useWidestText(["00.00.0000"]);
   // Single-digit selects (adults 1–6, children 0–5).
-  const digitPx = useMemo(() => widestText(["0"]), []);
+  const digitPx = useWidestText(["0"]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -281,8 +282,8 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
     if (!dest || !startDate) return;
     onSearch({
       serviceType: "tours",
-      fromDestination: from ? geoDisplayName(from.names, from.code) : "",
-      toDestination: geoDisplayName(dest.names, dest.code),
+      fromDestination: from ? geoDisplayName(from.names, from.code, locale) : "",
+      toDestination: geoDisplayName(dest.names, dest.code, locale),
       // Most specific geo code wins; catalog filters by it, supplier
       // (KOMPAS) is used only for country-level selection.
       toGeoCountry: toCountry?.code,
@@ -314,7 +315,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         <DirectorySelect
           id="tour-from"
           label={t("search.from", locale)}
-          placeholder="Откуда"
+          placeholder={t("search.from", locale)}
           value={from}
           onChange={setFrom}
           loadItems={async () => {
@@ -332,7 +333,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         <DestinationPicker
           id="tour-to"
           label={t("search.to", locale)}
-          placeholder="Куда"
+          placeholder={t("search.to", locale)}
           country={toCountry}
           city={toCity}
           resort={toResort}
@@ -606,8 +607,8 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
       <HelpFindButton
         context={{
           serviceType: "tours",
-          fromDestination: from ? geoDisplayName(from.names, from.code) : "",
-          toDestination: destination ? geoDisplayName(destination.names, destination.code) : "",
+          fromDestination: from ? geoDisplayName(from.names, from.code, locale) : "",
+          toDestination: destination ? geoDisplayName(destination.names, destination.code, locale) : "",
           startDate,
           endDate: safeEndDate,
           nights: nightsFrom,

@@ -7,7 +7,8 @@ import {
   geoDisplayName,
   type GeoDirectoryEntry,
 } from "@/lib/geo-api";
-import { widestText } from "@/lib/measure-text";
+import { useWidestText } from "@/lib/measure-text";
+import { useLocale, t } from "@/lib/i18n";
 import { useClickOutside } from "./useClickOutside";
 
 interface DestinationPickerProps {
@@ -74,6 +75,7 @@ export default function DestinationPicker({
   const [qCountry, setQCountry] = useState("");
   const [qCity, setQCity] = useState("");
   const [qResort, setQResort] = useState("");
+  const locale = useLocale();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // «Куда» is the only picker that STAYS open on selection (country → city →
@@ -131,16 +133,19 @@ export default function DestinationPicker({
 
   // Content-width: sized to the longest «Name · CODE» text across all three
   // sections (country/city/resort lists), placeholder as fallback.
-  const maxTextPx = useMemo(() => {
+  // useWidestText is SSR-safe (0 on server + hydration, measured after mount).
+  const widthLabels = useMemo(() => {
     const labels = [
-      ...(countries ?? []).map((i) => `${geoDisplayName(i.names, i.code)} · ${i.code}`),
-      ...(cities ?? []).map((i) => `${geoDisplayName(i.names, i.code)} · ${i.code}`),
-      ...(resorts ?? []).map((i) => `${geoDisplayName(i.names, i.code)} · ${i.code}`),
+      ...(countries ?? []).map((i) => `${geoDisplayName(i.names, i.code, locale)} · ${i.code}`),
+      ...(cities ?? []).map((i) => `${geoDisplayName(i.names, i.code, locale)} · ${i.code}`),
+      ...(resorts ?? []).map((i) => `${geoDisplayName(i.names, i.code, locale)} · ${i.code}`),
     ];
-    if (labels.length === 0) return 0;
+    if (labels.length === 0) return [];
     labels.push(placeholder);
-    return widestText(labels);
-  }, [countries, cities, resorts, placeholder]);
+    return labels;
+  }, [countries, cities, resorts, placeholder, locale]);
+  const measuredPx = useWidestText(widthLabels);
+  const maxTextPx = measuredPx;
 
   // Picking an entry collapses only its own section — the dropdown stays
   // open so a deeper level (city/resort) can be picked right away.
@@ -184,8 +189,8 @@ export default function DestinationPicker({
       </span>
       {current && (
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="max-w-[55%] truncate text-[14px] font-medium text-gold">
-            {geoDisplayName(current.names, current.code)}
+          <span className="max-w-[55%] truncate text-right text-[14px] font-medium text-gold">
+            {geoDisplayName(current.names, current.code, locale)}
           </span>
           {/* Per-level reset («Страна»/«Город»/«Курорт»): clears THIS level —
               and everything below it, the cascade contract (a country change
@@ -249,9 +254,9 @@ export default function DestinationPicker({
         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gold/10 px-1 text-center text-[14px] font-semibold leading-tight text-gold">
           {item.code.length > 6 ? item.code.slice(0, 6) : item.code}
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex-1 text-right">
           <span className="block truncate text-[15px] font-medium text-white">
-            {geoDisplayName(item.names, item.code)}
+            {geoDisplayName(item.names, item.code, locale)}
           </span>
         </span>
         {selectedId === item.id && <span className="text-[13px] text-gold">✓</span>}
@@ -279,9 +284,9 @@ export default function DestinationPicker({
       >
         <MapPin size={14} weight="light" className="shrink-0 text-neutral-500" />
 
-        <span className={`min-w-0 flex-1 truncate text-[15px] ${selected ? "text-white" : "text-neutral-500"}`}>
+        <span className={`min-w-0 flex-1 truncate text-right text-[15px] ${selected ? "text-white" : "text-neutral-500"}`}>
           {selected
-            ? `${geoDisplayName(selected.names, selected.code)} · ${selected.code}`
+            ? `${geoDisplayName(selected.names, selected.code, locale)} · ${selected.code}`
             : placeholder}
         </span>
 
@@ -301,7 +306,7 @@ export default function DestinationPicker({
               }
             }}
             className="text-neutral-500 hover:text-white"
-            aria-label="Очистить"
+            aria-label={t("search.clear", locale)}
           >
             <X size={14} />
           </span>
@@ -316,10 +321,10 @@ export default function DestinationPicker({
       {open && (
         <div className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
           {/* Country section */}
-          {sectionHeader("country", "Страна", country, () => onCountryChange(null))}
+          {sectionHeader("country", t("search.country", locale), country, () => onCountryChange(null))}
           {expanded === "country" && (
             <div className="border-b border-dark-border pb-1">
-              {searchInput(qCountry, setQCountry, "Поиск страны…")}
+              {searchInput(qCountry, setQCountry, `${t("search.country", locale)}…`)}
               <ul role="listbox" className="max-h-48 overflow-y-auto py-1">
                 {filterItems(countries, qCountry).map((item) =>
                   itemRow(item, country?.id, pickCountry),
@@ -327,7 +332,7 @@ export default function DestinationPicker({
                 {countries !== null &&
                   filterItems(countries, qCountry).length === 0 && (
                     <li className="px-3 py-3 text-center text-[14px] text-neutral-500">
-                      Ничего не найдено
+                      {t("search.no_results", locale)}
                     </li>
                   )}
               </ul>
@@ -335,14 +340,14 @@ export default function DestinationPicker({
           )}
 
           {/* City section */}
-          {sectionHeader("city", "Город", city, () => onCityChange(null))}
+          {sectionHeader("city", t("search.city", locale), city, () => onCityChange(null))}
           {expanded === "city" && (
             <div className="border-b border-dark-border pb-1">
-              {searchInput(qCity, setQCity, "Поиск города…")}
+              {searchInput(qCity, setQCity, `${t("search.city", locale)}…`)}
               <ul role="listbox" className="max-h-48 overflow-y-auto py-1">
                 {loadingCities && (
                   <li className="px-3 py-3 text-center text-[14px] text-neutral-500">
-                    Загрузка…
+                    {t("search.searching", locale)}
                   </li>
                 )}
                 {!loadingCities &&
@@ -353,7 +358,7 @@ export default function DestinationPicker({
                   cities !== null &&
                   filterItems(cities, qCity).length === 0 && (
                     <li className="px-3 py-3 text-center text-[14px] text-neutral-500">
-                      Ничего не найдено
+                      {t("search.no_results", locale)}
                     </li>
                   )}
               </ul>
@@ -361,14 +366,14 @@ export default function DestinationPicker({
           )}
 
           {/* Resort section */}
-          {sectionHeader("resort", "Курорт", resort, () => onResortChange(null))}
+          {sectionHeader("resort", t("search.resort", locale), resort, () => onResortChange(null))}
           {expanded === "resort" && (
             <div className="pb-1">
-              {searchInput(qResort, setQResort, "Поиск курорта…")}
+              {searchInput(qResort, setQResort, `${t("search.resort", locale)}…`)}
               <ul role="listbox" className="max-h-48 overflow-y-auto py-1">
                 {loadingResorts && (
                   <li className="px-3 py-3 text-center text-[14px] text-neutral-500">
-                    Загрузка…
+                    {t("search.searching", locale)}
                   </li>
                 )}
                 {!loadingResorts &&
@@ -379,7 +384,7 @@ export default function DestinationPicker({
                   resorts !== null &&
                   filterItems(resorts, qResort).length === 0 && (
                     <li className="px-3 py-3 text-center text-[14px] text-neutral-500">
-                      Ничего не найдено
+                      {t("search.no_results", locale)}
                     </li>
                   )}
               </ul>

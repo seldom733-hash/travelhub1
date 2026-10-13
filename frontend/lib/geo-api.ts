@@ -6,6 +6,9 @@ export interface GeoNames {
   az: string;
 }
 
+/** Locale keys for localized geo labels (mirrors GeoNames). */
+export type GeoLocale = "ru" | "en" | "az";
+
 export interface GeoCountry {
   id: string;
   code: string;
@@ -136,9 +139,30 @@ export const geoApi = {
   },
 };
 
-export function geoDisplayName(names: GeoNames | null | undefined, fallback = ""): string {
+/**
+ * Localized display name for a geo entity (country/city/resort).
+ *
+ * Picks the requested locale and falls back to the other locales in a fixed
+ * order, so a missing translation never renders an empty label. Suppliers
+ * (KOMPAS/ANEX) deliver mostly RU and EN source names; AZ is often derived by
+ * transliteration, so the fallback chain matters in practice.
+ */
+export function geoDisplayName(
+  names: GeoNames | null | undefined,
+  fallback = "",
+  locale: GeoLocale = "ru",
+): string {
   if (!names) return fallback;
-  return names.ru || names.en || names.az || fallback;
+  const chain: Record<GeoLocale, GeoLocale[]> = {
+    ru: ["ru", "en", "az"],
+    en: ["en", "ru", "az"],
+    az: ["az", "ru", "en"],
+  };
+  for (const key of chain[locale]) {
+    const v = names[key];
+    if (v) return v;
+  }
+  return fallback;
 }
 
 const PUBLIC_API_BASE =
