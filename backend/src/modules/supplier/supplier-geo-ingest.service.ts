@@ -2,7 +2,11 @@ import { Injectable, Logger, Inject } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { ANEX_STATEINC_TO_ISO, AnexProvider } from "./anex/anex.provider";
-import { KOMPAS_HOTEL_STATEINC_TO_ISO } from "./kompas/kompas-hotel-countries";
+import {
+  KOMPAS_HOTEL_STATEINC_TO_ISO,
+  KOMPAS_HOTEL_STATEINC_TO_RU,
+  KOMPAS_HOTEL_ISO_TO_EN,
+} from "./kompas/kompas-hotel-countries";
 import type { SupplierGeoOption } from "./supplier.types";
 
 /**
@@ -239,10 +243,19 @@ export class SupplierGeoIngestService {
 
     for (const [stateInc, iso] of Object.entries(KOMPAS_HOTEL_STATEINC_TO_ISO)) {
       if (stateIncs?.length && !stateIncs.includes(stateInc)) continue;
-      const country = countries.find((c) => c.code === iso);
+      let country = countries.find((c) => c.code === iso) as
+        | { id: string; code: string }
+        | undefined;
       if (!country) {
-        report.unmatched.push(`STATE ${stateInc} (${iso}): no GeoCountry in Master Geography`);
-        continue;
+        // The hotel dictionary is wider than Master Geography (ANEX seeded
+        // most of its 52 states, but UA/BG/CZ … were never created) — create
+        // the GeoCountry row with the dictionary's ru/en names, same as
+        // ingestAnexHotels does for its states.
+        country = await this.upsertCountry(
+          iso,
+          KOMPAS_HOTEL_STATEINC_TO_RU[stateInc] ?? iso,
+          KOMPAS_HOTEL_ISO_TO_EN[iso] ?? iso,
+        );
       }
       let options: SupplierGeoOption[] = [];
       try {
