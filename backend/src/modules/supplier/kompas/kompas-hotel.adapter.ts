@@ -205,7 +205,12 @@ export class KompasHotelAdapter implements SupplierAdapter {
 
     if (query.hotelExternalId) {
       const id = query.hotelExternalId.trim();
-      out = out.filter((r) => r.hotelKey === id);
+      // Upstream HOTELS=<id> already narrowed the request; rows with a
+      // non-dictionary key (dynamic/DOLOAD: synthetic negative or sentinel)
+      // can never equal the id and must not be false-dropped.
+      out = out.filter(
+        (r) => !r.hotelKey || r.hotelKey.startsWith("-") || r.hotelKey === id,
+      );
     } else if (query.hotel?.trim()) {
       const wanted = query.hotel.trim().toLowerCase();
       out = out.filter((r) => {
@@ -275,19 +280,40 @@ export class KompasHotelAdapter implements SupplierAdapter {
   // ── Normalization (hotel-specific mapping) ────────────────────────────
 
   private offerIdOf(row: KompasHotelRawRow): string {
+    // Positive keys are real dictionary ids (inline PRICES rows) — stable
+    // across sessions. Dynamic (DOLOAD) rows carry synthetic negatives or
+    // INT_MIN sentinels (roomKey/mealKey = -2147483647): identity then falls
+    // back to content tokens, because the variant lives in the room/meal TEXT
+    // («…No Balcony, 2 Twin Beds…» vs «…No Balcony, 1 Queen Bed…»). Without
+    // the fallback every dynamic row dedupes to one id (verified: BG Bansko).
+    const dictKey = (v: string | undefined): string =>
+      v && /^\d+$/.test(v) ? v : "";
+    const hotel = dictKey(row.hotelKey) || this.idToken(row.hotelName);
+    const room = dictKey(row.roomKey) || this.idToken(row.room);
+    const meal = dictKey(row.mealKey) || this.idToken(row.meal);
     return [
       "KOMPASHTL",
       row.stateInc,
-      row.hotelKey,
+      hotel,
       row.tourKey,
       row.spoKey,
-      row.roomKey,
-      row.mealKey,
+      room,
+      meal,
       row.checkIn,
       row.nights,
       row.adults,
       row.children,
     ].join("-");
+  }
+
+  /** ID-safe token from free text (room/meal names when no dictionary key). */
+  private idToken(v: string | undefined): string {
+    const t = (v ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9а-яё]+/gi, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 96);
+    return t || "x";
   }
 
   private availabilityOf(_row: KompasHotelRawRow): SupplierAvailability {

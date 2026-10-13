@@ -520,7 +520,16 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         resolvePricesEmpty = resolve;
       });
       page.on("response", (res) => {
-        if (!res.url().includes("samo_action=PRICES")) return;
+        const u = res.url();
+        // §DOLOAD: cover PRICES and the async dynamic follow-ups — BG-like
+        // states answer PRICES with an empty script + samo.location → DOLOAD=1
+        // and deliver the rows later via samo_action=getPricesDynamic; the
+        // DOM race below then wins on the rows that render after the redirect.
+        const isPrices = u.includes("samo_action=PRICES");
+        const isDynamic =
+          u.includes("samo_action=getPricesDynamic") ||
+          u.includes("samo_action=checkDynamicPricesStatus");
+        if (!isPrices && !isDynamic) return;
         void res
           .text()
           .then((text) => {
@@ -529,7 +538,11 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
             this.logger.debug(
               `KOMPAS PRICES response: status=${res.status()} len=${text.length} hasRows=${hasRows} head=${JSON.stringify(text.slice(0, 300))}`,
             );
-            if (!hasRows) resolvePricesEmpty();
+            // Honest "no tours": PRICES answered inline without a single price
+            // row AND without signalling the async dynamic flow (a DOLOAD
+            // redirect) — resolving the race on a DOLOAD-signalling empty would
+            // abort while getPricesDynamic is still bringing the rows.
+            if (!hasRows && isPrices && !text.includes("DOLOAD=1")) resolvePricesEmpty();
           })
           .catch(() => {
             pricesResponse = { status: res.status(), len: -1, body: "" };
@@ -2559,6 +2572,12 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
    *    NOT render rows into the live page DOM (verified 2026-10-12), so we
    *    parse the response body instead of the DOM. 100 rows arrive inline in
    *    the FIRST response per page (PRICEPAGE pagination).
+   *  • ASYNC ("dynamic") states (verified 2026-10-13: BG) answer the first
+   *    PRICES call with a ~1.2KB empty script carrying samo.location →
+   *    …&DOLOAD=1; following that redirect loads the full results page whose
+   *    own scripts pull the rows via samo_action=getPricesDynamic (273 rows
+   *    for Bansko 2026-12). The route captures all samo_action follow-ups and
+   *    the parser picks the first payload that yields rows.
    *
    * Additive: does not touch the tour `search()` flow.
    */
@@ -2620,9 +2639,17 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         document.getElementById("samo_popup_mini")?.remove();
       });
 
-      // Capture each PRICES response body (raw) via route interception.
+      // Capture every samo_action response body (raw) via route interception.
+      // §DOLOAD: some states (verified: BG) answer the first PRICES call with a
+      // ~1.2KB empty script that only carries samo.location → …&DOLOAD=1; the
+      // redirect never executes here (the bare script has no samo runtime), and
+      // the rows arrive later from the DOLOAD page via
+      // samo_action=getPricesDynamic (probe: Bansko 2026-12 → 273 price_info
+      // rows). So the capture covers the dynamic follow-up actions, not only
+      // PRICES — parseAny() picks the first payload that actually parses.
+      const RAW_ROUTE = "**samo_action=**";
       const rawPages: string[] = [];
-      await page.route("**samo_action=PRICES**", async (route) => {
+      await page.route(RAW_ROUTE, async (route) => {
         try {
           const response = await route.fetch();
           rawPages.push(await response.text());
@@ -2632,20 +2659,44 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         }
       });
 
+      const parseAny = async (): Promise<KompasHotelRawRow[]> => {
+        for (const raw of rawPages) {
+          const parsed = await this.parseHotelPricesRaw(page, raw, opts.stateInc);
+          if (parsed.length) return parsed;
+        }
+        return [];
+      };
+
       const rows: KompasHotelRawRow[] = [];
       for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
         const url = this.buildHotelPricesUrl(opts, pageNo);
         rawPages.length = 0;
         await page.goto(url, { waitUntil: "networkidle", timeout: 45_000 }).catch(() => {});
         await page.waitForTimeout(800);
-        const raw = rawPages[0];
-        if (!raw) break;
-        const pageRows = await this.parseHotelPricesRaw(page, raw, opts.stateInc);
-        if (!pageRows.length) break;
+        let pageRows = await parseAny();
+        if (!pageRows.length) {
+          // Async-search state: follow the server's own DOLOAD redirect and let
+          // the page's scripts pull the rows (checkDynamicPricesStatus →
+          // getPricesDynamic). Filters survive — the DOLOAD URL is built by the
+          // server from the PRICES params it already received (TOWNS included).
+          const redirect = rawPages
+            .map((raw) => /samo\.location\s*=\s*"([^"]+)"/.exec(raw)?.[1]?.replace(/\\\//g, "/"))
+            .find((u) => u?.includes("DOLOAD=1"));
+          if (!redirect) break;
+          rawPages.length = 0;
+          await page.goto(redirect, { waitUntil: "networkidle", timeout: 60_000 }).catch(() => {});
+          const deadline = Date.now() + 25_000;
+          do {
+            pageRows = await parseAny();
+            if (pageRows.length || Date.now() >= deadline) break;
+            await page.waitForTimeout(1_000);
+          } while (true);
+          if (!pageRows.length) break;
+        }
         rows.push(...pageRows);
       }
 
-      await page.unroute("**samo_action=PRICES**").catch(() => {});
+      await page.unroute(RAW_ROUTE).catch(() => {});
       return rows;
     } finally {
       await context?.close().catch(() => {});
@@ -2757,13 +2808,19 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
             (cityMatch ? linkHotelText.slice(0, cityMatch.index).trim() : linkHotelText);
           // cells[6]=meal, cells[7]=room (verified: [0]empty [1]date [2]program
           // [3]nights [4]hotel [5]availability [6]meal [7]room … [11]price).
+          // Key values may be negative: dictionary-less dynamic (DOLOAD) rows
+          // carry synthetic hotel ids (hotelKey--955302) and INT_MIN sentinels
+          // for room/meal (roomKey--2147483647) — the minus must be captured,
+          // otherwise every dynamic row parses with empty keys and collapses
+          // into ONE externalOfferId downstream (verified: BG Bansko — 300 rows
+          // deduped to 1 offer).
           return {
             stateInc: state,
-            hotelKey: cls.match(/hotelKey-(\d+)/)?.[1] || "",
-            tourKey: cls.match(/tourKey-(\d+)/)?.[1] || "",
-            spoKey: cls.match(/spoKey-(\d+)/)?.[1] || "",
-            mealKey: cls.match(/mealKey-(\d+)/)?.[1] || "",
-            roomKey: cls.match(/roomKey-(\d+)/)?.[1] || "",
+            hotelKey: cls.match(/hotelKey-(-?\d+)/)?.[1] || "",
+            tourKey: cls.match(/tourKey-(-?\d+)/)?.[1] || "",
+            spoKey: cls.match(/spoKey-(-?\d+)/)?.[1] || "",
+            mealKey: cls.match(/mealKey-(-?\d+)/)?.[1] || "",
+            roomKey: cls.match(/roomKey-(-?\d+)/)?.[1] || "",
             nights: toNum(cls.match(/nights-(\d+)/)?.[1]),
             checkIn: cls.match(/checkIn-(\d+)/)?.[1] || "",
             adults: toNum(cls.match(/adult-(\d+)/)?.[1]),
