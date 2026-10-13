@@ -1649,6 +1649,32 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
    * Opens one headless page (no search submit), read-only against supplier.
    */
   async discoverGeoOptions(countryExternalId?: string): Promise<SupplierGeoOption[]> {
+    return this.runGeoDiscovery(countryExternalId, {
+      formPath: "search_tour",
+      townFromInc: BAKU_TOWNFROMINC,
+      includeTours: true,
+    });
+  }
+
+  /**
+   * Geo discovery from the HOTEL form (search_hotel): hotel-only STATEINCs
+   * (53 hotel countries vs ~23 tour ones) can never be discovered via the
+   * tours form. Reads the TOWNS/STARS checklists + the state's hotelDynamic
+   * dictionary; no TOWNFROMINC (a stay-only search has no departure city) and
+   * no TOUR select. TOWNS id space is shared with search_tour (verified probe
+   * 2026-10-13: TOWNS=941 on search_hotel → rows city=Батуми only).
+   */
+  async discoverHotelGeoOptions(countryExternalId?: string): Promise<SupplierGeoOption[]> {
+    return this.runGeoDiscovery(countryExternalId, {
+      formPath: "search_hotel",
+      includeTours: false,
+    });
+  }
+
+  private async runGeoDiscovery(
+    countryExternalId: string | undefined,
+    opts: { formPath: string; townFromInc?: string; includeTours: boolean },
+  ): Promise<SupplierGeoOption[]> {
     const stateInc = countryExternalId ?? "";
     if (!/^(0|[1-9]\d*)$/.test(stateInc)) return [];
     const browser = await this.getBrowser();
@@ -1659,7 +1685,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     });
     try {
       const page = await context.newPage();
-      await page.goto(`${this.baseUrl}/search_tour`, { waitUntil: "networkidle", timeout: 60_000 });
+      await page.goto(`${this.baseUrl}/${opts.formPath}`, { waitUntil: "networkidle", timeout: 60_000 });
       await page.waitForFunction(
         () => (window as any).samo?.page_ready === true,
         { timeout: 15_000 },
@@ -1668,8 +1694,10 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         document.getElementById("samo_popup")?.remove();
         document.getElementById("samo_popup_mini")?.remove();
       });
-      await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-      await page.waitForTimeout(2_000);
+      if (opts.townFromInc) {
+        await this.setSamoSelect(page, "TOWNFROMINC", opts.townFromInc);
+        await page.waitForTimeout(2_000);
+      }
       // The country list is rebuilt after the departure city changes; without
       // waiting for the target STATEINC we would ingest the default country's
       // towns under the requested one (verified: EG run read Mauritius).
@@ -1700,18 +1728,20 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       const result: SupplierGeoOption[] = [];
 
-      // Dimension 1: TOURINC select.
-      const tours = await page.evaluate(() => {
-        const sel = document.querySelector("select[name=TOURINC]") as HTMLSelectElement | null;
-        if (!sel) return [];
-        return Array.from(sel.options)
-          .filter((o) => o.value && o.value !== "0")
-          .map((o) => ({
-            externalId: o.value,
-            label: (o.textContent ?? "").replace(/\s+/g, " ").trim(),
-          }));
-      });
-      for (const o of tours) result.push({ ...o, kind: "TOUR", countryExternalId: stateInc });
+      // Dimension 1: TOURINC select (tour form only — search_hotel has none).
+      if (opts.includeTours) {
+        const tours = await page.evaluate(() => {
+          const sel = document.querySelector("select[name=TOURINC]") as HTMLSelectElement | null;
+          if (!sel) return [];
+          return Array.from(sel.options)
+            .filter((o) => o.value && o.value !== "0")
+            .map((o) => ({
+              externalId: o.value,
+              label: (o.textContent ?? "").replace(/\s+/g, " ").trim(),
+            }));
+        });
+        for (const o of tours) result.push({ ...o, kind: "TOUR", countryExternalId: stateInc });
+      }
 
       // Dimension 2: TOWNS checkbox-list widget (div.checklistbox.TOWNS).
       // Lazy-populated after the townssearch input gains focus. The form is
@@ -1784,15 +1814,16 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       // the already-validated STATEINC. Each entry's townKey matches kind=TOWN
       // externalIds so ingest can geo-link the hotel.
       try {
-        const res = await fetch(
-          `${this.baseUrl}/search_tour?TOWNFROMINC=${BAKU_TOWNFROMINC}&STATEINC=${encodeURIComponent(stateInc)}`,
-          {
-            headers: {
-              "User-Agent": KOMPAS_USER_AGENT,
-              "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
-            },
+        const dictUrl =
+          `${this.baseUrl}/${opts.formPath}?` +
+          (opts.townFromInc ? `TOWNFROMINC=${encodeURIComponent(opts.townFromInc)}&` : "") +
+          `STATEINC=${encodeURIComponent(stateInc)}`;
+        const res = await fetch(dictUrl, {
+          headers: {
+            "User-Agent": KOMPAS_USER_AGENT,
+            "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
           },
-        );
+        });
         if (res.ok) {
           const hotels = parseSamoHotelDynamic(await res.text());
           for (const h of hotels) {
@@ -2542,6 +2573,13 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     childAges?: number[];
     /** Restrict to a single KOMPAS hotel (hotelKey) when set. */
     hotelExternalId?: string;
+    /**
+     * Supplier-town ids (CSV) resolved from Master Geography by the aggregator.
+     * → `TOWNS=<ids>&TOWNS_ANY=0` (verified probe: tours-dict id 941 → rows
+     * city=Батуми only — the id space is shared between search_tour and
+     * search_hotel).
+     */
+    towns?: string;
     /** Pages to pull (PRICEPAGE 1..N). v1 default 1 (inline rows). */
     maxPages?: number;
   }): Promise<KompasHotelRawRow[]> {
@@ -2628,6 +2666,8 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       children: number;
       childAges?: number[];
       hotelExternalId?: string;
+      /** Supplier-town ids (CSV) → `TOWNS=<ids>&TOWNS_ANY=0`. */
+      towns?: string;
     },
     page: number,
   ): string {
@@ -2635,6 +2675,12 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     const hotels = opts.hotelExternalId
       ? `&HOTELS_ANY=0&HOTELS=${encodeURIComponent(opts.hotelExternalId)}`
       : "&HOTELS_ANY=1&HOTELS=";
+    // §TOWNS: city/resort filter — the site's own widget sends TOWNS=<ids>
+    // &TOWNS_ANY=0 (verified probe on search_hotel: TOWNS=941 → rows city=Батуми
+    // only). Country-level searches keep the form default TOWNS_ANY=1.
+    const towns = opts.towns?.trim()
+      ? `&TOWNS_ANY=0&townssearch=0&TOWNS=${encodeURIComponent(opts.towns.trim())}`
+      : "&TOWNS_ANY=1&townssearch=0&TOWNS=";
     const params =
       `samo_action=PRICES` +
       `&STATEINC=${encodeURIComponent(opts.stateInc)}` +
@@ -2648,7 +2694,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       `&CURRENCY=2` +
       `&CHILD=${encodeURIComponent(opts.children)}` +
       ages +
-      `&TOWNS_ANY=1&townssearch=0&TOWNS=` +
+      towns +
       `&STARS_ANY=1&STARS=` +
       hotels +
       `&MEALS_ANY=1&MEALS=` +

@@ -20,7 +20,11 @@ import {
   KOMPAS_HOTEL_STATEINC_TO_ISO,
   resolveHotelStateInc,
   hotelStateIncToIso,
+  hotelStateIncToRu,
 } from "./kompas-hotel-countries";
+// Shared pure name-match helpers (same channel the ANEX hotel adapter uses).
+import { normName } from "../anex/anex.provider";
+import { translitKey } from "../anex/anex-hotel.adapter";
 
 /** Stay-nights bounds for a KOMPAS hotel search (soft clamp, not a hard reject). */
 const HOTEL_NIGHTS_MIN = 1;
@@ -103,6 +107,7 @@ export class KompasHotelAdapter implements SupplierAdapter {
       children,
       childAges: query.childAges,
       hotelExternalId: query.hotelExternalId?.trim() || undefined,
+      towns: query.towns,
     });
 
     // Occupancy must match the request (rows carry adult-/child- class tokens).
@@ -113,7 +118,7 @@ export class KompasHotelAdapter implements SupplierAdapter {
     );
     const droppedOccupancy = rows.length - filtered.length;
 
-    filtered = this.applyLocalFilters(filtered, query);
+    filtered = this.applyLocalFilters(filtered, query, stateInc);
 
     // §5.7: rows without a positive supplier price are dropped before
     // normalization — `amount: 0` must never be synthesized as a valid price.
@@ -135,20 +140,67 @@ export class KompasHotelAdapter implements SupplierAdapter {
   }
 
   /**
-   * Local post-filters: destination (city/town name) and hotel (name), mirroring
-   * the tour adapter's local filtering. KOMPAS hotel rows carry the city in the
-   * `.link-hotel` suffix («(Бодрум)») and the hotel name from the link.
+   * Local post-filters: city (three channels, in precedence order) and hotel
+   * (id or name). KOMPAS hotel rows carry the city in the `.link-hotel` suffix
+   * («(Бодрум)») and the hotel name from the link.
+   *
+   * City channels:
+   *  1. `towns` ids → already applied UPSTREAM by the PRICES URL
+   *     (TOWNS=<ids>&TOWNS_ANY=0, verified probe) — a local filter would only
+   *     false-drop rows (aggregated group labels like «Аджария» are not row
+   *     cities), so it is skipped here;
+   *  2. `townNames` (entity names + supplier TOWN labels) — the name channel,
+   *     same norm+translit match the ANEX hotel adapter uses;
+   *  3. free-text `destination` — form display name; skipped when it is the
+   *     COUNTRY name/ISO (country-level search: comparing «Грузия» against row
+   *     cities drops every row — observed 100 rows → 0 offers for GE).
    */
-  private applyLocalFilters(rows: KompasHotelRawRow[], query: SupplierSearchQuery): KompasHotelRawRow[] {
+  private applyLocalFilters(
+    rows: KompasHotelRawRow[],
+    query: SupplierSearchQuery,
+    stateInc: string,
+  ): KompasHotelRawRow[] {
     let out = rows;
 
-    const dest = query.destination?.trim().toLowerCase().replace(/ё/g, "е");
-    if (dest && !query.hotelExternalId) {
-      out = out.filter((r) => {
-        const c = r.city?.trim().toLowerCase().replace(/ё/g, "е");
-        if (!c) return true; // no city on the row — cannot filter, keep
-        return c === dest || c.includes(dest) || dest.includes(c);
-      });
+    if (!query.hotelExternalId) {
+      const towns = query.towns?.replace(/\s+/g, "");
+      if (towns) {
+        // Upstream TOWNS filter already narrowed the rows — nothing to do.
+      } else if (query.townNames?.length) {
+        const keys = new Set<string>();
+        for (const n of query.townNames) {
+          const a = normName(n);
+          if (a) keys.add(a);
+          const b = translitKey(n);
+          if (b) keys.add(b);
+        }
+        if (keys.size > 0) {
+          out = out.filter((r) => {
+            const c = r.city ?? "";
+            if (!c) return true; // no city on the row — cannot disprove, keep
+            const a = normName(c);
+            if (a && keys.has(a)) return true;
+            const b = translitKey(c);
+            if (b && keys.has(b)) return true;
+            return false;
+          });
+        }
+      } else {
+        const dest = query.destination?.trim().toLowerCase().replace(/ё/g, "е");
+        if (dest) {
+          const countryRu = (hotelStateIncToRu(stateInc) ?? "").toLowerCase().replace(/ё/g, "е");
+          const iso2 = (hotelStateIncToIso(stateInc) ?? "").toLowerCase();
+          const countryParam = (query.country ?? "").trim().toLowerCase();
+          const countryLevel = dest === countryRu || dest === iso2 || dest === countryParam;
+          if (!countryLevel) {
+            out = out.filter((r) => {
+              const c = r.city?.trim().toLowerCase().replace(/ё/g, "е");
+              if (!c) return true; // no city on the row — cannot filter, keep
+              return c === dest || c.includes(dest) || dest.includes(c);
+            });
+          }
+        }
+      }
     }
 
     if (query.hotelExternalId) {

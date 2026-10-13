@@ -9,22 +9,21 @@
  */
 import "dotenv/config";
 import { NestFactory } from "@nestjs/core";
-import { SupplierModule } from "../src/modules/supplier/supplier.module";
-import { PrismaService } from "../src/prisma/prisma.service";
+import { AppModule } from "../src/app.module";
 import { SupplierGeoIngestService } from "../src/modules/supplier/supplier-geo-ingest.service";
 
 async function main() {
   const isos = process.argv.slice(2).map((s) => s.trim().toUpperCase()).filter(Boolean);
-  const app = await NestFactory.createApplicationContext(SupplierModule, {
+  // AppModule (not SupplierModule): FinanceService→SecurityService lives
+  // outside SupplierModule's DI scope and the bare module context fails.
+  const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ["error", "warn", "log"],
   });
-  await app.init();
 
   const ingest = app.get(SupplierGeoIngestService);
   const report = await ingest.ingestAnexHotels(isos.length ? isos : undefined);
   console.log("REPORT", JSON.stringify(report, null, 2));
 
-  await app.get(PrismaService).$disconnect();
   await app.close();
 }
 

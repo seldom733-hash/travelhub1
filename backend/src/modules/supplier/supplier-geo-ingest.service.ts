@@ -2,6 +2,8 @@ import { Injectable, Logger, Inject } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { ANEX_STATEINC_TO_ISO, AnexProvider } from "./anex/anex.provider";
+import { KOMPAS_HOTEL_STATEINC_TO_ISO } from "./kompas/kompas-hotel-countries";
+import type { SupplierGeoOption } from "./supplier.types";
 
 /**
  * SupplierGeoIngestService — automated supplier geo mapping ingestion.
@@ -109,6 +111,27 @@ export class SupplierGeoIngestService {
       const options = await adapter.discoverGeoOptions(stateInc);
       report.discovered += options.length;
 
+      await this.linkOptions(supplierCode, country, options, report);
+    }
+    this.logger.log(
+      `[GeoIngest] ${supplierCode}: discovered=${report.discovered} linked=${report.linked} ` +
+        `cities=${report.createdCities} resorts=${report.createdResorts} retired=${report.retiredCities} ` +
+        `unmatched=${report.unmatched.length}`,
+    );
+    return report;
+  }
+
+  /**
+   * Link one country's discovered options (TOWN/STAR/TOUR/HOTEL) to Master
+   * Geography — the shared body of every ingest run (tours form and hotel
+   * form alike). Mutates the report counters in place.
+   */
+  private async linkOptions(
+    supplierCode: string,
+    country: { id: string; code: string },
+    options: SupplierGeoOption[],
+    report: IngestReport,
+  ): Promise<void> {
       for (const opt of options) {
         const normalized = this.normalizeLabel(opt.label);
 
@@ -179,9 +202,63 @@ export class SupplierGeoIngestService {
           target?.type === "resort" ? target.id : null,
         );
       }
+  }
+
+  /**
+   * KOMPAS HOTELS geo ingestion — the 53-country hotel dictionary of
+   * /search_hotel (kompas-hotel-countries.ts). The tours form only exposes
+   * the ~23 Baku-departure tour states, so hotel-only countries (VN, ME, CY …)
+   * can never be discovered via search_tour. TOWN/HOTEL ids are a SHARED SAMO
+   * id space (verified probes 2026-10-13: search_hotel honors both
+   * TOWNS=<tours id> and HOTELS=<tours id>), so overlapping countries are
+   * refreshed idempotently — and the hotel form may expose towns the tours
+   * checklist lacks (Кутаиси/Местия for GE have price rows but no tours TOWN).
+   */
+  async ingestKompasHotels(stateIncs?: string[]): Promise<IngestReport> {
+    const adapter = this.registry
+      .getEnabled()
+      .find((a) => a.code === "KOMPAS" && a.discoverHotelGeoOptions);
+    if (!adapter?.discoverHotelGeoOptions) {
+      throw new Error("KOMPAS adapter has no discoverHotelGeoOptions capability");
     }
+
+    const countries = await this.prisma.geoCountry.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true, code: true, names: true },
+    });
+
+    const report: IngestReport = {
+      supplierCode: "KOMPAS",
+      discovered: 0,
+      linked: 0,
+      createdCities: 0,
+      createdResorts: 0,
+      retiredCities: 0,
+      unmatched: [],
+    };
+
+    for (const [stateInc, iso] of Object.entries(KOMPAS_HOTEL_STATEINC_TO_ISO)) {
+      if (stateIncs?.length && !stateIncs.includes(stateInc)) continue;
+      const country = countries.find((c) => c.code === iso);
+      if (!country) {
+        report.unmatched.push(`STATE ${stateInc} (${iso}): no GeoCountry in Master Geography`);
+        continue;
+      }
+      let options: SupplierGeoOption[] = [];
+      try {
+        options = await adapter.discoverHotelGeoOptions(stateInc);
+      } catch (err) {
+        report.unmatched.push(
+          `STATE ${stateInc} (${iso}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+        continue;
+      }
+      report.discovered += options.length;
+      await this.linkOptions("KOMPAS", country, options, report);
+    }
+
     this.logger.log(
-      `[GeoIngest] ${supplierCode}: discovered=${report.discovered} linked=${report.linked} ` +
+      `[GeoIngest] KOMPAS hotels: discovered=${report.discovered} linked=${report.linked} ` +
         `cities=${report.createdCities} resorts=${report.createdResorts} retired=${report.retiredCities} ` +
         `unmatched=${report.unmatched.length}`,
     );

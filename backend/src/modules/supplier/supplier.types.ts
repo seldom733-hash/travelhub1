@@ -268,6 +268,16 @@ export interface SupplierAdapter {
    * do not simply return []). Used to auto-populate SupplierGeoLink table.
    */
   discoverGeoOptions?(countryExternalId?: string): Promise<SupplierGeoOption[]>;
+
+  /**
+   * Discover geo options from the supplier's HOTEL form (optional capability).
+   * The hotel dictionaries are separate upstream dictionaries with a wider
+   * country set (KOMPAS: 53 hotel states vs ~23 tour states — a stay-only
+   * booking needs no departure flight), so hotel-only countries can never be
+   * discovered via the tour form. Shares the TOWNS id space (verified probe:
+   * search_hotel honors search_tour TOWNS ids).
+   */
+  discoverHotelGeoOptions?(countryExternalId?: string): Promise<SupplierGeoOption[]>;
 }
 
 // ── Supplier Offer Reference ─────────────────────────────────────────────

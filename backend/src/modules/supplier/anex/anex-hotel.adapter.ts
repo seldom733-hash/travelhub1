@@ -35,7 +35,7 @@ const RU_TO_LAT: Record<string, string> = {
   ъ: "", ы: "y", ь: "", э: "e", ю: "u", я: "a",
 };
 
-function translitKey(s: string): string {
+export function translitKey(s: string): string {
   let out = "";
   for (const ch of s.toLowerCase()) {
     if (RU_TO_LAT[ch] !== undefined) out += RU_TO_LAT[ch];
