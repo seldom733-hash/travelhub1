@@ -61,8 +61,8 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
       : orderedTabs[0]?.key ?? "tours";
 
   const [activeTab, setActiveTab] = useState<ServiceType>(initialTab);
-  // «Сбросить все» → TourSearch resets every picker (tours is the only
-  // service whose form keeps a restorable draft).
+  // «Сбросить все» → the form resets every picker (tours and hotels are the
+  // services whose forms keep a restorable draft).
   const [resetSignal, setResetSignal] = useState(0);
 
   const handleSearch = (ctx: SearchContext) => {
@@ -112,7 +112,7 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
   const renderForm = () => {
     switch (activeTab) {
       case "tours": return <TourSearch onSearch={handleSearch} resetSignal={resetSignal} />;
-      case "hotels": return <HotelSearch onSearch={handleSearch} />;
+      case "hotels": return <HotelSearch onSearch={handleSearch} resetSignal={resetSignal} />;
       case "flights": return <FlightSearch onSearch={handleSearch} />;
       case "sanatoriums": return <SanatoriumSearch onSearch={handleSearch} />;
       case "guides": return <GuideSearch onSearch={handleSearch} />;
@@ -146,7 +146,7 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
             </button>
           ))}
         </div>
-        {activeTab === "tours" && (
+        {(activeTab === "tours" || activeTab === "hotels") && (
           <button
             type="button"
             onClick={() => setResetSignal((n) => n + 1)}

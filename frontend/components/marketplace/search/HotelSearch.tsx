@@ -1,19 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CalendarBlank, ArrowRight, Buildings } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import { todayISO } from "@/lib/dates";
 import type { SearchContext } from "@/lib/search-engine";
 import DestinationPicker from "./DestinationPicker";
-import { geoDisplayName, type GeoDirectoryEntry } from "@/lib/geo-api";
+import {
+  fetchGeoDirectory,
+  geoDisplayName,
+  type GeoDirectoryEntry,
+} from "@/lib/geo-api";
 import LiveSearchInput from "./LiveSearchInput";
 import ChildAges from "./ChildAges";
 import HelpFindButton from "./HelpFindButton";
 import NightsRange from "./NightsRange";
+import {
+  clearHotelDraft,
+  readHotelDraft,
+  writeHotelDraft,
+} from "./hotel-search-store";
 
 interface HotelSearchProps {
   onSearch: (ctx: SearchContext) => void;
+  /** «Сбросить все» (HeroSearch toolbar): every change resets all pickers. */
+  resetSignal?: number;
 }
 
 /**
@@ -23,7 +34,7 @@ interface HotelSearchProps {
  * the legacy free-text city field resolved through geo:hotels availability
  * (catalog-only) and could not reach supplier search at all.
  */
-export default function HotelSearch({ onSearch }: HotelSearchProps) {
+export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchProps) {
   const locale = useLocale();
   // Destination as Master Geography entries (most specific wins).
   const [toCountry, setToCountry] = useState<GeoDirectoryEntry | null>(null);
@@ -40,6 +51,82 @@ export default function HotelSearch({ onSearch }: HotelSearchProps) {
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
 
+  // ── Draft: restore the pickers of the previous search ──────────────────
+  // Same contract as TourSearch: the form unmounts between the home page
+  // and the results page; the draft (module memory + sessionStorage) brings
+  // every picker back on return. Applied AFTER mount so SSR renders plain
+  // defaults (no hydration mismatch); `hydrated` gates the persist effect
+  // so the initial default values cannot clobber the stored draft.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    const draft = readHotelDraft();
+    if (draft) {
+      setToCountry(draft.toCountry);
+      setToCity(draft.toCity);
+      setToResort(draft.toResort);
+      setHotelId(draft.hotelId);
+      setHotelName(draft.hotelName);
+      setCheckIn(draft.checkIn);
+      setNightsFrom(draft.nightsFrom);
+      setNightsTo(draft.nightsTo);
+      setAdults(draft.adults);
+      setChildren(draft.children);
+      setChildAges(draft.childAges);
+    }
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    writeHotelDraft({
+      toCountry,
+      toCity,
+      toResort,
+      hotelId,
+      hotelName,
+      checkIn,
+      nightsFrom,
+      nightsTo,
+      adults,
+      children,
+      childAges,
+    });
+  }, [
+    hydrated,
+    toCountry,
+    toCity,
+    toResort,
+    hotelId,
+    hotelName,
+    checkIn,
+    nightsFrom,
+    nightsTo,
+    adults,
+    children,
+    childAges,
+  ]);
+
+  /** «Сбросить все»: back to a fresh form (empty pickers, default date). */
+  const resetAll = useCallback(() => {
+    setToCountry(null);
+    setToCity(null);
+    setToResort(null);
+    setHotelId("");
+    setHotelName("");
+    setCheckIn(todayISO());
+    setNightsFrom(3);
+    setNightsTo(3);
+    setAdults(2);
+    setChildren(0);
+    setChildAges([]);
+    clearHotelDraft();
+  }, []);
+
+  useEffect(() => {
+    if (resetSignal > 0) resetAll();
+  }, [resetSignal, resetAll]);
+
   const destination = toResort ?? toCity ?? toCountry;
   // Supplier hotel directory scoped to the chosen region.
   const hotelRegion = {
@@ -51,6 +138,55 @@ export default function HotelSearch({ onSearch }: HotelSearchProps) {
   const resetHotel = () => {
     setHotelId("");
     setHotelName("");
+  };
+
+  // Destination cascade: country → city → resort (same contract as
+  // TourSearch): a different country invalidates the city/resort of the
+  // previous one, a different city invalidates its resort. Direct picks
+  // resolve their parents upward so the chain is always linked.
+  const handleCountryChange = (entry: GeoDirectoryEntry | null) => {
+    setToCountry(entry);
+    setToCity(null);
+    setToResort(null);
+    resetHotel();
+  };
+
+  const handleCityChange = (entry: GeoDirectoryEntry | null) => {
+    setToCity(entry);
+    setToResort(null);
+    resetHotel();
+    if (entry && !toCountry && entry.countryId) {
+      fetchGeoDirectory("country")
+        .then((countries) => {
+          const parent = countries.find((c) => c.id === entry.countryId);
+          if (parent) setToCountry(parent);
+        })
+        .catch(() => {});
+    }
+  };
+
+  const handleResortChange = (entry: GeoDirectoryEntry | null) => {
+    setToResort(entry);
+    resetHotel();
+    if (entry && !toCity && entry.cityId) {
+      fetchGeoDirectory("city")
+        .then((cities) => {
+          const parentCity = cities.find((c) => c.id === entry.cityId);
+          if (!parentCity) return;
+          setToCity(parentCity);
+          if (!toCountry && parentCity.countryId) {
+            fetchGeoDirectory("country")
+              .then((countries) => {
+                const parentCountry = countries.find(
+                  (c) => c.id === parentCity.countryId,
+                );
+                if (parentCountry) setToCountry(parentCountry);
+              })
+              .catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -87,23 +223,11 @@ export default function HotelSearch({ onSearch }: HotelSearchProps) {
         country={toCountry}
         city={toCity}
         resort={toResort}
-        onCountryChange={(entry) => {
-          setToCountry(entry);
-          resetHotel();
-        }}
-        onCityChange={(entry) => {
-          setToCity(entry);
-          resetHotel();
-        }}
-        onResortChange={(entry) => {
-          setToResort(entry);
-          resetHotel();
-        }}
+        onCountryChange={handleCountryChange}
+        onCityChange={handleCityChange}
+        onResortChange={handleResortChange}
         onClearAll={() => {
-          setToCountry(null);
-          setToCity(null);
-          setToResort(null);
-          resetHotel();
+          handleCountryChange(null);
         }}
         required
       />

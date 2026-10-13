@@ -168,6 +168,7 @@ export default function DestinationPicker({
     section: Section,
     title: string,
     current: GeoDirectoryEntry | null,
+    onClear: () => void,
   ) => (
     <button
       type="button"
@@ -182,8 +183,33 @@ export default function DestinationPicker({
         {title}
       </span>
       {current && (
-        <span className="max-w-[55%] truncate text-[14px] font-medium text-gold">
-          {geoDisplayName(current.names, current.code)}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="max-w-[55%] truncate text-[14px] font-medium text-gold">
+            {geoDisplayName(current.names, current.code)}
+          </span>
+          {/* Per-level reset («Страна»/«Город»/«Курорт»): clears THIS level —
+              and everything below it, the cascade contract (a country change
+              invalidates its cities, a city change its resorts). Same X icon
+              as the trigger's general clear, but scoped to the level. */}
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label={`Очистить: ${title}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                onClear();
+              }
+            }}
+            className="shrink-0 text-neutral-500 transition-colors hover:text-white"
+          >
+            <X size={13} />
+          </span>
         </span>
       )}
     </button>
@@ -290,7 +316,7 @@ export default function DestinationPicker({
       {open && (
         <div className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
           {/* Country section */}
-          {sectionHeader("country", "Страна", country)}
+          {sectionHeader("country", "Страна", country, () => onCountryChange(null))}
           {expanded === "country" && (
             <div className="border-b border-dark-border pb-1">
               {searchInput(qCountry, setQCountry, "Поиск страны…")}
@@ -309,7 +335,7 @@ export default function DestinationPicker({
           )}
 
           {/* City section */}
-          {sectionHeader("city", "Город", city)}
+          {sectionHeader("city", "Город", city, () => onCityChange(null))}
           {expanded === "city" && (
             <div className="border-b border-dark-border pb-1">
               {searchInput(qCity, setQCity, "Поиск города…")}
@@ -335,7 +361,7 @@ export default function DestinationPicker({
           )}
 
           {/* Resort section */}
-          {sectionHeader("resort", "Курорт", resort)}
+          {sectionHeader("resort", "Курорт", resort, () => onResortChange(null))}
           {expanded === "resort" && (
             <div className="pb-1">
               {searchInput(qResort, setQResort, "Поиск курорта…")}
