@@ -966,15 +966,18 @@ export class PublicCatalogService {
   }
 
   /**
-   * Локальное фото отеля для витрины туров (заказчик: файлы tripadvisor.ru
-   * сохраняются синком в frontend/public/hotels/<tourinc>-<hotelKey>.jpg|.png).
-   * Slug тура содержит identity `<supplier>-<tourinc>-<hotelKey>…`, поэтому URL
-   * выводится всегда — фронт сам решает показать img или иконку-фолбэк (HEAD).
+   * Локальное фото отеля для витрины (заказчик: файлы tripadvisor.ru
+   * сохраняются синком в frontend/public/hotels/…).
+   *  - тур: slug `<supplier>-<tourinc>-<hotelKey>…` → `<tourinc>-<hotelKey>.jpg`;
+   *  - отель (KOMPAS stay-only): slug `kompas-hotel-<iso>-<hotelKey>` → `htl-<hotelKey>.jpg`.
+   * URL выводится всегда — фронт сам решает показать img или иконку-фолбэк (HEAD).
    */
   private hotelPhotoUrl(slug: string): string | null {
-    const m = slug.match(/^[a-z]+-(\d+)-(\d+)/);
-    if (!m) return null;
-    return `/hotels/${m[1]}-${m[2]}.jpg`;
+    const tour = slug.match(/^[a-z]+-(\d+)-(\d+)/);
+    if (tour) return `/hotels/${tour[1]}-${tour[2]}.jpg`;
+    const hotel = slug.match(/^[a-z]+-hotel-[a-z]{2}-(\d+)/);
+    if (hotel) return `/hotels/htl-${hotel[1]}.jpg`;
+    return null;
   }
 
   private toCard(

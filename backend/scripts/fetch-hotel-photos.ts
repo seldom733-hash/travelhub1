@@ -2,13 +2,13 @@
  * Hotel photo downloader CLI:
  *   cd backend && npx tsx scripts/fetch-hotel-photos.ts [--limit=N] [--only=slug,...] [--dry-run]
  *
- * Скачивает фото отелей с tripadvisor.ru для витрины туров и сохраняет в
- * frontend/public/hotels/<tourinc>-<hotelKey>.jpg (или .png, если Tripadvisor
- * отдал PNG). Имя файла — по явному требованию заказчика.
+ * Скачивает фото отелей с tripadvisor.ru в frontend/public/hotels/:
+ *  - туры (type=TOUR, slug `<supplier>-<tourinc>-<hotelKey>…`) → `<tourinc>-<hotelKey>.jpg`;
+ *  - отели (type=HOTEL, KOMPAS stay-only, slug `kompas-hotel-<iso>-<hotelKey>`) → `htl-<hotelKey>.jpg`.
+ * Имя файла — по явному требованию заказчика; рядом может лежать `.png`.
  *
- * Источник пар: catalog.Product (type=TOUR, поставщики KOMPAS/KAZUNION/SUMMERTOUR).
- * tourinc/hotelKey извлекаются из slug продукта (`<supplier>-<tourinc>-<hotelKey>…`);
- * для поиска используется attributes.hotelName + country.
+ * Источник пар: catalog.Product (type=TOUR: KOMPAS/KAZUNION/SUMMERTOUR; type=HOTEL: KOMPAS).
+ * Ключевая пара ищется по attributes.hotelName + country.
  *
  * Архитектура (проверено live) — ПОЛНОСТЬЮ БЕЗ БРАУЗЕРА:
  *  - HTML tripadvisor.* закрыт DataDome (403 даже для curl/CDP-Chrome),
@@ -31,6 +31,8 @@ const UA =
 
 interface ProductPair {
   slug: string;
+  /** Ключ файла в frontend/public/hotels/ (без расширения): `<tourinc>-<hotelKey>` либо `htl-<hotelKey>`. */
+  photoKey: string;
   tourInc: string;
   hotelKey: string;
   hotelName: string;
@@ -60,7 +62,11 @@ async function loadPairs(): Promise<ProductPair[]> {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/travelhub1" });
   const prisma = new PrismaClient({ adapter });
   try {
-    const rows = await prisma.$queryRaw<
+    const pairs: ProductPair[] = [];
+    const seen = new Set<string>();
+
+    // 1) Туры: slug `<supplier>-<tourinc>-<hotelKey>…` → файл `<tourinc>-<hotelKey>`.
+    const tours = await prisma.$queryRaw<
       Array<{ slug: string; attributes: Record<string, unknown> | null }>
     >`
       SELECT "slug", "attributes"
@@ -68,13 +74,16 @@ async function loadPairs(): Promise<ProductPair[]> {
       WHERE "type" = 'TOUR'::"catalog"."ProductType"
         AND "slug" ~ '^[a-z]+-[0-9]+-[0-9]+'
     `;
-    const pairs: ProductPair[] = [];
-    for (const row of rows) {
+    for (const row of tours) {
       const m = row.slug.match(/^[a-z]+-(\d+)-(\d+)/);
       if (!m) continue;
+      const photoKey = `${m[1]}-${m[2]}`;
+      if (seen.has(photoKey)) continue;
+      seen.add(photoKey);
       const attrs = (row.attributes ?? {}) as Record<string, unknown>;
       pairs.push({
         slug: row.slug,
+        photoKey,
         tourInc: m[1],
         hotelKey: m[2],
         // Ключ отеля может лежать под hotelName (новые синки) или hotel (summer-синк).
@@ -85,6 +94,36 @@ async function loadPairs(): Promise<ProductPair[]> {
         country: (attrs.country as string) ?? null,
       });
     }
+
+    // 2) Отели (KOMPAS stay-only): slug `kompas-hotel-<iso>-<hotelKey>` → файл `htl-<hotelKey>`.
+    const hotels = await prisma.$queryRaw<
+      Array<{ slug: string; attributes: Record<string, unknown> | null }>
+    >`
+      SELECT "slug", "attributes"
+      FROM "catalog"."Product"
+      WHERE "type" = 'HOTEL'::"catalog"."ProductType"
+        AND "slug" ~ '^[a-z]+-hotel-[a-z]{2}-[0-9]+'
+    `;
+    for (const row of hotels) {
+      const m = row.slug.match(/^[a-z]+-hotel-[a-z]{2}-(\d+)/);
+      if (!m) continue;
+      const photoKey = `htl-${m[1]}`;
+      if (seen.has(photoKey)) continue;
+      seen.add(photoKey);
+      const attrs = (row.attributes ?? {}) as Record<string, unknown>;
+      pairs.push({
+        slug: row.slug,
+        photoKey,
+        tourInc: "",
+        hotelKey: m[1],
+        hotelName: ((attrs.hotelName as string) ?? "")
+          .replace(/\s*\(.*?\)\s*$/, "") // «… (Алания)» → без города (на всякий случай)
+          .replace(/\d\s*\*+\s*$/, "") // хвост «3*» мешает поиску
+          .trim(),
+        country: (attrs.country as string) ?? null,
+      });
+    }
+
     return pairs;
   } finally {
     await prisma.$disconnect();
@@ -184,8 +223,8 @@ async function main(): Promise<void> {
   // Не перекачиваем: пропускаем пары, у которых уже есть файл.
   pairs = pairs.filter(
     (p) =>
-      !fs.existsSync(path.join(OUTPUT_DIR, `${p.tourInc}-${p.hotelKey}.jpg`)) &&
-      !fs.existsSync(path.join(OUTPUT_DIR, `${p.tourInc}-${p.hotelKey}.png`)),
+      !fs.existsSync(path.join(OUTPUT_DIR, `${p.photoKey}.jpg`)) &&
+      !fs.existsSync(path.join(OUTPUT_DIR, `${p.photoKey}.png`)),
   );
   pairs = pairs.slice(0, limit);
 
@@ -196,7 +235,7 @@ async function main(): Promise<void> {
 
   if (dryRun) {
     console.log(`Would fetch ${pairs.length} photos:`);
-    for (const p of pairs) console.log(`  ${p.tourInc}-${p.hotelKey}  ${p.hotelName} (${p.country ?? "?"}) [${p.slug}]`);
+    for (const p of pairs) console.log(`  ${p.photoKey}  ${p.hotelName} (${p.country ?? "?"}) [${p.slug}]`);
     return;
   }
 
@@ -211,19 +250,19 @@ async function main(): Promise<void> {
       if (!pair.hotelName) { failed++; continue; }
       try {
         const photoUrl = await searchHotelPhoto(pair);
-        if (!photoUrl) { failed++; console.log(`MISS  ${pair.tourInc}-${pair.hotelKey}  ${pair.hotelName}`); continue; }
-        const base = path.join(OUTPUT_DIR, `${pair.tourInc}-${pair.hotelKey}`);
+        if (!photoUrl) { failed++; console.log(`MISS  ${pair.photoKey}  ${pair.hotelName}`); continue; }
+        const base = path.join(OUTPUT_DIR, pair.photoKey);
         const saved = await downloadTo(photoUrl, base);
         if (saved) {
           downloaded++;
           console.log(`OK    ${path.basename(saved.file)}  (${saved.mime}, ${pair.hotelName})`);
         } else {
           failed++;
-          console.log(`DLFAIL ${pair.tourInc}-${pair.hotelKey}  ${photoUrl.slice(0, 90)}`);
+          console.log(`DLFAIL ${pair.photoKey}  ${photoUrl.slice(0, 90)}`);
         }
       } catch (err) {
         failed++;
-        console.log(`ERR   ${pair.tourInc}-${pair.hotelKey}  ${(err as Error).message}`);
+        console.log(`ERR   ${pair.photoKey}  ${(err as Error).message}`);
       }
       // Небольшая пауза между поисками (вежливость к Bing).
       await new Promise((r) => setTimeout(r, 2_000));

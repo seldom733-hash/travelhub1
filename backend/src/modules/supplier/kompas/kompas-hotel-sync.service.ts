@@ -282,7 +282,12 @@ export class KompasHotelSyncService {
         const patch: Record<string, unknown> = {};
         if (existing.title !== title) patch.title = title;
         const cur = existing.attributes as any;
-        if (cur?.startingPrice !== startingPrice || cur?.city !== city || cur?.stars !== stars) {
+        if (
+          cur?.startingPrice !== startingPrice ||
+          cur?.city !== city ||
+          cur?.stars !== stars ||
+          cur?.hotelName !== hotelName
+        ) {
           patch.attributes = { ...cur, ...attributes };
         }
         if (Object.keys(patch).length > 0) {

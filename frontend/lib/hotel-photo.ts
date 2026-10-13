@@ -17,8 +17,12 @@ import { useEffect, useState } from "react";
 
 export const HOTEL_PHOTO_DIR = "/hotels";
 
-/** `<tourinc>-<hotelKey>` из product slug (например `kazunion-1553-7493-antalya` → `1553-7493`). */
+/** Фото-ключ из product slug:
+ *  - тур `<supplier>-<tourinc>-<hotelKey>…` → `<tourinc>-<hotelKey>` (напр. `5283-31215`);
+ *  - отель `kompas-hotel-<iso>-<hotelKey>` → `htl-<hotelKey>`. */
 export function hotelPhotoKeyFromSlug(slug: string): string | null {
+  const hotel = slug.match(/^[a-z]+-hotel-[a-z]{2}-(\d+)/);
+  if (hotel) return `htl-${hotel[1]}`;
   const parts = slug.split("-");
   if (parts.length < 3) return null;
   const tourInc = parts[1];

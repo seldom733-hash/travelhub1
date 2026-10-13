@@ -43,7 +43,9 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
   // Фото отеля витрины туров: локальный файл /hotels/<tourinc>-<hotelKey>.jpg|png
   // (скачивается с tripadvisor.ru скриптом fetch-hotel-photos). Используется, когда
   // у карточки нет primaryImage (ProductMedia пуст у supplier-синков).
-  const photoKey = card.hotelImage && card.type === "TOUR" ? hotelPhotoKeyFromSlug(card.slug) : null;
+  // hotelImage отдаётся для TOUR (slug `<sup>-<tourinc>-<hotelKey>`) и HOTEL
+  // (KOMPAS stay-only, slug `kompas-hotel-<iso>-<hotelKey>`) — ключ парсит слаг.
+  const photoKey = card.hotelImage ? hotelPhotoKeyFromSlug(card.slug) : null;
   const [hotelPhoto, setHotelPhoto] = useState<string | null>(null);
   useEffect(() => {
     setHotelPhoto(null);

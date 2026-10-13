@@ -2700,9 +2700,15 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           const cells = row.querySelectorAll("td");
           const priceEl = row.querySelector("[data-cat-price]");
           const hotelLink = row.querySelector(".link-hotel a");
-          const hotelName = hotelLink?.textContent?.trim() || "";
-          const linkHotelText = row.querySelector(".link-hotel")?.textContent?.trim() || "";
-          const cityMatch = linkHotelText.match(/\(([^)]+)\)\s*$/);
+          const linkHotelText = (row.querySelector(".link-hotel")?.textContent || "")
+            .replace(/\s+/g, " ")
+            .trim();
+          const cityMatch = linkHotelText.match(/\(([^)]+)\)$/);
+          // У части отелей нет карточки на kompastour.com → в <td class=link-hotel>
+          // только текст «Name (City)» без <a>; имя берём из текста ячейки без города.
+          const hotelName =
+            (hotelLink?.textContent || "").replace(/\s+/g, " ").trim() ||
+            (cityMatch ? linkHotelText.slice(0, cityMatch.index).trim() : linkHotelText);
           // cells[6]=meal, cells[7]=room (verified: [0]empty [1]date [2]program
           // [3]nights [4]hotel [5]availability [6]meal [7]room … [11]price).
           return {
