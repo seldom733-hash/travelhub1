@@ -106,10 +106,13 @@ export default function HotTours() {
 
   useEffect(() => {
     let alive = true;
-    // Backend has no type filter; fetch published marketplace products and filter client-side for TOUR type.
-    // This uses real data from the existing Public Catalog API without creating fake backend endpoints.
+    // Server-side `category` filter (see Tours.tsx): filtering by type over an
+    // unfiltered newest-50 page silently yields zero items once another product
+    // type dominates that window (HOTEL products were ingested last), and the
+    // section would render `null`. Category filtering happens in SQL over the
+    // full published set, so this block can't be pushed out of the window.
     void publicApi
-      .listProducts({ sort: "newest", pageSize: 50 })
+      .listProducts({ category: "tours", sort: "newest", pageSize: 50 })
       .then((r) => {
         if (alive) {
           const toursOnly = r.items.filter((item) => item.type === "TOUR").slice(0, 6);

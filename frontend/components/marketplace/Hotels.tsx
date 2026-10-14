@@ -98,10 +98,12 @@ export default function Hotels() {
 
   useEffect(() => {
     let alive = true;
-    // Category slug is not linked to HOTEL products in the seed data.
-    // Use client-side type filter (same pattern as Hot Tours / Tours).
+    // Server-side `category` filter (see Tours.tsx): filtering by type over an
+    // unfiltered newest-50 page silently yields zero items once another product
+    // type dominates that window, and the section would render `null`. Category
+    // filtering happens in SQL over the full published set (2857 hotels).
     void publicApi
-      .listProducts({ sort: "newest", pageSize: 50 })
+      .listProducts({ category: "accommodation", sort: "newest", pageSize: 50 })
       .then((r) => {
         if (alive) {
           const hotelsOnly = r.items.filter((item) => item.type === "HOTEL").slice(0, 6);

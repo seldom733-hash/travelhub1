@@ -114,11 +114,15 @@ export default function Tours() {
 
   useEffect(() => {
     let alive = true;
-    // Fetch published TOUR products. Skip the first 6 (shown in Hot Tours)
-    // to avoid duplication. This uses the same backend query as Hot Tours
-    // but with client-side offset for separation.
+    // Server-side `category` filter: the newest-50 window is currently filled
+    // entirely by HOTEL products (they were ingested after the tours), so a
+    // client-side `type` filter over an unfiltered page silently yields zero
+    // items and the whole section renders `null`. Filtering by category happens
+    // in SQL over the full published set (5478 tours), so the block can no
+    // longer be pushed out of the window by another product type.
+    // Skip the first 6 (shown in Hot Tours) to avoid duplication.
     void publicApi
-      .listProducts({ sort: "newest", pageSize: 50 })
+      .listProducts({ category: "tours", sort: "newest", pageSize: 50 })
       .then((r) => {
         if (alive) {
           const toursOnly = r.items
