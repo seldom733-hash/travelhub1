@@ -282,7 +282,13 @@ export class SupplierOfferService {
     );
     // Cache key for calendar — includes tourInc program(s) so that different
     // program contexts (e.g. round-trip 229 vs one-way 254) never share cache.
+    // §SERVICE-PASSTHROUGH: `service` + `country` are part of the key — the same
+    // supplierCode can serve a tours and a hotels adapter (KOMPAS does), and a
+    // hotel calendar resolves its STATEINC from `country`, so two calendars
+    // differing only there must never collide.
     const calendarKey = `calendar:${query.supplierCode}:${JSON.stringify({
+      service: query.service ?? "tours",
+      country: query.country ?? null,
       hotel: query.hotel,
       hotelExternalId: query.hotelExternalId,
       room: query.room,

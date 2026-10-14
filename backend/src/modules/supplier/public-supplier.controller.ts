@@ -289,6 +289,8 @@ export class PublicSupplierController {
     @Body() body: {
       supplierCode: string;
       externalOfferId: string;
+      /** Service category ("tours" | "hotels") — selects the re-check adapter. */
+      service?: string;
       hotel: string;
       hotelExternalId?: string;
       departureDate: string;

@@ -147,6 +147,37 @@ describe("TourRequestService — server-authoritative displayedPrice (Phase 2 §
     expect(out.status).toBe("NEW");
   });
 
+  it("§SERVICE-PASSTHROUGH: dto.service selects the re-check adapter (hotels)", async () => {
+    const h = makeHarness();
+
+    await h.service.createTourRequest({ ...DTO, service: "hotels" });
+
+    expect(h.offerService.refreshPrice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        searchContext: expect.objectContaining({ service: "hotels" }),
+      }),
+    );
+    // A hotel request must not convert into a TOUR OrderItem.
+    const data = h.prisma.request.create.mock.calls[0][0].data;
+    expect(data.productSnapshot.productType).toBe("HOTEL");
+    expect(data.productSnapshot.type).toBe("HOTEL");
+    expect(data.productSnapshot.offer.service).toBe("hotels");
+  });
+
+  it("service defaults to tours when dto.service is absent (back-compat)", async () => {
+    const h = makeHarness();
+
+    await h.service.createTourRequest(DTO);
+
+    expect(h.offerService.refreshPrice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        searchContext: expect.objectContaining({ service: "tours" }),
+      }),
+    );
+    const data = h.prisma.request.create.mock.calls[0][0].data;
+    expect(data.productSnapshot.productType).toBe("TOUR");
+  });
+
   it("passes geography/program hints (country/tourIncValue/tourIncName) to the re-check", async () => {
     const h = makeHarness();
 

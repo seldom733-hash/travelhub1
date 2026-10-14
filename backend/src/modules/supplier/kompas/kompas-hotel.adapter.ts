@@ -16,6 +16,7 @@ import {
   KompasSupplierAdapter,
   type KompasHotelRawRow,
 } from "./kompas.adapter";
+import { KompasCaptchaRequiredException } from "./kompas-captcha.exception";
 import {
   KOMPAS_HOTEL_STATEINC_TO_ISO,
   resolveHotelStateInc,
@@ -31,6 +32,8 @@ const HOTEL_NIGHTS_MIN = 1;
 const HOTEL_NIGHTS_MAX = 30;
 /** Search results cached for a re-check (matches the tour adapter's 5 min). */
 const HOTEL_TTL_MS = 5 * 60 * 1000;
+/** Max days per price-calendar PRICES request (mirrors the tour adapter). */
+const HOTEL_CALENDAR_WINDOW_DAYS = 31;
 
 /** YYYYMMDD (SAMO) → ISO YYYY-MM-DD. */
 function compactToIso(compact: string): string {
@@ -253,19 +256,31 @@ export class KompasHotelAdapter implements SupplierAdapter {
   }
 
   /**
-   * Hotels price calendar is not implemented for KOMPAS — an honest empty
-   * result (no fabricated min/max prices), same as the ANEX hotel adapter.
+   * Hotels price calendar — REAL data from the KOMPAS `search_hotel` PRICES
+   * feed. Mirrors `KompasSupplierAdapter.getPriceCalendar`: the range is split
+   * into 31-day windows (one PRICES request each — verified: a 32-day range
+   * over one hotel returns every check-in date in a single pull), offers are
+   * deduplicated and grouped by check-in date, and every date of the range gets
+   * an entry (missing dates carry an §10 absence, never a fabricated price).
+   *
+   * `country` (not `destination`) selects the STATEINC: a hotel PDP carries the
+   * CITY in `destination`, and the hotel dictionary only resolves countries.
    */
   async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult> {
     const now = new Date();
-    return {
+    const country = query.country ?? query.destination;
+    const stateInc = resolveHotelStateInc(country);
+
+    const base = (): PriceCalendarResult => ({
       supplierCode: this.code,
       contextHash: JSON.stringify({
         category: "hotels",
-        destination: query.destination,
+        stateInc,
+        hotelExternalId: query.hotelExternalId,
         hotel: query.hotel,
         adults: query.adults,
         children: query.children,
+        childAges: query.childAges,
         nights: query.nights,
       }),
       entries: [],
@@ -274,7 +289,181 @@ export class KompasHotelAdapter implements SupplierAdapter {
       fetchedAt: now,
       expiresAt: new Date(now.getTime() + HOTEL_TTL_MS),
       totalOffersScanned: 0,
-    };
+    });
+
+    if (!stateInc) {
+      this.logger.warn(
+        `KOMPAS hotels calendar: country "${country}" not in the hotel dictionary`,
+      );
+      return base();
+    }
+
+    const collected: SupplierOffer[] = [];
+    for (const w of this.calendarWindows(query.dateFrom, query.dateTo)) {
+      try {
+        const offers = await this.search({
+          service: "hotels",
+          country,
+          // `destination` may hold the city — harmless here, the hotel-id local
+          // filter short-circuits the city filter inside applyLocalFilters().
+          destination: query.destination,
+          hotel: query.hotel,
+          hotelExternalId: query.hotelExternalId,
+          room: query.room,
+          meal: query.meal,
+          adults: query.adults,
+          children: query.children,
+          childAges: query.childAges,
+          nightsFrom: query.nights || 7,
+          nightsTo: query.nights || 7,
+          departureDateFrom: w.from,
+          departureDateTo: w.to,
+          towns: (query as PriceCalendarQuery & { towns?: string }).towns,
+        });
+        collected.push(...offers);
+      } catch (err) {
+        // CAPTCHA owns its context — never swallow it into an empty calendar.
+        if (err instanceof KompasCaptchaRequiredException) throw err;
+        this.logger.warn(
+          `KOMPAS hotels calendar window ${w.from}→${w.to} failed: ${(err as Error).message}`,
+        );
+      }
+    }
+
+    const deduped = this.deduplicateCalendarOffers(collected);
+    const result = base();
+    result.totalOffersScanned = collected.length;
+
+    const byDate = new Map<string, SupplierOffer[]>();
+    for (const o of deduped) {
+      const list = byDate.get(o.departureDate) ?? [];
+      list.push(o);
+      byDate.set(o.departureDate, list);
+    }
+
+    const resultDates: string[] = [];
+    const cur = new Date(`${query.dateFrom}T00:00:00Z`);
+    const end = new Date(`${query.dateTo}T00:00:00Z`);
+    // Guard against a malformed range (end < start) — one entry, no infinite loop.
+    for (let guard = 0; cur <= end && guard < 400; guard++) {
+      resultDates.push(cur.toISOString().slice(0, 10));
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+
+    for (const date of resultDates) {
+      const dayOffers = (byDate.get(date) ?? []).sort(
+        (a, b) => a.price.amount - b.price.amount,
+      );
+      if (dayOffers.length === 0) {
+        result.entries.push({
+          date,
+          price: null,
+          currency: null,
+          availability: "NOT_AVAILABLE",
+          offerCount: 0,
+          absenceCode: "SUPPLIER_NO_RESULT",
+          absenceText: "Цена не получена — KOMPAS не предоставил предложение на эту дату",
+        });
+        continue;
+      }
+      const best = dayOffers[0];
+      result.entries.push({
+        date,
+        price: best.price.amount,
+        currency: best.price.currency,
+        availability: best.availability,
+        offerCount: dayOffers.length,
+        offers: dayOffers.map((o) => ({
+          // Stay-only: no TOURINC program — an empty string keeps the shared
+          // PriceCalendarEntryOffer shape (createTourRequest drops it via ||).
+          tourIncValue: "",
+          externalOfferId: o.externalOfferId,
+          externalClaim: o.externalClaim,
+          hotel: o.hotel,
+          hotelExternalId: o.hotelExternalId,
+          departureDate: o.departureDate,
+          nights: o.nights,
+          room: o.room,
+          meal: o.meal,
+          adults: o.adults,
+          children: o.children,
+          childAges: o.childAges,
+          availability: o.availability,
+          price: o.price.amount,
+          currency: o.price.currency,
+        })),
+        bestOfferRef: {
+          supplierCode: this.code,
+          externalOfferId: best.externalOfferId,
+          externalClaim: best.externalClaim,
+          searchContext: {
+            service: "hotels",
+            country,
+            destination: query.destination,
+            hotel: query.hotel,
+            hotelExternalId: query.hotelExternalId,
+            room: best.room,
+            meal: best.meal,
+            adults: query.adults,
+            children: query.children,
+            childAges: query.childAges,
+            nightsFrom: query.nights || 7,
+            nightsTo: query.nights || 7,
+            departureDateFrom: date,
+            departureDateTo: date,
+            towns: (query as PriceCalendarQuery & { towns?: string }).towns,
+          },
+        },
+      });
+    }
+
+    result.entries.sort((a, b) => a.date.localeCompare(b.date));
+    this.logger.log(
+      `KOMPAS hotels calendar ${query.dateFrom}..${query.dateTo} ` +
+        `STATEINC=${stateInc} hotel=${query.hotelExternalId ?? query.hotel ?? "*"}: ` +
+        `${collected.length} scanned → ${deduped.length} deduped → ${result.entries.length} days`,
+    );
+    return result;
+  }
+
+  /** ISO date windows of at most `HOTEL_CALENDAR_WINDOW_DAYS` days each. */
+  private calendarWindows(from: string, to: string): Array<{ from: string; to: string }> {
+    const windows: Array<{ from: string; to: string }> = [];
+    const start = new Date(`${from}T00:00:00Z`);
+    const end = new Date(`${to}T00:00:00Z`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return windows;
+    const cursor = new Date(start);
+    for (let guard = 0; cursor <= end && guard < 40; guard++) {
+      const windowEnd = new Date(cursor);
+      windowEnd.setUTCDate(windowEnd.getUTCDate() + HOTEL_CALENDAR_WINDOW_DAYS - 1);
+      const capped = windowEnd > end ? end : windowEnd;
+      windows.push({
+        from: cursor.toISOString().slice(0, 10),
+        to: capped.toISOString().slice(0, 10),
+      });
+      // Advance past the WINDOW END (the end may sit in a later month), and do
+      // it on a COPY: `cursor.setUTCDate(capped.getUTCDate() + 1)` writes the
+      // end's day-of-month back into the cursor's own month, so a cross-month
+      // cap regresses the cursor (verified: 19 Oct..08 Nov yielded an endless
+      // 09 Oct..08 Nov loop — 40 identical 36 s searches, 24 min total).
+      const next = new Date(capped);
+      next.setUTCDate(next.getUTCDate() + 1);
+      cursor.setTime(next.getTime());
+    }
+    return windows;
+  }
+
+  /** Identical to the tour adapter's calendar dedupe (identity + keep-max). */
+  private deduplicateCalendarOffers(offers: SupplierOffer[]): SupplierOffer[] {
+    const seen = new Map<string, SupplierOffer>();
+    for (const offer of offers) {
+      const roomKey = (offer.rawMetadata as Record<string, unknown> | undefined)?.roomKey ?? "";
+      const mealKey = (offer.rawMetadata as Record<string, unknown> | undefined)?.mealKey ?? "";
+      const key = `${offer.externalOfferId}|${offer.departureDate}|${roomKey}|${mealKey}|${offer.room ?? ""}|${offer.meal ?? ""}`;
+      const existing = seen.get(key);
+      if (!existing || offer.price.amount > existing.price.amount) seen.set(key, offer);
+    }
+    return Array.from(seen.values());
   }
 
   // ── Normalization (hotel-specific mapping) ────────────────────────────

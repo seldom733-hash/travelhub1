@@ -41,6 +41,12 @@ export class TourRequestService {
   async createTourRequest(dto: {
     supplierCode: string;
     externalOfferId: string;
+    /**
+     * Service category of the offer ("tours" | "hotels"). Drives the adapter
+     * used for the server-authoritative re-check — a hotel offer re-checked
+     * against the tours adapter returns PRICE_UNAVAILABLE (no TOWNFROMINC).
+     */
+    service?: string;
     hotel: string;
     hotelExternalId?: string;
     departureDate: string;
@@ -113,8 +119,12 @@ export class TourRequestService {
 
     // Server-authoritative price: re-verify the offer with the supplier and
     // run the markup boundary (public amount + §20 pricing block).
+    // §SERVICE-PASSTHROUGH: the category selects the re-check adapter — a hotel
+    // offer verified against the tours adapter can never match (the tour search
+    // needs TOWNFROMINC/departure city that stay-only offers don't carry).
+    const service = dto.service?.trim() || "tours";
     const searchContext: SupplierSearchQuery = {
-      service: "tours",
+      service,
       hotel: dto.hotel,
       hotelExternalId: dto.hotelExternalId,
       room: dto.room,
@@ -211,7 +221,7 @@ export class TourRequestService {
     const commercialSnapshot = recheck.pricing
       ? buildWorkingSnapshot({
           supplierCode: dto.supplierCode,
-          serviceType: "tours",
+          serviceType: service,
           pricing: recheck.pricing,
           priceSource: "PUBLIC",
           supplierPriceFetchedAt: recheck.fetchedAt,
@@ -238,6 +248,7 @@ export class TourRequestService {
     const offerSnapshot = JSON.parse(
       JSON.stringify({
         supplierCode: dto.supplierCode,
+        service,
         externalOfferId: dto.externalOfferId,
         hotel: dto.hotel,
         hotelExternalId: dto.hotelExternalId,
@@ -274,8 +285,11 @@ export class TourRequestService {
         productSnapshot: {
           ...(productId ? { productId, productCode, productTitle } : {}),
           productTitle: productTitle ?? dto.hotel ?? null,
-          productType: "TOUR",
-          type: "TOUR",
+          // §SERVICE-PASSTHROUGH: the product type follows the service — a
+          // hotel request must not convert to a TOUR OrderItem (order.service
+          // reads productSnapshot.productType ?? "SERVICE").
+          productType: service === "hotels" ? "HOTEL" : "TOUR",
+          type: service === "hotels" ? "HOTEL" : "TOUR",
           // §6: offer facts live in the product snapshot (existing JSON
           // location), NOT in pinnedRequirements.
           offer: offerSnapshot,

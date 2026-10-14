@@ -341,6 +341,13 @@ export interface PriceCalendarQuery {
   productId?: string;
   /** Destination country name — mapped to STATEINC by adapters that need it (e.g. KOMPAS). */
   destination?: string;
+  /**
+   * Country name/ISO separately from `destination`. Hotel calendars need it:
+   * a hotel PDP carries the CITY in `destination` and the country here, while
+   * the KOMPAS hotel dictionary (STATEINC) only resolves country names/codes.
+   * `destination` stays the fallback so existing tour calendars are unchanged.
+   */
+  country?: string;
   /** Hotel name or external ID. */
   hotel?: string;
   /** Hotel external ID. */
