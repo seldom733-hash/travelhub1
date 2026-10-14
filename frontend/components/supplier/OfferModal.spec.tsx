@@ -277,14 +277,37 @@ describe("§4.8 source guards (4.8.2/4.8.10)", () => {
   });
 
   it("no pre-submission verify-price UI; captcha modal retained", () => {
-    const src = readFileSync(
+    // §4.8.4 create flow: since the inline-panel refactor (2026-10-13) the
+    // request creation + captcha handling live in the SHARED OfferRow (used by
+    // both this modal and DayTariffsPanel). The guard covers BOTH files: the
+    // modal must stay free of verify-price UI, and the row must keep captcha.
+    const modal = readFileSync(
       resolve(process.cwd(), "components/supplier/OfferModal.tsx"),
       "utf8",
     );
-    expect(src).not.toContain("handleVerifyPrice");
-    expect(src).not.toContain("offer.verify_price");
-    expect(src).not.toContain("verificationState");
-    expect(src).toContain("KompasCaptchaModal");
-    expect(src).toContain("isCaptchaRequired(result)");
+    expect(modal).not.toContain("handleVerifyPrice");
+    expect(modal).not.toContain("offer.verify_price");
+    expect(modal).not.toContain("verificationState");
+
+    const row = readFileSync(
+      resolve(process.cwd(), "components/supplier/OfferRow.tsx"),
+      "utf8",
+    );
+    expect(row).not.toContain("handleVerifyPrice");
+    expect(row).not.toContain("offer.verify_price");
+    expect(row).not.toContain("verificationState");
+    expect(row).toContain("KompasCaptchaModal");
+    expect(row).toContain("isCaptchaRequired(result)");
+  });
+
+  it("request creation passes the service category to the backend", () => {
+    // §SERVICE-PASSTHROUGH: a hotel offer must be re-checked against the
+    // hotels adapter — a stay-only offer has no departure city, so verifying
+    // it as a tour always fails PRICE_UNAVAILABLE.
+    const row = readFileSync(
+      resolve(process.cwd(), "components/supplier/OfferRow.tsx"),
+      "utf8",
+    );
+    expect(row).toContain("service: service || \"tours\"");
   });
 });

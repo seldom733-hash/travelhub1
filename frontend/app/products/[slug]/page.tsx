@@ -16,6 +16,7 @@ import { publicApi, PublicNotFoundError, type PublicProductDetail, type PublicTa
 import { formatLocation } from "@/lib/locations";
 import { useCurrentUser } from "@/lib/use-user";
 import TourDetail from "@/components/supplier/TourDetail";
+import HotelDetail from "@/components/supplier/HotelDetail";
 
 /**
  * PHASE 1 STEP 1.7 §12 — Product Detail Page `/products/:slug`.
@@ -74,6 +75,9 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
   const locale = useLocale();
   const p = detail.product;
   const isTour = p.type === "TOUR";
+  // HOTEL: the tour PDP experience (calendar + inline day tariffs) replaces
+  // the static catalog tariff list — see HotelDetail.
+  const isHotel = p.type === "HOTEL";
 
   useMarketplaceProductViewed(p.slug, true);
 
@@ -161,6 +165,11 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           </span>
         </div>
 
+        {/* HOTEL: live price calendar + inline day tariffs (the tour PDP
+            experience). Replaces the static catalog tariff list, which carries
+            no dates and could never answer «что стоит 12 ноября». */}
+        {isHotel && <HotelDetail attributes={p.attributes} title={p.title} />}
+
         <div className="mt-5">
           <MediaGallery media={detail.media} />
         </div>
@@ -200,7 +209,10 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           ) : null;
         })()}
 
-        {p.tariffs.length > 0 && (
+        {/* Static tariff list — kept only for non-hotel, non-tour products.
+            HOTEL tariffs moved into the live calendar (HotelDetail): the
+            catalog list had no validFrom/validTo and answered no date. */}
+        {!isHotel && p.tariffs.length > 0 && (
           <section className="mt-8" aria-labelledby="pdp-tariffs">
             <h2 id="pdp-tariffs" className="text-lg font-bold text-slate-900">
               {t("pdp.tariffs_title", locale)}
@@ -263,7 +275,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
         {/* M4.5 §23: anonymous guest checkout (onboarding → Request). */}
         <GuestCheckoutForm productId={p.id} />
 
-        {p.tariffs.length > 0 && (
+        {!isHotel && p.tariffs.length > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm">
             <div className="text-xs uppercase tracking-wide text-slate-400">{t("pdp.tariffs_title", locale)}</div>
             <ul className="mt-2 space-y-1.5">

@@ -77,9 +77,19 @@ export interface SupplierOffer {
 
 export interface SupplierPriceCalendarQuery {
   supplierCode: string;
+  /**
+   * Service category ("tours" | "hotels"). Absent → the backend default (tours),
+   * so existing tour calendars are unchanged.
+   */
+  service?: string;
   hotelExternalId?: string;
   hotel?: string;
   destination?: string;
+  /**
+   * Country name/ISO — hotel calendars need it (a hotel PDP carries the CITY
+   * in `destination`, and the KOMPAS hotel dictionary only resolves countries).
+   */
+  country?: string;
   dateFrom: string;
   dateTo: string;
   nights?: number;
@@ -391,6 +401,11 @@ export async function refreshSupplierAvailability(
 export interface TourRequestInput {
   supplierCode: string;
   externalOfferId: string;
+  /**
+   * Service category ("tours" | "hotels") — selects the backend re-check
+   * adapter. Absent → "tours" (every existing caller is unchanged).
+   */
+  service?: string;
   hotel: string;
   hotelExternalId?: string;
   departureDate: string;

@@ -1,23 +1,32 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import MonthlyCalendar from "@/components/supplier/MonthlyCalendar";
-import OfferModal from "@/components/supplier/OfferModal";
+import DayTariffsPanel from "@/components/supplier/DayTariffsPanel";
 import {
-  type SupplierPriceCalendarEntryOffer,
   type SupplierPriceCalendarEntry,
 } from "@/lib/supplier-api";
 import { useSupplierOptions } from "@/lib/supplier-registry";
+
+/** Today as an ISO date string (local calendar day, not UTC). */
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 /**
  * TourDetail — live KOMPAS integration with left-side tour selection panel.
  *
  * Layout:
  * - Left: tour selection (city, adults, children, nights, calendar)
- * - Right: hotel info / description
+ * - Right: hotel info / description + INLINE day tariffs (no modal)
  *
  * Uses product attributes to pre-fill filters and query KOMPAS.
+ *
+ * The right column carries `DayTariffsPanel` — the inline replacement for the
+ * §4.8 modal (user decision, 2026-10-13). The calendar's first priced day is
+ * selected automatically, so the page opens on a usable tariff list.
  */
 export default function TourDetail({
   attributes,
@@ -34,7 +43,9 @@ export default function TourDetail({
 }) {
   const locale = useLocale();
   const [selectedEntry, setSelectedEntry] = useState<SupplierPriceCalendarEntry | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  // Auto-select must only apply ONCE (the first month that yields data) — a
+  // later user click or month change must never be overridden.
+  const autoSelectedRef = useRef(false);
 
   // Supplier of THIS product: attribute first, registry fallback (§4.7 — no
   // hardcoded supplier default). The calendar only renders once resolved.
@@ -77,19 +88,43 @@ export default function TourDetail({
     childAges: childAges.length > 0 ? childAges : undefined,
   };
 
-  // Handle calendar date click
+  // Handle calendar date click — inline panel, no modal.
   const handleCalendarSelect = useCallback((entry: SupplierPriceCalendarEntry) => {
     setSelectedEntry(entry);
-    setModalOpen(true);
   }, []);
 
-
-
-  // Handle request creation
-  const handleRequestCreated = useCallback((offer: SupplierPriceCalendarEntryOffer) => {
-    console.log("[TourDetail] Request created for offer:", offer.externalOfferId);
-    setModalOpen(false);
+  // §DEFAULT-NEAREST-DAY: pick the first priced day of the loaded month that
+  // is not in the past. Falls back to the first priced day when the whole
+  // month is behind us (defensive — calendars start at "tomorrow").
+  const handleEntriesLoaded = useCallback((entries: SupplierPriceCalendarEntry[]) => {
+    if (autoSelectedRef.current) return;
+    const today = todayIso();
+    const priced = entries.filter((e) => e.price !== null && e.availability !== "NOT_AVAILABLE");
+    if (priced.length === 0) return;
+    const nearest = priced.find((e) => e.date >= today) ?? priced[0];
+    autoSelectedRef.current = true;
+    setSelectedEntry(nearest);
   }, []);
+
+  // Handle request creation (inline panel).
+  const handleRequestCreated = useCallback((_offer: unknown) => {
+    // Keep the panel open: the row already shows the success state with the
+    // reference number (§4.8).
+  }, []);
+
+  // §4.8 context shared by every row of the day.
+  const summary = useMemo(
+    () => ({
+      departureCity: departureCity === "1411" ? "Баку (GYD)" : departureCity,
+      destination,
+      country: (attributes?.country as string) || undefined,
+      adults,
+      children,
+      childAges,
+      nights,
+    }),
+    [departureCity, destination, attributes, adults, children, childAges, nights],
+  );
 
   return (
     <section className="mt-8" aria-labelledby="tour-detail-section">
@@ -234,7 +269,12 @@ export default function TourDetail({
               {t("tour.calendar_title", locale) ?? "Календарь цен"}
             </h3>
             {supplierCode ? (
-              <MonthlyCalendar query={calendarQuery} onSelect={handleCalendarSelect} />
+              <MonthlyCalendar
+                query={calendarQuery}
+                onSelect={handleCalendarSelect}
+                selectedDate={selectedEntry?.date ?? null}
+                onEntriesLoaded={handleEntriesLoaded}
+              />
             ) : null}
             <p className="mt-3 text-xs text-slate-500">
               {t("tour.calendar_hint", locale)}
@@ -242,11 +282,20 @@ export default function TourDetail({
           </div>
         </div>
 
-        {/* ── Right: Hotel Info + Photo + Description ── */}
+        {/* ── Right: Hotel Info + Photo + Description + Day Tariffs ── */}
         <div className="space-y-4">
 
           {/* Main hotel photo */}
           {media}
+
+          {/* Inline day tariffs — the §4.8 modal replaced by an on-page panel */}
+          <DayTariffsPanel
+            entry={selectedEntry}
+            title={title}
+            supplierCode={supplierCode}
+            summary={summary}
+            onRequestCreated={handleRequestCreated}
+          />
 
           {/* Hotel info */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -297,27 +346,6 @@ export default function TourDetail({
 
         </div>
       </div>
-
-      {/* Offer Modal */}
-      {modalOpen && selectedEntry && (
-        <OfferModal
-          date={selectedEntry.date}
-          tour={title}
-          offers={selectedEntry.offers}
-          supplierCode={supplierCode}
-          summary={{
-            departureCity: departureCity === "1411" ? "Баку (GYD)" : departureCity,
-            destination,
-            country: (attributes?.country as string) || undefined,
-            adults,
-            children,
-            childAges,
-            nights,
-          }}
-          onClose={() => setModalOpen(false)}
-          onRequestCreated={handleRequestCreated}
-        />
-      )}
     </section>
   );
 }

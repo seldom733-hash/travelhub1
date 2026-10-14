@@ -39,6 +39,11 @@ function buildCacheKey(base: MonthlyCalendarQuery, year: number, month: number):
     hotelExternalId: base.hotelExternalId ?? null,
     hotel: base.hotel ?? null,
     destination: base.destination ?? null,
+    // Hotel calendars resolve STATEINC from `country` (a hotel PDP carries the
+    // CITY in destination) and the re-check adapter from `service` — both must
+    // be part of the cache key or a tour/hotel pair would share an entry.
+    country: base.country ?? null,
+    service: base.service ?? null,
     departureCity: (base as any).departureCity ?? null,
     adults: base.adults,
     children: base.children ?? 0,
@@ -129,9 +134,21 @@ function setSessionCache(key: string, entries: SupplierPriceCalendarEntry[], las
 export default function MonthlyCalendar({
   query: baseQuery,
   onSelect,
+  selectedDate,
+  onEntriesLoaded,
 }: {
   query: MonthlyCalendarQuery;
   onSelect?: (entry: SupplierPriceCalendarEntry) => void;
+  /**
+   * Day to render as active (inline tariffs panel, 2026-10-13). Highlighting
+   * only — selection state lives in the parent.
+   */
+  selectedDate?: string | null;
+  /**
+   * Fired whenever the month's entries resolve (network or cache). Lets the
+   * page auto-select the NEAREST priced day without duplicating the cache.
+   */
+  onEntriesLoaded?: (entries: SupplierPriceCalendarEntry[]) => void;
 }) {
   const locale = useLocale();
   const [currentMonth, setCurrentMonth] = useState(() => {
@@ -344,6 +361,16 @@ export default function MonthlyCalendar({
     fetchMonth(false);
   }, [fetchMonth]);
 
+  // Report entries to the page (nearest-day default). A ref guard keeps the
+  // callback from firing on every render — only when the array identity changes.
+  const lastReportedRef = useRef<SupplierPriceCalendarEntry[] | null>(null);
+  useEffect(() => {
+    if (!onEntriesLoaded) return;
+    if (lastReportedRef.current === entries) return;
+    lastReportedRef.current = entries;
+    onEntriesLoaded(entries);
+  }, [entries, onEntriesLoaded]);
+
   // Build entry map for current month grid (only entries of this month are in `entries`)
   const entryMap = useMemo(() => {
     const map = new Map<string, SupplierPriceCalendarEntry>();
@@ -479,7 +506,7 @@ export default function MonthlyCalendar({
                   aria-label={day.dateStr}
                   onClick={() => isAvailable && onSelect?.(day.entry!)}
                   disabled={!isAvailable}
-                  className={`relative h-16 rounded-lg border p-1.5 text-left transition-colors ${!day.isCurrentMonth ? "border-transparent bg-transparent" : isAvailable ? "border-green-200 bg-green-50 hover:bg-green-100 cursor-pointer" : day.entry?.absenceCode ? "border-amber-200 bg-amber-50 cursor-not-allowed" : "border-slate-100 bg-slate-50/50 cursor-not-allowed"} ${isToday ? "ring-2 ring-blue-400" : ""}`}
+                  className={`relative h-16 rounded-lg border p-1.5 text-left transition-colors ${!day.isCurrentMonth ? "border-transparent bg-transparent" : isAvailable ? "border-green-200 bg-green-50 hover:bg-green-100 cursor-pointer" : day.entry?.absenceCode ? "border-amber-200 bg-amber-50 cursor-not-allowed" : "border-slate-100 bg-slate-50/50 cursor-not-allowed"} ${day.dateStr === selectedDate ? "ring-2 ring-blue-500" : isToday ? "ring-2 ring-blue-400" : ""}`}
                 >
                   <div className={`text-xs font-medium ${day.isCurrentMonth ? "text-slate-700" : "text-slate-300"}`}>{day.date.getDate()}</div>
                   {isAvailable && day.entry!.price !== null ? (

@@ -293,6 +293,11 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "offer.phone_invalid": { ru: "Номер телефона указан неверно.", az: "Telefon nömrəsi yanlışdır.", en: "The phone number is invalid." },
   "offer.email_invalid": { ru: "Пожалуйста, введите корректный адрес электронной почты.", az: "Zəhmət olmasa, düzgün e-poçt ünvanı daxil edin.", en: "Please enter a valid email address." },
   "offer.request_error": { ru: "Не удалось создать заявку. Попробуйте ещё раз.", az: "Müraciət yaratmaq mümkün olmadı. Yenidən cəhd edin.", en: "Could not create the request. Please try again." },
+  // Inline day-tariffs panel (2026-10-13): the §4.8 modal was replaced by an
+  // on-page list, so the panel needs its own "pick a day" placeholder.
+  "offer.select_day_hint": { ru: "Выберите день в календаре — здесь появятся тарифы этого дня", az: "Təqvimdən gün seçin — burada o günün tarifləri görünəcək", en: "Pick a day in the calendar — its tariffs will appear here" },
+  "offer.tariffs_count": { ru: "{n} тарифов", az: "{n} tarif", en: "{n} tariffs" },
+  "hotel.selection_title": { ru: "Подбор номера", az: "Otaq seçimi", en: "Room selection" },
 
   // search
   "search.title": { ru: "Поиск услуг", az: "Xidmət axtarışı", en: "Search services" },

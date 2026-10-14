@@ -153,9 +153,13 @@ describe("§4.7 source-guard — no hardcoded supplier lists in the UI", () => {
   it("OfferModal: no KOMPAS default — supplier from calendar query prop", () => {
     expect(OFFER_MODAL).not.toContain('?? "KOMPAS"');
     expect(OFFER_MODAL).toContain("supplierCode: string");
-    expect(OFFER_MODAL).toContain("resolvedSupplier");
+    // The supplier resolution + captcha live in the shared OfferRow since the
+    // 2026-10-13 inline-panel refactor (the modal and the panel both render it).
+    const ROW = read("components/supplier/OfferRow.tsx");
+    expect(ROW).toContain("resolvedSupplier");
+    expect(ROW).not.toContain('?? "KOMPAS"');
     // captcha modal stays by design
-    expect(OFFER_MODAL).toContain("KompasCaptchaModal");
+    expect(ROW).toContain("KompasCaptchaModal");
   });
 
   it("FlightSearch: no hardcoded supplier options — options from registry", () => {
@@ -178,7 +182,10 @@ describe("§4.7 source-guard — no hardcoded supplier lists in the UI", () => {
 
   it("captcha supplier unions + KompasCaptchaModal imports stay untouched (by design)", () => {
     expect(SUPPLIER_API).toContain('supplier: "KOMPAS" | "SUMMERTOUR"');
-    expect(OFFER_MODAL).toContain("KompasCaptchaModal");
+    // The §4.8 create flow moved into the shared OfferRow (2026-10-13 inline
+    // panel refactor) — the captcha modal must stay wired in THAT component,
+    // which both OfferModal and DayTariffsPanel render.
+    expect(read("components/supplier/OfferRow.tsx")).toContain("KompasCaptchaModal");
     expect(read("components/supplier/MonthlyCalendar.tsx")).toContain("KompasCaptchaModal");
   });
 });
