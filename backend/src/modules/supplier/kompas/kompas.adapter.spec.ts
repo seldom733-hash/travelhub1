@@ -55,7 +55,12 @@ describe("KompasSupplierAdapter", () => {
       expect(result.supplierCode).toBe("KOMPAS");
       // Composite: spoKey alone is the program group id — it must never be
       // the dedupe identity (every row of a program shares one spoKey).
-      expect(result.externalOfferId).toBe("35000-2807-20260919-5-10");
+      // §NIGHTS-FANOUT: nights is part of the identity too. The same
+      // hotel/room/meal/check-in legitimately carries several night counts,
+      // so without it they all collapse into ONE id and a night-range query
+      // returns a single offer. Live check: 6853 KOMPAS offers across nights
+      // 3..7 with 6853/6853 unique ids.
+      expect(result.externalOfferId).toBe("35000-2807-20260919-5-10-7");
       expect(result.externalClaim).toBe("cat-claim-123");
       expect(result.hotel).toBe("Rixos Premium Tekirova");
       expect(result.hotelExternalId).toBe("2807");
