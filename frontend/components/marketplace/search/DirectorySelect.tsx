@@ -113,7 +113,7 @@ export default function DirectorySelect({
       >
         <MapPin size={14} weight="light" className="shrink-0 text-neutral-500" />
 
-        <span className={`min-w-0 flex-1 truncate text-right text-[15px] ${value ? "text-white" : "text-neutral-500"}`}>
+        <span className={`min-w-0 flex-1 truncate text-[15px] ${value ? "text-white" : "text-neutral-500"}`}>
           {value ? `${geoDisplayName(value.names, value.code, locale)} · ${value.code}` : placeholder}
         </span>
 
@@ -184,7 +184,7 @@ export default function DirectorySelect({
                       {item.code.length > 6 ? item.code.slice(0, 6) : item.code}
                     </span>
 
-                    <span className="min-w-0 flex-1 text-right">
+                    <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-medium text-white">
                         {geoDisplayName(item.names, item.code, locale)}
                       </span>

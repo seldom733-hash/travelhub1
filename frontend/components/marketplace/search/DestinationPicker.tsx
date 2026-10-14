@@ -189,7 +189,7 @@ export default function DestinationPicker({
       </span>
       {current && (
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="max-w-[55%] truncate text-right text-[14px] font-medium text-gold">
+          <span className="max-w-[55%] truncate text-[14px] font-medium text-gold">
             {geoDisplayName(current.names, current.code, locale)}
           </span>
           {/* Per-level reset («Страна»/«Город»/«Курорт»): clears THIS level —
@@ -254,7 +254,7 @@ export default function DestinationPicker({
         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gold/10 px-1 text-center text-[14px] font-semibold leading-tight text-gold">
           {item.code.length > 6 ? item.code.slice(0, 6) : item.code}
         </span>
-        <span className="min-w-0 flex-1 text-right">
+        <span className="min-w-0 flex-1">
           <span className="block truncate text-[15px] font-medium text-white">
             {geoDisplayName(item.names, item.code, locale)}
           </span>
@@ -284,7 +284,7 @@ export default function DestinationPicker({
       >
         <MapPin size={14} weight="light" className="shrink-0 text-neutral-500" />
 
-        <span className={`min-w-0 flex-1 truncate text-right text-[15px] ${selected ? "text-white" : "text-neutral-500"}`}>
+        <span className={`min-w-0 flex-1 truncate text-[15px] ${selected ? "text-white" : "text-neutral-500"}`}>
           {selected
             ? `${geoDisplayName(selected.names, selected.code, locale)} · ${selected.code}`
             : placeholder}
