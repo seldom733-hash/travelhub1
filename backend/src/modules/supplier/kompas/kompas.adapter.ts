@@ -129,6 +129,19 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
   private readonly baseUrl: string;
   private static readonly MAX_PAGES = 30;
   private static readonly PAGE_DELAY_MS = 2_000;
+  // §NIGHTS-FANOUT: per-night re-submits read fewer pages — the goal is night
+  // diversity, not the full 5000-row supplier cap per night.
+  private static readonly FANOUT_MAX_PAGES = 10;
+  private static readonly FANOUT_ROW_WAIT_MS = 60_000;
+  // Upper bound of distinct nights re-submitted during a fan-out (a 3..30
+  // request must not trigger 27 sequential browser searches).
+  private static readonly NIGHTS_FANOUT_MAX = 10;
+  // The supplier caps wide result sets at 5000 rows sorted by nights ascending
+  // and flags the payload with «Обработаны не все данные» (u-escaped inside the
+  // JS response and/or raw UTF-8).
+  private static readonly TRUNCATION_NOTICE_ESCAPED =
+    "\\u041e\\u0431\\u0440\\u0430\\u0431\\u043e\\u0442\\u0430\\u043d\\u044b";
+  private static readonly TRUNCATION_NOTICE_RAW = "Обработаны не все данные";
   private static readonly TOURINC_DELAY_MS = 3_000;
   private static readonly CALENDAR_WINDOW_DAYS = 31;
 
@@ -519,6 +532,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       const pricesEmptyAnswer = new Promise<void>((resolve) => {
         resolvePricesEmpty = resolve;
       });
+      // §NIGHTS-FANOUT: per-night re-submits need their OWN honest-empty
+      // signal (pricesEmptyAnswer resolves once, for the first search).
+      let pricesEmptyWaiter: (() => void) | null = null;
       page.on("response", (res) => {
         const u = res.url();
         // §DOLOAD: cover PRICES and the async dynamic follow-ups — BG-like
@@ -542,7 +558,11 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
             // row AND without signalling the async dynamic flow (a DOLOAD
             // redirect) — resolving the race on a DOLOAD-signalling empty would
             // abort while getPricesDynamic is still bringing the rows.
-            if (!hasRows && isPrices && !text.includes("DOLOAD=1")) resolvePricesEmpty();
+            if (!hasRows && isPrices && !text.includes("DOLOAD=1")) {
+              resolvePricesEmpty();
+              pricesEmptyWaiter?.();
+              pricesEmptyWaiter = null;
+            }
           })
           .catch(() => {
             pricesResponse = { status: res.status(), len: -1, body: "" };
@@ -773,31 +793,128 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         );
       }
 
+      // §NIGHTS-FANOUT: collect the current DOM result set, paginating via the
+      // supplier's own pager (span.page → getScript(PRICEPAGE)).
+      // (Non-null capture: closures lose the `page` narrowing.)
+      const resultPage: Page = page;
+      const collectPages = async (maxPages: number): Promise<any[]> => {
+        const collected: any[] = [];
+        let pageOffers = await this.extractPageOffers(resultPage);
+        collected.push(...pageOffers);
+        for (let p = 2; p <= maxPages; p++) {
+          const hasNextPage = await resultPage.evaluate((targetPage: number) => {
+            const spans = document.querySelectorAll(".pager span.page");
+            const target = Array.from(spans).find(
+              (s) => s.getAttribute("data-page") === String(targetPage),
+            );
+            if (target) {
+              (target as HTMLElement).click();
+              return true;
+            }
+            return false;
+          }, p);
+
+          if (!hasNextPage) break;
+          await resultPage.waitForTimeout(KompasSupplierAdapter.PAGE_DELAY_MS);
+          try {
+            await resultPage.waitForSelector("tr.price_info", { timeout: 10_000 });
+          } catch { break; }
+          await resultPage.waitForTimeout(1_000);
+          pageOffers = await this.extractPageOffers(resultPage);
+          collected.push(...pageOffers);
+        }
+        return collected;
+      };
+
       const allOffers: any[] = [];
-      let currentPageOffers = await this.extractPageOffers(page);
-      allOffers.push(...currentPageOffers);
+      allOffers.push(...(await collectPages(KompasSupplierAdapter.MAX_PAGES)));
 
-      for (let p = 2; p <= KompasSupplierAdapter.MAX_PAGES; p++) {
-        const hasNextPage = await page.evaluate((targetPage: number) => {
-          const spans = document.querySelectorAll(".pager span.page");
-          const target = Array.from(spans).find(
-            (s) => s.getAttribute("data-page") === String(targetPage),
-          );
-          if (target) {
-            (target as HTMLElement).click();
-            return true;
+      // §NIGHTS-FANOUT: the supplier caps wide result sets at 5000 rows SORTED
+      // BY NIGHTS ASCENDING — a country-wide range search (e.g. AE 3..7) then
+      // returns only nights-3 rows and flags the payload with «Обработаны не
+      // все данные» (verified 2026-10-14: TILL=3 and TILL=7 yield identical
+      // 50-page all-nights-3 sets; a city/hotel/program-narrowed query of the
+      // same range returns the full 3..7 mix). Re-run the search per night
+      // value so every night of the range surfaces. Narrowed queries are left
+      // alone — their range already works upstream.
+      const fanOutFrom = query.nightsFrom;
+      const fanOutTo = query.nightsTo;
+      const kqStars = (query as KompasSearchQuery).stars ?? query.starKeys?.["KOMPAS"];
+      const fanOutNarrowed = !!(
+        query.hotelExternalId ||
+        query.tourIncValue ||
+        (query as KompasSearchQuery).towns ||
+        kqStars
+      );
+      // pricesResponse is assigned inside the response callback — TS narrows it
+      // to null here, so read it through a typed alias (same as the diagnostics
+      // block above).
+      const lastPricesResponse = pricesResponse as { status: number; len: number; body: string } | null;
+      const respBody = lastPricesResponse?.body ?? "";
+      const supplierTruncated =
+        respBody.includes(KompasSupplierAdapter.TRUNCATION_NOTICE_ESCAPED) ||
+        respBody.includes(KompasSupplierAdapter.TRUNCATION_NOTICE_RAW);
+      if (
+        fanOutFrom &&
+        fanOutTo &&
+        fanOutTo > fanOutFrom &&
+        supplierTruncated &&
+        !fanOutNarrowed
+      ) {
+        // Cap the fan-out: a 3..30 request must not trigger 27 re-submits.
+        const fanOutLast = Math.min(
+          fanOutTo,
+          fanOutFrom + KompasSupplierAdapter.NIGHTS_FANOUT_MAX - 1,
+        );
+        this.logger.warn(
+          `KOMPAS: supplier truncated the nights ${fanOutFrom}..${fanOutTo} range ` +
+          `(5000-row cap, sorted by nights asc) — fanning out per night up to ${fanOutLast}`,
+        );
+        for (let n = fanOutFrom + 1; n <= fanOutLast; n++) {
+          try {
+            await this.setSamoSelect(resultPage, "NIGHTS_FROM", String(n));
+            // The site's own NIGHTS_FROM change handler mirrors the value into
+            // NIGHTS_TILL; set it explicitly anyway (idempotent, same value).
+            await this.setSamoSelect(resultPage, "NIGHTS_TILL", String(n));
+            // Drop the previous result rows so waitForSelector below sees the
+            // FRESH set for this night, not the leftover of the prior submit.
+            await resultPage.evaluate(() => {
+              document.querySelectorAll("tr.price_info").forEach((r) => r.remove());
+            });
+            const nightEmpty = new Promise<void>((resolve) => {
+              pricesEmptyWaiter = resolve;
+            });
+            await resultPage.evaluate(() => {
+              document.getElementById("samo_popup")?.remove();
+              document.querySelector<HTMLElement>(".load")?.click();
+            });
+            const raced = await Promise.race([
+              resultPage
+                .waitForSelector("tr.price_info", {
+                  timeout: KompasSupplierAdapter.FANOUT_ROW_WAIT_MS,
+                })
+                .then(() => "rows" as const)
+                .catch(() => "timeout" as const),
+              nightEmpty.then(() => "empty" as const),
+            ]);
+            pricesEmptyWaiter = null;
+            if (raced !== "rows") {
+              this.logger.warn(
+                `KOMPAS fan-out: no rows for ${n} nights (${raced}) — skipping this night`,
+              );
+              continue;
+            }
+            await resultPage.waitForTimeout(1_000);
+            const nightOffers = await collectPages(KompasSupplierAdapter.FANOUT_MAX_PAGES);
+            allOffers.push(...nightOffers);
+            this.logger.log(`KOMPAS fan-out: ${n} nights → ${nightOffers.length} rows`);
+          } catch (e) {
+            pricesEmptyWaiter = null;
+            this.logger.warn(
+              `KOMPAS fan-out failed for ${n} nights: ${(e as Error).message} — continuing`,
+            );
           }
-          return false;
-        }, p);
-
-        if (!hasNextPage) break;
-        await page.waitForTimeout(KompasSupplierAdapter.PAGE_DELAY_MS);
-        try {
-          await page.waitForSelector("tr.price_info", { timeout: 10_000 });
-        } catch { break; }
-        await page.waitForTimeout(1_000);
-        currentPageOffers = await this.extractPageOffers(page);
-        allOffers.push(...currentPageOffers);
+        }
       }
 
       await context.close();
@@ -1952,7 +2069,12 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       // Composite id (parity with KazUnion): spoKey is the program group id
       // (probe: 3000 rows of one program share ONE spoKey) — a bare spoKey
       // collapses every hotel/room/meal variant in the aggregator dedupe.
-      externalOfferId: `${raw.spoKey}-${raw.hotelKey}-${raw.checkIn}-${raw.roomKey}-${raw.mealKey}`,
+      // §NIGHTS: nights is part of the id — the same spo/hotel/room/meal
+      // routinely sells 3-night and 7-night variants on the same check-in
+      // (probe 2026-10-14: 444/500 composite ids collide across 3..3 and 7..7
+      // result sets); without it the aggregator dedupe silently drops every
+      // later-night variant of an offer.
+      externalOfferId: `${raw.spoKey}-${raw.hotelKey}-${raw.checkIn}-${raw.roomKey}-${raw.mealKey}-${raw.nights}`,
       externalClaim: raw.claim,
       hotel: raw.hotel || query.hotel || undefined,
       hotelExternalId: raw.hotelKey || query.hotelExternalId || undefined,
