@@ -75,13 +75,21 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
   const locale = useLocale();
   const p = detail.product;
   const isTour = p.type === "TOUR";
-  // HOTEL: the tour PDP experience (calendar + inline day tariffs) replaces
-  // the static catalog tariff list — see HotelDetail.
   const isHotel = p.type === "HOTEL";
+  // §HOTEL-PARITY (2026-10-15, «страница карточек отелей не одинакова с
+  // карточками туров — сделай как в карточке туров»): a hotel card is laid out
+  // exactly like a tour card — same breadcrumbs, same single column, same left
+  // selection panel / right media+tariffs split. Only the service differs (a
+  // stay has no departure city and no TOURINC program).
+  const isLive = isTour || isHotel;
 
   useMarketplaceProductViewed(p.slug, true);
+  // Unconditional on purpose: reading the user after the early return below
+  // would change the hook count when navigating between a live product and,
+  // say, a FLIGHT — React reports that as "Rendered fewer hooks than expected".
+  const user = useCurrentUser();
 
-  if (isTour) {
+  if (isLive) {
     return (
       <div>
         {/* Breadcrumbs */}
@@ -115,22 +123,31 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           </div>
         </div>
 
-        {/* TourDetail — primary tour experience: filters + calendar + offers + modal */}
-        <TourDetail
-          attributes={p.attributes}
-          title={p.title}
-          media={<MediaGallery media={detail.media} productSlug={p.slug} />}
-          description={p.description}
-          attributeSections={sectionsFor(p.attributes, locale)}
-        />
-
+        {isTour ? (
+          /* TourDetail — primary tour experience: filters + calendar + offers */
+          <TourDetail
+            attributes={p.attributes}
+            title={p.title}
+            media={<MediaGallery media={detail.media} productSlug={p.slug} />}
+            description={p.description}
+            attributeSections={sectionsFor(p.attributes, locale)}
+          />
+        ) : (
+          /* HotelDetail — the very same layout, service = hotels */
+          <HotelDetail
+            attributes={p.attributes}
+            title={p.title}
+            media={<MediaGallery media={detail.media} productSlug={p.slug} />}
+            description={p.description}
+            attributeSections={sectionsFor(p.attributes, locale)}
+          />
+        )}
       </div>
     );
   }
 
-  // Non-tour products: original two-column layout
+  // Non-tour, non-hotel products: original two-column layout
   const availability = availabilityText(p.availability, locale);
-  const user = useCurrentUser();
 
   return (
     <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
@@ -164,11 +181,6 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             {t("pdp.published_on", locale)}: {formatDate(p.publishedAt, locale)}
           </span>
         </div>
-
-        {/* HOTEL: live price calendar + inline day tariffs (the tour PDP
-            experience). Replaces the static catalog tariff list, which carries
-            no dates and could never answer «что стоит 12 ноября». */}
-        {isHotel && <HotelDetail attributes={p.attributes} title={p.title} />}
 
         <div className="mt-5">
           <MediaGallery media={detail.media} />
@@ -209,10 +221,11 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           ) : null;
         })()}
 
-        {/* Static tariff list — kept only for non-hotel, non-tour products.
-            HOTEL tariffs moved into the live calendar (HotelDetail): the
-            catalog list had no validFrom/validTo and answered no date. */}
-        {!isHotel && p.tariffs.length > 0 && (
+        {/* Static tariff list — live products (TOUR/HOTEL) never reach this
+            branch: their tariffs come from the calendar + DayTariffsPanel,
+            because the catalog list has no validFrom/validTo and therefore
+            answers no date. */}
+        {p.tariffs.length > 0 && (
           <section className="mt-8" aria-labelledby="pdp-tariffs">
             <h2 id="pdp-tariffs" className="text-lg font-bold text-slate-900">
               {t("pdp.tariffs_title", locale)}
@@ -275,7 +288,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
         {/* M4.5 §23: anonymous guest checkout (onboarding → Request). */}
         <GuestCheckoutForm productId={p.id} />
 
-        {!isHotel && p.tariffs.length > 0 && (
+        {p.tariffs.length > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm">
             <div className="text-xs uppercase tracking-wide text-slate-400">{t("pdp.tariffs_title", locale)}</div>
             <ul className="mt-2 space-y-1.5">

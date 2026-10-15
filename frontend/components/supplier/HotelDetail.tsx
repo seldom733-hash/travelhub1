@@ -18,31 +18,45 @@ function todayIso(): string {
  * HotelDetail — the tour PDP experience applied to a HOTEL product (user
  * decision, 2026-10-13: «давай с комбинируем страницы туров и отелей»).
  *
+ * §HOTEL-PARITY (2026-10-15, «страница карточек отелей не одинакова с
+ * карточками туров — сделай как в карточке туров»): this component deliberately
+ * mirrors `TourDetail` block for block, so a hotel card and a tour card are
+ * visually the same page:
+ *
+ *  - Left:  selection card (filters) → «Как подать заявку» howto → monthly
+ *    price calendar.
+ *  - Right: media → INLINE day tariffs (§4.8 modal replaced by an on-page
+ *    panel) → info card → description → attributes.
+ *
  * A hotel card used to show only a STATIC catalog tariff list (`p.tariffs`) —
  * which carries no dates and, in the real KOMPAS ingest, no validFrom/validTo
- * at all, so it could never answer «что стоит 12 ноября». This component gives
- * hotels the same live machinery tours have:
+ * at all, so it could never answer «что стоит 12 ноября». Here the day tariffs
+ * come from the live calendar (service="hotels", `country` resolves the
+ * STATEINC — a hotel PDP carries the CITY in `destination`, and the hotel
+ * dictionary only knows countries), defaulting to the nearest priced day.
  *
- *  - left: travelers + nights filters and the KOMPAS price calendar
- *    (service="hotels", `country` resolves the STATEINC — a hotel PDP carries
- *    the CITY in `destination`, and the hotel dictionary only knows countries);
- *  - right: the INLINE day tariffs (§4.8 modal, no modal) with a per-tariff
- *    «Оформить заявку», defaulting to the nearest priced day.
- *
- * Stay-only: no departure city, no TOURINC program.
+ * The only intentional difference from TourDetail: a stay has no departure
+ * city and no TOURINC program, so the left panel starts at travelers.
  */
 export default function HotelDetail({
   attributes,
   title,
+  media,
+  description,
+  attributeSections,
   onRequestCreated,
 }: {
   attributes: Record<string, unknown> | null;
   title: string;
+  media?: React.ReactNode;
+  description?: string | null;
+  attributeSections?: Array<{ section: string; items: Array<{ key: string; label: string; value: string }> }>;
   onRequestCreated?: () => void;
 }) {
   const locale = useLocale();
   const [selectedEntry, setSelectedEntry] = useState<SupplierPriceCalendarEntry | null>(null);
-  // Auto-select must only apply ONCE (the first month that yields data).
+  // Auto-select must only apply ONCE (the first month that yields data) — a
+  // later user click or month change must never be overridden.
   const autoSelectedRef = useRef(false);
 
   const supplierCode = (attributes?.supplierCode as string | undefined) ?? "KOMPAS";
@@ -77,11 +91,13 @@ export default function HotelDetail({
     [supplierCode, hotelExternalId, country, nights, adults, children, childAges],
   );
 
+  // Handle calendar date click — inline panel, no modal.
   const handleCalendarSelect = useCallback((entry: SupplierPriceCalendarEntry) => {
     setSelectedEntry(entry);
   }, []);
 
-  // §DEFAULT-NEAREST-DAY: the page opens on the first priced day of the month.
+  // §DEFAULT-NEAREST-DAY: the page opens on the first priced day of the month
+  // that is not in the past.
   const handleEntriesLoaded = useCallback((entries: SupplierPriceCalendarEntry[]) => {
     if (autoSelectedRef.current) return;
     const today = todayIso();
@@ -92,6 +108,7 @@ export default function HotelDetail({
     setSelectedEntry(nearest);
   }, []);
 
+  // §4.8 context shared by every row of the day.
   const summary = useMemo(
     () => ({
       destination: city || undefined,
@@ -105,9 +122,9 @@ export default function HotelDetail({
   );
 
   return (
-    <section aria-labelledby="hotel-detail-section" className="mt-8">
+    <section className="mt-8" aria-labelledby="hotel-detail-section">
       <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-        {/* ── Left: travelers + price calendar ── */}
+        {/* ── Left: Hotel Selection Panel ── */}
         <div className="space-y-4">
           <h2
             id="hotel-detail-section"
@@ -117,6 +134,7 @@ export default function HotelDetail({
           </h2>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+            {/* Adults */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-slate-500">
                 {t("tour.adults", locale) ?? "Взрослые"}
@@ -134,6 +152,7 @@ export default function HotelDetail({
               </select>
             </div>
 
+            {/* Children */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-slate-500">
                 {t("tour.children", locale) ?? "Дети"}
@@ -166,6 +185,7 @@ export default function HotelDetail({
               </select>
             </div>
 
+            {/* Child ages */}
             {children > 0 && (
               <div className="space-y-1">
                 <label className="block text-xs font-medium text-slate-500">
@@ -192,6 +212,7 @@ export default function HotelDetail({
               </div>
             )}
 
+            {/* Nights */}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-slate-500">
                 {t("tour.nights_count", locale) ?? "Количество ночей"}
@@ -208,6 +229,18 @@ export default function HotelDetail({
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Explicit guidance — same block as the tour card */}
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
+            <h3 className="text-sm font-semibold text-slate-800">
+              {t("tour.howto_title", locale)}
+            </h3>
+            <ol className="mt-2 list-decimal list-inside space-y-1 text-xs leading-relaxed text-slate-600">
+              <li>{t("tour.howto_step1", locale)}</li>
+              <li>{t("tour.howto_step2", locale)}</li>
+              <li>{t("tour.howto_step3", locale)}</li>
+            </ol>
           </div>
 
           {/* Monthly Calendar — same component/caching as the tour PDP */}
@@ -227,8 +260,12 @@ export default function HotelDetail({
           </div>
         </div>
 
-        {/* ── Right: inline day tariffs + hotel info ── */}
+        {/* ── Right: Photo + Day Tariffs + Info + Description ── */}
         <div className="space-y-4">
+          {/* Main hotel photo */}
+          {media}
+
+          {/* Inline day tariffs — the §4.8 modal replaced by an on-page panel */}
           <DayTariffsPanel
             entry={selectedEntry}
             title={title}
@@ -238,6 +275,7 @@ export default function HotelDetail({
             onRequestCreated={onRequestCreated ? () => onRequestCreated() : undefined}
           />
 
+          {/* Hotel info */}
           <div className="rounded-2xl border border-slate-200 bg-white p-6">
             <h3 className="font-serif text-xl font-bold text-slate-900">{title}</h3>
             {(city || country) && (
@@ -246,6 +284,42 @@ export default function HotelDetail({
               </p>
             )}
           </div>
+
+          {/* Description */}
+          {description && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+              <h4 className="text-sm font-semibold text-slate-800">
+                {t("pdp.description_title", locale)}
+              </h4>
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
+                {description}
+              </p>
+            </div>
+          )}
+
+          {/* Attributes */}
+          {attributeSections && attributeSections.length > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+              <h4 className="text-sm font-semibold text-slate-800">
+                {t("pdp.attributes_title", locale)}
+              </h4>
+              <div className="mt-3 space-y-3">
+                {attributeSections.map((s) => (
+                  <div key={s.section}>
+                    <h5 className="text-xs font-medium text-slate-500">{s.section}</h5>
+                    <dl className="mt-1 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+                      {s.items.map((i) => (
+                        <div key={i.key} className="flex flex-col">
+                          <dt className="text-[10px] uppercase tracking-wide text-slate-400">{i.label}</dt>
+                          <dd className="whitespace-pre-line text-slate-700">{i.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
