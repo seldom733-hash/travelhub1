@@ -12,6 +12,7 @@
  *   --dry-run          только показать, что будет скачано
  *   --width=N          ширина WebP (по умолчанию 1200)
  *   --quality=N        качество WebP (по умолчанию 82)
+ *   --concurrency=N    одновременных отелей (по умолчанию 2)
  *   --report           ничего не качать: сводка «сколько без фото»
  *
  * Инварианты (требования заказчика):
@@ -37,7 +38,7 @@ const OUTPUT_DIR = path.resolve(__dirname, "../../frontend/public/hotels");
 const DATA_DIR = path.resolve(__dirname, "../data/hotels");
 const JOURNAL = path.join(DATA_DIR, "photo-journal.jsonl");
 
-const CONCURRENCY = 2;
+const DEFAULT_CONCURRENCY = 2;
 const FETCH_TIMEOUT_MS = 30_000;
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -53,6 +54,7 @@ interface CliOptions {
   report: boolean;
   width: number;
   quality: number;
+  concurrency: number;
 }
 
 interface HotelTask {
@@ -75,6 +77,7 @@ function parseArgs(): CliOptions {
     report: false,
     width: 1200,
     quality: 82,
+    concurrency: DEFAULT_CONCURRENCY,
   };
   for (const a of args) {
     const num = (re: RegExp, set: (n: number) => void) => {
@@ -84,6 +87,7 @@ function parseArgs(): CliOptions {
     num(/^--limit=(\d+)$/, (n) => (opts.limit = n));
     num(/^--width=(\d+)$/, (n) => (opts.width = n));
     num(/^--quality=(\d+)$/, (n) => (opts.quality = n));
+    num(/^--concurrency=(\d+)$/, (n) => (opts.concurrency = Math.max(1, n)));
     const only = a.match(/^--only=(.+)$/);
     if (only) opts.only.push(...only[1].split(",").map((s) => s.trim()).filter(Boolean));
     const st = a.match(/^--status=([A-Z,]+)$/);
@@ -363,7 +367,7 @@ async function main(): Promise<void> {
         await new Promise((r) => setTimeout(r, 2_000));
       }
     };
-    await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+    await Promise.all(Array.from({ length: opts.concurrency }, () => worker()));
 
     console.log(`\nDone: saved=${saved} missed=${missed} total=${tasks.length}`);
   } finally {
