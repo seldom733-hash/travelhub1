@@ -165,9 +165,20 @@ export function geoDisplayName(
   return fallback;
 }
 
+/**
+ * Geo API base.
+ *
+ * В браузере — ОТНОСИТЕЛЬНЫЙ путь через rewrite `/api/v1/:path*`
+ * (next.config.ts), как уже сделано в `public-api.ts`. Абсолютный
+ * `http://localhost:4000` от origin `127.0.0.1:3000` (или LAN-хоста) бэкендный
+ * CORS-allowlist отклоняет — `No 'Access-Control-Allow-Origin'` — и справочник
+ * стран/городов/курортов остаётся пустым. На сервере (RSC) rewrite не действует
+ * → абсолютный backend base.
+ */
+const SERVER_API_BASE = (process.env.BACKEND_URL ?? "http://localhost:4000").replace(/\/$/, "");
 const PUBLIC_API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "http://localhost:4000/api/v1";
+  (typeof window === "undefined" ? `${SERVER_API_BASE}/api/v1` : "/api/v1");
 
 export interface GeoDirectoryEntry {
   id: string;

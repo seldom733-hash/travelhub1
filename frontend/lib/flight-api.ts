@@ -137,9 +137,16 @@ export interface FlightSearchResponse {
   flights: FlightOffer[];
 }
 
+/**
+ * Flight API base — тот же приём, что в `public-api.ts`/`geo-api.ts`: в
+ * браузере относительный путь через rewrite `/api/v1/:path*`, иначе бэкендный
+ * CORS-allowlist режет запрос с origin `127.0.0.1:3000`/LAN. На сервере —
+ * абсолютный backend base.
+ */
+const SERVER_API_BASE = (process.env.BACKEND_URL ?? "http://localhost:4000").replace(/\/$/, "");
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "http://localhost:4000/api/v1";
+  (typeof window === "undefined" ? `${SERVER_API_BASE}/api/v1` : "/api/v1");
 
 export async function createFlightRequest(body: { from: string; to: string; departureDate: string; returnDate?: string; tripType: string; passengers: any; fareFamily: string; price: number; currency: string; segments: any[]; supplierCode?: string }): Promise<any> {
   const res = await fetch(`${API_BASE}/supplier/azal/request`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
