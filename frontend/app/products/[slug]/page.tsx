@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import PublicLayout from "@/components/PublicLayout";
 import MediaGallery from "@/components/public/MediaGallery";
 import GuestCheckoutForm from "@/components/public/GuestCheckoutForm";
 import Price from "@/components/public/Price";
@@ -54,20 +53,16 @@ function PdpInner() {
 
   if (notFound) {
     return (
-      <PublicLayout>
-        <PublicNotFound title={t("pdp.not_found_title", locale)} hint={t("pdp.not_found_hint", locale)} />
-      </PublicLayout>
+      <PublicNotFound title={t("pdp.not_found_title", locale)} hint={t("pdp.not_found_hint", locale)} />
     );
   }
 
   return (
-    <PublicLayout>
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        {error && <PublicErrorState message={error} />}
-        {detail === null && !error && <PdpSkeleton />}
-        {detail && <PdpContent detail={detail} />}
-      </div>
-    </PublicLayout>
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      {error && <PublicErrorState message={error} />}
+      {detail === null && !error && <PdpSkeleton />}
+      {detail && <PdpContent detail={detail} />}
+    </div>
   );
 }
 
@@ -369,11 +364,9 @@ export default function ProductPage() {
   return (
     <Suspense
       fallback={
-        <PublicLayout>
-          <div className="p-8">
-            <PdpSkeleton />
-          </div>
-        </PublicLayout>
+        <div className="p-8">
+          <PdpSkeleton />
+        </div>
       }
     >
       <PdpInner />

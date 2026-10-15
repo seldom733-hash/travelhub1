@@ -38,10 +38,15 @@ function extFor(mime: string): string | null {
 }
 
 /**
- * Локальный URL фото отеля, если оно уже скачано (`/hotels/<key>.jpg|.png`).
- * Проверяется файл-конвенцией запросом HEAD — 404 (файла нет) → null.
+ * Кеш пробников: ОДИН HEAD на ключ за жизнь страницы — включая отрицательный
+ * результат. Раньше каждый монтаж карточки снова и снова сыпал HEAD на
+ * `/hotels/*` (в логе dev-сервера — 836 запросов по ~763 мс, суммарно ~10 минут
+ * занятого сервера), и навигация по клику на карточку стояла в очереди позади
+ * них — пользователь видел «отклик срабатывает поздно».
  */
-export async function fetchHotelPhoto(key: string): Promise<string | null> {
+const photoProbeCache = new Map<string, Promise<string | null>>();
+
+async function probeHotelPhoto(key: string): Promise<string | null> {
   for (const ext of ["jpg", "png"]) {
     const url = `${HOTEL_PHOTO_DIR}/${encodeURIComponent(key)}.${ext}`;
     try {
@@ -55,6 +60,21 @@ export async function fetchHotelPhoto(key: string): Promise<string | null> {
     }
   }
   return null;
+}
+
+/**
+ * Локальный URL фото отеля, если оно уже скачано (`/hotels/<key>.jpg|.png`).
+ * Проверяется файл-конвенцией запросом HEAD — 404 (файла нет) → null.
+ */
+export function fetchHotelPhoto(key: string): Promise<string | null> {
+  let pending = photoProbeCache.get(key);
+  if (!pending) {
+    pending = probeHotelPhoto(key);
+    photoProbeCache.set(key, pending);
+    // Сбой транспорта не должен отравлять кеш: повторный монтаж попробует снова.
+    pending.catch(() => photoProbeCache.delete(key));
+  }
+  return pending;
 }
 
 /**
