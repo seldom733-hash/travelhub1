@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Buildings } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
+import { useHotelPhoto } from "@/lib/hotel-photo";
 
 function HotelCardSkeleton() {
   return (
@@ -26,7 +27,9 @@ function HotelCardSkeleton() {
 
 function HotelCard({ card }: { card: PublicProductCard }) {
   const locale = useLocale();
-  const img = card.primaryImage;
+  // Фото: primaryImage (ProductMedia) → единый файл отеля из реестра (см. hotel-photo.ts).
+  const hotelPhoto = useHotelPhoto(card.hotelImage, card.slug);
+  const img = card.primaryImage ?? (hotelPhoto ? { thumbUrl: hotelPhoto } : null);
 
   return (
     <Link

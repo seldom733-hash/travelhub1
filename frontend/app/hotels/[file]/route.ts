@@ -21,6 +21,8 @@ const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".png": "image/png",
+  // Единый каталог фото отелей хранит файлы как `hotel_<id>.webp`.
+  ".webp": "image/webp",
 };
 
 function notFound(): Response {

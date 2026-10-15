@@ -119,8 +119,10 @@ export interface PublicProductCard {
   meal?: string | null;
   /** Код поставщика (KOMPAS/SUMMERTOUR/…) для синк-карточек. */
   supplierCode?: string | null;
-  /** Локальное фото отеля витрины туров (frontend/public/hotels/<tourinc>-<hotelKey>.jpg).
-   *  Файл может отсутствовать — фронт проверяет и показывает иконку-фолбэк. */
+  /** Единое фото физической гостиницы из реестра (catalog."Hotel".photoFile →
+   *  `/hotels/hotel_<hotelId>.webp`), общее для тура, услуги «Отели», поиска и
+   *  конструктора и для всех поставщиков этого отеля. Файла может не быть —
+   *  фронт проверяет и показывает иконку-фолбэк. */
   hotelImage?: string | null;
   /** Discovery-availability (§12); null, если строк Availability нет. */
   availabilitySummary: PublicAvailabilitySummary | null;
@@ -167,6 +169,13 @@ export interface PublicProductDetail {
     seller: PublicSeller | null;
     publishedAt: string;
     version: number;
+    /**
+     * Единое фото физической гостиницы из реестра (catalog."Hotel".photoFile):
+     * `/hotels/hotel_<hotelId>.webp`. Одна и та же ссылка для тура с этим
+     * отелем, карточки в услуге «Отели» и предложений всех поставщиков.
+     * null — фото ещё нет, фронт показывает placeholder.
+     */
+    hotelImage?: string | null;
   };
   media: PublicMedia[];
 }

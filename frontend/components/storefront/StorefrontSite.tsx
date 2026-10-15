@@ -5,6 +5,7 @@ import { t, useLocale, type Locale } from "@/lib/i18n";
 import type { PublicProductCard, PublicListResult } from "@/lib/public-api";
 import type { PublicStorefront } from "@/lib/storefront-api";
 import { formatLocation } from "@/lib/locations";
+import { useHotelPhoto } from "@/lib/hotel-photo";
 import { SOCIAL_PLATFORM_ICONS, themeStyle } from "./storefront-theme";
 import Price from "../public/Price";
 import { fireContactClick, useStorefrontCardImpression, useStorefrontViewed } from "@/lib/behavioral-events";
@@ -187,15 +188,18 @@ function StorefrontProductCard({ sf, card, locale, preview }: { sf: PublicStoref
   // Step 1.12.3: импрессия = карточка реально отрисована в grid (rendered-card
   // семантика); preview не трекается.
   useStorefrontCardImpression(sf.slug, card.slug, !preview);
+  // Фото: единый файл отеля из реестра — тот же, что в каталоге/туре/PDP.
+  const hotelPhoto = useHotelPhoto(card.hotelImage, card.slug);
+  const imageUrl = card.primaryImage?.thumbUrl ?? hotelPhoto ?? null;
   return (
     <Link
       href={`/store/${sf.slug}/products/${card.slug}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"
     >
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
-        {card.primaryImage ? (
+        {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={card.primaryImage.thumbUrl} alt={card.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+          <img src={imageUrl} alt={card.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-4xl text-slate-300">🏝</div>
         )}

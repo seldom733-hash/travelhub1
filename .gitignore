@@ -69,6 +69,10 @@ login.json
 # Hotel photos (707 MB, downloaded separately — referenced by lib/hotel-photo.ts)
 frontend/public/hotels/
 
+# Единый каталог фото отелей: сгенерированные реестр и журнал загрузок
+# (пересоздаются scripts/hotel-registry.ts и scripts/hotel-photo-catalog.ts)
+backend/data/
+
 # WhatsApp runtime artifacts: Baileys session (secrets — NEVER commit) + media
 backend/.whatsapp-session/
 backend/.whatsapp-media/

@@ -111,6 +111,12 @@ export interface PublicProductDetail {
     seller: PublicSeller | null;
     publishedAt: string;
     version: number;
+    /**
+     * Единое фото физической гостиницы из реестра (`/hotels/hotel_<hotelId>.webp`).
+     * Одна и та же ссылка для тура с этим отелем, карточки в услуге «Отели» и
+     * предложений всех поставщиков. null — фото ещё нет.
+     */
+    hotelImage?: string | null;
   };
   media: PublicMedia[];
 }

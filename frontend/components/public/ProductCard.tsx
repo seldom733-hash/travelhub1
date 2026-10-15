@@ -1,13 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { t, useLocale, formatDate } from "@/lib/i18n";
 import { useMarketplaceCardImpression } from "@/lib/behavioral-events";
 import type { PublicProductCard } from "@/lib/public-api";
 import { formatLocation } from "@/lib/locations";
 import { availabilityText } from "@/lib/marketplace-utils";
-import { fetchHotelPhoto, hotelPhotoKeyFromSlug } from "@/lib/hotel-photo";
+import { useHotelPhoto } from "@/lib/hotel-photo";
 import Price from "./Price";
 
 /** Дефолтная иконка по типу категории/услуги (нейтральный fallback без image). */
@@ -40,24 +39,12 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
   const availability = availabilityText(card.availabilitySummary, locale);
   const icon = TYPE_ICON[card.type] ?? "🏝";
 
-  // Фото отеля витрины туров: локальный файл /hotels/<tourinc>-<hotelKey>.jpg|png
-  // (скачивается с tripadvisor.ru скриптом fetch-hotel-photos). Используется, когда
-  // у карточки нет primaryImage (ProductMedia пуст у supplier-синков).
-  // hotelImage отдаётся для TOUR (slug `<sup>-<tourinc>-<hotelKey>`) и HOTEL
-  // (KOMPAS stay-only, slug `kompas-hotel-<iso>-<hotelKey>`) — ключ парсит слаг.
-  const photoKey = card.hotelImage ? hotelPhotoKeyFromSlug(card.slug) : null;
-  const [hotelPhoto, setHotelPhoto] = useState<string | null>(null);
-  useEffect(() => {
-    setHotelPhoto(null);
-    if (!photoKey) return;
-    let alive = true;
-    void fetchHotelPhoto(photoKey).then((url) => {
-      if (alive) setHotelPhoto(url);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [photoKey]);
+  // Фото отеля: единый файл физической гостиницы из реестра — бэкенд отдаёт
+  // `hotelImage` (`/hotels/hotel_<hotelId>.webp`) один и тот же для тура, услуги
+  // «Отели» и всех поставщиков этого отеля. Используется, когда у карточки нет
+  // primaryImage (ProductMedia пуст у supplier-синков). Legacy-файл по slug —
+  // резерв (см. lib/hotel-photo.ts).
+  const hotelPhoto = useHotelPhoto(card.hotelImage, card.slug);
   const img = card.primaryImage ? { thumbUrl: card.primaryImage.thumbUrl } : hotelPhoto ? { thumbUrl: hotelPhoto } : null;
 
   // Step 1.13B: rendered-card impression (карточка реально отрисована в grid;

@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { hotelPhotoUrl } from "../hotel/hotel-photo-url";
 
 export type SuggestType = "destination" | "hotel" | "tour" | "service";
 
@@ -41,6 +42,8 @@ export class PublicSuggestService {
       code: string;
       categoryTitle: string | null;
       thumbnailStorageKey: string | null;
+      hotelPhotoFile: string | null;
+      hotelPhotoVersion: Date | null;
     }>>(Prisma.sql`
       SELECT
         p."id",
@@ -49,10 +52,17 @@ export class PublicSuggestService {
         p."slug",
         p."code",
         c."title" AS "categoryTitle",
-        m."thumbnailStorageKey"
+        m."thumbnailStorageKey",
+        h."photoFile" AS "hotelPhotoFile",
+        h."photoUpdatedAt" AS "hotelPhotoVersion"
       FROM catalog."Product" p
       LEFT JOIN catalog."Category" c ON c."id" = p."categoryId"
       LEFT JOIN catalog."ProductMedia" m ON m."productId" = p."id" AND m."isPrimary" = true AND m."status" = 'PUBLISHED'
+      -- Единое фото физической гостиницы: (supplierCode, hotelKey) → реестр отелей.
+      LEFT JOIN catalog."HotelSupplierRef" r
+        ON r."supplierCode" = p."attributes"->>'supplierCode'
+       AND r."externalKey"  = p."attributes"->>'hotelKey'
+      LEFT JOIN catalog."Hotel" h ON h."id" = r."hotelId"
       WHERE p."status" = 'PUBLISHED'
         AND p."publishedAt" IS NOT NULL
         AND (p."title" ILIKE ${like} OR p."description" ILIKE ${like})
@@ -66,7 +76,14 @@ export class PublicSuggestService {
       id: r.id,
       name: r.title,
       subtitle: r.categoryTitle ?? undefined,
-      imageUrl: r.thumbnailStorageKey ? `/api/v1/public/media/${r.id}/thumb` : undefined,
+      // Фото отеля из единого реестра — та же ссылка, что и в карточках каталога,
+      // турах и PDP. `?v=` — версия файла, чтобы после замены фото кэш не отдавал
+      // старое изображение. Фолбэк — медиа продукта.
+      imageUrl: r.hotelPhotoFile
+        ? hotelPhotoUrl(r.hotelPhotoFile, r.hotelPhotoVersion)
+        : r.thumbnailStorageKey
+          ? `/api/v1/public/media/${r.id}/thumb`
+          : undefined,
       // Нейтральные URL: саджест ведёт на PRD-код, slug-ссылки мертвы (404).
       href: `/products/${r.code}`,
     }));

@@ -143,12 +143,22 @@ export default function GlobalSearchAutocomplete() {
                     index === highlightedIndex ? "bg-white/5 text-white" : "text-neutral-300 hover:bg-white/5 hover:text-white"
                   }`}
                 >
-                  <div className="flex size-8 items-center justify-center rounded-lg bg-gold/10 text-[10px] font-bold text-gold">
-                    {result.type === "destination" && "🌍"}
-                    {result.type === "hotel" && "🏨"}
-                    {result.type === "tour" && "✈️"}
-                    {result.type === "service" && "🔧"}
-                  </div>
+                  {result.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={result.imageUrl}
+                      alt=""
+                      loading="lazy"
+                      className="size-8 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="flex size-8 items-center justify-center rounded-lg bg-gold/10 text-[10px] font-bold text-gold">
+                      {result.type === "destination" && "🌍"}
+                      {result.type === "hotel" && "🏨"}
+                      {result.type === "tour" && "✈️"}
+                      {result.type === "service" && "🔧"}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[13px] font-medium text-white">{result.name}</div>
                     {result.subtitle && (

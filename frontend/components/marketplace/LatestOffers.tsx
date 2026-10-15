@@ -26,8 +26,9 @@ function LatestOfferCardSkeleton() {
 
 function LatestOfferCard({ card }: { card: PublicProductCard }) {
   const locale = useLocale();
-  // Fallback: локальное фото отеля /hotels/<tourinc>-<hotelKey>.jpg (см. hotel-photo.ts).
-  const hotelPhoto = useHotelPhoto(card.type === "TOUR" ? card.slug : null);
+  // Fallback: единое фото отеля из реестра (/hotels/hotel_<hotelId>.webp), а для
+  // карточек без него — legacy-файл по slug (см. lib/hotel-photo.ts).
+  const hotelPhoto = useHotelPhoto(card.hotelImage, card.slug);
   const img = card.primaryImage ? { thumbUrl: card.primaryImage.thumbUrl } : hotelPhoto ? { thumbUrl: hotelPhoto } : null;
 
   const relativeTime = useMemo(() => {

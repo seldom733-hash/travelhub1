@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import type { PublicMedia } from "@/lib/public-api";
-import { fetchHotelPhoto, hotelPhotoKeyFromSlug } from "@/lib/hotel-photo";
+import { useHotelPhoto } from "@/lib/hotel-photo";
 
 /**
  * PHASE 1 STEP 1.7 §13 — Media Gallery на стабильных public delivery URL
@@ -15,28 +15,19 @@ import { fetchHotelPhoto, hotelPhotoKeyFromSlug } from "@/lib/hotel-photo";
 export default function MediaGallery({
   media,
   productSlug,
+  hotelImage,
 }: {
   media: PublicMedia[];
-  /** Slug продукта: если media пуст, показываем локальное фото отеля /hotels/<tourinc>-<hotelKey>.jpg|png. */
+  /** Slug продукта: резервный источник локального фото отеля (`/hotels/<tourinc>-<hotelKey>.jpg|png`). */
   productSlug?: string;
+  /** Единое фото физической гостиницы из реестра (`/hotels/hotel_<hotelId>.webp`) — приоритетный источник. */
+  hotelImage?: string | null;
 }) {
   const locale = useLocale();
   const [active, setActive] = useState(0);
 
-  // Локальное фото отеля витрины туров (файл скачивается скриптом fetch-hotel-photos).
-  const photoKey = productSlug ? hotelPhotoKeyFromSlug(productSlug) : null;
-  const [hotelPhoto, setHotelPhoto] = useState<string | null>(null);
-  useEffect(() => {
-    setHotelPhoto(null);
-    if (!photoKey) return;
-    let alive = true;
-    void fetchHotelPhoto(photoKey).then((url) => {
-      if (alive) setHotelPhoto(url);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [photoKey]);
+  // Единое фото отеля из реестра; если его нет — legacy-файл по slug.
+  const hotelPhoto = useHotelPhoto(hotelImage, productSlug);
 
   const ordered = [...media].sort((a, b) => a.sortOrder - b.sortOrder || Number(b.isPrimary) - Number(a.isPrimary));
   const images = ordered.length > 0 ? ordered : [];

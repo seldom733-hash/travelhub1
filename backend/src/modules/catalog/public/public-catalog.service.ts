@@ -26,6 +26,7 @@ import { Prisma } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { NotFoundError, ValidationDomainError } from "../../../shared/errors";
 import { SIGNED_URL_TTL_SECONDS } from "../media/product-media.service";
+import { hotelPhotoUrl } from "../hotel/hotel-photo-url";
 import type { ObjectStorageService } from "../media/storage/storage.interface";
 import type { AttributeDef } from "../category-schema.validation";
 import {
@@ -312,9 +313,10 @@ export class PublicCatalogService {
     const sellers = await this.sellersOf(rows.map((r) => r.partnerId));
     const fx = await this.supplierFxByPartner(rows.map((r) => r.partnerId));
 
+    const hotelPhotos = await this.hotelPhotoMap(rows);
     const items = await Promise.all(
       rows.map((r) =>
-        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, fx),
+        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, fx, hotelPhotos),
       ),
     );
 
@@ -339,7 +341,7 @@ export class PublicCatalogService {
     }
     const seller = row.partnerId ? ((await this.sellersOf([row.partnerId])).get(row.partnerId) ?? null) : null;
     const fx = await this.supplierFxByPartner([row.partnerId]);
-    return this.toDetail(row, seller, fx);
+    return this.toDetail(row, seller, fx, await this.hotelImageForOne(row));
   }
 
   // ── Public Partner Storefront (Phase 1 Step 1.12.1 §11/§12/§13) ──────────
@@ -442,9 +444,10 @@ export class PublicCatalogService {
     const availability = await this.availabilitySummaries(typed.map((r) => r.id));
     const sellers = await this.sellersOf(typed.map((r) => r.partnerId));
     const fx = await this.supplierFxByPartner(typed.map((r) => r.partnerId));
+    const hotelPhotos = await this.hotelPhotoMap(typed);
     const items = await Promise.all(
       typed.map((r) =>
-        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, fx),
+        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, fx, hotelPhotos),
       ),
     );
     return { items, total, page, pageSize };
@@ -465,7 +468,7 @@ export class PublicCatalogService {
     }
     const seller = await this.sellerProjectionFor(partnerId);
     const fx = await this.supplierFxByPartner([row.partnerId]);
-    return this.toDetail(row, seller, fx);
+    return this.toDetail(row, seller, fx, await this.hotelImageForOne(row));
   }
 
   /**
@@ -903,6 +906,7 @@ export class PublicCatalogService {
     row: PublicProductRow,
     seller: PublicSeller | null,
     fx: SupplierFxByPartner,
+    hotelImage: string | null = null,
   ): PublicProductDetail {
     const media = row.media.map((m) => this.toPublicMedia(m));
     const availability = this.toAvailabilitySummary(row.availability ?? []);
@@ -960,19 +964,37 @@ export class PublicCatalogService {
         seller,
         publishedAt: row.publishedAt!.toISOString(),
         version: row.version,
+        hotelImage,
       },
       media,
     };
   }
 
   /**
-   * Локальное фото отеля для витрины (заказчик: файлы tripadvisor.ru
-   * сохраняются синком в frontend/public/hotels/…).
-   *  - тур: slug `<supplier>-<tourinc>-<hotelKey>…` → `<tourinc>-<hotelKey>.jpg`;
-   *  - отель (KOMPAS stay-only): slug `kompas-hotel-<iso>-<hotelKey>` → `htl-<hotelKey>.jpg`.
-   * URL выводится всегда — фронт сам решает показать img или иконку-фолбэк (HEAD).
+   * Ключ реестра отелей для строки продукта: (supplierCode, hotelKey).
+   * Один и тот же supplier-native id в туре и в услуге «Отели» даёт один ключ,
+   * значит одну запись catalog."Hotel" и одну фотографию.
    */
-  private hotelPhotoUrl(slug: string): string | null {
+  private static hotelRefKey(attributes: unknown): string | null {
+    const a = (attributes ?? {}) as Record<string, unknown>;
+    const supplierCode = typeof a.supplierCode === "string" ? a.supplierCode.trim() : "";
+    const hotelKey =
+      typeof a.hotelKey === "string" && a.hotelKey.trim()
+        ? a.hotelKey.trim()
+        : typeof a.hotelExternalId === "string"
+          ? a.hotelExternalId.trim()
+          : "";
+    if (!supplierCode || !hotelKey) return null;
+    return `${supplierCode}\u0000${hotelKey}`;
+  }
+
+  /**
+   * Legacy-файл по slug (`<tourinc>-<hotelKey>.jpg` для туров,
+   * `htl-<hotelKey>.jpg` для отелей). Оставлен как fallback на время перехода
+   * на единый реестр: общее фото отеля может быть ещё не загружено, а старый
+   * файл уже лежит на диске.
+   */
+  private legacyHotelPhotoUrl(slug: string): string | null {
     const tour = slug.match(/^[a-z]+-(\d+)-(\d+)/);
     if (tour) return `/hotels/${tour[1]}-${tour[2]}.jpg`;
     const hotel = slug.match(/^[a-z]+-hotel-[a-z]{2}-(\d+)/);
@@ -980,11 +1002,64 @@ export class PublicCatalogService {
     return null;
   }
 
+  /**
+   * Фото из реестра одним запросом на страницу выдачи (§ единый каталог фото):
+   * (supplierCode, hotelKey) → HotelSupplierRef → Hotel.photoFile.
+   */
+  private async hotelPhotoMap(rows: PublicProductRow[]): Promise<Map<string, string>> {
+    const pairs = new Map<string, { supplierCode: string; externalKey: string }>();
+    for (const row of rows) {
+      const key = PublicCatalogService.hotelRefKey(row.attributes);
+      if (!key) continue;
+      const [supplierCode, externalKey] = key.split("\u0000");
+      pairs.set(key, { supplierCode, externalKey });
+    }
+    const map = new Map<string, string>();
+    if (pairs.size === 0) return map;
+    const refs = await this.prisma.hotelSupplierRef.findMany({
+      where: { OR: [...pairs.values()].map((p) => ({ supplierCode: p.supplierCode, externalKey: p.externalKey })) },
+      select: { supplierCode: true, externalKey: true, hotel: { select: { photoFile: true, photoUpdatedAt: true } } },
+    });
+    for (const ref of refs) {
+      if (ref.hotel?.photoFile) {
+        map.set(
+          `${ref.supplierCode}\u0000${ref.externalKey}`,
+          hotelPhotoUrl(ref.hotel.photoFile, ref.hotel.photoUpdatedAt),
+        );
+      }
+    }
+    return map;
+  }
+
+  /** Фото отеля строки: реестр → legacy-файл по slug → null. */
+  private hotelImageFor(row: PublicProductRow, map?: Map<string, string>): string | null {
+    const key = PublicCatalogService.hotelRefKey(row.attributes);
+    const fromRegistry = key && map ? map.get(key) : undefined;
+    return fromRegistry ?? this.legacyHotelPhotoUrl(row.slug);
+  }
+
+  /** Фото отеля для одной строки (PDP) — без построения карты всей страницы. */
+  private async hotelImageForOne(row: PublicProductRow): Promise<string | null> {
+    const key = PublicCatalogService.hotelRefKey(row.attributes);
+    if (key) {
+      const [supplierCode, externalKey] = key.split("\u0000");
+      const ref = await this.prisma.hotelSupplierRef.findUnique({
+        where: { supplierCode_externalKey: { supplierCode, externalKey } },
+        select: { hotel: { select: { photoFile: true, photoUpdatedAt: true } } },
+      });
+      if (ref?.hotel?.photoFile) {
+        return hotelPhotoUrl(ref.hotel.photoFile, ref.hotel.photoUpdatedAt);
+      }
+    }
+    return this.legacyHotelPhotoUrl(row.slug);
+  }
+
   private toCard(
     row: PublicProductRow,
     availability: PublicAvailabilitySummary | null,
     seller: PublicSeller | null,
     fx: SupplierFxByPartner,
+    hotelPhotos?: Map<string, string>,
   ): PublicProductCard {
     const primary = row.media.find((m) => m.isPrimary) ?? row.media[0] ?? null;
     const primaryImage = primary
@@ -1018,7 +1093,7 @@ export class PublicCatalogService {
       // синки по общему контракту).
       room: (row.attributes as any)?.rooms?.[0] ?? (row.attributes as any)?.room ?? null,
       meal: (row.attributes as any)?.meals?.[0] ?? (row.attributes as any)?.meal ?? null,
-      hotelImage: this.hotelPhotoUrl(row.slug),
+      hotelImage: this.hotelImageFor(row, hotelPhotos),
       supplierCode: (row.attributes as any)?.supplierCode ?? null,
       availabilitySummary: availability,
       seller,

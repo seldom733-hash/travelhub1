@@ -1018,6 +1018,93 @@ model ServiceUnitHistory {
 /// binary-файлы — в Object Storage (S3-compatible), здесь только metadata + storage keys.
 /// Три ключа (derivatives): original + large.webp + thumb.webp.
 /// Внутренние storage keys НЕ публикуются: API отдаёт signed preview URL (абстракция).
+/// Статус основной фотографии гостиницы в общем каталоге /hotels/hotel_<id>.<ext>.
+enum HotelPhotoStatus {
+  /// Файла нет (ещё не искали).
+  NONE
+  /// Поиск/загрузка в процессе.
+  PENDING
+  /// Файл сохранён и проверен.
+  OK
+  /// Поиск/загрузка не удались.
+  FAILED
+  /// Найден кандидат, но требует ручной проверки (права/соответствие).
+  REVIEW
+  @@schema("catalog")
+}
+
+/// Физическая гостиница — ЕДИНАЯ запись для всех разделов и поставщиков.
+/// Тур с проживанием в этой гостинице, карточка в каталоге «Отели», поиск и
+/// конструктор ссылаются на одну и ту же запись и, значит, на одну фотографию.
+///
+/// Идентичность: нормализованное имя + страна + город (см. normalizedName).
+/// supplier-native id отеля (hotelKey/hotelInc) живёт в HotelSupplierRef.
+model Hotel {
+  id String @id @default(uuid())
+
+  /// Отображаемое имя без хвоста «(Город)» и «N*».
+  name           String
+  /// Имя в нижнем регистре (буквы/цифры одного алфавита) — ключ сопоставления.
+  /// Никогда не сопоставляем только по имени: в паре всегда страна и город.
+  normalizedName String
+  stars          Int?
+  countryCode    String @default("")
+  countryName    String @default("")
+  cityName       String @default("")
+  resortName     String @default("")
+
+  /// Имя файла основной фотографии в frontend/public/hotels (hotel_<id>.webp).
+  /// Все карточки берут фото отсюда — отдельных копий для туров/поставщиков нет.
+  photoFile        String?
+  photoStatus      HotelPhotoStatus @default(NONE)
+  photoSource      String?
+  photoSourceUrl   String?
+  photoAttribution String?
+  photoWidth       Int?
+  photoHeight      Int?
+  photoBytes       Int?
+  photoUpdatedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refs HotelSupplierRef[]
+
+  @@unique([normalizedName, countryCode, cityName])
+  @@index([name])
+  @@index([countryCode, cityName])
+  @@index([photoStatus])
+  @@schema("catalog")
+}
+
+/// Внешний идентификатор гостиницы у поставщика → единая запись Hotel.
+/// (supplierCode, externalKey) уникален: один supplier-native id = один отель,
+/// поэтому отель из тура и отель из услуги «Отели» с тем же ключом — одна запись.
+model HotelSupplierRef {
+  id      String @id @default(uuid())
+  hotelId String
+  hotel   Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  supplierCode String
+  /// supplier-native id отеля: hotelKey (KOMPAS/SUMMERTOUR/KAZUNION), hotelInc (ANEX).
+  externalKey  String
+  name         String  @default("")
+  countryCode  String  @default("")
+  cityName     String  @default("")
+  resortName   String  @default("")
+  stars        Int?
+  hotelHref    String?
+  /// Источник записи: product (attributes продукта) | geolink (справочник поставщика).
+  source       String  @default("product")
+  firstSeenAt  DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+
+  @@unique([supplierCode, externalKey])
+  @@index([hotelId])
+  @@index([supplierCode])
+  @@schema("catalog")
+}
+
 model ProductMedia {
   id        String    @id @default(uuid())
   productId String
