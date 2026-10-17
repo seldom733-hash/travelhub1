@@ -46,7 +46,7 @@ export const BLOCK_REGISTRY: BlockRegistryEntry[] = [
     description: { ru: "Глобальный блок поиска", az: "Qlobal axtarış bloku", en: "Global search block" },
     allowedContexts: ["marketplace"],
     allowedLayouts: ["full-width"],
-    defaultSettings: { tabs: ["accommodation", "tours", "excursions", "transfers", "car-rental", "cruise", "railway", "sanatorium", "guide", "flight"] },
+    defaultSettings: { tabs: ["tours", "hotels", "flights", "sanatoriums", "guides", "excursions", "transfers", "car-rental", "railway", "cruises"] },
     defaultLayout: "full-width",
     singleton: true,
     removable: false,

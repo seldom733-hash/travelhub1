@@ -6,6 +6,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
 import { SupplierOfferService } from "./supplier-offer.service";
 import type { SupplierSearchQuery, SupplierOffer } from "./supplier.types";
 import { KOMPAS_HOTEL_STATEINC_TO_ISO } from "./kompas/kompas-hotel-countries";
+import { SUPPLIER_TOKEN_CRM_NAMES } from "./supplier-crm-names";
 
 /**
  * Capability descriptor for a tour supplier adapter.
@@ -398,10 +399,10 @@ export class SupplierAggregatorService {
    * Tours/hotels come from the tour adapter registry; flights come from the
    * FlightSupplierRegistry (§4.7 — no frontend hardcode of flight options).
    */
-  listSuppliersOfService(serviceType: SupplierServiceType): Array<{
+  async listSuppliersOfService(serviceType: SupplierServiceType): Promise<Array<{
     code: string;
     name: string;
-  }> {
+  }>> {
     if (serviceType === "flights") {
       return this.flightRegistry
         .list()
@@ -411,7 +412,7 @@ export class SupplierAggregatorService {
         })
         .sort((x, y) => x.code.localeCompare(y.code));
     }
-    return this.registry
+    const entries = this.registry
       .getEntries()
       .filter(({ adapter, config }) => {
         // Entries-based: the same code can be registered per category, so the
@@ -422,8 +423,37 @@ export class SupplierAggregatorService {
         }
         return adapter.enabled && config.searchEnabled;
       })
-      .map(({ adapter }) => ({ code: adapter.code, name: adapter.name }))
+      .map(({ adapter }) => ({ code: adapter.code, name: adapter.name }));
+
+    // Имена поставщиков — из CRM-партнёров (единый источник), а не из кода
+    // адаптеров. Партнёр выключен в CRM (INACTIVE) → поставщик исчезает из
+    // пикера: предлагать отключённого партнёра нельзя.
+    const withCrmNames = await Promise.all(
+      entries.map(async (entry) => {
+        const crm = await this.crmPartnerForToken(entry.code);
+        if (crm && !crm.active) return null;
+        return { code: entry.code, name: crm?.name ?? entry.name };
+      }),
+    );
+    return withCrmNames
+      .filter((e): e is { code: string; name: string } => Boolean(e))
       .sort((x, y) => x.code.localeCompare(y.code));
+  }
+
+  /**
+   * CRM-партнёр для токена адаптера: { name, active } | null, если партнёра
+   * с таким токеном в CRM нет. Имя ищем по каноническому имени из
+   * SUPPLIER_TOKEN_CRM_NAMES (единый источник с finance-курсами).
+   */
+  private async crmPartnerForToken(token: string): Promise<{ name: string; active: boolean } | null> {
+    const canonical = SUPPLIER_TOKEN_CRM_NAMES[token.toUpperCase()];
+    if (!canonical) return null;
+    const partner = await this.prisma.partner.findFirst({
+      where: { name: { equals: canonical, mode: "insensitive" } },
+      select: { name: true, status: true },
+    });
+    if (!partner) return null;
+    return { name: partner.name, active: partner.status === "ACTIVE" };
   }
 
   /**

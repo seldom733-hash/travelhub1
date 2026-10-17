@@ -1,5 +1,6 @@
 "use client";
 
+import { TabsPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, type Customer, type Partner, type PartnerCustomer, type PartnerCustomerDetail, type CrmTierResponse, type PartnerIntakeResult, type Page } from "@/lib/api";
@@ -105,6 +106,14 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
   const [partnerCustomerDetailTab, setPartnerCustomerDetailTab] = useState<"overview" | "orders" | "bookings" | "payments" | "relations">("overview");
   const [partnerError, setPartnerError] = useState("");
   const [partnerLoadError, setPartnerLoadError] = useState(false);
+  // Ручное добавление партнёра (POST /partners) и переключение статуса
+  // (PATCH /partners/:id/status) — список поставщиков в поисковике берётся
+  // из CRM-партнёров, поэтому партнёров заводят и выключают здесь.
+  const [showPartnerCreate, setShowPartnerCreate] = useState(false);
+  const [creatingPartner, setCreatingPartner] = useState(false);
+  const [partnerForm, setPartnerForm] = useState({ name: "", countryCode: "" });
+  // Сортировка по коду применена один раз — дальше пользователь сам выбирает.
+  const partnerSortApplied = useRef(false);
 
   // ── Partner Customer CRM state (3.5C partner context) ──
   const [partnerData, setPartnerData] = useState<Page<PartnerCustomer> | null>(null);
@@ -156,6 +165,60 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
       setPartnerError((e as Error).message);
     }
   }, [partnerSearch, partnerPage, sortBy, sortDirection, partnerStatusFilter, dateFrom, dateTo, entitled]);
+
+  // Вкладка «Партнёры» по умолчанию сортируется по коду — список начинается
+  // с PRN-00000001 (канонический порядок партнёров).
+  useEffect(() => {
+    if (tab === "partners" && !partnerSortApplied.current) {
+      partnerSortApplied.current = true;
+      setSortBy("code");
+      setSortDirection("asc");
+    }
+  }, [tab]);
+
+  // ── Ручное добавление партнёра ──
+  const createPartner = useCallback(async () => {
+    const name = partnerForm.name.trim();
+    if (!name) {
+      setPartnerError("Укажите название партнёра");
+      return;
+    }
+    setCreatingPartner(true);
+    setPartnerError("");
+    try {
+      await api.post("/partners", { name, countryCode: partnerForm.countryCode || undefined });
+      setPartnerForm({ name: "", countryCode: "" });
+      setShowPartnerCreate(false);
+      setPartnerPage(1);
+      await loadPartners();
+    } catch (e) {
+      setPartnerError((e as Error).message);
+    } finally {
+      setCreatingPartner(false);
+    }
+  }, [partnerForm, loadPartners]);
+
+  // ── Включить/выключить партнёра (активный ↔ неактивный) ──
+  const togglePartnerStatus = useCallback(
+    async (partner: Partner) => {
+      const next = partner.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+      // Оптимистично: статус виден сразу, при ошибке — перезагрузка списка.
+      setPartnerListData(
+        (prev) =>
+          prev && {
+            ...prev,
+            items: prev.items.map((p) => (p.id === partner.id ? { ...p, status: next } : p)),
+          },
+      );
+      try {
+        await api.patch(`/partners/${partner.id}/status`, { status: next });
+      } catch (e) {
+        setPartnerError((e as Error).message);
+        await loadPartners();
+      }
+    },
+    [loadPartners],
+  );
 
   // ── Partner Customer loading (partner context) ──
   const loadPartnerCustomers = useCallback(async () => {
@@ -369,6 +432,34 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                       ✕ {t('crm.filter.clear', locale)}
                     </button>
                   )}
+                  {canPartnerWrite && (
+                    <button onClick={() => setShowPartnerCreate((v) => !v)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50">
+                      {showPartnerCreate ? t('crm.cancel', locale) : t('crm.partner.add', locale)}
+                    </button>
+                  )}
+                  {canPartnerWrite && showPartnerCreate && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <input
+                        value={partnerForm.name}
+                        onChange={(e) => setPartnerForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder={t('crm.partner.name_placeholder', locale)}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                      />
+                      <input
+                        value={partnerForm.countryCode}
+                        onChange={(e) => setPartnerForm((f) => ({ ...f, countryCode: e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2) }))}
+                        placeholder={t('crm.partner.country_placeholder', locale)}
+                        className="w-20 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-400"
+                      />
+                      <button
+                        onClick={() => void createPartner()}
+                        disabled={creatingPartner}
+                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {creatingPartner ? t('crm.saving', locale) : t('crm.partner.add', locale)}
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
               <TableExportButton
@@ -448,6 +539,9 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                       <SortableHeader field="email" currentSort={sortState} onSort={handleSort}>{t("crm.col.email", locale)}</SortableHeader>
                       <SortableHeader field="country" currentSort={sortState} onSort={handleSort}>{t("crm.col.country", locale)}</SortableHeader>
                       <SortableHeader field="status" currentSort={sortState} onSort={handleSort}>{t("crm.col.status", locale)}</SortableHeader>
+                      {canPartnerWrite && (
+                        <th className="px-4 py-2 text-xs font-medium uppercase tracking-wide text-slate-400">{t("crm.col.actions", locale)}</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -458,10 +552,17 @@ function CrmContent({ initialTab, initialSortBy, initialSortDirection, initialCu
                         <td className="px-4 py-2.5 text-slate-500">{p.contactEmail ?? "—"}</td>
                         <td className="px-4 py-2.5 text-slate-500">{p.countryCode ?? "—"}</td>
                         <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
+                        {canPartnerWrite && (
+                          <td className="px-4 py-2.5">
+                            <button onClick={() => void togglePartnerStatus(p)} className="text-xs font-medium text-blue-600 hover:underline">
+                              {p.status === "ACTIVE" ? t("crm.partner.deactivate", locale) : t("crm.partner.activate", locale)}
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     {(partnerListData?.items ?? []).length === 0 && (
-                      <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">{t("crm.partners_empty", locale)}</td></tr>
+                      <tr><td colSpan={canPartnerWrite ? 6 : 5} className="px-4 py-8 text-center text-sm text-slate-400">{t("crm.partners_empty", locale)}</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -785,7 +886,7 @@ function CrmWithParams() {
 
 export default function CrmPage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<TabsPageSkeleton />}>
       <CrmWithParams />
     </Suspense>
   );

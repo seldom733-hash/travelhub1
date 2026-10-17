@@ -1,7 +1,14 @@
 "use client";
 
+import { CaretDown } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import { useWidestText } from "@/lib/measure-text";
+import { PICKER_CONTROL, PICKER_LABEL } from "./picker-styles";
+
+/** Правый отступ: место под свой шеврон (right-2 + иконка 12px + зазор). */
+const CARET_PAD = 24;
+/** Запас на расхождение canvas-замера и рендера. */
+const WIDTH_SLACK = 4;
 
 interface NightsRangeProps {
   /** id prefix — "tour-nights" / "hotel-nights" → -from / -to selects. */
@@ -11,71 +18,77 @@ interface NightsRangeProps {
   /** Selectable night values (supplier capability bounds). */
   options: number[];
   onChange: (from: number, to: number) => void;
-  /** HotelSearch renders 11/13px, TourSearch 13/15px. */
-  compact?: boolean;
 }
 
 /**
- * «Ночей от — до»: two selects that keep the invariant from ≤ to by fixing
- * the side the user just moved past the other bound.
+ * «Ночи»: два select'а с инвариантом from ≤ to.
+ *
+ * Раскладка (запрос владельца): подписи «от»/«до» вынесены ИЗ контролов и стоят
+ * НАД ними, слово «Ночи» — по центру, над тире между контролами. Внутри
+ * контрола остаётся только число, поэтому ширина считается по двузначному
+ * значению, а не по префиксу, и контролы стали узкими.
+ *
+ * Размеры берутся из picker-styles (единый размер для ВСЕХ форм поиска).
  */
-export default function NightsRange({ idPrefix, from, to, options, onChange, compact = false }: NightsRangeProps) {
+export default function NightsRange({ idPrefix, from, to, options, onChange }: NightsRangeProps) {
   const locale = useLocale();
-  const labelClass = `mb-0.5 block font-medium text-neutral-400 ${compact ? "text-[11px]" : "text-[13px]"}`;
-  const selectClass = `w-full rounded-xl border border-dark-border bg-dark-card py-2 pl-9 pr-3 text-white outline-none transition-colors focus:border-gold/50 ${
-    compact ? "text-[13px]" : "text-[15px]"
-  }`;
+  // Свой шеврон вместо нативного: у нативного <select> стрелка рисуется внутри
+  // content-box и при большом padding-left съедала значение.
+  const selectClass = `${PICKER_CONTROL} cursor-pointer appearance-none`;
 
   const handleFrom = (value: number) => onChange(value, value > to ? value : to);
   const handleTo = (value: number) => onChange(value < from ? value : from, value);
 
-  // Content-width: each select fits its longest possible value (2-digit
-  // nights) plus the «от/до» prefix rendered inside the control + paddings.
-  // useWidestText is SSR-safe (0 on server + hydration, measured after mount)
-  // — a direct widestText call inside useMemo would still diverge because the
-  // client re-measures with canvas and hydration compares the first render.
-  const digitPx = useWidestText(options.map(String), compact ? 13 : 15);
-  const prefixPx = useWidestText(
-    [t("search.nights_from", locale), t("search.nights_to", locale)],
-    compact ? 13 : 15,
-  );
-  // + left padding for prefix, + right padding, + native select caret /
-  // spinner breathing room (the caret overlaps the value if too tight).
-  const maxDigitPx = digitPx > 0 && prefixPx > 0 ? digitPx + prefixPx + (compact ? 52 : 62) : 0;
+  // Content-width: двузначное число («30») + свой шеврон. Префиксы больше не
+  // участвуют — они вне контрола. useWidestText is SSR-safe (0 on server).
+  const digitPx = useWidestText(options.map(String));
+  const controlWidth = digitPx > 0 ? digitPx + CARET_PAD + WIDTH_SLACK : undefined;
 
   const renderSelect = (kind: "from" | "to") => {
     const value = kind === "from" ? from : to;
-    const prefix = kind === "from" ? t("search.nights_from", locale) : t("search.nights_to", locale);
+    const label = kind === "from" ? t("search.nights_from", locale) : t("search.nights_to", locale);
     return (
-      <div className="relative" style={{ maxWidth: maxDigitPx > 0 ? maxDigitPx : undefined, flex: "1 1 0" }}>
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
-          {prefix}
-        </span>
-        <select
-          id={`${idPrefix}-${kind}`}
-          value={value}
-          aria-label={`${t("search.nights", locale)} ${prefix}`}
-          onChange={(e) => (kind === "from" ? handleFrom(Number(e.target.value)) : handleTo(Number(e.target.value)))}
-          className={selectClass}
-        >
-          {options.map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </select>
+      <div className="flex flex-col">
+        <label htmlFor={`${idPrefix}-${kind}`} className={PICKER_LABEL}>
+          {label}
+        </label>
+        <div className="relative" style={{ width: controlWidth, maxWidth: controlWidth }}>
+          <select
+            id={`${idPrefix}-${kind}`}
+            value={value}
+            aria-label={`${t("search.nights", locale)} ${label}`}
+            onChange={(e) => (kind === "from" ? handleFrom(Number(e.target.value)) : handleTo(Number(e.target.value)))}
+            className={selectClass}
+            style={{ paddingRight: CARET_PAD }}
+          >
+            {options.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <CaretDown
+            size={12}
+            weight="light"
+            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500"
+          />
+        </div>
       </div>
     );
   };
 
   return (
-    <div>
-      <label htmlFor={`${idPrefix}-from`} className={labelClass}>
-        {t("search.nights", locale)}
-      </label>
-      <div className="flex items-center gap-1.5">
-        {renderSelect("from")}
-        <span className="shrink-0 text-neutral-500">—</span>
-        {renderSelect("to")}
+    <div className="flex items-end gap-3">
+      {renderSelect("from")}
+      {/* «Ночи» — между контролами, над тире. Текст декоративный: смысл уже в
+          aria-label каждого select'а. */}
+      <div className="flex flex-col items-center pb-3">
+        <span className={PICKER_LABEL} aria-hidden="true">
+          {t("search.nights", locale)}
+        </span>
+        <span aria-hidden="true" className="shrink-0 leading-none text-neutral-500">
+          -
+        </span>
       </div>
+      {renderSelect("to")}
     </div>
   );
 }

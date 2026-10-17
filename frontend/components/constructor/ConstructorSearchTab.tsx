@@ -30,10 +30,16 @@ interface Props {
 }
 
 const ALL_SERVICES: SearchService[] = [
-  { id: "tours", labelKey: "constructor.search_tours", enabled: true },
-  { id: "hotels", labelKey: "constructor.search_hotels", enabled: true },
-  { id: "flights", labelKey: "constructor.search_flights", enabled: true },
-  { id: "sanatoriums", labelKey: "constructor.search_sanatoriums", enabled: false },
+  { id: "tours", labelKey: "search.tab_tours", enabled: true },
+  { id: "hotels", labelKey: "search.tab_hotels", enabled: true },
+  { id: "flights", labelKey: "search.tab_flights", enabled: true },
+  { id: "sanatoriums", labelKey: "search.tab_sanatoriums", enabled: false },
+  { id: "guides", labelKey: "search.tab_guides", enabled: false },
+  { id: "excursions", labelKey: "search.tab_excursions", enabled: false },
+  { id: "transfers", labelKey: "search.tab_transfers", enabled: false },
+  { id: "car-rental", labelKey: "search.tab_car_rental", enabled: false },
+  { id: "railway", labelKey: "search.tab_railway", enabled: false },
+  { id: "cruises", labelKey: "search.tab_cruises", enabled: false },
 ];
 
 export default function ConstructorSearchTab({ slug, config, onSaved, onSaving, onError }: Props) {
@@ -48,7 +54,7 @@ export default function ConstructorSearchTab({ slug, config, onSaved, onSaving, 
       : ALL_SERVICES;
     return {
       services,
-      defaultService: (config?.defaultService as string) ?? "hotels",
+      defaultService: (config?.defaultService as string) ?? "tours",
     };
   });
 

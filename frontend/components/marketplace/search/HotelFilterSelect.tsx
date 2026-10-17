@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Buildings, CaretDown, MagnifyingGlass, X } from "@phosphor-icons/react";
 import { useLocale } from "@/lib/i18n";
+import { PICKER_LABEL, PICKER_TRIGGER, PICKER_TRIGGER_TEXT } from "./picker-styles";
 
 export interface SupplierHotelOption {
   /** Supplier-neutral id (= hotel name — the only cross-supplier identity). */
@@ -41,15 +42,20 @@ export default function HotelFilterSelect({
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fetchedRegionRef = useRef<string | null>(null);
 
   const regionKey = `${region.geoCountry ?? ""}|${region.geoCity ?? ""}|${region.geoResort ?? ""}`;
 
   // Load the region's full hotel list on open (per region — one request).
   useEffect(() => {
     if (!open) return;
-    if (hotels !== null) return;
+    // Уже загружали для этого региона — не перезапрашиваем.
+    if (fetchedRegionRef.current === regionKey) return;
+    fetchedRegionRef.current = regionKey;
     let alive = true;
     setLoading(true);
+    setHotels(null);
+    setQuery("");
     const sp = new URLSearchParams();
     if (region.geoCountry) sp.set("geoCountry", region.geoCountry);
     if (region.geoCity) sp.set("geoCity", region.geoCity);
@@ -71,12 +77,6 @@ export default function HotelFilterSelect({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, regionKey]);
-
-  // Direction change → previous list is stale; selection is cleared by parent.
-  useEffect(() => {
-    setHotels(null);
-    setQuery("");
-  }, [regionKey]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -108,7 +108,7 @@ export default function HotelFilterSelect({
     <div className="relative w-full" ref={containerRef}>
       <label
         htmlFor="tour-hotel-filter"
-        className="mb-0.5 block text-[13px] font-medium text-neutral-400"
+        className={PICKER_LABEL}
       >
         {locale === "ru" ? "Отель" : locale === "az" ? "Otel" : "Hotel"}
       </label>
@@ -118,11 +118,11 @@ export default function HotelFilterSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-xl border border-dark-border bg-dark-card px-3 py-2 text-left outline-none transition-colors hover:border-gold/40 focus:border-gold/50"
+        className={PICKER_TRIGGER}
       >
         <Buildings size={14} weight="light" className="shrink-0 text-neutral-500" />
         <span
-          className={`min-w-0 flex-1 truncate text-[15px] ${value ? "text-white" : "text-neutral-500"}`}
+          className={`${PICKER_TRIGGER_TEXT} ${value ? "text-white" : "text-neutral-500"}`}
         >
           {label}
         </span>

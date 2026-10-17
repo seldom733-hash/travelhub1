@@ -989,20 +989,6 @@ export class PublicCatalogService {
   }
 
   /**
-   * Legacy-файл по slug (`<tourinc>-<hotelKey>.jpg` для туров,
-   * `htl-<hotelKey>.jpg` для отелей). Оставлен как fallback на время перехода
-   * на единый реестр: общее фото отеля может быть ещё не загружено, а старый
-   * файл уже лежит на диске.
-   */
-  private legacyHotelPhotoUrl(slug: string): string | null {
-    const tour = slug.match(/^[a-z]+-(\d+)-(\d+)/);
-    if (tour) return `/hotels/${tour[1]}-${tour[2]}.jpg`;
-    const hotel = slug.match(/^[a-z]+-hotel-[a-z]{2}-(\d+)/);
-    if (hotel) return `/hotels/htl-${hotel[1]}.jpg`;
-    return null;
-  }
-
-  /**
    * Фото из реестра одним запросом на страницу выдачи (§ единый каталог фото):
    * (supplierCode, hotelKey) → HotelSupplierRef → Hotel.photoFile.
    */
@@ -1031,11 +1017,15 @@ export class PublicCatalogService {
     return map;
   }
 
-  /** Фото отеля строки: реестр → legacy-файл по slug → null. */
+  /**
+   * Фото отеля строки: только единый реестр (HotelSupplierRef → Hotel.photoFile).
+   * Legacy-пути `/hotels/<tourinc>-<key>.jpg` и `/hotels/htl-<key>.jpg` удалены:
+   * файлов с такими именами на диске нет, каждый такой URL давал 404 на витрине.
+   */
   private hotelImageFor(row: PublicProductRow, map?: Map<string, string>): string | null {
     const key = PublicCatalogService.hotelRefKey(row.attributes);
     const fromRegistry = key && map ? map.get(key) : undefined;
-    return fromRegistry ?? this.legacyHotelPhotoUrl(row.slug);
+    return fromRegistry ?? null;
   }
 
   /** Фото отеля для одной строки (PDP) — без построения карты всей страницы. */
@@ -1051,7 +1041,9 @@ export class PublicCatalogService {
         return hotelPhotoUrl(ref.hotel.photoFile, ref.hotel.photoUpdatedAt);
       }
     }
-    return this.legacyHotelPhotoUrl(row.slug);
+    // Реестр не дал фото — карточка показывается без фото. Legacy-путь здесь
+    // удалён: файлов на диске нет, запрос давал 404 (см. hotelImageFor).
+    return null;
   }
 
   private toCard(

@@ -2,7 +2,7 @@
  * KOMPAS (Kompastour) supplier FX rates → AZN.
  *
  * Sets the supplier-specific «1 source = N AZN» rates for the KOMPAS CRM
- * partner (Partner.name = "KOMPAS"), stored by Partner.code (PRN-*):
+ * partner (Partner.name = "Kompastour"), stored by Partner.code (PRN-*):
  *
  *   1 USD = 1.706 AZN
  *   1 EUR = 1.9284 AZN
@@ -13,8 +13,13 @@
  * rate is a no-op (no history noise); a differing rate is an UPDATE that keeps
  * the old value in history.
  *
- * The KOMPAS adapter reads prices in USD; the read-path (storefront/search/
- * calendars) converts to AZN through SupplierFxRateService using this rate.
+ * §AZN: the KOMPAS adapter now REQUESTS AZN from the supplier
+ * (`CURRENCY=13`, see KOMPAS_CURRENCY_INC in kompas.adapter.ts), so the
+ * storefront/search/calendar path converts nothing — an AZN source is an
+ * identity in SupplierFxRateService.resolveSafe. These rates are therefore no
+ * longer applied to Kompas prices; they remain seeded as a safety net for rows
+ * the supplier still reports in another currency (e.g. EUR) and to keep the
+ * FX admin/audit trail of the historical USD-based contract.
  *
  * Run: npx ts-node src/seed/kompas-fx-seed.ts
  */
@@ -27,7 +32,7 @@ const prisma = new PrismaClient({
 });
 
 /** Partner looked up by name (the KOMPAS sync + FX resolver use this token). */
-const PARTNER_NAME = "KOMPAS";
+const PARTNER_NAME = "Kompastour";
 
 /** «1 sourceCurrency = N AZN» — the requested Kompastour default rates. */
 const RATES: ReadonlyArray<readonly [string, string]> = [
@@ -55,7 +60,7 @@ async function main(): Promise<void> {
   });
   if (!partner) {
     // Create the KOMPAS CRM partner on first run (code PRN-*, status ACTIVE).
-    // The sync + FX resolver both key off Partner.name === "KOMPAS".
+    // The sync + FX resolver both key off Partner.name === "Kompastour".
     partner = await prisma.$transaction(async (tx) => {
       const code = await nextCode(tx, "PRN");
       return tx.partner.create({

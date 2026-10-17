@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { t, useLocale } from "@/lib/i18n";
 import type { ServiceType, SearchContext } from "@/lib/search-engine";
+import { SEARCH_SERVICES } from "@/lib/search-services";
 import { useRouter } from "next/navigation";
 
 // Service-specific search forms
@@ -23,27 +24,32 @@ interface Tab {
   priority: "P0" | "P1" | "P2";
 }
 
-const TABS: Tab[] = [
-  { key: "tours", labelKey: "search.tab_tours", priority: "P0" },
-  { key: "hotels", labelKey: "search.tab_hotels", priority: "P0" },
-  { key: "flights", labelKey: "search.tab_flights", priority: "P0" },
-  { key: "sanatoriums", labelKey: "search.tab_sanatoriums", priority: "P0" },
-  { key: "guides", labelKey: "search.tab_guides", priority: "P1" },
-  { key: "excursions", labelKey: "search.tab_excursions", priority: "P1" },
-  { key: "transfers", labelKey: "search.tab_transfers", priority: "P1" },
-  { key: "car-rental", labelKey: "search.tab_car_rental", priority: "P1" },
-  { key: "railway", labelKey: "search.tab_railway", priority: "P2" },
-  { key: "cruises", labelKey: "search.tab_cruises", priority: "P2" },
-];
+/**
+ * Вкладки услуг берутся из единого списка (lib/search-services.ts) — того же,
+ * по которому строится конфиг включения услуг в workspace, чтобы списки не
+ * расходились.
+ */
+const TABS: Tab[] = SEARCH_SERVICES.map(({ id, labelKey, priority }) => ({
+  key: id,
+  labelKey,
+  priority,
+}));
 
 interface HeroSearchProps {
   /** Enabled service ids in display order (from published searchConfig). Undefined → all tabs, default order. */
   enabledServices?: string[];
   /** Initially selected service tab (from published searchConfig). */
   defaultService?: string;
+  /**
+   * Пользователь переключил вкладку услуги (не вызывается при монтировании).
+   * Нужен странице результатов: URL при переключении вкладки не меняется, и
+   * результаты предыдущей услуги не должны выглядеть как результаты текущей
+   * вкладки, пока не нажата кнопка поиска.
+   */
+  onTabChange?: (service: string) => void;
 }
 
-export default function HeroSearch({ enabledServices, defaultService }: HeroSearchProps = {}) {
+export default function HeroSearch({ enabledServices, defaultService, onTabChange }: HeroSearchProps = {}) {
   const locale = useLocale();
   const router = useRouter();
 
@@ -61,6 +67,13 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
       : orderedTabs[0]?.key ?? "tours";
 
   const [activeTab, setActiveTab] = useState<ServiceType>(initialTab);
+  // Вкладки и услуга по умолчанию приходят из конфига асинхронно (страница
+  // результатов грузит searchConfig после монтирования). Пока пользователь сам
+  // не переключил вкладку, следуем за конфигом; после ручного выбора — нет.
+  const tabPickedByUser = useRef(false);
+  useEffect(() => {
+    if (!tabPickedByUser.current) setActiveTab(initialTab);
+  }, [initialTab]);
   // «Сбросить все» → the form resets every picker (tours and hotels are the
   // services whose forms keep a restorable draft).
   const [resetSignal, setResetSignal] = useState(0);
@@ -135,7 +148,11 @@ export default function HeroSearch({ enabledServices, defaultService }: HeroSear
               key={tab.key}
               role="tab"
               aria-selected={activeTab === tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => {
+                tabPickedByUser.current = true;
+                setActiveTab(tab.key);
+                onTabChange?.(tab.key);
+              }}
               className={`rounded-lg px-3 py-1.5 text-[14px] font-medium transition-all ${
                 activeTab === tab.key
                   ? "bg-gold text-dark"

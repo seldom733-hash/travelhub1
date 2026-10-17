@@ -21,8 +21,10 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 
 export type Locale = "ru" | "az" | "en";
 
-export const LOCALES: readonly Locale[] = ["ru", "az", "en"] as const;
-export const DEFAULT_LOCALE: Locale = "ru";
+/** Порядок языков в переключателях: основной AZ — первый, далее RU, EN. */
+export const LOCALES: readonly Locale[] = ["az", "ru", "en"] as const;
+/** Язык по умолчанию (SSR, первый кадр, fallback словаря) — AZ. */
+export const DEFAULT_LOCALE: Locale = "az";
 
 /** Отображаемые имена языков (в их собственном написании). */
 export const LOCALE_NAMES: Record<Locale, string> = {
@@ -117,7 +119,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "search.date": { ru: "Дата", az: "Tarix", en: "Date" },
   "search.check_in": { ru: "Заезд", az: "Giriş", en: "Check-in" },
   "search.check_out": { ru: "Выезд", az: "Çıxış", en: "Check-out" },
-  "search.nights": { ru: "Ночей", az: "Gece", en: "Nights" },
+  "search.nights": { ru: "Ночи", az: "Gecə", en: "Nights" },
   "search.nights_from": { ru: "от", az: "min", en: "from" },
   "search.nights_to": { ru: "до", az: "maks", en: "to" },
   "search.adults": { ru: "Взрослые", az: "Böyüklər", en: "Adults" },
@@ -144,6 +146,23 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "search.select_hotel": { ru: "Выбрать отель", az: "Otel seçin", en: "Select hotel" },
   "search.optional": { ru: "Необязательно", az: "Məcburi deyil", en: "Optional" },
   "search.help_find": { ru: "Помочь найти", az: "Tapmağa kömək edin", en: "Help find" },
+  "search.help_sending": { ru: "Отправка…", az: "Göndərilir…", en: "Sending…" },
+  "search.help_sent": { ru: "Ваш запрос отправлен! Мы подберём варианты для вас.", az: "Sorğunuz göndərildi! Sizin üçün variantlar seçəcəyik.", en: "Your request has been sent! We'll find options for you." },
+  "search.global_placeholder": { ru: "Поиск отелей, туров, экскурсий и услуг…", az: "Otellər, turlar, ekskursiyalar və xidmətlər üzrə axtarış…", en: "Search hotels, tours, excursions and services…" },
+  "search.select_departure_city": { ru: "Выберите город вылета", az: "Uçuş şəhərini seçin", en: "Select departure city" },
+  "search.select_arrival_city": { ru: "Выберите город прилёта", az: "Gəliş şəhərini seçin", en: "Select arrival city" },
+  "search.select_date": { ru: "Выберите дату", az: "Tarix seçin", en: "Select date" },
+  "search.supplier": { ru: "Поставщик", az: "Təchizatçı", en: "Supplier" },
+  "search.suppliers": { ru: "Поставщики", az: "Təchizatçılar", en: "Suppliers" },
+  "search.all_suppliers": { ru: "Все поставщики", az: "Bütün təchizatçılar", en: "All suppliers" },
+  "search.tariff_baggage": { ru: "Тариф (багаж)", az: "Tarif (baqaj)", en: "Tariff (baggage)" },
+  "search.all": { ru: "Все", az: "Hamısı", en: "All" },
+  "search.child_n": { ru: "Ребёнок {n}", az: "Uşaq {n}", en: "Child {n}" },
+  "search.child_age_aria": { ru: "Возраст ребёнка {n}", az: "Uşaq {n} yaşı", en: "Child {n} age" },
+  "search.age_under_one": { ru: "< 1 года", az: "< 1 yaş", en: "< 1 year" },
+  "search.age_one": { ru: "1 год", az: "1 yaş", en: "1 year" },
+  "search.age_unit_few": { ru: "года", az: "yaş", en: "years" },
+  "search.age_unit_many": { ru: "лет", az: "yaş", en: "years" },
   "search.change_hotel": { ru: "Выбрать другой отель", az: "Başqa otel seçin", en: "Change hotel" },
   "search.no_offers": { ru: "Для выбранного отеля на эти даты подходящих предложений не найдено", az: "Seçilmiş otel üçün bu tarixlərdə uyğun təklif tapılmadı", en: "No matching offers found for the selected hotel on these dates" },
   "search.show_all": { ru: "Показать все результаты", az: "Bütün nəticələri göstər", en: "Show all results" },
@@ -1006,6 +1025,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
 
   // ── Footer constructor ────────────────────────────────────────────────
   "constructor.footer_brand_name": { ru: "Название", az: "Ad", en: "Name" },
+  "constructor.footer_brand_name_hint": { ru: "Название бренда наследуется из шапки сайта (единый источник истины).", az: "Brend adı saytın başlığından götürülür (vahid mənbə).", en: "Brand name is inherited from the Header tab (single source of truth)." },
   "constructor.footer_description": { ru: "Описание", az: "Təsvir", en: "Description" },
   "constructor.footer_phone": { ru: "Телефон", az: "Telefon", en: "Phone" },
   "constructor.footer_email": { ru: "Email", az: "E-poçt", en: "Email" },
@@ -1237,6 +1257,11 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "finance.obligations.pay.submit": { ru: "Создать выплату", az: "Ödəniş yarat", en: "Create payout" },
   "search.to_required": { ru: "Выберите направление (Куда)", az: "İstiqamət seçin (Hara)", en: "Select destination (To)" },
   "search.date_required": { ru: "Выберите дату", az: "Tarix seçin", en: "Select a date" },
+  "search.service_unavailable": {
+    ru: "На данный момент на платформе нет поставщиков, предоставляющих эту услугу",
+    az: "Hazırda platformada bu xidməti təqdim edən təchizatçı yoxdur",
+    en: "There are currently no suppliers providing this service on the platform",
+  },
   "search.suppliers_searching": { ru: "Необходимо время для получения данных от поставщиков. Может занять 1 мин.", az: "Təchizatçılardan məlumat almaq vaxt tələb edir. Təxminən 1 dəqiqə.", en: "Fetching data from suppliers takes a moment. May take up to 1 minute." },
   "hd.tabs.categories": { ru: "Категории отелей", az: "Otel kateqoriyaları", en: "Hotel categories" },
   "hd.tabs.room_types": { ru: "Типы номеров", az: "Otaq növləri", en: "Room types" },
@@ -1592,6 +1617,13 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.active_partners": { ru: "Активные", az: "Aktiv", en: "Active" },
   "crm.customers_empty": { ru: "Клиентов пока нет", az: "Hələ müştəri yoxdur", en: "No customers yet" },
   "crm.partners_empty": { ru: "Партнёров пока нет", az: "Hələ tərəfdaş yoxdur", en: "No partners yet" },
+  "crm.partner.add": { ru: "Добавить партнёра", az: "Partner əlavə et", en: "Add partner" },
+  "crm.partner.activate": { ru: "Включить", az: "Aktivləşdir", en: "Activate" },
+  "crm.partner.deactivate": { ru: "Выключить", az: "Deaktivləşdir", en: "Deactivate" },
+  "crm.partner.name_placeholder": { ru: "Название партнёра", az: "Partnerin adı", en: "Partner name" },
+  "crm.partner.country_placeholder": { ru: "Страна", az: "Ölkə", en: "Country" },
+  "crm.cancel": { ru: "Отмена", az: "Ləğv et", en: "Cancel" },
+  "crm.saving": { ru: "Сохранение…", az: "Saxlanır…", en: "Saving…" },
   "crm.col.code": { ru: "Код", az: "Kod", en: "Code" },
   "crm.col.name": { ru: "Имя", az: "Ad", en: "Name" },
   "crm.col.email": { ru: "Email", az: "E-poçt", en: "Email" },
@@ -1607,12 +1639,14 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "crm.col.reason": { ru: "Причина", az: "Səbəb", en: "Reason" },
   "crm.col.country": { ru: "Страна", az: "Ölkə", en: "Country" },
   "crm.col.partner": { ru: "Партнёр", az: "Tərəfdaş", en: "Partner" },
+  "crm.col.actions": { ru: "Действия", az: "Əməliyyatlar", en: "Actions" },
   "crm.filter.status.none": { ru: "Нет данных по фильтрам", az: "Filtreyə uyğun məlumat yoxdur", en: "No data matching filters" },
   "crm.type.person": { ru: "Физлицо", az: "Fiziki şəxs", en: "Person" },
   "crm.type.company": { ru: "Компания", az: "Şirkət", en: "Company" },
   "crm.filter.type.all": { ru: "Все типы", az: "Bütün növlər", en: "All types" },
   "crm.filter.status.all": { ru: "Все статусы", az: "Bütün statuslar", en: "All statuses" },
   "crm.filter.clear": { ru: "Сбросить", az: "Təmizlə", en: "Clear" },
+  "crm.filter.clear_dates": { ru: "Период", az: "Dövr", en: "Period" },
   "crm.status.active": { ru: "Активен", az: "Aktiv", en: "Active" },
   "crm.status.inactive": { ru: "Неактивен", az: "Qeyri-aktiv", en: "Inactive" },
   "crm.status.suspended": { ru: "Приостановлен", az: "Dayandırıldı", en: "Suspended" },
@@ -1859,6 +1893,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "common.to": { ru: "По", az: "-ə qədər", en: "To" },
   "common.loading": { ru: "Загрузка…", az: "Yüklənir…", en: "Loading…" },
   "common.back": { ru: "← Назад", az: "← Geri", en: "← Back" },
+  "common.close": { ru: "Закрыть", az: "Bağla", en: "Close" },
   "common.detail": { ru: "Подробнее", az: "Ətraflı", en: "Details" },
   "common.id": { ru: "ID", az: "ID", en: "ID" },
   // Finance payments page

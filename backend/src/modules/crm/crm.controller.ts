@@ -155,6 +155,11 @@ class CreatePartnerDto {
   countryCode?: string;
 }
 
+class UpdatePartnerStatusDto {
+  @IsEnum(EntityStatus)
+  status!: EntityStatus;
+}
+
 class CreateSupplierDto {
   @IsString()
   name!: string;
@@ -285,6 +290,21 @@ export class CrmController {
   @RequirePermissions("crm.partner.write")
   createPartner(@Body() dto: CreatePartnerDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.crm.createPartner(dto.name, dto.companyId, dto.countryCode, actor);
+  }
+
+  /**
+   * Включить/выключить партнёра (активный ↔ неактивный). Статус читают
+   * поисковые пикеры «Поставщики» (listSuppliersOfService) и резолвинг
+   * курсов: выключенный партнёр из формы исчезает.
+   */
+  @Patch("partners/:id/status")
+  @RequirePermissions("crm.partner.write")
+  updatePartnerStatus(
+    @Param("id") id: string,
+    @Body() dto: UpdatePartnerStatusDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.crm.updatePartnerStatus(id, dto.status, actor.username);
   }
 
   @Get("suppliers")

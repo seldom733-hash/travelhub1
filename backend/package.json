@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
-    "dev": "ts-node src/main.ts",
+    "dev": "ts-node --transpile-only src/main.ts",
+    "dev:typed": "ts-node src/main.ts",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:e2e": "jest --config test/jest-e2e.json --runInBand",
