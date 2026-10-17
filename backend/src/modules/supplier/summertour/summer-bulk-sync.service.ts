@@ -66,7 +66,7 @@ export class SummerBulkSyncService {
 
     // 1. Get partner and category
     const summerPartner = await this.prisma.partner.findFirst({
-      where: { name: "Summer / Summertour" },
+      where: { name: "Summertour" },
       select: { id: true },
     });
     if (!summerPartner) {

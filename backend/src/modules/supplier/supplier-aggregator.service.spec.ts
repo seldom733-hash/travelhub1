@@ -118,7 +118,7 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     };
 
     aggregator = new SupplierAggregatorService(
-      mockRegistry,
+      mockRegistry as unknown as SupplierAdapterRegistry,
       mockOfferService as unknown as SupplierOfferService,
       mockPrisma as unknown as PrismaService,
       mockFlightRegistry as unknown as FlightSupplierRegistry,
@@ -421,6 +421,7 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
 describe("SupplierAggregatorService.listSuppliersOfService (§4.7 registry SSOT)", () => {
   let aggregator: SupplierAggregatorService;
   let mockFlightRegistry: { list: jest.Mock; get: jest.Mock };
+  let mockRegistry: { getEntries: jest.Mock };
 
   beforeEach(() => {
     const config = (code: string) => ({
@@ -434,9 +435,9 @@ describe("SupplierAggregatorService.listSuppliersOfService (§4.7 registry SSOT)
         adapter: { code, name: code, enabled: true } as never,
         config: config(code) as never,
       }));
-    const mockRegistry = {
+    mockRegistry = {
       getEntries: entries,
-    } as unknown as SupplierAdapterRegistry;
+    } as unknown as { getEntries: jest.Mock };
     mockFlightRegistry = {
       list: jest.fn(() => ["AVIASALES", "AZAL"]),
       get: jest.fn((code: string) => ({
@@ -447,26 +448,70 @@ describe("SupplierAggregatorService.listSuppliersOfService (§4.7 registry SSOT)
       })),
     };
     aggregator = new SupplierAggregatorService(
-      mockRegistry,
+      mockRegistry as unknown as SupplierAdapterRegistry,
       {} as unknown as SupplierOfferService,
-      {} as unknown as PrismaService,
+      // CRM-имя поставщика: партнёра с таким токеном нет → остаётся имя адаптера.
+      { partner: { findFirst: jest.fn().mockResolvedValue(null) } } as unknown as PrismaService,
       mockFlightRegistry as unknown as FlightSupplierRegistry,
     );
   });
 
-  it("flights come from FlightSupplierRegistry ({code,name}, sorted by code)", () => {
-    expect(aggregator.listSuppliersOfService("flights")).toEqual([
+  it("flights come from FlightSupplierRegistry ({code,name}, sorted by code)", async () => {
+    await expect(aggregator.listSuppliersOfService("flights")).resolves.toEqual([
       { code: "AVIASALES", name: "Aviasales" },
       { code: "AZAL", name: "AZAL" },
     ]);
     expect(mockFlightRegistry.list).toHaveBeenCalledTimes(1);
   });
 
-  it("tours come from the tour adapter registry (unchanged)", () => {
-    expect(aggregator.listSuppliersOfService("tours")).toEqual([
+  it("tours come from the tour adapter registry (unchanged)", async () => {
+    await expect(aggregator.listSuppliersOfService("tours")).resolves.toEqual([
       { code: "KOMPAS", name: "KOMPAS" },
       { code: "SUMMERTOUR", name: "SUMMERTOUR" },
     ]);
     expect(mockFlightRegistry.list).not.toHaveBeenCalled();
+  });
+
+  it("имена поставщиков берутся из CRM-партнёров (KOMPAS → Kompastour)", async () => {
+    const prisma = {
+      partner: {
+        findFirst: jest.fn(async ({ where }: { where?: { name?: { equals?: string } } } = {}) =>
+          where?.name?.equals === "Kompastour"
+            ? { code: "PRN-00000002", name: "Kompastour", status: "ACTIVE" }
+            : null,
+        ),
+      },
+    } as unknown as PrismaService;
+    const withCrm = new SupplierAggregatorService(
+      mockRegistry as unknown as SupplierAdapterRegistry,
+      {} as unknown as SupplierOfferService,
+      prisma,
+      mockFlightRegistry as unknown as FlightSupplierRegistry,
+    );
+    await expect(withCrm.listSuppliersOfService("tours")).resolves.toEqual([
+      { code: "KOMPAS", name: "Kompastour" },
+      { code: "SUMMERTOUR", name: "SUMMERTOUR" },
+    ]);
+  });
+
+  it("поставщик с выключенным в CRM партнёром из пикера исчезает", async () => {
+    const prisma = {
+      partner: {
+        findFirst: jest.fn(async ({ where }: { where?: { name?: { equals?: string } } } = {}) =>
+          where?.name?.equals === "Kompastour"
+            ? { code: "PRN-00000002", name: "Kompastour", status: "INACTIVE" }
+            : null,
+        ),
+      },
+    } as unknown as PrismaService;
+    const withCrm = new SupplierAggregatorService(
+      mockRegistry as unknown as SupplierAdapterRegistry,
+      {} as unknown as SupplierOfferService,
+      prisma,
+      mockFlightRegistry as unknown as FlightSupplierRegistry,
+    );
+    await expect(withCrm.listSuppliersOfService("tours")).resolves.toEqual([
+      { code: "SUMMERTOUR", name: "SUMMERTOUR" },
+    ]);
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { t, useLocale } from "@/lib/i18n";
+import { resolveSearchServices } from "@/lib/search-services";
 import HeroSearch from "./HeroSearch";
 
 /** Published search configuration shape (Constructor → searchConfig). */
@@ -12,23 +13,11 @@ export interface SearchBlockConfig {
 export default function SearchBlock({ config }: { config?: SearchBlockConfig | null }) {
   const locale = useLocale();
 
-  const configuredServices =
-    config?.services?.filter((s) => s.enabled).map((s) => s.id) ?? null;
-
-  // Flights are supplied by the flight supplier layer, not by published
-  // marketplace products. Therefore the absence of a "flights" entry in the
-  // published searchConfig must not hide the flight search UI.
-  // If flights are explicitly configured, respect that configuration
-  // (including an explicit disabled state).
-  const hasExplicitFlightConfig =
-    config?.services?.some((service) => service.id === "flights") ?? false;
-
-  const enabledServices =
-    configuredServices && !hasExplicitFlightConfig
-      ? [...configuredServices, "flights"]
-      : configuredServices;
-
-  const defaultService = config?.defaultService;
+  // Единственный источник истины — опубликованный searchConfig страницы
+  // marketplace-home (workspace → page-builder → вкладка «Поиск»). Если конфига
+  // ещё нет, включаются только услуги с реальными поставщиками
+  // (tours/hotels/flights) — остальные выключены. См. lib/search-services.ts.
+  const { enabled, defaultService } = resolveSearchServices(config ?? null);
 
   return (
     <section className="relative z-20 -mt-8 bg-dark sm:-mt-10">
@@ -37,7 +26,7 @@ export default function SearchBlock({ config }: { config?: SearchBlockConfig | n
           <h2 className="mb-4 text-center font-serif text-xl font-semibold text-white sm:text-2xl">
             {t("search.block_title", locale)}
           </h2>
-          <HeroSearch enabledServices={enabledServices ?? undefined} defaultService={defaultService} />
+          <HeroSearch enabledServices={enabled} defaultService={defaultService} />
         </div>
       </div>
     </section>

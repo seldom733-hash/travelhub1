@@ -570,7 +570,7 @@ export class SummerSyncService {
 
   private async getSummerPartner() {
     return this.prisma.partner.findFirst({
-      where: { name: "Summer / Summertour" },
+      where: { name: "Summertour" },
       select: { id: true, code: true, name: true },
     });
   }

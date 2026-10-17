@@ -4,6 +4,11 @@
  * Implements SupplierAdapter for the KOMPAS/SAMO platform.
  * §7: Departure city fixed to Baku (TOWNFROMINC=1411).
  * §10: Discovers all countries and programs from Baku.
+ * §AZN: every price request carries CURRENCY=13 → the supplier answers in AZN
+ * (SAMO `envCurrencyAznInc`, owner-verified request; mirrors ANEX's
+ * `ANEX_CURRENCY_INC=26`). The read-path then converts nothing: an AZN source
+ * is an identity in SupplierFxRateService.resolveSafe, and markup is applied
+ * to the AZN amount (convert-then-markup degenerates to markup-only).
  *
  * CAPTCHA Human-in-the-Loop (implemented 20.09):
  * KOMPAS may return real CAPTCHA (#captchaForm / #icaptcha.captcha-self data:image/jpeg;base64).
@@ -84,6 +89,30 @@ export function applyKompasAgesParam(url: string, childAges: number[]): string {
 }
 
 /**
+ * §AZN: SAMO currency id for AZN (`envCurrencyAznInc` on the KOMPAS site).
+ *
+ * The site's own form posts CURRENCY=2 (USD) by default; asking for AZN means
+ * the supplier itself does the conversion, so the read-path must not convert
+ * again (AZN source → identity in SupplierFxRateService.resolveSafe). Mirrors
+ * the ANEX pattern (`ANEX_CURRENCY_INC = "26"` → AZN).
+ */
+export const KOMPAS_CURRENCY_INC = "13";
+
+/**
+ * Force the supplier-facing CURRENCY param on a PRICES URL — the network-layer
+ * twin of `applyKompasAgesParam`. Applied in BOTH PRICES interceptors
+ * (search() + searchReusePage()) so the form's own default (CURRENCY=2 → USD)
+ * can never leak USD numbers into the AZN pipeline, including pagination and
+ * the nights fan-out (every follow-up PRICES request goes through the same
+ * interceptor).
+ */
+export function applyKompasCurrencyParam(url: string): string {
+  return /CURRENCY=/.test(url)
+    ? url.replace(/CURRENCY=[^&]*/g, `CURRENCY=${KOMPAS_CURRENCY_INC}`)
+    : `${url}${url.includes("?") && !url.endsWith("?") ? "&" : ""}CURRENCY=${KOMPAS_CURRENCY_INC}`;
+}
+
+/**
  * One parsed `tr.price_info` row from a `/search_hotel` PRICES response.
  * Field names mirror the DOM classes / class-key tokens on the row (see
  * probe 2026-10-12): the row structure is identical to the tour search, but
@@ -110,7 +139,7 @@ export interface KompasHotelRawRow {
   room: string;
   /** Visible converted price (the number in data-converted-price-number). */
   price: number;
-  /** Supplier currency code (data-currency_title, e.g. «USD»). */
+  /** Supplier currency code (data-currency_title — «AZN» since §AZN, «USD» in legacy captures). */
   currency: string;
   /** hotel_redirect.php target — yields country/city/slug (/turkey/bodrum/hotel/). */
   hotelHref: string;
@@ -339,6 +368,11 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         document.getElementById("samo_popup")?.remove();
         document.getElementById("samo_popup_mini")?.remove();
       });
+
+      // §AZN: ask for AZN (CURRENCY=13) BEFORE the dependent selects — a
+      // currency change may re-render the form; the PRICES interceptor below
+      // guarantees the param on the wire regardless of the control's presence.
+      await this.setSamoSelect(page, "CURRENCY", KOMPAS_CURRENCY_INC, true);
 
       // §7: TOWNFROMINC = Baku ALWAYS
       await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
@@ -613,6 +647,10 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         // on this page (search + pagination), independent of the form's
         // AGE1..AGE3 selects.
         url = applyKompasAgesParam(url, query.childAges ?? []);
+        // §AZN: CURRENCY=13 on EVERY PRICES request (search, pagination and
+        // the nights fan-out all pass this interceptor) — the form's own
+        // default is CURRENCY=2 (USD).
+        url = applyKompasCurrencyParam(url);
         if (routeDates) {
           url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`)
                    .replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
@@ -1464,6 +1502,11 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     // but re-applies dates and clicks search. For full correctness we reuse the same
     // filter-setting logic but without creating a new context.
     await page.waitForTimeout(500);
+    // §AZN: same AZN request as search() — the resumed page keeps its own
+    // form, so set the currency control before the re-submit (quiet: the
+    // form may lack it, and the direct-PRICES fallback below carries CURRENCY
+    // explicitly anyway).
+    await this.setSamoSelect(page, "CURRENCY", KOMPAS_CURRENCY_INC, true);
     // Re-apply dates if present
     if (query.departureDateFrom && query.departureDateTo) {
       const begDate = this.isoToSamodate(query.departureDateFrom);
@@ -1494,6 +1537,8 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     let pricesUrl = `${this.baseUrl}/search_tour?samo_action=PRICES`;
     if (routeDates) pricesUrl += `&CHECKIN_BEG=${routeDates.beg}&CHECKIN_END=${routeDates.end}`;
     pricesUrl += `&FREIGHT=1&FILTER=1`;
+    // §AZN: this branch bypasses the form, so the currency is explicit here.
+    pricesUrl += `&CURRENCY=${KOMPAS_CURRENCY_INC}`;
     // Keep the program scope: without TOURINC the URL falls back to the
     // form's default program — generic searches must stay TOURINC=0.
     pricesUrl += `&TOURINC=${query.tourIncValue || "0"}`;
@@ -1637,6 +1682,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     await page.goto(`${this.baseUrl}/search_tour`, { waitUntil: "networkidle", timeout: 60_000 });
     await page.waitForFunction(() => typeof (window as any).samo !== "undefined" && (window as any).samo.page_ready === true, { timeout: 15_000 });
     await page.evaluate(() => { document.getElementById("samo_popup")?.remove(); document.getElementById("samo_popup_mini")?.remove(); });
+    // §AZN: ask for AZN on the reuse/calendar/refresh path too (form control;
+    // the interceptor below guarantees it on the wire).
+    await this.setSamoSelect(page, "CURRENCY", KOMPAS_CURRENCY_INC, true);
     await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
     await page.waitForTimeout(2_000);
     const stateId =
@@ -1736,6 +1784,8 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       // §AGES: same confirmed canonical mapping as the main search() route —
       // the reuse/refresh path must not lose multi-child ages either.
       url = applyKompasAgesParam(url, query.childAges ?? []);
+      // §AZN: same currency guarantee as the main search() interceptor.
+      url = applyKompasCurrencyParam(url);
       if (routeDates) url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`).replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
       if (!url.includes("FREIGHT=")) url += "&FREIGHT=1"; else url = url.replace(/FREIGHT=\d+/g, "FREIGHT=1");
       if (!url.includes("FILTER=")) url += "&FILTER=1"; else url = url.replace(/FILTER=\d+/g, "FILTER=1");
@@ -2008,7 +2058,10 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         const price = priceEl?.getAttribute("data-converted-price-number")
           ?? priceEl?.getAttribute("data-cat-price")
           ?? "0";
-        const currency = priceEl?.getAttribute("data-currency_title") ?? "USD";
+        // §AZN: prices are requested in AZN (CURRENCY=13); data-converted-price-number
+        // is the AZN price the user sees on the site. data-currency_title may say
+        // "USD" (Kompas quirk for tours) — ignore the label, the number is in AZN.
+        const currency = "AZN";
         const departureDate = row.querySelector(".sortie")?.textContent?.trim() ?? "";
         const transport = row.querySelector(".transport")?.textContent?.trim() ?? "";
 
@@ -2864,7 +2917,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       `&CHECKIN_END=${encodeURIComponent(opts.checkInEnd)}` +
       `&NIGHTS_TILL=${encodeURIComponent(opts.nightsTo)}` +
       `&ADULT=${encodeURIComponent(opts.adults)}` +
-      `&CURRENCY=2` +
+      // §AZN: the site's hotel form posts CURRENCY=2 (USD); we ask for AZN so
+      // the supplier performs the conversion and the read-path does not.
+      `&CURRENCY=${KOMPAS_CURRENCY_INC}` +
       `&CHILD=${encodeURIComponent(opts.children)}` +
       ages +
       towns +
@@ -2952,7 +3007,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
             meal: cells[6]?.textContent?.trim() || "",
             room: cells[7]?.textContent?.trim() || "",
             price: toNum(priceEl?.getAttribute("data-converted-price-number")),
-            currency: priceEl?.getAttribute("data-currency_title") || "",
+            currency: "AZN",
             hotelHref: hotelLink?.getAttribute("href") || "",
           };
         });

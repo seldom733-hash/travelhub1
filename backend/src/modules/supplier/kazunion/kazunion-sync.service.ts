@@ -65,7 +65,7 @@ export class KazunionSyncService {
   /** Find (or create) the KazUnion supplier partner under the unified PRN-* code scheme. */
   async getKazunionPartner(): Promise<{ id: string } | null> {
     const existing = await this.prisma.partner.findFirst({
-      where: { name: "KazUnion" },
+      where: { name: "Kazunion" },
     });
     if (existing) return existing;
     // Unified supplier registry: create with a canonical PRN-* business code
@@ -73,7 +73,7 @@ export class KazunionSyncService {
     const code = await this.ids.nextCode(null, "PRN");
     this.logger.log(`KazUnion partner not found — creating ${code}`);
     return this.prisma.partner.create({
-      data: { code, name: "KazUnion", status: "ACTIVE" },
+      data: { code, name: "Kazunion", status: "ACTIVE" },
     });
   }
 

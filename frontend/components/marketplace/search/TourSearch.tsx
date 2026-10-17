@@ -20,6 +20,20 @@ import HotelStarsSelect from "./HotelStarsSelect";
 import HotelFilterSelect from "./HotelFilterSelect";
 import { useClickOutside } from "./useClickOutside";
 import {
+  PICKER_CHECKBOX,
+  PICKER_CONTROL,
+  PICKER_CONTROL_ICON,
+  PICKER_LABEL,
+  PICKER_ROW,
+  PICKER_SUBMIT,
+  PICKER_TRIGGER,
+  PICKER_TRIGGER_TEXT,
+  PICKER_W_DATE_RANGE,
+  PICKER_W_FROM,
+  PICKER_W_NIGHTS,
+  PICKER_W_TO,
+} from "./picker-styles";
+import {
   clearTourDraft,
   readTourDraft,
   writeTourDraft,
@@ -309,9 +323,9 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
       {/* Flex-wrap layout: every control takes its content width (sized to the
           longest text it can hold) and wraps naturally instead of being
           stretched over equal grid columns. */}
-      <div className="flex flex-wrap items-end gap-3">
+      <div className={PICKER_ROW}>
         {/* From — Azerbaijan cities from the directory */}
-        <div className="min-w-[180px] flex-[1_1_180px]">
+        <div className={PICKER_W_FROM}>
         <DirectorySelect
           id="tour-from"
           label={t("search.from", locale)}
@@ -329,7 +343,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
 
         {/* To: single dropdown with nested Country → City → Resort
             lists, each with its own live search. */}
-        <div className="min-w-[200px] flex-[1_1_200px]">
+        <div className={PICKER_W_TO}>
         <DestinationPicker
           id="tour-to"
           label={t("search.to", locale)}
@@ -349,44 +363,50 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         />
         </div>
 
-        {/* Departure date range «вылет от — до» */}
-        <div className="min-w-[240px] flex-[1_1_240px]">
-          <label htmlFor="tour-date-from" className="mb-0.5 block text-[13px] font-medium text-neutral-400">
-            {t("search.date", locale)}
-          </label>
-          <div className="flex items-center gap-1.5">
+        {/* Departure date range: слово «Дата» — по центру, НАД тире между полями
+            (та же раскладка, что у пикера ночей). */}
+        <div className={PICKER_W_DATE_RANGE}>
+          <div className="flex items-end gap-3">
             <div className="relative" style={{ maxWidth: datePx + 76, flex: "1 1 0" }}>
               <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
               <input
                 id="tour-date-from"
                 type="date"
+                aria-label={`${t("search.date", locale)} ${t("search.nights_from", locale)}`}
                 value={startDate}
                 onChange={(e) => {
                   const v = e.target.value;
                   setStartDate(v);
                   if (endDate && endDate < v) setEndDate(v);
                 }}
-                className="w-full rounded-xl border border-dark-border bg-dark-card py-2 pl-9 pr-3 text-[15px] text-white outline-none transition-colors focus:border-gold/50"
+                className={PICKER_CONTROL_ICON}
               />
             </div>
-            <span className="shrink-0 text-neutral-500">—</span>
+            <div className="flex flex-col items-center pb-3">
+              <span className={PICKER_LABEL} aria-hidden="true">
+                {t("search.date", locale)}
+              </span>
+              <span aria-hidden="true" className="shrink-0 leading-none text-neutral-500">
+                -
+              </span>
+            </div>
             <div className="relative" style={{ maxWidth: datePx + 76, flex: "1 1 0" }}>
               <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
               <input
                 id="tour-date-to"
                 type="date"
-                aria-label={`${t("search.date", locale)} — до`}
+                aria-label={`${t("search.date", locale)} ${t("search.nights_to", locale)}`}
                 value={endDate}
                 min={startDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-xl border border-dark-border bg-dark-card py-2 pl-9 pr-3 text-[15px] text-white outline-none transition-colors focus:border-gold/50"
+                className={PICKER_CONTROL_ICON}
               />
             </div>
           </div>
         </div>
 
         {/* Nights — range «от–до» */}
-        <div className="min-w-[160px] flex-[1_1_160px]">
+        <div className={PICKER_W_NIGHTS}>
         <NightsRange
           idPrefix="tour-nights"
           from={nightsFrom}
@@ -400,17 +420,17 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className={PICKER_ROW}>
         {/* Adults */}
         <div style={{ maxWidth: digitPx + 56 }}>
-          <label htmlFor="tour-adults" className="mb-0.5 block text-[13px] font-medium text-neutral-400">
+          <label htmlFor="tour-adults" className={PICKER_LABEL}>
             {t("search.adults", locale)}
           </label>
           <select
             id="tour-adults"
             value={adults}
             onChange={(e) => setAdults(Number(e.target.value))}
-            className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[15px] text-white outline-none transition-colors focus:border-gold/50"
+            className={PICKER_CONTROL}
           >
             {[1, 2, 3, 4, 5, 6].map((n) => (
               <option key={n} value={n}>{n}</option>
@@ -420,7 +440,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
 
         {/* Children */}
         <div style={{ maxWidth: digitPx + 56 }}>
-          <label htmlFor="tour-children" className="mb-0.5 block text-[13px] font-medium text-neutral-400">
+          <label htmlFor="tour-children" className={PICKER_LABEL}>
             {t("search.children", locale)}
           </label>
           <select
@@ -431,7 +451,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
               setChildren(val);
               setChildAges(Array(val).fill(0));
             }}
-            className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[15px] text-white outline-none transition-colors focus:border-gold/50"
+            className={PICKER_CONTROL}
           >
             {[0, 1, 2, 3, 4, 5].map((n) => (
               <option key={n} value={n}>{n}</option>
@@ -442,7 +462,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         {/* Suppliers («Поставщики») — all tour suppliers, multi-select;
             empty = every supplier. */}
         <div className="min-w-[150px] flex-[1_1_150px]">
-          <label htmlFor="tour-suppliers" className="mb-0.5 block text-[13px] font-medium text-neutral-400">
+          <label htmlFor="tour-suppliers" className={PICKER_LABEL}>
             {locale === "ru" ? "Поставщики" : locale === "az" ? "Təchizatçılar" : "Suppliers"}
           </label>
           <div className="relative" ref={suppliersRef}>
@@ -452,10 +472,10 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
               aria-haspopup="listbox"
               aria-expanded={suppliersOpen}
               onClick={() => setSuppliersOpen((v) => !v)}
-              className="flex w-full items-center gap-2 rounded-xl border border-dark-border bg-dark-card px-3 py-2 text-left outline-none transition-colors hover:border-gold/40 focus:border-gold/50"
+              className={PICKER_TRIGGER}
             >
               <span
-                className={`min-w-0 flex-1 truncate text-[15px] ${selectedSuppliers.length ? "text-white" : "text-neutral-500"}`}
+                className={`${PICKER_TRIGGER_TEXT} ${selectedSuppliers.length ? "text-white" : "text-neutral-500"}`}
               >
                 {selectedSuppliers.length
                   ? selectedSuppliers
@@ -527,7 +547,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
                     );
                   })}
                   {supplierOptions.length === 0 && (
-                    <li className="px-3 py-3 text-center text-[14px] text-neutral-500">Загрузка…</li>
+                    <li className="px-3 py-3 text-center text-[14px] text-neutral-500">{t("common.loading", locale)}</li>
                   )}
                 </ul>
                 {selectedSuppliers.length > 0 && (
@@ -547,7 +567,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         </div>
 
         {/* Hotel star categories — per-country supplier dictionaries */}
-        <div className="min-w-[160px] flex-[1_1_160px]">
+        <div className={PICKER_W_NIGHTS}>
           <HotelStarsSelect
             selected={hotelStars}
             onChange={setHotelStars}
@@ -557,7 +577,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
 
         {/* Select hotel checkbox */}
         <div className="flex items-end">
-          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-dark-border bg-dark-card px-4 py-2 text-[15px] text-neutral-300 transition-colors hover:border-gold/30 hover:text-white">
+          <label className={PICKER_CHECKBOX}>
             <input
               type="checkbox"
               checked={selectHotel}
@@ -628,7 +648,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         type="submit"
         disabled={!canSubmit}
         title={!canSubmit ? (!destination ? t("search.to_required", locale) : t("search.date_required", locale)) : undefined}
-        className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-[15px] font-semibold transition-opacity ${!canSubmit ? "cursor-not-allowed bg-neutral-700 text-neutral-400 opacity-60" : "btn-gold"}`}
+        className={`${!canSubmit ? "cursor-not-allowed bg-neutral-700 text-neutral-400 opacity-60" : "btn-gold"} ${PICKER_SUBMIT}`}
       >
         <span>{t("marketplace.search_submit", locale)}</span>
         <ArrowRight size={16} weight="bold" />

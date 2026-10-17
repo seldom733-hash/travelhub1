@@ -29,6 +29,7 @@ import { NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { toMoney2 } from "../sales/sales.money";
 import { validateIsoCode, validateRate } from "./finance.validation";
 import { DEFAULT_SUPPLIER_FX_RATES } from "../../shared/supplier-fx-defaults";
+import { SUPPLIER_TOKEN_CRM_NAMES } from "../supplier/supplier-crm-names";
 
 /** Актор мутации курса (как MarkupRuleService/CommissionPolicyService). */
 export interface Actor {
@@ -93,15 +94,14 @@ export const TARGET_AZN = "AZN";
  */
 const NORMALIZE_TOKEN = (s: string): string => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-/** Legacy-исключения, не покрытые нормализацией имён (шаг 3 — последний шанс). */
-const SUPPLIER_PARTNER_NAMES: Record<string, string[]> = {
-  KAZUNION: ["KazUnion"],
-  KOMPAS: ["KOMPAS"],
-  SUMMERTOUR: ["Summer / Summertour", "Summertour"],
-  AZAL: ["AZAL", "Azal"],
-  AVIASALES: ["Aviasales"],
-  ANEX: ["ANEX", "Anex"],
-};
+/**
+ * Legacy-фолбэк по имени Partner (шаг 3 — последний шанс). Производное от
+ * SUPPLIER_TOKEN_CRM_NAMES (supplier-crm-names.ts): имена партнёров живут в
+ * CRM, здесь только каноническое имя для каждого токена адаптера.
+ */
+const SUPPLIER_PARTNER_NAMES: Record<string, string[]> = Object.fromEntries(
+  Object.entries(SUPPLIER_TOKEN_CRM_NAMES).map(([token, name]) => [token, [name]]),
+);
 
 @Injectable()
 export class SupplierFxRateService {

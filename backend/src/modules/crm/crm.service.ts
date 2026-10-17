@@ -665,6 +665,17 @@ export class CrmService {
     });
   }
 
+  /**
+   * Смена статуса партнёра (активный ↔ неактивный). Статус читают поисковые
+   * пикеры «Поставщики» (listSuppliersOfService) и резолвинг курсов — у
+   * выключенного партнёра поставщика в форме больше нет.
+   */
+  async updatePartnerStatus(id: string, status: EntityStatus, actor?: string) {
+    const existing = await this.prisma.partner.findUnique({ where: { id }, select: { id: true } });
+    if (!existing) throw new NotFoundError(`Partner ${id} not found`);
+    return this.prisma.partner.update({ where: { id }, data: { status } });
+  }
+
   async createSupplier(name: string, companyId?: string, actor?: Actor) {
     return this.prisma.$transaction(async (tx) => {
       const code = await this.ids.nextCode(tx, "SUP");

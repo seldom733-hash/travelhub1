@@ -22,6 +22,8 @@ export interface HotelSearchDraft {
   adults: number;
   children: number;
   childAges: number[];
+  /** Выбранные поставщики (коды адаптеров); пусто = все поставщики отеля. */
+  selectedSuppliers: string[];
 }
 
 const BASE_KEY = "th.hotelSearchDraft.v1";

@@ -7,7 +7,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
-import { KompasSupplierAdapter } from "./kompas.adapter";
+import { KompasSupplierAdapter, KOMPAS_CURRENCY_INC } from "./kompas.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import type { SupplierOffer } from "../supplier.types";
 
@@ -49,7 +49,7 @@ export class KompasSyncService {
   ) {}
 
   async getKompasPartner(): Promise<{ id: string } | null> {
-    return this.prisma.partner.findFirst({ where: { name: "KOMPAS" } });
+    return this.prisma.partner.findFirst({ where: { name: "Kompastour" } });
   }
 
   /**
@@ -72,7 +72,7 @@ export class KompasSyncService {
       errors: [],
     };
 
-    const kompasPartner = await this.prisma.partner.findFirst({ where: { name: "KOMPAS" } });
+    const kompasPartner = await this.prisma.partner.findFirst({ where: { name: "Kompastour" } });
     if (!kompasPartner) {
       result.errors.push("KOMPAS partner not found");
       return result;
@@ -204,7 +204,10 @@ export class KompasSyncService {
         let minPrice = validOffers.length > 0
           ? Math.min(...validOffers.map((o) => o.price.amount))
           : 0;
-        const currency = validOffers[0]?.price.currency ?? "USD";
+        // §AZN: offers carry the currency the adapter requested (CURRENCY=13 →
+        // AZN); the literal is only reached if a valid offer has no currency
+        // label at all — fall back to the requested one, never to USD.
+        const currency = validOffers[0]?.price.currency || "AZN";
         // Markup boundary (§9): Tariff/startingPrice are customer-facing —
         // write the PUBLIC price. Offers already priced by another boundary
         // pass through untouched (NO DOUBLE MARKUP).

@@ -157,13 +157,23 @@ export function normalizeLegacyCompanyName(record: unknown): string | undefined 
 }
 
 export const DEFAULT_SEARCH_CONFIG: Record<string, unknown> = {
+  // Канонический список услуг поисковика = список вкладок HeroSearch
+  // (frontend/lib/search-services.ts). По умолчанию включены только услуги с
+  // реальными поставщиками: туры, отели, авиа. Остальные админ включает в
+  // workspace (page-builder → вкладка «Поиск»).
   services: [
-    { id: "tours", labelKey: "constructor.search_tours", enabled: true },
-    { id: "hotels", labelKey: "constructor.search_hotels", enabled: true },
-    { id: "flights", labelKey: "constructor.search_flights", enabled: true },
-    { id: "sanatoriums", labelKey: "constructor.search_sanatoriums", enabled: false },
+    { id: "tours", labelKey: "search.tab_tours", enabled: true },
+    { id: "hotels", labelKey: "search.tab_hotels", enabled: true },
+    { id: "flights", labelKey: "search.tab_flights", enabled: true },
+    { id: "sanatoriums", labelKey: "search.tab_sanatoriums", enabled: false },
+    { id: "guides", labelKey: "search.tab_guides", enabled: false },
+    { id: "excursions", labelKey: "search.tab_excursions", enabled: false },
+    { id: "transfers", labelKey: "search.tab_transfers", enabled: false },
+    { id: "car-rental", labelKey: "search.tab_car_rental", enabled: false },
+    { id: "railway", labelKey: "search.tab_railway", enabled: false },
+    { id: "cruises", labelKey: "search.tab_cruises", enabled: false },
   ],
-  defaultService: "hotels",
+  defaultService: "tours",
 };
 
 export const DEFAULT_FOOTER_CONFIG: Record<string, unknown> = {

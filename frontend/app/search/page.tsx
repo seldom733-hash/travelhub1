@@ -9,6 +9,8 @@ import TourResultsTable from "@/components/supplier/TourResultsTable";
 import { t, useLocale } from "@/lib/i18n";
 import type { ServiceType, SearchContext } from "@/lib/search-engine";
 import { publicApi, type PublicListResult } from "@/lib/public-api";
+import { useConstructorPublished } from "@/lib/use-constructor-published";
+import { resolveSearchServices, type SearchServicesConfig } from "@/lib/search-services";
 import {
   searchSupplierOffersAll,
   searchSupplierResolve,
@@ -56,8 +58,20 @@ function parseNightsRange(params: Record<string, string>): { from?: number; to?:
 export default function SearchResultsPage() {
   return (
     <Suspense fallback={
+      /* §SKELETON-PARITY: каркас повторяет реальную страницу (:350-404) —
+         шапка маркетплейса, блок поиска HeroSearch (`search-glass rounded-2xl`,
+         ≈120px), заголовок результатов и сетка карточек в
+         `mx-auto max-w-[1400px] px-6 py-8`. Прежде здесь была пустая тёмная
+         полоса с «…», после загрузки появлялись шапка, поисковик и сетка. */
       <div className="min-h-screen bg-dark">
-        <div className="mx-auto max-w-[1400px] px-6 py-16 text-center text-neutral-400">…</div>
+        <MarketplaceHeader />
+        <main className="mx-auto max-w-[1400px] px-6 py-8">
+          <div className="mb-6 h-[120px] animate-pulse rounded-2xl border border-white/10 bg-white/5" />
+          <div className="mb-4 h-7 w-56 animate-pulse rounded bg-white/10" />
+          <div className="mt-6">
+            <ProductGridSkeleton count={6} />
+          </div>
+        </main>
       </div>
     }>
       <SearchResultsInner />
@@ -77,6 +91,28 @@ function SearchResultsInner() {
     (searchParams.get("category") === "hotels" ? "hotels" : "tours")
   ) as ServiceType;
   const isValidService = VALID_SERVICES.includes(service);
+  // Включённые услуги — из конфига workspace (page-builder → «Поиск»).
+  // Пока конфиг грузится/недоступен, работает дефолт: tours/hotels/flights.
+  const { page: constructorPage } = useConstructorPublished("marketplace-home");
+  const { enabled: enabledServices, defaultService: configDefaultService } = resolveSearchServices(
+    (constructorPage?.searchConfig ?? null) as SearchServicesConfig | null,
+  );
+  // Услуга выключена в workspace (например, railway): поставщиков у неё нет,
+  // поэтому результатов не будет — страница отвечает текстом
+  // search.service_unavailable вместо формы выдачи.
+  const serviceEnabled = enabledServices.includes(service);
+  // Вкладка формы, которую пользователь выбрал, но ещё не применил кнопкой
+  // поиска: при переключении вкладок URL не меняется (HeroSearch.onTabChange),
+  // поэтому результаты прошлой услуги скрываем, пока поиск не нажат.
+  const [formService, setFormService] = useState<string | null>(null);
+  const showResults = !formService || formService === service;
+  // Показываем выдачу только для включённой услуги (см. serviceEnabled).
+  const resultsVisible = showResults && serviceEnabled;
+  // Услуга в URL сменилась (переход или новый поиск) — «неприменённая» вкладка
+  // больше ничему не противоречит.
+  useEffect(() => {
+    setFormService(null);
+  }, [service]);
   const q = searchParams.get("q") || "";
   const sort = searchParams.get("sort") || "newest";
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
@@ -132,6 +168,17 @@ function SearchResultsInner() {
   const flightRequestIdRef = useRef(0);
   useEffect(() => {
     let alive = true;
+
+    // Услуга выключена в конфиге поиска (workspace → page-builder → «Поиск»):
+    // к поставщикам не обращаемся вообще, страница покажет ответ
+    // «нет поставщиков, предоставляющих услугу» (см. serviceEnabled).
+    if (!serviceEnabled) {
+      setLoading(false);
+      setResult(null);
+      setLiveResult(null);
+      setFlightResults(null);
+      return () => { alive = false; };
+    }
 
     // AZAL flight search path
     if (service === "flights") {
@@ -336,7 +383,10 @@ function SearchResultsInner() {
       });
 
     return () => { alive = false; };
-  }, [service, q, sort, page, JSON.stringify(params), locale, liveMode]);
+    // locale НЕ в зависимостях: смена языка — это только перерисовка UI (t(...)),
+    // к запросам к поставщикам она не относится (язык в API не передаётся).
+    // Раньше locale здесь перезапускал поиск заново при каждом переключении языка.
+  }, [service, q, sort, page, JSON.stringify(params), liveMode, serviceEnabled]);
 
   const totalPages = result ? Math.max(1, Math.ceil(result.total / 12)) : 1;
 
@@ -354,11 +404,25 @@ function SearchResultsInner() {
             на главной; активна вкладка текущего поиска, чтобы параметры можно
             было поменять прямо со страницы результатов. */}
         <div className="mb-6">
-          <HeroSearch defaultService={isValidService ? service : "tours"} />
+          <HeroSearch
+            enabledServices={enabledServices}
+            defaultService={isValidService && serviceEnabled ? service : configDefaultService}
+            onTabChange={setFormService}
+          />
         </div>
 
-        {/* Universal live search results — table (§6) */}
-        {liveMode && (
+        {/* Услуга выключена в workspace (нет поставщиков) — отвечаем явно и
+            ничего не запрашиваем (см. serviceEnabled / early return в эффекте). */}
+        {!serviceEnabled && (
+          <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-[15px] text-neutral-300">
+            {t("search.service_unavailable", locale)}
+          </div>
+        )}
+
+        {/* Universal live search results — table (§6).
+            showResults: пока вкладка формы не применена кнопкой поиска,
+            результаты прошлой услуги не показываем (см. formService выше). */}
+        {resultsVisible && liveMode && (
           <div className="mt-6">
             <h1 className="mb-3 font-serif text-xl font-semibold text-white sm:text-2xl">
               {service === "hotels"
@@ -378,7 +442,7 @@ function SearchResultsInner() {
 
         {/* Results header — catalog/flights only; in live mode the table
             already renders the single «Результаты поиска» heading above. */}
-        {!liveMode && (
+        {resultsVisible && !liveMode && (
         <div className="mb-4 flex items-center justify-between">
           <h1 className="font-serif text-xl font-semibold text-white sm:text-2xl">
             {t("search.results_title", locale)}
@@ -397,14 +461,14 @@ function SearchResultsInner() {
         )}
 
         {/* Loading */}
-        {loading && service !== "flights" && !liveMode && (
+        {resultsVisible && loading && service !== "flights" && !liveMode && (
           <div className="mt-6">
             <ProductGridSkeleton count={6} />
           </div>
         )}
 
         {/* AZAL flight results */}
-        {service === "flights" && (
+        {resultsVisible && service === "flights" && (
           <div className="mt-6">
             <FlightResults
               flights={flightResults?.flights ?? []}
@@ -415,14 +479,14 @@ function SearchResultsInner() {
         )}
 
         {/* Catalog error (live-mode errors render inside TourResultsTable) */}
-        {error && !liveMode && (
+        {resultsVisible && error && !liveMode && (
           <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400">
             {error}
           </div>
         )}
 
         {/* Catalog results — hidden in live mode */}
-        {!liveMode && service !== "flights" && !loading && !error && result && (
+        {resultsVisible && !liveMode && service !== "flights" && !loading && !error && result && (
           <>
             {result.items.length === 0 ? (
               <div className="mt-12 text-center">
