@@ -90,6 +90,12 @@ describe("KOMPAS hotels TOWNS precision (buildHotelPricesUrl)", () => {
     const url = build(" 941 , 180 ");
     expect(url).toContain("TOWNS=941%20%2C%20180");
   });
+
+  it("requests the prices in AZN (§AZN CURRENCY=13, never the form default USD)", () => {
+    const url = build();
+    expect(url).toContain("CURRENCY=13");
+    expect(url).not.toContain("CURRENCY=2&");
+  });
 });
 
 describe("KOMPAS hotels city-channel precedence (applyLocalFilters)", () => {

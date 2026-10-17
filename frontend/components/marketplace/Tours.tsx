@@ -9,7 +9,7 @@ import { useHotelPhoto } from "@/lib/hotel-photo";
 
 function TourCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl bg-dark-card">
+    <div className="card-skeleton overflow-hidden rounded-2xl bg-dark-card">
       <div className="h-36 w-full animate-pulse bg-dark-border" />
       <div className="p-4">
         <div className="mb-2 h-3 w-16 animate-pulse rounded bg-dark-border" />
@@ -27,9 +27,9 @@ function TourCardSkeleton() {
 
 function TourCard({ card }: { card: PublicProductCard }) {
   const locale = useLocale();
-  // Fallback: единое фото отеля из реестра (/hotels/hotel_<hotelId>.webp), а для
-  // карточек без него — legacy-файл по slug (см. lib/hotel-photo.ts).
-  const hotelPhoto = useHotelPhoto(card.hotelImage, card.slug);
+  // Фото: единый файл отеля из реестра (/hotels/hotel_<hotelId>.webp), ссылку
+  // отдаёт бэкенд (см. lib/hotel-photo.ts).
+  const hotelPhoto = useHotelPhoto(card.hotelImage);
   const img = card.primaryImage ? { thumbUrl: card.primaryImage.thumbUrl } : hotelPhoto ? { thumbUrl: hotelPhoto } : null;
 
   return (
@@ -170,7 +170,7 @@ export default function Tours() {
         {/* Loading skeleton */}
         {loading && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <TourCardSkeleton key={i} />
             ))}
           </div>

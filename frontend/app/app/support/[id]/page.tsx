@@ -1,5 +1,6 @@
 "use client";
 
+import { EntityDetailSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
@@ -466,7 +467,7 @@ function CaseDetailContent() {
 
 export default function CaseDetailPage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<EntityDetailSkeleton />}>
       <CaseDetailContent />
     </Suspense>
   );

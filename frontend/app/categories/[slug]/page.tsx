@@ -8,7 +8,7 @@ import ProductCard from "@/components/public/ProductCard";
 import CategoryFilters from "@/components/public/CategoryFilters";
 import Pagination from "@/components/public/Pagination";
 import { PublicEmptyState, PublicErrorState, PublicNotFound } from "@/components/public/PublicStates";
-import { ProductGridSkeleton } from "@/components/public/Skeletons";
+import { CategoryPageSkeleton, ProductGridSkeleton } from "@/components/public/Skeletons";
 import { formatNumber, t, useLocale } from "@/lib/i18n";
 import { fireMarketplaceFilter, fireMarketplaceSort, useMarketplaceCategoryViewed } from "@/lib/behavioral-events";
 import { publicApi, PublicNotFoundError, type PublicCategory, type PublicFilterMetadata, type PublicListResult } from "@/lib/public-api";
@@ -130,7 +130,10 @@ function CategoryInner() {
     <PublicLayout>
       <div className="mx-auto max-w-6xl px-4 py-8">
         {error && <PublicErrorState message={error} />}
-        {category === null && !error && !notFound && <ProductGridSkeleton count={6} />}
+        {/* §SKELETON-PARITY: каркас повторяет реальную страницу категории
+            (хлебные крошки + h1 + тулбар + `lg:grid-cols-[260px_1fr]` с сайдбаром),
+            а не «голую» сетку на всю ширину. */}
+        {category === null && !error && !notFound && <CategoryPageSkeleton count={6} />}
         {category && (
           <>
             {/* Breadcrumb */}
@@ -220,8 +223,8 @@ export default function CategoryPage() {
     <Suspense
       fallback={
         <PublicLayout>
-          <div className="p-8">
-            <ProductGridSkeleton count={6} />
+          <div className="mx-auto max-w-6xl px-4 py-8">
+            <CategoryPageSkeleton count={6} />
           </div>
         </PublicLayout>
       }

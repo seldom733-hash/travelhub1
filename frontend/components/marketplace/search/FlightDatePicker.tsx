@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarBlank, CaretLeft, CaretRight, X } from "@phosphor-icons/react";
 import type { FlightCalendarDayPrice } from "@/lib/flight-api";
+import { PICKER_LABEL, PICKER_TRIGGER, PICKER_TRIGGER_TEXT } from "./picker-styles";
 
 interface FlightDatePickerProps {
   id: string;
@@ -126,7 +127,7 @@ export default function FlightDatePicker({
     <div ref={containerRef} className="relative">
       <label
         htmlFor={id}
-        className="mb-0.5 block text-[11px] font-medium text-neutral-400"
+        className={PICKER_LABEL}
       >
         {label}
       </label>
@@ -138,11 +139,11 @@ export default function FlightDatePicker({
         aria-expanded={open}
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-xl border border-dark-border bg-dark-card px-3 py-2 text-left outline-none transition-colors hover:border-gold/40 focus:border-gold/50 disabled:opacity-50"
+        className={`${PICKER_TRIGGER} disabled:opacity-50`}
       >
         <CalendarBlank size={14} weight="light" className="pointer-events-none shrink-0 text-neutral-500" />
 
-        <span className={`min-w-0 flex-1 truncate text-[13px] ${value ? "text-white" : "text-neutral-500"}`}>
+        <span className={`${PICKER_TRIGGER_TEXT} ${value ? "text-white" : "text-neutral-500"}`}>
           {value ? formatDisplay(value) : placeholder}
         </span>
 

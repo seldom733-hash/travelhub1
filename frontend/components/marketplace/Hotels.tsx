@@ -9,7 +9,7 @@ import { useHotelPhoto } from "@/lib/hotel-photo";
 
 function HotelCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl bg-dark-card">
+    <div className="card-skeleton overflow-hidden rounded-2xl bg-dark-card">
       <div className="aspect-[4/3] w-full animate-pulse bg-dark-border" />
       <div className="p-4">
         <div className="mb-2 h-3 w-16 animate-pulse rounded bg-dark-border" />
@@ -28,7 +28,7 @@ function HotelCardSkeleton() {
 function HotelCard({ card }: { card: PublicProductCard }) {
   const locale = useLocale();
   // Фото: primaryImage (ProductMedia) → единый файл отеля из реестра (см. hotel-photo.ts).
-  const hotelPhoto = useHotelPhoto(card.hotelImage, card.slug);
+  const hotelPhoto = useHotelPhoto(card.hotelImage);
   const img = card.primaryImage ?? (hotelPhoto ? { thumbUrl: hotelPhoto } : null);
 
   return (
@@ -151,7 +151,7 @@ export default function Hotels() {
         {/* Loading skeleton */}
         {loading && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <HotelCardSkeleton key={i} />
             ))}
           </div>

@@ -11,6 +11,7 @@
  * НИКОГДА не «captured − payouts». Read — finance.overview.read (nav gate).
  */
 import { Suspense, useCallback, useEffect, useState } from "react";
+import { MetricsPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import PageHeader from "@/components/PageHeader";
 import { useLocale, t } from "@/lib/i18n";
 import { financeCenterApi, type FinanceOverview, type AznMetric, type CurrencyAmount } from "@/lib/finance-center-api";
@@ -212,7 +213,7 @@ function OverviewContent() {
 
 export default function FinanceOverviewPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<MetricsPageSkeleton />}>
       <OverviewContent />
     </Suspense>
   );

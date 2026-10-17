@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceKpiPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Fragment, Suspense, useCallback, useEffect, useState } from "react";
 import { api, type Page } from "@/lib/api";
 import PageHeader from "@/components/PageHeader";
@@ -473,7 +474,7 @@ function MarketingContent() {
 
 export default function MarketingPage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<WorkspaceKpiPageSkeleton />}>
       <MarketingContent />
     </Suspense>
   );

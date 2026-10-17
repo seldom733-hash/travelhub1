@@ -14,20 +14,17 @@ import { useHotelPhoto } from "@/lib/hotel-photo";
  */
 export default function MediaGallery({
   media,
-  productSlug,
   hotelImage,
 }: {
   media: PublicMedia[];
-  /** Slug продукта: резервный источник локального фото отеля (`/hotels/<tourinc>-<hotelKey>.jpg|png`). */
-  productSlug?: string;
   /** Единое фото физической гостиницы из реестра (`/hotels/hotel_<hotelId>.webp`) — приоритетный источник. */
   hotelImage?: string | null;
 }) {
   const locale = useLocale();
   const [active, setActive] = useState(0);
 
-  // Единое фото отеля из реестра; если его нет — legacy-файл по slug.
-  const hotelPhoto = useHotelPhoto(hotelImage, productSlug);
+  // Единое фото отеля из реестра (ссылка от бэкенда).
+  const hotelPhoto = useHotelPhoto(hotelImage);
 
   const ordered = [...media].sort((a, b) => a.sortOrder - b.sortOrder || Number(b.isPrimary) - Number(a.isPrimary));
   const images = ordered.length > 0 ? ordered : [];

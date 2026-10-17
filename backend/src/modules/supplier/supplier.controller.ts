@@ -8,6 +8,7 @@ import { SummerBulkSyncService } from "./summertour/summer-bulk-sync.service";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
 import { KompasHotelSyncService } from "./kompas/kompas-hotel-sync.service";
 import { KazunionSyncService } from "./kazunion/kazunion-sync.service";
+import { AnexSyncService } from "./anex/anex-sync.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { RequirePermissions, CurrentUser } from "../../security/auth/decorators";
@@ -32,6 +33,7 @@ export class SupplierController {
     private readonly kompasSync: KompasSyncService,
     private readonly kompasHotelSync: KompasHotelSyncService,
     private readonly kazunionSync: KazunionSyncService,
+    private readonly anexSync: AnexSyncService,
   ) {}
 
   // ── Summer Sync ───────────────────────────────────────────────────
@@ -128,6 +130,27 @@ export class SupplierController {
   }
 
   // ── Search ──────────────────────────────────────────────────────────
+
+  @Post("anex/sync")
+  @RequirePermissions("supplier.search.manage")
+  async anexSyncEndpoint(
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Query("country") country?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("geoCountryCode") geoCountryCode?: string,
+  ) {
+    const partner = await this.anexSync.getAnexPartner();
+    if (!partner) {
+      throw new Error("ANEX partner not found — run partner seed first");
+    }
+    return this.anexSync.runSync(partner.id, {
+      countryNameContains: country,
+      dateFrom,
+      dateTo,
+      geoCountryCode,
+    });
+  }
 
   @Get("search")
   @RequirePermissions("supplier.search.read")

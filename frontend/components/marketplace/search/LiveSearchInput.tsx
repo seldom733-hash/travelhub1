@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { MagnifyingGlass, CaretDown, X } from "@phosphor-icons/react";
 import { useLiveSearch, searchSupplierHotels, type SuggestResult } from "@/lib/search-engine";
+import { PICKER_LABEL } from "./picker-styles";
 
 interface LiveSearchInputProps {
   id: string;
@@ -138,7 +139,7 @@ export default function LiveSearchInput({
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
-      <label htmlFor={id} className="mb-0.5 block text-[13px] font-medium text-neutral-400">
+      <label htmlFor={id} className={PICKER_LABEL}>
         {label}
         {required && <span className="ml-0.5 text-gold">*</span>}
       </label>

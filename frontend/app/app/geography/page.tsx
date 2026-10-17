@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspacePageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -609,7 +610,7 @@ function GeographyContent() {
 
 export default function GeographyPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-slate-400">…</div>}>
+    <Suspense fallback={<WorkspacePageSkeleton />}>
       <GeographyContent />
     </Suspense>
   );

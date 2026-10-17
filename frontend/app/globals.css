@@ -96,6 +96,14 @@ body {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
+/* Скелетоны карточек маркетплейса: тот же радиус, что у реальных карточек
+   (`.card-premium` → токен конструктора `--th-radius-card`), но без hover-эффектов:
+   скелетон не интерактивен. §SKELETON-PARITY (2026-10-16) — прежний `rounded-2xl`
+   давал 16px против реальных 12px (или значения конструктора). */
+.card-skeleton {
+  border-radius: var(--th-radius-card, 12px);
+}
+
 .btn-gold {
   background: linear-gradient(135deg, var(--th-accent, #c9a96e) 0%, #b8944f 100%);
   color: var(--th-bg, #0d0d0d);

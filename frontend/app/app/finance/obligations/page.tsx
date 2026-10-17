@@ -10,6 +10,7 @@
  * блокируют выплату («never zero»). Currency/суммы — строки (Decimal safe).
  */
 import { Suspense, useCallback, useEffect, useState } from "react";
+import { WorkspacePageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import PageHeader from "@/components/PageHeader";
 import PanelFrame from "@/components/PanelFrame";
 import Pagination from "@/components/Pagination";
@@ -339,7 +340,7 @@ function ObligationsContent() {
 
 export default function ObligationsPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<WorkspacePageSkeleton toolbar />}>
       <ObligationsContent />
     </Suspense>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { FormPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
@@ -135,7 +136,7 @@ function CreateCaseContent() {
 
 export default function CreateCasePage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<FormPageSkeleton maxWidth="max-w-xl" header />}>
       <CreateCaseContent />
     </Suspense>
   );

@@ -123,7 +123,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           <TourDetail
             attributes={p.attributes}
             title={p.title}
-            media={<MediaGallery media={detail.media} productSlug={p.slug} hotelImage={p.hotelImage} />}
+            media={<MediaGallery media={detail.media} hotelImage={p.hotelImage} />}
             description={p.description}
             attributeSections={sectionsFor(p.attributes, locale)}
           />
@@ -132,7 +132,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
           <HotelDetail
             attributes={p.attributes}
             title={p.title}
-            media={<MediaGallery media={detail.media} productSlug={p.slug} hotelImage={p.hotelImage} />}
+            media={<MediaGallery media={detail.media} hotelImage={p.hotelImage} />}
             description={p.description}
             attributeSections={sectionsFor(p.attributes, locale)}
           />
@@ -178,7 +178,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
         </div>
 
         <div className="mt-5">
-          <MediaGallery media={detail.media} productSlug={p.slug} hotelImage={p.hotelImage} />
+          <MediaGallery media={detail.media} hotelImage={p.hotelImage} />
         </div>
 
         <section className="mt-8" aria-labelledby="pdp-description">
@@ -364,7 +364,7 @@ export default function ProductPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-8">
+        <div className="mx-auto max-w-6xl px-4 py-8">
           <PdpSkeleton />
         </div>
       }

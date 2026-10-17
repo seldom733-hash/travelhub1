@@ -8,14 +8,19 @@
  *  • one Tariff per (room, meal) at the minimum AZN price across dates;
  *  • title «Hotel (City, Country)» — hotels DO carry a city (unlike tours).
  *
- * Prices arrive in USD (data-currency_title) and are converted to the public
- * AZN selling price through SupplierPricingService.publicAmountFor (KOMPAS
- * SupplierFxRate + markup), exactly like the tour import.
+ * §AZN: prices are requested in AZN (CURRENCY=13), so the number arriving here
+ * is already the supplier's AZN amount; SupplierPricingService.publicAmountFor
+ * applies the KOMPAS markup and writes the public selling price (no FX step —
+ * an AZN source is an identity), exactly like the tour import.
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
-import { KompasSupplierAdapter, type KompasHotelRawRow } from "./kompas.adapter";
+import {
+  KompasSupplierAdapter,
+  KOMPAS_CURRENCY_INC,
+  type KompasHotelRawRow,
+} from "./kompas.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import {
   hotelStateIncToIso,
@@ -210,16 +215,25 @@ export class KompasHotelSyncService {
     // «Hotel (City, Country)» — falls back to «Hotel (Country)» without a city.
     const title = city ? `${hotelName} (${city}, ${countryRu})` : `${hotelName} (${countryRu})`;
 
-    // Group rows by (roomKey, mealKey) → one tariff each, min USD across dates.
+    // Group rows by (roomKey, mealKey) → one tariff each, min source amount
+    // across dates (source currency = AZN, §AZN CURRENCY=13).
     const tariffGroups = new Map<
       string,
-      { room: string; meal: string; roomKey: string; mealKey: string; minUsd: number; checkIns: string[] }
+      {
+        room: string;
+        meal: string;
+        roomKey: string;
+        mealKey: string;
+        minSource: number;
+        currency: string;
+        checkIns: string[];
+      }
     >();
     for (const r of rows) {
       const key = `${r.roomKey || "0"}:${r.mealKey || "0"}`;
       const g = tariffGroups.get(key);
       if (g) {
-        if (r.price < g.minUsd) g.minUsd = r.price;
+        if (r.price < g.minSource) g.minSource = r.price;
         if (r.checkIn && !g.checkIns.includes(r.checkIn)) g.checkIns.push(r.checkIn);
       } else {
         tariffGroups.set(key, {
@@ -227,17 +241,22 @@ export class KompasHotelSyncService {
           meal: r.meal,
           roomKey: r.roomKey,
           mealKey: r.mealKey,
-          minUsd: r.price,
+          minSource: r.price,
+          currency: r.currency || KOMPAS_CURRENCY_INC,
           checkIns: r.checkIn ? [r.checkIn] : [],
         });
       }
     }
 
-    // Public AZN price per tariff (FX + markup); startingPrice = min.
+    // Public AZN price per tariff (markup only — the source is ALREADY AZN,
+    // so there is no FX step); startingPrice = min.
     const tariffs: Array<{ code: string; name: string; azn: number; inclusions: Record<string, unknown> }> = [];
     let startingPrice = 0;
     for (const g of tariffGroups.values()) {
-      const azn = await this.pricing.publicAmountFor(g.minUsd, "USD", "KOMPAS", "hotels");
+      // Currency comes from the rows themselves (never hardcoded) — if the
+      // supplier ever answers in another currency, the price is not silently
+      // relabelled.
+      const azn = await this.pricing.publicAmountFor(g.minSource, g.currency, "KOMPAS", "hotels");
       if (!(azn > 0)) continue;
       const name = [g.room, g.meal].filter(Boolean).join(" / ") || "Base";
       const code = `TRF-KOMH-${hotelKey}-${stateInc}-${g.roomKey || "0"}-${g.mealKey || "0"}`.slice(0, 120);

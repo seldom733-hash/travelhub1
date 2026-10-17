@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceKpiPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { api, type PlatformUser } from "@/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -476,7 +477,7 @@ function UsersWithParams() {
 
 export default function UsersPage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<WorkspaceKpiPageSkeleton />}>
       <UsersWithParams />
     </Suspense>
   );

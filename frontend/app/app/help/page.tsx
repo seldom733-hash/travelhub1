@@ -20,6 +20,7 @@
  *    CURRENT financial capability with Finance ownership.
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { HelpPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale, t, type Locale } from "@/lib/i18n";
@@ -437,7 +438,7 @@ function HelpCenterContent() {
 
 export default function HelpCenterPage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-56 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<HelpPageSkeleton />}>
       <HelpCenterContent />
     </Suspense>
   );

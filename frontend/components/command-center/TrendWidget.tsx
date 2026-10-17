@@ -121,8 +121,19 @@ export function TrendWidget({
   }
 
   if (loading) {
+    /* §SKELETON-PARITY: тот же каркас, что и у реального виджета (:153-155) —
+       карточка `rounded-2xl border bg-white p-4 shadow-sm` + подпись + область
+       диаграммы `mt-3 height:140`; раньше был бесформенный блок `h-48 bg-slate-100`. */
     return (
-      <div className="h-48 animate-pulse rounded-2xl bg-slate-100" aria-busy role="status" aria-label={t("cc.loading", locale)} />
+      <div
+        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+        aria-busy
+        role="status"
+        aria-label={t("cc.loading", locale)}
+      >
+        <div className="h-3 w-32 animate-pulse rounded bg-slate-100" />
+        <div className="mt-3 h-[140px] animate-pulse rounded-lg bg-slate-100" />
+      </div>
     );
   }
 

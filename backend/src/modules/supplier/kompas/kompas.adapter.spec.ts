@@ -1,4 +1,4 @@
-import { KompasSupplierAdapter, applyKompasAgesParam } from "./kompas.adapter";
+import { KompasSupplierAdapter, applyKompasAgesParam, applyKompasCurrencyParam, KOMPAS_CURRENCY_INC } from "./kompas.adapter";
 
 describe("KompasSupplierAdapter", () => {
   let adapter: KompasSupplierAdapter;
@@ -473,5 +473,44 @@ describe("applyKompasAgesParam — supplier-facing AGES mapping", () => {
   it("returns the URL untouched when there are no child ages", () => {
     const url = "https://x?samo_action=PRICES&ADULT=2&CHILD=0";
     expect(applyKompasAgesParam(url, [])).toBe(url);
+  });
+});
+
+// ── §AZN contract (owner-verified request CURRENCY=13 → AZN) ────────────────
+// The site's own form posts CURRENCY=2 (USD). Both PRICES interceptors (search()
+// + searchReusePage()) force CURRENCY=13 at the network layer, so the AZN
+// pipeline never receives USD numbers (AZN source = identity FX in the
+// read-path — no re-conversion).
+
+describe("applyKompasCurrencyParam — supplier-facing CURRENCY mapping", () => {
+  it("replaces the form's own CURRENCY=2 (USD) with the AZN id", () => {
+    const url = applyKompasCurrencyParam(
+      "https://kompas.tl/search_tour?samo_action=PRICES&ADULT=2&CURRENCY=2&CHILD=0",
+    );
+    expect(url).toContain(`CURRENCY=${KOMPAS_CURRENCY_INC}`);
+    expect(url).not.toContain("CURRENCY=2&");
+  });
+
+  it("appends CURRENCY when the native request carries none", () => {
+    const url = applyKompasCurrencyParam(
+      "https://kompas.tl/search_tour?samo_action=PRICES&ADULT=2",
+    );
+    expect(url).toContain(`CURRENCY=${KOMPAS_CURRENCY_INC}`);
+    expect(url.match(/CURRENCY=/g)).toHaveLength(1);
+  });
+
+  it("is idempotent — a second pass does not duplicate the param", () => {
+    const once = applyKompasCurrencyParam("https://x?samo_action=PRICES&CURRENCY=2");
+    const twice = applyKompasCurrencyParam(once);
+    expect(twice.match(/CURRENCY=/g)).toHaveLength(1);
+    expect(twice).toBe(once);
+  });
+
+  it("keeps the rest of the request untouched", () => {
+    const url = applyKompasCurrencyParam(
+      "https://x?samo_action=PRICES&STATEINC=23&CURRENCY=2&FILTER=0",
+    );
+    expect(url).toContain("STATEINC=23");
+    expect(url).toContain("FILTER=0");
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { DashboardPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense } from "react";
 import { CommandCenter } from "@/components/command-center/CommandCenter";
 
@@ -13,7 +14,7 @@ import { CommandCenter } from "@/components/command-center/CommandCenter";
  */
 export default function CommandCenterPage() {
   return (
-    <Suspense fallback={<div className="p-6 lg:p-10"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<DashboardPageSkeleton />}>
       <CommandCenter />
     </Suspense>
   );

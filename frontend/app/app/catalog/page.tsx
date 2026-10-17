@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceKpiPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, type Page, type Product } from "@/lib/api";
@@ -604,7 +605,7 @@ function CatalogWithParams() {
 
 export default function CatalogPage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<WorkspaceKpiPageSkeleton />}>
       <CatalogWithParams />
     </Suspense>
   );

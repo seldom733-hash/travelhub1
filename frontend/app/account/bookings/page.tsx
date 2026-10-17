@@ -54,11 +54,27 @@ export default function AccountBookingsPage() {
       </div>
 
       {data === null ? (
-        <div className="space-y-3" aria-busy="true">
+        <ul className="space-y-3" aria-busy="true" aria-label="loading">
+          {/* §SKELETON-PARITY: реальная форма (:71-99) — карточка
+              `rounded-2xl border bg-white p-5 shadow-sm` с шапкой и `dl`
+              `grid-cols-2 sm:grid-cols-4`; прежние `h-20` блоки не совпадали. */}
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+            <li key={i} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
+                <div className="h-5 w-24 animate-pulse rounded-full bg-slate-100" />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                {Array.from({ length: 4 }, (_, j) => (
+                  <div key={j} className="space-y-1">
+                    <div className="h-3 w-20 animate-pulse rounded bg-slate-100" />
+                    <div className="h-4 w-24 animate-pulse rounded bg-slate-100" />
+                  </div>
+                ))}
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : data.items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
           <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-full bg-slate-50 text-2xl" aria-hidden>

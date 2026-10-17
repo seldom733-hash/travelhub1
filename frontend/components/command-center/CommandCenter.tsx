@@ -267,8 +267,14 @@ export function CommandCenter() {
         <h1 className="text-2xl font-bold text-slate-900">{t("cc.title", locale)}</h1>
         <p className="mt-1 text-sm text-slate-500">{t("cc.loading", locale)}</p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-busy>
+          {/* §SKELETON-PARITY: реальный виджет — карточка `KpiCard`
+              (`KpiCard.tsx:85`: `rounded-2xl border border-slate-200 bg-white p-4 shadow-sm`
+              + подпись `text-xs` + значение `text-2xl`), а не блок без рамки/фона. */}
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+            <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+              <div className="mt-2 h-8 w-24 animate-pulse rounded bg-slate-100" />
+            </div>
           ))}
         </div>
       </div>

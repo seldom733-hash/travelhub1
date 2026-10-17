@@ -55,10 +55,37 @@ export default function AccountOrdersPage() {
       </div>
 
       {data === null ? (
-        <div className="space-y-3" aria-busy="true">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-2xl border border-slate-200 bg-white" />
-          ))}
+        <div
+          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+          aria-busy="true"
+          aria-label="loading"
+        >
+          {/* §SKELETON-PARITY: реальная форма (:73-124) — таблица на desktop и
+              список на mobile; прежние три карточки `h-20` не совпадали ни с чем. */}
+          <div className="hidden md:block">
+            <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+              <div className="grid grid-cols-6 gap-4">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <div key={i} className="h-3 w-3/4 animate-pulse rounded bg-slate-200" />
+                ))}
+              </div>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="px-5 py-3">
+                  <div className="h-4 w-4/5 animate-pulse rounded bg-slate-100" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100 md:hidden">
+            {Array.from({ length: 3 }, (_, i) => (
+              <div key={i} className="space-y-2 px-5 py-4">
+                <div className="h-4 w-32 animate-pulse rounded bg-slate-100" />
+                <div className="h-4 w-24 animate-pulse rounded bg-slate-100" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : data.items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">

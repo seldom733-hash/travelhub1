@@ -12,6 +12,7 @@
  * только на будущие расчёты — frozen snapshot'ы заявок не мутируют.
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { WorkspacePageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import PageHeader from "@/components/PageHeader";
 import PanelFrame from "@/components/PanelFrame";
 import { useLocale, t } from "@/lib/i18n";
@@ -376,7 +377,7 @@ function FxRatesContent() {
 
 export default function FxRatesPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-slate-900">…</div>}>
+    <Suspense fallback={<WorkspacePageSkeleton />}>
       <FxRatesContent />
     </Suspense>
   );

@@ -9,7 +9,10 @@ import HelpFindButton from "./search/HelpFindButton";
 
 function FlightCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl bg-dark-card">
+    <div className="card-skeleton overflow-hidden rounded-2xl bg-dark-card">
+      {/* Фото — реальная FlightCard начинается с `aspect-[4/3]` (см. ниже):
+          без этого блока скелетон был заметно ниже карточки. §SKELETON-PARITY */}
+      <div className="aspect-[4/3] w-full animate-pulse bg-dark-border" />
       <div className="p-4">
         <div className="mb-2 h-3 w-16 animate-pulse rounded bg-dark-border" />
         <div className="mb-2 h-5 w-3/4 animate-pulse rounded bg-dark-border" />
@@ -147,7 +150,7 @@ export default function Flights() {
         {/* Loading skeleton */}
         {loading && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((_, i) => (
               <FlightCardSkeleton key={i} />
             ))}
           </div>

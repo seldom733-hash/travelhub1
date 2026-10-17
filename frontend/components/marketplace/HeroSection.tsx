@@ -156,7 +156,11 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
     : SLIDES.map((s) => s.image);
 
   return (
-    <section className="relative min-h-[540px] overflow-hidden bg-dark lg:min-h-[620px]">
+    // Высота баннера — пропорция от ширины страницы (16:6), а не фиксированные
+    // пиксели: баннер масштабируется вместе с ней. `min-h` ниже — только защита
+    // от обрезки текста на узких экранах; `aspect` задан на контентном блоке,
+    // поэтому длинный текст увеличивает секцию, а не обрезается.
+    <section className="relative overflow-hidden bg-dark">
       {/* Background images - all layered */}
       {images.map((image, i) => (
         <div
@@ -218,7 +222,7 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
       )}
 
       {/* Content — cinematic text only, NO search */}
-      <div className="relative z-10 mx-auto flex min-h-[540px] flex-col justify-end px-6 pb-10 pt-16 sm:min-h-[620px] sm:pb-12 sm:pt-20 lg:pt-24">
+      <div className="relative z-10 mx-auto flex aspect-[16/6] min-h-[320px] flex-col justify-end px-6 pb-10 pt-16 sm:pb-12 sm:pt-20 lg:pt-24">
         <div className="mx-auto w-full" style={{ maxWidth: "var(--th-container-width, 1400px)" }}>
           <div className="max-w-3xl pb-4">
             {configuredSlide ? (

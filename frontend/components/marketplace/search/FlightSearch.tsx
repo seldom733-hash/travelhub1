@@ -12,6 +12,19 @@ import { setRemoteAirports } from "@/lib/flight-locations";
 import { useSupplierOptions } from "@/lib/supplier-registry";
 import ChildAges from "./ChildAges";
 import HelpFindButton from "./HelpFindButton";
+import { useWidestText } from "@/lib/measure-text";
+import {
+  PICKER_CHECKBOX,
+  PICKER_CONTROL,
+  PICKER_DATE_WIDTH_EXTRA,
+  PICKER_DIGIT_WIDTH_EXTRA,
+  PICKER_LABEL,
+  PICKER_ROW,
+  PICKER_SUBMIT,
+  PICKER_W_FROM,
+  PICKER_W_NIGHTS,
+  PICKER_W_TO,
+} from "./picker-styles";
 
 interface FlightSearchProps {
   onSearch: (ctx: SearchContext) => void;
@@ -161,50 +174,65 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
     });
   };
 
+  // Content-width: те же размеры, что в поиске туров.
+  const datePx = useWidestText(["00.00.0000"]);
+  const digitPx = useWidestText(["0"]);
+  const classPx = useWidestText([
+    t("search.class_economy", locale),
+    t("search.class_business", locale),
+    t("search.class_first", locale),
+  ]);
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={PICKER_ROW}>
         {/* From */}
-        <FlightAirportSelect
-          id="flight-from"
-          label={t("search.from", locale)}
-          placeholder="Выберите город вылета"
-          value={from}
-          onChange={setFrom}
-        />
+        <div className={PICKER_W_FROM}>
+          <FlightAirportSelect
+            id="flight-from"
+            label={t("search.from", locale)}
+            placeholder={t("search.select_departure_city", locale)}
+            value={from}
+            onChange={setFrom}
+          />
+        </div>
 
         {/* To */}
-        <FlightAirportSelect
-          id="flight-to"
-          label={t("search.to", locale)}
-          placeholder="Выберите город прилёта"
-          value={to}
-          onChange={setTo}
-        />
+        <div className={PICKER_W_TO}>
+          <FlightAirportSelect
+            id="flight-to"
+            label={t("search.to", locale)}
+            placeholder={t("search.select_arrival_city", locale)}
+            value={to}
+            onChange={setTo}
+          />
+        </div>
 
         {/* Departure date */}
-        <FlightDatePicker
-          id="flight-departure"
-          label={t("search.departure_date", locale)}
-          placeholder="Выберите дату"
-          value={departureDate}
-          onChange={handleDepartureChange}
-          availability={availability}
-          loadingAvailability={availabilityLoading}
-        />
+        <div style={{ maxWidth: datePx + PICKER_DATE_WIDTH_EXTRA, flex: "1 1 0" }}>
+          <FlightDatePicker
+            id="flight-departure"
+            label={t("search.departure_date", locale)}
+            placeholder={t("search.select_date", locale)}
+            value={departureDate}
+            onChange={handleDepartureChange}
+            availability={availability}
+            loadingAvailability={availabilityLoading}
+          />
+        </div>
 
         {/* Supplier */}
-        <div>
-          <label htmlFor="flight-supplier" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
-            Поставщик
+        <div className={PICKER_W_NIGHTS}>
+          <label htmlFor="flight-supplier" className={PICKER_LABEL}>
+            {t("search.supplier", locale)}
           </label>
           <select
             id="flight-supplier"
             value={supplier}
             onChange={(e) => setSupplier(e.target.value)}
-            className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
+            className={PICKER_CONTROL}
           >
-            <option value="ALL">Все поставщики</option>
+            <option value="ALL">{t("search.all_suppliers", locale)}</option>
             {supplierOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -215,21 +243,23 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
 
         {/* Return date (conditional) */}
         {roundTrip && (
-          <FlightDatePicker
-            id="flight-return"
-            label={t("search.return_date", locale)}
-            placeholder="Выберите дату"
-            value={returnDate}
-            onChange={setReturnDate}
-            minDate={minReturnDate || undefined}
-            availability={returnAvailability}
-            disabled={!departureDate}
-          />
+          <div style={{ maxWidth: datePx + PICKER_DATE_WIDTH_EXTRA, flex: "1 1 0" }}>
+            <FlightDatePicker
+              id="flight-return"
+              label={t("search.return_date", locale)}
+              placeholder={t("search.select_date", locale)}
+              value={returnDate}
+              onChange={setReturnDate}
+              minDate={minReturnDate || undefined}
+              availability={returnAvailability}
+              disabled={!departureDate}
+            />
+          </div>
         )}
       </div>
 
       {/* Round-trip checkbox */}
-      <label className="flex cursor-pointer items-center gap-2 self-start rounded-xl border border-dark-border bg-dark-card px-4 py-2 text-[13px] text-neutral-300 transition-colors hover:border-gold/30 hover:text-white">
+      <label className={`self-start ${PICKER_CHECKBOX}`}>
         <input
           type="checkbox"
           checked={roundTrip}
@@ -242,17 +272,17 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         {t("search.round_trip", locale)}
       </label>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={PICKER_ROW}>
         {/* Adults */}
-        <div>
-          <label htmlFor="flight-adults" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
+        <div style={{ maxWidth: digitPx + PICKER_DIGIT_WIDTH_EXTRA }}>
+          <label htmlFor="flight-adults" className={PICKER_LABEL}>
             {t("search.adults", locale)}
           </label>
           <select
             id="flight-adults"
             value={adults}
             onChange={(e) => setAdults(Number(e.target.value))}
-            className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
+            className={PICKER_CONTROL}
           >
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
               <option key={n} value={n}>{n}</option>
@@ -261,8 +291,8 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         </div>
 
         {/* Children */}
-        <div>
-          <label htmlFor="flight-children" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
+        <div style={{ maxWidth: digitPx + PICKER_DIGIT_WIDTH_EXTRA }}>
+          <label htmlFor="flight-children" className={PICKER_LABEL}>
             {t("search.children", locale)}
           </label>
           <select
@@ -273,7 +303,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
               setChildren(val);
               setChildAges(Array(val).fill(0));
             }}
-            className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
+            className={PICKER_CONTROL}
           >
             {[0, 1, 2, 3, 4, 5, 6].map((n) => (
               <option key={n} value={n}>{n}</option>
@@ -282,15 +312,15 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         </div>
 
         {/* Infants */}
-        <div>
-          <label htmlFor="flight-infants" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
+        <div style={{ maxWidth: digitPx + PICKER_DIGIT_WIDTH_EXTRA }}>
+          <label htmlFor="flight-infants" className={PICKER_LABEL}>
             {t("search.infants", locale)}
           </label>
           <select
             id="flight-infants"
             value={infants}
             onChange={(e) => setInfants(Number(e.target.value))}
-            className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
+            className={PICKER_CONTROL}
           >
             {[0, 1, 2, 3].map((n) => (
               <option key={n} value={n}>{n}</option>
@@ -299,15 +329,15 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         </div>
 
         {/* Service class */}
-        <div>
-          <label htmlFor="flight-class" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
+        <div style={{ maxWidth: classPx + PICKER_DIGIT_WIDTH_EXTRA }}>
+          <label htmlFor="flight-class" className={PICKER_LABEL}>
             {t("search.service_class", locale)}
           </label>
           <select
             id="flight-class"
             value={serviceClass}
             onChange={(e) => setServiceClass(e.target.value)}
-            className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
+            className={PICKER_CONTROL}
           >
             <option value="economy">{t("search.class_economy", locale)}</option>
             <option value="business">{t("search.class_business", locale)}</option>
@@ -323,16 +353,16 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
 
       {/* Tariff (baggage) */}
       <div>
-        <label htmlFor="flight-tariff" className="mb-0.5 block text-[11px] font-medium text-neutral-400">
-          Тариф (багаж)
+        <label htmlFor="flight-tariff" className={PICKER_LABEL}>
+          {t("search.tariff_baggage", locale)}
         </label>
         <select
           id="flight-tariff"
           value={tariff}
           onChange={(e) => setTariff(e.target.value)}
-          className="w-full rounded-xl border border-dark-border bg-dark-card py-2 px-3 text-[13px] text-white outline-none transition-colors focus:border-gold/50"
+          className={PICKER_CONTROL}
         >
-          <option value="ALL">Все</option>
+          <option value="ALL">{t("search.all", locale)}</option>
           <option value="BUDGET">BUDGET — No bag + Hand 10kg</option>
           <option value="CLASSIC">CLASSIC — Bag 1×23kg + Hand 10kg</option>
           <option value="PLUS">PLUS — Bag 1×32kg + Hand 10kg</option>
@@ -364,7 +394,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
       <button
         type="submit"
         disabled={!from || !to || !departureDate}
-        className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-[13px] font-semibold transition-opacity ${!from || !to || !departureDate ? "bg-neutral-700 text-neutral-400 cursor-not-allowed opacity-60" : "btn-gold"}`}
+        className={`${!from || !to || !departureDate ? "bg-neutral-700 text-neutral-400 cursor-not-allowed opacity-60" : "btn-gold"} ${PICKER_SUBMIT}`}
       >
         <span>{t("marketplace.search_submit", locale)}</span>
         <ArrowRight size={16} weight="bold" />

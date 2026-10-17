@@ -388,11 +388,20 @@ export default function WhatsappInboxPage() {
           </div>
           <div className="thin-scroll max-h-[70vh] min-h-[260px] overflow-y-auto divide-y divide-slate-50">
             {listLoading && rows.length === 0 ? (
-              <div className="space-y-2 p-3">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />
+              /* §SKELETON-PARITY: реальные строки (:416-431) — прямые дети
+                 контейнера `divide-y` (:389), `px-3 py-2.5`, две строки текста.
+                 Раньше здесь были «пилюли» `h-12 rounded-lg`, которых в списке нет. */
+              <>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+                      <div className="h-3 w-10 shrink-0 animate-pulse rounded bg-slate-100" />
+                    </div>
+                    <div className="mt-1 h-3 w-1/3 animate-pulse rounded bg-slate-100" />
+                  </div>
                 ))}
-              </div>
+              </>
             ) : listError ? (
               <div className="space-y-2 p-3 text-xs">
                 <p className="text-red-600">{listError}</p>
@@ -567,11 +576,22 @@ export default function WhatsappInboxPage() {
                 className="thin-scroll h-[46vh] min-h-[280px] space-y-2 overflow-y-auto bg-slate-50 px-4 py-3"
               >
                 {threadLoading && timeline.length === 0 ? (
-                  <div className="space-y-2">
-                    {[0, 1].map((i) => (
-                      <div key={i} className="h-10 w-2/3 animate-pulse rounded-xl bg-slate-100" />
-                    ))}
-                  </div>
+                  /* §SKELETON-PARITY: реальные «пузыри» (:586-592) —
+                     `max-w-[78%] rounded-2xl px-3 py-2`, исходящие прижаты вправо
+                     (`justify-end`), фон контейнера `bg-slate-50`, поэтому заглушка
+                     белая/голубая, а не `bg-slate-100` (была не видна). */
+                  <>
+                    {[0, 1, 2].map((i) => {
+                      const outbound = i % 2 === 1;
+                      return (
+                        <div key={i} className={`flex ${outbound ? "justify-end" : "justify-start"}`}>
+                          <div
+                            className={`h-10 animate-pulse rounded-2xl ${outbound ? "w-1/2 bg-blue-100/70" : "w-2/3 border border-slate-200 bg-white"}`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </>
                 ) : threadError ? (
                   <p className="text-xs text-red-600">{threadError}</p>
                 ) : timeline.length === 0 ? (

@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useLocale } from "@/lib/i18n";
-import { usePathname } from "next/navigation";
 
 /**
  * PHASE 1 STEP 1.12.3 — privacy-safe behavioral event client (public Storefront).

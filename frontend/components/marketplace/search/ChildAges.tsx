@@ -1,6 +1,8 @@
 ﻿"use client";
 
 import { CaretDown } from "@phosphor-icons/react";
+import { t, useLocale, type Locale } from "@/lib/i18n";
+import { PICKER_LABEL } from "./picker-styles";
 
 interface ChildAgesProps {
   count: number;
@@ -10,7 +12,16 @@ interface ChildAgesProps {
 
 const AGE_OPTIONS = Array.from({ length: 18 }, (_, i) => i); // 0-17
 
+/** «0 → < 1 года», «1 → 1 год», ru: 2-4 «года», 5+ «лет» (az/en — одна форма). */
+function ageLabel(option: number, locale: Locale): string {
+  if (option === 0) return t("search.age_under_one", locale);
+  if (option === 1) return t("search.age_one", locale);
+  if (locale === "ru" && option < 5) return `${option} ${t("search.age_unit_few", locale)}`;
+  return `${option} ${t("search.age_unit_many", locale)}`;
+}
+
 export default function ChildAges({ count, ages, onChange }: ChildAgesProps) {
+  const locale = useLocale();
   if (count <= 0) return null;
 
   // Ensure ages array matches count
@@ -27,17 +38,19 @@ export default function ChildAges({ count, ages, onChange }: ChildAgesProps) {
     <div className="mt-2 flex flex-wrap gap-2">
       {displayAges.map((age, index) => (
         <div key={index} className="flex flex-col items-center gap-0.5">
-          <span className="text-[14px] text-neutral-500">Ребёнок {index + 1}</span>
+          <span className={`${PICKER_LABEL} text-center`}>
+            {t("search.child_n", locale).replace("{n}", String(index + 1))}
+          </span>
           <div className="relative">
             <select
               value={age}
               onChange={(e) => handleChange(index, Number(e.target.value))}
               className="appearance-none rounded-lg border border-dark-border bg-dark-card px-3 py-1.5 pr-7 text-[15px] text-white outline-none transition-colors focus:border-gold/50"
-              aria-label={`Возраст ребёнка ${index + 1}`}
+              aria-label={t("search.child_age_aria", locale).replace("{n}", String(index + 1))}
             >
               {AGE_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>
-                  {opt === 0 ? "< 1" : `${opt} ${opt === 1 ? "год" : opt < 5 ? "года" : "лет"}`}
+                  {ageLabel(opt, locale)}
                 </option>
               ))}
             </select>

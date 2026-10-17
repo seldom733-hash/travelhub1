@@ -5,6 +5,7 @@ import { Buildings, CaretDown, X } from "@phosphor-icons/react";
 import { useLocale } from "@/lib/i18n";
 import { useWidestText } from "@/lib/measure-text";
 import { useClickOutside } from "./useClickOutside";
+import { PICKER_LABEL, PICKER_TRIGGER, PICKER_TRIGGER_TEXT } from "./picker-styles";
 
 export interface SupplierStarOption {
   /** Supplier label verbatim ("5*", "HV-1", …). */
@@ -97,7 +98,7 @@ export default function HotelStarsSelect({
 
   return (
     <div ref={containerRef} className="relative" style={{ maxWidth: maxTextPx > 0 ? maxTextPx + 56 : undefined }}>
-      <label htmlFor="hotel-stars" className="mb-0.5 block text-[13px] font-medium text-neutral-400">
+      <label htmlFor="hotel-stars" className={PICKER_LABEL}>
         {locale === "ru" ? "Категория отеля" : locale === "az" ? "Otel kateqoriyası" : "Hotel category"}
       </label>
       <button
@@ -106,10 +107,10 @@ export default function HotelStarsSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-xl border border-dark-border bg-dark-card px-3 py-2 text-left outline-none transition-colors hover:border-gold/40 focus:border-gold/50"
+        className={PICKER_TRIGGER}
       >
         <Buildings size={14} weight="light" className="shrink-0 text-neutral-500" />
-        <span className={`min-w-0 flex-1 truncate text-[15px] ${selected.length ? "text-white" : "text-neutral-500"}`}>
+        <span className={`${PICKER_TRIGGER_TEXT} ${selected.length ? "text-white" : "text-neutral-500"}`}>
           {label}
         </span>
         {selected.length > 0 ? (

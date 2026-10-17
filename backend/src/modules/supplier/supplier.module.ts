@@ -21,6 +21,7 @@ import { KazunionSyncService } from "./kazunion/kazunion-sync.service";
 import { AnexAdapter } from "./anex/anex.adapter";
 import { AnexProvider } from "./anex/anex.provider";
 import { AnexHotelAdapter } from "./anex/anex-hotel.adapter";
+import { AnexSyncService } from "./anex/anex-sync.service";
 import { SupplierController } from "./supplier.controller";
 import { PublicSupplierController } from "./public-supplier.controller";
 import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
@@ -70,6 +71,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     AnexAdapter,
     AnexProvider,
     AnexHotelAdapter,
+    AnexSyncService,
     TourRequestService,
     AzalAdapter,
     AzalHttpService,
@@ -260,6 +262,6 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KompasHotelSyncService, KazunionHttpService, KazunionAdapter, KazunionSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, KompasHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KompasHotelSyncService, KazunionHttpService, KazunionAdapter, KazunionSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AnexSyncService, KompasHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
 })
 export class SupplierModule {}

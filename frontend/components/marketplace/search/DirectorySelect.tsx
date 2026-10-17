@@ -6,6 +6,7 @@ import { geoDisplayName, type GeoDirectoryEntry, type GeoLocale } from "@/lib/ge
 import { useWidestText } from "@/lib/measure-text";
 import { useLocale, t } from "@/lib/i18n";
 import { useClickOutside } from "./useClickOutside";
+import { PICKER_LABEL, PICKER_TRIGGER, PICKER_TRIGGER_TEXT } from "./picker-styles";
 
 interface DirectorySelectProps {
   id: string;
@@ -97,7 +98,7 @@ export default function DirectorySelect({
     <div ref={containerRef} className="relative" style={{ maxWidth: maxTextPx > 0 ? maxTextPx + 56 : undefined }}>
       <label
         htmlFor={id}
-        className="mb-0.5 block text-[13px] font-medium text-neutral-400"
+        className={PICKER_LABEL}
       >
         {label}
         {required && <span className="ml-0.5 text-gold">*</span>}
@@ -109,11 +110,11 @@ export default function DirectorySelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => (open ? setOpen(false) : openDropdown())}
-        className="flex w-full items-center gap-2 rounded-xl border border-dark-border bg-dark-card px-3 py-2 text-left outline-none transition-colors hover:border-gold/40 focus:border-gold/50"
+        className={PICKER_TRIGGER}
       >
         <MapPin size={14} weight="light" className="shrink-0 text-neutral-500" />
 
-        <span className={`min-w-0 flex-1 truncate text-[15px] ${value ? "text-white" : "text-neutral-500"}`}>
+        <span className={`${PICKER_TRIGGER_TEXT} ${value ? "text-white" : "text-neutral-500"}`}>
           {value ? `${geoDisplayName(value.names, value.code, locale)} · ${value.code}` : placeholder}
         </span>
 

@@ -42,6 +42,7 @@
  */
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { OperationsPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import CommerceKpiCard from "@/components/commerce/CommerceKpiCard";
@@ -617,7 +618,7 @@ function PaymentsWithParams() {
 
 export default function PaymentsPage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<OperationsPageSkeleton />}>
       <PaymentsWithParams />
     </Suspense>
   );

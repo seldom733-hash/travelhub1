@@ -22,7 +22,7 @@ const SERVICE_BADGES: Record<string, { ru: string; az: string; en: string }> = {
 
 function OfferCardSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl bg-dark-card">
+    <div className="card-skeleton overflow-hidden rounded-2xl bg-dark-card">
       <div className="flex">
         <div className="aspect-[4/3] w-32 shrink-0 animate-pulse bg-dark-border sm:w-40" />
         <div className="flex flex-1 flex-col justify-center p-4">
@@ -38,9 +38,9 @@ function OfferCardSkeleton() {
 
 function OfferCard({ card }: { card: PublicProductCard }) {
   const locale = useLocale();
-  // Fallback: единое фото отеля из реестра (/hotels/hotel_<hotelId>.webp), а для
-  // карточек без него — legacy-файл по slug (см. lib/hotel-photo.ts).
-  const hotelPhoto = useHotelPhoto(card.hotelImage, card.slug);
+  // Фото: единый файл отеля из реестра (/hotels/hotel_<hotelId>.webp), ссылку
+  // отдаёт бэкенд (см. lib/hotel-photo.ts).
+  const hotelPhoto = useHotelPhoto(card.hotelImage);
   const img = card.primaryImage ? { thumbUrl: card.primaryImage.thumbUrl } : hotelPhoto ? { thumbUrl: hotelPhoto } : null;
   const badge = card.type ? SERVICE_BADGES[card.type] : null;
 

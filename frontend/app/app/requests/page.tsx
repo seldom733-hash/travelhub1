@@ -1,5 +1,6 @@
 "use client";
 
+import { OperationsPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -609,7 +610,7 @@ function RequestsWithParams() {
 
 export default function RequestsPage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<OperationsPageSkeleton />}>
       <RequestsWithParams />
     </Suspense>
   );

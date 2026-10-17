@@ -4,9 +4,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { MagnifyingGlass, X } from "@phosphor-icons/react";
 import { useLiveSearch, type SuggestResult } from "@/lib/search-engine";
+import { t, useLocale } from "@/lib/i18n";
 
 export default function GlobalSearchAutocomplete() {
   const router = useRouter();
+  const locale = useLocale();
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -95,7 +97,7 @@ export default function GlobalSearchAutocomplete() {
             }}
             onFocus={() => query.length >= 2 && setIsOpen(true)}
             onKeyDown={handleKeyDown}
-            placeholder="Поиск отелей, туров, экскурсий и услуг..."
+            placeholder={t("search.global_placeholder", locale)}
             autoComplete="off"
             role="combobox"
             aria-expanded={showDropdown}

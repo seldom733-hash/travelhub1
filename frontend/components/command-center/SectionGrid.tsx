@@ -151,8 +151,13 @@ export function SectionGrid({
   if (loading && !summary) {
     return (
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-busy>
+        {/* §SKELETON-PARITY: виджеты — карточки `rounded-2xl border bg-white p-4 shadow-sm`
+            (`SectionGrid.tsx:201`), а не блоки `h-24 bg-slate-100` без рамки. */}
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+          <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+            <div className="mt-2 h-8 w-24 animate-pulse rounded bg-slate-100" />
+          </div>
         ))}
       </div>
     );

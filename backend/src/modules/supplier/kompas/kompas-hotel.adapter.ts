@@ -14,6 +14,7 @@ import type {
 import { priceUnavailable } from "../supplier.types";
 import {
   KompasSupplierAdapter,
+  KOMPAS_CURRENCY_INC,
   type KompasHotelRawRow,
 } from "./kompas.adapter";
 import { KompasCaptchaRequiredException } from "./kompas-captcha.exception";
@@ -57,9 +58,10 @@ function todayCompact(): string {
  * search). No departure city, TOURINC=0 (stay-only).
  *
  * Registered under code KOMPAS / service "hotels" (alongside the tour adapter).
- * Prices are returned in the supplier's own currency (USD — data-currency_title)
- * and converted to AZN downstream by SupplierPricingService through the KOMPAS
- * SupplierFxRate, exactly like the tour offers.
+ * §AZN: prices are requested in AZN (CURRENCY=13 → data-currency_title "AZN"),
+ * so the read-path converts nothing (AZN source = identity in
+ * SupplierFxRateService) and markup applies to the AZN amount — exactly like
+ * the tour offers.
  */
 @Injectable()
 export class KompasHotelAdapter implements SupplierAdapter {
@@ -535,11 +537,13 @@ export class KompasHotelAdapter implements SupplierAdapter {
       children: row.children || query.children || 0,
       childAges: query.childAges ?? [],
       price: {
-        // data-converted-price-number is the visible supplier price; the
-        // currency (data-currency_title, usually USD) is converted to AZN
-        // downstream by SupplierPricingService via the KOMPAS SupplierFxRate.
+        // data-converted-price-number is the visible supplier price, requested
+        // in AZN (§AZN, CURRENCY=13) — the read-path therefore converts
+        // nothing (AZN source = identity) and markup applies in AZN. The
+        // supplier's own label wins; a missing one falls back to the requested
+        // currency, never to a hardcoded USD.
         amount,
-        currency: row.currency || "USD",
+        currency: row.currency || KOMPAS_CURRENCY_INC,
         fetchedAt: now,
         expiresAt: new Date(now.getTime() + HOTEL_TTL_MS),
         queryHash: "",

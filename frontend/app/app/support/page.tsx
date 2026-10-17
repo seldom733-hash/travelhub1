@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceKpiPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
@@ -219,7 +220,7 @@ function SupportListContent() {
 
 export default function SupportPage() {
   return (
-    <Suspense fallback={<div className="p-6"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<WorkspaceKpiPageSkeleton />}>
       <SupportListContent />
     </Suspense>
   );

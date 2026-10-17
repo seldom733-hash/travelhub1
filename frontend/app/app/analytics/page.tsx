@@ -1,5 +1,6 @@
 "use client";
 
+import { DashboardPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -509,7 +510,7 @@ function AnalyticsContent() {
 
 export default function AnalyticsPage() {
   return (
-    <Suspense fallback={<div className="p-6 lg:p-10"><div className="h-8 w-48 animate-pulse rounded bg-slate-100" /></div>}>
+    <Suspense fallback={<DashboardPageSkeleton />}>
       <AnalyticsContent />
     </Suspense>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspacePageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -386,7 +387,7 @@ function HotelDirectoryContent() {
 
 export default function HotelDirectoryPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-slate-900">…</div>}>
+    <Suspense fallback={<WorkspacePageSkeleton />}>
       <HotelDirectoryContent />
     </Suspense>
   );

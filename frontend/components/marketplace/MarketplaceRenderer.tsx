@@ -42,7 +42,7 @@ export default function MarketplaceRenderer() {
   if (loading) {
     return (
       <div className="min-h-screen bg-dark">
-        <div className="min-h-[540px] bg-dark lg:min-h-[620px]" aria-busy="true" />
+        <div className="aspect-[16/6] min-h-[320px] bg-dark" aria-busy="true" />
       </div>
     );
   }

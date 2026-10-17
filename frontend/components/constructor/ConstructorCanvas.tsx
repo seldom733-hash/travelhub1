@@ -46,10 +46,32 @@ export default function ConstructorCanvas({ slug }: Props) {
   } = useConstructor(slug);
 
   if (loading) {
+    /* §SKELETON-PARITY: тот же каркас, что и реальный (:69-146) — шапка
+       `flex items-center justify-between pb-4` + табы + `pt-6` →
+       `grid gap-6 lg:grid-cols-[280px_1fr]`; раньше был один блок `h-48`. */
     return (
-      <div className="space-y-4">
-        <div className="h-8 w-64 animate-pulse rounded bg-slate-100" />
-        <div className="h-48 animate-pulse rounded-lg bg-slate-100" />
+      <div className="space-y-0">
+        <div className="flex items-center justify-between pb-4">
+          <div>
+            <div className="h-6 w-48 animate-pulse rounded bg-slate-100" />
+            <div className="mt-1 h-4 w-72 animate-pulse rounded bg-slate-100" />
+          </div>
+          <div className="h-9 w-32 animate-pulse rounded-lg bg-slate-100" />
+        </div>
+        <div className="flex gap-1 border-b border-slate-200 pb-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-8 w-24 animate-pulse rounded-t-lg bg-slate-100" />
+          ))}
+        </div>
+        <div className="pt-6">
+          <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+            <div className="h-64 animate-pulse rounded-lg border border-slate-200 bg-white" />
+            <div className="space-y-3">
+              <div className="h-4 w-40 animate-pulse rounded bg-slate-100" />
+              <div className="h-48 animate-pulse rounded-lg border border-slate-200 bg-white" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

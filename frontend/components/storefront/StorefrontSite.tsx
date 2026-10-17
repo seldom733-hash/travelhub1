@@ -189,7 +189,7 @@ function StorefrontProductCard({ sf, card, locale, preview }: { sf: PublicStoref
   // семантика); preview не трекается.
   useStorefrontCardImpression(sf.slug, card.slug, !preview);
   // Фото: единый файл отеля из реестра — тот же, что в каталоге/туре/PDP.
-  const hotelPhoto = useHotelPhoto(card.hotelImage, card.slug);
+  const hotelPhoto = useHotelPhoto(card.hotelImage);
   const imageUrl = card.primaryImage?.thumbUrl ?? hotelPhoto ?? null;
   return (
     <Link

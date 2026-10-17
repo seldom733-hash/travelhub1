@@ -467,11 +467,20 @@ export default function MonthlyCalendar({
       </div>
 
       {loading && (
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: 42 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-lg bg-slate-100 animate-pulse" />
-          ))}
-        </div>
+        <>
+          {/* §SKELETON-PARITY: реальная сетка (:494-498) начинается со строки дней
+              недели; без неё календарь после загрузки «съезжал» на строку вниз. */}
+          <div className="grid grid-cols-7 gap-1">
+            {weekDays.map((day) => (
+              <div key={day} className="py-1 text-center text-xs font-medium text-slate-500">{day}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 42 }).map((_, i) => (
+              <div key={i} className="h-16 rounded-lg bg-slate-100 animate-pulse" />
+            ))}
+          </div>
+        </>
       )}
 
       {!loading && errorKind === "ERROR" && error && (

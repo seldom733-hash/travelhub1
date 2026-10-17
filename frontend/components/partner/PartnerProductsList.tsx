@@ -272,10 +272,23 @@ export default function PartnerProductsList({ initial }: { initial: InitialQuery
             <tbody className="divide-y divide-slate-100">
               {items === null &&
                 Array.from({ length: 5 }).map((_, i) => (
+                  /* §SKELETON-PARITY: строка повторяет реальную (:288-…): 8 ячеек
+                     `px-4 py-3`, превью `size-10` в колонке названия. Раньше была
+                     одна полоса `colSpan={8} h-4` — другая высота строки и ритм. */
                   <tr key={i} className="animate-pulse">
-                    <td className="px-4 py-3" colSpan={8}>
-                      <div className="h-4 w-full rounded bg-slate-100" />
+                    <td className="px-4 py-3"><div className="h-3 w-4 rounded bg-slate-100" /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="size-10 shrink-0 rounded-lg bg-slate-100" />
+                        <div className="h-4 w-40 rounded bg-slate-100" />
+                      </div>
                     </td>
+                    <td className="px-4 py-3"><div className="h-4 w-20 rounded bg-slate-100" /></td>
+                    <td className="px-4 py-3"><div className="h-5 w-20 rounded-full bg-slate-100" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-24 rounded bg-slate-100" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-16 rounded bg-slate-100" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-24 rounded bg-slate-100" /></td>
+                    <td className="px-4 py-3 text-right"><div className="ml-auto h-4 w-8 rounded bg-slate-100" /></td>
                   </tr>
                 ))}
               {items?.length === 0 && (

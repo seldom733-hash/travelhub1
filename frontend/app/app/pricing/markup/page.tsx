@@ -13,6 +13,7 @@
  * как ошибка + reload версий) → activate / archive + history.
  */
 import { Suspense, useCallback, useEffect, useState } from "react";
+import { WorkspacePageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import PanelFrame from "@/components/PanelFrame";
@@ -602,7 +603,7 @@ function MarkupAdminContent() {
 
 export default function MarkupAdminPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-slate-900">…</div>}>
+    <Suspense fallback={<WorkspacePageSkeleton />}>
       <MarkupAdminContent />
     </Suspense>
   );

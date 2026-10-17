@@ -169,9 +169,17 @@ export default function ProductEditorForm(props: ProductEditorFormProps) {
         {!categoryId ? (
           <p className="text-sm text-slate-400">{pt("partner.form.choose_category_first", locale)}</p>
         ) : schemaLoading ? (
-          <div className="space-y-3">
+          /* §SKELETON-PARITY: реальная форма атрибутов — `DynamicSchemaForm`
+             (`space-y-4`, подпись `text-sm` + контрол `w-full rounded-lg border
+             px-3 py-2 text-sm`); прежние 3 плоские полосы `h-9` были другой формы. */
+          <div className="space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-9 animate-pulse rounded-lg bg-slate-100" />
+              <div key={i}>
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  <div className="h-4 w-32 animate-pulse rounded bg-slate-100" />
+                </div>
+                <div className="h-10 w-full animate-pulse rounded-lg border border-slate-200 bg-slate-50" />
+              </div>
             ))}
           </div>
         ) : schema ? (

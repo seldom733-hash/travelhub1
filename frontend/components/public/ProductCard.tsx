@@ -42,9 +42,9 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
   // Фото отеля: единый файл физической гостиницы из реестра — бэкенд отдаёт
   // `hotelImage` (`/hotels/hotel_<hotelId>.webp`) один и тот же для тура, услуги
   // «Отели» и всех поставщиков этого отеля. Используется, когда у карточки нет
-  // primaryImage (ProductMedia пуст у supplier-синков). Legacy-файл по slug —
-  // резерв (см. lib/hotel-photo.ts).
-  const hotelPhoto = useHotelPhoto(card.hotelImage, card.slug);
+  // primaryImage (ProductMedia пуст у supplier-синков).
+  // См. lib/hotel-photo.ts.
+  const hotelPhoto = useHotelPhoto(card.hotelImage);
   const img = card.primaryImage ? { thumbUrl: card.primaryImage.thumbUrl } : hotelPhoto ? { thumbUrl: hotelPhoto } : null;
 
   // Step 1.13B: rendered-card impression (карточка реально отрисована в grid;
