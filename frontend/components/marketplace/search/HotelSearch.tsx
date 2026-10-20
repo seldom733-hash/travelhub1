@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarBlank, ArrowRight, CaretDown, X } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
 import { todayISO } from "@/lib/dates";
@@ -14,7 +14,7 @@ import {
 } from "@/lib/geo-api";
 import ChildAges from "./ChildAges";
 import HelpFindButton from "./HelpFindButton";
-import NightsRange from "./NightsRange";
+import NightsSelect from "./NightsSelect";
 import { useClickOutside } from "./useClickOutside";
 import { useWidestText } from "@/lib/measure-text";
 import {
@@ -28,6 +28,7 @@ import {
   PICKER_TRIGGER,
   PICKER_TRIGGER_TEXT,
   PICKER_W_NIGHTS,
+  PICKER_W_NIGHTS_WIDE,
   PICKER_W_TO,
 } from "./picker-styles";
 import {
@@ -59,15 +60,16 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
   const [hotelName, setHotelName] = useState("");
   // Default check-in = today (platform-wide default for date fields).
   const [checkIn, setCheckIn] = useState(todayISO());
-  // Night range «от–до» (same contract as the tours search).
-  const [nightsFrom, setNightsFrom] = useState(3);
-  const [nightsTo, setNightsTo] = useState(3);
+  // ONE night value (same contract as the tours search): the supplier request
+  // carries it as both range bounds. Hotels default to a 1-night stay.
+  const [nightsFrom, setNightsFrom] = useState(1);
+  const [nightsTo, setNightsTo] = useState(1);
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
   // «Поставщики» picker: enabled hotel suppliers from the backend (имена и
   // признак активности — из CRM-партнёров); пустой выбор = все поставщики.
-  const [supplierOptions, setSupplierOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [supplierOptions, setSupplierOptions] = useState<Array<{ code: string; name: string; countries?: string[] }>>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [suppliersOpen, setSuppliersOpen] = useState(false);
   const suppliersRef = useRef<HTMLDivElement>(null);
@@ -89,8 +91,14 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
       setHotelId(draft.hotelId);
       setHotelName(draft.hotelName);
       setCheckIn(draft.checkIn);
-      setNightsFrom(draft.nightsFrom);
-      setNightsTo(draft.nightsTo);
+      // Old drafts may carry a night RANGE. Collapse it to one value: the
+      // form now searches exactly one duration.
+      const restoredNights =
+        draft.nightsFrom === draft.nightsTo
+          ? draft.nightsFrom
+          : draft.nightsTo || draft.nightsFrom || 1;
+      setNightsFrom(restoredNights);
+      setNightsTo(restoredNights);
       setAdults(draft.adults);
       setChildren(draft.children);
       setChildAges(draft.childAges);
@@ -140,8 +148,8 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
     setHotelId("");
     setHotelName("");
     setCheckIn(todayISO());
-    setNightsFrom(3);
-    setNightsTo(3);
+    setNightsFrom(1);
+    setNightsTo(1);
     setAdults(2);
     setChildren(0);
     setChildAges([]);
@@ -169,6 +177,26 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
       alive = false;
     };
   }, []);
+
+  const allowedCountryCodes = useMemo(() => {
+    if (selectedSuppliers.length === 0) return undefined;
+    const codes = new Set<string>();
+    for (const code of selectedSuppliers) {
+      const supplier = supplierOptions.find((s) => s.code === code);
+      if (!supplier?.countries || supplier.countries.length === 0) return undefined;
+      supplier.countries.forEach((c) => codes.add(c.toUpperCase()));
+    }
+    return [...codes];
+  }, [selectedSuppliers, supplierOptions]);
+
+  useEffect(() => {
+    if (!allowedCountryCodes || !toCountry) return;
+    if (!allowedCountryCodes.includes(toCountry.code.toUpperCase())) {
+      setToCountry(null);
+      setToCity(null);
+      setToResort(null);
+    }
+  }, [allowedCountryCodes, toCountry]);
 
   const destination = toResort ?? toCity ?? toCountry;
   // Content-width: те же единицы измерения, что в поиске туров — одиночная
@@ -280,6 +308,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
             onClearAll={() => {
               handleCountryChange(null);
             }}
+            allowedCountryCodes={allowedCountryCodes}
             required
           />
         </div>
@@ -319,16 +348,15 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
           </div>
         </div>
 
-        {/* Nights — range «от–до» (тот же размер, что в турах: без compact) */}
-        <div className={PICKER_W_NIGHTS}>
-          <NightsRange
-            idPrefix="hotel-nights"
-            from={nightsFrom}
-            to={nightsTo}
+        {/* ONE night value (the supplier request gets it as both bounds). */}
+        <div className={PICKER_W_NIGHTS_WIDE}>
+          <NightsSelect
+            id="hotel-nights"
+            value={nightsFrom}
             options={Array.from({ length: 30 }, (_, i) => i + 1)}
-            onChange={(f, t2) => {
-              setNightsFrom(f);
-              setNightsTo(t2);
+            onChange={(n) => {
+              setNightsFrom(n);
+              setNightsTo(n);
             }}
           />
         </div>

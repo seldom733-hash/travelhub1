@@ -10,6 +10,7 @@ import type { PublicProductDetail } from "@/lib/public-api";
 import type { PublicStorefront } from "@/lib/storefront-api";
 import { SOCIAL_PLATFORM_ICONS, themeStyle } from "./storefront-theme";
 import { fireContactClick, useStorefrontProductViewed } from "@/lib/behavioral-events";
+import { useGlobalBranding } from "@/lib/use-global-branding";
 
 /**
  * PHASE 1 STEP 1.12.2 §11 — Storefront PDP (client-рендер из server-fetched props).
@@ -22,6 +23,7 @@ import { fireContactClick, useStorefrontProductViewed } from "@/lib/behavioral-e
 export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; detail: PublicProductDetail }) {
   const locale = useLocale();
   const theme = themeStyle(sf.themePreset);
+  const { brandName, loading: brandingLoading } = useGlobalBranding();
   const p = detail.product;
   const availability = availabilityText(p.availability, locale);
   const attributeSections = sectionsFor(p.attributes, locale);
@@ -216,10 +218,15 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
       </main>
 
       <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">
-        {name} — {t("storefront.powered_by", locale)}{" "}
-        <Link href="/" className="text-slate-500 hover:underline">
-          TravelHub
-        </Link>
+        {name}
+        {!brandingLoading && (
+          <>
+            {" "}— {t("storefront.powered_by", locale)}{" "}
+            <Link href="/" className="text-slate-500 hover:underline">
+              {brandName}
+            </Link>
+          </>
+        )}
       </footer>
     </div>
   );

@@ -2,7 +2,10 @@
 
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import MarketplaceHeader from "@/components/marketplace/MarketplaceHeader";
+import MarketplaceHeader, {
+  resolveBrandName,
+  type MarketplaceHeaderConfig,
+} from "@/components/marketplace/MarketplaceHeader";
 import HeroSearch from "@/components/marketplace/HeroSearch";
 import HelpFindButton from "@/components/marketplace/search/HelpFindButton";
 import TourResultsTable from "@/components/supplier/TourResultsTable";
@@ -64,7 +67,10 @@ export default function SearchResultsPage() {
          `mx-auto max-w-[1400px] px-6 py-8`. Прежде здесь была пустая тёмная
          полоса с «…», после загрузки появлялись шапка, поисковик и сетка. */
       <div className="min-h-screen bg-dark">
-        <MarketplaceHeader />
+        {/* Neutral header placeholder: the published header config is fetched
+            inside SearchResultsInner. Rendering the default <MarketplaceHeader />
+            here flashed the legacy "TravelHub" brand before Navitravel loaded. */}
+        <div className="h-[88px] border-b border-dark-border/60 bg-dark" aria-hidden="true" />
         <main className="mx-auto max-w-[1400px] px-6 py-8">
           <div className="mb-6 h-[120px] animate-pulse rounded-2xl border border-white/10 bg-white/5" />
           <div className="mb-4 h-7 w-56 animate-pulse rounded bg-white/10" />
@@ -93,10 +99,15 @@ function SearchResultsInner() {
   const isValidService = VALID_SERVICES.includes(service);
   // Включённые услуги — из конфига workspace (page-builder → «Поиск»).
   // Пока конфиг грузится/недоступен, работает дефолт: tours/hotels/flights.
-  const { page: constructorPage } = useConstructorPublished("marketplace-home");
+  const { page: constructorPage, loading: constructorLoading } = useConstructorPublished("marketplace-home");
   const { enabled: enabledServices, defaultService: configDefaultService } = resolveSearchServices(
     (constructorPage?.searchConfig ?? null) as SearchServicesConfig | null,
   );
+  // Canonical brand/logo come from the same published marketplace config as the
+  // home page. Passing it to the header keeps "Navitravel" on search results;
+  // without it MarketplaceHeader fell back to the legacy "TravelHub" default.
+  const headerConfig = (constructorPage?.headerConfig ?? null) as MarketplaceHeaderConfig | null;
+  const brandName = constructorPage ? resolveBrandName(headerConfig) : "";
   // Услуга выключена в workspace (например, railway): поставщиков у неё нет,
   // поэтому результатов не будет — страница отвечает текстом
   // search.service_unavailable вместо формы выдачи.
@@ -398,7 +409,11 @@ function SearchResultsInner() {
 
   return (
     <div className="min-h-screen bg-dark">
-      <MarketplaceHeader />
+      {constructorLoading ? (
+        <div className="h-[88px] border-b border-dark-border/60 bg-dark" aria-hidden="true" />
+      ) : (
+        <MarketplaceHeader config={headerConfig} />
+      )}
       <main className="mx-auto max-w-[1400px] px-6 py-8">
         {/* Универсальный поисковик — тот же HeroSearch (вкладки услуг), что и
             на главной; активна вкладка текущего поиска, чтобы параметры можно
@@ -555,7 +570,9 @@ function SearchResultsInner() {
 
       <footer className="border-t border-dark-border bg-dark py-8">
         <div className="mx-auto max-w-[1400px] px-6 text-center text-sm text-neutral-500">
-          © {new Date().getFullYear()} TravelHub
+          {brandName
+            ? `© ${new Date().getFullYear()} ${brandName}. ${t("footer.rights_reserved", locale)}`
+            : ""}
         </div>
       </footer>
     </div>

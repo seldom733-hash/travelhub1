@@ -43,7 +43,11 @@ export interface AggregatedOffer extends SupplierOffer {
 /** Result of an aggregate search across all enabled suppliers of a service. */
 export interface AggregatedSearchResult {
   offers: AggregatedOffer[];
-  perSupplier: Record<string, { count: number; error?: string }>;
+  /**
+   * Per-supplier result. `ms` is the wall-clock time the supplier spent on
+   * this search (max across its parallel jobs, e.g. KazUnion programs).
+   */
+  perSupplier: Record<string, { count: number; error?: string; ms?: number }>;
 }
 
 /**
@@ -294,7 +298,7 @@ export class SupplierAggregatorService {
       }
       return { offers: [], perSupplier: {} };
     }
-    const perSupplier: Record<string, { count: number; error?: string }> = {};
+    const perSupplier: Record<string, { count: number; error?: string; ms?: number }> = {};
     // Supplier-side STARS filters are best-effort (KazUnion can leak rows of
     // adjacent categories) — enforce the requested hotel category below.
     const wantedStars = this.wantedStarTokens(query);
@@ -302,11 +306,28 @@ export class SupplierAggregatorService {
     // (and adapters re-check by name); jobs without one — the supplier's
     // dictionary lacks that hotel — must never leak other hotels either.
     const wantedHotel = this.normHotel(query.hotel ?? "");
+    const searchStartedAt = Date.now();
+    // Capture the duration inside each job: a rejected promise would lose it.
+    // All jobs start together, so the max per supplier is its wall-clock time.
     const settled = await Promise.allSettled(
-      jobs.map(async (job) => ({
-        code: job.code,
-        offers: await this.offerService.search(job.code, job.q),
-      })),
+      jobs.map(async (job) => {
+        try {
+          const offers = await this.offerService.search(job.code, job.q);
+          return {
+            code: job.code,
+            offers,
+            ms: Date.now() - searchStartedAt,
+            error: undefined,
+          };
+        } catch (error) {
+          return {
+            code: job.code,
+            offers: [] as SupplierOffer[],
+            ms: Date.now() - searchStartedAt,
+            error,
+          };
+        }
+      }),
     );
 
     const aggregated: AggregatedOffer[] = [];
@@ -316,54 +337,69 @@ export class SupplierAggregatorService {
     const seenOffers = new Set<string>();
     settled.forEach((res, i) => {
       const code = jobs[i].code;
-      if (res.status === "fulfilled") {
-        // Only bookable offers reach the marketplace: rows with a sales stop
-        // or without flight seats are excluded, UNKNOWN stays (no fake data).
-        let bookable = res.value.offers.filter(
-          (o) => o.availability !== "NOT_AVAILABLE",
-        );
-        if (wantedStars) {
-          const before = bookable.length;
-          bookable = bookable.filter((o) => this.offerStarInCategory(o.hotel, wantedStars));
-          const dropped = before - bookable.length;
-          if (dropped > 0) {
-            this.logger.log(
-              `Aggregated search: ${code} — ${dropped} offers dropped (hotel category ${[...wantedStars].join(", ")})`,
-            );
-          }
-        }
-        if (wantedHotel && !jobs[i].q.hotelExternalId) {
-          // No native HOTELS id for this supplier → the name is the only
-          // truth: drop every offer of another hotel.
-          const before = bookable.length;
-          bookable = bookable.filter((o) => this.offerHotelMatches(o.hotel, wantedHotel));
-          const dropped = before - bookable.length;
-          if (dropped > 0) {
-            this.logger.log(
-              `Aggregated search: ${code} — ${dropped} offers dropped (hotel "${query.hotel}" not in supplier dictionary)`,
-            );
-          }
-        }
-        const hidden = res.value.offers.length - bookable.length;
-        if (hidden > 0) {
-          this.logger.log(`Aggregated search: ${code} — ${hidden} offers hidden (stop-sale/no seats)`);
-        }
-        let unique = 0;
-        for (const offer of bookable) {
-          const key = `${code}:${offer.externalOfferId}`;
-          if (seenOffers.has(key)) continue;
-          seenOffers.add(key);
-          unique += 1;
-          aggregated.push(this.normalizeGeo(offer));
-        }
-        perSupplier[code] = {
-          count: (perSupplier[code]?.count ?? 0) + unique,
-        };
-      } else {
+      const prev = perSupplier[code];
+      if (res.status !== "fulfilled") {
         const err = res.reason instanceof Error ? res.reason.message : String(res.reason);
+        const elapsed = Math.max(prev?.ms ?? 0, Date.now() - searchStartedAt);
         this.logger.warn(`Aggregated search: ${code} (job ${i}) failed: ${err}`);
-        if (!perSupplier[code]?.count) perSupplier[code] = { count: 0, error: err };
+        if (!prev?.count) perSupplier[code] = { count: 0, error: err, ms: elapsed };
+        else perSupplier[code] = { ...prev, ms: elapsed };
+        return;
       }
+
+      const job = res.value;
+      const elapsed = Math.max(prev?.ms ?? 0, job.ms);
+      if (job.error !== undefined) {
+        const err = job.error instanceof Error ? job.error.message : String(job.error);
+        this.logger.warn(`Aggregated search: ${code} (job ${i}) failed: ${err}`);
+        if (!prev?.count) perSupplier[code] = { count: 0, error: err, ms: elapsed };
+        else perSupplier[code] = { ...prev, ms: elapsed };
+        return;
+      }
+
+      // Only bookable offers reach the marketplace: rows with a sales stop
+      // or without flight seats are excluded, UNKNOWN stays (no fake data).
+      let bookable = job.offers.filter(
+        (o) => o.availability !== "NOT_AVAILABLE",
+      );
+      if (wantedStars) {
+        const before = bookable.length;
+        bookable = bookable.filter((o) => this.offerStarInCategory(o, wantedStars));
+        const dropped = before - bookable.length;
+        if (dropped > 0) {
+          this.logger.log(
+            `Aggregated search: ${code} — ${dropped} offers dropped (hotel category ${[...wantedStars].map((n) => `${n}*`).join(", ")})`,
+          );
+        }
+      }
+      if (wantedHotel && !jobs[i].q.hotelExternalId) {
+        // No native HOTELS id for this supplier → the name is the only
+        // truth: drop every offer of another hotel.
+        const before = bookable.length;
+        bookable = bookable.filter((o) => this.offerHotelMatches(o.hotel, wantedHotel));
+        const dropped = before - bookable.length;
+        if (dropped > 0) {
+          this.logger.log(
+            `Aggregated search: ${code} — ${dropped} offers dropped (hotel "${query.hotel}" not in supplier dictionary)`,
+          );
+        }
+      }
+      const hidden = job.offers.length - bookable.length;
+      if (hidden > 0) {
+        this.logger.log(`Aggregated search: ${code} — ${hidden} offers hidden (stop-sale/no seats)`);
+      }
+      let unique = 0;
+      for (const offer of bookable) {
+        const key = `${code}:${offer.externalOfferId}`;
+        if (seenOffers.has(key)) continue;
+        seenOffers.add(key);
+        unique += 1;
+        aggregated.push(this.normalizeGeo(offer));
+      }
+      perSupplier[code] = {
+        count: (prev?.count ?? 0) + unique,
+        ms: elapsed,
+      };
     });
 
     aggregated.sort((a, b) => (a.price?.amount ?? Infinity) - (b.price?.amount ?? Infinity));
@@ -371,31 +407,56 @@ export class SupplierAggregatorService {
   }
 
   /**
-   * Requested hotel-category tokens ("3*", "4*+") parsed from the query's
-   * hotelStars labels. Returns null when the post-filter must not run:
-   * no stars requested, or a non-star label («Семейный», «SpecClass» …)
-   * that cannot be verified from the hotel name.
+   * Requested hotel-category numbers parsed from the query's hotelStars
+   * labels. Supplier dictionaries use suffixes ("5*", "5*+", "5* HV1",
+   * "5* DELUXE"), so the leading N* is the category. Returns null when the
+   * post-filter must not run: no stars requested, or a non-star label
+   * («Семейный», «SpecClass», «HV-1» …) that cannot be compared by count.
    */
-  private wantedStarTokens(query: SupplierSearchQuery): Set<string> | null {
+  private wantedStarTokens(query: SupplierSearchQuery): Set<number> | null {
     if (!query.hotelStars?.length) return null;
-    const tokens = new Set<string>();
+    const stars = new Set<number>();
     for (const label of query.hotelStars) {
-      const m = label.trim().match(/^([1-5])\s*(\*\+?)$/);
+      const m = label.trim().match(/^([1-5])\s*\*/);
       if (!m) return null;
-      tokens.add(`${m[1]}${m[2]}`);
+      stars.add(parseInt(m[1], 10));
     }
-    return tokens;
+    return stars;
   }
 
   /**
-   * true when the offer may belong to the requested category: hotels without
-   * a parsable star rating in the name stay (cannot disprove), hotels with a
-   * different token ("4*" vs wanted "3*") are dropped.
+   * A requested category is a hard filter. The category is read from the
+   * hotel name first, then from supplier metadata (ANEX/others keep the real
+   * category in groupStarName/starName even when the name is bare). An offer
+   * with no verifiable category is dropped: otherwise "5*" leaks HV-1 and
+   * "Boutique" rows from KazUnion/Summertour.
    */
-  private offerStarInCategory(hotel: string | undefined, wanted: Set<string>): boolean {
-    const m = (hotel ?? "").match(/([1-5])\s*(\*\+?)/);
-    if (!m) return true;
-    return wanted.has(`${m[1]}${m[2]}`);
+  private offerStarInCategory(offer: SupplierOffer, wanted: Set<number>): boolean {
+    const star = this.offerStarNumber(offer);
+    return star !== null && wanted.has(star);
+  }
+
+  /** Numeric hotel category (1-5) from the name, else supplier metadata. */
+  private offerStarNumber(offer: SupplierOffer): number | null {
+    const parse = (value: unknown): number | null => {
+      if (typeof value === "number") {
+        return value >= 1 && value <= 5 ? Math.floor(value) : null;
+      }
+      if (typeof value !== "string") return null;
+      // "5 *****", "4*+", "5* / HV1" and the decimal form "5.0" used by ANEX
+      // hotel-only rows (where groupStarName is "???" and the group id is
+      // absent — the precise starName is the only category source).
+      const m = value.match(/([1-5])(?:\s*\*+|\.\d)/);
+      return m ? parseInt(m[1], 10) : null;
+    };
+    const fromName = parse(offer.hotel);
+    if (fromName !== null) return fromName;
+    const raw = offer.rawMetadata ?? {};
+    for (const key of ["groupStarName", "starName", "stars", "category", "hotelCategory"]) {
+      const n = parse(raw[key]);
+      if (n !== null) return n;
+    }
+    return null;
   }
 
   /** Normalized hotel identity: lowercase, ё→е, alphanumerics only. */
@@ -426,6 +487,8 @@ export class SupplierAggregatorService {
   async listSuppliersOfService(serviceType: SupplierServiceType): Promise<Array<{
     code: string;
     name: string;
+    /** ISO-2 countries the supplier can search. Omitted = all countries. */
+    countries?: string[];
   }>> {
     if (serviceType === "flights") {
       return this.flightRegistry
@@ -447,7 +510,15 @@ export class SupplierAggregatorService {
         }
         return adapter.enabled && config.searchEnabled;
       })
-      .map(({ adapter }) => ({ code: adapter.code, name: adapter.name }));
+      .map(({ adapter }) => {
+        const cap = SupplierAggregatorService.CAPABILITIES[adapter.code];
+        const svc = serviceType ? cap?.services?.[serviceType] : undefined;
+        return {
+          code: adapter.code,
+          name: adapter.name,
+          countries: svc?.countries ?? cap?.countries,
+        };
+      });
 
     // Имена поставщиков — из CRM-партнёров (единый источник), а не из кода
     // адаптеров. Партнёр выключен в CRM (INACTIVE) → поставщик исчезает из
@@ -456,11 +527,11 @@ export class SupplierAggregatorService {
       entries.map(async (entry) => {
         const crm = await this.crmPartnerForToken(entry.code);
         if (crm && !crm.active) return null;
-        return { code: entry.code, name: crm?.name ?? entry.name };
+        return { code: entry.code, name: crm?.name ?? entry.name, countries: entry.countries };
       }),
     );
     return withCrmNames
-      .filter((e): e is { code: string; name: string } => Boolean(e))
+      .filter((e): e is { code: string; name: string; countries: string[] | undefined } => Boolean(e))
       .sort((x, y) => x.code.localeCompare(y.code));
   }
 
@@ -595,7 +666,15 @@ export class SupplierAggregatorService {
     query: SupplierSearchQuery,
     perSupplierQueries: Record<string, SupplierSearchQuery>,
   ): Promise<void> {
-    const wanted = query.hotelStars!.map((s) => s.trim().toLowerCase()).filter(Boolean);
+    const wantedNums = new Set<number>();
+    const wantedLabels = new Set<string>();
+    for (const raw of query.hotelStars ?? []) {
+      const label = raw.trim().toLowerCase();
+      if (!label) continue;
+      wantedLabels.add(label);
+      const m = label.match(/^([1-5])\s*\*/);
+      if (m) wantedNums.add(parseInt(m[1], 10));
+    }
     const links = await this.prisma.supplierGeoLink.findMany({
       where: { kind: "STAR", supplierCode: { in: Object.keys(perSupplierQueries) } },
       select: { supplierCode: true, externalId: true, label: true },
@@ -608,7 +687,14 @@ export class SupplierAggregatorService {
         continue;
       }
       const ids = supplierLinks
-        .filter((l) => wanted.includes(l.label.trim().toLowerCase()))
+        .filter((l) => {
+          const label = l.label.trim().toLowerCase();
+          const m = label.match(/^([1-5])\s*\*/);
+          // "5*" must include "5*/HV1", "5* DELUXE", "5* Superior" —
+          // exact label matching silently dropped those suppliers.
+          if (m) return wantedNums.has(parseInt(m[1], 10));
+          return wantedLabels.has(label);
+        })
         .map((l) => l.externalId);
       if (ids.length > 0) {
         perSupplierQueries[code] = { ...q, starKeys: { ...q.starKeys, [code]: ids.join(",") } };

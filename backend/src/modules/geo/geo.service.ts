@@ -460,6 +460,30 @@ export class GeoService {
       entry.suppliers.add(l.supplierCode);
       if (!entry.externalIds[l.supplierCode]) entry.externalIds[l.supplierCode] = l.externalId;
     }
+
+    // Canonical N* options alongside supplier-specific labels. Supplier
+    // dictionaries often only ship grouped labels ("5* / HV1", "5* DELUXE",
+    // "5* Superior"), so without a plain "5*" the dropdown cannot express
+    // "five-star only" — and a grouped label legitimately includes HV-1.
+    // The canonical entry carries the same native ids; the adapters read the
+    // requested label to decide between strict star count and group match.
+    for (const [label, entry] of [...byLabel.entries()]) {
+      const m = label.match(/^([1-5])\s*\*/);
+      if (!m) continue;
+      const canonical = `${m[1]}*`;
+      if (label === canonical) continue;
+      const target = byLabel.get(canonical) ?? {
+        stars: parseInt(m[1], 10),
+        suppliers: new Set<string>(),
+        externalIds: {} as Record<string, string>,
+      };
+      for (const s of entry.suppliers) target.suppliers.add(s);
+      for (const [supplier, id] of Object.entries(entry.externalIds)) {
+        if (!target.externalIds[supplier]) target.externalIds[supplier] = id;
+      }
+      byLabel.set(canonical, target);
+    }
+
     return [...byLabel.entries()]
       .map(([label, v]) => ({
         label,

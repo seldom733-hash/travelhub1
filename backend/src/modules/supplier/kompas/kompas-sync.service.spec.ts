@@ -72,6 +72,7 @@ describe("KompasSyncService", () => {
           findFirst: jest.fn().mockResolvedValue({ id: "k1", name: "KOMPAS" }),
         },
         category: { findFirst: jest.fn().mockResolvedValue({ id: "c1" }) },
+        geoCountry: { findUnique: jest.fn().mockResolvedValue({ id: "gc-1" }) },
       };
       const mockKompas = {
         discoverCountriesAndPrograms: jest.fn().mockRejectedValue(new Error("CAPTCHA blocked")),
@@ -89,6 +90,7 @@ describe("KompasSyncService", () => {
           findFirst: jest.fn().mockResolvedValue({ id: "k1" }),
         },
         category: { findFirst: jest.fn().mockResolvedValue({ id: "c1" }) },
+        geoCountry: { findUnique: jest.fn().mockResolvedValue({ id: "gc-1" }) },
       };
       const mockKompas = {
         discoverCountriesAndPrograms: jest.fn().mockResolvedValue([]),
@@ -127,6 +129,7 @@ describe("KompasSyncService", () => {
           findFirst: jest.fn().mockResolvedValue({ id: "k1", name: "KOMPAS" }),
         },
         category: { findFirst: jest.fn().mockResolvedValue({ id: "c1" }) },
+        geoCountry: { findUnique: jest.fn().mockResolvedValue({ id: "gc-1" }) },
         product: {
           findFirst: jest.fn().mockResolvedValue(null),
         },
@@ -177,6 +180,7 @@ describe("KompasSyncService", () => {
           findFirst: jest.fn().mockResolvedValue({ id: "k1", name: "KOMPAS" }),
         },
         category: { findFirst: jest.fn().mockResolvedValue({ id: "c1" }) },
+        geoCountry: { findUnique: jest.fn().mockResolvedValue({ id: "gc-1" }) },
         product: {
           findFirst: jest.fn().mockResolvedValue({
             id: "existing",
@@ -220,6 +224,7 @@ describe("KompasSyncService", () => {
           findFirst: jest.fn().mockResolvedValue({ id: "k1", name: "KOMPAS" }),
         },
         category: { findFirst: jest.fn().mockResolvedValue({ id: "c1" }) },
+        geoCountry: { findUnique: jest.fn().mockResolvedValue({ id: "gc-1" }) },
         product: {
           findFirst: jest.fn().mockResolvedValue({
             id: "existing",
@@ -263,6 +268,7 @@ describe("KompasSyncService", () => {
           findFirst: jest.fn().mockResolvedValue({ id: "k1", name: "KOMPAS" }),
         },
         category: { findFirst: jest.fn().mockResolvedValue({ id: "c1" }) },
+        geoCountry: { findUnique: jest.fn().mockResolvedValue({ id: "gc-1" }) },
         // Existing card already stores the PUBLIC price (1000 + 5% = 1050):
         // unchanged iff minPrice was markups BEFORE the comparison.
         product: {
@@ -321,6 +327,7 @@ describe("KompasSyncService", () => {
           findFirst: jest.fn().mockResolvedValue({ id: "k1", name: "KOMPAS" }),
         },
         category: { findFirst: jest.fn().mockResolvedValue({ id: "c1" }) },
+        geoCountry: { findUnique: jest.fn().mockResolvedValue({ id: "gc-1" }) },
         product: {
           findFirst: jest.fn().mockResolvedValue({
             id: "existing",
@@ -389,6 +396,7 @@ describe("KompasSyncService", () => {
           findFirst: jest.fn().mockResolvedValue({ id: "k1", name: "KOMPAS" }),
         },
         category: { findFirst: jest.fn().mockResolvedValue({ id: "c1" }) },
+        geoCountry: { findUnique: jest.fn().mockResolvedValue({ id: "gc-1" }) },
         product: {
           findFirst: jest.fn().mockResolvedValue({
             id: "existing",

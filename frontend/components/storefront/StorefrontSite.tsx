@@ -9,6 +9,7 @@ import { useHotelPhoto } from "@/lib/hotel-photo";
 import { SOCIAL_PLATFORM_ICONS, themeStyle } from "./storefront-theme";
 import Price from "../public/Price";
 import { fireContactClick, useStorefrontCardImpression, useStorefrontViewed } from "@/lib/behavioral-events";
+import { useGlobalBranding } from "@/lib/use-global-branding";
 
 /**
  * PHASE 1 STEP 1.12.2 §10 — Storefront homepage: самостоятельный сайт бизнеса.
@@ -33,6 +34,7 @@ export default function StorefrontSite({
 }) {
   const locale = useLocale();
   const theme = themeStyle(sf.themePreset);
+  const { brandName, loading: brandingLoading } = useGlobalBranding();
   const logo = sf.media.find((m) => m.kind === "LOGO");
   const hero = sf.media.find((m) => m.kind === "HERO");
   const logoUrl = logo ? (mediaUrlOverrides?.[logo.id] ?? logo.url) : null;
@@ -168,10 +170,15 @@ export default function StorefrontSite({
 
       {/* ── Footer ── */}
       <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-400">
-        {name} — {t("storefront.powered_by", locale)}{" "}
-        <Link href="/" className="text-slate-500 hover:underline">
-          TravelHub
-        </Link>
+        {name}
+        {!brandingLoading && (
+          <>
+            {" "}— {t("storefront.powered_by", locale)}{" "}
+            <Link href="/" className="text-slate-500 hover:underline">
+              {brandName}
+            </Link>
+          </>
+        )}
       </footer>
 
       {preview && (

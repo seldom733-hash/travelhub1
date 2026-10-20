@@ -27,8 +27,10 @@ export default function ConstructorFooterTab({ slug, config, headerConfig, onSav
   const locale = useLocale();
   const year = new Date().getFullYear();
 
-  // Brand name is inherited from headerConfig (single source of truth).
+  // Brand name and contacts are inherited from headerConfig (single source of truth).
   const inheritedBrandName = resolveBrandName(headerConfig as never);
+  const inheritedPhone = ((headerConfig?.phone as string) ?? "").trim();
+  const inheritedEmail = ((headerConfig?.email as string) ?? "").trim();
 
   const [cfg, setCfg] = useState<FooterConfig>(() => ({
     description: (config?.description as Record<string, string>) ?? {
@@ -36,12 +38,12 @@ export default function ConstructorFooterTab({ slug, config, headerConfig, onSav
       az: "Səyahət üçün ən yaxşı təkliflər",
       en: "Best travel offers",
     },
-    phone: (config?.phone as string) ?? "+994 12 345 67 89",
-    email: (config?.email as string) ?? "info@travelhub.az",
+    phone: (config?.phone as string) || inheritedPhone,
+    email: (config?.email as string) || inheritedEmail,
     copyright: (config?.copyright as Record<string, string>) ?? {
-      ru: `© ${year} ${inheritedBrandName}. Все права защищены.`,
-      az: `© ${year} ${inheritedBrandName}. Bütün hüquqlar qorunur.`,
-      en: `© ${year} ${inheritedBrandName}. All rights reserved.`,
+      ru: `© ${year} {brand}. Все права защищены.`,
+      az: `© ${year} {brand}. Bütün hüquqlar qorunur.`,
+      en: `© ${year} {brand}. All rights reserved.`,
     },
   }));
 
@@ -100,6 +102,7 @@ export default function ConstructorFooterTab({ slug, config, headerConfig, onSav
             <input type="email" value={cfg.email ?? ""} onChange={(e) => setCfg((p) => ({ ...p, email: e.target.value }))} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500" />
           </div>
         </div>
+        <p className="mt-2 text-xs text-slate-500">{t("constructor.footer_contacts_hint", locale)}</p>
       </div>
 
       {/* Copyright */}
@@ -118,6 +121,9 @@ export default function ConstructorFooterTab({ slug, config, headerConfig, onSav
             </div>
           ))}
         </div>
+        <p className="mt-2 text-xs text-slate-500">
+          {t("constructor.footer_copyright_hint", locale)}
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

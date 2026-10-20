@@ -101,7 +101,11 @@ export default function MarketplaceRenderer() {
           <SearchBlock config={page.searchConfig as never} />
         )}
       </main>
-      <MarketplaceFooter config={cfg.footerConfig as never} brandName={canonicalBrandName} />
+      <MarketplaceFooter
+        config={cfg.footerConfig as never}
+        brandName={canonicalBrandName}
+        headerConfig={cfg.headerConfig as never}
+      />
     </div>
   );
 }

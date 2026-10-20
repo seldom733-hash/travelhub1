@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { t, useLocale } from "@/lib/i18n";
 import { Buildings, PaperPlaneRight } from "@phosphor-icons/react";
+import type { MarketplaceHeaderConfig } from "./MarketplaceHeader";
 
 const FOOTER_SERVICES = [
   { href: "/search?category=hotels", labelKey: "footer.service_accommodation" },
@@ -31,25 +32,38 @@ export interface MarketplaceFooterConfig {
   copyright?: Record<string, string>;
 }
 
-const DEFAULT_FOOTER_CONFIG: MarketplaceFooterConfig = {
-  phone: "+994 12 345 67 89",
-  email: "info@travelhub.az",
-};
-
 interface MarketplaceFooterProps {
   config?: MarketplaceFooterConfig | null;
   /** Canonical brand name — inherited from headerConfig.brandName (single source of truth). */
   brandName?: string;
+  /** Header config supplies canonical contacts when the footer has none. */
+  headerConfig?: MarketplaceHeaderConfig | null;
 }
 
-export default function MarketplaceFooter({ config, brandName: brandNameProp }: MarketplaceFooterProps) {
+export default function MarketplaceFooter({
+  config,
+  brandName: brandNameProp,
+  headerConfig,
+}: MarketplaceFooterProps) {
   const locale = useLocale();
   const year = new Date().getFullYear();
 
-  const cfg = { ...DEFAULT_FOOTER_CONFIG, ...(config ?? {}) };
-  const brandName = (brandNameProp ?? cfg.name?.[locale] ?? cfg.name?.ru ?? "TravelHub").trim();
+  const cfg: MarketplaceFooterConfig = config ?? {};
+  const brandName = (brandNameProp ?? cfg.name?.[locale] ?? cfg.name?.ru ?? "").trim() || "TravelHub";
   const description = (cfg.description?.[locale] || cfg.description?.ru || t("footer.brand_description", locale)).trim();
-  const copyright = (cfg.copyright?.[locale] || cfg.copyright?.ru || `© ${year} TravelHub. ${t("footer.rights_reserved", locale)}`).trim();
+  // Company profile (Header tab) is the single source of truth for contacts.
+  // Footer-specific values are only a fallback for legacy configs where the
+  // header has no phone/email. This is what keeps the footer in sync after a
+  // constructor rename/contact change (the old code used hardcoded TravelHub
+  // defaults and never looked at the company profile at all).
+  const phone = (headerConfig?.phone ?? "").trim() || (cfg.phone ?? "").trim();
+  const email = (headerConfig?.email ?? "").trim() || (cfg.email ?? "").trim();
+  // `{brand}` is replaced at render time, so the copyright follows the company
+  // name automatically instead of freezing the old literal.
+  const customCopyright = (cfg.copyright?.[locale] || cfg.copyright?.ru || "").trim();
+  const copyright = customCopyright
+    ? customCopyright.replace(/\{brand\}/gi, brandName)
+    : `© ${year} ${brandName}. ${t("footer.rights_reserved", locale)}`;
 
   return (
     <footer className="border-t border-dark-border bg-dark" role="contentinfo">
@@ -119,25 +133,25 @@ export default function MarketplaceFooter({ config, brandName: brandNameProp }: 
               {t("footer.heading_contact", locale)}
             </h3>
             <ul className="space-y-3">
-              {cfg.phone && (
+              {phone && (
                 <li>
                   <a
-                    href={`tel:${cfg.phone.replace(/\s+/g, "")}`}
+                    href={`tel:${phone.replace(/\s+/g, "")}`}
                     className="inline-flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-white"
                   >
                     <PaperPlaneRight className="h-4 w-4 text-gold" />
-                    {cfg.phone}
+                    {phone}
                   </a>
                 </li>
               )}
-              {cfg.email && (
+              {email && (
                 <li>
                   <a
-                    href={`mailto:${cfg.email}`}
+                    href={`mailto:${email}`}
                     className="inline-flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-white"
                   >
                     <PaperPlaneRight className="h-4 w-4 text-gold" />
-                    {cfg.email}
+                    {email}
                   </a>
                 </li>
               )}

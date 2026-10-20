@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarBlank, ArrowRight, Buildings, CaretDown, X } from "@phosphor-icons/react";
 import { t, useLocale } from "@/lib/i18n";
-import { todayISO, tomorrowISO } from "@/lib/dates";
+import { tomorrowISO } from "@/lib/dates";
 import { useWidestText } from "@/lib/measure-text";
 import type { SearchContext } from "@/lib/search-engine";
 import DirectorySelect from "./DirectorySelect";
@@ -15,7 +15,7 @@ import {
 } from "@/lib/geo-api";
 import ChildAges from "./ChildAges";
 import HelpFindButton from "./HelpFindButton";
-import NightsRange from "./NightsRange";
+import NightsSelect from "./NightsSelect";
 import HotelStarsSelect from "./HotelStarsSelect";
 import HotelFilterSelect from "./HotelFilterSelect";
 import { useClickOutside } from "./useClickOutside";
@@ -23,14 +23,15 @@ import {
   PICKER_CHECKBOX,
   PICKER_CONTROL,
   PICKER_CONTROL_ICON,
+  PICKER_DATE_WIDTH_EXTRA,
   PICKER_LABEL,
   PICKER_ROW,
   PICKER_SUBMIT,
   PICKER_TRIGGER,
   PICKER_TRIGGER_TEXT,
-  PICKER_W_DATE_RANGE,
   PICKER_W_FROM,
   PICKER_W_NIGHTS,
+  PICKER_W_NIGHTS_WIDE,
   PICKER_W_TO,
 } from "./picker-styles";
 import {
@@ -45,14 +46,6 @@ interface TourSearchProps {
   resetSignal?: number;
 }
 
-/** Default upper bound of the departure range (start + 1 day). */
-const defaultEndDate = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 2);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
-
 export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProps) {
   const locale = useLocale();
   const [from, setFrom] = useState<GeoDirectoryEntry | null>(null);
@@ -60,12 +53,12 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
   const [toCity, setToCity] = useState<GeoDirectoryEntry | null>(null);
   const [toResort, setToResort] = useState<GeoDirectoryEntry | null>(null);
   // Default departure = tomorrow (+1 day from today) — the search forms'
-  // platform default for the departure range start.
+  // platform default. The search uses ONE check-in date: the supplier request
+  // carries the same date as both range bounds.
   const [startDate, setStartDate] = useState(tomorrowISO());
-  // Departure range «вылет от–до»: end defaults to start (+1) until changed.
-  const [endDate, setEndDate] = useState(defaultEndDate);
-  // Night range «от–до» (default 3–7, supplier capability bounds).
-  const [nightsFrom, setNightsFrom] = useState(3);
+  // ONE night value (not a range). 7 nights is valid for every tour supplier
+  // (KOMPAS minimum is 3, ANEX minimum is 2).
+  const [nightsFrom, setNightsFrom] = useState(7);
   const [nightsTo, setNightsTo] = useState(7);
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
@@ -77,7 +70,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
   const [hotelStars, setHotelStars] = useState<string[]>([]);
   // «Поставщики» picker: enabled tour suppliers from the backend;
   // empty selection = all suppliers.
-  const [supplierOptions, setSupplierOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [supplierOptions, setSupplierOptions] = useState<Array<{ code: string; name: string; countries?: string[] }>>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [suppliersOpen, setSuppliersOpen] = useState(false);
   const suppliersRef = useRef<HTMLDivElement>(null);
@@ -99,10 +92,15 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
       setToCountry(draft.toCountry);
       setToCity(draft.toCity);
       setToResort(draft.toResort);
-      setStartDate(draft.startDate);
-      setEndDate(draft.endDate);
-      setNightsFrom(draft.nightsFrom);
-      setNightsTo(draft.nightsTo);
+      // Old drafts may carry a date/night RANGE. Collapse it to one value:
+      // the form now searches exactly one check-in and one duration.
+      setStartDate(draft.startDate || draft.endDate || tomorrowISO());
+      const restoredNights =
+        draft.nightsFrom === draft.nightsTo
+          ? draft.nightsFrom
+          : draft.nightsTo || draft.nightsFrom || 7;
+      setNightsFrom(restoredNights);
+      setNightsTo(restoredNights);
       setAdults(draft.adults);
       setChildren(draft.children);
       setChildAges(draft.childAges);
@@ -124,7 +122,9 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
       toCity,
       toResort,
       startDate,
-      endDate,
+      // Persisted for backwards compatibility with older drafts; the form
+      // itself no longer exposes a departure range.
+      endDate: startDate,
       nightsFrom,
       nightsTo,
       adults,
@@ -143,7 +143,6 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
     toCity,
     toResort,
     startDate,
-    endDate,
     nightsFrom,
     nightsTo,
     adults,
@@ -163,8 +162,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
     setToCity(null);
     setToResort(null);
     setStartDate(tomorrowISO());
-    setEndDate(defaultEndDate());
-    setNightsFrom(3);
+    setNightsFrom(7);
     setNightsTo(7);
     setAdults(2);
     setChildren(0);
@@ -230,6 +228,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
     setToCountry(entry);
     setToCity(null);
     setToResort(null);
+    setSubmitError("");
     // A different country invalidates the selected hotel (its dictionary
     // belongs to the previous direction).
     setHotelId("");
@@ -239,6 +238,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
   const handleCityChange = (entry: GeoDirectoryEntry | null) => {
     setToCity(entry);
     setToResort(null);
+    setSubmitError("");
     setHotelId("");
     setHotelName("");
     if (entry && !toCountry && entry.countryId) {
@@ -253,6 +253,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
 
   const handleResortChange = (entry: GeoDirectoryEntry | null) => {
     setToResort(entry);
+    setSubmitError("");
     setHotelId("");
     setHotelName("");
     if (entry && !toCity && entry.cityId) {
@@ -276,13 +277,36 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
     }
   };
 
+  // Countries allowed by the selected suppliers (union). No selection = all.
+  const allowedCountryCodes = useMemo(() => {
+    if (selectedSuppliers.length === 0) return undefined;
+    const codes = new Set<string>();
+    for (const code of selectedSuppliers) {
+      const supplier = supplierOptions.find((s) => s.code === code);
+      if (!supplier?.countries || supplier.countries.length === 0) return undefined;
+      supplier.countries.forEach((c) => codes.add(c.toUpperCase()));
+    }
+    return [...codes];
+  }, [selectedSuppliers, supplierOptions]);
+
+  // Drop a destination that is no longer allowed when the supplier set changes.
+  useEffect(() => {
+    if (!allowedCountryCodes || !toCountry) return;
+    if (!allowedCountryCodes.includes(toCountry.code.toUpperCase())) {
+      setToCountry(null);
+      setToCity(null);
+      setToResort(null);
+    }
+  }, [allowedCountryCodes, toCountry]);
+
   const destination = toResort ?? toCity ?? toCountry;
 
   // «Найти» активна, только когда выбрано направление (хотя бы один из
   // трёх списков в «Куда») и указана дата.
-  // Keep the departure range ordered: «вылет по» never lands before «вылет от».
-  const safeEndDate = endDate && startDate && endDate < startDate ? startDate : endDate;
   const canSubmit = Boolean(destination && startDate);
+  // Visible validation feedback instead of a silent no-op when the submit
+  // button is clicked while a required picker is still empty.
+  const [submitError, setSubmitError] = useState("");
 
   // Content-width: each date input fits «00.00.0000» (xx.xx.xxxx).
   // useWidestText is SSR-safe (0 on server + hydration, measured after mount).
@@ -293,7 +317,17 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const dest = toResort ?? toCity ?? toCountry;
-    if (!dest || !startDate) return;
+    if (!dest) {
+      setSubmitError(t("search.to_required", locale));
+      document.getElementById("tour-to")?.focus();
+      return;
+    }
+    if (!startDate) {
+      setSubmitError(t("search.date_required", locale));
+      document.getElementById("tour-date")?.focus();
+      return;
+    }
+    setSubmitError("");
     onSearch({
       serviceType: "tours",
       fromDestination: from ? geoDisplayName(from.names, from.code, locale) : "",
@@ -304,7 +338,8 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
       toGeoCity: toCity?.code,
       toGeoResort: toResort?.code,
       startDate,
-      endDate: safeEndDate,
+      // One check-in date: the backend receives the same date as both bounds.
+      endDate: startDate,
       nights: nightsFrom,
       nightsFrom,
       nightsTo,
@@ -359,62 +394,41 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
             setToCity(null);
             setToResort(null);
           }}
+          allowedCountryCodes={allowedCountryCodes}
           required
         />
         </div>
 
-        {/* Departure date range: слово «Дата» — по центру, НАД тире между полями
-            (та же раскладка, что у пикера ночей). */}
-        <div className={PICKER_W_DATE_RANGE}>
-          <div className="flex items-end gap-3">
-            <div className="relative" style={{ maxWidth: datePx + 76, flex: "1 1 0" }}>
-              <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-              <input
-                id="tour-date-from"
-                type="date"
-                aria-label={`${t("search.date", locale)} ${t("search.nights_from", locale)}`}
-                value={startDate}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setStartDate(v);
-                  if (endDate && endDate < v) setEndDate(v);
-                }}
-                className={PICKER_CONTROL_ICON}
-              />
-            </div>
-            <div className="flex flex-col items-center pb-3">
-              <span className={PICKER_LABEL} aria-hidden="true">
-                {t("search.date", locale)}
-              </span>
-              <span aria-hidden="true" className="shrink-0 leading-none text-neutral-500">
-                -
-              </span>
-            </div>
-            <div className="relative" style={{ maxWidth: datePx + 76, flex: "1 1 0" }}>
-              <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-              <input
-                id="tour-date-to"
-                type="date"
-                aria-label={`${t("search.date", locale)} ${t("search.nights_to", locale)}`}
-                value={endDate}
-                min={startDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={PICKER_CONTROL_ICON}
-              />
-            </div>
+        {/* ONE check-in date (the supplier request gets it as both bounds). */}
+        <div style={{ minWidth: datePx + PICKER_DATE_WIDTH_EXTRA, maxWidth: datePx + PICKER_DATE_WIDTH_EXTRA }}>
+          <label htmlFor="tour-date" className={PICKER_LABEL}>
+            {t("search.check_in", locale)}
+          </label>
+          <div className="relative">
+            <CalendarBlank size={14} weight="light" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+            <input
+              id="tour-date"
+              type="date"
+              aria-label={t("search.check_in", locale)}
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setSubmitError("");
+              }}
+              className={PICKER_CONTROL_ICON}
+            />
           </div>
         </div>
 
-        {/* Nights — range «от–до» */}
-        <div className={PICKER_W_NIGHTS}>
-        <NightsRange
-          idPrefix="tour-nights"
-          from={nightsFrom}
-          to={nightsTo}
+        {/* ONE night value - the supplier request gets it as both bounds. */}
+        <div className={PICKER_W_NIGHTS_WIDE}>
+        <NightsSelect
+          id="tour-nights"
+          value={nightsFrom}
           options={Array.from({ length: 12 }, (_, i) => i + 3)}
-          onChange={(f, t2) => {
-            setNightsFrom(f);
-            setNightsTo(t2);
+          onChange={(n) => {
+            setNightsFrom(n);
+            setNightsTo(n);
           }}
         />
         </div>
@@ -630,7 +644,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
           fromDestination: from ? geoDisplayName(from.names, from.code, locale) : "",
           toDestination: destination ? geoDisplayName(destination.names, destination.code, locale) : "",
           startDate,
-          endDate: safeEndDate,
+          endDate: startDate,
           nights: nightsFrom,
           nightsFrom,
           nightsTo,
@@ -644,11 +658,13 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
 
       {/* Submit — destination is required so the results URL always
           carries the direction (no more direction-less transitions) */}
+      {submitError && (
+        <p className="text-sm text-red-400">{submitError}</p>
+      )}
       <button
         type="submit"
-        disabled={!canSubmit}
-        title={!canSubmit ? (!destination ? t("search.to_required", locale) : t("search.date_required", locale)) : undefined}
-        className={`${!canSubmit ? "cursor-not-allowed bg-neutral-700 text-neutral-400 opacity-60" : "btn-gold"} ${PICKER_SUBMIT}`}
+        onClick={(e) => handleSubmit(e as React.FormEvent)}
+        className={`btn-gold ${PICKER_SUBMIT}`}
       >
         <span>{t("marketplace.search_submit", locale)}</span>
         <ArrowRight size={16} weight="bold" />

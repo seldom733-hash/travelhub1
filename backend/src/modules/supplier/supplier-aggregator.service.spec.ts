@@ -41,6 +41,7 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     supplierGeoLink: { findMany: jest.Mock };
     geoCity: { findUnique: jest.Mock };
     geoResort: { findUnique: jest.Mock };
+    partner: { findFirst: jest.Mock };
   };
   let mockFlightRegistry: {
     list: jest.Mock;
@@ -105,6 +106,8 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
       supplierGeoLink: { findMany: jest.fn().mockResolvedValue([]) },
       geoCity: { findUnique: jest.fn().mockResolvedValue(null) },
       geoResort: { findUnique: jest.fn().mockResolvedValue(null) },
+      // CRM gate: no partner → legacy behaviour (supplier stays enabled).
+      partner: { findFirst: jest.fn().mockResolvedValue(null) },
     };
 
     mockFlightRegistry = {
@@ -247,7 +250,7 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     const kompasIdx = searchedSuppliers.indexOf("KOMPAS");
     expect(kompasIdx).toBeGreaterThanOrEqual(0);
     expect(searchedQueries[kompasIdx].towns).toBe("2533");
-    expect(result.perSupplier["KOMPAS"]).toEqual({ count: 1 });
+    expect(result.perSupplier["KOMPAS"]).toEqual({ count: 1, ms: expect.any(Number) });
   });
 
   it("keeps a resort query on its own TOWN links (never widens to the city)", async () => {
@@ -354,7 +357,23 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
 
     expect(searchedSuppliers.filter((c) => c === "KOMPAS")).toHaveLength(1);
     expect(result.offers).toHaveLength(1);
-    expect(result.perSupplier["KOMPAS"]).toEqual({ count: 1 });
+    expect(result.perSupplier["KOMPAS"]).toEqual({ count: 1, ms: expect.any(Number) });
+  });
+
+  it("reports the supplier search duration next to its offer count", async () => {
+    mockPrisma.supplierGeoLink.findMany.mockResolvedValue([
+      { supplierCode: "KOMPAS", externalId: "77", label: "Dubai City Tour", kind: "TOUR" },
+    ]);
+    mockOfferService.search.mockImplementation(async (code: string) => {
+      searchedSuppliers.push(code);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return [makeOffer(code, "Hotel X")];
+    });
+
+    const result = await aggregator.searchByService("tours", baseQuery);
+
+    expect(result.perSupplier["KOMPAS"]?.count).toBe(1);
+    expect(result.perSupplier["KOMPAS"]?.ms).toBeGreaterThanOrEqual(15);
   });
 
   it("never turns a label-substring hit into a city filter or a program filter", async () => {

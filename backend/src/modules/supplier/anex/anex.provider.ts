@@ -66,6 +66,40 @@ export interface AnexHotel {
   townKey?: number | string;
 }
 
+/**
+ * Resolved hotel-category filter shared by the tour and hotel adapters.
+ * - ids:     native STARLIST ids sent to /search (server-side filter)
+ * - numbers: precise star counts ("5*" → 5) checked against row.starName
+ * - labels:  exact dictionary group labels ("5* / HV1", "Boutique")
+ * - hv1:     the requested label explicitly includes HV-1
+ */
+export interface AnexStarFilter {
+  ids: string[];
+  numbers: Set<number>;
+  labels: Set<string>;
+  hv1: boolean;
+}
+
+/** Normalize a dictionary label for comparisons ("5* / HV1" → "5* / hv1"). */
+export function normStarLabel(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s*\/\s*/g, "/")
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * Precise star count from a supplier star label: "5 *****" → 5, "4 ****+" → 4,
+ * "2.0" → 2; null for non-categories ("HV-1", "SPECIAL CLASS", "-").
+ * Used to verify ANEX's own STARLIST response, which is not exact
+ * (STARLIST=10010 was observed returning a 4* row).
+ */
+export function anexStarNumber(value: string | undefined): number | null {
+  const m = (value ?? "").trim().match(/^([1-5])(?:\s|\*|\.|$)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 // ── Shared pure helpers (used by both category adapters) ────────────────
 
 export function normName(s: string): string {

@@ -17,7 +17,10 @@ export function useClickOutside(
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onOutside();
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    // Close on `click` (not `mousedown`) so a click on an outside control such
+    // as the submit button is not cancelled by the dropdown unmounting during
+    // the same interaction.
+    document.addEventListener("click", handler, true);
+    return () => document.removeEventListener("click", handler, true);
   }, [ref, open, onOutside]);
 }

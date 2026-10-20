@@ -243,7 +243,7 @@ export interface AggregatedOffer extends SupplierOffer {
 
 export interface AggregatedSearchResult {
   offers: AggregatedOffer[];
-  perSupplier: Record<string, { count: number; error?: string }>;
+  perSupplier: Record<string, { count: number; error?: string; ms?: number }>;
 }
 
 /** Shared query → URL params mapping for search-all and search-suppliers. */

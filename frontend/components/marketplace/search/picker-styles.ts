@@ -17,6 +17,7 @@ export const PICKER_ROW = "flex flex-wrap items-end gap-3";
 export const PICKER_W_FROM = "min-w-[180px] flex-[1_1_180px]";
 export const PICKER_W_TO = "min-w-[200px] flex-[1_1_200px]";
 export const PICKER_W_NIGHTS = "min-w-[160px] flex-[1_1_160px]";
+export const PICKER_W_NIGHTS_WIDE = "min-w-[320px] flex-[1_1_320px]";
 export const PICKER_W_DATE_RANGE = "min-w-[360px] flex-[1_1_360px]";
 
 /** Поля ввода и select'ы. */

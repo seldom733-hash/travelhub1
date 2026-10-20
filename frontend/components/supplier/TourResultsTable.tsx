@@ -16,7 +16,7 @@ import type { AggregatedOffer, AggregatedSearchResult } from "@/lib/supplier-api
  * in the header row — no separate filter toolbar. Prices render gold.
  */
 
-type SortKey = "date" | "nights" | "hotel" | "stars" | "meal" | "room" | "price" | "source";
+type SortKey = "date" | "checkout" | "nights" | "hotel" | "stars" | "meal" | "room" | "price" | "source";
 type SortDir = "asc" | "desc";
 
 /** Hotel-category token ("3*", "4*+") parsed from the hotel name; "" = unknown. */
@@ -29,12 +29,14 @@ const starOf = (hotel?: string): string => {
  * Hotel-category token from supplier row metadata — fallback when the hotel
  * NAME carries no star (ANEX: 499/502 names are bare like «Consul Hotel»).
  * ANEX groupStarName is already canonical ("3*"); starName ("3 ***") is the
- * raw dictionary label. Non-star labels ("SPECIAL CLASS", "???") → "".
+ * raw dictionary label. Hotel-only rows may carry "5.0" with groupStarName
+ * "???" (no group link) — parse the decimal form too. Non-star labels
+ * ("SPECIAL CLASS", "HV-1", "???") → "".
  */
 const starOfMeta = (raw?: Record<string, unknown>): string => {
   const pick = (v: unknown): string => {
     if (typeof v !== "string") return "";
-    const m = v.match(/([1-5])\s*\*+/);
+    const m = v.match(/([1-5])(?:\s*\*+|\.\d)/);
     return m ? `${m[1]}*` : "";
   };
   return pick(raw?.groupStarName) || pick(raw?.starName);
@@ -43,6 +45,18 @@ const starOfMeta = (raw?: Record<string, unknown>): string => {
 /** Best hotel-category token: name parse first, supplier metadata fallback. */
 const offerStar = (o: Pick<AggregatedOffer, "hotel" | "rawMetadata">): string =>
   starOf(o.hotel) || starOfMeta(o.rawMetadata);
+
+/**
+ * Check-out date of an offer = check-in/departure date + nights.
+ * ISO dates are handled in UTC so the result does not shift with the
+ * browser timezone; an unparsable date yields "" (rendered as «—»).
+ */
+export const checkoutDate = (iso: string, nights: number): string => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return "";
+  d.setUTCDate(d.getUTCDate() + nights);
+  return d.toISOString().slice(0, 10);
+};
 
 /**
  * Meal plan normalization: supplier variants («RO», «Room Only», «Only Room»,
@@ -142,6 +156,7 @@ export default function TourResultsTable({
   const [supplierFilter, setSupplierFilter] = useState("");
   const [mealFilter, setMealFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [checkoutFilter, setCheckoutFilter] = useState("");
   const [nightsFilter, setNightsFilter] = useState("");
   const [hotelFilter, setHotelFilter] = useState("");
   const [starsFilter, setStarsFilter] = useState("");
@@ -168,6 +183,17 @@ export default function TourResultsTable({
   );
   const nights = useMemo(
     () => [...new Set((result?.offers ?? []).map((o) => o.nights))].sort((a, b) => a - b),
+    [result],
+  );
+  // Check-out dates (departure/check-in + nights) — powers the new column.
+  const checkoutDates = useMemo(
+    () => [
+      ...new Set(
+        (result?.offers ?? [])
+          .map((o) => checkoutDate(o.departureDate, o.nights))
+          .filter(Boolean),
+      ),
+    ].sort(),
     [result],
   );
   const meals = useMemo(() => {
@@ -215,6 +241,11 @@ export default function TourResultsTable({
     if (supplierFilter) list = list.filter((o) => o.supplierCode === supplierFilter);
     if (mealFilter) list = list.filter((o) => normalizeMeal(o.meal) === mealFilter);
     if (dateFilter) list = list.filter((o) => o.departureDate === dateFilter);
+    if (checkoutFilter) {
+      list = list.filter(
+        (o) => checkoutDate(o.departureDate, o.nights) === checkoutFilter,
+      );
+    }
     if (nightsFilter) list = list.filter((o) => String(o.nights) === nightsFilter);
     if (hotelFilter) {
       const q = hotelFilter.trim().toUpperCase();
@@ -238,6 +269,10 @@ export default function TourResultsTable({
       switch (sortKey) {
         case "date":
           return a.departureDate.localeCompare(b.departureDate);
+        case "checkout":
+          return checkoutDate(a.departureDate, a.nights).localeCompare(
+            checkoutDate(b.departureDate, b.nights),
+          );
         case "nights":
           return a.nights - b.nights;
         case "hotel":
@@ -271,6 +306,7 @@ export default function TourResultsTable({
     supplierFilter,
     mealFilter,
     dateFilter,
+    checkoutFilter,
     nightsFilter,
     hotelFilter,
     starsFilter,
@@ -282,6 +318,27 @@ export default function TourResultsTable({
   const fmtDate = (iso: string) => {
     const [y, m, d] = iso.split("-");
     return d && m && y ? `${d}.${m}.${y}` : iso;
+  };
+
+  /** Supplier search time: ms under one second, otherwise one decimal in s. */
+  const fmtSearchTime = (ms: number): string => {
+    if (!Number.isFinite(ms) || ms < 0) return "";
+    return ms < 1000
+      ? `${Math.round(ms)} ${t("tourSearch.time_ms", locale)}`
+      : `${(ms / 1000).toFixed(1)} ${t("tourSearch.time_sec", locale)}`;
+  };
+
+  /** «KOMPAS — 290 (31.8 с)» / «KAZUNION — временно недоступен (0.4 с)». */
+  const supplierStat = (
+    code: string,
+    r: AggregatedSearchResult["perSupplier"][string],
+  ): string => {
+    const label = supplierLabels[code] ?? code;
+    const timeText = typeof r.ms === "number" ? fmtSearchTime(r.ms) : "";
+    const time = timeText ? ` (${timeText})` : "";
+    return r.error
+      ? `${label} — ${t("tourSearch.unavailable", locale)}${time}`
+      : `${label} — ${r.count}${time}`;
   };
 
   /** Sortable header cell: label + active gold ▲/▼ marker (faint ⇅ on hover). */
@@ -364,11 +421,7 @@ export default function TourResultsTable({
         {result && Object.keys(result.perSupplier).length > 0 && (
           <p className="mt-2 text-xs text-neutral-500">
             {Object.entries(result.perSupplier)
-              .map(([code, r]) =>
-                r.error
-                  ? `${supplierLabels[code] ?? code} — ${t("tourSearch.unavailable", locale)}`
-                  : `${supplierLabels[code] ?? code} — ${r.count}`,
-              )
+              .map(([code, r]) => supplierStat(code, r))
               .join(" · ")}
           </p>
         )}
@@ -381,11 +434,7 @@ export default function TourResultsTable({
       {/* Supplier summary + searchId traceability (§13/§20) */}
       <p className="mb-3 text-sm text-neutral-500">
         {Object.entries(result.perSupplier)
-          .map(([code, r]) =>
-            r.error
-              ? `${supplierLabels[code] ?? code} — ${t("tourSearch.unavailable", locale)}`
-              : `${supplierLabels[code] ?? code} — ${r.count}`,
-          )
+          .map(([code, r]) => supplierStat(code, r))
           .join(" · ")}
         {" · "}
         {t("search.found", locale)}: {result.offers.length}
@@ -398,6 +447,7 @@ export default function TourResultsTable({
           <thead>
             <tr className="border-b border-white/10 bg-white/5 text-left text-xs uppercase tracking-wide text-neutral-400">
               <th className="px-4 pt-3">{thSort("date", t("tourSearch.col_date", locale))}</th>
+              <th className="px-4 pt-3">{thSort("checkout", t("tourSearch.col_checkout", locale))}</th>
               <th className="px-4 pt-3 text-right">
                 {thSort("nights", t("tourSearch.col_nights", locale), true)}
               </th>
@@ -421,6 +471,21 @@ export default function TourResultsTable({
                 >
                   <option value="">{t("tourSearch.filter_all_dates", locale)}</option>
                   {dates.map((d) => (
+                    <option key={d} value={d}>
+                      {fmtDate(d)}
+                    </option>
+                  ))}
+                </select>
+              </th>
+              <th className="px-4 pb-3 pt-1 font-normal">
+                <select
+                  value={checkoutFilter}
+                  onChange={(e) => setCheckoutFilter(e.target.value)}
+                  className={filterInput}
+                  aria-label={t("tourSearch.col_checkout", locale)}
+                >
+                  <option value="">{t("tourSearch.filter_all_checkouts", locale)}</option>
+                  {checkoutDates.map((d) => (
                     <option key={d} value={d}>
                       {fmtDate(d)}
                     </option>
@@ -542,6 +607,11 @@ export default function TourResultsTable({
               >
                 <td className="whitespace-nowrap px-4 py-3 text-neutral-200">
                   {fmtDate(o.departureDate)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-neutral-200">
+                  {checkoutDate(o.departureDate, o.nights)
+                    ? fmtDate(checkoutDate(o.departureDate, o.nights))
+                    : "—"}
                 </td>
                 <td className="px-4 py-3 text-right text-neutral-200">{o.nights}</td>
                 <td className="max-w-[240px] truncate px-4 py-3 text-neutral-100">

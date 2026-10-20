@@ -157,11 +157,11 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
   private readonly baseUrl: string;
   private static readonly MAX_PAGES = 30;
-  private static readonly PAGE_DELAY_MS = 2_000;
+  private static readonly PAGE_DELAY_MS = 1_000;
   // §NIGHTS-FANOUT: per-night re-submits read fewer pages — the goal is night
   // diversity, not the full 5000-row supplier cap per night.
   private static readonly FANOUT_MAX_PAGES = 10;
-  private static readonly FANOUT_ROW_WAIT_MS = 60_000;
+  private static readonly FANOUT_ROW_WAIT_MS = 30_000;
   // Upper bound of distinct nights re-submitted during a fan-out (a 3..30
   // request must not trigger 27 sequential browser searches).
   private static readonly NIGHTS_FANOUT_MAX = 10;
@@ -171,7 +171,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
   private static readonly TRUNCATION_NOTICE_ESCAPED =
     "\\u041e\\u0431\\u0440\\u0430\\u0431\\u043e\\u0442\\u0430\\u043d\\u044b";
   private static readonly TRUNCATION_NOTICE_RAW = "Обработаны не все данные";
-  private static readonly TOURINC_DELAY_MS = 3_000;
+  private static readonly TOURINC_DELAY_MS = 1_500;
   private static readonly CALENDAR_WINDOW_DAYS = 31;
 
   constructor(@Optional() private readonly captchaStore?: KompasCaptchaStore) {
@@ -211,7 +211,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       // §7: Set TOWNFROMINC to Baku
       await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-      await page.waitForTimeout(5_000);
+      await page.waitForTimeout(500);
 
       // Get all country options
       const countries = await page.evaluate(() => {
@@ -229,7 +229,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       for (const country of countries) {
         // Select country
         await this.setSamoSelect(page, "STATEINC", country.value);
-        await page.waitForTimeout(5_000);
+        await page.waitForTimeout(500);
 
         // SAMO may reset TOWNFROMINC — verify and re-set Baku
         const currentTown = await page.evaluate(() => {
@@ -239,10 +239,10 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         if (currentTown !== BAKU_TOWNFROMINC) {
           this.logger.warn(`discover: TOWNFROMINC reset to ${currentTown} after STATEINC, re-setting Baku`);
           await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-          await page.waitForTimeout(5_000);
+          await page.waitForTimeout(500);
           // Re-select the country after re-setting TOWNFROMINC
           await this.setSamoSelect(page, "STATEINC", country.value);
-          await page.waitForTimeout(5_000);
+          await page.waitForTimeout(500);
         }
 
         // Read TOURINC options for this country
@@ -293,12 +293,12 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       // §7: Set Baku
       await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-      await page.waitForTimeout(5_000);
+      await page.waitForTimeout(500);
 
       // If country specified, select it
       if (countryId) {
         await this.setSamoSelect(page, "STATEINC", countryId);
-        await page.waitForTimeout(5_000);
+        await page.waitForTimeout(500);
       }
 
       const programs = await page.evaluate(() => {
@@ -376,7 +376,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       // §7: TOWNFROMINC = Baku ALWAYS
       await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-      await page.waitForTimeout(2_000);
+      await page.waitForTimeout(500);
       // Wait for STATEINC options to populate for Baku (Turkey 17 should appear)
       const resolvedStateId =
         this.mapStateInc(query.destination) ??
@@ -390,7 +390,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           );
         } catch {}
       }
-      await page.waitForTimeout(1_000);
+      await page.waitForTimeout(500);
 
 // STATEINC (destination country) — set from query if provided
       // Resolve STATEINC from country name OR ISO-2 code. Order matters:
@@ -412,7 +412,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       }
       {
         await this.setSamoSelect(page, "STATEINC", stateId);
-        await page.waitForTimeout(2_000);
+        await page.waitForTimeout(500);
         // Wait for TOURINC options for this country to populate
         if (query.tourIncValue) {
           try {
@@ -423,7 +423,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
             );
           } catch {}
         }
-        await page.waitForTimeout(1_000);
+        await page.waitForTimeout(500);
         // SAMO may reset TOWNFROMINC after STATEINC change — verify and re-set Baku
         const currentTown = await page.evaluate(() => {
           const sel = document.querySelector("select[name=TOWNFROMINC]") as HTMLSelectElement | null;
@@ -432,9 +432,9 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         if (currentTown !== BAKU_TOWNFROMINC) {
           this.logger.warn(`TOWNFROMINC was reset to ${currentTown} after STATEINC, re-setting Baku`);
           await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-          await page.waitForTimeout(5_000);
+          await page.waitForTimeout(500);
           await this.setSamoSelect(page, "STATEINC", stateId);
-          await page.waitForTimeout(5_000);
+          await page.waitForTimeout(500);
         }
       }
 
@@ -531,7 +531,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         } else {
           this.logger.warn(`KOMPAS: hotel checkbox #hotel${hotelId} not found in DOM`);
         }
-        await page.waitForTimeout(1_000);
+        await page.waitForTimeout(500);
       }
 
       // Set dates via DOM
@@ -655,6 +655,21 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`)
                    .replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
         }
+        // §NIGHTS: the DOM select change does not reliably reach the PRICES URL
+        // (verified live: NIGHTS_FROM stayed 3..14 despite a successful
+        // setSamoSelect), so force the requested bounds at the network layer —
+        // this is the single biggest speed win for KOMPAS (avoids the 5000-row
+        // all-nights cap and the per-night fan-out).
+        if (query.nightsFrom !== undefined && query.nightsFrom !== null) {
+          url = /NIGHTS_FROM=/.test(url)
+            ? url.replace(/NIGHTS_FROM=\d*/g, `NIGHTS_FROM=${query.nightsFrom}`)
+            : `${url}&NIGHTS_FROM=${query.nightsFrom}`;
+        }
+        if (query.nightsTo !== undefined && query.nightsTo !== null) {
+          url = /NIGHTS_TILL=/.test(url)
+            ? url.replace(/NIGHTS_TILL=\d*/g, `NIGHTS_TILL=${query.nightsTo}`)
+            : `${url}&NIGHTS_TILL=${query.nightsTo}`;
+        }
         // §9: Force FREIGHT=1 (seats available on flight), FILTER=1 (no sales stop),
         // and PARTITION_PRICE=0 (no grouping — return all individual room/meal variants).
         if (!url.includes("FREIGHT=")) {
@@ -698,7 +713,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       // active for TOWNS injection) — up to 3 attempts, 45s of waiting each.
       let rowsAppeared = false;
       const MAX_ROW_ATTEMPTS = 3;
-      const ROW_WAIT_MS = 45_000;
+      const ROW_WAIT_MS = 10_000;
       for (let attempt = 0; attempt < MAX_ROW_ATTEMPTS && !rowsAppeared; attempt++) {
         // Race the DOM against the server's answer: when PRICES comes back
         // without a single price row the answer is honest — there are no
@@ -741,7 +756,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           await this.autoSolveCaptchaOrThrow(page, context, "search", query);
         }
         if (attempt < MAX_ROW_ATTEMPTS - 1) {
-          await page.waitForTimeout(3_000);
+          await page.waitForTimeout(1_500);
           const retried = await page
             .evaluate(() => {
               document.getElementById("samo_popup")?.remove();
@@ -788,7 +803,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         await this.autoSolveCaptchaOrThrow(page, context, "search", query);
       }
 
-      await page.waitForTimeout(2_000);
+      await page.waitForTimeout(500);
 
       // §6: DOM/result consistency — verify at least one row matches expected tour.
       // With PARTITION_PRICE=0, rows from different tours may appear; only stateKey/townFromKey must match.
@@ -1149,7 +1164,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         if ((await btn.count()) === 0) return false;
         await btn.first().click({ force: true });
       }
-      await page.waitForTimeout(2_000);
+      await page.waitForTimeout(500);
       return true;
     } catch {
       return false;
@@ -1267,7 +1282,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       }
 
       // Wait for KOMPAS response: either captcha gone or samo.showCaptchaError or new image
-      await page.waitForTimeout(2_000);
+      await page.waitForTimeout(500);
       // Wait for either price_info or captcha re-appears or error
       try {
         await page.waitForFunction(
@@ -1283,7 +1298,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         );
       } catch {}
 
-      await page.waitForTimeout(1_000);
+      await page.waitForTimeout(500);
 
       // Determine result
       const stillCaptcha = await this.isCaptchaPresent(page);
@@ -1526,7 +1541,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     if (btn) {
       await btn.click({ force: true });
       try { await page.waitForSelector("tr.price_info", { timeout: 20_000 }); } catch {}
-      await page.waitForTimeout(1_000);
+      await page.waitForTimeout(500);
       const rows = await this.extractPageOffers(page);
       return rows.map((r) => this.normalizeOffer(r, query));
     }
@@ -1686,19 +1701,19 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
     // the interceptor below guarantees it on the wire).
     await this.setSamoSelect(page, "CURRENCY", KOMPAS_CURRENCY_INC, true);
     await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-    await page.waitForTimeout(2_000);
+    await page.waitForTimeout(500);
     const stateId =
       this.mapStateInc(query.destination) ??
       this.mapStateInc(query.country);
     if (stateId) {
       await this.setSamoSelect(page, "STATEINC", stateId);
-      await page.waitForTimeout(2_000);
+      await page.waitForTimeout(500);
       const cur = await page.evaluate(() => (document.querySelector("select[name=TOWNFROMINC]") as HTMLSelectElement | null)?.value ?? "");
       if (cur !== BAKU_TOWNFROMINC) {
         await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-        await page.waitForTimeout(2_000);
+        await page.waitForTimeout(500);
         await this.setSamoSelect(page, "STATEINC", stateId);
-        await page.waitForTimeout(2_000);
+        await page.waitForTimeout(500);
       }
     }
     if (query.tourIncValue) {
@@ -1787,6 +1802,8 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       // §AZN: same currency guarantee as the main search() interceptor.
       url = applyKompasCurrencyParam(url);
       if (routeDates) url = url.replace(/CHECKIN_BEG=\d*/g, `CHECKIN_BEG=${routeDates.beg}`).replace(/CHECKIN_END=\d*/g, `CHECKIN_END=${routeDates.end}`);
+if (query.nightsFrom !== undefined && query.nightsFrom !== null) url = /NIGHTS_FROM=/.test(url) ? url.replace(/NIGHTS_FROM=\d*/g, `NIGHTS_FROM=${query.nightsFrom}`) : `${url}&NIGHTS_FROM=${query.nightsFrom}`;
+if (query.nightsTo !== undefined && query.nightsTo !== null) url = /NIGHTS_TILL=/.test(url) ? url.replace(/NIGHTS_TILL=\d*/g, `NIGHTS_TILL=${query.nightsTo}`) : `${url}&NIGHTS_TILL=${query.nightsTo}`;
       if (!url.includes("FREIGHT=")) url += "&FREIGHT=1"; else url = url.replace(/FREIGHT=\d+/g, "FREIGHT=1");
       if (!url.includes("FILTER=")) url += "&FILTER=1"; else url = url.replace(/FILTER=\d+/g, "FILTER=1");
       if (!url.includes("PARTITION_PRICE=")) url += "&PARTITION_PRICE=0"; else url = url.replace(/PARTITION_PRICE=\d+/g, "PARTITION_PRICE=0");
@@ -1876,7 +1893,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       });
       if (opts.townFromInc) {
         await this.setSamoSelect(page, "TOWNFROMINC", opts.townFromInc);
-        await page.waitForTimeout(2_000);
+        await page.waitForTimeout(500);
       }
       // The country list is rebuilt after the departure city changes; without
       // waiting for the target STATEINC we would ingest the default country's
@@ -1934,7 +1951,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
         const inp = document.querySelector("input.townssearch") as HTMLInputElement | null;
         if (inp) { inp.focus(); inp.click(); }
       });
-      await page.waitForTimeout(5_000);
+      await page.waitForTimeout(500);
       const towns = await page.evaluate(() => {
         const box = document.querySelector("div.checklistbox.TOWNS") as HTMLElement | null;
         if (!box) return [];
@@ -2864,7 +2881,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           do {
             pageRows = await parseAny();
             if (pageRows.length || Date.now() >= deadline) break;
-            await page.waitForTimeout(1_000);
+            await page.waitForTimeout(500);
           } while (true);
           if (!pageRows.length) break;
         }

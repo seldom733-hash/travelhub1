@@ -34,12 +34,15 @@ async function fetchBranding(): Promise<BrandingData> {
       const brandName = resolveBrandName(headerCfg);
       const logo = headerCfg?.logo ?? null;
       cached = { brandName, logo };
+      return cached;
     } catch {
-      // Fallback — no published config yet
-      cached = { brandName: "TravelHub", logo: null };
+      // Do NOT cache transient failures: the previous code pinned the legacy
+      // "TravelHub" fallback for the whole session after one failed request,
+      // so the old name reappeared on every page until a full reload.
+      return { brandName: "TravelHub", logo: null };
+    } finally {
+      inflight = null;
     }
-    inflight = null;
-    return cached!;
   })();
 
   return inflight;

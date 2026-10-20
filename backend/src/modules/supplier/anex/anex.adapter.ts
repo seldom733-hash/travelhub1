@@ -17,7 +17,9 @@ import { priceUnavailable } from "../supplier.types";
 import {
   AnexProvider,
   addDays,
+  anexStarNumber,
   normName,
+  normStarLabel,
   toCompactDate,
   toIsoDate,
   ANEX_CURRENCY_INC,
@@ -26,6 +28,7 @@ import {
   ANEX_SEARCH_MODE,
   type AnexHotel,
   type AnexStar,
+  type AnexStarFilter,
   type AnexState,
   type AnexTown,
 } from "./anex.provider";
@@ -42,11 +45,17 @@ import {
  *
  * Geo dictionary: /samo/searchtour/{Towns,Stars,Hotels} per STATEINC.
  *
- * Stars/hotel/town filters: the API's own filter param names were not
- * reverse-engineered (STARS=... breaks the response), so the adapter fetches
- * the country-wide inventory and post-filters locally on groupStarInc /
- * hotelInc / townInc — the payloads are small enough (≤2500 rows with
- * pagination) for this to stay fast.
+ * Hotel category: STARLIST=<dictionary ids> is the supplier's own star filter
+ * (labels come from /samo/searchtour/Stars, e.g. TR 10008=3*, 10009=4*,
+ * 10010=5* / HV1, 10014=Boutique). It is sent server-side AND verified
+ * locally, because the upstream is not exact: STARLIST=10010 was observed
+ * returning a 4* row, and its "5* / HV1" group mixes 5* hotels with HV-1.
+ * The local check reads the row's precise starName ("5 *****", "4 ****+",
+ * "HV-1", "2.0"), so a plain "5*" never leaks HV-1 — only an explicit
+ * "5* / HV1" request does.
+ *
+ * City/hotel filters stay local (townInc / hotelInc) — they are not part of
+ * the upstream /search contract.
  */
 
 /** Baku — the only departure town the AZ market serves (verified). */
@@ -169,6 +178,7 @@ export class AnexAdapter implements SupplierAdapter {
     const nightsFrom = query.nightsFrom ?? 7;
     const nightsTo = query.nightsTo ?? nightsFrom;
 
+    const starFilter = await this.resolveStarFilter(query, state);
     const rows = await this.fetchPriceRows({
       stateInc: String(state.id),
       checkInBeg: dateFrom,
@@ -178,12 +188,18 @@ export class AnexAdapter implements SupplierAdapter {
       adults: query.adults ?? 2,
       children: query.children ?? 0,
       childAges: query.childAges,
+      starList: starFilter?.ids.join(",") || undefined,
     });
 
     let filtered = this.applyLocalFilters(rows, query);
-    const starIds = await this.resolveStarIdSet(query, state);
-    if (starIds) {
-      filtered = filtered.filter((r) => starIds.has(String(r.groupStarInc ?? "")));
+    if (starFilter) {
+      const before = filtered.length;
+      filtered = filtered.filter((r) => this.rowMatchesStarFilter(r, starFilter));
+      this.logger.debug(
+        `ANEX star filter ${[...starFilter.numbers].map((n) => `${n}*`).join(", ") || "-"}` +
+          `${starFilter.labels.size ? ` [${[...starFilter.labels].join(", ")}]` : ""}: ` +
+          `${before - filtered.length} rows dropped locally`,
+      );
     }
     // §5.7: rows without a positive supplier price are dropped here — they
     // are NOT offer-shaped (`normalizeRow` fails closed via priceUnavailable),
@@ -218,6 +234,8 @@ export class AnexAdapter implements SupplierAdapter {
     adults: number;
     children: number;
     childAges?: number[];
+    /** STARLIST — supplier-native category ids (see AnexStarFilter). */
+    starList?: string;
   }): Promise<AnexPriceRow[]> {
     const lo = Math.max(NIGHTS_MIN, Math.min(params.nightsFrom, params.nightsTo));
     const hi = Math.min(NIGHTS_MAX, Math.max(params.nightsFrom, params.nightsTo));
@@ -253,6 +271,9 @@ export class AnexAdapter implements SupplierAdapter {
       adults: number;
       children: number;
       childAges?: number[];
+      starList?: string;
+      /** Set after a STARLIST request was rejected — retried without it. */
+      starListFallback?: boolean;
     },
     splitDepth = 0,
   ): Promise<AnexPriceRow[]> {
@@ -267,6 +288,8 @@ export class AnexAdapter implements SupplierAdapter {
         REGULAR: "True",
         FILTER: "1",
         FREIGHT: "1",
+        // Supplier-native category filter (dictionary ids, comma-separated).
+        STARLIST: params.starList ?? "",
         ADULT: params.adults,
         CHILD: params.children,
         // Confirmed supplier contract (owner-supplied real request):
@@ -301,6 +324,25 @@ export class AnexAdapter implements SupplierAdapter {
         NIGHTMAX: String(params.night),
         });
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        // A STARLIST request the upstream refuses (424/500 on a single date)
+        // must not turn into a silent empty: retry once without the native
+        // filter — the local precise check (rowMatchesStarFilter) still
+        // enforces the category, only the payload gets bigger.
+        if (
+          params.starList &&
+          !params.starListFallback &&
+          params.checkInBeg === params.checkInEnd &&
+          (message.includes("HTTP 424") || message.includes("HTTP 500"))
+        ) {
+          this.logger.warn(
+            `ANEX STARLIST=${params.starList} rejected (${message}) — retrying without it`,
+          );
+          return this.fetchPriceRowsExact(
+            { ...params, starList: undefined, starListFallback: true },
+            splitDepth,
+          );
+        }
         // HTTP 424 {"code":-1,"message":"Обработаны не все данные…"} is how
         // ANEX says "cannot process this request". Live probing (2026-09-30)
         // showed the upstream has NO working CHECKIN range for tours: any
@@ -399,16 +441,34 @@ export class AnexAdapter implements SupplierAdapter {
   }
 
   /**
-   * Supplier-native star ids for the requested hotelStars labels:
+   * Resolve the requested hotelStars labels to the supplier's category ids
+   * and to a precise local matcher:
    * 1) aggregator-resolved starKeys (SupplierGeoLink kind=STAR, ingested as
-   *    "stateInc:id" — a key from another state is ignored), else
-   * 2) the live Stars dictionary of the state (label → id).
+   *    "stateInc:id" — a key from another state is ignored), and
+   * 2) the live Stars dictionary of the state (label → id + exact label).
    * Returns null when no star filter applies.
+   *
+   * The local matcher matters because the supplier is not exact:
+   * - STARLIST=10010 (5* / HV1) returned a 4* row (groupStarInc=10009);
+   * - the same group mixes "5 *****" hotels with "HV-1".
+   * A plain "5*" must keep only starName 5 (no HV-1); an explicit
+   * "5* / HV1" keeps the whole group.
    */
-  private async resolveStarIdSet(query: SupplierSearchQuery, state: AnexState): Promise<Set<string> | null> {
+  private async resolveStarFilter(
+    query: SupplierSearchQuery,
+    state: AnexState,
+  ): Promise<AnexStarFilter | null> {
+    const labels = (query.hotelStars ?? []).map((l) => l.trim()).filter(Boolean);
+    const filter: AnexStarFilter = {
+      ids: [],
+      numbers: new Set<number>(),
+      labels: new Set<string>(),
+      hv1: false,
+    };
+    const ids = new Set<string>();
+
     const keysCsv = query.starKeys?.[this.code]?.replace(/\s+/g, "");
     if (keysCsv) {
-      const ids = new Set<string>();
       for (const part of keysCsv.split(",").filter(Boolean)) {
         const sep = part.indexOf(":");
         if (sep >= 0) {
@@ -417,29 +477,72 @@ export class AnexAdapter implements SupplierAdapter {
           ids.add(part);
         }
       }
-      if (ids.size) return ids;
     }
-    if (!query.hotelStars?.length) return null;
 
-    const dict = await this.provider.stars(String(state.id));
-    const ids = new Set<string>();
-    for (const label of query.hotelStars) {
-      const wanted = label.trim().toLowerCase();
-      if (!wanted) continue;
-      // Exact dictionary label match ("5*/hv1", "boutique").
-      const exact = dict.find((s) => s.name.trim().toLowerCase() === wanted);
-      if (exact) {
-        ids.add(String(exact.id));
-        continue;
+    if (labels.length) {
+      let dict: AnexStar[] = [];
+      try {
+        dict = await this.provider.stars(String(state.id));
+      } catch (err) {
+        // Without the dictionary we cannot verify the label precisely; keep
+        // the starKeys ids (if any) rather than failing the whole search.
+        this.logger.warn(
+          `ANEX stars dictionary STATE=${state.id} unavailable: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
-      // Numeric star label ("4*", "4*+") → first category of that rating.
-      const m = wanted.match(/^([1-5])\s*(\*\+?)?/);
-      if (m) {
-        const hit = dict.find((s) => s.name.trim().toLowerCase().startsWith(`${m[1]}*`));
-        if (hit) ids.add(String(hit.id));
+      for (const label of labels) {
+        const wanted = normStarLabel(label);
+        if (!wanted) continue;
+        const exact = dict.find((s) => normStarLabel(s.name) === wanted);
+        if (exact) ids.add(String(exact.id));
+        const num = wanted.match(/^([1-5])\s*\*/);
+        if (num) {
+          filter.numbers.add(parseInt(num[1], 10));
+          if (!exact) {
+            // Plain numeric label ("5*", "4*+") — first dictionary group of
+            // that rating is the native filter id, but the local matcher
+            // stays strictly numeric.
+            const hit = dict.find((s) => normStarLabel(s.name).startsWith(`${num[1]}*`));
+            if (hit) ids.add(String(hit.id));
+          }
+        }
+        // Exact dictionary label: match the supplier's own group name
+        // ("5*/HV1", "Boutique", "APART").
+        if (exact) filter.labels.add(wanted);
+        if (/hv[\s-]?1/i.test(wanted)) filter.hv1 = true;
       }
     }
-    return ids.size ? ids : null;
+
+    if (!ids.size && !filter.numbers.size && !filter.labels.size && !filter.hv1) return null;
+    filter.ids = [...ids];
+    return filter;
+  }
+
+  /** Precise star count from ANEX's own row field, or null ("HV-1", "SPECIAL CLASS"). */
+  private rowStarNumber(row: AnexPriceRow): number | null {
+    const precise = (row.starName ?? "").trim();
+    if (precise) return anexStarNumber(precise);
+    // No precise starName — fall back to the group label ("5*").
+    return anexStarNumber(row.groupStarName);
+  }
+
+  private rowMatchesStarFilter(row: AnexPriceRow, filter: AnexStarFilter): boolean {
+    // starKeys without any requested label (offer re-check / refresh): there
+    // is nothing to verify precisely, so fall back to the supplier group id.
+    const precise = filter.numbers.size > 0 || filter.labels.size > 0 || filter.hv1;
+    if (!precise) return filter.ids.includes(String(row.groupStarInc ?? ""));
+
+    const number = this.rowStarNumber(row);
+    if (number !== null && filter.numbers.has(number)) return true;
+
+    const group = normStarLabel(row.groupStarName ?? "");
+    if (group && filter.labels.has(group)) return true;
+
+    if (filter.hv1) {
+      const starName = (row.starName ?? "").trim();
+      if (/^hv[\s-]?1$/i.test(starName) || /hv[\s-]?1/i.test(group)) return true;
+    }
+    return false;
   }
 
   // ── SupplierAdapter: detail / refresh ─────────────────────────────────

@@ -15,13 +15,17 @@ import { priceUnavailable } from "../supplier.types";
 import {
   AnexProvider,
   addDays,
+  anexStarNumber,
   normName,
+  normStarLabel,
   toCompactDate,
   toIsoDate,
   ANEX_CURRENCY_INC,
   ANEX_MAX_PAGES,
   ANEX_PAGE_SIZE,
   ANEX_SEARCH_MODE,
+  type AnexStar,
+  type AnexStarFilter,
   type AnexState,
 } from "./anex.provider";
 
@@ -180,6 +184,7 @@ export class AnexHotelAdapter implements SupplierAdapter {
     const adults = query.adults ?? 2;
     const children = query.children ?? 0;
 
+    const starFilter = await this.resolveStarFilter(query, state);
     const rows = await this.fetchRows({
       stateInc: String(state.id),
       checkIn,
@@ -188,6 +193,7 @@ export class AnexHotelAdapter implements SupplierAdapter {
       adults,
       children,
       childAges: query.childAges,
+      starList: starFilter?.ids.join(",") || undefined,
     });
 
     let filtered = rows.filter(
@@ -198,9 +204,14 @@ export class AnexHotelAdapter implements SupplierAdapter {
     const droppedOccupancy = rows.length - filtered.length;
 
     filtered = this.applyLocalFilters(filtered, query);
-    const starIds = await this.resolveStarIdSet(query, state);
-    if (starIds) {
-      filtered = filtered.filter((r) => starIds.has(String(r.groupStarInc ?? "")));
+    if (starFilter) {
+      const before = filtered.length;
+      filtered = filtered.filter((r) => this.rowMatchesStarFilter(r, starFilter));
+      this.logger.debug(
+        `ANEX hotels star filter ${[...starFilter.numbers].map((n) => `${n}*`).join(", ") || "-"}` +
+          `${starFilter.labels.size ? ` [${[...starFilter.labels].join(", ")}]` : ""}: ` +
+          `${before - filtered.length} rows dropped locally`,
+      );
     }
 
     // §5.7: rows without a positive supplier price are dropped before
@@ -231,6 +242,8 @@ export class AnexHotelAdapter implements SupplierAdapter {
     adults: number;
     children: number;
     childAges?: number[];
+    /** STARLIST — supplier-native category ids (see AnexStarFilter). */
+    starList?: string;
   }): Promise<AnexHotelPriceRow[]> {
     const nights: number[] = [];
     for (let n = params.nightsFrom; n <= params.nightsTo; n++) nights.push(n);
@@ -274,6 +287,9 @@ export class AnexHotelAdapter implements SupplierAdapter {
     adults: number;
     children: number;
     childAges?: number[];
+    starList?: string;
+    /** Set after a STARLIST request was rejected — retried without it. */
+    starListFallback?: boolean;
   }): Promise<AnexHotelPriceRow[]> {
     const rows: AnexHotelPriceRow[] = [];
     const ages =
@@ -290,6 +306,8 @@ export class AnexHotelAdapter implements SupplierAdapter {
           REGULAR: "True",
           FILTER: "1",
           FREIGHT: "1",
+          // Supplier-native category filter (dictionary ids, comma-separated).
+          STARLIST: params.starList ?? "",
           ADULT: params.adults,
           CHILD: params.children,
           AGES: ages,
@@ -314,9 +332,25 @@ export class AnexHotelAdapter implements SupplierAdapter {
           THE_BEST_AT_TOP,
         });
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        // A rejected STARLIST must not turn into a silent empty: retry once
+        // without the native filter — the local precise check still
+        // enforces the category.
+        if (
+          params.starList &&
+          !params.starListFallback &&
+          (message.includes("HTTP 424") || message.includes("HTTP 500"))
+        ) {
+          this.logger.warn(
+            `ANEX hotels STARLIST=${params.starList} rejected (${message}) — retrying without it`,
+          );
+          return this.fetchExact(
+            { ...params, starList: undefined, starListFallback: true },
+          );
+        }
         // HTTP 424 is how ANEX says "no combinations for these params" —
         // an honest empty answer, not an error (same as the tours adapter).
-        if (err instanceof Error && err.message.includes("HTTP 424")) {
+        if (message.includes("HTTP 424")) {
           break;
         }
         throw err;
@@ -394,16 +428,35 @@ export class AnexHotelAdapter implements SupplierAdapter {
   }
 
   /**
-   * Supplier-native group star ids for the requested hotelStars labels:
+   * Supplier-native group star ids for the requested hotelStars labels plus a
+   * precise local matcher:
    * aggregator-resolved starKeys (SupplierGeoLink kind=STAR), else the live
    * HOTEL Stars dictionary by label (/samo/searchhotel/Stars?STATEFROM=16 —
-   * verified: ids match rows' groupStarInc, 10008=3* … 10014=Boutique; the
-   * tour Stars dictionary answers HTTP 500 for hotel-only countries like AZ).
+   * verified: 10008=3* … 10014=Boutique; the tour Stars dictionary answers
+   * HTTP 500 for hotel-only countries like AZ).
+   *
+   * Why local verification is required: hotel rows for some hotels carry
+   * starName "5.0" with groupStarName "???" (no group link) — a group-id
+   * filter silently loses them — and STARLIST itself is not exact
+   * (observed returning a 4* row for the 5* / HV1 id). The precise starName
+   * is authoritative: a plain "5*" keeps only 5-star rows, while an explicit
+   * "5* / HV1" keeps the whole supplier group.
    */
-  private async resolveStarIdSet(query: SupplierSearchQuery, state: AnexState): Promise<Set<string> | null> {
+  private async resolveStarFilter(
+    query: SupplierSearchQuery,
+    state: AnexState,
+  ): Promise<AnexStarFilter | null> {
+    const labels = (query.hotelStars ?? []).map((l) => l.trim()).filter(Boolean);
+    const filter: AnexStarFilter = {
+      ids: [],
+      numbers: new Set<number>(),
+      labels: new Set<string>(),
+      hv1: false,
+    };
+    const ids = new Set<string>();
+
     const keysCsv = query.starKeys?.[this.code]?.replace(/\s+/g, "");
     if (keysCsv) {
-      const ids = new Set<string>();
       for (const part of keysCsv.split(",").filter(Boolean)) {
         const sep = part.indexOf(":");
         if (sep >= 0) {
@@ -412,30 +465,67 @@ export class AnexHotelAdapter implements SupplierAdapter {
           ids.add(part);
         }
       }
-      if (ids.size) return ids;
     }
-    if (!query.hotelStars?.length) return null;
 
-    const dict = await this.provider.hotelStars(String(state.id));
-    const ids = new Set<string>();
-    for (const label of query.hotelStars) {
-      const wanted = label.trim().toLowerCase();
-      if (!wanted) continue;
-      const exact = dict.find((s) => s.name.trim().toLowerCase() === wanted);
-      if (exact) {
-        ids.add(String(exact.id));
-        continue;
+    if (labels.length) {
+      let dict: AnexStar[] = [];
+      try {
+        dict = await this.provider.hotelStars(String(state.id));
+      } catch (err) {
+        // Without the dictionary we cannot resolve label → id; keep the
+        // starKeys ids (if any) and verify locally by star count.
+        this.logger.warn(
+          `ANEX hotel stars dictionary STATE=${state.id} unavailable: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
-      // "4" / "4*" style tokens against dictionary labels ("4*", "5*/hv1").
-      const m = wanted.match(/^([1-5])\s*\*?/);
-      if (m) {
-        for (const s of dict) {
-          const sm = s.name.trim().toLowerCase().match(/^([1-5])\s*\*+/);
-          if (sm && sm[1] === m[1]) ids.add(String(s.id));
+      for (const label of labels) {
+        const wanted = normStarLabel(label);
+        if (!wanted) continue;
+        const exact = dict.find((s) => normStarLabel(s.name) === wanted);
+        if (exact) ids.add(String(exact.id));
+        const num = wanted.match(/^([1-5])\s*\*/);
+        if (num) {
+          filter.numbers.add(parseInt(num[1], 10));
+          if (!exact) {
+            for (const s of dict) {
+              if (normStarLabel(s.name).startsWith(`${num[1]}*`)) ids.add(String(s.id));
+            }
+          }
         }
+        if (exact) filter.labels.add(wanted);
+        if (/hv[\s-]?1/i.test(wanted)) filter.hv1 = true;
       }
     }
-    return ids.size ? ids : null;
+
+    if (!ids.size && !filter.numbers.size && !filter.labels.size && !filter.hv1) return null;
+    filter.ids = [...ids];
+    return filter;
+  }
+
+  /** Precise star count from ANEX's own row field, or null ("HV-1", "-"). */
+  private rowStarNumber(row: AnexHotelPriceRow): number | null {
+    const precise = (row.starName ?? "").trim();
+    if (precise) return anexStarNumber(precise);
+    return anexStarNumber(row.groupStarName);
+  }
+
+  private rowMatchesStarFilter(row: AnexHotelPriceRow, filter: AnexStarFilter): boolean {
+    // starKeys without any requested label (offer re-check / refresh): there
+    // is nothing to verify precisely, so fall back to the supplier group id.
+    const precise = filter.numbers.size > 0 || filter.labels.size > 0 || filter.hv1;
+    if (!precise) return filter.ids.includes(String(row.groupStarInc ?? ""));
+
+    const number = this.rowStarNumber(row);
+    if (number !== null && filter.numbers.has(number)) return true;
+
+    const group = normStarLabel(row.groupStarName ?? "");
+    if (group && filter.labels.has(group)) return true;
+
+    if (filter.hv1) {
+      const starName = (row.starName ?? "").trim();
+      if (/^hv[\s-]?1$/i.test(starName) || /hv[\s-]?1/i.test(group)) return true;
+    }
+    return false;
   }
 
   // ── SupplierAdapter: detail / refresh ─────────────────────────────────

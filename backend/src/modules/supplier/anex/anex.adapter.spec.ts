@@ -358,3 +358,92 @@ describe("AnexAdapter — AGES multi-child mapping (confirmed contract)", () => 
     );
   });
 });
+
+/**
+ * STARLIST is the supplier's own star filter, but its response is not exact:
+ * the 5* id (10010 = "5* / HV1") also returned a 4* row, and the same group
+ * contains HV-1 hotels. A plain "5*" must keep only precise 5* rows; only an
+ * explicit "5* / HV1" selection may include HV-1.
+ */
+describe("AnexAdapter.search — STARLIST + precise hotel-category filter", () => {
+  const DICT = [
+    { id: 10008, name: "3*" },
+    { id: 10009, name: "4*" },
+    { id: 10010, name: "5*/HV1" },
+    { id: 10014, name: "Boutique" },
+  ];
+  const row = (claim: string, hotel: string, starName: string, groupStarInc: number | null, groupStarName: string) => ({
+    cat_Claim: claim,
+    hotelInc: claim.charCodeAt(0),
+    hotelName: hotel,
+    starName,
+    groupStarInc,
+    groupStarName,
+    nights: 6,
+    checkIn: "2026-10-24T00:00:00",
+    converted_price: 1000,
+  });
+  const STAR_QUERY: SupplierSearchQuery = {
+    ...QUERY,
+    hotel: undefined,
+    hotelExternalId: undefined,
+  };
+  const ROWS = [
+    row("a", "Five Star", "5 *****", 10010, "5*/HV1"),
+    row("b", "HV One", "HV-1", 10010, "5*/HV1"),
+    row("c", "Four Star", "4 ****", 10009, "4*"),
+    row("d", "Special Class", "SPECIAL CLASS", null, "???"),
+    row("e", "Boutique Hotel", "Boutique", 10014, "Boutique"),
+  ];
+
+  function makeStarAdapter() {
+    const { adapter, provider } = makeAdapter();
+    provider.resolveStateFlexible.mockResolvedValue(TURKEY);
+    provider.stars.mockResolvedValue(DICT);
+    provider.fetchJson.mockResolvedValue([{ prices: ROWS, result: { pageCount: 1 } }]);
+    return { adapter, provider };
+  }
+
+  it("plain 5*: sends STARLIST=10010 and drops HV-1, 4* and unknown categories", async () => {
+    const { adapter, provider } = makeStarAdapter();
+
+    const offers = await adapter.search({ ...STAR_QUERY, hotelStars: ["5*"] });
+
+    expect(provider.fetchJson).toHaveBeenCalledWith(
+      "/search",
+      expect.objectContaining({ STARLIST: "10010" }),
+    );
+    expect(offers.map((o) => o.hotel)).toEqual(["Five Star"]);
+  });
+
+  it("explicit 5*/HV1 keeps the whole supplier group, including HV-1", async () => {
+    const { adapter } = makeStarAdapter();
+
+    const offers = await adapter.search({ ...STAR_QUERY, hotelStars: ["5*/HV1"] });
+
+    expect(offers.map((o) => o.hotel)).toEqual(["Five Star", "HV One"]);
+  });
+
+  it("non-numeric category (Boutique) filters by the dictionary label", async () => {
+    const { adapter, provider } = makeStarAdapter();
+
+    const offers = await adapter.search({ ...STAR_QUERY, hotelStars: ["Boutique"] });
+
+    expect(provider.fetchJson).toHaveBeenCalledWith(
+      "/search",
+      expect.objectContaining({ STARLIST: "10014" }),
+    );
+    expect(offers.map((o) => o.hotel)).toEqual(["Boutique Hotel"]);
+  });
+
+  it("no category → STARLIST is empty (no supplier-side filter)", async () => {
+    const { adapter, provider } = makeStarAdapter();
+
+    await adapter.search(STAR_QUERY);
+
+    expect(provider.fetchJson).toHaveBeenCalledWith(
+      "/search",
+      expect.objectContaining({ STARLIST: "" }),
+    );
+  });
+});

@@ -3,8 +3,8 @@ import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
-  title: "TravelHub — Marketplace",
-  description: "TravelHub: каталог туристических услуг. Marketplace + внутренние рабочие центры.",
+  title: "Navitravel — Marketplace",
+  description: "Navitravel: каталог туристических услуг. Marketplace + внутренние рабочие центры.",
 };
 
 /**

@@ -9,6 +9,7 @@ import { isInternalRole, isPublicPath } from "@/lib/routes";
 import { t, useLocale } from "@/lib/i18n";
 import { fireMarketplaceSearch } from "@/lib/behavioral-events";
 import { publicApi, type PublicCategory } from "@/lib/public-api";
+import { useGlobalBranding } from "@/lib/use-global-branding";
 import LocaleSelector from "./public/LocaleSelector";
 
 /**
@@ -23,13 +24,14 @@ import LocaleSelector from "./public/LocaleSelector";
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   const user = useCurrentUser();
   const locale = useLocale();
+  const { brandName, loading: brandingLoading } = useGlobalBranding();
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <PublicHeader user={user} />
       <main className="flex-1">{children}</main>
       <footer className="border-t border-slate-200 bg-slate-50 py-6 text-center text-xs text-slate-400">
-        {t("footer.text", locale)} © {new Date().getFullYear()}
+        {!brandingLoading && `© ${new Date().getFullYear()} ${brandName}. ${t("footer.rights_reserved", locale)}`}
       </footer>
     </div>
   );
@@ -42,6 +44,9 @@ function PublicHeader({ user }: { user: AuthUser | null }) {
   const [q, setQ] = useState("");
   const [categories, setCategories] = useState<PublicCategory[]>([]);
   const [catOpen, setCatOpen] = useState(false);
+  // Canonical brand/logo from the constructor (same source as the marketplace).
+  const { brandName, logo, loading: brandingLoading } = useGlobalBranding();
+  const displayBrand = brandingLoading ? "" : brandName;
 
   // Категории — из public API (не хардкод как единственный источник истины).
   useEffect(() => {
@@ -75,13 +80,16 @@ function PublicHeader({ user }: { user: AuthUser | null }) {
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         {/* Logo → public root */}
-        <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="TravelHub">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-blue-600 text-base font-bold text-white">
-            T
-          </div>
-          <span className="hidden text-base font-bold text-slate-900 sm:block">
-            Travel<span className="text-blue-600">Hub</span>
-          </span>
+        <Link href="/" className="flex shrink-0 items-center gap-2" aria-label={displayBrand || "Home"}>
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logo.url} alt={displayBrand} className="h-9 w-auto max-w-[140px] object-contain" />
+          ) : (
+            <div className="flex size-9 items-center justify-center rounded-xl bg-blue-600 text-base font-bold text-white">
+              {displayBrand ? displayBrand.charAt(0).toUpperCase() : "T"}
+            </div>
+          )}
+          <span className="hidden text-base font-bold text-slate-900 sm:block">{displayBrand}</span>
         </Link>
 
         {/* Public nav — только public-safe routes */}

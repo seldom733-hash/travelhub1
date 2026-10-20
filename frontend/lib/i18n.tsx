@@ -1029,7 +1029,17 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "constructor.footer_description": { ru: "Описание", az: "Təsvir", en: "Description" },
   "constructor.footer_phone": { ru: "Телефон", az: "Telefon", en: "Phone" },
   "constructor.footer_email": { ru: "Email", az: "E-poçt", en: "Email" },
+  "constructor.footer_contacts_hint": {
+    ru: "Контакты подвала берутся из шапки компании. Эти поля — запасной вариант, если в шапке контакты не заполнены.",
+    az: "Footer kontaktları şirkət başlığından götürülür. Bu sahələr yalnız başlıqda əlaqə yoxdursa istifadə olunur.",
+    en: "Footer contacts come from the company Header. These fields are a fallback used only when the Header has no contacts.",
+  },
   "constructor.footer_copyright": { ru: "Копирайт", az: "Müəllif hüququ", en: "Copyright" },
+  "constructor.footer_copyright_hint": {
+    ru: "Используйте {brand} — при смене названия компании в шапке подставится актуальное имя.",
+    az: "Şirkət adı dəyişdikdə {brand} cari adla əvəz olunur.",
+    en: "Use {brand} — it is replaced with the current company name from the Header tab.",
+  },
   "constructor.footer_save": { ru: "Сохранить Footer", az: "Footer-i Saxla", en: "Save Footer" },
 
   // ── Design constructor ────────────────────────────────────────────────
@@ -2884,6 +2894,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "tourSearch.no_results": { ru: "По вашему запросу предложений не найдено.", az: "Sorğunuza uyğun təklif tapılmadı.", en: "No offers found for your query." },
   "tourSearch.all_failed": { ru: "Не удалось получить актуальные предложения. Попробуйте повторить поиск.", az: "Aktual təklifləri əldə etmək mümkün olmadı. Yenidən cəhd edin.", en: "Could not fetch live offers. Please try again." },
   "tourSearch.unavailable": { ru: "временно недоступен", az: "müvəqqəti əlçatmazdır", en: "temporarily unavailable" },
+  "tourSearch.time_ms": { ru: "мс", az: "ms", en: "ms" },
+  "tourSearch.time_sec": { ru: "с", az: "san", en: "s" },
   "tourSearch.no_geo_data": { ru: "Для выбранного города или курорта поставщики пока не отдают предложения.", az: "Seçilmiş şəhər və ya kurort üçün təchizatçılar hələ təklif vermirlər.", en: "No offers available for the selected city or resort yet." },
   "tourSearch.no_geo_data_hint": { ru: "Выберите страну целиком или другой населённый пункт.", az: "Ölkəni bütövlükdə və ya başqa yaşayış nöqtəsini seçin.", en: "Select the whole country or a different place." },
   "tourSearch.error": { ru: "Не удалось выполнить поиск", az: "Axtarışı icra etmək mümkün olmadı", en: "Search request failed" },
@@ -2902,6 +2914,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "tourSearch.filter_all_meals": { ru: "Любое питание", az: "İstənilən qidalanma", en: "Any meal" },
   "tourSearch.filter_price_max": { ru: "Цена до", az: "Qiymətə qədər", en: "Max price" },
   "tourSearch.col_date": { ru: "Дата заезда", az: "Giriş tarixi", en: "Check-in" },
+  "tourSearch.col_checkout": { ru: "Дата выезда", az: "Çıxış tarixi", en: "Check-out" },
   "tourSearch.col_nights": { ru: "Ночей", az: "Gecə", en: "Nights" },
   "tourSearch.col_hotel": { ru: "Отель", az: "Otel", en: "Hotel" },
   "tourSearch.col_stars": { ru: "Категория отеля", az: "Oteli kateqoriyası", en: "Hotel category" },
@@ -2910,6 +2923,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "tourSearch.col_price": { ru: "Цена", az: "Qiymət", en: "Price" },
   "tourSearch.col_source": { ru: "Источник", az: "Mənbə", en: "Source" },
   "tourSearch.filter_all_dates": { ru: "Все даты", az: "Bütün tarixlər", en: "All dates" },
+  "tourSearch.filter_all_checkouts": { ru: "Все выезды", az: "Bütün çıxışlar", en: "All check-outs" },
   "tourSearch.filter_all_nights": { ru: "Все ночи", az: "Bütün gecələr", en: "All nights" },
   "tourSearch.filter_hotel": { ru: "Поиск отеля", az: "Otel axtarışı", en: "Hotel search" },
   "tourSearch.filter_all_stars": { ru: "Любая категория", az: "İstənilən kateqoriya", en: "Any category" },

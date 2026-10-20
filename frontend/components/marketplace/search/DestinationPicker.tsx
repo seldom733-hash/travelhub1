@@ -24,6 +24,8 @@ interface DestinationPickerProps {
   onResortChange: (entry: GeoDirectoryEntry | null) => void;
   onClearAll: () => void;
   required?: boolean;
+  /** ISO-2 country codes allowed by the selected suppliers. Omitted = all. */
+  allowedCountryCodes?: string[];
 }
 
 type Section = "country" | "city" | "resort";
@@ -63,6 +65,7 @@ export default function DestinationPicker({
   onResortChange,
   onClearAll,
   required = false,
+  allowedCountryCodes,
 }: DestinationPickerProps) {
   const [open, setOpen] = useState(false);
   // null = все секции свернуты (можно раскрыть любую кликом и свернуть обратно,
@@ -131,6 +134,15 @@ export default function DestinationPicker({
   }, [city?.id, country?.id]);
 
   const selected = resort ?? city ?? country;
+
+  // When supplier(s) are selected, restrict the country list to their
+  // supported countries (union for several suppliers).
+  const allowedCountries = useMemo(() => {
+    if (!countries) return null;
+    if (!allowedCountryCodes || allowedCountryCodes.length === 0) return countries;
+    const allowed = new Set(allowedCountryCodes.map((c) => c.toUpperCase()));
+    return countries.filter((c) => allowed.has(c.code.toUpperCase()));
+  }, [countries, allowedCountryCodes]);
 
   // Content-width: sized to the longest «Name · CODE» text across all three
   // sections (country/city/resort lists), placeholder as fallback.
@@ -327,11 +339,11 @@ export default function DestinationPicker({
             <div className="border-b border-dark-border pb-1">
               {searchInput(qCountry, setQCountry, `${t("search.country", locale)}…`)}
               <ul role="listbox" className="max-h-48 overflow-y-auto py-1">
-                {filterItems(countries, qCountry).map((item) =>
+                {filterItems(allowedCountries, qCountry).map((item) =>
                   itemRow(item, country?.id, pickCountry),
                 )}
-                {countries !== null &&
-                  filterItems(countries, qCountry).length === 0 && (
+                {allowedCountries !== null &&
+                  filterItems(allowedCountries, qCountry).length === 0 && (
                     <li className="px-3 py-3 text-center text-[14px] text-neutral-500">
                       {t("search.no_results", locale)}
                     </li>
