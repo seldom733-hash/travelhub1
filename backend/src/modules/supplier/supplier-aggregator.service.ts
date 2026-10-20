@@ -87,6 +87,19 @@ const COUNTRY_NAME_TO_ISO2: Record<string, string> = {
   montenegro: "ME", "черногория": "ME",
   portugal: "PT", "португалия": "PT",
   vietnam: "VN", "вьетнам": "VN",
+  // FSTravel tour countries missing from this map (2026-10-18): the ISO
+  // normalization feeds supports() for every supplier — without these a bare
+  // RU/EN destination name failed the capability gate ("Франция" skipped
+  // ANEX FR and FSTRAVEL alike).
+  germany: "DE", "германия": "DE",
+  spain: "ES", "испания": "ES",
+  italy: "IT", "италия": "IT",
+  france: "FR", "франция": "FR",
+  poland: "PL", "польша": "PL",
+  morocco: "MA", "марокко": "MA",
+  "saudi arabia": "SA", "саудовская аравия": "SA",
+  "танзания": "TZ",
+  "south korea": "KR", "южная корея": "KR",
   oman: "OM", "оман": "OM",
   nepal: "NP", "непал": "NP",
   cuba: "CU", "куба": "CU",
@@ -203,6 +216,17 @@ export class SupplierAggregatorService {
           children: { max: 5 },
         },
       },
+    },
+    // FSTravel (b2b.fstravel.asia): 26 countries from Baku (FSTRAVEL_STATES
+    // of the adapter, verified live 2026-10-18), tour nights 3–14 (the
+    // site's NIGHTS_FROM/TILL bounds the adapter iterates).
+    FSTRAVEL: {
+      countries: [
+        "AE", "CN", "DE", "EG", "ES", "FR", "GE", "ID", "IN", "IT", "JP",
+        "KR", "LK", "MA", "MU", "MY", "MV", "PL", "RS", "SA", "SC", "SG",
+        "TH", "TZ", "TR", "VN",
+      ],
+      nights: { min: 3, max: 14 },
     },
   };
 
@@ -488,7 +512,7 @@ export class SupplierAggregatorService {
     // search cache key (deriveSearchKey hashes the whole query), and lets
     // per-service capability overrides apply in supports().
     const svcQuery: SupplierSearchQuery = { ...query, service: serviceType };
-    const candidates = this.registry
+    const syncCandidates = this.registry
       .getEntries()
       .filter(({ adapter, config }) => {
         // Entries-based: a provider code registers one adapter per service;
@@ -504,8 +528,19 @@ export class SupplierAggregatorService {
       .filter(({ adapter }) => this.supports(adapter.code, svcQuery))
       .map(({ adapter }) => adapter);
 
+    // CRM-partner gate: a partner disabled in CRM (status != ACTIVE) must not
+    // participate in search or in the «Определяем поставщиков…» loading UI,
+    // consistent with listSuppliersOfService. Suppliers without a CRM partner
+    // (no canonical name) stay enabled (legacy behaviour).
+    const candidates: typeof syncCandidates = [];
+    for (const adapter of syncCandidates) {
+      const crm = await this.crmPartnerForToken(adapter.code);
+      if (crm && !crm.active) continue;
+      candidates.push(adapter);
+    }
+
     if (candidates.length === 0) {
-      return { jobs: [], hasCandidates: false };
+      return { jobs: [], hasCandidates: syncCandidates.length > 0 };
     }
 
     // City/resort → supplier town/program resolution (SupplierGeoLink): when

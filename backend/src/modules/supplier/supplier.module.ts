@@ -17,11 +17,15 @@ import { KompasSyncService } from "./kompas/kompas-sync.service";
 import { KompasCaptchaStore } from "./kompas/kompas-captcha.store";
 import { KazunionHttpService } from "./kazunion/kazunion-http.service";
 import { KazunionAdapter } from "./kazunion/kazunion.adapter";
+import { KazunionHotelAdapter } from "./kazunion/kazunion-hotel.adapter";
+import { KazunionHotelSyncService } from "./kazunion/kazunion-hotel-sync.service";
 import { KazunionSyncService } from "./kazunion/kazunion-sync.service";
 import { AnexAdapter } from "./anex/anex.adapter";
 import { AnexProvider } from "./anex/anex.provider";
 import { AnexHotelAdapter } from "./anex/anex-hotel.adapter";
 import { AnexSyncService } from "./anex/anex-sync.service";
+import { FstravelAdapter } from "./fstravel/fstravel.adapter";
+import { FstravelSyncService } from "./fstravel/fstravel-sync.service";
 import { SupplierController } from "./supplier.controller";
 import { PublicSupplierController } from "./public-supplier.controller";
 import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
@@ -67,11 +71,15 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     KompasHotelSyncService,
     KazunionHttpService,
     KazunionAdapter,
+    KazunionHotelAdapter,
     KazunionSyncService,
+    KazunionHotelSyncService,
     AnexAdapter,
     AnexProvider,
     AnexHotelAdapter,
     AnexSyncService,
+    FstravelAdapter,
+    FstravelSyncService,
     TourRequestService,
     AzalAdapter,
     AzalHttpService,
@@ -87,8 +95,10 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
 		  kompas: KompasSupplierAdapter,
 		  kompasHotel: KompasHotelAdapter,
 		  kazunion: KazunionAdapter,
+		  kazunionHotel: KazunionHotelAdapter,
           anex: AnexAdapter,
           anexHotel: AnexHotelAdapter,
+          fstravel: FstravelAdapter,
           flightRegistry: FlightSupplierRegistry,
           azal: AzalAdapter,
           aviasales: AviasalesAdapter,
@@ -192,6 +202,34 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           circuitBreakerOpenMs: 120_000,
         });
 
+        // HOTELS category adapter of the SAME KazUnion code (§2: Provider →
+        // Category-Adapter). Registered after tours so legacy service-less
+        // lookups keep resolving the tour adapter. Drives the SAMO
+        // `search_hotel` (stay-only, no departure city) over plain HTTP — the
+        // hotel form is a SEPARATE dictionary with 22 countries.
+        registry.register(kazunionHotel, {
+          code: "KAZUNION",
+          name: "KazUnion",
+          serviceTypes: ["hotels"],
+          enabled: true,
+          searchEnabled: true,
+          livePriceEnabled: true,
+          availabilityEnabled: true,
+          // Plain HTTP (no browser); the adapter shares the paced request
+          // queue with the tour adapter, so concurrency is bounded upstream.
+          maxConcurrency: 4,
+          requestsPerMinute: 20,
+          // A wide hotel search paginates PRICEPAGE; same budget class as the
+          // tour registration.
+          timeoutMs: 480_000,
+          searchCacheTtlMs: 5 * 60 * 1000,
+          priceCacheTtlMs: 5 * 60 * 1000,
+          availabilityCacheTtlMs: 5 * 60 * 1000,
+          detailCacheTtlMs: 24 * 60 * 60 * 1000,
+          circuitBreakerThreshold: 10,
+          circuitBreakerOpenMs: 120_000,
+        });
+
         registry.register(anex, {
           code: "ANEX",
           name: "ANEX",
@@ -242,6 +280,38 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           circuitBreakerOpenMs: 120_000,
         });
 
+        // FSTravel (b2b.fstravel.asia — plain HTTP + OCR captcha): tour
+        // supplier, registered so the universal search's «Поставщики» picker
+        // lists it and country-level live searches query it. The same adapter
+        // drives the sync endpoint (POST /supplier/fstravel/sync).
+        registry.register(fstravel, {
+          code: "FSTRAVEL",
+          name: "FSTravel",
+          serviceTypes: ["tours"],
+          enabled: true,
+          searchEnabled: true,
+          livePriceEnabled: true,
+          availabilityEnabled: true,
+          // The adapter paces itself (~3s/request) and auto-solves the SAMO
+          // antibot captcha by OCR; one country search fans out over 8-day
+          // windows × every night (≤48 paginated queries) — the budget
+          // matches KazUnion's worst case. Concurrency is NOT the upstream
+          // guard (the adapter's own paced queue is, and the sync path
+          // bypasses the registry entirely): an inflight slot is held for the
+          // whole call, which can run minutes while the pacing queue is
+          // congested — a small limit 503s legitimate parallel user calls
+          // (price-calendar + search + re-check), so let them queue instead.
+          maxConcurrency: 8,
+          requestsPerMinute: 15,
+          timeoutMs: 480_000,
+          searchCacheTtlMs: 5 * 60 * 1000,
+          priceCacheTtlMs: 5 * 60 * 1000,
+          availabilityCacheTtlMs: 5 * 60 * 1000,
+          detailCacheTtlMs: 24 * 60 * 60 * 1000,
+          circuitBreakerThreshold: 5,
+          circuitBreakerOpenMs: 120_000,
+        });
+
         flightRegistry.register(azal);
         // Second live flight price source. Registering it makes every
         // /supplier/azal/search call fan out over both suppliers; failures
@@ -254,14 +324,16 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
         KompasSupplierAdapter,
         KompasHotelAdapter,
         KazunionAdapter,
+        KazunionHotelAdapter,
         AnexAdapter,
         AnexHotelAdapter,
+        FstravelAdapter,
         FlightSupplierRegistry,
         AzalAdapter,
         AviasalesAdapter,
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KompasHotelSyncService, KazunionHttpService, KazunionAdapter, KazunionSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AnexSyncService, KompasHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KompasHotelSyncService, KazunionHttpService, KazunionAdapter, KazunionHotelAdapter, KazunionSyncService, KazunionHotelSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AnexSyncService, FstravelAdapter, FstravelSyncService, KompasHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
 })
 export class SupplierModule {}

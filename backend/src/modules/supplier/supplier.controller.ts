@@ -8,7 +8,9 @@ import { SummerBulkSyncService } from "./summertour/summer-bulk-sync.service";
 import { KompasSyncService } from "./kompas/kompas-sync.service";
 import { KompasHotelSyncService } from "./kompas/kompas-hotel-sync.service";
 import { KazunionSyncService } from "./kazunion/kazunion-sync.service";
+import { KazunionHotelSyncService } from "./kazunion/kazunion-hotel-sync.service";
 import { AnexSyncService } from "./anex/anex-sync.service";
+import { FstravelSyncService } from "./fstravel/fstravel-sync.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { RequirePermissions, CurrentUser } from "../../security/auth/decorators";
@@ -33,7 +35,9 @@ export class SupplierController {
     private readonly kompasSync: KompasSyncService,
     private readonly kompasHotelSync: KompasHotelSyncService,
     private readonly kazunionSync: KazunionSyncService,
+    private readonly kazunionHotelSync: KazunionHotelSyncService,
     private readonly anexSync: AnexSyncService,
+    private readonly fstravelSync: FstravelSyncService,
   ) {}
 
   // ── Summer Sync ───────────────────────────────────────────────────
@@ -129,6 +133,36 @@ export class SupplierController {
     });
   }
 
+  /**
+   * Import KazUnion HOTELS (stay-only) as Product(type=HOTEL, accommodation).
+   * POST /supplier/kazunion/hotel-sync?countryIsos=VN,AZ&dateFrom=&dateTo=&nights=7&maxPages=30
+   * Default scope: every country of the KazUnion hotel dictionary (22).
+   *
+   * A captcha-blocked country is reported in `errors` — never as "0 hotels".
+   * Countries with a genuine empty answer are counted in
+   * `countriesWithoutInventory`.
+   */
+  @Post("kazunion/hotel-sync")
+  @RequirePermissions("supplier.search.manage")
+  async kazunionHotelSyncEndpoint(
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Query("countryIsos") countryIsos?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("nights") nights?: string,
+    @Query("maxPages") maxPages?: string,
+  ) {
+    return this.kazunionHotelSync.runSync({
+      countryIsos: countryIsos
+        ? countryIsos.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+        : undefined,
+      dateFrom,
+      dateTo,
+      nights: nights ? parseInt(nights, 10) : undefined,
+      maxPages: maxPages ? parseInt(maxPages, 10) : undefined,
+    });
+  }
+
   // ── Search ──────────────────────────────────────────────────────────
 
   @Post("anex/sync")
@@ -145,6 +179,27 @@ export class SupplierController {
       throw new Error("ANEX partner not found — run partner seed first");
     }
     return this.anexSync.runSync(partner.id, {
+      countryNameContains: country,
+      dateFrom,
+      dateTo,
+      geoCountryCode,
+    });
+  }
+
+  @Post("fstravel/sync")
+  @RequirePermissions("supplier.search.manage")
+  async fstravelSyncEndpoint(
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Query("country") country?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("geoCountryCode") geoCountryCode?: string,
+  ) {
+    const partner = await this.fstravelSync.getFstravelPartner();
+    if (!partner) {
+      throw new Error("FSTRAVEL partner not found — run partner seed first");
+    }
+    return this.fstravelSync.runSync(partner.id, {
       countryNameContains: country,
       dateFrom,
       dateTo,

@@ -10,6 +10,7 @@ import { IdsService } from "../../../shared/ids.service";
 import { KompasSupplierAdapter, KOMPAS_CURRENCY_INC } from "./kompas.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import type { SupplierOffer } from "../supplier.types";
+import { buildGeoCountryMap } from "../geo-country-resolver";
 
 export interface KompasSyncResult {
   countriesDiscovered: number;
@@ -194,6 +195,12 @@ export class KompasSyncService {
     result.uniqueIdentities = Object.keys(groups).length;
     this.logger.log(`Grouped into ${result.uniqueIdentities} unique identities`);
 
+    // Master Geography linkage per card. Resolve once per distinct country.
+    const geoMap = await buildGeoCountryMap(
+      this.prisma,
+      Object.values(groups).map((o) => o[0]?.rawMetadata?.country as string).filter((c): c is string => !!c),
+    );
+
     // 4. Upsert each card
     for (const [key, offers] of Object.entries(groups)) {
       try {
@@ -282,8 +289,9 @@ export class KompasSyncService {
             };
             // Country-level linkage only — see the note at option parsing.
             const geoPatch: { geoCountryId?: string } = {};
-            if (geoCountryId && !existingAny.geoCountryId) {
-              geoPatch.geoCountryId = geoCountryId;
+            const gci = geoCountryId ?? geoMap.get(country) ?? null;
+            if (gci && !existingAny.geoCountryId) {
+              geoPatch.geoCountryId = gci;
             }
             if (Object.keys(geoPatch).length > 0) {
               await tx.product.update({
@@ -311,7 +319,7 @@ export class KompasSyncService {
             ${title}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
             ${toursCategory.id}, ${JSON.stringify(attributes)}::jsonb, ${kompasPartner.id},
             now(), now(), now(),
-            ${geoCountryId}
+            ${geoCountryId ?? geoMap.get(country) ?? null}
           )
           RETURNING "id"
           `;

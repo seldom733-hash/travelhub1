@@ -334,7 +334,33 @@ export class AnexAdapter implements SupplierAdapter {
       }
       const payload = body?.[0];
       if (!payload?.prices?.length) {
-        // No flights/seats on this date — an honest empty answer, not an error.
+        // Multi-day windows LIE with HTTP 200: live probe (2026-10-18) showed
+        // CHECKIN 2026-10-26..10-31 answers countTotal=0 while the single date
+        // 2026-10-27 inside it answers 128 prices. Same for 5-day windows —
+        // the upstream only tells the truth for CHECKIN_BEG = CHECKIN_END
+        // (the site itself only ever sends single dates). So an empty window
+        // is NOT an honest empty: bisect it down to single dates exactly like
+        // a 424; only a single-date empty is trusted (fetchPriceRows aggregates
+        // those into one warn).
+        const beg = params.checkInBeg;
+        const end = params.checkInEnd;
+        const days = Math.round(
+          (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${beg}T00:00:00Z`)) / (24 * 60 * 60 * 1000),
+        );
+        if (page === 1 && beg < end && days >= 1 && splitDepth < 10) {
+          const mid = addDays(beg, Math.floor(days / 2));
+          const rightBeg = addDays(mid, 1);
+          const [left, right] = await Promise.all([
+            this.fetchPriceRowsExact({ ...params, checkInEnd: mid }, splitDepth + 1),
+            this.fetchPriceRowsExact({ ...params, checkInBeg: rightBeg }, splitDepth + 1),
+          ]);
+          rows.push(...left, ...right);
+          this.logger.debug(
+            `ANEX empty-window bisect ${beg}→${end} ${params.night}n: ${mid} / ${rightBeg} → ${rows.length} rows`,
+          );
+          break;
+        }
+        // Single date with no prices — an honest empty answer, not an error.
         break;
       }
       rows.push(...payload.prices);

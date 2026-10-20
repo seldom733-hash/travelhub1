@@ -63,7 +63,14 @@ export default function TourDetail({
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
-  const [nights, setNights] = useState(7);
+  const [nights, setNights] = useState(() => {
+    // Supplier card nights can be a string ("3") or fall outside the select
+    // options (ANEX France cards carry 2). Clamp into the rendered range
+    // (3..14) so the <select> always has a matching <option>.
+    const raw = Number(attributes?.nights);
+    const n = Number.isFinite(raw) && raw >= 1 ? Math.round(raw) : 7;
+    return Math.min(14, Math.max(3, n));
+  });
 
   // Product identity — hotel keys pin the calendar to THIS hotel; the program
   // (tourIncValue) is deliberately NOT sent: supplier programs get re-numbered

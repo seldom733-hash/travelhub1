@@ -76,6 +76,75 @@ export interface KazunionOfferRow {
   pageRowCount: number;
 }
 
+/**
+ * One parsed row of a `search_hotel` PRICES table (stay-only product).
+ *
+ * The row markup is the SAME `tr.price_info` shape the tour search returns
+ * (verified live 2026-10-19), but hotel rows carry no departure/flight
+ * columns: `checkIn` is the STAY date and `city` comes from the parenthesised
+ * suffix of the hotel cell («Art Deluxe Hotel Nha Trang 3* (Nha Trang)»).
+ */
+export interface KazunionHotelRow {
+  stateInc: string;
+  hotelKey: string;
+  /** Hotel display name without the city suffix. */
+  hotelName: string;
+  /** City from the «(Nha Trang)» suffix; empty when the supplier omits it. */
+  city: string;
+  tourKey: string;
+  spoKey: string;
+  mealKey: string;
+  roomKey: string;
+  nights: number;
+  /** YYYYMMDD stay date. */
+  checkIn: string;
+  adults: number;
+  children: number;
+  /** Meal display text («ROOM ONLY», «BB», …). */
+  meal: string;
+  /** Room display text («ROH Room / Dbl»). */
+  room: string;
+  /** Visible converted price (data-converted-price-number). */
+  price: number;
+  /** Supplier currency label (data-currency_title). */
+  currency: string;
+  /** Hotel coordinates when the supplier exposes them. */
+  latitude?: number;
+  longitude?: number;
+  /** Star rating derived from the name suffix («… 3*»), when present. */
+  stars?: number;
+}
+
+/** Parameters of one `search_hotel` PRICES request (stay-only). */
+export interface KazunionHotelFetchParams {
+  /** `search_hotel` STATEINC (hotel dictionary country id). */
+  stateInc: string;
+  /** TOURINC hotel program id. Default "0" (any program). */
+  tourInc?: string;
+  /** ISO dates (YYYY-MM-DD). */
+  checkInBeg: string;
+  checkInEnd: string;
+  nightsFrom?: number;
+  nightsTill?: number;
+  adults?: number;
+  children?: number;
+  childAges?: number[];
+  /** Currency id on KazUnion (10 = AZN). */
+  currency?: string;
+  /** TOWNS CSV (supplier town ids) → `TOWNS=<ids>&TOWNS_ANY=0`. */
+  townsCsv?: string;
+  /**
+   * HOTELS CSV (supplier hotel keys) → `HOTELS=<ids>&HOTELS_ANY=0`.
+   * A hotel-detail calendar must filter UPSTREAM: fetching 5 pages of a whole
+   * country only to keep one hotel wastes ~15s per window.
+   */
+  hotelsCsv?: string;
+  /** Start page (1-based). */
+  startPage?: number;
+  /** Stop after this many pages (safety). */
+  maxPages?: number;
+}
+
 export interface KazunionFetchParams {
   /** TOWNFROMINC (departure town id, KazUnion form). Default Baku = 849. */
   townFromInc?: string;
@@ -117,6 +186,8 @@ export interface KazunionFetchParams {
 export class KazunionHttpService {
   private readonly logger = new Logger(KazunionHttpService.name);
   private static readonly BASE_URL = "https://online.kazunion.com/search_tour";
+  /** Stay-only hotel search endpoint (separate dictionary, no departure city). */
+  private static readonly HOTEL_BASE_URL = "https://online.kazunion.com/search_hotel";
   /**
    * PARTITION_PRICE=0 → no price grouping: return every room/meal/program
    * variant individually. The former value "232" grouped rows by price id and
@@ -127,6 +198,8 @@ export class KazunionHttpService {
   private static readonly PARTITION_PRICE = "0";
   /** Dictionary cache: key = `${townFromInc}:${stateInc ?? ""}`. */
   private readonly dictCache = new Map<string, KazunionDictionary>();
+  /** Hotel program cache: key = hotel STATEINC. */
+  private readonly hotelProgramCache = new Map<string, Array<{ value: string; name: string }>>();
   /** Global pacing: min interval between supplier requests (~30 rpm cap). */
   private static readonly MIN_REQUEST_INTERVAL_MS = 2_000;
   /** Backoff between captcha auto-solve attempts (fresh image each round). */
@@ -339,6 +412,282 @@ export class KazunionHttpService {
     return rows;
   }
 
+  // ── Hotel (stay-only) search ──────────────────────────────────────────
+
+  /**
+   * Fetch prices from the stay-only `search_hotel` form.
+   *
+   * Verified live 2026-10-19: unlike the tour form, `search_hotel` answers a
+   * plain GET with the results table inline (no browser/JS needed) — the same
+   * `.ehtml("…")` SAMO envelope as `search_tour`. The hotel form is a
+   * SEPARATE dictionary with 22 countries (see kazunion-hotel-countries.ts).
+   *
+   * Two negative outcomes are deliberately distinguished:
+   *  • CAPTCHA (`captchaForm`) → throws, so a blocked country is never
+   *    recorded as "0 hotels";
+   *  • genuine "Нет данных" → returns [] (the country simply has no
+   *    availability for these dates — verified: Turkey is empty while
+   *    Vietnam/Azerbaijan/Greece answer 100 rows).
+   */
+  async fetchHotelPrices(params: KazunionHotelFetchParams): Promise<KazunionHotelRow[]> {
+    const rows: KazunionHotelRow[] = [];
+    const seen = new Set<string>();
+    const startPage = params.startPage ?? 1;
+    const maxPages = params.maxPages ?? 30;
+    let sawCaptcha = false;
+
+    for (let page = startPage; page < startPage + maxPages; page++) {
+      const url = this.buildHotelPricesUrl(params, page);
+      let body: string;
+      try {
+        body = await this.pacedGet(url);
+      } catch (err) {
+        // pacedGet already exhausts the captcha solver before throwing.
+        if (/captcha|antibot/i.test((err as Error).message)) sawCaptcha = true;
+        throw err;
+      }
+      if (this.isCaptchaResponse(body)) {
+        sawCaptcha = true;
+        throw new Error(
+          `KazUnion hotels: captcha challenge not solved for STATEINC=${params.stateInc} (page ${page})`,
+        );
+      }
+
+      const html = this.extractHtmlFromJs(body);
+      if (!html) {
+        // No results table. This is ONLY acceptable as an explicit "no data"
+        // answer (verified: Turkey genuinely has no hotel inventory for these
+        // dates). Anything else — a soft block, an error page, an unexpected
+        // envelope — must THROW, otherwise a blocked country would be
+        // silently recorded as "0 hotels" (the exact failure the captcha
+        // handling exists to prevent).
+        if (this.isNoDataResponse(body)) {
+          this.logger.debug(
+            `KazUnion hotels STATEINC=${params.stateInc}: supplier answered "no data" (page ${page})`,
+          );
+          break;
+        }
+        throw new Error(
+          `KazUnion hotels: unexpected response for STATEINC=${params.stateInc} (page ${page}, ` +
+            `len=${body.length}, captcha=${this.isCaptchaResponse(body)}): ` +
+            `${body.slice(0, 300).replace(/\s+/g, " ")}`,
+        );
+      }
+
+      const pageRows = this.parseHotelPriceRows(html, params.stateInc);
+      if (pageRows.length === 0 && page === startPage) {
+        // A results envelope with zero parsed rows is either a real empty
+        // answer or a markup drift. Log the payload head so the two can never
+        // be confused silently.
+        this.logger.warn(
+          `KazUnion hotels STATEINC=${params.stateInc}: results envelope with 0 rows — ` +
+            `noData=${this.isNoDataResponse(body)} snippet="${html.replace(/\s+/g, " ").slice(0, 240)}"`,
+        );
+        if (!this.isNoDataResponse(body) && !this.isNoDataResponse(html)) {
+          throw new Error(
+            `KazUnion hotels: results table parsed to 0 rows for STATEINC=${params.stateInc} ` +
+              `and the payload carries no "no data" marker — refusing to report an empty country`,
+          );
+        }
+      }
+      let added = 0;
+      for (const row of pageRows) {
+        const id = `${row.hotelKey}|${row.tourKey}|${row.spoKey}|${row.checkIn}|${row.roomKey}|${row.mealKey}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        rows.push(row);
+        added++;
+      }
+
+      const totalPages = this.parseTotalPages(body, html);
+      this.logger.debug(
+        `KazUnion hotels STATEINC=${params.stateInc} page ${page}/${totalPages}: +${added} → ${rows.length} rows`,
+      );
+      if (added === 0 || page >= totalPages) break;
+    }
+
+    this.logger.debug(
+      `KazUnion hotels STATEINC=${params.stateInc} ${params.checkInBeg}→${params.checkInEnd}: ` +
+        `${rows.length} rows${sawCaptcha ? " (captcha seen)" : ""}`,
+    );
+    return rows;
+  }
+
+  /** Build the raw `search_hotel` PRICES URL (page = PRICEPAGE). */
+  private buildHotelPricesUrl(params: KazunionHotelFetchParams, page: number): string {
+    const towns = params.townsCsv?.replace(/\s+/g, "");
+    const hotels = params.hotelsCsv?.replace(/\s+/g, "");
+    const p: Record<string, string> = {
+      samo_action: "PRICES",
+      STATEINC: params.stateInc,
+      TOURINC: params.tourInc ?? "0",
+      CHECKIN_BEG: this.toSamodate(params.checkInBeg),
+      CHECKIN_END: this.toSamodate(params.checkInEnd),
+      NIGHTS_FROM: String(params.nightsFrom ?? 3),
+      NIGHTS_TILL: String(params.nightsTill ?? params.nightsFrom ?? 15),
+      ADULT: String(params.adults ?? 2),
+      CHILD: String(params.children ?? 0),
+      CURRENCY: params.currency ?? "10",
+      hotelsearch: "0",
+      HOTELS_ANY: hotels ? "0" : "1",
+      HOTELS: hotels || "",
+      MEALS_ANY: "1",
+      MEALS: "",
+      TOWNS_ANY: towns ? "0" : "1",
+      TOWNS: towns || "",
+      ROOMS_ANY: "1",
+      ROOMS: "",
+      STARS_ANY: "1",
+      STARS: "",
+      // Filters mirror the supplier's own form defaults for a wide search.
+      FILTER: "1",
+      MOMENT_CONFIRM: "0",
+      WITHOUT_PROMO: "1",
+      UFILTER: "",
+      HOTELTYPES: "",
+      PARTITION_PRICE: "",
+      PRICEPAGE: String(page),
+      DYN_SEPARATE: "1",
+      rev: String(Math.floor(Math.random() * 9000000000) + 1000000000),
+      _: String(Date.now()),
+    };
+
+    const ages = params.childAges ?? [];
+    if (ages.length) p.AGES = ages.join(",");
+
+    const qs = Object.entries(p)
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join("&");
+    return `${KazunionHttpService.HOTEL_BASE_URL}?${qs}`;
+  }
+
+  /**
+   * Parse the hotel PRICES table. The row markup is shared with the tour
+   * search, so the class-key tokens are reused; the only hotel-specific
+   * extraction is the city suffix and the coordinates.
+   */
+  parseHotelPriceRows(html: string, stateInc: string): KazunionHotelRow[] {
+    const out: KazunionHotelRow[] = [];
+    const rowRegex = /<tr[^>]*class="[^"]*price_info[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+    let m: RegExpExecArray | null;
+
+    while ((m = rowRegex.exec(html)) !== null) {
+      const fullRow = m[0];
+      const rowContent = m[1];
+      const classes = fullRow.match(/class="([^"]*)"/)?.[1] ?? "";
+
+      const hotelKey =
+        classes.match(/hotelKey-(-?\d+)/)?.[1] ??
+        fullRow.match(/data-hotel="(-?\d+)"/)?.[1] ??
+        "";
+      const tourKey = classes.match(/tourKey-(-?\d+)/)?.[1] ?? "";
+      const spoKey = classes.match(/spoKey-(-?\d+)/)?.[1] ?? "";
+      const mealKey = classes.match(/mealKey-(-?\d+)/)?.[1] ?? "";
+      const roomKey = classes.match(/roomKey-(-?\d+)/)?.[1] ?? "";
+      const nights = parseInt(classes.match(/nights-(\d+)/)?.[1] ?? "0", 10);
+      const checkIn = classes.match(/checkIn-(\d+)/)?.[1] ?? "";
+      const adults = parseInt(classes.match(/adult-(\d+)/)?.[1] ?? "0", 10);
+      const children = parseInt(classes.match(/child-(\d+)/)?.[1] ?? "0", 10);
+
+      // Hotel cell: «Art Deluxe Hotel Nha Trang 3* (Nha Trang)».
+      const hotelCell =
+        rowContent.match(/<td[^>]*class="[^"]*link-hotel[^"]*"[^>]*>([\s\S]*?)<\/td>/i)?.[1] ?? "";
+      const hotelText = this.decodeEntities(
+        hotelCell.replace(/<[\s\S]*?>/g, " ").replace(/\s+/g, " ").trim(),
+      );
+      const city = hotelText.match(/\(([^)]+)\)\s*$/)?.[1]?.trim() ?? "";
+      const hotelName = hotelText.replace(/\s*\([^)]*\)\s*$/, "").trim();
+      const stars = parseInt(hotelName.match(/(\d)\s*\*+\s*$/)?.[1] ?? "", 10) || undefined;
+
+      const priceSpan = rowContent.match(
+        /data-cat-price="([^"]*)"[\s\S]{0,300}?data-converted-price-number="([^"]*)"[\s\S]{0,200}?data-currency_title="([^"]*)"/,
+      );
+      const priceFallback = rowContent.match(
+        /data-cat-price="([^"]*)"[\s\S]{0,300}?data-currency_title="([^"]*)"/,
+      );
+      let price = 0;
+      let currency = "AZN";
+      if (priceSpan && priceSpan[2]) {
+        price = parseFloat(priceSpan[2]);
+        currency = priceSpan[3] || "AZN";
+      } else if (priceFallback) {
+        price = parseFloat(priceFallback[1]);
+        currency = priceFallback[2] || "AZN";
+      }
+
+      // Meal: bare <td>ROOM ONLY</td> after the availability cell.
+      let meal = "";
+      const availIdx = rowContent.search(/hotel_availability/i);
+      if (availIdx >= 0) {
+        const cell = rowContent.slice(availIdx).match(/<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>/i);
+        if (cell) meal = cell[1].replace(/<[\s\S]*?>/g, " ").replace(/\s+/g, " ").trim();
+      }
+      meal = this.decodeEntities(meal);
+
+      const room = this.decodeEntities(
+        (rowContent.match(/<span class="">([\s\S]*?)<\/span>/)?.[1] ?? "")
+          .replace(/<[\s\S]*?>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim(),
+      );
+
+      const lat = parseFloat(fullRow.match(/data-hotel-lat="([^"]*)"/)?.[1] ?? "");
+      const lng = parseFloat(fullRow.match(/data-hotel-lng="([^"]*)"/)?.[1] ?? "");
+
+      if (!hotelKey || !price || !isFinite(price)) continue;
+
+      out.push({
+        stateInc,
+        hotelKey,
+        hotelName: hotelName || "Unknown Hotel",
+        city,
+        tourKey,
+        spoKey,
+        mealKey,
+        roomKey,
+        nights,
+        checkIn,
+        adults,
+        children,
+        meal,
+        room,
+        price,
+        currency,
+        latitude: isFinite(lat) ? lat : undefined,
+        longitude: isFinite(lng) ? lng : undefined,
+        stars,
+      });
+    }
+
+    return out;
+  }
+
+  /**
+   * Live hotel dictionary check: the `search_hotel` form's STATEINC options.
+   * Used to confirm the static map still matches the supplier (a country that
+   * disappears upstream must not be synced blindly).
+   */
+  async discoverHotelStates(): Promise<Array<{ value: string; name: string }>> {
+    const body = await this.pacedGet(KazunionHttpService.HOTEL_BASE_URL);
+    if (this.isCaptchaResponse(body)) {
+      throw new Error("KazUnion hotels: captcha challenge on the hotel form");
+    }
+    return this.parseSelectOptions(body, "STATEINC", true);
+  }
+
+  /** TOURINC hotel programs for one hotel STATEINC (form fetch, cached). */
+  async discoverHotelPrograms(stateInc: string): Promise<Array<{ value: string; name: string }>> {
+    const cached = this.hotelProgramCache.get(stateInc);
+    if (cached) return cached;
+    const body = await this.pacedGet(`${KazunionHttpService.HOTEL_BASE_URL}?STATEINC=${stateInc}`);
+    if (this.isCaptchaResponse(body)) {
+      throw new Error(`KazUnion hotels: captcha challenge on the hotel form (STATEINC=${stateInc})`);
+    }
+    const programs = this.parseSelectOptions(body, "TOURINC", true);
+    this.hotelProgramCache.set(stateInc, programs);
+    return programs;
+  }
+
   // ── Response parsing ──────────────────────────────────────────────────
 
   /** Detect SAMO captcha/antibot pages (same markers as Summertour/KOMPAS). */
@@ -348,6 +697,32 @@ export class KazunionHttpService {
     if (/samo_action\s*=\s*["']?antibot/i.test(text)) return true;
     if (text.includes("captchaForm") || text.includes("icaptcha")) return true;
     return false;
+  }
+
+  /**
+   * True only for an EXPLICIT "nothing found" answer from the SAMO engine.
+   *
+   * Needed to keep three outcomes apart, because they look similar on the
+   * wire but mean different things:
+   *  • captcha challenge   → `isCaptchaResponse`, must throw (blocked, retry);
+   *  • explicit "no data"  → here, a legitimate empty country (verified:
+   *    Turkey has no hotel inventory for the sampled dates);
+   *  • anything else       → a contract violation, must throw (never "0 hotels").
+   *
+   * SAMO sends the phrase either literally ("Нет данных") or as \uXXXX escapes
+   * inside the ehtml(...) payload, so both forms are checked.
+   */
+  isNoDataResponse(text: string): boolean {
+    if (!text) return false;
+    // Normalize both the escaped envelope and the decoded markup: the phrase
+    // can arrive literally, as \uXXXX escapes, or split by tags/&nbsp;.
+    const decoded = this.unescapeJsString(text);
+    const plain = decoded
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;|&#160;/gi, " ")
+      .replace(/&quot;/gi, '"')
+      .replace(/\s+/g, " ");
+    return /нет\s+данных/i.test(plain);
   }
 
   /**

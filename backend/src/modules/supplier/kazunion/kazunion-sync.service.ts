@@ -12,6 +12,7 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
 import { KazunionAdapter, kazunionCountryCandidates, type KazunionSearchQuery } from "./kazunion.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
+import { resolveGeoCountryId } from "../geo-country-resolver";
 import type { SupplierOffer } from "../supplier.types";
 
 export interface KazunionSyncResult {
@@ -211,7 +212,13 @@ export class KazunionSyncService {
         if (programOfferList.length > 0) {
           await this.persistOffers(
             programOfferList,
-            { toursCategoryId: toursCategory.id, partnerId, geoCountryId: defaultGeoCountryId },
+            {
+              toursCategoryId: toursCategory.id,
+              partnerId,
+              geoCountryId:
+                (await resolveGeoCountryId(this.prisma, country.countryName)) ??
+                geoCountryId,
+            },
             result,
           );
         }

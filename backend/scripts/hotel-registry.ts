@@ -48,11 +48,16 @@ type BuiltRef = HotelRef;
 function parseArgs(): {
   jsonOnly: boolean;
   includeGeolinkOnly: boolean;
+  supplier: string | null;
+  mergeNameOnly: boolean;
 } {
   const args = process.argv.slice(2);
+  const supplierArg = args.find((a) => a.startsWith("--supplier="));
   return {
     jsonOnly: args.includes("--json-only"),
     includeGeolinkOnly: args.includes("--include-geolink-only"),
+    supplier: supplierArg ? supplierArg.slice("--supplier=".length).trim().toUpperCase() || null : null,
+    mergeNameOnly: args.includes("--merge-name-only"),
   };
 }
 
@@ -83,7 +88,7 @@ function pickName(names: unknown): string {
 }
 
 async function main(): Promise<void> {
-  const { jsonOnly, includeGeolinkOnly } = parseArgs();
+  const { jsonOnly, includeGeolinkOnly, supplier, mergeNameOnly } = parseArgs();
   const { PrismaClient } = await import("../src/generated/prisma/client");
   const { PrismaPg } = await import("@prisma/adapter-pg");
   const adapter = new PrismaPg({ connectionString: databaseUrl() });
@@ -119,6 +124,12 @@ async function main(): Promise<void> {
         AND COALESCE(attributes->>'hotelKey', '') <> ''
         AND COALESCE(attributes->>'supplierCode', '') <> ''
     `;
+
+    // `--supplier=` ограничивает сборку одним поставщиком: остальные ref-ы не
+    // трогаются, но и не попадают в отчёт этого запуска.
+    const scopedRows = supplier
+      ? productRows.filter((r) => (r.supplierCode ?? "").toUpperCase() === supplier)
+      : productRows;
 
     const geolinkRows = await prisma.$queryRaw<
       Array<{
@@ -186,11 +197,24 @@ async function main(): Promise<void> {
       };
     };
 
-    const seen = new Set<string>();
-    for (const row of productRows) {
+    // Один и тот же отель приходит и из тура, и из услуги «Отели». Атрибуты
+    // могут быть заполнены неравномерно (в туре иногда нет countryCode/города),
+    // поэтому для каждой пары (поставщик, hotelKey) берём НАИБОЛЕЕ ПОЛНУЮ строку.
+    const refRowScore = (r: (typeof scopedRows)[number]): number =>
+      [r.name, r.countryCode, r.country, r.city, r.resort, r.hotelHref].filter(
+        (v) => String(v ?? "").trim().length > 0,
+      ).length;
+
+    const bestRowByKey = new Map<string, (typeof scopedRows)[number]>();
+    for (const row of scopedRows) {
       const key = `${row.supplierCode}\u0000${row.hotelKey}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const prev = bestRowByKey.get(key);
+      if (!prev || refRowScore(row) > refRowScore(prev)) bestRowByKey.set(key, row);
+    }
+
+    const seen = new Set<string>();
+    for (const row of bestRowByKey.values()) {
+      const key = `${row.supplierCode}\u0000${row.hotelKey}`;
       const ref = buildRef(row.supplierCode, row.hotelKey, {
         rawName: row.name ?? "",
         country: row.country ?? "",
@@ -208,6 +232,7 @@ async function main(): Promise<void> {
 
     if (includeGeolinkOnly) {
       for (const g of geolinkRows) {
+        if (supplier && g.supplierCode.toUpperCase() !== supplier) continue;
         const key = `${g.supplierCode}\u0000${g.externalId}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -297,6 +322,21 @@ async function main(): Promise<void> {
       dbExisting.map((h) => [`${h.normalizedName}|${h.countryCode}|${h.cityName}`, h.id]),
     );
 
+    // `--merge-name-only`: поставщики пишут город по-разному (перевод,
+    // транслитерация), из-за чего одна гостиница даёт две записи. Если пара
+    // (нормализованное имя, страна) указывает РОВНО на одну существующую
+    // гостиницу — привязываем ref к ней (и переиспользуем её фото). При двух и
+    // более кандидатах НЕ склеиваем: неоднозначность уходит в лог.
+    const hotelIdsByNameCountry = new Map<string, string[]>();
+    for (const h of dbExisting) {
+      const key = `${h.normalizedName}|${h.countryCode}`;
+      const list = hotelIdsByNameCountry.get(key) ?? [];
+      list.push(h.id);
+      hotelIdsByNameCountry.set(key, list);
+    }
+    const mergedByNameOnly: Array<{ hotel: string; country: string; city: string }> = [];
+    const ambiguousNameOnly: Array<{ hotel: string; country: string; city: string; candidates: number }> = [];
+
     let hotelsCreated = 0;
     let hotelsUpdated = 0;
     for (const g of groupList) {
@@ -305,6 +345,20 @@ async function main(): Promise<void> {
       // поэтому ищем и по нормализованному, и по сохранённому варианту.
       const lookupKey = `${g.normalizedName}|${g.countryCode}|${g.cityName}`;
       let hotelId = hotelIdByKey.get(lookupKey);
+      if (!hotelId && mergeNameOnly) {
+        const candidates = hotelIdsByNameCountry.get(`${g.normalizedName}|${g.countryCode}`) ?? [];
+        if (candidates.length === 1) {
+          hotelId = candidates[0];
+          mergedByNameOnly.push({ hotel: g.name, country: g.countryCode, city: g.cityName });
+        } else if (candidates.length > 1) {
+          ambiguousNameOnly.push({
+            hotel: g.name,
+            country: g.countryCode,
+            city: g.cityName,
+            candidates: candidates.length,
+          });
+        }
+      }
       if (!hotelId) {
         const created = await prisma.hotel.upsert({
           where: {
@@ -367,7 +421,27 @@ async function main(): Promise<void> {
       }
     }
 
-    console.log(JSON.stringify({ ...summary, hotelsCreated, hotelsUpdated }, null, 2));
+    if (mergedByNameOnly.length > 0 || ambiguousNameOnly.length > 0) {
+      fs.writeFileSync(
+        path.join(DATA_DIR, "hotel-registry-name-merge.json"),
+        JSON.stringify({ mergedByNameOnly, ambiguousNameOnly }, null, 2),
+        "utf8",
+      );
+    }
+
+    console.log(
+      JSON.stringify(
+        {
+          ...summary,
+          hotelsCreated,
+          hotelsUpdated,
+          mergedByNameOnly: mergedByNameOnly.length,
+          ambiguousNameOnly: ambiguousNameOnly.length,
+        },
+        null,
+        2,
+      ),
+    );
   } finally {
     await prisma.$disconnect();
   }

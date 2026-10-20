@@ -8,6 +8,7 @@
  */
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { buildGeoCountryMap } from "../geo-country-resolver";
 import { IdsService } from "../../../shared/ids.service";
 import { AnexAdapter } from "./anex.adapter";
 import { AnexProvider, type AnexState } from "./anex.provider";
@@ -147,6 +148,7 @@ export class AnexSyncService {
     }
 
     // 3. Group by hotel (hotelExternalId + hotel name)
+    const geoMap = await buildGeoCountryMap(this.prisma, allOffers.map((o) => o.country).filter((c): c is string => !!c));
     const groups: Record<string, SupplierOffer[]> = {};
     for (const offer of allOffers) {
       const hotelKey = offer.hotelExternalId || offer.hotel || "";
@@ -217,8 +219,9 @@ export class AnexSyncService {
               await tx.tariff.update({ where: { id: tariff.id }, data: { price: minPrice } });
             }
             const geoPatch: { geoCountryId?: string } = {};
-            if (geoCountryId && !(existing as any).geoCountryId) {
-              geoPatch.geoCountryId = geoCountryId;
+            const gci = geoCountryId ?? geoMap.get(country) ?? null;
+            if (gci && !(existing as any).geoCountryId) {
+              geoPatch.geoCountryId = gci;
             }
             if (Object.keys(geoPatch).length > 0) {
               await tx.product.update({ where: { id: existing.id }, data: geoPatch });
@@ -243,7 +246,7 @@ export class AnexSyncService {
                 ${title}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
                 ${toursCategory.id}, ${JSON.stringify(attributes)}::jsonb, ${anexPartner.id},
                 now(), now(), now(),
-                ${geoCountryId}
+                ${geoCountryId ?? geoMap.get(country) ?? null}
               )
               RETURNING "id"
             `;

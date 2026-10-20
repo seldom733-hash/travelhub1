@@ -4,6 +4,7 @@ import { IdsService } from "../../../shared/ids.service";
 import { SummertourNewAdapter } from "./summertour-new.adapter";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import type { SupplierSearchQuery, SupplierOffer } from "../supplier.types";
+import { resolveGeoCountryId } from "../geo-country-resolver";
 
 /**
  * Summertour Bulk Catalog Sync — Playwright-based.
@@ -87,6 +88,8 @@ export class SummerBulkSyncService {
       return result;
     }
 
+    const geoCountryId = await resolveGeoCountryId(this.prisma, "Turkey");
+
     // 2. Discover programs
     let programs: Array<{ value: string; name: string }>;
     try {
@@ -154,7 +157,7 @@ export class SummerBulkSyncService {
         }
 
         // Group by hotel
-        const hotelGroups = this.groupByHotel(allOffers);
+        const hotelGroups = this.groupByHotel(allOffers, geoCountryId);
         programResult.hotelsFound = Object.keys(hotelGroups).length;
         this.logger.log(
           `Program ${program.name}: ${allOffers.length} offers → ${programResult.hotelsFound} hotels`
@@ -170,6 +173,7 @@ export class SummerBulkSyncService {
               hotelOffers,
               summerPartner.id,
               toursCategory.id,
+              geoCountryId,
             );
             if (upsertResult === "created") programResult.productsCreated++;
             else if (upsertResult === "updated") programResult.productsUpdated++;
@@ -202,7 +206,7 @@ export class SummerBulkSyncService {
   }
 
   /** Group offers by hotelKey. */
-  private groupByHotel(offers: SupplierOffer[]): Record<string, SupplierOffer[]> {
+  private groupByHotel(offers: SupplierOffer[], geoCountryId: string | null): Record<string, SupplierOffer[]> {
     const groups: Record<string, SupplierOffer[]> = {};
     for (const offer of offers) {
       const hotelKey = (offer.rawMetadata?.hotelKey as string) ?? offer.hotelExternalId ?? "unknown";
@@ -222,6 +226,7 @@ export class SummerBulkSyncService {
     offers: SupplierOffer[],
     partnerId: string,
     categoryId: string,
+    geoCountryId: string | null,
   ): Promise<"created" | "updated" | "unchanged"> {
     const productCode = `SUMMERTOUR-${tourIncValue}-${hotelKey}`;
 
@@ -300,7 +305,7 @@ export class SummerBulkSyncService {
       await this.prisma.$transaction(async (tx: any) => {
         await tx.product.update({
           where: { id: existing.id },
-          data: { title, attributes, updatedAt: new Date() },
+          data: { title, attributes, updatedAt: new Date(), geoCountryId },
         });
 
         const tariff = await tx.tariff.findFirst({
@@ -326,12 +331,14 @@ export class SummerBulkSyncService {
       const idResult = await tx.$queryRaw<{ id: string }[]>`
         INSERT INTO "catalog"."Product" (
           "id", "code", "supplierRef", "type", "title", "slug", "status", "version",
-          "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt"
+          "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt",
+          "geoCountryId"
         ) VALUES (
           gen_random_uuid(), ${prdCode}, ${productCode}, 'TOUR'::"catalog"."ProductType",
           ${title}, ${slug}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
           ${categoryId}, ${JSON.stringify(attributes)}::jsonb, ${partnerId},
-          now(), now(), now()
+          now(), now(), now(),
+          ${geoCountryId}
         )
         RETURNING "id"
       `;

@@ -12,6 +12,7 @@ export const SUPPLIER_TOKEN_CRM_NAMES: Record<string, string> = {
   KOMPAS: "Kompastour",
   KAZUNION: "Kazunion",
   ANEX: "Anextour",
+  FSTRAVEL: "FSTravel",
   AZAL: "AZAL",
   AVIASALES: "Aviasales",
 };

@@ -63,6 +63,17 @@ login.json
 .kazunion-session.json
 .kazunion-captcha.jpg
 
+# Local supplier debug/session artifacts (secrets and one-off probes) - never commit
+backend/.fstravel-*
+backend/.kazunion-*
+backend/.kz*
+backend/.probe-*
+backend/.s[0-9]*
+backend/*.probe.js
+backend/*.probe.py
+backend/*-probe*.py
+backend/probe-*.txt
+
 # Archived unused files (moved out of backend/frontend/root with paths preserved)
 /unneeded/
 

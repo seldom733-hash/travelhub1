@@ -73,15 +73,21 @@
 
 `backend/scripts/hotel-photo-catalog.ts`
 
-- Источник: Tripadvisor CDN (поиск прямых CDN-URL через Bing Images; HTML tripadvisor закрыт
-  DataDome, CDN картинок открыт). Переиспользована рабочая логика `fetch-hotel-photos.ts`.
+- Источник: Tripadvisor CDN. Прямые CDN-URL ищутся через **DuckDuckGo Images**
+  (HTML `duckduckgo.com` → `vqd`-токен → JSON `i.js` с прямыми ссылками). Bing Images
+  больше не подходит: его страница результатов стала JS-only и перестала отдавать
+  `murl` в HTML (оставлен как резерв). HTML Tripadvisor закрыт DataDome, CDN картинок
+  открыт. Результат принимается только если ВСЕ значимые слова названия отеля есть в
+  заголовке/URL — иначе оставляем фолбэк, чтобы не подставить чужое фото.
 - Обработка: `sharp` → WebP (ширина 1200, q 82, EXIF-поворот).
 - Валидация: `failOn: error`, размер ≥ 5 КБ, стороны ≥ 400×300.
 - Имя файла: **`hotel_<hotelId>.webp`** — стабильное, безопасное, детерминированное (один отель → один файл).
 - Запись атомарная: `tmp` → `rename` (обрыв не оставит половинчатый файл).
 - Идемпотентность: `photoStatus=OK` пропускается (кроме `--force`); повторный запуск не создаёт дубликатов.
 - Журнал: `backend/data/hotels/photo-journal.jsonl` (источник, размеры, результат по каждому отелю).
-- Опции: `--limit=N`, `--only=<id|name>`, `--status=A,B`, `--force`, `--dry-run`, `--width`, `--quality`, `--concurrency=N`, `--report`.
+- Опции: `--limit=N`, `--only=<id|name>`, `--ids-file=<path>` (построчный список id — точечный прогон по конкретным карточкам), `--status=A,B`, `--force`, `--dry-run`, `--width`, `--quality`, `--concurrency=N`, `--report`.
+- Переиспользование: если у гостиницы с тем же (нормализованное имя, страна) фото уже есть —
+  файл переиспользуется (`result: "reused"`), без повторной загрузки и без копии файла.
 
 **Итог загрузки:** сохранено **4 603** файла из 4 878 гостиниц (см. §6).
 
@@ -184,6 +190,12 @@ cd backend; npx tsx scripts/hotel-registry.ts
 npx tsx scripts/hotel-photo-catalog.ts --report          # сколько без фото
 npx tsx scripts/hotel-photo-catalog.ts --dry-run --limit=10
 npx tsx scripts/hotel-photo-catalog.ts --limit=100000    # докачает только отсутствующие
+
+# 2a. Только один поставщик (склейка записей с разным написанием города + переиспользование фото)
+npx tsx scripts/hotel-registry.ts --supplier=KAZUNION --merge-name-only
+
+# 2b. Точечно по списку id (один id на строку) — например, только гостиницы за карточками без фото
+npx tsx scripts/hotel-photo-catalog.ts --ids-file=data/hotels/photo-targets.txt --limit=100000
 
 # 3. Повторить только неудачные (например, после сетевых сбоев)
 npx tsx scripts/hotel-photo-catalog.ts --status=FAILED --limit=100000

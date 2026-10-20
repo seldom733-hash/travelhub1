@@ -105,23 +105,34 @@ export class AnexProvider {
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
       .join("&");
     const url = `${ANEX_BASE_URL}${path}?${qs}`;
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": ANEX_USER_AGENT,
-        Accept: "application/json, text/plain, */*",
-        "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.7",
-        Referer: `${ANEX_SITE_URL}/`,
-      },
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (!res.ok) {
-      throw new Error(`ANEX HTTP ${res.status} for ${path}`);
-    }
-    const text = await res.text();
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      throw new Error(`ANEX non-JSON response for ${path}: ${text.slice(0, 120)}`);
+    // ANEX rate-limits the IP with HTTP 429 during/after heavy syncs (observed
+    // 2026-10-18 after a 34k-offer Turkey sync: 429 persisted >10 min). Retry
+    // with backoff instead of failing the whole sync; keep the retries bounded
+    // (20s/60s) so user-facing searches never hang indefinitely.
+    const backoffMs = [20_000, 60_000];
+    for (let attempt = 0; ; attempt++) {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": ANEX_USER_AGENT,
+          Accept: "application/json, text/plain, */*",
+          "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.7",
+          Referer: `${ANEX_SITE_URL}/`,
+        },
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (res.status !== 429 || attempt >= backoffMs.length) {
+        if (!res.ok) {
+          throw new Error(`ANEX HTTP ${res.status} for ${path}`);
+        }
+        const text = await res.text();
+        try {
+          return JSON.parse(text) as T;
+        } catch {
+          throw new Error(`ANEX non-JSON response for ${path}: ${text.slice(0, 120)}`);
+        }
+      }
+      // HTTP 429 — rate-limited: wait out the window and retry.
+      await new Promise((r) => setTimeout(r, backoffMs[attempt]!));
     }
   }
 

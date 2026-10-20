@@ -48,6 +48,7 @@ type PhotoStatus = "NONE" | "PENDING" | "OK" | "FAILED" | "REVIEW";
 interface CliOptions {
   limit: number;
   only: string[];
+  idsFile: string | null;
   statuses: PhotoStatus[];
   force: boolean;
   dryRun: boolean;
@@ -60,6 +61,7 @@ interface CliOptions {
 interface HotelTask {
   id: string;
   name: string;
+  normalizedName: string;
   cityName: string;
   countryName: string;
   countryCode: string;
@@ -71,6 +73,7 @@ function parseArgs(): CliOptions {
   const opts: CliOptions = {
     limit: 25,
     only: [],
+    idsFile: null,
     statuses: ["NONE", "FAILED"],
     force: false,
     dryRun: false,
@@ -90,6 +93,8 @@ function parseArgs(): CliOptions {
     num(/^--concurrency=(\d+)$/, (n) => (opts.concurrency = Math.max(1, n)));
     const only = a.match(/^--only=(.+)$/);
     if (only) opts.only.push(...only[1].split(",").map((s) => s.trim()).filter(Boolean));
+    const idsFile = a.match(/^--ids-file=(.+)$/);
+    if (idsFile) opts.idsFile = idsFile[1].trim();
     const st = a.match(/^--status=([A-Z,]+)$/);
     if (st) opts.statuses = st[1].split(",").map((s) => s.trim()) as PhotoStatus[];
     if (a === "--force") opts.force = true;
@@ -117,12 +122,16 @@ function pickPhotoUrl(src: string): string | null {
   return src;
 }
 
-async function httpGet(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<{ status: number; body: string }> {
+async function httpGet(
+  url: string,
+  timeoutMs = FETCH_TIMEOUT_MS,
+  headers: Record<string, string> = {},
+): Promise<{ status: number; body: string }> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const resp = await fetch(url, {
-      headers: { "User-Agent": UA, Accept: "text/html,*/*" },
+      headers: { "User-Agent": UA, Accept: "text/html,*/*", ...headers },
       signal: ctrl.signal,
       redirect: "follow",
     });
@@ -132,24 +141,134 @@ async function httpGet(url: string, timeoutMs = FETCH_TIMEOUT_MS): Promise<{ sta
   }
 }
 
-/** Поиск CDN-фото отеля через Bing Images (plain GET, без браузера). */
-async function searchHotelPhoto(query: string): Promise<string | null> {
-  const q = encodeURIComponent(`${query} tripadvisor`.trim());
-  const { status, body } = await httpGet(`https://www.bing.com/images/search?q=${q}&qft=+filterui%3aphoto-photo`);
-  if (status !== 200) return null;
-  const murls = [...body.matchAll(/&quot;murl&quot;:&quot;(.*?)&quot;/g)].map((m) =>
-    m[1].replace(/&amp;/g, "&"),
+/**
+ * Значимые слова названия отеля для проверки релевантности результата.
+ * Служебные слова («hotel», «resort», «spa»…) отбрасываются: они есть почти в
+ * любом названии и не помогают отличить один отель от другого.
+ */
+const STOP_WORDS = new Set([
+  "hotel", "hotels", "resort", "resorts", "spa", "guest", "house", "guesthouse",
+  "apartments", "apartment", "suites", "suite", "inn", "hostel", "villa", "villas",
+  "club", "beach", "by", "the", "and", "of", "at", "in", "city", "center", "centre",
+]);
+
+function normalizeForMatch(raw: string): string {
+  return (raw ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function nameTokens(name: string): string[] {
+  return normalizeForMatch(name)
+    .split(" ")
+    .filter((t) => t.length >= 3 && !STOP_WORDS.has(t));
+}
+
+interface ImageResult {
+  image: string;
+  title: string;
+}
+
+/**
+ * Bing Images (async-эндпоинт). Обычная страница `/images/search` стала JS-only
+ * и `murl` в HTML не отдаёт, но `/images/async` возвращает HTML-фрагмент, где
+ * каждый результат — JSON-блоб `m="{…}"` с `murl` (прямой URL картинки) и `t`
+ * (заголовок). Работает без браузера.
+ */
+async function bingImageResults(query: string): Promise<ImageResult[]> {
+  const url = `https://www.bing.com/images/async?q=${encodeURIComponent(query)}&first=1&count=35&mmasync=1&qft=+filterui%3aphoto-photo`;
+  const { status, body } = await httpGet(url);
+  if (status !== 200) return [];
+  const out: ImageResult[] = [];
+  for (const m of body.matchAll(/m="([^"]*)"/g)) {
+    const decoded = m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+    try {
+      const o = JSON.parse(decoded) as { murl?: string; t?: string };
+      if (typeof o.murl === "string" && o.murl) out.push({ image: o.murl, title: o.t ?? "" });
+    } catch {
+      // не JSON — пропускаем
+    }
+  }
+  if (out.length === 0) {
+    // Резервная разметка, если блобы не распарсились.
+    for (const m of body.matchAll(/&quot;murl&quot;:&quot;(.*?)&quot;/g)) {
+      out.push({ image: m[1].replace(/&amp;/g, "&"), title: "" });
+    }
+  }
+  return out;
+}
+
+/**
+ * DuckDuckGo Images (plain GET): HTML отдаёт `vqd`-токен, JSON-эндпоинт `i.js`
+ * — прямые URL картинок. DuckDuckGo быстро включает бот-защиту (HTTP 202) при
+ * частых запросах, поэтому используется только как резерв к Bing.
+ */
+async function ddgImageResults(query: string): Promise<ImageResult[]> {
+  const page = await httpGet(
+    `https://duckduckgo.com/?q=${encodeURIComponent(query)}&iax=images&ia=images`,
   );
-  const ta = murls.filter((u) => /(?:media-cdn|dynamic-media-cdn)\.tripadvisor\.com/.test(u));
-  const ranked = ta
-    .filter((u) => !/default-avatar|user_photo/i.test(u))
-    .sort((a, b) => (b.includes("/photo-o/") ? 1 : 0) - (a.includes("/photo-o/") ? 1 : 0));
-  for (const raw of ranked) {
-    const upgraded = raw.includes("/photo-o/") ? raw : raw.replace(/\/photo-[a-z]\//, "/photo-o/");
-    const withSize = upgraded.includes("?")
-      ? upgraded.replace(/w=\d+/, "w=1200").replace(/h=\d+/, "h=-1")
-      : `${upgraded}?w=1200&h=-1&s=1`;
-    if (pickPhotoUrl(withSize)) return withSize;
+  if (page.status !== 200) return [];
+  const vqd = page.body.match(/vqd=["']?([\d-]+)["']?/)?.[1];
+  if (!vqd) return [];
+  const json = await httpGet(
+    `https://duckduckgo.com/i.js?l=us-en&o=json&q=${encodeURIComponent(query)}&vqd=${vqd}&f=,,,&p=1`,
+    FETCH_TIMEOUT_MS,
+    { Accept: "application/json", Referer: "https://duckduckgo.com/" },
+  );
+  if (json.status !== 200) return [];
+  try {
+    const parsed = JSON.parse(json.body) as { results?: Array<{ image?: string; title?: string }> };
+    return (parsed.results ?? [])
+      .filter((r): r is { image: string; title?: string } => typeof r.image === "string")
+      .map((r) => ({ image: r.image, title: r.title ?? "" }));
+  } catch {
+    return [];
+  }
+}
+
+/** Приводит CDN-ссылку Tripadvisor к «оригиналу» нужного размера. */
+function upgradePhotoUrl(raw: string): string {
+  const clean = raw.replace(/&amp;/g, "&");
+  const upgraded = clean.includes("/photo-o/") ? clean : clean.replace(/\/photo-[a-z]\//, "/photo-o/");
+  return upgraded.includes("?")
+    ? upgraded.replace(/w=\d+/, "w=1200").replace(/h=\d+/, "h=-1")
+    : `${upgraded}?w=1200&h=-1&s=1`;
+}
+
+/**
+ * Поиск CDN-фото отеля. Источник — Tripadvisor CDN; сами ссылки ищутся через
+ * Bing Images (async), при отказе — через DuckDuckGo Images. Результат
+ * принимается только если ВСЕ значимые слова названия отеля встречаются в
+ * заголовке/URL: лучше оставить карточку без фото, чем подставить чужое.
+ */
+async function searchHotelPhoto(query: string, hotelName: string): Promise<string | null> {
+  const tokens = nameTokens(hotelName);
+  // Запрос с русским/локализованным городом Bing часто уводит в ноль результатов
+  // Tripadvisor, поэтому сначала пробуем чистое название отеля.
+  const queries = [`${hotelName} tripadvisor`, `${query} tripadvisor`];
+  const providers: Array<(q: string) => Promise<ImageResult[]>> = [bingImageResults, ddgImageResults];
+
+  for (const provider of providers) {
+    for (const q of queries) {
+      const results = await provider(q);
+      const candidates = results
+        .filter((r) => /(?:media-cdn|dynamic-media-cdn)\.tripadvisor\.com/.test(r.image))
+        .filter((r) => !/default-avatar|user_photo/i.test(r.image))
+        .map((r) => {
+          const hay = normalizeForMatch(`${r.title} ${r.image}`);
+          const score = tokens.filter((t) => hay.includes(t)).length;
+          return { ...r, score };
+        })
+        .filter((r) => (tokens.length === 0 ? true : r.score === tokens.length))
+        .sort((a, b) => (b.image.includes("/photo-o/") ? 1 : 0) - (a.image.includes("/photo-o/") ? 1 : 0));
+
+      for (const best of candidates) {
+        const withSize = upgradePhotoUrl(best.image);
+        if (pickPhotoUrl(withSize)) return withSize;
+      }
+    }
   }
   return null;
 }
@@ -205,6 +324,7 @@ async function main(): Promise<void> {
       select: {
         id: true,
         name: true,
+        normalizedName: true,
         cityName: true,
         countryName: true,
         countryCode: true,
@@ -212,6 +332,14 @@ async function main(): Promise<void> {
       },
       orderBy: { name: "asc" },
     })) as HotelTask[];
+
+    if (opts.idsFile) {
+      const raw = fs.readFileSync(path.resolve(opts.idsFile), "utf8");
+      const ids = new Set(
+        raw.split(/[\r\n,]+/).map((s) => s.trim().toLowerCase()).filter(Boolean),
+      );
+      tasks = tasks.filter((h) => ids.has(h.id.toLowerCase()));
+    }
 
     if (opts.only.length > 0) {
       const wanted = opts.only.map((s) => s.toLowerCase());
@@ -243,7 +371,20 @@ async function main(): Promise<void> {
       // Для поиска берём самое «латинское» имя рефа: у KOMPAS в справочнике
       // поставщика label может быть на русском, а в продукте — на английском.
       const ref = h.refs.find((r) => /[a-zA-Z]/.test(r.name)) ?? h.refs[0];
-      const name = (ref?.name || h.name).replace(/[,\s]+$/, "");
+      const name = (ref?.name || h.name)
+        .replace(/[,\s]+$/, "")
+        // «… 4*+», «… 5 *» — хвост звёздности мешает поиску.
+        .replace(/\s*\d*\s*\*+\s*\+?\s*$/, "")
+        .trim();
+      // Имя для поиска: убираем скобочные пометки («(ex. …)», «(Город)»),
+      // хвостовую звёздность с суффиксом («5*lux») и пунктуацию — они уводят
+      // поиск в ноль и мешают проверке совпадения.
+      const searchName = name
+        .replace(/\([^()]*\)/g, " ")
+        .replace(/\s*\d*\s*\*+\s*\w*\s*$/, "")
+        .replace(/[.,;:]+\s*$/, "")
+        .replace(/\s+/g, " ")
+        .trim();
       const city = ref?.cityName || h.cityName;
       const country = h.countryName;
       const countryCode = ref?.countryCode || h.countryCode;
@@ -258,8 +399,54 @@ async function main(): Promise<void> {
         return;
       }
 
-      const query = [name, city, country || countryCode].filter(Boolean).join(" ");
-      const sourceUrl = await searchHotelPhoto(query);
+      // Фото уже есть у отеля с тем же названием и страной: поставщики пишут
+      // город по-разному («Северный Мале Атолл» / «North Male' Atoll»), из-за
+      // чего в реестре появляется вторая запись той же гостиницы. Переиспользуем
+      // готовый файл — не качаем заново и не плодим копии.
+      const sibling = await prisma.hotel.findFirst({
+        where: {
+          id: { not: h.id },
+          normalizedName: h.normalizedName,
+          countryCode: h.countryCode,
+          NOT: { photoFile: null },
+        },
+        orderBy: { photoUpdatedAt: "desc" },
+        select: {
+          photoFile: true,
+          photoSourceUrl: true,
+          photoWidth: true,
+          photoHeight: true,
+          photoBytes: true,
+        },
+      });
+      if (sibling?.photoFile && fs.existsSync(path.join(OUTPUT_DIR, sibling.photoFile))) {
+        await prisma.hotel.update({
+          where: { id: h.id },
+          data: {
+            photoFile: sibling.photoFile,
+            photoStatus: "OK",
+            photoSource: "tripadvisor",
+            photoSourceUrl: sibling.photoSourceUrl,
+            photoWidth: sibling.photoWidth,
+            photoHeight: sibling.photoHeight,
+            photoBytes: sibling.photoBytes,
+            photoUpdatedAt: new Date(),
+          },
+        });
+        saved += 1;
+        journal({
+          hotelId: h.id,
+          name: h.name,
+          file: sibling.photoFile,
+          sourceUrl: sibling.photoSourceUrl,
+          result: "reused",
+        });
+        console.log(`REUSE  ${h.id}  ${sibling.photoFile}  (${h.name})`);
+        return;
+      }
+
+      const query = [searchName || name, city, country || countryCode].filter(Boolean).join(" ");
+      const sourceUrl = await searchHotelPhoto(query, searchName || name);
       if (!sourceUrl) {
         missed += 1;
         await prisma.hotel.update({

@@ -6,7 +6,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
-    "dev": "ts-node --transpile-only src/main.ts",
+    "dev": "node scripts/dev-minio.js --soft && ts-node --transpile-only src/main.ts",
+    "dev:app": "ts-node --transpile-only src/main.ts",
+    "storage:up": "node scripts/dev-minio.js",
     "dev:typed": "ts-node src/main.ts",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",

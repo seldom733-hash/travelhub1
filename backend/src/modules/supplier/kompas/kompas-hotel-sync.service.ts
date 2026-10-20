@@ -293,6 +293,11 @@ export class KompasHotelSyncService {
       supplierCode: "KOMPAS",
     };
 
+    const geoCountryId = (await this.prisma.geoCountry.findUnique({
+      where: { code: iso2 },
+      select: { id: true },
+    }))?.id ?? null;
+
     const existing = await this.prisma.product.findFirst({ where: { supplierRef } });
 
     if (existing) {
@@ -309,6 +314,7 @@ export class KompasHotelSyncService {
         ) {
           patch.attributes = { ...cur, ...attributes };
         }
+        if (geoCountryId && !(existing as any).geoCountryId) patch.geoCountryId = geoCountryId;
         if (Object.keys(patch).length > 0) {
           await tx.product.update({ where: { id: existing.id }, data: patch });
         }
@@ -332,12 +338,14 @@ export class KompasHotelSyncService {
       const inserted = await tx.$queryRaw<{ id: string }[]>`
         INSERT INTO "catalog"."Product" (
           "id", "code", "supplierRef", "type", "title", "slug", "status", "version",
-          "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt"
+          "categoryId", "attributes", "partnerId", "publishedAt", "createdAt", "updatedAt",
+          "geoCountryId"
         ) VALUES (
           gen_random_uuid(), ${prdCode}, ${supplierRef}, 'HOTEL'::"catalog"."ProductType",
           ${title}, ${slugBase}, 'PUBLISHED'::"catalog"."ProductStatus", 1,
           ${categoryId}, ${JSON.stringify(attributes)}::jsonb, ${partnerId},
-          now(), now(), now()
+          now(), now(), now(),
+          ${geoCountryId}
         )
         RETURNING "id"
       `;
