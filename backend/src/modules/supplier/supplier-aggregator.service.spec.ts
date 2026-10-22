@@ -190,6 +190,54 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     }
   });
 
+  it("abandons hung suppliers at the server deadline (DEADLINE error per supplier, fast response)", async () => {
+    // Все jobs стартуют вместе → общий дедлайн240s (здесь 40ms) обрывает
+    // зависшего поставщика: ответ уходит сразу, причина видна в perSupplier.
+    aggregator.searchDeadlineMs = 40;
+    mockOfferService.search.mockImplementation(() => new Promise(() => {})); // никогда не завершится
+
+    const started = Date.now();
+    const result = await aggregator.searchByService("tours", {
+      ...baseQuery,
+      country: "TR",
+      geoCity: undefined,
+    });
+    const elapsed = Date.now() - started;
+
+    expect(elapsed).toBeLessThan(5_000); // не 240s — дедлайн сработал
+    expect(result.offers).toHaveLength(0);
+    const entries = Object.values(result.perSupplier);
+    expect(entries).toHaveLength(3); // KOMPAS + SUMMERTOUR + KAZUNION
+    for (const entry of entries) {
+      expect(entry.count).toBe(0);
+      expect(entry.error).toMatch(/DEADLINE/);
+      expect(entry.ms).toBeGreaterThanOrEqual(40);
+    }
+  });
+
+  it("logs request-level start/done lines under the caller's requestId with rawOffers", async () => {
+    const logs: string[] = [];
+    jest
+      .spyOn(
+        (aggregator as unknown as { logger: { log: (m: string) => void } }).logger,
+        "log",
+      )
+      .mockImplementation((m: string) => {
+        logs.push(String(m));
+      });
+    mockPrisma.supplierGeoLink.findMany.mockResolvedValue([
+      { supplierCode: "KOMPAS", externalId: "457", label: "Deira", kind: "TOWN" },
+    ]);
+
+    await aggregator.searchByService("tours", baseQuery, { requestId: "TEST-42" });
+
+    expect(logs.some((l) => l.includes("[SEARCH TEST-42] start"))).toBe(true);
+    const done = logs.find((l) => l.includes("[SEARCH TEST-42] done"));
+    expect(done).toBeDefined();
+    expect(done).toMatch(/offers=1 /);
+    expect(done).toMatch(/KOMPAS:1\/\d+ms\(raw 1\)/); // count=1, rawOffers=1
+  });
+
   it("searches WITHOUT a program («Любой») when the supplier only has TOUR links for the city", async () => {
     mockPrisma.supplierGeoLink.findMany.mockResolvedValue([
       { supplierCode: "KOMPAS", externalId: "3706", label: "AE: Дубай из Баку (GDS: AZAL)", kind: "TOUR" },
@@ -250,7 +298,7 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
     const kompasIdx = searchedSuppliers.indexOf("KOMPAS");
     expect(kompasIdx).toBeGreaterThanOrEqual(0);
     expect(searchedQueries[kompasIdx].towns).toBe("2533");
-    expect(result.perSupplier["KOMPAS"]).toEqual({ count: 1, ms: expect.any(Number) });
+    expect(result.perSupplier["KOMPAS"]).toEqual({ count: 1, ms: expect.any(Number), rawOffers: 1 });
   });
 
   it("keeps a resort query on its own TOWN links (never widens to the city)", async () => {
@@ -357,7 +405,8 @@ describe("SupplierAggregatorService geo precision (страна+город)", ()
 
     expect(searchedSuppliers.filter((c) => c === "KOMPAS")).toHaveLength(1);
     expect(result.offers).toHaveLength(1);
-    expect(result.perSupplier["KOMPAS"]).toEqual({ count: 1, ms: expect.any(Number) });
+    // raw=2 строки до дедупликации, count=1 после — так и видно в метрике.
+    expect(result.perSupplier["KOMPAS"]).toEqual({ count: 1, ms: expect.any(Number), rawOffers: 2 });
   });
 
   it("reports the supplier search duration next to its offer count", async () => {
@@ -485,8 +534,17 @@ describe("SupplierAggregatorService.listSuppliersOfService (§4.7 registry SSOT)
 
   it("tours come from the tour adapter registry (unchanged)", async () => {
     await expect(aggregator.listSuppliersOfService("tours")).resolves.toEqual([
-      { code: "KOMPAS", name: "KOMPAS" },
-      { code: "SUMMERTOUR", name: "SUMMERTOUR" },
+      {
+        code: "KOMPAS",
+        name: "KOMPAS",
+        // ISO-2 list from CAPABILITIES (registry SSOT, §4.7): the picker uses
+        // it to filter «Куда» by the selected suppliers' countries.
+        countries: [
+          "TR", "EG", "AE", "MV", "TH", "IN", "ID", "LK", "GE", "CN", "SG",
+          "MY", "KZ", "UZ", "US", "CH", "JP", "MU", "TZ", "QA", "KE", "AT", "SC",
+        ],
+      },
+      { code: "SUMMERTOUR", name: "SUMMERTOUR", countries: ["TR"] },
     ]);
     expect(mockFlightRegistry.list).not.toHaveBeenCalled();
   });
@@ -508,8 +566,15 @@ describe("SupplierAggregatorService.listSuppliersOfService (§4.7 registry SSOT)
       mockFlightRegistry as unknown as FlightSupplierRegistry,
     );
     await expect(withCrm.listSuppliersOfService("tours")).resolves.toEqual([
-      { code: "KOMPAS", name: "Kompastour" },
-      { code: "SUMMERTOUR", name: "SUMMERTOUR" },
+      {
+        code: "KOMPAS",
+        name: "Kompastour",
+        countries: [
+          "TR", "EG", "AE", "MV", "TH", "IN", "ID", "LK", "GE", "CN", "SG",
+          "MY", "KZ", "UZ", "US", "CH", "JP", "MU", "TZ", "QA", "KE", "AT", "SC",
+        ],
+      },
+      { code: "SUMMERTOUR", name: "SUMMERTOUR", countries: ["TR"] },
     ]);
   });
 
@@ -530,7 +595,7 @@ describe("SupplierAggregatorService.listSuppliersOfService (§4.7 registry SSOT)
       mockFlightRegistry as unknown as FlightSupplierRegistry,
     );
     await expect(withCrm.listSuppliersOfService("tours")).resolves.toEqual([
-      { code: "SUMMERTOUR", name: "SUMMERTOUR" },
+      { code: "SUMMERTOUR", name: "SUMMERTOUR", countries: ["TR"] },
     ]);
   });
 });

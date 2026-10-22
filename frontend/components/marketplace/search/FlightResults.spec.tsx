@@ -93,11 +93,14 @@ describe("FlightResults itinerary columns", () => {
     expect(screen.queryByText("GYD-FRA")).toBeNull();
   });
 
-  it("renders «Перевозчик» as the column right after «Код»", () => {
+  it("puts «Дата вылета» first and keeps «Перевозчик» right after «Код»", () => {
     render(<FlightResults flights={[makeConnectingOffer()]} />);
     const headers = [...screen.getAllByRole("columnheader")].map((th) => th.textContent ?? "");
-    expect(headers[0]).toContain("Код");
-    expect(headers[1]).toContain("Перевозчик");
+    // Требование: первая колонка — «Дата вылета» («Класс обслуживания»
+    // заменён чекбоксом «Прямой рейс» в фильтрах, колонок не занимает).
+    expect(headers[0]).toContain("Дата вылета");
+    expect(headers[1]).toContain("Код");
+    expect(headers[2]).toContain("Перевозчик");
   });
 
   it("resolves the carrier from the first segment's operating airline", () => {

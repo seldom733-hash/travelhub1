@@ -14,11 +14,11 @@ import {
   type GeoDirectoryEntry,
 } from "@/lib/geo-api";
 import ChildAges from "./ChildAges";
-import HelpFindButton from "./HelpFindButton";
 import NightsSelect from "./NightsSelect";
 import HotelStarsSelect from "./HotelStarsSelect";
 import HotelFilterSelect from "./HotelFilterSelect";
 import { useClickOutside } from "./useClickOutside";
+import { usePanelMaxHeight } from "./usePanelMaxHeight";
 import {
   PICKER_CHECKBOX,
   PICKER_CONTROL,
@@ -26,7 +26,7 @@ import {
   PICKER_DATE_WIDTH_EXTRA,
   PICKER_LABEL,
   PICKER_ROW,
-  PICKER_SUBMIT,
+  PICKER_SUBMIT_RIGHT,
   PICKER_TRIGGER,
   PICKER_TRIGGER_TEXT,
   PICKER_W_FROM,
@@ -77,6 +77,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
   // Multi-select: stays open while picking (like «Куда»), closes on the
   // trigger or when another search element is clicked.
   useClickOutside(suppliersRef, suppliersOpen, () => setSuppliersOpen(false));
+  const suppliersPanelMaxHeight = usePanelMaxHeight(suppliersRef, suppliersOpen);
 
   // ── Draft: restore the pickers of the previous search ──────────────────
   // The form unmounts between the home page and the results page; the draft
@@ -277,15 +278,24 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
     }
   };
 
-  // Countries allowed by the selected suppliers (union). No selection = all.
+  // Countries allowed by the selected suppliers (union).
+  // Без выбора поставщиков — объединение стран ВСЕХ поставщиков (а не весь
+  // гео-справочник, где есть страны, по которым ни один поставщик не едет).
   const allowedCountryCodes = useMemo(() => {
-    if (selectedSuppliers.length === 0) return undefined;
+    const suppliers = selectedSuppliers.length > 0
+      ? selectedSuppliers
+      : supplierOptions.map((s) => s.code);
     const codes = new Set<string>();
-    for (const code of selectedSuppliers) {
+    let hasAny = false;
+    for (const code of suppliers) {
       const supplier = supplierOptions.find((s) => s.code === code);
-      if (!supplier?.countries || supplier.countries.length === 0) return undefined;
+      if (!supplier?.countries || supplier.countries.length === 0) continue;
+      hasAny = true;
       supplier.countries.forEach((c) => codes.add(c.toUpperCase()));
     }
+    // Если ни у одного поставщика нет списка стран — показываем всё
+    // (старое поведение как fallback).
+    if (!hasAny) return undefined;
     return [...codes];
   }, [selectedSuppliers, supplierOptions]);
 
@@ -527,8 +537,8 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
               )}
             </button>
             {suppliersOpen && (
-              <div className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
-                <ul role="listbox" aria-multiselectable="true" className="max-h-56 overflow-y-auto py-1">
+              <div style={{ maxHeight: suppliersPanelMaxHeight }} className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-y-auto overflow-x-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
+                <ul role="listbox" aria-multiselectable="true" className="py-1">
                   {supplierOptions.map((s) => {
                     const active = selectedSuppliers.includes(s.code);
                     return (
@@ -637,38 +647,24 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         />
       )}
 
-      {/* Help Find */}
-      <HelpFindButton
-        context={{
-          serviceType: "tours",
-          fromDestination: from ? geoDisplayName(from.names, from.code, locale) : "",
-          toDestination: destination ? geoDisplayName(destination.names, destination.code, locale) : "",
-          startDate,
-          endDate: startDate,
-          nights: nightsFrom,
-          nightsFrom,
-          nightsTo,
-          hotelStars: hotelStars.length ? hotelStars : undefined,
-          adults,
-          children,
-          childAges: childAges.slice(0, children),
-          hotelId: hotelId || undefined,
-        }}
-      />
-
-      {/* Submit — destination is required so the results URL always
-          carries the direction (no more direction-less transitions) */}
+      {/* Submit — HelpFind скрыт (решение продукта: список пикера важнее);
+          кнопка в правом углу его строки. Любая панель закрывается выбором
+          или кликом мимо, после чего «Найти» снова впереди и кликабельна. */}
       {submitError && (
         <p className="text-sm text-red-400">{submitError}</p>
       )}
-      <button
-        type="submit"
-        onClick={(e) => handleSubmit(e as React.FormEvent)}
-        className={`btn-gold ${PICKER_SUBMIT}`}
-      >
-        <span>{t("marketplace.search_submit", locale)}</span>
-        <ArrowRight size={16} weight="bold" />
-      </button>
+      {/* z-[70]: панель дропдауна (z-[60]) может накрывать кнопку «Найти»
+          (список большой, панель доходит до нижнего края формы). Без этого
+          после первого поиска панель остаётся открытой и перехватывает клик. */}
+      <div className="relative z-[70] flex justify-end">
+        <button
+          type="submit"
+          className={`btn-gold ${PICKER_SUBMIT_RIGHT}`}
+        >
+          <span>{t("marketplace.search_submit", locale)}</span>
+          <ArrowRight size={16} weight="bold" />
+        </button>
+      </div>
     </form>
   );
 }

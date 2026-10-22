@@ -7,6 +7,7 @@ import {
   type FlightAirport,
 } from "@/lib/flight-locations";
 import { PICKER_LABEL, PICKER_TRIGGER, PICKER_TRIGGER_TEXT } from "./picker-styles";
+import { usePanelMaxHeight } from "./usePanelMaxHeight";
 
 interface FlightAirportSelectProps {
   id: string;
@@ -28,6 +29,7 @@ export default function FlightAirportSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelMaxHeight = usePanelMaxHeight(containerRef, open);
 
   // No slice limit: the directory is small (~73 entries) and the list
   // scrolls, so every matching city (e.g. Анталия on query "ан")
@@ -98,7 +100,7 @@ export default function FlightAirportSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
+        <div style={{ maxHeight: panelMaxHeight }} className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-y-auto overflow-x-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
           <div className="border-b border-dark-border p-2">
             <input
               autoFocus
@@ -109,7 +111,7 @@ export default function FlightAirportSelect({
             />
           </div>
 
-          <ul role="listbox" className="max-h-64 overflow-y-auto py-1">
+          <ul role="listbox" className="py-1">
             {airports.length === 0 && (
               <li className="px-3 py-4 text-center text-[12px] text-neutral-500">
                 Аэропорт не найден

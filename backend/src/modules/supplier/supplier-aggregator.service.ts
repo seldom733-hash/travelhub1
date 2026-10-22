@@ -6,6 +6,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
 import { SupplierOfferService } from "./supplier-offer.service";
 import type { SupplierSearchQuery, SupplierOffer } from "./supplier.types";
 import { KOMPAS_HOTEL_STATEINC_TO_ISO } from "./kompas/kompas-hotel-countries";
+import { VOYAGER_HOTEL_STATEINC_BY_ISO } from "./voyager/voyager-countries";
 import { SUPPLIER_TOKEN_CRM_NAMES } from "./supplier-crm-names";
 
 /**
@@ -46,8 +47,14 @@ export interface AggregatedSearchResult {
   /**
    * Per-supplier result. `ms` is the wall-clock time the supplier spent on
    * this search (max across its parallel jobs, e.g. KazUnion programs).
+   * `rawOffers` — сколько строк вернул поставщик ДО фильтров
+   * (stop-sale/места/категория/отель) и дедупликации: `count ≪ rawOffers`
+   * сразу объясняет, куда делся объём (диагностика обрезков в логах).
    */
-  perSupplier: Record<string, { count: number; error?: string; ms?: number }>;
+  perSupplier: Record<
+    string,
+    { count: number; error?: string; ms?: number; rawOffers?: number }
+  >;
 }
 
 /**
@@ -152,6 +159,16 @@ export class SupplierAggregatorService {
   private readonly logger = new Logger(SupplierAggregatorService.name);
 
   /**
+   * Серверный дедлайн одного агрегированного поиска: jobs стартуют
+   * одновременно, поэтому поставщик, не успевший за срок, получает
+   * `DEADLINE…` в perSupplier[].error и клиент сразу получает ответ с тем,
+   * что успело собраться (защита от зависаний). ENV
+   * AGGREGATED_SEARCH_DEADLINE_MS, default 240s.
+   */
+  searchDeadlineMs =
+    Number(process.env.AGGREGATED_SEARCH_DEADLINE_MS ?? 0) || 240_000;
+
+  /**
    * Verified capability matrix for tour suppliers (from adapter docs/specs).
    * KOMPAS: mapStateInc covers ~23 countries, nights 3–14 (adapter rejects
    * outside the range); multi-child ages travel as the confirmed AGES CSV
@@ -232,6 +249,30 @@ export class SupplierAggregatorService {
       ],
       nights: { min: 3, max: 14 },
     },
+    // Voyager (online.voyagergroup.az — SAMO over plain HTTP): 10 countries
+    // from Baku (verified live dictionary 2026-10-21: Занзибар(Танзания),
+    // Индия, Катар, Малайзия, Мальдивы, ОАЭ, Оман, Сингапур, Тайланд,
+    // Шри-Ланка), nights 1–14 (NIGHTS_FROM/TILL options), adults 1–7;
+    // children travel as the AGES CSV (verified CHILD=3 + AGES=1,5,11 in the
+    // supplier's own pager URL) — no children cap.
+    VOYAGER: {
+      countries: ["TZ", "IN", "QA", "MY", "MV", "AE", "OM", "SG", "TH", "LK"],
+      nights: { min: 1, max: 14 },
+      adults: { min: 1, max: 7 },
+      // Hotels (VoyagerHotelAdapter, verified live 2026-10-22 from the
+      // /search_hotel form): stay-only search exposes a WIDER dictionary —
+      // 16 states (+ AZ, GE, ID, KG, MU, UZ) vs 10 on the tour form; stay
+      // nights 1..30 (NIGHTS_FROM/TILL options). countries is a FULL
+      // override (supports() merges {...base, ...svc}); children travel as
+      // the AGES CSV (verified CHILD=3 + AGES=1,5,11) — no children cap.
+      services: {
+        hotels: {
+          countries: Object.keys(VOYAGER_HOTEL_STATEINC_BY_ISO).sort(),
+          nights: { min: 1, max: 30 },
+          adults: { min: 1, max: 7 },
+        },
+      },
+    },
   };
 
   constructor(
@@ -287,18 +328,38 @@ export class SupplierAggregatorService {
   async searchByService(
     serviceType: SupplierServiceType,
     query: SupplierSearchQuery,
+    options: { requestId?: string } = {},
   ): Promise<AggregatedSearchResult> {
+    // request-id связывает старт/финиш/падения этого запроса с логом
+    // контроллера (clientClosed) — фронт шлёт свой sid, иначе генерируем.
+    const requestId =
+      options.requestId?.trim() ||
+      `SRCH-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const { jobs, hasCandidates } = await this.buildJobs(serviceType, query);
+    const dest =
+      query.geoResort ?? query.geoCity ?? query.country ?? query.destination ?? "-";
 
     if (jobs.length === 0) {
+      this.logger.log(
+        `[SEARCH ${requestId}] start service=${serviceType} jobs=0 to=${dest}` +
+          `${hasCandidates && (query.geoCity || query.geoResort) ? " (candidates exist but no geo link — empty result on purpose)" : ""}`,
+      );
       if (hasCandidates && (query.geoCity || query.geoResort)) {
         this.logger.warn(
-          `Aggregated search: no supplier has a geo mapping for city "${query.geoResort ?? query.geoCity}" — returning empty result instead of whole-country data`,
+          `[SEARCH ${requestId}] no supplier has a geo mapping for city "${query.geoResort ?? query.geoCity}" — returning empty result instead of whole-country data`,
         );
       }
       return { offers: [], perSupplier: {} };
     }
-    const perSupplier: Record<string, { count: number; error?: string; ms?: number }> = {};
+
+    this.logger.log(
+      `[SEARCH ${requestId}] start service=${serviceType} jobs=${jobs.length} codes=[${jobs.map((j) => j.code).join(",")}] ` +
+        `to=${dest} date=${query.departureDateFrom ?? "-"}..${query.departureDateTo ?? "-"} ` +
+        `nights=${query.nightsFrom ?? "-"}..${query.nightsTo ?? "-"} ` +
+        `stars=${query.hotelStars?.join(",") ?? "-"} pax=${query.adults}+${query.children}`,
+    );
+
+    const perSupplier: AggregatedSearchResult["perSupplier"] = {};
     // Supplier-side STARS filters are best-effort (KazUnion can leak rows of
     // adjacent categories) — enforce the requested hotel category below.
     const wantedStars = this.wantedStarTokens(query);
@@ -307,25 +368,57 @@ export class SupplierAggregatorService {
     // dictionary lacks that hotel — must never leak other hotels either.
     const wantedHotel = this.normHotel(query.hotel ?? "");
     const searchStartedAt = Date.now();
+    let deadlineHit = false;
     // Capture the duration inside each job: a rejected promise would lose it.
     // All jobs start together, so the max per supplier is its wall-clock time.
+    type JobOutcome = {
+      code: string;
+      offers: SupplierOffer[];
+      ms: number;
+      error?: unknown;
+    };
     const settled = await Promise.allSettled(
-      jobs.map(async (job) => {
+      jobs.map(async (job): Promise<JobOutcome> => {
+        const search = (async (): Promise<JobOutcome> => {
+          try {
+            const offers = await this.offerService.search(job.code, job.q);
+            return {
+              code: job.code,
+              offers,
+              ms: Date.now() - searchStartedAt,
+            };
+          } catch (error) {
+            return {
+              code: job.code,
+              offers: [] as SupplierOffer[],
+              ms: Date.now() - searchStartedAt,
+              error,
+            };
+          }
+        })();
+        // Серверный дедлайн: незавершённый к сроку поставщик → TIMEOUT в
+        // perSupplier, ответ уходит сразу с уже готовыми результатами.
+        // Сам запрос продолжает идти в фоне и заберёт кэш/coalesce — его
+        // нельзя отменить сигналом: общий промис делится параллельными
+        // клиентами (resilience.coalesce), отмена сломала бы им ответ.
+        let timer: NodeJS.Timeout | undefined;
+        const deadline = new Promise<JobOutcome>((resolve) => {
+          timer = setTimeout(() => {
+            deadlineHit = true;
+            resolve({
+              code: job.code,
+              offers: [],
+              ms: Date.now() - searchStartedAt,
+              error: new Error(
+                `DEADLINE: aggregated search exceeded ${this.searchDeadlineMs}ms — supplier abandoned (continues in background)`,
+              ),
+            });
+          }, this.searchDeadlineMs);
+        });
         try {
-          const offers = await this.offerService.search(job.code, job.q);
-          return {
-            code: job.code,
-            offers,
-            ms: Date.now() - searchStartedAt,
-            error: undefined,
-          };
-        } catch (error) {
-          return {
-            code: job.code,
-            offers: [] as SupplierOffer[],
-            ms: Date.now() - searchStartedAt,
-            error,
-          };
+          return await Promise.race([search, deadline]);
+        } finally {
+          clearTimeout(timer);
         }
       }),
     );
@@ -341,7 +434,7 @@ export class SupplierAggregatorService {
       if (res.status !== "fulfilled") {
         const err = res.reason instanceof Error ? res.reason.message : String(res.reason);
         const elapsed = Math.max(prev?.ms ?? 0, Date.now() - searchStartedAt);
-        this.logger.warn(`Aggregated search: ${code} (job ${i}) failed: ${err}`);
+        this.logger.warn(`[SEARCH ${requestId}] ${code} (job ${i}) failed: ${err}`);
         if (!prev?.count) perSupplier[code] = { count: 0, error: err, ms: elapsed };
         else perSupplier[code] = { ...prev, ms: elapsed };
         return;
@@ -351,7 +444,7 @@ export class SupplierAggregatorService {
       const elapsed = Math.max(prev?.ms ?? 0, job.ms);
       if (job.error !== undefined) {
         const err = job.error instanceof Error ? job.error.message : String(job.error);
-        this.logger.warn(`Aggregated search: ${code} (job ${i}) failed: ${err}`);
+        this.logger.warn(`[SEARCH ${requestId}] ${code} (job ${i}) failed: ${err}`);
         if (!prev?.count) perSupplier[code] = { count: 0, error: err, ms: elapsed };
         else perSupplier[code] = { ...prev, ms: elapsed };
         return;
@@ -368,7 +461,7 @@ export class SupplierAggregatorService {
         const dropped = before - bookable.length;
         if (dropped > 0) {
           this.logger.log(
-            `Aggregated search: ${code} — ${dropped} offers dropped (hotel category ${[...wantedStars].map((n) => `${n}*`).join(", ")})`,
+            `[SEARCH ${requestId}] ${code} — ${dropped} offers dropped (hotel category ${[...wantedStars].map((n) => `${n}*`).join(", ")})`,
           );
         }
       }
@@ -380,13 +473,13 @@ export class SupplierAggregatorService {
         const dropped = before - bookable.length;
         if (dropped > 0) {
           this.logger.log(
-            `Aggregated search: ${code} — ${dropped} offers dropped (hotel "${query.hotel}" not in supplier dictionary)`,
+            `[SEARCH ${requestId}] ${code} — ${dropped} offers dropped (hotel "${query.hotel}" not in supplier dictionary)`,
           );
         }
       }
       const hidden = job.offers.length - bookable.length;
       if (hidden > 0) {
-        this.logger.log(`Aggregated search: ${code} — ${hidden} offers hidden (stop-sale/no seats)`);
+        this.logger.log(`[SEARCH ${requestId}] ${code} — ${hidden} offers hidden (stop-sale/no seats)`);
       }
       let unique = 0;
       for (const offer of bookable) {
@@ -399,10 +492,24 @@ export class SupplierAggregatorService {
       perSupplier[code] = {
         count: (prev?.count ?? 0) + unique,
         ms: elapsed,
+        rawOffers: (prev?.rawOffers ?? 0) + job.offers.length,
       };
     });
 
     aggregated.sort((a, b) => (a.price?.amount ?? Infinity) - (b.price?.amount ?? Infinity));
+    // Request-level итог: поставщики, что успело собраться, насколько обрезан
+    // raw vs count, был ли дедлайн — одна строка на поиск в логе.
+    const totalMs = Date.now() - searchStartedAt;
+    const summary = Object.entries(perSupplier)
+      .map(([code, v]) =>
+        `${code}:${v.count}${v.error ? `!${v.error.slice(0, 60)}` : ""}/${v.ms ?? "-"}ms` +
+          (v.rawOffers !== undefined ? `(raw ${v.rawOffers})` : ""),
+      )
+      .join(" ");
+    this.logger.log(
+      `[SEARCH ${requestId}] done offers=${aggregated.length} ms=${totalMs}` +
+        `${deadlineHit ? " DEADLINE_EXCEEDED" : ""} perSupplier=[${summary}]`,
+    );
     return { offers: aggregated, perSupplier };
   }
 

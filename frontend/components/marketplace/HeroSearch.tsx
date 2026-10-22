@@ -112,12 +112,17 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
     if ((ctx as any).tariff && (ctx as any).tariff !== "ALL") sp.set("tariff", (ctx as any).tariff);
     if (ctx.supplier && ctx.supplier !== "ALL") sp.set("supplier", ctx.supplier);
     if (ctx.roundTrip) sp.set("roundTrip", "1");
+    if (ctx.direct) sp.set("direct", "1");
     if (ctx.language) sp.set("lang", ctx.language);
     // Tours → universal live search across Summer + KOMPAS (§1) and hotels →
     // supplier live search (ANEX hotels): results come from supplier live
     // availability, not the static catalog.
     if (ctx.serviceType === "tours" || ctx.serviceType === "hotels") {
       sp.set("live", "1");
+    }
+    const nextUrl = `/search?${sp.toString()}`;
+    if (typeof window !== "undefined" && nextUrl === `${window.location.pathname}${window.location.search}`) {
+      sp.set("_t", String(Date.now()));
     }
     router.push(`/search?${sp.toString()}`);
   };

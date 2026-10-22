@@ -97,6 +97,7 @@ export interface SearchContext {
   roundTrip?: boolean;
   infants?: number;
   serviceClass?: string;
+  direct?: boolean;
   tariff?: string;
   /** Flight supplier filter (registry code, "ALL" = every supplier). */
   supplier?: string;

@@ -8,7 +8,7 @@ import type { SearchContext } from "@/lib/search-engine";
 import FlightAirportSelect from "./FlightAirportSelect";
 import FlightDatePicker from "./FlightDatePicker";
 import { fetchAzalDirectory, fetchFlightCalendar, type FlightCalendarDayPrice } from "@/lib/flight-api";
-import { setRemoteAirports } from "@/lib/flight-locations";
+import { findFlightAirports, setRemoteAirports } from "@/lib/flight-locations";
 import { useSupplierOptions } from "@/lib/supplier-registry";
 import ChildAges from "./ChildAges";
 import HelpFindButton from "./HelpFindButton";
@@ -42,7 +42,48 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
   const [infants, setInfants] = useState(0);
-  const [serviceClass, setServiceClass] = useState("economy");
+  const [direct, setDirect] = useState(false);
+
+  // Restore the form from the URL so a second search on the results page
+  // starts with the previously selected airports/dates instead of an empty form.
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const pickAirport = (value: string | null) => {
+        if (!value) return null;
+        const list = findFlightAirports(value);
+        return list.find((a) => a.code.toUpperCase() === value.trim().toUpperCase()) ?? list[0] ?? null;
+      };
+      const fromAirport = pickAirport(sp.get("from"));
+      const toAirport = pickAirport(sp.get("to"));
+      if (fromAirport) setFrom(fromAirport);
+      if (toAirport) setTo(toAirport);
+
+      const dep = sp.get("departureDate") || sp.get("departure") || sp.get("start");
+      if (dep) setDepartureDate(dep);
+      const rt = sp.get("roundTrip") === "1" || sp.get("tripType")?.toUpperCase() === "RT";
+      setRoundTrip(rt);
+      const ret = sp.get("returnDate") || sp.get("return");
+      if (ret) setReturnDate(ret);
+
+      const a = Number(sp.get("adults"));
+      if (Number.isFinite(a) && a > 0) setAdults(a);
+      const c = Number(sp.get("children"));
+      if (Number.isFinite(c) && c >= 0) setChildren(c);
+      const inf = Number(sp.get("infants"));
+      if (Number.isFinite(inf) && inf >= 0) setInfants(inf);
+      const ages = sp.get("childAges");
+      if (ages) setChildAges(ages.split(",").map(Number).filter((n) => !Number.isNaN(n)));
+
+      const t = sp.get("tariff");
+      if (t) setTariff(t);
+      const s = sp.get("supplier");
+      if (s) setSupplier(s);
+      setDirect(sp.get("direct") === "1" || sp.get("direct") === "true");
+    } catch {}
+    // Run once on mount; the form is the source of truth afterwards.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [tariff, setTariff] = useState("ALL");
   const [supplier, setSupplier] = useState("ALL");
   // Registry-driven supplier options (§4.7): backend FlightSupplierRegistry,
@@ -168,7 +209,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
       children,
       childAges: childAges.slice(0, children),
       infants,
-      serviceClass,
+      direct,
       tariff,
       supplier,
     });
@@ -177,11 +218,6 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
   // Content-width: те же размеры, что в поиске туров.
   const datePx = useWidestText(["00.00.0000"]);
   const digitPx = useWidestText(["0"]);
-  const classPx = useWidestText([
-    t("search.class_economy", locale),
-    t("search.class_business", locale),
-    t("search.class_first", locale),
-  ]);
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -328,22 +364,16 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           </select>
         </div>
 
-        {/* Service class */}
-        <div style={{ maxWidth: classPx + PICKER_DIGIT_WIDTH_EXTRA }}>
-          <label htmlFor="flight-class" className={PICKER_LABEL}>
-            {t("search.service_class", locale)}
-          </label>
-          <select
-            id="flight-class"
-            value={serviceClass}
-            onChange={(e) => setServiceClass(e.target.value)}
-            className={PICKER_CONTROL}
-          >
-            <option value="economy">{t("search.class_economy", locale)}</option>
-            <option value="business">{t("search.class_business", locale)}</option>
-            <option value="first">{t("search.class_first", locale)}</option>
-          </select>
-        </div>
+        {/* Direct flight only */}
+        <label className={PICKER_CHECKBOX}>
+          <input
+            type="checkbox"
+            checked={direct}
+            onChange={(e) => setDirect(e.target.checked)}
+            className="size-3.5 rounded border-dark-border accent-gold"
+          />
+          {t("search.direct_flight", locale)}
+        </label>
       </div>
 
       {/* Child ages */}
@@ -384,7 +414,7 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           children,
           childAges: childAges.slice(0, children),
           infants,
-          serviceClass,
+          direct,
           tariff,
           supplier,
         }}

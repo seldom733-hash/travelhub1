@@ -43,6 +43,10 @@ export const PICKER_CHECKBOX =
 export const PICKER_SUBMIT =
   "flex w-full items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-[15px] font-semibold transition-opacity";
 
+/** Та же кнопка, но авто-ширина — для правого угла строки (поиск туров). */
+export const PICKER_SUBMIT_RIGHT =
+  "flex w-max items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-[15px] font-semibold transition-opacity";
+
 /** Ширина одиночного поля-даты: под «00.00.0000» + иконка и рамка. */
 export const PICKER_DATE_WIDTH_EXTRA = 76;
 /** Ширина однозначного select'а: место под стрелку и внутренние отступы. */

@@ -9,6 +9,8 @@ import { KompasSyncService } from "./kompas/kompas-sync.service";
 import { KompasHotelSyncService } from "./kompas/kompas-hotel-sync.service";
 import { KazunionSyncService } from "./kazunion/kazunion-sync.service";
 import { KazunionHotelSyncService } from "./kazunion/kazunion-hotel-sync.service";
+import { VoyagerSyncService } from "./voyager/voyager-sync.service";
+import { VoyagerHotelSyncService } from "./voyager/voyager-hotel-sync.service";
 import { AnexSyncService } from "./anex/anex-sync.service";
 import { FstravelSyncService } from "./fstravel/fstravel-sync.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
@@ -36,6 +38,8 @@ export class SupplierController {
     private readonly kompasHotelSync: KompasHotelSyncService,
     private readonly kazunionSync: KazunionSyncService,
     private readonly kazunionHotelSync: KazunionHotelSyncService,
+    private readonly voyagerSync: VoyagerSyncService,
+    private readonly voyagerHotelSync: VoyagerHotelSyncService,
     private readonly anexSync: AnexSyncService,
     private readonly fstravelSync: FstravelSyncService,
   ) {}
@@ -153,6 +157,65 @@ export class SupplierController {
     @Query("maxPages") maxPages?: string,
   ) {
     return this.kazunionHotelSync.runSync({
+      countryIsos: countryIsos
+        ? countryIsos.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+        : undefined,
+      dateFrom,
+      dateTo,
+      nights: nights ? parseInt(nights, 10) : undefined,
+      maxPages: maxPages ? parseInt(maxPages, 10) : undefined,
+    });
+  }
+
+  // ── Voyager Sync ─────────────────────────────────────────────────────
+
+  /**
+   * Import Voyager TOURS as Product(type=TOUR) cards.
+   * POST /supplier/voyager/sync?countryIsos=TZ,IN&dateFrom=&dateTo=&maxPages=30
+   * Default scope: every country of the tour dictionary (10).
+   *
+   * The engine fans out ALL programs of a country per sweep (TOURINC=0) —
+   * the sync does not loop programs.
+   */
+  @Post("voyager/sync")
+  @RequirePermissions("supplier.search.manage")
+  async voyagerSyncEndpoint(
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Query("countryIsos") countryIsos?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("maxPages") maxPages?: string,
+  ) {
+    const partner = await this.voyagerSync.getVoyagerPartner();
+    if (!partner) {
+      throw new Error("Voyager partner not found — sync cannot run");
+    }
+    return this.voyagerSync.runSync({
+      countryIsos: countryIsos
+        ? countryIsos.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
+        : undefined,
+      dateFrom,
+      dateTo,
+      maxPages: maxPages ? parseInt(maxPages, 10) : undefined,
+    });
+  }
+
+  /**
+   * Import Voyager HOTELS (stay-only /search_hotel) as Product(type=HOTEL,
+   * accommodation) cards. POST /supplier/voyager/hotel-sync?countryIsos=AZ,GE&dateFrom=&dateTo=&nights=7&maxPages=30
+   * Default scope: every country of the hotel dictionary (16).
+   */
+  @Post("voyager/hotel-sync")
+  @RequirePermissions("supplier.search.manage")
+  async voyagerHotelSyncEndpoint(
+    @CurrentUser() actor: AuthedRequest["user"],
+    @Query("countryIsos") countryIsos?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+    @Query("nights") nights?: string,
+    @Query("maxPages") maxPages?: string,
+  ) {
+    return this.voyagerHotelSync.runSync({
       countryIsos: countryIsos
         ? countryIsos.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
         : undefined,

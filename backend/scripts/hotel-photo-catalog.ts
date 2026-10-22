@@ -56,6 +56,8 @@ interface CliOptions {
   width: number;
   quality: number;
   concurrency: number;
+  /** Второй проход: мягкое совпадение по названию (ядро + половина слов). */
+  relaxed: boolean;
 }
 
 interface HotelTask {
@@ -81,6 +83,7 @@ function parseArgs(): CliOptions {
     width: 1200,
     quality: 82,
     concurrency: DEFAULT_CONCURRENCY,
+    relaxed: false,
   };
   for (const a of args) {
     const num = (re: RegExp, set: (n: number) => void) => {
@@ -98,6 +101,7 @@ function parseArgs(): CliOptions {
     const st = a.match(/^--status=([A-Z,]+)$/);
     if (st) opts.statuses = st[1].split(",").map((s) => s.trim()) as PhotoStatus[];
     if (a === "--force") opts.force = true;
+    if (a === "--relaxed") opts.relaxed = true;
     if (a === "--dry-run") opts.dryRun = true;
     if (a === "--report") opts.report = true;
   }
@@ -242,13 +246,23 @@ function upgradePhotoUrl(raw: string): string {
  * Bing Images (async), при отказе — через DuckDuckGo Images. Результат
  * принимается только если ВСЕ значимые слова названия отеля встречаются в
  * заголовке/URL: лучше оставить карточку без фото, чем подставить чужое.
+ *
+ * `--relaxed` (второй проход): требование «все слова» снимается — берётся
+ * первое значимое слово (ядро названия) + не менее половины слов. Нужен для
+ * длинных названий вида «MAIKHAO HOTEL MANAGED BY CENTARA», где в заголовке
+ * TripAdvisor есть «Maikhao» и «Centara», но нет «Managed».
  */
-async function searchHotelPhoto(query: string, hotelName: string): Promise<string | null> {
+async function searchHotelPhoto(
+  query: string,
+  hotelName: string,
+  relaxed = false,
+): Promise<string | null> {
   const tokens = nameTokens(hotelName);
   // Запрос с русским/локализованным городом Bing часто уводит в ноль результатов
   // Tripadvisor, поэтому сначала пробуем чистое название отеля.
   const queries = [`${hotelName} tripadvisor`, `${query} tripadvisor`];
   const providers: Array<(q: string) => Promise<ImageResult[]>> = [bingImageResults, ddgImageResults];
+  const minScore = relaxed ? Math.max(1, Math.ceil(tokens.length / 2)) : tokens.length;
 
   for (const provider of providers) {
     for (const q of queries) {
@@ -259,10 +273,17 @@ async function searchHotelPhoto(query: string, hotelName: string): Promise<strin
         .map((r) => {
           const hay = normalizeForMatch(`${r.title} ${r.image}`);
           const score = tokens.filter((t) => hay.includes(t)).length;
-          return { ...r, score };
+          const coreHit = tokens.length === 0 ? true : hay.includes(tokens[0]);
+          return { ...r, score, coreHit };
         })
-        .filter((r) => (tokens.length === 0 ? true : r.score === tokens.length))
-        .sort((a, b) => (b.image.includes("/photo-o/") ? 1 : 0) - (a.image.includes("/photo-o/") ? 1 : 0));
+        .filter((r) => (tokens.length === 0 ? true : r.score >= minScore))
+        // В мягком режиме ядро названия обязательно: без него совпадение
+        // случайное (например, «Crown» из «Crown Plaza»).
+        .filter((r) => (relaxed ? r.coreHit : true))
+        .sort((a, b) => {
+          if (relaxed && a.coreHit !== b.coreHit) return a.coreHit ? -1 : 1;
+          return (b.image.includes("/photo-o/") ? 1 : 0) - (a.image.includes("/photo-o/") ? 1 : 0);
+        });
 
       for (const best of candidates) {
         const withSize = upgradePhotoUrl(best.image);
@@ -446,7 +467,7 @@ async function main(): Promise<void> {
       }
 
       const query = [searchName || name, city, country || countryCode].filter(Boolean).join(" ");
-      const sourceUrl = await searchHotelPhoto(query, searchName || name);
+      const sourceUrl = await searchHotelPhoto(query, searchName || name, opts.relaxed);
       if (!sourceUrl) {
         missed += 1;
         await prisma.hotel.update({
@@ -535,6 +556,7 @@ async function main(): Promise<void> {
         bytes: converted.length,
         width,
         height,
+        relaxed: opts.relaxed,
         result: "ok",
       });
       console.log(`OK     ${fileName}  ${width}x${height}  (${name})`);

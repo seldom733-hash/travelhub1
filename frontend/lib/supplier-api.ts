@@ -243,15 +243,23 @@ export interface AggregatedOffer extends SupplierOffer {
 
 export interface AggregatedSearchResult {
   offers: AggregatedOffer[];
-  perSupplier: Record<string, { count: number; error?: string; ms?: number }>;
+  /**
+   * `rawOffers` — строк от поставщика ДО фильтров/дедупликации (серверная
+   * диагностика: count ≪ rawOffers объясняет обрезки).
+   */
+  perSupplier: Record<
+    string,
+    { count: number; error?: string; ms?: number; rawOffers?: number }
+  >;
 }
 
 /** Shared query → URL params mapping for search-all and search-suppliers. */
 function supplierSearchParams(
-  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string; geoCity?: string; geoResort?: string },
+  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string; geoCity?: string; geoResort?: string; requestId?: string },
 ): Record<string, string | number | undefined> {
   return {
     service: query.service,
+    requestId: query.requestId,
     country: query.country,
     departureCity: query.departureCity,
     destination: query.destination,
@@ -277,7 +285,7 @@ function supplierSearchParams(
  * Suppliers are isolated: one failing supplier never fails the response.
  */
 export async function searchSupplierOffersAll(
-  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string; geoCity?: string; geoResort?: string },
+  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string; geoCity?: string; geoResort?: string; requestId?: string },
 ): Promise<AggregatedSearchResult> {
   return get<AggregatedSearchResult>("/search-all", supplierSearchParams(query));
 }
@@ -288,7 +296,7 @@ export async function searchSupplierOffersAll(
  * → "Найдены поставщики: …" while the search itself is still running.
  */
 export async function searchSupplierResolve(
-  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string; geoCity?: string; geoResort?: string },
+  query: Omit<SupplierSearchQuery, "supplierCode"> & { service?: string; geoCity?: string; geoResort?: string; requestId?: string },
 ): Promise<{ suppliers: string[] }> {
   return get<{ suppliers: string[] }>("/search-suppliers", supplierSearchParams(query));
 }

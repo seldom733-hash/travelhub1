@@ -6,6 +6,7 @@ import { geoDisplayName, type GeoDirectoryEntry, type GeoLocale } from "@/lib/ge
 import { useWidestText } from "@/lib/measure-text";
 import { useLocale, t } from "@/lib/i18n";
 import { useClickOutside } from "./useClickOutside";
+import { usePanelMaxHeight } from "./usePanelMaxHeight";
 import { PICKER_LABEL, PICKER_TRIGGER, PICKER_TRIGGER_TEXT } from "./picker-styles";
 
 interface DirectorySelectProps {
@@ -79,6 +80,8 @@ export default function DirectorySelect({
 
   // Close when clicking another search control (selection itself closes too).
   useClickOutside(containerRef, open, () => setOpen(false));
+  // Панель не должна перекрывать кнопку «Найти»/другие контролы формы ниже.
+  const panelMaxHeight = usePanelMaxHeight(containerRef, open);
 
   // Content-width: the control is as wide as the longest display text it can
   // hold (longest geo name + « · CODE» suffix), with placeholder fallback.
@@ -147,7 +150,10 @@ export default function DirectorySelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
+        <div
+          className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-y-auto overflow-x-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl"
+          style={{ maxHeight: panelMaxHeight }}
+        >
           <div className="border-b border-dark-border p-2">
             <input
               autoFocus
@@ -158,7 +164,7 @@ export default function DirectorySelect({
             />
           </div>
 
-          <ul role="listbox" className="max-h-64 overflow-y-auto py-1">
+          <ul role="listbox" className="py-1">
             {loading && (
               <li className="px-3 py-4 text-center text-[14px] text-neutral-500">
                 {t("search.searching", locale)}

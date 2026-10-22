@@ -129,6 +129,7 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "search.departure_date": { ru: "Дата вылета", az: "Uçuş tarixi", en: "Departure date" },
   "search.return_date": { ru: "Дата возвращения", az: "Qayıdış tarixi", en: "Return date" },
   "search.round_trip": { ru: "Туда-обратно", az: "Gediş-dönüş", en: "Round trip" },
+  "search.direct_flight": { ru: "Прямой рейс", az: "Birbaşa reys", en: "Direct flight" },
   "search.service_class": { ru: "Класс обслуживания", az: "Xidmət sinfi", en: "Service class" },
   "search.class_economy": { ru: "Эконом", az: "Ekonom", en: "Economy" },
   "search.class_business": { ru: "Бизнес", az: "Biznes", en: "Business" },

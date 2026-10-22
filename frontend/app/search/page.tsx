@@ -218,7 +218,8 @@ function SearchResultsInner() {
       const returnDate = params.returnDate || params.return || undefined;
       const tariff = params.tariff || "ALL";
       const supplier = params.supplier || "ALL";
-      const dedupKey = `${from}-${to}-${departureDate}-${tripType}-${adults}-${children}-${infants}-${childAges?.join(",") ?? ""}-${returnDate}-${tariff}-${supplier}`;
+      const direct = params.direct === "1" || params.direct === "true";
+      const dedupKey = `${from}-${to}-${departureDate}-${tripType}-${adults}-${children}-${infants}-${childAges?.join(",") ?? ""}-${returnDate}-${tariff}-${supplier}-${direct ? "direct" : "all"}-${params._t ?? ""}`;
       const requestId = ++flightRequestIdRef.current;
 
       setLoading(true);
@@ -269,6 +270,13 @@ function SearchResultsInner() {
               .map((f) => ({ ...f, fares: (f.fares ?? []).filter((ff: any) => (ff.family ?? ff.fareFamily) === tariff) }))
               .filter((f) => (f.fares ?? []).length > 0);
           }
+          if (direct) {
+            flights = flights.filter((f: any) => {
+              const segs = f.segments ?? [];
+              if (f.optionId?.endsWith("_RT")) return segs.length <= 2;
+              return segs.length <= 1;
+            });
+          }
           setFlightResults({ ...flightResult, flights });
         })
         .catch((e) => {
@@ -304,6 +312,9 @@ function SearchResultsInner() {
       setResolvedSuppliers(null);
       const liveQuery = {
         service,
+        // Корреляция с серверными логами [SEARCH <sid>]: start/done/дедлайн
+        // в агрегаторе и clientClosed в контроллере — тот же id, что в UI.
+        requestId: sid,
         destination: params.to || undefined,
         country: params.geoCountry || undefined,
         geoCity: params.geoCity || undefined,

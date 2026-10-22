@@ -95,6 +95,13 @@ function formatTime(value?: string): string {
   const m = value.match(/\d{2}:\d{2}/);
   return m ? m[0] : value.slice(11, 16) || "--:--";
 }
+function formatDate(value?: string): string {
+  if (!value) return "--.--.----";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+}
+
 function getTime(point?: any): string | undefined {
   return point?.time ?? point?.dateTime ?? point?.date ?? undefined;
 }
@@ -276,6 +283,7 @@ export default function FlightResults({
         <table className="w-full text-left text-[11px]">
           <thead className="bg-white/5 text-neutral-400">
             <tr>
+              <th className="px-2 py-2">Дата вылета</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("code")}>Код {arrow("code")}</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("carrier")}>Перевозчик {arrow("carrier")}</th>
               <th className="px-2 py-2 cursor-pointer hover:text-white" onClick={() => toggleSort("time")}>Время вылета {arrow("time")}</th>
@@ -323,6 +331,7 @@ export default function FlightResults({
               const seatsAvailable = isRowAvailable(r);
               return (
                 <tr key={`${r.out.optionId}-${r.inn?.optionId ?? "ow"}-${r.fareFamily}-${idx}`} className={`hover:bg-white/5 ${seatsAvailable ? "" : "opacity-60"}`}>
+                  <td className="px-2 py-2 text-white">{formatDate(getDateTime(outSeg?.departure) || r.out.requested?.departureDate)}</td>
                   <td className="px-2 py-2 text-white">{chainOf(r.out.segments)}</td>
                   <td className="px-2 py-2 text-neutral-300">{airlineNameOf(outSeg)}</td>
                   <td className="px-2 py-2 text-white">{formatTime(getTime(outSeg?.departure))}</td>

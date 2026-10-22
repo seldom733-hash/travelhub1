@@ -16,6 +16,12 @@ export interface SamoHotelEntry {
   name: string;
   /** Supplier town id (kind=TOWNS externalId space). */
   townKey?: string;
+  /** Supplier star label ("5*") when the engine ships it (optional). */
+  star?: string;
+  /** Latitude when the engine ships it (optional, card enrichment). */
+  latitude?: number;
+  /** Longitude when the engine ships it (optional, card enrichment). */
+  longitude?: number;
 }
 
 export function parseSamoHotelDynamic(html: string): SamoHotelEntry[] {
@@ -72,6 +78,9 @@ export function parseSamoHotelDynamic(html: string): SamoHotelEntry[] {
       id,
       name,
       ...(e.townKey !== undefined && e.townKey !== null ? { townKey: String(e.townKey) } : {}),
+      ...(typeof e.star === "string" && e.star.trim() ? { star: e.star.trim() } : {}),
+      ...(typeof e.latitude === "number" && isFinite(e.latitude) ? { latitude: e.latitude } : {}),
+      ...(typeof e.longitude === "number" && isFinite(e.longitude) ? { longitude: e.longitude } : {}),
     });
   }
   return out;

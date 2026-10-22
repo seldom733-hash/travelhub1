@@ -5,6 +5,7 @@ import { Buildings, CaretDown, X } from "@phosphor-icons/react";
 import { useLocale } from "@/lib/i18n";
 import { useWidestText } from "@/lib/measure-text";
 import { useClickOutside } from "./useClickOutside";
+import { usePanelMaxHeight } from "./usePanelMaxHeight";
 import { PICKER_LABEL, PICKER_TRIGGER, PICKER_TRIGGER_TEXT } from "./picker-styles";
 
 export interface SupplierStarOption {
@@ -49,6 +50,7 @@ export default function HotelStarsSelect({
   // Multi-select: stays open while picking (like «Куда»), closes on trigger
   // or a click on another search control.
   useClickOutside(containerRef, open, () => setOpen(false));
+  const panelMaxHeight = usePanelMaxHeight(containerRef, open);
 
   useEffect(() => {
     let alive = true;
@@ -139,8 +141,8 @@ export default function HotelStarsSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
-          <ul role="listbox" aria-multiselectable="true" className="max-h-56 overflow-y-auto py-1">
+        <div style={{ maxHeight: panelMaxHeight }} className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-y-auto overflow-x-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
+          <ul role="listbox" aria-multiselectable="true" className="py-1">
             {(options ?? []).map((opt) => {
               const active = selected.includes(opt.label);
               return (

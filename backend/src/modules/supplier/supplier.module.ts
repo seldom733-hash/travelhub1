@@ -26,6 +26,12 @@ import { AnexHotelAdapter } from "./anex/anex-hotel.adapter";
 import { AnexSyncService } from "./anex/anex-sync.service";
 import { FstravelAdapter } from "./fstravel/fstravel.adapter";
 import { FstravelSyncService } from "./fstravel/fstravel-sync.service";
+import { VoyagerHttpService } from "./voyager/voyager-http.service";
+import { VoyagerAdapter } from "./voyager/voyager.adapter";
+import { VoyagerHotelAdapter } from "./voyager/voyager-hotel.adapter";
+import { VoyagerSyncService } from "./voyager/voyager-sync.service";
+import { VoyagerHotelSyncService } from "./voyager/voyager-hotel-sync.service";
+import { SupplierProvisioningService } from "./supplier-provisioning.service";
 import { SupplierController } from "./supplier.controller";
 import { PublicSupplierController } from "./public-supplier.controller";
 import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
@@ -80,6 +86,12 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     AnexSyncService,
     FstravelAdapter,
     FstravelSyncService,
+    VoyagerHttpService,
+    VoyagerAdapter,
+    VoyagerHotelAdapter,
+    VoyagerSyncService,
+    VoyagerHotelSyncService,
+    SupplierProvisioningService,
     TourRequestService,
     AzalAdapter,
     AzalHttpService,
@@ -99,6 +111,8 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           anex: AnexAdapter,
           anexHotel: AnexHotelAdapter,
           fstravel: FstravelAdapter,
+          voyager: VoyagerAdapter,
+          voyagerHotel: VoyagerHotelAdapter,
           flightRegistry: FlightSupplierRegistry,
           azal: AzalAdapter,
           aviasales: AviasalesAdapter,
@@ -312,6 +326,55 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
           circuitBreakerOpenMs: 120_000,
         });
 
+        // Voyager (online.voyagergroup.az — SAMO engine over plain HTTP,
+        // verified live 2026-10-21: no browser, no captcha). ONE PRICES
+        // fan-out serves all programs of the country (no per-program loop),
+        // so the worst case is a handful of paginated GETs (~1.5s pacing).
+        registry.register(voyager, {
+          code: "VOYAGER",
+          name: "Voyager",
+          serviceTypes: ["tours"],
+          enabled: true,
+          searchEnabled: true,
+          livePriceEnabled: true,
+          availabilityEnabled: true,
+          maxConcurrency: 4,
+          requestsPerMinute: 25,
+          timeoutMs: 180_000,
+          searchCacheTtlMs: 5 * 60 * 1000,
+          priceCacheTtlMs: 5 * 60 * 1000,
+          availabilityCacheTtlMs: 5 * 60 * 1000,
+          detailCacheTtlMs: 24 * 60 * 60 * 1000,
+          circuitBreakerThreshold: 10,
+          circuitBreakerOpenMs: 120_000,
+        });
+
+        // Voyager HOTELS (stay-only /search_hotel — verified live 2026-10-22
+        // with the owner's own request): same provider code, separate
+        // category adapter (§2), a SEPARATE 16-state dictionary (vs 10 on
+        // the tour form) and no departure city. Plain HTTP, shared paced
+        // queue with the tour adapter.
+        registry.register(voyagerHotel, {
+          code: "VOYAGER",
+          name: "Voyager",
+          serviceTypes: ["hotels"],
+          enabled: true,
+          searchEnabled: true,
+          livePriceEnabled: true,
+          availabilityEnabled: true,
+          maxConcurrency: 4,
+          requestsPerMinute: 25,
+          // A wide hotel search paginates PRICEPAGE; same budget class as
+          // the tour registration.
+          timeoutMs: 180_000,
+          searchCacheTtlMs: 5 * 60 * 1000,
+          priceCacheTtlMs: 5 * 60 * 1000,
+          availabilityCacheTtlMs: 5 * 60 * 1000,
+          detailCacheTtlMs: 24 * 60 * 60 * 1000,
+          circuitBreakerThreshold: 10,
+          circuitBreakerOpenMs: 120_000,
+        });
+
         flightRegistry.register(azal);
         // Second live flight price source. Registering it makes every
         // /supplier/azal/search call fan out over both suppliers; failures
@@ -328,12 +391,14 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
         AnexAdapter,
         AnexHotelAdapter,
         FstravelAdapter,
+        VoyagerAdapter,
+        VoyagerHotelAdapter,
         FlightSupplierRegistry,
         AzalAdapter,
         AviasalesAdapter,
       ],
     },
   ],
-  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KompasHotelSyncService, KazunionHttpService, KazunionAdapter, KazunionHotelAdapter, KazunionSyncService, KazunionHotelSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AnexSyncService, FstravelAdapter, FstravelSyncService, KompasHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
+  exports: [SupplierAdapterRegistry, SupplierCacheService, SupplierResilienceService, SupplierOfferService, SupplierAggregatorService, SupplierGeoIngestService, SummerSyncService, SummertourHttpService, SummerBulkSyncService, KompasSyncService, KompasHotelSyncService, KazunionHttpService, KazunionAdapter, KazunionHotelAdapter, KazunionSyncService, KazunionHotelSyncService, AnexAdapter, AnexProvider, AnexHotelAdapter, AnexSyncService, FstravelAdapter, FstravelSyncService, VoyagerHttpService, VoyagerAdapter, VoyagerHotelAdapter, VoyagerSyncService, VoyagerHotelSyncService, KompasHotelAdapter, AzalAdapter, AzalHttpService, AzalLocationsService, AviasalesAdapter, AviasalesHttpService, FlightSupplierRegistry],
 })
 export class SupplierModule {}

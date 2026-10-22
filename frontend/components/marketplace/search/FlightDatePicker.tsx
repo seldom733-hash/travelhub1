@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarBlank, CaretLeft, CaretRight, X } from "@phosphor-icons/react";
 import type { FlightCalendarDayPrice } from "@/lib/flight-api";
 import { PICKER_LABEL, PICKER_TRIGGER, PICKER_TRIGGER_TEXT } from "./picker-styles";
+import { usePanelMaxHeight } from "./usePanelMaxHeight";
 
 interface FlightDatePickerProps {
   id: string;
@@ -78,6 +79,7 @@ export default function FlightDatePicker({
   const [viewYear, setViewYear] = useState<number>(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState<number>(() => new Date().getMonth());
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelMaxHeight = usePanelMaxHeight(containerRef, open);
 
   const effectiveMin = minDate && minDate > todayISO() ? minDate : todayISO();
 
@@ -178,7 +180,7 @@ export default function FlightDatePicker({
             className="fixed inset-0 z-[55] cursor-default bg-transparent"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute left-0 top-full z-[60] mt-1 w-[300px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
+          <div style={{ maxHeight: panelMaxHeight }} className="absolute left-0 top-full z-[60] mt-1 w-[300px] max-w-[calc(100vw-2rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-dark-border px-3 py-2">
               <button
                 type="button"

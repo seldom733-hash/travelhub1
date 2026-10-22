@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Buildings, CaretDown, MagnifyingGlass, X } from "@phosphor-icons/react";
 import { useLocale } from "@/lib/i18n";
 import { PICKER_LABEL, PICKER_TRIGGER, PICKER_TRIGGER_TEXT } from "./picker-styles";
+import { usePanelMaxHeight } from "./usePanelMaxHeight";
 
 export interface SupplierHotelOption {
   /** Supplier-neutral id (= hotel name — the only cross-supplier identity). */
@@ -41,6 +42,7 @@ export default function HotelFilterSelect({
   const [hotels, setHotels] = useState<SupplierHotelOption[] | null>(null);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelMaxHeight = usePanelMaxHeight(containerRef, open);
   const inputRef = useRef<HTMLInputElement>(null);
   const fetchedRegionRef = useRef<string | null>(null);
 
@@ -153,7 +155,7 @@ export default function HotelFilterSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
+        <div style={{ maxHeight: panelMaxHeight }} className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-y-auto overflow-x-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
           <div className="relative border-b border-dark-border">
             <MagnifyingGlass
               size={14}
@@ -175,7 +177,7 @@ export default function HotelFilterSelect({
               className="w-full bg-transparent py-2.5 pl-9 pr-3 text-[15px] text-white placeholder-neutral-500 outline-none"
             />
           </div>
-          <ul role="listbox" className="max-h-64 overflow-y-auto py-1">
+          <ul role="listbox" className="py-1">
             {loading && (
               <li className="px-3 py-3 text-center text-[14px] text-neutral-500">
                 {locale === "ru" ? "Загрузка…" : locale === "az" ? "Yüklənir…" : "Loading…"}

@@ -20,7 +20,7 @@ export function useClickOutside(
     // Close on `click` (not `mousedown`) so a click on an outside control such
     // as the submit button is not cancelled by the dropdown unmounting during
     // the same interaction.
-    document.addEventListener("click", handler, true);
-    return () => document.removeEventListener("click", handler, true);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
   }, [ref, open, onOutside]);
 }

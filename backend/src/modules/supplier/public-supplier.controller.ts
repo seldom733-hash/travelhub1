@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Body, Query, HttpException, BadRequestException, RequestTimeoutException, BadGatewayException, Logger } from "@nestjs/common";
+import { Controller, Post, Get, Body, Query, Res, HttpException, BadRequestException, RequestTimeoutException, BadGatewayException, Logger } from "@nestjs/common";
+import type { Response } from "express";
 import { Public } from "../../security/auth/decorators";
 import { SupplierOfferService } from "./supplier-offer.service";
 import { SupplierAggregatorService } from "./supplier-aggregator.service";
@@ -192,10 +193,35 @@ export class PublicSupplierController {
    */
   @Get("public/supplier/search-all")
   @Public()
-  async searchAll(@Query() params: Record<string, unknown>) {
+  async searchAll(
+    @Query() params: Record<string, unknown>,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const query = this.buildSearchQuery(params);
     const serviceType = String(params.service ?? "") || "tours";
-    return this.aggregatorService.searchByService(serviceType, query);
+    // request-id связывает логи этого запроса с логами агрегатора; фронт
+    // шлёт свой sid (searchId), иначе — короткий id на сервере.
+    const requestId =
+      String(params.requestId ?? "").trim() ||
+      `SRCH-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+    // Клиент отключился до ответа (закрыл вкладку / перезапустил поиск) —
+    // фиксируем причину: результат не доставлен, поставщики отработали
+    // впустую (реальный abort — отдельный шаг: общий in-flight промис
+    // делится параллельными клиентами, см. supplier-aggregator/дедлайн).
+    let responseSent = false;
+    res.on("finish", () => {
+      responseSent = true;
+    });
+    res.on("close", () => {
+      if (!responseSent) {
+        this.logger.warn(
+          `[SEARCH ${requestId}] clientClosed — отключение до ответа, результат не доставлен`,
+        );
+      }
+    });
+
+    return this.aggregatorService.searchByService(serviceType, query, { requestId });
   }
 
   /**

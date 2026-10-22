@@ -11,6 +11,7 @@ import { useWidestText } from "@/lib/measure-text";
 import { useLocale, t } from "@/lib/i18n";
 import { PICKER_LABEL, PICKER_TRIGGER, PICKER_TRIGGER_TEXT } from "./picker-styles";
 import { useClickOutside } from "./useClickOutside";
+import { usePanelMaxHeight } from "./usePanelMaxHeight";
 
 interface DestinationPickerProps {
   id: string;
@@ -86,6 +87,7 @@ export default function DestinationPicker({
   // resort is a cascade) — it closes on the parent (trigger) click or when
   // another search element is clicked.
   useClickOutside(containerRef, open, () => setOpen(false));
+  const panelMaxHeight = usePanelMaxHeight(containerRef, open);
 
   // Load countries once (cached in fetchGeoDirectory).
   useEffect(() => {
@@ -332,13 +334,13 @@ export default function DestinationPicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
+        <div style={{ maxHeight: panelMaxHeight }} className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-y-auto overflow-x-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
           {/* Country section */}
           {sectionHeader("country", t("search.country", locale), country, () => onCountryChange(null))}
           {expanded === "country" && (
             <div className="border-b border-dark-border pb-1">
               {searchInput(qCountry, setQCountry, `${t("search.country", locale)}…`)}
-              <ul role="listbox" className="max-h-48 overflow-y-auto py-1">
+              <ul role="listbox" className="py-1">
                 {filterItems(allowedCountries, qCountry).map((item) =>
                   itemRow(item, country?.id, pickCountry),
                 )}
@@ -357,7 +359,7 @@ export default function DestinationPicker({
           {expanded === "city" && (
             <div className="border-b border-dark-border pb-1">
               {searchInput(qCity, setQCity, `${t("search.city", locale)}…`)}
-              <ul role="listbox" className="max-h-48 overflow-y-auto py-1">
+              <ul role="listbox" className="py-1">
                 {loadingCities && (
                   <li className="px-3 py-3 text-center text-[14px] text-neutral-500">
                     {t("search.searching", locale)}
@@ -383,7 +385,7 @@ export default function DestinationPicker({
           {expanded === "resort" && (
             <div className="pb-1">
               {searchInput(qResort, setQResort, `${t("search.resort", locale)}…`)}
-              <ul role="listbox" className="max-h-48 overflow-y-auto py-1">
+              <ul role="listbox" className="py-1">
                 {loadingResorts && (
                   <li className="px-3 py-3 text-center text-[14px] text-neutral-500">
                     {t("search.searching", locale)}
