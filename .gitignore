@@ -99,3 +99,7 @@ docs/audit/tours-hotels-reference-audit/
 docs/audit/tours-hotels-reference-audit-v2/
 docs/audit/ui-baseline/
 docs/audit/catalog-review-state.json
+
+# Graphify local virtualenv / generated graph
+.venv-graphify/
+graphify-out/
