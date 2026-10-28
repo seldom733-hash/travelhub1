@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Airplane } from "@phosphor-icons/react";
-import { t, useLocale } from "@/lib/i18n";
+import { t, useLocale, formatPrice } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import HelpFindButton from "./search/HelpFindButton";
+import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
+import { categoryLabel } from "@/lib/category-label";
 
 function FlightCardSkeleton() {
   return (
@@ -56,9 +58,9 @@ function FlightCard({ card }: { card: PublicProductCard }) {
 
       {/* Content */}
       <div className="p-4">
-        {card.category?.title && (
+        {categoryLabel(card.category, locale) && (
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-neutral-500">
-            {card.category.title}
+            {categoryLabel(card.category, locale)}
           </p>
         )}
         <h3 className="line-clamp-2 font-serif text-base font-semibold text-white transition-colors group-hover:text-gold">
@@ -69,17 +71,11 @@ function FlightCard({ card }: { card: PublicProductCard }) {
             {card.shortDescription}
           </p>
         )}
-        {card.seller && (
-          <p className="mt-1 text-[11px] text-neutral-500">
-            {card.seller.visibilityMode === "ANONYMOUS"
-              ? t("seller.anonymous_label", locale)
-              : card.seller.displayName ?? t("seller.anonymous_label", locale)}
-          </p>
-        )}
+        <SupplierCodeBadge code={card.partnerCode} className="mt-1 text-[11px] text-neutral-500" />
         <div className="mt-3 flex items-center justify-between">
           {card.priceFrom ? (
             <p className="text-sm font-semibold text-gold">
-              {t("price.from", locale)} {card.priceFrom} {card.currency || ""}
+              {t("price.from", locale)} {formatPrice(card.priceFrom, card.currency, locale)}
             </p>
           ) : (
             <p className="text-xs text-neutral-500">{t("price.on_request", locale)}</p>

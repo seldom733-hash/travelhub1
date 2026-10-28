@@ -108,6 +108,11 @@ export const DomainEvents = {
   // (supplier-obligation.service) в транзакции payout/adjust; retryable=true —
   // durable retry ledger-проекции.
   SupplierPayoutCreated: "SupplierPayoutCreated",
+  // SupplierPayoutReversed — компенсирующий факт отмены CONFIRMED-выплаты.
+  // Producer: Finance (cancelSupplierPayment, в транзакции отмены); consumer —
+  // LedgerPostingConsumer пишет отдельный append-only факт
+  // SUPPLIER_PAYOUT_REVERSAL (исходный SUPPLIER_PAYOUT остаётся в истории).
+  SupplierPayoutReversed: "SupplierPayoutReversed",
   ObligationAdjusted: "ObligationAdjusted",
 } as const;
 
@@ -493,6 +498,27 @@ export interface SupplierPayoutCreatedPayload {
   /** Опциональный провайдерский/внутренний ref (opaque; идемпотентность). */
   providerRef?: string | null;
   /** Бизнес-время движения (ISO 8601; occurredAt payout). */
+  occurredAt: string;
+}
+
+/**
+ * SupplierPayoutReversed — компенсирующий ledger-факт отмены CONFIRMED-выплаты.
+ *
+ * Producer: Finance (supplier-payment.service.cancel, в транзакции отмены).
+ * Consumer: LedgerPostingConsumer → отдельная append-only проводка
+ * `SUPPLIER_PAYOUT_REVERSAL` (тот же sourceType/sourceId, другой type).
+ * Исходная `SUPPLIER_PAYOUT` НЕ удаляется и не переписывается; idempotency —
+ * unique(sourceType, sourceId, type) + inbox.
+ */
+export interface SupplierPayoutReversedPayload {
+  payoutId: string;
+  payoutCode: string;
+  /** Сумма исходного движения (AED/… — валюта payout). */
+  amount: string;
+  currency: string;
+  /** Основание отмены (descriptive; без PII). */
+  reason?: string | null;
+  /** Бизнес-время сторно (ISO 8601; момент отмены). */
   occurredAt: string;
 }
 

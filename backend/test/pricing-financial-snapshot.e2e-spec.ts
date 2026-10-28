@@ -95,7 +95,8 @@ describe("Phase 2 Step 2.11 — Pricing & Financial Snapshot (e2e)", () => {
   const createProduct = async (tag: string, price: number): Promise<{ productId: string; tariffId: string }> => {
     const res = await adminAgent
       .post("/api/v1/products")
-      .send({ type: "TOUR", title: `Snap ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
+      .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Snap ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
       .expect(201);
     const product = res.body.product as { id: string };
     created.products.push(product.id);

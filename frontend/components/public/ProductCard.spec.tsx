@@ -28,6 +28,7 @@ function card(overrides: Partial<PublicProductCard> = {}): PublicProductCard {
     headlineDepartureDate: null,
     headlineNights: null,
     availabilitySummary: null,
+    partnerCode: "PRN-00000001",
     seller: null,
     publishedAt: "2026-08-07T19:24:06.555Z",
     ...overrides,
@@ -68,7 +69,14 @@ describe("ProductCard (Step 1.7 §7)", () => {
     expect(img.src).toContain("/api/v1/public/media/m1/thumb");
   });
 
-  it("ANONYMOUS seller → generic label (никогда raw CRM name)", () => {
+  it("показывает CRM Partner.code даже без публичного seller-профиля и не раскрывает имя", () => {
+    const { container } = render(<ProductCard card={card()} />);
+    expect(screen.getByText("PRN-00000001")).toBeTruthy();
+    expect(screen.getByText("Код поставщика:")).toBeTruthy();
+    expect(container.innerHTML).not.toContain("Проверенный партнёр TravelHub");
+  });
+
+  it("ANONYMOUS seller не добавляет имя, код остаётся видимым", () => {
     render(
       <ProductCard
         card={card({
@@ -76,18 +84,11 @@ describe("ProductCard (Step 1.7 §7)", () => {
         })}
       />,
     );
-    expect(screen.getByText("Проверенный партнёр TravelHub")).toBeTruthy();
-    const { container } = render(
-      <ProductCard
-        card={card({
-          seller: { publicId: "SELL-00000001", partnerCode: "PAR-00000001", displayName: null, visibilityMode: "ANONYMOUS", verified: true, memberSince: "2026-07-01T00:00:00Z", countryCode: "AZ", cityCode: null },
-        })}
-      />,
-    );
-    expect(container.innerHTML).not.toContain("RawBrand");
+    expect(screen.getByText("PRN-00000001")).toBeTruthy();
+    expect(screen.queryByText("Проверенный партнёр TravelHub")).toBeNull();
   });
 
-  it("VERIFIED_ALIAS/PUBLIC_BRAND → partner code (PAR-*), никогда raw название", () => {
+  it("PUBLIC_BRAND не выводит displayName — только CRM Partner.code", () => {
     render(
       <ProductCard
         card={card({
@@ -95,9 +96,9 @@ describe("ProductCard (Step 1.7 §7)", () => {
         })}
       />,
     );
-    expect(screen.getByText("PAR-00000002")).toBeTruthy();
+    expect(screen.getByText("PRN-00000001")).toBeTruthy();
     expect(screen.queryByText("Smoke Travel")).toBeNull();
-    expect(screen.queryByText("Проверенный партнёр TravelHub")).toBeNull();
+    expect(screen.queryByText("PAR-00000002")).toBeNull();
   });
 
   it("не рендерит internal-поля (status/partnerId/storage keys)", () => {

@@ -236,8 +236,8 @@ describe("Phase 2 Step 2.2B — Buyer Request Foundation (e2e)", () => {
     const res = await createReq(buyerAAgent, {
       categoryId: catHotelId,
       destinations: [{ countryCode: "TR" }, { countryCode: "TR", cityCode: "ANTALYA" }],
-      serviceDateFrom: "2026-09-01",
-      serviceDateTo: "2026-09-07",
+      serviceDateFrom: "2027-09-01",
+      serviceDateTo: "2027-09-07",
       adults: 2,
       children: 1,
       budget: { currency: "USD", min: 100, max: 500 },
@@ -251,8 +251,8 @@ describe("Phase 2 Step 2.2B — Buyer Request Foundation (e2e)", () => {
     expect(r.status).toBe("DRAFT");
     expect(r.categorySlug).toBe(`br-hotel-${stamp}`);
     expect(r.destinations).toEqual([{ countryCode: "TR" }, { countryCode: "TR", cityCode: "ANTALYA" }]);
-    expect(r.serviceDateFrom).toBe("2026-09-01T00:00:00.000Z");
-    expect(r.serviceDateTo).toBe("2026-09-07T00:00:00.000Z");
+    expect(r.serviceDateFrom).toBe("2027-09-01T00:00:00.000Z");
+    expect(r.serviceDateTo).toBe("2027-09-07T00:00:00.000Z");
     expect(r.adults).toBe(2);
     expect(r.budget).toEqual({ currency: "USD", min: 100, max: 500 });
     // НЕ создаются Product/Tariff/Availability/Lead/Opportunity/Quote/Sale/Order/Booking.
@@ -305,13 +305,13 @@ describe("Phase 2 Step 2.2B — Buyer Request Foundation (e2e)", () => {
     const r = own.items.find((x) => x.categoryId === catTourId)!;
     const upd = (await patchReq(buyerAAgent, r.id, {
       destinations: [{ countryCode: "GE", cityCode: "TBILISI" }],
-      serviceDateFrom: "2026-10-01",
+      serviceDateFrom: "2027-10-01",
       adults: 3,
       budget: { currency: "EUR", min: 50, max: 300 },
       expectedVersion: r.version,
     }).expect(200)).body as RequestView;
     expect(upd.destinations).toEqual([{ countryCode: "GE", cityCode: "TBILISI" }]);
-    expect(upd.serviceDateFrom).toBe("2026-10-01T00:00:00.000Z");
+    expect(upd.serviceDateFrom).toBe("2027-10-01T00:00:00.000Z");
     expect(upd.adults).toBe(3);
     expect(upd.children).toBe(0); // не передано — сохранено
     expect(upd.budget).toEqual({ currency: "EUR", min: 50, max: 300 });

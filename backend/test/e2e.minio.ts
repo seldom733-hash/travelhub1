@@ -48,6 +48,7 @@ const MINIO_BASE_URL = "https://github.com/minio/minio/releases/download";
 let proc: ChildProcess | null = null;
 let client: S3Client | null = null;
 let stderrBuf = "";
+let dataDir: string | null = null;
 
 /** Артефакт для текущей платформы (имя GitHub-ассета + локальное имя файла). */
 function minioArtifact(): { url: string; sha256Url: string; fileName: string } {
@@ -213,8 +214,11 @@ export async function startTestMinIO(): Promise<void> {
   if (proc) return;
   killPortListener();
   const binary = await ensureMinioBinary();
-  // MinIO (Windows) не понимает backslash-пути из os.tmpdir() — нормализуем в forward slashes.
-  const dataDir = mkdtempSync(path.join(os.tmpdir(), "travelhub-minio-")).replace(/\\/g, "/");
+  // Windows MinIO не понимает backslash-пути; держим data dir внутри checkout,
+  // а не в os.tmpdir (там встречается file access denied из-за ACL/AV).
+  const testTmpRoot = path.resolve(__dirname, "..", ".e2e-tmp");
+  mkdirSync(testTmpRoot, { recursive: true });
+  dataDir = mkdtempSync(path.join(testTmpRoot, "minio-")).replace(/\\/g, "/");
   stderrBuf = "";
   proc = spawn(binary, ["server", dataDir, "--address", `127.0.0.1:${MINIO_TEST_PORT}`], {
     env: {
@@ -268,5 +272,13 @@ export async function stopTestMinIO(): Promise<void> {
       // best-effort
     }
     proc = null;
+  }
+  if (dataDir) {
+    try {
+      rmSync(dataDir, { recursive: true, force: true });
+    } catch {
+      // best-effort
+    }
+    dataDir = null;
   }
 }

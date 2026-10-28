@@ -19,6 +19,7 @@ import type {
   SupplierGeoOption,
 } from "../supplier.types";
 import { priceUnavailable } from "../supplier.types";
+import { withCatalogCoverage, recordCatalogError, recordCatalogProgram } from "../catalog/catalog-coverage";
 
 /**
  * KazUnion adapter (online.kazunion.com) — SAMO platform like Summertour,
@@ -357,9 +358,11 @@ export class KazunionAdapter implements SupplierAdapter {
             !query.hotelStars?.length,
         });
         rows.push(...programRows);
+        recordCatalogProgram(true);
         this.programState.set(program.value, state.value);
       } catch (err) {
         const msg = (err as Error).message;
+        recordCatalogProgram(false);
         // Fail the whole search on captcha/HTTP errors — never show partial
         // inventory as if it were complete.
         if (/captcha|antibot|HTTP \d|Timeout/i.test(msg)) {
@@ -375,6 +378,18 @@ export class KazunionAdapter implements SupplierAdapter {
       `${rows.length} rows → ${offers.length} offers in ${Date.now() - start}ms`,
     );
     return offers;
+  }
+
+  async searchCatalog(query: SupplierSearchQuery) {
+    const { result, coverage } = await withCatalogCoverage(async () => {
+      try {
+        return await this.search(query);
+      } catch (error) {
+        recordCatalogError((error as Error).message);
+        throw error;
+      }
+    });
+    return { offers: result, coverage };
   }
 
   async getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail> {

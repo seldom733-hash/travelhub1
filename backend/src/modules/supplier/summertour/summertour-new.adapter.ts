@@ -17,6 +17,7 @@ import type {
   PriceCalendarEntry,
 } from "../supplier.types";
 import { priceUnavailable } from "../supplier.types";
+import { withCatalogCoverage, recordCatalogError, recordCatalogPage, recordCatalogProgram } from "../catalog/catalog-coverage";
 import { buildSummerSearchRequest, buildSummerXhrUrl, SummerSearchRequest } from "./summertour.request-builder";
 import { parseSummerOffers } from "./summertour.response-parser";
 import { KompasCaptchaStore, type KompasCaptchaOperation } from "../kompas/kompas-captcha.store";
@@ -71,7 +72,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
   // The SAMO price table for a whole country runs 30+ pages × 100 rows
   // (verified live: PRICEPAGE keeps returning rows past the pager window).
   // 5 pages truncated the answer to a fraction of the catalog.
-  private static readonly MAX_PAGES = 30;
+  private static readonly MAX_PAGES = 60;
   private static readonly PAGE_DELAY_MS = 1_000;
   /** Transient empty-XHR retries (parity with the KOMPAS no-rows retry). */
   private static readonly XHR_ATTEMPTS = 3;
@@ -168,7 +169,10 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       });
 
       // Step 3b: When HOTELS_ANY=1 (no specific hotel), discover towns from form, then query each
-      if (!query.hotelExternalId && query.tourIncValue) {
+      // Catalog mode deliberately uses the direct XHR path instead of DOLOAD
+      // town discovery, so PRICEPAGE can be swept to a real end-of-pager
+      // signal. The discovery path has no page-completeness proof.
+      if (!query.hotelExternalId && query.tourIncValue && !(query as { skipTownDiscovery?: boolean }).skipTownDiscovery) {
         return await this.searchWithTownDiscovery(page, summerReq, query, start);
       }
 
@@ -235,6 +239,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
       // Step 8: Parse offers from injected DOM
       const all: any[] = [];
       let cur = await parseSummerOffers(page);
+      recordCatalogPage(1, null);
       all.push(...cur);
 
       // Step 9: Pagination
@@ -251,6 +256,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
           await page.waitForTimeout(SummertourNewAdapter.PAGE_DELAY_MS);
           cur = await parseSummerOffers(page);
           if (cur.length === 0) break;
+          recordCatalogPage(pg, null, pg === SummertourNewAdapter.MAX_PAGES);
           all.push(...cur);
         } catch {
           break;
@@ -268,6 +274,18 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
     }
   }
 
+  async searchCatalog(query: SupplierSearchQuery) {
+    const { result, coverage } = await withCatalogCoverage(async () => {
+      try {
+        return await this.search(query);
+      } catch (error) {
+        recordCatalogError((error as Error).message);
+        throw error;
+      }
+    });
+    return { offers: result, coverage };
+  }
+
   /**
    * When HOTELS_ANY=1 (calendar query, no specific hotel), discover available towns from the
    * page form, then query each town with samo_action=TOWNS to get results.
@@ -278,6 +296,7 @@ export class SummertourNewAdapter implements SupplierAdapter, OnModuleDestroy {
   ): Promise<SupplierOffer[]> {
     const all: any[] = [];
     const tourIncValue = summerReq.TOURINC;
+    if (!tourIncValue) recordCatalogProgram(false);
     this.logger.log(`[Summertour] DOLOAD search for TOURINC=${tourIncValue}`);
 
     // В§TOWNS: city/resort filter вЂ” the request builder sets TOWNS=<ids>

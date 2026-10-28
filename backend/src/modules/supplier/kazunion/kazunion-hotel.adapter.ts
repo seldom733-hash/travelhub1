@@ -12,6 +12,7 @@ import type {
   PriceCalendarResult,
 } from "../supplier.types";
 import { priceUnavailable } from "../supplier.types";
+import { withCatalogCoverage, recordCatalogError } from "../catalog/catalog-coverage";
 import { KazunionHttpService, type KazunionHotelRow } from "./kazunion-http.service";
 import {
   KAZUNION_HOTEL_COUNTRIES,
@@ -199,6 +200,25 @@ export class KazunionHotelAdapter implements SupplierAdapter {
   }
 
   // ── SupplierAdapter: detail / refresh ─────────────────────────────────
+
+  async discoverCountries(): Promise<Array<{ countryId: string; countryName: string }>> {
+    return (await this.http.discoverHotelStates()).map((state) => ({
+      countryId: state.value,
+      countryName: state.name,
+    }));
+  }
+
+  async searchCatalog(query: SupplierSearchQuery) {
+    const { result, coverage } = await withCatalogCoverage(async () => {
+      try {
+        return await this.search(query);
+      } catch (error) {
+        recordCatalogError((error as Error).message);
+        throw error;
+      }
+    });
+    return { offers: result, coverage };
+  }
 
   async getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail> {
     const offers = await this.search({ ...ref.searchContext, adults: ref.searchContext.adults ?? 2 });

@@ -90,3 +90,12 @@ backend/.whatsapp-media/
 
 # local DB snapshot
 travelhub_test_dump.sql
+
+# Local production DB backups / cleanup SQL (never commit)
+reports/backups/
+
+# Generated production audit snapshots / screenshots (do not commit)
+docs/audit/tours-hotels-reference-audit/
+docs/audit/tours-hotels-reference-audit-v2/
+docs/audit/ui-baseline/
+docs/audit/catalog-review-state.json

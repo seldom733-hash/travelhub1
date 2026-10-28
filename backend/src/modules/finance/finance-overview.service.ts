@@ -65,6 +65,18 @@ export interface FinanceOverview {
     unknownCount: number;
   };
   supplierPayouts: { paidAzn: string; count: number };
+  /** Supplier payments registry KPI (derived from obligation due dates + allocations). */
+  supplierPayables: {
+    overdueAzn: string;
+    overdueCount: number;
+    dueSoonAzn: string;
+    dueSoonCount: number;
+    pendingPaymentsAzn: string;
+    pendingPaymentsCount: number;
+    unallocatedAzn: string;
+    unallocatedCount: number;
+    byStatus: Array<{ status: string; count: number; remainingAzn: string }>;
+  };
   expectedMargin: AznMetric;
   customerReceipts: { byCurrency: CurrencyAmount[]; azn: AznMetric };
   customerDebt: { byCurrency: CurrencyAmount[]; azn: AznMetric };
@@ -135,9 +147,10 @@ export class FinanceOverviewService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getOverview(range: RangeFilter = {}): Promise<FinanceOverview> {
-    const [obligations, supplierPayouts, expectedMargin, customerReceipts, customerDebt] = await Promise.all([
+    const [obligations, supplierPayouts, supplierPayables, expectedMargin, customerReceipts, customerDebt] = await Promise.all([
       this.obligationsAggregate(range),
       this.payoutsAggregate(range),
+      this.supplierPayablesKpi(),
       this.expectedMarginMetric(range),
       this.receiptsMetric(range),
       this.debtMetric(range),
@@ -147,6 +160,7 @@ export class FinanceOverviewService {
       range: { from: range.from ?? null, to: range.to ?? null },
       obligations,
       supplierPayouts,
+      supplierPayables,
       expectedMargin,
       customerReceipts,
       customerDebt,
@@ -187,11 +201,97 @@ export class FinanceOverviewService {
 
   private async payoutsAggregate(range: RangeFilter): Promise<FinanceOverview["supplierPayouts"]> {
     const agg = await this.prisma.supplierPayout.aggregate({
-      where: rangeWhere("occurredAt", range),
+      where: {
+        status: "CONFIRMED",
+        ...rangeWhere("occurredAt", range),
+      },
       _sum: { aznAmount: true },
       _count: { _all: true },
     });
     return { paidAzn: decStr(agg._sum.aznAmount), count: agg._count._all };
+  }
+
+  /**
+   * KPI реестра платежей поставщикам:
+   *  - overdue/dueSoon — по remaining и dueDate (derived, не stored);
+   *  - pendingPayments — зарегистрированные, но не подтверждённые (НЕ оплата);
+   *  - unallocated — остаток CONFIRMED-платежей, не разнесённый по обязательствам.
+   */
+  private async supplierPayablesKpi(): Promise<FinanceOverview["supplierPayables"]> {
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const dueSoonUntil = new Date(today);
+    dueSoonUntil.setUTCDate(dueSoonUntil.getUTCDate() + 7);
+    const payable = ["OPEN", "PARTIALLY_PAID", "ADJUSTED"];
+
+    const [obligations, confirmed, allocations, pending] = await Promise.all([
+      this.prisma.supplierObligation.findMany({
+        where: { status: { in: payable }, remainingAmount: { gt: new Prisma.Decimal(0) } },
+        select: { status: true, remainingAmount: true, dueDate: true },
+      }),
+      this.prisma.supplierPayout.findMany({
+        where: { status: "CONFIRMED" },
+        select: { id: true, aznAmount: true },
+      }),
+      this.prisma.supplierPayoutAllocation.groupBy({
+        by: ["payoutId"],
+        where: { reversedAt: null, payout: { status: "CONFIRMED" } },
+        _sum: { aznAmount: true },
+      }),
+      this.prisma.supplierPayout.aggregate({
+        where: { status: "PENDING" },
+        _sum: { aznAmount: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    let overdue = new Prisma.Decimal(0);
+    let dueSoon = new Prisma.Decimal(0);
+    let overdueCount = 0;
+    let dueSoonCount = 0;
+    const byStatus = new Map<string, { count: number; remaining: Prisma.Decimal }>();
+    for (const row of obligations) {
+      const remaining = row.remainingAmount ?? new Prisma.Decimal(0);
+      const bucket = byStatus.get(row.status) ?? { count: 0, remaining: new Prisma.Decimal(0) };
+      bucket.count += 1;
+      bucket.remaining = bucket.remaining.plus(remaining);
+      byStatus.set(row.status, bucket);
+
+      if (row.dueDate && row.dueDate.getTime() < today.getTime()) {
+        overdue = overdue.plus(remaining);
+        overdueCount += 1;
+      } else if (row.dueDate && row.dueDate.getTime() < dueSoonUntil.getTime()) {
+        dueSoon = dueSoon.plus(remaining);
+        dueSoonCount += 1;
+      }
+    }
+
+    const allocatedByPayout = new Map<string, Prisma.Decimal>(
+      allocations.map((a) => [a.payoutId, a._sum.aznAmount ?? new Prisma.Decimal(0)]),
+    );
+    let unallocated = new Prisma.Decimal(0);
+    let unallocatedCount = 0;
+    for (const payment of confirmed) {
+      const left = payment.aznAmount.minus(allocatedByPayout.get(payment.id) ?? new Prisma.Decimal(0));
+      if (left.greaterThan(0)) {
+        unallocated = unallocated.plus(left);
+        unallocatedCount += 1;
+      }
+    }
+
+    return {
+      overdueAzn: overdue.toString(),
+      overdueCount,
+      dueSoonAzn: dueSoon.toString(),
+      dueSoonCount,
+      pendingPaymentsAzn: decStr(pending._sum.aznAmount),
+      pendingPaymentsCount: pending._count._all,
+      unallocatedAzn: unallocated.toString(),
+      unallocatedCount,
+      byStatus: [...byStatus.entries()]
+        .map(([status, v]) => ({ status, count: v.count, remainingAzn: v.remaining.toString() }))
+        .sort((a, b) => a.status.localeCompare(b.status)),
+    };
   }
 
   private async expectedMarginMetric(range: RangeFilter): Promise<AznMetric> {

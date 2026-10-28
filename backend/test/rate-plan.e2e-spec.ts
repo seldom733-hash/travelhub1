@@ -213,7 +213,7 @@ describe("Phase 1 Step 1.8B — Tariff → Rate Plan foundation (e2e)", () => {
   }
 
   async function createRatePlan(ag: ReturnType<typeof request.agent>, productId: string, body: Record<string, unknown>, expected = 201): Promise<RatePlanRow> {
-    const res = await ag.post(`/api/v1/products/${productId}/tariffs`).send(body);
+    const res = await ag.post(`/api/v1/products/${productId}/tariffs`).send({ currency: "AZN", ...body });
     expect(res.status).toBe(expected);
     if (expected !== 201) return res.body as never;
     const plan = res.body as RatePlanRow;
@@ -531,7 +531,7 @@ describe("Phase 1 Step 1.8B — Tariff → Rate Plan foundation (e2e)", () => {
 
   it("26. существующий Quote creation с legacy Tariff остаётся зелёным", async () => {
     // Legacy продукт с тарифом через классический путь (tariffs в product create).
-    const res = await adminAgent
+    const res = await seller1Agent
       .post("/api/v1/products")
       .send({ type: "HOTEL", title: `RP26 Legacy Quote ${stamp}`, tariffs: [{ name: "Std", price: 100, currency: "USD" }] })
       .expect(201);
@@ -829,7 +829,7 @@ describe("Phase 1 Step 1.8B — Tariff → Rate Plan foundation (e2e)", () => {
   // ── 34: additive migration / legacy rows ──────────────────────────────────
 
   it("34. additive миграция: legacy Tariff (созданный классическим путём) валиден с defaults", async () => {
-    const res = await adminAgent
+    const res = await seller1Agent
       .post("/api/v1/products")
       .send({ type: "TOUR", title: `RP34 Legacy ${stamp}`, tariffs: [{ name: "Legacy", price: 55 }] })
       .expect(201);

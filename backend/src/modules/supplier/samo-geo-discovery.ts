@@ -1,6 +1,7 @@
 import type { Page } from "playwright";
 import type { SupplierGeoOption } from "./supplier.types";
 import { parseSamoHotelDynamic } from "./samo-hotel-dict";
+import { canonicalHotelCategory } from "../catalog/hotel/hotel-category";
 
 /**
  * Shared SAMO geo discovery: extracts the lazy-loaded TOWNS checkbox-list
@@ -118,11 +119,16 @@ export async function discoverSamoGeoOptions(
     }
     return out;
   });
-  const starItems: SupplierGeoOption[] = stars.map((o) => ({
-    ...o,
-    kind: "STAR",
-    countryExternalId: opts.stateInc,
-  }));
+  const starItems: SupplierGeoOption[] = stars.flatMap((o) => {
+    const category = canonicalHotelCategory(o.label);
+    if (!category) return [];
+    return [{
+      ...o,
+      label: category.label,
+      kind: "STAR" as const,
+      countryExternalId: opts.stateInc,
+    }];
+  });
 
   // Dimension 3: hotel dictionary — the form embeds the full hotel list as
   // inline samo.hotelDynamic JSON (verified over plain HTTP for all SAMO

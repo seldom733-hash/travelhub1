@@ -3,9 +3,11 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight } from "@phosphor-icons/react";
-import { t, useLocale, formatDate } from "@/lib/i18n";
+import { t, useLocale, formatDate, formatPrice } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import { useHotelPhoto } from "@/lib/hotel-photo";
+import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
+import { categoryLabel } from "@/lib/category-label";
 
 function LatestOfferCardSkeleton() {
   return (
@@ -84,26 +86,20 @@ function LatestOfferCard({ card }: { card: PublicProductCard }) {
       </div>
 
       <div className="p-4">
-        {card.category?.title && (
+        {categoryLabel(card.category, locale) && (
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-neutral-500">
-            {card.category.title}
+            {categoryLabel(card.category, locale)}
           </p>
         )}
         <h3 className="line-clamp-2 font-serif text-sm font-semibold text-white transition-colors group-hover:text-gold">
           {card.title}
         </h3>
-        {card.seller && (
-          <p className="mt-1 text-[10px] text-neutral-500">
-            {card.seller.visibilityMode === "ANONYMOUS"
-              ? t("seller.anonymous_label", locale)
-              : card.seller.displayName ?? t("seller.anonymous_label", locale)}
-          </p>
-        )}
+        <SupplierCodeBadge code={card.partnerCode} className="mt-1 text-[10px] text-neutral-500" />
         <div className="mt-3 flex items-center justify-between">
           <div>
             {card.priceFrom ? (
               <p className="text-xs font-semibold text-gold">
-                {t("price.from", locale)} {card.priceFrom} {card.currency || ""}
+                {t("price.from", locale)} {formatPrice(card.priceFrom, card.currency, locale)}
               </p>
             ) : (
               <p className="text-xs text-neutral-500">{t("price.on_request", locale)}</p>
@@ -140,7 +136,7 @@ export default function LatestOffers() {
     // sort=newest → publishedAt DESC (server-side), which is the canonical "latest" ordering.
     // Fetch all published marketplace products and take the first 6 by publication date.
     void publicApi
-      .listProducts({ sort: "newest", pageSize: 50 })
+      .listProducts({ sort: "price_asc", pageSize: 50 })
       .then((r) => {
         if (alive) {
           // Deduplicate by id (safety net), take top 6

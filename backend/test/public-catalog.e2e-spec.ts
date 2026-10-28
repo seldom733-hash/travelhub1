@@ -575,7 +575,7 @@ describe("Phase 1 Step 1.5 — Public Catalog Read Foundation (e2e)", () => {
 
     const detail = (await publicDetail(product.id).expect(200)).body as { product: Record<string, unknown>; media: Array<Record<string, unknown>> };
     expect(Object.keys(detail.product).sort()).toEqual(
-      ["attributes", "availability", "category", "code", "currency", "description", "id", "priceFrom", "pricingUnit", "seller", "publishedAt", "slug", "tariffs", "title", "type", "version"].sort(),
+      ["attributes", "availability", "category", "code", "currency", "description", "hotelImage", "id", "priceFrom", "pricingUnit", "seller", "publishedAt", "slug", "tariffs", "title", "type", "version"].sort(),
     );
     expect(Object.keys(detail.media[0]).sort()).toEqual(
       ["altText", "caption", "height", "id", "isPrimary", "mimeType", "sortOrder", "type", "url", "width"].sort(),
@@ -785,8 +785,8 @@ describe("Phase 1 Step 1.5 — Public Catalog Read Foundation (e2e)", () => {
     await adminAgent.post(`/api/v1/products/${product.id}/availability`).send({ date: "2026-09-15", slotsTotal: 10 }).expect(201);
 
     const card = (await publicList({ category: lightCatSlug, q: "PubExtra" }).expect(200)).body as { items: PublicProductCardRow[] };
-    expect(card.items[0].priceFrom).toBe("90.00");
-    expect(card.items[0].currency).toBe("USD");
+    expect(card.items[0].priceFrom).toBe("153.00");
+    expect(card.items[0].currency).toBe("AZN");
     expect(card.items[0].pricingUnit).toBe("unit");
     expect(card.items[0].availabilitySummary).toEqual({ availableFrom: "2026-09-15T00:00:00.000Z", datesCount: 1, totalSlots: 10, totalBooked: 0, totalReserved: 0 });
 

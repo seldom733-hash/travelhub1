@@ -356,6 +356,11 @@ export class OperationalNotesService {
       throw new BadRequestException(`Invalid entity type: ${entityType}`);
     }
 
+    const parent = await resolveNoteParent(this.prisma, entityType, entityId);
+    if (!parent.exists) {
+      throw new NotFoundException(`${entityType} with id ${entityId} not found`);
+    }
+
     const page = Math.max(1, options?.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, options?.pageSize ?? 20));
     const skip = (page - 1) * pageSize;

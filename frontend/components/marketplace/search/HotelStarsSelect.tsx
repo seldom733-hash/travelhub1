@@ -17,7 +17,7 @@ export interface SupplierStarOption {
   externalIds: Record<string, string>;
 }
 
-const FALLBACK: SupplierStarOption[] = [1, 2, 3, 4, 5].map((s) => ({
+const FALLBACK: SupplierStarOption[] = [4, 5].map((s) => ({
   label: `${s}*`,
   stars: s,
   suppliers: [],
@@ -27,10 +27,11 @@ const FALLBACK: SupplierStarOption[] = [1, 2, 3, 4, 5].map((s) => ({
 /**
  * HotelStarsSelect — «Категория отеля» dropdown for the universal search.
  *
- * The option list is the FULL set of hotel categories known from supplier
- * dictionaries (GET /api/v1/geo/supplier-stars — SupplierGeoLink kind=STAR
- * ingested from KOMPAS/KazUnion forms), with a static 1★–5★ fallback while
- * loading/offline. Multi-select; empty = any category.
+ * The option list is served by the backend canonical filter: only 4-star and
+ * 5-star ratings and the property types Boutique / Guest House / Deluxe /
+ * Apart. Supplier-only audience/promo labels (Adults only, Family, HALAL,
+ * Kids Go Free, Recommend) and 1-3 stars are intentionally not selectable.
+ * Static 4/5-star fallback while loading/offline. Multi-select; empty = any.
  */
 export default function HotelStarsSelect({
   selected,
@@ -155,7 +156,7 @@ export default function HotelStarsSelect({
                     className={`flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-white/5 ${active ? "bg-gold/10" : ""}`}
                   >
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-[13px] font-semibold text-gold">
-                      {opt.label}
+                      {opt.stars !== null ? opt.label : <Buildings size={16} weight="light" />}
                     </span>
                     <span className="min-w-0 flex-1 text-[15px] font-medium text-white">
                       {opt.label}

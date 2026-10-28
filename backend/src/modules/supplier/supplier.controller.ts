@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Logger } from "@nestjs/common";
 import { SupplierOfferService } from "./supplier-offer.service";
 import { SupplierAdapterRegistry } from "./adapter/supplier-adapter.registry";
 import { SupplierCacheService } from "./cache/supplier-cache.service";
@@ -13,6 +13,7 @@ import { VoyagerSyncService } from "./voyager/voyager-sync.service";
 import { VoyagerHotelSyncService } from "./voyager/voyager-hotel-sync.service";
 import { AnexSyncService } from "./anex/anex-sync.service";
 import { FstravelSyncService } from "./fstravel/fstravel-sync.service";
+import { HotelMatchingService } from "../catalog/hotel/hotel-matching.service";
 import { JwtAuthGuard } from "../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../security/auth/permissions.guard";
 import { RequirePermissions, CurrentUser } from "../../security/auth/decorators";
@@ -27,6 +28,8 @@ import type { AuthedRequest } from "../../security/auth/jwt-auth.guard";
 @Controller("supplier")
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class SupplierController {
+  private readonly logger = new Logger(SupplierController.name);
+
   constructor(
     private readonly offerService: SupplierOfferService,
     private readonly registry: SupplierAdapterRegistry,
@@ -42,9 +45,23 @@ export class SupplierController {
     private readonly voyagerHotelSync: VoyagerHotelSyncService,
     private readonly anexSync: AnexSyncService,
     private readonly fstravelSync: FstravelSyncService,
+    private readonly hotelMatching: HotelMatchingService,
   ) {}
 
   // ── Summer Sync ───────────────────────────────────────────────────
+
+  /**
+   * Обновить реестр отелей после синка. Сбой сопоставления НЕ отменяет уже
+   * записанный каталог: это восстановимый шаг (повторный вызов идемпотентен),
+   * поэтому логируем ошибку и возвращаем результат синка.
+   */
+  private async syncHotelRegistry(supplierCode: string): Promise<void> {
+    try {
+      await this.hotelMatching.syncSupplierHotels(supplierCode);
+    } catch (error) {
+      this.logger.error(`HotelMatching [${supplierCode}] failed: ${(error as Error).message}`);
+    }
+  }
 
   @Post("summertour/sync")
   @RequirePermissions("supplier.search.manage")
@@ -103,7 +120,7 @@ export class SupplierController {
     @Query("nights") nights?: string,
     @Query("maxPages") maxPages?: string,
   ) {
-    return this.kompasHotelSync.runSync({
+    const result = await this.kompasHotelSync.runSync({
       countryIsos: countryIsos
         ? countryIsos.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
         : undefined,
@@ -112,6 +129,9 @@ export class SupplierController {
       nights: nights ? parseInt(nights, 10) : undefined,
       maxPages: maxPages ? parseInt(maxPages, 10) : undefined,
     });
+    // Автоматическое сопоставление отелей после синка
+    await this.syncHotelRegistry("KOMPAS");
+    return result;
   }
 
   // ── KazUnion Sync ─────────────────────────────────────────────────────
@@ -156,7 +176,7 @@ export class SupplierController {
     @Query("nights") nights?: string,
     @Query("maxPages") maxPages?: string,
   ) {
-    return this.kazunionHotelSync.runSync({
+    const result = await this.kazunionHotelSync.runSync({
       countryIsos: countryIsos
         ? countryIsos.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
         : undefined,
@@ -165,6 +185,8 @@ export class SupplierController {
       nights: nights ? parseInt(nights, 10) : undefined,
       maxPages: maxPages ? parseInt(maxPages, 10) : undefined,
     });
+    await this.syncHotelRegistry("KAZUNION");
+    return result;
   }
 
   // ── Voyager Sync ─────────────────────────────────────────────────────
@@ -215,7 +237,7 @@ export class SupplierController {
     @Query("nights") nights?: string,
     @Query("maxPages") maxPages?: string,
   ) {
-    return this.voyagerHotelSync.runSync({
+    const result = await this.voyagerHotelSync.runSync({
       countryIsos: countryIsos
         ? countryIsos.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
         : undefined,
@@ -224,6 +246,8 @@ export class SupplierController {
       nights: nights ? parseInt(nights, 10) : undefined,
       maxPages: maxPages ? parseInt(maxPages, 10) : undefined,
     });
+    await this.syncHotelRegistry("VOYAGER");
+    return result;
   }
 
   // ── Search ──────────────────────────────────────────────────────────

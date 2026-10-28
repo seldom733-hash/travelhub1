@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import StorefrontSite from "@/components/storefront/StorefrontSite";
+import StorefrontBlocks from "@/components/storefront/StorefrontBlocks";
 import { publicStorefrontApi, PublicNotFoundError, type PublicListResult, type PublicStorefront } from "@/lib/public-api";
+import type { PageConfigView } from "@/lib/constructor-api";
 
 // Dynamic rendering: public storefront существует только в рантайме (ACTIVE +
 // entitled); build не должен пытаться статически предрендерить /store/:slug.
@@ -15,10 +17,17 @@ export const dynamic = "force-dynamic";
  * SEO foundation (§19): title/meta description/canonical/OG.
  */
 
-async function fetchStorefront(slug: string): Promise<{ sf: PublicStorefront; products: PublicListResult } | null> {
+async function fetchStorefront(slug: string): Promise<{ sf: PublicStorefront; products: PublicListResult; page: PageConfigView | null; menu: Array<{ slug: string; name: string; isHome: boolean }> } | null> {
   try {
-    const [sf, products] = await Promise.all([publicStorefrontApi.get(slug), publicStorefrontApi.listProducts(slug, { pageSize: 12 })]);
-    return { sf, products };
+    const [sf, products, page, menu] = await Promise.all([
+      publicStorefrontApi.get(slug),
+      publicStorefrontApi.listProducts(slug, { pageSize: 12 }),
+      // Backward compatible: an older backend without the builder endpoint
+      // must not break the legacy storefront.
+      publicStorefrontApi.getPage(slug).catch(() => null),
+      publicStorefrontApi.listPages(slug).catch(() => []),
+    ]);
+    return { sf, products, page, menu };
   } catch (err) {
     if (err instanceof PublicNotFoundError) return null;
     throw err;
@@ -29,16 +38,27 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const data = await fetchStorefront(slug);
   if (!data) return { title: "Storefront — TravelHub" };
-  const { sf } = data;
+  const { sf, page } = data;
+  const seoTitle = page?.seo?.title;
+  const seoDescription = page?.seo?.description;
+  const pick = (v: unknown): string | undefined => {
+    if (typeof v === "string") return v;
+    if (v && typeof v === "object") {
+      const rec = v as Record<string, unknown>;
+      return typeof rec.ru === "string" ? rec.ru : typeof rec.az === "string" ? rec.az : typeof rec.en === "string" ? rec.en : undefined;
+    }
+    return undefined;
+  };
   const name = sf.businessName ?? sf.slug;
-  const description = sf.tagline ?? sf.description?.slice(0, 160) ?? undefined;
+  const title = pick(seoTitle) || `${name} — ${sf.tagline ?? "Storefront"}`;
+  const description = pick(seoDescription) || sf.tagline || sf.description?.slice(0, 160) || undefined;
   return {
-    title: `${name} — ${sf.tagline ?? "Storefront"}`,
+    title,
     description,
     robots: { index: true, follow: true },
     alternates: { canonical: `/store/${sf.slug}` },
     openGraph: {
-      title: name,
+      title,
       description,
       type: "website",
       url: `/store/${sf.slug}`,
@@ -51,5 +71,11 @@ export default async function StorefrontPage({ params }: { params: Promise<{ slu
   const { slug } = await params;
   const data = await fetchStorefront(slug);
   if (!data) notFound();
-  return <StorefrontSite sf={data.sf} products={data.products} />;
+  const { sf, products, page, menu } = data;
+  // Published constructor page is the new path; legacy fixed template remains
+  // the fallback for partners that have not opened the builder yet.
+  if (page && page.sections.some((s) => s.enabled)) {
+    return <StorefrontBlocks sf={sf} products={products} page={page} menu={menu} />;
+  }
+  return <StorefrontSite sf={sf} products={products} />;
 }

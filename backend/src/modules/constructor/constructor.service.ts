@@ -269,16 +269,391 @@ export class ConstructorService {
     return this.mapPage(page);
   }
 
-  async saveDraft(slug: string, sections: PageSectionInput[], actorId: string): Promise<PageConfigView> {
-    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
+  // ─── Partner Storefront builder (tenant-scoped) ────────────────────────
+  // Reuses the same ConstructorPage/version/audit pipeline as marketplace but
+  // keeps ownership server-side: tenantId is the authenticated actor.partnerId.
+
+  async getStorefrontBuilderPage(actor: { id: string; partnerId: string | null }, pageId?: string): Promise<PageConfigView> {
+    const page = await this.resolveStorefrontPage(actor, pageId);
+    return this.getPage(page.slug, actor.id);
+  }
+
+  async listStorefrontPages(actor: { id: string; partnerId: string | null }) {
+    const sf = await this.requireOwnStorefront(actor.partnerId);
+    await this.ensureStorefrontPage(sf, actor.id);
+    const pages = await this.prisma.constructorPage.findMany({
+      where: { context: "storefront", tenantId: sf.partnerId },
+      orderBy: { createdAt: "asc" },
+    });
+    return pages.map((page, index) => {
+      const seo = (page.seo as Record<string, unknown> | null) ?? {};
+      return {
+        id: page.id,
+        slug: String(seo.pageSlug ?? (index === 0 ? "home" : page.slug)),
+        name: String(seo.navLabel ?? page.slug),
+        isHome: index === 0 || Boolean(seo.isHome),
+        published: page.currentVersion != null,
+      };
+    });
+  }
+
+  async createStorefrontPage(
+    actor: { id: string; partnerId: string | null },
+    input: { name: string; slug: string },
+  ): Promise<PageConfigView> {
+    const sf = await this.requireOwnStorefront(actor.partnerId);
+    await this.ensureStorefrontPage(sf, actor.id);
+    const name = input.name.trim();
+    const pageSlug = input.slug.trim().toLowerCase();
+    if (name.length < 2) throw new BadRequestException("Page name is too short");
+    if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(pageSlug) || pageSlug === "home") {
+      throw new BadRequestException("Page slug must be kebab-case and cannot be 'home'");
+    }
+    const existing = await this.prisma.constructorPage.findFirst({
+      where: { context: "storefront", tenantId: sf.partnerId, slug: `storefront-${sf.slug}-${pageSlug}` },
+    });
+    if (existing) throw new BadRequestException("Page slug already exists");
+    const defaultSections: PageSectionInput[] = [
+      { blockType: "content-about", blockInstanceId: "page-about", sortOrder: 0, enabled: true, settings: { heading: name, body: "" } },
+      { blockType: "storefront-contacts", blockInstanceId: "page-contacts", sortOrder: 1, enabled: true, settings: { heading: "Контакты" } },
+      { blockType: "storefront-footer", blockInstanceId: "page-footer", sortOrder: 2, enabled: true, settings: { text: sf.businessName ?? sf.slug } },
+    ];
+    const page = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.constructorPage.create({
+        data: {
+          slug: `storefront-${sf.slug}-${pageSlug}`,
+          context: "storefront",
+          tenantId: sf.partnerId,
+          status: "DRAFT",
+          draftVersion: 1,
+          seo: { pageSlug, navLabel: name, isHome: false, title: name, description: "", robots: "index" } as any,
+          designConfig: { themePreset: sf.themePreset } as any,
+        },
+      });
+      for (const section of defaultSections) {
+        await tx.constructorPageSection.create({
+          data: {
+            pageId: created.id,
+            version: 1,
+            blockType: section.blockType,
+            blockInstanceId: section.blockInstanceId,
+            sortOrder: section.sortOrder,
+            enabled: section.enabled,
+            settings: (section.settings ?? {}) as any,
+            style: {},
+            responsive: {},
+            dataSource: {},
+            visibility: null as any,
+            localeContent: {},
+          },
+        });
+      }
+      await tx.constructorPageAuditLog.create({ data: { pageId: created.id, version: 1, action: "create", actorId: actor.id } });
+      return created;
+    });
+    return this.getPage(page.slug, actor.id);
+  }
+
+  private async resolveStorefrontPage(
+    actor: { id: string; partnerId: string | null },
+    pageId?: string,
+  ) {
+    const sf = await this.requireOwnStorefront(actor.partnerId);
+    if (!pageId) return this.ensureStorefrontPage(sf, actor.id);
+    const page = await this.prisma.constructorPage.findFirst({
+      where: { id: pageId, context: "storefront", tenantId: sf.partnerId },
+    });
+    if (!page) throw new NotFoundException("Storefront page not found");
+    return page;
+  }
+
+  async saveStorefrontDraft(
+    actor: { id: string; partnerId: string | null },
+    sections: PageSectionInput[],
+    pageId?: string,
+  ): Promise<PageConfigView> {
+    const page = await this.resolveStorefrontPage(actor, pageId);
+    for (const section of sections) {
+      const def = getBlockDefinition(section.blockType);
+      if (!def || !def.allowedContexts.includes("storefront")) {
+        throw new ForbiddenException(`Block type "${section.blockType}" is not available for Storefront`);
+      }
+    }
+    return this.saveDraft(page.slug, sections, actor.id);
+  }
+
+  async publishStorefront(actor: { id: string; partnerId: string | null }, pageId?: string): Promise<PageConfigView> {
+    const page = await this.resolveStorefrontPage(actor, pageId);
+    const draftSections = await this.prisma.constructorPageSection.count({
+      where: { pageId: page.id, version: page.draftVersion ?? 0, enabled: true },
+    });
+    if (draftSections === 0) {
+      throw new BadRequestException("Add at least one website block before publishing");
+    }
+    return this.publish(page.slug, actor.id);
+  }
+
+  async getStorefrontPreview(actor: { id: string; partnerId: string | null }, pageId?: string): Promise<PageConfigView> {
+    const page = await this.resolveStorefrontPage(actor, pageId);
+    return this.getPreview(page.slug, actor.id);
+  }
+
+  async saveStorefrontDesign(
+    actor: { id: string; partnerId: string | null },
+    input: { accentColor?: string; fontFamily?: string },
+    pageId?: string,
+  ): Promise<PageConfigView> {
+    const page = await this.resolveStorefrontPage(actor, pageId);
+    const accentColor = input.accentColor?.trim() || null;
+    if (accentColor && !/^#[0-9a-f]{6}$/i.test(accentColor)) {
+      throw new BadRequestException("accentColor must be a #RRGGBB value");
+    }
+    const allowedFonts = ["Inter, system-ui, sans-serif", "Georgia, serif", "'Times New Roman', serif", "Arial, sans-serif"];
+    const fontFamily = input.fontFamily?.trim() || null;
+    if (fontFamily && !allowedFonts.includes(fontFamily)) {
+      throw new BadRequestException("fontFamily is not allowed");
+    }
+    const design = {
+      ...((page.designConfig as Record<string, unknown> | null) ?? {}),
+      accentColor,
+      fontFamily,
+    };
+    await this.prisma.$transaction(async (tx) => {
+      await tx.constructorPage.update({ where: { id: page.id }, data: { designConfig: design as any } });
+      if (page.currentVersion) {
+        const published = await tx.constructorPageVersion.findUnique({
+          where: { pageId_version: { pageId: page.id, version: page.currentVersion } },
+        });
+        if (published) {
+          await tx.constructorPageVersion.update({
+            where: { id: published.id },
+            data: { snapshot: { ...(published.snapshot as Record<string, unknown>), designConfig: design } as any },
+          });
+        }
+      }
+      await tx.constructorPageAuditLog.create({
+        data: { pageId: page.id, version: page.currentVersion ?? page.draftVersion ?? null, action: "update_design", actorId: actor.id },
+      });
+    });
+    return this.getPage(page.slug, actor.id);
+  }
+
+  async saveStorefrontSeo(
+    actor: { id: string; partnerId: string | null },
+    input: { title?: string; description?: string },
+    pageId?: string,
+  ): Promise<PageConfigView> {
+    const page = await this.resolveStorefrontPage(actor, pageId);
+    const seo = {
+      ...((page.seo as Record<string, unknown> | null) ?? {}),
+      title: (input.title ?? "").trim(),
+      description: (input.description ?? "").trim(),
+      robots: "index",
+    };
+    await this.prisma.$transaction(async (tx) => {
+      await tx.constructorPage.update({ where: { id: page.id }, data: { seo: seo as any } });
+      if (page.currentVersion) {
+        const published = await tx.constructorPageVersion.findUnique({
+          where: { pageId_version: { pageId: page.id, version: page.currentVersion } },
+        });
+        if (published) {
+          await tx.constructorPageVersion.update({
+            where: { id: published.id },
+            data: { snapshot: { ...(published.snapshot as Record<string, unknown>), seo } as any },
+          });
+        }
+      }
+      await tx.constructorPageAuditLog.create({
+        data: { pageId: page.id, version: page.currentVersion ?? page.draftVersion ?? null, action: "update_seo", actorId: actor.id },
+      });
+    });
+    return this.getPage(page.slug, actor.id);
+  }
+
+  /**
+   * Public contract: published tenant page only. Returns null when the
+   * storefront is not live/entitled or the partner has no page — the public
+   * route then falls back to the legacy StorefrontSite template.
+   */
+  async getPublishedStorefrontPage(slug: string, pageSlug = "home"): Promise<PageConfigView | null> {
+    const sf = await this.prisma.partnerStorefront.findUnique({ where: { slug } });
+    if (!sf || sf.status !== "ACTIVE" || !sf.activatedAt || sf.entitlementStatus !== "ACTIVE") {
+      return null;
+    }
+    const pages = await this.prisma.constructorPage.findMany({
+      where: { context: "storefront", tenantId: sf.partnerId },
+      orderBy: { createdAt: "asc" },
+    });
+    const page = pages.find((p) => {
+      const seo = (p.seo as Record<string, unknown> | null) ?? {};
+      return pageSlug === "home" ? Boolean(seo.isHome) : seo.pageSlug === pageSlug;
+    }) ?? (pageSlug === "home" ? pages[0] : undefined);
+    if (!page || !page.currentVersion) return null;
+    return this.getPublished(page.slug);
+  }
+
+  async listPublicStorefrontPages(slug: string) {
+    const sf = await this.prisma.partnerStorefront.findUnique({ where: { slug } });
+    if (!sf || sf.status !== "ACTIVE" || !sf.activatedAt || sf.entitlementStatus !== "ACTIVE") {
+      return [];
+    }
+    const pages = await this.prisma.constructorPage.findMany({
+      where: { context: "storefront", tenantId: sf.partnerId },
+      orderBy: { createdAt: "asc" },
+    });
+    return pages
+      .filter((page) => page.currentVersion != null)
+      .map((page, index) => {
+        const seo = (page.seo as Record<string, unknown> | null) ?? {};
+        return {
+          slug: String(seo.pageSlug ?? (index === 0 ? "home" : page.slug)),
+          name: String(seo.navLabel ?? page.slug),
+          isHome: index === 0 || Boolean(seo.isHome),
+        };
+      });
+  }
+
+  private async requireOwnStorefront(partnerId: string | null) {
+    if (!partnerId) throw new ForbiddenException("Partner scope is required");
+    const sf = await this.prisma.partnerStorefront.findUnique({ where: { partnerId } });
+    if (!sf) throw new NotFoundException("Create your Storefront before opening the website builder");
+    return sf;
+  }
+
+  private async ensureStorefrontPage(
+    sf: { partnerId: string; slug: string; businessName: string | null; tagline: string | null; description: string | null; heroHeading: string | null; heroSubheading: string | null; defaultLocale: string; themePreset: string },
+    actorId: string,
+  ) {
+    const pages = await this.prisma.constructorPage.findMany({
+      where: { context: "storefront", tenantId: sf.partnerId },
+      orderBy: { createdAt: "asc" },
+    });
+    const existing = pages.find((page) => Boolean(((page.seo as Record<string, unknown> | null) ?? {}).isHome)) ?? pages[0];
+    if (existing) return existing;
+
+    const name = sf.businessName ?? sf.slug;
+    const sections: PageSectionInput[] = [
+      {
+        blockType: "storefront-hero",
+        blockInstanceId: "sf-hero-main",
+        sortOrder: 0,
+        enabled: true,
+        settings: {
+          heading: sf.heroHeading ?? name,
+          subheading: sf.heroSubheading ?? sf.tagline ?? "",
+          ctaLabel: "Смотреть каталог",
+          ctaHref: "#products",
+        },
+      },
+      {
+        blockType: "storefront-about",
+        blockInstanceId: "sf-about-main",
+        sortOrder: 1,
+        enabled: true,
+        settings: { heading: "О нас", body: sf.description ?? "" },
+      },
+      {
+        blockType: "storefront-products",
+        blockInstanceId: "sf-products-main",
+        sortOrder: 2,
+        enabled: true,
+        settings: { heading: "Туры и услуги", pageSize: 12 },
+      },
+      {
+        blockType: "storefront-cta",
+        blockInstanceId: "sf-cta-main",
+        sortOrder: 3,
+        enabled: true,
+        settings: { heading: "Готовы подобрать путешествие?", label: "Связаться", href: "#contacts" },
+      },
+      {
+        blockType: "storefront-contacts",
+        blockInstanceId: "sf-contacts-main",
+        sortOrder: 4,
+        enabled: true,
+        settings: { heading: "Контакты" },
+      },
+      {
+        blockType: "storefront-footer",
+        blockInstanceId: "sf-footer-main",
+        sortOrder: 5,
+        enabled: true,
+        settings: { text: name },
+      },
+    ];
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const page = await tx.constructorPage.create({
+          data: {
+            slug: `storefront-${sf.slug}`,
+            context: "storefront",
+            tenantId: sf.partnerId,
+            status: "DRAFT",
+            draftVersion: 1,
+            seo: {
+              pageSlug: "home",
+              navLabel: name,
+              isHome: true,
+              title: { ru: name, az: name, en: name },
+              description: { ru: sf.description ?? sf.tagline ?? "", az: sf.description ?? sf.tagline ?? "", en: sf.description ?? sf.tagline ?? "" },
+              robots: "index",
+            } as any,
+            headerConfig: { brandName: name, logo: null, navVisible: true } as any,
+            footerConfig: { text: name } as any,
+            designConfig: { themePreset: sf.themePreset } as any,
+          },
+        });
+        for (const section of sections) {
+          const def = getBlockDefinition(section.blockType);
+          await tx.constructorPageSection.create({
+            data: {
+              pageId: page.id,
+              version: 1,
+              blockType: section.blockType,
+              blockInstanceId: section.blockInstanceId,
+              sortOrder: section.sortOrder,
+              enabled: section.enabled,
+              settings: (section.settings ?? def?.defaultSettings ?? {}) as any,
+              style: {},
+              responsive: {},
+              dataSource: {},
+              visibility: null as any,
+              localeContent: {},
+            },
+          });
+        }
+        await tx.constructorPageAuditLog.create({
+          data: { pageId: page.id, version: 1, action: "create", actorId },
+        });
+        return page;
+      });
+    } catch (e: any) {
+      // Concurrent first open: unique slug conflict — return the winner.
+      if (e?.code === "P2002") {
+        const raced = await this.prisma.constructorPage.findFirst({
+          where: { context: "storefront", tenantId: sf.partnerId },
+          orderBy: { updatedAt: "desc" },
+        });
+        if (raced) return raced;
+      }
+      throw e;
+    }
+  }
+
+  async saveDraft(slug: string, sections: PageSectionInput[], actorId: string): Promise<PageConfigView> {    const page = await this.prisma.constructorPage.findUnique({ where: { slug } });
     if (!page) throw new NotFoundException(`Page "${slug}" not found`);
 
     const newDraftVersion = (page.draftVersion ?? page.currentVersion ?? 0) + 1;
 
-    // Validate all block types
+    // Validate all block types and context membership.
     for (const section of sections) {
-      if (!getBlockDefinition(section.blockType)) {
+      const def = getBlockDefinition(section.blockType);
+      if (!def) {
         throw new ForbiddenException(`Unknown block type: ${section.blockType}`);
+      }
+      if (!def.allowedContexts.includes(page.context)) {
+        throw new ForbiddenException(`Block type "${section.blockType}" is not available for ${page.context}`);
       }
     }
 
@@ -366,10 +741,14 @@ export class ConstructorService {
       orderBy: { sortOrder: "asc" },
     });
 
-    // Validate all blocks
+    // Validate all blocks and context membership.
     for (const s of draftSections) {
-      if (!getBlockDefinition(s.blockType)) {
+      const def = getBlockDefinition(s.blockType);
+      if (!def) {
         throw new ForbiddenException(`Unknown block type: ${s.blockType}`);
+      }
+      if (!def.allowedContexts.includes(page.context)) {
+        throw new ForbiddenException(`Block type "${s.blockType}" is not available for ${page.context}`);
       }
     }
 

@@ -113,7 +113,8 @@ describe("Phase 1 Step 1.16 — Communication Foundation (e2e)", () => {
   /** Создаёт реальный Order + Booking (для context ORDER/BOOKING). */
   const createOrderWithBooking = async (customerId: string, title: string) => {
     const product = (
-      await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `${title} ${stamp}`, tariffs: [{ name: "S", price: 90 }] }).expect(201)
+      await adminAgent.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `${title} ${stamp}`, tariffs: [{ name: "S", price: 90 }] }).expect(201)
     ).body.product;
     created.products.push(product.id);
     await adminAgent.post(`/api/v1/products/${product.id}/publish`).expect(201);

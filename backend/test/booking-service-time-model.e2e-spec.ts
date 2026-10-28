@@ -109,6 +109,7 @@ describe("Phase 2 Step 2.8A — Booking Service Date / Time Model (e2e)", () => 
     const res = await adminAgent
       .post("/api/v1/products")
       .send({
+        partnerId: "00000000-0000-4000-8000-000000000001",
         type: opts.type ?? "TOUR",
         title: `S28A ${tag} ${stamp}`,
         tariffs: [{ name: "Std", price: opts.price ?? 100 }],
@@ -360,7 +361,8 @@ describe("Phase 2 Step 2.8A — Booking Service Date / Time Model (e2e)", () => 
     it("35.3. invalid timezone (offset 'UTC+4' вместо IANA) при создании Product → 422", async () => {
       await adminAgent
         .post("/api/v1/products")
-        .send({ type: "TOUR", title: `S28A bad-zone ${stamp}`, tariffs: [{ name: "Std", price: 100 }], serviceTimeZone: "UTC+4" })
+        .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `S28A bad-zone ${stamp}`, tariffs: [{ name: "Std", price: 100 }], serviceTimeZone: "UTC+4" })
         .expect(422);
     });
 

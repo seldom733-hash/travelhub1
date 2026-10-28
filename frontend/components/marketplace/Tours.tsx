@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Compass } from "@phosphor-icons/react";
-import { t, useLocale, formatDate } from "@/lib/i18n";
+import { t, useLocale, formatDateShort, formatPrice } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import { useHotelPhoto } from "@/lib/hotel-photo";
+import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
+import { categoryLabel } from "@/lib/category-label";
 
 function TourCardSkeleton() {
   return (
@@ -57,9 +59,9 @@ function TourCard({ card }: { card: PublicProductCard }) {
 
       {/* Content */}
       <div className="p-4">
-        {card.category?.title && (
+        {categoryLabel(card.category, locale) && (
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-neutral-500">
-            {card.category.title}
+            {categoryLabel(card.category, locale)}
           </p>
         )}
         <h3 className="line-clamp-2 font-serif text-sm font-semibold text-white transition-colors group-hover:text-gold">
@@ -70,32 +72,17 @@ function TourCard({ card }: { card: PublicProductCard }) {
             {card.shortDescription}
           </p>
         )}
-        {card.seller && (
-          <p className="mt-1 text-[10px] text-neutral-500">
-            {card.seller.visibilityMode === "ANONYMOUS"
-              ? t("seller.anonymous_label", locale)
-              : card.seller.displayName ?? t("seller.anonymous_label", locale)}
-          </p>
-        )}
+        <SupplierCodeBadge code={card.partnerCode} className="mt-1 text-[10px] text-neutral-500" />
         <div className="mt-3 flex items-center justify-between">
           <div>
             {card.priceFrom ? (
               <p className="text-xs font-semibold text-gold">
-                {t("price.from", locale)} {card.priceFrom} {card.currency || ""}
+                {formatPrice(card.priceFrom, card.currency, locale)}
+                {card.headlineDepartureDate && <span className="ml-1 font-normal text-neutral-400">· {formatDateShort(card.headlineDepartureDate, locale)}</span>}
+                {card.headlineNights != null && <span className="ml-1 font-normal text-neutral-400">· {card.headlineNights} {card.headlineNights === 1 ? t("card.night", locale) : t("card.nights", locale)}</span>}
               </p>
             ) : (
               <p className="text-xs text-neutral-500">{t("price.on_request", locale)}</p>
-            )}
-            {(card.headlineDepartureDate || card.headlineNights != null) && (
-              <p className="mt-1 text-[10px] text-neutral-400">
-                {card.headlineDepartureDate && (
-                  <span>{formatDate(card.headlineDepartureDate, locale)}</span>
-                )}
-                {card.headlineDepartureDate && card.headlineNights != null && <span> · </span>}
-                {card.headlineNights != null && (
-                  <span>{card.headlineNights} {card.headlineNights === 1 ? t("card.night", locale) : t("card.nights", locale)}</span>
-                )}
-              </p>
             )}
           </div>
           <span className="text-[11px] text-neutral-500 transition-colors group-hover:text-gold">
@@ -123,12 +110,14 @@ export default function Tours() {
     // longer be pushed out of the window by another product type.
     // Skip the first 6 (shown in Hot Tours) to avoid duplication.
     void publicApi
-      .listProducts({ category: "tours", sort: "newest", pageSize: 50 })
+      .listProducts({ category: "tours", sort: "price_asc", pageSize: 50 })
       .then((r) => {
         if (alive) {
-          const toursOnly = r.items
-            .filter((item) => item.type === "TOUR")
-            .slice(6, 12); // Skip first 6 (Hot Tours), take next 6
+          const items = r.items.filter((item) => item.type === "TOUR");
+          // Normally the first six are shown in Hot Tours; take the next six
+          // here. With a small catalog (or when Hot Tours is disabled) there is
+          // no "next six", so show the available tours instead of empty.
+          const toursOnly = items.length > 6 ? items.slice(6, 12) : items.slice(0, 6);
           setTours(toursOnly);
           setLoading(false);
         }

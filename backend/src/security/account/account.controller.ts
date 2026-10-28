@@ -116,7 +116,8 @@ export class AccountController {
     @Query() query: OwnCabinetQuery,
   ) {
     this.assertBuyerActor(user);
-    return this.documents.listBuyerDocuments(user.id, query.page, query.pageSize);
+    const result = await this.documents.listBuyerDocuments(user.id, query.page, query.pageSize);
+    return { ...result, available: true };
   }
 
   @RequirePermissions("account.support.read_own")

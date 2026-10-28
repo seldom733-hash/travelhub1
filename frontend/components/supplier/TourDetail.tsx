@@ -64,12 +64,12 @@ export default function TourDetail({
   const [children, setChildren] = useState(0);
   const [childAges, setChildAges] = useState<number[]>([]);
   const [nights, setNights] = useState(() => {
-    // Supplier card nights can be a string ("3") or fall outside the select
-    // options (ANEX France cards carry 2). Clamp into the rendered range
-    // (3..14) so the <select> always has a matching <option>.
-    const raw = Number(attributes?.nights);
+    // Prefer the nearest-price night count saved by the catalog sync, then the
+    // supplier card value. ANEX starts at 2 nights; the select mirrors the
+    // supplier range 2..28.
+    const raw = Number(attributes?.priceNights ?? attributes?.nights);
     const n = Number.isFinite(raw) && raw >= 1 ? Math.round(raw) : 7;
-    return Math.min(14, Math.max(3, n));
+    return Math.min(28, Math.max(2, n));
   });
 
   // Product identity — hotel keys pin the calendar to THIS hotel; the program
@@ -248,7 +248,7 @@ export default function TourDetail({
                 onChange={(e) => setNights(Number(e.target.value))}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               >
-                {Array.from({ length: 12 }, (_, i) => i + 3).map((n) => (
+                {Array.from({ length: 27 }, (_, i) => i + 2).map((n) => (
                   <option key={n} value={n}>
                     {n} {n === 1 ? "ночь" : n < 5 ? "ночи" : "ночей"}
                   </option>

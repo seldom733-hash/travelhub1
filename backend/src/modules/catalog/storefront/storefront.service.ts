@@ -32,7 +32,8 @@
  * unique-инварианты (partnerId/slug); события НЕ создаются (нет consumer'а).
  */
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
+import { promises as dns } from "dns";
 import { Prisma, type StorefrontEntitlementStatus, type StorefrontMediaKind } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { IdsService } from "../../../shared/ids.service";
@@ -110,8 +111,12 @@ export interface StorefrontView {
   heroHeading: string | null;
   heroSubheading: string | null;
   themePreset: string;
+  customDomain: string | null;
+  customDomainStatus: string;
+  customDomainToken: string | null;
+  customDomainVerifiedAt: string | null;
   /** Storefront-owned media (metadata; байты — через media endpoints). */
-  media: Array<{ id: string; kind: string; mimeType: string; width: number | null; height: number | null; createdAt: string }>;
+  media: Array<{ id: string; kind: string; mimeType: string; width: number | null; height: number | null; sortOrder: number; altText: string | null; createdAt: string }>;
   /** Публичный URL витрины (работает только при ACTIVE + entitlement ACTIVE). */
   publicUrl: string;
   createdAt: string;
@@ -479,15 +484,18 @@ export class StorefrontService {
    * (public predicate); preview (owner) видит staged/любые. Replace-семантика:
    * один файл на kind (DB unique [storefrontId, kind]); старый объект удаляется.
    */
-  async uploadMedia(actor: AuthUser, kind: StorefrontMediaKind, file: { originalname: string; mimetype: string; size: number; buffer: Buffer }): Promise<StorefrontView> {
+  async uploadMedia(actor: AuthUser, kind: StorefrontMediaKind, file: { originalname: string; mimetype: string; size: number; buffer: Buffer }, altText?: string): Promise<StorefrontView> {
     const partnerId = await this.assertEligible(actor);
     const sf = await this.prisma.partnerStorefront.findUnique({
       where: { partnerId },
       include: { media: { orderBy: { createdAt: "asc" } } },
     });
     if (!sf) throw new NotFoundError("Storefront not found");
-    if (kind !== "LOGO" && kind !== "HERO") {
-      throw new ValidationDomainError(`Invalid media kind "${String(kind)}"; allowed: LOGO, HERO`);
+    if (kind !== "LOGO" && kind !== "HERO" && kind !== "GALLERY") {
+      throw new ValidationDomainError(`Invalid media kind "${String(kind)}"; allowed: LOGO, HERO, GALLERY`);
+    }
+    if (kind === "GALLERY" && sf.media.filter((m) => m.kind === "GALLERY").length >= 24) {
+      throw new ValidationDomainError("Gallery limit reached (24 images)");
     }
     if (!file?.buffer) {
       throw new ValidationDomainError("No file provided for upload");
@@ -507,9 +515,10 @@ export class StorefrontService {
 
     try {
       const row = await this.prisma.$transaction(async (tx) => {
-        const existing = await tx.storefrontMedia.findUnique({
-          where: { storefrontId_kind: { storefrontId: sf.id, kind } },
+        const existing = kind === "GALLERY" ? null : await tx.storefrontMedia.findFirst({
+          where: { storefrontId: sf.id, kind },
         });
+        const galleryCount = kind === "GALLERY" ? await tx.storefrontMedia.count({ where: { storefrontId: sf.id, kind: "GALLERY" } }) : 0;
         let mediaRow;
         if (existing) {
           mediaRow = await tx.storefrontMedia.update({
@@ -521,6 +530,7 @@ export class StorefrontService {
               width: processed.width,
               height: processed.height,
               originalFileName: file.originalname || `${kind.toLowerCase()}.webp`,
+              altText: altText?.trim() || existing.altText,
               createdById: actor.id,
             },
           });
@@ -536,6 +546,8 @@ export class StorefrontService {
               width: processed.width,
               height: processed.height,
               originalFileName: file.originalname || `${kind.toLowerCase()}.webp`,
+              sortOrder: galleryCount,
+              altText: altText?.trim() || null,
               createdById: actor.id,
             },
           });
@@ -570,8 +582,8 @@ export class StorefrontService {
       include: { media: { orderBy: { createdAt: "asc" } } },
     });
     if (!sf) throw new NotFoundError("Storefront not found");
-    const existing = await this.prisma.storefrontMedia.findUnique({
-      where: { storefrontId_kind: { storefrontId: sf.id, kind } },
+    const existing = await this.prisma.storefrontMedia.findFirst({
+      where: { storefrontId: sf.id, kind },
     });
     if (!existing) throw new NotFoundError(`Storefront ${String(kind)} media not found`);
 
@@ -595,6 +607,33 @@ export class StorefrontService {
    * DRAFT/INACTIVE/staged media видны владельцу, НЕ публикуют витрину.
    * Байты остаются приватными (signed, 5 min).
    */
+  /** Delete one gallery image by id (own-scope; logo/hero stay in the app). */
+  async deleteGalleryMediaById(actor: AuthUser, mediaId: string): Promise<StorefrontView> {
+    const partnerId = await this.assertEligible(actor);
+    const sf = await this.prisma.partnerStorefront.findUnique({
+      where: { partnerId },
+      include: { media: { orderBy: { createdAt: "asc" } } },
+    });
+    if (!sf) throw new NotFoundError("Storefront not found");
+    const media = await this.prisma.storefrontMedia.findFirst({
+      where: { id: mediaId, storefrontId: sf.id, kind: "GALLERY" },
+    });
+    if (!media) throw new NotFoundError("Gallery media not found");
+    await this.prisma.$transaction(async (tx) => {
+      await tx.storefrontMedia.delete({ where: { id: media.id } });
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "storefront.media_deleted",
+        resource: "PartnerStorefront",
+        resourceId: sf.id,
+        details: { partnerId, storefrontId: sf.id, mediaId: media.id, kind: "GALLERY" },
+      });
+    });
+    await this.safeDelete(media.storageKey);
+    return this.toView({ ...sf, media: await this.listMediaRows(sf.id) });
+  }
+
   async signedPreviewMediaUrl(actor: AuthUser, mediaId: string): Promise<{ url: string; expiresIn: number; mediaId: string }> {
     const partnerId = await this.assertEligible(actor);
     const media = await this.prisma.storefrontMedia.findFirst({ where: { id: mediaId, storefront: { partnerId } } });
@@ -687,6 +726,100 @@ export class StorefrontService {
     return theme;
   }
 
+  /** Set/replace custom domain; verification starts in PENDING. */
+  async setCustomDomain(actor: AuthUser, rawDomain: string): Promise<StorefrontView> {
+    const partnerId = await this.assertEligible(actor);
+    const sf = await this.prisma.partnerStorefront.findUnique({ where: { partnerId } });
+    if (!sf) throw new NotFoundError("Storefront not found");
+    const domain = String(rawDomain ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].replace(/\.$/, "");
+    if (!/^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/.test(domain)) {
+      throw new ValidationDomainError("Invalid custom domain");
+    }
+    const token = `navitravel-verify=${randomBytes(16).toString("hex")}`;
+    try {
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.partnerStorefront.update({
+          where: { id: sf.id },
+          data: { customDomain: domain, customDomainStatus: "PENDING", customDomainToken: token, customDomainVerifiedAt: null },
+          include: { media: true },
+        });
+        await this.security.audit(tx, {
+          userId: actor.id,
+          username: actor.username,
+          action: "storefront.domain_set",
+          resource: "PartnerStorefront",
+          resourceId: sf.id,
+          details: { domain },
+        });
+        return row;
+      });
+      return this.toView(updated);
+    } catch (err) {
+      if (uniqueConstraintNames(err).some((n) => n.toLowerCase().includes("customdomain"))) {
+        throw new ConflictError("Custom domain is already used by another storefront");
+      }
+      throw err;
+    }
+  }
+
+  /** Verify domain ownership via DNS TXT `navitravel-verify=<token>`. */
+  async verifyCustomDomain(actor: AuthUser): Promise<StorefrontView> {
+    const partnerId = await this.assertEligible(actor);
+    const sf = await this.prisma.partnerStorefront.findUnique({ where: { partnerId }, include: { media: true } });
+    if (!sf || !sf.customDomain || !sf.customDomainToken) throw new ValidationDomainError("Set a custom domain first");
+    let records: string[][] = [];
+    try {
+      records = await dns.resolveTxt(sf.customDomain);
+    } catch (err) {
+      throw new ValidationDomainError(`DNS TXT lookup failed: ${(err as Error).message}`);
+    }
+    const values = records.map((parts) => parts.join(""));
+    if (!values.includes(sf.customDomainToken)) {
+      throw new ValidationDomainError(`TXT record ${sf.customDomainToken} not found`);
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.partnerStorefront.update({
+        where: { id: sf.id },
+        data: { customDomainStatus: "VERIFIED", customDomainVerifiedAt: new Date() },
+        include: { media: true },
+      });
+      await this.security.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "storefront.domain_verified",
+        resource: "PartnerStorefront",
+        resourceId: sf.id,
+        details: { domain: sf.customDomain },
+      });
+      return row;
+    });
+    return this.toView(updated);
+  }
+
+  async removeCustomDomain(actor: AuthUser): Promise<StorefrontView> {
+    const partnerId = await this.assertEligible(actor);
+    const sf = await this.prisma.partnerStorefront.findUnique({ where: { partnerId } });
+    if (!sf) throw new NotFoundError("Storefront not found");
+    const updated = await this.prisma.partnerStorefront.update({
+      where: { id: sf.id },
+      data: { customDomain: null, customDomainStatus: "NONE", customDomainToken: null, customDomainVerifiedAt: null },
+      include: { media: true },
+    });
+    return this.toView(updated);
+  }
+
+  /** Anonymous host→slug resolution for custom-domain routing. */
+  async resolveByDomain(host: string): Promise<{ slug: string } | null> {
+    const domain = String(host ?? "").trim().toLowerCase().split(":")[0].replace(/\.$/, "");
+    if (!domain) return null;
+    const sf = await this.prisma.partnerStorefront.findFirst({
+      where: { customDomain: domain, customDomainStatus: "VERIFIED" },
+      select: { slug: true, status: true, activatedAt: true, entitlementStatus: true },
+    });
+    if (!sf || sf.status !== "ACTIVE" || !sf.activatedAt || sf.entitlementStatus !== "ACTIVE") return null;
+    return { slug: sf.slug };
+  }
+
   private toView(sf: {
     id: string;
     code: string;
@@ -708,11 +841,15 @@ export class StorefrontService {
     heroHeading: string | null;
     heroSubheading: string | null;
     themePreset: string;
+    customDomain?: string | null;
+    customDomainStatus?: string;
+    customDomainToken?: string | null;
+    customDomainVerifiedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
     activatedAt: Date | null;
     deactivatedAt: Date | null;
-    media?: Array<{ id: string; kind: string; mimeType: string; width: number | null; height: number | null; createdAt: Date }>;
+    media?: Array<{ id: string; kind: string; mimeType: string; width: number | null; height: number | null; sortOrder: number; altText: string | null; createdAt: Date }>;
   }): StorefrontView {
     const social = Array.isArray(sf.socialLinks)
       ? (sf.socialLinks as unknown as SocialLinkInput[])
@@ -738,12 +875,18 @@ export class StorefrontService {
       heroHeading: sf.heroHeading,
       heroSubheading: sf.heroSubheading,
       themePreset: sf.themePreset,
+      customDomain: sf.customDomain ?? null,
+      customDomainStatus: sf.customDomainStatus ?? "NONE",
+      customDomainToken: sf.customDomainToken ?? null,
+      customDomainVerifiedAt: sf.customDomainVerifiedAt ? sf.customDomainVerifiedAt.toISOString() : null,
       media: (sf.media ?? []).map((m) => ({
         id: m.id,
         kind: m.kind,
         mimeType: m.mimeType,
         width: m.width,
         height: m.height,
+        sortOrder: m.sortOrder,
+        altText: m.altText,
         createdAt: m.createdAt.toISOString(),
       })),
       publicUrl: `/store/${sf.slug}`,

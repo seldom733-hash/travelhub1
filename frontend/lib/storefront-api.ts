@@ -12,7 +12,7 @@ import { api } from "./api";
 
 export type StorefrontStatus = "DRAFT" | "ACTIVE" | "INACTIVE";
 export type StorefrontEntitlement = "NONE" | "ACTIVE" | "SUSPENDED" | "EXPIRED";
-export type StorefrontMediaKind = "LOGO" | "HERO";
+export type StorefrontMediaKind = "LOGO" | "HERO" | "GALLERY";
 
 export interface SocialLinkInput {
   platform: string;
@@ -25,6 +25,8 @@ export interface StorefrontMediaView {
   mimeType: string;
   width: number | null;
   height: number | null;
+  sortOrder: number;
+  altText: string | null;
   createdAt: string;
 }
 
@@ -49,6 +51,10 @@ export interface StorefrontView {
   heroHeading: string | null;
   heroSubheading: string | null;
   themePreset: string;
+  customDomain: string | null;
+  customDomainStatus: "NONE" | "PENDING" | "VERIFIED" | "FAILED";
+  customDomainToken: string | null;
+  customDomainVerifiedAt: string | null;
   media: StorefrontMediaView[];
   publicUrl: string;
   createdAt: string;
@@ -133,14 +139,29 @@ export const storefrontApi = {
   },
 
   /** Upload/replace logo|hero (multipart, до 15 MB). */
-  uploadMedia(kind: StorefrontMediaKind, file: File): Promise<StorefrontView> {
+  uploadMedia(kind: StorefrontMediaKind, file: File, altText?: string): Promise<StorefrontView> {
     const fd = new FormData();
     fd.append("file", file);
+    if (altText) fd.append("altText", altText);
     return api.postForm(`/partner/storefront/media/${kind}`, fd);
   },
 
   deleteMedia(kind: StorefrontMediaKind): Promise<StorefrontView> {
     return api.del(`/partner/storefront/media/${kind}`);
+  },
+
+  deleteGalleryMedia(mediaId: string): Promise<StorefrontView> {
+    return api.del(`/partner/storefront/media/id/${encodeURIComponent(mediaId)}`);
+  },
+
+  setDomain(domain: string): Promise<StorefrontView> {
+    return api.patch(`/partner/storefront/domain`, { domain });
+  },
+  verifyDomain(): Promise<StorefrontView> {
+    return api.post(`/partner/storefront/domain/verify`);
+  },
+  removeDomain(): Promise<StorefrontView> {
+    return api.del(`/partner/storefront/domain`);
   },
 
   /** Owner-only preview: short-lived signed URL (не публикует витрину). */

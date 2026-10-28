@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { auth, type AuthUser } from "@/lib/api";
-import { useCurrentUser } from "@/lib/use-user";
+import { useCurrentUserStatus } from "@/lib/use-user";
 import { isInternalRole, isPublicPath } from "@/lib/routes";
 import { t, useLocale } from "@/lib/i18n";
 import { fireMarketplaceSearch } from "@/lib/behavioral-events";
@@ -22,13 +22,13 @@ import LocaleSelector from "./public/LocaleSelector";
  * - НИКАКИХ internal sidebar/действий.
  */
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
-  const user = useCurrentUser();
+  const { user, ready: userReady } = useCurrentUserStatus();
   const locale = useLocale();
   const { brandName, loading: brandingLoading } = useGlobalBranding();
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      <PublicHeader user={user} />
+      <PublicHeader user={user} userReady={userReady} />
       <main className="flex-1">{children}</main>
       <footer className="border-t border-slate-200 bg-slate-50 py-6 text-center text-xs text-slate-400">
         {!brandingLoading && `© ${new Date().getFullYear()} ${brandName}. ${t("footer.rights_reserved", locale)}`}
@@ -37,7 +37,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   );
 }
 
-function PublicHeader({ user }: { user: AuthUser | null }) {
+function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
@@ -170,13 +170,15 @@ function PublicHeader({ user }: { user: AuthUser | null }) {
         {/* Locale selector (§17) */}
         <LocaleSelector />
 
-        {/* Step 1.10: public Partner onboarding entry */}
-        <Link
-          href="/become-a-partner"
-          className="hidden shrink-0 rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 lg:block"
-        >
-          {t("nav.become_partner", locale)}
-        </Link>
+        {/* Step 1.10: public Partner onboarding entry — guests only. */}
+        {userReady && user === null && (
+          <Link
+            href="/become-a-partner"
+            className="hidden shrink-0 rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 lg:block"
+          >
+            {t("nav.become_partner", locale)}
+          </Link>
+        )}
 
         {/* Account / Work Area entry (Step 1.9 §8 account states) */}
         <div className="shrink-0">
@@ -184,7 +186,7 @@ function PublicHeader({ user }: { user: AuthUser | null }) {
             <div className="flex items-center gap-2 text-sm">
               <Link
                 href={isPublicPath(pathname) && pathname !== "/" ? `/register?next=${encodeURIComponent(pathname)}` : "/register"}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-600"
+                className="hidden rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-600 sm:inline-flex"
               >
                 {t("nav.register", locale)}
               </Link>
@@ -199,7 +201,7 @@ function PublicHeader({ user }: { user: AuthUser | null }) {
             <div className="flex items-center gap-2 text-sm">
               <Link
                 href="/account"
-                className="rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-600"
+                className="hidden rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-600 sm:inline-flex"
               >
                 {t("nav.account", locale)}
               </Link>
@@ -214,7 +216,7 @@ function PublicHeader({ user }: { user: AuthUser | null }) {
             <div className="flex items-center gap-2 text-sm">
               <Link
                 href="/account"
-                className="rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-600"
+                className="hidden rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-600 sm:inline-flex"
               >
                 {t("nav.account", locale)}
               </Link>
@@ -235,7 +237,7 @@ function PublicHeader({ user }: { user: AuthUser | null }) {
               </Link>
               <button
                 onClick={logout}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-100"
+                className="hidden rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-100 sm:inline-flex"
               >
                 {t("nav.logout", locale)}
               </button>

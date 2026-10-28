@@ -133,7 +133,8 @@ describe("Phase 2 Step 2.2F — Proposal → Canonical Sales Conversion (e2e)", 
   const createProduct = async (tag: string, price = 100) => {
     const res = await adminAgent
       .post("/api/v1/products")
-      .send({ type: "TOUR", title: `Conversion ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
+      .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Conversion ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
       .expect(201);
     const product = res.body.product as { id: string };
     created.products.push(product.id);
@@ -280,7 +281,7 @@ describe("Phase 2 Step 2.2F — Proposal → Canonical Sales Conversion (e2e)", 
     const r = (
       await buyerAgent
         .post("/api/v1/buyer/requests")
-        .send({ categoryId: catHotelId, destinations: [{ countryCode: "TR" }], serviceDateFrom: "2026-09-01", serviceDateTo: "2026-09-07", adults: 2 })
+        .send({ categoryId: catHotelId, destinations: [{ countryCode: "TR" }], serviceDateFrom: "2027-09-01", serviceDateTo: "2027-09-07", adults: 2 })
         .expect(201)
     ).body as { id: string; version: number };
     const s = (await buyerAgent.post(`/api/v1/buyer/requests/${r.id}/submit`).send({ expectedVersion: r.version }).expect(201)).body as { id: string; version: number };
@@ -749,12 +750,30 @@ describe("Phase 2 Step 2.2F — Proposal → Canonical Sales Conversion (e2e)", 
     // acquisition-source-propagation.e2e-spec.
     await adminAgent
       .patch(`/api/v1/orders/${order.id}/travelers`)
-      .send({ travelers: [{ firstName: "Иван", lastName: "Иванов", birthDate: "1990-05-01", passportNumber: "P1234567", citizenship: "AZ", gender: "M" }] })
+      .send({ travelers: [{ firstName: "Иван", lastName: "Иванов", birthDate: "1990-05-01", passportNumber: "P1234567", passportExpiry: "2030-01-01", citizenship: "AZ", gender: "M" }] })
       .expect(200);
+    await prisma.orderTraveler.updateMany({
+      where: { orderId: order.id },
+      data: { dataCompleteness: "COMPLETE" },
+    });
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        termsAcceptedAt: new Date(),
+        travelerDataCompletedAt: new Date(),
+        finalConfirmedAt: new Date(),
+        pinnedRequirements: { passportExpiry: "OPTIONAL", gender: "NOT_REQUESTED" },
+      },
+    });
     for (const act of ["process", "confirm", "send"] as const) {
       await adminAgent.patch(`/api/v1/orders/${order.id}`).send({ action: act }).expect(200);
     }
-    const bookings = await prisma.booking.findMany({ where: { orderId: order.id } });
+    let bookings: Awaited<ReturnType<typeof prisma.booking.findMany>> = [];
+    for (let i = 0; i < 40; i += 1) {
+      bookings = await prisma.booking.findMany({ where: { orderId: order.id } });
+      if (bookings.length > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     expect(bookings.length).toBeGreaterThan(0);
     for (const b of bookings) {
       expect(b.acquisitionSource).toBe("BUYER_REQUEST"); // frozen из Order

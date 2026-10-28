@@ -198,7 +198,8 @@ describe("Phase 2 Step 2.1 — Sales Domain Foundation (e2e)", () => {
     expect(opp.leadId).toBe(lead.id);
 
     const product = (
-      await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Sales Quote Product ${stamp}`, tariffs: [{ name: "S", price: 90 }] }).expect(201)
+      await adminAgent.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Sales Quote Product ${stamp}`, tariffs: [{ name: "S", price: 90 }] }).expect(201)
     ).body.product as { id: string };
     created.products.push(product.id);
 
@@ -333,7 +334,8 @@ describe("Phase 2 Step 2.1 — Sales Domain Foundation (e2e)", () => {
 
     // Quote: DRAFT → ISSUED (Step 2.3: ISSUE требует состав + validUntil); повтор → 422.
     const product = (
-      await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Quote Lifecycle ${stamp}`, tariffs: [{ name: "Std", price: 90 }] }).expect(201)
+      await adminAgent.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Quote Lifecycle ${stamp}`, tariffs: [{ name: "Std", price: 90 }] }).expect(201)
     ).body.product as { id: string };
     created.products.push(product.id);
     const tariff = await prisma.tariff.findFirstOrThrow({ where: { productId: product.id } });

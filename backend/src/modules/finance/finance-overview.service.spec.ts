@@ -48,9 +48,14 @@ function makeService(opts: {
     supplierObligation: {
       aggregate: jest.fn().mockResolvedValue(opts.obligations ?? { _sum: { aznAmount: null, paidAmount: null, remainingAmount: null }, _count: { _all: 0 } }),
       count: jest.fn().mockResolvedValue(0),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     supplierPayout: {
       aggregate: jest.fn().mockResolvedValue(opts.payouts ?? { _sum: { aznAmount: null }, _count: { _all: 0 } }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    supplierPayoutAllocation: {
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     order: {
       findMany: jest.fn().mockResolvedValue(opts.orders ?? []),

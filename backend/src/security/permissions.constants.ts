@@ -68,6 +68,11 @@ export const PERMISSIONS = {
   "crm.partner.read": "Чтение партнёров (CRM)",
   "crm.partner.write": "Управление партнёрами",
   "crm.supplier.write": "Управление поставщиками",
+  // Supplier API (search/sync): коды уже требовались @RequirePermissions в
+  // supplier.controller.ts, но не были объявлены — fail-closed 403 для всех
+  // ролей (включая ADMIN). Объявлены в миграции 20261025150000.
+  "supplier.search.read": "Чтение поиска/офферов поставщиков",
+  "supplier.search.manage": "Запуск синхронизации и управление кэшем поставщиков",
   // Step 3.5C: Partner own-scope CRM (relations + intake)
   "crm.customer.read_own": "Чтение собственных CRM-отношений (partner own-scope)",
   "crm.customer.create_own": "Прямое добавление клиента/лида в собственный CRM (partner intake)",
@@ -159,6 +164,9 @@ export const PERMISSIONS = {
   "finance.obligation.manage": "Управление обязательствами поставщиков (cancel/adjust)",
   "finance.supplier_payout.read": "Чтение выплат поставщикам (SupplierPayout)",
   "finance.supplier_payout.manage": "Создание выплат поставщикам (SupplierPayout)",
+  // Finance completion: отдельное право подтверждения исполнения выплаты
+  // (PENDING → CONFIRMED). Регистрация/распределение/отмена — supplier_payout.manage.
+  "finance.supplier_payment.confirm": "Подтверждение исполнения платежа поставщику",
   // UNIFIED FINANCE CENTER Phase 3: сводные KPI (overview) Finance Center —
   // read-only агрегаты обязательств/выплат/маржи/поступлений/долгов. Отдельный
   // least-privilege: payment-read НЕ даёт overview; overview НЕ даёт payout-write.
@@ -340,6 +348,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "geography.read",
     "hotel_directory.read",
     "catalog.category_schema.read",
+    "supplier.search.read",
     "crm.customer.read",
     "crm.partner.read",
     "order.read",
@@ -431,6 +440,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.payment.write",
     "finance.payment.create",
     "finance.payment.manage",
+    // Finance completion: отдельное право подтверждения исполнения выплаты
+    // поставщику (миграция 20261025160000).
+    "finance.supplier_payment.confirm",
     "finance.refund.read",
     "finance.refund.write",
     "finance.refund.approve",
@@ -670,6 +682,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "account.profile.read",
     "account.profile.update",
     "catalog.product.read",
+    "supplier.search.read",
     "crm.customer.read",
     "crm.customer.write",
     "crm.contact.write",

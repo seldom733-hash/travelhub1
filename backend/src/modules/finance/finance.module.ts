@@ -12,9 +12,14 @@ import { RefundService } from "./refund.service";
 import { SettlementService } from "./settlement.service";
 import { SupplierFxRateService } from "./supplier-fx-rate.service";
 import { SupplierObligationService } from "./supplier-obligation.service";
+import { SupplierPaymentService } from "./supplier-payment.service";
+import { SupplierPaymentEvidenceService } from "./supplier-payment-evidence.service";
+import { SupplierDebtReportService } from "./supplier-debt-report.service";
+import { SupplierPaymentTermsService } from "./supplier-payment-terms.service";
 import { SupplierObligationConsumer } from "./supplier-obligation.consumer";
 import { FinanceOverviewService } from "./finance-overview.service";
 import { LedgerPostingConsumer } from "./ledger-posting.consumer";
+import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.service";
 
 /**
  * PHASE 2 STEP 2.10 — Finance Domain Foundation (новый bounded context, finance.*).
@@ -33,7 +38,7 @@ import { LedgerPostingConsumer } from "./ledger-posting.consumer";
 @Module({
   imports: [PaymentProviderModule],
   controllers: [FinanceController],
-  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer, SupplierFxRateService, SupplierObligationService, SupplierObligationConsumer, FinanceOverviewService, LedgerPostingConsumer],
+  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer, SupplierFxRateService, SupplierObligationService, SupplierPaymentService, SupplierPaymentEvidenceService, SupplierDebtReportService, SupplierPaymentTermsService, { provide: "ObjectStorageService", useClass: S3ObjectStorageService }, SupplierObligationConsumer, FinanceOverviewService, LedgerPostingConsumer],
   /** Step 2.12E: CommissionPolicyService экспортируется для Sales/Order
    *  freeze-time read (ADR-0013 D1: read by Sales/Order at freeze boundary,
    *  READ-only cross-domain). CommissionService/Consumer — Finance-internal.

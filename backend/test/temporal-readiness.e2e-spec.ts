@@ -211,7 +211,8 @@ describe("Phase 1 Step 1.13A — Temporal readiness (e2e)", () => {
 
     const res = await adminAgent
       .post("/api/v1/products")
-      .send({ type: "TOUR", title: `Temporal Product ${stamp}`, categoryId: cat.id, attributes: { days: 3 } })
+      .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Temporal Product ${stamp}`, categoryId: cat.id, attributes: { days: 3 } })
       .expect(201);
     const product = res.body.product as { id: string };
     created.products.push(product.id);

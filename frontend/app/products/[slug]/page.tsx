@@ -7,6 +7,8 @@ import MediaGallery from "@/components/public/MediaGallery";
 import GuestCheckoutForm from "@/components/public/GuestCheckoutForm";
 import Price from "@/components/public/Price";
 import { PublicErrorState, PublicNotFound } from "@/components/public/PublicStates";
+import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
+import { categoryLabel } from "@/lib/category-label";
 import { PdpSkeleton } from "@/components/public/Skeletons";
 import { formatDate, formatPrice as formatPriceRaw, t, useLocale } from "@/lib/i18n";
 import { fireMarketplaceCta, useMarketplaceProductViewed } from "@/lib/behavioral-events";
@@ -96,7 +98,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             <>
               <span className="mx-1.5">/</span>
               <Link href={`/categories/${p.category.slug}`} className="hover:text-blue-600 hover:underline">
-                {p.category.title}
+                {categoryLabel(p.category, locale)}
               </Link>
             </>
           )}
@@ -109,10 +111,11 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
         {/* Hotel header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{p.title}</h1>
+          <SupplierCodeBadge code={p.partnerCode} className="mt-2 text-xs text-slate-500" />
           <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
             {p.category && (
               <Link href={`/categories/${p.category.slug}`} className="rounded-full bg-blue-50 px-2.5 py-0.5 font-medium text-blue-700 hover:bg-blue-100">
-                {p.category.title}
+                {categoryLabel(p.category, locale)}
               </Link>
             )}
           </div>
@@ -155,7 +158,7 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             <>
               <span className="mx-1.5">/</span>
               <Link href={`/categories/${p.category.slug}`} className="hover:text-blue-600 hover:underline">
-                {p.category.title}
+                {categoryLabel(p.category, locale)}
               </Link>
             </>
           )}
@@ -169,13 +172,14 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
           {p.category && (
             <Link href={`/categories/${p.category.slug}`} className="rounded-full bg-blue-50 px-2.5 py-0.5 font-medium text-blue-700 hover:bg-blue-100">
-              {p.category.title}
+              {categoryLabel(p.category, locale)}
             </Link>
           )}
           <span>
             {t("pdp.published_on", locale)}: {formatDate(p.publishedAt, locale)}
           </span>
         </div>
+        <SupplierCodeBadge code={p.partnerCode} className="mt-2 text-xs text-slate-500" />
 
         <div className="mt-5">
           <MediaGallery media={detail.media} hotelImage={p.hotelImage} />
@@ -298,8 +302,6 @@ function PdpContent({ detail }: { detail: PublicProductDetail }) {
             </ul>
           </div>
         )}
-
-        {p.seller && <SellerBlock seller={p.seller} locale={locale} />}
       </aside>
     </div>
   );

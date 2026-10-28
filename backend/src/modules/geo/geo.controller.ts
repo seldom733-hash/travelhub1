@@ -111,6 +111,8 @@ export class GeoController {
     @Query("geoCountry") geoCountry?: string,
     @Query("geoCity") geoCity?: string,
     @Query("geoResort") geoResort?: string,
+    @Query("suppliers") suppliers?: string,
+    @Query("service") service?: string,
     @Query("q") q?: string,
     @Query("limit") limit?: string,
   ) {
@@ -118,6 +120,8 @@ export class GeoController {
       geoCountry,
       geoCity,
       geoResort,
+      suppliers: suppliers ? suppliers.split(",").filter(Boolean) : undefined,
+      service: service === "hotels" ? "hotels" : service === "tours" ? "tours" : undefined,
       q,
       limit: limit ? parseInt(limit, 10) : undefined,
     });

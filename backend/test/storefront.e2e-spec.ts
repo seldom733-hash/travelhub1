@@ -64,7 +64,11 @@ interface StorefrontView {
   heroHeading: string | null;
   heroSubheading: string | null;
   themePreset: string;
-  media: Array<{ id: string; kind: string; mimeType: string; width: number | null; height: number | null; createdAt: string }>;
+  customDomain: string | null;
+  customDomainStatus: string;
+  customDomainToken: string | null;
+  customDomainVerifiedAt: string | null;
+  media: Array<{ id: string; kind: string; mimeType: string; width: number | null; height: number | null; sortOrder: number; altText: string | null; createdAt: string }>;
   publicUrl: string;
   createdAt: string;
   updatedAt: string;
@@ -295,6 +299,7 @@ describe("Phase 1 Step 1.12.1 + 1.12.2 — Partner Storefront (e2e)", () => {
   });
 
   afterAll(async () => {
+    await prisma.constructorPage.deleteMany({ where: { tenantId: { in: created.partners } } });
     await prisma.storefrontMedia.deleteMany({ where: { storefrontId: sf1Id } });
     await prisma.productMedia.deleteMany({ where: { productId: { in: created.products } } });
     await prisma.product.deleteMany({ where: { id: { in: created.products } } });
@@ -554,6 +559,19 @@ describe("Phase 1 Step 1.12.1 + 1.12.2 — Partner Storefront (e2e)", () => {
     await partnerAgent.post("/api/v1/partner/storefront/media/LOGO").attach("file", Buffer.from("<svg onload=alert(1)></svg>"), "evil.svg").expect(422);
   });
 
+  it("24b. media: GALLERY supports multiple images, ordering and delete by id", async () => {
+    const first = (await partnerAgent.post("/api/v1/partner/storefront/media/GALLERY").attach("file", PNG_1PX, "gallery1.png").expect(201)).body as StorefrontView;
+    const second = (await partnerAgent.post("/api/v1/partner/storefront/media/GALLERY").attach("file", PNG_1PX, "gallery2.png").expect(201)).body as StorefrontView;
+    const gallery = second.media.filter((m) => m.kind === "GALLERY");
+    expect(gallery.length).toBe(2);
+    expect(gallery.map((m) => m.sortOrder)).toEqual([0, 1]);
+    const galleryId = gallery[0].id;
+    await publicSfMedia(`live-${stamp}`, galleryId).redirects(0).expect(302);
+    const removed = (await partnerAgent.delete(`/api/v1/partner/storefront/media/id/${galleryId}`).expect(200)).body as StorefrontView;
+    expect(removed.media.filter((m) => m.kind === "GALLERY").length).toBe(1);
+    expect(removed.media.some((m) => m.id === galleryId)).toBe(false);
+  });
+
   // ── Product scope + channels (REVIEW FIX 3/4) ─────────────────────────────
 
   it("25. products витрины: только PUBLISHED + PARTNER_STOREFRONT-enabled своего Partner", async () => {
@@ -763,5 +781,104 @@ describe("Phase 1 Step 1.12.1 + 1.12.2 — Partner Storefront (e2e)", () => {
     const list = (await publicSfProducts(`race-${stamp}`).expect(200)).body as { items: unknown[]; total: number };
     expect(list.total).toBe(0);
     await publicSfProductDetail(`race-${stamp}`, p2PublishedId).expect(404);
+  });
+
+  it("44. Storefront site builder: tenant page, draft/publish, public blocks, entitlement gate", async () => {
+    const builder = (await partnerAgent.get("/api/v1/partner/storefront/builder").expect(200)).body as {
+      id: string; context: string; tenantId: string; currentVersion: number | null; sections: Array<{ blockType: string; blockInstanceId: string; enabled: boolean; settings: Record<string, unknown> }>;
+    };
+    expect(builder.context).toBe("storefront");
+    expect(builder.tenantId).toBe(partner1Id);
+    expect(builder.sections.map((s) => s.blockType)).toEqual(
+      expect.arrayContaining(["storefront-hero", "storefront-products", "storefront-contacts"]),
+    );
+
+    const registry = (await partnerAgent.get("/api/v1/partner/storefront/builder/registry").expect(200)).body as Array<{ type: string; allowedContexts: string[] }>;
+    expect(registry.some((b) => b.type === "storefront-hero")).toBe(true);
+    expect(registry.every((b) => b.allowedContexts.includes("storefront"))).toBe(true);
+
+    await partnerAgent
+      .put("/api/v1/partner/storefront/builder/sections")
+      .send({ sections: [{ ...builder.sections[0], blockType: "hero" }] })
+      .expect(403);
+
+    const sections = builder.sections.map((s) =>
+      s.blockType === "storefront-hero" ? { ...s, settings: { ...s.settings, heading: "Кавказ Тур — сайт" } } : s,
+    );
+    const saved = (await partnerAgent.put("/api/v1/partner/storefront/builder/sections").send({ sections }).expect(200)).body as typeof builder;
+    expect(saved.sections.find((s) => s.blockType === "storefront-hero")?.settings.heading).toBe("Кавказ Тур — сайт");
+
+    const published = (await partnerAgent.post("/api/v1/partner/storefront/builder/publish").expect(201)).body as typeof builder;
+    expect(published.currentVersion).toBeGreaterThan(0);
+
+    const seoUpdated = (await partnerAgent.put("/api/v1/partner/storefront/builder/seo").send({ title: "Кавказ Тур — туры", description: "Авторские туры по Кавказу" }).expect(200)).body as { seo: { title: string } };
+    expect(seoUpdated.seo.title).toBe("Кавказ Тур — туры");
+    const designUpdated = (await partnerAgent.put("/api/v1/partner/storefront/builder/design").send({ accentColor: "#112233", fontFamily: "Georgia, serif" }).expect(200)).body as { designConfig: { accentColor: string } };
+    expect(designUpdated.designConfig.accentColor).toBe("#112233");
+
+    const publicPage = (await request(app.getHttpServer()).get(`/api/v1/public/storefronts/live-${stamp}/page`).expect(200)).body as {
+      page: { seo: { title: string }; designConfig: { accentColor: string }; sections: Array<{ blockType: string; settings: Record<string, unknown> }> };
+    };
+    expect(publicPage.page.seo.title).toBe("Кавказ Тур — туры");
+    expect(publicPage.page.designConfig.accentColor).toBe("#112233");
+
+    const subpage = (await partnerAgent.post("/api/v1/partner/storefront/builder/pages").send({ name: "О нас", slug: "about" }).expect(201)).body as { id: string; slug: string };
+    expect(subpage.slug).toContain("storefront-");
+    await partnerAgent.post(`/api/v1/partner/storefront/builder/publish?pageId=${subpage.id}`).expect(201);
+    const menu = (await request(app.getHttpServer()).get(`/api/v1/public/storefronts/live-${stamp}/pages`).expect(200)).body as Array<{ slug: string; name: string; isHome: boolean }>;
+    expect(menu.some((p) => p.slug === "home")).toBe(true);
+    expect(menu.some((p) => p.slug === "about" && p.name === "О нас")).toBe(true);
+    const subPublic = (await request(app.getHttpServer()).get(`/api/v1/public/storefronts/live-${stamp}/page?pageSlug=about`).expect(200)).body as { page: { sections: Array<{ blockType: string }> } };
+    expect(subPublic.page.sections.some((s) => s.blockType === "content-about")).toBe(true);
+    expect(publicPage.page.sections.find((s) => s.blockType === "storefront-hero")?.settings.heading).toBe("Кавказ Тур — сайт");
+    expect((publicPage.page as { tenantId?: string }).tenantId).toBeUndefined();
+
+    // Tenant isolation: partner2 gets its own auto-provisioned page, not partner1's.
+    const other = (await partner2Agent.get("/api/v1/partner/storefront/builder").expect(200)).body as { id: string; tenantId: string };
+    expect(other.tenantId).toBe(partner2Id);
+    expect(other.id).not.toBe(published.id);
+
+    // Public page follows storefront lifecycle/entitlement.
+    await adminAgent.post(`/api/v1/storefronts/${partner1Id}/entitlement`).send({ status: "SUSPENDED" }).expect(201);
+    const hidden = (await request(app.getHttpServer()).get(`/api/v1/public/storefronts/live-${stamp}/page`).expect(200)).body as { page: unknown };
+    expect(hidden.page).toBeNull();
+    await adminAgent.post(`/api/v1/storefronts/${partner1Id}/entitlement`).send({ status: "ACTIVE" }).expect(201);
+    await request(app.getHttpServer()).get(`/api/v1/public/storefronts/live-${stamp}/page`).expect(200);
+
+    const audits = await prisma.constructorPageAuditLog.findMany({ where: { pageId: published.id } });
+    expect(audits.some((a) => a.action === "publish")).toBe(true);
+  });
+
+  it("45. Storefront lead form creates a CRM lead with source/storefront provenance", async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/public/storefronts/live-${stamp}/request`)
+      .send({ name: "Тестовый клиент", contact: "+994501112233", message: "Хочу тур", consent: true })
+      .expect(201);
+    expect((res.body as { ok: boolean }).ok).toBe(true);
+    const history = await prisma.leadHistory.findFirst({
+      where: { action: "created", fields: { path: ["storefrontSlug"], equals: `live-${stamp}` } },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(history).not.toBeNull();
+    expect((history!.fields as { source: string }).source).toBe("STOREFRONT");
+    await request(app.getHttpServer())
+      .post(`/api/v1/public/storefronts/live-${stamp}/request`)
+      .send({ name: "X", contact: "123", consent: false })
+      .expect(400);
+  });
+
+  it("46. custom domain: set → PENDING + token; verified host resolves to slug", async () => {
+    const domain = `tours-${stamp}.example.com`;
+    const set = (await partnerAgent.patch("/api/v1/partner/storefront/domain").send({ domain }).expect(200)).body as StorefrontView & { customDomainToken: string };
+    expect(set.customDomain).toBe(domain);
+    expect(set.customDomainStatus).toBe("PENDING");
+    expect(set.customDomainToken).toContain("navitravel-verify=");
+    const sf = await prisma.partnerStorefront.findFirstOrThrow({ where: { customDomain: domain } });
+    await prisma.partnerStorefront.update({ where: { id: sf.id }, data: { customDomainStatus: "VERIFIED", customDomainVerifiedAt: new Date() } });
+    const resolved = (await request(app.getHttpServer()).get(`/api/v1/public/domains/resolve?host=${domain}`).expect(200)).body as { slug: string | null };
+    expect(resolved.slug).toBe(`live-${stamp}`);
+    await partnerAgent.patch("/api/v1/partner/storefront/domain").send({ domain: "not a domain" }).expect(422);
+    const removed = (await partnerAgent.delete("/api/v1/partner/storefront/domain").expect(200)).body as StorefrontView;
+    expect(removed.customDomain).toBeNull();
   });
 });

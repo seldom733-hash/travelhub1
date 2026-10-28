@@ -6,6 +6,7 @@ import {
   type PaymentEventPayload,
   type RefundEventPayload,
   type SupplierPayoutCreatedPayload,
+  type SupplierPayoutReversedPayload,
   type ObligationAdjustedPayload,
 } from "../../eventbus/domain-events";
 import { LedgerService, type LedgerCreateInput } from "./ledger.service";
@@ -83,6 +84,19 @@ export class LedgerPostingConsumer implements OnModuleInit {
         sourceEventId: ev.id,
         businessRef: p.payoutCode,
         occurredAt: p.occurredAt, // frozen бизнес-время движения (ISO 8601)
+      })),
+    );
+
+    this.eventBus.on(DomainEvents.SupplierPayoutReversed, (ev) =>
+      this.post<SupplierPayoutReversedPayload>(ev, (p) => ({
+        amount: p.amount,
+        currency: p.currency,
+        type: "SUPPLIER_PAYOUT_REVERSAL",
+        sourceType: "SUPPLIER_PAYOUT",
+        sourceId: p.payoutId,
+        sourceEventId: ev.id,
+        businessRef: p.payoutCode,
+        occurredAt: p.occurredAt,
       })),
     );
 

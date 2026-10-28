@@ -487,7 +487,7 @@ export class BookingService {
         serviceDate: b.serviceDate?.toISOString() ?? '',
         acquisitionSource: b.acquisitionSource ?? '',
         orderId: b.orderId ?? '',
-        orderCode: order?.referenceNumber ?? '',
+        orderCode: order?.code ?? '',
         orderReference: order?.referenceNumber ?? '',
         partnerId: order?.sellerPartnerId ?? '',
         partnerCode: partner?.code ?? '',

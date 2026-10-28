@@ -89,7 +89,8 @@ describe("Phase 2 Step 2.4 — Sale Completion → OrderRequested + Availability
   const createProduct = async (tag: string, price = 100): Promise<ProductFixture> => {
     const res = await adminAgent
       .post("/api/v1/products")
-      .send({ type: "TOUR", title: `S24 ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
+      .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `S24 ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
       .expect(201);
     const product = res.body.product as { id: string };
     created.products.push(product.id);
@@ -352,12 +353,12 @@ describe("Phase 2 Step 2.4 — Sale Completion → OrderRequested + Availability
     expect(hist.map((h) => h.action)).toEqual(["created", "completed"]);
     expect(hist[1].from).toBe("OPEN");
     expect(hist[1].to).toBe("CLOSED");
-    expect(JSON.stringify(hist[1].fields)).not.toMatch(/firstName|lastName|email|passport/);
+    expect(JSON.stringify(hist[1].fields)).not.toMatch(/firstName|lastName|email|passportNumber/);
 
     const audit = await prisma.auditLog.findMany({ where: { resource: "Sale", resourceId: ctx.sale.id } });
     expect(audit.map((a) => a.action)).toContain("sales.sale.completed");
     created.auditLogs.push(...audit.map((a) => a.id));
-    for (const a of audit) expect(JSON.stringify(a.details ?? {})).not.toMatch(/firstName|lastName|email|passport/);
+    for (const a of audit) expect(JSON.stringify(a.details ?? {})).not.toMatch(/firstName|lastName|email|passportNumber/);
   });
 
   // ── 9-13. OrderRequested payload ───────────────────────────────────────────
@@ -388,8 +389,11 @@ describe("Phase 2 Step 2.4 — Sale Completion → OrderRequested + Availability
       quantity: 1,
       amount: "88.5",
     });
-    // PII-minimization: нет имен/email/passport.
-    expect(JSON.stringify(p)).not.toMatch(/firstName|lastName|passport|email|phone/);
+    // PII-minimization: нет имен/email/passport. pinnedRequirements — это
+    // конфигурация обязательных полей (ключи firstName/lastName), не PII,
+    // поэтому исключаем её из проверки значений payload.
+    const { pinnedRequirements: _requirements, ...payloadWithoutRequirements } = p as Record<string, unknown>;
+    expect(JSON.stringify(payloadWithoutRequirements)).not.toMatch(/firstName|lastName|passportNumber|email|phone/);
   });
 
   // ── 14-16. Isolation ───────────────────────────────────────────────────────

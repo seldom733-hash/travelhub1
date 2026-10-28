@@ -76,6 +76,9 @@
       "tsx"
     ],
     "rootDir": "src",
+    "setupFiles": [
+      "dotenv/config"
+    ],
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.tsx?$": [

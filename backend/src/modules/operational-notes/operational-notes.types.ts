@@ -4,6 +4,8 @@
  * Canonical entity types for polymorphic reference (entityType).
  * Server-controlled: never arbitrary free text.
  */
+import { BadRequestException } from '@nestjs/common';
+
 export const VALID_ENTITY_TYPES = [
   'Customer',
   'Partner',
@@ -73,14 +75,14 @@ export function isValidVisibility(value: string): value is OperationalNoteVisibi
  */
 export function validateNoteText(text: string): string {
   if (typeof text !== 'string') {
-    throw new Error('Note text must be a string');
+    throw new BadRequestException('Note text must be a string');
   }
   const trimmed = text.trim();
   if (trimmed.length < MIN_NOTE_TEXT_LENGTH) {
-    throw new Error('Note text must not be empty or whitespace only');
+    throw new BadRequestException('Note text must not be empty or whitespace only');
   }
   if (trimmed.length > MAX_NOTE_TEXT_LENGTH) {
-    throw new Error(`Note text must not exceed ${MAX_NOTE_TEXT_LENGTH} characters`);
+    throw new BadRequestException(`Note text must not exceed ${MAX_NOTE_TEXT_LENGTH} characters`);
   }
   return trimmed;
 }

@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Buildings } from "@phosphor-icons/react";
-import { t, useLocale } from "@/lib/i18n";
+import { t, useLocale, formatPrice, formatDateShort } from "@/lib/i18n";
 import { publicApi, type PublicProductCard } from "@/lib/public-api";
 import { useHotelPhoto } from "@/lib/hotel-photo";
+import SupplierCodeBadge from "@/components/public/SupplierCodeBadge";
+import { categoryLabel } from "@/lib/category-label";
 
 function HotelCardSkeleton() {
   return (
@@ -56,9 +58,9 @@ function HotelCard({ card }: { card: PublicProductCard }) {
 
       {/* Content */}
       <div className="p-4">
-        {card.category?.title && (
+        {categoryLabel(card.category, locale) && (
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-neutral-500">
-            {card.category.title}
+            {categoryLabel(card.category, locale)}
           </p>
         )}
         <h3 className="line-clamp-2 font-serif text-base font-semibold text-white transition-colors group-hover:text-gold">
@@ -69,17 +71,13 @@ function HotelCard({ card }: { card: PublicProductCard }) {
             {card.shortDescription}
           </p>
         )}
-        {card.seller && (
-          <p className="mt-1 text-[11px] text-neutral-500">
-            {card.seller.visibilityMode === "ANONYMOUS"
-              ? t("seller.anonymous_label", locale)
-              : card.seller.displayName ?? t("seller.anonymous_label", locale)}
-          </p>
-        )}
+        <SupplierCodeBadge code={card.partnerCode} className="mt-1 text-[11px] text-neutral-500" />
         <div className="mt-3 flex items-center justify-between">
           {card.priceFrom ? (
             <p className="text-sm font-semibold text-gold">
-              {t("price.from", locale)} {card.priceFrom} {card.currency || ""}
+              {formatPrice(card.priceFrom, card.currency, locale)}
+              {card.headlineDepartureDate && <span className="ml-1 font-normal text-neutral-400">· {formatDateShort(card.headlineDepartureDate, locale)}</span>}
+              {card.headlineNights != null && <span className="ml-1 font-normal text-neutral-400">· {card.headlineNights} {card.headlineNights === 1 ? t("card.night", locale) : t("card.nights", locale)}</span>}
             </p>
           ) : (
             <p className="text-xs text-neutral-500">{t("price.on_request", locale)}</p>
@@ -106,7 +104,7 @@ export default function Hotels() {
     // type dominates that window, and the section would render `null`. Category
     // filtering happens in SQL over the full published set (2857 hotels).
     void publicApi
-      .listProducts({ category: "accommodation", sort: "newest", pageSize: 50 })
+      .listProducts({ category: "accommodation", sort: "price_asc", pageSize: 50 })
       .then((r) => {
         if (alive) {
           const hotelsOnly = r.items.filter((item) => item.type === "HOTEL").slice(0, 6);

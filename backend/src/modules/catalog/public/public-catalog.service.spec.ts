@@ -683,5 +683,20 @@ describe("PublicCatalogService (Phase 1 Step 1.5 + review fixes) — unit", () =
       expect(meta.availability).toEqual({ enabled: true, dateRequired: true });
       expect(meta.sort).toEqual(["newest", "price_asc", "price_desc"]);
     });
+    it("listDestinations maps aggregate rows and normalizes bigint counts", async () => {
+      const prisma = makePrismaStub();
+      prisma.$queryRaw.mockResolvedValue([
+        { code: "TH", names: { ru: "Таиланд", en: "Thailand" }, tours: 12n, hotels: 3n },
+        { code: "TR", names: { ru: "Турция", en: "Türkiye" }, tours: 4, hotels: 5 },
+      ]);
+      const service = makeService(prisma);
+
+      const result = await service.listDestinations();
+
+      expect(result).toEqual([
+        { code: "TH", names: { ru: "Таиланд", en: "Thailand" }, tours: 12, hotels: 3 },
+        { code: "TR", names: { ru: "Турция", en: "Türkiye" }, tours: 4, hotels: 5 },
+      ]);
+    });
   });
 });

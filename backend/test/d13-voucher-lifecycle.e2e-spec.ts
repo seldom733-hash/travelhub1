@@ -268,6 +268,8 @@ describe("D13 — Voucher Lifecycle (e2e)", () => {
     await emitAndWait(DomainEvents.PaymentCaptured, {
       orderId,
       code: `PAY-${stamp}-T03`,
+      amount: "1500",
+      currency: "USD",
     });
 
     await new Promise((r) => setTimeout(r, 2000));
@@ -294,6 +296,8 @@ describe("D13 — Voucher Lifecycle (e2e)", () => {
     await emitAndWait(DomainEvents.PaymentCaptured, {
       orderId,
       code: `PAY-${stamp}-T04a`,
+      amount: "1500",
+      currency: "USD",
     });
 
     const doc = await waitFor(
@@ -311,6 +315,8 @@ describe("D13 — Voucher Lifecycle (e2e)", () => {
     await emitAndWait(DomainEvents.PaymentCaptured, {
       orderId,
       code: `PAY-${stamp}-T04b`,
+      amount: "1500",
+      currency: "USD",
     });
     await new Promise((r) => setTimeout(r, 1000));
 

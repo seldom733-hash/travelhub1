@@ -30,6 +30,7 @@ import { AppExceptionFilter } from "../src/shared/exception.filter";
 import { GLOBAL_VALIDATION_PIPE_OPTIONS } from "../src/shared/validation-pipe";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { RoleCode } from "../src/generated/prisma/enums";
+import { SalesService } from "../src/modules/sales/sales.service";
 
 interface Session {
   accessToken: string;
@@ -440,7 +441,8 @@ describe("Phase 2 Step 2.2 — Sales Center Backend (e2e)", () => {
 
     // Step 2.3: ISSUE требует состав + validUntil — собираем валидное КП.
     const product = (
-      await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Quote Action ${stamp}`, tariffs: [{ name: "Std", price: 90 }] }).expect(201)
+      await adminAgent.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Quote Action ${stamp}`, tariffs: [{ name: "Std", price: 90 }] }).expect(201)
     ).body.product as { id: string };
     created.products.push(product.id);
     const tariff = await prisma.tariff.findFirstOrThrow({ where: { productId: product.id } });
@@ -479,11 +481,25 @@ describe("Phase 2 Step 2.2 — Sales Center Backend (e2e)", () => {
     expect(row.assignedToId).toBeNull();
 
     // CAS: одновременный assign → один 201, другой 409.
+    // Deterministic barrier: both HTTP requests must reach the service before
+    // either executes its read/update, otherwise a fast server can serialize
+    // them and both legitimately succeed (no shared expectedVersion in API).
     const lead2 = await smCreateLead(sm.accessToken, "CAS Assign Lead");
-    const results = await Promise.allSettled([
-      agent(sm.accessToken).post(`/api/v1/sales/leads/${lead2.code}/assign`).send({ assignedToId: sm.user.id }),
-      agent(sm.accessToken).post(`/api/v1/sales/leads/${lead2.code}/assign`).send({ assignedToId: other.user.id }),
-    ]);
+    const sales = app.get(SalesService);
+    const originalAssign = sales.assignLead.bind(sales);
+    const gates: Array<() => void> = [];
+    const spy = jest.spyOn(sales, "assignLead").mockImplementation(async (...args: Parameters<SalesService["assignLead"]>) => {
+      await new Promise<void>((resolve) => gates.push(resolve));
+      return originalAssign(...args);
+    });
+    const results = await (async () => {
+      const p1 = agent(sm.accessToken).post(`/api/v1/sales/leads/${lead2.code}/assign`).send({ assignedToId: sm.user.id }).then((r) => r);
+      const p2 = agent(sm.accessToken).post(`/api/v1/sales/leads/${lead2.code}/assign`).send({ assignedToId: other.user.id }).then((r) => r);
+      const deadline = Date.now() + 5000;
+      while (gates.length < 2 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10));
+      gates.splice(0).forEach((release) => release());
+      return Promise.allSettled([p1, p2]);
+    })().finally(() => spy.mockRestore());
     const statuses = results.map((r) => (r.status === "fulfilled" ? r.value.status : "rejected"));
     expect(statuses.filter((s) => s === 201)).toHaveLength(1);
     expect(statuses.filter((s) => s === 409)).toHaveLength(1);

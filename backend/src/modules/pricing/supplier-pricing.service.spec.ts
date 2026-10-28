@@ -457,6 +457,39 @@ describe("SupplierPricingService — FX convert-then-markup (Phase 1)", () => {
     expect(out.pricing!.publicCurrency).toBeUndefined();
   });
 
+  // §SYNC-FX: catалог хранит И сумму, И валюту; метод обязан вернуть их парой,
+  // иначе USD-сумма попадёт в Tariff с меткой AZN (дефект Voyager).
+  it("publicAmountWithFxFor: 1000 USD ×1.70 +5% → 1785 AZN (сумма и валюта согласованы)", async () => {
+    const svc = makePricingWithFx(configured5, jest.fn().mockResolvedValue(FX_USD));
+    await expect(svc.publicAmountWithFxFor(1000, "USD", "VOYAGER", "hotels")).resolves.toEqual({
+      amount: 1785,
+      currency: "AZN",
+    });
+  });
+
+  it("publicAmountWithFxFor: нет курса → исходная валюта и сумма (fail-open, без метки AZN)", async () => {
+    const svc = makePricingWithFx(configured5, jest.fn().mockResolvedValue(null));
+    await expect(svc.publicAmountWithFxFor(1000, "USD", "VOYAGER", "tours")).resolves.toEqual({
+      amount: 1050,
+      currency: "USD",
+    });
+  });
+
+  it("publicAmountWithFxFor: AZN-источник → identity без FX, валюта AZN", async () => {
+    const fx = jest.fn();
+    const svc = makePricingWithFx(configured5, fx);
+    await expect(svc.publicAmountWithFxFor(1000, "AZN", "KOMPAS", "hotels")).resolves.toEqual({
+      amount: 1050,
+      currency: "AZN",
+    });
+    expect(fx).not.toHaveBeenCalled();
+  });
+
+  it("publicAmountWithFxFor: сбой правила → sync падает, а не пишет 0%", async () => {
+    const svc = makePricingWithFx(jest.fn().mockRejectedValue(new Error("db down")), jest.fn());
+    await expect(svc.publicAmountWithFxFor(1000, "USD", "VOYAGER", "hotels")).rejects.toThrow("db down");
+  });
+
   it("applyToPriceSnapshot with fx: amount → AZN", async () => {
     const svc = makePricingWithFx(configured5, jest.fn().mockResolvedValue(FX_USD));
     const out = await svc.applyToPriceSnapshot(makeSnapshot(), "SUMMERTOUR", "tours");

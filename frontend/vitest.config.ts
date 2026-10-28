@@ -11,6 +11,13 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
+    /**
+     * Компонентные спеки исторически написаны против RU-контракта (тексты
+     * кнопок/заголовков). Продовый дефолт локали — AZ (см. lib/i18n.tsx),
+     * поэтому в тестах фиксируем RU, чтобы проверять переводимость, а не
+     * продуктовый дефолт. AZ/EN по-прежнему покрыты явными locale-тестами.
+     */
+    env: { NEXT_PUBLIC_DEFAULT_LOCALE: "ru" },
     include: ["lib/**/*.spec.ts", "lib/**/*.spec.tsx", "components/**/*.spec.ts", "components/**/*.spec.tsx", "app/**/*.spec.tsx"],
     setupFiles: ["./test/setup.ts"],
   },

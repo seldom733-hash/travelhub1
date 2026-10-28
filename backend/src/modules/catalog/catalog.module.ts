@@ -16,7 +16,7 @@ import { AntiDisintermediationService } from "./anti-disintermediation/anti-disi
 import { SellerProfileController } from "./seller/seller-profile.controller";
 import { PublicSellerProfileService } from "./seller/seller-profile.service";
 import { SellerProfileRepairService } from "./seller/seller-profile-repair.service";
-import { StorefrontAdminController, StorefrontController } from "./storefront/storefront.controller";
+import { PublicStorefrontDomainController, StorefrontAdminController, StorefrontController } from "./storefront/storefront.controller";
 import { StorefrontService } from "./storefront/storefront.service";
 import { ServiceUnitsController } from "./service-units.controller";
 import { ServiceUnitService } from "./service-unit.service";
@@ -31,8 +31,12 @@ import { StorefrontBehavioralService } from "./behavioral/storefront-behavioral.
 import { MarketplaceBehavioralController } from "./behavioral/marketplace-behavioral.controller";
 import { MarketplaceBehavioralService } from "./behavioral/marketplace-behavioral.service";
 import { TourBuilderController, TourBuilderDictionariesController } from "./tour-builder/tour-builder.controller";
+import { HotelMatchReviewController } from "./hotel/hotel-match-review.controller";
 import { TourBuilderService } from "./tour-builder/tour-builder.service";
 import { DictionaryModerationService } from "./moderation/dictionary-moderation.service";
+import { HotelMatchingService } from "./hotel/hotel-matching.service";
+import { HotelMatchReviewService } from "./hotel/hotel-match-review.service";
+import { TourMatchingService } from "./tour-matching.service";
 
 /**
  * CatalogModule — Catalog Center (Product/Category/Tariff/Availability/Media).
@@ -73,7 +77,7 @@ import { DictionaryModerationService } from "./moderation/dictionary-moderation.
  * soft lifecycle; валюта наследуется из Tariff; POR без числовых периодов.
  */
 @Module({
-  controllers: [CatalogController, ModerationController, PublicCatalogController, PublicSuggestController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController, CommercialRestrictionsController, TourBuilderController, TourBuilderDictionariesController],
+  controllers: [CatalogController, ModerationController, PublicCatalogController, PublicSuggestController, PartnerCatalogController, SellerProfileController, StorefrontController, StorefrontAdminController, PublicStorefrontDomainController, StorefrontBehavioralController, MarketplaceBehavioralController, ServiceUnitsController, RatePlansController, CommercialPeriodsController, CommercialRestrictionsController, TourBuilderController, TourBuilderDictionariesController, HotelMatchReviewController],
   providers: [
     CatalogService,
     CatalogAccessPolicy,
@@ -95,6 +99,9 @@ import { DictionaryModerationService } from "./moderation/dictionary-moderation.
     CommercialPeriodService,
     CommercialRestrictionService,
     { provide: "ObjectStorageService", useClass: S3ObjectStorageService },
+    HotelMatchingService,
+    HotelMatchReviewService,
+    TourMatchingService,
   ],
   exports: [CatalogService, CatalogAccessPolicy, ProductMediaService, PublicSellerProfileService, ServiceUnitService, RatePlanService, "ObjectStorageService"],
 })

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { t, useLocale } from "@/lib/i18n";
@@ -120,9 +120,16 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
     if (ctx.serviceType === "tours" || ctx.serviceType === "hotels") {
       sp.set("live", "1");
     }
-    const nextUrl = `/search?${sp.toString()}`;
-    if (typeof window !== "undefined" && nextUrl === `${window.location.pathname}${window.location.search}`) {
-      sp.set("_t", String(Date.now()));
+    // Force a distinct URL for every submit. Next sometimes dedupes a
+    // query-only push while the form submit is still settling, leaving the old
+    // results URL in place; `_t` makes the navigation unambiguous.
+    sp.set("_t", String(Date.now()));
+    // Flight results load a separate client-side flight engine. On a
+    // query-only push Next occasionally keeps the old URL in place; a hard
+    // navigation guarantees the submitted flight params are applied.
+    if (ctx.serviceType === "flights" && typeof window !== "undefined") {
+      window.location.assign(`/search?${sp.toString()}`);
+      return;
     }
     router.push(`/search?${sp.toString()}`);
   };

@@ -181,9 +181,11 @@ describe("Supplier Markup Phase 4 §4.1/§4.2 — Admin Markup Matrix + Rule UX 
     expect(m.suppliers.map((s) => s.code)).toEqual(expect.arrayContaining(["ANEX", "KOMPAS"]));
     expect(m.suppliers.every((s) => typeof s.name === "string" && s.name.length > 0)).toBe(true);
 
-    // supported pairs only: KOMPAS/tours есть, KOMPAS/hotels нет
+    // supported pairs only: KOMPAS теперь покрывает и tours, и hotels;
+    // flights у KOMPAS не поддерживается (реестр живой, отрицательный контроль).
     expect(cellOf(m, "KOMPAS", "tours")).toBeDefined();
-    expect(cellOf(m, "KOMPAS", "hotels")).toBeUndefined();
+    expect(cellOf(m, "KOMPAS", "hotels")).toBeDefined();
+    expect(cellOf(m, "KOMPAS", "flights")).toBeUndefined();
     // хотя бы одна flights-ячейка (реестр живой)
     expect(m.cells.some((c) => c.serviceType === "flights")).toBe(true);
 

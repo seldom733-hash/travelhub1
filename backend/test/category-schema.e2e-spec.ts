@@ -160,6 +160,7 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
     const res = await adminAgent
       .post("/api/v1/products")
       .send({
+        partnerId: "00000000-0000-4000-8000-000000000001",
         type: "HOTEL",
         title: `CatSchema Hotel ${stamp}`,
         categoryId: accId,
@@ -179,6 +180,7 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
     await adminAgent
       .post("/api/v1/products")
       .send({
+        partnerId: "00000000-0000-4000-8000-000000000001",
         type: "HOTEL",
         title: `Bad type ${stamp}`,
         categoryId: accId,
@@ -192,6 +194,7 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
     await adminAgent
       .post("/api/v1/products")
       .send({
+        partnerId: "00000000-0000-4000-8000-000000000001",
         type: "HOTEL",
         title: `Unknown attr ${stamp}`,
         categoryId: accId,
@@ -205,6 +208,7 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
     await adminAgent
       .post("/api/v1/products")
       .send({
+        partnerId: "00000000-0000-4000-8000-000000000001",
         type: "HOTEL",
         title: `Missing required ${stamp}`,
         categoryId: accId,
@@ -321,7 +325,8 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
     const product = (
       await adminAgent
         .post("/api/v1/products")
-        .send({ type: "TOUR", title: `Diving Trip ${stamp}`, categoryId: cat.id, attributes: { depth: 30, certification: "advanced" } })
+        .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Diving Trip ${stamp}`, categoryId: cat.id, attributes: { depth: 30, certification: "advanced" } })
         .expect(201)
     ).body.product;
     created.products.push(product.id);
@@ -329,7 +334,8 @@ describe("Phase 1 Step 1.1 — Category Schema foundation (e2e)", () => {
     expect(product.attributes.depth).toBe(30);
 
     // и валидация по новой schema работает
-    await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Bad Diving ${stamp}`, categoryId: cat.id, attributes: { depth: "deep" } }).expect(422);
+    await adminAgent.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Bad Diving ${stamp}`, categoryId: cat.id, attributes: { depth: "deep" } }).expect(422);
   });
 
   it("11. custom Category: slug обязателен, стабилен и уникален (title не источник identity)", async () => {

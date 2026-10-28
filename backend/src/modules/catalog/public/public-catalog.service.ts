@@ -24,6 +24,9 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Prisma } from "../../../generated/prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
+import { HotelMatchingService } from "../hotel/hotel-matching.service";
+import { TourMatchingService } from "../tour-matching.service";
+import { applyCanonicalName } from "../hotel/hotel-identity";
 import { NotFoundError, ValidationDomainError } from "../../../shared/errors";
 import { SIGNED_URL_TTL_SECONDS } from "../media/product-media.service";
 import { hotelPhotoUrl } from "../hotel/hotel-photo-url";
@@ -91,6 +94,23 @@ function todayStartUtc(): Date {
 /** Курсы поставщиков для витрины: partnerId → (sourceCurrencyIso → rate→AZN). */
 type SupplierFxByPartner = Map<string, Map<string, Prisma.Decimal>>;
 
+/**
+ * Запись реестра отелей для строки выдачи: одна физическая гостиница →
+ * одно фото и одно каноническое имя, независимо от поставщика.
+ */
+interface HotelRegistryEntry {
+  imageUrl: string | null;
+  canonicalName: string | null;
+}
+
+/** Курс offer-цены в AZN (fail-open: нет курса → исходные цена/валюта). */
+interface DisplayPrice {
+  amount: number;
+  currency: string;
+  /** Цена приведена к AZN и годится для сравнения между поставщиками. */
+  comparable: boolean;
+}
+
 interface PublicProductRow {
   id: string;
   code: string;
@@ -114,6 +134,8 @@ export class PublicCatalogService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject("ObjectStorageService") private readonly storage: ObjectStorageService,
+    private readonly hotelMatching?: HotelMatchingService,
+    private readonly tourMatching?: TourMatchingService,
   ) {}
 
   // ── Visibility predicate (§3/§16/§17) ────────────────────────────────────
@@ -311,12 +333,13 @@ export class PublicCatalogService {
 
     const availability = await this.availabilitySummaries(rows.map((r) => r.id));
     const sellers = await this.sellersOf(rows.map((r) => r.partnerId));
+    const partnerCodes = await this.partnerCodesOf(rows.map((r) => r.partnerId));
     const fx = await this.supplierFxByPartner(rows.map((r) => r.partnerId));
 
-    const hotelPhotos = await this.hotelPhotoMap(rows);
+    const hotelRegistry = await this.hotelRegistryMap(rows);
     const items = await Promise.all(
       rows.map((r) =>
-        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, fx, hotelPhotos),
+        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, r.partnerId ? (partnerCodes.get(r.partnerId) ?? null) : null, fx, hotelRegistry),
       ),
     );
 
@@ -324,6 +347,47 @@ export class PublicCatalogService {
   }
 
   // ── Public Product detail (PDP, §5) ───────────────────────────────────────
+
+  /**
+   * Countries that currently have at least one published Marketplace tour or
+   * accommodation. Aggregated server-side so the destinations page does not
+   * have to pull the whole catalog into the browser.
+   */
+  async listDestinations(): Promise<Array<{
+    code: string;
+    names: Record<string, string>;
+    tours: number;
+    hotels: number;
+  }>> {
+    const rows = await this.prisma.$queryRaw<Array<{ code: string; names: unknown; tours: number; hotels: number }>>`
+      SELECT gc."code",
+             gc."names",
+             COUNT(DISTINCT p."id") FILTER (WHERE c."slug" = 'tours')::int AS "tours",
+             COUNT(DISTINCT p."id") FILTER (WHERE c."slug" = 'accommodation')::int AS "hotels"
+      FROM catalog."Product" p
+      JOIN catalog."Category" c ON c."id" = p."categoryId"
+      JOIN geo."GeoCountry" gc ON gc."id" = p."geoCountryId"
+      WHERE p."status" = 'PUBLISHED'
+        AND p."publishedAt" IS NOT NULL
+        AND gc."status" = 'ACTIVE'
+        AND c."slug" IN ('tours', 'accommodation')
+        AND EXISTS (
+          SELECT 1 FROM catalog."ProductPublicationChannel" pc
+          WHERE pc."productId" = p."id" AND pc."channel" = 'MARKETPLACE'
+        )
+      GROUP BY gc."code", gc."names"
+      HAVING COUNT(DISTINCT p."id") FILTER (WHERE c."slug" = 'tours') > 0
+          OR COUNT(DISTINCT p."id") FILTER (WHERE c."slug" = 'accommodation') > 0
+      ORDER BY (COUNT(DISTINCT p."id")) DESC, gc."code" ASC
+      LIMIT 250
+    `;
+    return rows.map((row) => ({
+      code: row.code,
+      names: (row.names ?? {}) as Record<string, string>,
+      tours: Number(row.tours ?? 0),
+      hotels: Number(row.hotels ?? 0),
+    }));
+  }
 
   async getProductDetail(slugOrId: string): Promise<PublicProductDetail> {
     // Нейтральные URL: marketplace-PDP резолвится ТОЛЬКО по PRD-коду (или id).
@@ -340,8 +404,9 @@ export class PublicCatalogService {
       throw new NotFoundError("Product not found");
     }
     const seller = row.partnerId ? ((await this.sellersOf([row.partnerId])).get(row.partnerId) ?? null) : null;
+    const partnerCode = row.partnerId ? ((await this.partnerCodesOf([row.partnerId])).get(row.partnerId) ?? null) : null;
     const fx = await this.supplierFxByPartner([row.partnerId]);
-    return this.toDetail(row, seller, fx, await this.hotelImageForOne(row));
+    return this.toDetail(row, seller, partnerCode, fx, await this.hotelRegistryForOne(row));
   }
 
   // ── Public Partner Storefront (Phase 1 Step 1.12.1 §11/§12/§13) ──────────
@@ -443,11 +508,12 @@ export class PublicCatalogService {
     const typed = rows as unknown as PublicProductRow[];
     const availability = await this.availabilitySummaries(typed.map((r) => r.id));
     const sellers = await this.sellersOf(typed.map((r) => r.partnerId));
+    const partnerCodes = await this.partnerCodesOf(typed.map((r) => r.partnerId));
     const fx = await this.supplierFxByPartner(typed.map((r) => r.partnerId));
-    const hotelPhotos = await this.hotelPhotoMap(typed);
+    const hotelRegistry = await this.hotelRegistryMap(typed);
     const items = await Promise.all(
       typed.map((r) =>
-        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, fx, hotelPhotos),
+        this.toCard(r, availability.get(r.id) ?? null, r.partnerId ? (sellers.get(r.partnerId) ?? null) : null, r.partnerId ? (partnerCodes.get(r.partnerId) ?? null) : null, fx, hotelRegistry),
       ),
     );
     return { items, total, page, pageSize };
@@ -467,8 +533,9 @@ export class PublicCatalogService {
       throw new NotFoundError("Product not found");
     }
     const seller = await this.sellerProjectionFor(partnerId);
+    const partnerCode = (await this.partnerCodesOf([partnerId])).get(partnerId) ?? null;
     const fx = await this.supplierFxByPartner([row.partnerId]);
-    return this.toDetail(row, seller, fx, await this.hotelImageForOne(row));
+    return this.toDetail(row, seller, partnerCode, fx, await this.hotelRegistryForOne(row));
   }
 
   /**
@@ -905,13 +972,17 @@ export class PublicCatalogService {
   private toDetail(
     row: PublicProductRow,
     seller: PublicSeller | null,
+    partnerCode: string | null,
     fx: SupplierFxByPartner,
-    hotelImage: string | null = null,
+    hotel: HotelRegistryEntry | null = null,
   ): PublicProductDetail {
     const media = row.media.map((m) => this.toPublicMedia(m));
     const availability = this.toAvailabilitySummary(row.availability ?? []);
     const price = this.minTariff(row.tariffs);
     const shown = price ? this.toDisplayPrice(price.amount, price.currency, row.partnerId, fx) : null;
+    // Единое имя физической гостиницы из реестра (Hotel.name): поставщики
+    // называют один отель по-разному, карточка показывает каноническое имя.
+    const title = applyCanonicalName(row.title, hotel?.canonicalName);
     // PDP-атрибуты sync-поставщиков несут startingPrice/currency в валюте
     // поставщика (факт синка). Если витринная цена сконвертирована в AZN —
     // подменяем и их, иначе PDP показывает «Currency USD / Starting price»
@@ -927,7 +998,7 @@ export class PublicCatalogService {
         id: row.id,
         code: row.code,
         slug: row.slug,
-        title: row.title,
+        title,
         description: row.description,
         type: row.type as PublicProductDetail["product"]["type"],
         category: row.category ? this.toCategory(row.category) : null,
@@ -962,9 +1033,10 @@ export class PublicCatalogService {
         pricingUnit: "unit",
         availability,
         seller,
+        partnerCode,
         publishedAt: row.publishedAt!.toISOString(),
         version: row.version,
-        hotelImage,
+        hotelImage: hotel?.imageUrl ?? null,
       },
       media,
     };
@@ -989,10 +1061,11 @@ export class PublicCatalogService {
   }
 
   /**
-   * Фото из реестра одним запросом на страницу выдачи (§ единый каталог фото):
-   * (supplierCode, hotelKey) → HotelSupplierRef → Hotel.photoFile.
+   * Реестр отелей одним запросом на страницу выдачи: (supplierCode, hotelKey) →
+   * HotelSupplierRef → Hotel. Даёт и фото, и каноническое имя физической
+   * гостиницы, поэтому один отель у разных поставщиков выглядит одинаково.
    */
-  private async hotelPhotoMap(rows: PublicProductRow[]): Promise<Map<string, string>> {
+  private async hotelRegistryMap(rows: PublicProductRow[]): Promise<Map<string, HotelRegistryEntry>> {
     const pairs = new Map<string, { supplierCode: string; externalKey: string }>();
     for (const row of rows) {
       const key = PublicCatalogService.hotelRefKey(row.attributes);
@@ -1000,58 +1073,48 @@ export class PublicCatalogService {
       const [supplierCode, externalKey] = key.split("\u0000");
       pairs.set(key, { supplierCode, externalKey });
     }
-    const map = new Map<string, string>();
+    const map = new Map<string, HotelRegistryEntry>();
     if (pairs.size === 0) return map;
     const refs = await this.prisma.hotelSupplierRef.findMany({
       where: { OR: [...pairs.values()].map((p) => ({ supplierCode: p.supplierCode, externalKey: p.externalKey })) },
-      select: { supplierCode: true, externalKey: true, hotel: { select: { photoFile: true, photoUpdatedAt: true } } },
+      select: {
+        supplierCode: true,
+        externalKey: true,
+        hotel: { select: { name: true, photoFile: true, photoUpdatedAt: true } },
+      },
     });
     for (const ref of refs) {
-      if (ref.hotel?.photoFile) {
-        map.set(
-          `${ref.supplierCode}\u0000${ref.externalKey}`,
-          hotelPhotoUrl(ref.hotel.photoFile, ref.hotel.photoUpdatedAt),
-        );
-      }
+      map.set(`${ref.supplierCode}\u0000${ref.externalKey}`, {
+        imageUrl: ref.hotel?.photoFile ? hotelPhotoUrl(ref.hotel.photoFile, ref.hotel.photoUpdatedAt) : null,
+        canonicalName: ref.hotel?.name?.trim() || null,
+      });
     }
     return map;
   }
 
-  /**
-   * Фото отеля строки: только единый реестр (HotelSupplierRef → Hotel.photoFile).
-   * Legacy-пути `/hotels/<tourinc>-<key>.jpg` и `/hotels/htl-<key>.jpg` удалены:
-   * файлов с такими именами на диске нет, каждый такой URL давал 404 на витрине.
-   */
-  private hotelImageFor(row: PublicProductRow, map?: Map<string, string>): string | null {
+  /** Запись реестра для одной строки (PDP) — без построения карты всей страницы. */
+  private async hotelRegistryForOne(row: PublicProductRow): Promise<HotelRegistryEntry | null> {
     const key = PublicCatalogService.hotelRefKey(row.attributes);
-    const fromRegistry = key && map ? map.get(key) : undefined;
-    return fromRegistry ?? null;
-  }
-
-  /** Фото отеля для одной строки (PDP) — без построения карты всей страницы. */
-  private async hotelImageForOne(row: PublicProductRow): Promise<string | null> {
-    const key = PublicCatalogService.hotelRefKey(row.attributes);
-    if (key) {
-      const [supplierCode, externalKey] = key.split("\u0000");
-      const ref = await this.prisma.hotelSupplierRef.findUnique({
-        where: { supplierCode_externalKey: { supplierCode, externalKey } },
-        select: { hotel: { select: { photoFile: true, photoUpdatedAt: true } } },
-      });
-      if (ref?.hotel?.photoFile) {
-        return hotelPhotoUrl(ref.hotel.photoFile, ref.hotel.photoUpdatedAt);
-      }
-    }
-    // Реестр не дал фото — карточка показывается без фото. Legacy-путь здесь
-    // удалён: файлов на диске нет, запрос давал 404 (см. hotelImageFor).
-    return null;
+    if (!key) return null;
+    const [supplierCode, externalKey] = key.split("\u0000");
+    const ref = await this.prisma.hotelSupplierRef.findUnique({
+      where: { supplierCode_externalKey: { supplierCode, externalKey } },
+      select: { hotel: { select: { name: true, photoFile: true, photoUpdatedAt: true } } },
+    });
+    if (!ref?.hotel) return null;
+    return {
+      imageUrl: ref.hotel.photoFile ? hotelPhotoUrl(ref.hotel.photoFile, ref.hotel.photoUpdatedAt) : null,
+      canonicalName: ref.hotel.name?.trim() || null,
+    };
   }
 
   private toCard(
     row: PublicProductRow,
     availability: PublicAvailabilitySummary | null,
     seller: PublicSeller | null,
+    partnerCode: string | null,
     fx: SupplierFxByPartner,
-    hotelPhotos?: Map<string, string>,
+    hotelRegistry?: Map<string, HotelRegistryEntry>,
   ): PublicProductCard {
     const primary = row.media.find((m) => m.isPrimary) ?? row.media[0] ?? null;
     const primaryImage = primary
@@ -1059,18 +1122,29 @@ export class PublicCatalogService {
       : null;
     const price = this.minTariff(row.tariffs);
     const shown = price ? this.toDisplayPrice(price.amount, price.currency, row.partnerId, fx) : null;
-    // Extract headline departure date and nights from the minimum tariff
-    const headlineDepartureDate = price?.validFrom ? price.validFrom.toISOString().slice(0, 10) : null;
+    const key = PublicCatalogService.hotelRefKey(row.attributes);
+    const registryEntry = key && hotelRegistry ? hotelRegistry.get(key) : undefined;
+    // Каноническое имя физической гостиницы — то же, что в PDP и саджесте.
+    const title = applyCanonicalName(row.title, registryEntry?.canonicalName);
+    // Extract headline departure date and nights from the selected
+    // nearest-date/min-nights tariff, with attributes as a fallback.
+    const attrs = (row.attributes ?? {}) as Record<string, unknown>;
+    const headlineDepartureDate = price?.validFrom
+      ? price.validFrom.toISOString().slice(0, 10)
+      : typeof attrs.priceDate === "string" ? attrs.priceDate : null;
     let headlineNights: number | null = null;
     if (price?.name) {
       const nightsMatch = price.name.match(/(\d+)\s*nights?/i);
       if (nightsMatch) headlineNights = parseInt(nightsMatch[1], 10);
     }
+    if (headlineNights === null && Number.isFinite(Number(attrs.priceNights)) && Number(attrs.priceNights) > 0) {
+      headlineNights = Number(attrs.priceNights);
+    }
     return {
       id: row.id,
       code: row.code,
       slug: row.slug,
-      title: row.title,
+      title,
       shortDescription: this.shorten(row.description),
       type: row.type as PublicProductCard["type"],
       category: row.category ? this.toCategory(row.category) : null,
@@ -1085,8 +1159,9 @@ export class PublicCatalogService {
       // синки по общему контракту).
       room: (row.attributes as any)?.rooms?.[0] ?? (row.attributes as any)?.room ?? null,
       meal: (row.attributes as any)?.meals?.[0] ?? (row.attributes as any)?.meal ?? null,
-      hotelImage: this.hotelImageFor(row, hotelPhotos),
+      hotelImage: registryEntry?.imageUrl ?? null,
       supplierCode: (row.attributes as any)?.supplierCode ?? null,
+      partnerCode,
       availabilitySummary: availability,
       seller,
       publishedAt: row.publishedAt!.toISOString(),
@@ -1264,6 +1339,21 @@ export class PublicCatalogService {
    * (Catalog-owned), НЕ из crm.Partner. Профиль HIDDEN/отсутствует → null (идентичность
    * не показывается). ANONYMOUS → generic label (displayName=null, фронтенд локализует).
    */
+  /**
+   * CRM Partner.code for every partner id. Independent of PublicSellerProfile:
+   * a supplier product without an approved seller profile must still expose
+   * the code-only marketplace marker.
+   */
+  private async partnerCodesOf(partnerIds: Array<string | null>): Promise<Map<string, string>> {
+    const unique = [...new Set(partnerIds.filter((id): id is string => Boolean(id)))];
+    if (unique.length === 0) return new Map();
+    const partners = await this.prisma.partner.findMany({
+      where: { id: { in: unique } },
+      select: { id: true, code: true },
+    });
+    return new Map(partners.map((p) => [p.id, p.code]));
+  }
+
   private async sellersOf(partnerIds: Array<string | null>): Promise<Map<string, PublicSeller>> {
     const unique = [...new Set(partnerIds.filter((id): id is string => Boolean(id)))];
     if (unique.length === 0) return new Map();
@@ -1310,6 +1400,173 @@ export class PublicCatalogService {
       // FIX 2: коды, не labels. Локализацию выполняет клиент (RU/AZ/EN label).
       countryCode: p.countryCode,
       cityCode: p.cityCode,
+    };
+  }
+
+  /**
+   * Цена предложения для сравнения между поставщиками.
+   * `startingPrice` уже публичная цена поставщика; валюта — его фактическая
+   * (AZN, если курс был при синке). Сравнивать суммы в разных валютах нельзя,
+   * поэтому «сравнимая» цена = приведённая к AZN по курсу поставщика.
+   * Нет курса → исходная валюта и comparable=false (fail-open, без вранья).
+   */
+  private toComparablePrice(
+    price: number,
+    currency: string,
+    partnerId: string | null,
+    fx: SupplierFxByPartner,
+  ): DisplayPrice {
+    const shown = this.toDisplayPrice(new Prisma.Decimal(price), currency, partnerId, fx);
+    return {
+      amount: Number(shown.amount),
+      currency: shown.currency || currency,
+      comparable: (shown.currency || currency).toUpperCase() === "AZN",
+    };
+  }
+
+  /**
+   * Предложения отеля: минимальная цена + другие предложения.
+   * Одно предложение на supplier-native отель (самый дешёвый продукт).
+   * Публичный контур Marketplace: только продукты, видимые на витрине.
+   */
+  async getHotelOffers(hotelId: string): Promise<{
+    hotelId: string;
+    minPrice: number | null;
+    minPartnerCode: string | null;
+    minPriceCurrency: string;
+    offers: Array<{
+      supplierCode: string;
+      externalKey: string;
+      productId: string;
+      productCode: string;
+      productName: string;
+      price: number | null;
+      currency: string;
+      sourceCurrency: string;
+      comparable: boolean;
+    }>;
+  }> {
+    const empty = { hotelId, minPrice: null, minPartnerCode: null, minPriceCurrency: "AZN", offers: [] };
+    if (!this.hotelMatching) return empty;
+    const offers = await this.hotelMatching.getOffersForHotel(hotelId, this.marketplaceWhere());
+    if (offers.length === 0) return empty;
+
+    const fx = await this.supplierFxByPartner(offers.map((o) => o.partnerId));
+    const priced = offers.map((offer) => {
+      const display = offer.price == null
+        ? null
+        : this.toComparablePrice(offer.price, offer.currency, offer.partnerId, fx);
+      return {
+        supplierCode: offer.supplierCode,
+        externalKey: offer.externalKey,
+        productId: offer.productId,
+        productCode: offer.productCode,
+        productName: offer.productName,
+        price: display?.amount ?? null,
+        currency: display?.currency ?? offer.currency,
+        sourceCurrency: offer.currency,
+        comparable: display?.comparable ?? false,
+      };
+    });
+
+    // Минимум имеет смысл только если все цены в одной валюте: иначе нельзя
+    // складывать AZN, USD и EUR. При смешанных валютах минимум не выдумываем.
+    const currencies = new Set(priced.filter((o) => o.price != null).map((o) => o.currency.toUpperCase()));
+    let minPrice: number | null = null;
+    let minPartnerCode: string | null = null;
+    let minPriceCurrency = currencies.size === 1 ? [...currencies][0] : "AZN";
+    if (currencies.size === 1) {
+      for (const offer of priced) {
+        if (offer.price == null) continue;
+        if (minPrice === null || offer.price < minPrice) {
+          minPrice = offer.price;
+          minPartnerCode = offer.supplierCode;
+        }
+      }
+    }
+
+    priced.sort((a, b) => (a.price ?? Number.POSITIVE_INFINITY) - (b.price ?? Number.POSITIVE_INFINITY));
+    return { hotelId, minPrice, minPartnerCode, minPriceCurrency, offers: priced };
+  }
+
+  /**
+   * Сопоставимые туры: минимальная цена + другие предложения.
+   * Базовый тур проверяется на публичную видимость (иначе публичный endpoint
+   * отдавал бы цену/название черновика по id — утечка внутренних данных).
+   */
+  async getComparableTours(productId: string): Promise<{
+    productId: string;
+    minPrice: number | null;
+    minPartnerId: string | null;
+    count: number;
+    currency: string;
+    comparable: Array<{
+      id: string;
+      code: string;
+      title: string;
+      price: number | null;
+      currency: string;
+      partnerId: string | null;
+      comparable: boolean;
+    }>;
+  }> {
+    const empty = { productId, minPrice: null, minPartnerId: null, count: 0, currency: "AZN", comparable: [] };
+    if (!this.tourMatching) return empty;
+    const base = await this.prisma.product.findFirst({
+      where: { id: productId, ...this.marketplaceWhere() },
+      select: { id: true, partnerId: true, attributes: true },
+    });
+    if (!base) throw new NotFoundError("Product not found");
+
+    const alternatives = await this.tourMatching.findComparableTours(productId, this.marketplaceWhere());
+    const baseAttrs = (base.attributes ?? {}) as Record<string, unknown>;
+    const basePrice = typeof baseAttrs.startingPrice === "number" ? baseAttrs.startingPrice : null;
+    const baseCurrency = typeof baseAttrs.currency === "string" ? baseAttrs.currency : "AZN";
+
+    const fx = await this.supplierFxByPartner([base.partnerId, ...alternatives.map((a) => a.partnerId)]);
+    const baseDisplay = basePrice == null
+      ? null
+      : this.toComparablePrice(basePrice, baseCurrency, base.partnerId, fx);
+    const priced = alternatives.map((item) => {
+      const display = item.price == null
+        ? null
+        : this.toComparablePrice(item.price, item.currency, item.partnerId, fx);
+      return {
+        id: item.id,
+        code: item.code,
+        title: item.title,
+        price: display?.amount ?? null,
+        currency: display?.currency ?? item.currency,
+        partnerId: item.partnerId,
+        comparable: display?.comparable ?? false,
+      };
+    });
+
+    const withPrice: Array<{ price: number; currency: string; partnerId: string | null }> = [];
+    if (baseDisplay) withPrice.push({ price: baseDisplay.amount, currency: baseDisplay.currency, partnerId: base.partnerId });
+    for (const item of priced) {
+      if (item.price != null) withPrice.push({ price: item.price, currency: item.currency, partnerId: item.partnerId });
+    }
+    const currencies = new Set(withPrice.map((entry) => entry.currency.toUpperCase()));
+    let minPrice: number | null = null;
+    let minPartnerId: string | null = null;
+    if (currencies.size === 1) {
+      for (const entry of withPrice) {
+        if (minPrice === null || entry.price < minPrice) {
+          minPrice = entry.price;
+          minPartnerId = entry.partnerId;
+        }
+      }
+    }
+
+    priced.sort((a, b) => (a.price ?? Number.POSITIVE_INFINITY) - (b.price ?? Number.POSITIVE_INFINITY));
+    return {
+      productId,
+      minPrice,
+      minPartnerId,
+      count: 1 + alternatives.length,
+      currency: currencies.size === 1 ? [...currencies][0] : baseDisplay?.currency ?? baseCurrency,
+      comparable: priced,
     };
   }
 

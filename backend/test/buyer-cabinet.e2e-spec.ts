@@ -181,7 +181,8 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
     const product = (
       await adminAgent
         .post("/api/v1/products")
-        .send({ type: "TOUR", title: `Cab IDOR ${stamp}`, tariffs: [{ name: "S", price: 120 }] })
+        .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Cab IDOR ${stamp}`, tariffs: [{ name: "S", price: 120 }] })
         .expect(201)
     ).body.product;
     created.products.push(product.id);
@@ -244,7 +245,8 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
     const product = (
       await adminAgent
         .post("/api/v1/products")
-        .send({ type: "TOUR", title: `Cab Own ${stamp}`, tariffs: [{ name: "S", price: 250 }] })
+        .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Cab Own ${stamp}`, tariffs: [{ name: "S", price: 250 }] })
         .expect(201)
     ).body.product;
     created.products.push(product.id);
@@ -325,7 +327,8 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
     const product = (
       await adminAgent
         .post("/api/v1/products")
-        .send({ type: "TOUR", title: `Cab Page ${stamp}`, tariffs: [{ name: "S", price: 100 }] })
+        .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Cab Page ${stamp}`, tariffs: [{ name: "S", price: 100 }] })
         .expect(201)
     ).body.product;
     created.products.push(product.id);
@@ -383,7 +386,8 @@ describe("Phase 1 Step 1.13 — Buyer Cabinet Foundation (e2e)", () => {
       };
       expect(res.items).toEqual([]);
       expect(res.total).toBe(0);
-      expect(res.available).toBe(false);
+      // Documents domain уже реализован; payments/support пока controlled-empty.
+      expect(res.available).toBe(path === "documents");
     }
   });
 

@@ -119,6 +119,8 @@ export interface PublicProductCard {
   meal?: string | null;
   /** Код поставщика (KOMPAS/SUMMERTOUR/…) для синк-карточек. */
   supplierCode?: string | null;
+  /** CRM Partner.code — единственная публичная метка продавца на карточке. */
+  partnerCode: string | null;
   /** Единое фото физической гостиницы из реестра (catalog."Hotel".photoFile →
    *  `/hotels/hotel_<hotelId>.webp`), общее для тура, услуги «Отели», поиска и
    *  конструктора и для всех поставщиков этого отеля. Файла может не быть —
@@ -167,6 +169,8 @@ export interface PublicProductDetail {
     availability: PublicAvailabilitySummary | null;
     /** Seller-safe проекция (§8, Step 1.11); null — идентичность скрыта/не задана. */
     seller: PublicSeller | null;
+    /** CRM Partner.code — code-only supplier marker on PDP. */
+    partnerCode: string | null;
     publishedAt: string;
     version: number;
     /**

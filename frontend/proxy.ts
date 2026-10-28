@@ -22,11 +22,34 @@ import { NextResponse, type NextRequest } from "next/server";
 const AUTH_COOKIE = "travelhub.auth";
 const LOGIN_URL = "/login";
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const authed = req.cookies.get(AUTH_COOKIE)?.value;
+  const host = (req.headers.get("host") ?? "").split(":")[0].toLowerCase();
+  const isLocalHost = !host || host === "localhost" || host === "127.0.0.1" || host === "::1";
 
-  if (!authed) {
+  // Custom Storefront domains: resolve verified host → /store/<slug>.
+  // Drafts never become public here because the backend only returns
+  // ACTIVE+entitled slugs for VERIFIED custom domains.
+  if (!isLocalHost && !pathname.startsWith("/_next") && !pathname.startsWith("/api")) {
+    try {
+      const backend = process.env.BACKEND_INTERNAL_URL ?? "http://127.0.0.1:4000/api/v1";
+      const res = await fetch(`${backend}/public/domains/resolve?host=${encodeURIComponent(host)}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = (await res.json()) as { slug?: string | null };
+        if (data.slug) {
+          const url = req.nextUrl.clone();
+          url.pathname = `/store/${data.slug}${pathname === "/" ? "" : pathname}`;
+          return NextResponse.rewrite(url);
+        }
+      }
+    } catch {
+      /* network failure: fall through to normal host behavior */
+    }
+  }
+
+  const requiresAuth = pathname === "/app" || pathname.startsWith("/app/") || pathname === "/partner" || pathname.startsWith("/partner/") || pathname === "/account" || pathname.startsWith("/account/") || pathname === "/preview" || pathname.startsWith("/preview/");
+  const authed = req.cookies.get(AUTH_COOKIE)?.value;
+  if (requiresAuth && !authed) {
     const login = req.nextUrl.clone();
     login.pathname = LOGIN_URL;
     login.search = "";
@@ -37,7 +60,7 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Step 1.9: /account/* — защищённый внешний контур (BUYER identity):
-  // anonymous → /login?next=/account...
-  matcher: ["/app", "/app/:path*", "/partner", "/partner/:path*", "/account", "/account/:path*"],
+  // Catch custom-domain hostnames too; auth is scoped to /app, /partner and
+  // /account inside proxy().
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

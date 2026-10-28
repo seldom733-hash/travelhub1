@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { t, useLocale, formatDate } from "@/lib/i18n";
+import { t, useLocale, formatDateShort } from "@/lib/i18n";
 import { useMarketplaceCardImpression } from "@/lib/behavioral-events";
 import type { PublicProductCard } from "@/lib/public-api";
-import { formatLocation } from "@/lib/locations";
 import { availabilityText } from "@/lib/marketplace-utils";
+import { categoryLabel } from "@/lib/category-label";
 import { useHotelPhoto } from "@/lib/hotel-photo";
 import Price from "./Price";
 
@@ -79,40 +79,31 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
 
       <div className="flex flex-1 flex-col gap-1 p-4">
         <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-          {card.category?.title ?? card.type}
+          {categoryLabel(card.category, locale) || card.type}
         </div>
         <div className="line-clamp-2 font-bold text-slate-900 transition-colors group-hover:text-blue-600" title={card.title}>
           {card.title}
         </div>
-        {/* Партнёр: показываем ТОЛЬКО код (PAR-*), никогда raw CRM-название.
-            ANONYMOUS → generic label (приватность seller-safe сохранена). */}
-        {card.seller && (
+        {/* Продавец явно не раскрывается: на карточке только CRM Partner.code.
+            Код берётся из Product.partner, а не из seller-profile, поэтому он
+            виден и для supplier-синков без публичного seller-профиля. */}
+        {card.partnerCode && (
           <div className="flex items-center gap-1 text-[11px] text-slate-500">
-            <span className="truncate">
-              {card.seller.visibilityMode === "ANONYMOUS"
-                ? t("seller.anonymous_label", locale)
-                : (card.seller.partnerCode ?? t("seller.anonymous_label", locale))}
-            </span>
-            {card.seller.verified && <span className="shrink-0 text-emerald-600" title={t("seller.verified_badge", locale)}>✓</span>}
+            <span>{t("card.supplier_code", locale)}:</span>
+            <span className="font-mono font-medium text-slate-600">{card.partnerCode}</span>
           </div>
         )}
-        {/* FIX 2: география — коды (countryCode/cityCode), локализуется по locale. */}
-        {card.seller &&
-          (() => {
-            const loc = formatLocation(card.seller.countryCode, card.seller.cityCode, locale);
-            return loc ? <div className="text-[11px] text-slate-400">📍 {loc}</div> : null;
-          })()}
         {card.shortDescription && (
           <p className="line-clamp-2 text-xs leading-relaxed text-slate-500">{card.shortDescription}</p>
         )}
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           <div>
-            <Price amount={card.priceFrom} currency={card.currency} size="sm" />
+            <Price amount={card.priceFrom} currency={card.currency} size="sm" withPrefix={false} />
             {(card.headlineDepartureDate || card.headlineNights) && (
               <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-400">
                 {card.headlineDepartureDate && (
-                  <span>{formatDate(card.headlineDepartureDate, locale)}</span>
+                  <span>{formatDateShort(card.headlineDepartureDate, locale)}</span>
                 )}
                 {card.headlineDepartureDate && card.headlineNights && <span>·</span>}
                 {card.headlineNights != null && (

@@ -302,9 +302,10 @@ export class VoyagerHotelSyncService {
       }
     }
 
-    // Public AZN price per tariff: convert USD→AZN (seeded SupplierFxRate,
-    // §FX) then apply markup. `resolveFxSafe` decides the write currency —
-    // a missing rate falls open to the source currency.
+    // Public price per tariff: convert source→AZN (SupplierFxRate, §FX), затем
+    // markup. applyWithFx возвращает и сумму, и валюту; метка валюты всегда
+    // соответствует сумме (нет курса → source currency, fail-open).
+    const resolution = await this.pricing.resolve("VOYAGER", "hotels");
     const tariffs: Array<{
       code: string;
       name: string;
@@ -315,21 +316,13 @@ export class VoyagerHotelSyncService {
       meal: string;
       inclusions: Record<string, unknown>;
     }> = [];
-    let startingPrice = 0;
-    let startingCurrency = "AZN";
+    const pricedGroups: Array<{ amount: number; currency: string }> = [];
     for (const g of tariffGroups.values()) {
       const fx = await this.pricing.resolveFxSafe("VOYAGER", g.currency);
-      const amount = await this.pricing.publicAmountFor(
-        g.minSource,
-        g.currency,
-        "VOYAGER",
-        "hotels",
-      );
-      const currency = fx ? "AZN" : g.currency;
-      if (!startingPrice || amount < startingPrice) {
-        startingPrice = amount;
-        startingCurrency = currency;
-      }
+      const { pricing, fxJson } = this.pricing.applyWithFx(resolution, g.minSource, g.currency, fx);
+      const amount = Number(pricing.publicPrice.toString());
+      const currency = fxJson ? "AZN" : g.currency;
+      pricedGroups.push({ amount, currency });
       tariffs.push({
         code: `TRF-VOY-H-${hotelKey}-${stateInc}-${g.roomKey || "x"}-${g.mealKey || "x"}`,
         name: [g.room, g.meal].filter(Boolean).join(" / ") || "Base",
@@ -349,6 +342,21 @@ export class VoyagerHotelSyncService {
           sourceCurrency: g.currency,
         },
       });
+    }
+
+    // startingPrice — минимум в ОДНОЙ валюте (иначе сравнивать суммы нельзя).
+    // Все группы обычно конвертированы в AZN; при частично настроенных курсах
+    // берём AZN-подмножество, иначе — валюту первой группы.
+    const startingPool = pricedGroups.every((p) => p.currency === pricedGroups[0]?.currency)
+      ? pricedGroups
+      : pricedGroups.filter((p) => p.currency === "AZN");
+    let startingPrice = 0;
+    let startingCurrency = pricedGroups[0]?.currency ?? "AZN";
+    for (const group of startingPool) {
+      if (!startingPrice || group.amount < startingPrice) {
+        startingPrice = group.amount;
+        startingCurrency = group.currency;
+      }
     }
 
     const existing = await this.prisma.product.findFirst({ where: { supplierRef } });

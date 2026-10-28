@@ -204,7 +204,7 @@ describe("Phase 2 Step 2.2C — Matching & Distribution (e2e)", () => {
     const r = (
       await buyerAgent
         .post("/api/v1/buyer/requests")
-        .send({ categoryId: catHotelId, destinations, serviceDateFrom: "2026-09-01", serviceDateTo: "2026-09-07", adults: 2, preferences: prefs })
+        .send({ categoryId: catHotelId, destinations, serviceDateFrom: "2027-09-01", serviceDateTo: "2027-09-07", adults: 2, preferences: prefs })
         .expect(201)
     ).body as { id: string; version: number };
     const s = (await buyerAgent.post(`/api/v1/buyer/requests/${r.id}/submit`).send({ expectedVersion: r.version }).expect(201)).body as { id: string };

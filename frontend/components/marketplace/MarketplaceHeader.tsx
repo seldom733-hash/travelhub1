@@ -24,7 +24,7 @@ import {
   ForkKnife,
 } from "@phosphor-icons/react";
 import { t, useLocale, useSetLocale, LOCALES } from "@/lib/i18n";
-import { useCurrentUser } from "@/lib/use-user";
+import { useCurrentUserStatus } from "@/lib/use-user";
 import { isInternalRole } from "@/lib/routes";
 import GlobalSearchAutocomplete from "./GlobalSearchAutocomplete";
 
@@ -32,6 +32,8 @@ interface ServiceItem {
   icon: React.ReactNode;
   labelKey: string;
   href: string;
+  /** Temporarily unavailable service: visible but not clickable. */
+  disabled?: boolean;
 }
 
 /** Published header configuration shape (Constructor → headerConfig). */
@@ -75,18 +77,19 @@ const DEFAULT_HEADER_CONFIG: MarketplaceHeaderConfig = {
 const SERVICES: ServiceItem[] = [
   { icon: <HouseSimple size={18} weight="light" />, labelKey: "marketplace.category_accommodation", href: "/search?category=hotels" },
   { icon: <MapPin size={18} weight="light" />, labelKey: "marketplace.category_tours", href: "/search?category=tours" },
-  { icon: <Compass size={18} weight="light" />, labelKey: "marketplace.category_excursions", href: "/search?category=excursions" },
-  { icon: <Van size={18} weight="light" />, labelKey: "marketplace.category_transfers", href: "/search?category=transfers" },
-  { icon: <Star size={18} weight="light" />, labelKey: "marketplace.category_experiences", href: "/search?category=experiences" },
-  { icon: <Sun size={18} weight="light" />, labelKey: "marketplace.category_wellness", href: "/search?category=wellness" },
-  { icon: <ForkKnife size={18} weight="light" />, labelKey: "marketplace.category_gastronomy", href: "/search?category=gastronomy" },
+  { icon: <Compass size={18} weight="light" />, labelKey: "marketplace.category_excursions", href: "/search?category=excursions", disabled: true },
+  { icon: <Van size={18} weight="light" />, labelKey: "marketplace.category_transfers", href: "/search?category=transfers", disabled: true },
+  { icon: <Star size={18} weight="light" />, labelKey: "marketplace.category_experiences", href: "/search?category=experiences", disabled: true },
+  { icon: <Sun size={18} weight="light" />, labelKey: "marketplace.category_wellness", href: "/search?category=wellness", disabled: true },
+  { icon: <ForkKnife size={18} weight="light" />, labelKey: "marketplace.category_gastronomy", href: "/search?category=gastronomy", disabled: true },
 ];
 
 export default function MarketplaceHeader({ config }: { config?: MarketplaceHeaderConfig | null }) {
-  const user = useCurrentUser();
+  const { user, ready: userReady } = useCurrentUserStatus();
   const locale = useLocale();
   const setLocale = useSetLocale();
   const router = useRouter();
+  const soonLabel = locale === "ru" ? "скоро" : locale === "az" ? "tezliklə" : "soon";
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
@@ -210,43 +213,66 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
               {servicesOpen && (
                 <div className="absolute left-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-dark-border bg-dark-surface/95 shadow-xl backdrop-blur-md">
                   {SERVICES.map((svc) => (
-                    <Link
-                      key={svc.href}
-                      href={svc.href}
-                      onClick={() => setServicesOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white"
-                    >
-                      <span className="text-gold">{svc.icon}</span>
-                      <span>{t(svc.labelKey, locale)}</span>
-                    </Link>
+                    svc.disabled ? (
+                      <div
+                        key={svc.href}
+                        aria-disabled="true"
+                        title="Временно недоступно"
+                        className="flex cursor-not-allowed items-center gap-3 px-4 py-2.5 text-sm text-neutral-600 opacity-60"
+                      >
+                        <span className="text-neutral-600">{svc.icon}</span>
+                        <span>{t(svc.labelKey, locale)}</span>
+                        <span className="ml-auto rounded bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-neutral-500">{soonLabel}</span>
+                      </div>
+                    ) : (
+                      <Link
+                        key={svc.href}
+                        href={svc.href}
+                        onClick={() => setServicesOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white"
+                      >
+                        <span className="text-gold">{svc.icon}</span>
+                        <span>{t(svc.labelKey, locale)}</span>
+                      </Link>
+                    )
                   ))}
                 </div>
               )}
             </div>
 
-            <Link href="/become-a-partner" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
-              {t("nav.for_partners", locale)}
-            </Link>
+            {userReady && user === null && (
+              <Link href="/become-a-partner" className="rounded-lg px-3 py-2 text-sm text-neutral-400 transition-colors hover:text-white">
+                {t("nav.for_partners", locale)}
+              </Link>
+            )}
           </div>
           )}
 
-          {/* Right side - icons with labels */}
+          {/* Right side - icons with labels.
+              Личные разделы (Избранное / Уведомления / Корзина) — только для
+              зарегистрированных клиентов (роль BUYER). Гостям, партнёру и
+              сотрудникам не показываются: у гостей нет персональных данных,
+              у PARTNER и внутренних ролей — свои кабинеты. */}
           <div className="ml-auto flex items-center gap-2">
-            <button className="hidden flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-neutral-400 transition-colors hover:text-white sm:flex" aria-label={t("nav.favorites", locale)}>
-              <Heart size={20} weight="light" />
-              <span className="text-[10px]">{t("nav.favorites", locale)}</span>
-            </button>
-            <button className="hidden flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-neutral-400 transition-colors hover:text-white sm:flex" aria-label={t("nav.notifications", locale)}>
-              <div className="relative">
-                <Bell size={20} weight="light" />
-                <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-gold text-[8px] font-bold text-dark">2</span>
-              </div>
-              <span className="text-[10px]">{t("nav.notifications", locale)}</span>
-            </button>
-            <button className="hidden flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-neutral-400 transition-colors hover:text-white sm:flex" aria-label={t("nav.cart", locale)}>
-              <ShoppingCart size={20} weight="light" />
-              <span className="text-[10px]">{t("nav.cart", locale)}</span>
-            </button>
+            {user?.role === "BUYER" && (
+              <>
+                <button className="hidden flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-neutral-400 transition-colors hover:text-white sm:flex" aria-label={t("nav.favorites", locale)}>
+                  <Heart size={20} weight="light" />
+                  <span className="text-[10px]">{t("nav.favorites", locale)}</span>
+                </button>
+                <button className="hidden flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-neutral-400 transition-colors hover:text-white sm:flex" aria-label={t("nav.notifications", locale)}>
+                  <div className="relative">
+                    <Bell size={20} weight="light" />
+                    <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-gold text-[8px] font-bold text-dark">2</span>
+                  </div>
+                  <span className="text-[10px]">{t("nav.notifications", locale)}</span>
+                </button>
+                <button className="hidden flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-neutral-400 transition-colors hover:text-white sm:flex" aria-label={t("nav.cart", locale)}>
+                  <ShoppingCart size={20} weight="light" />
+                  <span className="text-[10px]">{t("nav.cart", locale)}</span>
+                </button>
+              </>
+            )}
 
             {user === null ? (
               <Link
@@ -292,9 +318,11 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
                 <Link href="/search" onClick={() => setMobileOpen(false)} className="rounded-lg px-4 py-3 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white">
                   {t("nav.services", locale)}
                 </Link>
-                <Link href="/become-a-partner" onClick={() => setMobileOpen(false)} className="rounded-lg px-4 py-3 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white">
-                  {t("nav.for_partners", locale)}
-                </Link>
+                {userReady && user === null && (
+                  <Link href="/become-a-partner" onClick={() => setMobileOpen(false)} className="rounded-lg px-4 py-3 text-sm text-neutral-300 transition-colors hover:bg-white/5 hover:text-white">
+                    {t("nav.for_partners", locale)}
+                  </Link>
+                )}
               </div>
             </div>
           </div>

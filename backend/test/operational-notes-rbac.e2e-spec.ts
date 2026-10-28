@@ -153,7 +153,7 @@ describe('Phase 3 Step 3.5 — Operational Notes Round 2B (e2e)', () => {
 
     // Create test Partner
     const partnerReg = await request(app.getHttpServer())
-      .post('/api/v1/auth/register-partner')
+      .post('/api/v1/auth/partner-register')
       .send({
         email: `notesPartner${stamp}@test.local`,
         password: 'partnerpass123',
@@ -204,6 +204,7 @@ describe('Phase 3 Step 3.5 — Operational Notes Round 2B (e2e)', () => {
     // Create test Product
     const product = (
       await adminAgent.post('/api/v1/products').send({
+        partnerId: "00000000-0000-4000-8000-000000000001",
         type: 'TOUR',
         title: `Notes Test Product ${stamp}`,
         tariffs: [{ name: 'S', price: 100 }],

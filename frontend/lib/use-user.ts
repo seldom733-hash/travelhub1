@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { auth, fetchSessionUser, type AuthUser } from "./api";
 
 /**
@@ -19,8 +19,10 @@ let cached: { token: string | null; user: AuthUser | null } | null = null;
  * auth.subscribe. Сетевые сбои (abort/offline) НЕ разлогинивают — держим
  * последнего известного пользователя (AbortError-регрессия не возвращается).
  */
-export function useCurrentUser(): AuthUser | null {
+export function useCurrentUserStatus(): { user: AuthUser | null; ready: boolean } {
   const [user, setUser] = useState<AuthUser | null>(cached?.user ?? null);
+  const [ready, setReady] = useState(cached !== null);
+  const resolvedToken = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     let alive = true;
@@ -28,14 +30,23 @@ export function useCurrentUser(): AuthUser | null {
     const load = () => {
       const token = auth.token;
       if (cached && cached.token === token) {
-        if (alive) setUser(cached.user);
+        if (alive) {
+          resolvedToken.current = token;
+          setUser(cached.user);
+          setReady(true);
+        }
         return;
       }
+      // Only hide the CTA when the session token actually changed; a periodic
+      // focus/interval revalidation must not make a guest CTA blink.
+      if (alive && resolvedToken.current !== token) setReady(false);
       fetchSessionUser()
         .then((u) => {
           cached = { token, user: u };
+          resolvedToken.current = token;
           if (!alive) return;
           setUser(u);
+          setReady(true);
           // Safety net для защищённых контуров (/app/*, /partner/*, /account/*):
           // серверный proxy.ts перехватывает anonymous по отсутствию cookie, но
           // если cookie есть, а сессия недействительна (revoked/expired), уводим
@@ -50,17 +61,43 @@ export function useCurrentUser(): AuthUser | null {
         })
         .catch(() => {
           // Только сетевые сбои (abort/offline). Не разлогиниваем: следующий
-          // mount/смена токена повторит пробу.
+          // mount/смена токена повторит пробу. Для UI считаем сессию проверенной,
+          // чтобы не прятать гостевые CTA навсегда при недоступном backend.
+          if (alive) {
+            resolvedToken.current = token;
+            setReady(true);
+          }
         });
     };
 
     load();
     const unsubscribe = auth.subscribe(load);
+    // Role/permission changes are authoritative in the DB and enforced on every
+    // backend request. For the UI (menus/buttons) revalidate on focus and at a
+    // bounded interval, so an already-open session cannot keep stale menus.
+    const refresh = () => {
+      cached = null;
+      load();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibility);
+    const interval = window.setInterval(refresh, 60_000);
     return () => {
       alive = false;
       unsubscribe();
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(interval);
     };
   }, []);
 
-  return user;
+  return { user, ready };
+}
+
+/** Backward-compatible hook for components that only need the user. */
+export function useCurrentUser(): AuthUser | null {
+  return useCurrentUserStatus().user;
 }

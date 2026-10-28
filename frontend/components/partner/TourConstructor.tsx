@@ -30,10 +30,10 @@ import PriceCalendarEditor from "@/components/partner/PriceCalendarEditor";
  * красный = стоп).
  */
 
-const STEPS = ["Основная информация", "Проживание", "Перелёт", "Трансфер", "Страховка", "Предпросмотр"] as const;
+const STEPS = ["Основная информация", "Отель", "Перелёт", "Трансфер", "Страховка", "Предпросмотр"] as const;
 
 const KIND_LABEL: Record<ComponentKind, string> = {
-  accommodation: "Проживание",
+  accommodation: "Отель",
   flight: "Перелёт",
   transfer: "Трансфер",
   insurance: "Страховка",
@@ -350,7 +350,7 @@ export default function TourConstructor({ productId }: Props) {
     const entry = dicts?.roomTypes.find((e) => e.id === roomTypeId);
     const res = await tourBuilderApi.addComponent(id, {
       kind: "accommodation",
-      name: entry ? entryLabel(entry) : "Проживание",
+      name: entry ? entryLabel(entry) : "Отель",
       basePrice: 0,
       componentPayload: { roomTypeId, mealSupplements: {} },
     });

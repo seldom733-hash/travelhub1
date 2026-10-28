@@ -68,6 +68,8 @@ export interface FixtureOrderInput {
    *  entry). Тесты STRICT REVIEW 2.7 используют BUYER_REQUEST (non-DIRECT
    *  immutability) и null (legacy Order, nullable acquisition исторически). */
   acquisitionSource?: SalesAcquisitionSource | null;
+  /** Unique commerce root for Booking reference derivation (test fixture). */
+  commerceSequence?: string | null;
 }
 
 export interface FixtureOrderResult {
@@ -118,6 +120,9 @@ export async function createFixtureOrder(
         serviceTimeZone: input.serviceTimeZone ?? null,
         version: 1,
         submittedAt,
+        commerceSequence: input.commerceSequence !== undefined
+          ? input.commerceSequence
+          : `E2E-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`,
         acquisitionSource: input.acquisitionSource !== undefined ? input.acquisitionSource : SalesAcquisitionSource.DIRECT,
         createdBy: actor,
         updatedBy: actor,
@@ -131,6 +136,25 @@ export async function createFixtureOrder(
       select: { id: true, code: true },
     });
     const codeById = new Map(productCodes.map((p) => [p.id, p.code]));
+
+    // Deterministic catalog rows for tests that use synthetic product IDs as
+    // OrderItem references (Booking consumer does not read mutable Catalog, but
+    // other projections/read models may). Existing real Products are untouched.
+    for (const item of input.items) {
+      await tx.product.upsert({
+        where: { id: item.productId },
+        create: {
+          id: item.productId,
+          code: `PRD-E2E-${item.productId}`,
+          slug: `prd-e2e-${item.productId}`.toLowerCase(),
+          type: item.type as never,
+          title: item.title,
+          status: "DRAFT",
+          version: 1,
+        },
+        update: {},
+      });
+    }
 
     for (const item of input.items) {
       await tx.orderItem.create({

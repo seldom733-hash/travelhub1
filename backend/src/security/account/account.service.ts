@@ -254,7 +254,7 @@ export class AccountService {
         id: b.id,
         code: b.code,
         orderId: b.orderId,
-        orderCode: orderById.get(b.orderId)?.referenceNumber ?? "",
+        orderCode: orderById.get(b.orderId)?.code ?? "",
         currency: orderById.get(b.orderId)?.currency ?? "USD",
         status: b.status,
         amount: b.amount.toString(),

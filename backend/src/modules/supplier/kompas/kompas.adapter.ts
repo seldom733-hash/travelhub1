@@ -41,6 +41,7 @@ import type {
   SupplierGeoOption,
 } from "../supplier.types";
 import { priceUnavailable } from "../supplier.types";
+import { withCatalogCoverage, recordCatalogError, recordCatalogPage } from "../catalog/catalog-coverage";
 import { parseSamoHotelDynamic } from "../samo-hotel-dict";
 
 const KOMPAS_USER_AGENT =
@@ -156,7 +157,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
   private readonly browserLock = new Map<string, Promise<Browser>>();
 
   private readonly baseUrl: string;
-  private static readonly MAX_PAGES = 30;
+  private static readonly MAX_PAGES = 60;
   private static readonly PAGE_DELAY_MS = 1_000;
   // §NIGHTS-FANOUT: per-night re-submits read fewer pages — the goal is night
   // diversity, not the full 5000-row supplier cap per night.
@@ -262,6 +263,46 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       return result;
     } catch (err) {
       this.logger.error(`KOMPAS country/program discovery failed: ${(err as Error).message}`);
+      if (page) await page.context().close().catch(() => {});
+      return [];
+    }
+  }
+
+  /**
+   * Discover countries from the stay-only `/search_hotel` STATEINC select.
+   * This dictionary is wider than the tour dictionary (53 vs ~23) and must not
+   * be replaced by tour discovery.
+   */
+  async discoverHotelCountries(): Promise<Array<{ countryId: string; countryName: string }>> {
+    let page: Page | null = null;
+    try {
+      const browser = await this.getBrowser();
+      const context = await browser.newContext({
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+        locale: "ru-RU",
+      });
+      page = await context.newPage();
+      await page.goto(`${this.baseUrl}/search_hotel`, { waitUntil: "networkidle", timeout: 60_000 });
+      await page.waitForFunction(
+        () => typeof (window as any).samo !== "undefined" && (window as any).samo.page_ready === true,
+        { timeout: 15_000 },
+      );
+      await page.evaluate(() => {
+        document.getElementById("samo_popup")?.remove();
+        document.getElementById("samo_popup_mini")?.remove();
+      });
+      const countries = await page.evaluate(() => {
+        const sel = document.querySelector("select[name=STATEINC]") as HTMLSelectElement | null;
+        if (!sel) return [] as Array<{ countryId: string; countryName: string }>;
+        return Array.from(sel.options)
+          .filter((o) => o.value !== "0" && o.value !== "")
+          .map((o) => ({ countryId: o.value, countryName: o.text.trim() }));
+      });
+      this.logger.log(`KOMPAS hotels: ${countries.length} countries discovered`);
+      await context.close();
+      return countries;
+    } catch (err) {
+      this.logger.error(`KOMPAS hotel country discovery failed: ${(err as Error).message}`);
       if (page) await page.context().close().catch(() => {});
       return [];
     }
@@ -853,6 +894,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       const collectPages = async (maxPages: number): Promise<any[]> => {
         const collected: any[] = [];
         let pageOffers = await this.extractPageOffers(resultPage);
+        recordCatalogPage(1, null);
         collected.push(...pageOffers);
         for (let p = 2; p <= maxPages; p++) {
           const hasNextPage = await resultPage.evaluate((targetPage: number) => {
@@ -874,6 +916,7 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           } catch { break; }
           await resultPage.waitForTimeout(1_000);
           pageOffers = await this.extractPageOffers(resultPage);
+          recordCatalogPage(p, null, p === maxPages);
           collected.push(...pageOffers);
         }
         return collected;
@@ -1831,6 +1874,18 @@ if (query.nightsTo !== undefined && query.nightsTo !== null) url = /NIGHTS_TILL=
     await page.unroute("**samo_action=PRICES**");
     const offers = await this.extractPageOffers(page);
     return offers.map((r) => this.normalizeOffer(r, query));
+  }
+
+  async searchCatalog(query: SupplierSearchQuery) {
+    const { result, coverage } = await withCatalogCoverage(async () => {
+      try {
+        return await this.search(query);
+      } catch (error) {
+        recordCatalogError((error as Error).message);
+        throw error;
+      }
+    });
+    return { offers: result, coverage };
   }
 
   // ── Geo Discovery (provider-agnostic contract) ─────────────────────
@@ -2885,6 +2940,7 @@ if (query.nightsTo !== undefined && query.nightsTo !== null) url = /NIGHTS_TILL=
           } while (true);
           if (!pageRows.length) break;
         }
+        recordCatalogPage(pageNo, null, pageNo === maxPages && pageRows.length > 0);
         rows.push(...pageRows);
       }
 

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarBlank, ArrowRight, Buildings, CaretDown, X } from "@phosphor-icons/react";
@@ -299,6 +299,27 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
     return [...codes];
   }, [selectedSuppliers, supplierOptions]);
 
+  // Suppliers that actually serve the selected destination. Before a
+  // destination is chosen, show every tour supplier.
+  const visibleSupplierOptions = useMemo(() => {
+    if (!toCountry) return supplierOptions;
+    const code = toCountry.code.toUpperCase();
+    return supplierOptions.filter((supplier) =>
+      !supplier.countries?.length || supplier.countries.some((c) => c.toUpperCase() === code),
+    );
+  }, [supplierOptions, toCountry]);
+
+  // Drop suppliers that no longer serve the chosen destination.
+  useEffect(() => {
+    if (!toCountry || selectedSuppliers.length === 0) return;
+    const code = toCountry.code.toUpperCase();
+    const next = selectedSuppliers.filter((supplierCode) => {
+      const supplier = supplierOptions.find((s) => s.code === supplierCode);
+      return !supplier?.countries?.length || supplier.countries.some((c) => c.toUpperCase() === code);
+    });
+    if (next.length !== selectedSuppliers.length) setSelectedSuppliers(next);
+  }, [toCountry, selectedSuppliers, supplierOptions]);
+
   // Drop a destination that is no longer allowed when the supplier set changes.
   useEffect(() => {
     if (!allowedCountryCodes || !toCountry) return;
@@ -435,7 +456,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
         <NightsSelect
           id="tour-nights"
           value={nightsFrom}
-          options={Array.from({ length: 12 }, (_, i) => i + 3)}
+          options={Array.from({ length: 27 }, (_, i) => i + 2)}
           onChange={(n) => {
             setNightsFrom(n);
             setNightsTo(n);
@@ -485,7 +506,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
 
         {/* Suppliers («Поставщики») — all tour suppliers, multi-select;
             empty = every supplier. */}
-        <div className="min-w-[150px] flex-[1_1_150px]">
+        <div className="min-w-[150px] max-w-[260px] flex-[0_1_260px]">
           <label htmlFor="tour-suppliers" className={PICKER_LABEL}>
             {locale === "ru" ? "Поставщики" : locale === "az" ? "Təchizatçılar" : "Suppliers"}
           </label>
@@ -539,7 +560,7 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
             {suppliersOpen && (
               <div style={{ maxHeight: suppliersPanelMaxHeight }} className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-y-auto overflow-x-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
                 <ul role="listbox" aria-multiselectable="true" className="py-1">
-                  {supplierOptions.map((s) => {
+                  {visibleSupplierOptions.map((s) => {
                     const active = selectedSuppliers.includes(s.code);
                     return (
                       <li key={s.code}>
@@ -629,22 +650,26 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
           selected direction (hotels from ALL suppliers) as a dropdown filter
           with live search over the list. */}
       {selectHotel && (
-        <HotelFilterSelect
-          region={{
-            geoCountry: toCountry?.code,
-            geoCity: toCity?.code,
-            geoResort: toResort?.code,
-          }}
-          value={hotelName}
-          onSelect={(h) => {
-            setHotelId(h.id);
-            setHotelName(h.name);
-          }}
-          onClear={() => {
-            setHotelId("");
-            setHotelName("");
-          }}
-        />
+        <div className="w-full max-w-[280px]">
+          <HotelFilterSelect
+            region={{
+              geoCountry: toCountry?.code,
+              geoCity: toCity?.code,
+              geoResort: toResort?.code,
+            }}
+            suppliers={selectedSuppliers}
+            serviceType="tours"
+            value={hotelName}
+            onSelect={(h) => {
+              setHotelId(h.id);
+              setHotelName(h.name);
+            }}
+            onClear={() => {
+              setHotelId("");
+              setHotelName("");
+            }}
+          />
+        </div>
       )}
 
       {/* Submit — HelpFind скрыт (решение продукта: список пикера важнее);
@@ -655,8 +680,13 @@ export default function TourSearch({ onSearch, resetSignal = 0 }: TourSearchProp
       )}
       {/* z-[70]: панель дропдауна (z-[60]) может накрывать кнопку «Найти»
           (список большой, панель доходит до нижнего края формы). Без этого
-          после первого поиска панель остаётся открытой и перехватывает клик. */}
-      <div className="relative z-[70] flex justify-end">
+          после первого поиска панель остаётся открытой и перехватывает клик.
+          self-end (вместо растяжки во всю ширину): обёртка должна перекрывать
+          только саму кнопку справа — иначе её прозрачная часть ложится поверх
+          панели «Отель» слева, клик в поле поиска попадает в обёртку (вне
+          контейнера пикера), мousedown-обработчик считает его «клик мимо» и
+          сворачивает список. */}
+      <div className="relative z-[70] flex justify-end self-end">
         <button
           type="submit"
           className={`btn-gold ${PICKER_SUBMIT_RIGHT}`}

@@ -191,7 +191,7 @@ export default function StorefrontSite({
 }
 
 /** Карточка продукта в Storefront-контексте (не Marketplace ProductCard). */
-function StorefrontProductCard({ sf, card, locale, preview }: { sf: PublicStorefront; card: PublicProductCard; locale: Locale; preview: boolean }) {
+export function StorefrontProductCard({ sf, card, locale, preview }: { sf: PublicStorefront; card: PublicProductCard; locale: Locale; preview: boolean }) {
   // Step 1.12.3: импрессия = карточка реально отрисована в grid (rendered-card
   // семантика); preview не трекается.
   useStorefrontCardImpression(sf.slug, card.slug, !preview);

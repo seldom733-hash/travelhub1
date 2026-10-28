@@ -10,6 +10,7 @@ import Pagination from "@/components/public/Pagination";
 import { PublicEmptyState, PublicErrorState, PublicNotFound } from "@/components/public/PublicStates";
 import { CategoryPageSkeleton, ProductGridSkeleton } from "@/components/public/Skeletons";
 import { formatNumber, t, useLocale } from "@/lib/i18n";
+import { categoryLabel } from "@/lib/category-label";
 import { fireMarketplaceFilter, fireMarketplaceSort, useMarketplaceCategoryViewed } from "@/lib/behavioral-events";
 import { publicApi, PublicNotFoundError, type PublicCategory, type PublicFilterMetadata, type PublicListResult } from "@/lib/public-api";
 
@@ -142,9 +143,9 @@ function CategoryInner() {
                 {t("pdp.breadcrumb_home", locale)}
               </Link>
               <span className="mx-1.5">/</span>
-              <span className="text-slate-600">{category.title}</span>
+              <span className="text-slate-600">{categoryLabel(category, locale)}</span>
             </nav>
-            <h1 className="mt-2 text-2xl font-bold text-slate-900">{category.title}</h1>
+            <h1 className="mt-2 text-2xl font-bold text-slate-900">{categoryLabel(category, locale)}</h1>
             {result && (
               <p className="mt-1 text-xs text-slate-400">
                 {formatNumber(result.total, locale)} {t("category.services_count", locale)}

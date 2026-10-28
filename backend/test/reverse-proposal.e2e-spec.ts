@@ -252,7 +252,7 @@ describe("Phase 2 Step 2.2D — Seller Proposal Foundation (e2e)", () => {
     const r = (
       await buyerAgent
         .post("/api/v1/buyer/requests")
-        .send({ categoryId: catHotelId, destinations, serviceDateFrom: "2026-09-01", serviceDateTo: "2026-09-07", adults: 2, preferences: prefs })
+        .send({ categoryId: catHotelId, destinations, serviceDateFrom: "2027-09-01", serviceDateTo: "2027-09-07", adults: 2, preferences: prefs })
         .expect(201)
     ).body as { id: string; version: number };
     const s = (await buyerAgent.post(`/api/v1/buyer/requests/${r.id}/submit`).send({ expectedVersion: r.version }).expect(201)).body as { id: string };
@@ -511,10 +511,10 @@ describe("Phase 2 Step 2.2D — Seller Proposal Foundation (e2e)", () => {
     const reqId = await submitRequest([{ countryCode: "TR" }]);
     await runMatch(adminAgent, reqId).expect(201);
     const p = (await createProposal(sellerA.agent, reqId).expect(201)).body as ProposalView;
-    const up = (await updateProposal(sellerA.agent, p.id, { money: { amount: 123.45, currency: "EUR" }, description: "обновлено", validUntil: "2026-10-01", expectedVersion: p.version }).expect(200)).body as ProposalView;
+    const up = (await updateProposal(sellerA.agent, p.id, { money: { amount: 123.45, currency: "EUR" }, description: "обновлено", validUntil: "2027-10-01", expectedVersion: p.version }).expect(200)).body as ProposalView;
     expect(up.money).toEqual({ amount: "123.45", currency: "EUR" });
     expect(up.description).toBe("обновлено");
-    expect(up.validUntil).toBe("2026-10-01T00:00:00.000Z");
+    expect(up.validUntil).toBe("2027-10-01T00:00:00.000Z");
     expect(up.version).toBe(p.version + 1);
     const sub = (await submitProposal(sellerA.agent, up.id, up.version).expect(201)).body as ProposalView;
     expect(sub.status).toBe("SUBMITTED");

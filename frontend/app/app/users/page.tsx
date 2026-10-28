@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { WorkspaceKpiPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { api, type PlatformUser } from "@/lib/api";
@@ -12,6 +13,7 @@ import Pagination from "@/components/Pagination";
 import { useLocale, t } from "@/lib/i18n";
 import TableExportButton from "@/components/TableExportButton";
 import SortableHeader, { type SortDirection } from "@/components/SortableHeader";
+import { permissionLabel } from "@/lib/permission-labels";
 
 const ROLES: { code: string; titleKey: string }[] = [
   { code: "ADMIN", titleKey: "user.role.ADMIN" },
@@ -31,6 +33,27 @@ interface UsersResult {
   total: number;
   page: number;
   pageSize: number;
+}
+
+interface UserRoleAssignment {
+  id: string;
+  roleCode: string;
+  roleTitle: string;
+  startAt: string;
+  endAt: string | null;
+  reason: string | null;
+  assignedByName: string | null;
+  assignedAt: string;
+  status: string;
+}
+interface UserRolesData {
+  userId: string;
+  username: string;
+  fullName: string | null;
+  primaryRole: { code: string; title: string };
+  assignments: UserRoleAssignment[];
+  effectivePermissions: string[];
+  availableRoles: Array<{ code: string; title: string }>;
 }
 
 function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy, initialSortDirection, initialPage }: { initialSearch?: string; initialStatus?: string; initialRole?: string; initialSortBy?: string; initialSortDirection?: string; initialPage?: number }) {
@@ -55,6 +78,11 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
   const [pwdUser, setPwdUser] = useState<PlatformUser | null>(null);
   const [pwdValue, setPwdValue] = useState("");
   const [pwdBusy, setPwdBusy] = useState(false);
+  const [rolesUser, setRolesUser] = useState<PlatformUser | null>(null);
+  const [rolesData, setRolesData] = useState<UserRolesData | null>(null);
+  const [rolesBusy, setRolesBusy] = useState(false);
+  const [rolesError, setRolesError] = useState("");
+  const [newRole, setNewRole] = useState({ roleCode: "", startAt: "", endAt: "", reason: "" });
 
   const router = useRouter();
   const isInitialMount = useRef(true);
@@ -134,6 +162,54 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
     }
   };
 
+  /** Role assignments panel (hybrid RBAC). */
+  const openRoles = async (u: PlatformUser) => {
+    setRolesUser(u);
+    setRolesData(null);
+    setRolesError("");
+    setNewRole({ roleCode: "", startAt: "", endAt: "", reason: "" });
+    try {
+      setRolesData(await api.get<UserRolesData>(`/users/${u.id}/roles`));
+    } catch (e) {
+      setRolesError((e as Error).message);
+    }
+  };
+
+  const addRole = async () => {
+    if (!rolesUser || !newRole.roleCode) return;
+    setRolesBusy(true);
+    setRolesError("");
+    try {
+      const data = await api.post<UserRolesData>(`/users/${rolesUser.id}/roles`, {
+        roleCode: newRole.roleCode,
+        startAt: newRole.startAt ? new Date(newRole.startAt).toISOString() : undefined,
+        endAt: newRole.endAt ? new Date(newRole.endAt).toISOString() : undefined,
+        reason: newRole.reason || undefined,
+      });
+      setRolesData(data);
+      setNewRole({ roleCode: "", startAt: "", endAt: "", reason: "" });
+      setNotice(t("rbac.assigned", locale));
+    } catch (e) {
+      setRolesError((e as Error).message);
+    } finally {
+      setRolesBusy(false);
+    }
+  };
+
+  const revokeRole = async (assignmentId: string) => {
+    if (!rolesUser) return;
+    setRolesBusy(true);
+    setRolesError("");
+    try {
+      setRolesData(await api.del<UserRolesData>(`/users/${rolesUser.id}/roles/${assignmentId}`));
+      setNotice(t("rbac.revoked", locale));
+    } catch (e) {
+      setRolesError((e as Error).message);
+    } finally {
+      setRolesBusy(false);
+    }
+  };
+
   /** Смена пароля любому пользователю (settings.write): PATCH /users/:id/password. */
   const resetPassword = async () => {
     if (!pwdUser || pwdValue.length < 8) return;
@@ -186,12 +262,20 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
           title={t("nav.users", locale)}
           breadcrumbs={["TravelHub", t("nav.users", locale)]}
           actions={
-            <button
-              onClick={() => void load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              {t("admin.table.refresh", locale)}
-            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/app/users/roles"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                {t("rbac.title", locale)}
+              </Link>
+              <button
+                onClick={() => void load(page, search, sortBy, sortDirection, statusFilter, roleFilter, dateFrom, dateTo)}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                {t("admin.table.refresh", locale)}
+              </button>
+            </div>
           }
         />
 
@@ -293,17 +377,32 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
                       </div>
                     </td>
                     <td className="px-4 py-2.5">
-                      <select
-                        value={u.role.code}
-                        onChange={(e) => void assignRole(u.id, e.target.value)}
-                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-blue-400"
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r.code} value={r.code}>
-                            {t(r.titleKey, locale)}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <select
+                          value={u.role.code}
+                          onChange={(e) => void assignRole(u.id, e.target.value)}
+                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-blue-400"
+                        >
+                          {ROLES.map((r) => (
+                            <option key={r.code} value={r.code}>
+                              {t(r.titleKey, locale)}
+                            </option>
+                          ))}
+                        </select>
+                        {u.roleAssignments && u.roleAssignments.length > 0 && (
+                          <span className="rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                            +{u.roleAssignments.length}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void openRoles(u)}
+                          className="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-blue-600 hover:bg-blue-50"
+                          title={t("rbac.manage_user", locale)}
+                        >
+                          {t("rbac.roles_short", locale)}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
@@ -455,6 +554,118 @@ function UsersContent({ initialSearch, initialStatus, initialRole, initialSortBy
             <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
               {t("admin.form.reset_subtitle", locale)}
             </div>
+        </PanelFrame>
+      )}
+      {rolesUser && (
+        <PanelFrame
+          title={t("rbac.user_roles", locale)}
+          subtitle={`@${rolesUser.username} · ${rolesUser.fullName ?? ""}`}
+          onClose={() => { setRolesUser(null); setRolesData(null); setRolesError(""); }}
+        >
+          {rolesError && <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{rolesError}</div>}
+          {!rolesData ? (
+            <div className="py-8 text-center text-sm text-slate-500">{t("common.loading", locale)}</div>
+          ) : (
+            <>
+              <div className="rounded-lg border border-line p-3">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{t("rbac.primary", locale)}</div>
+                <div className="mt-1 text-sm font-semibold text-slate-800">
+                  {rolesData.primaryRole.title} <span className="font-mono text-xs text-slate-400">{rolesData.primaryRole.code}</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{t("rbac.additional", locale)}</div>
+                {rolesData.assignments.length === 0 ? (
+                  <p className="text-xs text-slate-500">{t("rbac.no_additional", locale)}</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {rolesData.assignments.map((a) => (
+                      <li key={a.id} className="rounded-lg border border-line p-2 text-xs">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="font-semibold text-slate-800">
+                              {a.roleTitle} <span className="font-mono text-[10px] text-slate-400">{a.roleCode}</span>
+                            </div>
+                            <div className="text-slate-500">
+                              {a.startAt.slice(0, 10)} → {a.endAt ? a.endAt.slice(0, 10) : t("rbac.permanent", locale)}
+                              {" · "}
+                              <span className={a.status === "ACTIVE" ? "text-emerald-700" : "text-amber-700"}>{a.status}</span>
+                            </div>
+                            {a.reason ? <div className="text-slate-500">{a.reason}</div> : null}
+                            {a.assignedByName ? <div className="text-slate-400">{t("rbac.assigned_by", locale)}: {a.assignedByName} · {a.assignedAt.slice(0, 10)}</div> : null}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={rolesBusy || a.status === "REVOKED"}
+                            onClick={() => void revokeRole(a.id)}
+                            className="rounded border border-rose-200 px-2 py-0.5 text-[11px] text-rose-600 disabled:opacity-40"
+                          >
+                            {t("rbac.revoke", locale)}
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">{t("rbac.add_role", locale)}</div>
+                <div className="grid gap-2">
+                  <select
+                    value={newRole.roleCode}
+                    onChange={(e) => setNewRole({ ...newRole, roleCode: e.target.value })}
+                    className="rounded-lg border border-line px-2 py-1.5 text-sm"
+                  >
+                    <option value="">{t("rbac.select_role", locale)}</option>
+                    {rolesData.availableRoles
+                      .filter((r) => r.code !== rolesData.primaryRole.code && !rolesData.assignments.some((a) => a.roleCode === r.code && (a.status === "ACTIVE" || a.status === "SCHEDULED")))
+                      .map((r) => (
+                        <option key={r.code} value={r.code}>{r.title} ({r.code})</option>
+                      ))}
+                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[11px] text-slate-500">
+                      {t("rbac.start", locale)}
+                      <input type="datetime-local" value={newRole.startAt} onChange={(e) => setNewRole({ ...newRole, startAt: e.target.value })} className="mt-1 w-full rounded border border-line px-2 py-1 text-xs" />
+                    </label>
+                    <label className="text-[11px] text-slate-500">
+                      {t("rbac.end", locale)}
+                      <input type="datetime-local" value={newRole.endAt} onChange={(e) => setNewRole({ ...newRole, endAt: e.target.value })} className="mt-1 w-full rounded border border-line px-2 py-1 text-xs" />
+                    </label>
+                  </div>
+                  <input
+                    value={newRole.reason}
+                    onChange={(e) => setNewRole({ ...newRole, reason: e.target.value })}
+                    placeholder={t("rbac.reason", locale)}
+                    className="rounded-lg border border-line px-2 py-1.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={rolesBusy || !newRole.roleCode}
+                    onClick={() => void addRole()}
+                    className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {t("rbac.assign", locale)}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  {t("rbac.effective", locale)} ({rolesData.effectivePermissions.length})
+                </div>
+                <div className="flex max-h-40 flex-wrap gap-1 overflow-auto">
+                  {rolesData.effectivePermissions.sort().map((p) => (
+                    <span key={p} className="rounded border border-line bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-600">
+                      {permissionLabel(p, locale)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </PanelFrame>
       )}
     </div>

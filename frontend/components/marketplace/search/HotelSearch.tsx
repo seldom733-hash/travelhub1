@@ -13,7 +13,6 @@ import {
   type GeoDirectoryEntry,
 } from "@/lib/geo-api";
 import ChildAges from "./ChildAges";
-import HelpFindButton from "./HelpFindButton";
 import NightsSelect from "./NightsSelect";
 import { useClickOutside } from "./useClickOutside";
 import { usePanelMaxHeight } from "./usePanelMaxHeight";
@@ -25,7 +24,7 @@ import {
   PICKER_DIGIT_WIDTH_EXTRA,
   PICKER_LABEL,
   PICKER_ROW,
-  PICKER_SUBMIT,
+  PICKER_SUBMIT_RIGHT,
   PICKER_TRIGGER,
   PICKER_TRIGGER_TEXT,
   PICKER_W_NIGHTS,
@@ -142,6 +141,49 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
     selectedSuppliers,
   ]);
 
+  // Results page: restore the pickers from the URL, not only from the draft.
+  // Without this, the form can look filled while `destination` is null and
+  // submit silently returns.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("service") !== "hotels" && !sp.get("geoCountry")) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const countries = await fetchGeoDirectory("country");
+        if (!alive) return;
+        const code = (sp.get("geoCountry") ?? "").toUpperCase();
+        const country = countries.find((c) => c.code.toUpperCase() === code) ?? null;
+        if (country) setToCountry(country);
+        const cityCode = sp.get("geoCity");
+        if (country && cityCode) {
+          const cities = await fetchGeoDirectory("city", country.id);
+          if (alive) setToCity(cities.find((c) => c.code === cityCode) ?? null);
+        }
+        const resortCode = sp.get("geoResort");
+        if (country && cityCode && resortCode) {
+          const resorts = await fetchGeoDirectory("resort", cityCode);
+          if (alive) setToResort(resorts.find((c) => c.code === resortCode) ?? null);
+        }
+        if (sp.get("start")) setCheckIn(sp.get("start")!);
+        const n = Number(sp.get("nights") ?? sp.get("nightsFrom"));
+        if (Number.isFinite(n) && n > 0) { setNightsFrom(n); setNightsTo(n); }
+        const a = Number(sp.get("adults"));
+        if (Number.isFinite(a) && a > 0) setAdults(a);
+        const c = Number(sp.get("children"));
+        if (Number.isFinite(c) && c >= 0) setChildren(c);
+        const suppliers = sp.get("suppliers");
+        if (suppliers) setSelectedSuppliers(suppliers.split(",").filter(Boolean));
+        const hotel = sp.get("hotel");
+        if (hotel) setHotelName(hotel);
+      } catch {
+        // Keep the draft/defaults if the geo directory is unavailable.
+      }
+    })();
+    return () => { alive = false; };
+    // One-shot URL restore on mount.
+  }, []);
+
   /** «Сбросить все»: back to a fresh form (empty pickers, default date). */
   const resetAll = useCallback(() => {
     setToCountry(null);
@@ -195,6 +237,25 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
     if (!hasAny) return undefined;
     return [...codes];
   }, [selectedSuppliers, supplierOptions]);
+
+  // Suppliers that actually serve the selected destination.
+  const visibleSupplierOptions = useMemo(() => {
+    if (!toCountry) return supplierOptions;
+    const code = toCountry.code.toUpperCase();
+    return supplierOptions.filter((supplier) =>
+      !supplier.countries?.length || supplier.countries.some((c) => c.toUpperCase() === code),
+    );
+  }, [supplierOptions, toCountry]);
+
+  useEffect(() => {
+    if (!toCountry || selectedSuppliers.length === 0) return;
+    const code = toCountry.code.toUpperCase();
+    const next = selectedSuppliers.filter((supplierCode) => {
+      const supplier = supplierOptions.find((s) => s.code === supplierCode);
+      return !supplier?.countries?.length || supplier.countries.some((c) => c.toUpperCase() === code);
+    });
+    if (next.length !== selectedSuppliers.length) setSelectedSuppliers(next);
+  }, [toCountry, selectedSuppliers, supplierOptions]);
 
   useEffect(() => {
     if (!allowedCountryCodes || !toCountry) return;
@@ -326,6 +387,8 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
         <div className={PICKER_W_TO}>
           <HotelFilterSelect
             region={hotelRegion}
+            suppliers={selectedSuppliers}
+            serviceType="hotels"
             value={hotelName}
             onSelect={(h) => {
               setHotelId(h.id);
@@ -408,7 +471,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
 
         {/* Suppliers («Поставщики») — hotel suppliers from CRM partners,
             multi-select; empty = every supplier. */}
-        <div className="min-w-[150px] flex-[1_1_150px]">
+        <div className="min-w-[150px] max-w-[260px] flex-[0_1_260px]">
           <label htmlFor="hotel-suppliers" className={PICKER_LABEL}>
             {t("search.suppliers", locale)}
           </label>
@@ -458,7 +521,7 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
             {suppliersOpen && (
               <div style={{ maxHeight: suppliersPanelMaxHeight }} className="absolute left-0 right-0 top-full z-[60] mt-1 overflow-y-auto overflow-x-hidden rounded-xl border border-dark-border bg-dark-surface shadow-xl">
                 <ul role="listbox" aria-multiselectable="true" className="py-1">
-                  {supplierOptions.map((s) => {
+                  {visibleSupplierOptions.map((s) => {
                     const active = selectedSuppliers.includes(s.code);
                     return (
                       <li key={s.code}>
@@ -515,34 +578,15 @@ export default function HotelSearch({ onSearch, resetSignal = 0 }: HotelSearchPr
         <ChildAges count={children} ages={childAges} onChange={setChildAges} />
       )}
 
-      {/* Help Find */}
-      <HelpFindButton
-        context={{
-          serviceType: "hotels",
-          toDestination: destination ? geoDisplayName(destination.names, destination.code, locale) : "",
-          toGeoCountry: toCountry?.code,
-          toGeoCity: toCity?.code,
-          toGeoResort: toResort?.code,
-          hotelId: hotelId || undefined,
-          hotelName: hotelName || undefined,
-          startDate: checkIn,
-          nights: nightsFrom,
-          nightsFrom,
-          nightsTo,
-          adults,
-          children,
-          childAges: childAges.slice(0, children),
-          suppliers: selectedSuppliers.length ? selectedSuppliers : undefined,
-        }}
-      />
-
-      {/* Submit — z-[70]: панель дропдауна (z-[60]) может накрывать кнопку. */}
-      <div className="relative z-[70]">
-      <button type="submit" className={`btn-gold ${PICKER_SUBMIT}`}>
-        <span>{t("marketplace.search_submit", locale)}</span>
-        <ArrowRight size={16} weight="bold" />
-      </button>
+      {/* Submit — right aligned at the same visual position as tours/flights. */}
+      <div className="relative z-[70] flex justify-end">
+        <button type="submit" className={`btn-gold ${PICKER_SUBMIT_RIGHT}`}>
+          <span>{t("marketplace.search_submit", locale)}</span>
+          <ArrowRight size={16} weight="bold" />
+        </button>
       </div>
+
+      {/* HelpFind скрыт (как в поиске туров): кнопка «Найти» занимает его строку. */}
     </form>
   );
 }

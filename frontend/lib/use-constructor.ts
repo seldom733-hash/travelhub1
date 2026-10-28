@@ -238,6 +238,11 @@ export function useConstructor(slug: string) {
     );
   }, []);
 
+  /** Replace the working draft (undo/redo, templates, reorder snapshots). */
+  const replaceSections = useCallback((sections: SectionView[]) => {
+    setDraft(sections);
+  }, []);
+
   // Available blocks (not in draft or not singleton)
   const availableBlocks = registry.filter((def) => {
     if (def.singleton && draft.some((s) => s.blockType === def.type)) return false;
@@ -265,5 +270,6 @@ export function useConstructor(slug: string) {
     toggleEnabled,
     reorder,
     updateSection,
+    replaceSections,
   };
 }

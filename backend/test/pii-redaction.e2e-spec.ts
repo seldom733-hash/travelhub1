@@ -198,7 +198,7 @@ describe("Step 1.17 — PII redaction: traveler/passenger в order/booking read 
 
   it("ANALYST: GET /orders (list) → travelers redacted в списке", async () => {
     const s = st();
-    const res = (await agent(s.analystToken).get("/api/v1/orders").expect(200)).body;
+    const res = (await agent(s.analystToken).get("/api/v1/orders?acquisitionSource=DIRECT").expect(200)).body;
     expect(res.items.length).toBeGreaterThan(0);
     const found = res.items.find((o: { id: string }) => o.id === s.orderId);
     expect(found).toBeTruthy();

@@ -392,7 +392,7 @@ describe("Phase 2 Step 2.10 — Finance Domain Foundation (e2e)", () => {
     const cancelled = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
       "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name = 'cancelledAt'",
     );
-    expect(new Set(cancelled.map((r) => r.table_name))).toEqual(new Set(["Payment", "Dispute"]));
+    expect(new Set(cancelled.map((r) => r.table_name))).toEqual(new Set(["Payment", "Dispute", "SupplierPayout"]));
 
     // Step 2.13-милстоуны Refund: requestedAt/approvedAt/processedAt уникальны
     // для Refund (failedAt — общий с Payment 2.12, проверен ниже отдельно).
@@ -413,10 +413,14 @@ describe("Phase 2 Step 2.10 — Finance Domain Foundation (e2e)", () => {
     );
     expect(new Set(dsp.map((r) => r.table_name))).toEqual(new Set(["Dispute"]));
 
-    // occurredAt — 2.10C-поле и живёт ТОЛЬКО на LedgerTransaction.
+    // occurredAt — бизнес-время факта: LedgerTransaction + исходящие выплаты
+    // (SupplierPayout.occurredAt) + append-only история обязательств
+    // (SupplierObligationEvent.occurredAt, Finance completion 2026-10-25).
     const occ = await prisma.$queryRawUnsafe<Array<{ table_name: string }>>(
       "SELECT table_name FROM information_schema.columns WHERE table_schema = 'finance' AND column_name = 'occurredAt'",
     );
-    expect(occ.map((r) => r.table_name)).toEqual(["LedgerTransaction"]);
+    expect(new Set(occ.map((r) => r.table_name))).toEqual(
+      new Set(["LedgerTransaction", "SupplierPayout", "SupplierObligationEvent"]),
+    );
   });
 });

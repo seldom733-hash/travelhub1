@@ -429,7 +429,7 @@ function SearchResultsInner() {
         {/* Универсальный поисковик — тот же HeroSearch (вкладки услуг), что и
             на главной; активна вкладка текущего поиска, чтобы параметры можно
             было поменять прямо со страницы результатов. */}
-        <div className="mb-6">
+        <div className="mb-6 mx-auto max-w-6xl">
           <HeroSearch
             enabledServices={enabledServices}
             defaultService={isValidService && serviceEnabled ? service : configDefaultService}

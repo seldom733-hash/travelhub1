@@ -14,7 +14,7 @@ event-driven интеграция с transactional outbox.
 - **Frontend** — Next.js (App Router), RU/AZ/EN: каталог, search, витрины
   `/store/:slug`, Partner Cabinet, Buyer Cabinet `/account/*`, internal staff UI
   `/app/*`.
-- **Данные** — PostgreSQL, домен владеет своей схемой (10 схем), между схемами
+- **Данные** — PostgreSQL, домен владеет своей схемой (17 схем), между схемами
   нет foreign keys — только ссылки по ID.
 - **Интеграция** — только через события (transactional outbox + inbox
   deduplication), correlation/causation сквозь цепочку (ADR-0009/0010).
@@ -70,12 +70,16 @@ event-driven интеграция с transactional outbox.
 | Order | `order` | Order aggregate, lifecycle, temporal contract, `OrderRequested` consumer |
 | Booking | `booking` | Booking lifecycle, temporal milestones, service time model |
 | Communication | `communication` | Conversations/messages (foundation) |
-| Finance | `finance` | Master data (Currency/ExchangeRate/Tax/TaxRule), immutable факты (LedgerTransaction, ProviderFee/Settlement/Payout); Payment/Refund/Invoice/Commission — schema-only, runtime deferred |
+| Finance | `finance` | Master data (Currency/ExchangeRate/Tax/TaxRule), immutable ledger, клиентские Payment/Refund runtime, обязательства поставщиков (SupplierObligation) и реестр платежей (SupplierPayout + allocations, confirm/cancel, overdue), FX-курсы; PSP-эквайринг и банковская сверка — deferred |
 | Security | `security` | User, Role, Permission, RBAC, JWT auth, AuditLog |
 | EventBus (инфраструктура) | `events` | Transactional outbox, inbox dedup, доменные события, счётчики ID |
 
-Не все домены имеют полный production UI: финансовый UI минимален, часть
-коммерческих процессов реализована на уровне backend-фундамента.
+Не все домены имеют полный production UI: Finance Center покрывает overview,
+обязательства и платежи поставщикам, распределения, подтверждающие документы,
+отчёт «задолженность на дату», условия оплаты, FX-курсы и экспорт реестров;
+банковская сверка/импорт выписок остаются задачей (см.
+`docs/audit/REMAINING_WORK.md`). Часть коммерческих процессов реализована на
+уровне backend-фундамента.
 
 ## Быстрый старт
 
@@ -118,8 +122,11 @@ npm run dev
 
 ## База данных и миграции
 
-- PostgreSQL **multiSchema**: 10 доменных схем (см. выше), модели — в
-  `backend/prisma/schema.prisma`; миграции — в `backend/prisma/migrations/`.
+- PostgreSQL **multiSchema**: 17 доменных схем (`catalog`, `crm`, `sales`,
+  `reverse`, `order`, `booking`, `communication`, `finance`, `security`,
+  `events`, `geo`, `decision`, `documents`, `constructor`, `marketing`,
+  `support`, `whatsapp`), модели — в `backend/prisma/schema.prisma`; миграции —
+  в `backend/prisma/migrations/`.
 - Канонический workflow: `prisma migrate dev --create-only` (просмотр SQL) →
   `prisma migrate deploy` (применение). **`prisma db push` для канонических
   изменений запрещён.**
@@ -133,7 +140,7 @@ npm run dev
 
 ```bash
 npm run typecheck   # tsc --noEmit
-npm test            # unit (jest --runInBand)
+npm test            # unit (jest --runInBand); DB-backed спеки читают DATABASE_URL из backend/.env
 npm run test:e2e    # полный serial e2e (jest --config test/jest-e2e.json --runInBand)
 npm run build       # tsc -p tsconfig.build.json
 ```
@@ -148,9 +155,14 @@ e2e требует: PostgreSQL + `psql` в PATH, `TEST_DATABASE_URL` (имя с 
 ```bash
 npx tsc --noEmit     # typecheck
 npm test             # vitest run
-npm run lint         # eslint
+npm run lint         # eslint — требует установленного eslint (в текущем checkout не установлен)
 npm run build        # next build
 ```
+
+Язык по умолчанию — AZ; для другого рынка/стенда задайте
+`NEXT_PUBLIC_DEFAULT_LOCALE=ru|az|en` на этапе сборки frontend (иначе AZ).
+Vitest фиксирует RU, чтобы компонентные тесты проверяли переводы, а не
+продуктовый дефолт.
 
 ## CI/CD
 
@@ -173,6 +185,11 @@ Workflow `.github/workflows/ci.yml` (Step 2.17):
 - **ID-политика**: `docs/contracts/ids.md`
 - **Screen Design**: `docs/prompts/TravelHub_Screen_Design_Brief_Baseline_1.6_PAYMENTS_FINAL.md`
 - **Отчёты шагов / strict-review**: `docs/prompts/` и `docs/architecture/`
+- **Технический аудит 2026-10-25**: `docs/audit/` (`PROJECT_AUDIT.md`,
+  `ISSUES.md`, `REFACTORING.md`, `UI_UX_AUDIT.md`, `TEST_REPORT.md`,
+  `HYBRID_RBAC.md`, `PERMISSION_LABELS.md`, `STOREFRONT_BUILDER.md`,
+  `BUILDER_V2.md`, `DESTINATIONS.md`, `PARTNER_CTA.md`, `SUPPLIER_CATALOG_IMPLEMENTATION.md`,
+  `REMAINING_WORK.md`)
 
 ## Директория `legacy/`
 
@@ -193,10 +210,16 @@ SQLite со своим `package.json`, `prisma/schema.prisma`, `dev.db`). Это
 
 ## Известные ограничения
 
-- **PSP-интеграция не реализована**: Finance — фундамент (master data +
-  immutable факты); Payment/Refund/Invoice/Commission runtime, settlement engine,
-  partner payout rail — deferred (шаги 2.12–2.14).
-- **Финансовый UI** минимален (нет полноценного Finance Center во frontend).
+- **PSP-интеграция не реализована**: Finance содержит master data, immutable
+  ledger, клиентские payment/refund runtime и реестр платежей поставщикам
+  (обязательства, распределения, подтверждение/сторно); эквайринг, банковские
+  выписки/сверка, settlement engine и partner payout rail — deferred.
+- **Finance Center UI**: overview KPI (включая overdue/due-soon/unallocated),
+  обязательства поставщиков, платежи поставщикам (PENDING → CONFIRMED →
+  CANCELLED, распределения, подтверждающие документы через приватный S3,
+  CSV/XLSX-экспорт), отчёт «задолженность на дату», условия оплаты поставщиков,
+  FX-курсы. Банковская сверка/импорт выписок — не реализованы (см.
+  `docs/audit/REMAINING_WORK.md`).
 - **Login rate limiter** — in-memory per-instance (single-instance deployment;
   при горизонтальном масштабировании требуется external store — известно и
   документировано в Step 2.17).

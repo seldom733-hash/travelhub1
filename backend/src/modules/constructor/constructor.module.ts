@@ -1,11 +1,13 @@
 import { Module } from "@nestjs/common";
 import { ConstructorController, ConstructorPublicMediaController } from "./constructor.controller";
+import { StorefrontBuilderController, StorefrontPagePublicController } from "./storefront-builder.controller";
+import { StorefrontLeadController } from "./storefront-lead.controller";
 import { ConstructorService } from "./constructor.service";
 import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.service";
 import { MediaProcessor } from "../catalog/media/media-processor.service";
 
 @Module({
-  controllers: [ConstructorController, ConstructorPublicMediaController],
+  controllers: [ConstructorController, ConstructorPublicMediaController, StorefrontBuilderController, StorefrontPagePublicController, StorefrontLeadController],
   providers: [
     ConstructorService,
     { provide: "ObjectStorageService", useClass: S3ObjectStorageService },

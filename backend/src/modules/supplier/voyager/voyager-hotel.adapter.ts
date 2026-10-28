@@ -460,6 +460,13 @@ export class VoyagerHotelAdapter implements SupplierAdapter {
    * Discover Voyager HOTEL geo options for a country: TOWNS + STAR + HOTEL
    * from the stay-form dictionary (plain HTTP, no browser).
    */
+  async discoverCountries(): Promise<Array<{ countryId: string; countryName: string }>> {
+    return (await this.http.discoverHotelStates()).map((state) => ({
+      countryId: state.value,
+      countryName: state.name,
+    }));
+  }
+
   async discoverHotelGeoOptions(countryExternalId?: string): Promise<SupplierGeoOption[]> {
     const stateInc =
       countryExternalId ??

@@ -73,6 +73,28 @@ export default async function globalSetup(): Promise<void> {
   );
   process.stdout.write("[e2e] Core currencies (AZN/USD/EUR) seeded.\n");
 
+  // 2b-bis. Валюты засеяны фиксированными кодами CUR-00000001..3, но
+  // BusinessSequence CUR при этом не сдвигается: первый createCurrency получает
+  // CUR-00000001 → unique-conflict 409 на пустой БД. Выравниваем счётчик.
+  await pgExec(
+    url,
+    `INSERT INTO "events"."BusinessSequence" ("prefix", "value")
+     VALUES ('CUR', 3)
+     ON CONFLICT ("prefix") DO UPDATE SET "value" = GREATEST("BusinessSequence"."value", 3)`,
+  );
+  process.stdout.write("[e2e] CUR sequence aligned to seeded currencies.\n");
+
+  // 2b-ter. Commercial Product требует Partner-владельца; платформенный ADMIN
+  // не может создать ownerless Product. Даём тестовым фикстурам стабильного
+  // partner-владельца (template клонируется во все suite-DB).
+  await pgExec(
+    url,
+    `INSERT INTO "crm"."Partner" ("id", "code", "name", "status")
+     VALUES ('00000000-0000-4000-8000-000000000001', 'PRN-E2E-PLATFORM', 'E2E Platform Partner', 'ACTIVE')
+     ON CONFLICT ("id") DO NOTHING`,
+  );
+  process.stdout.write("[e2e] Platform test partner seeded.\n");
+
   // 3. Create template database from the migrated test database.
   //    The template DB is used by e2e-isolated-env.ts for instant per-suite cloning.
   //    We connect via the maintenance DB (admin), not the template itself.

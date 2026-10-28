@@ -12,6 +12,7 @@ import type {
   PriceCalendarResult,
 } from "../supplier.types";
 import { priceUnavailable } from "../supplier.types";
+import { withCatalogCoverage, recordCatalogError } from "../catalog/catalog-coverage";
 import {
   KompasSupplierAdapter,
   KOMPAS_CURRENCY_INC,
@@ -73,6 +74,11 @@ export class KompasHotelAdapter implements SupplierAdapter {
 
   constructor(private readonly tours: KompasSupplierAdapter) {}
 
+  /** Country discovery for the stay-only hotel dictionary. */
+  discoverCountries(): Promise<Array<{ countryId: string; countryName: string }>> {
+    return this.tours.discoverHotelCountries();
+  }
+
   // ── SupplierAdapter: search ───────────────────────────────────────────
 
   async search(query: SupplierSearchQuery): Promise<SupplierOffer[]> {
@@ -113,6 +119,7 @@ export class KompasHotelAdapter implements SupplierAdapter {
       childAges: query.childAges,
       hotelExternalId: query.hotelExternalId?.trim() || undefined,
       towns: query.towns,
+      maxPages: (query as { maxPages?: number }).maxPages ?? 20,
     });
 
     // Occupancy must match the request (rows carry adult-/child- class tokens).
@@ -232,6 +239,18 @@ export class KompasHotelAdapter implements SupplierAdapter {
   }
 
   // ── SupplierAdapter: detail / refresh ─────────────────────────────────
+
+  async searchCatalog(query: SupplierSearchQuery) {
+    const { result, coverage } = await withCatalogCoverage(async () => {
+      try {
+        return await this.search(query);
+      } catch (error) {
+        recordCatalogError((error as Error).message);
+        throw error;
+      }
+    });
+    return { offers: result, coverage };
+  }
 
   async getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail> {
     const offers = await this.search({ ...ref.searchContext, adults: ref.searchContext.adults ?? 2 });

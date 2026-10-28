@@ -80,7 +80,8 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
     http.set("Authorization", `Bearer ${login.body.accessToken}`);
     anon = request.agent(app.getHttpServer());
 
-    const product = (await http.post("/api/v1/products").send({ type: "TOUR", title: `Ctx ${stamp}` }).expect(201)).body.product;
+    const product = (await http.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Ctx ${stamp}` }).expect(201)).body.product;
     productIds.push(product.id);
     productId = product.id;
     await http.post(`/api/v1/products/${productId}/publish`).expect(201);
@@ -218,7 +219,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
     expect(bookingCreated!.causationId).toBe(bookingRequested!.id);
 
     // Booking создан (потребитель сработал) — flow не сломан.
-    expect((await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.total).toBe(1);
+    expect((await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.total).toBe(1);
   });
 
   it("4d. повтор одного client X-Request-Id в двух независимых requests НЕ сливает chains (разные correlationId)", async () => {
@@ -263,7 +264,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
     await action(order.id, "send").expect(200);
-    expect((await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.total).toBe(1);
+    expect((await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.total).toBe(1);
 
     const requested = await prisma.outboxEvent.findFirst({ where: { aggregateId: order.id, eventType: "BookingRequested" } });
     const createdBefore = await prisma.outboxEvent.findFirst({
@@ -282,7 +283,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
     });
     expect(createdAfter!.id).toBe(createdBefore!.id); // тот же child event
     expect(createdAfter!.correlationId).toBe(requested!.correlationId); // correlation сохранён
-    expect((await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.total).toBe(1);
+    expect((await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.total).toBe(1);
     // Событие снова обработано (inbox восстановлен).
     const inbox = await prisma.inboxEvent.findUnique({
       where: { consumerId_eventId: { consumerId: "booking-requested-consumer", eventId: requested!.id } },
@@ -321,7 +322,7 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
       where: { consumerId_eventId: { consumerId: "booking-requested-consumer", eventId: requested!.id } },
     });
     expect(inbox).not.toBeNull();
-    expect((await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.total).toBe(1);
+    expect((await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.total).toBe(1);
   });
 
   // ── 13-14. Anonymous / authenticated ─────────────────────────────────────
@@ -459,7 +460,11 @@ describe("Phase 1 Step 1.15 — Correlation / Request ID (e2e)", () => {
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
     await action(order.id, "send").expect(200);
-    const bookings = (await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.items;
+    let bookings = (await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.items;
+    for (let i = 0; i < 100 && bookings.length === 0; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      bookings = (await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.items;
+    }
     expect(bookings).toHaveLength(1);
     const detail = await http.get(`/api/v1/bookings/${bookings[0].id}`).expect(200);
     expect(detail.body.passengers).toHaveLength(1);

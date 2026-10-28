@@ -4,6 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { execFile } from "child_process";
 import { parseSamoHotelDynamic } from "../samo-hotel-dict";
+import { recordCatalogPage } from "../catalog/catalog-coverage";
 
 /**
  * KazUnion HTTP Service — direct HTTP requests to the KazUnion SAMO endpoint
@@ -399,6 +400,7 @@ export class KazunionHttpService {
       }
 
       const totalPages = this.parseTotalPages(body, html);
+      recordCatalogPage(page, totalPages, page === startPage + maxPages - 1 && page < totalPages);
       this.logger.debug(
         `KazUnion PRICES ${params.tourInc} page ${page}/${totalPages}: +${added} → ${rows.length} rows`,
       );
@@ -500,6 +502,7 @@ export class KazunionHttpService {
       }
 
       const totalPages = this.parseTotalPages(body, html);
+      recordCatalogPage(page, totalPages, page === startPage + maxPages - 1 && page < totalPages);
       this.logger.debug(
         `KazUnion hotels STATEINC=${params.stateInc} page ${page}/${totalPages}: +${added} → ${rows.length} rows`,
       );

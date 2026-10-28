@@ -9,8 +9,8 @@
  * Mass-assignment: server-owned поля (id/code/createdAt/updatedAt/version)
  * запрещены громко (422, project convention loud-forbidden-key) — не silent strip.
  */
-import { IsBoolean, IsEnum, IsISO8601, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min, MinLength, ValidateIf } from "class-validator";
-import { Type } from "class-transformer";
+import { IsBoolean, IsEnum, IsIn, IsISO8601, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from "class-validator";
+import { Type, Transform } from "class-transformer";
 import { ValidationDomainError } from "../../shared/errors";
 import { Prisma } from "../../generated/prisma/client";
 import { CommissionAccrualStatus, CommissionChannel, CommissionStatus } from "../../generated/prisma/enums";
@@ -318,6 +318,18 @@ export class ObligationListQueryDto {
   @MaxLength(64)
   orderId?: string;
 
+  /** ?overdue=true — только просроченные (dueDate < сегодня, остаток > 0, payable). */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true" || value === "1")
+  @IsBoolean()
+  overdue?: boolean;
+
+  /** Поиск по коду/счёту/заказу/броне. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -432,6 +444,203 @@ export class AdjustObligationDto {
 
 /** DTO отмены обязательства (только unpaid; audit). */
 export class CancelObligationDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+/** Реквизиты оплаты обязательства: счёт поставщика и срок оплаты (audit). */
+export class UpdateObligationTermsDto {
+  /** ISO date (YYYY-MM-DD) или null — снять срок. */
+  @IsOptional()
+  @ValidateIf((o: UpdateObligationTermsDto) => o.dueDate !== null)
+  @IsISO8601()
+  dueDate?: string | null;
+
+  @IsOptional()
+  @ValidateIf((o: UpdateObligationTermsDto) => o.invoiceNumber !== null)
+  @IsString()
+  @MaxLength(100)
+  invoiceNumber?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+/** Распределение платежа на обязательство. */
+export class SupplierPaymentAllocationDto {
+  /** SBO-* или id обязательства. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  obligationCode!: string;
+
+  /** Сумма в валюте платежа (> 0). */
+  @IsString()
+  @Matches(DECIMAL_RE)
+  @MaxLength(32)
+  amount!: string;
+
+  /** AZN-эквивалент; обязателен при несовпадении валют без frozen FX. */
+  @IsOptional()
+  @IsString()
+  @Matches(DECIMAL_RE)
+  @MaxLength(32)
+  aznAmount?: string;
+}
+
+/** Регистрация платежа поставщику (PENDING; подтверждение — отдельный шаг). */
+export class CreateSupplierPaymentDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  partnerId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  supplierCode?: string;
+
+  @IsString()
+  @Matches(DECIMAL_RE)
+  @MaxLength(32)
+  amount!: string;
+
+  @IsString()
+  @Length(3, 3)
+  currency!: string;
+
+  /** AZN-эквивалент; сервер считает по SupplierFxRate, если не передан. */
+  @IsOptional()
+  @IsString()
+  @Matches(DECIMAL_RE)
+  @MaxLength(32)
+  aznAmount?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  fxRate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  method?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  providerRef?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  purpose?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  comment?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  occurredAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  evidenceUrl?: string;
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => SupplierPaymentAllocationDto)
+  allocations?: SupplierPaymentAllocationDto[];
+}
+
+/** Query реестра платежей поставщикам. */
+export class SupplierPaymentListQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  supplierCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  partnerId?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  currency?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  from?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  to?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+
+  /** ?unallocated=true — только платежи с нераспределённым остатком. */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true" || value === "1")
+  @IsBoolean()
+  unallocated?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  pageSize?: number;
+}
+
+/** Условия оплаты поставщика (минимальная модель: IMMEDIATE / NET_DAYS). */
+export class UpsertSupplierPaymentTermsDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  supplierCode!: string;
+
+  @IsString()
+  @IsIn(["IMMEDIATE", "NET_DAYS"])
+  rule!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  days?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+/** Отмена платежа поставщику (PENDING без сторно; CONFIRMED — со сторно). */
+export class CancelSupplierPaymentDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)

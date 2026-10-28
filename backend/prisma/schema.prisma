@@ -421,6 +421,9 @@ model Product {
   geoAirportId String?
 
   @@index([status])
+  /// Public Marketplace listing: WHERE status+publishedAt, ORDER BY publishedAt DESC.
+  /// Без этого индекса выдача сортирует все ≈18k PUBLISHED-строк (Seq Scan + Sort).
+  @@index([status, publishedAt])
   @@index([categoryId])
   @@index([partnerId])
   @@index([geoCountryId])
@@ -445,7 +448,8 @@ model ProductPublicationChannel {
   createdById String?
 
   @@unique([productId, channel])
-  @@index([channel])
+  /// Публичный контур: EXISTS (... channel = 'MARKETPLACE' AND productId = p.id).
+  @@index([channel, productId])
   @@schema("catalog")
 }
 
@@ -1105,6 +1109,103 @@ model HotelSupplierRef {
   @@schema("catalog")
 }
 
+/// Durable identity linking one supplier-native service to one catalog Product.
+/// `externalKey` is the current supplierRef (prefix included) and is the exact
+/// reconciliation key. Country/state are scope metadata used for safe archive
+/// and for detecting cross-country collisions.
+model SupplierCatalogCountry {
+  id           String   @id @default(uuid())
+  supplierCode String
+  serviceType  String // "tours" | "hotels"
+  /// ISO-2 when resolvable; otherwise the supplier-native key.
+  countryKey   String
+  countryLabel String
+  /// DISCOVERED | STATIC
+  source       String   @default("DISCOVERED")
+  firstSeenAt  DateTime @default(now())
+  lastSeenAt   DateTime @default(now())
+
+  @@unique([supplierCode, serviceType, countryKey])
+  @@index([supplierCode, serviceType])
+  @@schema("catalog")
+}
+
+/// Stable supplier-native key ↔ Product link; survives supplierRef changes.
+model SupplierCatalogIdentity {
+  id              String   @id @default(uuid())
+  supplierCode    String
+  serviceType     String // "tours" | "hotels"
+  externalKey     String
+  countryCode     String?
+  stateCode       String?
+  productId       String
+  /// ACTIVE | ARCHIVED | NEEDS_REVIEW
+  status          String   @default("ACTIVE")
+  archivedByRunId String?
+  firstSeenAt     DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([supplierCode, serviceType, externalKey])
+  @@index([productId])
+  @@index([supplierCode, serviceType, status])
+  @@index([countryCode])
+  @@schema("catalog")
+}
+
+/// One preview/apply execution for a supplier + service + country scope.
+/// Preview writes only run/items; catalog Products/Tariffs are untouched until
+/// explicit confirm.
+model SupplierCatalogRun {
+  id              String    @id @default(uuid())
+  supplierCode    String
+  serviceType     String // "tours" | "hotels" | "all"
+  countryCode     String?
+  status          String    @default("PREVIEWING")
+  /// COMPLETE | PARTIAL | FAILED
+  coverage        String    @default("PARTIAL")
+  /// Scope echoed to the UI (countries, categories, date windows, page caps).
+  scope           Json?
+  counts          Json?
+  errors          Json?
+  /// Null while the run is active; unique guard against two parallel runs.
+  activeKey       String?   @unique
+  createdById     String?
+  createdByName   String?
+  startedAt       DateTime  @default(now())
+  finishedAt      DateTime?
+  confirmedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  items SupplierCatalogRunItem[]
+
+  @@index([supplierCode, serviceType, countryCode, createdAt])
+  @@index([status])
+  @@schema("catalog")
+}
+
+/// Per-card preview/apply result. `before`/`after` contain the diff needed for
+/// the report and for an audit-friendly retry.
+model SupplierCatalogRunItem {
+  id          String   @id @default(uuid())
+  runId       String
+  run         SupplierCatalogRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  productId   String?
+  supplierRef String?
+  externalKey String
+  action      String // CREATE | UPDATE | RESTORE | ARCHIVE | AMBIGUOUS | LEGACY_ARCHIVED | UNCHANGED | ERROR
+  reason      String?
+  before      Json?
+  after       Json?
+  error       String?
+  applied     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([runId, action])
+  @@index([productId])
+  @@schema("catalog")
+}
+
 model ProductMedia {
   id        String    @id @default(uuid())
   productId String
@@ -1477,6 +1578,13 @@ model PartnerStorefront {
   heroSubheading String?
   themePreset    String  @default("default")
 
+  /// Optional custom domain (normalized hostname). Verified via DNS TXT before
+  /// public host routing is enabled.
+  customDomain           String?   @unique
+  customDomainStatus     String    @default("NONE") // NONE | PENDING | VERIFIED | FAILED
+  customDomainToken      String?
+  customDomainVerifiedAt DateTime?
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   /// Моменты РЕАЛЬНЫХ lifecycle-переходов (не updatedAt).
@@ -1678,6 +1786,7 @@ model SubscriptionPayment {
 enum StorefrontMediaKind {
   LOGO
   HERO
+  GALLERY
 
   @@schema("catalog")
 }
@@ -1700,12 +1809,15 @@ model StorefrontMedia {
   width            Int?
   height           Int?
   originalFileName String
+  /// Gallery ordering; LOGO/HERO always 0.
+  sortOrder        Int                 @default(0)
+  altText          String?
   createdAt        DateTime            @default(now())
   createdById      String?
 
   storefront PartnerStorefront @relation(fields: [storefrontId], references: [id])
 
-  @@unique([storefrontId, kind])
+  @@index([storefrontId, kind])
   @@index([storefrontId])
   @@schema("catalog")
 }
@@ -3045,6 +3157,8 @@ model User {
   status       UserStatus @default(ACTIVE)
   roleId       String
   role         Role       @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  /// Дополнительные роли (primary остаётся roleId для backward compatibility).
+  roleAssignments UserRoleAssignment[]
 
   // Object scope (RBAC Matrix §3): PARTNER → partnerId, BUYER → customerId.
   partnerId  String?
@@ -3181,9 +3295,37 @@ model Role {
   id          String           @id @default(uuid())
   code        RoleCode         @unique
   title       String
+  description String?
   users       User[]
   permissions RolePermission[]
+  assignments UserRoleAssignment[]
 
+  @@schema("security")
+}
+
+/// Дополнительная роль пользователя (primary хранится в User.roleId для
+/// совместимости). Временная роль действует при startAt <= now < endAt и
+/// revokedAt = null; срок проверяется при каждом запросе (guard читает БД),
+/// поэтому истечение не зависит от фоновой задачи. Повторное назначение той же
+/// роли обновляет существующую строку (unique user+role), история — AuditLog.
+model UserRoleAssignment {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  startAt      DateTime @default(now())
+  endAt        DateTime?
+  reason       String?
+  assignedById String?
+  assignedByName String?
+  revokedAt    DateTime?
+  revokedById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, roleId])
+  @@index([userId, startAt, endAt])
   @@schema("security")
 }
 
@@ -5099,6 +5241,14 @@ model SupplierObligation {
   orderId         String
   orderCode       String?
   orderItemId     String?
+  /// Номер счёта поставщика (invoice) — вводится финансами, не вычисляется.
+  invoiceNumber   String?
+  /// Срок оплаты (UTC date). NULL = срок не согласован → не считается просроченным.
+  dueDate         DateTime?
+  /// Snapshot применённого правила срока на момент создания обязательства.
+  paymentTermsRule      String?
+  paymentTermsDays      Int?
+  paymentTermsAppliedAt DateTime?
   /// Registry-токен поставщика (KOMPAS/KAZUNION/... из commercialSnapshot).
   supplierCode    String?
   /// CRM Partner для отображения (PAR-*; resolve на read).
@@ -5114,7 +5264,7 @@ model SupplierObligation {
   fxRateCode      String?   // SFX-*
   /// OPEN / PARTIALLY_PAID / CLOSED / CANCELLED / ADJUSTED.
   status          String    @default("OPEN")
-  /// Оплаченная AZN-сумма (сумма aznAmount всех payout); всегда >= 0.
+  /// Оплаченная AZN-сумма (сумма aznAmount всех CONFIRMED allocations); >= 0.
   paidAmount      Decimal   @default(0) @db.Decimal(18, 2)
   /// Остаток AZN (= aznAmount - paidAmount); NULL если aznAmount UNKNOWN.
   remainingAmount Decimal?  @db.Decimal(18, 2)
@@ -5124,12 +5274,57 @@ model SupplierObligation {
   confirmedAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  /// Optimistic lock для ручных корректировок (dueDate/invoice/cancel).
+  version         Int       @default(1)
   payouts         SupplierPayout[]
+  allocations     SupplierPayoutAllocation[]
+  events          SupplierObligationEvent[]
 
   @@index([orderId])
   @@index([status])
   @@index([supplierCode])
   @@index([partnerId])
+  @@index([dueDate])
+  @@schema("finance")
+}
+
+/// Условия оплаты поставщика (минимальная модель). Применяется ТОЛЬКО к новым
+/// обязательствам; у существующих срок зафиксирован snapshot-полями
+/// SupplierObligation.paymentTerms*. Изменение правила не переписывает прошлое.
+model SupplierPaymentTerms {
+  id           String   @id @default(uuid())
+  /// Registry-токен поставщика (KOMPAS/SUMMERTOUR/…).
+  supplierCode String   @unique
+  /// IMMEDIATE | NET_DAYS (дни после подтверждения брони).
+  rule         String
+  days         Int      @default(0)
+  active       Boolean  @default(true)
+  updatedById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@schema("finance")
+}
+
+/// Аудируемая история изменения AZN-суммы/статуса обязательства.
+/// Нужна для отчёта «задолженность на дату»: текущая строка SupplierObligation
+/// не позволяет восстановить прошлое (adjust/cancel меняют её in-place).
+/// Append-only; occurredAt — бизнес-время события (не createdAt).
+model SupplierObligationEvent {
+  id           String             @id @default(uuid())
+  obligationId String
+  obligation   SupplierObligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
+  /// CREATED | ADJUSTED | CANCELLED
+  type         String
+  /// AZN-сумма ПОСЛЕ события; NULL = UNKNOWN (нет snapshot/FX).
+  aznAmount    Decimal?           @db.Decimal(18, 2)
+  /// Бизнес-время события (UTC).
+  occurredAt   DateTime
+  actorId      String?
+  details      Json?
+  createdAt    DateTime           @default(now())
+
+  @@index([obligationId, occurredAt])
   @@schema("finance")
 }
 
@@ -5144,8 +5339,17 @@ model SupplierObligation {
 model SupplierPayout {
   id            String              @id @default(uuid())
   code          String              @unique // SPO-########
-  obligationId  String
-  obligation    SupplierObligation  @relation(fields: [obligationId], references: [id])
+  /// Legacy-привязка «один payout = одна obligation». Новые платежи живут в
+  /// SupplierPayout + SupplierPayoutAllocation (можно распределить на несколько
+  /// обязательств и оставить нераспределённый остаток), поэтому поле nullable.
+  obligationId  String?
+  obligation    SupplierObligation? @relation(fields: [obligationId], references: [id])
+  /// Supplier identity платежа — обязательна для нераспределённых платежей.
+  supplierCode  String?
+  partnerId     String?
+  /// PENDING (зарегистрирован, деньги не подтверждены) → CONFIRMED (исполнен)
+  /// или CANCELLED. Только CONFIRMED влияет на paid/remaining обязательств.
+  status        String              @default("CONFIRMED")
   /// Фактическое исходящее движение (> 0), реальная валюта банка/провайдера.
   amount        Decimal             @db.Decimal(18, 2)
   currency      String
@@ -5158,16 +5362,80 @@ model SupplierPayout {
   method        String?
   /// Внешний референс провайдера/банка — ключ идемпотентности replay.
   providerRef   String?             @unique
+  /// Серверный idempotency-слот POST /finance/supplier-payments (crash-safe
+  /// business idempotency: stale takeover возвращает уже созданный платёж).
+  idempotencySlotKey String?        @unique
+  /// Назначение платежа (свободный текст для банка).
+  purpose       String?
+  /// Внутренний комментарий финансиста (не уходит в банк).
+  comment       String?
   occurredAt    DateTime
   reason        String?
   evidenceUrl   String?
+  confirmedAt   DateTime?
+  confirmedById String?
+  cancelledAt   DateTime?
+  cancelledById String?
+  /// Optimistic lock для переходов статусов.
+  version       Int                 @default(1)
   correlationId String?
   causationId   String?
   actorType     String?
   actorId       String?
   createdAt     DateTime            @default(now())
+  allocations   SupplierPayoutAllocation[]
+  evidence      SupplierPaymentEvidence[]
 
   @@index([obligationId])
+  @@index([partnerId])
+  @@index([supplierCode])
+  @@index([status])
+  @@index([occurredAt])
+  @@schema("finance")
+}
+
+/// Распределение платежа поставщику по обязательствам. Только CONFIRMED
+/// распределения уменьшают остаток; PENDING — «план», не оплата.
+model SupplierPayoutAllocation {
+  id            String            @id @default(uuid())
+  payoutId      String
+  payout        SupplierPayout    @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  obligationId  String
+  obligation    SupplierObligation @relation(fields: [obligationId], references: [id])
+  /// Сумма распределения в валюте платежа.
+  amount        Decimal           @db.Decimal(18, 2)
+  /// AZN-эквивалент распределения (management currency, money-safe).
+  aznAmount     Decimal           @db.Decimal(18, 2)
+  /// Отмена/сторно распределения (append-only: строка не удаляется).
+  reversedAt    DateTime?
+  reversedById  String?
+  createdAt     DateTime          @default(now())
+  createdById   String?
+
+  @@unique([payoutId, obligationId])
+  @@index([obligationId])
+  @@schema("finance")
+}
+
+/// Подтверждающий документ исходящего платежа поставщику (счёт, платёжное
+/// поручение, выписка). Файл — в приватном S3 bucket; здесь только metadata.
+/// Выдаётся исключительно короткоживущим signed URL через authenticated
+/// endpoint (не публичный контур). Мягкое удаление с аудитом; история остаётся.
+model SupplierPaymentEvidence {
+  id           String         @id @default(uuid())
+  payoutId     String
+  payout       SupplierPayout @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  /// Storage key в приватном bucket (никогда не отдаётся клиенту).
+  storageKey   String         @unique
+  fileName     String
+  mimeType     String
+  size         Int
+  uploadedById String?
+  createdAt    DateTime       @default(now())
+  deletedAt    DateTime?
+  deletedById  String?
+
+  @@index([payoutId])
   @@schema("finance")
 }
 

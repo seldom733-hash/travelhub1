@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import StorefrontSite from "@/components/storefront/StorefrontSite";
+import StorefrontBlocks from "@/components/storefront/StorefrontBlocks";
 import { pt } from "@/lib/partner-i18n";
 import { useLocale } from "@/lib/i18n";
 import { storefrontApi, type StorefrontView } from "@/lib/storefront-api";
+import { storefrontConstructorApi } from "@/lib/storefront-constructor-api";
+import type { PageConfigView } from "@/lib/constructor-api";
 import { partnerApi, type PartnerProductListItem } from "@/lib/partner-api";
-import type { PublicListResult, PublicProductCard } from "@/lib/public-api";
+import type { PublicListResult, PublicProductCard, PublicStorefront } from "@/lib/public-api";
 
 /**
  * PHASE 1 STEP 1.12.2 §13 — Preview (owner-only, own-scope).
@@ -21,6 +24,7 @@ export default function StorefrontPreviewPage() {
   const locale = useLocale();
   const router = useRouter();
   const [sf, setSf] = useState<StorefrontView | null>(null);
+  const [page, setPage] = useState<PageConfigView | null>(null);
   const [products, setProducts] = useState<PublicListResult | null>(null);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
@@ -54,6 +58,14 @@ export default function StorefrontPreviewPage() {
           page: 1,
           pageSize: 50,
         });
+        try {
+          const pageId = new URLSearchParams(window.location.search).get("pageId") ?? undefined;
+          const previewPage = await storefrontConstructorApi.getPreview(pageId);
+          if (alive) setPage(previewPage);
+        } catch {
+          // No builder page yet — legacy preview remains valid.
+          if (alive) setPage(null);
+        }
       } catch (e) {
         if (alive) setError((e as Error).message);
       }
@@ -91,6 +103,29 @@ export default function StorefrontPreviewPage() {
     return <div className="py-16 text-center text-sm text-slate-400">{pt("partner.state.loading", locale)}</div>;
   }
 
+  const publicSf: PublicStorefront = {
+    id: sf.id,
+    code: sf.code,
+    slug: sf.slug,
+    businessName: sf.businessName,
+    tagline: sf.tagline,
+    description: sf.description,
+    defaultLocale: sf.defaultLocale,
+    countryCode: sf.countryCode,
+    cityCode: sf.cityCode,
+    publicPhone: sf.publicPhone,
+    publicEmail: sf.publicEmail,
+    websiteUrl: sf.websiteUrl,
+    whatsapp: sf.whatsapp,
+    socialLinks: sf.socialLinks,
+    heroHeading: sf.heroHeading,
+    heroSubheading: sf.heroSubheading,
+    themePreset: sf.themePreset,
+    media: sf.media.map((m) => ({ id: m.id, kind: m.kind, url: "" })),
+    seller: null,
+    activatedAt: sf.activatedAt ?? new Date().toISOString(),
+  };
+
   return (
     <div className="bg-slate-100">
       <div className="mx-auto max-w-6xl px-4 py-3 text-center text-xs text-slate-500">
@@ -99,33 +134,11 @@ export default function StorefrontPreviewPage() {
           ← {pt("storefront.back_management", locale)}
         </button>
       </div>
-      <StorefrontSite
-        sf={{
-          id: sf.id,
-          code: sf.code,
-          slug: sf.slug,
-          businessName: sf.businessName,
-          tagline: sf.tagline,
-          description: sf.description,
-          defaultLocale: sf.defaultLocale,
-          countryCode: sf.countryCode,
-          cityCode: sf.cityCode,
-          publicPhone: sf.publicPhone,
-          publicEmail: sf.publicEmail,
-          websiteUrl: sf.websiteUrl,
-          whatsapp: sf.whatsapp,
-          socialLinks: sf.socialLinks,
-          heroHeading: sf.heroHeading,
-          heroSubheading: sf.heroSubheading,
-          themePreset: sf.themePreset,
-          media: sf.media.map((m) => ({ id: m.id, kind: m.kind, url: "" })),
-          seller: null,
-          activatedAt: sf.activatedAt ?? new Date().toISOString(),
-        }}
-        products={products}
-        preview
-        mediaUrlOverrides={mediaUrls}
-      />
+      {page && page.sections.some((s) => s.enabled) ? (
+        <StorefrontBlocks sf={publicSf} products={products} page={page} preview mediaUrlOverrides={mediaUrls} />
+      ) : (
+        <StorefrontSite sf={publicSf} products={products} preview mediaUrlOverrides={mediaUrls} />
+      )}
     </div>
   );
 }

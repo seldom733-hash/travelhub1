@@ -4,25 +4,28 @@ import { useState } from "react";
 import { useLocale, t } from "@/lib/i18n";
 import { useGlobalBranding } from "@/lib/use-global-branding";
 import { useConstructor } from "@/lib/use-constructor";
-import ConstructorTabs, { type ConstructorTab } from "./ConstructorTabs";
-import ConstructorBlockList from "./ConstructorBlockList";
-import ConstructorAvailableBlocks from "./ConstructorAvailableBlocks";
+import BuilderWorkspace from "./BuilderWorkspace";
 import ConstructorHeaderTab from "./ConstructorHeaderTab";
 import ConstructorHeroTab from "./ConstructorHeroTab";
 import ConstructorSearchTab from "./ConstructorSearchTab";
 import ConstructorFooterTab from "./ConstructorFooterTab";
 import ConstructorDesignTab from "./ConstructorDesignTab";
 import ConstructorContentTab from "./ConstructorContentTab";
-import { FloppyDisk, PaperPlaneRight, Eye } from "@phosphor-icons/react";
+import { instantiateTemplate, MARKETPLACE_TEMPLATES } from "@/lib/builder-templates";
 
 interface Props {
   slug: string;
 }
 
+/**
+ * Marketplace site builder adapter. Rendering/structure/settings controls live
+ * in the shared BuilderWorkspace; this component only wires marketplace API and
+ * marketplace-specific tabs (Header/Hero/Search/Footer/Design/Content).
+ */
 export default function ConstructorCanvas({ slug }: Props) {
   const locale = useLocale();
   const { brandName } = useGlobalBranding();
-  const [activeTab, setActiveTab] = useState<ConstructorTab>("structure");
+  const [activeTab, setActiveTab] = useState("structure");
   const {
     page,
     draft,
@@ -33,198 +36,89 @@ export default function ConstructorCanvas({ slug }: Props) {
     refresh,
     saveDraft,
     publish,
-    saveHeaderConfig,
-    saveHeroConfig,
-    saveSearchConfig,
-    saveFooterConfig,
-    saveDesignConfig,
     addBlock,
     removeBlock,
     toggleEnabled,
     reorder,
     updateSection,
+    replaceSections,
   } = useConstructor(slug);
 
   if (loading) {
-    /* §SKELETON-PARITY: тот же каркас, что и реальный (:69-146) — шапка
-       `flex items-center justify-between pb-4` + табы + `pt-6` →
-       `grid gap-6 lg:grid-cols-[280px_1fr]`; раньше был один блок `h-48`. */
     return (
-      <div className="space-y-0">
-        <div className="flex items-center justify-between pb-4">
-          <div>
-            <div className="h-6 w-48 animate-pulse rounded bg-slate-100" />
-            <div className="mt-1 h-4 w-72 animate-pulse rounded bg-slate-100" />
-          </div>
-          <div className="h-9 w-32 animate-pulse rounded-lg bg-slate-100" />
-        </div>
-        <div className="flex gap-1 border-b border-slate-200 pb-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-8 w-24 animate-pulse rounded-t-lg bg-slate-100" />
-          ))}
-        </div>
-        <div className="pt-6">
-          <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-            <div className="h-64 animate-pulse rounded-lg border border-slate-200 bg-white" />
-            <div className="space-y-3">
-              <div className="h-4 w-40 animate-pulse rounded bg-slate-100" />
-              <div className="h-48 animate-pulse rounded-lg border border-slate-200 bg-white" />
-            </div>
-          </div>
-        </div>
+      <div className="space-y-4">
+        <div className="h-8 w-64 animate-pulse rounded bg-slate-100" />
+        <div className="h-10 animate-pulse rounded bg-slate-100" />
+        <div className="h-64 animate-pulse rounded border border-slate-200 bg-white" />
       </div>
     );
   }
 
   if (error && !page) {
-    return (
-      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-        {error}
-      </div>
-    );
+    return <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>;
   }
 
   const isPublished = page?.status === "PUBLISHED" && page?.currentVersion != null;
   const hasDraft = page?.draftVersion != null && (page?.currentVersion == null || page.draftVersion > page.currentVersion);
+  const tabs = [
+    { id: "structure", label: t("constructor.tab_structure", locale) },
+    { id: "header", label: t("constructor.tab_header", locale) },
+    { id: "hero", label: t("constructor.tab_hero", locale) },
+    { id: "search", label: t("constructor.tab_search", locale) },
+    { id: "content", label: t("constructor.tab_content", locale) },
+    { id: "footer", label: t("constructor.tab_footer", locale) },
+    { id: "design", label: t("constructor.tab_design", locale) },
+  ];
+
+  const updateSettings = (instanceId: string, key: string, value: string | number) => {
+    const section = draft.find((s) => s.blockInstanceId === instanceId);
+    if (!section) return;
+    updateSection(instanceId, { settings: { ...section.settings, [key]: value } });
+  };
 
   return (
-    <div className="space-y-0">
-      {/* Header with actions */}
-      <div className="flex items-center justify-between pb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900">
-            {t("constructor.home_title", locale)}
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {t("constructor.home_description", locale)} {brandName}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Status badge */}
-          <span className={`rounded-full px-3 py-1 text-xs font-medium ${isPublished ? "bg-green-100 text-green-700" : hasDraft ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
-            {isPublished ? t("constructor.published_status", locale) : hasDraft ? t("constructor.draft_status", locale) : t("constructor.draft_status", locale)}
-          </span>
-
-          {/* Preview */}
-          <a
-            href="/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            <Eye className="h-4 w-4" />
-            {t("constructor.preview", locale)}
-          </a>
-
-          {/* Save Draft */}
-          <button
-            onClick={saveDraft}
-            disabled={saving}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <FloppyDisk className="h-4 w-4" />
-            {saving ? t("constructor.saving", locale) : t("constructor.save_draft", locale)}
-          </button>
-
-          {/* Publish */}
-          <button
-            onClick={publish}
-            disabled={saving || !hasDraft}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <PaperPlaneRight className="h-4 w-4" />
-            {t("constructor.publish", locale)}
-          </button>
-        </div>
-      </div>
-
-      {/* Error banner */}
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
-          {error}
-        </div>
+    <BuilderWorkspace
+      title={t("constructor.home_title", locale)}
+      description={`${t("constructor.home_description", locale)} ${brandName}`}
+      previewHref="/"
+      livePreviewHref="/app/page-builder/preview"
+      published={isPublished}
+      saving={saving}
+      error={error}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      registry={availableBlocks}
+      sections={draft}
+      savingLabel={t("constructor.saving", locale)}
+      publishDisabled={!hasDraft}
+      onSave={saveDraft}
+      onPublish={publish}
+      onAdd={addBlock}
+      onRemove={removeBlock}
+      onToggle={toggleEnabled}
+      onReorder={reorder}
+      onUpdateSettings={updateSettings}
+      onReplaceSections={replaceSections}
+      templates={MARKETPLACE_TEMPLATES}
+      onApplyTemplate={(template) => replaceSections(instantiateTemplate(template, "mp"))}
+    >
+      {activeTab === "header" && (
+        <ConstructorHeaderTab slug={slug} config={page?.headerConfig ?? null} onSaved={refresh} onSaving={() => {}} onError={(msg) => { if (msg) alert(msg); }} />
       )}
-
-      {/* Tabs */}
-      <ConstructorTabs activeTab={activeTab} onTabChange={setActiveTab} />
-
-      {/* Tab content */}
-      <div className="pt-6">
-        {activeTab === "structure" && (
-          <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-            <ConstructorAvailableBlocks blocks={availableBlocks} onAdd={addBlock} />
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-slate-700">
-                {t("constructor.canvas_title", locale)} ({draft.length})
-              </h3>
-              <ConstructorBlockList
-                sections={draft}
-                onReorder={reorder}
-                onToggle={toggleEnabled}
-                onRemove={removeBlock}
-              />
-            </div>
-          </div>
-        )}
-
-        {activeTab === "header" && (
-          <ConstructorHeaderTab
-            slug={slug}
-            config={page?.headerConfig ?? null}
-            onSaved={refresh}
-            onSaving={() => {}}
-            onError={(msg) => { if (msg) alert(msg); }}
-          />
-        )}
-
-        {activeTab === "hero" && (
-          <ConstructorHeroTab
-            slug={slug}
-            config={page?.heroConfig ?? null}
-            onSaved={refresh}
-            onSaving={() => {}}
-            onError={(msg) => { if (msg) alert(msg); }}
-          />
-        )}
-
-        {activeTab === "search" && (
-          <ConstructorSearchTab
-            slug={slug}
-            config={page?.searchConfig ?? null}
-            onSaved={refresh}
-            onSaving={() => {}}
-            onError={(msg) => { if (msg) alert(msg); }}
-          />
-        )}
-
-        {activeTab === "content" && (
-          <ConstructorContentTab
-            sections={draft}
-            onUpdateSection={updateSection}
-          />
-        )}
-
-        {activeTab === "footer" && (
-          <ConstructorFooterTab
-            slug={slug}
-            config={page?.footerConfig ?? null}
-            headerConfig={page?.headerConfig ?? null}
-            onSaved={refresh}
-            onSaving={() => {}}
-            onError={(msg) => { if (msg) alert(msg); }}
-          />
-        )}
-
-        {activeTab === "design" && (
-          <ConstructorDesignTab
-            slug={slug}
-            config={page?.designConfig ?? null}
-            onSaved={refresh}
-            onSaving={() => {}}
-            onError={(msg) => { if (msg) alert(msg); }}
-          />
-        )}
-      </div>
-    </div>
+      {activeTab === "hero" && (
+        <ConstructorHeroTab slug={slug} config={page?.heroConfig ?? null} onSaved={refresh} onSaving={() => {}} onError={(msg) => { if (msg) alert(msg); }} />
+      )}
+      {activeTab === "search" && (
+        <ConstructorSearchTab slug={slug} config={page?.searchConfig ?? null} onSaved={refresh} onSaving={() => {}} onError={(msg) => { if (msg) alert(msg); }} />
+      )}
+      {activeTab === "content" && <ConstructorContentTab sections={draft} onUpdateSection={updateSection} />}
+      {activeTab === "footer" && (
+        <ConstructorFooterTab slug={slug} config={page?.footerConfig ?? null} headerConfig={page?.headerConfig ?? null} onSaved={refresh} onSaving={() => {}} onError={(msg) => { if (msg) alert(msg); }} />
+      )}
+      {activeTab === "design" && (
+        <ConstructorDesignTab slug={slug} config={page?.designConfig ?? null} onSaved={refresh} onSaving={() => {}} onError={(msg) => { if (msg) alert(msg); }} />
+      )}
+    </BuilderWorkspace>
   );
 }

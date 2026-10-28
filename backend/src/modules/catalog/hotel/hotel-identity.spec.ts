@@ -1,4 +1,4 @@
-import { cleanHotelName, groupHotelRefs, hotelGroupKey, normalizeName, parseStars, type HotelRef } from "./hotel-identity";
+import { applyCanonicalName, cleanHotelName, groupHotelRefs, hotelGroupKey, nameSimilarity, normalizeName, parseStars, type HotelRef } from "./hotel-identity";
 
 /**
  * Единый каталог фотографий отелей (Этап B/E).
@@ -118,5 +118,47 @@ describe("groupHotelRefs — одна фотография на физическ
     const c = ref({ supplierCode: "Z", externalKey: "3", name: "Hotel A", cityName: "Кута", countryCode: "TH" });
     expect(hotelGroupKey(a)).toBe(hotelGroupKey(b));
     expect(hotelGroupKey(a)).not.toBe(hotelGroupKey(c));
+  });
+});
+
+describe("applyCanonicalName — единое имя отеля в карточке", () => {
+  it("сохраняет хвост программы тура после « — »", () => {
+    expect(applyCanonicalName("KOMPAS Hotel 4* (Baku, AZ) — Baku–Dubai", "KOMPAS Hotel")).toBe(
+      "KOMPAS Hotel — Baku–Dubai",
+    );
+  });
+
+  it("сохраняет гео-хвост карточки отеля", () => {
+    expect(applyCanonicalName("KOMPAS Hotel 4* (Baku, AZ)", "KOMPAS Hotel")).toBe("KOMPAS Hotel (Baku, AZ)");
+  });
+
+  it("без хвоста возвращает каноническое имя целиком", () => {
+    expect(applyCanonicalName("KOMPAS Hotel 4*", "KOMPAS Hotel")).toBe("KOMPAS Hotel");
+  });
+
+  it("пустое каноническое имя не меняет title", () => {
+    expect(applyCanonicalName("KOMPAS Hotel 4*", "")).toBe("KOMPAS Hotel 4*");
+    expect(applyCanonicalName("KOMPAS Hotel 4*", null)).toBe("KOMPAS Hotel 4*");
+    expect(applyCanonicalName("KOMPAS Hotel 4*", "   ")).toBe("KOMPAS Hotel 4*");
+  });
+});
+
+describe("nameSimilarity — сигнал для ручной проверки, не доказательство", () => {
+  it("одинаковые названия → 1", () => {
+    expect(nameSimilarity("Hilton Baku", "Hilton Baku")).toBe(1);
+  });
+
+  it("служебные слова не мешают: порядок токенов не важен", () => {
+    expect(nameSimilarity("Hilton Baku Hotel", "Hilton Hotel Baku")).toBe(1);
+  });
+
+  it("разные отели в одном городе → низкая похожесть", () => {
+    expect(nameSimilarity("Hilton Baku", "Marriott Baku")).toBeLessThan(0.5);
+  });
+
+  it("пустые/служебные названия → 0", () => {
+    expect(nameSimilarity("", "Hilton")).toBe(0);
+    expect(nameSimilarity("Hilton", "")).toBe(0);
+    expect(nameSimilarity("Hotel", "Resort")).toBe(0);
   });
 });

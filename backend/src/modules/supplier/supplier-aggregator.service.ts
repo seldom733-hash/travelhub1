@@ -8,6 +8,7 @@ import type { SupplierSearchQuery, SupplierOffer } from "./supplier.types";
 import { KOMPAS_HOTEL_STATEINC_TO_ISO } from "./kompas/kompas-hotel-countries";
 import { VOYAGER_HOTEL_STATEINC_BY_ISO } from "./voyager/voyager-countries";
 import { SUPPLIER_TOKEN_CRM_NAMES } from "./supplier-crm-names";
+import { canonicalHotelCategory } from "../catalog/hotel/hotel-category";
 
 /**
  * Capability descriptor for a tour supplier adapter.
@@ -776,11 +777,10 @@ export class SupplierAggregatorService {
     const wantedNums = new Set<number>();
     const wantedLabels = new Set<string>();
     for (const raw of query.hotelStars ?? []) {
-      const label = raw.trim().toLowerCase();
-      if (!label) continue;
-      wantedLabels.add(label);
-      const m = label.match(/^([1-5])\s*\*/);
-      if (m) wantedNums.add(parseInt(m[1], 10));
+      const category = canonicalHotelCategory(raw);
+      if (!category) continue;
+      wantedLabels.add(category.label.toLowerCase());
+      if (category.kind === "STAR") wantedNums.add(category.stars);
     }
     const links = await this.prisma.supplierGeoLink.findMany({
       where: { kind: "STAR", supplierCode: { in: Object.keys(perSupplierQueries) } },
@@ -795,12 +795,10 @@ export class SupplierAggregatorService {
       }
       const ids = supplierLinks
         .filter((l) => {
-          const label = l.label.trim().toLowerCase();
-          const m = label.match(/^([1-5])\s*\*/);
-          // "5*" must include "5*/HV1", "5* DELUXE", "5* Superior" —
-          // exact label matching silently dropped those suppliers.
-          if (m) return wantedNums.has(parseInt(m[1], 10));
-          return wantedLabels.has(label);
+          const category = canonicalHotelCategory(l.label);
+          if (!category) return false;
+          if (category.kind === "STAR") return wantedNums.has(category.stars);
+          return wantedLabels.has(category.label.toLowerCase());
         })
         .map((l) => l.externalId);
       if (ids.length > 0) {

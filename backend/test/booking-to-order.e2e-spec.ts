@@ -516,7 +516,12 @@ describe("Stage 2 — Booking → Order round-trip (e2e)", () => {
 
     // Повторный send из PARTIALLY_FULFILLED (follow-up) → B2 только для item1.
     await opAgent().patch(`/api/v1/orders/${orderId}`).send({ action: "send" }).expect(200);
-    const afterSend = await prisma.booking.findMany({ where: { orderId } });
+    let afterSend: Awaited<ReturnType<typeof prisma.booking.findMany>> = [];
+    for (let i = 0; i < 100; i += 1) {
+      afterSend = await prisma.booking.findMany({ where: { orderId } });
+      if (afterSend.length >= 3) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
     expect(afterSend).toHaveLength(3);
     const b1After = afterSend.find((b) => b.id === b1)!;
     expect(b1After.status).toBe("CANCELLED"); // старая бронь никогда не удаляется (Q9)

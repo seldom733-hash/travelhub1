@@ -13,7 +13,9 @@ import Advertisement from "@/components/marketplace/Advertisement";
 import DesignTokenInjector from "@/components/marketplace/DesignTokenInjector";
 import { resolveBrandName } from "@/components/marketplace/MarketplaceHeader";
 import { useConstructorPublished } from "@/lib/use-constructor-published";
+import type { PageConfigView } from "@/lib/constructor-api";
 import SearchBlock from "@/components/marketplace/SearchBlock";
+import MarketplaceContentBlock from "@/components/marketplace/MarketplaceContentBlock";
 
 const BLOCK_COMPONENTS: Record<string, React.FC> = {
   "hero": HeroSection,
@@ -35,8 +37,10 @@ const BLOCK_COMPONENTS: Record<string, React.FC> = {
  * hero texts before the published config arrives was the server-side source
  * of the legacy-text flash.
  */
-export default function MarketplaceRenderer() {
-  const { page, loading } = useConstructorPublished("marketplace-home");
+export default function MarketplaceRenderer({ pageOverride }: { pageOverride?: PageConfigView | null } = {}) {
+  const publishedState = useConstructorPublished("marketplace-home");
+  const page = pageOverride !== undefined ? pageOverride : publishedState.page;
+  const loading = pageOverride !== undefined ? false : publishedState.loading;
 
   // Loading: neutral shell (dark hero-sized block, no text content).
   if (loading) {
@@ -90,6 +94,9 @@ export default function MarketplaceRenderer() {
           }
 
           const Component = BLOCK_COMPONENTS[section.blockType];
+          if (section.blockType.startsWith("content-")) {
+            return <MarketplaceContentBlock key={section.blockInstanceId} section={section} />;
+          }
           if (!Component) return null;
           if (section.blockType === "hero") {
             return <HeroSection key={section.blockInstanceId} config={cfg.heroConfig as never} />;

@@ -11,6 +11,7 @@ import type { PublicStorefront } from "@/lib/storefront-api";
 import { SOCIAL_PLATFORM_ICONS, themeStyle } from "./storefront-theme";
 import { fireContactClick, useStorefrontProductViewed } from "@/lib/behavioral-events";
 import { useGlobalBranding } from "@/lib/use-global-branding";
+import { categoryLabel } from "@/lib/category-label";
 
 /**
  * PHASE 1 STEP 1.12.2 §11 — Storefront PDP (client-рендер из server-fetched props).
@@ -66,7 +67,7 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
               {p.category && (
                 <>
                   <span className="mx-1.5">/</span>
-                  <span className="text-slate-500">{p.category.title}</span>
+                  <span className="text-slate-500">{categoryLabel(p.category, locale)}</span>
                 </>
               )}
               <span className="mx-1.5">/</span>
@@ -78,7 +79,7 @@ export default function StorefrontPdp({ sf, detail }: { sf: PublicStorefront; de
             <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{p.title}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
               {p.category && (
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-medium text-slate-600">{p.category.title}</span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-medium text-slate-600">{categoryLabel(p.category, locale)}</span>
               )}
               <span>
                 {t("pdp.published_on", locale)}: {formatDate(p.publishedAt, locale)}

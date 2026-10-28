@@ -123,7 +123,8 @@ describe("Phase 2 Step 2.3 — Quote & Commercial Offer Flow (e2e)", () => {
 
   /** Создание Product + tariffs через admin API; возвращает productId + tariffs. */
   const createProduct = async (title: string, tariffs: Array<{ name: string; price: number; currency?: string }>) => {
-    const res = await adminAgent.post("/api/v1/products").send({ type: "TOUR", title, tariffs }).expect(201);
+    const res = await adminAgent.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title, tariffs }).expect(201);
     const product = res.body.product as { id: string };
     created.products.push(product.id);
     const tariffRows = await prisma.tariff.findMany({ where: { productId: product.id }, orderBy: { createdAt: "asc" } });

@@ -82,6 +82,91 @@ export function hotelGroupKey(ref: Pick<HotelRef, "normalizedName" | "countryCod
 }
 
 /**
+ * Служебные слова, которые не различают отели: «Hotel», «Resort», «Spa» и т. п.
+ * Нужны только для оценки похожести названий (кандидаты на ручное слияние); в
+ * ключ группы они НЕ входят — ключ строится по полному нормализованному имени.
+ */
+const GENERIC_NAME_TOKENS = new Set([
+  "hotel",
+  "hotels",
+  "resort",
+  "resorts",
+  "spa",
+  "guest",
+  "house",
+  "guesthouse",
+  "apart",
+  "apartments",
+  "apartment",
+  "suites",
+  "suite",
+  "inn",
+  "hostel",
+  "villa",
+  "villas",
+  "club",
+  "beach",
+  "by",
+  "the",
+  "and",
+  "of",
+  "at",
+  "in",
+  "city",
+  "center",
+  "centre",
+  "luxury",
+  "deluxe",
+  "grand",
+  "royal",
+  "palace",
+  "boutique",
+  "complex",
+  "residence",
+  "old",
+  "new",
+]);
+
+/** Значимые токены названия отеля (без служебных слов и коротких предлогов). */
+function significantTokens(raw: string): string[] {
+  return normalizeName(cleanHotelName(raw))
+    .split(" ")
+    .filter((t) => t.length > 2 && !GENERIC_NAME_TOKENS.has(t));
+}
+
+/**
+ * Похожесть двух названий отелей по Жаккару на значимых токенах: 0 — нет
+ * общих слов, 1 — одинаковый набор. Это ТОЛЬКО сигнал для очереди ручной
+ * проверки; слияние по одному сходству имён запрещено (аудит 23.10.2026: без
+ * адресов/координат совпадение имени не доказывает идентичность).
+ */
+export function nameSimilarity(a: string, b: string): number {
+  const ta = new Set(significantTokens(a));
+  const tb = new Set(significantTokens(b));
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let common = 0;
+  for (const t of ta) if (tb.has(t)) common += 1;
+  const union = ta.size + tb.size - common;
+  if (union === 0) return 0;
+  return Math.round((common / union) * 100) / 100;
+}
+
+/**
+ * Подставляет каноническое имя физического отеля в title карточки, сохраняя
+ * смысловой хвост: программу тура (« — Baku–Dubai») или гео-хвост карточки
+ * отеля (« (Baku, Azerbaijan)»). Пустое каноническое имя — title без изменений.
+ */
+export function applyCanonicalName(title: string, canonicalName: string | null | undefined): string {
+  const canonical = (canonicalName ?? "").trim();
+  if (!canonical) return title;
+  const programIdx = title.indexOf(" — ");
+  if (programIdx >= 0) return `${canonical}${title.slice(programIdx)}`;
+  const geoIdx = title.indexOf(" (");
+  if (geoIdx >= 0) return `${canonical}${title.slice(geoIdx)}`;
+  return canonical;
+}
+
+/**
  * Группирует ref-ы поставщиков в физические гостиницы.
  *
  * Правило: одинаковые (имя, страна, город) → одна гостиница. Разные города или

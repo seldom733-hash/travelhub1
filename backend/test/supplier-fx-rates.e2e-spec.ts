@@ -182,7 +182,11 @@ describe("UNIFIED FINANCE CENTER Phase 1 — SupplierFxRate (e2e)", () => {
     created.fxRates.push((kompas.body as { code: string }).code);
 
     const listed = await finance.get(`${SFX}?sourceCurrencyIso=USD`).expect(200);
-    const rows = (listed.body as Array<{ supplierCode: string; rate: string }>).sort((a, b) => a.supplierCode.localeCompare(b.supplierCode));
+    // В тестовой БД есть baseline-курсы партнёров (PRN-*), поэтому проверяем
+    // именно независимость двух supplier-specific курсов, а не «всего две строки».
+    const rows = (listed.body as Array<{ supplierCode: string; rate: string }>)
+      .filter((r) => r.supplierCode === "KOMPAS" || r.supplierCode === "SUMMERTOUR")
+      .sort((a, b) => a.supplierCode.localeCompare(b.supplierCode));
     expect(rows).toHaveLength(2);
     expect(rows.find((r) => r.supplierCode === "KOMPAS")!.rate).toBe("1.72");
     expect(rows.find((r) => r.supplierCode === "SUMMERTOUR")!.rate).toBe("1.75");

@@ -81,7 +81,8 @@ describe("Phase 2 Step 2.13A — Chargeback / Dispute Foundation (e2e)", () => {
   /** Полная canonical цепочка до Order (frozen money snapshot, как 2.11–2.13 e2e). */
   const buildOrder = async (sm: Session, tag: string, price: number): Promise<{ orderId: string; amount: string; currency: string }> => {
     const smAgent = agent(sm.accessToken);
-    const prod = (await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Dsp ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] }).expect(201)).body.product as { id: string };
+    const prod = (await adminAgent.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Dsp ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] }).expect(201)).body.product as { id: string };
     created.products.push(prod.id);
     const tariff = await prisma.tariff.findFirstOrThrow({ where: { productId: prod.id } });
     const date = futureDate();
@@ -108,7 +109,7 @@ describe("Phase 2 Step 2.13A — Chargeback / Dispute Foundation (e2e)", () => {
   const buildCapturedPayment = async (sm: Session, fin: Session, tag: string, price: number): Promise<{ orderId: string; paymentId: string; paymentCode: string; amount: string; currency: string }> => {
     const { orderId, amount, currency } = await buildOrder(sm, tag, price);
     // Step 2.12H: payment.create требует Idempotency-Key (защищённая операция).
-    const pay = (await agent(fin.accessToken).post("/api/v1/finance/payments").set("Idempotency-Key", `e2e-cb-${Date.now()}-1`).send({ orderId }).expect(201)).body as { id: string; code: string };
+    const pay = (await agent(fin.accessToken).post("/api/v1/finance/payments").set("Idempotency-Key", `e2e-cb-${Date.now()}-1`).send({ orderId, reason: "e2e chargeback fixture" }).expect(201)).body as { id: string; code: string };
     created.payments.push(pay.id);
     await agent(fin.accessToken).post(`/api/v1/finance/payments/${pay.code}/confirm`).expect(201);
     await eventBus.publishPending();
@@ -206,7 +207,7 @@ describe("Phase 2 Step 2.13A — Chargeback / Dispute Foundation (e2e)", () => {
     const sm = await createStaff("s13a_sm2", RoleCode.SALES_MANAGER);
     const fin = await createStaff("s13a_fin2", RoleCode.FINANCE);
     const { orderId } = await buildOrder(sm, "dsp_t2", 60);
-    const pending = (await agent(fin.accessToken).post("/api/v1/finance/payments").set("Idempotency-Key", `e2e-cb-${Date.now()}-2`).send({ orderId }).expect(201)).body as { id: string };
+    const pending = (await agent(fin.accessToken).post("/api/v1/finance/payments").set("Idempotency-Key", `e2e-cb-${Date.now()}-2`).send({ orderId, reason: "e2e pending chargeback fixture" }).expect(201)).body as { id: string };
     created.payments.push(pending.id);
     await createDispute(fin, pending.id, { amount: "10" }).expect(422);
     await createDispute(fin, "no-such-payment", { amount: "10" }).expect(404);

@@ -5,6 +5,8 @@ import { SupplierResilienceService } from "./resilience/supplier-resilience.serv
 import { SupplierOfferService } from "./supplier-offer.service";
 import { SupplierAggregatorService } from "./supplier-aggregator.service";
 import { SupplierGeoIngestService } from "./supplier-geo-ingest.service";
+import { HotelMatchingService } from "../catalog/hotel/hotel-matching.service";
+import { HotelPhotoSyncService } from "../catalog/hotel/hotel-photo-sync.service";
 import { SummertourAdapter } from "./summertour/summertour.adapter";
 import { SummertourNewAdapter } from "./summertour/summertour-new.adapter";
 import { SummerSyncService } from "./summertour/summer-sync.service";
@@ -33,6 +35,9 @@ import { VoyagerSyncService } from "./voyager/voyager-sync.service";
 import { VoyagerHotelSyncService } from "./voyager/voyager-hotel-sync.service";
 import { SupplierProvisioningService } from "./supplier-provisioning.service";
 import { SupplierController } from "./supplier.controller";
+import { SupplierCatalogController } from "./catalog/supplier-catalog.controller";
+import { SupplierCatalogService } from "./catalog/supplier-catalog.service";
+import { SupplierCatalogSource } from "./catalog/supplier-catalog.source";
 import { PublicSupplierController } from "./public-supplier.controller";
 import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
 import { TourRequestService } from "./tour-request.service";
@@ -57,7 +62,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
 @Global()
 @Module({
   imports: [PrismaModule, EventBusModule, PricingModule, CrmModule],
-  controllers: [SupplierController, PublicSupplierController, KompasCaptchaController, AzalController],
+  controllers: [SupplierController, PublicSupplierController, KompasCaptchaController, AzalController, SupplierCatalogController],
   providers: [
     SupplierAdapterRegistry,
     SupplierCacheService,
@@ -65,6 +70,8 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     SupplierOfferService,
     SupplierAggregatorService,
     SupplierGeoIngestService,
+    HotelMatchingService,
+    HotelPhotoSyncService,
     SummertourAdapter,
     SummertourNewAdapter,
     SummerSyncService,
@@ -84,6 +91,8 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     AnexProvider,
     AnexHotelAdapter,
     AnexSyncService,
+    SupplierCatalogSource,
+    SupplierCatalogService,
     FstravelAdapter,
     FstravelSyncService,
     VoyagerHttpService,

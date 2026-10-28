@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Res, UseGuards } from "@nestjs/common";
 import { Response } from 'express';
 import { ExportService } from '../modules/shared/export/export.service';
 import { Type } from "class-transformer";
-import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
+import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsISO8601, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
 import { RoleCode, UserStatus } from "../generated/prisma/enums";
 import { SecurityService } from "./security.service";
 import { ActivationService } from "./activation.service";
@@ -86,6 +86,31 @@ class AssignRoleDto {
   roleCode!: RoleCode;
 }
 
+class AssignAdditionalRoleDto {
+  @IsEnum(RoleCode)
+  roleCode!: RoleCode;
+
+  @IsOptional()
+  @IsISO8601()
+  startAt?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  endAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+class UpdateRolePermissionsDto {
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsString({ each: true })
+  permissions!: string[];
+}
+
 class SetStatusDto {
   @IsEnum(UserStatus)
   status!: UserStatus;
@@ -118,6 +143,56 @@ export class UsersController {
     private readonly security: SecurityService,
     private readonly activation: ActivationService,
   ) {}
+
+  // ── Hybrid RBAC: role catalogue / permission editor / assignments ─────────
+
+  @Get("roles")
+  @RequirePermissions("settings.write")
+  listRoles() {
+    return this.security.listRoles();
+  }
+
+  @Get("roles/:code/history")
+  @RequirePermissions("settings.write")
+  roleHistory(@Param("code") code: RoleCode) {
+    return this.security.roleHistory(code);
+  }
+
+  @Put("roles/:code/permissions")
+  @RequirePermissions("settings.write")
+  updateRolePermissions(
+    @Param("code") code: RoleCode,
+    @Body() dto: UpdateRolePermissionsDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.security.updateRolePermissions(code, dto.permissions, actor.id);
+  }
+
+  @Get(":id/roles")
+  @RequirePermissions("settings.write")
+  userRoles(@Param("id") id: string) {
+    return this.security.userRoles(id);
+  }
+
+  @Post(":id/roles")
+  @RequirePermissions("settings.write")
+  assignAdditionalRole(
+    @Param("id") id: string,
+    @Body() dto: AssignAdditionalRoleDto,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.security.assignAdditionalRole(id, dto, { id: actor.id, username: actor.username });
+  }
+
+  @Delete(":id/roles/:assignmentId")
+  @RequirePermissions("settings.write")
+  revokeAdditionalRole(
+    @Param("id") id: string,
+    @Param("assignmentId") assignmentId: string,
+    @CurrentUser() actor: AuthedRequest["user"],
+  ) {
+    return this.security.revokeAdditionalRole(id, assignmentId, { id: actor.id, username: actor.username });
+  }
 
   @Get()
   @RequirePermissions("settings.write")
@@ -170,7 +245,7 @@ export class UsersController {
   @Patch(":id/role")
   @RequirePermissions("settings.write")
   assignRole(@Param("id") id: string, @Body() dto: AssignRoleDto, @CurrentUser() actor: AuthedRequest["user"]) {
-    return this.security.assignRole(id, dto.roleCode, actor.id);
+    return this.security.assignRole(id, dto.roleCode, { id: actor.id, username: actor.username });
   }
 
   @Patch(":id/status")

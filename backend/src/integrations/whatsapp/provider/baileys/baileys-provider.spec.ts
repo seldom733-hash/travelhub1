@@ -1173,7 +1173,9 @@ describe("BaileysWhatsAppProvider: watchdog зомби-соединения", ()
   });
 
   it("активный сокет (WS-кадры keepalive) реконнект не запускает", async () => {
-    const h = createWatchdogHarness(20, 150);
+    // stale 600ms vs keepalive 10ms: 60× запас, иначе под нагрузкой CI
+    // event loop успевает «проголодать» watchdog и тест флапает.
+    const h = createWatchdogHarness(20, 600);
     try {
       await h.provider.start();
       h.socket.emit("connection.update", { connection: "open" });
@@ -1182,7 +1184,7 @@ describe("BaileysWhatsAppProvider: watchdog зомби-соединения", ()
       const start = Date.now();
       while (Date.now() - start < 400) {
         h.socket.ws.emit("message");
-        await new Promise((resolve) => setTimeout(resolve, 25));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
       expect(h.provider.getSnapshot().state).toBe("CONNECTED");
       expect(h.socket.ended).toBe(false);
@@ -1192,7 +1194,7 @@ describe("BaileysWhatsAppProvider: watchdog зомби-соединения", ()
   });
 
   it("ev-события тоже считаются liveness (fallback, когда ws-кадров нет)", async () => {
-    const h = createWatchdogHarness(20, 150);
+    const h = createWatchdogHarness(20, 600);
     try {
       await h.provider.start();
       h.socket.emit("connection.update", { connection: "open" });
@@ -1201,7 +1203,7 @@ describe("BaileysWhatsAppProvider: watchdog зомби-соединения", ()
       const start = Date.now();
       while (Date.now() - start < 400) {
         h.socket.emit("messages.update", []);
-        await new Promise((resolve) => setTimeout(resolve, 25));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
       expect(h.provider.getSnapshot().state).toBe("CONNECTED");
     } finally {

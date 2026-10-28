@@ -28,7 +28,7 @@ export default function PanelFrame({
           ✕
         </button>
       </div>
-      <div className="space-y-4 p-5 text-sm">{children}</div>
+      <div className="space-y-4 p-5 text-sm text-slate-900">{children}</div>
     </aside>
   );
 }

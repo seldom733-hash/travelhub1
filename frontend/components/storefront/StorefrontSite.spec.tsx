@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import StorefrontSite from "./StorefrontSite";
 import { LocaleProvider } from "@/lib/i18n";
 import type { PublicStorefront } from "@/lib/storefront-api";
@@ -78,15 +78,19 @@ beforeEach(() => {
 });
 
 describe("StorefrontSite (Step 1.12.2 §10)", () => {
-  it("рендерит header с бизнес-именем, hero, description, контакты и продукты", () => {
+  it("рендерит header с бизнес-именем, hero, description, контакты и продукты", async () => {
     render(<StorefrontSite sf={sf()} products={products()} />);
-    expect(screen.getByText("Кавказ Тур")).toBeTruthy();
+    // Бизнес-имя есть и в header, и в footer — проверяем именно шапку.
+    expect(within(screen.getByRole("banner")).getByText("Кавказ Тур")).toBeTruthy();
     expect(screen.getByText("Путешествия по Кавказу")).toBeTruthy();
     expect(screen.getByText("Официальная витрина партнёра")).toBeTruthy();
     expect(screen.getByText(/\+994 50 123 45 67/)).toBeTruthy();
     expect(screen.getByText(/hello@kavkaz.example/)).toBeTruthy();
     expect(screen.getByText("Тур в Баку")).toBeTruthy();
-    expect(screen.getByText(/Powered by TravelHub|Сайт создан на/)).toBeTruthy();
+    // Брендинг подгружается эффектом (useGlobalBranding) — ждём футер.
+    await waitFor(() =>
+      expect(screen.getByRole("contentinfo").textContent).toContain("Сайт создан на"),
+    );
   });
 
   it("RU/AZ/EN локализуют ОДНУ И ТУ ЖЕ географию (AZ/BAKU) — identity не меняется", () => {

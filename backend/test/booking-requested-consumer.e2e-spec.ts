@@ -85,7 +85,8 @@ describe("Phase 2 Step 2.8 — BookingRequested → Booking Creation (e2e)", () 
   const createProduct = async (tag: string, price = 100): Promise<ProductFixture> => {
     const res = await adminAgent
       .post("/api/v1/products")
-      .send({ type: "TOUR", title: `S28 ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
+      .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `S28 ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
       .expect(201);
     const product = res.body.product as { id: string };
     created.products.push(product.id);
@@ -109,7 +110,21 @@ describe("Phase 2 Step 2.8 — BookingRequested → Booking Creation (e2e)", () 
   const bookingAction = (bookingId: string, act: string) => adminAgent.patch(`/api/v1/bookings/${bookingId}`).send({ action: act });
   const eventsFor = async (orderId: string) => prisma.outboxEvent.findMany({ where: { aggregateId: orderId }, orderBy: { createdAt: "asc" } });
   const typeCount = (events: Array<{ eventType: string }>, t: string) => events.filter((e) => e.eventType === t).length;
-  const bookingsFor = (orderId: string) => prisma.booking.findMany({ where: { orderId }, orderBy: { createdAt: "asc" } });
+  const bookingsFor = async (orderId: string) => {
+    // Event consumer is asynchronous (outbox); poll until the projection is
+    // stable so the assertion sees the eventual Booking(s), not a mid-flight 0.
+    let last: Awaited<ReturnType<typeof prisma.booking.findMany>> = [];
+    let stable = 0;
+    for (let i = 0; i < 60; i += 1) {
+      const rows = await prisma.booking.findMany({ where: { orderId }, orderBy: { createdAt: "asc" } });
+      if (rows.length === last.length) stable += 1;
+      else stable = 0;
+      last = rows;
+      if (stable >= 3) return rows;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return last;
+  };
   const bookingCreatedEvents = () => prisma.outboxEvent.findMany({ where: { eventType: "BookingCreated" }, orderBy: { createdAt: "asc" } });
 
   beforeAll(async () => {

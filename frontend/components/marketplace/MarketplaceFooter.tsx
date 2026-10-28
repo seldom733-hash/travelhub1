@@ -4,6 +4,7 @@ import Link from "next/link";
 import { t, useLocale } from "@/lib/i18n";
 import { Buildings, PaperPlaneRight } from "@phosphor-icons/react";
 import type { MarketplaceHeaderConfig } from "./MarketplaceHeader";
+import { useCurrentUserStatus } from "@/lib/use-user";
 
 const FOOTER_SERVICES = [
   { href: "/search?category=hotels", labelKey: "footer.service_accommodation" },
@@ -13,7 +14,7 @@ const FOOTER_SERVICES = [
 ] as const;
 
 const FOOTER_NAV = [
-  { href: "/search?category=destinations", labelKey: "footer.nav_destinations" },
+  { href: "/destinations", labelKey: "footer.nav_destinations" },
   { href: "/search?sort=popular", labelKey: "footer.nav_offers" },
   { href: "/become-a-partner", labelKey: "footer.nav_partners" },
 ] as const;
@@ -46,6 +47,7 @@ export default function MarketplaceFooter({
   headerConfig,
 }: MarketplaceFooterProps) {
   const locale = useLocale();
+  const { user, ready } = useCurrentUserStatus();
   const year = new Date().getFullYear();
 
   const cfg: MarketplaceFooterConfig = config ?? {};
@@ -104,7 +106,7 @@ export default function MarketplaceFooter({
               {t("footer.heading_navigation", locale)}
             </h3>
             <ul className="space-y-3">
-              {FOOTER_NAV.map((item) => (
+              {FOOTER_NAV.filter((item) => item.href !== "/become-a-partner" || (ready && user === null)).map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}

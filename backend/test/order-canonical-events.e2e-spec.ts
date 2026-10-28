@@ -62,7 +62,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
   /** Штатный полный цикл: send booking → подтвердить/завершить бронь (reconcile). */
   const fulfillViaBooking = async (orderId: string) => {
     await action(orderId, "send").expect(200);
-    const bookingId = (await http.get(`/api/v1/bookings?orderId=${orderId}`).expect(200)).body.items[0].id;
+    const bookingId = (await http.get(`/api/v1/bookings?orderId=${orderId}&acquisitionSource=DIRECT`).expect(200)).body.items[0].id;
     for (const a of ["send", "confirm", "service", "complete"]) {
       await http.patch(`/api/v1/bookings/${bookingId}`).send({ action: a }).expect(200);
     }
@@ -83,7 +83,8 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
     http = request.agent(app.getHttpServer());
     http.set("Authorization", `Bearer ${login.body.accessToken}`);
 
-    const product = (await http.post("/api/v1/products").send({ type: "TOUR", title: `Canon ${stamp}` }).expect(201)).body.product;
+    const product = (await http.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Canon ${stamp}` }).expect(201)).body.product;
     productIds.push(product.id);
     productId = product.id;
     await http.post(`/api/v1/products/${productId}/publish`).expect(201);
@@ -143,7 +144,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
     expect(hist.some((h) => h.action === "confirm" && h.from === "IN_PROCESSING" && h.to === "READY_FOR_BOOKING")).toBe(true);
 
     // §23.6: confirm ALONE (без send) НЕ создаёт Booking — Booking только по BookingRequested.
-    expect((await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.total).toBe(0);
+    expect((await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.total).toBe(0);
     const afterConfirm = (await eventsFor(order.id)).map((e) => e.eventType);
     expect(afterConfirm).not.toContain("BookingRequested");
   });
@@ -269,7 +270,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
     await action(order.id, "send").expect(200);
-    const bookingId = (await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.items[0].id;
+    const bookingId = (await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.items[0].id;
 
     // Прямой complete: FULFILLED + ровно одно OrderFulfilled, пока броня ещё не завершена.
     await action(order.id, "complete").expect(200);
@@ -292,7 +293,7 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
     await action(order.id, "send").expect(200);
-    const bookingId = (await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.items[0].id;
+    const bookingId = (await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.items[0].id;
 
     // Одна бронь подтверждена, но НЕ завершена → order PARTIALLY_FULFILLED.
     for (const a of ["send", "confirm"]) {
@@ -369,10 +370,10 @@ describe("Phase 1 Step 1.14 — Canonical Order Events (e2e)", () => {
     await action(order.id, "process").expect(200);
     await action(order.id, "confirm").expect(200);
     await action(order.id, "send").expect(200);
-    expect((await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.total).toBe(1);
+    expect((await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.total).toBe(1);
     // Повторный send запрещён from-guard'ом → 409, брони не дублируются.
     await action(order.id, "send").expect(409);
-    expect((await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.total).toBe(1);
+    expect((await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.total).toBe(1);
     // Consumer отметил обработку ровно одного BookingRequested (InboxEvent).
     const requested = (await eventsFor(order.id)).find((e) => e.eventType === "BookingRequested")!;
     const inbox = await prisma.inboxEvent.findUnique({

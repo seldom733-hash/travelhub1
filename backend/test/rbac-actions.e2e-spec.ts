@@ -185,7 +185,8 @@ describe("Phase 2 — RBAC: действия Order/Booking закрыты по �
     const product = (
       await adminAgent
         .post("/api/v1/products")
-        .send({ type: "TOUR", title: `403 Order ${stamp}`, tariffs: [{ name: "S", price: 100 }] })
+        .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `403 Order ${stamp}`, tariffs: [{ name: "S", price: 100 }] })
     ).body.product;
     created.products.push(product.id);
     await adminAgent.post(`/api/v1/products/${product.id}/publish`).expect(201);
@@ -219,7 +220,8 @@ describe("Phase 2 — RBAC: действия Order/Booking закрыты по �
     const product = (
       await adminAgent
         .post("/api/v1/products")
-        .send({ type: "HOTEL", title: `403 Booking ${stamp}`, tariffs: [{ name: "S", price: 200 }] })
+        .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "HOTEL", title: `403 Booking ${stamp}`, tariffs: [{ name: "S", price: 200 }] })
     ).body.product;
     created.products.push(product.id);
     await adminAgent.post(`/api/v1/products/${product.id}/publish`).expect(201);
@@ -245,7 +247,7 @@ describe("Phase 2 — RBAC: действия Order/Booking закрыты по �
     await opAgent.patch(`/api/v1/orders/${order.id}`).send({ action: "confirm" }).expect(200);
     await opAgent.patch(`/api/v1/orders/${order.id}`).send({ action: "send" }).expect(200);
 
-    const bookings = await opAgent.get(`/api/v1/bookings?orderId=${order.id}`).expect(200);
+    const bookings = await opAgent.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200);
     expect(bookings.body.total).toBe(1);
     const booking = bookings.body.items[0] as { id: string };
 

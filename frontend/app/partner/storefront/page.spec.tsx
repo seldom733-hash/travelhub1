@@ -16,6 +16,10 @@ vi.mock("@/lib/storefront-api", async (importOriginal) => {
       deactivate: vi.fn(),
       uploadMedia: vi.fn(),
       deleteMedia: vi.fn(),
+      deleteGalleryMedia: vi.fn(),
+      setDomain: vi.fn(),
+      verifyDomain: vi.fn(),
+      removeDomain: vi.fn(),
       previewMedia: vi.fn(async () => ({ url: "https://signed.example/x", expiresIn: 300, mediaId: "m1" })),
     },
   };
@@ -53,6 +57,10 @@ function view(overrides: Partial<StorefrontView> = {}): StorefrontView {
     heroHeading: null,
     heroSubheading: null,
     themePreset: "default",
+    customDomain: null,
+    customDomainStatus: "NONE",
+    customDomainToken: null,
+    customDomainVerifiedAt: null,
     media: [],
     publicUrl: "/store/kavkaz",
     createdAt: "2026-08-09T00:00:00.000Z",
@@ -104,7 +112,7 @@ describe("PartnerStorefrontPage (Step 1.12.2 §7 states)", () => {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
     setter.call(nameInput, "Новое имя");
     nameInput.dispatchEvent(new Event("input", { bubbles: true }));
-    screen.getByText("Сохранить").click();
+    screen.getAllByText("Сохранить")[0].click();
     await waitFor(() => expect(updateMock).toHaveBeenCalled());
     expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ businessName: "Новое имя" }));
   });

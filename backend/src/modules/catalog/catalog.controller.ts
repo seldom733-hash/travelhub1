@@ -369,7 +369,7 @@ export class CatalogController {
 
   @Patch("products/:id")
   @RequirePermissions((req: AuthedRequest) =>
-    req.user.role === RoleCode.PARTNER ? ["catalog.product.update_own_draft"] : ["catalog.product.moderate"],
+    req.user.role === RoleCode.PARTNER ? ["catalog.product.update_own_draft"] : ["catalog.product.write"],
   )
   updateProduct(@Param("id") id: string, @Body() dto: UpdateProductDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.catalog.updateProduct(id, dto, actor);
@@ -382,7 +382,7 @@ export class CatalogController {
    */
   @Put("products/:id/channels")
   @RequirePermissions((req: AuthedRequest) =>
-    req.user.role === RoleCode.PARTNER ? ["catalog.product.channels_own"] : ["catalog.product.moderate"],
+    req.user.role === RoleCode.PARTNER ? ["catalog.product.channels_own"] : ["catalog.product.write"],
   )
   setChannels(@Param("id") id: string, @Body() dto: SetChannelsDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.catalog.setProductChannels(id, dto.channels as unknown as string[], actor);

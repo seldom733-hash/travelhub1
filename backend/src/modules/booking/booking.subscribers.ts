@@ -177,8 +177,14 @@ export class BookingSubscribers implements OnModuleInit {
         for (const item of freeItems) {
           const code = await this.ids.nextCode(tx, "BKG");
           // Shared Commerce Sequence: derive Booking ref from Order's commerceSequence.
+          // Multi-item Order: same commerce root must not collide on Booking.referenceNumber
+          // (unique) — ordinal suffix keeps MKT-BKG-{root}-{n} stable per OrderItem.
+          const itemOrdinal = order.items.findIndex((i) => i.id === item.id) + 1;
+          const priorAttempts = existing.filter((b) => b.orderItemId === item.id).length + 1;
           const bookingRefNum = order.commerceSequence
-            ? this.refNum.commerceBookingRef(order.commerceSequence)
+            ? `${this.refNum.commerceBookingRef(order.commerceSequence)}${
+                order.items.length > 1 ? `-${itemOrdinal}` : ""
+              }${priorAttempts > 1 ? `-${priorAttempts}` : ""}`
             : await this.generateBookingReferenceNumber(tx, order, item);
           // Step 2.8: canonical cardinality 1 OrderItem → 1 Booking. orderItemId
           // (частичный unique — status <> CANCELLED AND rejectedAt IS NULL,

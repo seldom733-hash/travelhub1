@@ -58,6 +58,8 @@ interface CliOptions {
   concurrency: number;
   /** Второй проход: мягкое совпадение по названию (ядро + половина слов). */
   relaxed: boolean;
+  /** Only hotels referenced by this supplier code (post-sync backfill). */
+  supplier: string | null;
 }
 
 interface HotelTask {
@@ -67,7 +69,7 @@ interface HotelTask {
   cityName: string;
   countryName: string;
   countryCode: string;
-  refs: Array<{ name: string; cityName: string; countryCode: string }>;
+  refs: Array<{ name: string; cityName: string; countryCode: string; supplierCode: string; externalKey: string }>;
 }
 
 function parseArgs(): CliOptions {
@@ -84,6 +86,7 @@ function parseArgs(): CliOptions {
     quality: 82,
     concurrency: DEFAULT_CONCURRENCY,
     relaxed: false,
+    supplier: null,
   };
   for (const a of args) {
     const num = (re: RegExp, set: (n: number) => void) => {
@@ -100,6 +103,8 @@ function parseArgs(): CliOptions {
     if (idsFile) opts.idsFile = idsFile[1].trim();
     const st = a.match(/^--status=([A-Z,]+)$/);
     if (st) opts.statuses = st[1].split(",").map((s) => s.trim()) as PhotoStatus[];
+    const supplier = a.match(/^--supplier=([A-Za-z0-9_-]+)$/);
+    if (supplier) opts.supplier = supplier[1].toUpperCase();
     if (a === "--force") opts.force = true;
     if (a === "--relaxed") opts.relaxed = true;
     if (a === "--dry-run") opts.dryRun = true;
@@ -256,8 +261,7 @@ async function searchHotelPhoto(
   query: string,
   hotelName: string,
   relaxed = false,
-): Promise<string | null> {
-  const tokens = nameTokens(hotelName);
+): Promise<string | null> {  const tokens = nameTokens(hotelName);
   // Запрос с русским/локализованным городом Bing часто уводит в ноль результатов
   // Tripadvisor, поэтому сначала пробуем чистое название отеля.
   const queries = [`${hotelName} tripadvisor`, `${query} tripadvisor`];
@@ -292,6 +296,40 @@ async function searchHotelPhoto(
     }
   }
   return null;
+}
+
+/**
+ * Anextour hotel page fallback. Anextour embeds its own lodging gallery
+ * (i.travelapi.com) on /hotel/<hotelKey>; use the first validated image when
+ * the Tripadvisor CDN search has no result for this hotel.
+ */
+async function anexHotelPhotoUrl(hotelKey: string): Promise<string | null> {
+  if (!hotelKey) return null;
+  // Do NOT send an explicit Accept header: agent.anextour.ru serves a reduced
+  // bot page (no gallery) when Accept is present, but the normal SSR page with
+  // the travelapi gallery when only the browser UA is sent.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(
+      `https://agent.anextour.ru/hotel/${encodeURIComponent(hotelKey)}`,
+      { headers: { "User-Agent": UA }, signal: ctrl.signal, redirect: "follow" },
+    );
+    if (!resp.ok) return null;
+    const body = await resp.text();
+    const direct = body.match(
+      /https:\/\/i\.travelapi\.com\/lodging\/[^"'\\\s<>]+?\.(?:jpg|jpeg|webp|png)(?:\?[^"'\\\s<>]*)?/i,
+    );
+    if (direct?.[0]) return direct[0];
+    // Georgia/other Anextour hotel pages serve the gallery from
+    // files.anextour.com (the travelapi CDN is absent there).
+    const gallery = body.match(
+      /https:\/\/files\.anextour\.com\/Content\/uploads\/images\/b2c\/galleries\/[^"'\\\s<>]+?\.(?:jpg|jpeg|webp|png)(?:\?[^"'\\\s<>]*)?/i,
+    );
+    return gallery?.[0] ?? null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Скачивает оригинал CDN (в память) — 200 + image/*, не мельче 5 КБ. */
@@ -349,10 +387,14 @@ async function main(): Promise<void> {
         cityName: true,
         countryName: true,
         countryCode: true,
-        refs: { select: { name: true, cityName: true, countryCode: true } },
+        refs: { select: { name: true, cityName: true, countryCode: true, supplierCode: true, externalKey: true } },
       },
       orderBy: { name: "asc" },
     })) as HotelTask[];
+
+    if (opts.supplier) {
+      tasks = tasks.filter((h) => h.refs.some((r) => r.supplierCode === opts.supplier));
+    }
 
     if (opts.idsFile) {
       const raw = fs.readFileSync(path.resolve(opts.idsFile), "utf8");
@@ -434,6 +476,7 @@ async function main(): Promise<void> {
         orderBy: { photoUpdatedAt: "desc" },
         select: {
           photoFile: true,
+          photoSource: true,
           photoSourceUrl: true,
           photoWidth: true,
           photoHeight: true,
@@ -446,7 +489,7 @@ async function main(): Promise<void> {
           data: {
             photoFile: sibling.photoFile,
             photoStatus: "OK",
-            photoSource: "tripadvisor",
+            photoSource: sibling.photoSource ?? "tripadvisor",
             photoSourceUrl: sibling.photoSourceUrl,
             photoWidth: sibling.photoWidth,
             photoHeight: sibling.photoHeight,
@@ -467,7 +510,19 @@ async function main(): Promise<void> {
       }
 
       const query = [searchName || name, city, country || countryCode].filter(Boolean).join(" ");
-      const sourceUrl = await searchHotelPhoto(query, searchName || name, opts.relaxed);
+      let sourceUrl: string | null = null;
+      let photoSource: "tripadvisor" | "anextour" = "tripadvisor";
+      const anexRef = h.refs.find((r) => r.supplierCode === "ANEX");
+      if (anexRef) {
+        // ANEX policy: take the exact hotel gallery from Anextour first.
+        // Tripadvisor CDN remains a fallback when the supplier page has no
+        // usable gallery.
+        sourceUrl = await anexHotelPhotoUrl(anexRef.externalKey);
+        if (sourceUrl) photoSource = "anextour";
+      }
+      if (!sourceUrl) {
+        sourceUrl = await searchHotelPhoto(query, searchName || name, opts.relaxed);
+      }
       if (!sourceUrl) {
         missed += 1;
         await prisma.hotel.update({
@@ -538,7 +593,7 @@ async function main(): Promise<void> {
         data: {
           photoFile: fileName,
           photoStatus: "OK",
-          photoSource: "tripadvisor",
+          photoSource,
           photoSourceUrl: sourceUrl,
           photoWidth: width,
           photoHeight: height,
@@ -552,6 +607,7 @@ async function main(): Promise<void> {
         name,
         query,
         sourceUrl,
+        source: photoSource,
         file: fileName,
         bytes: converted.length,
         width,

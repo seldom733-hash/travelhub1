@@ -70,8 +70,10 @@ export class PublicSupplierController {
     // their own httpStatus — let the global AppExceptionFilter map them
     // (§4.8: customer validation must reach the client as 422/409, not 500).
     if (err instanceof DomainError) throw err;
-    // Expose 500 with message so frontend can see cause (instead of generic Internal Server Error)
-    throw new HttpException(msg, 500);
+    // 500 — НЕ отдаём анонимному клиенту сырой текст/стек поставщика (может
+    // содержать URL с токеном, внутренние пути, HTML ответа). Полный текст уже
+    // в server log выше; клиент получает нейтральный код для retry-логики.
+    throw new HttpException("Supplier request failed", 500);
   }
 
   private async handleCaptcha<T>(promise: Promise<T>): Promise<T> {

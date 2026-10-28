@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import * as https from "https";
+import { recordCatalogPage } from "../catalog/catalog-coverage";
 import {
   buildVoyagerFormUrl,
   buildVoyagerPricesParams,
@@ -88,6 +89,11 @@ export class VoyagerHttpService {
   /** All states available (from the Baku form). */
   async discoverStates(): Promise<VoyagerState[]> {
     return (await this.fetchDictionary()).states;
+  }
+
+  /** All stay-only states (separate hotel dictionary). */
+  async discoverHotelStates(): Promise<VoyagerState[]> {
+    return (await this.fetchHotelDictionary("0")).states;
   }
 
   /** TOURINC programs for a state (cached form fetch). */
@@ -243,6 +249,7 @@ export class VoyagerHttpService {
       }
 
       const totalPages = parseTotalPages(body, html);
+      recordCatalogPage(page, totalPages, maxPages < totalPages);
       this.logger.debug(
         `Voyager ${label} page ${page}/${totalPages}: +${added} → ${rows.length} rows`,
       );

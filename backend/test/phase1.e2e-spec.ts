@@ -76,7 +76,7 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     // ── 1. Product создаётся и публикуется ────────────────────────────────────
     const productRes = await http
       .post("/api/v1/products")
-      .send({ type: "TOUR", title: "Test Tour Phase1", tariffs: [{ name: "Standard", price: 250 }] })
+      .send({ partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: "Test Tour Phase1", tariffs: [{ name: "Standard", price: 250 }] })
       .expect(201);
     const product = productRes.body.product;
     productIds.push(product.id);
@@ -146,7 +146,7 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
     expect(sendRequestId).toBeTruthy();
 
     // ── 7. Booking создан consumer-ом (BKG-*) + Passenger ────────────────────
-    const bookings = await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200);
+    const bookings = await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200);
     expect(bookings.body.total).toBe(1);
     const booking = bookings.body.items[0];
     expect(booking.code).toMatch(/^BKG-\d{8}$/);
@@ -160,7 +160,7 @@ describe("Phase 1 — Product → Order → Booking (e2e)", () => {
 
     // ── 8. Идемпотентность: повторный send НЕ создаёт вторую бронь ────────────
     await http.patch(`/api/v1/orders/${order.id}`).send({ action: "send" }).expect(409);
-    const bookingsAfter = await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200);
+    const bookingsAfter = await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200);
     expect(bookingsAfter.body.total).toBe(1);
 
     // ── 9. BookingConfirmed → Order обновляет агрегированное состояние ────────

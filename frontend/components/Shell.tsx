@@ -57,6 +57,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/app/finance/overview", icon: "📉", labelKey: "nav.finance_overview", permission: "finance.overview.read" },
       { href: "/app/payments", icon: "💳", labelKey: "nav.payments", permission: "finance.payment.read" },
       { href: "/app/finance/obligations", icon: "📤", labelKey: "nav.supplier_obligations", permission: "finance.obligation.read" },
+      { href: "/app/finance/supplier-payments", icon: "🏦", labelKey: "nav.supplier_payments", permission: "finance.supplier_payout.read" },
+      { href: "/app/finance/reports/debt-as-of", icon: "📅", labelKey: "nav.supplier_debt_report", permission: "finance.obligation.read" },
+      { href: "/app/finance/payment-terms", icon: "⏱️", labelKey: "nav.payment_terms", permission: "finance.obligation.read" },
       { href: "/app/pricing/markup", icon: "％", labelKey: "nav.markup_matrix", permission: "pricing.markup.read" },
       { href: "/app/finance/fx-rates", icon: "💱", labelKey: "nav.fx_rates", permission: "finance.fx_rate.read" },
     ],
@@ -67,6 +70,12 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/app/catalog", icon: "📚", labelKey: "nav.catalog", permission: "catalog.product.read" },
       { href: "/app/crm", icon: "🤝", labelKey: "nav.crm", permission: "crm.customer.read" },
       { href: "/app/marketing", icon: "📣", labelKey: "nav.marketing", permission: "marketing.campaign.read" },
+    ],
+  },
+  {
+    headingKey: "nav.group.supplier_updates",
+    items: [
+      { href: "/app/supplier-updates", icon: "🔄", labelKey: "nav.supplier_updates", permission: "supplier.search.manage" },
     ],
   },
   {
@@ -142,10 +151,17 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const collapsedRef = useRef(false);
   const { brandName } = useGlobalBranding();
 
-  // Hydrate collapsed state from localStorage after mount.
+  // Hydrate collapsed state after mount. На мобильных (<768px) sidebar
+  // принудительно свёрнут: 240px колонка съедала половину экрана и контент
+  // уходил за правый край (визуальный аудит 2026-10-25, 375px).
   useEffect(() => {
-    setCollapsed(readCollapsedDefault());
+    const apply = () => {
+      setCollapsed(window.innerWidth < 768 ? true : readCollapsedDefault());
+    };
+    apply();
     setMounted(true);
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
   }, []);
 
   // Sync ref for animations / effects.
@@ -337,7 +353,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* ── Content ── */}
-      <main className="thin-scroll flex-1 overflow-y-auto">{children}</main>
+      {/* Admin content is a LIGHT surface: глобальный body-color из marketplace
+          (#e8e8e8) давал нечитаемые значения в таблицах/панелях. Явный
+          text-slate-900 — базовая типографика internal-контура. */}
+      <main className="thin-scroll flex-1 overflow-y-auto bg-slate-50 text-slate-900 [color-scheme:light]">{children}</main>
     </div>
   );
 }

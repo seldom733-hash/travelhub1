@@ -113,7 +113,8 @@ describe("Phase 2 Step 2.3A — Checkout / Commercial Intent Foundation (e2e)", 
   const createProduct = async (tag: string, price = 100, quantity = 1): Promise<ProductFixture> => {
     const res = await adminAgent
       .post("/api/v1/products")
-      .send({ type: "TOUR", title: `Checkout ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
+      .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Checkout ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
       .expect(201);
     const product = res.body.product as { id: string };
     created.products.push(product.id);

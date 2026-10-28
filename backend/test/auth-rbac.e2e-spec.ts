@@ -243,7 +243,8 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     const adminAgent = await agent(admin.accessToken);
 
     const product = (
-      await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: "RBAC Tour", tariffs: [{ name: "S", price: 100 }] })
+      await adminAgent.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: "RBAC Tour", tariffs: [{ name: "S", price: 100 }] })
     ).body.product;
     created.products.push(product.id);
     await adminAgent.post(`/api/v1/products/${product.id}/publish`).expect(201);
@@ -269,11 +270,17 @@ describe("Phase 2 — Auth + RBAC (e2e)", () => {
     await opAgent.patch(`/api/v1/orders/${order.id}`).send({ action: "process" }).expect(200);
     await opAgent.patch(`/api/v1/orders/${order.id}`).send({ action: "confirm" }).expect(200);
     await opAgent.patch(`/api/v1/orders/${order.id}`).send({ action: "send" }).expect(200);
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const bookings = await opAgent.get(`/api/v1/bookings?orderId=${order.id}`).expect(200);
+    let bookings = await opAgent.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200);
+    for (let i = 0; i < 100 && bookings.body.total === 0; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      bookings = await opAgent.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200);
+    }
     expect(bookings.body.total).toBe(1);
     const booking = bookings.body.items[0];
     await opAgent.patch(`/api/v1/bookings/${booking.id}`).send({ action: "send" }).expect(200);
+    await new Promise((resolve) => setTimeout(resolve, 500));
     await opAgent.patch(`/api/v1/bookings/${booking.id}`).send({ action: "confirm" }).expect(200);
     await opAgent.patch(`/api/v1/bookings/${booking.id}`).send({ action: "cancel" }).expect(200);
   });

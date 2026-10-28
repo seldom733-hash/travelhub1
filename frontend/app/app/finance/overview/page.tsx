@@ -13,7 +13,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { MetricsPageSkeleton } from "@/components/internal/WorkspaceSkeletons";
 import PageHeader from "@/components/PageHeader";
-import { useLocale, t } from "@/lib/i18n";
+import { useLocale, t, formatPrice } from "@/lib/i18n";
 import { financeCenterApi, type FinanceOverview, type AznMetric, type CurrencyAmount } from "@/lib/finance-center-api";
 
 /** Цвет availability-бейджа. */
@@ -195,6 +195,45 @@ function OverviewContent() {
               <ObligationsCard data={data} />
               <AznCard titleKey="finance.overview.supplier_cash_paid" metric={{ amount: data.supplierPayouts.paidAzn, availability: "OK" }} />
               <AznCard titleKey="finance.overview.expected_margin" metric={data.expectedMargin} />
+            </div>
+            {/* Supplier payments registry KPI: derived from dueDate + allocations. */}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <a href="/app/finance/supplier-payments" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-rose-200">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("finance.supplier_payments.kpi.overdue", locale)}</p>
+                <p className="mt-2 font-mono text-xl font-semibold text-rose-600">
+                  {formatPrice(data.supplierPayables.overdueAzn, "AZN", locale)}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {data.supplierPayables.overdueCount} {t("finance.supplier_payments.kpi.items", locale)}
+                </p>
+              </a>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("finance.supplier_payments.kpi.due_soon", locale)}</p>
+                <p className="mt-2 font-mono text-xl font-semibold text-amber-600">
+                  {formatPrice(data.supplierPayables.dueSoonAzn, "AZN", locale)}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {data.supplierPayables.dueSoonCount} {t("finance.supplier_payments.kpi.items", locale)}
+                </p>
+              </div>
+              <a href="/app/finance/supplier-payments" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-slate-300">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("finance.supplier_payments.kpi.pending", locale)}</p>
+                <p className="mt-2 font-mono text-xl font-semibold text-slate-800">
+                  {formatPrice(data.supplierPayables.pendingPaymentsAzn, "AZN", locale)}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {data.supplierPayables.pendingPaymentsCount} {t("finance.supplier_payments.kpi.items", locale)}
+                </p>
+              </a>
+              <a href="/app/finance/supplier-payments?unallocated=true" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-violet-200">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{t("finance.supplier_payments.kpi.unallocated", locale)}</p>
+                <p className="mt-2 font-mono text-xl font-semibold text-violet-600">
+                  {formatPrice(data.supplierPayables.unallocatedAzn, "AZN", locale)}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {data.supplierPayables.unallocatedCount} {t("finance.supplier_payments.kpi.items", locale)}
+                </p>
+              </a>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <CurrencyBreakdown titleKey="finance.overview.customer_receipts" rows={data.customerReceipts.byCurrency} azn={data.customerReceipts.azn} />

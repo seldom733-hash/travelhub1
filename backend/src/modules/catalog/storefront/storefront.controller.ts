@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseEnumPipe, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseEnumPipe, Patch, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Request } from "express";
 import { IsArray, IsIn, IsObject, IsOptional, IsString, MaxLength, ValidateNested } from "class-validator";
@@ -6,10 +6,16 @@ import { Type } from "class-transformer";
 import { StorefrontEntitlementStatus, StorefrontMediaKind } from "../../../generated/prisma/enums";
 import { JwtAuthGuard } from "../../../security/auth/jwt-auth.guard";
 import { PermissionsGuard } from "../../../security/auth/permissions.guard";
-import { CurrentUser, RequirePermissions } from "../../../security/auth/decorators";
+import { CurrentUser, Public, RequirePermissions } from "../../../security/auth/decorators";
 import type { AuthedRequest } from "../../../security/auth/jwt-auth.guard";
 import { assertNoForbiddenKeys, STOREFRONT_CREATE_FORBIDDEN_KEYS, STOREFRONT_UPDATE_FORBIDDEN_KEYS } from "../../../shared/field-validation";
 import { SOCIAL_PLATFORMS, STOREFRONT_LOCALES, STOREFRONT_THEMES, StorefrontService, type SocialLinkInput, type StorefrontCreateInput, type StorefrontUpdateInput } from "./storefront.service";
+
+class SetDomainDto {
+  @IsString()
+  @MaxLength(253)
+  domain!: string;
+}
 
 class SocialLinkDto implements SocialLinkInput {
   @IsString()
@@ -183,9 +189,16 @@ export class StorefrontController {
   uploadMedia(
     @Param("kind", new ParseEnumPipe(StorefrontMediaKind)) kind: StorefrontMediaKind,
     @UploadedFile() file: Express.Multer.File,
+    @Body("altText") altText: string | undefined,
     @CurrentUser() actor: AuthedRequest["user"],
   ) {
-    return this.storefronts.uploadMedia(actor, kind, file);
+    return this.storefronts.uploadMedia(actor, kind, file, altText);
+  }
+
+  @Delete("storefront/media/id/:mediaId")
+  @RequirePermissions("storefront.update_own")
+  deleteGalleryMedia(@Param("mediaId") mediaId: string, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.storefronts.deleteGalleryMediaById(actor, mediaId);
   }
 
   @Delete("storefront/media/:kind")
@@ -195,6 +208,24 @@ export class StorefrontController {
     @CurrentUser() actor: AuthedRequest["user"],
   ) {
     return this.storefronts.deleteMedia(actor, kind);
+  }
+
+  @Patch("storefront/domain")
+  @RequirePermissions("storefront.update_own")
+  setDomain(@Body() body: SetDomainDto, @CurrentUser() actor: AuthedRequest["user"]) {
+    return this.storefronts.setCustomDomain(actor, body.domain);
+  }
+
+  @Post("storefront/domain/verify")
+  @RequirePermissions("storefront.update_own")
+  verifyDomain(@CurrentUser() actor: AuthedRequest["user"]) {
+    return this.storefronts.verifyCustomDomain(actor);
+  }
+
+  @Delete("storefront/domain")
+  @RequirePermissions("storefront.update_own")
+  removeDomain(@CurrentUser() actor: AuthedRequest["user"]) {
+    return this.storefronts.removeCustomDomain(actor);
   }
 
   /** Owner-only preview: short-lived signed URL (не публикует витрину; staged media видна владельцу). */
@@ -222,5 +253,16 @@ export class StorefrontAdminController {
   @RequirePermissions("storefront.entitlement.manage")
   setEntitlement(@Param("partnerId") partnerId: string, @Body() dto: EntitlementDto, @CurrentUser() actor: AuthedRequest["user"]) {
     return this.storefronts.setEntitlement(partnerId, dto.status, actor);
+  }
+}
+
+@Controller()
+export class PublicStorefrontDomainController {
+  constructor(private readonly storefronts: StorefrontService) {}
+
+  @Get("public/domains/resolve")
+  @Public()
+  resolve(@Query("host") host: string) {
+    return this.storefronts.resolveByDomain(host).then((result) => result ?? { slug: null });
   }
 }

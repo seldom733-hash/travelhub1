@@ -194,7 +194,7 @@ describe("Phase 2 Step 2.2E — Buyer Request / Proposal Communication (e2e)", (
     const r = (
       await buyer
         .post("/api/v1/buyer/requests")
-        .send({ categoryId: catHotelId, destinations, serviceDateFrom: "2026-09-01", serviceDateTo: "2026-09-07", adults: 2 })
+        .send({ categoryId: catHotelId, destinations, serviceDateFrom: "2027-09-01", serviceDateTo: "2027-09-07", adults: 2 })
         .expect(201)
     ).body as { id: string; version: number };
     const s = (await buyer.post(`/api/v1/buyer/requests/${r.id}/submit`).send({ expectedVersion: r.version }).expect(201)).body as { id: string; version: number };

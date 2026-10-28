@@ -42,6 +42,7 @@ export function calcPanelMaxHeight(
 export function usePanelMaxHeight(
   ref: RefObject<HTMLElement | null>,
   open: boolean,
+  min: number = MIN_PANEL_PX,
 ): number | undefined {
   const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
 
@@ -53,7 +54,7 @@ export function usePanelMaxHeight(
     const compute = () => {
       // Панель: `absolute top-full mt-1` → верх = низ контейнера + 4px.
       const panelTop = el.getBoundingClientRect().bottom + 4;
-      setMaxHeight(calcPanelMaxHeight(panelTop, window.innerHeight));
+      setMaxHeight(calcPanelMaxHeight(panelTop, window.innerHeight, min));
     };
 
     compute();

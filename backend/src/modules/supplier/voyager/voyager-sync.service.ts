@@ -227,20 +227,21 @@ export class VoyagerSyncService {
           : 0;
         const sourceCurrency = validOffers[0]?.price.currency ?? "USD";
         // Markup boundary (§9): Tariff/startingPrice are customer-facing —
-        // write the PUBLIC price. Voyager quotes USD → the pricing service
-        // converts USD→AZN via the seeded SupplierFxRate (§FX) then applies
-        // the markup; a missing rate fails OPEN (source currency, no FX).
-        let minPrice = minSource;
+        // write the PUBLIC price. Voyager quotes USD, поэтому convert-then-markup:
+        // publicAmountWithFxFor возвращает И сумму, И валюту (AZN, если курс
+        // настроен; иначе source). Раньше здесь маркап применялся к USD-сумме,
+        // но метка ставилась "AZN" — цена на витрине занижалась на курс.
+        let minPrice = 0;
         let publicCurrency = sourceCurrency;
         if (minSource > 0) {
-          const fx = await this.pricing.resolveFxSafe("VOYAGER", sourceCurrency);
-          minPrice = await this.pricing.publicAmountFor(
+          const converted = await this.pricing.publicAmountWithFxFor(
             minSource,
             sourceCurrency,
             "VOYAGER",
             "tours",
           );
-          if (fx) publicCurrency = "AZN";
+          minPrice = converted.amount;
+          publicCurrency = converted.currency;
         }
 
         const rooms = Array.from(

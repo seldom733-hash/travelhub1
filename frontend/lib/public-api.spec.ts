@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PublicApiError, PublicNotFoundError, buildPublicQuery, publicApi } from "./public-api";
+import { PublicApiError, PublicNotFoundError, buildPublicQuery, publicApi, publicStorefrontApi } from "./public-api";
 
 /**
  * Step 1.6 §15: public pages используют ТОЛЬКО Public Catalog API — БЕЗ JWT,
@@ -60,5 +60,18 @@ describe("public-api (Step 1.6 §15 — public-only client)", () => {
     expect(err).toBeInstanceOf(PublicApiError);
     expect((err as PublicApiError).status).toBe(422);
     expect((err as PublicApiError).message).toBe("Bad filter");
+  });
+
+  it("storefront published page is unwrapped and stays public", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ page: { id: "p1", sections: [{ blockType: "storefront-hero" }] } }),
+    });
+    const page = await publicStorefrontApi.getPage("my-store");
+    expect(page?.id).toBe("p1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
+    expect(url).toContain("/api/v1/public/storefronts/my-store/page");
+    expect(JSON.stringify(init ?? {})).not.toContain("Authorization");
   });
 });

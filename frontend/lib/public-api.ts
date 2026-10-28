@@ -77,6 +77,8 @@ export interface PublicProductCard {
   meal?: string | null;
   /** Supplier code (KOMPAS/SUMMERTOUR/…) when the card is sync-backed. */
   supplierCode?: string | null;
+  /** CRM Partner.code — единственная видимая метка продавца на карточке. */
+  partnerCode?: string | null;
   /** Local hotel photo (frontend/public/hotels/<tourinc>-<hotelKey>.jpg); may 404 — check before showing. */
   hotelImage?: string | null;
   availabilitySummary: PublicAvailabilitySummary | null;
@@ -109,6 +111,7 @@ export interface PublicProductDetail {
     pricingUnit: "unit";
     availability: PublicAvailabilitySummary | null;
     seller: PublicSeller | null;
+    partnerCode?: string | null;
     publishedAt: string;
     version: number;
     /**
@@ -135,6 +138,13 @@ export interface PublicFilterMetadata {
   filters: PublicFilterOption[];
   availability: { enabled: boolean; dateRequired: boolean } | null;
   sort: string[];
+}
+
+export interface PublicDestination {
+  code: string;
+  names: Record<string, string>;
+  tours: number;
+  hotels: number;
 }
 
 export interface PublicListResult {
@@ -230,6 +240,7 @@ export const publicApi = {
   },
   getProduct: (slugOrId: string): Promise<PublicProductDetail> => http<PublicProductDetail>(`/products/${encodeURIComponent(slugOrId)}`),
   listCategories: (): Promise<PublicCategory[]> => http<PublicCategory[]>("/categories"),
+  listDestinations: (): Promise<PublicDestination[]> => http<PublicDestination[]>("/destinations"),
   getCategory: (slug: string): Promise<PublicCategory> => http<PublicCategory>(`/categories/${encodeURIComponent(slug)}`),
   getCategoryFilters: (slug: string): Promise<PublicFilterMetadata> =>
     http<PublicFilterMetadata>(`/categories/${encodeURIComponent(slug)}/filters`),
@@ -260,7 +271,7 @@ export interface PublicStorefront {
   heroHeading: string | null;
   heroSubheading: string | null;
   themePreset: string;
-  media: Array<{ id: string; kind: "LOGO" | "HERO"; url: string }>;
+  media: Array<{ id: string; kind: "LOGO" | "HERO" | "GALLERY"; url: string }>;
   seller: PublicSeller | null;
   activatedAt: string;
 }
@@ -269,6 +280,16 @@ export const publicStorefrontApi = {
   /** Витрина по slug (только ACTIVE + entitled; иначе PublicNotFoundError). */
   get(slug: string): Promise<PublicStorefront> {
     return http<PublicStorefront>(`/storefronts/${encodeURIComponent(slug)}`);
+  },
+  /** Опубликованная страница конструктора (null → legacy fixed template). */
+  async getPage(slug: string, pageSlug?: string): Promise<import("./constructor-api").PageConfigView | null> {
+    const qs = pageSlug && pageSlug !== "home" ? `?pageSlug=${encodeURIComponent(pageSlug)}` : "";
+    const res = await http<{ page: import("./constructor-api").PageConfigView | null }>(`/storefronts/${encodeURIComponent(slug)}/page${qs}`);
+    return res.page;
+  },
+  /** Опубликованное меню страниц (home/about/...) для Storefront. */
+  listPages(slug: string): Promise<Array<{ slug: string; name: string; isHome: boolean }>> {
+    return http<Array<{ slug: string; name: string; isHome: boolean }>>(`/storefronts/${encodeURIComponent(slug)}/pages`);
   },
   /** Продукты витрины (server-side pagination, только продукты этого Partner). */
   listProducts(slug: string, q: { page?: number; pageSize?: number } = {}): Promise<PublicListResult> {

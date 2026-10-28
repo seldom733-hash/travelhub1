@@ -40,6 +40,7 @@ import type {
   SupplierGeoOption,
 } from "../supplier.types";
 import { priceUnavailable } from "../supplier.types";
+import { withCatalogCoverage, recordCatalogError, recordCatalogPage, recordCatalogWindow } from "../catalog/catalog-coverage";
 
 const FSTRAVEL_BASE = "https://b2b.fstravel.asia";
 const TOWNFROM_BAKU = "433614"; // Baku TOWNFROMINC for FSTravel
@@ -144,12 +145,15 @@ export class FstravelAdapter implements SupplierAdapter {
             stateInc, window.from, window.to, n, adults, children,
           );
           queries++;
+          recordCatalogWindow(true);
           for (const row of rows) {
             const key = this.rowKey(row);
             if (!rowsByKey.has(key)) rowsByKey.set(key, row);
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
+          recordCatalogWindow(false);
+          recordCatalogError(msg);
           if (msg.startsWith("FSTRAVEL_CAPTCHA_BLOCKED")) {
             this.logger.warn(
               `FSTRAVEL ${country}: captcha blocked after ${FstravelAdapter.CAPTCHA_RETRY_DELAYS_MS.length} rounds — aborting country (kept ${rowsByKey.size} rows)`,
@@ -223,6 +227,18 @@ export class FstravelAdapter implements SupplierAdapter {
       `FSTRAVEL ${country}: ${queries} queries → ${rowsByKey.size} rows → ${offers.length} offers${aborted ? ` (aborted: ${aborted})` : ""}`,
     );
     return offers;
+  }
+
+  async searchCatalog(query: SupplierSearchQuery) {
+    const { result, coverage } = await withCatalogCoverage(async () => {
+      try {
+        return await this.search(query);
+      } catch (error) {
+        recordCatalogError((error as Error).message);
+        throw error;
+      }
+    });
+    return { offers: result, coverage };
   }
 
   async getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail> {
@@ -346,7 +362,10 @@ export class FstravelAdapter implements SupplierAdapter {
     for (let page = 1; page <= FstravelAdapter.MAX_PAGES_PER_QUERY; page++) {
       const url = this.buildPricesUrl({ stateInc, beg, end, nights, adults, children, page });
       const body = await this.pacedGet(url);
-      if (body.includes("Нет данных") || body.includes("\\u041d\\u0435\\u0442")) break;
+      if (body.includes("Нет данных") || body.includes("\\u041d\\u0435\\u0442")) {
+        recordCatalogPage(page, null);
+        break;
+      }
       const pageRows = this.parsePriceRows(this.unwrapJsHtml(body));
       let added = 0;
       for (const row of pageRows) {
@@ -356,6 +375,7 @@ export class FstravelAdapter implements SupplierAdapter {
         rows.push(row);
         added++;
       }
+      recordCatalogPage(page, null, page === FstravelAdapter.MAX_PAGES_PER_QUERY && added > 0);
       if (pageRows.length === 0 || added === 0) break;
     }
     return rows;

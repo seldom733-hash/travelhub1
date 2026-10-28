@@ -11,7 +11,7 @@ import { fetchAzalDirectory, fetchFlightCalendar, type FlightCalendarDayPrice } 
 import { findFlightAirports, setRemoteAirports } from "@/lib/flight-locations";
 import { useSupplierOptions } from "@/lib/supplier-registry";
 import ChildAges from "./ChildAges";
-import HelpFindButton from "./HelpFindButton";
+
 import { useWidestText } from "@/lib/measure-text";
 import {
   PICKER_CHECKBOX,
@@ -20,9 +20,8 @@ import {
   PICKER_DIGIT_WIDTH_EXTRA,
   PICKER_LABEL,
   PICKER_ROW,
-  PICKER_SUBMIT,
+  PICKER_SUBMIT_RIGHT,
   PICKER_W_FROM,
-  PICKER_W_NIGHTS,
   PICKER_W_TO,
 } from "./picker-styles";
 
@@ -257,58 +256,6 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           />
         </div>
 
-        {/* Supplier */}
-        <div className={PICKER_W_NIGHTS}>
-          <label htmlFor="flight-supplier" className={PICKER_LABEL}>
-            {t("search.supplier", locale)}
-          </label>
-          <select
-            id="flight-supplier"
-            value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
-            className={PICKER_CONTROL}
-          >
-            <option value="ALL">{t("search.all_suppliers", locale)}</option>
-            {supplierOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Return date (conditional) */}
-        {roundTrip && (
-          <div style={{ maxWidth: datePx + PICKER_DATE_WIDTH_EXTRA, flex: "1 1 0" }}>
-            <FlightDatePicker
-              id="flight-return"
-              label={t("search.return_date", locale)}
-              placeholder={t("search.select_date", locale)}
-              value={returnDate}
-              onChange={setReturnDate}
-              minDate={minReturnDate || undefined}
-              availability={returnAvailability}
-              disabled={!departureDate}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Round-trip checkbox */}
-      <label className={`self-start ${PICKER_CHECKBOX}`}>
-        <input
-          type="checkbox"
-          checked={roundTrip}
-          onChange={(e) => {
-            setRoundTrip(e.target.checked);
-            if (!e.target.checked) setReturnDate("");
-          }}
-          className="size-3.5 rounded border-dark-border accent-gold"
-        />
-        {t("search.round_trip", locale)}
-      </label>
-
-      <div className={PICKER_ROW}>
         {/* Adults */}
         <div style={{ maxWidth: digitPx + PICKER_DIGIT_WIDTH_EXTRA }}>
           <label htmlFor="flight-adults" className={PICKER_LABEL}>
@@ -364,6 +311,58 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           </select>
         </div>
 
+        {/* Return date (conditional) */}
+        {roundTrip && (
+          <div style={{ maxWidth: datePx + PICKER_DATE_WIDTH_EXTRA, flex: "1 1 0" }}>
+            <FlightDatePicker
+              id="flight-return"
+              label={t("search.return_date", locale)}
+              placeholder={t("search.select_date", locale)}
+              value={returnDate}
+              onChange={setReturnDate}
+              minDate={minReturnDate || undefined}
+              availability={returnAvailability}
+              disabled={!departureDate}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className={PICKER_ROW}>
+        {/* Tariff (baggage) */}
+        <div className="w-[260px] max-w-full">
+          <label htmlFor="flight-tariff" className={PICKER_LABEL}>
+            {t("search.tariff_baggage", locale)}
+          </label>
+          <select
+            id="flight-tariff"
+            value={tariff}
+            onChange={(e) => setTariff(e.target.value)}
+            className={PICKER_CONTROL}
+          >
+            <option value="ALL">{t("search.all", locale)}</option>
+            <option value="BUDGET">BUDGET — No bag + Hand 10kg</option>
+            <option value="CLASSIC">CLASSIC — Bag 1×23kg + Hand 10kg</option>
+            <option value="PLUS">PLUS — Bag 1×32kg + Hand 10kg</option>
+            <option value="COMFORT">COMFORT — Bag 2×32kg + Hand 10kg</option>
+            <option value="BUSINESS">BUSINESS — Bag 2×32kg + Hand 10kg</option>
+          </select>
+        </div>
+
+        {/* Round-trip checkbox */}
+        <label className={PICKER_CHECKBOX}>
+          <input
+            type="checkbox"
+            checked={roundTrip}
+            onChange={(e) => {
+              setRoundTrip(e.target.checked);
+              if (!e.target.checked) setReturnDate("");
+            }}
+            className="size-3.5 rounded border-dark-border accent-gold"
+          />
+          {t("search.round_trip", locale)}
+        </label>
+
         {/* Direct flight only */}
         <label className={PICKER_CHECKBOX}>
           <input
@@ -374,6 +373,26 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
           />
           {t("search.direct_flight", locale)}
         </label>
+
+        {/* Supplier */}
+        <div className="w-[260px] min-w-[260px] max-w-[260px] flex-none">
+          <label htmlFor="flight-supplier" className={PICKER_LABEL}>
+            {t("search.supplier", locale)}
+          </label>
+          <select
+            id="flight-supplier"
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+            className={PICKER_CONTROL}
+          >
+            <option value="ALL">{t("search.all_suppliers", locale)}</option>
+            {supplierOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Child ages */}
@@ -381,54 +400,19 @@ export default function FlightSearch({ onSearch }: FlightSearchProps) {
         <ChildAges count={children} ages={childAges} onChange={setChildAges} />
       )}
 
-      {/* Tariff (baggage) */}
-      <div>
-        <label htmlFor="flight-tariff" className={PICKER_LABEL}>
-          {t("search.tariff_baggage", locale)}
-        </label>
-        <select
-          id="flight-tariff"
-          value={tariff}
-          onChange={(e) => setTariff(e.target.value)}
-          className={PICKER_CONTROL}
+      {/* Submit — right aligned at the same visual position as tours. */}
+      <div className="relative z-[70] flex justify-end">
+        <button
+          type="submit"
+          disabled={!from || !to || !departureDate}
+          className={`${!from || !to || !departureDate ? "bg-neutral-700 text-neutral-400 cursor-not-allowed opacity-60" : "btn-gold"} ${PICKER_SUBMIT_RIGHT}`}
         >
-          <option value="ALL">{t("search.all", locale)}</option>
-          <option value="BUDGET">BUDGET — No bag + Hand 10kg</option>
-          <option value="CLASSIC">CLASSIC — Bag 1×23kg + Hand 10kg</option>
-          <option value="PLUS">PLUS — Bag 1×32kg + Hand 10kg</option>
-          <option value="COMFORT">COMFORT — Bag 2×32kg + Hand 10kg</option>
-          <option value="BUSINESS">BUSINESS — Bag 2×32kg + Hand 10kg</option>
-        </select>
+          <span>{t("marketplace.search_submit", locale)}</span>
+          <ArrowRight size={16} weight="bold" />
+        </button>
       </div>
 
-      {/* Help Find */}
-      <HelpFindButton
-        context={{
-          serviceType: "flights",
-          fromDestination: from?.city ?? "",
-          toDestination: to?.city ?? "",
-          departureDate,
-          returnDate: roundTrip ? returnDate : undefined,
-          roundTrip,
-          adults,
-          children,
-          childAges: childAges.slice(0, children),
-          infants,
-          direct,
-          tariff,
-          supplier,
-        }}
-      />
-
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={!from || !to || !departureDate}
-        className={`${!from || !to || !departureDate ? "bg-neutral-700 text-neutral-400 cursor-not-allowed opacity-60" : "btn-gold"} ${PICKER_SUBMIT}`}
-      >
-        <span>{t("marketplace.search_submit", locale)}</span>
-        <ArrowRight size={16} weight="bold" />
-      </button>
+      {/* HelpFind скрыт (как в поиске туров): кнопка «Найти» занимает его строку. */}
     </form>
   );
 }

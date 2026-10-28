@@ -429,6 +429,11 @@ export class SupplierPricingService {
    * Sync/catalog-запись (Tariff/startingPrice): public-цена как число.
    * Строгий путь (applyFor) — сбой правила роняет sync, а не пишет
    * незамаркапленную цену в каталог.
+   *
+   * ВНИМАНИЕ: НЕ конвертирует валюту. Результат записывается в валюте
+   * поставщика — вызывающий обязан сохранить `supplierCurrency` рядом с ценой.
+   * Нужна AZN-сумма в каталоге → publicAmountWithFxFor (иначе метка валюты
+   * разойдётся с суммой и витрина занизит цену).
    */
   async publicAmountFor(
     supplierPrice: MoneyInput,
@@ -438,5 +443,32 @@ export class SupplierPricingService {
   ): Promise<number> {
     const pricing = await this.applyFor(supplierCode, serviceType, supplierPrice, supplierCurrency);
     return Number(pricing.publicPrice.toString());
+  }
+
+  /**
+   * Sync/catalog-запись С конвертацией: convert-then-markup (Phase 1 FX).
+   *
+   * Отличие от publicAmountFor: тот возвращает только число и НЕ конвертирует,
+   * поэтому вызывающий обязан писать исходную валюту. Если синк хочет писать
+   * AZN (Voyager), он обязан взять сумму И валюту из этого метода — иначе
+   * USD-сумма попадёт в каталог с меткой "AZN" и витрина занизит цену на
+   * величину курса (реальный дефект Voyager до этого метода).
+   *
+   * Курс есть → amount в AZN, currency = "AZN"; курса нет → исходная валюта
+   * (fail-open browse-контракт, без подстановки 1).
+   */
+  async publicAmountWithFxFor(
+    supplierPrice: MoneyInput,
+    supplierCurrency: string,
+    supplierCode: string,
+    serviceType: string,
+  ): Promise<{ amount: number; currency: string }> {
+    const resolution = await this.resolve(validateSupplierCode(supplierCode), validateServiceType(serviceType));
+    const fx = await this.resolveFxSafe(supplierCode, supplierCurrency);
+    const { pricing, fxJson } = this.applyWithFx(resolution, supplierPrice, supplierCurrency, fx);
+    return {
+      amount: Number(pricing.publicPrice.toString()),
+      currency: fxJson ? "AZN" : supplierCurrency,
+    };
   }
 }

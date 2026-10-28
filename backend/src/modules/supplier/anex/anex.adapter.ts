@@ -14,6 +14,7 @@ import type {
   SupplierGeoOption,
 } from "../supplier.types";
 import { priceUnavailable } from "../supplier.types";
+import { withCatalogCoverage, recordCatalogError, recordCatalogPage, recordCatalogWindow } from "../catalog/catalog-coverage";
 import {
   AnexProvider,
   addDays,
@@ -185,6 +186,7 @@ export class AnexAdapter implements SupplierAdapter {
       checkInEnd: dateTo,
       nightsFrom,
       nightsTo,
+      nightOptions: query.nightOptions,
       adults: query.adults ?? 2,
       children: query.children ?? 0,
       childAges: query.childAges,
@@ -216,6 +218,19 @@ export class AnexAdapter implements SupplierAdapter {
     return offers;
   }
 
+  /** Catalog-safe search: returns shared coverage metadata without changing offers. */
+  async searchCatalog(query: SupplierSearchQuery) {
+    const { result, coverage } = await withCatalogCoverage(async () => {
+      try {
+        return await this.search(query);
+      } catch (error) {
+        recordCatalogError((error as Error).message);
+        throw error;
+      }
+    });
+    return { offers: result, coverage };
+  }
+
   /**
    * Fetch price rows for a NIGHTS RANGE.
    *
@@ -231,6 +246,8 @@ export class AnexAdapter implements SupplierAdapter {
     checkInEnd: string;
     nightsFrom: number;
     nightsTo: number;
+    /** Optional exact night values (catalog sampling) instead of a range. */
+    nightOptions?: number[];
     adults: number;
     children: number;
     childAges?: number[];
@@ -239,11 +256,15 @@ export class AnexAdapter implements SupplierAdapter {
   }): Promise<AnexPriceRow[]> {
     const lo = Math.max(NIGHTS_MIN, Math.min(params.nightsFrom, params.nightsTo));
     const hi = Math.min(NIGHTS_MAX, Math.max(params.nightsFrom, params.nightsTo));
+    const nights = params.nightOptions?.length
+      ? [...new Set(params.nightOptions.map((n) => Math.max(NIGHTS_MIN, Math.min(NIGHTS_MAX, n))))]
+      : Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
     const merged: AnexPriceRow[] = [];
     const seen = new Set<string>();
     let emptyNights = 0;
-    for (let night = lo; night <= hi; night++) {
+    for (const night of nights) {
       const rows = await this.fetchPriceRowsExact({ ...params, night });
+      recordCatalogWindow(true);
       if (!rows.length) emptyNights += 1;
       for (const row of rows) {
         const key = `${this.offerIdOf(row)}|${row.nights ?? night}`;
@@ -255,7 +276,7 @@ export class AnexAdapter implements SupplierAdapter {
     if (!merged.length) {
       this.logger.warn(
         `ANEX search STATE=${params.stateInc} ${params.checkInBeg}→${params.checkInEnd}: ` +
-          `no prices for ${lo}-${hi}n (${emptyNights}/${hi - lo + 1} nights empty)`,
+          `no prices for ${nights.join(",")}n (${emptyNights}/${nights.length} nights empty)`,
       );
     }
     return merged;
@@ -372,6 +393,29 @@ export class AnexAdapter implements SupplierAdapter {
           }
           break;
         }
+        // Some ANEX state/date combinations answer HTTP 400 for a multi-date
+        // window while each single date is valid. Split the window exactly
+        // like the verified 424 case; a single-date 400 remains a hard error
+        // (never silently converted into an empty catalog).
+        if (err instanceof Error && err.message.includes("HTTP 400")) {
+          const beg = params.checkInBeg;
+          const end = params.checkInEnd;
+          const days = Math.round(
+            (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${beg}T00:00:00Z`)) / (24 * 60 * 60 * 1000),
+          );
+          if (page === 1 && beg < end && days >= 1 && splitDepth < 10) {
+            const mid = addDays(beg, Math.floor(days / 2));
+            const rightBeg = addDays(mid, 1);
+            const [left, right] = await Promise.all([
+              this.fetchPriceRowsExact({ ...params, checkInEnd: mid }, splitDepth + 1),
+              this.fetchPriceRowsExact({ ...params, checkInBeg: rightBeg }, splitDepth + 1),
+            ]);
+            rows.push(...left, ...right);
+            this.logger.debug(`ANEX 400-bisect ${beg} to ${end} ${params.night}n: ${mid} / ${rightBeg} -> ${rows.length} rows`);
+            break;
+          }
+          throw err;
+        }
         throw err;
       }
       const payload = body?.[0];
@@ -407,6 +451,7 @@ export class AnexAdapter implements SupplierAdapter {
       }
       rows.push(...payload.prices);
       pageCount = payload.result?.pageCount ?? 1;
+      recordCatalogPage(page, pageCount, pageCount > ANEX_MAX_PAGES);
       page += 1;
     } while (page <= pageCount && page <= ANEX_MAX_PAGES);
     return rows;
@@ -581,15 +626,17 @@ export class AnexAdapter implements SupplierAdapter {
     const state = await this.resolveStateForQuery(query.destination, query.hotelExternalId);
 
     const collected: AnexPriceRow[] = [];
-    const sizeDays = 30;
+    // A multi-day CHECKIN window is answered sparsely by ANEX (often only a
+    // few rows), so a 30-day calendar request can silently lose most dates.
+    // Ask for each day separately; a single-date request is the only honest
+    // shape confirmed by the upstream.
     let cursor = query.dateFrom;
     while (cursor <= query.dateTo) {
-      const windowEnd = addDays(cursor, sizeDays - 1) > query.dateTo ? query.dateTo : addDays(cursor, sizeDays - 1);
       try {
         const rows = await this.fetchPriceRows({
           stateInc: String(state.id),
           checkInBeg: cursor,
-          checkInEnd: windowEnd,
+          checkInEnd: cursor,
           nightsFrom: query.nights,
           nightsTo: query.nights,
           adults: query.adults ?? 2,
@@ -599,10 +646,10 @@ export class AnexAdapter implements SupplierAdapter {
         collected.push(...rows);
       } catch (err) {
         this.logger.warn(
-          `ANEX calendar window ${cursor}→${windowEnd}: ${err instanceof Error ? err.message : String(err)}`,
+          `ANEX calendar date ${cursor}: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
-      cursor = addDays(windowEnd, 1);
+      cursor = addDays(cursor, 1);
     }
 
     let filtered = collected;

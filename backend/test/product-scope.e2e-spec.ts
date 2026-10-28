@@ -153,7 +153,18 @@ describe("Phase 1 Step 1.3 — Product Ownership & PARTNER Object Scope (e2e)", 
     created.products.push(productA.id);
     productB = (await partnerBAgent.post("/api/v1/products").send({ type: "TOUR", title: `Scope B ${stamp}` }).expect(201)).body.product as ProductRow;
     created.products.push(productB.id);
-    productAdmin = (await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Scope Admin ${stamp}` }).expect(201)).body.product as ProductRow;
+    // System-owned Product (partnerId null) — API больше не создаёт ownerless
+    // Commercial Product (бизнес-правило); для ownership-сценария — direct fixture.
+    productAdmin = (await prisma.product.create({
+      data: {
+        code: `PRD-E2E-SYS-${stamp}`,
+        slug: `e2e-scope-admin-${stamp}`,
+        type: "TOUR",
+        title: `Scope Admin ${stamp}`,
+        status: "DRAFT",
+        version: 1,
+      },
+    })) as unknown as ProductRow;
     created.products.push(productAdmin.id);
 
     // ── Admin ownership override (explicit partnerId) ────────────────────────

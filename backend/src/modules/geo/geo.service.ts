@@ -6,6 +6,7 @@ import {
 import { Prisma } from "../../generated/prisma/client";
 import { GeoStatus } from "../../generated/prisma/enums";
 import { PrismaService } from "../../prisma/prisma.service";
+import { canonicalHotelCategory } from "../catalog/hotel/hotel-category";
 import { SecurityService } from "../../security/security.service";
 import type { AuthUser } from "../../security/auth/auth.service";
 import {
@@ -449,39 +450,16 @@ export class GeoService {
     });
     const byLabel = new Map<string, { stars: number | null; suppliers: Set<string>; externalIds: Record<string, string> }>();
     for (const l of links) {
-      const label = l.label.trim();
-      if (!label) continue;
+      const category = canonicalHotelCategory(l.label);
+      if (!category) continue;
+      const label = category.label;
       let entry = byLabel.get(label);
       if (!entry) {
-        const m = label.match(/^(\d)\s*\*$/);
-        entry = { stars: m ? parseInt(m[1], 10) : null, suppliers: new Set(), externalIds: {} };
+        entry = { stars: category.stars, suppliers: new Set(), externalIds: {} };
         byLabel.set(label, entry);
       }
       entry.suppliers.add(l.supplierCode);
       if (!entry.externalIds[l.supplierCode]) entry.externalIds[l.supplierCode] = l.externalId;
-    }
-
-    // Canonical N* options alongside supplier-specific labels. Supplier
-    // dictionaries often only ship grouped labels ("5* / HV1", "5* DELUXE",
-    // "5* Superior"), so without a plain "5*" the dropdown cannot express
-    // "five-star only" — and a grouped label legitimately includes HV-1.
-    // The canonical entry carries the same native ids; the adapters read the
-    // requested label to decide between strict star count and group match.
-    for (const [label, entry] of [...byLabel.entries()]) {
-      const m = label.match(/^([1-5])\s*\*/);
-      if (!m) continue;
-      const canonical = `${m[1]}*`;
-      if (label === canonical) continue;
-      const target = byLabel.get(canonical) ?? {
-        stars: parseInt(m[1], 10),
-        suppliers: new Set<string>(),
-        externalIds: {} as Record<string, string>,
-      };
-      for (const s of entry.suppliers) target.suppliers.add(s);
-      for (const [supplier, id] of Object.entries(entry.externalIds)) {
-        if (!target.externalIds[supplier]) target.externalIds[supplier] = id;
-      }
-      byLabel.set(canonical, target);
     }
 
     return [...byLabel.entries()]
@@ -509,45 +487,65 @@ export class GeoService {
     geoCountry?: string;
     geoCity?: string;
     geoResort?: string;
+    suppliers?: string[];
+    service?: "tours" | "hotels";
     q?: string;
     limit?: number;
   }): Promise<Array<{ id: string; name: string; suppliers: string[] }>> {
     const limit = Math.min(params.limit ?? 500, 2000);
-    // Hotels geo-link through their town: a town ingested as a resort carries
-    // geoResortId (city on the resort), so a city filter must cover both the
-    // hotel's direct geoCityId and resorts OF that city.
-    const cityCondition: Prisma.SupplierGeoLinkWhereInput[] = params.geoCity
-      ? [{ geoCity: { code: params.geoCity } }, { geoResort: { city: { code: params.geoCity } } }]
-      : [];
-    const where: Prisma.SupplierGeoLinkWhereInput = {
-      kind: "HOTEL",
-      label: params.q
-        ? { contains: params.q, mode: "insensitive" }
-        : { not: "" },
-      ...(params.geoCountry ? { geoCountry: { code: params.geoCountry } } : {}),
-      ...(params.geoResort ? { geoResort: { code: params.geoResort } } : {}),
-      ...(cityCondition.length ? { OR: cityCondition } : {}),
-    };
-    const links = await this.prisma.supplierGeoLink.findMany({
-      where,
-      select: { supplierCode: true, label: true },
-      orderBy: { label: "asc" },
-      take: limit * 4, // grouping headroom before the limit cut
-    });
-    // One entry per hotel NAME: external ids are per-supplier and differ, the
-    // name is the only supplier-neutral identity (the picker's id).
-    const byLabel = new Map<string, Set<string>>();
-    for (const l of links) {
-      const name = l.label.replace(/\s+/g, " ").trim();
+    const categorySlug = params.service === "tours" ? "tours" : "accommodation";
+    const conditions: Prisma.Sql[] = [
+      Prisma.sql`p."status"::text = 'PUBLISHED'`,
+      Prisma.sql`c."slug" = ${categorySlug}`,
+      Prisma.sql`COALESCE(TRIM(p."attributes"->>'hotelName'), '') <> ''`,
+    ];
+    if (params.geoCountry) {
+      conditions.push(Prisma.sql`gc."code" = ${params.geoCountry}`);
+    }
+    if (params.geoCity) {
+      conditions.push(
+        Prisma.sql`(gcity."code" = ${params.geoCity} OR grcity."code" = ${params.geoCity})`,
+      );
+    }
+    if (params.geoResort) {
+      conditions.push(Prisma.sql`gr."code" = ${params.geoResort}`);
+    }
+    if (params.suppliers?.length) {
+      conditions.push(
+        Prisma.sql`p."attributes"->>'supplierCode' IN (${Prisma.join(params.suppliers)})`,
+      );
+    }
+    if (params.q) {
+      conditions.push(Prisma.sql`TRIM(p."attributes"->>'hotelName') ILIKE ${`%${params.q}%`}`);
+    }
+    const rows = await this.prisma.$queryRaw<Array<{ name: string; supplierCode: string }>>(
+      Prisma.sql`
+        SELECT DISTINCT
+          TRIM(p."attributes"->>'hotelName') AS "name",
+          p."attributes"->>'supplierCode' AS "supplierCode"
+        FROM catalog."Product" p
+        JOIN catalog."Category" c ON c."id" = p."categoryId"
+        LEFT JOIN geo."GeoCountry" gc ON gc."id" = p."geoCountryId"
+        LEFT JOIN geo."GeoCity" gcity ON gcity."id" = p."geoCityId"
+        LEFT JOIN geo."GeoResort" gr ON gr."id" = p."geoResortId"
+        LEFT JOIN geo."GeoCity" grcity ON grcity."id" = gr."cityId"
+        WHERE ${Prisma.join(conditions, " AND ")}
+        ORDER BY "name" ASC
+        LIMIT ${limit}
+      `,
+    );
+    const byName = new Map<string, Set<string>>();
+    for (const row of rows) {
+      const name = row.name.replace(/\s+/g, " ").trim();
       if (!name) continue;
-      let suppliers = byLabel.get(name);
+      let suppliers = byName.get(name);
       if (!suppliers) {
         suppliers = new Set();
-        byLabel.set(name, suppliers);
+        byName.set(name, suppliers);
       }
-      suppliers.add(l.supplierCode);
+      if (row.supplierCode) suppliers.add(row.supplierCode);
     }
-    return [...byLabel.entries()]
+    return [...byName.entries()]
       .slice(0, limit)
       .map(([name, suppliers]) => ({ id: name, name, suppliers: [...suppliers] }));
   }

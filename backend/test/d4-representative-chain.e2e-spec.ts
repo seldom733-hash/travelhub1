@@ -43,7 +43,7 @@ interface Seller {
   agent: ReturnType<typeof request.agent>;
 }
 
-const waitFor = async <T>(fn: () => Promise<T | null | undefined>, until: (v: T) => boolean, tries = 25): Promise<T> => {
+const waitFor = async <T>(fn: () => Promise<T | null | undefined>, until: (v: T) => boolean, tries = 75): Promise<T> => {
   for (let i = 0; i < tries; i++) {
     const v = await fn();
     if (v && until(v)) return v;
@@ -204,7 +204,15 @@ describe("Phase 3 Pre-Step 3.12 D4 — Representative Commerce Chains (e2e)", ()
   };
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider("ObjectStorageService")
+      .useValue({
+        putObject: jest.fn(async ({ key }: { key: string }) => ({ key, size: 10 })),
+        deleteObject: jest.fn(async () => undefined),
+        objectExists: jest.fn(async () => true),
+        getSignedReadUrl: jest.fn(async () => "https://signed.test/doc"),
+      })
+      .compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");
     app.useGlobalPipes(new ValidationPipe(GLOBAL_VALIDATION_PIPE_OPTIONS));

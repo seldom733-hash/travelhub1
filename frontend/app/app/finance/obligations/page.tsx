@@ -14,6 +14,7 @@ import { WorkspacePageSkeleton } from "@/components/internal/WorkspaceSkeletons"
 import PageHeader from "@/components/PageHeader";
 import PanelFrame from "@/components/PanelFrame";
 import Pagination from "@/components/Pagination";
+import TableExportButton from "@/components/TableExportButton";
 import { useLocale, t } from "@/lib/i18n";
 import { useCan } from "@/lib/use-can";
 import {
@@ -30,8 +31,9 @@ const short = (iso: string | null): string => (iso ? iso.slice(0, 19).replace("T
 
 function StatusBadge({ status }: { status: string }) {
   const locale = useLocale();
+  const tone = status === "OVERDUE" ? "border-rose-200 bg-rose-50 text-rose-700" : obligationStatusTone(status);
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${obligationStatusTone(status)}`}>
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${tone}`}>
       {t(`finance.obligations.status.${status.toLowerCase()}`, locale)}
     </span>
   );
@@ -40,16 +42,21 @@ function StatusBadge({ status }: { status: string }) {
 function ObligationsContent() {
   const locale = useLocale();
   const canPay = useCan("finance.supplier_payout.manage");
+  const canManage = useCan("finance.obligation.manage");
 
   const [items, setItems] = useState<SupplierObligation[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [supplierCode, setSupplierCode] = useState("");
+  const [overdueOnly, setOverdueOnly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const [detail, setDetail] = useState<SupplierObligation | null>(null);
+  const [terms, setTerms] = useState({ invoiceNumber: "", dueDate: "" });
+  const [termsBusy, setTermsBusy] = useState(false);
+  const [termsNotice, setTermsNotice] = useState("");
   const [payFor, setPayFor] = useState<SupplierObligation | null>(null);
   const [payForm, setPayForm] = useState<CreatePayoutInput>({ amount: "", currency: "AZN", aznAmount: "", providerRef: "", reason: "" });
   const [saving, setSaving] = useState(false);
@@ -58,7 +65,13 @@ function ObligationsContent() {
   const load = useCallback(async () => {
     setBusy(true);
     try {
-      const res = await financeCenterApi.listObligations({ status: status || undefined, supplierCode: supplierCode || undefined, page, pageSize: PAGE_SIZE });
+      const res = await financeCenterApi.listObligations({
+        status: status || undefined,
+        supplierCode: supplierCode || undefined,
+        overdue: overdueOnly || undefined,
+        page,
+        pageSize: PAGE_SIZE,
+      });
       setItems(res.items);
       setTotal(res.total);
       setError("");
@@ -68,7 +81,7 @@ function ObligationsContent() {
     } finally {
       setBusy(false);
     }
-  }, [status, supplierCode, page]);
+  }, [status, supplierCode, overdueOnly, page]);
 
   useEffect(() => {
     void load();
@@ -76,9 +89,31 @@ function ObligationsContent() {
 
   const openDetail = async (code: string) => {
     try {
-      setDetail(await financeCenterApi.getObligation(code));
+      const ob = await financeCenterApi.getObligation(code);
+      setDetail(ob);
+      setTerms({ invoiceNumber: ob.invoiceNumber ?? "", dueDate: ob.dueDate ? ob.dueDate.slice(0, 10) : "" });
+      setTermsNotice("");
     } catch (e) {
       setError((e as Error).message);
+    }
+  };
+
+  const saveTerms = async () => {
+    if (!detail) return;
+    setTermsBusy(true);
+    setTermsNotice("");
+    try {
+      const updated = await financeCenterApi.updateObligationTerms(detail.code, {
+        invoiceNumber: terms.invoiceNumber.trim() || null,
+        dueDate: terms.dueDate || null,
+      });
+      setDetail(updated);
+      setTermsNotice(t("finance.obligations.terms.save", locale));
+      await load();
+    } catch (e) {
+      setTermsNotice((e as Error).message);
+    } finally {
+      setTermsBusy(false);
     }
   };
 
@@ -116,13 +151,19 @@ function ObligationsContent() {
         title={t("finance.obligations.title", locale)}
         breadcrumbs={["TravelHub", t("nav.group.finance", locale), t("finance.obligations.title", locale)]}
         actions={
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
-          >
-            {t("admin.table.refresh", locale)}
-          </button>
+          <div className="flex items-center gap-2">
+            <TableExportButton
+              exportUrl="/api/v1/finance/obligations/export"
+              extraParams={{ status, supplierCode, overdue: overdueOnly ? "true" : "" }}
+            />
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              {t("admin.table.refresh", locale)}
+            </button>
+          </div>
         }
       />
 
@@ -154,6 +195,18 @@ function ObligationsContent() {
             placeholder={t("finance.obligations.filter.supplier", locale)}
             className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-400"
           />
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={overdueOnly}
+              onChange={(e) => {
+                setOverdueOnly(e.target.checked);
+                setPage(1);
+              }}
+              className="size-4 rounded border-slate-300"
+            />
+            {t("finance.obligations.filter.overdue", locale)}
+          </label>
           {busy && <span className="text-xs text-slate-500">{t("admin.table.loading", locale)}</span>}
         </div>
 
@@ -164,6 +217,8 @@ function ObligationsContent() {
                 <tr>
                   <th className="px-4 py-2.5 font-medium">{t("finance.obligations.col.code", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("finance.obligations.col.supplier", locale)}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("finance.obligations.col.invoice", locale)}</th>
+                  <th className="px-4 py-2.5 font-medium">{t("finance.obligations.col.due", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("finance.obligations.col.source", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("finance.obligations.col.azn", locale)}</th>
                   <th className="px-4 py-2.5 font-medium">{t("finance.obligations.col.status", locale)}</th>
@@ -176,6 +231,17 @@ function ObligationsContent() {
                   <tr key={ob.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                     <td className="px-4 py-2.5 font-mono text-xs font-semibold text-slate-900">{ob.code}</td>
                     <td className="px-4 py-2.5 text-sm text-slate-900">{ob.partnerCode ?? ob.supplierCode ?? "—"}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-slate-700">{ob.invoiceNumber ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-xs">
+                      {ob.dueDate ? (
+                        <span className={ob.overdue ? "font-semibold text-rose-600" : "text-slate-700"}>
+                          {ob.dueDate.slice(0, 10)}
+                          {ob.overdue ? ` · ${t("finance.obligations.overdue", locale)}` : ""}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-700">
                       {ob.sourceAmount} {ob.sourceCurrency}
                     </td>
@@ -183,7 +249,7 @@ function ObligationsContent() {
                       {ob.amountUnknown ? <span className="text-slate-500">{t("finance.overview.unknown_value", locale)}</span> : ob.aznAmount}
                     </td>
                     <td className="px-4 py-2.5">
-                      <StatusBadge status={ob.status} />
+                      <StatusBadge status={ob.displayStatus} />
                     </td>
                     <td className="px-4 py-2.5 font-mono text-sm text-slate-900">{ob.remainingAmount ?? "—"}</td>
                     <td className="px-4 py-2.5">
@@ -202,7 +268,7 @@ function ObligationsContent() {
                 ))}
                 {items !== null && items.length === 0 && !busy && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-900">
+                    <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-900">
                       {t("ops.empty_no_data", locale)}
                     </td>
                   </tr>
@@ -233,7 +299,7 @@ function ObligationsContent() {
               <div>
                 <dt className="text-xs text-slate-500">{t("finance.obligations.col.status", locale)}</dt>
                 <dd>
-                  <StatusBadge status={detail.status} />
+                  <StatusBadge status={detail.displayStatus} />
                 </dd>
               </div>
               <div>
@@ -249,6 +315,45 @@ function ObligationsContent() {
                 <dd className="font-mono text-slate-900">{detail.orderCode ?? detail.orderId}</dd>
               </div>
             </dl>
+
+            {/* Счёт поставщика и срок оплаты — метаданные, не суммы (audit). */}
+            <div className="rounded-lg border border-slate-200 p-3">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {t("finance.obligations.terms.title", locale)}
+              </h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="text-xs font-medium text-slate-700">
+                  {t("finance.obligations.terms.invoice", locale)}
+                  <input
+                    value={terms.invoiceNumber}
+                    disabled={!canManage || detail.status === "CLOSED" || detail.status === "CANCELLED"}
+                    onChange={(e) => setTerms((v) => ({ ...v, invoiceNumber: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-900 disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="text-xs font-medium text-slate-700">
+                  {t("finance.obligations.terms.due", locale)}
+                  <input
+                    type="date"
+                    value={terms.dueDate}
+                    disabled={!canManage || detail.status === "CLOSED" || detail.status === "CANCELLED"}
+                    onChange={(e) => setTerms((v) => ({ ...v, dueDate: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-900 disabled:bg-slate-50"
+                  />
+                </label>
+              </div>
+              {canManage && detail.status !== "CLOSED" && detail.status !== "CANCELLED" && (
+                <button
+                  type="button"
+                  disabled={termsBusy}
+                  onClick={() => void saveTerms()}
+                  className="mt-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {termsBusy ? t("common.loading", locale) : t("finance.obligations.terms.save", locale)}
+                </button>
+              )}
+              {termsNotice && <p className="mt-2 text-xs text-slate-600">{termsNotice}</p>}
+            </div>
 
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{t("finance.obligations.payouts", locale)}</h3>

@@ -141,7 +141,7 @@ describe("Phase 1 Step 1.8C — Period Pricing & Period Availability foundation 
   }
 
   async function createPlan(ag: ReturnType<typeof request.agent>, productId: string, body: Record<string, unknown>, expected = 201): Promise<{ id: string; code: string; pricingMode: string; price: string; status: string }> {
-    const res = await ag.post(`/api/v1/products/${productId}/tariffs`).send(body);
+    const res = await ag.post(`/api/v1/products/${productId}/tariffs`).send({ currency: "AZN", ...body });
     expect(res.status).toBe(expected);
     if (expected !== 201) return res.body as never;
     const plan = res.body as { id: string; code: string; pricingMode: string; price: string; status: string };

@@ -60,7 +60,8 @@ describe("Phase 2 Step 2.13 — Refund Flow (e2e)", () => {
     bookings: string[];
     payments: string[];
     refunds: string[];
-  } = { users: [], products: [], quotes: [], checkouts: [], sales: [], orders: [], bookings: [], payments: [], refunds: [] };
+    partners: string[];
+  } = { users: [], products: [], quotes: [], checkouts: [], sales: [], orders: [], bookings: [], payments: [], refunds: [], partners: [] };
 
   const login = async (username: string, password: string): Promise<Session> => {
     const res = await request(app.getHttpServer()).post("/api/v1/auth/login").send({ username, password }).expect(200);
@@ -85,7 +86,17 @@ describe("Phase 2 Step 2.13 — Refund Flow (e2e)", () => {
   /** Полная canonical цепочка до Order (frozen money snapshot, как 2.11/2.12 e2e). */
   const buildOrder = async (sm: Session, tag: string, price: number, opts: { buyerRequest?: boolean } = {}): Promise<{ orderId: string; amount: string; currency: string }> => {
     const smAgent = agent(sm.accessToken);
-    const prod = (await adminAgent.post("/api/v1/products").send({ type: "TOUR", title: `Ref ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] }).expect(201)).body.product as { id: string };
+    // Commercial Product требует Partner-владельца (платформенный актор не может
+    // создать ownerless Product). Создаём отдельного partner-а для фикстуры.
+    const partner = await prisma.partner.create({
+      data: { code: `PRN-REF-${tag}-${stamp}`, name: `Ref Partner ${tag}` },
+    });
+    created.partners.push(partner.id);
+    const prodRes = await adminAgent
+      .post("/api/v1/products")
+      .send({ type: "TOUR", title: `Ref ${tag} ${stamp}`, partnerId: partner.id, tariffs: [{ name: "Std", price }] });
+    expect(prodRes.status).toBe(201);
+    const prod = prodRes.body.product as { id: string };
     created.products.push(prod.id);
     const tariff = await prisma.tariff.findFirstOrThrow({ where: { productId: prod.id } });
     const date = futureDate();
@@ -113,7 +124,12 @@ describe("Phase 2 Step 2.13 — Refund Flow (e2e)", () => {
   const buildCapturedPayment = async (sm: Session, fin: Session, tag: string, price: number, opts: { buyerRequest?: boolean } = {}): Promise<{ orderId: string; paymentId: string; paymentCode: string; amount: string; currency: string }> => {
     const { orderId, amount, currency } = await buildOrder(sm, tag, price, opts);
     // Step 2.12H: payment.create требует Idempotency-Key (защищённая операция).
-    const pay = (await agent(fin.accessToken).post("/api/v1/finance/payments").set("Idempotency-Key", `e2e-rf-${Date.now()}-1`).send({ orderId }).expect(201)).body as { id: string; code: string };
+    const payRes = await agent(fin.accessToken)
+      .post("/api/v1/finance/payments")
+      .set("Idempotency-Key", `e2e-rf-${Date.now()}-1`)
+      .send({ orderId, reason: "e2e refund fixture payment" });
+    expect(payRes.status).toBe(201);
+    const pay = payRes.body as { id: string; code: string };
     created.payments.push(pay.id);
     await agent(fin.accessToken).post(`/api/v1/finance/payments/${pay.code}/confirm`).expect(201);
     await eventBus.publishPending();
@@ -171,6 +187,7 @@ describe("Phase 2 Step 2.13 — Refund Flow (e2e)", () => {
     await prisma.checkoutIntent.deleteMany({ where: { id: { in: created.checkouts } } });
     await prisma.quote.deleteMany({ where: { id: { in: created.quotes } } });
     await prisma.product.deleteMany({ where: { id: { in: created.products } } });
+    await prisma.partner.deleteMany({ where: { id: { in: created.partners } } });
     await prisma.user.deleteMany({ where: { id: { in: created.users } } });
     await app.close();
   });
@@ -205,7 +222,7 @@ describe("Phase 2 Step 2.13 — Refund Flow (e2e)", () => {
     const fin = await createStaff("s13_fin2", RoleCode.FINANCE);
     // Order + PENDING payment (НЕ подтверждён) — refund невозможен.
     const { orderId } = await buildOrder(sm, "rfd_t2", 60);
-    const pending = (await agent(fin.accessToken).post("/api/v1/finance/payments").set("Idempotency-Key", `e2e-rf-${Date.now()}-2`).send({ orderId }).expect(201)).body as { id: string };
+    const pending = (await agent(fin.accessToken).post("/api/v1/finance/payments").set("Idempotency-Key", `e2e-rf-${Date.now()}-2`).send({ orderId, reason: "e2e pending refund fixture" }).expect(201)).body as { id: string };
     created.payments.push(pending.id);
     await createRefund(fin, pending.id, { amount: "10" }).expect(422);
     await createRefund(fin, "no-such-payment", { amount: "10" }).expect(404);
@@ -419,9 +436,9 @@ describe("Phase 2 Step 2.13 — Refund Flow (e2e)", () => {
     const sm = await createStaff("s13_sm11a", RoleCode.SALES_MANAGER);
     const fin = await createStaff("s13_fin11b", RoleCode.FINANCE);
     const { orderId, paymentId, paymentCode, amount } = await buildCapturedPayment(sm, fin, "rfd_t11", 45);
+    const beforeLedgerIds = (await prisma.ledgerTransaction.findMany({ select: { id: true } })).map((r) => r.id);
     const before = {
-      ledger: await prisma.ledgerTransaction.count(),
-      fees: await prisma.providerFee.count(),
+      ledger: await prisma.ledgerTransaction.count(),      fees: await prisma.providerFee.count(),
       settlements: await prisma.settlement.count(),
       payouts: await prisma.payout.count(),
       invoices: await prisma.invoice.count(),
@@ -446,7 +463,23 @@ describe("Phase 2 Step 2.13 — Refund Flow (e2e)", () => {
       bookings: await prisma.booking.count({ where: { orderId } }),
       availReserved: await prisma.availabilityReservation.count({ where: { sourceSaleId: { in: created.sales } } }),
     };
-    expect(after).toEqual(before);
+    // Refund — cash OUT: ровно одна append-only проводка REFUND_PROCESSED
+    // (LedgerPostingConsumer), без прочих финансовых side effects.
+    const { ledger: ledgerAfter, ...afterOther } = after;
+    const { ledger: ledgerBefore, ...beforeOther } = before;
+    expect(afterOther).toEqual(beforeOther);
+    expect(ledgerAfter).toBe(ledgerBefore + 1);
+    const newLedger = await prisma.ledgerTransaction.findMany({
+      where: { id: { notIn: beforeLedgerIds } },
+      select: { type: true, sourceType: true, sourceId: true, amount: true },
+    });
+    expect(newLedger).toHaveLength(1);
+    expect(newLedger[0]).toMatchObject({
+      type: "REFUND_PROCESSED",
+      sourceType: "REFUND",
+      sourceId: rfd.id,
+      amount: new Prisma.Decimal(amount),
+    });
     // Payment НЕ мутирован: status CAPTURED, amount/currency frozen (никакого reprice).
     const payRow = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
     expect(payRow.status).toBe("CAPTURED");

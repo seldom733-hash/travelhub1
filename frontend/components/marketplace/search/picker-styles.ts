@@ -14,8 +14,8 @@ export const PICKER_LABEL = "mb-0.5 block text-[13px] font-medium text-neutral-4
 export const PICKER_ROW = "flex flex-wrap items-end gap-3";
 
 /** Ширины контейнеров — контентные, как в поиске туров. */
-export const PICKER_W_FROM = "min-w-[180px] flex-[1_1_180px]";
-export const PICKER_W_TO = "min-w-[200px] flex-[1_1_200px]";
+export const PICKER_W_FROM = "w-[278px] min-w-[220px] max-w-[278px] flex-none";
+export const PICKER_W_TO = "w-[278px] min-w-[220px] max-w-[278px] flex-none";
 export const PICKER_W_NIGHTS = "min-w-[160px] flex-[1_1_160px]";
 export const PICKER_W_NIGHTS_WIDE = "min-w-[320px] flex-[1_1_320px]";
 export const PICKER_W_DATE_RANGE = "min-w-[360px] flex-[1_1_360px]";

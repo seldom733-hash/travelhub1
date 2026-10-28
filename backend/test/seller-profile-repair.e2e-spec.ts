@@ -51,6 +51,10 @@ describe("Phase 1 Step 1.11 — SellerProfileRepair (explicit, no startup backfi
     app.useGlobalFilters(new AppExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+    // Suite-isolated cleanup: repair scans ALL partners; global E2E fixtures
+    // (platform partner) would otherwise change scanned/skipped counts.
+    await prisma.publicSellerProfile.deleteMany({});
+    await prisma.partner.deleteMany({});
 
     const login = await request(app.getHttpServer()).post("/api/v1/auth/login").send({ username: "admin", password: "admin123" }).expect(200);
     adminAgent = request.agent(app.getHttpServer());

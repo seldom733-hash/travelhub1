@@ -54,11 +54,14 @@ export default function PartnerStorefrontPage() {
   const [heroHeading, setHeroHeading] = useState("");
   const [heroSubheading, setHeroSubheading] = useState("");
   const [themePreset, setThemePreset] = useState("default");
+  const [domainDraft, setDomainDraft] = useState("");
+  const [domainBusy, setDomainBusy] = useState(false);
 
   const [uploading, setUploading] = useState<StorefrontMediaKind | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<{ logo?: string; hero?: string }>({});
+  const [mediaPreview, setMediaPreview] = useState<{ logo?: string; hero?: string; gallery: Record<string, string> }>({ gallery: {} });
   const logoRef = useRef<HTMLInputElement>(null);
   const heroRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,6 +82,7 @@ export default function PartnerStorefrontPage() {
       setHeroHeading(view.heroHeading ?? "");
       setHeroSubheading(view.heroSubheading ?? "");
       setThemePreset(view.themePreset);
+      setDomainDraft(view.customDomain ?? "");
       void refreshMediaPreviews(view);
     } catch (e) {
       if ((e as Error).message.includes("404") || (e as Error).message.includes("not found")) {
@@ -96,12 +100,13 @@ export default function PartnerStorefrontPage() {
   }, [load]);
 
   const refreshMediaPreviews = async (view: StorefrontView) => {
-    const next: { logo?: string; hero?: string } = {};
+    const next: { logo?: string; hero?: string; gallery: Record<string, string> } = { gallery: {} };
     for (const m of view.media) {
       try {
         const { url } = await storefrontApi.previewMedia(m.id);
         if (m.kind === "LOGO") next.logo = url;
-        else next.hero = url;
+        else if (m.kind === "HERO") next.hero = url;
+        else next.gallery[m.id] = url;
       } catch {
         /* best-effort */
       }
@@ -124,6 +129,7 @@ export default function PartnerStorefrontPage() {
     setHeroHeading(view.heroHeading ?? "");
     setHeroSubheading(view.heroSubheading ?? "");
     setThemePreset(view.themePreset);
+    setDomainDraft(view.customDomain ?? "");
     void refreshMediaPreviews(view);
   };
 
@@ -221,6 +227,74 @@ export default function PartnerStorefrontPage() {
     }
   };
 
+  const saveDomain = async () => {
+    setDomainBusy(true);
+    setError("");
+    try {
+      applyView(await storefrontApi.setDomain(domainDraft.trim()));
+      setNotice("Домен сохранён. Добавьте TXT-запись и подтвердите.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDomainBusy(false);
+    }
+  };
+
+  const verifyDomain = async () => {
+    setDomainBusy(true);
+    setError("");
+    try {
+      applyView(await storefrontApi.verifyDomain());
+      setNotice("Домен подтверждён.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDomainBusy(false);
+    }
+  };
+
+  const removeDomain = async () => {
+    setDomainBusy(true);
+    setError("");
+    try {
+      applyView(await storefrontApi.removeDomain());
+      setNotice("Домен отвязан.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDomainBusy(false);
+    }
+  };
+
+  const uploadGallery = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading("GALLERY");
+    setError("");
+    try {
+      let view: StorefrontView | null = null;
+      for (const file of Array.from(files).slice(0, 12)) {
+        view = await storefrontApi.uploadMedia("GALLERY", file);
+      }
+      if (view) applyView(view);
+      setNotice(pt("storefront.media_uploaded_ok", locale));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setUploading(null);
+      if (galleryRef.current) galleryRef.current.value = "";
+    }
+  };
+
+  const removeGallery = async (mediaId: string) => {
+    setError("");
+    try {
+      applyView(await storefrontApi.deleteGalleryMedia(mediaId));
+      setNotice(pt("storefront.media_deleted_ok", locale));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
   const cities = useMemo(() => citiesOf(sf?.countryCode ?? null), [sf?.countryCode]);
   const countryLabel = countryName(sf?.countryCode ?? null, locale);
 
@@ -306,6 +380,9 @@ export default function PartnerStorefrontPage() {
             {pt("storefront.open_public", locale)} ↗
           </a>
         )}
+        <Link href="/partner/storefront/builder" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+          Конструктор сайта
+        </Link>
         <Link href="/partner/storefront/preview" className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:border-emerald-300 hover:text-emerald-700">
           {pt("storefront.preview", locale)}
         </Link>
@@ -470,6 +547,34 @@ export default function PartnerStorefrontPage() {
         </div>
         <input ref={logoRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => upload("LOGO", e.target.files?.[0])} />
         <input ref={heroRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => upload("HERO", e.target.files?.[0])} />
+
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">Галерея сайта</h3>
+              <p className="text-xs text-slate-400">До 24 изображений. Можно добавить их в блок «Галерея» в конструкторе.</p>
+            </div>
+            <button type="button" onClick={() => galleryRef.current?.click()} disabled={uploading === "GALLERY"} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+              {uploading === "GALLERY" ? "Загрузка…" : "Добавить изображения"}
+            </button>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {sf.media.filter((m) => m.kind === "GALLERY").map((m) => (
+              <div key={m.id} className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                {mediaPreview.gallery[m.id] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={mediaPreview.gallery[m.id]} alt={m.altText ?? ""} className="aspect-[4/3] w-full object-cover" />
+                ) : (
+                  <div className="flex aspect-[4/3] items-center justify-center text-xs text-slate-400">—</div>
+                )}
+                <button type="button" onClick={() => void removeGallery(m.id)} className="absolute right-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[11px] text-rose-600 opacity-0 shadow transition group-hover:opacity-100">
+                  Удалить
+                </button>
+              </div>
+            ))}
+          </div>
+          <input ref={galleryRef} type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => void uploadGallery(e.target.files)} />
+        </div>
       </section>
 
       {/* ── Distribution ── */}
@@ -479,6 +584,32 @@ export default function PartnerStorefrontPage() {
         <Link href="/partner/products" className="inline-block rounded-lg border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50">
           {pt("storefront.manage_distribution", locale)} →
         </Link>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-900">Свой домен</h2>
+        <p className="mt-0.5 text-xs text-slate-400">Например, tours.example.com. Нужна TXT-запись для подтверждения.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input value={domainDraft} onChange={(e) => setDomainDraft(e.target.value)} placeholder="tours.example.com" className="min-w-64 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+          <button type="button" onClick={() => void saveDomain()} disabled={domainBusy || !domainDraft.trim()} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Сохранить</button>
+          {sf.customDomainStatus === "PENDING" && (
+            <button type="button" onClick={() => void verifyDomain()} disabled={domainBusy} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Проверить DNS</button>
+          )}
+          {sf.customDomain && (
+            <button type="button" onClick={() => void removeDomain()} disabled={domainBusy} className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 disabled:opacity-50">Отвязать</button>
+          )}
+        </div>
+        {sf.customDomain && (
+          <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs text-slate-600">
+            <div>Статус: <b>{sf.customDomainStatus}</b></div>
+            {sf.customDomainStatus !== "VERIFIED" && sf.customDomainToken && (
+              <div className="mt-2">
+                Добавьте TXT-запись для <b>{sf.customDomain}</b>:<br />
+                <code className="mt-1 block break-all rounded bg-white px-2 py-1 text-[11px]">{sf.customDomainToken}</code>
+              </div>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

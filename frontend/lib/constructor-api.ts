@@ -6,7 +6,7 @@ import { api } from "./api";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type BlockCategory = "system" | "marketplace" | "content";
+export type BlockCategory = "system" | "marketplace" | "storefront" | "content";
 
 export type ConstructorTabKey = "header" | "hero" | "search" | "footer" | "design";
 

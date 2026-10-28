@@ -76,7 +76,7 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
   /** Штатный полный цикл: send booking → подтвердить/завершить бронь (reconcile → FULFILLED). */
   const fulfillViaBooking = async (orderId: string) => {
     await action(orderId, "send").expect(200);
-    const bookingId = (await http.get(`/api/v1/bookings?orderId=${orderId}`).expect(200)).body.items[0].id;
+    const bookingId = (await http.get(`/api/v1/bookings?orderId=${orderId}&acquisitionSource=DIRECT`).expect(200)).body.items[0].id;
     for (const a of ["send", "confirm", "service", "complete"]) {
       await http.patch(`/api/v1/bookings/${bookingId}`).send({ action: a }).expect(200);
     }
@@ -101,7 +101,8 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
     http.set("Authorization", `Bearer ${login.body.accessToken}`);
     adminId = (await http.get("/api/v1/auth/me").expect(200)).body.id as string;
 
-    const product = (await http.post("/api/v1/products").send({ type: "TOUR", title: `Env ${stamp}` }).expect(201)).body.product;
+    const product = (await http.post("/api/v1/products").send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `Env ${stamp}` }).expect(201)).body.product;
     productIds.push(product.id);
     productId = product.id;
     await http.post(`/api/v1/products/${productId}/publish`).expect(201);
@@ -233,7 +234,7 @@ describe("Phase 1 Step 1.15A — Business Event Envelope (e2e)", () => {
     // §7: события-результаты consumer-а — SYSTEM actor.
     expect(actorOf(created!.actor)).toEqual({ type: "SYSTEM" });
     // §8: entityId — canonical booking ID (первая созданная бронь).
-    const bookingId = (await http.get(`/api/v1/bookings?orderId=${order.id}`).expect(200)).body.items[0].id;
+    const bookingId = (await http.get(`/api/v1/bookings?orderId=${order.id}&acquisitionSource=DIRECT`).expect(200)).body.items[0].id;
     expect(created!.aggregateId).toBe(bookingId);
     expect(created!.aggregateType).toBe("Booking");
     // §7(1.15): OrderReadyForBooking не порождает booking-команду; BookingRequested — USER actor (send).

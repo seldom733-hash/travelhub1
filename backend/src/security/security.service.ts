@@ -54,7 +54,7 @@ export class SecurityService implements OnModuleInit {
       await this.prisma.role.upsert({
         where: { code },
         update: {},
-        create: { code, title: ROLE_TITLES[code] },
+        create: { code, title: ROLE_TITLES[code], description: ROLE_TITLES[code] },
       });
     }
 
@@ -132,17 +132,420 @@ export class SecurityService implements OnModuleInit {
 
   /** Права пользователя (из его роли). */
   async permissionsOf(userId: string): Promise<string[]> {
+    const now = new Date();
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { role: { select: { permissions: { select: { permission: { select: { code: true } } } } } } },
+      select: {
+        role: { select: { permissions: { select: { permission: { select: { code: true } } } } } },
+        roleAssignments: {
+          where: {
+            revokedAt: null,
+            startAt: { lte: now },
+            OR: [{ endAt: null }, { endAt: { gt: now } }],
+          },
+          select: { role: { select: { permissions: { select: { permission: { select: { code: true } } } } } } },
+        },
+      },
     });
-    return (user?.role?.permissions ?? []).map((rp) => rp.permission.code);
+    const codes = new Set<string>();
+    for (const rp of user?.role?.permissions ?? []) codes.add(rp.permission.code);
+    for (const assignment of user?.roleAssignments ?? []) {
+      for (const rp of assignment.role.permissions) codes.add(rp.permission.code);
+    }
+    // Primary role is always effective; additional roles are filtered by their
+    // validity window at REQUEST time — expiry takes effect without a cron.
+    return [...codes];
   }
 
   /** Проверка права у пользователя. */
   async hasPermission(userId: string, permission: string): Promise<boolean> {
     const perms = await this.permissionsOf(userId);
     return perms.includes(permission);
+  }
+
+  // ── Hybrid RBAC: role catalogue / permission editor / assignments ──────────
+
+  private static readonly SETTINGS_WRITE = "settings.write";
+
+  /** Roles + permission catalogue + counts (primary + active additional). */
+  async listRoles() {
+    const now = new Date();
+    const [roles, permissions, users, assignments] = await Promise.all([
+      this.prisma.role.findMany({
+        orderBy: { code: "asc" },
+        include: { permissions: { include: { permission: true } } },
+      }),
+      this.prisma.permission.findMany({ orderBy: { code: "asc" }, select: { code: true, description: true } }),
+      this.prisma.user.findMany({ select: { id: true, roleId: true } }),
+      this.prisma.userRoleAssignment.findMany({
+        where: { revokedAt: null, startAt: { lte: now }, OR: [{ endAt: null }, { endAt: { gt: now } }] },
+        select: { roleId: true, userId: true },
+      }),
+    ]);
+    const primary = new Map<string, Set<string>>();
+    for (const u of users) {
+      if (!primary.has(u.roleId)) primary.set(u.roleId, new Set());
+      primary.get(u.roleId)!.add(u.id);
+    }
+    const extra = new Map<string, Set<string>>();
+    for (const a of assignments) {
+      if (!extra.has(a.roleId)) extra.set(a.roleId, new Set());
+      extra.get(a.roleId)!.add(a.userId);
+    }
+    return {
+      roles: roles.map((r) => ({
+        code: r.code,
+        title: r.title,
+        description: r.description ?? r.title,
+        userCount: new Set([...(primary.get(r.id) ?? []), ...(extra.get(r.id) ?? [])]).size,
+        permissions: r.permissions.map((p) => p.permission.code).sort(),
+      })),
+      permissions,
+    };
+  }
+
+  async roleHistory(code: RoleCode) {
+    const role = await this.prisma.role.findUnique({ where: { code } });
+    if (!role) throw new NotFoundError(`Role ${code} not found`);
+    const rows = await this.prisma.auditLog.findMany({
+      where: { action: "role.permissions_updated", resource: "Role", resourceId: role.id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      action: r.action,
+      actor: r.username,
+      createdAt: r.createdAt.toISOString(),
+      details: r.details,
+    }));
+  }
+
+  /**
+   * Replace the role's permission set atomically. Guards:
+   *  - unknown permission codes rejected;
+   *  - the platform must retain at least one ACTIVE user with settings.write.
+   */
+  async updateRolePermissions(code: RoleCode, requested: string[], actorId: string) {
+    const role = await this.prisma.role.findUnique({
+      where: { code },
+      include: { permissions: { include: { permission: true } } },
+    });
+    if (!role) throw new NotFoundError(`Role ${code} not found`);
+    const unique = [...new Set(requested.map((p) => p.trim()).filter(Boolean))];
+    const found = await this.prisma.permission.findMany({ where: { code: { in: unique } }, select: { code: true } });
+    if (found.length !== unique.length) {
+      const known = new Set(found.map((p) => p.code));
+      throw new ValidationDomainError(`Unknown permission(s): ${unique.filter((p) => !known.has(p)).join(", ")}`);
+    }
+    const before = role.permissions.map((p) => p.permission.code).sort();
+    if (before.includes(SecurityService.SETTINGS_WRITE) && !unique.includes(SecurityService.SETTINGS_WRITE)) {
+      await this.assertRoleEditKeepsAdmin(role.id, unique);
+    }
+    const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { username: true } });
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({ where: { roleId: role.id } });
+      if (unique.length > 0) {
+        const permissions = await tx.permission.findMany({ where: { code: { in: unique } }, select: { id: true } });
+        await tx.rolePermission.createMany({ data: permissions.map((p) => ({ roleId: role.id, permissionId: p.id })) });
+      }
+      await this.audit(tx, {
+        userId: actorId,
+        username: actor?.username ?? null,
+        action: "role.permissions_updated",
+        resource: "Role",
+        resourceId: role.id,
+        details: {
+          roleCode: role.code,
+          before,
+          after: [...unique].sort(),
+          added: unique.filter((p) => !before.includes(p)),
+          removed: before.filter((p) => !unique.includes(p)),
+        },
+      });
+      await tx.role.update({ where: { id: role.id }, data: { description: role.description ?? role.title } });
+      return tx.role.findUniqueOrThrow({
+        where: { id: role.id },
+        include: { permissions: { include: { permission: true } } },
+      });
+    });
+    return {
+      code: updated.code,
+      title: updated.title,
+      description: updated.description,
+      permissions: updated.permissions.map((p) => p.permission.code).sort(),
+    };
+  }
+
+  /** Detailed user roles: primary + all additional assignments + effective perms. */
+  async userRoles(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: true,
+        roleAssignments: { include: { role: true }, orderBy: [{ startAt: "desc" }, { createdAt: "desc" }] },
+      },
+    });
+    if (!user) throw new NotFoundError(`User ${userId} not found`);
+    const now = new Date();
+    const roles = await this.prisma.role.findMany({ orderBy: { code: "asc" }, select: { code: true, title: true } });
+    return {
+      userId: user.id,
+      code: user.code,
+      username: user.username,
+      fullName: user.fullName,
+      primaryRole: { code: user.role.code, title: user.role.title },
+      assignments: user.roleAssignments.map((a) => ({
+        id: a.id,
+        roleCode: a.role.code,
+        roleTitle: a.role.title,
+        startAt: a.startAt.toISOString(),
+        endAt: a.endAt ? a.endAt.toISOString() : null,
+        reason: a.reason,
+        assignedById: a.assignedById,
+        assignedByName: a.assignedByName,
+        assignedAt: a.createdAt.toISOString(),
+        status: a.revokedAt
+          ? "REVOKED"
+          : a.startAt > now
+            ? "SCHEDULED"
+            : a.endAt && a.endAt <= now
+              ? "EXPIRED"
+              : "ACTIVE",
+        revokedAt: a.revokedAt ? a.revokedAt.toISOString() : null,
+      })),
+      effectivePermissions: await this.permissionsOf(user.id),
+      availableRoles: roles,
+    };
+  }
+
+  /** Assign an additional role (optionally temporary). Never changes primary. */
+  async assignAdditionalRole(
+    userId: string,
+    input: { roleCode: RoleCode; startAt?: string; endAt?: string; reason?: string },
+    actor: { id: string; username: string },
+  ) {
+    if (actor.id === userId) throw new ValidationDomainError("You cannot assign roles to yourself");
+    const role = await this.prisma.role.findUnique({ where: { code: input.roleCode } });
+    if (!role) throw new NotFoundError(`Role ${input.roleCode} not found`);
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, roleId: true, username: true } });
+    if (!user) throw new NotFoundError(`User ${userId} not found`);
+    if (user.roleId === role.id) throw new ValidationDomainError("Role is already the user's primary role");
+    const startAt = input.startAt ? new Date(input.startAt) : new Date();
+    const endAt = input.endAt ? new Date(input.endAt) : null;
+    if (Number.isNaN(startAt.getTime()) || (endAt && Number.isNaN(endAt.getTime()))) {
+      throw new ValidationDomainError("Invalid role validity dates");
+    }
+    if (endAt && endAt <= startAt) throw new ValidationDomainError("endAt must be after startAt");
+    if (endAt && endAt <= new Date()) throw new ValidationDomainError("endAt must be in the future");
+    const reason = input.reason?.trim() || null;
+
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.userRoleAssignment.findUnique({
+        where: { userId_roleId: { userId, roleId: role.id } },
+      });
+      // Atomic upsert (unique user+role) — concurrent duplicate assignments do
+      // not create a second row or leak a raw P2002.
+      await tx.userRoleAssignment.upsert({
+        where: { userId_roleId: { userId, roleId: role.id } },
+        create: {
+          userId,
+          roleId: role.id,
+          startAt,
+          endAt,
+          reason,
+          assignedById: actor.id,
+          assignedByName: actor.username,
+        },
+        update: {
+          startAt,
+          endAt,
+          reason,
+          assignedById: actor.id,
+          assignedByName: actor.username,
+          revokedAt: null,
+          revokedById: null,
+          createdAt: new Date(),
+        },
+      });
+      await this.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: existing ? "user.role_assignment_updated" : "user.role_assigned",
+        resource: "User",
+        resourceId: user.id,
+        details: {
+          targetUsername: user.username,
+          roleCode: role.code,
+          startAt: startAt.toISOString(),
+          endAt: endAt ? endAt.toISOString() : null,
+          reason,
+          actor: actor.username,
+        },
+      });
+    });
+    return this.userRoles(userId);
+  }
+
+  /** Revoke one additional assignment; other roles (and primary) untouched. */
+  async revokeAdditionalRole(userId: string, assignmentId: string, actor: { id: string; username: string }) {
+    if (actor.id === userId) throw new ValidationDomainError("You cannot revoke your own roles");
+    const assignment = await this.prisma.userRoleAssignment.findFirst({
+      where: { id: assignmentId, userId },
+      include: { role: true, user: { select: { id: true, roleId: true, username: true } } },
+    });
+    if (!assignment) throw new NotFoundError("Role assignment not found");
+    if (assignment.role.code === RoleCode.ADMIN && assignment.user.roleId !== assignment.roleId) {
+      await this.assertUserRemainsAdmin(userId, { removeRoleId: assignment.roleId });
+    }
+    const changed = await this.prisma.$transaction(async (tx) => {
+      const res = await tx.userRoleAssignment.updateMany({
+        where: { id: assignment.id, userId, revokedAt: null },
+        data: { revokedAt: new Date(), revokedById: actor.id },
+      });
+      if (res.count === 0) return false;
+      await this.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "user.role_revoked",
+        resource: "User",
+        resourceId: userId,
+        details: {
+          targetUsername: assignment.user.username,
+          roleCode: assignment.role.code,
+          assignmentId: assignment.id,
+          actor: actor.username,
+        },
+      });
+      return true;
+    });
+    return this.userRoles(userId);
+  }
+
+  /** Change primary role (legacy /users/:id/role), preserving additional roles. */
+  async assignRole(userId: string, roleCode: RoleCode, actor: { id: string; username: string }): Promise<void> {
+    if (actor.id === userId) throw new ValidationDomainError("You cannot change your own primary role");
+    const role = await this.prisma.role.findUnique({ where: { code: roleCode } });
+    if (!role) throw new NotFoundError(`Role ${roleCode} not found`);
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { role: true } });
+    if (!user) throw new NotFoundError(`User ${userId} not found`);
+    if (user.roleId === role.id) return;
+    if (user.role.code === RoleCode.ADMIN && role.code !== RoleCode.ADMIN) {
+      await this.assertUserRemainsAdmin(userId, { newPrimaryRoleId: role.id });
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { roleId: role.id, version: { increment: 1 } } });
+      // The promoted role cannot remain as an additional assignment.
+      await tx.userRoleAssignment.updateMany({
+        where: { userId, roleId: role.id, revokedAt: null },
+        data: { revokedAt: new Date(), revokedById: actor.id },
+      });
+      await this.audit(tx, {
+        userId: actor.id,
+        username: actor.username,
+        action: "user.role_changed",
+        resource: "User",
+        resourceId: user.id,
+        details: { fromRole: user.role.code, toRole: role.code, username: user.username },
+      });
+    });
+  }
+
+  /** True if at least one ACTIVE user would retain settings.write after simulation. */
+  private async assertRoleEditKeepsAdmin(roleId: string, newCodes: string[]) {
+    const settingsWriteRoles = await this.prisma.role.findMany({
+      where: { permissions: { some: { permission: { code: SecurityService.SETTINGS_WRITE } } } },
+      select: { id: true },
+    });
+    const users = await this.prisma.user.findMany({
+      where: { status: UserStatus.ACTIVE },
+      select: {
+        id: true,
+        roleId: true,
+        roleAssignments: {
+          where: { revokedAt: null, startAt: { lte: new Date() }, OR: [{ endAt: null }, { endAt: { gt: new Date() } }] },
+          select: { roleId: true },
+        },
+      },
+    });
+    const roleGrants = new Set(settingsWriteRoles.map((r) => r.id));
+    if (newCodes.includes(SecurityService.SETTINGS_WRITE)) roleGrants.add(roleId);
+    else roleGrants.delete(roleId);
+    const any = users.some((u) => roleGrants.has(u.roleId) || u.roleAssignments.some((a) => roleGrants.has(a.roleId)));
+    if (!any) throw new ConflictError("Cannot remove settings.write: platform must retain at least one active administrator");
+  }
+
+  /** Locking/deactivating the last active administrator is forbidden. */
+  private async assertTargetRetainsAdminOnStatusChange(targetUserId: string) {
+    const settingsRoles = await this.prisma.role.findMany({
+      where: { permissions: { some: { permission: { code: SecurityService.SETTINGS_WRITE } } } },
+      select: { id: true },
+    });
+    const roleGrants = new Set(settingsRoles.map((r) => r.id));
+    const now = new Date();
+    const users = await this.prisma.user.findMany({
+      where: { status: UserStatus.ACTIVE },
+      select: {
+        id: true,
+        roleId: true,
+        roleAssignments: {
+          where: { revokedAt: null, startAt: { lte: now }, OR: [{ endAt: null }, { endAt: { gt: now } }] },
+          select: { roleId: true },
+        },
+      },
+    });
+    const target = users.find((u) => u.id === targetUserId);
+    if (!target) return;
+    const targetIsAdmin =
+      roleGrants.has(target.roleId) || target.roleAssignments.some((a) => roleGrants.has(a.roleId));
+    if (!targetIsAdmin) return;
+    const others = users.filter(
+      (u) =>
+        u.id !== targetUserId &&
+        (roleGrants.has(u.roleId) || u.roleAssignments.some((a) => roleGrants.has(a.roleId))),
+    ).length;
+    if (others === 0) throw new ConflictError("Cannot deactivate the last active administrator");
+  }
+
+  /** Last-admin protection for primary change / additional ADMIN revocation. */
+  private async assertUserRemainsAdmin(
+    targetUserId: string,
+    opts: { newPrimaryRoleId?: string; removeRoleId?: string } = {},
+  ) {
+    const settingsWriteRoles = await this.prisma.role.findMany({
+      where: { permissions: { some: { permission: { code: SecurityService.SETTINGS_WRITE } } } },
+      select: { id: true },
+    });
+    const roleGrants = new Set(settingsWriteRoles.map((r) => r.id));
+    const now = new Date();
+    const users = await this.prisma.user.findMany({
+      where: { status: UserStatus.ACTIVE },
+      select: {
+        id: true,
+        roleId: true,
+        roleAssignments: {
+          where: { revokedAt: null, startAt: { lte: now }, OR: [{ endAt: null }, { endAt: { gt: now } }] },
+          select: { roleId: true },
+        },
+      },
+    });
+    let remaining = 0;
+    for (const u of users) {
+      if (u.id === targetUserId) continue;
+      if (roleGrants.has(u.roleId) || u.roleAssignments.some((a) => roleGrants.has(a.roleId))) remaining += 1;
+    }
+    const target = users.find((u) => u.id === targetUserId);
+    if (target) {
+      const primary = opts.newPrimaryRoleId ?? target.roleId;
+      const assigned = target.roleAssignments
+        .map((a) => a.roleId)
+        .filter((roleId) => roleId !== opts.removeRoleId);
+      const targetRetains = roleGrants.has(primary) || assigned.some((id) => roleGrants.has(id));
+      if (!targetRetains && remaining === 0) {
+        throw new ConflictError("Cannot remove the last active administrator");
+      }
+    }
   }
 
   private static readonly USER_SORT_ALLOWLIST: Record<string, string> = {
@@ -193,6 +596,14 @@ export class SecurityService implements OnModuleInit {
           fullName: true,
           status: true,
           role: { select: { code: true, title: true } },
+          roleAssignments: {
+            where: {
+              revokedAt: null,
+              startAt: { lte: new Date() },
+              OR: [{ endAt: null }, { endAt: { gt: new Date() } }],
+            },
+            select: { role: { select: { code: true, title: true } }, endAt: true },
+          },
           partnerId: true,
           customerId: true,
           lastLoginAt: true,
@@ -248,30 +659,13 @@ export class SecurityService implements OnModuleInit {
     return { rows, total: rows.length };
   }
 
-  /** Смена роли пользователя (audit обязателен). */
-  async assignRole(userId: string, roleCode: RoleCode, actorId: string): Promise<void> {
-    const role = await this.prisma.role.findUnique({ where: { code: roleCode } });
-    if (!role) throw new NotFoundError(`Role ${roleCode} not found`);
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundError(`User ${userId} not found`);
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: userId }, data: { roleId: role.id, version: { increment: 1 } } });
-      await this.audit(tx, {
-        userId: actorId,
-        username: null,
-        action: "user.role_changed",
-        resource: "User",
-        resourceId: user.id,
-        details: { fromRole: user.roleId, toRole: role.code, username: user.username },
-      });
-    });
-  }
-
   /** Смена статуса пользователя (lock/unlock). */
   async setStatus(userId: string, status: UserStatus, actorId: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundError(`User ${userId} not found`);
+    if (status !== UserStatus.ACTIVE) {
+      await this.assertTargetRetainsAdminOnStatusChange(userId);
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({ where: { id: userId }, data: { status, version: { increment: 1 } } });

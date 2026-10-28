@@ -142,7 +142,8 @@ describe("Phase 2 — RBAC: запись Catalog/CRM закрыта по пра�
     const product = (
       await adminAgent
         .post("/api/v1/products")
-        .send({ type: "TOUR", title: `403 Cat ${stamp}`, tariffs: [{ name: "S", price: 100 }] })
+        .send({
+        partnerId: "00000000-0000-4000-8000-000000000001", type: "TOUR", title: `403 Cat ${stamp}`, tariffs: [{ name: "S", price: 100 }] })
         .expect(201)
     ).body.product;
     created.products.push(product.id);

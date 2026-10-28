@@ -32,6 +32,11 @@ export interface SupplierSearchQuery {
   /** Night range. */
   nightsFrom?: number;
   nightsTo?: number;
+  /**
+   * Explicit night values for a catalog sample. When set, adapters may use
+   * these instead of expanding the whole [nightsFrom, nightsTo] range.
+   */
+  nightOptions?: number[];
   /** Passenger composition. */
   adults: number;
   children?: number;
@@ -239,6 +244,22 @@ export interface SupplierGeoOption {
   townKey?: string;
 }
 
+export interface SupplierCatalogCoverage {
+  pagesFetched: number;
+  /** Null when the supplier does not expose a total page count. */
+  pageCount: number | null;
+  hasMore: boolean | null;
+  truncated: boolean;
+  programsComplete: boolean;
+  windowsComplete: boolean;
+  errors: string[];
+}
+
+export interface SupplierCatalogSearchResult {
+  offers: SupplierOffer[];
+  coverage: SupplierCatalogCoverage;
+}
+
 export interface SupplierAdapter {
   /** Unique supplier code. */
   readonly code: string;
@@ -249,6 +270,13 @@ export interface SupplierAdapter {
 
   /** Search for offers matching the query. */
   search(query: SupplierSearchQuery): Promise<SupplierOffer[]>;
+
+  /**
+   * Catalog-safe search with explicit coverage metadata. Adapters that do not
+   * implement it keep the legacy search and are always treated as incomplete
+   * by the catalog preview.
+   */
+  searchCatalog?(query: SupplierSearchQuery): Promise<SupplierCatalogSearchResult>;
 
   /** Get full detail for a specific offer. */
   getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail>;

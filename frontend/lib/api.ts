@@ -1,3 +1,5 @@
+import { humanizePermissionMessage } from "./permission-labels";
+
 const BASE = "/api/v1";
 
 /**
@@ -82,7 +84,7 @@ async function handle<T>(res: Response): Promise<T> {
     let message = `HTTP ${res.status}`;
     try {
       const body = (await res.json()) as { message?: string };
-      if (body?.message) message = body.message;
+      if (body?.message) message = humanizePermissionMessage(body.message);
     } catch {
       /* ignore */
     }
@@ -152,6 +154,7 @@ export interface PlatformUser {
   fullName: string | null;
   status: string;
   role: { code: string; title: string };
+  roleAssignments?: Array<{ role: { code: string; title: string }; endAt: string | null }>;
   partnerId: string | null;
   customerId: string | null;
   lastLoginAt: string | null;

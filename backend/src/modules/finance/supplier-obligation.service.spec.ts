@@ -151,6 +151,11 @@ function makeService(opts: { obligation?: ObligationRow | null; payoutByProvider
       count: jest.fn().mockResolvedValue(0),
     },
     partner: { findMany: jest.fn().mockResolvedValue([{ id: "ptn1", code: "PAR-00000001" }]) },
+    // Finance completion: legacy payout теперь пишет allocation в той же транзакции.
+    supplierPayoutAllocation: { create: jest.fn().mockResolvedValue({ id: "alloc-1" }) },
+    // Условия оплаты: по умолчанию правила нет → dueDate вводится вручную.
+    supplierPaymentTerms: { findUnique: jest.fn().mockResolvedValue(null) },
+    supplierObligationEvent: { create: jest.fn().mockResolvedValue({ id: "evt-1" }) },
   };
   prisma.$transaction = { ...({} as Record<string, jest.Mock>) };
   const $transaction = jest.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma));
@@ -192,6 +197,37 @@ describe("SupplierObligationService (UNIFIED FINANCE CENTER Phase 2)", () => {
       expect(dto.status).toBe("OPEN");
       expect(dto.paidAmount).toBe("0");
       expect(dto.remainingAmount).toBe("1700");
+    });
+
+    it("payment terms NET_DAYS 30 → dueDate + snapshot в обязательстве", async () => {
+      const h = makeService({ obligation: null });
+      h.prisma.supplierPaymentTerms.findUnique.mockResolvedValue({ rule: "NET_DAYS", days: 30, active: true });
+      h.prisma.supplierObligation.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) =>
+        ob({ id: "ob-new", ...data } as Partial<ObligationRow>));
+      await h.service.createObligationForBooking(
+        h.prisma as never,
+        { ...booking, commercialSnapshot: { supplierCode: "SUMMERTOUR", serviceType: "tour", supplierPrice: 1000, supplierCurrency: "USD", fx: { rate: "1.7", rateCode: "SFX-1", aznAmount: 1700 } } },
+        ctx,
+      );
+      const data = (h.prisma.supplierObligation.create.mock.calls[0][0] as { data: Record<string, unknown> }).data;
+      expect((data.dueDate as Date).toISOString()).toBe("2026-10-31T00:00:00.000Z");
+      expect(data.paymentTermsRule).toBe("NET_DAYS");
+      expect(data.paymentTermsDays).toBe(30);
+      expect(data.paymentTermsAppliedAt).toBeInstanceOf(Date);
+    });
+
+    it("нет правила поставщика → dueDate null (ручной срок), snapshot пуст", async () => {
+      const h = makeService({ obligation: null });
+      h.prisma.supplierObligation.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) =>
+        ob({ id: "ob-new", ...data } as Partial<ObligationRow>));
+      await h.service.createObligationForBooking(
+        h.prisma as never,
+        { ...booking, commercialSnapshot: { supplierCode: "SUMMERTOUR", serviceType: "tour", supplierPrice: 1000, supplierCurrency: "USD", fx: { rate: "1.7", rateCode: "SFX-1", aznAmount: 1700 } } },
+        ctx,
+      );
+      const data = (h.prisma.supplierObligation.create.mock.calls[0][0] as { data: Record<string, unknown> }).data;
+      expect(data.dueDate).toBeNull();
+      expect(data.paymentTermsRule).toBeNull();
     });
 
     it("AZN-источник без fx → aznAmount = sourceAmount, rate 1", async () => {

@@ -130,15 +130,30 @@ describe("Phase 2 Step 2.12E — Partner Collect / Commission Accrual (e2e, ADR-
     return { productId: product.id, tariffId: tariff.id, tariffPrice: String(tariff.price) };
   };
 
-  /** Продукт БЕЗ владельца (system/admin-owned) — D14 fail-closed путь. */
+  /** Продукт БЕЗ владельца (system/admin-owned) — D14 fail-closed путь.
+   *  Через API ownerless Product больше не создаётся (бизнес-правило); для
+   *  legacy-сценария создаём строку напрямую в БД (test-only fixture). */
   const createUnownedProduct = async (tag: string, price = 100): Promise<ProductFixture> => {
-    const res = await adminAgent
-      .post("/api/v1/products")
-      .send({ type: "TOUR", title: `2.12E unowned ${tag} ${stamp}`, tariffs: [{ name: "Std", price }] })
-      .expect(201);
-    const product = res.body.product as { id: string };
+    const product = await prisma.product.create({
+      data: {
+        code: `PRD-E2E-UNOWNED-${tag}-${stamp}`,
+        slug: `e2e-unowned-${tag}-${stamp}`,
+        type: "TOUR",
+        title: `2.12E unowned ${tag} ${stamp}`,
+        status: "DRAFT",
+        version: 1,
+      },
+    });
     created.products.push(product.id);
-    const tariff = await prisma.tariff.findFirstOrThrow({ where: { productId: product.id } });
+    const tariff = await prisma.tariff.create({
+      data: {
+        code: `TRF-E2E-UNOWNED-${tag}-${stamp}`,
+        productId: product.id,
+        name: "Std",
+        price: new Prisma.Decimal(price),
+        currency: "AZN",
+      },
+    });
     return { productId: product.id, tariffId: tariff.id, tariffPrice: String(tariff.price) };
   };
 
@@ -579,6 +594,7 @@ describe("Phase 2 Step 2.12E — Partner Collect / Commission Accrual (e2e, ADR-
       data: {
         code,
         number,
+        referenceNumber: `MKT-ORD-E2E-${stamp}-T8`,
         customerId: null,
         status: "NEW",
         paymentStatus: "UNPAID",
@@ -714,6 +730,7 @@ describe("Phase 2 Step 2.12E — Partner Collect / Commission Accrual (e2e, ADR-
       data: {
         code,
         number,
+        referenceNumber: `MKT-ORD-E2E-${stamp}-T12`,
         customerId: null,
         status: "NEW",
         paymentStatus: "UNPAID",

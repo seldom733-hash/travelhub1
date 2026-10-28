@@ -32,6 +32,7 @@ import { DomainEvents } from "../../eventbus/domain-events";
 import { ConflictError, NotFoundError, ValidationDomainError } from "../../shared/errors";
 import { toMoney2 } from "../sales/sales.money";
 import { validateIsoCode } from "./finance.validation";
+import { computeDueDate } from "./supplier-payment-terms.service";
 
 export const TARGET_AZN = "AZN";
 /** Статусы, по которым допустима частичная выплата (remaining > 0). */
@@ -51,6 +52,14 @@ export interface SupplierObligationDto {
   orderId: string;
   orderCode: string | null;
   orderItemId: string | null;
+  /** Номер счёта поставщика (вводится финансами). */
+  invoiceNumber: string | null;
+  /** Срок оплаты (ISO date) или null — срок не согласован. */
+  dueDate: string | null;
+  /** true: срок прошёл, остаток > 0, статус позволяет оплату (derived, не stored). */
+  overdue: boolean;
+  /** status + derived OVERDUE для отображения (не пишется в БД). */
+  displayStatus: string;
   supplierCode: string | null;
   partnerId: string | null;
   /** CRM Partner.code (PAR-*) — resolve на read; null если не привязан. */
@@ -78,8 +87,15 @@ export interface SupplierObligationDto {
 export interface SupplierPayoutDto {
   id: string;
   code: string;
-  obligationId: string;
+  /** null для нераспределённых платежей (реестр supplier payments). */
+  obligationId: string | null;
   obligationCode: string;
+  status: string;
+  supplierCode: string | null;
+  partnerId: string | null;
+  purpose: string | null;
+  comment: string | null;
+  confirmedAt: string | null;
   amount: string;
   currency: string;
   aznAmount: string;
@@ -102,6 +118,8 @@ interface ObligationRow {
   orderId: string;
   orderCode: string | null;
   orderItemId: string | null;
+  invoiceNumber: string | null;
+  dueDate: Date | null;
   supplierCode: string | null;
   partnerId: string | null;
   serviceType: string | null;
@@ -121,6 +139,12 @@ interface ObligationRow {
 }
 
 const dec = (d: Prisma.Decimal | null | undefined): string | null => (d == null ? null : d.toString());
+
+/** Начало сегодняшнего дня (UTC) — overdue сравнивается по календарной дате. */
+function startOfTodayUtc(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
 
 @Injectable()
 export class SupplierObligationService {
@@ -188,6 +212,16 @@ export class SupplierObligationService {
     const supplierCode = snap && typeof snap.supplierCode === "string" ? snap.supplierCode : null;
     const serviceType = snap && typeof snap.serviceType === "string" ? snap.serviceType : null;
 
+    // Срок оплаты: применяем активное правило поставщика ТОЛЬКО сейчас и
+    // фиксируем snapshot; изменение правила позже не переписывает срок.
+    const terms = supplierCode
+      ? await tx.supplierPaymentTerms.findUnique({ where: { supplierCode: supplierCode.trim().toUpperCase() } })
+      : null;
+    const termsAppliedAt = terms?.active ? new Date() : null;
+    const dueDate = terms?.active
+      ? computeDueDate(terms.rule, terms.days, ctx.confirmedAt ?? new Date())
+      : null;
+
     const code = await this.ids.nextCode(tx, "SBO");
     try {
       const row = await tx.supplierObligation.create({
@@ -212,6 +246,10 @@ export class SupplierObligationService {
           source: "BOOKING_CONFIRMED",
           sourceEventId: ctx.sourceEventId,
           confirmedAt: ctx.confirmedAt,
+          dueDate,
+          paymentTermsRule: terms?.active ? terms.rule : null,
+          paymentTermsDays: terms?.active ? terms.days : null,
+          paymentTermsAppliedAt: termsAppliedAt,
         },
       });
       await this.security.audit(tx, {
@@ -227,6 +265,16 @@ export class SupplierObligationService {
           sourceCurrency,
           aznAmount: aznAmount ? aznAmount.toString() : null,
           amountUnknown: aznAmount == null,
+        },
+      });
+      // Историческая проекция для отчёта «задолженность на дату».
+      await tx.supplierObligationEvent.create({
+        data: {
+          obligationId: row.id,
+          type: "CREATED",
+          aznAmount,
+          occurredAt: ctx.confirmedAt ?? row.createdAt,
+          details: { source: "BOOKING_CONFIRMED", sourceEventId: ctx.sourceEventId },
         },
       });
       return this.toDto(row, null);
@@ -246,21 +294,44 @@ export class SupplierObligationService {
     status?: string;
     supplierCode?: string;
     orderId?: string;
+    /** true — только просроченные (dueDate < сегодня, остаток > 0, payable). */
+    overdue?: boolean;
+    /** dueDate < переданной даты (ISO). */
+    dueBefore?: string;
+    /** Поиск по коду/счёту/заказу/брони. */
+    search?: string;
     page?: number;
     pageSize?: number;
   }): Promise<{ items: SupplierObligationDto[]; page: number; pageSize: number; total: number }> {
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(200, Math.max(1, query.pageSize ?? 20));
-    const where: Record<string, unknown> = {};
+    const where: Prisma.SupplierObligationWhereInput = {};
     if (query.status) where.status = query.status;
     if (query.supplierCode) where.supplierCode = query.supplierCode;
     if (query.orderId) where.orderId = query.orderId;
+    const today = startOfTodayUtc();
+    if (query.overdue === true) {
+      where.dueDate = { lt: today };
+      where.status = { in: [...PAYABLE_STATUSES] };
+      where.remainingAmount = { gt: new Prisma.Decimal(0) };
+    } else if (query.dueBefore) {
+      where.dueDate = { lt: this.parseDate(query.dueBefore, "dueBefore") };
+    }
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { code: { contains: search, mode: "insensitive" } },
+        { invoiceNumber: { contains: search, mode: "insensitive" } },
+        { orderCode: { contains: search, mode: "insensitive" } },
+        { bookingCode: { contains: search, mode: "insensitive" } },
+      ];
+    }
 
     const [total, rows] = await Promise.all([
       this.prisma.supplierObligation.count({ where }),
       this.prisma.supplierObligation.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -272,6 +343,61 @@ export class SupplierObligationService {
       pageSize,
       total,
     };
+  }
+
+  /** Плоские строки для экспорта реестра обязательств (cap 5000). */
+  async exportRows(query: {
+    status?: string;
+    supplierCode?: string;
+    overdue?: boolean;
+    search?: string;
+    dueBefore?: string;
+  }): Promise<Array<Record<string, string | null>>> {
+    const where: Prisma.SupplierObligationWhereInput = {};
+    if (query.status) where.status = query.status;
+    if (query.supplierCode) where.supplierCode = query.supplierCode;
+    if (query.overdue === true) {
+      where.dueDate = { lt: startOfTodayUtc() };
+      where.status = { in: [...PAYABLE_STATUSES] };
+      where.remainingAmount = { gt: new Prisma.Decimal(0) };
+    } else if (query.dueBefore) {
+      where.dueDate = { lt: this.parseDate(query.dueBefore, "dueBefore") };
+    }
+    const search = query.search?.trim();
+    if (search) {
+      where.OR = [
+        { code: { contains: search, mode: "insensitive" } },
+        { invoiceNumber: { contains: search, mode: "insensitive" } },
+        { orderCode: { contains: search, mode: "insensitive" } },
+        { bookingCode: { contains: search, mode: "insensitive" } },
+      ];
+    }
+    const rows = await this.prisma.supplierObligation.findMany({
+      where,
+      orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+      take: 5000,
+    });
+    const partners = await this.resolvePartnerCodes(rows.map((r) => r.partnerId));
+    return rows.map((r) => {
+      const dto = this.toDto(r, partners.get(r.partnerId ?? "") ?? null);
+      return {
+        code: dto.code,
+        status: dto.displayStatus,
+        supplierCode: dto.supplierCode,
+        partnerCode: dto.partnerCode,
+        invoiceNumber: dto.invoiceNumber,
+        dueDate: dto.dueDate,
+        overdue: String(dto.overdue),
+        orderCode: dto.orderCode,
+        bookingCode: dto.bookingCode,
+        sourceAmount: dto.sourceAmount,
+        sourceCurrency: dto.sourceCurrency,
+        aznAmount: dto.aznAmount,
+        paidAmount: dto.paidAmount,
+        remainingAmount: dto.remainingAmount,
+        confirmedAt: dto.confirmedAt,
+      };
+    });
   }
 
   async getObligation(codeOrId: string): Promise<SupplierObligationDto & { payouts: SupplierPayoutDto[] }> {
@@ -306,6 +432,8 @@ export class SupplierObligationService {
       occurredAt?: string;
       reason?: string;
       evidenceUrl?: string;
+      purpose?: string;
+      comment?: string;
     },
     actor: Actor,
   ): Promise<SupplierPayoutDto> {
@@ -401,6 +529,9 @@ export class SupplierObligationService {
         data: {
           code,
           obligationId: obligation.id,
+          supplierCode: obligation.supplierCode,
+          partnerId: obligation.partnerId,
+          status: "CONFIRMED",
           amount,
           currency,
           aznAmount,
@@ -408,11 +539,27 @@ export class SupplierObligationService {
           fxVariance,
           method: input.method?.trim() || null,
           providerRef,
+          purpose: input.purpose?.trim() || null,
+          comment: input.comment?.trim() || null,
           occurredAt,
           reason: input.reason?.trim() || null,
           evidenceUrl: input.evidenceUrl?.trim() || null,
+          confirmedAt: occurredAt,
+          confirmedById: actor.id,
           actorType: "USER",
           actorId: actor.id,
+        },
+      });
+      // Allocation — единственный источник, из которого пересчитывается
+      // paid/remaining; legacy-путь остаётся «одна obligation = один платёж»,
+      // но данные уже совместимы с multi-allocation реестром.
+      await tx.supplierPayoutAllocation.create({
+        data: {
+          payoutId: payout.id,
+          obligationId: obligation.id,
+          amount,
+          aznAmount,
+          createdById: actor.id,
         },
       });
 
@@ -487,12 +634,12 @@ export class SupplierObligationService {
       this.prisma.supplierPayout.findMany({ where, orderBy: { occurredAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
     ]);
     const obCodes = new Map<string, string>();
-    const obIds = [...new Set(rows.map((r) => r.obligationId))];
+    const obIds = [...new Set(rows.map((r) => r.obligationId).filter((id): id is string => Boolean(id)))];
     if (obIds.length) {
       const obs = await this.prisma.supplierObligation.findMany({ where: { id: { in: obIds } }, select: { id: true, code: true } });
       for (const o of obs) obCodes.set(o.id, o.code);
     }
-    return { items: rows.map((r) => this.toPayoutDto(r, obCodes.get(r.obligationId) ?? "")), page, pageSize, total };
+    return { items: rows.map((r) => this.toPayoutDto(r, obCodes.get(r.obligationId ?? "") ?? "")), page, pageSize, total };
   }
 
   // ── Cancel / adjust (только unpaid; auditable) ───────────────────────────
@@ -514,6 +661,16 @@ export class SupplierObligationService {
         resource: "SupplierObligation",
         resourceId: ob.id,
         details: { code: ob.code, reason: reason ?? null, actor: actor.username },
+      });
+      await tx.supplierObligationEvent.create({
+        data: {
+          obligationId: ob.id,
+          type: "CANCELLED",
+          aznAmount: ob.aznAmount,
+          occurredAt: new Date(),
+          actorId: actor.id,
+          details: { reason: reason ?? null },
+        },
       });
       return row;
     });
@@ -569,6 +726,20 @@ export class SupplierObligationService {
           actor: actor.username,
         },
       });
+      await tx.supplierObligationEvent.create({
+        data: {
+          obligationId: ob.id,
+          type: "ADJUSTED",
+          aznAmount: newAzn,
+          occurredAt: new Date(),
+          actorId: actor.id,
+          details: {
+            oldAznAmount: ob.aznAmount ? ob.aznAmount.toString() : null,
+            newAznAmount: newAzn.toString(),
+            reason: input.reason ?? null,
+          },
+        },
+      });
 
       // UNIFIED FINANCE CENTER Phase 5 — ledger source-fact (revaluation).
       // Эмитится в ТОЙ ЖЕ транзакции; retryable=true — durable retry
@@ -596,9 +767,109 @@ export class SupplierObligationService {
     return this.toDto(updated, null);
   }
 
+  /**
+   * Реквизиты счёта и срок оплаты (вводятся/уточняются финансами). Меняются
+   * только метаданные обязательства — суммы и frozen FX не переписываются.
+   * Каждое изменение версионируется и попадает в AuditLog.
+   */
+  async updateTerms(
+    codeOrId: string,
+    input: { dueDate?: string | null; invoiceNumber?: string | null; reason?: string | null },
+    actor: Actor,
+  ): Promise<SupplierObligationDto> {
+    const ob = await this.prisma.supplierObligation.findFirst({
+      where: { OR: [{ code: codeOrId }, { id: codeOrId }] },
+    });
+    if (!ob) throw new NotFoundError(`SupplierObligation ${codeOrId} not found`);
+    if (ob.status === "CANCELLED" || ob.status === "CLOSED") {
+      throw new ConflictError(`cannot change payment terms of ${ob.code}: obligation is ${ob.status}`);
+    }
+
+    let dueDate: Date | null = ob.dueDate;
+    if (input.dueDate !== undefined) {
+      if (input.dueDate === null || input.dueDate.trim() === "") {
+        dueDate = null;
+      } else {
+        const parsed = this.parseDate(input.dueDate, "dueDate");
+        // Date-only contract: нормализуем к UTC-полуночи, чтобы «сегодня» не
+        // становилось просрочкой из-за времени суток.
+        dueDate = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
+      }
+    }
+    let invoiceNumber: string | null = ob.invoiceNumber;
+    if (input.invoiceNumber !== undefined) {
+      const trimmed = input.invoiceNumber?.trim() ?? "";
+      if (trimmed.length > 100) throw new ValidationDomainError("invoiceNumber must be <= 100 characters");
+      invoiceNumber = trimmed || null;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.supplierObligation.update({
+        where: { id: ob.id },
+        data: { dueDate, invoiceNumber, version: { increment: 1 }, updatedAt: new Date() },
+      });
+      await this.security.audit(tx, {
+        action: "finance.obligation.terms_updated",
+        resource: "SupplierObligation",
+        resourceId: ob.id,
+        details: {
+          code: ob.code,
+          oldDueDate: ob.dueDate ? ob.dueDate.toISOString() : null,
+          newDueDate: dueDate ? dueDate.toISOString() : null,
+          oldInvoiceNumber: ob.invoiceNumber,
+          newInvoiceNumber: invoiceNumber,
+          reason: input.reason ?? null,
+          actor: actor.username,
+        },
+      });
+      return row;
+    });
+    return this.toDto(updated, null);
+  }
+
+  /** Append-only история действий по обязательству (security.AuditLog). */
+  async getHistory(codeOrId: string) {
+    const ob = await this.prisma.supplierObligation.findFirst({
+      where: { OR: [{ code: codeOrId }, { id: codeOrId }] },
+      select: { id: true, code: true },
+    });
+    if (!ob) throw new NotFoundError(`SupplierObligation ${codeOrId} not found`);
+    const rows = await this.prisma.auditLog.findMany({
+      where: { resource: "SupplierObligation", resourceId: ob.id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        action: true,
+        username: true,
+        details: true,
+        createdAt: true,
+      },
+    });
+    return {
+      obligationCode: ob.code,
+      items: rows.map((r) => ({
+        id: r.id,
+        action: r.action,
+        username: r.username,
+        details: r.details,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    };
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────
 
+  /** Просрочка: срок в прошлом, остаток > 0 и статус допускает оплату. */
+  private isOverdue(status: string, remaining: Prisma.Decimal | null, dueDate: Date | null): boolean {
+    if (!dueDate || remaining == null || remaining.lessThanOrEqualTo(0)) return false;
+    if (!PAYABLE_STATUSES.includes(status as (typeof PAYABLE_STATUSES)[number])) return false;
+    return dueDate.getTime() < startOfTodayUtc().getTime();
+  }
+
   private toDto(row: ObligationRow, partnerCode: string | null): SupplierObligationDto {
+    const remaining = row.remainingAmount;
+    const overdue = this.isOverdue(row.status, remaining, row.dueDate);
     return {
       id: row.id,
       code: row.code,
@@ -607,6 +878,10 @@ export class SupplierObligationService {
       orderId: row.orderId,
       orderCode: row.orderCode,
       orderItemId: row.orderItemId,
+      invoiceNumber: row.invoiceNumber,
+      dueDate: row.dueDate ? row.dueDate.toISOString() : null,
+      overdue,
+      displayStatus: overdue ? "OVERDUE" : row.status,
       supplierCode: row.supplierCode,
       partnerId: row.partnerId,
       partnerCode,
@@ -632,7 +907,13 @@ export class SupplierObligationService {
     p: {
       id: string;
       code: string;
-      obligationId: string;
+      obligationId: string | null;
+      status: string;
+      supplierCode: string | null;
+      partnerId: string | null;
+      purpose: string | null;
+      comment: string | null;
+      confirmedAt: Date | null;
       amount: Prisma.Decimal;
       currency: string;
       aznAmount: Prisma.Decimal;
@@ -653,6 +934,12 @@ export class SupplierObligationService {
       code: p.code,
       obligationId: p.obligationId,
       obligationCode,
+      status: p.status,
+      supplierCode: p.supplierCode,
+      partnerId: p.partnerId,
+      purpose: p.purpose,
+      comment: p.comment,
+      confirmedAt: p.confirmedAt ? p.confirmedAt.toISOString() : null,
       amount: p.amount.toString(),
       currency: p.currency,
       aznAmount: p.aznAmount.toString(),

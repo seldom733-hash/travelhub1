@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { MagnifyingGlass, CaretDown, X } from "@phosphor-icons/react";
 import { useLiveSearch, searchSupplierHotels, type SuggestResult } from "@/lib/search-engine";
+import { t, useLocale } from "@/lib/i18n";
 import { PICKER_LABEL } from "./picker-styles";
 
 interface LiveSearchInputProps {
@@ -40,6 +41,7 @@ export default function LiveSearchInput({
   "aria-describedby": ariaDescribedBy,
 }: LiveSearchInputProps) {
   const [query, setQuery] = useState(controlledValue || "");
+  const locale = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -234,7 +236,11 @@ export default function LiveSearchInput({
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[15px] font-medium text-white">{result.name}</div>
                 {result.subtitle && (
-                  <div className="truncate text-[13px] text-neutral-500">{result.subtitle}</div>
+                  <div className="truncate text-[13px] text-neutral-500">{
+                    result.subtitle === "Accommodation"
+                      ? t("marketplace.category_accommodation", locale)
+                      : result.subtitle
+                  }</div>
                 )}
               </div>
               <span className="shrink-0 rounded-full bg-dark-card px-2 py-0.5 text-[14px] text-neutral-500">

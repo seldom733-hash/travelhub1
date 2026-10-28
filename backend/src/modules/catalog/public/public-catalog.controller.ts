@@ -84,6 +84,13 @@ export class PublicCatalogController {
     return this.publicCatalog.listProducts(query);
   }
 
+  /** Страны, где есть опубликованные туры/отели Marketplace. */
+  @Get("public/destinations")
+  @Public()
+  listDestinations() {
+    return this.publicCatalog.listDestinations();
+  }
+
   /** PDP: детали опубликованного продукта по id или стабильному public slug. */
   @Get("public/products/:id")
   @Public()
@@ -110,6 +117,20 @@ export class PublicCatalogController {
     }
     const { url } = await this.publicCatalog.getPublicMediaUrl(mediaId, derivative as PublicMediaDerivative);
     res.redirect(302, url);
+  }
+
+  /** Предложения отелей: минимальная цена + другие предложения (скрытая опция). */
+  @Get("public/hotels/:hotelId/offers")
+  @Public()
+  async getHotelOffers(@Param("hotelId") hotelId: string) {
+    return this.publicCatalog.getHotelOffers(hotelId);
+  }
+
+  /** Сопоставимые туры: минимальная цена + другие предложения (скрытая опция). */
+  @Get("public/tours/:productId/comparable")
+  @Public()
+  async getComparableTours(@Param("productId") productId: string) {
+    return this.publicCatalog.getComparableTours(productId);
   }
 
   /** Публичные категории (только ACTIVE, без internal schema/admin полей). */

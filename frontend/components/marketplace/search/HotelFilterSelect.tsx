@@ -16,6 +16,10 @@ export interface SupplierHotelOption {
 interface HotelFilterSelectProps {
   /** Region scope for /geo/supplier-hotels (Master Geography codes). */
   region: { geoCountry?: string; geoCity?: string; geoResort?: string };
+  /** Selected supplier codes; empty = all suppliers. */
+  suppliers?: string[];
+  /** Never mix tour hotels into hotel search (and vice versa). */
+  serviceType: "tours" | "hotels";
   /** Currently selected hotel name ("" = none). */
   value: string;
   onSelect: (hotel: SupplierHotelOption) => void;
@@ -32,6 +36,8 @@ interface HotelFilterSelectProps {
  */
 export default function HotelFilterSelect({
   region,
+  suppliers = [],
+  serviceType,
   value,
   onSelect,
   onClear,
@@ -42,11 +48,14 @@ export default function HotelFilterSelect({
   const [hotels, setHotels] = useState<SupplierHotelOption[] | null>(null);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const panelMaxHeight = usePanelMaxHeight(containerRef, open);
+  // Отель-пикер меньше общего контракта (384px): список отелей длинный,
+  // но пикер должен быть компактнее остальных.
+  // Фиксированная компактная высота: панель не должна накрывать кнопку «Найти».
+  const panelMaxHeight = 200;
   const inputRef = useRef<HTMLInputElement>(null);
   const fetchedRegionRef = useRef<string | null>(null);
 
-  const regionKey = `${region.geoCountry ?? ""}|${region.geoCity ?? ""}|${region.geoResort ?? ""}`;
+  const regionKey = `${region.geoCountry ?? ""}|${region.geoCity ?? ""}|${region.geoResort ?? ""}|${serviceType}|${[...suppliers].sort().join(",")}`;
 
   // Load the region's full hotel list on open (per region — one request).
   useEffect(() => {
@@ -62,6 +71,8 @@ export default function HotelFilterSelect({
     if (region.geoCountry) sp.set("geoCountry", region.geoCountry);
     if (region.geoCity) sp.set("geoCity", region.geoCity);
     if (region.geoResort) sp.set("geoResort", region.geoResort);
+    sp.set("service", serviceType);
+    if (suppliers.length) sp.set("suppliers", suppliers.join(","));
     sp.set("limit", "1000");
     fetch(`/api/v1/geo/supplier-hotels?${sp.toString()}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))

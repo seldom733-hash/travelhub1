@@ -10,6 +10,7 @@ import {
   VOYAGER_STATE_NAMES,
   VOYAGER_STARS_KEY,
 } from "./voyager-countries";
+import { withCatalogCoverage, recordCatalogError, recordCatalogWindow } from "../catalog/catalog-coverage";
 import type {
   SupplierAdapter,
   SupplierSearchQuery,
@@ -188,6 +189,7 @@ export class VoyagerAdapter implements SupplierAdapter {
           query.maxPages ?? 5,
         )),
       );
+      recordCatalogWindow(true);
     }
 
     const offers = this.normalizeRows(rows, query, state);
@@ -196,6 +198,18 @@ export class VoyagerAdapter implements SupplierAdapter {
         `${offers.length} offers in ${Date.now() - start}ms`,
     );
     return offers;
+  }
+
+  async searchCatalog(query: SupplierSearchQuery) {
+    const { result, coverage } = await withCatalogCoverage(async () => {
+      try {
+        return await this.search(query);
+      } catch (error) {
+        recordCatalogError((error as Error).message);
+        throw error;
+      }
+    });
+    return { offers: result, coverage };
   }
 
   async getOffer(ref: SupplierOfferRef): Promise<SupplierOfferDetail> {
@@ -360,6 +374,13 @@ export class VoyagerAdapter implements SupplierAdapter {
    * Discover Voyager geo options for a country: TOWNS + STAR + HOTEL
    * (dictionary served over plain HTTP, no browser needed).
    */
+  async discoverCountries(): Promise<Array<{ countryId: string; countryName: string }>> {
+    return (await this.http.discoverStates()).map((state) => ({
+      countryId: state.value,
+      countryName: state.name,
+    }));
+  }
+
   async discoverGeoOptions(countryExternalId?: string): Promise<SupplierGeoOption[]> {
     const stateInc = countryExternalId ?? "13"; // 13 = ОАЭ (verified)
     const dict = await this.http.fetchDictionary(stateInc);
