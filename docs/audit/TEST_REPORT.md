@@ -15,7 +15,7 @@ suite DB from `template_travelhub_test`.
 | Миграции test | `DATABASE_URL=$TEST_DATABASE_URL npx prisma migrate status` | up to date; **139 migrations** |
 | Catalog unit tests | `npx jest src/modules/supplier/catalog src/modules/catalog/hotel/hotel-category.spec.ts --runInBand` | **4 suites / 40 tests — PASS** |
 | Catalog apply E2E | `npx jest --config test/jest-e2e.json --runInBand test/supplier-catalog.e2e-spec.ts` | **4/4 PASS** on isolated DB |
-| Backend typecheck/build | `npm run typecheck`, `npm run build` | PASS (`reports/supplier-catalog-backend-build52.log`) |
+| Backend typecheck/build | `npm run typecheck`, `npm run build` | PASS (`reports/supplier-catalog-backend-build53.log`) |
 | Frontend typecheck/build | `npx tsc --noEmit`, `npm run build` | PASS (`reports/supplier-catalog-frontend-build40.log`) |
 | ProductCard tests | `npx vitest run components/public/ProductCard.spec.tsx --pool=threads` | **8/8 PASS** |
 | Admin UI smoke | Playwright `/app/supplier-updates` | 0 page errors; country/category split verified |
@@ -185,6 +185,12 @@ Screenshots: `reports/demo/25-card-partner-code.png`,
   saved `priceDate/priceNights`; a fresh apply is required to populate them.
   Daily “move to the next date when the shown date is reached” repricing is a
   separate scheduled offer-calendar job and is not implemented yet.
+- ANEX has a hotel catalog path now: hotel-state countries are exposed in
+  capabilities, the same 11 sampled weeks are fetched date-by-date through
+  `AnexHotelAdapter.search` (7-night basis), grouped by `hotelInc`, and written
+  as `accommodation` products with AZN prices. Coverage stays `PARTIAL` so
+  archive of unobserved hotels is blocked. The hotel calendar is also
+  implemented date-by-date instead of returning an empty result.
 - The once-per-country-per-day guard has a deliberate temporary bypass:
   `SUPPLIER_CATALOG_ALLOW_RERUN_TODAY=true` in the backend process env. It is
   not persisted and disappears on the next backend restart; it is meant for

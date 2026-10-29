@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { AnexAdapter } from "../anex/anex.adapter";
+import { AnexHotelAdapter } from "../anex/anex-hotel.adapter";
 import { AnexProvider } from "../anex/anex.provider";
 import { SupplierPricingService } from "../../pricing/supplier-pricing.service";
 import { SupplierOfferService } from "../supplier-offer.service";
@@ -64,9 +65,11 @@ function option(key: string, label: string): { key: string; label: string } {
 export class SupplierCatalogSource {
   private readonly logger = new Logger(SupplierCatalogSource.name);
   private anexCountries: { at: number; countries: Array<{ key: string; label: string; searchLabel: string }> } | null = null;
+  private anexHotelCountries: { at: number; countries: Array<{ key: string; label: string; searchLabel: string }> } | null = null;
 
   constructor(
     private readonly anex: AnexAdapter,
+    private readonly anexHotel: AnexHotelAdapter,
     private readonly anexProvider: AnexProvider,
     private readonly pricing: SupplierPricingService,
     private readonly offers: SupplierOfferService,
@@ -75,6 +78,7 @@ export class SupplierCatalogSource {
 
   async capabilities(): Promise<CatalogCapability[]> {
     const anexCountries = await this.anexCountriesCached();
+    const anexHotelCountries = await this.anexHotelCountriesCached();
     const voyagerTourCountries = Object.entries(VOYAGER_STATEINC_BY_ISO).map(([iso]) => option(iso, iso));
     const voyagerHotelCountries = Object.entries(VOYAGER_HOTEL_STATEINC_BY_ISO).map(([iso]) => option(iso, iso));
     const kazunionCountries = KAZUNION_HOTEL_COUNTRIES.map((country) => option(country.iso2, country.iso2));
@@ -92,10 +96,7 @@ export class SupplierCatalogSource {
 
     return [
       { supplierCode: "ANEX", name: "ANEX", serviceTypes: ["tours"], countries: anexCountries },
-      {
-        supplierCode: "ANEX", name: "ANEX", serviceTypes: ["hotels"], countries: [],
-        unavailableReason: "ANEX hotel catalog sync is not implemented; hotel offers are live-search only",
-      },
+      { supplierCode: "ANEX", name: "ANEX", serviceTypes: ["hotels"], countries: anexHotelCountries },
       { supplierCode: "VOYAGER", name: "Voyager", serviceTypes: ["tours"], countries: voyagerTourCountries },
       { supplierCode: "VOYAGER", name: "Voyager", serviceTypes: ["hotels"], countries: voyagerHotelCountries },
       { supplierCode: "KOMPAS", name: "KOMPAS", serviceTypes: ["tours"], countries: kompasTourCountries },
@@ -113,7 +114,7 @@ export class SupplierCatalogSource {
     countryKey: string;
   }): Promise<CatalogSourceResult> {
     if (input.supplierCode === "ANEX") {
-      return this.fetchAnex(input);
+      return input.serviceType === "hotels" ? this.fetchAnexHotels(input) : this.fetchAnex(input);
     }
     return this.fetchGeneric(input);
   }
@@ -205,6 +206,84 @@ export class SupplierCatalogSource {
         dateFrom: day(0),
         dateTo: day(365),
         coverage,
+      },
+    };
+  }
+
+  private async fetchAnexHotels(input: {
+    serviceType: CatalogServiceType;
+    countryKey: string;
+  }): Promise<CatalogSourceResult> {
+    const countries = await this.anexHotelCountriesCached();
+    const country = countries.find((c) => c.key === input.countryKey);
+    if (!country) {
+      return {
+        records: [],
+        complete: false,
+        errors: [`Unknown ANEX hotel country ${input.countryKey}`],
+        scope: input,
+      };
+    }
+
+    const sampledDates: string[] = [];
+    for (let offset = 0; offset < 365; offset += 35) {
+      for (let dayOffset = 0; dayOffset < 7 && offset + dayOffset < 365; dayOffset++) {
+        sampledDates.push(day(offset + dayOffset));
+      }
+    }
+
+    const offers: SupplierOffer[] = [];
+    const errors: string[] = [];
+    const nights = this.nightsRange("ANEX", true);
+    for (const date of sampledDates) {
+      try {
+        const hotelOffers = await this.anexHotel.search({
+          service: "hotels",
+          country: country.searchLabel,
+          adults: 2,
+          departureDateFrom: date,
+          departureDateTo: date,
+          nightsFrom: nights.nightsFrom,
+          nightsTo: nights.nightsTo,
+        });
+        offers.push(...hotelOffers);
+      } catch (error) {
+        errors.push(`${date}: ${(error as Error).message}`);
+      }
+    }
+
+    const groups = groupBy(offers, (offer) => offer.hotelExternalId || offer.hotel || "");
+    const records: CatalogRecord[] = [];
+    for (const [hotelKey, hotelOffers] of groups) {
+      const record = await this.toRecord({
+        supplierCode: "ANEX",
+        serviceType: "hotels",
+        externalKey: `ANEXHTL-${hotelKey}-${country.key}`,
+        offers: hotelOffers,
+        countryCode: country.key,
+        stateCode: country.key,
+        countryLabel: country.searchLabel,
+        hotelKey,
+      });
+      if (record.error) errors.push(record.error);
+      else if (record.record) records.push(record.record);
+    }
+
+    return {
+      records,
+      // Same sampled boundary as ANEX tours: keep the run PARTIAL so a
+      // partially observed country never archives unseen hotels.
+      complete: false,
+      errors,
+      scope: {
+        supplierCode: "ANEX",
+        serviceType: "hotels",
+        countryKey: country.key,
+        countryLabel: country.searchLabel,
+        dateFrom: day(0),
+        dateTo: day(365),
+        sampledDates: sampledDates.length,
+        coverage: null,
       },
     };
   }
@@ -557,6 +636,26 @@ export class SupplierCatalogSource {
     }
     if (supplierCode === "SUMMERTOUR") return "Турция";
     return countryKey;
+  }
+
+  private async anexHotelCountriesCached(): Promise<Array<{ key: string; label: string; searchLabel: string }>> {
+    const now = Date.now();
+    if (this.anexHotelCountries && now - this.anexHotelCountries.at < ANEX_COUNTRY_CACHE_MS) {
+      return this.anexHotelCountries.countries;
+    }
+    try {
+      const states = await this.anexProvider.hotelStates();
+      const countries = states.map((state) => ({
+        key: state.stateISO,
+        label: state.stateISO,
+        searchLabel: state.nameAlt || state.name,
+      }));
+      this.anexHotelCountries = { at: now, countries };
+      return countries;
+    } catch (error) {
+      this.logger.warn(`ANEX hotel countries discovery failed: ${(error as Error).message}`);
+      return this.anexHotelCountries?.countries ?? [];
+    }
   }
 
   private async anexCountriesCached(): Promise<Array<{ key: string; label: string; searchLabel: string }>> {

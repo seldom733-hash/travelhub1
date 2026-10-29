@@ -25,13 +25,23 @@ const offer = (overrides: Partial<SupplierOffer> = {}): SupplierOffer => ({
 
 function makeSource(offers: SupplierOffer[]) {
   const anex = { search: jest.fn() };
-  const provider = { states: jest.fn().mockResolvedValue([]) };
+  const anexHotel = { search: jest.fn().mockResolvedValue([]) };
+  const provider = {
+    states: jest.fn().mockResolvedValue([]),
+    hotelStates: jest.fn().mockResolvedValue([]),
+  };
   const pricing = {
     publicAmountWithFxFor: jest.fn().mockResolvedValue({ amount: 110, currency: "AZN" }),
     publicAmountFor: jest.fn(async (amount: number) => amount),
   };
   const offerService = { search: jest.fn().mockResolvedValue(offers) };
-  return new SupplierCatalogSource(anex as never, provider as never, pricing as never, offerService as never);
+  return new SupplierCatalogSource(
+    anex as never,
+    anexHotel as never,
+    provider as never,
+    pricing as never,
+    offerService as never,
+  );
 }
 
 describe("SupplierCatalogSource", () => {
@@ -69,7 +79,7 @@ describe("SupplierCatalogSource", () => {
     const source = makeSource([]);
     const caps = await source.capabilities();
     expect(caps.map((c) => c.supplierCode)).toEqual(expect.arrayContaining(["ANEX", "VOYAGER", "KOMPAS", "KAZUNION", "SUMMERTOUR", "FSTRAVEL"]));
-    expect(caps.find((c) => c.supplierCode === "ANEX" && c.serviceTypes.includes("hotels"))?.unavailableReason).toBeTruthy();
+    expect(caps.find((c) => c.supplierCode === "ANEX" && c.serviceTypes.includes("hotels"))?.unavailableReason).toBeUndefined();
   });
 
   it("keeps tour and hotel country dictionaries separate", async () => {
@@ -102,6 +112,7 @@ describe("SupplierCatalogSource", () => {
     });
     const source = new SupplierCatalogSource(
       { searchCatalog: anexSearchCatalog } as never,
+      {} as never,
       { states: jest.fn().mockResolvedValue([{ id: 1, name: "Austria", nameAlt: "Austria", stateISO: "AT" }]) } as never,
       {
         publicAmountWithFxFor: jest.fn(),
@@ -117,5 +128,46 @@ describe("SupplierCatalogSource", () => {
       expect(query.nightOptions).toEqual([2, 3, 4, 5, 6, 7]);
     }
     expect(result.scope.dateTo).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("fetches ANEX hotel catalog offers date-by-date and marks coverage partial", async () => {
+    const anexHotelSearch = jest.fn().mockResolvedValue([
+      offer({
+        supplierCode: "ANEX",
+        service: "hotels",
+        hotel: "Hotel",
+        hotelExternalId: "H1",
+        nights: 7,
+        price: { ...offer().price, currency: "AZN" },
+        rawMetadata: { hotelKey: "H1", stateInc: "TR" },
+      }),
+    ]);
+    const source = new SupplierCatalogSource(
+      {} as never,
+      { search: anexHotelSearch } as never,
+      {
+        states: jest.fn().mockResolvedValue([]),
+        hotelStates: jest.fn().mockResolvedValue([
+          { id: 6, name: "Turkey", nameAlt: "Turkey", stateISO: "TR" },
+        ]),
+      } as never,
+      {
+        publicAmountWithFxFor: jest.fn(),
+        publicAmountFor: jest.fn(async (amount: number) => amount),
+      } as never,
+      {} as never,
+    );
+
+    const result = await source.fetch({ supplierCode: "ANEX", serviceType: "hotels", countryKey: "TR" });
+
+    expect(anexHotelSearch).toHaveBeenCalledTimes(77);
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0]).toMatchObject({
+      externalKey: "ANEXHTL-H1-TR",
+      productType: "HOTEL",
+      categorySlug: "accommodation",
+      currency: "AZN",
+    });
+    expect(result.complete).toBe(false);
   });
 });

@@ -9,6 +9,7 @@ import type {
   SupplierAvailability,
   SupplierAvailabilitySnapshot,
   PriceCalendarQuery,
+  PriceCalendarEntry,
   PriceCalendarResult,
 } from "../supplier.types";
 import { priceUnavailable } from "../supplier.types";
@@ -558,27 +559,134 @@ export class AnexHotelAdapter implements SupplierAdapter {
   }
 
   /**
-   * Hotels price calendar is not implemented for this provider — an honest
-   * empty result (no fabricated min/max prices).
+   * Hotels price calendar. ANEX hotels have no range-priced endpoint: fetch
+   * one exact stay per calendar date (same date-by-date contract as the tour
+   * calendar) and keep the cheapest room/meal row for that date.
    */
   async getPriceCalendar(query: PriceCalendarQuery): Promise<PriceCalendarResult> {
     const now = new Date();
+    const nights = Math.max(NIGHTS_MIN, Math.min(NIGHTS_MAX, query.nights ?? 7));
+    const entries: PriceCalendarEntry[] = [];
+    let scanned = 0;
+
+    let cursor = query.dateFrom;
+    while (cursor <= query.dateTo) {
+      try {
+        const offers = await this.search({
+          service: "hotels",
+          country: query.country ?? query.destination,
+          destination: query.destination,
+          adults: query.adults ?? 2,
+          children: query.children ?? 0,
+          childAges: query.childAges,
+          hotel: query.hotel,
+          hotelExternalId: query.hotelExternalId,
+          room: query.room,
+          meal: query.meal,
+          departureDateFrom: cursor,
+          departureDateTo: cursor,
+          nightsFrom: nights,
+          nightsTo: nights,
+        });
+        scanned += offers.length;
+        const best = offers
+          .filter((offer) => offer.price.amount > 0)
+          .sort((a, b) => a.price.amount - b.price.amount)[0];
+        if (best) {
+          entries.push({
+            date: cursor,
+            price: best.price.amount,
+            currency: best.price.currency,
+            availability: best.availability,
+            offerCount: offers.length,
+            offers: offers.map((offer) => ({
+              tourIncValue: offer.tour ?? "HOTEL",
+              tourIncName: offer.tour,
+              externalOfferId: offer.externalOfferId,
+              externalClaim: offer.externalClaim,
+              hotel: offer.hotel,
+              hotelExternalId: offer.hotelExternalId,
+              departureDate: offer.departureDate,
+              nights: offer.nights,
+              room: offer.room,
+              meal: offer.meal,
+              adults: offer.adults ?? 2,
+              children: offer.children ?? 0,
+              childAges: offer.childAges ?? [],
+              availability: offer.availability,
+              price: offer.price.amount,
+              currency: offer.price.currency,
+              transport: offer.transport,
+            })),
+            bestOfferRef: {
+              supplierCode: this.code,
+              externalOfferId: best.externalOfferId,
+              externalClaim: best.externalClaim,
+              searchContext: {
+                service: "hotels",
+                adults: query.adults ?? 2,
+                children: query.children ?? 0,
+                childAges: query.childAges,
+                hotel: query.hotel,
+                hotelExternalId: query.hotelExternalId,
+                room: query.room,
+                meal: query.meal,
+                country: query.country ?? query.destination,
+                destination: query.destination,
+                nightsFrom: nights,
+                nightsTo: nights,
+                departureDateFrom: cursor,
+                departureDateTo: cursor,
+              },
+            },
+          });
+        } else {
+          entries.push({
+            date: cursor,
+            price: null,
+            currency: null,
+            availability: "NOT_AVAILABLE",
+            offerCount: 0,
+            absenceCode: "SUPPLIER_NO_RESULT",
+            absenceText: `ANEX hotels не предоставил предложение на ${cursor}`,
+          });
+        }
+      } catch (err) {
+        this.logger.warn(
+          `ANEX hotels calendar ${cursor}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        entries.push({
+          date: cursor,
+          price: null,
+          currency: null,
+          availability: "UNKNOWN",
+          offerCount: 0,
+          absenceCode: "SUPPLIER_ERROR",
+          absenceText: `Ошибка запроса ANEX hotels на ${cursor}`,
+        });
+      }
+      cursor = addDays(cursor, 1);
+    }
+
     return {
       supplierCode: this.code,
       contextHash: JSON.stringify({
         category: "hotels",
         destination: query.destination,
+        country: query.country,
         hotel: query.hotel,
+        hotelExternalId: query.hotelExternalId,
         adults: query.adults,
         children: query.children,
-        nights: query.nights,
+        childAges: query.childAges,
+        nights,
       }),
-      entries: [],
+      entries,
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
       fetchedAt: now,
       expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
-      totalOffersScanned: 0,
+      totalOffersScanned: scanned,
     };
   }
 
