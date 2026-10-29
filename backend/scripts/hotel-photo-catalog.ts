@@ -326,7 +326,19 @@ async function anexHotelPhotoUrl(hotelKey: string): Promise<string | null> {
     const gallery = body.match(
       /https:\/\/files\.anextour\.com\/Content\/uploads\/images\/b2c\/galleries\/[^"'\\\s<>]+?\.(?:jpg|jpeg|webp|png)(?:\?[^"'\\\s<>]*)?/i,
     );
-    return gallery?.[0] ?? null;
+    // Shared generic gallery asset used by Anextour for hotels without their
+    // own gallery; do not stamp it onto unrelated hotels.
+    const GENERIC_GALLERY = /\/galleries\/20191217_150418_6a9f423b-6721-42dc-9f3b-82b695872740\.(?:png|jpg|jpeg|webp)(?:\?|$)/i;
+    if (gallery?.[0] && !GENERIC_GALLERY.test(gallery[0])) return gallery[0];
+    // Anextour's SSR payload carries hotel-specific room photos under
+    // files.anextour.ru/hotel/<country>/hotel/<slug>/room/.../<id>. These are
+    // unique per hotel and are the reliable fallback when the page's
+    // "galleries" block is a shared generic banner (observed for 249 Egypt
+    // hotels, all pointing at the same 20191217… placeholder).
+    const roomPhoto = body.match(
+      /https:\/\/files\.anextour\.(?:ru|com)\/hotel\/[^"'\\\s<>]+\/room\/[^"'\\\s<>]+?\/\d+/i,
+    );
+    return roomPhoto?.[0] ?? null;
   } finally {
     clearTimeout(timer);
   }
@@ -522,6 +534,31 @@ async function main(): Promise<void> {
       }
       if (!sourceUrl) {
         sourceUrl = await searchHotelPhoto(query, searchName || name, opts.relaxed);
+      }
+      // Never reuse one photo URL for two different physical hotels: image
+      // search sometimes returns a generic overview/placeholder for several
+      // properties. Same normalized name + country is handled by the sibling
+      // reuse above; different names must not share a URL.
+      if (sourceUrl) {
+        const usedByOther = await prisma.hotel.findFirst({
+          where: {
+            id: { not: h.id },
+            photoSourceUrl: sourceUrl,
+            normalizedName: { not: h.normalizedName },
+          },
+          select: { id: true },
+        });
+        if (usedByOther) {
+          journal({
+            hotelId: h.id,
+            name,
+            query,
+            sourceUrl,
+            result: "duplicate-photo",
+          });
+          console.log(`DUPE   ${h.id}  ${sourceUrl.slice(0, 90)}  (${h.name})`);
+          sourceUrl = null;
+        }
       }
       if (!sourceUrl) {
         missed += 1;

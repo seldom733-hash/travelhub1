@@ -185,6 +185,15 @@ Screenshots: `reports/demo/25-card-partner-code.png`,
   saved `priceDate/priceNights`; a fresh apply is required to populate them.
   Daily “move to the next date when the shown date is reached” repricing is a
   separate scheduled offer-calendar job and is not implemented yet.
+- Anextour photo fallback no longer accepts the shared generic gallery asset
+  (`20191217_…6a9f…png`). The resolver prefers the hotel-specific
+  `files.anextour.ru/.../room/...` image, rejects the shared gallery, and a
+  per-hotel URL uniqueness guard prevents one image being stamped onto
+  differently named hotels. A targeted Egypt backfill replaced 243/250 shared
+  photos; the remaining cards were cleared rather than keeping the generic
+  image. Hotel photo counts: 10,894 OK / 308 FAILED / 20 NONE; 0 linked
+  photo files are missing from disk. FAILED means the external exact-name
+  image search found no trustworthy photo (fail-closed, not a broken URL).
 - ANEX has a hotel catalog path now: hotel-state countries are exposed in
   capabilities, the same 11 sampled weeks are fetched date-by-date through
   `AnexHotelAdapter.search` (7-night basis), grouped by `hotelInc`, and written
