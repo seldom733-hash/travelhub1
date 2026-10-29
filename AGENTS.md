@@ -7,6 +7,22 @@ A project-scoped Graphify skill and a prebuilt code graph are available.
 - Graph: `graphify-out/graph.json`
 - CLI: `.venv-graphify\Scripts\graphify.exe`
 - Skill: `.agents/skills/graphify/SKILL.md`
+- Team guide: [`docs/GRAPHIFY.md`](docs/GRAPHIFY.md)
+
+First-time setup / refresh:
+
+```powershell
+.\scripts\graphify-setup.cmd -Rebuild
+```
+
+or on Linux/macOS:
+
+```bash
+./scripts/graphify-setup.sh --rebuild
+```
+
+If the PowerShell execution policy blocks `.ps1`, use the `.cmd` wrapper above
+or run `powershell -ExecutionPolicy Bypass -File .\scripts\graphify-setup.ps1`.
 
 For questions about the codebase, architecture, file relationships, suppliers,
 catalog, pricing, or data flow, use the `graphify` skill / CLI **before**

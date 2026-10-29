@@ -126,3 +126,35 @@ jobs:
         run: npm run build
         env:
           BACKEND_URL: "http://localhost:4000"
+
+  graphify:
+    name: Graphify · code graph artifact
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Graphify
+        run: python -m pip install --disable-pip-version-check "graphifyy[sql]"
+
+      - name: Build code graph
+        run: graphify update . --force
+
+      - name: Upload graph artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphify-out
+          retention-days: 7
+          path: |
+            graphify-out/graph.json
+            graphify-out/graph.html
+            graphify-out/GRAPH_REPORT.md
+            graphify-out/manifest.json
+
