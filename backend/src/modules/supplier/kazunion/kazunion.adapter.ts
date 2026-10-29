@@ -340,6 +340,10 @@ export class KazunionAdapter implements SupplierAdapter {
           nightsFrom,
           nightsTill,
           maxPages,
+          // KazUnion returns AZN natively when CURRENCY=10. Request AZN for
+          // tours too, so the catalog does not depend on a separate USD→AZN
+          // display rate (the KazUnion partner FX row is not a real market rate).
+          currency: "10",
           adults: query.adults ?? 2,
           children: query.children ?? 0,
           childAges: query.childAges,

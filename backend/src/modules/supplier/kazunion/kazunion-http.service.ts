@@ -175,7 +175,7 @@ export interface KazunionFetchParams {
   starsKey?: string;
   /** STARS_ANY checkbox ("1" = any category). Default true. */
   starsAny?: boolean;
-  /** Currency id on KazUnion (2 = USD). */
+  /** Requested currency id on KazUnion (2 = USD, 10 = AZN). */
   currency?: string;
   /** Start page (1-based). */
   startPage?: number;
@@ -785,20 +785,20 @@ export class KazunionHttpService {
           .replace(/\s*\([^)]*\)\s*$/, ""),
       );
 
-      // Converted price is in the requested currency (CURRENCY=2 → USD);
+      // Converted price is in the requested currency (CURRENCY=10 → AZN);
       // data-cat-price may be denominated in data-cat-currency (e.g. EUR).
       const priceSpan = rowContent.match(
         /data-cat-price="([^"]*)"[\s\S]{0,300}?data-converted-price-number="([^"]*)"[\s\S]{0,200}?data-currency_title="([^"]*)"/,
       );
       const priceFallback = rowContent.match(/data-cat-price="([^"]*)"[\s\S]{0,300}?data-currency_title="([^"]*)"/);
       let price = 0;
-      let currency = "USD";
+      let currency = "AZN";
       if (priceSpan && priceSpan[2]) {
         price = parseFloat(priceSpan[2]);
-        currency = priceSpan[3] || "USD";
+        currency = priceSpan[3] || "AZN";
       } else if (priceFallback) {
         price = parseFloat(priceFallback[1]);
-        currency = priceFallback[2] || "USD";
+        currency = priceFallback[2] || "AZN";
       }
 
       const departureDateText = (rowContent.match(/<td[^>]*class="sortie"[^>]*>([\s\S]*?)<\/td>/i)?.[1] ?? "")
@@ -961,7 +961,7 @@ export class KazunionHttpService {
       NIGHTS_TILL: String(params.nightsTill ?? params.nightsFrom ?? 15),
       ADULT: String(params.adults ?? 2),
       CHILD: String(params.children ?? 0),
-      CURRENCY: params.currency ?? "2",
+      CURRENCY: params.currency ?? "10",
       hotelsearch: "0",
       HOTELS_ANY: params.hotelKey ? "0" : "1",
       HOTELS: params.hotelKey ?? "",

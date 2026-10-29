@@ -139,6 +139,28 @@ describe("KazunionHttpService", () => {
       expect(row.stopSale).toBe(false);
     });
 
+    it("parses the AZN-converted price and uses AZN as the fallback currency", () => {
+      const aznRow = PRICE_ROW_HTML
+        .replace('data-currency="2"', 'data-currency="10"')
+        .replace(/data-currency_title="USD"/, 'data-currency_title="AZN"')
+        .replace("993 USD", "993 AZN");
+      const row = service.parsePriceRows(aznRow)[0];
+      expect(row.price).toBe(993);
+      expect(row.currency).toBe("AZN");
+    });
+
+    it("requests tours in AZN (CURRENCY=10)", () => {
+      const url = (service as unknown as {
+        buildPricesUrl: (params: Record<string, unknown>, page: number) => string;
+      }).buildPricesUrl({
+        stateInc: "6",
+        tourInc: "2791",
+        checkInBeg: "2026-11-01",
+        checkInEnd: "2026-11-02",
+      }, 1);
+      expect(new URL(url).searchParams.get("CURRENCY")).toBe("10");
+    });
+
     it("marks rows without seat markers as not seat-available", () => {
       const rows = service.parsePriceRows(NO_SEATS_ROW_HTML);
       expect(rows).toHaveLength(1);
