@@ -216,6 +216,10 @@ export class SupplierCatalogService implements OnModuleInit {
     services: CatalogServiceType[],
     countryCode: string,
   ): Promise<void> {
+    // Temporary operational escape hatch: allows a deliberate re-sync of a
+    // country already completed today (e.g. after a price-currency fix).
+    // Enabled only via the backend process env, never persisted in the DB.
+    if (process.env.SUPPLIER_CATALOG_ALLOW_RERUN_TODAY === "true") return;
     const day = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Asia/Baku",
       year: "numeric",
