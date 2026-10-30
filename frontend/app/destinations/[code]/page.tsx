@@ -13,10 +13,12 @@ import { publicApi, type PublicDestination, type PublicListResult } from "@/lib/
 import { countryFlagUrl, destinationLabel } from "@/lib/destinations";
 
 const COPY = {
-  ru: { back: "Все направления", tours: "Туры", hotels: "Отели", emptyTours: "Для этой страны пока нет опубликованных туров.", emptyHotels: "Для этой страны пока нет опубликованных отелей.", notFound: "Направление не найдено.", error: "Не удалось загрузить предложения." },
-  az: { back: "Bütün istiqamətlər", tours: "Turlar", hotels: "Otellər", emptyTours: "Bu ölkə üçün hələ dərc edilmiş tur yoxdur.", emptyHotels: "Bu ölkə üçün hələ dərc edilmiş otel yoxdur.", notFound: "İstiqamət tapılmadı.", error: "Təklifləri yükləmək alınmadı." },
-  en: { back: "All destinations", tours: "Tours", hotels: "Hotels", emptyTours: "No published tours for this country yet.", emptyHotels: "No published hotels for this country yet.", notFound: "Destination not found.", error: "Could not load offers." },
+  ru: { back: "Все направления", tours: "Туры", hotels: "Отели", emptyTours: "Для этой страны пока нет опубликованных туров.", emptyHotels: "Для этой страны пока нет опубликованных отелей.", notFound: "Направление не найдено.", error: "Не удалось загрузить предложения.", more: "Показать ещё", shown: "Показано" },
+  az: { back: "Bütün istiqamətlər", tours: "Turlar", hotels: "Otellər", emptyTours: "Bu ölkə üçün hələ dərc edilmiş tur yoxdur.", emptyHotels: "Bu ölkə üçün hələ dərc edilmiş otel yoxdur.", notFound: "İstiqamət tapılmadı.", error: "Təklifləri yükləmək alınmadı.", more: "Daha çox göstər", shown: "Göstərildi" },
+  en: { back: "All destinations", tours: "Tours", hotels: "Hotels", emptyTours: "No published tours for this country yet.", emptyHotels: "No published hotels for this country yet.", notFound: "Destination not found.", error: "Could not load offers.", more: "Show more", shown: "Showing" },
 } as const;
+
+const PAGE_SIZE = 48;
 
 type Tab = "tours" | "hotels";
 
@@ -30,6 +32,8 @@ export default function DestinationCountryPage() {
   const [tab, setTab] = useState<Tab>("tours");
   const [result, setResult] = useState<PublicListResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageNumber, setPageNumber] = useState(1);
   const [error, setError] = useState("");
 
   const headerConfig = (page?.headerConfig ?? null) as MarketplaceHeaderConfig | null;
@@ -48,16 +52,49 @@ export default function DestinationCountryPage() {
   }, [code]);
 
   useEffect(() => {
+    if (destination && destination.tours === 0 && destination.hotels > 0) {
+      setTab("hotels");
+    }
+  }, [destination]);
+
+  useEffect(() => {
     if (destination === undefined || destination === null) return;
     let alive = true;
     setLoading(true);
+    setLoadingMore(false);
+    setPageNumber(1);
     setError("");
-    publicApi.listProducts({ category: tab === "tours" ? "tours" : "accommodation", geoCountry: code, sort: "price_asc", pageSize: 24 })
+    setResult(null);
+    publicApi.listProducts({ category: tab === "tours" ? "tours" : "accommodation", geoCountry: code, sort: "price_asc", page: 1, pageSize: PAGE_SIZE })
       .then((data) => { if (alive) setResult(data); })
       .catch((e) => { if (alive) setError((e as Error).message); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [code, tab, destination]);
+
+  const loadMore = async () => {
+    if (!result || loadingMore || result.items.length >= result.total) return;
+    setLoadingMore(true);
+    setError("");
+    try {
+      const nextPage = pageNumber + 1;
+      const data = await publicApi.listProducts({
+        category: tab === "tours" ? "tours" : "accommodation",
+        geoCountry: code,
+        sort: "price_asc",
+        page: nextPage,
+        pageSize: PAGE_SIZE,
+      });
+      setResult((previous) => previous
+        ? { ...data, items: [...previous.items, ...data.items] }
+        : data);
+      setPageNumber(nextPage);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-dark">
@@ -125,9 +162,26 @@ export default function DestinationCountryPage() {
                 </div>
               )}
               {!loading && result && result.items.length > 0 && (
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {result.items.map((card, index) => <ProductCard key={card.id} card={card} position={index} />)}
-                </div>
+                <>
+                  <p className="mb-4 text-xs text-neutral-500">
+                    {copy.shown}: {result.items.length} / {result.total}
+                  </p>
+                  <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    {result.items.map((card, index) => <ProductCard key={card.id} card={card} position={index} />)}
+                  </div>
+                  {result.items.length < result.total && (
+                    <div className="mt-7 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => { void loadMore(); }}
+                        disabled={loadingMore}
+                        className="rounded-xl border border-gold/40 bg-gold/10 px-5 py-2.5 text-sm font-semibold text-gold transition-colors hover:bg-gold/20 disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {loadingMore ? "…" : `${copy.more} (${Math.min(PAGE_SIZE, result.total - result.items.length)})`}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </section>
           </>

@@ -16,7 +16,7 @@ suite DB from `template_travelhub_test`.
 | Catalog unit tests | `npx jest src/modules/supplier/catalog src/modules/catalog/hotel/hotel-category.spec.ts --runInBand` | **4 suites / 40 tests — PASS** |
 | Catalog apply E2E | `npx jest --config test/jest-e2e.json --runInBand test/supplier-catalog.e2e-spec.ts` | **4/4 PASS** on isolated DB |
 | Backend typecheck/build | `npm run typecheck`, `npm run build` | PASS (`reports/supplier-catalog-backend-build55.log`) |
-| Frontend typecheck/build | `npx tsc --noEmit`, `npm run build` | PASS (`reports/supplier-catalog-frontend-build40.log`) |
+| Frontend typecheck/build | `npx tsc --noEmit`, `npm run build` | PASS (`reports/supplier-catalog-frontend-build41.log`) |
 | ProductCard tests | `npx vitest run components/public/ProductCard.spec.tsx --pool=threads` | **8/8 PASS** |
 | Admin UI smoke | Playwright `/app/supplier-updates` | 0 page errors; country/category split verified |
 
@@ -185,6 +185,11 @@ Screenshots: `reports/demo/25-card-partner-code.png`,
   saved `priceDate/priceNights`; a fresh apply is required to populate them.
   Daily “move to the next date when the shown date is reached” repricing is a
   separate scheduled offer-calendar job and is not implemented yet.
+- Master Geography now contains Kyrgyzstan (`KG`, `Qırğızıstan` / `Кыргызстан`)
+  and the 21 existing KG products were linked to it; `/destinations` returns 28
+  countries, including KG. Destination detail pages show 48 cards initially and
+  load the remaining pages with «Показать ещё»; countries with only hotels
+  (KG) open on the Hotels tab automatically.
 - Public constructor media and product media are now streamed through the
   backend instead of redirecting to the signed MinIO URL. That URL was
   `http://localhost:9000/...`, so a browser on another LAN machine resolved
