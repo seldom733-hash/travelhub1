@@ -15,7 +15,7 @@ suite DB from `template_travelhub_test`.
 | Миграции test | `DATABASE_URL=$TEST_DATABASE_URL npx prisma migrate status` | up to date; **139 migrations** |
 | Catalog unit tests | `npx jest src/modules/supplier/catalog src/modules/catalog/hotel/hotel-category.spec.ts --runInBand` | **4 suites / 40 tests — PASS** |
 | Catalog apply E2E | `npx jest --config test/jest-e2e.json --runInBand test/supplier-catalog.e2e-spec.ts` | **4/4 PASS** on isolated DB |
-| Backend typecheck/build | `npm run typecheck`, `npm run build` | PASS (`reports/supplier-catalog-backend-build53.log`) |
+| Backend typecheck/build | `npm run typecheck`, `npm run build` | PASS (`reports/supplier-catalog-backend-build55.log`) |
 | Frontend typecheck/build | `npx tsc --noEmit`, `npm run build` | PASS (`reports/supplier-catalog-frontend-build40.log`) |
 | ProductCard tests | `npx vitest run components/public/ProductCard.spec.tsx --pool=threads` | **8/8 PASS** |
 | Admin UI smoke | Playwright `/app/supplier-updates` | 0 page errors; country/category split verified |
@@ -185,6 +185,12 @@ Screenshots: `reports/demo/25-card-partner-code.png`,
   saved `priceDate/priceNights`; a fresh apply is required to populate them.
   Daily “move to the next date when the shown date is reached” repricing is a
   separate scheduled offer-calendar job and is not implemented yet.
+- Public constructor media and product media are now streamed through the
+  backend instead of redirecting to the signed MinIO URL. That URL was
+  `http://localhost:9000/...`, so a browser on another LAN machine resolved
+  `localhost` to itself and the logo/product image failed. `GET
+  /api/v1/public/constructor-media?...` now returns `200 image/png`; verified
+  through both `127.0.0.1:3000` and the machine's LAN IP `10.1.10.6:3000`.
 - Anextour photo fallback no longer accepts the shared generic gallery asset
   (`20191217_…6a9f…png`). The resolver prefers the hotel-specific
   `files.anextour.ru/.../room/...` image, rejects the shared gallery, and a

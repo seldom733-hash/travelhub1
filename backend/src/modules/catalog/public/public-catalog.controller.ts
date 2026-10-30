@@ -116,7 +116,19 @@ export class PublicCatalogController {
       throw new NotFoundError("Media not found");
     }
     const { url } = await this.publicCatalog.getPublicMediaUrl(mediaId, derivative as PublicMediaDerivative);
-    res.redirect(302, url);
+    // Keep the public URL on the caller's origin. The signed MinIO URL often
+    // contains localhost:9000, which is unreachable from another PC/phone on
+    // the LAN; proxy the bytes instead of redirecting to it.
+    const upstream = await fetch(url);
+    if (!upstream.ok) {
+      throw new NotFoundError("Media not found");
+    }
+    const body = Buffer.from(await upstream.arrayBuffer());
+    res.status(200);
+    res.setHeader("Content-Type", upstream.headers.get("content-type") ?? "application/octet-stream");
+    res.setHeader("Content-Length", String(body.length));
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(body);
   }
 
   /** Предложения отелей: минимальная цена + другие предложения (скрытая опция). */

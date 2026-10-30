@@ -214,6 +214,18 @@ export class ConstructorPublicMediaController {
       throw new NotFoundException("Media not found");
     }
     const url = await this.service.getMediaReadUrl(key, 300);
-    res.redirect(302, url);
+    // Do not redirect the browser to the signed MinIO URL: in local/LAN
+    // deployments that URL contains localhost:9000 and is unreachable from a
+    // phone/another PC. Proxy the bytes through the same public origin.
+    const upstream = await fetch(url);
+    if (!upstream.ok) {
+      throw new NotFoundException("Media not found");
+    }
+    const body = Buffer.from(await upstream.arrayBuffer());
+    res.status(200);
+    res.setHeader("Content-Type", upstream.headers.get("content-type") ?? "application/octet-stream");
+    res.setHeader("Content-Length", String(body.length));
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(body);
   }
 }
