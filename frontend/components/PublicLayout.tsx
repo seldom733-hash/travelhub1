@@ -89,7 +89,7 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
               {displayBrand ? displayBrand.charAt(0).toUpperCase() : "T"}
             </div>
           )}
-          <span className="hidden text-[28px] font-bold tracking-[0.005em] text-slate-900 sm:block lg:text-[30px]">{displayBrand}</span>
+          <span className="hidden font-display text-[22px] font-semibold tracking-[0.005em] text-slate-900 sm:block sm:text-[28px] lg:text-[30px]">{displayBrand}</span>
         </Link>
 
         {/* Public nav — только public-safe routes */}
