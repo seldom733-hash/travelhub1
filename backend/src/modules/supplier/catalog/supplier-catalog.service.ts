@@ -1069,7 +1069,14 @@ export class SupplierCatalogService implements OnModuleInit {
 
     // Archive only when the source explicitly proved completeness. This block
     // is intentionally empty for incomplete sources such as ANEX today.
-    if (complete) {
+    //
+    // KazUnion is special: its tour/hotel search is a date-window sample
+    // (today → +30 days), not a full supplier inventory. A hotel can be
+    // absent from that window and still be sellable later — archiving it
+    // would remove a valid card (e.g. Premist Sultanahmet). Keep it published
+    // until an explicit supplier removal signal exists.
+    const archiveSafe = input.supplierCode !== "KAZUNION";
+    if (complete && archiveSafe) {
       const prefix = `${input.supplierCode}-`;
       const candidates = await this.prisma.product.findMany({
         where: {
