@@ -1,5 +1,12 @@
 # Navitravel — agent instructions
 
+## Frontend design
+
+For new UI screens, redesigns, or visual polish, use the `frontend-design` skill
+(`.agents/skills/frontend-design/`). Preserve existing product conventions
+(design tokens, RU/AZ/EN copy, accessibility) and verify the result in the
+browser at desktop and mobile widths.
+
 ## Graphify
 
 A project-scoped Graphify skill and a prebuilt code graph are available.
