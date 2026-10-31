@@ -54,7 +54,11 @@ export class SupplierCatalogService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.reapStaleRuns();
+    try {
+      await this.reapStaleRuns();
+    } catch (error) {
+      this.logger.warn(`Initial stale supplier catalog sweep failed: ${(error as Error).message}`);
+    }
     // A background sweep can survive a request while a process restart cannot.
     // Re-check periodically so an orphaned run never stays PREVIEWING forever
     // just because nobody opens the catalog screen again.
@@ -368,6 +372,11 @@ export class SupplierCatalogService implements OnModuleInit {
   }
 
   async listRuns(limit = 30) {
+    // Opening the report is also a natural recovery point: clear runs whose
+    // worker died before returning the list, without waiting for the next tick.
+    await this.reapStaleRuns().catch((error) =>
+      this.logger.warn(`Stale supplier catalog sweep on list failed: ${(error as Error).message}`),
+    );
     return this.prisma.supplierCatalogRun.findMany({
       orderBy: { createdAt: "desc" },
       take: Math.min(Math.max(limit, 1), 100),
