@@ -270,14 +270,29 @@ async function searchHotelPhoto(
 
   for (const provider of providers) {
     for (const q of queries) {
-      const results = await provider(q);
+      // Bing/DDG occasionally rate-limit or time out. One failed provider must
+      // not abort the whole hotel — fall through to the next query/provider.
+      let results: ImageResult[] = [];
+      try {
+        results = await provider(q);
+      } catch {
+        continue;
+      }
       const candidates = results
         .filter((r) => /(?:media-cdn|dynamic-media-cdn)\.tripadvisor\.com/.test(r.image))
         .filter((r) => !/default-avatar|user_photo/i.test(r.image))
         .map((r) => {
           const hay = normalizeForMatch(`${r.title} ${r.image}`);
-          const score = tokens.filter((t) => hay.includes(t)).length;
-          const coreHit = tokens.length === 0 ? true : hay.includes(tokens[0]);
+          // «Der Kapruner Hof» → «kaprunerhof» must match across the spaced
+          // title/URL form too, otherwise a valid hotel is rejected.
+          const compact = hay.replace(/\s+/g, "");
+          const score = tokens.filter(
+            (t) => hay.includes(t) || compact.includes(t.replace(/\s+/g, "")),
+          ).length;
+          const coreHit =
+            tokens.length === 0 ||
+            hay.includes(tokens[0]) ||
+            compact.includes(tokens[0].replace(/\s+/g, ""));
           return { ...r, score, coreHit };
         })
         .filter((r) => (tokens.length === 0 ? true : r.score >= minScore))
