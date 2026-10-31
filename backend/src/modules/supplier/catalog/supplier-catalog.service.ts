@@ -54,10 +54,21 @@ export class SupplierCatalogService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    // A process restart or killed background job can leave an active run
-    // holding activeKey forever. A sampled one-year ANEX sweep can take up to
-    // an hour; allow a 90-minute stale window.
-    const cutoff = new Date(Date.now() - 90 * 60 * 1000);
+    await this.reapStaleRuns();
+    // A background sweep can survive a request while a process restart cannot.
+    // Re-check periodically so an orphaned run never stays PREVIEWING forever
+    // just because nobody opens the catalog screen again.
+    const timer = setInterval(() => {
+      void this.reapStaleRuns().catch((error) =>
+        this.logger.warn(`Stale supplier catalog sweep failed: ${(error as Error).message}`),
+      );
+    }, 15 * 60 * 1000);
+    timer.unref?.();
+  }
+
+  /** Mark runs whose worker is gone (process restart / killed job) as FAILED. */
+  private async reapStaleRuns(maxAgeMs = 90 * 60 * 1000): Promise<void> {
+    const cutoff = new Date(Date.now() - maxAgeMs);
     const stale = await this.prisma.supplierCatalogRun.updateMany({
       where: { status: { in: ["PREVIEWING", "APPLYING"] }, startedAt: { lt: cutoff } },
       data: {
@@ -255,6 +266,7 @@ export class SupplierCatalogService implements OnModuleInit {
     actor: { id: string; username: string },
     input: { supplierCode: string; serviceType: RunServiceType; countryKey: string },
   ) {
+    await this.reapStaleRuns();
     const neededServices: CatalogServiceType[] = input.serviceType === "all" ? ["tours", "hotels"] : [input.serviceType];
     const allCountries = input.countryKey === "ALL";
     if (!allCountries) {
