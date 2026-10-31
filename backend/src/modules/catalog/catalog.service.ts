@@ -938,7 +938,11 @@ export class CatalogService implements OnModuleInit {
         await tx.productMedia.updateMany({ where: { productId: id, status: "DRAFT" }, data: { status: "PUBLISHED" } });
       }
       const policy = await this.mediaRequirementsOf(tx, existing);
-      if (policy) {
+      // Supplier-catalog cards get their image from the linked Hotel
+      // (hotelImage), not from ProductMedia. Applying the partner upload policy
+      // here makes every archived catalog card impossible to re-publish.
+      const catalogSourced = Boolean(existing.supplierRef);
+      if (policy && !catalogSourced) {
         const published = await tx.productMedia.findMany({ where: { productId: id, status: "PUBLISHED" } });
         if (policy.primaryImageRequired) {
           const primary = published.find((m) => m.isPrimary);
@@ -1147,7 +1151,9 @@ export class CatalogService implements OnModuleInit {
       categoryId: draft?.categoryId !== undefined ? draft.categoryId : existing.categoryId,
       categorySchemaId: draft?.categorySchemaId !== undefined ? draft.categorySchemaId : existing.categorySchemaId,
     });
-    if (policy) {
+    // Same exception as publishProduct: supplier-catalog cards use hotelImage,
+    // not uploaded ProductMedia.
+    if (policy && !existing.supplierRef) {
       const published = await tx.productMedia.findMany({ where: { productId, status: "PUBLISHED" } });
       if (policy.primaryImageRequired) {
         const primary = published.find((m) => m.isPrimary);
