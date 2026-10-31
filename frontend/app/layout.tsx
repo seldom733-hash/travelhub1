@@ -1,6 +1,20 @@
 import type { Metadata } from "next";
+import { Onest, Unbounded } from "next/font/google";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
+
+const bodyFont = Onest({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+const displayFont = Unbounded({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-display",
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Navitravel — Marketplace",
@@ -8,16 +22,14 @@ export const metadata: Metadata = {
 };
 
 /**
- * PHASE 1 STEP 1.6 — корневой layout БЕЗ внутреннего Shell.
- *   /        → Public Marketplace (PublicLayout в каждой public-странице)
- *   /app/*   → InternalAppLayout (app/app/layout.tsx, Shell с auth/RBAC)
- *   /login   → standalone (auth entry)
- * LocaleProvider (Step 1.7 §17) оборачивает всё приложение: RU/AZ/EN состояние
- * + синхронизация <html lang>. Internal sidebar не попадает в public bundle.
+ * Root layout without an internal shell:
+ *   /      → public marketplace
+ *   /app/* → internal app shell (auth/RBAC)
+ *   /login → standalone auth entry
  */
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="az">
+    <html lang="az" className={`${bodyFont.variable} ${displayFont.variable}`}>
       <body>
         <LocaleProvider>{children}</LocaleProvider>
       </body>

@@ -9,26 +9,13 @@ import { t, useLocale } from "@/lib/i18n";
 import LocaleSelector from "@/components/public/LocaleSelector";
 
 /**
- * Step 1.6 §12 + Step 1.9 §5-6 + Step 1.13 §16: вход ведёт по роли и safe ?next=:
- *  - internal-роли → /app/dashboard (или ?next= под /app/*);
- *  - PARTNER → /partner (или ?next= под /partner/*);
- *  - BUYER → ?next= public Marketplace-путь (/products/*, /search*, /categories/*)
- *    ИЛИ /account/* deep-link (Buyer Cabinet, Step 1.13); без next — /account
- *    (никогда /app/*, /partner/*).
- * ?next= валидируется safeNextPath (anti-open-redirect).
- * RU/AZ/EN (Step 1.9 §16): UI-ярлыки локализованы, locale сохраняется (localStorage).
- * M4.3 §14: phone-first identifier — единое поле принимает canonical/любой формат
- * телефона (сервер приводит к E.164 → loginPhone) ИЛИ legacy username (staff/admin
- * compat). Email НЕ является login identity. Payload-ключ остаётся `username`
- * (LoginDto contract), значение — phone или login.
+ * Login entry point. Phone-first identity (legacy username remains accepted),
+ * role-aware redirect via safe ?next=.
  */
 function LoginPageInner() {
   const router = useRouter();
   const params = useSearchParams();
   const locale = useLocale();
-  // rawNext — исходный ?next= (null при отсутствии); next — санитизированный для
-  // ссылок. postLoginTarget получает rawNext: отсутствие next → home роли (Step 1.13:
-  // BUYER → /account), а не возврат на витрину «по умолчанию».
   const rawNext = params.get("next");
   const next = safeNextPath(rawNext);
   const [username, setUsername] = useState("");
@@ -36,15 +23,13 @@ function LoginPageInner() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Уже залогиненный пользователь (Step 2.17: сессия в HttpOnly cookie):
-  // проба /auth/session → переводим по роли (внешние — на витрину/next).
   useEffect(() => {
     fetchSessionUser()
       .then((u) => {
         if (u) router.replace(postLoginTarget(u.role, rawNext));
       })
       .catch(() => undefined);
-  }, [router, next]);
+  }, [router, rawNext]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,64 +50,108 @@ function LoginPageInner() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-blue-500 text-2xl font-bold text-white shadow-lg shadow-blue-500/30">
-            T
+    <div className="min-h-screen bg-dark text-white">
+      <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
+        <aside className="relative hidden overflow-hidden bg-dark-surface lg:block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/hero1.png" alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-br from-dark/90 via-dark/55 to-dark/20" />
+          <div className="relative flex h-full flex-col justify-between p-12">
+            <Link href="/" className="flex items-center gap-3">
+              <span className="flex size-11 items-center justify-center rounded-2xl bg-gold text-base font-bold text-dark">N</span>
+              <span className="font-display text-lg font-semibold text-white">Navitravel</span>
+            </Link>
+            <div className="max-w-md">
+              <p className="font-display text-4xl font-semibold leading-[1.08] text-white">
+                {t("auth.login_subtitle", locale)}
+              </p>
+              <p className="mt-5 max-w-sm text-sm leading-relaxed text-neutral-300">
+                {t("footer.brand_description", locale)}
+              </p>
+            </div>
+            <span className="text-xs text-neutral-400">© {new Date().getFullYear()} Navitravel</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">
-            Travel<span className="text-blue-400">Hub</span>
-          </h1>
-          <p className="mt-1 text-sm text-slate-400">{t("auth.login_subtitle", locale)}</p>
-          <div className="mt-3 flex justify-center">
-            <LocaleSelector />
+        </aside>
+
+        <main className="flex items-center justify-center px-5 py-12 sm:px-10">
+          <div className="w-full max-w-[400px]">
+            <div className="mb-8 flex items-center justify-between lg:hidden">
+              <Link href="/" className="flex items-center gap-2.5">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-gold text-base font-bold text-dark">N</span>
+                <span className="font-display text-base font-semibold">Navitravel</span>
+              </Link>
+              <LocaleSelector />
+            </div>
+
+            <div className="mb-8">
+              <h1 className="font-display text-3xl font-semibold leading-tight text-white">
+                {t("auth.login_submit", locale)}
+              </h1>
+              <p className="mt-2 text-sm text-neutral-400">{t("auth.phone_login_hint", locale)}</p>
+              <div className="mt-4 hidden lg:block">
+                <LocaleSelector />
+              </div>
+            </div>
+
+            <form onSubmit={(e) => void submit(e)} className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-neutral-300">
+                  {t("auth.phone_login_label", locale)}
+                </label>
+                <input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                  inputMode="text"
+                  className="w-full rounded-xl border border-dark-border bg-dark-surface px-3.5 py-3 text-sm text-white outline-none transition-colors placeholder:text-neutral-600 focus:border-gold"
+                  placeholder="+994 50 000 00 00"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-neutral-300">
+                  {t("auth.password_label", locale)}
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  className="w-full rounded-xl border border-dark-border bg-dark-surface px-3.5 py-3 text-sm text-white outline-none transition-colors placeholder:text-neutral-600 focus:border-gold"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              {error && (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 text-sm text-rose-200">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={busy || !username || !password}
+                className="w-full rounded-xl bg-gold px-4 py-3 text-sm font-bold text-dark transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busy ? t("auth.login_busy", locale) : t("auth.login_submit", locale)}
+              </button>
+            </form>
+
+            <p className="mt-6 text-center text-xs text-neutral-400">
+              <Link href="/" className="transition-colors hover:text-white">
+                {t("auth.back_marketplace", locale)}
+              </Link>
+              <span className="mx-2 text-neutral-600">·</span>
+              {t("auth.no_account", locale)}{" "}
+              <Link
+                href={`/register${next && next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`}
+                className="font-semibold text-gold hover:text-gold-light"
+              >
+                {t("auth.register_link", locale)}
+              </Link>
+            </p>
           </div>
-        </div>
-
-        <form onSubmit={(e) => void submit(e)} className="rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-xl">
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("auth.phone_login_label", locale)}</label>
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
-            inputMode="text"
-            className="mb-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
-            placeholder="+994 50 000 00 00"
-          />
-          <p className="mb-4 text-xs leading-relaxed text-slate-500">{t("auth.phone_login_hint", locale)}</p>
-
-          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">{t("auth.password_label", locale)}</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            className="mb-5 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
-            placeholder="••••••••"
-          />
-
-          {error && <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</div>}
-
-          <button
-            type="submit"
-            disabled={busy || !username || !password}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {busy ? t("auth.login_busy", locale) : t("auth.login_submit", locale)}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-xs text-slate-500">
-          <Link href="/" className="text-slate-400 hover:text-white">
-            {t("auth.back_marketplace", locale)}
-          </Link>
-          <span className="mx-2">·</span>
-          {t("auth.no_account", locale)}{" "}
-          <Link href={`/register${next && next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`} className="text-blue-400 hover:text-blue-300">
-            {t("auth.register_link", locale)}
-          </Link>
-        </p>
+        </main>
       </div>
     </div>
   );
@@ -130,7 +159,7 @@ function LoginPageInner() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">…</div>}>
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-dark text-neutral-400">…</div>}>
       <LoginPageInner />
     </Suspense>
   );

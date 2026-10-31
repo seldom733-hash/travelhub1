@@ -151,10 +151,10 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
   };
 
   return (
-    <div className="search-glass rounded-2xl p-3 sm:p-4">
+    <div className="search-glass rounded-[24px] p-3 sm:p-4">
       {/* Service tabs + «Сбросить все» (right, same row as the services) */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1" role="tablist" aria-label="Тип услуги">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1 rounded-full bg-black/15 p-1" role="tablist" aria-label="Тип услуги">
           {orderedTabs.map((tab) => (
             <button
               key={tab.key}
@@ -165,10 +165,10 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
                 setActiveTab(tab.key);
                 onTabChange?.(tab.key);
               }}
-              className={`rounded-lg px-3 py-1.5 text-[14px] font-medium transition-all ${
+              className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
                 activeTab === tab.key
                   ? "bg-gold text-dark"
-                  : "text-neutral-400 hover:bg-white/5 hover:text-white"
+                  : "text-neutral-400 hover:text-white"
               }`}
             >
               {t(tab.labelKey, locale)}
@@ -179,7 +179,7 @@ export default function HeroSearch({ enabledServices, defaultService, onTabChang
           <button
             type="button"
             onClick={() => setResetSignal((n) => n + 1)}
-            className="rounded-lg px-3 py-1.5 text-[14px] font-medium text-neutral-400 transition-colors hover:bg-white/5 hover:text-white"
+            className="rounded-full px-3 py-1.5 text-[13px] font-medium text-neutral-400 transition-colors hover:text-white"
           >
             {t("search.reset_all", locale)}
           </button>

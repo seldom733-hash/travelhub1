@@ -27,10 +27,10 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const { brandName, loading: brandingLoading } = useGlobalBranding();
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="public-shell flex min-h-screen flex-col bg-dark text-white">
       <PublicHeader user={user} userReady={userReady} />
       <main className="flex-1">{children}</main>
-      <footer className="border-t border-slate-200 bg-slate-50 py-6 text-center text-xs text-slate-400">
+      <footer className="border-t border-dark-border bg-dark-surface py-6 text-center text-xs text-neutral-400">
         {!brandingLoading && `© ${new Date().getFullYear()} ${brandName}. ${t("footer.rights_reserved", locale)}`}
       </footer>
     </div>

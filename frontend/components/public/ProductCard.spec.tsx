@@ -38,10 +38,10 @@ function card(overrides: Partial<PublicProductCard> = {}): PublicProductCard {
 describe("ProductCard (Step 1.7 §7)", () => {
   it("рендерит категорию, title, цену (locale-aware) и CTA; ссылка на /products/:code", () => {
     render(<ProductCard card={card()} />);
-    expect(screen.getByText("Tours")).toBeTruthy();
+    expect(screen.getByText("Туры")).toBeTruthy();
     expect(screen.getByText("Тур на 5 дней")).toBeTruthy();
-    // ru-RU USD: «от 350,00 $» (Intl — неразрывный пробел перед символом).
-    expect(screen.getByText(/от 350,00\s*\$/)).toBeTruthy();
+    // Card price has no «от» prefix by design.
+    expect(screen.getByText(/350,00\s*\$/)).toBeTruthy();
     expect(screen.getByText("Подробнее")).toBeTruthy();
     expect(screen.getByRole("link").getAttribute("href")).toBe("/products/PRD-00000001");
   });

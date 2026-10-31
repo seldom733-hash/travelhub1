@@ -188,14 +188,14 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
       <>
       <button
         onClick={prev}
-        className="absolute left-4 top-1/2 z-20 flex size-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-dark/40 text-white/70 backdrop-blur-sm transition-all hover:border-gold/50 hover:bg-dark/60 hover:text-white lg:left-8"
+        className="absolute left-4 top-1/2 z-20 hidden size-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-dark/40 text-white/70 backdrop-blur-sm transition-colors hover:border-gold/50 hover:bg-dark/60 hover:text-white sm:flex lg:left-8"
         aria-label="Previous slide"
       >
         <CaretLeft size={24} weight="light" />
       </button>
       <button
         onClick={next}
-        className="absolute right-4 top-1/2 z-20 flex size-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-dark/40 text-white/70 backdrop-blur-sm transition-all hover:border-gold/50 hover:bg-dark/60 hover:text-white lg:right-8"
+        className="absolute right-4 top-1/2 z-20 hidden size-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-dark/40 text-white/70 backdrop-blur-sm transition-colors hover:border-gold/50 hover:bg-dark/60 hover:text-white sm:flex lg:right-8"
         aria-label="Next slide"
       >
         <CaretRight size={24} weight="light" />
@@ -222,13 +222,13 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
       )}
 
       {/* Content — cinematic text only, NO search */}
-      <div className="relative z-10 mx-auto flex aspect-[16/6] min-h-[320px] flex-col justify-end px-6 pb-10 pt-16 sm:pb-12 sm:pt-20 lg:pt-24">
+      <div className="relative z-10 mx-auto flex min-h-[320px] w-full flex-col justify-end px-6 pb-10 pt-16 sm:aspect-[16/6] sm:pb-12 sm:pt-20 lg:pt-24">
         <div className="mx-auto w-full" style={{ maxWidth: "var(--th-container-width, 1400px)" }}>
           <div className="max-w-3xl pb-4">
             {configuredSlide ? (
               <>
                 {configuredSlide.title1 && (
-                  <h1 className="font-serif text-4xl font-bold leading-[1.1] text-white sm:text-5xl lg:text-6xl">
+                  <h1 className="max-w-[22rem] font-serif text-[2rem] font-bold leading-[1.06] text-white sm:max-w-3xl sm:text-5xl lg:text-6xl">
                     {configuredSlide.title1}
                     {configuredSlide.title2 && (
                       <>
@@ -246,7 +246,7 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
               </>
             ) : (
               <>
-                <h1 className="font-serif text-4xl font-bold leading-[1.1] text-white sm:text-5xl lg:text-6xl">
+                <h1 className="max-w-[22rem] font-serif text-[2rem] font-bold leading-[1.06] text-white sm:max-w-3xl sm:text-5xl lg:text-6xl">
                   {t(defaultSlide.titleKey1, locale)}
                   <br />
                   <span className="text-gold-gradient">{t(defaultSlide.titleKey2, locale)}</span>

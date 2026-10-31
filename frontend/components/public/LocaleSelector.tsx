@@ -17,8 +17,8 @@ export default function LocaleSelector({ variant = "header" }: { variant?: "head
         value={locale}
         onChange={(e) => setLocale(e.target.value as (typeof LOCALES)[number])}
         aria-label={t("nav.locale", locale)}
-        className={`rounded-lg border bg-white text-xs font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 ${
-          variant === "compact" ? "border-slate-200 px-1.5 py-1" : "border-slate-200 px-2 py-1.5"
+        className={`rounded-lg border border-dark-border bg-dark-surface text-xs font-medium text-neutral-200 outline-none transition-colors focus:border-gold ${
+          variant === "compact" ? "px-1.5 py-1" : "px-2 py-1.5"
         }`}
       >
         {LOCALES.map((l) => (

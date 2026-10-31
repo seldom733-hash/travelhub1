@@ -56,52 +56,50 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
   return (
     <Link
       href={`/products/${card.code}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-blue-500"
+      className="group flex flex-col overflow-hidden rounded-[20px] border border-dark-border bg-dark-card transition-[transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-gold/60 focus-visible:outline-2 focus-visible:outline-gold"
     >
-      <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-dark-surface">
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={img.thumbUrl}
             alt={card.title}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-4xl text-slate-300">{icon}</div>
+          <div className="flex h-full w-full items-center justify-center text-4xl text-neutral-600">{icon}</div>
         )}
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-dark-card/80 to-transparent" />
         {availability.tone === "limited" && (
-          <span className="absolute right-2 top-2 rounded-full bg-amber-100/95 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+          <span className="absolute right-3 top-3 rounded-full bg-gold px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-dark">
             {t("card.availability_limited", locale)}
           </span>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-1 p-4">
-        <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-          {categoryLabel(card.category, locale) || card.type}
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+          <span>{categoryLabel(card.category, locale) || card.type}</span>
+          {card.partnerCode && (
+            <span className="flex items-center gap-1 text-[10px] font-medium normal-case tracking-normal text-neutral-500">
+              <span>{`${t("card.supplier_code", locale)}:`}</span>
+              <span className="font-mono">{card.partnerCode}</span>
+            </span>
+          )}
         </div>
-        <div className="line-clamp-2 font-bold text-slate-900 transition-colors group-hover:text-blue-600" title={card.title}>
+        <h3 className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug text-white transition-colors group-hover:text-gold" title={card.title}>
           {card.title}
-        </div>
-        {/* Продавец явно не раскрывается: на карточке только CRM Partner.code.
-            Код берётся из Product.partner, а не из seller-profile, поэтому он
-            виден и для supplier-синков без публичного seller-профиля. */}
-        {card.partnerCode && (
-          <div className="flex items-center gap-1 text-[11px] text-slate-500">
-            <span>{t("card.supplier_code", locale)}:</span>
-            <span className="font-mono font-medium text-slate-600">{card.partnerCode}</span>
-          </div>
-        )}
+        </h3>
         {card.shortDescription && (
-          <p className="line-clamp-2 text-xs leading-relaxed text-slate-500">{card.shortDescription}</p>
+          <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-neutral-400">{card.shortDescription}</p>
         )}
 
-        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+        <div className="mt-auto flex items-end justify-between gap-3 pt-4">
           <div>
-            <Price amount={card.priceFrom} currency={card.currency} size="sm" withPrefix={false} />
+            <Price amount={card.priceFrom} currency={card.currency} size="sm" withPrefix={false} tone="gold" />
             {(card.headlineDepartureDate || card.headlineNights) && (
-              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-400">
+              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-neutral-400">
                 {card.headlineDepartureDate && (
                   <span>{formatDateShort(card.headlineDepartureDate, locale)}</span>
                 )}
@@ -112,7 +110,7 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
               </div>
             )}
           </div>
-          <span className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+          <span className="shrink-0 rounded-full border border-dark-border px-3 py-1.5 text-[11px] font-semibold text-neutral-300 transition-colors group-hover:border-gold group-hover:bg-gold group-hover:text-dark">
             {t("card.details", locale)}
           </span>
         </div>

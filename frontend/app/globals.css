@@ -1,29 +1,64 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand: #2563eb;
-  --color-brand-dark: #1d4ed8;
-  --color-ink: #0f172a;
-  --color-panel: #f8fafc;
-  --color-line: #e2e8f0;
-  --color-gold: var(--th-accent, #c9a96e);
-  --color-gold-light: #d4b97a;
-  --color-gold-dark: #b8944f;
-  --color-dark: var(--th-bg, #0d0d0d);
-  --color-dark-surface: var(--th-surface, #1a1a1a);
-  --color-dark-card: #242424;
-  --color-dark-border: var(--th-border, #333333);
+  --color-brand: #2f6f68;
+  --color-brand-dark: #245a54;
+  --color-ink: #0c1c1e;
+  --color-panel: #f4f1e8;
+  --color-line: #d8ded7;
+  --color-gold: var(--th-accent, #a8e6cf);
+  --color-gold-light: #c6f1e2;
+  --color-gold-dark: #7bc9b3;
+  --color-coral: #ff7a59;
+  --color-dark: var(--th-bg, #071417);
+  --color-dark-surface: var(--th-surface, #0d2226);
+  --color-dark-card: var(--th-card, #122b30);
+  --color-dark-border: var(--th-border, #23464a);
 }
 
 :root {
   color-scheme: dark;
+  --th-bg: #071417;
+  --th-surface: #0d2226;
+  --th-card: #122b30;
+  --th-border: #23464a;
+  --th-text: #f4f0e6;
+  --th-muted: #9bb1ae;
+  --th-accent: #a8e6cf;
+  --th-accent-ink: #06221c;
+  --th-radius-card: 20px;
+  --th-radius-btn: 12px;
+  --th-radius-input: 12px;
+  --th-container-width: 1280px;
+  --th-padding: 24px;
+  --th-section-spacing: 76px;
 }
 
 body {
-  font-family: var(--th-font-body, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
-  background: var(--th-bg, #0d0d0d);
-  color: var(--th-text, #e8e8e8);
-  line-height: var(--th-line-height, 1.6);
+  font-family: var(--font-body), "Onest", ui-sans-serif, system-ui, sans-serif;
+  background: var(--th-bg);
+  color: var(--th-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display), "Unbounded", ui-sans-serif, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+::selection {
+  background: var(--th-accent);
+  color: var(--th-accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--th-accent);
+  outline-offset: 3px;
 }
 
 .thin-scroll::-webkit-scrollbar {
@@ -53,47 +88,54 @@ body {
 }
 
 .font-serif {
-  font-family: "Georgia", "Times New Roman", serif;
+  font-family: var(--font-display), "Unbounded", ui-sans-serif, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 .marketplace-dark {
-  background: var(--th-bg, #0d0d0d);
-  color: var(--th-text, #e8e8e8);
+  background: var(--th-bg);
+  color: var(--th-text);
 }
 .marketplace-dark a {
   color: inherit;
 }
 
 .text-gold-gradient {
-  background: linear-gradient(135deg, #c9a96e 0%, #d4b97a 50%, #c9a96e 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--th-accent);
+  background: none;
+  -webkit-text-fill-color: currentColor;
 }
 
 .hero-overlay {
   background: linear-gradient(
-    180deg,
-    rgba(13, 13, 13, 0.15) 0%,
-    rgba(13, 13, 13, 0.3) 30%,
-    rgba(13, 13, 13, 0.65) 70%,
-    rgba(13, 13, 13, 0.92) 100%
+    90deg,
+    rgba(7, 20, 23, 0.88) 0%,
+    rgba(7, 20, 23, 0.62) 42%,
+    rgba(7, 20, 23, 0.16) 78%,
+    rgba(7, 20, 23, 0.32) 100%
   );
 }
 
 .search-glass {
-  background: rgba(26, 26, 26, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(201, 169, 110, 0.2);
+  background: color-mix(in srgb, var(--th-surface) 88%, transparent);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--th-border);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
 }
 
 .card-premium {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: var(--th-radius-card, 12px);
+  border: 1px solid var(--th-border);
+  background: var(--th-card);
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    border-color 220ms ease,
+    background-color 220ms ease;
+  border-radius: var(--th-radius-card);
 }
 .card-premium:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--th-accent) 55%, var(--th-border));
+  box-shadow: none;
 }
 
 /* Скелетоны карточек маркетплейса: тот же радиус, что у реальных карточек
@@ -105,58 +147,64 @@ body {
 }
 
 .btn-gold {
-  background: linear-gradient(135deg, var(--th-accent, #c9a96e) 0%, #b8944f 100%);
-  color: var(--th-bg, #0d0d0d);
-  font-weight: 600;
-  border-radius: var(--th-radius-btn, 8px);
-  transition: all 0.2s ease;
+  background: var(--th-accent);
+  color: var(--th-accent-ink);
+  font-weight: 700;
+  border-radius: var(--th-radius-btn);
+  transition:
+    background-color 180ms ease,
+    transform 180ms ease;
 }
 .btn-gold:hover {
-  background: linear-gradient(135deg, #d4b97a 0%, var(--th-accent, #c9a96e) 100%);
-  box-shadow: 0 4px 20px rgba(201, 169, 110, 0.4);
+  background: var(--color-gold-light, #c6f1e2);
+  transform: translateY(-1px);
+  box-shadow: none;
 }
 
 .category-chip {
-  transition: all 0.2s ease;
-  border: 1px solid rgba(201, 169, 110, 0.3);
-  border-radius: var(--th-radius-btn, 8px);
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease;
+  border: 1px solid var(--th-border);
+  border-radius: 999px;
 }
 .category-chip:hover {
-  border-color: var(--th-accent, #c9a96e);
-  background: rgba(201, 169, 110, 0.1);
+  border-color: color-mix(in srgb, var(--th-accent) 65%, var(--th-border));
+  background: color-mix(in srgb, var(--th-accent) 9%, transparent);
 }
 .category-chip:focus-visible {
-  outline: 2px solid var(--th-accent, #c9a96e);
+  outline: 2px solid var(--th-accent);
   outline-offset: 2px;
 }
 
 .destination-overlay {
   background: linear-gradient(
     180deg,
-    transparent 0%,
-    rgba(13, 13, 13, 0.5) 50%,
-    rgba(13, 13, 13, 0.92) 100%
+    rgba(7, 20, 23, 0.04) 0%,
+    rgba(7, 20, 23, 0.35) 48%,
+    rgba(7, 20, 23, 0.92) 100%
   );
 }
 
 /* Design token utilities */
 .th-container {
-  max-width: var(--th-container-width, 1400px);
+  max-width: var(--th-container-width);
   margin-left: auto;
   margin-right: auto;
-  padding-left: var(--th-padding, 24px);
-  padding-right: var(--th-padding, 24px);
+  padding-left: var(--th-padding);
+  padding-right: var(--th-padding);
 }
 
 .th-section {
-  padding-top: var(--th-section-spacing, 80px);
-  padding-bottom: var(--th-section-spacing, 80px);
+  padding-top: var(--th-section-spacing);
+  padding-bottom: var(--th-section-spacing);
 }
 
 .th-heading {
-  font-family: var(--th-font-heading, Georgia, serif);
-  font-weight: var(--th-heading-weight, 700);
-  letter-spacing: var(--th-letter-spacing, 0);
+  font-family: var(--th-font-heading, var(--font-display), "Unbounded", ui-sans-serif, sans-serif);
+  font-weight: var(--th-heading-weight, 600);
+  letter-spacing: var(--th-letter-spacing, -0.02em);
 }
 
 .th-input {
@@ -177,4 +225,84 @@ body {
 
 .th-surface {
   background-color: var(--th-surface, #1a1a1a);
+}
+
+/* Legacy public pages (PDP, partner onboarding) still use slate utility
+   classes. Keep them inside the same dark visual system without duplicating
+   every JSX branch. */
+.public-shell {
+  color-scheme: dark;
+}
+.public-shell header {
+  border-color: var(--th-border);
+  background: color-mix(in srgb, var(--th-bg) 92%, transparent);
+}
+.public-shell .bg-white,
+.public-shell .bg-slate-50,
+.public-shell .bg-slate-100,
+.public-shell .bg-slate-200 {
+  background-color: var(--th-surface) !important;
+}
+.public-shell .border-slate-200,
+.public-shell .border-slate-300 {
+  border-color: var(--th-border) !important;
+}
+.public-shell .text-slate-900,
+.public-shell .text-slate-800 {
+  color: var(--th-text) !important;
+}
+.public-shell .text-slate-700,
+.public-shell .text-slate-600,
+.public-shell .text-slate-500,
+.public-shell .text-slate-400 {
+  color: var(--th-muted) !important;
+}
+.public-shell .bg-blue-600,
+.public-shell .bg-blue-500 {
+  background-color: var(--th-accent) !important;
+  color: var(--th-accent-ink) !important;
+}
+.public-shell .text-blue-600,
+.public-shell .text-blue-700 {
+  color: var(--th-accent) !important;
+}
+.public-shell .border-blue-200,
+.public-shell .border-blue-300 {
+  border-color: color-mix(in srgb, var(--th-accent) 45%, var(--th-border)) !important;
+}
+.public-shell input,
+.public-shell select,
+.public-shell textarea {
+  background-color: var(--th-surface) !important;
+  border-color: var(--th-border) !important;
+  color: var(--th-text) !important;
+}
+.public-shell input::placeholder,
+.public-shell textarea::placeholder {
+  color: color-mix(in srgb, var(--th-muted) 70%, transparent) !important;
+}
+/* Legacy slate/blue variants with opacity suffixes (bg-blue-50/70 etc.). */
+.public-shell [class*="bg-blue-50"],
+.public-shell [class*="bg-blue-100"] {
+  background-color: color-mix(in srgb, var(--th-accent) 8%, var(--th-surface)) !important;
+}
+.public-shell [class*="text-blue-"] {
+  color: var(--th-accent) !important;
+}
+.public-shell [class*="border-blue-100"],
+.public-shell [class*="border-blue-200"] {
+  border-color: color-mix(in srgb, var(--th-accent) 35%, var(--th-border)) !important;
+}
+.public-shell [class*="bg-slate-"] {
+  background-color: var(--th-surface) !important;
+}
+.public-shell [class*="text-slate-"] {
+  color: var(--th-muted) !important;
+}
+.public-shell [class*="border-slate-"] {
+  border-color: var(--th-border) !important;
+}
+.public-shell .text-slate-900,
+.public-shell .text-slate-800 {
+  color: var(--th-text) !important;
 }

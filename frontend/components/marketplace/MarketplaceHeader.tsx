@@ -170,21 +170,21 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
       <nav className="border-b border-dark-border/60 bg-dark/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1400px] items-center gap-5 px-6 py-3">
           {/* Logo */}
-          <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label={companyName || "TravelHub"}>
+          <Link href="/" className="flex shrink-0 items-center gap-3" aria-label={companyName || "TravelHub"}>
             {cfg.logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={cfg.logo.url} alt={companyName || "TravelHub"} className="h-9 w-auto max-w-[140px] object-contain" />
+              <span className="flex size-11 items-center justify-center overflow-hidden rounded-2xl bg-[#f4f0e6] p-1.5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={cfg.logo.url} alt={companyName || "TravelHub"} className="h-full w-full object-contain" />
+              </span>
             ) : (
-              <div className="flex size-9 items-center justify-center rounded-lg bg-gold/15 font-serif text-base font-bold text-gold">
+              <span className="flex size-11 items-center justify-center rounded-2xl bg-gold text-base font-bold text-dark">
                 T
-              </div>
+              </span>
             )}
-            <div className="hidden sm:block">
-              <div className="text-[15px] font-bold leading-tight">
-                <span className="text-white">{companyName || "TravelHub"}</span>
-              </div>
-              <div className="text-[9px] uppercase tracking-[0.15em] text-neutral-500">Discover more together</div>
-            </div>
+            <span className="block">
+              <span className="block font-display text-[13px] font-semibold leading-tight text-white sm:text-[15px]">{companyName || "TravelHub"}</span>
+              <span className="hidden text-[10px] tracking-[0.04em] text-neutral-500 sm:block">Discover more together</span>
+            </span>
           </Link>
 
           {/* Header search bar with autocomplete */}
@@ -277,21 +277,21 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
             {user === null ? (
               <Link
                 href="/login"
-                className="flex flex-col items-center gap-0.5 rounded-lg border border-dark-border bg-dark-card px-3 py-1.5 text-neutral-300 transition-all hover:border-gold/40 hover:text-white"
+                className="flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-sm font-semibold text-dark transition-colors hover:bg-gold-light"
               >
-                <User size={18} weight="light" />
-                <span className="text-[10px]">{t("nav.login", locale)}</span>
+                <User size={16} weight="bold" />
+                <span>{t("nav.login", locale)}</span>
               </Link>
             ) : isInternalRole(user.role) ? (
-              <Link href="/app/dashboard" className="rounded-lg bg-gold/10 px-4 py-2 text-sm font-medium text-gold transition-colors hover:bg-gold/20">
+              <Link href="/app/dashboard" className="rounded-full border border-gold/40 px-4 py-2 text-sm font-semibold text-gold transition-colors hover:bg-gold/10">
                 {t("nav.workspace", locale)}
               </Link>
             ) : user.role === "PARTNER" ? (
-              <Link href="/partner" className="rounded-lg bg-gold/10 px-4 py-2 text-sm font-medium text-gold transition-colors hover:bg-gold/20">
+              <Link href="/partner" className="rounded-full border border-gold/40 px-4 py-2 text-sm font-semibold text-gold transition-colors hover:bg-gold/10">
                 {t("nav.cabinet", locale)}
               </Link>
             ) : (
-              <Link href="/account" className="rounded-lg bg-gold/10 px-4 py-2 text-sm font-medium text-gold transition-colors hover:bg-gold/20">
+              <Link href="/account" className="rounded-full border border-gold/40 px-4 py-2 text-sm font-semibold text-gold transition-colors hover:bg-gold/10">
                 {t("nav.account", locale)}
               </Link>
             )}
