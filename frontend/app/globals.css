@@ -35,10 +35,12 @@
 }
 
 body {
-  font-family: var(--font-body), "Onest", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-body), "Manrope", ui-sans-serif, system-ui, sans-serif;
   background: var(--th-bg);
   color: var(--th-text);
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.65;
+  letter-spacing: 0.012em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -47,8 +49,8 @@ h1,
 h2,
 h3,
 .font-display {
-  font-family: var(--font-display), "Unbounded", ui-sans-serif, sans-serif;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display), "Playfair Display", ui-sans-serif, sans-serif;
+  letter-spacing: -0.012em;
 }
 
 ::selection {
@@ -204,7 +206,7 @@ h3,
 .th-heading {
   font-family: var(--th-font-heading, var(--font-display), "Unbounded", ui-sans-serif, sans-serif);
   font-weight: var(--th-heading-weight, 600);
-  letter-spacing: var(--th-letter-spacing, -0.02em);
+  letter-spacing: var(--th-letter-spacing, -0.01em);
 }
 
 .th-input {
@@ -251,6 +253,7 @@ h3,
   --th-muted: #64746a;
   --th-accent: #3f7a36;
   --th-accent-ink: #ffffff;
+  --th-letter-spacing: 0.005em;
   background: var(--th-bg);
   color: var(--th-text);
 }
