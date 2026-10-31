@@ -97,7 +97,7 @@ export default function DestinationCountryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-dark">
+    <div className="theme-grove min-h-screen bg-dark">
       <MarketplaceHeader config={headerConfig} />
       <main className="mx-auto max-w-[1200px] px-6 py-10">
         <Link href="/destinations" className="inline-flex items-center gap-2 text-xs text-neutral-400 hover:text-gold">

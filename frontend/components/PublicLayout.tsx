@@ -27,7 +27,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const { brandName, loading: brandingLoading } = useGlobalBranding();
 
   return (
-    <div className="public-shell flex min-h-screen flex-col bg-dark text-white">
+    <div className="theme-grove public-shell flex min-h-screen flex-col bg-dark text-white">
       <PublicHeader user={user} userReady={userReady} />
       <main className="flex-1">{children}</main>
       <footer className="border-t border-dark-border bg-dark-surface py-6 text-center text-xs text-neutral-400">

@@ -2,49 +2,52 @@
 
 ## Direction
 
-A single modern visual system for the public marketplace: deep Caspian ink,
-sea-glass accent, warm paper text, and editorial display typography. The goal is
-to make discovery, search, destination browsing, product cards, and auth feel
-like one product rather than separate legacy screens.
+The approved direction is **Logo Grove**: a light botanical canvas built from the
+company logo's green, warm off-white surfaces, editorial serif headlines and a
+quiet dark-green action color.
 
 ## Tokens
 
 | Token | Value |
 |---|---|
-| Canvas | `#071417` |
-| Surface | `#0d2226` |
-| Card | `#122b30` |
-| Border | `#23464a` |
-| Text | `#f4f0e6` |
-| Muted | `#9bb1ae` |
-| Accent | `#a8e6cf` |
-| Display font | Unbounded |
-| Body font | Onest |
-| Radius | 20px cards / 12px controls |
+| Canvas | `#f1f4ec` |
+| Surface | `#fbfcf8` |
+| Text | `#1d2a20` |
+| Muted | `#64746a` |
+| Accent / logo green | `#3f7a36` |
+| Bright logo green | `#7fd858` |
+| Border | `#d5e0d2` |
+| Display font | Playfair Display |
+| Body font | Manrope |
+| Radius | 18px cards / 12px controls |
 
-The published constructor `designConfig` is refreshed by
-`20261031190000_refresh_marketplace_design_tokens`.
+The palette is applied to the published constructor `designConfig` and its
+published versions by
+`20261031210000_apply_grove_marketplace_palette`.
 
 ## What changed
 
 - global public tokens, typography, focus states, selection and controls;
-- marketplace header: logo tile, brand lockup, pill navigation/auth actions;
-- search panel: compact segmented tabs, glass surface, accent submit;
-- product cards: dark editorial cards with image, category, supplier code,
+- marketplace header: logo tile, brand lockup, green pill actions;
+- hero: editorial title above a large image, floating search card overlapping
+  the image bottom;
+- search panel: compact segmented tabs, white surface, green submit;
+- product cards: light editorial cards with image, category, supplier code,
   price, date, nights and hover state;
-- destination directory and destination cards now use the same card language;
-- product detail pages inherit the dark public shell (including legacy
+- destination directory and destination cards use the same card language;
+- product detail pages inherit the light public shell (including legacy
   slate/blue utility classes);
-- login and registration use a split image/form layout instead of standalone
-  blue auth screens;
-- mobile hero no longer overflows the viewport; arrows are desktop-only and
-  brand/auth controls fit the mobile header;
-- footer and public layout use the same ink/surface/border tokens.
+- login and registration keep a dark contrast split screen while the public
+  marketplace uses the light Grove canvas;
+- mobile hero no longer overflows the viewport; carousel arrows are
+  desktop-only and brand/auth controls fit the mobile header;
+- footer and public layout use the same light ink/surface/border tokens.
 
 ## Verification
 
 - `npx tsc --noEmit` — pass
 - `npm run build` — pass
-- `npx vitest run` — **1122 tests / 77 files pass**
-- Browser screenshots: `reports/demo/final-home.png`,
-  `final-home-mobile.png`, `final-login.png` and `ui5-*` page shots.
+- `npx vitest run` — 1122 tests / 77 files pass
+- Browser screenshots: `reports/demo/grove-final-home.png`,
+  `grove-final-home-mobile.png`, `grove-final-dest.png`,
+  `grove-final-search.png`, `grove-final-pdp.png`.

@@ -1,37 +1,37 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand: #2f6f68;
-  --color-brand-dark: #245a54;
-  --color-ink: #0c1c1e;
-  --color-panel: #f4f1e8;
-  --color-line: #d8ded7;
-  --color-gold: var(--th-accent, #a8e6cf);
-  --color-gold-light: #c6f1e2;
-  --color-gold-dark: #7bc9b3;
-  --color-coral: #ff7a59;
-  --color-dark: var(--th-bg, #071417);
-  --color-dark-surface: var(--th-surface, #0d2226);
-  --color-dark-card: var(--th-card, #122b30);
-  --color-dark-border: var(--th-border, #23464a);
+  --color-brand: #3f7a36;
+  --color-brand-dark: #2f5e29;
+  --color-ink: #1d2a20;
+  --color-panel: #f1f4ec;
+  --color-line: #d5e0d2;
+  --color-gold: var(--th-accent, #3f7a36);
+  --color-gold-light: #5a9b4e;
+  --color-gold-dark: #2f5e29;
+  --color-coral: #b94f35;
+  --color-dark: var(--th-bg, #f1f4ec);
+  --color-dark-surface: var(--th-surface, #fbfcf8);
+  --color-dark-card: var(--th-card, #fbfcf8);
+  --color-dark-border: var(--th-border, #d5e0d2);
 }
 
 :root {
-  color-scheme: dark;
-  --th-bg: #071417;
-  --th-surface: #0d2226;
-  --th-card: #122b30;
-  --th-border: #23464a;
-  --th-text: #f4f0e6;
-  --th-muted: #9bb1ae;
-  --th-accent: #a8e6cf;
-  --th-accent-ink: #06221c;
-  --th-radius-card: 20px;
+  color-scheme: light;
+  --th-bg: #f1f4ec;
+  --th-surface: #fbfcf8;
+  --th-card: #fbfcf8;
+  --th-border: #d5e0d2;
+  --th-text: #1d2a20;
+  --th-muted: #64746a;
+  --th-accent: #3f7a36;
+  --th-accent-ink: #ffffff;
+  --th-radius-card: 18px;
   --th-radius-btn: 12px;
   --th-radius-input: 12px;
-  --th-container-width: 1280px;
+  --th-container-width: 1240px;
   --th-padding: 24px;
-  --th-section-spacing: 76px;
+  --th-section-spacing: 64px;
 }
 
 body {
@@ -225,6 +225,62 @@ h3,
 
 .th-surface {
   background-color: var(--th-surface, #1a1a1a);
+}
+
+/* Auth screens keep a quieter dark contrast against the light public shell. */
+.theme-dark {
+  --th-bg: #071417;
+  --th-surface: #0d2226;
+  --th-card: #122b30;
+  --th-border: #23464a;
+  --th-text: #f4f0e6;
+  --th-muted: #9bb1ae;
+  --th-accent: #a8e6cf;
+  --th-accent-ink: #06221c;
+  background: var(--th-bg);
+  color: var(--th-text);
+}
+
+/* Grove public theme: logo-green palette on a light botanical canvas. */
+.theme-grove {
+  --th-bg: #f1f4ec;
+  --th-surface: #fbfcf8;
+  --th-card: #fbfcf8;
+  --th-border: #d5e0d2;
+  --th-text: #1d2a20;
+  --th-muted: #64746a;
+  --th-accent: #3f7a36;
+  --th-accent-ink: #ffffff;
+  background: var(--th-bg);
+  color: var(--th-text);
+}
+.theme-grove .text-white {
+  color: var(--th-text) !important;
+}
+.theme-grove .text-neutral-200,
+.theme-grove .text-neutral-300,
+.theme-grove .text-neutral-400,
+.theme-grove .text-neutral-500,
+.theme-grove .text-neutral-600 {
+  color: var(--th-muted) !important;
+}
+.theme-grove .text-dark {
+  color: var(--th-accent-ink) !important;
+}
+.theme-grove .bg-black\/15,
+.theme-grove .bg-black\/20 {
+  background: color-mix(in srgb, var(--th-ink, #1d2a20) 6%, transparent) !important;
+}
+.theme-grove .search-glass {
+  background: var(--th-surface);
+  border-color: var(--th-border);
+  box-shadow: 0 24px 60px rgba(45, 65, 44, 0.12);
+}
+.theme-grove .card-premium {
+  box-shadow: none;
+}
+.theme-grove .hero-overlay {
+  background: linear-gradient(180deg, transparent 45%, rgba(29, 42, 32, 0.28) 100%);
 }
 
 /* Legacy public pages (PDP, partner onboarding) still use slate utility

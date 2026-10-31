@@ -20,12 +20,10 @@ export default function SearchBlock({ config }: { config?: SearchBlockConfig | n
   const { enabled, defaultService } = resolveSearchServices(config ?? null);
 
   return (
-    <section className="relative z-20 -mt-10 bg-dark pb-2 sm:-mt-14">
+    <section className="relative z-20 -mt-16 bg-dark pb-2 sm:-mt-20" aria-label={t("search.block_title", locale)}>
       <div className="th-container">
         <div className="mx-auto max-w-6xl">
-          <h2 className="mb-3 px-1 font-display text-lg font-semibold text-white sm:text-xl">
-            {t("search.block_title", locale)}
-          </h2>
+          <h2 className="sr-only">{t("search.block_title", locale)}</h2>
           <HeroSearch enabledServices={enabled} defaultService={defaultService} />
         </div>
       </div>

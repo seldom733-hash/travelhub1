@@ -35,7 +35,7 @@ export default function DestinationsPage() {
   const brandName = page ? resolveBrandName(headerConfig) : "";
 
   return (
-    <div className="min-h-screen bg-dark">
+    <div className="theme-grove min-h-screen bg-dark">
       <MarketplaceHeader config={headerConfig} />
       <main className="mx-auto max-w-[1200px] px-6 py-12">
         <div className="mb-8 flex items-start gap-3">

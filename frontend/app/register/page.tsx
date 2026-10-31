@@ -67,26 +67,26 @@ function RegisterPageInner() {
   const label = "mb-1.5 block text-xs font-semibold text-neutral-300";
 
   return (
-    <div className="min-h-screen bg-dark text-white">
+    <div className="theme-grove min-h-screen bg-dark text-white">
       <div className="grid min-h-screen lg:grid-cols-[0.95fr_1.05fr]">
-        <aside className="relative hidden overflow-hidden bg-dark-surface lg:block">
+        <aside className="relative hidden overflow-hidden bg-dark-surface lg:block" style={{ color: "#fff" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/hero2.png" alt="" className="absolute inset-0 h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-br from-dark/90 via-dark/55 to-dark/20" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(7,20,23,.88), rgba(7,20,23,.46), rgba(7,20,23,.18))" }} />
           <div className="relative flex h-full flex-col justify-between p-12">
             <Link href="/" className="flex items-center gap-3">
               <span className="flex size-11 items-center justify-center rounded-2xl bg-gold text-base font-bold text-dark">N</span>
-              <span className="font-display text-lg font-semibold text-white">Navitravel</span>
+              <span className="font-display text-lg font-semibold" style={{ color: "#fff" }}>Navitravel</span>
             </Link>
             <div className="max-w-md">
-              <p className="font-display text-4xl font-semibold leading-[1.08] text-white">
+              <p className="font-display text-4xl font-semibold leading-[1.08]" style={{ color: "#fff" }}>
                 {t("register.subtitle", locale)}
               </p>
-              <p className="mt-5 max-w-sm text-sm leading-relaxed text-neutral-300">
+              <p className="mt-5 max-w-sm text-sm leading-relaxed" style={{ color: "rgba(255,255,255,.75)" }}>
                 {t("footer.brand_description", locale)}
               </p>
             </div>
-            <span className="text-xs text-neutral-400">© {new Date().getFullYear()} Navitravel</span>
+            <span className="text-xs" style={{ color: "rgba(255,255,255,.65)" }}>© {new Date().getFullYear()} Navitravel</span>
           </div>
         </aside>
 

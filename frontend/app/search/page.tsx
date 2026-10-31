@@ -66,7 +66,7 @@ export default function SearchResultsPage() {
          ≈120px), заголовок результатов и сетка карточек в
          `mx-auto max-w-[1400px] px-6 py-8`. Прежде здесь была пустая тёмная
          полоса с «…», после загрузки появлялись шапка, поисковик и сетка. */
-      <div className="min-h-screen bg-dark">
+      <div className="theme-grove min-h-screen bg-dark">
         {/* Neutral header placeholder: the published header config is fetched
             inside SearchResultsInner. Rendering the default <MarketplaceHeader />
             here flashed the legacy "TravelHub" brand before Navitravel loaded. */}
@@ -419,7 +419,7 @@ function SearchResultsInner() {
   };
 
   return (
-    <div className="min-h-screen bg-dark">
+    <div className="theme-grove min-h-screen bg-dark">
       {constructorLoading ? (
         <div className="h-[88px] border-b border-dark-border/60 bg-dark" aria-hidden="true" />
       ) : (

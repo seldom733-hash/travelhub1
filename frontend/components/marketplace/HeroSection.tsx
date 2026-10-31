@@ -156,79 +156,14 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
     : SLIDES.map((s) => s.image);
 
   return (
-    // Высота баннера — пропорция от ширины страницы (16:6), а не фиксированные
-    // пиксели: баннер масштабируется вместе с ней. `min-h` ниже — только защита
-    // от обрезки текста на узких экранах; `aspect` задан на контентном блоке,
-    // поэтому длинный текст увеличивает секцию, а не обрезается.
     <section className="relative overflow-hidden bg-dark">
-      {/* Background images - all layered */}
-      {images.map((image, i) => (
-        <div
-          key={`${image}-${i}`}
-          className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-            i === current ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={image}
-            alt=""
-            className={`h-full w-full object-cover object-center ${
-              image === "/hero2.png" ? "scale-x-[-1]" : ""
-            }`}
-            fetchPriority={i === 0 ? "high" : "low"}
-          />
-        </div>
-      ))}
-      {/* Overlay */}
-      <div className="hero-overlay absolute inset-0 z-[1]" />
-
-      {/* Navigation arrows */}
-      {showArrows && slideCount > 1 && (
-      <>
-      <button
-        onClick={prev}
-        className="absolute left-4 top-1/2 z-20 hidden size-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-dark/40 text-white/70 backdrop-blur-sm transition-colors hover:border-gold/50 hover:bg-dark/60 hover:text-white sm:flex lg:left-8"
-        aria-label="Previous slide"
-      >
-        <CaretLeft size={24} weight="light" />
-      </button>
-      <button
-        onClick={next}
-        className="absolute right-4 top-1/2 z-20 hidden size-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-dark/40 text-white/70 backdrop-blur-sm transition-colors hover:border-gold/50 hover:bg-dark/60 hover:text-white sm:flex lg:right-8"
-        aria-label="Next slide"
-      >
-        <CaretRight size={24} weight="light" />
-      </button>
-      </>
-      )}
-
-      {/* Indicators */}
-      {showIndicators && slideCount > 1 && (
-      <div className="absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 gap-2.5 sm:bottom-8">
-        {images.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => goTo(i)}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              i === current
-                ? "w-8 bg-gold"
-                : "w-2 bg-white/40 hover:bg-white/60"
-            }`}
-            aria-label={`Go to slide ${i + 1}`}
-          />
-        ))}
-      </div>
-      )}
-
-      {/* Content — cinematic text only, NO search */}
-      <div className="relative z-10 mx-auto flex min-h-[320px] w-full flex-col justify-end px-6 pb-10 pt-16 sm:aspect-[16/6] sm:pb-12 sm:pt-20 lg:pt-24">
-        <div className="mx-auto w-full" style={{ maxWidth: "var(--th-container-width, 1400px)" }}>
-          <div className="max-w-3xl pb-4">
+      <div className="th-container pt-10 sm:pt-14">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-2xl">
             {configuredSlide ? (
               <>
                 {configuredSlide.title1 && (
-                  <h1 className="max-w-[22rem] font-serif text-[2rem] font-bold leading-[1.06] text-white sm:max-w-3xl sm:text-5xl lg:text-6xl">
+                  <h1 className="font-serif text-[2.35rem] font-semibold leading-[1.04] text-white sm:text-5xl lg:text-[4.25rem]">
                     {configuredSlide.title1}
                     {configuredSlide.title2 && (
                       <>
@@ -246,7 +181,7 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
               </>
             ) : (
               <>
-                <h1 className="max-w-[22rem] font-serif text-[2rem] font-bold leading-[1.06] text-white sm:max-w-3xl sm:text-5xl lg:text-6xl">
+                <h1 className="font-serif text-[2.35rem] font-semibold leading-[1.04] text-white sm:text-5xl lg:text-[4.25rem]">
                   {t(defaultSlide.titleKey1, locale)}
                   <br />
                   <span className="text-gold-gradient">{t(defaultSlide.titleKey2, locale)}</span>
@@ -257,6 +192,67 @@ export default function HeroSection({ config }: { config?: HeroConfigShape | nul
               </>
             )}
           </div>
+          <div className="flex items-center gap-2 pb-1 text-[11px] font-semibold text-neutral-500">
+            <span>{String(current + 1).padStart(2, "0")}</span>
+            <span className="h-px w-8 bg-dark-border" />
+            <span>{String(slideCount).padStart(2, "0")}</span>
+          </div>
+        </div>
+
+        <div className="relative mt-8 h-[260px] overflow-hidden rounded-[26px] bg-dark-surface sm:h-[390px]">
+          {images.map((image, i) => (
+            <div
+              key={`${image}-${i}`}
+              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                i === current ? "opacity-100" : "opacity-0"
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image}
+                alt=""
+                className={`h-full w-full object-cover object-center ${
+                  image === "/hero2.png" ? "scale-x-[-1]" : ""
+                }`}
+                fetchPriority={i === 0 ? "high" : "low"}
+              />
+            </div>
+          ))}
+          <div className="hero-overlay absolute inset-0 z-[1]" />
+
+          {showArrows && slideCount > 1 && (
+            <>
+              <button
+                onClick={prev}
+                className="absolute left-4 top-1/2 z-20 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/35 sm:flex"
+                aria-label="Previous slide"
+              >
+                <CaretLeft size={20} weight="light" />
+              </button>
+              <button
+                onClick={next}
+                className="absolute right-4 top-1/2 z-20 hidden size-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/35 sm:flex"
+                aria-label="Next slide"
+              >
+                <CaretRight size={20} weight="light" />
+              </button>
+            </>
+          )}
+
+          {showIndicators && slideCount > 1 && (
+            <div className="absolute bottom-5 left-1/2 z-20 flex -translate-x-1/2 gap-2">
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => goTo(i)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    i === current ? "w-7 bg-white" : "w-1.5 bg-white/55 hover:bg-white/80"
+                  }`}
+                  aria-label={`Go to slide ${i + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>

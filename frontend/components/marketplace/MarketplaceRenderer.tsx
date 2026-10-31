@@ -45,7 +45,7 @@ export default function MarketplaceRenderer({ pageOverride }: { pageOverride?: P
   // Loading: neutral shell (dark hero-sized block, no text content).
   if (loading) {
     return (
-      <div className="min-h-screen bg-dark">
+      <div className="theme-grove min-h-screen bg-dark">
         <div className="aspect-[16/6] min-h-[320px] bg-dark" aria-busy="true" />
       </div>
     );
@@ -79,7 +79,7 @@ export default function MarketplaceRenderer({ pageOverride }: { pageOverride?: P
   }
 
   return (
-    <div className="min-h-screen bg-dark">
+    <div className="theme-grove min-h-screen bg-dark">
       <DesignTokenInjector designConfig={cfg.designConfig} />
       <MarketplaceHeader config={cfg.headerConfig as never} />
       <main>
@@ -119,7 +119,7 @@ export default function MarketplaceRenderer({ pageOverride }: { pageOverride?: P
 
 function DefaultMarketplaceLayout() {
   return (
-    <div className="min-h-screen bg-dark">
+    <div className="theme-grove min-h-screen bg-dark">
       <MarketplaceHeader />
       <main>
         <HeroSection />
