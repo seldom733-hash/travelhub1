@@ -88,7 +88,7 @@ export default function ProductCard({ card, position = 0 }: { card: PublicProduc
             </span>
           )}
         </div>
-        <h3 className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug text-white transition-colors group-hover:text-gold" title={card.title}>
+        <h3 className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug tracking-[0.012em] text-white transition-colors group-hover:text-gold" title={card.title}>
           {card.title}
         </h3>
         {card.shortDescription && (

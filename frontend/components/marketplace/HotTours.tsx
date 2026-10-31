@@ -61,7 +61,7 @@ function HotTourCard({ card }: { card: PublicProductCard }) {
             {categoryLabel(card.category, locale)}
           </p>
         )}
-        <h3 className="line-clamp-2 font-serif text-sm font-semibold text-white transition-colors group-hover:text-gold">
+        <h3 className="line-clamp-2 font-serif text-sm font-semibold tracking-[0.012em] text-white transition-colors group-hover:text-gold">
           {card.title}
         </h3>
         <SupplierCodeBadge code={card.partnerCode} className="mt-1 text-[10px] text-neutral-500" />

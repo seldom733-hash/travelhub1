@@ -83,13 +83,13 @@ function PublicHeader({ user, userReady }: { user: AuthUser | null; userReady: b
         <Link href="/" className="flex shrink-0 items-center gap-2" aria-label={displayBrand || "Home"}>
           {logo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logo.url} alt={displayBrand} className="h-12 w-auto max-w-[180px] object-contain" />
+            <img src={logo.url} alt={displayBrand} className="h-16 w-auto max-w-[220px] object-contain sm:h-20" />
           ) : (
-            <div className="flex size-12 items-center justify-center rounded-xl bg-blue-600 text-base font-bold text-white">
+            <div className="flex size-14 items-center justify-center rounded-xl bg-blue-600 text-xl font-bold text-white sm:size-20">
               {displayBrand ? displayBrand.charAt(0).toUpperCase() : "T"}
             </div>
           )}
-          <span className="hidden text-lg font-bold text-slate-900 sm:block">{displayBrand}</span>
+          <span className="hidden text-[28px] font-bold tracking-[0.005em] text-slate-900 sm:block lg:text-[30px]">{displayBrand}</span>
         </Link>
 
         {/* Public nav — только public-safe routes */}

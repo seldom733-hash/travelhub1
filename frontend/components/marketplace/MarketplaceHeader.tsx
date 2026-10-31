@@ -172,18 +172,18 @@ export default function MarketplaceHeader({ config }: { config?: MarketplaceHead
           {/* Logo */}
           <Link href="/" className="flex shrink-0 items-center gap-3" aria-label={companyName || "TravelHub"}>
             {cfg.logo ? (
-              <span className="flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-[#f4f0e6] p-1.5 sm:size-14">
+              <span className="flex size-14 items-center justify-center overflow-hidden rounded-2xl bg-[#f4f0e6] p-2 sm:size-20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={cfg.logo.url} alt={companyName || "TravelHub"} className="h-full w-full object-contain" />
               </span>
             ) : (
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-gold text-base font-bold text-dark sm:size-14">
+              <span className="flex size-14 items-center justify-center rounded-2xl bg-gold text-xl font-bold text-dark sm:size-20">
                 T
               </span>
             )}
             <span className="block">
-              <span className="block font-display text-[15px] font-semibold leading-tight tracking-[0.005em] text-white sm:text-[18px]">{companyName || "TravelHub"}</span>
-              <span className="hidden text-[10px] tracking-[0.04em] text-neutral-500 sm:block">Discover more together</span>
+              <span className="block font-display text-[22px] font-semibold leading-none tracking-[0.005em] text-white sm:text-[28px] lg:text-[30px]">{companyName || "TravelHub"}</span>
+              <span className="mt-1 hidden text-[10px] tracking-[0.04em] text-neutral-500 sm:block">Discover more together</span>
             </span>
           </Link>
 

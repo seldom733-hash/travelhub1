@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -64,7 +64,7 @@ function TourCard({ card }: { card: PublicProductCard }) {
             {categoryLabel(card.category, locale)}
           </p>
         )}
-        <h3 className="line-clamp-2 font-serif text-sm font-semibold text-white transition-colors group-hover:text-gold">
+        <h3 className="line-clamp-2 font-serif text-sm font-semibold tracking-[0.012em] text-white transition-colors group-hover:text-gold">
           {card.title}
         </h3>
         {card.shortDescription && (
@@ -190,3 +190,4 @@ export default function Tours() {
     </section>
   );
 }
+

@@ -63,7 +63,7 @@ function HotelCard({ card }: { card: PublicProductCard }) {
             {categoryLabel(card.category, locale)}
           </p>
         )}
-        <h3 className="line-clamp-2 font-serif text-base font-semibold text-white transition-colors group-hover:text-gold">
+        <h3 className="line-clamp-2 font-serif text-base font-semibold tracking-[0.012em] text-white transition-colors group-hover:text-gold">
           {card.title}
         </h3>
         {card.shortDescription && (
