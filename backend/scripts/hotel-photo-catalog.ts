@@ -123,11 +123,18 @@ function journal(entry: Record<string, unknown>): void {
   fs.appendFileSync(JOURNAL, `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`, "utf8");
 }
 
-/** Валидация CDN-URL: только фото tripadvisor, не аватары/иконки. */
+function isBookingCdn(src: string): boolean {
+  return /https?:\/\/cf\.bstatic\.com\//i.test(src);
+}
+
+/** Валидация CDN-URL: фото Tripadvisor или Booking.com, не аватары/иконки. */
 function pickPhotoUrl(src: string): string | null {
   if (!src || !/^https?:\/\//.test(src)) return null;
+  if (/default-avatar|user_photo|logo/i.test(src)) return null;
+  if (isBookingCdn(src)) {
+    return /\/xdata\/images\/hotel\//i.test(src) ? src.replace(/&amp;/g, "&") : null;
+  }
   if (!/\/photo-[a-z]\//.test(src)) return null;
-  if (/default-avatar|user_photo/i.test(src)) return null;
   return src;
 }
 
@@ -210,6 +217,18 @@ async function bingImageResults(query: string): Promise<ImageResult[]> {
 }
 
 /**
+ * Booking.com image source: the hotel pages themselves are protected by
+ * anti-bot, but their public image CDN (`cf.bstatic.com/xdata/images/hotel/`)
+ * is indexed by Bing. Search there first; the generic Tripadvisor provider
+ * remains the primary source, this is a second independent source.
+ */
+async function bookingImageResults(query: string): Promise<ImageResult[]> {
+  const base = query.replace(/\s+tripadvisor$/i, "").trim();
+  const results = await bingImageResults(`${base} booking.com`);
+  return results.filter((result) => isBookingCdn(result.image));
+}
+
+/**
  * DuckDuckGo Images (plain GET): HTML отдаёт `vqd`-токен, JSON-эндпоинт `i.js`
  * — прямые URL картинок. DuckDuckGo быстро включает бот-защиту (HTTP 202) при
  * частых запросах, поэтому используется только как резерв к Bing.
@@ -265,7 +284,11 @@ async function searchHotelPhoto(
   // Запрос с русским/локализованным городом Bing часто уводит в ноль результатов
   // Tripadvisor, поэтому сначала пробуем чистое название отеля.
   const queries = [`${hotelName} tripadvisor`, `${query} tripadvisor`];
-  const providers: Array<(q: string) => Promise<ImageResult[]>> = [bingImageResults, ddgImageResults];
+  const providers: Array<(q: string) => Promise<ImageResult[]>> = [
+    bingImageResults,
+    bookingImageResults,
+    ddgImageResults,
+  ];
   const minScore = relaxed ? Math.max(1, Math.ceil(tokens.length / 2)) : tokens.length;
 
   for (const provider of providers) {
@@ -279,8 +302,8 @@ async function searchHotelPhoto(
         continue;
       }
       const candidates = results
-        .filter((r) => /(?:media-cdn|dynamic-media-cdn)\.tripadvisor\.com/.test(r.image))
-        .filter((r) => !/default-avatar|user_photo/i.test(r.image))
+        .filter((r) => /(?:media-cdn|dynamic-media-cdn)\.tripadvisor\.com|cf\.bstatic\.com/i.test(r.image))
+        .filter((r) => !/default-avatar|user_photo|logo/i.test(r.image))
         .map((r) => {
           const hay = normalizeForMatch(`${r.title} ${r.image}`);
           // «Der Kapruner Hof» → «kaprunerhof» must match across the spaced
@@ -305,7 +328,7 @@ async function searchHotelPhoto(
         });
 
       for (const best of candidates) {
-        const withSize = upgradePhotoUrl(best.image);
+        const withSize = isBookingCdn(best.image) ? best.image : upgradePhotoUrl(best.image);
         if (pickPhotoUrl(withSize)) return withSize;
       }
     }
@@ -538,17 +561,18 @@ async function main(): Promise<void> {
 
       const query = [searchName || name, city, country || countryCode].filter(Boolean).join(" ");
       let sourceUrl: string | null = null;
-      let photoSource: "tripadvisor" | "anextour" = "tripadvisor";
+      let photoSource: "tripadvisor" | "anextour" | "booking" = "tripadvisor";
       const anexRef = h.refs.find((r) => r.supplierCode === "ANEX");
       if (anexRef) {
         // ANEX policy: take the exact hotel gallery from Anextour first.
-        // Tripadvisor CDN remains a fallback when the supplier page has no
+        // Tripadvisor / Booking CDN remain fallbacks when the supplier page has no
         // usable gallery.
         sourceUrl = await anexHotelPhotoUrl(anexRef.externalKey);
         if (sourceUrl) photoSource = "anextour";
       }
       if (!sourceUrl) {
         sourceUrl = await searchHotelPhoto(query, searchName || name, opts.relaxed);
+        if (sourceUrl && isBookingCdn(sourceUrl)) photoSource = "booking";
       }
       // Never reuse one photo URL for two different physical hotels: image
       // search sometimes returns a generic overview/placeholder for several
