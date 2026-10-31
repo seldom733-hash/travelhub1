@@ -265,11 +265,22 @@ function upgradePhotoUrl(raw: string): string {
     : `${upgraded}?w=1200&h=-1&s=1`;
 }
 
+interface PhotoMatch {
+  url: string;
+  title: string;
+  score: number;
+  confident: boolean;
+}
+
 /**
  * Поиск CDN-фото отеля. Источник — Tripadvisor CDN; сами ссылки ищутся через
  * Bing Images (async), при отказе — через DuckDuckGo Images. Результат
  * принимается только если ВСЕ значимые слова названия отеля встречаются в
  * заголовке/URL: лучше оставить карточку без фото, чем подставить чужое.
+ *
+ * Если найдено частичное совпадение (ядро названия/часть слов), оно не
+ * применяется автоматически: возвращается confident=false, чтобы вызывающий
+ * код поставил отель в очередь REVIEW для ручной проверки имени.
  *
  * `--relaxed` (второй проход): требование «все слова» снимается — берётся
  * первое значимое слово (ядро названия) + не менее половины слов. Нужен для
@@ -280,7 +291,8 @@ async function searchHotelPhoto(
   query: string,
   hotelName: string,
   relaxed = false,
-): Promise<string | null> {  const tokens = nameTokens(hotelName);
+): Promise<PhotoMatch | null> {
+  const tokens = nameTokens(hotelName);
   // Запрос с русским/локализованным городом Bing часто уводит в ноль результатов
   // Tripadvisor, поэтому сначала пробуем чистое название отеля.
   const queries = [`${hotelName} tripadvisor`, `${query} tripadvisor`];
@@ -290,6 +302,7 @@ async function searchHotelPhoto(
     ddgImageResults,
   ];
   const minScore = relaxed ? Math.max(1, Math.ceil(tokens.length / 2)) : tokens.length;
+  let fallback: PhotoMatch | null = null;
 
   for (const provider of providers) {
     for (const q of queries) {
@@ -301,7 +314,7 @@ async function searchHotelPhoto(
       } catch {
         continue;
       }
-      const candidates = results
+      const scored = results
         .filter((r) => /(?:media-cdn|dynamic-media-cdn)\.tripadvisor\.com|cf\.bstatic\.com/i.test(r.image))
         .filter((r) => !/default-avatar|user_photo|logo/i.test(r.image))
         .map((r) => {
@@ -317,7 +330,27 @@ async function searchHotelPhoto(
             hay.includes(tokens[0]) ||
             compact.includes(tokens[0].replace(/\s+/g, ""));
           return { ...r, score, coreHit };
-        })
+        });
+
+      // Preserve the best partial match as a review candidate, but never
+      // auto-download it.
+      for (const candidate of scored) {
+        if (candidate.score <= 0 || !candidate.coreHit) continue;
+        const candidateUrl = isBookingCdn(candidate.image)
+          ? candidate.image
+          : upgradePhotoUrl(candidate.image);
+        if (!pickPhotoUrl(candidateUrl)) continue;
+        if (!fallback || candidate.score > fallback.score) {
+          fallback = {
+            url: candidateUrl,
+            title: candidate.title,
+            score: candidate.score,
+            confident: false,
+          };
+        }
+      }
+
+      const candidates = scored
         .filter((r) => (tokens.length === 0 ? true : r.score >= minScore))
         // В мягком режиме ядро названия обязательно: без него совпадение
         // случайное (например, «Crown» из «Crown Plaza»).
@@ -329,11 +362,13 @@ async function searchHotelPhoto(
 
       for (const best of candidates) {
         const withSize = isBookingCdn(best.image) ? best.image : upgradePhotoUrl(best.image);
-        if (pickPhotoUrl(withSize)) return withSize;
+        if (pickPhotoUrl(withSize)) {
+          return { url: withSize, title: best.title, score: best.score, confident: true };
+        }
       }
     }
   }
-  return null;
+  return fallback;
 }
 
 /**
@@ -561,6 +596,7 @@ async function main(): Promise<void> {
 
       const query = [searchName || name, city, country || countryCode].filter(Boolean).join(" ");
       let sourceUrl: string | null = null;
+      let review: PhotoMatch | null = null;
       let photoSource: "tripadvisor" | "anextour" | "booking" = "tripadvisor";
       const anexRef = h.refs.find((r) => r.supplierCode === "ANEX");
       if (anexRef) {
@@ -571,8 +607,13 @@ async function main(): Promise<void> {
         if (sourceUrl) photoSource = "anextour";
       }
       if (!sourceUrl) {
-        sourceUrl = await searchHotelPhoto(query, searchName || name, opts.relaxed);
-        if (sourceUrl && isBookingCdn(sourceUrl)) photoSource = "booking";
+        const match = await searchHotelPhoto(query, searchName || name, opts.relaxed);
+        if (match?.confident) {
+          sourceUrl = match.url;
+          if (isBookingCdn(sourceUrl)) photoSource = "booking";
+        } else if (match) {
+          review = match;
+        }
       }
       // Never reuse one photo URL for two different physical hotels: image
       // search sometimes returns a generic overview/placeholder for several
@@ -598,6 +639,36 @@ async function main(): Promise<void> {
           console.log(`DUPE   ${h.id}  ${sourceUrl.slice(0, 90)}  (${h.name})`);
           sourceUrl = null;
         }
+      }
+      if (!sourceUrl && review) {
+        await prisma.hotel.update({
+          where: { id: h.id },
+          data: {
+            photoStatus: "REVIEW",
+            photoSource: "review",
+            photoSourceUrl: review.url,
+            photoAttribution: JSON.stringify({
+              expectedName: name,
+              candidateTitle: review.title,
+              candidateUrl: review.url,
+              score: review.score,
+              tokens: nameTokens(name),
+              reason: "low-confidence",
+            }),
+            photoUpdatedAt: new Date(),
+          },
+        });
+        journal({
+          hotelId: h.id,
+          name,
+          query,
+          sourceUrl: review.url,
+          candidateTitle: review.title,
+          score: review.score,
+          result: "review",
+        });
+        console.log(`REVIEW ${h.id}  score=${review.score}  ${review.title.slice(0, 80)}  (${h.name})`);
+        return;
       }
       if (!sourceUrl) {
         missed += 1;

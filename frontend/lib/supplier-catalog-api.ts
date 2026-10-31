@@ -52,6 +52,17 @@ export interface SupplierCatalogRun {
   items?: SupplierCatalogRunItem[];
 }
 
+export interface PhotoReviewItem {
+  id: string;
+  name: string;
+  cityName: string;
+  countryName: string;
+  candidateTitle: string;
+  candidateUrl: string;
+  expectedName: string;
+  score: number;
+}
+
 export const supplierCatalogApi = {
   capabilities: () => api.get<SupplierCatalogCapability[]>("/supplier/catalog/capabilities"),
   runs: (limit = 30) => api.get<SupplierCatalogRun[]>(`/supplier/catalog/runs?limit=${limit}`),
@@ -67,4 +78,9 @@ export const supplierCatalogApi = {
   cancel: (id: string) => api.post<SupplierCatalogRun>(`/supplier/catalog/runs/${encodeURIComponent(id)}/cancel`),
   manualRestore: (runId: string, itemId: string) =>
     api.post<SupplierCatalogRun>(`/supplier/catalog/runs/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}/restore`),
+  photoReviews: () => api.get<PhotoReviewItem[]>("/supplier/catalog/photo-review"),
+  approvePhotoReview: (id: string) =>
+    api.post<{ id: string; photoFile: string }>(`/supplier/catalog/photo-review/${encodeURIComponent(id)}/approve`),
+  rejectPhotoReview: (id: string) =>
+    api.post<{ id: string }>(`/supplier/catalog/photo-review/${encodeURIComponent(id)}/reject`),
 };

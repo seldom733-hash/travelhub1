@@ -38,6 +38,8 @@ import { SupplierController } from "./supplier.controller";
 import { SupplierCatalogController } from "./catalog/supplier-catalog.controller";
 import { SupplierCatalogService } from "./catalog/supplier-catalog.service";
 import { SupplierCatalogSource } from "./catalog/supplier-catalog.source";
+import { PhotoReviewController } from "./catalog/photo-review.controller";
+import { PhotoReviewService } from "./catalog/photo-review.service";
 import { PublicSupplierController } from "./public-supplier.controller";
 import { KompasCaptchaController } from "./kompas/kompas-captcha.controller";
 import { TourRequestService } from "./tour-request.service";
@@ -62,7 +64,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
 @Global()
 @Module({
   imports: [PrismaModule, EventBusModule, PricingModule, CrmModule],
-  controllers: [SupplierController, PublicSupplierController, KompasCaptchaController, AzalController, SupplierCatalogController],
+  controllers: [SupplierController, PublicSupplierController, KompasCaptchaController, AzalController, SupplierCatalogController, PhotoReviewController],
   providers: [
     SupplierAdapterRegistry,
     SupplierCacheService,
@@ -93,6 +95,7 @@ import { FlightSupplierRegistry } from "./flight-supplier.registry";
     AnexSyncService,
     SupplierCatalogSource,
     SupplierCatalogService,
+    PhotoReviewService,
     FstravelAdapter,
     FstravelSyncService,
     VoyagerHttpService,

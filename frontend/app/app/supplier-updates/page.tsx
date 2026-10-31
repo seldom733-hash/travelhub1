@@ -9,6 +9,7 @@ import {
   type SupplierCatalogRun,
   type SupplierCatalogRunItem,
   type SupplierCatalogRunServiceType,
+  type PhotoReviewItem,
 } from "@/lib/supplier-catalog-api";
 
 const SERVICE_LABEL: Record<string, string> = { tours: "Туры", hotels: "Отели", all: "Все услуги" };
@@ -73,6 +74,8 @@ export default function SupplierUpdatesPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [discoveryReport, setDiscoveryReport] = useState<DiscoveryReport | null>(null);
+  const [photoReviews, setPhotoReviews] = useState<PhotoReviewItem[]>([]);
+  const [photoReviewBusy, setPhotoReviewBusy] = useState<string | null>(null);
 
   const loadRuns = useCallback(async () => {
     try {
@@ -81,6 +84,31 @@ export default function SupplierUpdatesPage() {
       setError((e as Error).message);
     }
   }, []);
+
+  const loadPhotoReviews = useCallback(async () => {
+    try {
+      setPhotoReviews(await supplierCatalogApi.photoReviews());
+    } catch (e) {
+      // Photo review is an optional panel; do not hide the catalog report if
+      // the review endpoint is temporarily unavailable.
+      setPhotoReviews([]);
+    }
+  }, []);
+
+  const resolvePhotoReview = async (id: string, action: "approve" | "reject") => {
+    setPhotoReviewBusy(id);
+    setError("");
+    try {
+      if (action === "approve") await supplierCatalogApi.approvePhotoReview(id);
+      else await supplierCatalogApi.rejectPhotoReview(id);
+      await loadPhotoReviews();
+      setNotice(action === "approve" ? "Фото подтверждено и сохранено." : "Кандидат отклонён.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPhotoReviewBusy(null);
+    }
+  };
 
   const setRunInUrl = useCallback((id: string | null) => {
     const url = new URL(window.location.href);
@@ -143,8 +171,9 @@ export default function SupplierUpdatesPage() {
       .catch((e) => { if (alive) setError((e as Error).message); })
       .finally(() => { if (alive) setLoadingCaps(false); });
     void loadRuns();
+    void loadPhotoReviews();
     return () => { alive = false; };
-  }, [loadRuns]);
+  }, [loadRuns, loadPhotoReviews]);
 
   const suppliers = useMemo(() => {
     const map = new Map<string, { code: string; name: string; serviceTypes: Set<string> }>();
@@ -579,6 +608,63 @@ export default function SupplierUpdatesPage() {
             )}
           </section>
         )}
+
+        <section className="rounded-xl border border-slate-200 bg-white p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Фото на проверку имени</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Найдено частичное совпадение с отелем — подтвердите, что фото относится к нужной услуге.
+              </p>
+            </div>
+            <button type="button" onClick={() => void loadPhotoReviews()} className="text-xs text-slate-500 hover:text-slate-900">Обновить</button>
+          </div>
+          {photoReviews.length === 0 ? (
+            <div className="py-4 text-sm text-slate-400">Нет фото-кандидатов, требующих проверки.</div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {photoReviews.map((review) => (
+                <div key={review.id} className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50/40 p-3">
+                  <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={review.candidateUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={(event) => { event.currentTarget.style.display = "none"; }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-semibold text-slate-900">{review.name}</div>
+                    <div className="text-[11px] text-slate-500">{review.cityName} · {review.countryName}</div>
+                    <div className="mt-2 text-[11px] text-slate-600">
+                      Найдено: <span className="font-medium">{review.candidateTitle || "без названия"}</span>
+                      {review.score > 0 ? ` · совпадение ${review.score}` : ""}
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        disabled={photoReviewBusy === review.id}
+                        onClick={() => void resolvePhotoReview(review.id, "approve")}
+                        className="rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-800 disabled:opacity-50"
+                      >
+                        Подтвердить
+                      </button>
+                      <button
+                        type="button"
+                        disabled={photoReviewBusy === review.id}
+                        onClick={() => void resolvePhotoReview(review.id, "reject")}
+                        className="rounded border border-slate-200 px-2 py-1 text-[11px] text-slate-600 disabled:opacity-50"
+                      >
+                        Отклонить
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
