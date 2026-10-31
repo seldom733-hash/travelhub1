@@ -260,12 +260,31 @@ h3,
 .theme-grove .text-white {
   color: var(--th-text) !important;
 }
+.theme-grove .text-neutral-100 {
+  color: var(--th-text) !important;
+}
 .theme-grove .text-neutral-200,
 .theme-grove .text-neutral-300,
 .theme-grove .text-neutral-400,
 .theme-grove .text-neutral-500,
 .theme-grove .text-neutral-600 {
   color: var(--th-muted) !important;
+}
+.theme-grove .text-neutral-700 {
+  color: var(--th-muted) !important;
+}
+.theme-grove .bg-white\/5,
+.theme-grove .bg-white\/10 {
+  background-color: color-mix(in srgb, var(--th-text) 5%, transparent) !important;
+}
+.theme-grove .bg-neutral-900 {
+  background-color: var(--th-surface) !important;
+  color: var(--th-text) !important;
+  border-color: var(--th-border) !important;
+}
+.theme-grove .border-white\/5,
+.theme-grove .border-white\/10 {
+  border-color: var(--th-border) !important;
 }
 .theme-grove .text-dark {
   color: var(--th-accent-ink) !important;
