@@ -157,6 +157,7 @@ describe("SupplierCatalogService.buildPlan", () => {
         findFirst: jest.fn().mockResolvedValue({ status: "ACTIVE" }),
       },
       supplierCatalogRun: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         create: jest.fn().mockResolvedValue({ id: "run-1" }),
         findUnique: jest.fn().mockResolvedValue({ id: "run-1", items: [] }),
       },
@@ -195,6 +196,7 @@ describe("SupplierCatalogService.buildPlan", () => {
         findFirst: jest.fn().mockResolvedValue({ status: "ACTIVE" }),
       },
       supplierCatalogRun: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         findMany: jest.fn().mockResolvedValue([
           { serviceType: "tours", countryCode: "TR", scope: null },
         ]),

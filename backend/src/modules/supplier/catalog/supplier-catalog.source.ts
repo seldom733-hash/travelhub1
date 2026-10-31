@@ -31,8 +31,23 @@ const KOMPAS_ISO_TO_STATEINC: Record<string, string> = Object.fromEntries(
   Object.entries(KOMPAS_HOTEL_STATEINC_TO_ISO).map(([stateInc, iso]) => [iso, stateInc]),
 );
 
+/** Calendar day in the company timezone (Baku), not the server's UTC day. */
+function bakuToday(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Baku",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
 function day(offset = 0): string {
-  const d = new Date();
+  // Catalog windows must start on the local business day. At 00:xx Baku the
+  // server is still on yesterday's UTC date; KazUnion then receives a past
+  // check-in and answers "Нет данных" (notably SA hotels).
+  const d = new Date(`${bakuToday()}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + offset);
   return d.toISOString().slice(0, 10);
 }

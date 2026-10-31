@@ -51,9 +51,18 @@ function itemServiceName(item: SupplierCatalogRunItem): string {
   return typeof candidate === "string" && candidate.trim() ? candidate : "—";
 }
 
+type DiscoveryReport = {
+  supplierCode: string;
+  serviceType: string;
+  discovered: number;
+  skipped: number;
+  countries: Array<{ key: string; label: string }>;
+  added: string[];
+  at: string;
+};
+
 export default function SupplierUpdatesPage() {
-  const canManage = useCan("supplier.search.manage");
-  const [capabilities, setCapabilities] = useState<SupplierCatalogCapability[]>([]);
+  const canManage = useCan("supplier.search.manage");  const [capabilities, setCapabilities] = useState<SupplierCatalogCapability[]>([]);
   const [loadingCaps, setLoadingCaps] = useState(true);
   const [supplierCode, setSupplierCode] = useState("");
   const [serviceType, setServiceType] = useState<SupplierCatalogRunServiceType>("tours");
@@ -63,6 +72,7 @@ export default function SupplierUpdatesPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [discoveryReport, setDiscoveryReport] = useState<DiscoveryReport | null>(null);
 
   const loadRuns = useCallback(async () => {
     try {
@@ -77,13 +87,31 @@ export default function SupplierUpdatesPage() {
     setBusy(true);
     setError("");
     setNotice("");
+    setDiscoveryReport(null);
     try {
+      const before = new Set(
+        capabilities
+          .filter((cap) => cap.supplierCode === supplierCode && cap.serviceTypes.includes(serviceType))
+          .flatMap((cap) => cap.countries.map((country) => country.key)),
+      );
       const result = await supplierCatalogApi.discoverCountries({ supplierCode, serviceType });
+      const added = result.countries
+        .filter((country) => !before.has(country.key))
+        .map((country) => country.key);
       setCapabilities(await supplierCatalogApi.capabilities());
+      setDiscoveryReport({
+        supplierCode,
+        serviceType,
+        discovered: result.discovered,
+        skipped: result.skipped,
+        countries: result.countries,
+        added,
+        at: new Date().toISOString(),
+      });
       setNotice(
         result.discovered > 0
-          ? `Добавлено новых стран: ${result.discovered}. Обновлённые страны доступны в списке.`
-          : `Новых стран не найдено (распознано: ${result.countries.length}, пропущено: ${result.skipped}).`,
+          ? `Список стран обновлён: добавлено ${result.discovered}, распознано ${result.countries.length}.`
+          : `Список стран проверен: новых нет, распознано ${result.countries.length}, пропущено ${result.skipped}.`,
       );
     } catch (e) {
       setError((e as Error).message);
@@ -224,6 +252,8 @@ export default function SupplierUpdatesPage() {
 
   const counts = run?.counts ?? {};
   const errors = errorList(run?.errors ?? null);
+  const sourceScope = (run?.scope as { sourceScopes?: Array<{ dateFrom?: string; dateTo?: string; coverage?: { pagesFetched?: number; pageCount?: number } }> } | null)?.sourceScopes?.[0];
+  const emptySource = Boolean(run && run.status === "COMPLETED" && (run.items?.length ?? 0) === 0);
   const canConfirm = Boolean(canManage && run?.status === "PREVIEW_READY" && run.coverage !== "FAILED");
   const archiveBlocked = Boolean((counts.ARCHIVE ?? 0) > 0 && run?.coverage !== "COMPLETE");
 
@@ -238,6 +268,92 @@ export default function SupplierUpdatesPage() {
         )}
         {error && <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
         {notice && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{notice}</div>}
+
+        {discoveryReport && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
+            role="presentation"
+            onClick={() => setDiscoveryReport(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="discovery-report-title"
+              className="max-h-[85vh] w-full max-w-xl overflow-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 id="discovery-report-title" className="text-lg font-semibold text-slate-900">Отчёт об обновлении списка стран</h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {discoveryReport.supplierCode} · {SERVICE_LABEL[discoveryReport.serviceType] ?? discoveryReport.serviceType} · {formatDate(discoveryReport.at)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setDiscoveryReport(null)}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Закрыть
+                </button>
+              </div>
+
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-emerald-700">Новых</div>
+                  <div className="text-xl font-semibold text-emerald-800">{discoveryReport.discovered}</div>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500">Распознано</div>
+                  <div className="text-xl font-semibold text-slate-900">{discoveryReport.countries.length}</div>
+                </div>
+                <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-amber-700">Пропущено</div>
+                  <div className="text-xl font-semibold text-amber-800">{discoveryReport.skipped}</div>
+                </div>
+              </div>
+
+              {discoveryReport.countries.length === 0 ? (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                  Поставщик не вернул ни одной страны. Список не изменён.
+                </div>
+              ) : (
+                <div className="mt-4 max-h-72 overflow-auto rounded-lg border border-slate-100">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2">Код</th>
+                        <th className="px-3 py-2">Страна</th>
+                        <th className="px-3 py-2">Статус</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {discoveryReport.countries.map((country) => {
+                        const isNew = discoveryReport.added.includes(country.key);
+                        return (
+                          <tr key={country.key} className="border-t border-slate-100">
+                            <td className="px-3 py-2 font-mono text-[11px] text-slate-600">{country.key}</td>
+                            <td className="px-3 py-2 text-slate-700">{country.label || "—"}</td>
+                            <td className="px-3 py-2">
+                              <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${isNew ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                                {isNew ? "добавлена" : "уже была"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <p className="mt-3 text-[11px] text-slate-500">
+                Отчёт только по справочнику стран. Цены и карточки услуг он не меняет — для этого нужен preview и подтверждение.
+              </p>
+            </div>
+          </div>
+        )}
 
         <section className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -366,6 +482,14 @@ export default function SupplierUpdatesPage() {
             {run.coverage === "COMPLETE" && (counts.ARCHIVE ?? 0) > 0 && (
               <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                 В отчёте {counts.ARCHIVE} карточек к архивации. Проверьте список перед подтверждением.
+              </div>
+            )}
+            {emptySource && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Поставщик вернул <strong>0 предложений</strong> за проверяемый период
+                {sourceScope?.dateFrom && sourceScope?.dateTo ? ` ${sourceScope.dateFrom} — ${sourceScope.dateTo}` : ""}.
+                Цены и карточки не изменены. Обычно это означает, что у поставщика нет доступных тарифов на эти даты,
+                либо изменился сезон/окно продаж. Повторите проверку на другой период или проверьте наличие на сайте поставщика.
               </div>
             )}
 

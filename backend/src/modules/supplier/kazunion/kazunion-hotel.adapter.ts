@@ -58,8 +58,15 @@ const HOTEL_LIVE_MAX_PAGES = 5;
 const KAZUNION_HOTEL_CURRENCY_INC = "10";
 
 function todayIso(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Baku business date — the process may still be on yesterday's UTC date.
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Baku",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
 function compactToIso(compact: string): string {
