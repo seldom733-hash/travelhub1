@@ -82,6 +82,13 @@ export default function SupplierUpdatesPage() {
     }
   }, []);
 
+  const setRunInUrl = useCallback((id: string | null) => {
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("run", id);
+    else url.searchParams.delete("run");
+    window.history.replaceState(null, "", url);
+  }, []);
+
   const discoverCountries = async () => {
     if (!supplierCode || serviceType === "all") return;
     setBusy(true);
@@ -210,6 +217,22 @@ export default function SupplierUpdatesPage() {
     return () => window.clearInterval(timer);
   }, [run, pollRun]);
 
+  // The selected run id is kept in the URL so a refresh / shared link opens
+  // the same saved preview report instead of an empty panel.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("run");
+    if (!id) return;
+    void pollRun(id).catch((e) => {
+      setError((e as Error).message);
+      setRunInUrl(null);
+    });
+  }, [pollRun, setRunInUrl]);
+
+  const openRun = (id: string) => {
+    setRunInUrl(id);
+    void pollRun(id).catch((e) => setError((e as Error).message));
+  };
+
   const preview = async () => {
     if (!supplierCode || !countryKey) return;
     setBusy(true);
@@ -217,6 +240,7 @@ export default function SupplierUpdatesPage() {
     try {
       const created = await supplierCatalogApi.preview({ supplierCode, serviceType, countryKey });
       setRun(created);
+      setRunInUrl(created.id);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -253,7 +277,7 @@ export default function SupplierUpdatesPage() {
   const counts = run?.counts ?? {};
   const errors = errorList(run?.errors ?? null);
   const sourceScope = (run?.scope as { sourceScopes?: Array<{ dateFrom?: string; dateTo?: string; coverage?: { pagesFetched?: number; pageCount?: number } }> } | null)?.sourceScopes?.[0];
-  const emptySource = Boolean(run && run.status === "COMPLETED" && (run.items?.length ?? 0) === 0);
+  const emptySource = Boolean(run && !["PREVIEWING", "APPLYING"].includes(run.status) && (run.items?.length ?? 0) === 0);
   const canConfirm = Boolean(canManage && run?.status === "PREVIEW_READY" && run.coverage !== "FAILED");
   const archiveBlocked = Boolean((counts.ARCHIVE ?? 0) > 0 && run?.coverage !== "COMPLETE");
 
@@ -579,7 +603,7 @@ export default function SupplierUpdatesPage() {
                 </thead>
                 <tbody>
                   {runs.map((item) => (
-                    <tr key={item.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => void pollRun(item.id)}>
+                    <tr key={item.id} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50" onClick={() => openRun(item.id)}>
                       <td className="px-2 py-2 text-slate-500">{formatDate(item.createdAt)}</td>
                       <td className="px-2 py-2 font-medium">{item.supplierCode}</td>
                       <td className="px-2 py-2">{SERVICE_LABEL[item.serviceType] ?? item.serviceType}</td>

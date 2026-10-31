@@ -400,12 +400,25 @@ export class SupplierCatalogService implements OnModuleInit {
   async getRun(id: string) {
     const run = await this.prisma.supplierCatalogRun.findUnique({
       where: { id },
-      include: { items: { orderBy: { createdAt: "asc" }, take: 1000 } },
+      include: { items: { orderBy: { createdAt: "asc" } } },
     });
     if (!run) throw new NotFoundException("Supplier catalog run not found");
     const photos = await this.photoStatusByItem(run.items);
+    // `run.counts` is overwritten with { applied } when a preview is confirmed.
+    // The report itself must stay immutable: rebuild the action counters from
+    // the persisted items and keep the applied counter as an extra field.
+    const actionCounts = run.items.reduce<Record<string, number>>((counts, item) => {
+      counts[item.action] = (counts[item.action] ?? 0) + 1;
+      return counts;
+    }, {});
+    const applied = run.items.filter((item) => item.applied).length;
     return {
       ...run,
+      counts: {
+        ...((run.counts as Record<string, number> | null) ?? {}),
+        ...actionCounts,
+        ...(applied > 0 ? { applied } : {}),
+      },
       items: run.items.map((item) => ({
         ...item,
         photo: photos.get(item.id) ? "YES" : "NO",
