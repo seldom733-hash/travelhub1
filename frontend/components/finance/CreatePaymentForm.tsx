@@ -320,24 +320,9 @@ export default function CreatePaymentForm({
         </div>
 
         {direction === "EXPENSE" && (
-          <div className="mb-4">
-            <label className={labelCls} htmlFor="create-refund-payment">
-              Платёж для возврата
-            </label>
-            <select
-              id="create-refund-payment"
-              value={refundPaymentId}
-              onChange={(e) => setRefundPaymentId(e.target.value)}
-              className={inputCls}
-            >
-              <option value="">Выберите оплаченный платёж</option>
-              {refundPayments.map((payment) => (
-                <option key={payment.id} value={payment.id}>
-                  {payment.code} · {fmtMoney(payment.amount, presetCurrency, locale)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <p className="mb-3 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            Возврат будет привязан к последнему оплаченному платежу клиента автоматически.
+          </p>
         )}
 
         {success ? (

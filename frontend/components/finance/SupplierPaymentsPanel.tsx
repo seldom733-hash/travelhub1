@@ -172,18 +172,9 @@ export default function SupplierPaymentsPanel({
           </div>
           <div className="grid gap-2 md:grid-cols-[2fr_1fr_1fr_auto]">
             {form.direction === "OUTGOING" && (
-              <select
-                value={form.obligationCode}
-                onChange={(event) => setForm({ ...form, obligationCode: event.target.value })}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
-              >
-                <option value="">Услуга / обязательство</option>
-                {obligations.map((item) => (
-                  <option key={item.id} value={item.code}>
-                    {item.supplierCode ?? "—"} · остаток {formatPrice(item.remainingAmount ?? "0", "AZN", locale) ?? "—"}
-                  </option>
-                ))}
-              </select>
+              <div className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600">
+                {selected ? `Услуга: ${selected.supplierCode ?? "—"} · остаток ${formatPrice(selected.remainingAmount ?? "0", "AZN", locale) ?? "—"}` : "Услуга не выбрана"}
+              </div>
             )}
             <input
               inputMode="decimal"

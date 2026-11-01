@@ -216,7 +216,20 @@ export default function OrderDetailPage() {
       remainingAfter: null,
       kind: payment.direction === "INCOMING" ? ("SUPPLIER_REFUND" as const) : ("SUPPLIER" as const),
     }));
-    const combined = [...clientRows, ...supplierRows].sort((a, b) => {
+    const refundRows: PaymentsTableRow[] = finHistory.refunds.map((refund) => ({
+      id: `refund-${refund.id}`,
+      ordinal: null,
+      code: refund.code,
+      createdAt: refund.processedAt ?? refund.createdAt,
+      amount: refund.amount,
+      currency: refund.currency,
+      paymentMethod: null,
+      status: refund.status,
+      acceptedBy: null,
+      remainingAfter: null,
+      kind: "CLIENT_REFUND" as const,
+    }));
+    const combined = [...clientRows, ...supplierRows, ...refundRows].sort((a, b) => {
       const ta = Date.parse(a.createdAt);
       const tb = Date.parse(b.createdAt);
       return ta - tb;
@@ -224,8 +237,11 @@ export default function OrderDetailPage() {
     let income = 0;
     return combined.map((row) => {
       const amount = Number(row.amount);
-      if (row.kind === "CLIENT" && ["CAPTURED", "REFUNDED"].includes(row.status)) {
+      if (row.kind === "CLIENT" && row.status === "CAPTURED") {
         income += Number.isFinite(amount) ? amount : 0;
+      }
+      if (row.kind === "CLIENT_REFUND" && row.status === "PROCESSED") {
+        income -= Number.isFinite(amount) ? amount : 0;
       }
       if (row.kind === "SUPPLIER" && row.status === "CONFIRMED") {
         income -= Number.isFinite(amount) ? amount : 0;
@@ -331,7 +347,7 @@ export default function OrderDetailPage() {
               <EntityFinanceCell label={t("finance.refundable_amount", locale)} value={formatPrice(order.refundableAmount, order.currency, locale)} tone="info" />
               <EntityFinanceCell label={t("crm.detail.payment_status", locale) || "Статус оплаты"} value={<StatusBadge status={order.paymentStatus} />} tone="neutral" />
             </div>
-            {canCreatePayment && (
+            {canCreatePayment && !order.linkedBooking && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -348,6 +364,15 @@ export default function OrderDetailPage() {
                 >
                   Платёж поставщику
                 </button>
+              </div>
+            )}
+            {order.linkedBooking && (
+              <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                Заказ перешёл в бронь. Платежи ведутся в карточке брони{" "}
+                <Link href={`/app/bookings/${order.linkedBooking.id}`} className="font-semibold underline">
+                  {order.linkedBooking.referenceNumber}
+                </Link>
+                .
               </div>
             )}
           </EntitySectionCard>
@@ -434,7 +459,8 @@ export default function OrderDetailPage() {
           />
         </EntityDetailWide>
 
-        <EntityDetailWide>
+        {!order.linkedBooking && (
+          <EntityDetailWide>
           <EntitySectionCard title={t("finance.client_payments", locale) || "Платежи клиента"}>
             {finHistoryLoading && <div className="text-xs text-slate-400">{t("crm.loading", locale)}</div>}
             {!finHistoryLoading && ledgerRows.length === 0 && finHistory.refunds.length === 0 && (
@@ -464,7 +490,8 @@ export default function OrderDetailPage() {
               </div>
             )}
           </EntitySectionCard>
-        </EntityDetailWide>
+          </EntityDetailWide>
+        )}
       </EntityDetailLayout>
 
       {/* + Создать платеж — фиксированный контекст текущего Order (prompt §4) */}

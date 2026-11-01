@@ -46,7 +46,7 @@ export interface PaymentsTableRow {
   /** Остаток к оплате ПОСЛЕ этого платежа (total − Σ CAPTURED/REFUNDED). */
   remainingAfter: string | null;
   /** Клиентский платёж = приход, платёж поставщику = расход. */
-  kind?: "CLIENT" | "SUPPLIER" | "SUPPLIER_REFUND";
+  kind?: "CLIENT" | "SUPPLIER" | "SUPPLIER_REFUND" | "CLIENT_REFUND";
   /** Накопленный доход после строки (клиентские приходы − выплаты поставщикам). */
   incomeAfter?: string | null;
   /** Ссылка на карточку платежа (реестр). */
@@ -289,8 +289,8 @@ export default function PaymentsTable({
                 <td className="px-4 py-2.5 align-top text-xs text-slate-500">{fmtDate(row.createdAt, locale)}</td>
                 {ledger && (
                   <td className="px-4 py-2.5 align-top text-xs">
-                    <span className={row.kind === "SUPPLIER" ? "text-rose-600" : "text-emerald-700"}>
-                      {row.kind === "SUPPLIER" ? "Расход" : "Приход"}
+                    <span className={row.kind === "SUPPLIER" || row.kind === "CLIENT_REFUND" ? "text-rose-600" : "text-emerald-700"}>
+                      {row.kind === "SUPPLIER" || row.kind === "CLIENT_REFUND" ? "Расход" : "Приход"}
                     </span>
                   </td>
                 )}
