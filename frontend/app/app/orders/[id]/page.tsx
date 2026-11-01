@@ -30,6 +30,7 @@ import { useCurrentUser } from "@/lib/use-user";
 import { useCan } from "@/lib/use-can";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
 import PaymentsTable, { buildPaymentsTableRows } from "@/components/finance/PaymentsTable";
+import SupplierPaymentsPanel from "@/components/finance/SupplierPaymentsPanel";
 
 interface OrderDetail {
   id: string;
@@ -287,6 +288,8 @@ export default function OrderDetailPage() {
             )}
           </EntitySectionCard>
 
+          <SupplierPaymentsPanel orderId={order.id} orderCode={order.referenceNumber} />
+
           {order.items && order.items.length > 0 && (
             <EntitySectionCard title={t("order.items", locale)}>
               <div className="space-y-2">
@@ -370,7 +373,7 @@ export default function OrderDetailPage() {
         </EntityDetailWide>
 
         <EntityDetailWide>
-          <EntitySectionCard title={t("finance.history", locale) || "Финансовая история"}>
+          <EntitySectionCard title={t("finance.client_payments", locale) || "Платежи клиента"}>
             {finHistoryLoading && <div className="text-xs text-slate-400">{t("crm.loading", locale)}</div>}
             {!finHistoryLoading && finHistory.payments.length === 0 && finHistory.refunds.length === 0 && (
               <div className="text-xs text-slate-400">{t("finance.no_history", locale) || "Нет финансовых событий"}</div>

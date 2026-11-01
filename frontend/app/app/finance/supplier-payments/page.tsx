@@ -324,15 +324,6 @@ export default function SupplierPaymentsPage() {
               exportUrl="/api/v1/finance/supplier-payments/export"
               extraParams={{ status, search }}
             />
-            {canManage ? (
-              <button
-                type="button"
-                onClick={() => setShowCreate((v) => !v)}
-                className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
-              >
-                {t("finance.supplier_payments.create", locale)}
-              </button>
-            ) : null}
           </div>
         }
       />

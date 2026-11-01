@@ -224,6 +224,8 @@ export interface SupplierPaymentListQuery {
   status?: string;
   supplierCode?: string;
   partnerId?: string;
+  orderId?: string;
+  bookingId?: string;
   currency?: string;
   from?: string;
   to?: string;
@@ -335,6 +337,8 @@ export const financeCenterApi = {
       status: query.status,
       supplierCode: query.supplierCode,
       partnerId: query.partnerId,
+      orderId: query.orderId,
+      bookingId: query.bookingId,
       currency: query.currency,
       from: query.from,
       to: query.to,

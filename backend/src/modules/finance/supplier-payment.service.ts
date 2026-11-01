@@ -558,6 +558,8 @@ export class SupplierPaymentService {
     status?: string;
     supplierCode?: string;
     partnerId?: string;
+    orderId?: string;
+    bookingId?: string;
     currency?: string;
     from?: string;
     to?: string;
@@ -573,6 +575,8 @@ export class SupplierPaymentService {
     if (query.status) where.status = query.status;
     if (query.supplierCode) where.supplierCode = query.supplierCode;
     if (query.partnerId) where.partnerId = query.partnerId;
+    if ((query as { orderId?: string }).orderId) where.orderId = (query as { orderId?: string }).orderId;
+    if ((query as { bookingId?: string }).bookingId) where.bookingId = (query as { bookingId?: string }).bookingId;
     if (query.currency) where.currency = query.currency.toUpperCase();
     if (query.from || query.to) {
       where.occurredAt = {};
@@ -635,6 +639,8 @@ export class SupplierPaymentService {
     if (query.status) where.status = query.status;
     if (query.supplierCode) where.supplierCode = query.supplierCode;
     if (query.partnerId) where.partnerId = query.partnerId;
+    if ((query as { orderId?: string }).orderId) where.orderId = (query as { orderId?: string }).orderId;
+    if ((query as { bookingId?: string }).bookingId) where.bookingId = (query as { bookingId?: string }).bookingId;
     if (query.currency) where.currency = query.currency.toUpperCase();
     if (query.from || query.to) {
       where.occurredAt = {};

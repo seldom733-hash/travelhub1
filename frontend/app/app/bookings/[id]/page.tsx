@@ -29,6 +29,7 @@ import { useCurrentUser } from "@/lib/use-user";
 import { useCan } from "@/lib/use-can";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
 import PaymentsTable, { buildPaymentsTableRows, type PaymentsTableRow } from "@/components/finance/PaymentsTable";
+import SupplierPaymentsPanel from "@/components/finance/SupplierPaymentsPanel";
 
 interface BookingDetail {
   id: string;
@@ -315,6 +316,15 @@ export default function BookingDetailPage() {
               </button>
             )}
           </EntitySectionCard>
+
+          {(booking.orderId || booking.linkedOrder?.id) && (
+            <SupplierPaymentsPanel
+              orderId={booking.orderId ?? booking.linkedOrder?.id ?? ""}
+              orderCode={booking.orderCode ?? booking.linkedOrder?.referenceNumber ?? booking.orderId}
+              bookingId={booking.id}
+              bookingCode={booking.referenceNumber}
+            />
+          )}
 
           {booking.passengers && booking.passengers.length > 0 && (
             <EntitySectionCard title={t("bookings.passengers", locale)}>

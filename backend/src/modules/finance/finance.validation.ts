@@ -580,6 +580,16 @@ export class SupplierPaymentListQueryDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
+  orderId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  bookingId?: string;
+
+  @IsOptional()
+  @IsString()
   @Length(3, 3)
   currency?: string;
 
