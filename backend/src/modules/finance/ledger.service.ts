@@ -88,46 +88,10 @@ export class LedgerService {
     const sourceType = this.assertNonEmpty(input.sourceType, "sourceType");
     const sourceId = this.assertNonEmpty(input.sourceId, "sourceId");
     const type = this.assertNonEmpty(input.type, "type");
-    const occurredAt = validateOccurredAt(input.occurredAt);
-
-    // Currency authority: ISO 4217 снапшот должен существовать в finance.Currency
-    // (inactive допустим — исторические факты сохраняются; без FK, read-by-code).
-    const cur = await this.prisma.currency.findUnique({ where: { isoCode: currency }, select: { isoCode: true } });
-    if (!cur) throw new ValidationDomainError(`Unknown currency ${currency}; register it in finance.Currency first`);
-
-    const ctx = getRequestContext();
-    const actor = ctx?.actor ?? null;
-    const actorType = actor ? actor.type : null;
-    const actorId = actor?.type === "USER" ? actor.id : actor?.type === "SYSTEM" ? (actor.id ?? null) : null;
+    validateOccurredAt(input.occurredAt);
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const code = await this.ids.nextCode(tx, "LTX");
-        const row = await tx.ledgerTransaction.create({
-          data: {
-            code,
-            amount: new Prisma.Decimal(amount),
-            currency,
-            type,
-            sourceType,
-            sourceId,
-            sourceEventId: input.sourceEventId ?? null,
-            businessRef: input.businessRef ?? null,
-            occurredAt,
-            correlationId: ctx?.correlationId ?? null,
-            causationId: ctx?.causationId ?? null,
-            actorType,
-            actorId,
-          },
-        });
-        await this.security.audit(tx, {
-          action: "finance.ledger_transaction.created",
-          resource: "LedgerTransaction",
-          resourceId: row.id,
-          details: { code },
-        });
-        return this.ledgerDto(row);
-      });
+      return await this.prisma.$transaction((tx) => this.createInTransaction(tx, input));
     } catch (err) {
       // Replay/idempotency: тот же canonical source fact → детерминированный
       // no-op ТОЛЬКО при идентичном финансовом payload (first-write-wins + верификация).
@@ -158,6 +122,58 @@ export class LedgerService {
       if (constraints.length > 0) throw new ConflictError("Ledger transaction conflict");
       throw err;
     }
+  }
+
+  /**
+   * Ledger writer that participates in the caller's transaction. This exists so
+   * settlement adjustments and their ledger facts commit atomically. The public
+   * `create` remains the canonical standalone path; both share the same
+   * validation/audit/idempotency semantics.
+   */
+  async createInTransaction(
+    tx: Prisma.TransactionClient,
+    input: LedgerCreateInput,
+  ): Promise<Record<string, unknown>> {
+    const amount = validateLedgerAmount(input.amount);
+    const currency = validateIsoCode(input.currency, "currency");
+    const sourceType = this.assertNonEmpty(input.sourceType, "sourceType");
+    const sourceId = this.assertNonEmpty(input.sourceId, "sourceId");
+    const type = this.assertNonEmpty(input.type, "type");
+    const occurredAt = validateOccurredAt(input.occurredAt);
+
+    const cur = await tx.currency.findUnique({ where: { isoCode: currency }, select: { isoCode: true } });
+    if (!cur) throw new ValidationDomainError(`Unknown currency ${currency}; register it in finance.Currency first`);
+
+    const ctx = getRequestContext();
+    const actor = ctx?.actor ?? null;
+    const actorType = actor ? actor.type : null;
+    const actorId = actor?.type === "USER" ? actor.id : actor?.type === "SYSTEM" ? (actor.id ?? null) : null;
+
+    const code = await this.ids.nextCode(tx, "LTX");
+    const row = await tx.ledgerTransaction.create({
+      data: {
+        code,
+        amount: new Prisma.Decimal(amount),
+        currency,
+        type,
+        sourceType,
+        sourceId,
+        sourceEventId: input.sourceEventId ?? null,
+        businessRef: input.businessRef ?? null,
+        occurredAt,
+        correlationId: ctx?.correlationId ?? null,
+        causationId: ctx?.causationId ?? null,
+        actorType,
+        actorId,
+      },
+    });
+    await this.security.audit(tx, {
+      action: "finance.ledger_transaction.created",
+      resource: "LedgerTransaction",
+      resourceId: row.id,
+      details: { code },
+    });
+    return this.ledgerDto(row);
   }
 
   /** Минимальный read contract (Finance Center ledger view): whitelist + пагинация. */

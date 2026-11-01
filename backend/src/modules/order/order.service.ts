@@ -1217,8 +1217,16 @@ export class OrderService {
     const totalAmt = new Prisma.Decimal(order.amount ?? 0);
     const paidAmt = new Prisma.Decimal(order.paidAmount ?? 0);
     const refundedAmt = new Prisma.Decimal(order.refundedAmount ?? 0);
-    const dueAmount = Prisma.Decimal.max(new Prisma.Decimal(0), totalAmt.minus(paidAmt));
-    const refundableAmount = Prisma.Decimal.max(new Prisma.Decimal(0), paidAmt.minus(refundedAmt));
+    const financialSettlement = await this.prisma.orderFinancialSettlement.findUnique({
+      where: { orderId: order.id },
+    });
+    const terminal = order.status === "CANCELLED";
+    const dueAmount = terminal
+      ? new Prisma.Decimal(financialSettlement?.remainingToPay ?? 0)
+      : Prisma.Decimal.max(new Prisma.Decimal(0), totalAmt.minus(paidAmt));
+    const refundableAmount = terminal && financialSettlement
+      ? new Prisma.Decimal(financialSettlement.remainingToRefund)
+      : Prisma.Decimal.max(new Prisma.Decimal(0), paidAmt.minus(refundedAmt));
     // MULTI/PARTIAL: резерв активных платежей (PENDING/AUTHORIZED) — CREATE
     // доступно available = due − reserved (зеркало due-guard payment.service).
     // canonical dueAmount НЕ меняется (prompt §5: paid только CAPTURED).
@@ -1236,6 +1244,22 @@ export class OrderService {
       dueAmount: dueAmount.toString(),
       reservedAmount: reservedAmount.toString(),
       refundableAmount: refundableAmount.toString(),
+      financialSettlement: financialSettlement
+        ? {
+            ...financialSettlement,
+            originalAmount: financialSettlement.originalAmount.toString(),
+            capturedAmount: financialSettlement.capturedAmount.toString(),
+            refundedAmount: financialSettlement.refundedAmount.toString(),
+            pendingRefundAmount: financialSettlement.pendingRefundAmount.toString(),
+            finalCustomerLiability: financialSettlement.finalCustomerLiability.toString(),
+            penaltyAmount: financialSettlement.penaltyAmount.toString(),
+            platformPenaltyShare: financialSettlement.platformPenaltyShare.toString(),
+            supplierPenaltyShare: financialSettlement.supplierPenaltyShare.toString(),
+            annulledUnpaidAmount: financialSettlement.annulledUnpaidAmount.toString(),
+            remainingToPay: financialSettlement.remainingToPay.toString(),
+            remainingToRefund: financialSettlement.remainingToRefund.toString(),
+          }
+        : null,
       linkedRequest: linkedRequest ?? null,
       linkedBooking: linkedBooking ?? null,
     };

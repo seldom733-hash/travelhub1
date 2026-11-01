@@ -239,6 +239,35 @@ export interface SupplierPaymentListQuery {
   pageSize?: number;
 }
 
+/** Order cancellation/settlement calculation (Finance-owned). */
+export interface OrderFinancialSettlement {
+  code: string | null;
+  orderId: string;
+  originalAmount: string;
+  currency: string;
+  capturedAmount: string;
+  refundedAmount: string;
+  pendingRefundAmount: string;
+  finalCustomerLiability: string | null;
+  penaltyAmount: string;
+  platformPenaltyShare: string;
+  supplierPenaltyShare: string;
+  annulledUnpaidAmount: string;
+  remainingToPay: string;
+  remainingToRefund: string;
+  status: string;
+  reason?: string;
+  confirmedAt?: string | null;
+}
+
+export interface OrderFinancialSettlementInput {
+  finalCustomerLiability?: string;
+  penaltyAmount?: string;
+  platformPenaltyShare?: string;
+  supplierPenaltyShare?: string;
+  reason?: string;
+}
+
 /** Отчёт «задолженность на дату» — историческая реконструкция. */
 export interface DebtAsOfRow {
   obligationCode: string;
@@ -307,6 +336,18 @@ export const financeCenterApi = {
 
   getObligation(code: string): Promise<SupplierObligation> {
     return api.get(`${BASE}/obligations/${encodeURIComponent(code)}`);
+  },
+
+  getOrderSettlement(orderId: string): Promise<OrderFinancialSettlement> {
+    return api.get(`/orders/${encodeURIComponent(orderId)}/financial-settlement`);
+  },
+
+  previewOrderSettlement(orderId: string, input: OrderFinancialSettlementInput = {}): Promise<OrderFinancialSettlement> {
+    return api.post(`/orders/${encodeURIComponent(orderId)}/financial-settlement/preview`, input);
+  },
+
+  confirmOrderSettlement(orderId: string, input: OrderFinancialSettlementInput & { reason: string }): Promise<OrderFinancialSettlement> {
+    return api.post(`/orders/${encodeURIComponent(orderId)}/financial-settlement/confirm`, input);
   },
 
   listPayouts(query: { obligationCode?: string; page?: number; pageSize?: number } = {}): Promise<{ items: SupplierPayout[]; total: number; page: number; pageSize: number }> {

@@ -2306,6 +2306,19 @@ enum OrderPaymentStatus {
   @@schema("order")
 }
 
+/// Cancellation/settlement outcome. OPEN — normal order; PENDING_SETTLEMENT —
+/// cancellation confirmed but financial closing conditions are not met yet.
+enum OrderFinancialStatus {
+  OPEN
+  PENDING_SETTLEMENT
+  FINANCIALLY_SETTLED
+  FINANCIALLY_SETTLED_WITH_PENALTY
+  FINANCIALLY_SETTLED_FULL_REFUND
+  FINANCIALLY_SETTLED_NO_CHARGES
+
+  @@schema("order")
+}
+
 enum FulfillmentStatus {
   NOT_STARTED
   IN_PROGRESS
@@ -2355,6 +2368,10 @@ model Order {
   /// переписывается; refundedAmount — возвраты поверх него. Полный refund
   /// (refundedAmount >= paidAmount) → paymentStatus REFUNDED; partial → PAID.
   refundedAmount   Decimal            @default(0) @db.Decimal(12, 2)
+  /// Cancellation/settlement projection. OPEN until a cancellation settlement
+  /// is confirmed; never auto-settled merely by status=CANCELLED.
+  financialStatus      OrderFinancialStatus @default(OPEN)
+  financiallySettledAt DateTime?
   serviceDate      DateTime?
   /// Step 2.8A: frozen local temporal facts услуги (verbatim из OrderRequested,
   /// произошли из CheckoutIntent; НЕ пере-вычисляются). serviceTime — local
@@ -4579,6 +4596,67 @@ model RefundHistory {
   createdAt DateTime @default(now())
 
   @@index([refundId])
+  @@schema("finance")
+}
+
+/// One authoritative cancellation/settlement calculation per Order. Historical
+/// money facts (Payment/Refund/Order.amount/paidAmount/refundedAmount) are never
+/// rewritten; this row records the final customer liability, penalty split and
+/// the remaining payable/refundable amounts.
+model OrderFinancialSettlement {
+  id                    String                @id @default(uuid())
+  code                  String                @unique // SET-00000001
+  orderId               String                @unique
+  originalAmount        Decimal               @db.Decimal(12, 2)
+  currency              String
+  capturedAmount        Decimal               @db.Decimal(12, 2)
+  refundedAmount        Decimal               @db.Decimal(12, 2)
+  pendingRefundAmount   Decimal               @db.Decimal(12, 2)
+  finalCustomerLiability Decimal              @db.Decimal(12, 2)
+  penaltyAmount         Decimal               @db.Decimal(12, 2)
+  platformPenaltyShare  Decimal               @db.Decimal(12, 2)
+  supplierPenaltyShare  Decimal               @db.Decimal(12, 2)
+  annulledUnpaidAmount  Decimal               @db.Decimal(12, 2)
+  remainingToPay        Decimal               @db.Decimal(12, 2)
+  remainingToRefund     Decimal               @db.Decimal(12, 2)
+  status                OrderFinancialStatus
+  reason                String
+  confirmedAt           DateTime
+  confirmedById         String?
+  version               Int                   @default(1)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  adjustments OrderFinancialAdjustment[]
+
+  @@index([orderId])
+  @@index([status])
+  @@schema("finance")
+}
+
+/// Append-only cancellation adjustments. Each row is a separate, auditable
+/// financial correction (never a fake Payment/Refund).
+model OrderFinancialAdjustment {
+  id                  String    @id @default(uuid())
+  code                String    @unique // FAD-00000001
+  orderId             String
+  settlementId        String
+  settlement          OrderFinancialSettlement @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  /// UNPAID_WRITE_OFF | CUSTOMER_PENALTY | PLATFORM_PENALTY_SHARE |
+  /// SUPPLIER_PENALTY_SHARE | REFUND_WAIVER
+  type                String
+  amount              Decimal   @db.Decimal(12, 2)
+  currency            String
+  reason              String
+  actorId             String?
+  actorName           String?
+  occurredAt          DateTime
+  ledgerTransactionId String?
+  idempotencyKey      String    @unique
+  createdAt           DateTime  @default(now())
+
+  @@index([orderId])
+  @@index([settlementId])
   @@schema("finance")
 }
 

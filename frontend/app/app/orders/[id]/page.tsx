@@ -30,6 +30,7 @@ import { useCurrentUser } from "@/lib/use-user";
 import { useCan } from "@/lib/use-can";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
 import CreateSupplierPaymentForm from "@/components/finance/CreateSupplierPaymentForm";
+import OrderFinancialSettlementPanel from "@/components/finance/OrderFinancialSettlementPanel";
 import PaymentsTable, { buildPaymentsTableRows, type PaymentsTableRow } from "@/components/finance/PaymentsTable";
 import { financeCenterApi, type SupplierPayment } from "@/lib/finance-center-api";
 
@@ -40,6 +41,25 @@ interface OrderDetail {
   referenceNumber: string;
   status: string;
   paymentStatus: string;
+  financialStatus?: string;
+  financiallySettledAt?: string | null;
+  financialSettlement?: {
+    code: string;
+    originalAmount: string;
+    capturedAmount: string;
+    refundedAmount: string;
+    pendingRefundAmount: string;
+    finalCustomerLiability: string;
+    penaltyAmount: string;
+    platformPenaltyShare: string;
+    supplierPenaltyShare: string;
+    annulledUnpaidAmount: string;
+    remainingToPay: string;
+    remainingToRefund: string;
+    status: string;
+    reason: string;
+    confirmedAt: string;
+  } | null;
   amount: string;
   paidAmount: string;
   refundedAmount: string;
@@ -379,6 +399,8 @@ export default function OrderDetailPage() {
             )}
           </EntitySectionCard>
           )}
+
+          <OrderFinancialSettlementPanel orderId={order.id} orderStatus={order.status} />
 
           {order.items && order.items.length > 0 && (
             <EntitySectionCard title={t("order.items", locale)}>

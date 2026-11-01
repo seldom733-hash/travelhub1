@@ -19,6 +19,8 @@ import { SupplierPaymentTermsService } from "./supplier-payment-terms.service";
 import { SupplierObligationConsumer } from "./supplier-obligation.consumer";
 import { FinanceOverviewService } from "./finance-overview.service";
 import { LedgerPostingConsumer } from "./ledger-posting.consumer";
+import { OrderFinancialSettlementController } from "./order-financial-settlement.controller";
+import { OrderFinancialSettlementService } from "./order-financial-settlement.service";
 import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.service";
 
 /**
@@ -37,8 +39,8 @@ import { S3ObjectStorageService } from "../catalog/media/storage/s3-storage.serv
  */
 @Module({
   imports: [PaymentProviderModule],
-  controllers: [FinanceController],
-  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer, SupplierFxRateService, SupplierObligationService, SupplierPaymentService, SupplierPaymentEvidenceService, SupplierDebtReportService, SupplierPaymentTermsService, { provide: "ObjectStorageService", useClass: S3ObjectStorageService }, SupplierObligationConsumer, FinanceOverviewService, LedgerPostingConsumer],
+  controllers: [FinanceController, OrderFinancialSettlementController],
+  providers: [FinanceService, LedgerService, PaymentService, RefundService, SettlementService, DisputeService, CommissionPolicyService, CommissionService, CommissionAccrualConsumer, SupplierFxRateService, SupplierObligationService, SupplierPaymentService, SupplierPaymentEvidenceService, SupplierDebtReportService, SupplierPaymentTermsService, { provide: "ObjectStorageService", useClass: S3ObjectStorageService }, SupplierObligationConsumer, FinanceOverviewService, LedgerPostingConsumer, OrderFinancialSettlementService],
   /** Step 2.12E: CommissionPolicyService экспортируется для Sales/Order
    *  freeze-time read (ADR-0013 D1: read by Sales/Order at freeze boundary,
    *  READ-only cross-domain). CommissionService/Consumer — Finance-internal.

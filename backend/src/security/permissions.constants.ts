@@ -178,6 +178,7 @@ export const PERMISSIONS = {
   // Write — только внутренний SettlementService (нет публичного write-эндпоинта).
   "finance.provider_fee.read": "Чтение ProviderFee (Finance Center)",
   "finance.settlement.read": "Чтение Settlement (Finance Center)",
+  "finance.settlement.manage": "Подтверждение финансового закрытия заказа (штраф/аннулирование)",
   "finance.payout.read": "Чтение Payout (Finance Center)",
 
   // ── Pricing (Supplier Markup, design §12 / STRICT PROMPT §23, Gate J) ───
@@ -460,6 +461,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     "finance.ledger.read",
     "finance.provider_fee.read",
     "finance.settlement.read",
+    "finance.settlement.manage",
     "finance.payout.read",
     // UNIFIED FINANCE CENTER Phase 1: FINANCE управляет курсами поставщиков
     // (admin UI/API + history read).
