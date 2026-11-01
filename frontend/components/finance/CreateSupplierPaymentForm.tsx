@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatPrice, t, useLocale } from "@/lib/i18n";
 import {
   financeCenterApi,
@@ -42,6 +42,7 @@ export default function CreateSupplierPaymentForm({
   const [supplierCode, setSupplierCode] = useState("");
   const [direction, setDirection] = useState<"EXPENSE" | "INCOME">("EXPENSE");
   const [amount, setAmount] = useState("");
+  const amountTouchedRef = useRef(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
@@ -70,14 +71,10 @@ export default function CreateSupplierPaymentForm({
         );
         setObligations(rows);
         setSupplierCode((current) => current || rows[0]?.supplierCode || "");
-        const remaining = rows.reduce((sum, item) => sum + Number(item.remainingAmount ?? 0), 0);
-        const fallback = Number(fallbackCost ?? 0);
-        setAmount((remaining > 0 ? remaining : fallback).toFixed(2));
       })
       .catch(() => {
         if (!alive) return;
         setObligations([]);
-        setAmount(Number(fallbackCost ?? 0).toFixed(2));
       });
     financeCenterApi.listSupplierPayments({ orderId, pageSize: 100 })
       .then((result) => { if (alive) setPayments(result.items); })
@@ -101,6 +98,10 @@ export default function CreateSupplierPaymentForm({
     .filter((payment) => payment.direction === "INCOMING")
     .reduce((sum, payment) => sum + Number(payment.aznAmount), 0);
   const remaining = Math.max(0, cost - paid + refunded);
+
+  useEffect(() => {
+    if (!amountTouchedRef.current) setAmount(remaining.toFixed(2));
+  }, [remaining]);
 
   const amountValue = Number(amount);
   const amountValid =
@@ -236,7 +237,10 @@ export default function CreateSupplierPaymentForm({
                 id="supplier-payment-amount"
                 inputMode="decimal"
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
+                onChange={(event) => {
+                  amountTouchedRef.current = true;
+                  setAmount(event.target.value);
+                }}
                 disabled={busy}
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
               />

@@ -198,6 +198,13 @@ export default function CreatePaymentForm({
   const displayedTotal = Number(financials?.amount ?? 0);
   const displayedDue = Math.max(0, displayedTotal - displayedPaid);
 
+  // Default «Сумма платежа» = фактический остаток (total − already paid).
+  // Не перетираем значение, если пользователь уже редактировал поле.
+  useEffect(() => {
+    if (!open || !financials || amountTouchedRef.current) return;
+    setAmount(displayedDue.toFixed(2));
+  }, [open, financials, displayedDue]);
+
   // Order selector source (только когда заказ не предзадан).
   useEffect(() => {
     if (!open || presetId) return;
