@@ -205,6 +205,31 @@ export interface CustomerDetail extends Customer {
   orders: { id: string; code: string; referenceNumber: string; number: string; status: string; paymentStatus: string; amount: string; paidAmount: string; currency: string; createdAt: string }[];
   bookings: { id: string; code: string; referenceNumber: string; status: string; amount: string; currency: string; orderId: string; productId: string; createdAt: string }[];
   payments: { id: string; code: string; referenceNumber: string; status: string; amount: string; currency: string; orderId: string; paymentMethod: string | null; orderCode: string; orderNumber: string | null; createdAt: string; paidAt: string | null }[];
+  supplierPayments: {
+    id: string;
+    code: string;
+    status: string;
+    supplierCode: string | null;
+    amount: string;
+    currency: string;
+    aznAmount: string;
+    orderId: string | null;
+    orderCode: string | null;
+    bookingId: string | null;
+    bookingCode: string | null;
+    occurredAt: string;
+    confirmedAt: string | null;
+    allocations: Array<{
+      id: string;
+      obligationCode: string;
+      obligationOrderCode: string | null;
+      bookingCode: string | null;
+      amount: string;
+      aznAmount: string;
+      reversedAt: string | null;
+    }>;
+  }[];
+  supplierSummary: { total: number; paidAzn: string; remainingAzn: string };
   refunds: { id: string; code: string; referenceNumber: string | null; amount: string; currency: string; status: string; reason: string | null; paymentId: string; orderId: string; paymentCode: string | null; orderCode: string | null; orderNumber: string | null; createdAt: string; processedAt: string | null }[];
   summary: { totalOrders: number; totalBookings: number; totalPayments: number; totalRefunds: number };
 }

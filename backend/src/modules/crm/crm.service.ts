@@ -1,5 +1,5 @@
 import { Injectable, ForbiddenException } from "@nestjs/common";
-import type { Prisma, CustomerType, EntityStatus } from "../../generated/prisma/client";
+import { Prisma, type CustomerType, type EntityStatus } from "../../generated/prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EventBusService } from "../../eventbus/eventbus.service";
 import { DomainEvents, type CustomerEventPayload, type PartnerEventPayload } from "../../eventbus/domain-events";
@@ -1360,11 +1360,77 @@ export class CrmService {
       orderNumber: orderMap.get(r.orderId)?.number ?? null,
     }));
 
+    // Supplier side of the same client order. A supplier payout is linked
+    // through allocations → obligations; legacy payouts may only carry the
+    // canonical orderId on the payout row.
+    const supplierObligations = allOrderIds.length
+      ? await this.prisma.supplierObligation.findMany({
+          where: { orderId: { in: allOrderIds } },
+          select: { id: true, aznAmount: true, paidAmount: true, remainingAmount: true },
+        })
+      : [];
+    const supplierPayouts = allOrderIds.length
+      ? await this.prisma.supplierPayout.findMany({
+          where: {
+            OR: [
+              { orderId: { in: allOrderIds } },
+              { allocations: { some: { obligation: { orderId: { in: allOrderIds } } } } },
+            ],
+          },
+          orderBy: [{ occurredAt: "desc" }, { createdAt: "desc" }],
+          take: 20,
+          include: {
+            allocations: {
+              include: {
+                obligation: { select: { code: true, orderId: true, orderCode: true, bookingId: true, bookingCode: true } },
+              },
+            },
+          },
+        })
+      : [];
+    const supplierPaidAzn = supplierObligations.reduce(
+      (sum, obligation) => sum.plus(obligation.paidAmount ?? new Prisma.Decimal(0)),
+      new Prisma.Decimal(0),
+    );
+    const supplierRemainingAzn = supplierObligations.reduce(
+      (sum, obligation) => sum.plus(obligation.remainingAmount ?? new Prisma.Decimal(0)),
+      new Prisma.Decimal(0),
+    );
+
     return {
       ...customer,
       orders,
       bookings,
       payments: enrichedPayments,
+      supplierPayments: supplierPayouts.map((payout) => ({
+        id: payout.id,
+        code: payout.code,
+        status: payout.status,
+        supplierCode: payout.supplierCode,
+        amount: payout.amount.toString(),
+        currency: payout.currency,
+        aznAmount: payout.aznAmount.toString(),
+        orderId: payout.orderId ?? payout.allocations[0]?.obligation.orderId ?? null,
+        orderCode: payout.orderCode ?? payout.allocations[0]?.obligation.orderCode ?? null,
+        bookingId: payout.bookingId ?? payout.allocations[0]?.obligation.bookingId ?? null,
+        bookingCode: payout.bookingCode ?? payout.allocations[0]?.obligation.bookingCode ?? null,
+        occurredAt: payout.occurredAt.toISOString(),
+        confirmedAt: payout.confirmedAt ? payout.confirmedAt.toISOString() : null,
+        allocations: payout.allocations.map((allocation) => ({
+          id: allocation.id,
+          obligationCode: allocation.obligation.code,
+          obligationOrderCode: allocation.obligation.orderCode,
+          bookingCode: allocation.obligation.bookingCode,
+          amount: allocation.amount.toString(),
+          aznAmount: allocation.aznAmount.toString(),
+          reversedAt: allocation.reversedAt ? allocation.reversedAt.toISOString() : null,
+        })),
+      })),
+      supplierSummary: {
+        total: supplierPayouts.length,
+        paidAzn: supplierPaidAzn.toString(),
+        remainingAzn: supplierRemainingAzn.toString(),
+      },
       refunds: enrichedRefunds,
       summary: {
         totalOrders,

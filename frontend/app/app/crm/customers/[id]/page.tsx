@@ -303,6 +303,50 @@ export default function Customer360Page() {
             </div>
           )}
 
+          {/* Supplier side of the same client orders: payments + remaining */}
+          {tab === "payments" && (
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Платежи поставщикам
+                </div>
+                <div className="ml-auto flex flex-wrap gap-3 text-xs">
+                  <span className="text-slate-500">Оплачено: <b className="text-slate-800">{formatPrice(customer.supplierSummary?.paidAzn ?? "0", "AZN", locale) ?? "—"}</b></span>
+                  <span className="text-slate-500">Осталось: <b className="text-amber-700">{formatPrice(customer.supplierSummary?.remainingAzn ?? "0", "AZN", locale) ?? "—"}</b></span>
+                </div>
+              </div>
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-100 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">Оплата</th>
+                    <th className="px-4 py-2.5 font-medium">Заказ</th>
+                    <th className="px-4 py-2.5 font-medium">Поставщик</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Сумма</th>
+                    <th className="px-4 py-2.5 font-medium">Статус</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(customer.supplierPayments ?? []).length > 0 ? (customer.supplierPayments ?? []).map((p) => (
+                    <tr key={p.id} className="border-b border-slate-50 hover:bg-emerald-50/20">
+                      <td className="px-4 py-2.5 font-mono text-slate-700">{p.code}</td>
+                      <td className="px-4 py-2.5">
+                        {p.orderId ? (
+                          <Link href={`/app/orders/${p.orderId}`} className="text-blue-600 hover:underline">{p.orderCode ?? "—"}</Link>
+                        ) : "—"}
+                        {p.bookingCode && <div className="mt-0.5 text-[10px] text-slate-400">{p.bookingCode}</div>}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600">{p.supplierCode ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatPrice(p.amount, p.currency, locale) ?? "—"}</td>
+                      <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">По этому клиенту ещё нет платежей поставщикам.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* Partners — TABLE with commercial aggregates */}
           {tab === "partners" && (
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

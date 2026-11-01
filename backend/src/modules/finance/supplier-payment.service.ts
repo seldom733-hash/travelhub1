@@ -85,6 +85,11 @@ export interface SupplierPaymentDto {
   supplierCode: string | null;
   partnerId: string | null;
   partnerCode: string | null;
+  orderId: string | null;
+  orderCode: string | null;
+  bookingId: string | null;
+  bookingCode: string | null;
+  customerId: string | null;
   amount: string;
   currency: string;
   aznAmount: string;
@@ -111,6 +116,11 @@ interface PaymentRow {
   status: string;
   supplierCode: string | null;
   partnerId: string | null;
+  orderId: string | null;
+  orderCode: string | null;
+  bookingId: string | null;
+  bookingCode: string | null;
+  customerId: string | null;
   amount: Prisma.Decimal;
   currency: string;
   aznAmount: Prisma.Decimal;
@@ -192,6 +202,7 @@ export class SupplierPaymentService {
       paymentCurrency: currency,
       paymentAzn: aznAmount,
     }, "create");
+    const payoutContext = await this.resolvePayoutContext(allocations);
 
     if (providerRef) {
       const existing = await this.prisma.supplierPayout.findUnique({ where: { providerRef } });
@@ -208,7 +219,9 @@ export class SupplierPaymentService {
       }
     }
 
-    const code = await this.ids.nextCode(null, "SPO");
+    const code = payoutContext.orderId
+      ? await this.nextOrderPaymentCode(payoutContext.orderId)
+      : await this.ids.nextCode(null, "SPO");
     let created: { id: string; code: string } | undefined;
     try {
       created = await this.prisma.$transaction(async (tx) => {
@@ -217,6 +230,11 @@ export class SupplierPaymentService {
             code,
             supplierCode,
             partnerId: partner?.id ?? null,
+            orderId: payoutContext.orderId,
+            orderCode: payoutContext.orderCode,
+            bookingId: payoutContext.bookingId,
+            bookingCode: payoutContext.bookingCode,
+            customerId: payoutContext.customerId,
             status: "PENDING",
             amount,
             currency,
@@ -472,6 +490,15 @@ export class SupplierPaymentService {
     }, "allocate");
 
     const allocation = prepared[0];
+    const context = await this.resolvePayoutContext(prepared);
+    if (payment.orderId && context.orderId && payment.orderId !== context.orderId) {
+      throw new ValidationDomainError(
+        `payment ${payment.code} already belongs to another order; one supplier payment cannot span orders`,
+      );
+    }
+    const nextCode = !payment.orderId && context.orderId
+      ? await this.nextOrderPaymentCode(context.orderId)
+      : payment.code;
     const existing = await this.prisma.supplierPayoutAllocation.findUnique({
       where: { payoutId_obligationId: { payoutId: payment.id, obligationId: allocation.obligationId } },
     });
@@ -480,6 +507,19 @@ export class SupplierPaymentService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      if (!payment.orderId && context.orderId) {
+        await tx.supplierPayout.update({
+          where: { id: payment.id },
+          data: {
+            code: nextCode,
+            orderId: context.orderId,
+            orderCode: context.orderCode,
+            bookingId: context.bookingId,
+            bookingCode: context.bookingCode,
+            customerId: context.customerId,
+          },
+        });
+      }
       await tx.supplierPayoutAllocation.create({
         data: {
           payoutId: payment.id,
@@ -696,6 +736,60 @@ export class SupplierPaymentService {
     return { aznAmount: this.fxRates.convertToAzn(amount, fx), fxRate: fx.rate };
   }
 
+  private async resolvePayoutContext(
+    allocations: Array<{ orderId: string | null; bookingId: string | null }>,
+  ): Promise<{
+    orderId: string | null;
+    orderCode: string | null;
+    bookingId: string | null;
+    bookingCode: string | null;
+    customerId: string | null;
+  }> {
+    const orderIds = [...new Set(allocations.map((a) => a.orderId).filter((id): id is string => Boolean(id)))];
+    if (orderIds.length > 1) {
+      throw new ValidationDomainError("A supplier payment must be allocated to obligations of one order");
+    }
+    const orderId = orderIds[0] ?? null;
+    if (!orderId) {
+      return { orderId: null, orderCode: null, bookingId: null, bookingCode: null, customerId: null };
+    }
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, code: true, referenceNumber: true, customerId: true },
+    });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+
+    const bookingIds = [...new Set(allocations.map((a) => a.bookingId).filter((id): id is string => Boolean(id)))];
+    const bookingId = bookingIds.length === 1 ? bookingIds[0] : null;
+    const booking = bookingId
+      ? await this.prisma.booking.findUnique({
+          where: { id: bookingId },
+          select: { code: true, referenceNumber: true },
+        })
+      : null;
+    return {
+      orderId,
+      orderCode: order.referenceNumber ?? order.code,
+      bookingId,
+      bookingCode: booking?.referenceNumber ?? booking?.code ?? null,
+      customerId: order.customerId ?? null,
+    };
+  }
+
+  /** SPO-<order sequence>-<payment ordinal>, e.g. MKT-ORD-00000001 → SPO-00000001-1. */
+  private async nextOrderPaymentCode(orderId: string): Promise<string> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { code: true, referenceNumber: true, commerceSequence: true },
+    });
+    if (!order) throw new NotFoundError(`Order ${orderId} not found`);
+    const source = order.referenceNumber || order.code;
+    const sequence = order.commerceSequence ?? source.match(/(\d+)\s*$/)?.[1] ?? source.replace(/\D/g, "");
+    if (!sequence) throw new ValidationDomainError(`Cannot derive order sequence for ${source}`);
+    const existing = await this.prisma.supplierPayout.count({ where: { orderId } });
+    return `SPO-${sequence}-${existing + 1}`;
+  }
+
   private async prepareAllocations(
     inputs: PaymentAllocationInput[],
     ctx: {
@@ -706,9 +800,21 @@ export class SupplierPaymentService {
       excludeAllocationOfPaymentId?: string;
     },
     mode: "create" | "allocate",
-  ): Promise<Array<{ obligationId: string; amount: Prisma.Decimal; aznAmount: Prisma.Decimal }>> {
+  ): Promise<Array<{
+    obligationId: string;
+    amount: Prisma.Decimal;
+    aznAmount: Prisma.Decimal;
+    orderId: string | null;
+    bookingId: string | null;
+  }>> {
     if (inputs.length === 0) return [];
-    const result: Array<{ obligationId: string; amount: Prisma.Decimal; aznAmount: Prisma.Decimal }> = [];
+    const result: Array<{
+      obligationId: string;
+      amount: Prisma.Decimal;
+      aznAmount: Prisma.Decimal;
+      orderId: string | null;
+      bookingId: string | null;
+    }> = [];
     const seen = new Set<string>();
 
     for (const input of inputs) {
@@ -757,7 +863,13 @@ export class SupplierPaymentService {
           `allocation exceeds remaining: ${aznAmount.toString()} > ${obligation.remainingAmount.toString()} (${obligation.code})`,
         );
       }
-      result.push({ obligationId: obligation.id, amount, aznAmount });
+      result.push({
+        obligationId: obligation.id,
+        amount,
+        aznAmount,
+        orderId: obligation.orderId ?? null,
+        bookingId: obligation.bookingId ?? null,
+      });
     }
 
     const totalAzn = result.reduce((sum, a) => sum.plus(a.aznAmount), new Prisma.Decimal(0));
@@ -906,6 +1018,11 @@ export class SupplierPaymentService {
       supplierCode: row.supplierCode,
       partnerId: row.partnerId,
       partnerCode,
+      orderId: row.orderId,
+      orderCode: row.orderCode,
+      bookingId: row.bookingId,
+      bookingCode: row.bookingCode,
+      customerId: row.customerId,
       amount: row.amount.toString(),
       currency: row.currency,
       aznAmount: row.aznAmount.toString(),

@@ -164,6 +164,11 @@ export interface SupplierPayment {
   supplierCode: string | null;
   partnerId: string | null;
   partnerCode: string | null;
+  orderId: string | null;
+  orderCode: string | null;
+  bookingId: string | null;
+  bookingCode: string | null;
+  customerId: string | null;
   amount: string;
   currency: string;
   aznAmount: string;
