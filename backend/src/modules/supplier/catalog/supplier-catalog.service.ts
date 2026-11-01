@@ -179,10 +179,12 @@ export class SupplierCatalogService implements OnModuleInit {
       select: { code: true, names: true },
     });
     const byName = new Map<string, string>();
+    const countryNameByIso = new Map<string, string>();
     for (const country of geo) {
       const names = (country.names ?? {}) as Record<string, unknown>;
-      for (const value of Object.values(names)) {
+      for (const [locale, value] of Object.entries(names)) {
         if (typeof value === "string") byName.set(this.normalizeCountry(value), country.code);
+        if (locale === "ru" && typeof value === "string") countryNameByIso.set(country.code, value);
       }
     }
     const resolved = new Map<string, string>();
@@ -242,7 +244,7 @@ export class SupplierCatalogService implements OnModuleInit {
     const removed: Array<{ key: string; label: string }> = [];
     for (const key of new Set([...staticKeys, ...known])) {
       if (resolved.has(key)) continue;
-      const label = labels.get(key) ?? key;
+      const label = countryNameByIso.get(key) ?? labels.get(key) ?? key;
       await this.prisma.supplierCatalogCountry.upsert({
         where: {
           supplierCode_serviceType_countryKey: {
