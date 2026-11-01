@@ -37,7 +37,13 @@ export default function SupplierPaymentsPanel({
   const [open, setOpen] = useState(compact);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ obligationCode: "", amount: "", method: "" });
+  const [form, setForm] = useState({
+    obligationCode: "",
+    direction: "OUTGOING" as "OUTGOING" | "INCOMING",
+    amount: "",
+    method: "",
+    reason: "",
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,6 +76,12 @@ export default function SupplierPaymentsPanel({
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!form.obligationCode && obligations.length > 0) {
+      setForm((current) => ({ ...current, obligationCode: obligations[0].code }));
+    }
+  }, [obligations, form.obligationCode]);
+
   const selected = useMemo(
     () => obligations.find((item) => item.code === form.obligationCode) ?? null,
     [obligations, form.obligationCode],
@@ -83,19 +95,25 @@ export default function SupplierPaymentsPanel({
   );
 
   const submit = async () => {
-    if (!selected || !form.amount) return;
+    if (!form.amount || (form.direction === "OUTGOING" && !selected)) return;
     setBusy(true);
     setError("");
     try {
       await financeCenterApi.createSupplierPayment({
-        supplierCode: selected.supplierCode ?? undefined,
+        supplierCode: selected?.supplierCode ?? obligations[0]?.supplierCode ?? undefined,
+        direction: form.direction,
+        orderId,
         amount: form.amount,
         currency: "AZN",
         method: form.method || undefined,
-        purpose: `${orderCode}${bookingCode ? ` / ${bookingCode}` : ""}`,
-        allocations: [{ obligationCode: selected.code, amount: form.amount }],
+        purpose: `${form.direction === "INCOMING" ? "Supplier refund" : "Supplier payment"} ${orderCode}`,
+        comment: form.reason || undefined,
+        allocations:
+          form.direction === "OUTGOING" && selected
+            ? [{ obligationCode: selected.code, amount: form.amount }]
+            : undefined,
       });
-      setForm({ obligationCode: "", amount: "", method: "" });
+      setForm({ obligationCode: "", direction: form.direction, amount: "", method: "", reason: "" });
       setOpen(false);
       await load();
     } catch (e) {
@@ -136,19 +154,37 @@ export default function SupplierPaymentsPanel({
 
       {open && (
         <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/40 p-3">
-          <div className="grid gap-2 md:grid-cols-[2fr_1fr_1fr_auto]">
-            <select
-              value={form.obligationCode}
-              onChange={(event) => setForm({ ...form, obligationCode: event.target.value })}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
+          <div className="mb-2 flex gap-1 rounded-lg bg-white p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, direction: "OUTGOING" })}
+              className={`rounded-md px-3 py-1.5 font-medium ${form.direction === "OUTGOING" ? "bg-rose-100 text-rose-700" : "text-slate-500"}`}
             >
-              <option value="">Выберите заказ / бронь клиента</option>
-              {obligations.map((item) => (
-                <option key={item.id} value={item.code}>
-                  {item.orderCode ?? orderCode} · {item.bookingCode ?? item.bookingId} · {item.supplierCode ?? "—"} · остаток {formatPrice(item.remainingAmount ?? "0", "AZN", locale) ?? "—"}
-                </option>
-              ))}
-            </select>
+              Расход · платёж поставщику
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, direction: "INCOMING" })}
+              className={`rounded-md px-3 py-1.5 font-medium ${form.direction === "INCOMING" ? "bg-emerald-100 text-emerald-700" : "text-slate-500"}`}
+            >
+              Приход · возврат от поставщика
+            </button>
+          </div>
+          <div className="grid gap-2 md:grid-cols-[2fr_1fr_1fr_auto]">
+            {form.direction === "OUTGOING" && (
+              <select
+                value={form.obligationCode}
+                onChange={(event) => setForm({ ...form, obligationCode: event.target.value })}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
+              >
+                <option value="">Услуга / обязательство</option>
+                {obligations.map((item) => (
+                  <option key={item.id} value={item.code}>
+                    {item.supplierCode ?? "—"} · остаток {formatPrice(item.remainingAmount ?? "0", "AZN", locale) ?? "—"}
+                  </option>
+                ))}
+              </select>
+            )}
             <input
               inputMode="decimal"
               value={form.amount}
@@ -164,14 +200,20 @@ export default function SupplierPaymentsPanel({
             />
             <button
               type="button"
-              disabled={busy || !selected || !form.amount}
+              disabled={busy || !form.amount || (form.direction === "OUTGOING" && !selected)}
               onClick={() => void submit()}
               className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
             >
               {busy ? "…" : "Записать"}
             </button>
           </div>
-          {selected && (
+          <input
+            value={form.reason}
+            onChange={(event) => setForm({ ...form, reason: event.target.value })}
+            placeholder="Основание / комментарий"
+            className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs"
+          />
+          {form.direction === "OUTGOING" && selected && (
             <p className="mt-2 text-[11px] text-slate-500">
               Заказ: {selected.orderCode ?? orderCode} · Бронь: {selected.bookingCode ?? selected.bookingId} · Поставщик: {selected.supplierCode ?? "—"} · Остаток: {formatPrice(selected.remainingAmount ?? "0", "AZN", locale)}
             </p>

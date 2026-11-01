@@ -504,6 +504,15 @@ export class CreateSupplierPaymentDto {
   @MaxLength(64)
   supplierCode?: string;
 
+  @IsOptional()
+  @IsIn(["OUTGOING", "INCOMING"])
+  direction?: "OUTGOING" | "INCOMING";
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  orderId?: string;
+
   @IsString()
   @Matches(DECIMAL_RE)
   @MaxLength(32)

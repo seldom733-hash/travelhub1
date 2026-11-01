@@ -161,6 +161,7 @@ export interface SupplierPayment {
   id: string;
   code: string;
   status: string;
+  direction: "OUTGOING" | "INCOMING";
   supplierCode: string | null;
   partnerId: string | null;
   partnerCode: string | null;
@@ -209,6 +210,8 @@ export interface SupplierPaymentTerms {
 export interface CreateSupplierPaymentInput {
   partnerId?: string;
   supplierCode?: string;
+  direction?: "OUTGOING" | "INCOMING";
+  orderId?: string;
   amount: string;
   currency: string;
   aznAmount?: string;

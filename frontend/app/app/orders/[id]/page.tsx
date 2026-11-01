@@ -214,7 +214,7 @@ export default function OrderDetailPage() {
       status: payment.status,
       acceptedBy: null,
       remainingAfter: null,
-      kind: "SUPPLIER" as const,
+      kind: payment.direction === "INCOMING" ? ("SUPPLIER_REFUND" as const) : ("SUPPLIER" as const),
     }));
     const combined = [...clientRows, ...supplierRows].sort((a, b) => {
       const ta = Date.parse(a.createdAt);
@@ -229,6 +229,9 @@ export default function OrderDetailPage() {
       }
       if (row.kind === "SUPPLIER" && row.status === "CONFIRMED") {
         income -= Number.isFinite(amount) ? amount : 0;
+      }
+      if (row.kind === "SUPPLIER_REFUND" && row.status === "CONFIRMED") {
+        income += Number.isFinite(amount) ? amount : 0;
       }
       return { ...row, incomeAfter: income.toFixed(2) };
     });

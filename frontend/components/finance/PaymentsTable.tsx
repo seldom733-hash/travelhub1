@@ -46,7 +46,7 @@ export interface PaymentsTableRow {
   /** Остаток к оплате ПОСЛЕ этого платежа (total − Σ CAPTURED/REFUNDED). */
   remainingAfter: string | null;
   /** Клиентский платёж = приход, платёж поставщику = расход. */
-  kind?: "CLIENT" | "SUPPLIER";
+  kind?: "CLIENT" | "SUPPLIER" | "SUPPLIER_REFUND";
   /** Накопленный доход после строки (клиентские приходы − выплаты поставщикам). */
   incomeAfter?: string | null;
   /** Ссылка на карточку платежа (реестр). */
@@ -309,7 +309,7 @@ export default function PaymentsTable({
                 )}
                 <td className="px-4 py-2.5 align-top">
                   <StatusBadge status={row.status} label={statusLabel(row.status, locale)} />
-                  {!ledger || row.kind !== "SUPPLIER" ? (
+                  {!ledger || row.kind === "CLIENT" ? (
                     canManage && row.status === "PENDING" && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         <button

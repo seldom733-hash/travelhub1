@@ -53,6 +53,10 @@ export interface PaymentAllocationInput {
 export interface CreateSupplierPaymentInput {
   partnerId?: string | null;
   supplierCode?: string | null;
+  /** OUTGOING = payment to supplier, INCOMING = refund received from supplier. */
+  direction?: "OUTGOING" | "INCOMING";
+  /** Required for INCOMING when there are no allocations. */
+  orderId?: string | null;
   amount: string;
   currency: string;
   aznAmount?: string;
@@ -82,6 +86,7 @@ export interface SupplierPaymentDto {
   id: string;
   code: string;
   status: string;
+  direction: string;
   supplierCode: string | null;
   partnerId: string | null;
   partnerCode: string | null;
@@ -114,6 +119,7 @@ interface PaymentRow {
   id: string;
   code: string;
   status: string;
+  direction: string;
   supplierCode: string | null;
   partnerId: string | null;
   orderId: string | null;
@@ -202,7 +208,11 @@ export class SupplierPaymentService {
       paymentCurrency: currency,
       paymentAzn: aznAmount,
     }, "create");
-    const payoutContext = await this.resolvePayoutContext(allocations);
+    const payoutContext = await this.resolvePayoutContext(allocations, input.orderId ?? null);
+    const direction = input.direction === "INCOMING" ? "INCOMING" : "OUTGOING";
+    if (direction === "INCOMING" && !payoutContext.orderId) {
+      throw new ValidationDomainError("INCOMING supplier refund requires an orderId");
+    }
 
     if (providerRef) {
       const existing = await this.prisma.supplierPayout.findUnique({ where: { providerRef } });
@@ -230,6 +240,7 @@ export class SupplierPaymentService {
             code,
             supplierCode,
             partnerId: partner?.id ?? null,
+            direction,
             orderId: payoutContext.orderId,
             orderCode: payoutContext.orderCode,
             bookingId: payoutContext.bookingId,
@@ -329,6 +340,16 @@ export class SupplierPaymentService {
     if (payment.status === "CONFIRMED") return this.getByCodeOrId(payment.code);
     if (payment.status !== "PENDING") {
       throw new ConflictError(`supplier payment ${payment.code} is ${payment.status} and cannot be confirmed`);
+    }
+    // A refund received from the supplier has no obligation allocations: it is
+    // a cash inflow linked to the order, not a reduction of supplier debt.
+    if (payment.direction === "INCOMING") {
+      const cas = await this.prisma.supplierPayout.updateMany({
+        where: { id: payment.id, status: "PENDING" },
+        data: { status: "CONFIRMED", confirmedAt: new Date(), confirmedById: actor.id, version: { increment: 1 } },
+      });
+      if (cas.count === 0) throw new ConflictError(`supplier payment ${payment.code} cannot be confirmed`);
+      return this.getByCodeOrId(payment.code);
     }
     const allocations = await this.prisma.supplierPayoutAllocation.findMany({
       where: { payoutId: payment.id, reversedAt: null },
@@ -744,6 +765,7 @@ export class SupplierPaymentService {
 
   private async resolvePayoutContext(
     allocations: Array<{ orderId: string | null; bookingId: string | null }>,
+    explicitOrderId: string | null = null,
   ): Promise<{
     orderId: string | null;
     orderCode: string | null;
@@ -755,7 +777,7 @@ export class SupplierPaymentService {
     if (orderIds.length > 1) {
       throw new ValidationDomainError("A supplier payment must be allocated to obligations of one order");
     }
-    const orderId = orderIds[0] ?? null;
+    const orderId = orderIds[0] ?? explicitOrderId;
     if (!orderId) {
       return { orderId: null, orderCode: null, bookingId: null, bookingCode: null, customerId: null };
     }
@@ -1021,6 +1043,7 @@ export class SupplierPaymentService {
       id: row.id,
       code: row.code,
       status: row.status,
+      direction: row.direction,
       supplierCode: row.supplierCode,
       partnerId: row.partnerId,
       partnerCode,

@@ -226,7 +226,7 @@ export default function BookingDetailPage() {
       status: payment.status,
       acceptedBy: null,
       remainingAfter: null,
-      kind: "SUPPLIER" as const,
+      kind: payment.direction === "INCOMING" ? ("SUPPLIER_REFUND" as const) : ("SUPPLIER" as const),
     }));
     const combined = [...clientRows, ...supplierRows].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
     let income = 0;
@@ -234,6 +234,7 @@ export default function BookingDetailPage() {
       const amount = Number(row.amount);
       if (row.kind === "CLIENT" && ["CAPTURED", "REFUNDED"].includes(row.status)) income += Number.isFinite(amount) ? amount : 0;
       if (row.kind === "SUPPLIER" && row.status === "CONFIRMED") income -= Number.isFinite(amount) ? amount : 0;
+      if (row.kind === "SUPPLIER_REFUND" && row.status === "CONFIRMED") income += Number.isFinite(amount) ? amount : 0;
       return { ...row, incomeAfter: income.toFixed(2) };
     });
   }, [orderPaymentRows, supplierPayments]);

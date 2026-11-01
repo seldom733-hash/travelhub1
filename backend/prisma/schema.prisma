@@ -5359,6 +5359,8 @@ model SupplierPayout {
   /// PENDING (зарегистрирован, деньги не подтверждены) → CONFIRMED (исполнен)
   /// или CANCELLED. Только CONFIRMED влияет на paid/remaining обязательств.
   status        String              @default("CONFIRMED")
+  /// OUTGOING = payment to supplier, INCOMING = refund received from supplier.
+  direction     String              @default("OUTGOING")
   /// Фактическое исходящее движение (> 0), реальная валюта банка/провайдера.
   amount        Decimal             @db.Decimal(18, 2)
   currency      String

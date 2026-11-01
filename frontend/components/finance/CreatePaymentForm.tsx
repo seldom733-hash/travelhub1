@@ -22,6 +22,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { t, ti, useLocale, LOCALE_TAGS } from "@/lib/i18n";
+import { api } from "@/lib/api";
 import {
   PAYMENT_METHODS,
   availableToCreate,
@@ -79,6 +80,9 @@ export default function CreatePaymentForm({
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [orderId, setOrderId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [direction, setDirection] = useState<"INCOME" | "EXPENSE">("INCOME");
+  const [refundPayments, setRefundPayments] = useState<Array<{ id: string; code: string; amount: string; status: string }>>([]);
+  const [refundPaymentId, setRefundPaymentId] = useState("");
   const [reason, setReason] = useState("");
   const [initialNote, setInitialNote] = useState("");
   // MULTI/PARTIAL: редактируемая сумма + финансовый контекст заказа.
@@ -108,6 +112,9 @@ export default function CreatePaymentForm({
     setPhase("idle");
     setOrderId(presetId ?? "");
     setPaymentMethod("cash");
+    setDirection("INCOME");
+    setRefundPayments([]);
+    setRefundPaymentId("");
     setReason("");
     setInitialNote("");
     setAmount("");
@@ -160,6 +167,23 @@ export default function CreatePaymentForm({
     };
   }, [open, activeOrderId]);
 
+  // Refund source payments for the EXPENSE direction.
+  useEffect(() => {
+    if (!open || direction !== "EXPENSE" || !activeOrderId) return;
+    let alive = true;
+    api.get<{ payments?: { payments?: Array<{ id: string; code: string; amount: string; status: string }> } }>(
+      `/orders/${activeOrderId}/financial-history`,
+    ).then((result) => {
+      if (!alive) return;
+      const payments = (result.payments?.payments ?? []).filter((payment) => payment.status === "CAPTURED");
+      setRefundPayments(payments);
+      setRefundPaymentId((current) => current || payments[0]?.id || "");
+    }).catch(() => {
+      if (alive) setRefundPayments([]);
+    });
+    return () => { alive = false; };
+  }, [open, direction, activeOrderId]);
+
   // Order selector source (только когда заказ не предзадан).
   useEffect(() => {
     if (!open || presetId) return;
@@ -196,7 +220,10 @@ export default function CreatePaymentForm({
   // Cap клиентской проверки = доступно к созданию (due − reserved) — зеркало
   // серверского due-guard; без финансового контекста — только формат.
   // Сервер (due-guard) остаётся authority в любом случае.
-  const availableForValidation = availableToCreate(financials);
+  const availableForValidation =
+    direction === "EXPENSE" && financials?.paidAmount
+      ? financials.paidAmount
+      : availableToCreate(financials);
   // Пустое поле допустимо: amount опционален сервер-side (платёж на весь
   // остаток); блокируем только НЕКОРРЕКТНОЕ непустое значение.
   const amountValid =
@@ -208,6 +235,7 @@ export default function CreatePaymentForm({
     phase !== "submitting" &&
     phase !== "success" &&
     Boolean(activeOrderId) &&
+    (direction === "INCOME" || Boolean(refundPaymentId)) &&
     trimmedReason.length > 0 &&
     trimmedReason.length <= 255 &&
     amountValid;
@@ -219,6 +247,17 @@ export default function CreatePaymentForm({
     setErrorKey(null);
     setErrorMessage(null);
     try {
+      if (direction === "EXPENSE") {
+        await api.post("/finance/refunds", {
+          paymentId: refundPaymentId,
+          amount: trimmedAmount,
+          reason: trimmedReason,
+          ...(initialNote.trim() ? { initialNote: initialNote.trim() } : {}),
+        });
+        setPhase("success");
+        closeTimerRef.current = setTimeout(onClose, 900);
+        return;
+      }
       const input: CreatePaymentInput = {
         orderId: activeOrderId,
         amount: trimmedAmount,
@@ -262,6 +301,44 @@ export default function CreatePaymentForm({
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-4 text-lg font-bold text-slate-900">{t("payments.create.title", locale)}</h2>
+
+        <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setDirection("INCOME")}
+            className={`flex-1 rounded-md px-3 py-2 font-semibold ${direction === "INCOME" ? "bg-emerald-100 text-emerald-800" : "text-slate-500"}`}
+          >
+            Приход · платёж клиента
+          </button>
+          <button
+            type="button"
+            onClick={() => setDirection("EXPENSE")}
+            className={`flex-1 rounded-md px-3 py-2 font-semibold ${direction === "EXPENSE" ? "bg-rose-100 text-rose-700" : "text-slate-500"}`}
+          >
+            Расход · возврат клиенту
+          </button>
+        </div>
+
+        {direction === "EXPENSE" && (
+          <div className="mb-4">
+            <label className={labelCls} htmlFor="create-refund-payment">
+              Платёж для возврата
+            </label>
+            <select
+              id="create-refund-payment"
+              value={refundPaymentId}
+              onChange={(e) => setRefundPaymentId(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">Выберите оплаченный платёж</option>
+              {refundPayments.map((payment) => (
+                <option key={payment.id} value={payment.id}>
+                  {payment.code} · {fmtMoney(payment.amount, presetCurrency, locale)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {success ? (
           <div className="space-y-4">
