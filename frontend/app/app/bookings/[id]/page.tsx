@@ -30,7 +30,7 @@ import { useCan } from "@/lib/use-can";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
 import CreateSupplierPaymentForm from "@/components/finance/CreateSupplierPaymentForm";
 import PaymentsTable, { buildPaymentsTableRows, type PaymentsTableRow } from "@/components/finance/PaymentsTable";
-import { financeCenterApi, type SupplierPayment } from "@/lib/finance-center-api";
+import { financeCenterApi, type SupplierObligation, type SupplierPayment } from "@/lib/finance-center-api";
 
 interface BookingDetail {
   id: string;
@@ -146,6 +146,7 @@ export default function BookingDetailPage() {
   const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
   const [supplierPaymentOpen, setSupplierPaymentOpen] = useState(false);
   const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
+  const [supplierObligations, setSupplierObligations] = useState<SupplierObligation[]>([]);
 
   // MULTI/PARTIAL §7: платежи linked Order в Booking detail (permission-tolerant:
   // 403/404 на financial-history → таблица просто не показывается, страница живёт).
@@ -210,6 +211,9 @@ export default function BookingDetailPage() {
     financeCenterApi.listSupplierPayments({ orderId: booking.orderId, pageSize: 100 })
       .then((result) => { if (!cancelled) setSupplierPayments(result.items); })
       .catch(() => { if (!cancelled) setSupplierPayments([]); });
+    financeCenterApi.listObligations({ orderId: booking.orderId, pageSize: 200 })
+      .then((result) => { if (!cancelled) setSupplierObligations(result.items); })
+      .catch(() => { if (!cancelled) setSupplierObligations([]); });
     return () => { cancelled = true; };
   }, [booking]);
 
@@ -232,12 +236,41 @@ export default function BookingDetailPage() {
     let income = 0;
     return combined.map((row) => {
       const amount = Number(row.amount);
-      if (row.kind === "CLIENT" && ["CAPTURED", "REFUNDED"].includes(row.status)) income += Number.isFinite(amount) ? amount : 0;
-      if (row.kind === "SUPPLIER" && row.status === "CONFIRMED") income -= Number.isFinite(amount) ? amount : 0;
-      if (row.kind === "SUPPLIER_REFUND" && row.status === "CONFIRMED") income += Number.isFinite(amount) ? amount : 0;
+      if (row.kind === "CLIENT" && ["CAPTURED", "PENDING", "AUTHORIZED"].includes(row.status)) income += Number.isFinite(amount) ? amount : 0;
+      if (row.kind === "SUPPLIER" && !["CANCELLED", "FAILED"].includes(row.status)) income -= Number.isFinite(amount) ? amount : 0;
+      if (row.kind === "SUPPLIER_REFUND" && !["CANCELLED", "FAILED"].includes(row.status)) income += Number.isFinite(amount) ? amount : 0;
       return { ...row, incomeAfter: income.toFixed(2) };
     });
   }, [orderPaymentRows, supplierPayments]);
+
+  const clientFinance = useMemo(() => {
+    const total = Number(booking?.amount ?? 0);
+    const paid = orderPaymentRows
+      .filter((row) => ["CAPTURED", "PENDING", "AUTHORIZED"].includes(row.status))
+      .reduce((sum, row) => sum + Number(row.amount), 0);
+    return { total, paid, due: Math.max(0, total - paid) };
+  }, [booking?.amount, orderPaymentRows]);
+
+  const supplierFinance = useMemo(() => {
+    const active = supplierPayments.filter((payment) => !["CANCELLED", "FAILED"].includes(payment.status));
+    const paid = active
+      .filter((payment) => payment.direction !== "INCOMING")
+      .reduce((sum, payment) => sum + Number(payment.aznAmount), 0);
+    const refunded = active
+      .filter((payment) => payment.direction === "INCOMING")
+      .reduce((sum, payment) => sum + Number(payment.aznAmount), 0);
+    const cost = supplierObligations.length > 0
+      ? supplierObligations.reduce((sum, obligation) => sum + Number(obligation.aznAmount ?? 0), 0)
+      : Number(booking?.amount ?? 0);
+    return {
+      cost,
+      paid,
+      refunded,
+      remaining: Math.max(0, cost - paid + refunded),
+    };
+  }, [supplierPayments, supplierObligations, booking?.amount]);
+
+  const income = clientFinance.paid - supplierFinance.paid + supplierFinance.refunded;
 
   // UI-C9: action errors surface in an inline header banner — the page content
   // and its centered load/not-found state remain untouched.
@@ -318,20 +351,34 @@ export default function BookingDetailPage() {
             </EntityFieldGrid>
           </EntitySectionCard>
 
-          {/* SECONDARY: Finance — D7 linked Order finance authority; money/payment cells only */}
+          {/* SECONDARY: Finance — split client and supplier money */}
           <EntitySectionCard title={t("bookings.financial", locale)}>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Оплаты клиента
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <EntityFinanceCell label={t("crm.detail.total_amount", locale)} value={formatPrice(booking.amount, booking.currency, locale)} tone="neutral" />
-              {financialSummary && (
-                <>
-                  <EntityFinanceCell label={t("crm.detail.paid_amount", locale)} value={formatPrice(financialSummary.paidAmount, financialSummary.currency, locale)} tone="positive" />
-                  <EntityFinanceCell label={t("finance.due_amount", locale)} value={formatPrice(financialSummary.dueAmount, financialSummary.currency, locale)} tone="warning" />
-                  <EntityFinanceCell label={t("crm.detail.refunded_amount", locale)} value={formatPrice(financialSummary.refundedAmount, financialSummary.currency, locale)} tone="negative" />
-                  <EntityFinanceCell label={t("finance.refundable_amount", locale)} value={formatPrice(financialSummary.refundableAmount, financialSummary.currency, locale)} tone="info" />
-                  <EntityFinanceCell label={t("crm.detail.payment_status", locale)} value={<StatusBadge status={financialSummary.paymentStatus ?? ""} />} tone="neutral" />
-                </>
+              <EntityFinanceCell label="Оплачено клиентом" value={formatPrice(clientFinance.paid.toFixed(2), booking.currency ?? "AZN", locale)} tone="positive" />
+              <EntityFinanceCell label="К оплате клиентом" value={formatPrice(clientFinance.due.toFixed(2), booking.currency ?? "AZN", locale)} tone="warning" />
+            </div>
+
+            <div className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Оплаты поставщику
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <EntityFinanceCell label="Себестоимость" value={formatPrice(supplierFinance.cost.toFixed(2), "AZN", locale)} tone="neutral" />
+              <EntityFinanceCell label="Оплачено поставщику" value={formatPrice(supplierFinance.paid.toFixed(2), "AZN", locale)} tone="positive" />
+              <EntityFinanceCell label="Осталось оплатить" value={formatPrice(supplierFinance.remaining.toFixed(2), "AZN", locale)} tone="warning" />
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
+              <EntityFinanceCell label="Возвращено от поставщика" value={formatPrice(supplierFinance.refunded.toFixed(2), "AZN", locale)} tone="info" />
+              <EntityFinanceCell label="Доход" value={formatPrice(income.toFixed(2), "AZN", locale)} tone={income >= 0 ? "positive" : "negative"} />
+              {financialSummary?.paymentStatus && (
+                <EntityFinanceCell label={t("crm.detail.payment_status", locale)} value={<StatusBadge status={financialSummary.paymentStatus} />} tone="neutral" />
               )}
             </div>
+
             {activePayment && (
               <div className="mt-3 flex flex-wrap gap-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
                 <span>{t("finance.payment_method", locale)}: {activePayment.paymentMethod ?? "—"}</span>

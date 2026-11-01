@@ -237,16 +237,16 @@ export default function OrderDetailPage() {
     let income = 0;
     return combined.map((row) => {
       const amount = Number(row.amount);
-      if (row.kind === "CLIENT" && row.status === "CAPTURED") {
+      if (row.kind === "CLIENT" && ["CAPTURED", "PENDING", "AUTHORIZED"].includes(row.status)) {
         income += Number.isFinite(amount) ? amount : 0;
       }
       if (row.kind === "CLIENT_REFUND" && row.status === "PROCESSED") {
         income -= Number.isFinite(amount) ? amount : 0;
       }
-      if (row.kind === "SUPPLIER" && row.status === "CONFIRMED") {
+      if (row.kind === "SUPPLIER" && !["CANCELLED", "FAILED"].includes(row.status)) {
         income -= Number.isFinite(amount) ? amount : 0;
       }
-      if (row.kind === "SUPPLIER_REFUND" && row.status === "CONFIRMED") {
+      if (row.kind === "SUPPLIER_REFUND" && !["CANCELLED", "FAILED"].includes(row.status)) {
         income += Number.isFinite(amount) ? amount : 0;
       }
       return { ...row, incomeAfter: income.toFixed(2) };
