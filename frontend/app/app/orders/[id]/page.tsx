@@ -29,8 +29,8 @@ import { orderActionLabel } from "@/lib/commerce-history-labels";
 import { useCurrentUser } from "@/lib/use-user";
 import { useCan } from "@/lib/use-can";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
+import CreateSupplierPaymentForm from "@/components/finance/CreateSupplierPaymentForm";
 import PaymentsTable, { buildPaymentsTableRows, type PaymentsTableRow } from "@/components/finance/PaymentsTable";
-import SupplierPaymentsPanel from "@/components/finance/SupplierPaymentsPanel";
 import { financeCenterApi, type SupplierPayment } from "@/lib/finance-center-api";
 
 interface OrderDetail {
@@ -347,20 +347,22 @@ export default function OrderDetailPage() {
               <EntityFinanceCell label={t("finance.refundable_amount", locale)} value={formatPrice(order.refundableAmount, order.currency, locale)} tone="info" />
               <EntityFinanceCell label={t("crm.detail.payment_status", locale) || "Статус оплаты"} value={<StatusBadge status={order.paymentStatus} />} tone="neutral" />
             </div>
-            {canCreatePayment && !order.linkedBooking && (
+            {canCreatePayment && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   data-testid="order-create-payment-button"
+                  disabled={Boolean(order.linkedBooking)}
                   onClick={() => setCreatePaymentOpen(true)}
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Платёж клиента
                 </button>
                 <button
                   type="button"
+                  disabled={Boolean(order.linkedBooking)}
                   onClick={() => setSupplierPaymentOpen(true)}
-                  className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+                  className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Платёж поставщику
                 </button>
@@ -508,16 +510,13 @@ export default function OrderDetailPage() {
       />
 
       {supplierPaymentOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 pt-16">
-          <div className="w-full max-w-3xl rounded-xl bg-white p-4 shadow-2xl">
-            <SupplierPaymentsPanel
-              compact
-              orderId={order.id}
-              orderCode={order.referenceNumber}
-              onClose={() => setSupplierPaymentOpen(false)}
-            />
-          </div>
-        </div>
+        <CreateSupplierPaymentForm
+          orderId={order.id}
+          orderCode={order.referenceNumber}
+          fallbackCost={order.amount}
+          onClose={() => setSupplierPaymentOpen(false)}
+          onCreated={handlePaymentCreated}
+        />
       )}
     </EntityDetailShell>
   );

@@ -28,8 +28,8 @@ import { bookingActionLabel } from "@/lib/commerce-history-labels";
 import { useCurrentUser } from "@/lib/use-user";
 import { useCan } from "@/lib/use-can";
 import CreatePaymentForm from "@/components/finance/CreatePaymentForm";
+import CreateSupplierPaymentForm from "@/components/finance/CreateSupplierPaymentForm";
 import PaymentsTable, { buildPaymentsTableRows, type PaymentsTableRow } from "@/components/finance/PaymentsTable";
-import SupplierPaymentsPanel from "@/components/finance/SupplierPaymentsPanel";
 import { financeCenterApi, type SupplierPayment } from "@/lib/finance-center-api";
 
 interface BookingDetail {
@@ -468,18 +468,15 @@ export default function BookingDetailPage() {
       />
 
       {supplierPaymentOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-4 pt-16">
-          <div className="w-full max-w-3xl rounded-xl bg-white p-4 shadow-2xl">
-            <SupplierPaymentsPanel
-              compact
-              orderId={booking.linkedOrder?.id ?? booking.orderId}
-              orderCode={booking.linkedOrder?.referenceNumber ?? booking.orderReference ?? booking.orderCode}
-              bookingId={booking.id}
-              bookingCode={booking.referenceNumber}
-              onClose={() => setSupplierPaymentOpen(false)}
-            />
-          </div>
-        </div>
+        <CreateSupplierPaymentForm
+          orderId={booking.linkedOrder?.id ?? booking.orderId}
+          orderCode={booking.linkedOrder?.referenceNumber ?? booking.orderReference ?? booking.orderCode}
+          bookingId={booking.id}
+          bookingCode={booking.referenceNumber}
+          fallbackCost={booking.amount}
+          onClose={() => setSupplierPaymentOpen(false)}
+          onCreated={() => void loadBooking()}
+        />
       )}
     </EntityDetailShell>
   );

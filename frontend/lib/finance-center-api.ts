@@ -295,6 +295,7 @@ export const financeCenterApi = {
       `${BASE}/obligations${qs({
         status: query.status,
         supplierCode: query.supplierCode,
+        orderId: query.orderId,
         overdue: query.overdue ? "true" : undefined,
         search: query.search,
         page: query.page,
