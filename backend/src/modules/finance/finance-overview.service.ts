@@ -202,7 +202,9 @@ export class FinanceOverviewService {
   private async payoutsAggregate(range: RangeFilter): Promise<FinanceOverview["supplierPayouts"]> {
     const agg = await this.prisma.supplierPayout.aggregate({
       where: {
-        status: "CONFIRMED",
+        // A payment recorded by the operator is already a cash movement for the
+        // overview; PENDING must not disappear from the KPI before confirmation.
+        status: { in: ["PENDING", "CONFIRMED"] },
         ...rangeWhere("occurredAt", range),
       },
       _sum: { aznAmount: true },
@@ -335,7 +337,9 @@ export class FinanceOverviewService {
     // Группируем по валютам; AZN = UNKNOWN (нет frozen per-payment AZN-курса).
     const grouped = await this.prisma.payment.groupBy({
       by: ["currency"],
-      where: { status: "CAPTURED", ...rangeWhere("paidAt", range) },
+      // Include recorded but not yet confirmed client payments: otherwise a
+      // freshly created payment disappears from the overview KPI.
+      where: { status: { in: ["CAPTURED", "PENDING", "AUTHORIZED"] }, ...rangeWhere("paidAt", range) },
       _sum: { amount: true },
     });
     const byCurrency = grouped
@@ -352,17 +356,29 @@ export class FinanceOverviewService {
   }
 
   private async debtMetric(range: RangeFilter): Promise<{ byCurrency: CurrencyAmount[]; azn: AznMetric }> {
-    // Debt = amount − paidAmount по не-отменённым заказам (Order — source of
-    // truth). Группируем по валюте; AZN = UNKNOWN (нет frozen AZN).
-    const grouped = await this.prisma.order.groupBy({
-      by: ["currency"],
-      where: { status: { not: "CANCELLED" }, ...rangeWhere("createdAt", range) },
-      _sum: { amount: true, paidAmount: true },
-    });
-    const byCurrency = grouped
+    // Debt = order amount − recorded client payments (CAPTURED/PENDING/AUTHORIZED).
+    // Order.paidAmount is a denormalized field and can lag behind a newly created
+    // payment; Payment is the actual cash source for this KPI.
+    const [orderGroups, paymentGroups] = await Promise.all([
+      this.prisma.order.groupBy({
+        by: ["currency"],
+        where: { status: { not: "CANCELLED" }, ...rangeWhere("createdAt", range) },
+        _sum: { amount: true, paidAmount: true },
+      }),
+      this.prisma.payment.groupBy({
+        by: ["currency"],
+        where: { status: { in: ["CAPTURED", "PENDING", "AUTHORIZED"] } },
+        _sum: { amount: true },
+      }),
+    ]);
+    const paidByCurrency = new Map(paymentGroups.map((g) => [g.currency, g._sum.amount ?? new Prisma.Decimal(0)]));
+    const byCurrency = orderGroups
       .map((g) => {
-        const debt = (g._sum.amount ?? new Prisma.Decimal(0)).sub(g._sum.paidAmount ?? new Prisma.Decimal(0));
-        return { currency: g.currency, amount: debt.toString() };
+        const paid = paidByCurrency.has(g.currency)
+          ? paidByCurrency.get(g.currency) ?? new Prisma.Decimal(0)
+          : g._sum.paidAmount ?? new Prisma.Decimal(0);
+        const debt = (g._sum.amount ?? new Prisma.Decimal(0)).sub(paid);
+        return { currency: g.currency, amount: (debt.lessThan(0) ? new Prisma.Decimal(0) : debt).toString() };
       })
       .sort((a, b) => a.currency.localeCompare(b.currency));
     return {
