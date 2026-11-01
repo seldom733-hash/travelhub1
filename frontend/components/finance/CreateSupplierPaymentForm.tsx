@@ -7,6 +7,7 @@ import {
   type SupplierObligation,
 } from "@/lib/finance-center-api";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/payments";
+import { financeFxApi, type FxSupplier } from "@/lib/finance-fx-api";
 
 /**
  * Supplier payment form — deliberately mirrors CreatePaymentForm (client
@@ -36,6 +37,8 @@ export default function CreateSupplierPaymentForm({
 }) {
   const locale = useLocale();
   const [obligations, setObligations] = useState<SupplierObligation[]>([]);
+  const [suppliers, setSuppliers] = useState<FxSupplier[]>([]);
+  const [supplierCode, setSupplierCode] = useState("");
   const [direction, setDirection] = useState<"EXPENSE" | "INCOME">("EXPENSE");
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
@@ -44,6 +47,15 @@ export default function CreateSupplierPaymentForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    financeFxApi.suppliers()
+      .then((rows) => {
+        setSuppliers(rows);
+        setSupplierCode((current) => current || rows[0]?.supplierCode || "");
+      })
+      .catch(() => setSuppliers([]));
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -56,6 +68,7 @@ export default function CreateSupplierPaymentForm({
             (!bookingId || item.bookingId === bookingId),
         );
         setObligations(rows);
+        setSupplierCode((current) => current || rows[0]?.supplierCode || "");
         const remaining = rows.reduce((sum, item) => sum + Number(item.remainingAmount ?? 0), 0);
         const fallback = Number(fallbackCost ?? 0);
         setAmount((remaining > 0 ? remaining : fallback).toFixed(2));
@@ -92,7 +105,7 @@ export default function CreateSupplierPaymentForm({
     reason.trim().length > 0 &&
     reason.trim().length <= 255 &&
     amountValid &&
-    Boolean(selected);
+    Boolean(supplierCode);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -101,7 +114,7 @@ export default function CreateSupplierPaymentForm({
     setError("");
     try {
       await financeCenterApi.createSupplierPayment({
-        supplierCode: selected?.supplierCode ?? undefined,
+        supplierCode: supplierCode || selected?.supplierCode || undefined,
         direction: direction === "INCOME" ? "INCOMING" : "OUTGOING",
         orderId,
         amount,
@@ -169,6 +182,26 @@ export default function CreateSupplierPaymentForm({
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Заказ</label>
               <input value={`${orderCode}${bookingCode ? ` · ${bookingCode}` : ""}`} readOnly disabled className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500" />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="supplier-payment-supplier">
+                Поставщик
+              </label>
+              <select
+                id="supplier-payment-supplier"
+                value={supplierCode}
+                onChange={(event) => setSupplierCode(event.target.value)}
+                disabled={busy || suppliers.length === 0}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">Выберите поставщика</option>
+                {suppliers.map((supplier) => (
+                  <option key={supplier.supplierCode} value={supplier.supplierCode}>
+                    {supplier.partnerName ? `${supplier.partnerName} (${supplier.supplierCode})` : supplier.supplierCode}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs">
@@ -251,9 +284,9 @@ export default function CreateSupplierPaymentForm({
               />
             </div>
 
-            {!selected && (
-              <p className="text-xs text-rose-600">
-                По этому заказу нет обязательств поставщику — создать платёж нельзя.
+            {direction === "EXPENSE" && obligations.length === 0 && (
+              <p className="text-xs text-slate-500">
+                По заказу нет обязательств — платёж будет создан без распределения, только с привязкой к заказу.
               </p>
             )}
             {error && <p className="text-xs text-rose-600">{error}</p>}

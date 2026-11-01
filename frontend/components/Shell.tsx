@@ -56,7 +56,6 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/app/finance/overview", icon: "📉", labelKey: "nav.finance_overview", permission: "finance.overview.read" },
       { href: "/app/payments", icon: "💳", labelKey: "nav.payments", permission: "finance.payment.read" },
-      { href: "/app/finance/obligations", icon: "📤", labelKey: "nav.supplier_obligations", permission: "finance.obligation.read" },
       { href: "/app/finance/supplier-payments", icon: "🏦", labelKey: "nav.supplier_payments", permission: "finance.supplier_payout.read" },
       { href: "/app/finance/reports/debt-as-of", icon: "📅", labelKey: "nav.supplier_debt_report", permission: "finance.obligation.read" },
       { href: "/app/finance/payment-terms", icon: "⏱️", labelKey: "nav.payment_terms", permission: "finance.obligation.read" },
