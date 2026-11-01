@@ -454,6 +454,29 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
       {
         await this.setSamoSelect(page, "STATEINC", stateId);
         await page.waitForTimeout(500);
+        const selectedState = async (): Promise<string> =>
+          page!.evaluate(() => {
+            const sel = document.querySelector("select[name=STATEINC]") as HTMLSelectElement | null;
+            return sel?.value ?? "";
+          });
+        let appliedState = await selectedState();
+        if (appliedState !== stateId) {
+          // The option list can be re-rendered after TOWNFROMINC/CURRENCY.
+          // Retry once explicitly; never submit with the previous country.
+          this.logger.warn(
+            `KOMPAS: STATEINC=${stateId} was reset to ${appliedState || "?"}; re-applying`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 1_000));
+          await this.setSamoSelect(page, "STATEINC", stateId);
+          await page.waitForTimeout(500);
+          appliedState = await selectedState();
+        }
+        if (appliedState !== stateId) {
+          throw new Error(
+            `KOMPAS: STATEINC=${stateId} is not applied (form reports ${appliedState || "?"}); ` +
+              `refusing to run a search for a different country`,
+          );
+        }
         // Wait for TOURINC options for this country to populate
         if (query.tourIncValue) {
           try {
@@ -864,9 +887,18 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
           const stateKey = cls.match(/stateKey-(\d+)/)?.[1] ?? "";
           const townFromKey = cls.match(/townFromKey-(\d+)/)?.[1] ?? "";
           const mismatches: string[] = [];
-          // stateKey and townFromKey must match on first row
-          if (expected.stateKey && stateKey !== expected.stateKey) mismatches.push(`stateKey: expected ${expected.stateKey}, got ${stateKey}`);
-          if (expected.townFromKey && townFromKey !== expected.townFromKey) mismatches.push(`townFromKey: expected ${expected.townFromKey}, got ${townFromKey}`);
+          // With PARTITION_PRICE=0 rows from several states/programs can be
+          // present. Require at least one row with the requested state/town,
+          // not necessarily the first row — otherwise a stale leading row
+          // rejects an otherwise valid result set.
+          if (expected.stateKey) {
+            const hasState = rows.some((row) => row.className.match(/stateKey-(\d+)/)?.[1] === expected.stateKey);
+            if (!hasState) mismatches.push(`stateKey: expected ${expected.stateKey}, got ${stateKey}`);
+          }
+          if (expected.townFromKey) {
+            const hasTown = rows.some((row) => row.className.match(/townFromKey-(\d+)/)?.[1] === expected.townFromKey);
+            if (!hasTown) mismatches.push(`townFromKey: expected ${expected.townFromKey}, got ${townFromKey}`);
+          }
           // tourKey: check if ANY row has the expected tour (soft check — with PARTITION_PRICE=0 other tours may be first)
           if (expected.tourKey) {
             const hasTour = rows.some((r) => {
@@ -2785,7 +2817,10 @@ if (query.nightsTo !== undefined && query.nightsTo !== null) url = /NIGHTS_TILL=
           if (!opt) return false;
           sel.value = value;
           sel.dispatchEvent(new Event("change", { bubbles: true }));
-          return true;
+          // The SAMO form can re-render dependent selects synchronously. Report
+          // whether the requested value survived that re-render; callers that
+          // need a hard guarantee verify it again after the wait.
+          return sel.value === value;
         },
         { name, value },
       );
