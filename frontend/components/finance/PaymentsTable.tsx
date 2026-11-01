@@ -28,6 +28,7 @@ import { t, LOCALE_TAGS, type Locale } from "@/lib/i18n";
 import { fmtDate } from "@/lib/temporal-display";
 import { useCan } from "@/lib/use-can";
 import { confirmPayment, cancelPayment } from "@/lib/payments";
+import { financeCenterApi } from "@/lib/finance-center-api";
 
 // ── Row model ───────────────────────────────────────────────────────────────
 
@@ -194,6 +195,7 @@ export default function PaymentsTable({
 }: PaymentsTableProps) {
   // Статусные действия — только finance.payment.manage (ADMIN/FINANCE).
   const canManage = useCan("finance.payment.manage");
+  const canManageSupplier = useCan("finance.supplier_payout.manage");
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<{ id: string; detail: string } | null>(null);
 
@@ -201,7 +203,9 @@ export default function PaymentsTable({
     setActionBusyId(row.id);
     setActionError(null);
     try {
-      if (action === "confirm") await confirmPayment(row.code);
+      if (row.kind === "SUPPLIER" || row.kind === "SUPPLIER_REFUND") {
+        await financeCenterApi.confirmSupplierPayment(row.code);
+      } else if (action === "confirm") await confirmPayment(row.code);
       else await cancelPayment(row.code);
       onActionCompleted?.();
     } catch (e) {
@@ -309,30 +313,41 @@ export default function PaymentsTable({
                 )}
                 <td className="px-4 py-2.5 align-top">
                   <StatusBadge status={row.status} label={statusLabel(row.status, locale)} />
-                  {!ledger || row.kind === "CLIENT" ? (
-                    canManage && row.status === "PENDING" && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        <button
-                          type="button"
-                          data-testid="payment-confirm-button"
-                          disabled={actionBusyId !== null}
-                          onClick={() => void runAction(row, "confirm")}
-                          className="rounded border border-emerald-600 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
-                        >
-                          {t("payments.action.confirm", locale)}
-                        </button>
-                        <button
-                          type="button"
-                          data-testid="payment-cancel-button"
-                          disabled={actionBusyId !== null}
-                          onClick={() => void runAction(row, "cancel")}
-                          className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
-                        >
-                          {t("payments.action.cancel", locale)}
-                        </button>
-                      </div>
-                    )
-                  ) : null}
+                  {(!ledger || row.kind === "CLIENT") && canManage && row.status === "PENDING" && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      <button
+                        type="button"
+                        data-testid="payment-confirm-button"
+                        disabled={actionBusyId !== null}
+                        onClick={() => void runAction(row, "confirm")}
+                        className="rounded border border-emerald-600 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                      >
+                        {t("payments.action.confirm", locale)}
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="payment-cancel-button"
+                        disabled={actionBusyId !== null}
+                        onClick={() => void runAction(row, "cancel")}
+                        className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        {t("payments.action.cancel", locale)}
+                      </button>
+                    </div>
+                  )}
+                  {(row.kind === "SUPPLIER" || row.kind === "SUPPLIER_REFUND") && canManageSupplier && row.status === "PENDING" && (
+                    <div className="mt-1.5">
+                      <button
+                        type="button"
+                        data-testid="supplier-payment-confirm-button"
+                        disabled={actionBusyId !== null}
+                        onClick={() => void runAction(row, "confirm")}
+                        className="rounded border border-emerald-600 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                      >
+                        Подтвердить оплату
+                      </button>
+                    </div>
+                  )}
                   {actionError?.id === row.id && (
                     <div
                       className="mt-1 text-[10px] text-red-500"

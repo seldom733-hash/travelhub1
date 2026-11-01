@@ -37,6 +37,7 @@ export default function CreateSupplierPaymentForm({
 }) {
   const locale = useLocale();
   const [obligations, setObligations] = useState<SupplierObligation[]>([]);
+  const [payments, setPayments] = useState<Array<{ aznAmount: string; status: string; direction?: string }>>([]);
   const [suppliers, setSuppliers] = useState<FxSupplier[]>([]);
   const [supplierCode, setSupplierCode] = useState("");
   const [direction, setDirection] = useState<"EXPENSE" | "INCOME">("EXPENSE");
@@ -78,6 +79,9 @@ export default function CreateSupplierPaymentForm({
         setObligations([]);
         setAmount(Number(fallbackCost ?? 0).toFixed(2));
       });
+    financeCenterApi.listSupplierPayments({ orderId, pageSize: 100 })
+      .then((result) => { if (alive) setPayments(result.items); })
+      .catch(() => { if (alive) setPayments([]); });
     return () => { alive = false; };
   }, [orderId, bookingId, fallbackCost]);
 
@@ -89,10 +93,14 @@ export default function CreateSupplierPaymentForm({
   const cost = obligations.length > 0
     ? obligations.reduce((sum, item) => sum + Number(item.aznAmount ?? 0), 0)
     : Number(fallbackCost ?? 0);
-  const paid = obligations.reduce((sum, item) => sum + Number(item.paidAmount ?? 0), 0);
-  const remaining = obligations.length > 0
-    ? obligations.reduce((sum, item) => sum + Number(item.remainingAmount ?? 0), 0)
-    : Number(fallbackCost ?? 0);
+  const activePayments = payments.filter((payment) => !["CANCELLED", "FAILED"].includes(payment.status));
+  const paid = activePayments
+    .filter((payment) => payment.direction !== "INCOMING")
+    .reduce((sum, payment) => sum + Number(payment.aznAmount), 0);
+  const refunded = activePayments
+    .filter((payment) => payment.direction === "INCOMING")
+    .reduce((sum, payment) => sum + Number(payment.aznAmount), 0);
+  const remaining = Math.max(0, cost - paid + refunded);
 
   const amountValue = Number(amount);
   const amountValid =

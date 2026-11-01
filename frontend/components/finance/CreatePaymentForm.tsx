@@ -82,6 +82,7 @@ export default function CreatePaymentForm({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [direction, setDirection] = useState<"INCOME" | "EXPENSE">("INCOME");
   const [refundPayments, setRefundPayments] = useState<Array<{ id: string; code: string; amount: string; status: string }>>([]);
+  const [clientPayments, setClientPayments] = useState<Array<{ id: string; code: string; amount: string; status: string }>>([]);
   const [refundPaymentId, setRefundPaymentId] = useState("");
   const [reason, setReason] = useState("");
   const [initialNote, setInitialNote] = useState("");
@@ -114,6 +115,7 @@ export default function CreatePaymentForm({
     setPaymentMethod("cash");
     setDirection("INCOME");
     setRefundPayments([]);
+    setClientPayments([]);
     setRefundPaymentId("");
     setReason("");
     setInitialNote("");
@@ -167,22 +169,34 @@ export default function CreatePaymentForm({
     };
   }, [open, activeOrderId]);
 
-  // Refund source payments for the EXPENSE direction.
+  // Client payments for the actual paid/income display and refund source.
   useEffect(() => {
-    if (!open || direction !== "EXPENSE" || !activeOrderId) return;
+    if (!open || !activeOrderId) return;
     let alive = true;
     api.get<{ payments?: { payments?: Array<{ id: string; code: string; amount: string; status: string }> } }>(
       `/orders/${activeOrderId}/financial-history`,
     ).then((result) => {
       if (!alive) return;
-      const payments = (result.payments?.payments ?? []).filter((payment) => payment.status === "CAPTURED");
-      setRefundPayments(payments);
-      setRefundPaymentId((current) => current || payments[0]?.id || "");
+      const all = result.payments?.payments ?? [];
+      setClientPayments(all);
+      const captured = all.filter((payment) => payment.status === "CAPTURED");
+      setRefundPayments(captured);
+      setRefundPaymentId((current) => current || captured[0]?.id || "");
     }).catch(() => {
-      if (alive) setRefundPayments([]);
+      if (alive) {
+        setClientPayments([]);
+        setRefundPayments([]);
+      }
     });
     return () => { alive = false; };
-  }, [open, direction, activeOrderId]);
+  }, [open, activeOrderId]);
+
+  const actualPaid = clientPayments
+    .filter((payment) => ["CAPTURED", "PENDING", "AUTHORIZED"].includes(payment.status))
+    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+  const displayedPaid = actualPaid > 0 ? actualPaid : Number(financials?.paidAmount ?? 0);
+  const displayedTotal = Number(financials?.amount ?? 0);
+  const displayedDue = Math.max(0, displayedTotal - displayedPaid);
 
   // Order selector source (только когда заказ не предзадан).
   useEffect(() => {
@@ -221,9 +235,9 @@ export default function CreatePaymentForm({
   // серверского due-guard; без финансового контекста — только формат.
   // Сервер (due-guard) остаётся authority в любом случае.
   const availableForValidation =
-    direction === "EXPENSE" && financials?.paidAmount
-      ? financials.paidAmount
-      : availableToCreate(financials);
+    direction === "EXPENSE"
+      ? displayedPaid.toFixed(2)
+      : displayedDue.toFixed(2);
   // Пустое поле допустимо: amount опционален сервер-side (платёж на весь
   // остаток); блокируем только НЕКОРРЕКТНОЕ непустое значение.
   const amountValid =
@@ -398,13 +412,13 @@ export default function CreatePaymentForm({
                       <div>
                         <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("payments.create.paid", locale)}</dt>
                         <dd className="mt-0.5 text-sm text-emerald-700" data-testid="create-payment-paid">
-                          {fmtMoney(financials.paidAmount, financials.currency, locale)}
+                          {fmtMoney(displayedPaid.toFixed(2), financials.currency, locale)}
                         </dd>
                       </div>
                       <div>
                         <dt className="font-semibold uppercase tracking-wide text-slate-500">{t("payments.create.due", locale)}</dt>
                         <dd className="mt-0.5 text-sm font-semibold text-amber-700" data-testid="create-payment-due">
-                          {fmtMoney(financials.dueAmount, financials.currency, locale)}
+                          {fmtMoney(displayedDue.toFixed(2), financials.currency, locale)}
                         </dd>
                       </div>
                     </dl>
