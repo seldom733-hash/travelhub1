@@ -92,7 +92,7 @@ export default function CreateSupplierPaymentForm({
     reason.trim().length > 0 &&
     reason.trim().length <= 255 &&
     amountValid &&
-    (direction === "INCOME" || Boolean(selected));
+    Boolean(selected);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -251,9 +251,9 @@ export default function CreateSupplierPaymentForm({
               />
             </div>
 
-            {direction === "EXPENSE" && !selected && (
+            {!selected && (
               <p className="text-xs text-rose-600">
-                По этому заказу нет обязательств поставщику с остатком — создать платёж нельзя.
+                По этому заказу нет обязательств поставщику — создать платёж нельзя.
               </p>
             )}
             {error && <p className="text-xs text-rose-600">{error}</p>}
