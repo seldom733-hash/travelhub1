@@ -337,7 +337,18 @@ export default function OrderDetailPage() {
             </EntityFieldGrid>
           </EntitySectionCard>
 
-          {/* SECONDARY: Finance — D7 backend-authoritative */}
+          {/* SECONDARY: Finance — shown on Order only while it has no active Booking */}
+          {order.linkedBooking ? (
+            <EntitySectionCard title={t("bookings.financial", locale)}>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                Заказ перешёл в бронь. Финансы и платежи ведутся в карточке брони{" "}
+                <Link href={`/app/bookings/${order.linkedBooking.id}`} className="font-semibold underline">
+                  {order.linkedBooking.referenceNumber}
+                </Link>
+                .
+              </div>
+            </EntitySectionCard>
+          ) : (
           <EntitySectionCard title={t("bookings.financial", locale)}>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               <EntityFinanceCell label={t("crm.detail.total_amount", locale)} value={formatPrice(order.amount, order.currency, locale)} tone="neutral" />
@@ -352,32 +363,22 @@ export default function OrderDetailPage() {
                 <button
                   type="button"
                   data-testid="order-create-payment-button"
-                  disabled={Boolean(order.linkedBooking)}
                   onClick={() => setCreatePaymentOpen(true)}
-                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
                   Платёж клиента
                 </button>
                 <button
                   type="button"
-                  disabled={Boolean(order.linkedBooking)}
                   onClick={() => setSupplierPaymentOpen(true)}
-                  className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
                 >
                   Платёж поставщику
                 </button>
               </div>
             )}
-            {order.linkedBooking && (
-              <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                Заказ перешёл в бронь. Платежи ведутся в карточке брони{" "}
-                <Link href={`/app/bookings/${order.linkedBooking.id}`} className="font-semibold underline">
-                  {order.linkedBooking.referenceNumber}
-                </Link>
-                .
-              </div>
-            )}
           </EntitySectionCard>
+          )}
 
           {order.items && order.items.length > 0 && (
             <EntitySectionCard title={t("order.items", locale)}>

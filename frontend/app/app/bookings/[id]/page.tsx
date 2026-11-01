@@ -57,6 +57,8 @@ interface BookingDetail {
   createdAt: string;
   updatedAt: string;
   availableActions?: string[];
+  /** Booking was returned to its Order; finance belongs to the Order again. */
+  returnedToOrder?: boolean;
   financialSummary?: FinancialSummaryView | null;
   activePayment?: ActivePaymentView | null;
   passengers?: PassengerRow[];
@@ -352,6 +354,17 @@ export default function BookingDetailPage() {
           </EntitySectionCard>
 
           {/* SECONDARY: Finance — split client and supplier money */}
+          {booking.returnedToOrder ? (
+            <EntitySectionCard title={t("bookings.financial", locale)}>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                Бронирование возвращено в заказ. Финансы и платежи ведутся в карточке заказа{" "}
+                <Link href={`/app/orders/${booking.orderId}`} className="font-semibold underline">
+                  {booking.orderReference ?? booking.orderCode}
+                </Link>
+                .
+              </div>
+            </EntitySectionCard>
+          ) : (
           <EntitySectionCard title={t("bookings.financial", locale)}>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               Оплаты клиента
@@ -410,6 +423,7 @@ export default function BookingDetailPage() {
               </div>
             )}
           </EntitySectionCard>
+          )}
 
           {booking.passengers && booking.passengers.length > 0 && (
             <EntitySectionCard title={t("bookings.passengers", locale)}>

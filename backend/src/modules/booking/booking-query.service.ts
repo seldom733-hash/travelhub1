@@ -140,8 +140,13 @@ export class BookingQueryService {
     }
 
     // Step 1.17: field-level redaction — passenger PII виден только OPERATOR/ADMIN.
+    const returnedToOrder = (await this.prisma.bookingHistory.findFirst({
+      where: { bookingId: booking.id, action: "returned_to_order" },
+      select: { id: true },
+    })) !== null;
     return {
       ...booking,
+      returnedToOrder,
       passengers: redactTravelersPii(booking.passengers ?? [], viewer),
       orderCode: orderDisplay?.referenceNumber ?? null,
       productTitle: productDisplay?.title ?? null,

@@ -1202,7 +1202,12 @@ export class OrderService {
 
     // D5 §12: связанная бронь — exactly linked Booking для этого Order (V1: 1:1).
     const linkedBooking = await this.prisma.booking.findFirst({
-      where: { orderId: order.id },
+      where: {
+        orderId: order.id,
+        // A booking returned to the order must not keep the finance block
+        // hidden on the order page.
+        status: { notIn: ["CANCELLED", "SUPPLIER_REJECTED"] },
+      },
       select: { id: true, referenceNumber: true, status: true, code: true },
       orderBy: { createdAt: "asc" },
     });
