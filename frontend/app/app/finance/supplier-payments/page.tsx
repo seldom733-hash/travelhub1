@@ -25,6 +25,7 @@ import {
   type FinanceOverview,
   type SupplierPayment,
   type SupplierPaymentDocument,
+  type SupplierObligation,
   type CreateSupplierPaymentInput,
 } from "@/lib/finance-center-api";
 
@@ -84,6 +85,8 @@ export default function SupplierPaymentsPage() {
     comment: "",
   });
   const [allocationDraft, setAllocationDraft] = useState({ obligationCode: "", amount: "", aznAmount: "" });
+  const [payableObligations, setPayableObligations] = useState<SupplierObligation[]>([]);
+  const [obligationsLoading, setObligationsLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
@@ -129,6 +132,21 @@ export default function SupplierPaymentsPage() {
   useEffect(() => {
     financeFxApi.suppliers().then(setSuppliers).catch(() => setSuppliers([]));
   }, []);
+
+  useEffect(() => {
+    if (!showCreate) return;
+    setObligationsLoading(true);
+    financeCenterApi.listObligations({ page: 1, pageSize: 200 })
+      .then((result) => {
+        setPayableObligations(
+          result.items.filter(
+            (o) => !["CLOSED", "CANCELLED"].includes(o.status) && Number(o.remainingAmount ?? 0) > 0,
+          ),
+        );
+      })
+      .catch(() => setPayableObligations([]))
+      .finally(() => setObligationsLoading(false));
+  }, [showCreate]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -451,6 +469,22 @@ export default function SupplierPaymentsPage() {
               {t("finance.supplier_payments.allocate_now", locale)}
             </p>
             <div className="grid gap-2 sm:grid-cols-3">
+              <label className="text-xs text-slate-600 sm:col-span-3">
+                <span className="mb-1 block font-medium">{t("finance.supplier_payments.field.order_booking", locale)}</span>
+                <select
+                  value={allocationDraft.obligationCode}
+                  onChange={(e) => setAllocationDraft({ ...allocationDraft, obligationCode: e.target.value })}
+                  className="w-full rounded-lg border border-line px-3 py-2 text-sm"
+                >
+                  <option value="">{t("finance.supplier_payments.field.order_booking_hint", locale)}</option>
+                  {payableObligations.map((o) => (
+                    <option key={o.id} value={o.code}>
+                      {o.orderCode ?? o.orderId} · {o.bookingCode ?? o.bookingId} · {o.supplierCode ?? "—"} · остаток {formatPrice(o.remainingAmount ?? "0", "AZN", locale) ?? "—"}
+                    </option>
+                  ))}
+                </select>
+                {obligationsLoading && <span className="mt-1 block text-[11px] text-slate-400">Загрузка заказов…</span>}
+              </label>
               <input
                 value={allocationDraft.obligationCode}
                 onChange={(e) => setAllocationDraft({ ...allocationDraft, obligationCode: e.target.value })}

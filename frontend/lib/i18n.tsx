@@ -1335,6 +1335,8 @@ export const DICT: Record<string, Record<Locale, string>> = {
   "finance.supplier_payments.field.status": { ru: "Статус", az: "Status", en: "Status" },
   "finance.supplier_payments.field.occurred": { ru: "Дата платежа", az: "Ödəniş tarixi", en: "Payment date" },
   "finance.supplier_payments.field.obligation": { ru: "Обязательство (SBO-…)", az: "Öhdəlik (SBO-…)", en: "Obligation (SBO-…)" },
+  "finance.supplier_payments.field.order_booking": { ru: "Заказ / бронь клиента", az: "Müştəri sifarişi / bronu", en: "Client order / booking" },
+  "finance.supplier_payments.field.order_booking_hint": { ru: "Выберите заказ или бронь, которую оплачиваем поставщику", az: "Təchizatçıya ödənilən sifarişi və ya bronu seçin", en: "Select the client order or booking being paid to the supplier" },
   "finance.supplier_payments.field.allocation_amount": { ru: "Сумма распределения", az: "Bölgü məbləği", en: "Allocation amount" },
   "finance.supplier_payments.field.allocation_azn": { ru: "AZN распределения (если нужен)", az: "Bölgünün AZN-i (lazım olduqda)", en: "Allocation AZN (if needed)" },
   "finance.supplier_payments.col.date": { ru: "Дата", az: "Tarix", en: "Date" },
