@@ -8,6 +8,7 @@ import { IdsService } from "../../../shared/ids.service";
 import { SupplierCatalogSource } from "./supplier-catalog.source";
 import { SupplierAdapterRegistry } from "../adapter/supplier-adapter.registry";
 import { HotelPhotoSyncService } from "../../catalog/hotel/hotel-photo-sync.service";
+import { KOMPAS_HOTEL_STATEINC_TO_ISO } from "../kompas/kompas-hotel-countries";
 import type {
   CatalogCapability,
   CatalogItemAction,
@@ -98,7 +99,20 @@ export class SupplierCatalogService implements OnModuleInit {
     const discovered = await this.prisma.supplierCatalogCountry.findMany({
       orderBy: { countryLabel: "asc" },
     });
+    const inactive = new Set(
+      discovered
+        .filter((row) => !row.isActive)
+        .map((row) => `${row.supplierCode}\u0000${row.serviceType}\u0000${row.countryKey}`),
+    );
+    // Remove countries explicitly marked absent by the latest refresh.
+    for (const cap of caps) {
+      cap.countries = cap.countries.filter(
+        (country) =>
+          !inactive.has(`${cap.supplierCode}\u0000${cap.serviceTypes[0]}\u0000${country.key}`),
+      );
+    }
     for (const row of discovered) {
+      if (!row.isActive) continue;
       let cap = caps.find((c) => c.supplierCode === row.supplierCode && c.serviceTypes.includes(row.serviceType as CatalogServiceType));
       if (!cap) {
         cap = {
@@ -176,18 +190,37 @@ export class SupplierCatalogService implements OnModuleInit {
     for (const country of raw) {
       const name = country.countryName?.trim();
       if (!name) { skipped += 1; continue; }
-      const iso = /^[A-Za-z]{2}$/.test(country.countryId ?? "")
-        ? country.countryId!.toUpperCase()
-        : byName.get(this.normalizeCountry(name));
+      // KOMPAS returns its native numeric STATEINC as countryId. Resolve it
+      // through the supplier dictionary before falling back to a name match;
+      // otherwise Zanzibar/Seychelles are reported as "skipped" and a refresh
+      // would incorrectly remove valid countries.
+      const nativeId = country.countryId?.trim() ?? "";
+      const iso = /^[A-Za-z]{2}$/.test(nativeId)
+        ? nativeId.toUpperCase()
+        : input.supplierCode === "KOMPAS" && /^\d+$/.test(nativeId)
+          ? KOMPAS_HOTEL_STATEINC_TO_ISO[nativeId] ?? byName.get(this.normalizeCountry(name))
+          : byName.get(this.normalizeCountry(name));
       if (!iso) { skipped += 1; continue; }
       resolved.set(iso, name);
     }
 
     const existing = await this.prisma.supplierCatalogCountry.findMany({
       where: { supplierCode: input.supplierCode, serviceType: input.serviceType },
-      select: { countryKey: true },
+      select: { countryKey: true, countryLabel: true },
     });
     const known = new Set(existing.map((row) => row.countryKey));
+    const caps = await this.source.capabilities();
+    const staticCountries =
+      caps.find(
+        (cap) =>
+          cap.supplierCode === input.supplierCode &&
+          cap.serviceTypes.includes(input.serviceType),
+      )?.countries ?? [];
+    const staticKeys = new Set(staticCountries.map((country) => country.key));
+    const labels = new Map<string, string>();
+    for (const country of staticCountries) labels.set(country.key, country.label);
+    for (const row of existing) labels.set(row.countryKey, row.countryLabel);
+
     for (const [key, label] of resolved) {
       await this.prisma.supplierCatalogCountry.upsert({
         where: {
@@ -197,10 +230,33 @@ export class SupplierCatalogService implements OnModuleInit {
             countryKey: key,
           },
         },
-        create: { supplierCode: input.supplierCode, serviceType: input.serviceType, countryKey: key, countryLabel: label, source: "DISCOVERED" },
-        update: { countryLabel: label, lastSeenAt: new Date() },
+        create: { supplierCode: input.supplierCode, serviceType: input.serviceType, countryKey: key, countryLabel: label, source: "DISCOVERED", isActive: true },
+        update: { countryLabel: label, lastSeenAt: new Date(), isActive: true },
       });
     }
+
+    // Refresh is a two-way sync: a country that was in the static dictionary
+    // or a previous discovery but is absent from the live dictionary becomes
+    // an inactive tombstone. It stays in the table for audit but is hidden by
+    // activeCapabilities().
+    const removed: Array<{ key: string; label: string }> = [];
+    for (const key of new Set([...staticKeys, ...known])) {
+      if (resolved.has(key)) continue;
+      const label = labels.get(key) ?? key;
+      await this.prisma.supplierCatalogCountry.upsert({
+        where: {
+          supplierCode_serviceType_countryKey: {
+            supplierCode: input.supplierCode,
+            serviceType: input.serviceType,
+            countryKey: key,
+          },
+        },
+        create: { supplierCode: input.supplierCode, serviceType: input.serviceType, countryKey: key, countryLabel: label, source: "REMOVED", isActive: false },
+        update: { countryLabel: label, lastSeenAt: new Date(), isActive: false },
+      });
+      removed.push({ key, label });
+    }
+
     await this.prisma.auditLog.create({
       data: {
         userId: actor.id,
@@ -208,13 +264,14 @@ export class SupplierCatalogService implements OnModuleInit {
         action: "supplier_catalog.countries_discovered",
         resource: "SupplierCatalogCountry",
         resourceId: `${input.supplierCode}:${input.serviceType}`,
-        details: { discovered: resolved.size, skipped } as Prisma.InputJsonValue,
+        details: { discovered: resolved.size, skipped, removed: removed.length } as Prisma.InputJsonValue,
       },
     }).catch(() => undefined);
     return {
       discovered: [...resolved.keys()].filter((key) => !known.has(key)).length,
       skipped,
       countries: [...resolved.entries()].map(([key, label]) => ({ key, label })),
+      removed,
     };
   }
 

@@ -212,7 +212,18 @@ export class KompasSupplierAdapter implements SupplierAdapter, OnModuleDestroy {
 
       // §7: Set TOWNFROMINC to Baku
       await this.setSamoSelect(page, "TOWNFROMINC", BAKU_TOWNFROMINC);
-      await page.waitForTimeout(500);
+      // STATEINC is populated asynchronously by SAMO after the departure town
+      // changes. Waiting a fixed 500ms captured only the initial 3-country
+      // default and made the country refresh delete valid countries.
+      await page.waitForTimeout(1_500);
+      try {
+        await page.waitForFunction(
+          () => document.querySelectorAll("select[name=STATEINC] option").length > 5,
+          { timeout: 10_000 },
+        );
+      } catch {
+        this.logger.warn("KOMPAS discover: STATEINC options did not expand after selecting Baku");
+      }
 
       // Get all country options
       const countries = await page.evaluate(() => {

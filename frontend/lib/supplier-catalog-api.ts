@@ -70,10 +70,12 @@ export const supplierCatalogApi = {
   preview: (input: { supplierCode: string; serviceType: SupplierCatalogRunServiceType; countryKey: string }) =>
     api.post<SupplierCatalogRun>("/supplier/catalog/runs/preview", input),
   discoverCountries: (input: { supplierCode: string; serviceType: SupplierCatalogServiceType }) =>
-    api.post<{ discovered: number; skipped: number; countries: Array<{ key: string; label: string }> }>(
-      "/supplier/catalog/countries/discover",
-      input,
-    ),
+    api.post<{
+      discovered: number;
+      skipped: number;
+      countries: Array<{ key: string; label: string }>;
+      removed?: Array<{ key: string; label: string }>;
+    }>("/supplier/catalog/countries/discover", input),
   confirm: (id: string) => api.post<SupplierCatalogRun>(`/supplier/catalog/runs/${encodeURIComponent(id)}/confirm`),
   cancel: (id: string) => api.post<SupplierCatalogRun>(`/supplier/catalog/runs/${encodeURIComponent(id)}/cancel`),
   manualRestore: (runId: string, itemId: string) =>

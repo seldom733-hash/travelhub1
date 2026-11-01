@@ -59,6 +59,7 @@ type DiscoveryReport = {
   skipped: number;
   countries: Array<{ key: string; label: string }>;
   added: string[];
+  removed: Array<{ key: string; label: string }>;
   at: string;
 };
 
@@ -141,11 +142,12 @@ export default function SupplierUpdatesPage() {
         skipped: result.skipped,
         countries: result.countries,
         added,
+        removed: result.removed ?? [],
         at: new Date().toISOString(),
       });
       setNotice(
-        result.discovered > 0
-          ? `Список стран обновлён: добавлено ${result.discovered}, распознано ${result.countries.length}.`
+        result.discovered > 0 || (result.removed?.length ?? 0) > 0
+          ? `Список стран обновлён: добавлено ${result.discovered}, удалено ${result.removed?.length ?? 0}, распознано ${result.countries.length}.`
           : `Список стран проверен: новых нет, распознано ${result.countries.length}, пропущено ${result.skipped}.`,
       );
     } catch (e) {
@@ -352,7 +354,7 @@ export default function SupplierUpdatesPage() {
                 </button>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
                   <div className="text-[10px] uppercase tracking-wide text-emerald-700">Новых</div>
                   <div className="text-xl font-semibold text-emerald-800">{discoveryReport.discovered}</div>
@@ -365,7 +367,20 @@ export default function SupplierUpdatesPage() {
                   <div className="text-[10px] uppercase tracking-wide text-amber-700">Пропущено</div>
                   <div className="text-xl font-semibold text-amber-800">{discoveryReport.skipped}</div>
                 </div>
+                <div className="rounded-lg border border-rose-100 bg-rose-50 px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-rose-700">Удалено</div>
+                  <div className="text-xl font-semibold text-rose-800">{discoveryReport.removed.length}</div>
+                </div>
               </div>
+
+              {discoveryReport.removed.length > 0 && (
+                <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                  <div className="font-semibold">Убраны из списка — больше нет в справочнике поставщика:</div>
+                  <div className="mt-1">
+                    {discoveryReport.removed.map((country) => `${country.key} ${country.label}`).join(" · ")}
+                  </div>
+                </div>
+              )}
 
               {discoveryReport.countries.length === 0 ? (
                 <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
