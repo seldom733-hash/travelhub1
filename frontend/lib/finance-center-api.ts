@@ -212,6 +212,7 @@ export interface CreateSupplierPaymentInput {
   supplierCode?: string;
   direction?: "OUTGOING" | "INCOMING";
   orderId?: string;
+  bookingId?: string;
   amount: string;
   currency: string;
   aznAmount?: string;

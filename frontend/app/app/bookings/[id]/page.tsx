@@ -207,7 +207,7 @@ export default function BookingDetailPage() {
   useEffect(() => {
     if (!booking?.orderId) return;
     let cancelled = false;
-    financeCenterApi.listSupplierPayments({ orderId: booking.orderId, bookingId: booking.id, pageSize: 100 })
+    financeCenterApi.listSupplierPayments({ orderId: booking.orderId, pageSize: 100 })
       .then((result) => { if (!cancelled) setSupplierPayments(result.items); })
       .catch(() => { if (!cancelled) setSupplierPayments([]); });
     return () => { cancelled = true; };

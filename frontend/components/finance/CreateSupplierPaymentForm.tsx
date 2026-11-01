@@ -117,6 +117,7 @@ export default function CreateSupplierPaymentForm({
         supplierCode: supplierCode || selected?.supplierCode || undefined,
         direction: direction === "INCOME" ? "INCOMING" : "OUTGOING",
         orderId,
+        bookingId,
         amount,
         currency: "AZN",
         method: paymentMethod,

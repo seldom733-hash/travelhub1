@@ -513,6 +513,11 @@ export class CreateSupplierPaymentDto {
   @MaxLength(64)
   orderId?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  bookingId?: string;
+
   @IsString()
   @Matches(DECIMAL_RE)
   @MaxLength(32)

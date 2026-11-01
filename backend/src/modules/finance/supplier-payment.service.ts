@@ -57,6 +57,7 @@ export interface CreateSupplierPaymentInput {
   direction?: "OUTGOING" | "INCOMING";
   /** Required for INCOMING when there are no allocations. */
   orderId?: string | null;
+  bookingId?: string | null;
   amount: string;
   currency: string;
   aznAmount?: string;
@@ -208,7 +209,7 @@ export class SupplierPaymentService {
       paymentCurrency: currency,
       paymentAzn: aznAmount,
     }, "create");
-    const payoutContext = await this.resolvePayoutContext(allocations, input.orderId ?? null);
+    const payoutContext = await this.resolvePayoutContext(allocations, input.orderId ?? null, input.bookingId ?? null);
     const direction = input.direction === "INCOMING" ? "INCOMING" : "OUTGOING";
     if (direction === "INCOMING" && !payoutContext.orderId) {
       throw new ValidationDomainError("INCOMING supplier refund requires an orderId");
@@ -766,6 +767,7 @@ export class SupplierPaymentService {
   private async resolvePayoutContext(
     allocations: Array<{ orderId: string | null; bookingId: string | null }>,
     explicitOrderId: string | null = null,
+    explicitBookingId: string | null = null,
   ): Promise<{
     orderId: string | null;
     orderCode: string | null;
@@ -788,7 +790,7 @@ export class SupplierPaymentService {
     if (!order) throw new NotFoundError(`Order ${orderId} not found`);
 
     const bookingIds = [...new Set(allocations.map((a) => a.bookingId).filter((id): id is string => Boolean(id)))];
-    const bookingId = bookingIds.length === 1 ? bookingIds[0] : null;
+    const bookingId = bookingIds[0] ?? explicitBookingId;
     const booking = bookingId
       ? await this.prisma.booking.findUnique({
           where: { id: bookingId },
